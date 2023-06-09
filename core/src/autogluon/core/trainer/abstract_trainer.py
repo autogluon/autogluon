@@ -14,6 +14,7 @@ from pathlib import Path
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.log_utils import convert_time_in_s_to_log_friendly
+from autogluon.common.utils.path_converter import PathConverter
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_torch
 
@@ -52,6 +53,7 @@ class AbstractTrainer:
                  num_classes=None, quantile_levels=None, low_memory=False, feature_metadata=None, k_fold=0, n_repeats=1,
                  sample_weight=None, weight_evaluation=False, save_data=False, random_state=0, verbosity=2):
         self.path = path
+        self.path = PathConverter.to_relative(self.path)
         self.problem_type = problem_type
         self.feature_metadata = feature_metadata
         self.save_data = save_data
@@ -233,8 +235,10 @@ class AbstractTrainer:
             self.set_model_attribute(model=model, attribute='path', val=path)
 
     def create_contexts(self, path_context: str) -> (str, dict):
+        self.path = PathConverter.to_current(self.path)
         path = path_context
         model_paths = self.get_models_attribute_dict(attribute='path')
+        model_paths = {model: PathConverter.to_current(model_path) for model, model_path in model_paths.items()}
         for model, prev_path in model_paths.items():
             prev_path = os.path.abspath(prev_path) + os.path.sep
             abs_path = os.path.abspath(self.path) + os.path.sep
@@ -437,11 +441,30 @@ class AbstractTrainer:
                                                   infer_limit=infer_limit, infer_limit_batch_size=infer_limit_batch_size, **aux_kwargs)
         return core_models, aux_models
 
-    def stack_new_level_core(self, X, y, models: Union[List[AbstractModel], dict], X_val=None, y_val=None, X_unlabeled=None,
-                             level=1, base_model_names: List[str] = None, stack_name='core',
-                             ag_args=None, ag_args_fit=None, ag_args_ensemble=None, excluded_model_types=None, ensemble_type=StackerEnsembleModel,
-                             name_suffix: str = None, get_models_func=None, refit_full=False,
-                             infer_limit=None, infer_limit_batch_size=None, **kwargs) -> List[str]:
+    def stack_new_level_core(
+        self,
+        X,
+        y,
+        models: Union[List[AbstractModel], dict],
+        X_val=None,
+        y_val=None,
+        X_unlabeled=None,
+        level=1,
+        base_model_names: List[str] = None,
+        stack_name='core',
+        ag_args=None,
+        ag_args_fit=None,
+        ag_args_ensemble=None,
+        included_model_types=None,
+        excluded_model_types=None,
+        ensemble_type=StackerEnsembleModel,
+        name_suffix: str = None,
+        get_models_func=None,
+        refit_full=False,
+        infer_limit=None,
+        infer_limit_batch_size=None,
+        **kwargs
+    ) -> List[str]:
         """
         Trains all models using the data provided.
         If level > 1, then the models will use base model predictions as additional features.
@@ -469,6 +492,7 @@ class AbstractTrainer:
                 name_suffix=name_suffix,
                 ag_args=ag_args,
                 ag_args_fit=ag_args_fit,
+                included_model_types=included_model_types,
                 excluded_model_types=excluded_model_types,
             )
 
@@ -2820,7 +2844,7 @@ class AbstractTrainer:
             name_suffix = name_suffix + "_" + models_name_suffix
 
         if hyperparameters is None:
-            hyperparameters = {'GBM': {}, 'CAT': {}, 'NN_MXNET': {},  'NN_TORCH': {}, 'RF': {}}
+            hyperparameters = {'GBM': {}, 'CAT': {}, 'NN_TORCH': {}, 'RF': {}}
         hyperparameters = self._process_hyperparameters(hyperparameters=hyperparameters)  # TODO: consider exposing ag_args_fit, excluded_model_types as distill() arguments.
         if teacher_preds is not None and teacher_preds != 'hard' and self.problem_type != REGRESSION:
             self._regress_preds_asprobas = True

@@ -11,6 +11,7 @@ import pandas as pd
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.features.types import R_FLOAT, S_STACK
+from autogluon.common.utils.path_converter import PathConverter
 
 from .bagged_ensemble_model import BaggedEnsembleModel
 from ..abstract.abstract_model import AbstractModel
@@ -52,6 +53,12 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         self.base_model_names = base_model_names
         self.base_models_dict: Dict[str, AbstractModel] = base_models_dict  # String name -> Model objects
         self.base_model_paths_dict = base_model_paths_dict
+
+        # FIXME: DO NOT DO THIS, FIX ASAP
+        self.base_model_paths_dict = {
+            k: PathConverter.to_relative(v) for k, v in self.base_model_paths_dict.items()
+        }
+
         self.base_model_types_dict = base_model_types_dict
 
         # TODO: Consider deleting these variables after initialization
@@ -155,7 +162,10 @@ class StackerEnsembleModel(BaggedEnsembleModel):
 
     def set_contexts(self, path_context):
         path_root_orig = self.path_root
+        path_root_orig = PathConverter.to_current(path_root_orig)
+        self.path_root = path_root_orig
         abs_path_root_orig = os.path.abspath(path_root_orig) + os.path.sep
+        self.base_model_paths_dict = {model: PathConverter.to_current(model_path) for model, model_path in self.base_model_paths_dict.items()}
         super().set_contexts(path_context=path_context)
         for model, model_path in self.base_model_paths_dict.items():
             model_path = os.path.abspath(model_path) + os.path.sep

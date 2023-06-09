@@ -15,7 +15,7 @@ When filing an issue, please check [existing open](https://github.com/autogluon/
 reported the issue. Please try to include as much information as you can. Details like these are incredibly useful:
 
 * A reproducible test case or series of steps
-* The version of AutoGluon being used, the version of MXNet
+* The version of AutoGluon being used, the version of pytorch
 * Any modifications you've made relevant to the bug
 * Anything unusual about your environment or deployment
 
@@ -57,18 +57,20 @@ Be sure to select the *Source* option from the installation preferences.
 
 - After you have edited the code, ensure your changes pass the unit tests via:
 ```
-cd core/
+cd common/
 pytest
-cd ../tabular/
-pytest
-cd ../mxnet/
-pytest
-cd ../extra/
-pytest
-cd ../text/
+cd ../core/
 pytest
 cd ../features/
 pytest
+cd ../tabular/
+pytest
+cd ../multimodal/
+pytest
+cd ../timeseries/
+pytest
+cd ../eda/
+isort src tests && black src tests && tox -e lint,format,typecheck,testenv
 ```
 
 - We encourage you to add your own unit tests, but please ensure they run quickly (unit tests should train models on small data-subsample with the lowest values of training iterations and time-limits that suffice to evaluate the intended functionality). You can run a specific unit test within a specific file like this:

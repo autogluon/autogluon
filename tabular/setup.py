@@ -34,6 +34,7 @@ extras_require = {
         'lightgbm>=3.3,<3.4',
     ],
     'catboost': [
+        # catboost>=1.2 no longer has macosx 10.x wheels available, which are needed for Github CI on older Python versions
         # https://github.com/autogluon/autogluon/pull/3190#issuecomment-1540599280
         'catboost>=1.1,<1.2 ; python_version <= "3.8" and sys_platform == "darwin"',
         'catboost>=1.1,<1.3',
@@ -53,7 +54,7 @@ extras_require = {
     ],
     'skex': [
         # Note: 2021.7 released on Sep 2022, version 2022.x doesn't exist (went directly from 2021.7 to 2023.0)
-        'scikit-learn-intelex>=2021.7,<2023.1',
+        'scikit-learn-intelex>=2021.7,<2023.2',
     ],
     'imodels': [
         'imodels>=1.3.10,<1.4.0',  # 1.3.8/1.3.9 either remove/renamed attribute `complexity_` causing failures. https://github.com/csinva/imodels/issues/147

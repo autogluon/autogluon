@@ -12,6 +12,8 @@ import PIL
 
 from ..constants import (
     AUTOMM,
+    BBOX,
+    LABEL,
     MAP,
     MAP_50,
     MAP_75,
@@ -855,17 +857,18 @@ class COCODataset:
 
         for i, row in data.reset_index(drop=True).iterrows():
             image_id = self.get_image_id_from_path(row["image"])
-            for j, res in enumerate(ret[i]):
-                category_id = self.category_ids[j]
-                for bbox in res:
-                    coco_format_result.append(
-                        {
-                            "image_id": image_id,
-                            "category_id": category_id,
-                            "bbox": bbox_xyxy_to_xywh(bbox[:4].astype(float).tolist()),
-                            "score": float(bbox[4]),
-                        }
-                    )
+
+            pred_result = ret[i]
+            N_pred = len(pred_result["bboxes"])
+            for bbox_idx in range(N_pred):
+                coco_format_result.append(
+                    {
+                        "image_id": image_id,
+                        "category_id": self.category_ids[int(pred_result["labels"][bbox_idx].item())],
+                        "bbox": bbox_xyxy_to_xywh(pred_result["bboxes"][bbox_idx].tolist()),
+                        "score": pred_result["scores"][bbox_idx].item(),
+                    }
+                )
 
         with open(save_path, "w") as f:
             print(f"saving file at {save_path}")
@@ -893,31 +896,19 @@ def cocoeval_torchmetrics(outputs: List):
 
     preds = []
     target = []
-    for img_idx, img_output in enumerate(outputs):  # TODO: refactor here
-        img_result = img_output["bbox"]
-        boxes = []
-        scores = []
-        labels = []
-        for category_idx, category_result in enumerate(img_result):
-            for item_idx, item_result in enumerate(category_result):
-                boxes.append(item_result[:4])
-                scores.append(float(item_result[4]))
-                labels.append(category_idx)
+    for per_img_outputs in outputs:  # TODO: refactor here
         preds.append(
             dict(
-                boxes=torch.tensor(np.array(boxes).astype(float)).float().to("cpu"),
-                scores=torch.tensor(scores).float().to("cpu"),
-                labels=torch.tensor(labels).long().to("cpu"),
+                boxes=per_img_outputs[BBOX]["bboxes"].to("cpu"),
+                scores=per_img_outputs[BBOX]["scores"].to("cpu"),
+                labels=per_img_outputs[BBOX]["labels"].to("cpu"),
             )
         )
 
-        img_gt = np.array(img_output["label"])
-        boxes = img_gt[:, :4]
-        labels = img_gt[:, 4]
         target.append(
             dict(
-                boxes=torch.tensor(boxes).float().to("cpu"),
-                labels=torch.tensor(labels).long().to("cpu"),
+                boxes=per_img_outputs[LABEL]["bboxes"].to("cpu"),
+                labels=per_img_outputs[LABEL]["labels"].to("cpu"),
             )
         )
 
@@ -1529,17 +1520,21 @@ def save_result_df(
 
     for image_pred, image_name in zip(pred, image_names):
         box_info = []
-        for class_idx, bboxes in enumerate(image_pred):
-            pred_class = idx2classname[class_idx]
-
-            for bbox in bboxes:
-                box_info.append({"class": pred_class, "bbox": list(bbox[:4]), "score": bbox[4]})
+        N_preds = len(image_pred["bboxes"])
+        for i in range(N_preds):
+            box_info.append(
+                {
+                    "class": idx2classname[image_pred["labels"][i].item()],
+                    "class_id": image_pred["labels"][i].item(),
+                    "bbox": image_pred["bboxes"][i].tolist(),
+                    "score": image_pred["scores"][i].item(),
+                }
+            )
         results.append([image_name, box_info])
     result_df = pd.DataFrame(results, columns=["image", "bboxes"])
     if result_path:
         result_df.to_csv(result_path, index=False)
         logger.info("Saved detection results to {}".format(result_path))
-        print("Saved detection results to {}".format(result_path))
     return result_df
 
 
@@ -1655,9 +1650,6 @@ def setup_detection_train_tuning_data(predictor, max_num_tuning_data, seed, trai
 def convert_pred_to_xywh(pred: Optional[List]):
     if not pred:
         return pred
-    num_images = len(pred)
-    num_categories = len(pred[0])
-    for i in range(num_images):
-        for j in range(num_categories):
-            pred[i][j][:, :4] = bbox_xyxy_to_xywh(pred[i][j][:, :4])
+    for i, pred_per_image in enumerate(pred):
+        pred[i]["bboxes"] = bbox_xyxy_to_xywh(pred_per_image["bboxes"].detach().numpy())
     return pred

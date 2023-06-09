@@ -5,7 +5,6 @@ import warnings
 import numpy.testing as npt
 import pytest
 from sklearn.model_selection import train_test_split
-from torch import Tensor
 
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.constants import BIT_FIT, IA3, IA3_BIAS, IA3_LORA, LORA_BIAS, LORA_NORM, NORM_FIT
@@ -13,26 +12,6 @@ from autogluon.multimodal.models.timm_image import TimmAutoModelForImagePredicti
 from autogluon.multimodal.utils.misc import shopee_dataset
 
 from ..utils.unittest_datasets import AmazonReviewSentimentCrossLingualDataset, PetFinderDataset
-
-
-def _is_lazy_weight_tensor(p: Tensor) -> bool:
-    from torch.nn.parameter import UninitializedParameter
-
-    if isinstance(p, UninitializedParameter):
-        warnings.warn(
-            "A layer with UninitializedParameter was found. "
-            "Thus, the total number of parameters detected may be inaccurate."
-        )
-        return True
-    return False
-
-
-def total_parameters(model) -> int:
-    return sum(p.numel() if not _is_lazy_weight_tensor(p) else 0 for p in model.parameters())
-
-
-def trainable_parameters(model) -> int:
-    return sum(p.numel() if not _is_lazy_weight_tensor(p) else 0 for p in model.parameters() if p.requires_grad)
 
 
 @pytest.mark.parametrize(
@@ -75,7 +54,7 @@ def test_predictor_gradient_checkpointing(
         time_limit=30,
     )
     predictions = predictor.predict(test_data, as_pandas=False)
-    tunable_ratio = trainable_parameters(predictor._model) / total_parameters(predictor._model)
+    tunable_ratio = predictor.trainable_parameters / predictor.total_parameters
     npt.assert_allclose(tunable_ratio, expected_ratio, 2e-05, 2e-05)
     save_path = save_path + "_new"
     if os.path.isdir(save_path):
@@ -90,7 +69,8 @@ def test_predictor_skip_final_val():
     download_dir = "./"
     save_path = "petfinder_checkpoint"
     train_df, tune_df = shopee_dataset(download_dir=download_dir)
-
+    if os.path.isdir(save_path):
+        shutil.rmtree(save_path)
     predictor = MultiModalPredictor(label="label", path=save_path)
     hyperparameters = {
         "model.names": ["timm_image"],
@@ -105,7 +85,7 @@ def test_predictor_skip_final_val():
         train_data=train_df,
         tuning_data=tune_df,
         hyperparameters=hyperparameters,
-        time_limit=2,
+        time_limit=5,
     )
     predictor_new = MultiModalPredictor.load(path=save_path)
     assert isinstance(predictor_new._model, TimmAutoModelForImagePrediction)

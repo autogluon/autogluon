@@ -126,7 +126,7 @@ def test_mmdet_object_detection_save_and_load():
     # Init predictor
     predictor = MultiModalPredictor(
         hyperparameters={
-            "model.mmdet_image.checkpoint_name": "yolov3_mobilenetv2_320_300e_coco",
+            "model.mmdet_image.checkpoint_name": "yolov3_mobilenetv2_8xb24-320-300e_coco",
             "env.num_gpus": 1,
         },
         problem_type="object_detection",

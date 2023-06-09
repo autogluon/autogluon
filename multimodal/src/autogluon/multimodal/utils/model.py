@@ -1,11 +1,12 @@
 import functools
 import json
 import logging
+import warnings
 from typing import Dict, List, Optional, Tuple, Union
 
 import timm
 from omegaconf import DictConfig, OmegaConf
-from torch import nn
+from torch import Tensor, nn
 
 from ..constants import (
     ALL_MODALITIES,
@@ -556,3 +557,15 @@ def modify_duplicate_model_names(
 
 def list_timm_models(pretrained=True):
     return timm.list_models(pretrained=pretrained)
+
+
+def is_lazy_weight_tensor(p: Tensor) -> bool:
+    from torch.nn.parameter import UninitializedParameter
+
+    if isinstance(p, UninitializedParameter):
+        warnings.warn(
+            "A layer with UninitializedParameter was found. "
+            "Thus, the total number of parameters detected may be inaccurate."
+        )
+        return True
+    return False

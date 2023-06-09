@@ -31,8 +31,8 @@ def download_sample_dataset():
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
-        "yolox_s_8x8_300e_coco",
-        "yolov3_mobilenetv2_320_300e_coco",
+        "yolox_s",
+        "yolov3_mobilenetv2_8xb24-320-300e_coco",
     ],
 )
 def test_mmdet_object_detection_fit_then_evaluate_coco(checkpoint_name):
@@ -67,7 +67,7 @@ def test_mmdet_object_detection_fit_then_evaluate_coco(checkpoint_name):
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
-        "yolov3_mobilenetv2_320_300e_coco",
+        "yolov3_mobilenetv2_8xb24-320-300e_coco",
     ],
 )
 def test_mmdet_object_detection_inference_list_str_dict(checkpoint_name):
@@ -94,7 +94,7 @@ def test_mmdet_object_detection_inference_list_str_dict(checkpoint_name):
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
-        "yolov3_mobilenetv2_320_300e_coco",
+        "yolov3_mobilenetv2_8xb24-320-300e_coco",
     ],
 )
 def test_mmdet_object_detection_inference_xywh_output(checkpoint_name):
@@ -136,7 +136,7 @@ def test_mmdet_object_detection_inference_xywh_output(checkpoint_name):
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
-        "yolov3_mobilenetv2_320_300e_coco",
+        "yolov3_mobilenetv2_8xb24-320-300e_coco",
     ],
 )
 def test_mmdet_object_detection_inference_df(checkpoint_name):
@@ -161,7 +161,7 @@ def test_mmdet_object_detection_inference_df(checkpoint_name):
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
-        "yolov3_mobilenetv2_320_300e_coco",
+        "yolov3_mobilenetv2_8xb24-320-300e_coco",
     ],
 )
 def test_mmdet_object_detection_inference_coco(checkpoint_name):
@@ -183,7 +183,7 @@ def test_mmdet_object_detection_inference_coco(checkpoint_name):
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
-        "yolov3_mobilenetv2_320_300e_coco",
+        "yolov3_mobilenetv2_8xb24-320-300e_coco",
     ],
 )
 def test_mmdet_object_detection_save_and_load(checkpoint_name):
@@ -217,26 +217,8 @@ def test_mmdet_object_detection_save_and_load(checkpoint_name):
 
 @pytest.mark.parametrize(
     "checkpoint_name",
-    ["https://automl-mm-bench.s3.amazonaws.com/object_detection/quick_start/AP50_433.zip"],
-)
-def test_mmdet_object_detection_evaluate_coco(checkpoint_name):
-    data_dir = download_sample_dataset()
-
-    test_path = os.path.join(data_dir, "Annotations", "test_cocoformat.json")
-    # Init predictor
-    zip_file = checkpoint_name
-    download_dir = "./AP50_433"
-    load_zip.unzip(zip_file, unzip_dir=download_dir)
-    predictor = MultiModalPredictor.load("./AP50_433/quick_start_tutorial_temp_save")
-    predictor.set_num_gpus(1)
-
-    pred = predictor.evaluate(test_path)
-
-
-@pytest.mark.parametrize(
-    "checkpoint_name",
     [
-        "yolov3_mobilenetv2_320_300e_coco",
+        "yolov3_mobilenetv2_8xb24-320-300e_coco",
     ],
 )
 def test_mmdet_object_detection_fit_then_inference_dict(checkpoint_name):
@@ -270,7 +252,7 @@ def test_mmdet_object_detection_fit_then_inference_dict(checkpoint_name):
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
-        "yolov3_mobilenetv2_320_300e_coco",
+        "yolov3_mobilenetv2_8xb24-320-300e_coco",
     ],
 )
 def test_mmdet_object_detection_fit_then_inference_df(checkpoint_name):
@@ -306,7 +288,7 @@ def test_mmdet_object_detection_fit_then_inference_df(checkpoint_name):
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
-        "yolov3_mobilenetv2_320_300e_coco",
+        "yolov3_mobilenetv2_8xb24-320-300e_coco",
     ],
 )
 def test_mmdet_object_detection_fit_then_inference_coco(checkpoint_name):
@@ -340,7 +322,7 @@ def test_mmdet_object_detection_fit_then_inference_coco(checkpoint_name):
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
-        "yolov3_mobilenetv2_320_300e_coco",
+        "yolov3_mobilenetv2_8xb24-320-300e_coco",
     ],
 )
 def test_mmdet_object_detection_fit_eval_predict_df(checkpoint_name):
@@ -376,7 +358,7 @@ def test_mmdet_object_detection_fit_eval_predict_df(checkpoint_name):
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
-        "yolov3_mobilenetv2_320_300e_coco",
+        "yolov3_mobilenetv2_8xb24-320-300e_coco",
     ],
 )
 def test_mmdet_object_detection_fit_with_freeze_backbone(checkpoint_name):
@@ -404,3 +386,35 @@ def test_mmdet_object_detection_fit_with_freeze_backbone(checkpoint_name):
         },
         time_limit=30,
     )
+
+
+def test_detector_hyperparameters_consistency():
+    data_dir = download_sample_dataset()
+
+    train_path = os.path.join(data_dir, "Annotations", "trainval_cocoformat.json")
+    train_df = from_coco_or_voc(train_path)
+
+    hyperparameters = {
+        "model.mmdet_image.checkpoint_name": "yolov3_mobilenetv2_8xb24-320-300e_coco",
+        "env.num_gpus": 1,
+    }
+
+    # pass hyperparameters to init()
+    predictor = MultiModalPredictor(
+        problem_type="object_detection",
+        sample_data_path=train_df,
+        hyperparameters=hyperparameters,
+    )
+    predictor.fit(train_df, time_limit=10)
+
+    # pass hyperparameters to fit()
+    predictor_2 = MultiModalPredictor(
+        problem_type="object_detection",
+        sample_data_path=train_df,
+    )
+    predictor_2.fit(
+        train_df,
+        hyperparameters=hyperparameters,
+        time_limit=10,
+    )
+    assert predictor._config == predictor_2._config

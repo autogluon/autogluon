@@ -92,13 +92,12 @@ class TimeSeriesPredictor:
         If True, the predictor will ignore the datetime indexes during both training and testing, and will replace
         the data indexes with dummy timestamps in second frequency. In this case, the forecast output time indexes will
         be arbitrary values, and seasonality will be turned off for local models.
-    learner_type : AbstractLearner, default = TimeSeriesLearner
-        A class which inherits from ``AbstractLearner``. The learner specifies the inner logic of the
-        ``TimeSeriesPredictor``.
-    learner_kwargs : dict, optional
-        Keyword arguments to send to the learner (for advanced users only). Options include ``trainer_type``, a
-        class inheriting from ``AbstractTrainer`` which controls training of multiple models.
-        If ``path`` and ``eval_metric`` are re-specified within ``learner_kwargs``, these are ignored.
+    cache_predictions : bool, default = True
+        If True, the predictor will cache and reuse the predictions made by individual models whenever
+        :meth:`~autogluon.timeseries.TimeSeriesPredictor.predict`, :meth:`~autogluon.timeseries.TimeSeriesPredictor.leaderboard`,
+        or :meth:`~autogluon.timeseries.TimeSeriesPredictor.evaluate` methods are called. This allows to significantly
+        speed up these methods. If False, caching will be disabled. You can set this argument to False to reduce disk
+        usage at the cost of longer prediction times.
     label : str, optional
         Alias for :attr:`target`.
     """
@@ -117,6 +116,7 @@ class TimeSeriesPredictor:
         verbosity: int = 2,
         quantile_levels: Optional[List[float]] = None,
         ignore_time_index: bool = False,
+        cache_predictions: bool = True,
         learner_type: Type[AbstractLearner] = TimeSeriesLearner,
         learner_kwargs: Optional[dict] = None,
         label: Optional[str] = None,
@@ -128,6 +128,7 @@ class TimeSeriesPredictor:
         self.path = setup_outputdir(path)
 
         self.ignore_time_index = ignore_time_index
+        self.cache_predictions = cache_predictions
         if target is not None and label is not None:
             raise ValueError("Both `label` and `target` are specified. Please specify at most one of these arguments.")
         self.target = target or label or "target"
@@ -175,6 +176,7 @@ class TimeSeriesPredictor:
                 prediction_length=self.prediction_length,
                 quantile_levels=self.quantile_levels,
                 ignore_time_index=ignore_time_index,
+                cache_predictions=self.cache_predictions,
             )
         )
         self._learner: AbstractLearner = learner_type(**learner_kwargs)
@@ -360,10 +362,10 @@ class TimeSeriesPredictor:
 
             Available presets:
 
-            - ``"fast_training"``: fit simple "local" statistical models (``ETS``, ``ARIMA``, ``Theta``, ``Naive``, ``SeasonalNaive``). These models are fast to train, but cannot capture more complex patterns in the data.
-            - ``"medium_quality"``: all models mentioned above + tree-based model ``DirectTabular`` + deep learning model ``DeepAR``. Default setting that produces good forecasts with reasonable training time.
-            - ``"high_quality"``: all models mentioned above + hyperparameter optimization for local statistical models + deep learning models ``TemporalFusionTransformerMXNet`` (if MXNet is available) and ``SimpleFeedForward``. Usually more accurate than ``medium_quality``, but takes longer to train.
-            - ``"best_quality"``: all models mentioned above + deep learning model ``TransformerMXNet`` (if MXNet is available) + hyperparameter optimization for deep learning models. Usually better than ``high_quality``, but takes much longer to train.
+            - ``"fast_training"``: fit simple statistical models (``ETS``, ``Theta``, ``Naive``, ``SeasonalNaive``) + fast tree-based model ``RecursiveTabular``. These models are fast to train but may not be very accurate.
+            - ``"medium_quality"``: all models mentioned above + deep learning model ``DeepAR``. Default setting that produces good forecasts with reasonable training time.
+            - ``"high_quality"``: all models mentioned above + automatically tuned statistical models (``AutoETS``, ``AutoARIMA``) + tree-based model ``DirectTabular`` + deep learning models ``TemporalFusionTransformer`` and ``PatchTST`` . Much more accurate than ``medium_quality``, but takes longer to train.
+            - ``"best_quality"``: all models mentioned above + more tabular models + training multiple copies of ``DeepAR``. Usually better than ``high_quality``, but takes even longer to train.
 
             Details for these presets can be found in ``autogluon/timeseries/configs/presets_configs.py``. If not
             provided, user-provided values for ``hyperparameters`` and ``hyperparameter_tune_kwargs`` will be used
@@ -555,6 +557,7 @@ class TimeSeriesPredictor:
         data: Union[TimeSeriesDataFrame, pd.DataFrame],
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         model: Optional[str] = None,
+        use_cache: bool = True,
         random_seed: Optional[int] = 123,
     ) -> TimeSeriesDataFrame:
         """Return quantile and mean forecasts for the given dataset, starting from the end of each time series.
@@ -587,6 +590,9 @@ class TimeSeriesPredictor:
         random_seed : int or None, default = 123
             If provided, fixes the seed of the random number generator for all models. This guarantees reproducible
             results for most models (except those trained on GPU because of the non-determinism of GPU operations).
+        use_cache : bool, default = True
+            If True, will attempt to use the cached predictions. If False, cached predictions will be ignored.
+            This argument is ignored if ``cache_predictions`` was set to False when creating the ``TimeSeriesPredictor``.
 
 
         Examples
@@ -621,7 +627,7 @@ class TimeSeriesPredictor:
         # Don't use data.item_ids in case data is not a TimeSeriesDataFrame
         original_item_id_order = data.reset_index()[ITEMID].unique()
         data = self._check_and_prepare_data_frame(data)
-        predictions = self._learner.predict(data, known_covariates=known_covariates, model=model)
+        predictions = self._learner.predict(data, known_covariates=known_covariates, model=model, use_cache=use_cache)
         return predictions.reindex(original_item_id_order, level=ITEMID)
 
     def evaluate(self, data: Union[TimeSeriesDataFrame, pd.DataFrame], **kwargs):
@@ -650,6 +656,9 @@ class TimeSeriesPredictor:
             (with highest validation score) will be used.
         metric : str, optional
             Name of the evaluation metric to compute scores with. Defaults to ``self.eval_metric``
+        use_cache : bool, default = True
+            If True, will attempt to use the cached predictions. If False, cached predictions will be ignored.
+            This argument is ignored if ``cache_predictions`` was set to False when creating the ``TimeSeriesPredictor``.
 
         Returns
         -------
@@ -745,7 +754,10 @@ class TimeSeriesPredictor:
         return self._trainer.get_model_best()
 
     def leaderboard(
-        self, data: Optional[Union[TimeSeriesDataFrame, pd.DataFrame]] = None, silent=False
+        self,
+        data: Optional[Union[TimeSeriesDataFrame, pd.DataFrame]] = None,
+        silent: bool = False,
+        use_cache: bool = True,
     ) -> pd.DataFrame:
         """Return a leaderboard showing the performance of every trained model, the output is a
         pandas data frame with columns:
@@ -781,6 +793,9 @@ class TimeSeriesPredictor:
 
         silent : bool, default = False
             If False, the leaderboard DataFrame will be printed.
+        use_cache : bool, default = True
+            If True, will attempt to use the cached predictions. If False, cached predictions will be ignored.
+            This argument is ignored if ``cache_predictions`` was set to False when creating the ``TimeSeriesPredictor``.
 
         Returns
         -------
@@ -789,7 +804,7 @@ class TimeSeriesPredictor:
             test performance.
         """
         data = self._check_and_prepare_data_frame(data)
-        leaderboard = self._learner.leaderboard(data)
+        leaderboard = self._learner.leaderboard(data, use_cache=use_cache)
         if not silent:
             with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):
                 print(leaderboard)

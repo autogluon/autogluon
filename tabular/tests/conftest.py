@@ -8,6 +8,7 @@ from contextlib import contextmanager
 from typing import List
 
 from autogluon.common.utils.resource_utils import ResourceManager
+from autogluon.common.utils.path_converter import PathConverter
 from autogluon.core.utils import download, unzip
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.data.label_cleaner import LabelCleaner
@@ -144,6 +145,7 @@ class FitHelper:
                                  delete_directory=True,
                                  extra_metrics=None,
                                  expected_model_count=2,
+                                 path_as_absolute=False,
                                  compile_models=False,
                                  compiler_configs=None):
         if compiler_configs is None:
@@ -151,16 +153,21 @@ class FitHelper:
         directory_prefix = './datasets/'
         train_data, test_data, dataset_info = DatasetLoaderHelper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
         label = dataset_info['label']
-        save_path = os.path.join(directory_prefix, dataset_name, f'AutogluonOutput_{uuid.uuid4()}')
         _init_args = dict(
             label=label,
-            path=save_path,
         )
         if init_args is None:
             init_args = _init_args
         else:
+            init_args = copy.deepcopy(init_args)
             _init_args.update(init_args)
             init_args = _init_args
+        if 'path' not in init_args:
+            init_args['path'] = os.path.join(directory_prefix, dataset_name, f'AutogluonOutput_{uuid.uuid4()}')
+        if path_as_absolute:
+            init_args['path'] = PathConverter.to_absolute(path=init_args['path'])
+            assert PathConverter._is_absolute(path=init_args['path'])
+        save_path = init_args['path']
         predictor = FitHelper.fit_dataset(train_data=train_data, init_args=init_args, fit_args=fit_args, sample_size=sample_size)
         if compile_models:
             predictor.compile_models(models="all", compiler_configs=compiler_configs)
@@ -168,9 +175,14 @@ class FitHelper:
         if sample_size is not None and sample_size < len(test_data):
             test_data = test_data.sample(n=sample_size, random_state=0)
         predictor.predict(test_data)
-        pred_proba = predictor.predict_proba(test_data)
         predictor.evaluate(test_data)
-        predictor.evaluate_predictions(y_true=test_data[label], y_pred=pred_proba)
+
+        if predictor.can_predict_proba:
+            pred_proba = predictor.predict_proba(test_data)
+            predictor.evaluate_predictions(y_true=test_data[label], y_pred=pred_proba)
+        else:
+            with pytest.raises(AssertionError):
+                predictor.predict_proba(test_data)
 
         model_names = predictor.get_model_names()
         model_name = model_names[0]
@@ -181,9 +193,13 @@ class FitHelper:
             refit_model_name = refit_model_names[model_name]
             assert '_FULL' in refit_model_name
             predictor.predict(test_data, model=refit_model_name)
-            predictor.predict_proba(test_data, model=refit_model_name)
+            if predictor.can_predict_proba:
+                predictor.predict_proba(test_data, model=refit_model_name)
         predictor.info()
         predictor.leaderboard(test_data, extra_info=True, extra_metrics=extra_metrics)
+
+        predictor_load = predictor.load(path=predictor.path)
+        predictor_load.predict(test_data)
 
         assert os.path.realpath(save_path) == os.path.realpath(predictor.path)
         if delete_directory:
@@ -216,7 +232,7 @@ class FitHelper:
             shutil.rmtree(predictor.path, ignore_errors=True)  # Delete AutoGluon output directory to ensure runs' information has been removed.
 
     @staticmethod
-    def fit_dataset(train_data, init_args, fit_args, sample_size=None):
+    def fit_dataset(train_data, init_args, fit_args, sample_size=None) -> TabularPredictor:
         if sample_size is not None and sample_size < len(train_data):
             train_data = train_data.sample(n=sample_size, random_state=0)
         return TabularPredictor(**init_args).fit(train_data, **fit_args)

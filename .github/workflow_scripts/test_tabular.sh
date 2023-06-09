@@ -17,7 +17,15 @@ else
     export CUDA_VISIBLE_DEVICES=0
 fi
 
-install_local_packages "common/[tests]" "core/[all,tests]" "features/" "tabular/[all,tests]"
+install_local_packages "common/[tests]" "core/[all,tests]" "features/"
+
+if [ "$IS_PLATFORM_TEST" = "true" ]
+then
+    install_tabular_platforms "[all,tests]"
+else
+    install_tabular "[all,tests]"
+fi
+
 install_multimodal "[tests]"
 
 cd tabular/

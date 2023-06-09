@@ -24,3 +24,11 @@ def test_xgboost_regression(fit_helper):
     )
     dataset_name = 'ames'
     fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args)
+
+
+def test_xgboost_binary_enable_categorical(fit_helper):
+    fit_args = dict(
+        hyperparameters={XGBoostModel: {'enable_categorical': True}},
+    )
+    dataset_name = 'adult'
+    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args)

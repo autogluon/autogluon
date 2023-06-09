@@ -27,6 +27,7 @@ from random import seed
 import numpy as np
 import pandas as pd
 import pytest
+import tempfile
 
 from autogluon.common import space
 from autogluon.core.utils import download, unzip
@@ -70,15 +71,18 @@ def test_tabular():
 
 def _assert_predict_dict_identical_to_predict(predictor, data):
     """Assert that predict_proba_dict and predict_dict are identical to looping calls to predict and predict_proba"""
-    predict_proba_dict = predictor.predict_proba_multi(data=data)
     predict_dict = predictor.predict_multi(data=data)
-    assert set(predictor.get_model_names()) == set(predict_proba_dict.keys())
     assert set(predictor.get_model_names()) == set(predict_dict.keys())
     for m in predictor.get_model_names():
         model_pred = predictor.predict(data, model=m)
-        model_pred_proba = predictor.predict_proba(data, model=m)
         assert model_pred.equals(predict_dict[m])
-        assert model_pred_proba.equals(predict_proba_dict[m])
+
+    if predictor.can_predict_proba:
+        predict_proba_dict = predictor.predict_proba_multi(data=data)
+        assert set(predictor.get_model_names()) == set(predict_proba_dict.keys())
+        for m in predictor.get_model_names():
+            model_pred_proba = predictor.predict_proba(data, model=m)
+            assert model_pred_proba.equals(predict_proba_dict[m])
 
 
 def test_advanced_functionality():
@@ -107,6 +111,7 @@ def test_advanced_functionality():
     savedir_predictor_original = savedir + 'predictor/'
     predictor: TabularPredictor = TabularPredictor(label=label, path=savedir_predictor_original).fit(train_data)
     leaderboard = predictor.leaderboard(data=test_data)
+    predictor.plot_ensemble_model()
     extra_metrics = ['accuracy', 'roc_auc', 'log_loss']
     test_data_no_label = test_data.drop(columns=[label])
     with pytest.raises(ValueError):
@@ -145,9 +150,12 @@ def test_advanced_functionality():
     y_pred = predictor.predict(test_data)
     y_pred_from_transform = predictor.predict(test_data_transformed, transform_features=False)
     assert y_pred.equals(y_pred_from_transform)
-    y_pred_proba = predictor.predict_proba(test_data)
-    y_pred_proba_from_transform = predictor.predict_proba(test_data_transformed, transform_features=False)
-    assert y_pred_proba.equals(y_pred_proba_from_transform)
+
+    y_pred_proba = None
+    if predictor.can_predict_proba:
+        y_pred_proba = predictor.predict_proba(test_data)
+        y_pred_proba_from_transform = predictor.predict_proba(test_data_transformed, transform_features=False)
+        assert y_pred_proba.equals(y_pred_proba_from_transform)
 
     assert predictor.get_model_names_persisted() == []  # Assert that no models were persisted during training
     assert predictor.unpersist_models() == []  # Assert that no models were unpersisted
@@ -182,8 +190,11 @@ def test_advanced_functionality():
     path_clone = predictor.clone(path=predictor.path[:-1] + '_clone' + os.path.sep)
     predictor_clone = TabularPredictor.load(path_clone)
     assert predictor.path != predictor_clone.path
-    y_pred_proba_clone = predictor_clone.predict_proba(test_data)
-    assert y_pred_proba.equals(y_pred_proba_clone)
+    if predictor_clone.can_predict_proba:
+        y_pred_proba_clone = predictor_clone.predict_proba(test_data)
+        assert y_pred_proba.equals(y_pred_proba_clone)
+    y_pred_clone = predictor_clone.predict(test_data)
+    assert y_pred.equals(y_pred_clone)
     leaderboard_clone = predictor_clone.leaderboard(data=test_data)
     assert len(leaderboard) == len(leaderboard_clone)
 
@@ -196,8 +207,11 @@ def test_advanced_functionality():
     assert path_clone_for_deployment == path_clone_for_deployment_og
     predictor_clone_for_deployment = TabularPredictor.load(path_clone_for_deployment)
     assert predictor.path != predictor_clone_for_deployment.path
-    y_pred_proba_clone_for_deployment = predictor_clone_for_deployment.predict_proba(test_data)
-    assert y_pred_proba.equals(y_pred_proba_clone_for_deployment)
+    if predictor_clone_for_deployment.can_predict_proba:
+        y_pred_proba_clone_for_deployment = predictor_clone_for_deployment.predict_proba(test_data)
+        assert y_pred_proba.equals(y_pred_proba_clone_for_deployment)
+    y_pred_clone_for_deployment = predictor_clone_for_deployment.predict(test_data)
+    assert y_pred.equals(y_pred_clone_for_deployment)
     leaderboard_clone_for_deployment = predictor_clone_for_deployment.leaderboard(data=test_data)
     assert len(leaderboard) >= len(leaderboard_clone_for_deployment)
     # Raise exception due to lacking fit artifacts
@@ -206,6 +220,7 @@ def test_advanced_functionality():
 
     assert(predictor.get_model_full_dict() == dict())
     predictor.refit_full()
+    predictor.plot_ensemble_model()
     assert(len(predictor.get_model_full_dict()) == num_models)
     assert(len(predictor.get_model_names()) == num_models * 2)
     for model in predictor.get_model_names():
@@ -229,8 +244,11 @@ def test_advanced_functionality():
         raise AssertionError('predictor.predict should raise exception after all models are deleted')
     # Assert that clone is not impacted by changes to original
     assert len(predictor_clone.leaderboard(data=test_data)) == len(leaderboard_clone)
-    y_pred_proba_clone_2 = predictor_clone.predict_proba(data=test_data)
-    assert y_pred_proba.equals(y_pred_proba_clone_2)
+    if predictor_clone.can_predict_proba:
+        y_pred_proba_clone_2 = predictor_clone.predict_proba(data=test_data)
+        assert y_pred_proba.equals(y_pred_proba_clone_2)
+    y_pred_clone_2 = predictor_clone.predict(data=test_data)
+    assert y_pred.equals(y_pred_clone_2)
     print('Tabular Advanced Functionality Test Succeeded.')
 
 
@@ -1049,3 +1067,36 @@ def test_tabular_raise_on_nonfinite_class_labels():
         with pytest.raises(ValueError) as ex_info:
             predictor.fit(train_data)
         assert str(ex_info.value).split()[-1] == str(idx)
+
+
+def test_tabular_log_to_file():
+    data_root = 'https://autogluon.s3.amazonaws.com/datasets/Inc/'
+    train_data = TabularDataset(data_root + 'train.csv')
+    train_data = train_data.sample(500)
+
+    predictor = TabularPredictor(label='class', log_to_file=True).fit(
+        train_data=train_data,
+        hyperparameters={
+            "DUMMY": {}
+        }
+    )
+    log = TabularPredictor.load_log(predictor_path=predictor.path)
+    assert "TabularPredictor saved." in log[-1]
+    
+    with tempfile.TemporaryDirectory() as tempdir:
+        log_file = os.path.join(tempdir, "temp.log")
+        predictor = TabularPredictor(
+            label='class',
+            log_to_file=True,
+            log_file_path=log_file
+        ).fit(
+            train_data=train_data,
+            hyperparameters={
+                "DUMMY": {}
+            }
+        )
+        log = TabularPredictor.load_log(log_file_path=log_file)
+        assert "TabularPredictor saved." in log[-1]
+    
+    with pytest.raises(AssertionError):
+        TabularPredictor.load_log()

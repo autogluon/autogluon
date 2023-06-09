@@ -7,7 +7,6 @@ from ..version import __version__
 
 __all__ = [
     'try_import_mxboard',
-    'try_import_mxnet',
     'try_import_catboost',
     'try_import_lightgbm',
     'try_import_xgboost',
@@ -31,27 +30,6 @@ def try_import_mxboard():
         raise ImportError(
             "Unable to import dependency mxboard. "
             "A quick tip is to install via `pip install mxboard`. ")
-
-
-def try_import_mxnet():
-    mx_version = '1.6.0'
-    try:
-        import mxnet as mx
-        from packaging import version
-
-        if version.parse(mx.__version__) < version.parse(mx_version):
-            msg = (
-                "Legacy mxnet=={} detected, some new modules will not work properly. "
-                "mxnet>={} is required. You can use pip to upgrade mxnet "
-                "`pip install mxnet --upgrade` "
-                "or `pip install mxnet_cu101 --upgrade`").format(mx.__version__, mx_version)
-            raise ValueError(msg)
-    except ImportError:
-        raise ImportError(
-            "Unable to import dependency mxnet. "
-            "A quick tip is to install via `pip install mxnet --upgrade`, "
-            "or `pip install mxnet_cu101 --upgrade`")
-
 
 def try_import_ray() -> ModuleType:
     RAY_MAX_VERSION = '2.4.0'

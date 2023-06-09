@@ -17,7 +17,6 @@ optimization:
   gradient_clip_val: 1
   gradient_clip_algorithm: "norm"
   log_every_n_steps: 10
-  val_metric: null
   top_k: 3
   top_k_average_method:
     "greedy_soup" # We support averaging method described in https://arxiv.org/pdf/2203.05482.pdf.

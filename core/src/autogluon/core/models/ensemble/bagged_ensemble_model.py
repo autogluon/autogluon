@@ -401,8 +401,13 @@ class BaggedEnsembleModel(AbstractModel):
                 model_base.predict_time = time.time() - time_start_predict
                 model_base.val_score = model_base.score_with_y_pred_proba(y=y, y_pred_proba=self._oof_pred_proba)
             else:
-                logger.log(30, f'\tWARNING: Setting `self._oof_pred_proba` by predicting on train directly! '
-                               f'This is probably a bug and should be investigated...')
+                can_get_oof_from_train = self._get_tags().get('can_get_oof_from_train', False)
+                if not can_get_oof_from_train:
+                    # TODO: Consider raising an exception in v1.0 release, we don't want this happening when not intended.
+                    logger.log(30, f'\tWARNING: Setting `self._oof_pred_proba` by predicting on train directly! '
+                                   f'This is probably a bug and should be investigated...\n'
+                                   f'\tIf this is intended, set the model tag "can_get_oof_from_train" to True '
+                                   f'in `{self.__class__.__name__}._more_tags` to avoid this warning.')
                 self._oof_pred_proba = model_base.predict_proba(X=X)  # TODO: Cheater value, will be overfit to valid set
             self._oof_pred_model_repeats = np.ones(shape=len(X), dtype=np.uint8)
         model_base.reduce_memory_size(remove_fit=True, remove_info=False, requires_save=True)
@@ -1137,8 +1142,6 @@ class BaggedEnsembleModel(AbstractModel):
         except EmptySearchSpace:
             return skip_hpo(X=X, y=y, X_val=X_val, y_val=y_val, **kwargs)
 
-        # Use absolute path here because ray tune will change the working directory
-        self.set_contexts(os.path.abspath(self.path) + os.path.sep)
         directory = self.path
         os.makedirs(directory, exist_ok=True)
         data_path = directory
@@ -1199,6 +1202,7 @@ class BaggedEnsembleModel(AbstractModel):
             model_estimate_memory_usage=None,  # Not needed as we've already calculated it above
             adapter_type='tabular',
             trainable_is_parallel=True,
+            tune_config_kwargs={'chdir_to_trial_dir': False}
         )
 
         hpo_results = hpo_executor.get_hpo_results(

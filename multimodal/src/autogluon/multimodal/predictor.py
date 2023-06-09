@@ -132,8 +132,11 @@ from .utils import (
     get_available_devices,
     get_config,
     get_detection_classes,
+    get_dir_ckpt_paths,
     get_fit_complete_message,
     get_fit_start_message,
+    get_gpu_message,
+    get_load_ckpt_paths,
     get_local_pretrained_config_paths,
     get_minmax_mode,
     get_mixup,
@@ -144,7 +147,7 @@ from .utils import (
     infer_precision,
     infer_scarcity_mode_by_data_size,
     init_df_preprocessor,
-    init_pretrained,
+    is_lazy_weight_tensor,
     list_timm_models,
     load_text_tokenizers,
     logits_to_prob,
@@ -152,7 +155,6 @@ from .utils import (
     modify_duplicate_model_names,
     object_detection_data_to_df,
     predict,
-    process_batch,
     save_ovd_result_df,
     save_pretrained_model_configs,
     save_result_df,
@@ -201,6 +203,8 @@ class MultiModalPredictor(ExportMixin):
         warn_if_exist: Optional[bool] = True,
         enable_progress_bar: Optional[bool] = None,
         init_scratch: Optional[bool] = False,
+        pretrained: Optional[bool] = True,
+        validation_metric: Optional[str] = None,
         sample_data_path: Optional[str] = None,
     ):
         """
@@ -262,7 +266,7 @@ class MultiModalPredictor(ExportMixin):
             Presets regarding model quality, e.g., best_quality, high_quality, and medium_quality.
         eval_metric
             Evaluation metric name. If `eval_metric = None`, it is automatically chosen based on `problem_type`.
-            Defaults to 'accuracy' for binary and multiclass classification, 'root_mean_squared_error' for regression.
+            Defaults to 'accuracy' for multiclass classification, `roc_auc` for binary classification, and 'root_mean_squared_error' for regression.
         hyperparameters
             This is to override some default configurations.
             For example, changing the text and image backbones can be done by formatting:
@@ -302,9 +306,11 @@ class MultiModalPredictor(ExportMixin):
         enable_progress_bar
             Whether to show progress bar. It will be True by default and will also be
             disabled if the environment variable os.environ["AUTOMM_DISABLE_PROGRESS_BAR"] is set.
-        init_scratch
-            Whether to init model from scratch. It's useful when we want to load a checkpoints
-            without its weights.
+        pretrained
+            Whether to init model with pretrained weights. If False, it creates a model with random initialization.
+        validation_metric
+            Validation metric name. If `validation_metric = None`, it is automatically chosen based on `problem_type`.
+            Defaults to 'accuracy' for multiclass classification, `roc_auc` for binary classification, and 'root_mean_squared_error' for regression.
         sample_data_path
             This is used for automatically inference num_classes, classes, or label.
 
@@ -383,15 +389,20 @@ class MultiModalPredictor(ExportMixin):
         if verbosity is not None:
             set_logger_verbosity(verbosity)
 
+        if init_scratch:
+            warnings.warn("init_scratch is deprecated. Try pretrained=False instead.", UserWarning)
+            pretrained = False
+
         self._label_column = label
         self._problem_type = problem_type
         self._presets = presets.lower() if presets else None
-        self._eval_metric_name = eval_metric
-        self._validation_metric_name = None
+        self._eval_metric_name = eval_metric.lower() if eval_metric else None
+        self._validation_metric_name = validation_metric.lower() if validation_metric else None
         self._output_shape = num_classes
         self._classes = classes
         self._ckpt_path = None
         self._pretrained_path = None
+        self._pretrained = pretrained
         self._config = None
         self._df_preprocessor = None
         self._column_types = None
@@ -402,11 +413,11 @@ class MultiModalPredictor(ExportMixin):
         self._verbosity = verbosity
         self._warn_if_exist = warn_if_exist
         self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
-        self._init_scratch = init_scratch
         self._sample_data_path = sample_data_path
         self._fit_called = False  # While using ddp, after fit called, we can only use single gpu.
         self._matcher = None
         self._save_path = path
+        self._hyperparameters = hyperparameters
 
         # Summary statistics used in fit summary. TODO: wrap it in a class.
         self._total_train_time = None
@@ -426,6 +437,8 @@ class MultiModalPredictor(ExportMixin):
                 verbosity=verbosity,
                 warn_if_exist=warn_if_exist,
                 enable_progress_bar=enable_progress_bar,
+                pretrained=pretrained,
+                validation_metric=validation_metric,
             )
             return
 
@@ -434,22 +447,6 @@ class MultiModalPredictor(ExportMixin):
             if self._sample_data_path is not None:
                 self._classes = get_detection_classes(self._sample_data_path)
                 self._output_shape = len(self._classes)
-
-        if self._problem_type is not None:
-            if self.problem_property.support_zero_shot:
-                # Load pretrained model via the provided hyperparameters and presets
-                # TODO: do not create pretrained model for HPO presets.
-                self._config, self._model, self._data_processors = init_pretrained(
-                    problem_type=self._problem_type,
-                    presets=self._presets,
-                    hyperparameters=hyperparameters,
-                    num_classes=self._output_shape,
-                    classes=self._classes,
-                    init_scratch=self._init_scratch,
-                )
-                self._validation_metric_name = self._config["optimization"][
-                    "val_metric"
-                ]  # TODO: only object detection is using this
 
     @property
     def path(self):
@@ -491,14 +488,17 @@ class MultiModalPredictor(ExportMixin):
 
     @property
     def problem_type(self):
-        return self._problem_type
+        if self._matcher:
+            return self._matcher._pipeline
+        else:
+            return self._problem_type
 
     @property
     def problem_property(self):
-        if self._problem_type is None:
+        if self.problem_type is None:
             return None
         else:
-            return PROBLEM_TYPES_REG.get(self._problem_type)
+            return PROBLEM_TYPES_REG.get(self.problem_type)
 
     @property
     def column_types(self):
@@ -506,6 +506,23 @@ class MultiModalPredictor(ExportMixin):
             return self._matcher.column_types
         else:
             return self._column_types
+
+    @property
+    def total_parameters(self) -> int:
+        return sum(p.numel() if not is_lazy_weight_tensor(p) else 0 for p in self._model.parameters())
+
+    @property
+    def trainable_parameters(self) -> int:
+        return sum(
+            p.numel() if not is_lazy_weight_tensor(p) else 0 for p in self._model.parameters() if p.requires_grad
+        )
+
+    @property
+    def model_size(self) -> float:
+        model_size = sum(
+            p.numel() * p.element_size() if not is_lazy_weight_tensor(p) else 0 for p in self._model.parameters()
+        )
+        return model_size * 1e-6  # convert to megabytes
 
     # This func is required by the abstract trainer of TabularPredictor.
     def set_verbosity(self, verbosity: int):
@@ -785,10 +802,15 @@ class MultiModalPredictor(ExportMixin):
         self._validation_metric_name = validation_metric_name
         self._column_types = column_types
 
+        if self._hyperparameters and hyperparameters:
+            self._hyperparameters.update(hyperparameters)
+        elif hyperparameters:
+            self._hyperparameters = hyperparameters
+
         hyperparameters, hyperparameter_tune_kwargs = update_hyperparameters(
             problem_type=self._problem_type,
             presets=presets,
-            provided_hyperparameters=hyperparameters,
+            provided_hyperparameters=self._hyperparameters,
             provided_hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             teacher_predictor=teacher_predictor,
         )
@@ -894,14 +916,38 @@ class MultiModalPredictor(ExportMixin):
         )
         return train_data, tuning_data
 
-    def _verify_inference_ready(self):
+    def _init_pretrained(self):
+        # split out the hyperparameters whose values are complex objects
+        hyperparameters, advanced_hyperparameters = split_hyperparameters(self._hyperparameters)
+
+        if self._config is None:
+            self._config = get_config(
+                problem_type=self._problem_type, presets=self._presets, overrides=hyperparameters
+            )
+        if self._model is None:
+            assert (
+                len(self._config.model.names) == 1
+            ), f"Zero shot mode only supports using one model, but detects multiple models {self._config.model.names}"
+            self._model = create_fusion_model(
+                config=self._config, pretrained=self._pretrained, num_classes=self._output_shape, classes=self._classes
+            )
+        if self._data_processors is None:
+            self._data_processors = create_fusion_data_processors(
+                config=self._config,
+                model=self._model,
+                advanced_hyperparameters=advanced_hyperparameters,
+            )
+
+    def _ensure_inference_ready(self):
         if not self._fit_called:
-            if self._problem_type and not self.problem_property.support_zero_shot:
+            if not self._problem_type or not self.problem_property.support_zero_shot:
                 raise RuntimeError(
                     f"problem_type='{self._problem_type}' does not support running inference directly. "
                     f"You need to call `predictor.fit()`, or load a predictor first before "
                     f"running `predictor.predict()`, `predictor.evaluate()` or `predictor.extract_embedding()`."
                 )
+            else:
+                self._init_pretrained()
 
     def _setup_distillation(
         self,
@@ -1376,6 +1422,7 @@ class MultiModalPredictor(ExportMixin):
         )
 
         num_gpus = compute_num_gpus(config_num_gpus=config.env.num_gpus, strategy=config.env.strategy)
+        logger.info(get_gpu_message(detected_num_gpus=ResourceManager.get_gpu_count_torch(), used_num_gpus=num_gpus))
 
         precision = infer_precision(num_gpus=num_gpus, precision=config.env.precision)
 
@@ -1475,7 +1522,7 @@ class MultiModalPredictor(ExportMixin):
 
         if trainer.global_rank == 0:
             # We do not perform averaging checkpoint in the case of hpo for each trial
-            # We only averaging the checkpoint of the best trial in the end in the master process
+            # We only average the checkpoint of the best trial at the end in the master process.
             if not hpo_mode:
                 self._top_k_average(
                     model=model,
@@ -1654,7 +1701,6 @@ class MultiModalPredictor(ExportMixin):
         batch_size: int,
         strategy: str,
     ) -> List[Dict]:
-
         if self._config.env.strategy == DEEPSPEED_OFFLOADING and DEEPSPEED_MODULE not in sys.modules:
             # Need to initialize DeepSpeed and optimizer as currently required in Pytorch-Lighting integration of deepspeed.
             # TODO: Using optimiation_kwargs for inference is confusing and bad design. Remove as soon as fixed in pytorch-lighting.
@@ -1772,15 +1818,8 @@ class MultiModalPredictor(ExportMixin):
                     else:
                         outputs = pred_writer.collect_all_gpu_results(num_gpus=num_gpus)
                 elif self._problem_type == OBJECT_DETECTION:
-                    # reformat single gpu output for object detection
-                    # outputs shape: num_batch, 1(["bbox"]), batch_size, 80, n, 5
-                    # output LABEL if exists for evaluations
-                    outputs = [
-                        {BBOX: bbox, LABEL: ele[LABEL][i]} if LABEL in ele else {BBOX: bbox}
-                        for ele in outputs
-                        for i, bbox in enumerate(ele[BBOX])
-                    ]
-
+                    # Unpack outputs for object detection while using single gpu
+                    outputs = [output for batch_outputs in outputs for output in batch_outputs]
         return outputs
 
     def _on_predict_start(
@@ -1914,7 +1953,6 @@ class MultiModalPredictor(ExportMixin):
         A dictionary with the metric names and their corresponding scores.
         Optionally return a dataframe of prediction results.
         """
-        self._verify_inference_ready()
         if self._matcher:
             return self._matcher.evaluate(
                 data=data,
@@ -1929,6 +1967,8 @@ class MultiModalPredictor(ExportMixin):
                 return_pred=return_pred,
                 realtime=realtime,
             )
+
+        self._ensure_inference_ready()
         if self._problem_type == OBJECT_DETECTION:
             if realtime:
                 return NotImplementedError(
@@ -2104,8 +2144,6 @@ class MultiModalPredictor(ExportMixin):
         -------
         Array of predictions, one corresponding to each row in given dataset.
         """
-        self._verify_inference_ready()
-
         if self._matcher:
             return self._matcher.predict(
                 data=data,
@@ -2113,6 +2151,8 @@ class MultiModalPredictor(ExportMixin):
                 as_pandas=as_pandas,
                 realtime=realtime,
             )
+
+        self._ensure_inference_ready()
         if self._problem_type == OBJECT_DETECTION:
             data = object_detection_data_to_df(data)
 
@@ -2194,7 +2234,9 @@ class MultiModalPredictor(ExportMixin):
             )
 
         if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
-            if self._problem_type == OBJECT_DETECTION:
+            if (
+                self._problem_type == OBJECT_DETECTION
+            ):  # TODO: add prediction output in COCO format if as_pandas is False
                 pred = save_result_df(
                     pred=pred,
                     data=data,
@@ -2253,7 +2295,7 @@ class MultiModalPredictor(ExportMixin):
         When as_multiclass is True, the output will always have shape (#samples, #classes).
         Otherwise, the output will have shape (#samples,)
         """
-        self._verify_inference_ready()
+
         if self._matcher:
             return self._matcher.predict_proba(
                 data=data,
@@ -2263,6 +2305,7 @@ class MultiModalPredictor(ExportMixin):
                 realtime=realtime,
             )
 
+        self._ensure_inference_ready()
         assert self._problem_type not in [
             REGRESSION,
         ], f"Problem {self._problem_type} has no probability output."
@@ -2341,7 +2384,6 @@ class MultiModalPredictor(ExportMixin):
         It will have shape (#samples, D) where the embedding dimension D is determined
         by the neural network's architecture.
         """
-        self._verify_inference_ready()
         if self._matcher:
             return self._matcher.extract_embedding(
                 data=data,
@@ -2352,6 +2394,7 @@ class MultiModalPredictor(ExportMixin):
                 realtime=realtime,
             )
 
+        self._ensure_inference_ready()
         turn_on_off_feature_column_info(
             data_processors=self._data_processors,
             flag=True,
@@ -2494,6 +2537,7 @@ class MultiModalPredictor(ExportMixin):
                     "output_shape": self._output_shape,
                     "classes": self._classes,
                     "save_path": self._save_path,
+                    "pretrained": self._pretrained,
                     "pretrained_path": self._pretrained_path,
                     "fit_called": self._fit_called,
                     "best_score": self._best_score,
@@ -2594,7 +2638,9 @@ class MultiModalPredictor(ExportMixin):
         predictor._verbosity = verbosity
         predictor._resume = resume
         predictor._save_path = path  # in case the original exp dir is copied to somewhere else
-        predictor._pretrain_path = path
+        predictor._pretrained_path = path
+        if "pretrained" in assets:
+            predictor._pretrained = assets["pretrained"]
         if "fit_called" in assets:
             predictor._fit_called = assets["fit_called"]
         else:
@@ -2622,6 +2668,7 @@ class MultiModalPredictor(ExportMixin):
         can be completely or partially trained by .fit(). If a previous training has completed,
         it will load the checkpoint `model.ckpt`. Otherwise if a previous training accidentally
         collapses in the middle, it can load the `last.ckpt` checkpoint by setting `resume=True`.
+        It also supports loading one specific checkpoint given its path.
 
         Parameters
         ----------
@@ -2638,11 +2685,12 @@ class MultiModalPredictor(ExportMixin):
         -------
         The loaded predictor object.
         """
-        path = os.path.abspath(os.path.expanduser(path))
-        assert os.path.isdir(path), f"'{path}' must be an existing directory."
+        dir_path, ckpt_path = get_dir_ckpt_paths(path=path)
+
+        assert os.path.isdir(dir_path), f"'{dir_path}' must be an existing directory."
         predictor = cls(label="dummy_label")
 
-        with open(os.path.join(path, "assets.json"), "r") as fp:
+        with open(os.path.join(dir_path, "assets.json"), "r") as fp:
             assets = json.load(fp)
         if "class_name" in assets and assets["class_name"] == "MultiModalMatcher":
             predictor._matcher = MultiModalMatcher.load(
@@ -2650,9 +2698,10 @@ class MultiModalPredictor(ExportMixin):
                 resume=resume,
                 verbosity=verbosity,
             )
+            predictor._problem_type = predictor._matcher._pipeline
             return predictor
 
-        predictor = cls._load_metadata(predictor=predictor, path=path, resume=resume, verbosity=verbosity)
+        predictor = cls._load_metadata(predictor=predictor, path=dir_path, resume=resume, verbosity=verbosity)
 
         efficient_finetune = OmegaConf.select(predictor._config, "optimization.efficient_finetune")
 
@@ -2673,42 +2722,11 @@ class MultiModalPredictor(ExportMixin):
                 model=model,
             )
 
-        resume_ckpt_path = os.path.join(path, LAST_CHECKPOINT)
-        final_ckpt_path = os.path.join(path, MODEL_CHECKPOINT)
-        if resume:  # resume training which crashed before
-            if not os.path.isfile(resume_ckpt_path):
-                if os.path.isfile(final_ckpt_path):
-                    raise ValueError(
-                        f"Resuming checkpoint '{resume_ckpt_path}' doesn't exist, but "
-                        f"final checkpoint '{final_ckpt_path}' exists, which means training "
-                        f"is already completed."
-                    )
-                else:
-                    raise ValueError(
-                        f"Resuming checkpoint '{resume_ckpt_path}' and "
-                        f"final checkpoint '{final_ckpt_path}' both don't exist. "
-                        f"Consider starting training from scratch."
-                    )
-            load_path = resume_ckpt_path
-            logger.info(f"Resume training from checkpoint: '{resume_ckpt_path}'")
-            ckpt_path = resume_ckpt_path
-        else:  # load a model checkpoint for prediction, evaluation, or continuing training on new data
-            if not os.path.isfile(final_ckpt_path):
-                if os.path.isfile(resume_ckpt_path):
-                    raise ValueError(
-                        f"Final checkpoint '{final_ckpt_path}' doesn't exist, but "
-                        f"resuming checkpoint '{resume_ckpt_path}' exists, which means training "
-                        f"is not done yet. Consider resume training from '{resume_ckpt_path}'."
-                    )
-                else:
-                    raise ValueError(
-                        f"Resuming checkpoint '{resume_ckpt_path}' and "
-                        f"final checkpoint '{final_ckpt_path}' both don't exist. "
-                        f"Consider starting training from scratch."
-                    )
-            load_path = final_ckpt_path
-            logger.info(f"Load pretrained checkpoint: {os.path.join(path, MODEL_CHECKPOINT)}")
-            ckpt_path = None  # must set None since we do not resume training
+        load_path, ckpt_path = get_load_ckpt_paths(
+            ckpt_path=ckpt_path,
+            dir_path=dir_path,
+            resume=resume,
+        )
 
         model = cls._load_state_dict(
             model=model,

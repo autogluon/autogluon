@@ -12,6 +12,8 @@ import pandas as pd
 from tqdm import tqdm
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
+from autogluon.common.utils.path_converter import PathConverter
+from autogluon.common.utils.utils import hash_pandas_df
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.loaders import load_pkl
@@ -37,6 +39,7 @@ class SimpleAbstractTrainer:
 
     def __init__(self, path: str, low_memory: bool, save_data: bool, *args, **kwargs):
         self.path = path
+        self.path = PathConverter.to_relative(self.path)
         self.reset_paths = False
 
         self.low_memory = low_memory
@@ -175,22 +178,6 @@ class SimpleAbstractTrainer:
     def construct_model_templates(self, hyperparameters: Union[str, Dict[str, Any]], **kwargs):
         raise NotImplementedError
 
-    # TODO: This is horribly inefficient beyond simple weighted ensembling.
-    #  Refactor to Tabular's implementation if doing stacking / multiple ensembles
-    def get_inputs_to_model(
-        self, model, X, model_pred_proba_dict=None, known_covariates: Optional[TimeSeriesDataFrame] = None
-    ):
-        if model_pred_proba_dict is None:
-            model_pred_proba_dict = {}
-        model_set = self.get_minimum_model_set(model, include_self=False)
-        if model_set:
-            for m in model_set:
-                if m not in model_pred_proba_dict:
-                    model_pred_proba_dict[m] = self.predict(model=m, data=X, known_covariates=known_covariates)
-            return model_pred_proba_dict
-        else:
-            return X
-
     # FIXME: Copy pasted from Tabular
     def get_minimum_model_set(self, model: Union[str, AbstractTimeSeriesModel], include_self: bool = True) -> list:
         """Gets the minimum set of models that the provided model depends on, including itself.
@@ -267,6 +254,8 @@ class SimpleAbstractTrainer:
 
 
 class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
+    _cached_predictions_filename = "cached_predictions.pkl"
+
     def __init__(
         self,
         path: str,
@@ -277,6 +266,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         enable_ensemble: bool = True,
         verbosity: int = 2,
         num_val_windows: int = 1,
+        cache_predictions: bool = True,
         **kwargs,
     ):
         super().__init__(path=path, save_data=save_data, low_memory=True, **kwargs)
@@ -302,6 +292,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         self.eval_metric = TimeSeriesEvaluator.check_get_evaluation_metric(eval_metric)
         self.eval_metric_seasonal_period = eval_metric_seasonal_period
         self.num_val_windows = num_val_windows
+        self.cache_predictions = cache_predictions
         self.hpo_results = {}
 
     def save_train_data(self, data: TimeSeriesDataFrame, verbose: bool = True) -> None:
@@ -552,7 +543,6 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         excluded_model_types: Optional[List[str]] = None,
         time_limit: Optional[float] = None,
     ) -> List[str]:
-
         logger.info(f"\nStarting training. Start time is {time.strftime('%Y-%m-%d %H:%M:%S')}")
 
         time_start = time.time()
@@ -752,7 +742,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         self.save_model(model=ensemble)
         return ensemble.name
 
-    def leaderboard(self, data: Optional[TimeSeriesDataFrame] = None) -> pd.DataFrame:
+    def leaderboard(self, data: Optional[TimeSeriesDataFrame] = None, use_cache: bool = True) -> pd.DataFrame:
         logger.debug("Generating leaderboard for all models trained")
 
         model_names = self.get_model_names()
@@ -774,18 +764,24 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 "Additional data provided, testing on additional data. Resulting leaderboard "
                 "will be sorted according to test score (`score_test`)."
             )
-            # TODO: Cache predictions for all models using `model_pred_proba_dict` as in Tabular
+            model_predictions, pred_time_dict = self.get_model_pred_dict(
+                model_names=model_names,
+                data=past_data,
+                known_covariates=known_covariates,
+                record_pred_time=True,
+                raise_exception_if_failed=False,
+                use_cache=use_cache,
+            )
+
             for model_name in model_names:
-                try:
-                    pred_start_time = time.time()
-                    predictions = self.predict(data=past_data, known_covariates=known_covariates, model=model_name)
-                    model_info[model_name]["pred_time_test"] = time.time() - pred_start_time
-                    model_info[model_name]["score_test"] = self._score_with_predictions(data, predictions)
-                except Exception as e:  # noqa
-                    logger.error(f"Cannot score with model {model_name}. An error occurred: {str(e)}")
-                    logger.debug(traceback.format_exc())
-                    model_info[model_name]["pred_time_test"] = float("nan")
+                model_preds = model_predictions[model_name]
+                if model_preds is None:
+                    # Model failed at prediction time
                     model_info[model_name]["score_test"] = float("nan")
+                    model_info[model_name]["pred_time_test"] = float("nan")
+                else:
+                    model_info[model_name]["score_test"] = self._score_with_predictions(data, model_preds)
+                    model_info[model_name]["pred_time_test"] = pred_time_dict[model_name]
 
         df = pd.DataFrame(model_info.values())
 
@@ -808,13 +804,11 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         return df[explicit_column_order]
 
-    def _get_model_for_prediction(
-        self, model: Optional[Union[str, AbstractTimeSeriesModel]] = None
-    ) -> AbstractTimeSeriesModel:
-        """Given an optional identifier or model object, return the model to perform predictions
-        with. If the model is not provided, this method will default to the best model according to
-        the validation score."""
+    def _get_model_for_prediction(self, model: Optional[Union[str, AbstractTimeSeriesModel]] = None) -> str:
+        """Given an optional identifier or model object, return the name of the model with which to predict.
 
+        If the model is not provided, this method will default to the best model according to the validation score.
+        """
         if model is None:
             if self.model_best is None:
                 best_model_name: str = self.get_model_best()
@@ -823,30 +817,26 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 f"Model not specified in predict, will default to the model with the "
                 f"best validation score: {self.model_best}",
             )
-            return self.load_model(self.model_best)
+            return self.model_best
         else:
-            if isinstance(model, str):
-                return self.load_model(model)
-            return model
+            if isinstance(model, AbstractTimeSeriesModel):
+                return model.name
+            else:
+                return model
 
     def predict(
         self,
         data: TimeSeriesDataFrame,
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
+        use_cache: bool = True,
         **kwargs,
-    ) -> Union[TimeSeriesDataFrame, None]:
-        model_was_selected_automatically = model is None
-        model = self._get_model_for_prediction(model)
-        try:
-            return self._predict_model(data, model, known_covariates=known_covariates, **kwargs)
-        except Exception as err:
-            logger.error(f"Warning: Model {model.name} failed during prediction with exception: {err}")
-            logger.debug(traceback.format_exc())
-            other_models = [m for m in self.get_model_names() if m != model.name]
-            if len(other_models) > 0 and model_was_selected_automatically:
-                logger.info(f"\tYou can call predict(data, model) with one of other available models: {other_models}")
-            return None
+    ) -> TimeSeriesDataFrame:
+        model_name = self._get_model_for_prediction(model)
+        model_pred_dict = self.get_model_pred_dict(
+            model_names=[model_name], data=data, known_covariates=known_covariates, use_cache=use_cache
+        )
+        return model_pred_dict[model_name]
 
     def _score_with_predictions(
         self,
@@ -869,24 +859,178 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         data: TimeSeriesDataFrame,
         model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
         metric: Optional[str] = None,
+        use_cache: bool = True,
     ) -> float:
         past_data, known_covariates = data.get_model_inputs_for_scoring(
             prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates_real
         )
-        predictions = self.predict(data=past_data, known_covariates=known_covariates, model=model)
+        predictions = self.predict(data=past_data, known_covariates=known_covariates, model=model, use_cache=use_cache)
         return self._score_with_predictions(data=data, predictions=predictions, metric=metric)
 
     def _predict_model(
         self,
-        data: TimeSeriesDataFrame,
         model: Union[str, AbstractTimeSeriesModel],
+        data: TimeSeriesDataFrame,
+        model_pred_dict: Dict[str, TimeSeriesDataFrame],
         known_covariates: Optional[TimeSeriesDataFrame] = None,
-        **kwargs,
     ) -> TimeSeriesDataFrame:
+        """Generate predictions using the given model.
+
+        This method assumes that model_pred_dict contains the predictions of all base models, if model is an ensemble.
+        """
         if isinstance(model, str):
             model = self.load_model(model)
-        data = self.get_inputs_to_model(model=model, X=data, known_covariates=known_covariates)
-        return model.predict(data, known_covariates=known_covariates, **kwargs)
+        data = self._get_inputs_to_model(model=model, data=data, model_pred_dict=model_pred_dict)
+        return model.predict(data, known_covariates=known_covariates)
+
+    def _get_inputs_to_model(
+        self,
+        model: str,
+        data: TimeSeriesDataFrame,
+        model_pred_dict: Dict[str, TimeSeriesDataFrame],
+    ) -> Union[TimeSeriesDataFrame, Dict[str, TimeSeriesDataFrame]]:
+        """Get the first argument that should be passed to model.predict.
+
+        This method assumes that model_pred_dict contains the predictions of all base models, if model is an ensemble.
+        """
+        model_set = self.get_minimum_model_set(model, include_self=False)
+        if model_set:
+            for m in model_set:
+                if m not in model_pred_dict:
+                    raise AssertionError(f"Prediction for base model {m} not found in model_pred_dict")
+            return {m: model_pred_dict[m] for m in model_set}
+        else:
+            return data
+
+    def get_model_pred_dict(
+        self,
+        model_names: List[str],
+        data: TimeSeriesDataFrame,
+        known_covariates: Optional[TimeSeriesDataFrame] = None,
+        record_pred_time: bool = False,
+        raise_exception_if_failed: bool = True,
+        use_cache: bool = True,
+    ) -> Union[Dict[str, TimeSeriesDataFrame], Tuple[Dict[str, TimeSeriesDataFrame], Dict[str, float]]]:
+        """Return a dictionary with predictions of all models for the given dataset.
+
+        Parameters
+        ----------
+        model_names
+            Names of the model for which the predictions should be produced.
+        data
+            Time series data to forecast with.
+        known_covariates
+            Future values of the known covariates.
+        record_pred_time
+            If True, will additionally return the total prediction times for all models (including the prediction time
+            for base models). If False, will only return the model predictions.
+        raise_exception_if_failed
+            If True, the method will raise an exception if any model crashes during prediction.
+            If False, error will be logged and predictions for failed models will contain None.
+        use_cache
+            If False, will ignore the cache even if it's available.
+        """
+        # TODO: Unify design of the method with Tabular
+        if self.cache_predictions and use_cache:
+            dataset_hash = self._compute_dataset_hash(data=data, known_covariates=known_covariates)
+            model_pred_dict, pred_time_dict_marginal = self._get_cached_pred_dicts(dataset_hash)
+        else:
+            model_pred_dict = {}
+            pred_time_dict_marginal = {}
+
+        model_set = set()
+        for model_name in model_names:
+            model_set.update(self.get_minimum_model_set(model_name))
+        if len(model_set) > 1:
+            model_to_level = self._get_model_levels()
+            model_set = sorted(model_set, key=model_to_level.get)
+        logger.debug(f"Prediction order: {model_set}")
+
+        failed_models = []
+        for model_name in model_set:
+            if model_name not in model_pred_dict:
+                try:
+                    predict_start_time = time.time()
+                    model_pred_dict[model_name] = self._predict_model(
+                        model=model_name,
+                        data=data,
+                        known_covariates=known_covariates,
+                        model_pred_dict=model_pred_dict,
+                    )
+                    pred_time_dict_marginal[model_name] = time.time() - predict_start_time
+                except Exception as e:
+                    failed_models.append(model_name)
+                    logger.error(f"Model {model_name} failed to predict with the following exception:")
+                    logger.error(traceback.format_exc())
+                    model_pred_dict[model_name] = None
+                    pred_time_dict_marginal[model_name] = None
+
+        if len(failed_models) > 0 and raise_exception_if_failed:
+            raise RuntimeError(f"Following models failed to predict: {failed_models}")
+        if self.cache_predictions and use_cache:
+            self._save_cached_pred_dicts(
+                dataset_hash, model_pred_dict=model_pred_dict, pred_time_dict=pred_time_dict_marginal
+            )
+        pred_time_dict_total = self._get_total_pred_time_from_marginal(pred_time_dict_marginal)
+
+        final_model_pred_dict = {model_name: model_pred_dict[model_name] for model_name in model_names}
+        final_pred_time_dict_total = {model_name: pred_time_dict_total[model_name] for model_name in model_names}
+        if record_pred_time:
+            return final_model_pred_dict, final_pred_time_dict_total
+        else:
+            return final_model_pred_dict
+
+    def _get_total_pred_time_from_marginal(self, pred_time_dict_marginal: Dict[str, float]) -> Dict[str, float]:
+        pred_time_dict_total = defaultdict(float)
+        for model_name in pred_time_dict_marginal.keys():
+            for base_model in self.get_minimum_model_set(model_name):
+                if pred_time_dict_marginal[base_model] is not None:
+                    pred_time_dict_total[model_name] += pred_time_dict_marginal[base_model]
+        return dict(pred_time_dict_total)
+
+    @property
+    def _cached_predictions_path(self) -> Path:
+        return Path(self.path) / self._cached_predictions_filename
+
+    @staticmethod
+    def _compute_dataset_hash(
+        data: TimeSeriesDataFrame, known_covariates: Optional[TimeSeriesDataFrame] = None
+    ) -> str:
+        """Compute a unique string that identifies the time series dataset."""
+        combined_hash = hash_pandas_df(data) + hash_pandas_df(known_covariates) + hash_pandas_df(data.static_features)
+        return combined_hash
+
+    def _get_cached_pred_dicts(self, dataset_hash: str) -> Tuple[Dict[str, TimeSeriesDataFrame], Dict[str, float]]:
+        """Load cached predictions for given dataset_hash from disk, if possible. Otherwise returns empty dicts."""
+        if self._cached_predictions_path.exists():
+            cached_predictions = load_pkl.load(str(self._cached_predictions_path))
+            if dataset_hash in cached_predictions:
+                model_pred_dict = cached_predictions[dataset_hash]["model_pred_dict"]
+                pred_time_dict = cached_predictions[dataset_hash]["pred_time_dict"]
+                if model_pred_dict.keys() == pred_time_dict.keys():
+                    logger.debug(f"Loaded cached predictions for models {list(model_pred_dict.keys())}")
+                    return model_pred_dict, pred_time_dict
+                else:
+                    logger.warning(f"Found corrupted cached predictions in {self._cached_predictions_path}")
+        logger.debug(f"Found no cached predictions")
+        return {}, {}
+
+    def _save_cached_pred_dicts(
+        self, dataset_hash: str, model_pred_dict: Dict[str, TimeSeriesDataFrame], pred_time_dict: Dict[str, float]
+    ) -> None:
+        # TODO: Save separate file for each dataset if _cached_predictions file grows large?
+        if self._cached_predictions_path.exists():
+            logger.debug(f"Extending existing cached predictions")
+            cached_predictions = load_pkl.load(str(self._cached_predictions_path))
+        else:
+            cached_predictions = {}
+        # Do not save results for models that failed
+        cached_predictions[dataset_hash] = {
+            "model_pred_dict": {k: v for k, v in model_pred_dict.items() if v is not None},
+            "pred_time_dict": {k: v for k, v in pred_time_dict.items() if v is not None},
+        }
+        save_pkl.save(str(self._cached_predictions_path), object=cached_predictions)
+        logger.debug(f"Cached predictions saved to {self._cached_predictions_path}")
 
     def _merge_refit_full_data(
         self, train_data: TimeSeriesDataFrame, val_data: Optional[TimeSeriesDataFrame]
@@ -903,7 +1047,6 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         val_data: Optional[TimeSeriesDataFrame] = None,
         models: List[str] = None,
     ) -> List[str]:
-
         train_data = train_data or self.load_train_data()
         val_data = val_data or self.load_val_data()
         refit_full_data = self._merge_refit_full_data(train_data, val_data)

@@ -32,6 +32,7 @@ class TimeSeriesLearner(AbstractLearner):
         eval_metric_seasonal_period: Optional[int] = None,
         prediction_length: int = 1,
         ignore_time_index: bool = False,
+        cache_predictions: bool = True,
         **kwargs,
     ):
         super().__init__(path_context=path_context)
@@ -46,6 +47,7 @@ class TimeSeriesLearner(AbstractLearner):
             kwargs.get("quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]),
         )
         self.ignore_time_index = ignore_time_index
+        self.cache_predictions = cache_predictions
 
         self.feature_generator = TimeSeriesFeatureGenerator(
             target=self.target, known_covariates_names=self.known_covariates_names
@@ -113,6 +115,7 @@ class TimeSeriesLearner(AbstractLearner):
                 enable_ensemble=kwargs.get("enable_ensemble", True),
                 metadata=self.feature_generator.covariate_metadata,
                 num_val_windows=num_val_windows,
+                cache_predictions=self.cache_predictions,
             )
         )
         self.trainer = self.trainer_type(**trainer_init_kwargs)
@@ -186,26 +189,30 @@ class TimeSeriesLearner(AbstractLearner):
         data: TimeSeriesDataFrame,
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
+        use_cache: bool = True,
         **kwargs,
     ) -> TimeSeriesDataFrame:
         data = self.feature_generator.transform(data)
         known_covariates = self.feature_generator.transform_future_known_covariates(known_covariates)
         known_covariates = self._align_covariates_with_forecast_index(known_covariates=known_covariates, data=data)
-        prediction = self.load_trainer().predict(data=data, known_covariates=known_covariates, model=model, **kwargs)
-        if prediction is None:
-            raise RuntimeError("Prediction failed, please provide a different model to the `predict` method.")
-        return prediction
+        return self.load_trainer().predict(
+            data=data, known_covariates=known_covariates, model=model, use_cache=use_cache, **kwargs
+        )
 
     def score(
-        self, data: TimeSeriesDataFrame, model: AbstractTimeSeriesModel = None, metric: Optional[str] = None
+        self,
+        data: TimeSeriesDataFrame,
+        model: AbstractTimeSeriesModel = None,
+        metric: Optional[str] = None,
+        use_cache: bool = True,
     ) -> float:
         data = self.feature_generator.transform(data)
-        return self.load_trainer().score(data=data, model=model, metric=metric)
+        return self.load_trainer().score(data=data, model=model, metric=metric, use_cache=use_cache)
 
-    def leaderboard(self, data: Optional[TimeSeriesDataFrame] = None) -> pd.DataFrame:
+    def leaderboard(self, data: Optional[TimeSeriesDataFrame] = None, use_cache: bool = True) -> pd.DataFrame:
         if data is not None:
             data = self.feature_generator.transform(data)
-        return self.load_trainer().leaderboard(data)
+        return self.load_trainer().leaderboard(data, use_cache=use_cache)
 
     def get_info(self, include_model_info: bool = False, **kwargs) -> Dict[str, Any]:
         learner_info = super().get_info(include_model_info=include_model_info)

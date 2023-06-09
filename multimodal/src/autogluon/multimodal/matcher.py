@@ -78,8 +78,10 @@ from .utils import (
     filter_hyperparameters,
     get_available_devices,
     get_config,
+    get_dir_ckpt_paths,
     get_fit_complete_message,
     get_fit_start_message,
+    get_load_ckpt_paths,
     get_local_pretrained_config_paths,
     get_minmax_mode,
     get_stopping_threshold,
@@ -88,13 +90,13 @@ from .utils import (
     infer_metrics,
     infer_precision,
     init_df_preprocessor,
-    init_pretrained_matcher,
     load_text_tokenizers,
     predict,
     save_pretrained_model_configs,
     save_text_tokenizers,
     select_model,
     setup_save_path,
+    split_hyperparameters,
     split_train_tuning_data,
     update_hyperparameters,
     upgrade_config,
@@ -124,6 +126,8 @@ class MultiModalMatcher:
         verbosity: Optional[int] = 3,
         warn_if_exist: Optional[bool] = True,
         enable_progress_bar: Optional[bool] = None,
+        pretrained: Optional[bool] = True,
+        validation_metric: Optional[str] = None,
     ):
         """
         Parameters
@@ -151,7 +155,7 @@ class MultiModalMatcher:
             Presets regarding model quality, e.g., best_quality, high_quality, and medium_quality.
         eval_metric
             Evaluation metric name. If `eval_metric = None`, it is automatically chosen based on `problem_type`.
-            Defaults to 'accuracy' for binary and multiclass classification, 'root_mean_squared_error' for regression.
+            Defaults to 'roc_auc' for binary classification and 'spearmanr' for multiclass classification and regression.
         path
             Path to directory where models and intermediate outputs should be saved.
             If unspecified, a time-stamped folder called "AutogluonAutoMM/ag-[TIMESTAMP]"
@@ -170,6 +174,11 @@ class MultiModalMatcher:
         enable_progress_bar
             Whether to show progress bar. It will be True by default and will also be
             disabled if the environment variable os.environ["AUTOMM_DISABLE_PROGRESS_BAR"] is set.
+        pretrained
+            Whether to init model with pretrained weights. If False, it creates a model with random initialization.
+        validation_metric
+            Validation metric name. If `validation_metric = None`, it is automatically chosen based on `problem_type`.
+            Defaults to 'roc_auc' for binary classification and 'spearmanr' for multiclass classification and regression.
         """
         if eval_metric is not None and not isinstance(eval_metric, str):
             eval_metric = eval_metric.name
@@ -199,12 +208,14 @@ class MultiModalMatcher:
         self._problem_type = None  # always infer problem type for matching.
         self._pipeline = problem_type.lower() if problem_type is not None else None
         self._presets = presets.lower() if presets else None
-        self._eval_metric_name = eval_metric
-        self._validation_metric_name = None
+        self._eval_metric_name = eval_metric.lower() if eval_metric else None
+        self._validation_metric_name = validation_metric.lower() if validation_metric else None
+        self._hyperparameters = hyperparameters
         self._output_shape = None
         self._save_path = path
         self._ckpt_path = None
         self._pretrained_path = None
+        self._pretrained = pretrained
         self._config = None
         self._query_config = None
         self._response_config = None
@@ -222,19 +233,6 @@ class MultiModalMatcher:
         self._verbosity = verbosity
         self._warn_if_exist = warn_if_exist
         self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
-
-        if self._pipeline is not None:  # TODO: do not create pretrained model for HPO presets.
-            (
-                self._config,
-                self._query_config,
-                self._response_config,
-                self._query_model,
-                self._response_model,
-                self._query_processors,
-                self._response_processors,
-            ) = init_pretrained_matcher(
-                pipeline=self._pipeline, presets=self._presets, hyperparameters=hyperparameters
-            )
 
     @property
     def query(self):
@@ -282,6 +280,66 @@ class MultiModalMatcher:
         """
         self._verbosity = verbosity
         set_logger_verbosity(verbosity, logger=logger)
+
+    def _init_pretrained(self):
+
+        if self._config is None:
+            # split out the hyperparameters whose values are complex objects
+            hyperparameters, advanced_hyperparameters = split_hyperparameters(self._hyperparameters)
+            self._config = get_config(
+                problem_type=self._pipeline,
+                presets=self._presets,
+                overrides=hyperparameters,
+                extra=["matcher"],
+            )
+        else:
+            advanced_hyperparameters = None
+
+        assert (
+            len(self._config.model.names) == 1
+        ), f"Zero shot mode only supports using one model, but detects multiple models {self._config.model.names}"
+
+        if self._query_config is None:
+            self._query_config = copy.deepcopy(self._config)
+            # customize config model names to make them consistent with model prefixes.
+            self._query_config.model, query_advanced_hyperparameters = customize_model_names(
+                config=self._query_config.model,
+                customized_names=[f"{n}_{QUERY}" for n in self._query_config.model.names],
+                advanced_hyperparameters=advanced_hyperparameters,
+            )
+        else:
+            query_advanced_hyperparameters = (None,)
+
+        if self._response_config is None:
+            self._response_config = copy.deepcopy(self._config)
+            # customize config model names to make them consistent with model prefixes.
+            self._response_config.model, response_advanced_hyperparameters = customize_model_names(
+                config=self._response_config.model,
+                customized_names=[f"{n}_{RESPONSE}" for n in self._response_config.model.names],
+                advanced_hyperparameters=advanced_hyperparameters,
+            )
+        else:
+            response_advanced_hyperparameters = None
+
+        if self._query_model is None or self._response_model is None:
+            self._query_model, self._response_model = create_siamese_model(
+                query_config=self._query_config,
+                response_config=self._response_config,
+                pretrained=self._pretrained,
+            )
+
+        self._query_processors, self._response_processors, self._label_processors = self._get_matcher_data_processors(
+            query_model=self._query_model,
+            query_config=self._query_config,
+            response_model=self._response_model,
+            response_config=self._response_config,
+            query_advanced_hyperparameters=query_advanced_hyperparameters,
+            response_advanced_hyperparameters=response_advanced_hyperparameters,
+        )
+
+    def _ensure_inference_ready(self):
+        if not self._fit_called:
+            self._init_pretrained()
 
     def fit(
         self,
@@ -452,12 +510,20 @@ class MultiModalMatcher:
         self._output_shape = output_shape
         self._column_types = column_types
 
+        if self._hyperparameters and hyperparameters:
+            self._hyperparameters.update(hyperparameters)
+        elif hyperparameters:
+            self._hyperparameters = hyperparameters
+
         hyperparameters, hyperparameter_tune_kwargs = update_hyperparameters(
             problem_type=self._pipeline,
             presets=presets,
-            provided_hyperparameters=hyperparameters,
+            provided_hyperparameters=self._hyperparameters,
             provided_hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
         )
+        # split out the hyperparameters whose values are complex objects
+        hyperparameters, advanced_hyperparameters = split_hyperparameters(hyperparameters)
+
         hpo_mode = True if hyperparameter_tune_kwargs else False
         if hpo_mode:
             hyperparameters = filter_hyperparameters(
@@ -480,6 +546,7 @@ class MultiModalMatcher:
             enable_progress_bar=False if hpo_mode else self._enable_progress_bar,
             presets=presets,
             hyperparameters=hyperparameters,
+            advanced_hyperparameters=advanced_hyperparameters,
             hpo_mode=hpo_mode,  # skip average checkpoint if in hpo mode
         )
 
@@ -559,6 +626,8 @@ class MultiModalMatcher:
         query_config: Optional[DictConfig] = None,
         response_model: Optional[nn.Module] = None,
         response_config: Optional[DictConfig] = None,
+        query_advanced_hyperparameters: Optional[Dict] = None,
+        response_advanced_hyperparameters: Optional[Dict] = None,
     ):
         if query_model is None:
             query_processors = None
@@ -568,6 +637,7 @@ class MultiModalMatcher:
                 config=query_config,
                 requires_label=False,
                 requires_data=True,
+                advanced_hyperparameters=query_advanced_hyperparameters,
             )
         else:  # continuing training
             query_processors = self._query_processors
@@ -580,6 +650,7 @@ class MultiModalMatcher:
                 config=response_config,
                 requires_label=False,
                 requires_data=True,
+                advanced_hyperparameters=response_advanced_hyperparameters,
             )
         else:  # continuing training
             response_processors = self._response_processors
@@ -615,6 +686,7 @@ class MultiModalMatcher:
         enable_progress_bar: bool,
         presets: Optional[str] = None,
         hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
+        advanced_hyperparameters: Optional[Dict] = None,
         hpo_mode: bool = False,
         **hpo_kwargs,
     ):
@@ -632,21 +704,26 @@ class MultiModalMatcher:
         if self._query_config is None:
             query_config = copy.deepcopy(config)
             # customize config model names to make them consistent with model prefixes.
-            query_config.model, _ = customize_model_names(
-                config=query_config.model, customized_names=[f"{n}_{QUERY}" for n in query_config.model.names]
+            query_config.model, query_advanced_hyperparameters = customize_model_names(
+                config=query_config.model,
+                customized_names=[f"{n}_{QUERY}" for n in query_config.model.names],
+                advanced_hyperparameters=advanced_hyperparameters,
             )
         else:
             query_config = self._query_config
+            query_advanced_hyperparameters = None
 
         if self._response_config is None:
             response_config = copy.deepcopy(config)
             # customize config model names to make them consistent with model prefixes.
-            response_config.model, _ = customize_model_names(
+            response_config.model, response_advanced_hyperparameters = customize_model_names(
                 config=response_config.model,
                 customized_names=[f"{n}_{RESPONSE}" for n in response_config.model.names],
+                advanced_hyperparameters=advanced_hyperparameters,
             )
         else:
             response_config = self._response_config
+            response_advanced_hyperparameters = None
 
         query_df_preprocessor, response_df_preprocessor, label_df_preprocessor = self._get_matcher_df_preprocessor(
             data=train_df,
@@ -664,6 +741,7 @@ class MultiModalMatcher:
             query_model, response_model = create_siamese_model(
                 query_config=query_config,
                 response_config=response_config,
+                pretrained=self._pretrained,
             )
         else:  # continuing training
             query_model = self._query_model
@@ -674,6 +752,8 @@ class MultiModalMatcher:
             query_config=query_config,
             response_model=response_model,
             response_config=response_config,
+            query_advanced_hyperparameters=query_advanced_hyperparameters,
+            response_advanced_hyperparameters=response_advanced_hyperparameters,
         )
 
         query_processors_count = {k: len(v) for k, v in query_processors.items()}
@@ -1444,6 +1524,7 @@ class MultiModalMatcher:
         A dictionary with the metric names and their corresponding scores.
         Optionally return a dataframe of prediction results.
         """
+        self._ensure_inference_ready()
         if all(v is not None for v in [data, query_data, response_data]):
             if isinstance(query_data, list):
                 assert (
@@ -1516,6 +1597,7 @@ class MultiModalMatcher:
         -------
         Array of predictions, one corresponding to each row in given dataset.
         """
+        self._ensure_inference_ready()
         outputs = predict(
             predictor=self,
             data=data,
@@ -1577,6 +1659,7 @@ class MultiModalMatcher:
         When as_multiclass is True, the output will always have shape (#samples, #classes).
         Otherwise, the output will have shape (#samples,)
         """
+        self._ensure_inference_ready()
         outputs = predict(
             predictor=self,
             data=data,
@@ -1633,6 +1716,7 @@ class MultiModalMatcher:
         It will have shape (#samples, D) where the embedding dimension D is determined
         by the neural network's architecture.
         """
+        self._ensure_inference_ready()
         if signature is None:
             if self._query or self._response:
                 if isinstance(data, list):
@@ -1789,6 +1873,7 @@ class MultiModalMatcher:
                     "validation_metric_name": self._validation_metric_name,
                     "output_shape": self._output_shape,
                     "save_path": self._save_path,
+                    "pretrained": self._pretrained,
                     "pretrained_path": self._pretrained_path,
                     "fit_called": self._fit_called,
                     "version": ag_version.__version__,
@@ -1892,7 +1977,9 @@ class MultiModalMatcher:
         matcher._verbosity = verbosity
         matcher._resume = resume
         matcher._save_path = path  # in case the original exp dir is copied to somewhere else
-        matcher._pretrain_path = path
+        matcher._pretrained_path = path
+        if "pretrained" in assets:
+            matcher._pretrained = assets["pretrained"]
         if "fit_called" in assets:
             matcher._fit_called = assets["fit_called"]
         else:
@@ -1940,10 +2027,11 @@ class MultiModalMatcher:
         -------
         The loaded matcher object.
         """
-        path = os.path.abspath(os.path.expanduser(path))
-        assert os.path.isdir(path), f"'{path}' must be an existing directory."
+        dir_path, ckpt_path = get_dir_ckpt_paths(path=path)
+
+        assert os.path.isdir(dir_path), f"'{dir_path}' must be an existing directory."
         matcher = cls(query="", response="")
-        matcher = cls._load_metadata(matcher=matcher, path=path, resume=resume, verbosity=verbosity)
+        matcher = cls._load_metadata(matcher=matcher, path=dir_path, resume=resume, verbosity=verbosity)
 
         query_model, response_model = create_siamese_model(
             query_config=matcher._query_config,
@@ -1951,42 +2039,11 @@ class MultiModalMatcher:
             pretrained=False,
         )
 
-        resume_ckpt_path = os.path.join(path, LAST_CHECKPOINT)
-        final_ckpt_path = os.path.join(path, MODEL_CHECKPOINT)
-        if resume:  # resume training which crashed before
-            if not os.path.isfile(resume_ckpt_path):
-                if os.path.isfile(final_ckpt_path):
-                    raise ValueError(
-                        f"Resuming checkpoint '{resume_ckpt_path}' doesn't exist, but "
-                        f"final checkpoint '{final_ckpt_path}' exists, which means training "
-                        f"is already completed."
-                    )
-                else:
-                    raise ValueError(
-                        f"Resuming checkpoint '{resume_ckpt_path}' and "
-                        f"final checkpoint '{final_ckpt_path}' both don't exist. "
-                        f"Consider starting training from scratch."
-                    )
-            load_path = resume_ckpt_path
-            logger.info(f"Resume training from checkpoint: '{resume_ckpt_path}'")
-            ckpt_path = resume_ckpt_path
-        else:  # load a model checkpoint for prediction, evaluation, or continuing training on new data
-            if not os.path.isfile(final_ckpt_path):
-                if os.path.isfile(resume_ckpt_path):
-                    raise ValueError(
-                        f"Final checkpoint '{final_ckpt_path}' doesn't exist, but "
-                        f"resuming checkpoint '{resume_ckpt_path}' exists, which means training "
-                        f"is not done yet. Consider resume training from '{resume_ckpt_path}'."
-                    )
-                else:
-                    raise ValueError(
-                        f"Resuming checkpoint '{resume_ckpt_path}' and "
-                        f"final checkpoint '{final_ckpt_path}' both don't exist. "
-                        f"Consider starting training from scratch."
-                    )
-            load_path = final_ckpt_path
-            logger.info(f"Load pretrained checkpoint: {os.path.join(path, MODEL_CHECKPOINT)}")
-            ckpt_path = None  # must set None since we do not resume training
+        load_path, ckpt_path = get_load_ckpt_paths(
+            ckpt_path=ckpt_path,
+            dir_path=dir_path,
+            resume=resume,
+        )
 
         query_model, response_model = cls._load_state_dict(
             query_model=query_model,
