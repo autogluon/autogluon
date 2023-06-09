@@ -8,31 +8,16 @@ AutoGluon also supports additional information, such as time-independent static 
 and time-dependent covariates (e.g., price of the product each day).
 See the [In Depth Tutorial](forecasting-indepth.ipynb) for more details.
 
+Currently, AutoGluon does not support features such as hierarchical forecasting and forecast explainability, but we will consider adding them in the future.
+
 ## How can I get the most accurate forecasts?
 To maximize the forecast accuracy, set the `predictor.fit()` argument `presets="best_quality"` or `presets="high_quality"` and provide a high `time_limit`.
-Training usually takes up to 15-60 minutes for small and medium-sized datasets.
-Large datasets with more than 5M rows may require up to 4-6 hours of training.
 
 ## How should I choose the evaluation metric?
-See ["How should I choose the `eval_metric`?" in the In Depth Tutorial](forecasting-indepth.ipynb)
-
-The `eval_metric` parameter allows you to control the metric optimized by
-
-Definition of the metrics can be found in the [`autogluon.timeseries.evaluator`](https://github.com/autogluon/autogluon/blob/master/timeseries/src/autogluon/timeseries/evaluator.py) module.
-An overview of different evaluation metrics is also available
-[here](https://docs.aws.amazon.com/forecast/latest/dg/metrics.html).
-
+See ["How to choose and interpret the evaluation metric?" in the In Depth Tutorial](forecasting-indepth.ipynb)
 
 ## Are there any restrictions on the data that I can pass to TimeSeriesPredictor?
-See ["What data can I pass to `TimeSeriesPredictor`?" in the In Depth Tutorial](forecasting-indepth.ipynb)
-
-Time series in the dataset can have different lengths.
-
-All time series in the dataset
-
-
-All time series must be regularly sampled (e.g., measured every hour) and contain no missing values.
-If your data is irregularly sampled or contains missing values, have a look at DDDDD.
+See ["What data format is expected by `TimeSeriesPredictor`?" in the In Depth Tutorial](forecasting-indepth.ipynb)
 
 
 ## Can I use GPUs for model training?
