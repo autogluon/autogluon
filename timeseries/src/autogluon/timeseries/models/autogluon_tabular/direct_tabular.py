@@ -21,9 +21,9 @@ logger = logging.getLogger(__name__)
 
 
 class DirectTabularModel(AbstractTimeSeriesModel):
-    """Predict future time series values using autogluon.tabular.TabularPredictor.
+    """Predict all future time series values simultaneously using TabularPredictor from AutoGluon-Tabular.
 
-    A single predictor is used to forecast all future time series values using the following features:
+    A single TabularPredictor is used to forecast all future time series values using the following features:
 
     - lag features (observed time series values) based on ``freq`` of the data
     - time features (e.g., day of the week) based on the timestamp of the measurement

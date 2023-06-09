@@ -22,19 +22,17 @@ IRREGULAR_TIME_INDEX_FREQSTR = "IRREG"
 
 
 class TimeSeriesDataFrame(pd.DataFrame):
-    """``TimeSeriesDataFrame`` s represent a collection of time series, where each row
-    identifies the values of an (``item_id``, ``timestamp``) pair.
+    """A collection of univariate time series, where each row is identified by an (``item_id``, ``timestamp``) pair.
 
-    For example, a time series data frame could represent the daily sales of a collection
-    of products, where each ``item_id`` identifies a product and ``timestamp`` s correspond to
-    the days.
+    For example, a time series data frame could represent the daily sales of a collection of products, where each
+    ``item_id`` corresponds to a product and ``timestamp`` corresponds to the day of the record.
 
     Parameters
     ----------
     data : Any
-        Time-series data to construct a ``TimeSeriesDataFrame``. The class currently supports four input formats.
+        Time series data to construct a ``TimeSeriesDataFrame``. The class currently supports four input formats.
 
-        1. Time-series data in a pandas DataFrame format without multi-index. For example::
+        1. Time series data in a pandas DataFrame format without multi-index. For example::
 
                    item_id  timestamp  target
                 0        0 2019-01-01       0
@@ -47,7 +45,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 7        2 2019-01-02       7
                 8        2 2019-01-03       8
 
-        2. Time-series data in pandas DataFrame format with multi-index on item_id and timestamp. For example::
+        2. Time series data in pandas DataFrame format with multi-index on ``item_id`` and ``timestamp``. For example::
 
                                         target
                 item_id timestamp
@@ -63,12 +61,12 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
         3. Path to a data file in CSV or Parquet format. The file must contain columns ``item_id`` and ``timestamp``, as well as columns with time series values. This is similar to Option 1 above (pandas DataFrame format without multi-index). Both remote (e.g., S3) and local paths are accepted.
 
-        4. Time-series data in Iterable format. For example::
+        4. Time series data in Iterable format. For example::
 
                 iterable_dataset = [
-                    {"target": [0, 1, 2], "start": pd.Timestamp("01-01-2019", freq='D')},
-                    {"target": [3, 4, 5], "start": pd.Timestamp("01-01-2019", freq='D')},
-                    {"target": [6, 7, 8], "start": pd.Timestamp("01-01-2019", freq='D')}
+                    {"target": [0, 1, 2], "start": pd.Period("01-01-2019", freq='D')},
+                    {"target": [3, 4, 5], "start": pd.Period("01-01-2019", freq='D')},
+                    {"target": [6, 7, 8], "start": pd.Period("01-01-2019", freq='D')}
                 ]
 
     static_features : Optional[pd.DataFrame]
@@ -85,8 +83,9 @@ class TimeSeriesDataFrame(pd.DataFrame):
     Attributes
     ----------
     freq : str
-        A pandas and gluon-ts compatible string describing the frequency of the time series. For example
-        "D" is daily data, etc. Also see,
+        A pandas-compatible string describing the frequency of the time series. For example ``"D"`` for daily data,
+        ``"H"`` for hourly data, etc. This attribute is determined automatically based on the timestamps. For the full
+        list of possible values, see
         https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases
     num_items : int
         Number of items (time series) in the data set.
