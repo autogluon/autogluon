@@ -264,12 +264,17 @@ def get_pred_from_proba_df(y_pred_proba, problem_type=BINARY):
     return y_pred
 
 
-def get_pred_from_proba(y_pred_proba, problem_type=BINARY):
+def get_pred_from_proba(y_pred_proba: np.ndarray, problem_type=BINARY):
     if problem_type == BINARY:
         # Using > instead of >= to align with Pandas `.idxmax` logic which picks the left-most column during ties.
         # If this is not done, then predictions can be inconsistent when converting in binary classification from multiclass-form pred_proba and
         # binary-form pred_proba when the pred_proba is 0.5 for positive and negative classes.
-        y_pred = [1 if pred > 0.5 else 0 for pred in y_pred_proba]
+        if len(y_pred_proba.shape) == 2:
+            assert y_pred_proba.shape[1] == 2
+            # Assume positive class is in 2nd position
+            y_pred = [1 if pred > 0.5 else 0 for pred in y_pred_proba[:, 1]]
+        else:
+            y_pred = [1 if pred > 0.5 else 0 for pred in y_pred_proba]
     elif problem_type == REGRESSION:
         y_pred = y_pred_proba
     elif problem_type == QUANTILE:

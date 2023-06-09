@@ -99,6 +99,10 @@ class AbstractTabularLearner(AbstractLearner):
         return self.label_cleaner.ordered_class_labels
 
     @property
+    def class_labels_transformed(self):
+        return self.label_cleaner.ordered_class_labels_transformed
+
+    @property
     def positive_class(self):
         """
         Returns the positive class name in binary classification. Useful for computing metrics such as F1 which require a positive and negative class.
@@ -129,58 +133,66 @@ class AbstractTabularLearner(AbstractLearner):
         raise NotImplementedError
 
     def predict_proba(self, X: DataFrame, model=None, as_pandas=True, as_multiclass=True, inverse_transform=True, transform_features=True):
-        if as_pandas:
-            X_index = copy.deepcopy(X.index)
-        else:
-            X_index = None
+        X_index = copy.deepcopy(X.index) if as_pandas else None
         if X.empty:
             y_pred_proba = np.array([])
         else:
             if transform_features:
                 X = self.transform_features(X)
             y_pred_proba = self.load_trainer().predict_proba(X, model=model)
-        if inverse_transform:
-            y_pred_proba = self.label_cleaner.inverse_transform_proba(y_pred_proba)
-        if as_multiclass and (self.problem_type == BINARY):
-            y_pred_proba = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_pred_proba)
-        if as_pandas:
-            if self.problem_type == MULTICLASS or (as_multiclass and self.problem_type == BINARY):
-                y_pred_proba = pd.DataFrame(data=y_pred_proba, columns=self.class_labels, index=X_index)
-            elif self.problem_type == QUANTILE:
-                y_pred_proba = pd.DataFrame(data=y_pred_proba, columns=self.quantile_levels, index=X_index)
-            else:
-                y_pred_proba = pd.Series(data=y_pred_proba, name=self.label, index=X_index)
+        y_pred_proba = self._post_process_predict_proba(y_pred_proba=y_pred_proba,
+                                                        as_pandas=as_pandas,
+                                                        index=X_index,
+                                                        as_multiclass=as_multiclass,
+                                                        inverse_transform=inverse_transform)
         return y_pred_proba
 
-    def predict(self, X: DataFrame, model=None, as_pandas=True, transform_features=True):
-        if as_pandas:
-            X_index = copy.deepcopy(X.index)
-        else:
-            X_index = None
+    def predict(self, X: DataFrame, model=None, as_pandas=True, inverse_transform=True, transform_features=True):
+        X_index = copy.deepcopy(X.index) if as_pandas else None
         y_pred_proba = self.predict_proba(X=X, model=model, as_pandas=False, as_multiclass=False, inverse_transform=False, transform_features=transform_features)
         problem_type = self.label_cleaner.problem_type_transform or self.problem_type
         y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=problem_type)
-        if problem_type != QUANTILE:
-            y_pred = self.label_cleaner.inverse_transform(pd.Series(y_pred))
+        y_pred = self._post_process_predict(y_pred=y_pred,
+                                            as_pandas=as_pandas,
+                                            index=X_index,
+                                            inverse_transform=inverse_transform)
+        return y_pred
+
+    def _post_process_predict(
+        self,
+        y_pred: np.ndarray,
+        as_pandas: bool = True,
+        index=None,
+        inverse_transform: bool = True,
+    ):
+        """
+        Given internal predictions, post-process them to vend to user.
+        """
+        if self.problem_type != QUANTILE:
+            if inverse_transform:
+                y_pred = self.label_cleaner.inverse_transform(pd.Series(y_pred))
+            else:
+                y_pred = pd.Series(y_pred)
             if as_pandas:
-                y_pred.index = X_index
+                y_pred.index = index
                 y_pred.name = self.label
             else:
                 y_pred = y_pred.values
         else:
             if as_pandas:
-                y_pred = pd.DataFrame(data=y_pred, columns=self.quantile_levels, index=X_index)
+                y_pred = pd.DataFrame(data=y_pred, columns=self.quantile_levels, index=index)
         return y_pred
 
-    def _inverse_transform_proba(
-            self,
-            y_pred_proba,
-            as_pandas=True,
-            index=None,
-            as_multiclass=True,
-            inverse_transform=True):
+    def _post_process_predict_proba(
+        self,
+        y_pred_proba: np.ndarray,
+        as_pandas: bool = True,
+        index=None,
+        as_multiclass: bool = True,
+        inverse_transform: bool = True
+    ):
         """
-        Given internal prediction probabilities, convert them to external prediction probabilities.
+        Given internal prediction probabilities, post-process them to vend to user.
         """
         if inverse_transform:
             y_pred_proba = self.label_cleaner.inverse_transform_proba(y_pred_proba)
@@ -188,7 +200,8 @@ class AbstractTabularLearner(AbstractLearner):
             y_pred_proba = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_pred_proba)
         if as_pandas:
             if self.problem_type == MULTICLASS or (as_multiclass and self.problem_type == BINARY):
-                y_pred_proba = pd.DataFrame(data=y_pred_proba, columns=self.class_labels, index=index)
+                classes = self.class_labels if inverse_transform else self.class_labels_transformed
+                y_pred_proba = pd.DataFrame(data=y_pred_proba, columns=classes, index=index)
             elif self.problem_type == QUANTILE:
                 y_pred_proba = pd.DataFrame(data=y_pred_proba, columns=self.quantile_levels, index=index)
             else:
@@ -246,28 +259,32 @@ class AbstractTabularLearner(AbstractLearner):
 
         if models is None:
             models = trainer.get_model_names(can_infer=True)
-        if X is not None and transform_features:
-            X = self.transform_features(X)
-        if X is None:
-            if not trainer.has_val:
+        if X is not None:
+            X_index = copy.deepcopy(X.index) if as_pandas else None
+            if transform_features:
+                X = self.transform_features(X)
+            predict_proba_dict = trainer.get_model_pred_proba_dict(X=X, models=models)
+        else:
+            if trainer.has_val:
+                # Return validation pred proba
+                X = trainer.load_X_val()
+                X_index = copy.deepcopy(X.index) if as_pandas else None
+                predict_proba_dict = trainer.get_model_pred_proba_dict(X=X, models=models, use_val_cache=True)
+            else:
+                # Return out-of-fold pred proba
                 X = trainer.load_X()
+                X_index = copy.deepcopy(X.index) if as_pandas else None
                 predict_proba_dict = dict()
                 for m in models:
                     predict_proba_dict[m] = trainer.get_model_oof(m)
-            else:
-                X = trainer.load_X_val()
-                predict_proba_dict = trainer.get_model_pred_proba_dict(X=X, models=models, use_val_cache=True)
-        else:
-            predict_proba_dict = trainer.get_model_pred_proba_dict(X=X, models=models)
 
-        if inverse_transform:
-            # Inverse Transform labels
-            for m, pred_proba in predict_proba_dict.items():
-                predict_proba_dict[m] = self._inverse_transform_proba(y_pred_proba=pred_proba,
-                                                                      as_pandas=as_pandas,
-                                                                      as_multiclass=as_multiclass,
-                                                                      index=X.index,
-                                                                      inverse_transform=True)
+        # Inverse Transform labels
+        for m, pred_proba in predict_proba_dict.items():
+            predict_proba_dict[m] = self._post_process_predict_proba(y_pred_proba=pred_proba,
+                                                                     as_pandas=as_pandas,
+                                                                     as_multiclass=as_multiclass,
+                                                                     index=X_index,
+                                                                     inverse_transform=inverse_transform)
         return predict_proba_dict
 
     def predict_multi(self,
@@ -290,9 +307,12 @@ class AbstractTabularLearner(AbstractLearner):
                 predict_dict[m] = get_pred_from_proba_df(predict_proba_dict[m], problem_type=self.problem_type)
         else:
             for m in predict_proba_dict:
-                predict_dict[m] = get_pred_from_proba(predict_proba_dict[m], problem_type=self.problem_type)
+                y_pred = get_pred_from_proba(predict_proba_dict[m], problem_type=self.problem_type)
+                predict_dict[m] = self._post_process_predict(y_pred=y_pred,
+                                                             as_pandas=as_pandas,
+                                                             index=None,
+                                                             inverse_transform=inverse_transform)
         return predict_dict
-
 
     def _validate_fit_input(self, X: DataFrame, **kwargs):
         if self.label not in X.columns:

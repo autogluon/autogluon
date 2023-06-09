@@ -69,20 +69,39 @@ def test_tabular():
     run_tabular_benchmark_toy(fit_args=fit_args)
 
 
-def _assert_predict_dict_identical_to_predict(predictor, data):
-    """Assert that predict_proba_dict and predict_dict are identical to looping calls to predict and predict_proba"""
-    predict_dict = predictor.predict_multi(data=data)
-    assert set(predictor.get_model_names()) == set(predict_dict.keys())
-    for m in predictor.get_model_names():
-        model_pred = predictor.predict(data, model=m)
-        assert model_pred.equals(predict_dict[m])
+def _assert_predict_dict_identical_to_predict(predictor: TabularPredictor, data):
+    """Assert that predict_multi is identical to looping calls to predict"""
+    for as_pandas in [True, False]:
+        for inverse_transform in [True, False]:
+            predict_dict = predictor.predict_multi(data=data, as_pandas=as_pandas, inverse_transform=inverse_transform)
+            assert set(predictor.get_model_names()) == set(predict_dict.keys())
+            for m in predictor.get_model_names():
+                if not inverse_transform:
+                    model_pred = predictor._learner.predict(data, model=m, as_pandas=as_pandas, inverse_transform=inverse_transform)
+                else:
+                    model_pred = predictor.predict(data, model=m, as_pandas=as_pandas)
+                if as_pandas:
+                    assert model_pred.equals(predict_dict[m])
+                else:
+                    assert np.array_equal(model_pred, predict_dict[m])
 
-    if predictor.can_predict_proba:
-        predict_proba_dict = predictor.predict_proba_multi(data=data)
-        assert set(predictor.get_model_names()) == set(predict_proba_dict.keys())
-        for m in predictor.get_model_names():
-            model_pred_proba = predictor.predict_proba(data, model=m)
-            assert model_pred_proba.equals(predict_proba_dict[m])
+
+def _assert_predict_proba_dict_identical_to_predict_proba(predictor: TabularPredictor, data):
+    """Assert that predict_proba_multi is identical to looping calls to predict_proba"""
+    for as_pandas in [True, False]:
+        for inverse_transform in [True, False]:
+            for as_multiclass in [True, False]:
+                predict_proba_dict = predictor.predict_proba_multi(data=data, as_pandas=as_pandas, as_multiclass=as_multiclass, inverse_transform=inverse_transform)
+                assert set(predictor.get_model_names()) == set(predict_proba_dict.keys())
+                for m in predictor.get_model_names():
+                    if not inverse_transform:
+                        model_pred_proba = predictor._learner.predict_proba(data, model=m, as_pandas=as_pandas, as_multiclass=as_multiclass, inverse_transform=inverse_transform)
+                    else:
+                        model_pred_proba = predictor.predict_proba(data, model=m, as_pandas=as_pandas, as_multiclass=as_multiclass)
+                    if as_pandas:
+                        assert model_pred_proba.equals(predict_proba_dict[m])
+                    else:
+                        assert np.array_equal(model_pred_proba, predict_proba_dict[m])
 
 
 def test_advanced_functionality():
@@ -131,6 +150,7 @@ def test_advanced_functionality():
         assert leaderboard_no_score['score_test'].isnull().iloc[i]
     leaderboard_extra = predictor.leaderboard(data=test_data, extra_info=True, extra_metrics=extra_metrics)
     _assert_predict_dict_identical_to_predict(predictor=predictor, data=test_data)
+    _assert_predict_proba_dict_identical_to_predict_proba(predictor=predictor, data=test_data)
     assert set(predictor.get_model_names()) == set(leaderboard['model'])
     assert set(predictor.get_model_names()) == set(leaderboard_extra['model'])
     assert set(leaderboard_extra.columns).issuperset(set(leaderboard.columns))
@@ -288,6 +308,7 @@ def test_advanced_functionality_bagging():
     assert(len(predictor.get_model_names()) == expected_num_models)
 
     _assert_predict_dict_identical_to_predict(predictor=predictor, data=test_data)
+    _assert_predict_proba_dict_identical_to_predict_proba(predictor=predictor, data=test_data)
 
     oof_pred_proba = predictor.get_oof_pred_proba()
     assert(len(oof_pred_proba) == len(train_data))
