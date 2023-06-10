@@ -20,6 +20,7 @@ from autogluon.common.utils.try_import import try_import_torch
 
 from .utils import process_hyperparameters
 from ..augmentation.distill_utils import format_distillation_labels, augment_data
+from ..calibrate import calibrate_decision_threshold
 from ..calibrate.conformity_score import compute_conformity_score
 from ..calibrate.temperature_scaling import tune_temperature_scaling
 from ..constants import AG_ARGS, BINARY, MULTICLASS, REGRESSION, QUANTILE, SOFTCLASS, REFIT_FULL_NAME, REFIT_FULL_SUFFIX
@@ -3053,8 +3054,8 @@ class AbstractTrainer:
                 model.save()
 
     def calibrate_decision_threshold(self,
-                                     X=None,
-                                     y=None,
+                                     X: pd.DataFrame = None,
+                                     y: np.array = None,
                                      metric=None,
                                      model: str = 'best',
                                      decision_thresholds: Union[int, List[float]] = 50,
@@ -3085,57 +3086,16 @@ class AbstractTrainer:
                 # Use validation data
                 X = self.load_X_val()
                 y = self.load_y_val()
-                y_pred_proba_val = self.get_model_pred_proba_dict(X=X, models=[model])[model]
+                y_pred_proba = self.get_model_pred_proba_dict(X=X, models=[model])[model]
             else:
                 # Use out-of-fold data
                 y = self.load_y()
-                y_pred_proba_val = self.get_model_oof(model=model)
+                y_pred_proba = self.get_model_oof(model=model)
         else:
-            y_pred_proba_val = self.predict_proba(X=X, model=model)
+            y_pred_proba = self.predict_proba(X=X, model=model)
 
-        if isinstance(decision_thresholds, int):
-            # Order thresholds by their proximity to 0.5
-            num_checks_half = decision_thresholds
-            num_checks = num_checks_half*2
-            decision_thresholds = [[0.5]] + [[0.5 - (i/num_checks), 0.5 + (i/num_checks)] for i in range(1, num_checks_half+1)]
-            decision_thresholds = [item for sublist in decision_thresholds for item in sublist]
-        best_score_val = None
-        best_threshold = None
-
-        y_pred_val = get_pred_from_proba(
-            y_pred_proba=y_pred_proba_val,
-            problem_type=self.problem_type,
-            decision_threshold=0.5,
-        )
-        # TODO: Avoid calling like this, re-use logic that works with weights + extra args
-        score_val_baseline = metric(y_true=y, y_pred=y_pred_val)
-
-        if verbose:
-            logger.log(20, f'\nOptimizing Metric: {metric.name}')
-        for decision_threshold in decision_thresholds:
-            extra_log = ''
-            y_pred_val = get_pred_from_proba(
-                y_pred_proba=y_pred_proba_val,
-                problem_type=self.problem_type,
-                decision_threshold=decision_threshold,
-            )
-            # TODO: Avoid calling like this, re-use logic that works with weights + extra args
-            score_val = metric(y_true=y, y_pred=y_pred_val)
-
-            if best_score_val is None or score_val > best_score_val:
-                best_threshold = decision_threshold
-                best_score_val = score_val
-                extra_log = '\t| NEW BEST'
-            elif best_score_val == score_val:
-                # If the new threshold is closer to 0.5 than the previous threshold, prioritize it.
-                if abs(decision_threshold - 0.5) < abs(best_threshold - 0.5):
-                    best_threshold = decision_threshold
-                    best_score_val = score_val
-                    extra_log = '\t| NEW BEST (Tie, using threshold that is closer to 0.5)'
-
-            if verbose:
-                logger.log(15, f'\tthreshold: {decision_threshold:.3f}\t| val: {score_val:.4f}{extra_log}')
-        if verbose:
-            logger.log(20, f'\tBase Threshold: {0.5:.3f}\t| val: {score_val_baseline:.4f}')
-            logger.log(20, f'\tBest Threshold: {best_threshold:.3f}\t| val: {best_score_val:.4f}')
-        return best_threshold
+        return calibrate_decision_threshold(y=y,
+                                            y_pred_proba=y_pred_proba,
+                                            metric=metric,
+                                            decision_thresholds=decision_thresholds,
+                                            verbose=verbose)
