@@ -4,6 +4,7 @@ from typing import List, Union
 import numpy as np
 
 from ..constants import BINARY
+from ..metrics import Scorer
 from ..utils import get_pred_from_proba
 
 logger = logging.getLogger(__name__)
@@ -13,13 +14,20 @@ logger = logging.getLogger(__name__)
 # TODO: Can use a smarter search strategy than brute force for faster speed, such as bayes opt.
 def calibrate_decision_threshold(y: np.array,
                                  y_pred_proba: np.array,
-                                 metric,
+                                 metric: Scorer,
                                  decision_thresholds: Union[int, List[float]] = 50,
                                  verbose: bool = True) -> float:
     problem_type = BINARY
     assert len(y_pred_proba.shape) == 1
     assert len(y.shape) == 1
     assert len(y) == len(y_pred_proba)
+
+    if not metric.needs_pred:
+        logger.warning(f'WARNING: The provided metric "{metric.name}" does not use class predictions for scoring, '
+                       f'and thus is invalid for decision threshold calibration. '
+                       f'Falling back to `decision_threshold=0.5`.')
+        return 0.5
+
     if isinstance(decision_thresholds, int):
         # Order thresholds by their proximity to 0.5
         num_checks_half = decision_thresholds
@@ -27,6 +35,11 @@ def calibrate_decision_threshold(y: np.array,
         decision_thresholds = [[0.5]] + [[0.5 - (i / num_checks), 0.5 + (i / num_checks)] for i in
                                          range(1, num_checks_half + 1)]
         decision_thresholds = [item for sublist in decision_thresholds for item in sublist]
+    else:
+        for decision_threshold in decision_thresholds:
+            if decision_threshold > 1 or decision_threshold < 0:
+                raise ValueError(f'Invalid decision_threshold specified: {decision_threshold} |'
+                                 f' Decision thresholds must be between 0 and 1.')
     best_score_val = None
     best_threshold = None
 

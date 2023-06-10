@@ -3068,12 +3068,6 @@ class AbstractTrainer:
         elif isinstance(metric, str):
             metric = get_metric(metric, self.problem_type, 'eval_metric')
 
-        if not metric.needs_pred:
-            logger.warning(f'WARNING: The provided metric "{metric.name}" does not use class predictions for scoring, '
-                           f'and thus is invalid for decision threshold calibration. '
-                           f'Falling back to `decision_threshold=0.5`.')
-            return 0.5
-
         if model == 'best':
             # FIXME: Incorrect if 'val' and model is refit_full
             model = self.get_model_best()

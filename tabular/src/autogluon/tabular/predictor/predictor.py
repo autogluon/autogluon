@@ -2537,8 +2537,6 @@ class TabularPredictor:
         #  add get_pred_from_proba method with decision_threshold argument
         #  unit tests (non-bag, bag, non-refit, refit)
         #  unit tests (verify predict identical to predict_proba + get_pred_from_proba with a given threshold)
-        #  move minimal logic given y_pred_proba and y to a function + unit test
-        #  move bulk of logic to learner/trainer/util function
         #  add `decision_threshold` support to predict_multi
         #  add `decision_threshold` support to get_pred_from_proba_df()
         #  precision has strange edge-cases where it flips from 1.0 to 0.0 score due to becoming undefined
