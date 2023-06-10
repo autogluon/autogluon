@@ -26,7 +26,7 @@ from autogluon.core.problem_type import problem_type_info
 from autogluon.core.pseudolabeling.pseudolabeling import filter_pseudo, filter_ensemble_pseudo
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.trainer import AbstractTrainer
-from autogluon.core.utils import get_pred_from_proba_df
+from autogluon.core.utils import get_pred_from_proba, get_pred_from_proba_df
 from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models
 from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl, load_str
@@ -1380,7 +1380,13 @@ class TabularPredictor:
                                             fit_ensemble=fit_ensemble, fit_ensemble_every_iter=fit_ensemble_every_iter,
                                             **fit_extra_kwargs)
 
-    def predict(self, data, model=None, as_pandas=True, transform_features=True):
+    def predict(self,
+                data,
+                model=None,
+                as_pandas=True,
+                transform_features=True,
+                *,
+                decision_threshold: float = None):
         """
         Use trained models to produce predictions of `label` column values for new data.
 
@@ -1399,6 +1405,13 @@ class TabularPredictor:
             If True, preprocesses data before predicting with models.
             If False, skips global feature preprocessing.
                 This is useful to save on inference time if you have already called `data = predictor.transform_features(data)`.
+        decision_threshold : float, default = None
+            The decision threshold used to convert prediction probabilities to predictions.
+            Only relevant for binary classification, otherwise ignored.
+            If None, defaults to `0.5`.
+            Valid values are in the range [0.0, 1.0]
+            Useful to set for metrics such as `balanced_accuracy` and `f1` as `0.5` is often not an optimal threshold.
+            Predictions are calculated via the following logic on the positive class: `1 if pred > decision_threshold else 0`
 
         Returns
         -------
@@ -1406,7 +1419,7 @@ class TabularPredictor:
         """
         self._assert_is_fit('predict')
         data = self._get_dataset(data)
-        return self._learner.predict(X=data, model=model, as_pandas=as_pandas, transform_features=transform_features)
+        return self._learner.predict(X=data, model=model, as_pandas=as_pandas, transform_features=transform_features, decision_threshold=decision_threshold)
 
     def predict_proba(self, data, model=None, as_pandas=True, as_multiclass=True, transform_features=True):
         """
@@ -1450,6 +1463,12 @@ class TabularPredictor:
                                  f'You can check the value of `predictor.can_predict_proba` to tell if predict_proba is valid.')
         data = self._get_dataset(data)
         return self._learner.predict_proba(X=data, model=model, as_pandas=as_pandas, as_multiclass=as_multiclass, transform_features=transform_features)
+
+    def get_pred_from_proba(self, pred_proba, decision_threshold: float = None):
+        # FIXME: Implement (Refer to `evaluate_predictions` logic)
+        # FIXME: docstring
+        # FIXME: Work for external/internal, work for pandas/numpy
+        raise NotImplementedError()
 
     @property
     def can_predict_proba(self) -> bool:
@@ -2506,6 +2525,112 @@ class TabularPredictor:
             models += self.refit_full(model=models)
 
         return models
+
+    def calibrate_decision_threshold(self,
+                                     data=None,
+                                     metric=None,
+                                     model: str = 'best',
+                                     decision_thresholds: Union[int, List[float]] = 101,
+                                     verbose: bool = True) -> float:
+        # TODO: v0.8
+        #  add docstring
+        #  ensure 0.5 is the first threshold searched unless user specifies specific thresholds.
+        #  add get_pred_from_proba method with decision_threshold argument
+        #  work with refit_full & data=None & 'val'
+        #  unit tests (non-bag, bag, non-refit, refit)
+        #  unit tests (verify predict identical to predict_proba + get_pred_from_proba with a given threshold)
+        #  move minimal logic given y_pred_proba and y to a function + unit test
+        #  move bulk of logic to learner/trainer/util function
+        #  add `decision_threshold` support to predict_multi
+        #  add `decision_threshold` support to get_pred_from_proba_df()
+        #  recall and precision have strange edge-cases where they flip from 1.0 to 0.0 score due to becoming undefined
+        #    consider warning users who pass these metrics,
+        #    or edit these metrics so they do not flip their value when undefined.
+        #      UndefinedMetricWarning: Precision is ill-defined and being set to 0.0 due to no predicted samples. Use `zero_division` parameter to control this behavior.
+        #  add tutorial section
+        #
+        # TODO: v0.9
+        #  sampling/time limit
+        #  work with sample weights, and load sample weights from val/oof if they exist
+        #  add .fit flag to automatically calibrate decision threshold
+        #  make decision threshold work in predictor.leaderboard
+        #  update validation scores of models based on threshold
+        #  speed up the logic / search for optimal threshold more efficiently
+        #  make threshold calibration part of internal optimization, such as during fit_weighted_ensemble.
+
+        self._assert_is_fit('calibrate_decision_threshold')
+        assert self.problem_type == BINARY, f'calibrate_decision_threshold is only available for `problem_type="{BINARY}"`'
+        trainer = self._learner.load_trainer()
+
+        if metric is None:
+            metric = self.eval_metric
+        elif isinstance(metric, str):
+            from autogluon.core.metrics import get_metric  # FIXME: Move to learner
+            metric = get_metric(metric, self.problem_type, 'eval_metric')
+
+        if not metric.needs_pred:
+            logger.warning(f'WARNING: The provided metric "{metric.name}" does not use class predictions for scoring, '
+                           f'and thus is invalid for decision threshold calibration. '
+                           f'Falling back to `decision_threshold=0.5`.')
+            return 0.5
+
+        if model == 'best':
+            # FIXME: Incorrect if 'val' and model is refit_full
+            model = self.get_model_best()
+
+        if data is None:
+            y_pred_proba_multi_val = self.predict_proba_multi(inverse_transform=False, as_multiclass=False)
+            y_pred_proba_val = y_pred_proba_multi_val[model]
+            val_data_source = 'val' if trainer.has_val else 'train'
+            _, y_val = self.load_data_internal(data=val_data_source, return_X=False, return_y=True)
+        else:
+            y_pred_proba_multi_val = self.predict_proba_multi(data=data, inverse_transform=False, as_multiclass=False)
+            y_pred_proba_val = y_pred_proba_multi_val[model]
+            y_val = self.transform_labels(labels=data[self.label])
+
+        if isinstance(decision_thresholds, int):
+            num_checks = decision_thresholds
+            decision_thresholds = [i / (num_checks - 1) for i in range(num_checks)]
+        best_score_val = None
+        best_threshold = None
+
+        y_pred_val = get_pred_from_proba(
+            y_pred_proba=y_pred_proba_val.values,
+            problem_type=self.problem_type,
+            decision_threshold=0.5,
+        )
+        # TODO: Avoid calling like this, re-use logic that works with weights + extra args
+        score_val_baseline = metric(y_true=y_val, y_pred=y_pred_val)
+
+        if verbose:
+            logger.log(20, f'\nOptimizing Metric: {metric.name}')
+        for decision_threshold in decision_thresholds:
+            extra_log = ''
+            y_pred_val = get_pred_from_proba(
+                y_pred_proba=y_pred_proba_val.values,
+                problem_type=self.problem_type,
+                decision_threshold=decision_threshold,
+            )
+            # TODO: Avoid calling like this, re-use logic that works with weights + extra args
+            score_val = metric(y_true=y_val, y_pred=y_pred_val)
+
+            if best_score_val is None or score_val > best_score_val:
+                best_threshold = decision_threshold
+                best_score_val = score_val
+                extra_log = '\t| NEW BEST'
+            elif best_score_val == score_val:
+                # If the new threshold is closer to 0.5 than the previous threshold, prioritize it.
+                if abs(decision_threshold - 0.5) < abs(best_threshold - 0.5):
+                    best_threshold = decision_threshold
+                    best_score_val = score_val
+                    extra_log = '\t| NEW BEST (Tie, using threshold that is closer to 0.5)'
+
+            if verbose:
+                logger.log(15, f'\tthreshold: {decision_threshold:.3f}\t| val: {score_val:.4f}{extra_log}')
+        if verbose:
+            logger.log(20, f'\tBase Threshold: {0.5:.3f}\t| val: {score_val_baseline:.4f}')
+            logger.log(20, f'\tBest Threshold: {best_threshold:.3f}\t| val: {best_score_val:.4f}')
+        return best_threshold
 
     def get_oof_pred(self, model: str = None, transformed=False, train_data=None, internal_oof=False, can_infer=None) -> pd.Series:
         """

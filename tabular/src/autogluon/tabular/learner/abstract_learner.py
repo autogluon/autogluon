@@ -147,11 +147,23 @@ class AbstractTabularLearner(AbstractLearner):
                                                         inverse_transform=inverse_transform)
         return y_pred_proba
 
-    def predict(self, X: DataFrame, model=None, as_pandas=True, inverse_transform=True, transform_features=True):
+    def predict(self,
+                X: DataFrame,
+                model=None,
+                as_pandas=True,
+                inverse_transform=True,
+                transform_features=True,
+                *,
+                decision_threshold: float = None,
+                ):
+        if decision_threshold is None:
+            decision_threshold = 0.5
         X_index = copy.deepcopy(X.index) if as_pandas else None
         y_pred_proba = self.predict_proba(X=X, model=model, as_pandas=False, as_multiclass=False, inverse_transform=False, transform_features=transform_features)
         problem_type = self.label_cleaner.problem_type_transform or self.problem_type
-        y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=problem_type)
+        y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba,
+                                     problem_type=problem_type,
+                                     decision_threshold=decision_threshold)
         y_pred = self._post_process_predict(y_pred=y_pred,
                                             as_pandas=as_pandas,
                                             index=X_index,
