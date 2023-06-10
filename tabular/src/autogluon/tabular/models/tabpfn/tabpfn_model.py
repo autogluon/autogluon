@@ -7,8 +7,6 @@ from autogluon.core.models import AbstractModel
 from autogluon.core.utils import generate_train_test_split
 
 
-# TODO: Implement max_sets for bagging as a model config option, consider `max_sets=1` for TabPFN by default,
-#  to avoid unreasonable inference times.
 class TabPFNModel(AbstractModel):
     """
     AutoGluon model wrapper to the TabPFN model: https://github.com/automl/TabPFN
@@ -144,15 +142,6 @@ class TabPFNModel(AbstractModel):
         }
         default_ag_args_ensemble.update(extra_ag_args_ensemble)
         return default_ag_args_ensemble
-
-    # FIXME: Enable parallel bagging once AutoMM supports being run within Ray without hanging
-    @classmethod
-    def _get_default_ag_args_ensemble(cls, **kwargs) -> dict:
-        default_ag_args_ensemble = super()._get_default_ag_args_ensemble(**kwargs)
-        extra_ag_args_ensemble = {'fold_fitting_strategy': 'sequential_local'}
-        default_ag_args_ensemble.update(extra_ag_args_ensemble)
-        return default_ag_args_ensemble
-
 
     def _ag_params(self) -> set:
         return {'sample_rows', 'max_features', 'max_classes'}
