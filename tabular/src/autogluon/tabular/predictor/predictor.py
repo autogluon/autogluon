@@ -2530,11 +2530,10 @@ class TabularPredictor:
                                      data=None,
                                      metric=None,
                                      model: str = 'best',
-                                     decision_thresholds: Union[int, List[float]] = 101,
+                                     decision_thresholds: Union[int, List[float]] = 50,
                                      verbose: bool = True) -> float:
         # TODO: v0.8
         #  add docstring
-        #  ensure 0.5 is the first threshold searched unless user specifies specific thresholds.
         #  add get_pred_from_proba method with decision_threshold argument
         #  work with refit_full & data=None & 'val'
         #  unit tests (non-bag, bag, non-refit, refit)
@@ -2589,8 +2588,11 @@ class TabularPredictor:
             y_val = self.transform_labels(labels=data[self.label])
 
         if isinstance(decision_thresholds, int):
-            num_checks = decision_thresholds
-            decision_thresholds = [i / (num_checks - 1) for i in range(num_checks)]
+            # Order thresholds by their proximity to 0.5
+            num_checks_half = decision_thresholds
+            num_checks = num_checks_half*2
+            decision_thresholds = [[0.5]] + [[0.5 - (i/num_checks), 0.5 + (i/num_checks)] for i in range(1, num_checks_half+1)]
+            decision_thresholds = [item for sublist in decision_thresholds for item in sublist]
         best_score_val = None
         best_threshold = None
 
