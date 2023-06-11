@@ -278,7 +278,7 @@ class TabularPredictor:
         return self._learner.problem_type
 
     @property
-    def decision_threshold(self):
+    def decision_threshold(self) -> float:
         """
         The decision threshold used to convert prediction probabilities to predictions.
         Only relevant for binary classification, otherwise the value will be None.
