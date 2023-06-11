@@ -648,6 +648,12 @@ class AbstractTrainer:
         return compute_weighted_metric(y, y_pred, self.eval_metric, weights, weight_evaluation=self.weight_evaluation,
                                        quantile_levels=self.quantile_levels)
 
+    def _score_with_y_pred(self, y, y_pred, weights=None, metric=None) -> float:
+        if metric is None:
+            metric = self.eval_metric
+        return compute_weighted_metric(y, y_pred, metric=metric, weights=weights, weight_evaluation=self.weight_evaluation,
+                                       quantile_levels=self.quantile_levels)
+
     # TODO: Slow if large ensemble with many models, could cache output result to speed up cascades during inference
     def _construct_model_pred_order(self, models: List[str]) -> List[str]:
         """
@@ -3058,6 +3064,7 @@ class AbstractTrainer:
                                      y: np.array = None,
                                      metric=None,
                                      model: str = 'best',
+                                     weights=None,
                                      decision_thresholds: Union[int, List[float]] = 50,
                                      verbose: bool = True) -> float:
         # TODO: Docstring
@@ -3079,17 +3086,30 @@ class AbstractTrainer:
             if self.has_val:
                 # Use validation data
                 X = self.load_X_val()
+                if self.weight_evaluation:
+                    X, weights = extract_column(X=X, col_name=self.sample_weight)
                 y = self.load_y_val()
                 y_pred_proba = self.get_model_pred_proba_dict(X=X, models=[model])[model]
             else:
                 # Use out-of-fold data
+                if self.weight_evaluation:
+                    X = self.load_X()
+                    X, weights = extract_column(X=X, col_name=self.sample_weight)
                 y = self.load_y()
                 y_pred_proba = self.get_model_oof(model=model)
         else:
             y_pred_proba = self.predict_proba(X=X, model=model)
 
+        if not metric.needs_pred:
+            logger.warning(f'WARNING: The provided metric "{metric.name}" does not use class predictions for scoring, '
+                           f'and thus is invalid for decision threshold calibration. '
+                           f'Falling back to `decision_threshold=0.5`.')
+            return 0.5
+
+        # metric_func =
         return calibrate_decision_threshold(y=y,
                                             y_pred_proba=y_pred_proba,
-                                            metric=metric,
+                                            metric=lambda y, y_pred : self._score_with_y_pred(y=y, y_pred=y_pred, weights=weights, metric=metric),
                                             decision_thresholds=decision_thresholds,
+                                            metric_name=metric.name,
                                             verbose=verbose)

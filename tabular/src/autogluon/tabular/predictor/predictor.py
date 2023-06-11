@@ -26,7 +26,7 @@ from autogluon.core.problem_type import problem_type_info
 from autogluon.core.pseudolabeling.pseudolabeling import filter_pseudo, filter_ensemble_pseudo
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
 from autogluon.core.trainer import AbstractTrainer
-from autogluon.core.utils import get_pred_from_proba, get_pred_from_proba_df
+from autogluon.core.utils import get_pred_from_proba_df
 from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models
 from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl, load_str
@@ -2037,17 +2037,7 @@ class TabularPredictor:
 
         """
         self._assert_is_fit('transform_labels')
-        if inverse:
-            if proba:
-                labels_transformed = self._learner.label_cleaner.inverse_transform_proba(y=labels, as_pandas=True)
-            else:
-                labels_transformed = self._learner.label_cleaner.inverse_transform(y=labels)
-        else:
-            if proba:
-                labels_transformed = self._learner.label_cleaner.transform_proba(y=labels, as_pandas=True)
-            else:
-                labels_transformed = self._learner.label_cleaner.transform(y=labels)
-        return labels_transformed
+        return self._learner.transform_labels(y=labels, inverse=inverse, proba=proba)
 
     def feature_importance(self, data=None, model=None, features=None, feature_stage='original', subsample_size=5000,
                            time_limit=None, num_shuffle_sets=None, include_confidence_band=True, confidence_level=0.99,
@@ -2542,12 +2532,13 @@ class TabularPredictor:
         #  precision has strange edge-cases where it flips from 1.0 to 0.0 score due to becoming undefined
         #    consider warning users who pass this metric,
         #    or edit this metric so they do not flip value when undefined.
-        #      UndefinedMetricWarning: Precision is ill-defined and being set to 0.0 due to no predicted samples. Use `zero_division` parameter to control this behavior.
+        #      UndefinedMetricWarning: Precision is ill-defined and being set to 0.0 due to no predicted samples.
+        #      Use `zero_division` parameter to control this behavior.
         #  add tutorial section
         #
         # TODO: v0.9
+        #  Calculate optimal threshold for each model separately when deciding best model
         #  sampling/time limit
-        #  work with sample weights, and load sample weights from val/oof if they exist
         #  add .fit flag to automatically calibrate decision threshold
         #  make decision threshold work in predictor.leaderboard
         #  update validation scores of models based on threshold
@@ -2556,26 +2547,17 @@ class TabularPredictor:
 
         self._assert_is_fit('calibrate_decision_threshold')
         assert self.problem_type == BINARY, f'calibrate_decision_threshold is only available for `problem_type="{BINARY}"`'
-        trainer = self._learner.load_trainer()
 
         if metric is None:
             metric = self.eval_metric
         if model == 'best':
             model = self.get_model_best()
 
-        if data is None:
-            X = None
-            y = None
-        else:
-            X = self.transform_features(data=data)
-            y = self.transform_labels(labels=data[self.label])
-        best_threshold = trainer.calibrate_decision_threshold(X=X,
-                                                              y=y,
-                                                              metric=metric,
-                                                              model=model,
-                                                              decision_thresholds=decision_thresholds,
-                                                              verbose=verbose)
-        return best_threshold
+        return self._learner.calibrate_decision_threshold(data=data,
+                                                          metric=metric,
+                                                          model=model,
+                                                          decision_thresholds=decision_thresholds,
+                                                          verbose=verbose)
 
     def get_oof_pred(self, model: str = None, transformed=False, train_data=None, internal_oof=False, can_infer=None) -> pd.Series:
         """

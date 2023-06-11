@@ -7,7 +7,7 @@ from collections.abc import Iterable
 import numpy as np
 import pandas as pd
 from pandas import DataFrame, Series
-from typing import List
+from typing import List, Union
 from sklearn.metrics import classification_report
 
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT
@@ -906,6 +906,47 @@ class AbstractTabularLearner(AbstractLearner):
                                                 augmentation_data=augmentation_data, augment_method=augment_method, augment_args=augment_args)
         self.save_trainer(trainer=trainer)
         return distilled_model_names
+
+    def transform_labels(self, y, inverse=False, proba=False):
+        if inverse:
+            if proba:
+                y_transformed = self.label_cleaner.inverse_transform_proba(y=y, as_pandas=True)
+            else:
+                y_transformed = self.label_cleaner.inverse_transform(y=y)
+        else:
+            if proba:
+                y_transformed = self.label_cleaner.transform_proba(y=y, as_pandas=True)
+            else:
+                y_transformed = self.label_cleaner.transform(y=y)
+        return y_transformed
+
+    def calibrate_decision_threshold(self,
+                                     data=None,
+                                     metric=None,
+                                     model: str = 'best',
+                                     decision_thresholds: Union[int, List[float]] = 50,
+                                     verbose: bool = True) -> float:
+        # TODO: docstring
+        if metric is None:
+            metric = self.eval_metric
+
+        weights = None
+        if data is None:
+            X = None
+            y = None
+        else:
+            if self.weight_evaluation:
+                data, weights = extract_column(data, self.sample_weight)
+            X = self.transform_features(X=data)
+            y = self.transform_labels(y=data[self.label])
+
+        return self.load_trainer().calibrate_decision_threshold(X=X,
+                                                                y=y,
+                                                                metric=metric,
+                                                                model=model,
+                                                                weights=weights,
+                                                                decision_thresholds=decision_thresholds,
+                                                                verbose=verbose)
 
     # TODO: Add data info gathering at beginning of .fit() that is used by all learners to add to get_info output
     # TODO: Add feature inference / feature engineering info to get_info output
