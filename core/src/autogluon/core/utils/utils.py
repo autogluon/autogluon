@@ -4,7 +4,7 @@ import pickle
 import time
 import random
 import sys
-from typing import Callable, List, Union, Tuple
+from typing import Callable, List, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -253,12 +253,26 @@ def augment_rare_classes(X, label, threshold):
     return X
 
 
-def get_pred_from_proba_df(y_pred_proba, problem_type=BINARY):
-    """From input DataFrame of pred_proba, return Series of pred"""
+def get_pred_from_proba_df(y_pred_proba: pd.DataFrame,
+                           problem_type: str = BINARY,
+                           decision_threshold: float = None) -> pd.Series:
+    """
+    From input DataFrame of pred_proba, return Series of pred.
+    The input DataFrame's columns must be the names of the target classes.
+    """
     if problem_type == REGRESSION:
         y_pred = y_pred_proba
     elif problem_type == QUANTILE:
         y_pred = y_pred_proba
+    elif problem_type == BINARY and decision_threshold is not None:
+        cols = y_pred_proba.columns
+        negative_class = cols[0]
+        positive_class = cols[1]
+        y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba.values,
+                                     problem_type=problem_type,
+                                     decision_threshold=decision_threshold)
+        y_pred = [positive_class if pred == 1 else negative_class for pred in y_pred]
+        y_pred = pd.Series(data=y_pred, index=y_pred_proba.index)
     else:
         y_pred = y_pred_proba.idxmax(axis=1)
     return y_pred

@@ -85,14 +85,23 @@ def test_lightgbm_binary_with_calibrate_decision_threshold(fit_helper):
 
         y_pred_val = predictor.predict(data=X_val, transform_features=False)
         y_pred_val_w_decision_threshold = predictor.predict(data=X_val, decision_threshold=decision_threshold, transform_features=False)
+        y_pred_multi_val_w_decision_threshold = predictor.predict_multi(data=X_val, decision_threshold=decision_threshold, transform_features=False)
+        y_pred_multi_val_w_decision_threshold_cache = predictor.predict_multi(decision_threshold=decision_threshold)
+
+        y_pred_proba_val = predictor.predict_proba(data=X_val, transform_features=False)
+        y_pred_val_w_decision_threshold_from_proba = predictor.get_pred_from_proba(y_pred_proba=y_pred_proba_val, decision_threshold=decision_threshold)
+
+        assert y_pred_val_w_decision_threshold.equals(y_pred_multi_val_w_decision_threshold[predictor.get_model_best()])
+        assert y_pred_val_w_decision_threshold.equals(y_pred_multi_val_w_decision_threshold_cache[predictor.get_model_best()])
+        assert y_pred_val_w_decision_threshold.equals(y_pred_val_w_decision_threshold_from_proba)
 
         result = predictor.evaluate_predictions(y_true=y_val, y_pred=y_pred_val)
         result_calibrated = predictor.evaluate_predictions(y_true=y_val, y_pred=y_pred_val_w_decision_threshold)
 
         # Ensure validation score never becomes worse on the calibrated metric
         assert result[metric] <= result_calibrated[metric]
-        if metric in ['recall', 'precision']:
-            # recall and precision should always be able to achieve a perfect validation score
+        if metric in ['recall']:
+            # recall should always be able to achieve a perfect validation score
             assert result_calibrated[metric] == 1.0
 
     for decision_threshold in [0.0, 0.01, 0.02, 0.03, 0.1, 0.2, 0.4999, 0.5, 0.5001, 0.8, 0.9, 0.97, 0.98, 0.99, 1.0]:

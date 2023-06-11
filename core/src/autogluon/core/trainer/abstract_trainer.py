@@ -3106,7 +3106,6 @@ class AbstractTrainer:
                            f'Falling back to `decision_threshold=0.5`.')
             return 0.5
 
-        # metric_func =
         return calibrate_decision_threshold(y=y,
                                             y_pred_proba=y_pred_proba,
                                             metric=lambda y, y_pred : self._score_with_y_pred(y=y, y_pred=y_pred, weights=weights, metric=metric),

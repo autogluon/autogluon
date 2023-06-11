@@ -1410,6 +1410,7 @@ class TabularPredictor:
             Only relevant for binary classification, otherwise ignored.
             If None, defaults to `0.5`.
             Valid values are in the range [0.0, 1.0]
+            You can obtain an optimized `decision_threshold` by first calling `predictor.calibrate_decision_threshold()`.
             Useful to set for metrics such as `balanced_accuracy` and `f1` as `0.5` is often not an optimal threshold.
             Predictions are calculated via the following logic on the positive class: `1 if pred > decision_threshold else 0`
 
@@ -1464,11 +1465,14 @@ class TabularPredictor:
         data = self._get_dataset(data)
         return self._learner.predict_proba(X=data, model=model, as_pandas=as_pandas, as_multiclass=as_multiclass, transform_features=transform_features)
 
-    def get_pred_from_proba(self, pred_proba, decision_threshold: float = None):
-        # FIXME: Implement (Refer to `evaluate_predictions` logic)
+    def get_pred_from_proba(self,
+                            y_pred_proba: Union[pd.DataFrame, np.ndarray],
+                            decision_threshold: float = None) -> Union[pd.Series, np.array]:
         # FIXME: docstring
         # FIXME: Work for external/internal, work for pandas/numpy
-        raise NotImplementedError()
+        if not self.can_predict_proba:
+            raise AssertionError(f'`predictor.get_pred_from_proba` is not supported when problem_type="{self.problem_type}".')
+        return self._learner.get_pred_from_proba(y_pred_proba=y_pred_proba, decision_threshold=decision_threshold)
 
     @property
     def can_predict_proba(self) -> bool:
@@ -1756,7 +1760,9 @@ class TabularPredictor:
                       models: List[str] = None,
                       as_pandas: bool = True,
                       transform_features: bool = True,
-                      inverse_transform: bool = True) -> dict:
+                      inverse_transform: bool = True,
+                      *,
+                      decision_threshold: float = None) -> dict:
         """
         Returns a dictionary of predictions where the key is
         the model name and the value is the model's prediction probabilities on the data.
@@ -1792,6 +1798,14 @@ class TabularPredictor:
         inverse_transform : bool, default = True
             If True, will return predictions in the original format.
             If False (advanced), will return predictions in AutoGluon's internal format.
+        decision_threshold : float, default = None
+            The decision threshold used to convert prediction probabilities to predictions.
+            Only relevant for binary classification, otherwise ignored.
+            If None, defaults to `0.5`.
+            Valid values are in the range [0.0, 1.0]
+            You can obtain an optimized `decision_threshold` by first calling `predictor.calibrate_decision_threshold()`.
+            Useful to set for metrics such as `balanced_accuracy` and `f1` as `0.5` is often not an optimal threshold.
+            Predictions are calculated via the following logic on the positive class: `1 if pred > decision_threshold else 0`
 
         Returns
         -------
@@ -1803,7 +1817,8 @@ class TabularPredictor:
                                            models=models,
                                            as_pandas=as_pandas,
                                            transform_features=transform_features,
-                                           inverse_transform=inverse_transform)
+                                           inverse_transform=inverse_transform,
+                                           decision_threshold=decision_threshold)
 
     def fit_summary(self, verbosity=3, show_plot=False):
         """
@@ -2524,11 +2539,7 @@ class TabularPredictor:
                                      verbose: bool = True) -> float:
         # TODO: v0.8
         #  add docstring
-        #  add get_pred_from_proba method with decision_threshold argument
         #  unit tests (non-bag, bag, non-refit, refit)
-        #  unit tests (verify predict identical to predict_proba + get_pred_from_proba with a given threshold)
-        #  add `decision_threshold` support to predict_multi
-        #  add `decision_threshold` support to get_pred_from_proba_df()
         #  precision has strange edge-cases where it flips from 1.0 to 0.0 score due to becoming undefined
         #    consider warning users who pass this metric,
         #    or edit this metric so they do not flip value when undefined.

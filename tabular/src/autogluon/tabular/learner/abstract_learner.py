@@ -304,7 +304,9 @@ class AbstractTabularLearner(AbstractLearner):
                       models: List[str] = None,
                       as_pandas: bool = True,
                       transform_features: bool = True,
-                      inverse_transform: bool = True) -> dict:
+                      inverse_transform: bool = True,
+                      *,
+                      decision_threshold: float = None) -> dict:
         """
         Identical to predict_proba_multi, except returns predictions instead of probabilities.
         """
@@ -314,17 +316,29 @@ class AbstractTabularLearner(AbstractLearner):
                                                       transform_features=transform_features,
                                                       inverse_transform=inverse_transform)
         predict_dict = {}
-        if as_pandas:
-            for m in predict_proba_dict:
-                predict_dict[m] = get_pred_from_proba_df(predict_proba_dict[m], problem_type=self.problem_type)
-        else:
-            for m in predict_proba_dict:
-                y_pred = get_pred_from_proba(predict_proba_dict[m], problem_type=self.problem_type)
-                predict_dict[m] = self._post_process_predict(y_pred=y_pred,
-                                                             as_pandas=as_pandas,
-                                                             index=None,
-                                                             inverse_transform=inverse_transform)
+        for m in predict_proba_dict:
+            predict_dict[m] = self.get_pred_from_proba(y_pred_proba=predict_proba_dict[m],
+                                                       decision_threshold=decision_threshold,
+                                                       inverse_transform=inverse_transform)
         return predict_dict
+
+    def get_pred_from_proba(self,
+                            y_pred_proba: Union[np.ndarray, pd.DataFrame],
+                            decision_threshold: float = None,
+                            inverse_transform: bool = True) -> Union[np.array, pd.Series]:
+        if isinstance(y_pred_proba, pd.DataFrame):
+            y_pred = get_pred_from_proba_df(y_pred_proba,
+                                            problem_type=self.problem_type,
+                                            decision_threshold=decision_threshold)
+        else:
+            y_pred = get_pred_from_proba(y_pred_proba,
+                                         problem_type=self.problem_type,
+                                         decision_threshold=decision_threshold)
+            y_pred = self._post_process_predict(y_pred=y_pred,
+                                                as_pandas=False,
+                                                index=None,
+                                                inverse_transform=inverse_transform)
+        return y_pred
 
     def _validate_fit_input(self, X: DataFrame, **kwargs):
         if self.label not in X.columns:
