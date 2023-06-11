@@ -278,8 +278,10 @@ def get_pred_from_proba_df(y_pred_proba: pd.DataFrame,
     return y_pred
 
 
-def get_pred_from_proba(y_pred_proba: np.ndarray, problem_type=BINARY, decision_threshold=0.5):
+def get_pred_from_proba(y_pred_proba: np.ndarray, problem_type=BINARY, decision_threshold: float = None):
     if problem_type == BINARY:
+        if decision_threshold is None:
+            decision_threshold = 0.5
         # Using > instead of >= to align with Pandas `.idxmax` logic which picks the left-most column during ties.
         # If this is not done, then predictions can be inconsistent when converting in binary classification from multiclass-form pred_proba and
         # binary-form pred_proba when the pred_proba is 0.5 for positive and negative classes.

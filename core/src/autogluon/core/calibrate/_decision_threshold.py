@@ -61,7 +61,7 @@ def calibrate_decision_threshold(y: np.array,
     score_val_baseline = metric(y, y_pred_val, **metric_kwargs)
 
     if verbose:
-        logger.log(20, f'\nCalibrating decision threshold to optimize metric{metric_name_log} '
+        logger.log(20, f'Calibrating decision threshold to optimize metric{metric_name_log} '
                        f'| Checking {len(decision_thresholds)} thresholds...')
     for decision_threshold in decision_thresholds:
         extra_log = ''

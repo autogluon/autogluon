@@ -451,7 +451,8 @@ class AbstractTabularLearner(AbstractLearner):
         return compute_weighted_metric(y, y_pred, self.eval_metric, w, weight_evaluation=self.weight_evaluation, quantile_levels=self.quantile_levels)
 
     # Scores both learner and all individual models, along with computing the optimal ensemble score + weights (oracle)
-    def score_debug(self, X: DataFrame, y=None, extra_info=False, compute_oracle=False, extra_metrics=None, skip_score=False, silent=False):
+    def score_debug(self, X: DataFrame, y=None, extra_info=False, compute_oracle=False, extra_metrics=None,
+                    decision_threshold=None, skip_score=False, silent=False):
         leaderboard_df = self.leaderboard(extra_info=extra_info, silent=silent)
         if extra_metrics is None:
             extra_metrics = []
@@ -505,6 +506,7 @@ class AbstractTabularLearner(AbstractLearner):
                 scores[model_name] = self._score_with_pred_proba(
                     y_pred_proba_internal=y_pred_proba_internal,
                     metric=self.eval_metric,
+                    decision_threshold=decision_threshold,
                     **scoring_args
                 )
             for metric in extra_metrics:
@@ -514,6 +516,7 @@ class AbstractTabularLearner(AbstractLearner):
                 extra_scores[metric.name][model_name] = self._score_with_pred_proba(
                     y_pred_proba_internal=y_pred_proba_internal,
                     metric=metric,
+                    decision_threshold=decision_threshold,
                     **scoring_args
                 )
 
@@ -598,6 +601,7 @@ class AbstractTabularLearner(AbstractLearner):
                                y_pred_proba_internal,
                                metric,
                                sample_weight=None,
+                               decision_threshold=None,
                                weight_evaluation=None):
         metric = get_metric(metric, self.problem_type, 'leaderboard_metric')
         if weight_evaluation is None:
@@ -605,7 +609,9 @@ class AbstractTabularLearner(AbstractLearner):
         if metric.needs_pred:
             if self.problem_type == BINARY:
                 # Use 1 and 0, otherwise f1 can crash due to unknown pos_label.
-                y_pred = get_pred_from_proba(y_pred_proba_internal, problem_type=self.problem_type)
+                y_pred = self.get_pred_from_proba(y_pred_proba_internal,
+                                                  decision_threshold=decision_threshold,
+                                                  inverse_transform=False)
                 y_tmp = y_internal
             else:
                 y_pred = self.label_cleaner.inverse_transform_proba(y_pred_proba_internal, as_pred=True)
@@ -652,7 +658,7 @@ class AbstractTabularLearner(AbstractLearner):
                 # log_loss / pac_score
                 raise ValueError(f'Multiclass scoring with eval_metric=\'{self.eval_metric.name}\' does not support unknown classes. Unknown classes: {unknown_classes}')
 
-    def evaluate_predictions(self, y_true, y_pred, sample_weight=None, silent=False, auxiliary_metrics=True, detailed_report=False):
+    def evaluate_predictions(self, y_true, y_pred, sample_weight=None, decision_threshold=None, silent=False, auxiliary_metrics=True, detailed_report=False):
         """ Evaluate predictions. Does not support sample weights since this method reports a variety of metrics.
             Args:
                 silent (bool): Should we print which metric is being used as well as performance.
@@ -683,7 +689,7 @@ class AbstractTabularLearner(AbstractLearner):
                                  f'which is not supported by `evaluate_predictions`.')
         if is_proba:
             y_pred_proba = y_pred
-            y_pred = get_pred_from_proba_df(y_pred_proba, problem_type=self.problem_type)
+            y_pred = self.get_pred_from_proba(y_pred_proba=y_pred_proba, decision_threshold=decision_threshold)
             if self.problem_type == BINARY:
                 # roc_auc crashes if this isn't done
                 y_pred_proba = y_pred_proba[self.positive_class]
@@ -749,6 +755,7 @@ class AbstractTabularLearner(AbstractLearner):
                     score = self._score_with_pred_proba(
                         y_pred_proba_internal=y_pred_proba_internal,
                         metric=aux_metric,
+                        decision_threshold=decision_threshold,
                         **scoring_args
                     )
                 else:
@@ -797,9 +804,11 @@ class AbstractTabularLearner(AbstractLearner):
         X = X.drop(self.label, axis=1)
         return X, y
 
-    def leaderboard(self, X=None, y=None, extra_info=False, extra_metrics=None, only_pareto_frontier=False, skip_score=False, silent=False):
+    def leaderboard(self, X=None, y=None, extra_info=False, extra_metrics=None, decision_threshold=None,
+                    only_pareto_frontier=False, skip_score=False, silent=False) -> pd.DataFrame:
         if X is not None:
-            leaderboard = self.score_debug(X=X, y=y, extra_info=extra_info, extra_metrics=extra_metrics, skip_score=skip_score, silent=True)
+            leaderboard = self.score_debug(X=X, y=y, extra_info=extra_info, extra_metrics=extra_metrics,
+                                           decision_threshold=decision_threshold, skip_score=skip_score, silent=True)
         else:
             if extra_metrics:
                 raise AssertionError('`extra_metrics` is only valid when data is specified.')
