@@ -1520,7 +1520,37 @@ class TabularPredictor:
     def get_pred_from_proba(self,
                             y_pred_proba: Union[pd.DataFrame, np.ndarray],
                             decision_threshold: float = None) -> Union[pd.Series, np.array]:
-        # TODO: docstring
+        """
+        Given prediction probabilities, convert to predictions.
+
+        Parameters
+        ----------
+        y_pred_proba : :class:`pd.DataFrame` or :class:`np.ndarray`
+            The prediction probabilities to convert to predictions.
+            Obtainable via the output of `predictor.predict_proba`.
+        decision_threshold : float, default = None
+            The decision threshold used to convert prediction probabilities to predictions.
+            Only relevant for binary classification, otherwise ignored.
+            If None, defaults to `predictor.decision_threshold`.
+            Valid values are in the range [0.0, 1.0]
+            You can obtain an optimized `decision_threshold` by first calling `predictor.calibrate_decision_threshold()`.
+            Useful to set for metrics such as `balanced_accuracy` and `f1` as `0.5` is often not an optimal threshold.
+            Predictions are calculated via the following logic on the positive class: `1 if pred > decision_threshold else 0`
+
+        Returns
+        -------
+        Array of predictions, one corresponding to each row in given dataset. Either :class:`np.ndarray` or :class:`pd.Series` depending on `y_pred_proba` dtype.
+
+        Examples
+        --------
+        >>> from autogluon.tabular import TabularPredictor
+        >>> predictor = TabularPredictor(label='class').fit('train.csv', label='class')
+        >>> y_pred_proba = predictor.predict_proba('test.csv')
+        >>>
+        >>> # y_pred and y_pred_from_proba are identical
+        >>> y_pred = predictor.predict('test.csv')
+        >>> y_pred_from_proba = predictor.get_pred_from_proba(y_pred_proba=y_pred_proba)
+        """
         if not self.can_predict_proba:
             raise AssertionError(f'`predictor.get_pred_from_proba` is not supported when problem_type="{self.problem_type}".')
         if decision_threshold is None:
