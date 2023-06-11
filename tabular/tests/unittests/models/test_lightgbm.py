@@ -104,8 +104,4 @@ def test_lightgbm_binary_with_calibrate_decision_threshold(fit_helper):
             # recall should always be able to achieve a perfect validation score
             assert result_calibrated[metric] == 1.0
 
-    for decision_threshold in [0.0, 0.01, 0.02, 0.03, 0.1, 0.2, 0.4999, 0.5, 0.5001, 0.8, 0.9, 0.97, 0.98, 0.99, 1.0]:
-        # TODO: Verify that predict_proba + get_pred_from_proba w/ threshold is equivalent to predict w/ threshold
-        pass
-
     assert predictor.calibrate_decision_threshold(metric='roc_auc') == 0.5

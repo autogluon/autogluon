@@ -25,7 +25,7 @@ from ..calibrate.conformity_score import compute_conformity_score
 from ..calibrate.temperature_scaling import tune_temperature_scaling
 from ..constants import AG_ARGS, BINARY, MULTICLASS, REGRESSION, QUANTILE, SOFTCLASS, REFIT_FULL_NAME, REFIT_FULL_SUFFIX
 from ..data.label_cleaner import LabelCleanerMulticlassToBinary
-from ..metrics import get_metric
+from ..metrics import get_metric, Scorer
 from ..models import AbstractModel, BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel, GreedyWeightedEnsembleModel, SimpleWeightedEnsembleModel
 from ..utils import default_holdout_frac, get_pred_from_proba, generate_train_test_split, infer_eval_metric, compute_permutation_feature_importance, \
     extract_column, compute_weighted_metric, convert_pred_probas_to_df
@@ -2394,6 +2394,9 @@ class AbstractTrainer:
             model_full_dict = {parent: refit for refit, parent in model_full_dict.items()}
         return model_full_dict
 
+    def model_exists(self, model: str) -> bool:
+        return model in self.get_model_names()
+
     def _get_banned_model_names(self) -> list:
         """Gets all model names which would cause model files to be overwritten if a new model was trained with the name"""
         return self.get_model_names() + list(self._extra_banned_names)
@@ -3062,7 +3065,7 @@ class AbstractTrainer:
     def calibrate_decision_threshold(self,
                                      X: pd.DataFrame = None,
                                      y: np.array = None,
-                                     metric=None,
+                                     metric: Union[str, Scorer] = None,
                                      model: str = 'best',
                                      weights=None,
                                      decision_thresholds: Union[int, List[float]] = 50,
@@ -3076,20 +3079,25 @@ class AbstractTrainer:
             metric = get_metric(metric, self.problem_type, 'eval_metric')
 
         if model == 'best':
-            # FIXME: Incorrect if 'val' and model is refit_full
             model = self.get_model_best()
 
         if y is None:
             # If model is refit_full, use its parent to avoid over-fitting
-            # FIXME: What if parent is deleted?
-            model = self.get_refit_full_parent(model=model)
+            model_parent = self.get_refit_full_parent(model=model)
+            if not self.model_exists(model_parent):
+                raise AssertionError(f'Unable to calibrate the decision threshold on the internal data because the '
+                                     f'model "{model}" is a refit_full model trained on all of the internal data, '
+                                     f'whose parent model "{model_parent}" does not exist or was deleted.\n'
+                                     f'It may have been deleted due to `predictor.fit(..., keep_only_best=True)`. '
+                                     f'Ensure `keep_only_best=False` to be able to calibrate refit_full models.')
+            model = model_parent
             if self.has_val:
                 # Use validation data
                 X = self.load_X_val()
                 if self.weight_evaluation:
                     X, weights = extract_column(X=X, col_name=self.sample_weight)
                 y = self.load_y_val()
-                y_pred_proba = self.get_model_pred_proba_dict(X=X, models=[model])[model]
+                y_pred_proba = self.predict_proba(X=X, model=model)
             else:
                 # Use out-of-fold data
                 if self.weight_evaluation:
