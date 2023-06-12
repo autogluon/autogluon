@@ -265,9 +265,7 @@ def get_pred_from_proba_df(y_pred_proba: pd.DataFrame,
     elif problem_type == QUANTILE:
         y_pred = y_pred_proba
     elif problem_type == BINARY and decision_threshold is not None:
-        cols = y_pred_proba.columns
-        negative_class = cols[0]
-        positive_class = cols[1]
+        negative_class, positive_class = y_pred_proba.columns
         y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba.values,
                                      problem_type=problem_type,
                                      decision_threshold=decision_threshold)
