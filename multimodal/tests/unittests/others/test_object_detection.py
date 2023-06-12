@@ -386,3 +386,35 @@ def test_mmdet_object_detection_fit_with_freeze_backbone(checkpoint_name):
         },
         time_limit=30,
     )
+
+
+def test_detector_hyperparameters_consistency():
+    data_dir = download_sample_dataset()
+
+    train_path = os.path.join(data_dir, "Annotations", "trainval_cocoformat.json")
+    train_df = from_coco_or_voc(train_path)
+
+    hyperparameters = {
+        "model.mmdet_image.checkpoint_name": "yolov3_mobilenetv2_8xb24-320-300e_coco",
+        "env.num_gpus": 1,
+    }
+
+    # pass hyperparameters to init()
+    predictor = MultiModalPredictor(
+        problem_type="object_detection",
+        sample_data_path=train_df,
+        hyperparameters=hyperparameters,
+    )
+    predictor.fit(train_df, time_limit=10)
+
+    # pass hyperparameters to fit()
+    predictor_2 = MultiModalPredictor(
+        problem_type="object_detection",
+        sample_data_path=train_df,
+    )
+    predictor_2.fit(
+        train_df,
+        hyperparameters=hyperparameters,
+        time_limit=10,
+    )
+    assert predictor._config == predictor_2._config

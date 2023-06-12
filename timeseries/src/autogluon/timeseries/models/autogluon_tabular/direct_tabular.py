@@ -14,15 +14,16 @@ import autogluon.core as ag
 from autogluon.tabular import TabularPredictor
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
+from autogluon.timeseries.models.local.abstract_local_model import AG_DEFAULT_N_JOBS
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 
 logger = logging.getLogger(__name__)
 
 
 class DirectTabularModel(AbstractTimeSeriesModel):
-    """Predict future time series values using autogluon.tabular.TabularPredictor.
+    """Predict all future time series values simultaneously using TabularPredictor from AutoGluon-Tabular.
 
-    A single predictor is used to forecast all future time series values using the following features:
+    A single TabularPredictor is used to forecast all future time series values using the following features:
 
     - lag features (observed time series values) based on ``freq`` of the data
     - time features (e.g., day of the week) based on the timestamp of the measurement
@@ -219,7 +220,7 @@ class DirectTabularModel(AbstractTimeSeriesModel):
             See the docstring of get_lags for the description of the parameters.
             """
             # TODO: Expose n_jobs to the user as a hyperparameter
-            lags_per_item = Parallel(n_jobs=-1)(
+            lags_per_item = Parallel(n_jobs=AG_DEFAULT_N_JOBS)(
                 delayed(get_lags)(
                     ts,
                     lag_indices,

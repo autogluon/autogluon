@@ -12,13 +12,15 @@ from .presets_custom import get_preset_custom
 from ...models import LGBModel, CatBoostModel, XGBoostModel, RFModel, XTModel, KNNModel, LinearModel,\
     TabularNeuralNetTorchModel, NNFastAiTabularModel, FastTextModel, TextPredictorModel, \
     ImagePredictorModel, VowpalWabbitModel, \
-    RuleFitModel, GreedyTreeModel, HSTreeModel, FigsModel, BoostedRulesModel, MultiModalPredictorModel, FTTransformerModel
+    RuleFitModel, GreedyTreeModel, HSTreeModel, FigsModel, BoostedRulesModel, MultiModalPredictorModel, \
+    FTTransformerModel, TabPFNModel
 from ...models.tab_transformer.tab_transformer_model import TabTransformerModel
 
 logger = logging.getLogger(__name__)
 
 # Higher values indicate higher priority, priority dictates the order models are trained for a given level.
 DEFAULT_MODEL_PRIORITY = dict(
+    TABPFN=110,  # highest priority due to its very fast training time
     KNN=100,
     GBM=90,
     RF=80,
@@ -77,7 +79,10 @@ MODEL_TYPES = dict(
     AG_TEXT_NN=TextPredictorModel,
     AG_IMAGE_NN=ImagePredictorModel,
     AG_AUTOMM=MultiModalPredictorModel,
+
     FT_TRANSFORMER=FTTransformerModel,
+    TABPFN=TabPFNModel,
+
     FASTTEXT=FastTextModel,
     ENS_WEIGHTED=GreedyWeightedEnsembleModel,
     SIMPLE_ENS_WEIGHTED=SimpleWeightedEnsembleModel,
@@ -94,6 +99,7 @@ MODEL_TYPES = dict(
 )
 
 
+# TODO: v1.0 Have this be defined in the model class
 DEFAULT_MODEL_NAMES = {
     RFModel: 'RandomForest',
     XTModel: 'ExtraTrees',
@@ -108,7 +114,10 @@ DEFAULT_MODEL_NAMES = {
     TextPredictorModel: 'TextPredictor',
     ImagePredictorModel: 'ImagePredictor',
     MultiModalPredictorModel: 'MultiModalPredictor',
+
     FTTransformerModel: 'FTTransformer',
+    TabPFNModel: 'TabPFN',
+
     FastTextModel: 'FastText',
     VowpalWabbitModel: 'VowpalWabbit',
     GreedyWeightedEnsembleModel: 'WeightedEnsemble',

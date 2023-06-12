@@ -49,6 +49,9 @@ extras_require = {
         'torch>=1.9,<1.14',
         'fastai>=2.3.1,<2.8',
     ],
+    'tabpfn': [
+        'tabpfn>=0.1,<0.2',
+    ],
     'ray': [
         f'{ag.PACKAGE_NAME}.core[all]=={version}',
     ],
@@ -74,6 +77,7 @@ extras_require = {
     ]
 }
 
+# TODO: v1.0: Rename `all` to `core`, make `all` contain everything.
 all_requires = []
 # TODO: Consider adding 'skex' to 'all'
 for extra_package in ['lightgbm', 'catboost', 'xgboost', 'fastai', 'ray']:
@@ -83,7 +87,7 @@ extras_require['all'] = all_requires
 
 
 test_requires = []
-for test_package in ['imodels', 'vowpalwabbit', 'skl2onnx']:
+for test_package in ['tabpfn', 'imodels', 'vowpalwabbit', 'skl2onnx']:
     test_requires += extras_require[test_package]
 extras_require['tests'] = test_requires
 install_requires = ag.get_dependency_version_ranges(install_requires)

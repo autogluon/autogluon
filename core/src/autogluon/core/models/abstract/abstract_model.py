@@ -17,6 +17,7 @@ from autogluon.common.utils.distribute_utils import DistributedContext
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.utils.try_import import try_import_ray
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
+from autogluon.common.utils.path_converter import PathConverter
 from autogluon.common.utils.utils import setup_outputdir
 from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.log_utils import DuplicateFilter
@@ -112,6 +113,10 @@ class AbstractModel:
             path_cur = setup_outputdir(path=None, create_dir=True, path_suffix=path_suffix)
             self.path_root = path_cur.rsplit(self.path_suffix, 1)[0]
             logger.log(20, f'Warning: No path was specified for model, defaulting to: {self.path_root}')
+
+        # v0.9 FIXME: This is a hack, change so we aren't vulnerable to self.path_root breaking things
+        self.path_root = PathConverter.to_relative(self.path_root)
+
         self.path = self.create_contexts(self.path_root + self.path_suffix)  # TODO: Make this path a function for consistency.
 
         self.num_classes = None

@@ -45,13 +45,27 @@ from .export import ExportMixin
 from .hpo import hyperparameter_tune
 from .inference import extract_from_output, infer_batch, predict, process_batch, use_realtime
 from .load import CustomUnpickler, get_dir_ckpt_paths, get_load_ckpt_paths, load_text_tokenizers
-from .log import LogFilter, apply_log_filter, get_fit_complete_message, get_fit_start_message, make_exp_dir
+from .log import (
+    LogFilter,
+    apply_log_filter,
+    get_fit_complete_message,
+    get_fit_start_message,
+    get_gpu_message,
+    make_exp_dir,
+)
 from .map import MeanAveragePrecision
 from .matcher import compute_semantic_similarity, convert_data_for_ranking, create_siamese_model, semantic_search
 from .metric import compute_ranking_score, compute_score, get_minmax_mode, get_stopping_threshold, infer_metrics
 from .misc import logits_to_prob, merge_bio_format, shopee_dataset, tensor_to_ndarray, visualize_ner
 from .mmcv import CollateMMDet, CollateMMOcr
-from .model import create_fusion_model, create_model, list_timm_models, modify_duplicate_model_names, select_model
+from .model import (
+    create_fusion_model,
+    create_model,
+    is_lazy_weight_tensor,
+    list_timm_models,
+    modify_duplicate_model_names,
+    select_model,
+)
 from .object_detection import (
     COCODataset,
     bbox_ratio_xywh_to_index_xyxy,

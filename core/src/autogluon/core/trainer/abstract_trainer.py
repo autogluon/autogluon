@@ -53,6 +53,7 @@ class AbstractTrainer:
                  num_classes=None, quantile_levels=None, low_memory=False, feature_metadata=None, k_fold=0, n_repeats=1,
                  sample_weight=None, weight_evaluation=False, save_data=False, random_state=0, verbosity=2):
         self.path = path
+        self.path = PathConverter.to_relative(self.path)
         self.problem_type = problem_type
         self.feature_metadata = feature_metadata
         self.save_data = save_data

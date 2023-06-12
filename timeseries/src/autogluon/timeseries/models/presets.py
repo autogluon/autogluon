@@ -77,18 +77,20 @@ DEFAULT_MODEL_NAMES = {v: k for k, v in MODEL_TYPES.items()}
 DEFAULT_MODEL_PRIORITY = dict(
     Naive=100,
     SeasonalNaive=100,
-    ETS=90,
     Theta=90,
-    RecursiveTabular=80,
-    ARIMA=70,
-    DirectTabular=70,
+    AutoETS=80,
+    ETS=80,
+    RecursiveTabular=70,
     DeepAR=60,
     TemporalFusionTransformer=50,
-    SimpleFeedForward=40,
-    AutoARIMA=50,
-    AutoETS=70,
-    DynamicOptimizedTheta=60,
+    PatchTST=50,
+    DirectTabular=40,
+    AutoARIMA=30,
     # Models below are not included in any presets
+    ARIMA=30,
+    ThetaStatsmodels=90,
+    SimpleFeedForward=30,
+    DynamicOptimizedTheta=30,
     DeepARMXNet=50,
     SimpleFeedForwardMXNet=30,
     TemporalFusionTransformerMXNet=50,
@@ -107,10 +109,9 @@ VALID_AG_ARGS_KEYS = {
 
 def get_default_hps(key):
     default_model_hps = {
-        "local_only": {
+        "fast_training": {
             "Naive": {},
             "SeasonalNaive": {},
-            "ARIMA": {},
             "ETS": {},
             "Theta": {},
             "RecursiveTabular": {"max_num_samples": 100_000},
@@ -118,37 +119,30 @@ def get_default_hps(key):
         "medium_quality": {
             "Naive": {},
             "SeasonalNaive": {},
-            "ARIMA": {},
-            "ETS": {},
             "AutoETS": {},
             "Theta": {},
             "RecursiveTabular": {},
-            "DirectTabular": {},
             "DeepAR": {},
         },
         "high_quality": {
             "Naive": {},
             "SeasonalNaive": {},
-            "ARIMA": {},
-            "ETS": {},
             "AutoETS": {},
             "AutoARIMA": {},
             "Theta": {},
             "RecursiveTabular": {},
             "DirectTabular": {},
             "DeepAR": {},
-            "SimpleFeedForward": {},
             "TemporalFusionTransformer": {},
+            "PatchTST": {},
         },
         "best_quality": {
             "Naive": {},
             "SeasonalNaive": {},
-            "ARIMA": {},
-            "ETS": {},
             "AutoETS": {},
             "AutoARIMA": {},
-            "DynamicOptimizedTheta": {},
             "Theta": {},
+            # TODO: Define separate model for each tabular submodel?
             "RecursiveTabular": {
                 "tabular_hyperparameters": {
                     "NN_TORCH": {"proc.impute_strategy": "constant"},
@@ -156,14 +150,12 @@ def get_default_hps(key):
                 },
             },
             "DirectTabular": {},
+            "TemporalFusionTransformer": {},
+            "PatchTST": {},
             "DeepAR": {
                 "num_layers": space.Int(1, 3, default=2),
                 "hidden_size": space.Int(40, 80, default=40),
             },
-            "SimpleFeedForward": {
-                "hidden_dimensions": space.Categorical([40], [40, 40], [120]),
-            },
-            "TemporalFusionTransformer": {},
         },
     }
 

@@ -141,12 +141,10 @@ class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
 
 
 class DeepARModel(AbstractGluonTSPyTorchModel):
-    """DeepAR model from GluonTS based on the PyTorch backend.
-
-    The model consists of an LSTM encoder and a decoder that outputs the
-    distribution of the next target value. Close to the model described in [Salinas2020]_.
+    """Autoregressive forecasting model based on a recurrent neural network [Salinas2020]_.
 
     Based on `gluonts.torch.model.deepar.DeepAREstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.torch.model.deepar.html>`_.
+    See GluonTS documentation for additional hyperparameters.
 
 
     References
@@ -203,10 +201,7 @@ class DeepARModel(AbstractGluonTSPyTorchModel):
 
 
 class SimpleFeedForwardModel(AbstractGluonTSPyTorchModel):
-    """SimpleFeedForward model from GluonTS based on the PyTorch backend.
-
-    The model consists of a multilayer perceptron (MLP) that predicts the distribution of all the target value in the
-    forecast horizon.
+    """Simple feedforward neural network that simultaneously predicts all future values.
 
     Based on `gluonts.torch.model.simple_feedforward.SimpleFeedForwardEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.torch.model.simple_feedforward.html>`_.
     See GluonTS documentation for additional hyperparameters.
@@ -238,10 +233,7 @@ class SimpleFeedForwardModel(AbstractGluonTSPyTorchModel):
 
 
 class TemporalFusionTransformerModel(AbstractGluonTSPyTorchModel):
-    """TemporalFusionTransformer model from GluonTS.
-
-    The model combines an LSTM encoder, a transformer decoder, and directly predicts
-    the quantiles of future target values. As described in [Lim2021]_.
+    """Combines LSTM with a transformer layer to predict the quantiles of all future target values [Lim2021]_.
 
     Based on `gluonts.torch.model.tft.TemporalFusionTransformerEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.torch.model.tft.html>`_.
     See GluonTS documentation for additional hyperparameters.
@@ -307,10 +299,7 @@ class TemporalFusionTransformerModel(AbstractGluonTSPyTorchModel):
 
 
 class DLinearModel(AbstractGluonTSPyTorchModel):
-    """D-Linear model from GluonTS.
-
-    The model combines a moving window detrender with a multilayer perceptron (MLP) that predicts the distribution of
-    all the target value in the forecast horizon.
+    """Simple feedforward neural network that subtracts trend before forecasting [Zeng2023]_.
 
     Based on `gluonts.torch.model.d_linear.DLinearEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.torch.model.d_linear.html>`_.
     See GluonTS documentation for additional hyperparameters.
@@ -351,9 +340,7 @@ class DLinearModel(AbstractGluonTSPyTorchModel):
 
 
 class PatchTSTModel(AbstractGluonTSPyTorchModel):
-    """PatchTST model from GluonTS.
-
-    The model is based on a transformer that segments each time series into subseries-level patches.
+    """Transformer-based forecaster that segments each time series into patches [Nie2023]_.
 
     Based on `gluonts.torch.model.d_linear.PatchTSTEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.torch.model.patch_tst.html>`_.
     See GluonTS documentation for additional hyperparameters.

@@ -17,3 +17,5 @@ from .imodels.imodels_models import RuleFitModel, BoostedRulesModel, GreedyTreeM
 from .vowpalwabbit.vowpalwabbit_model import VowpalWabbitModel
 from .automm.automm_model import MultiModalPredictorModel
 from .automm.ft_transformer import FTTransformerModel
+from .tabpfn.tabpfn_model import TabPFNModel
+
