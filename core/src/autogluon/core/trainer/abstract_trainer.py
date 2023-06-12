@@ -3091,6 +3091,8 @@ class AbstractTrainer:
                                      f'It may have been deleted due to `predictor.fit(..., keep_only_best=True)`. '
                                      f'Ensure `keep_only_best=False` to be able to calibrate refit_full models.')
             model = model_parent
+
+            # TODO: Add helpful logging when data is not available, for example post optimize for deployment
             if self.has_val:
                 # Use validation data
                 X = self.load_X_val()
