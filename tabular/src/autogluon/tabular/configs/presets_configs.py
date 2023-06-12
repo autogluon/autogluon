@@ -51,6 +51,10 @@ tabular_presets_dict = dict(
     # Best quality with an additional FTTransformer model, GPU is recommended.
     experimental_best_quality={'auto_stack': True, 'hyperparameters': 'default_FTT'},
 
+    # Best quality with an additional FTTransformer and TabPFN model, GPU is recommended.
+    #  May have **extremely** slow inference speed, to a potentially unusable degree.
+    experimental_extreme_quality={'auto_stack': True, 'hyperparameters': 'extreme'},
+
     # ------------------------------------------
     # ------------------------------------------
     # ------------------------------------------

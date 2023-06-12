@@ -100,6 +100,10 @@ hyperparameter_config_dict = dict(
 hyperparameter_config_dict['default_FTT'] = {'FT_TRANSFORMER': {}}
 hyperparameter_config_dict['default_FTT'].update(hyperparameter_config_dict['default'])
 
+# extreme is experimental
+hyperparameter_config_dict['extreme'] = {'TABPFN': {'N_ensemble_configurations': 8}}
+hyperparameter_config_dict['extreme'].update(hyperparameter_config_dict['default_FTT'])
+
 
 def get_hyperparameter_config_options():
     return list(hyperparameter_config_dict.keys())

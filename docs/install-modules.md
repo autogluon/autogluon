@@ -4,9 +4,10 @@ AutoGluon is modularized into [sub-modules](https://packaging.python.org/guides/
     - The default installation of `autogluon.tabular` standalone is a skeleton installation.
     - Install via `pip install autogluon.tabular[all]` to get the same installation of tabular as via `pip install autogluon`
     - Available optional dependencies: `lightgbm,catboost,xgboost,fastai,ray`. These are included in `all`.
-    - Optional dependencies not included in `all`: `vowpalwabbit,imodels,skex,skl2onnx`.
+    - Optional dependencies not included in `all`: `tabpfn,vowpalwabbit,imodels,skex,skl2onnx`.
     - To run `autogluon.tabular` with only the optional LightGBM and CatBoost models for example, you can do: `pip install autogluon.tabular[lightgbm,catboost]`
     - Experimental optional dependency: `skex`. This will speedup KNN models by 25x in training and inference on CPU. Use `pip install autogluon.tabular[all,skex]` to enable.
+    - Experimental optional dependency: `tabpfn`. This will enable the usage of the TabPFN model, and allow you to fit TabPFN in TabularPredictor. Use `pip install autogluon.tabular[all,tabpfn]` to enable.
     - Optional dependency: `vowpalwabbit`. This will install the VowpalWabbit package and allow you to fit VowpalWabbit in TabularPredictor.
     - Experimental optional dependency: `imodels`. This will install the imodels package and allow you to fit interpretable models in TabularPredictor.
     - Optional dependency: `skl2onnx`. This will enable ONNX model compilation via `predictor.compile_models()` on supported models.
@@ -24,4 +25,4 @@ To install a submodule from source, follow the instructions for installing the e
 
 To install all AutoGluon optional dependencies:
 
-`pip install autogluon && pip install autogluon.tabular[vowpalwabbit,imodels,skex,skl2onnx]`
+`pip install autogluon && pip install autogluon.tabular[tabpfn,vowpalwabbit,imodels,skex,skl2onnx]`
