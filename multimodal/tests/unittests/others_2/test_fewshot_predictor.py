@@ -3,6 +3,11 @@ import numpy as np
 from autogluon.multimodal.utils.few_shot_learning import FewShotSVMPredictor
 from autogluon.multimodal.utils.misc import shopee_dataset
 
+from ..predictor.test_predictor import (
+    verify_predictor_save_load,
+    verify_realtime_inference,
+)
+
 
 def verify_evaluate(test_data, predictor):
     results = predictor.evaluate(test_data)
@@ -59,9 +64,14 @@ def test_fewshot_fit_predict():
         path=model_path,  # path to save model and artifacts
     )
     predictor.fit(train_data)
-    verify_predict_single_column(test_data, predictor)
 
-    verify_evaluate(test_data, predictor)
+    verify_predictor_save_load(predictor, test_data, verify_embedding=False, cls=FewShotSVMPredictor)
+    verify_predictor_save_load(predictor, test_data, verify_embedding=True, cls=FewShotSVMPredictor)
+
+    verify_realtime_inference(predictor, test_data, verify_embedding=False)
+    verify_realtime_inference(predictor, test_data, verify_embedding=True)
+
+    verify_predict_single_column(test_data, predictor)
 
     verify_predict_predict_proba(test_data, predictor)
 
@@ -98,3 +108,5 @@ def test_fewshot_save_load():
     preds2 = predictor.predict(test_data.drop(columns=["label"], axis=1))
     assert results == results2
     assert (preds == preds2).all()
+
+    predictor2.fit(train_data)
