@@ -12,22 +12,15 @@ Search Space
 
 You can use AutoGluon search space to perform HPO. For a high-level overview, see this example:
 
-.. code-blcok:: python
+.. code-block::
 
    from autogluon.common import space
 
    categorical_space = space.Categorical('a', 'b', 'c', 'd')  # Nested search space for hyperparameters which are categorical.
    real_space = space.Real(0.01, 0.1)  # Search space for numeric hyperparameter that takes continuous values
    int_space = space.Int(0, 100)  # Search space for numeric hyperparameter that takes integer values
-   bool_space = space. Bool()  # Search space for hyperparameter that is either True or False.
+   bool_space = space.Bool()  # Search space for hyperparameter that is either True or False.
 
-.. autosummary::
-   :nosignatures:
-
-   Categorical
-   Real
-   Int
-   Bool
 
 :hidden:`Categorical`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
