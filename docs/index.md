@@ -265,4 +265,6 @@ MultiModalPredictor <api/autogluon.multimodal.MultiModalPredictor>
 TimeSeriesDataFrame <api/autogluon.timeseries.TimeSeriesDataFrame>
 TimeSeriesPredictor <api/autogluon.timeseries.TimeSeriesPredictor>
 FeatureMetadata <api/autogluon.common.features.feature_metadata.FeatureMetadata>
+Tabular Models <api/autogluon.tabular.models.rst>
+Feature Generators <api/autogluon.features.rst>
 ```
