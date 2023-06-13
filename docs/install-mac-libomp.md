@@ -1,4 +1,4 @@
-:::{note} LightGBM support on MacOS (LibOMP)
+:::{admonition} LightGBM support on MacOS (LibOMP)
 AutoGluon dependency LightGBM uses `libomp` for multi-threading. If you install `libomp` via `brew install libomp`, you may get segmentation faults due to incompatible library versions. Install a compatible version using the following commands:
 
 ```bash
