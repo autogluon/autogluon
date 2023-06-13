@@ -1,4 +1,4 @@
-# Object Detection Quick Start
+# Object Detection Advanced
 
 ::::{grid} 2
   :gutter: 3
@@ -13,7 +13,7 @@
 
 ```{toctree}
 ---
-caption: Object Detection Quick Start
+caption: Object Detection Advanced
 maxdepth: 1
 hidden: true
 ---
