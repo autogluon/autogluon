@@ -57,7 +57,7 @@ class Categorical(DiscreteSpace):
 
     Examples
     --------
-    a = Categorical('a', 'b', 'c', 'd')  # 'a' will be default value tried first during HPO
+    >>> a = Categorical('a', 'b', 'c', 'd')  # 'a' will be default value tried first during HPO
     """
     def __init__(self, *data):
         self.data = [*data]
@@ -163,7 +163,7 @@ class Bool(Int):
 
     Examples
     --------
-    pretrained = Bool()
+    >>> pretrained = Bool()
     """
     def __init__(self):
         super(Bool, self).__init__(0, 1)

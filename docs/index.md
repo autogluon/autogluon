@@ -267,4 +267,5 @@ TimeSeriesPredictor <api/autogluon.timeseries.TimeSeriesPredictor>
 TimeSeriesDataFrame <api/autogluon.timeseries.TimeSeriesDataFrame>
 Feature Generators <api/autogluon.features.rst>
 FeatureMetadata <api/autogluon.common.features.feature_metadata.FeatureMetadata>
+Search Spaces <api/autogluon.common.space.rst>
 ```
