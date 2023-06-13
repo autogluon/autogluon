@@ -659,10 +659,27 @@ class TabularPredictor:
             hyperparameter_tune_kwargs : str or dict, default = None
                 Hyperparameter tuning strategy and kwargs (for example, how many HPO trials to run).
                 If None, then hyperparameter tuning will not be performed.
-                Valid preset values:
-                    'auto': Uses the 'random' preset.
-                    'random': Performs HPO via random search using local scheduler.
-                The 'searcher' key is required when providing a dict.
+                You can either choose to provide a preset
+                    Valid preset values:
+                        'auto': Uses the 'random' preset.
+                        'random': Performs HPO via random search using local scheduler.
+                Or provide a dict to specify searchers and schedulers
+                    Valid keys:
+                        'num_trials': How many HPO trials to run
+                        'scheduler': Which scheduler to use
+                            Valid values:
+                                'local': Local shceduler that schedule trials FIFO
+                        'searcher': Which searching algorithm to use
+                            'local_random': Uses the 'random' searcher
+                            'random': Perform random search
+                            'auto': Perform bayesian optimization search on NN_TORCH and NN_FASTAI models. Perform random search on other models.
+                    The 'scheduler' and 'searcher' key are required when providing a dict.
+                    An example of a valid dict:
+                        hyperparameter_tune_kwargs = {
+                            'num_trials': 5,
+                            'scheduler' : 'local',
+                            'searcher': 'auto',
+                        }
             feature_prune_kwargs: dict, default = None
                 Performs layer-wise feature pruning via recursive feature elimination with permutation feature importance.
                 This fits all models in a stack layer once, discovers a pruned set of features, fits all models in the stack layer
