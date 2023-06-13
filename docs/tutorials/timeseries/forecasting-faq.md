@@ -8,7 +8,7 @@ AutoGluon also supports additional information, such as time-independent static 
 and time-dependent covariates (e.g., price of the product each day).
 See the [In Depth Tutorial](forecasting-indepth.ipynb) for more details.
 
-Currently, AutoGluon does not support features such as hierarchical forecasting and forecast explainability, but we will consider adding them in the future.
+Currently, AutoGluon does not support features such as hierarchical forecasting and forecast explainability.
 
 ## How can I get the most accurate forecasts?
 To maximize the forecast accuracy, set the `predictor.fit()` argument `presets="best_quality"` and provide a high `time_limit`.
