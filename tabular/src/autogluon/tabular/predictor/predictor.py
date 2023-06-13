@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 import inspect
 import logging
@@ -22,6 +24,7 @@ from autogluon.common.utils.utils import setup_outputdir, get_autogluon_metadata
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT, PSEUDO_MODEL_SUFFIX, PROBLEM_TYPES_CLASSIFICATION
 from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.dataset import TabularDataset
+from autogluon.core.metrics import Scorer
 from autogluon.core.problem_type import problem_type_info
 from autogluon.core.pseudolabeling.pseudolabeling import filter_pseudo, filter_ensemble_pseudo
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
@@ -222,6 +225,7 @@ class TabularPredictor:
             logger.log(15, f"{AUTO_WEIGHT} currently does not use any sample weights.")
         self.sample_weight = sample_weight
         self.weight_evaluation = weight_evaluation  # TODO: sample_weight and weight_evaluation can both be properties that link to self._learner.sample_weight, self._learner.weight_evaluation
+        self._decision_threshold = None  # TODO: Each model should have its own decision threshold instead of one global threshold
         if self.sample_weight in [AUTO_WEIGHT, BALANCE_WEIGHT] and self.weight_evaluation:
             logger.warning(
                 f"We do not recommend specifying weight_evaluation when sample_weight='{self.sample_weight}', instead specify appropriate eval_metric.")
@@ -276,6 +280,40 @@ class TabularPredictor:
     def problem_type(self):
         return self._learner.problem_type
 
+    @property
+    def decision_threshold(self) -> float:
+        """
+        The decision threshold used to convert prediction probabilities to predictions.
+        Only relevant for binary classification, otherwise the value will be None.
+        Valid values are in the range [0.0, 1.0]
+        You can obtain an optimized `decision_threshold` by first calling `predictor.calibrate_decision_threshold()`.
+        Useful to set for metrics such as `balanced_accuracy` and `f1` as `0.5` is often not an optimal threshold.
+        Predictions are calculated via the following logic on the positive class: `1 if pred > decision_threshold else 0`
+        """
+        if self._decision_threshold is not None:
+            return self._decision_threshold
+        elif self.problem_type == BINARY:
+            return 0.5
+        else:
+            return None
+
+    def set_decision_threshold(self, decision_threshold: float):
+        """
+        Set `predictor.decision_threshold`. Problem type must be 'binary', and the value must be between 0 and 1.
+        """
+        assert self.problem_type == BINARY
+        assert decision_threshold >= 0
+        assert decision_threshold <= 1
+        if decision_threshold != self.decision_threshold:
+            logger.log(20, f'Updating predictor.decision_threshold from {self.decision_threshold} -> {decision_threshold}\n'
+                           f'\tThis will impact how prediction probabilities are converted to predictions in binary classification.\n'
+                           f'\tPrediction probabilities of the positive class >{decision_threshold} '
+                           f'will be predicted as the positive class ({self.positive_class}). '
+                           f'This can significantly impact metric scores.\n'
+                           f'\tYou can update this value via `predictor.set_decision_threshold`.\n'
+                           f'\tYou can calculate an optimal decision threshold on the validation data via `predictor.calibrate_decision_threshold()`.')
+        self._decision_threshold = decision_threshold
+
     def features(self, feature_stage: str = 'original'):
         """
         Returns a list of feature names dependent on the value of feature_stage.
@@ -324,6 +362,7 @@ class TabularPredictor:
             infer_limit=None,
             infer_limit_batch_size=None,
             fit_weighted_ensemble=True,
+            calibrate_decision_threshold=False,
             num_cpus='auto',
             num_gpus='auto',
             **kwargs):
@@ -570,6 +609,12 @@ class TabularPredictor:
             If True, a WeightedEnsembleModel will be fit in each stack layer.
             A weighted ensemble will often be stronger than an individual model while being very fast to train.
             It is recommended to keep this value set to True to maximize predictive quality.
+        calibrate_decision_threshold : bool, default = False
+            [Experimental] This may be removed / changed without warning in a future release.
+            If True, will automatically calibrate the decision threshold at the end of fit for calls to `.predict` based on the evaluation metric.
+            By default, the decision threshold is `0.5`, however for some metrics such as `f1` and `balanced_accuracy`,
+            scores can be significantly improved by choosing a threshold other than `0.5`.
+            Only valid for `problem_type='binary'`. Ignored for all other problem types.
         num_cpus: int, default = "auto"
             The total amount of cpus you want AutoGluon predictor to use.
             Auto means AutoGluon will make the decision based on the total number of cpus available and the model requirement for best performance.
@@ -900,13 +945,14 @@ class TabularPredictor:
             set_best_to_refit_full=kwargs['set_best_to_refit_full'],
             save_space=kwargs['save_space'],
             calibrate=kwargs['calibrate'],
+            calibrate_decision_threshold=calibrate_decision_threshold,
             infer_limit=infer_limit,
         )
         self.save()
         return self
 
     def _post_fit(self, keep_only_best=False, refit_full=False, set_best_to_refit_full=False, save_space=False,
-                  calibrate=False, infer_limit=None):
+                  calibrate=False, calibrate_decision_threshold=False, infer_limit=None):
         if refit_full is True:
             if keep_only_best is True:
                 if set_best_to_refit_full is True:
@@ -953,6 +999,13 @@ class TabularPredictor:
                 self._trainer.calibrate_model()
             else:
                 logger.log(30, 'WARNING: `calibrate=True` is only applicable to classification or quantile regression problems. Skipping calibration...')
+
+        if calibrate_decision_threshold:
+            if self.problem_type != BINARY:
+                logger.log(30, 'WARNING: `calibrate_decision_threshold=True` is only applicable to binary classification. Skipping calibration...')
+            else:
+                best_threshold = self.calibrate_decision_threshold()
+                self.set_decision_threshold(decision_threshold=best_threshold)
 
         if keep_only_best:
             self.delete_models(models_to_keep='best', dry_run=False)
@@ -1380,7 +1433,13 @@ class TabularPredictor:
                                             fit_ensemble=fit_ensemble, fit_ensemble_every_iter=fit_ensemble_every_iter,
                                             **fit_extra_kwargs)
 
-    def predict(self, data, model=None, as_pandas=True, transform_features=True):
+    def predict(self,
+                data: str | TabularDataset | pd.DataFrame,
+                model: str | None = None,
+                as_pandas: bool = True,
+                transform_features: bool = True,
+                *,
+                decision_threshold: float | None = None):
         """
         Use trained models to produce predictions of `label` column values for new data.
 
@@ -1399,6 +1458,14 @@ class TabularPredictor:
             If True, preprocesses data before predicting with models.
             If False, skips global feature preprocessing.
                 This is useful to save on inference time if you have already called `data = predictor.transform_features(data)`.
+        decision_threshold : float, default = None
+            The decision threshold used to convert prediction probabilities to predictions.
+            Only relevant for binary classification, otherwise ignored.
+            If None, defaults to `predictor.decision_threshold`.
+            Valid values are in the range [0.0, 1.0]
+            You can obtain an optimized `decision_threshold` by first calling `predictor.calibrate_decision_threshold()`.
+            Useful to set for metrics such as `balanced_accuracy` and `f1` as `0.5` is often not an optimal threshold.
+            Predictions are calculated via the following logic on the positive class: `1 if pred > decision_threshold else 0`
 
         Returns
         -------
@@ -1406,9 +1473,16 @@ class TabularPredictor:
         """
         self._assert_is_fit('predict')
         data = self._get_dataset(data)
-        return self._learner.predict(X=data, model=model, as_pandas=as_pandas, transform_features=transform_features)
+        if decision_threshold is None:
+            decision_threshold = self.decision_threshold
+        return self._learner.predict(X=data, model=model, as_pandas=as_pandas, transform_features=transform_features, decision_threshold=decision_threshold)
 
-    def predict_proba(self, data, model=None, as_pandas=True, as_multiclass=True, transform_features=True):
+    def predict_proba(self,
+                      data: str | TabularDataset | pd.DataFrame,
+                      model: str | None = None,
+                      as_pandas: bool = True,
+                      as_multiclass: bool = True,
+                      transform_features: bool = True):
         """
         Use trained models to produce predicted class probabilities rather than class-labels (if task is classification).
         If `predictor.problem_type` is regression or quantile, this will raise an AssertionError.
@@ -1451,6 +1525,46 @@ class TabularPredictor:
         data = self._get_dataset(data)
         return self._learner.predict_proba(X=data, model=model, as_pandas=as_pandas, as_multiclass=as_multiclass, transform_features=transform_features)
 
+    def get_pred_from_proba(self,
+                            y_pred_proba: pd.DataFrame | np.ndarray,
+                            decision_threshold: float | None = None) -> pd.Series | np.array:
+        """
+        Given prediction probabilities, convert to predictions.
+
+        Parameters
+        ----------
+        y_pred_proba : :class:`pd.DataFrame` or :class:`np.ndarray`
+            The prediction probabilities to convert to predictions.
+            Obtainable via the output of `predictor.predict_proba`.
+        decision_threshold : float, default = None
+            The decision threshold used to convert prediction probabilities to predictions.
+            Only relevant for binary classification, otherwise ignored.
+            If None, defaults to `predictor.decision_threshold`.
+            Valid values are in the range [0.0, 1.0]
+            You can obtain an optimized `decision_threshold` by first calling `predictor.calibrate_decision_threshold()`.
+            Useful to set for metrics such as `balanced_accuracy` and `f1` as `0.5` is often not an optimal threshold.
+            Predictions are calculated via the following logic on the positive class: `1 if pred > decision_threshold else 0`
+
+        Returns
+        -------
+        Array of predictions, one corresponding to each row in given dataset. Either :class:`np.ndarray` or :class:`pd.Series` depending on `y_pred_proba` dtype.
+
+        Examples
+        --------
+        >>> from autogluon.tabular import TabularPredictor
+        >>> predictor = TabularPredictor(label='class').fit('train.csv', label='class')
+        >>> y_pred_proba = predictor.predict_proba('test.csv')
+        >>>
+        >>> # y_pred and y_pred_from_proba are identical
+        >>> y_pred = predictor.predict('test.csv')
+        >>> y_pred_from_proba = predictor.get_pred_from_proba(y_pred_proba=y_pred_proba)
+        """
+        if not self.can_predict_proba:
+            raise AssertionError(f'`predictor.get_pred_from_proba` is not supported when problem_type="{self.problem_type}".')
+        if decision_threshold is None:
+            decision_threshold = self.decision_threshold
+        return self._learner.get_pred_from_proba(y_pred_proba=y_pred_proba, decision_threshold=decision_threshold)
+
     @property
     def can_predict_proba(self) -> bool:
         """
@@ -1460,7 +1574,7 @@ class TabularPredictor:
         self._assert_is_fit('can_predict_proba')
         return problem_type_info.can_predict_proba(problem_type=self.problem_type)
 
-    def evaluate(self, data, model=None, silent=False, auxiliary_metrics=True, detailed_report=False) -> dict:
+    def evaluate(self, data, model=None, decision_threshold=None, silent=False, auxiliary_metrics=True, detailed_report=False) -> dict:
         """
         Report the predictive performance evaluated over a given dataset.
         This is basically a shortcut for: `pred_proba = predict_proba(data); evaluate_predictions(data[label], pred_proba)`.
@@ -1474,6 +1588,11 @@ class TabularPredictor:
         model : str (optional)
             The name of the model to get prediction probabilities from. Defaults to None, which uses the highest scoring model on the validation set.
             Valid models are listed in this `predictor` by calling `predictor.get_model_names()`.
+        decision_threshold : float, default = None
+            The decision threshold to use when converting prediction probabilities to predictions.
+            This will impact the scores of metrics such as `f1` and `accuracy`.
+            If None, defaults to `predictor.decision_threshold`. Ignored unless `problem_type='binary'`.
+            Refer to the `predictor.decision_threshold` docstring for more information.
         silent : bool, default = False
             If False, performance results are printed.
         auxiliary_metrics: bool, default = True
@@ -1489,6 +1608,8 @@ class TabularPredictor:
         """
         self._assert_is_fit('evaluate')
         data = self._get_dataset(data)
+        if decision_threshold is None:
+            decision_threshold = self.decision_threshold
         if self.can_predict_proba:
             y_pred = self.predict_proba(data=data, model=model)
         else:
@@ -1497,10 +1618,11 @@ class TabularPredictor:
             sample_weight = data[self.sample_weight]
         else:
             sample_weight = None
-        return self.evaluate_predictions(y_true=data[self.label], y_pred=y_pred, sample_weight=sample_weight, silent=silent,
+        return self.evaluate_predictions(y_true=data[self.label], y_pred=y_pred, sample_weight=sample_weight,
+                                         decision_threshold=decision_threshold, silent=silent,
                                          auxiliary_metrics=auxiliary_metrics, detailed_report=detailed_report)
 
-    def evaluate_predictions(self, y_true, y_pred, sample_weight=None, silent=False, auxiliary_metrics=True, detailed_report=False) -> dict:
+    def evaluate_predictions(self, y_true, y_pred, sample_weight=None, decision_threshold=None, silent=False, auxiliary_metrics=True, detailed_report=False) -> dict:
         """
         Evaluate the provided prediction probabilities against ground truth labels.
         Evaluation is based on the `eval_metric` previously specified in init, or default metrics if none was specified.
@@ -1515,6 +1637,11 @@ class TabularPredictor:
             Caution: For certain types of `eval_metric` (such as 'roc_auc'), `y_pred` must be predicted-probabilities rather than predicted labels.
         sample_weight : :class:`pd.Series`, default = None
             Sample weight for each row of data. If None, uniform sample weights are used.
+        decision_threshold : float, default = None
+            The decision threshold to use when converting prediction probabilities to predictions.
+            This will impact the scores of metrics such as `f1` and `accuracy`.
+            If None, defaults to `predictor.decision_threshold`. Ignored unless `problem_type='binary'`.
+            Refer to the `predictor.decision_threshold` docstring for more information.
         silent : bool, default = False
             If False, performance results are printed.
         auxiliary_metrics: bool, default = True
@@ -1528,13 +1655,17 @@ class TabularPredictor:
         NOTE: Metrics scores always show in higher is better form.
         This means that metrics such as log_loss and root_mean_squared_error will have their signs FLIPPED, and values will be negative.
         """
-        return self._learner.evaluate_predictions(y_true=y_true, y_pred=y_pred, sample_weight=sample_weight, silent=silent,
+        if decision_threshold is None:
+            decision_threshold = self.decision_threshold
+        return self._learner.evaluate_predictions(y_true=y_true, y_pred=y_pred, sample_weight=sample_weight,
+                                                  decision_threshold=decision_threshold, silent=silent,
                                                   auxiliary_metrics=auxiliary_metrics, detailed_report=detailed_report)
 
     def leaderboard(self,
-                    data=None,
+                    data: str | TabularDataset | pd.DataFrame | None = None,
                     extra_info: bool = False,
-                    extra_metrics: list = None,
+                    extra_metrics: list | None = None,
+                    decision_threshold: float | None = None,
                     only_pareto_frontier: bool = False,
                     skip_score: bool = False,
                     silent: bool = False) -> pd.DataFrame:
@@ -1645,6 +1776,14 @@ class TabularPredictor:
             NOTE: Metrics scores always show in higher is better form.
             This means that metrics such as log_loss and root_mean_squared_error will have their signs FLIPPED, and values will be negative.
             This is necessary to avoid the user needing to know the metric to understand if higher is better when looking at leaderboard.
+        decision_threshold : float, default = None
+            The decision threshold to use when converting prediction probabilities to predictions.
+            This will impact the scores of metrics such as `f1` and `accuracy`.
+            If None, defaults to `predictor.decision_threshold`. Ignored unless `problem_type='binary'`.
+            Refer to the `predictor.decision_threshold` docstring for more information.
+            NOTE: `score_val` will not be impacted by this value in v0.8.
+                `score_val` will always show the validation scores achieved with a decision threshold of `0.5`.
+                Only test scores will be properly updated.
         only_pareto_frontier : bool, default = False
             If `True`, only return model information of models in the Pareto frontier of the accuracy/latency trade-off (models which achieve the highest score within their end-to-end inference time).
             At minimum this will include the model with the highest score and the model with the lowest inference time.
@@ -1663,7 +1802,9 @@ class TabularPredictor:
         """
         self._assert_is_fit('leaderboard')
         data = self._get_dataset(data, allow_nan=True)
-        return self._learner.leaderboard(X=data, extra_info=extra_info, extra_metrics=extra_metrics,
+        if decision_threshold is None:
+            decision_threshold = self.decision_threshold
+        return self._learner.leaderboard(X=data, extra_info=extra_info, extra_metrics=extra_metrics, decision_threshold=decision_threshold,
                                          only_pareto_frontier=only_pareto_frontier, skip_score=skip_score, silent=silent)
 
     def predict_proba_multi(self,
@@ -1737,7 +1878,9 @@ class TabularPredictor:
                       models: List[str] = None,
                       as_pandas: bool = True,
                       transform_features: bool = True,
-                      inverse_transform: bool = True) -> dict:
+                      inverse_transform: bool = True,
+                      *,
+                      decision_threshold: float = None) -> dict:
         """
         Returns a dictionary of predictions where the key is
         the model name and the value is the model's prediction probabilities on the data.
@@ -1773,18 +1916,29 @@ class TabularPredictor:
         inverse_transform : bool, default = True
             If True, will return predictions in the original format.
             If False (advanced), will return predictions in AutoGluon's internal format.
+        decision_threshold : float, default = None
+            The decision threshold used to convert prediction probabilities to predictions.
+            Only relevant for binary classification, otherwise ignored.
+            If None, defaults to `0.5`.
+            Valid values are in the range [0.0, 1.0]
+            You can obtain an optimized `decision_threshold` by first calling `predictor.calibrate_decision_threshold()`.
+            Useful to set for metrics such as `balanced_accuracy` and `f1` as `0.5` is often not an optimal threshold.
+            Predictions are calculated via the following logic on the positive class: `1 if pred > decision_threshold else 0`
 
         Returns
         -------
         Dictionary with model names as keys and model predictions as values.
         """
         self._assert_is_fit('predict_multi')
+        if decision_threshold is None:
+            decision_threshold = self.decision_threshold
         data = self._get_dataset(data, allow_nan=True)
         return self._learner.predict_multi(X=data,
                                            models=models,
                                            as_pandas=as_pandas,
                                            transform_features=transform_features,
-                                           inverse_transform=inverse_transform)
+                                           inverse_transform=inverse_transform,
+                                           decision_threshold=decision_threshold)
 
     def fit_summary(self, verbosity=3, show_plot=False):
         """
@@ -2018,17 +2172,7 @@ class TabularPredictor:
 
         """
         self._assert_is_fit('transform_labels')
-        if inverse:
-            if proba:
-                labels_transformed = self._learner.label_cleaner.inverse_transform_proba(y=labels, as_pandas=True)
-            else:
-                labels_transformed = self._learner.label_cleaner.inverse_transform(y=labels)
-        else:
-            if proba:
-                labels_transformed = self._learner.label_cleaner.transform_proba(y=labels, as_pandas=True)
-            else:
-                labels_transformed = self._learner.label_cleaner.transform(y=labels)
-        return labels_transformed
+        return self._learner.transform_labels(y=labels, inverse=inverse, proba=proba)
 
     def feature_importance(self, data=None, model=None, features=None, feature_stage='original', subsample_size=5000,
                            time_limit=None, num_shuffle_sets=None, include_confidence_band=True, confidence_level=0.99,
@@ -2507,7 +2651,77 @@ class TabularPredictor:
 
         return models
 
-    def get_oof_pred(self, model: str = None, transformed=False, train_data=None, internal_oof=False, can_infer=None) -> pd.Series:
+    def calibrate_decision_threshold(self,
+                                     data: str | TabularDataset | pd.DataFrame | None = None,
+                                     metric: str | Scorer | None = None,
+                                     model: str = 'best',
+                                     decision_thresholds: int | List[float] = 50,
+                                     verbose: bool = True) -> float:
+        """
+        Calibrate the decision threshold in binary classification to optimize a given metric.
+        You can pass the output of this method as input to `predictor.set_decision_threshold` to update the predictor.
+        Will raise an AssertionError if `predictor.problem_type != 'binary'`.
+
+        Note that while calibrating the decision threshold can help to improve a given metric,
+        other metrics may end up having worse scores.
+        For example, calibrating on `balanced_accuracy` will often harm `accuracy`.
+        Users should keep this in mind while leveraging decision threshold calibration.
+
+        Parameters
+        ----------
+        data : Union[str, pd.DataFrame], default = None
+            The data to use for calibration. Must contain the label column.
+            We recommend to keep this value as None unless you are an advanced user and understand the implications.
+            If None, will use internal data such as the holdout validation data or out-of-fold predictions.
+        metric : autogluon.core.metrics.Scorer or str, default = None
+            The metric to optimize during calibration.
+            If None, uses `predictor.eval_metric`.
+        model : str, default = 'best'
+            The model to use prediction probabilities of when calibrating the threshold.
+            If 'best', will use `predictor.get_model_best()`.
+        decision_thresholds : Union[int, List[float]], default = 50
+            The number of decision thresholds on either side of `0.5` to search.
+            The default of 50 will result in 101 searched thresholds: [0.00, 0.01, 0.02, ..., 0.49, 0.50, 0.51, ..., 0.98, 0.99, 1.00]
+            Alternatively, a list of decision thresholds can be passed and only the thresholds in the list will be searched.
+        verbose : bool, default = True
+            If True, will log information about the calibration process.
+
+        Returns
+        -------
+        Decision Threshold: A float between 0 and 1 defining the decision boundary for predictions that
+        maximizes the `metric` score on the `data` for the `model`.
+        """
+        # TODO: v0.8
+        #  add tutorial section
+        #
+        # TODO: v0.9
+        #  Calculate optimal threshold for each model separately when deciding best model
+        #  sampling/time limit
+        #  update validation scores of models based on threshold
+        #  speed up the logic / search for optimal threshold more efficiently
+        #  make threshold calibration part of internal optimization, such as during fit_weighted_ensemble.
+        #  precision has strange edge-cases where it flips from 1.0 to 0.0 score due to becoming undefined
+        #    consider warning users who pass this metric,
+        #    or edit this metric so they do not flip value when undefined.
+        #      UndefinedMetricWarning: Precision is ill-defined and being set to 0.0 due to no predicted samples.
+        #      Use `zero_division` parameter to control this behavior.
+
+        self._assert_is_fit('calibrate_decision_threshold')
+        assert self.problem_type == BINARY, f'calibrate_decision_threshold is only available for `problem_type="{BINARY}"`'
+        data = self._get_dataset(data, allow_nan=True)
+
+        if metric is None:
+            metric = self.eval_metric
+        if model == 'best':
+            model = self.get_model_best()
+
+        return self._learner.calibrate_decision_threshold(data=data,
+                                                          metric=metric,
+                                                          model=model,
+                                                          decision_thresholds=decision_thresholds,
+                                                          verbose=verbose)
+
+    def get_oof_pred(self, model: str = None, transformed=False, train_data=None, internal_oof=False, decision_threshold=None, can_infer=None) -> pd.Series:
         """
         Note: This is advanced functionality not intended for normal usage.
 
@@ -2525,6 +2739,8 @@ class TabularPredictor:
             Refer to `get_oof_pred_proba()` documentation.
         internal_oof : bool, default = False
             Refer to `get_oof_pred_proba()` documentation.
+        decision_threshold : float, default = None
+            Refer to `predict_multi` documentation.
         can_infer : bool, default = None
             Refer to `get_oof_pred_proba()` documentation.
 
@@ -2533,13 +2749,17 @@ class TabularPredictor:
         :class:`pd.Series` object of the out-of-fold training predictions of the model.
         """
         self._assert_is_fit('get_oof_pred')
+        if decision_threshold is None:
+            decision_threshold = self.decision_threshold
         y_pred_proba_oof = self.get_oof_pred_proba(model=model,
                                                    transformed=transformed,
                                                    as_multiclass=True,
                                                    train_data=train_data,
                                                    internal_oof=internal_oof,
                                                    can_infer=can_infer)
-        y_pred_oof = get_pred_from_proba_df(y_pred_proba_oof, problem_type=self.problem_type)
+        y_pred_oof = get_pred_from_proba_df(y_pred_proba_oof,
+                                            problem_type=self.problem_type,
+                                            decision_threshold=decision_threshold)
         if transformed:
             return self._learner.label_cleaner.to_transformed_dtype(y_pred_oof)
         return y_pred_oof
