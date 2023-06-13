@@ -10,7 +10,8 @@ Search Space
 .. automodule:: autogluon.common.space
 .. currentmodule:: autogluon.common.space
 
-You can use AutoGluon search space to perform HPO. For a high-level overview, see this example:
+You can use AutoGluon search space to perform HPO.
+For a high-level overview, see this example:
 
 .. code-block::
 
@@ -21,6 +22,7 @@ You can use AutoGluon search space to perform HPO. For a high-level overview, se
    int_space = space.Int(0, 100)  # Search space for numeric hyperparameter that takes integer values
    bool_space = space.Bool()  # Search space for hyperparameter that is either True or False.
 
+For how to use the search space to perform HPO, check out `Tabular Indepth Tutorial <../tutorials/tabular/tabular-indepth.html#specifying-hyperparameters-and-tuning-them>`_
 
 :hidden:`Categorical`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
