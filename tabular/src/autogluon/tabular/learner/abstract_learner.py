@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 import json
 import logging
@@ -7,13 +9,13 @@ from collections.abc import Iterable
 import numpy as np
 import pandas as pd
 from pandas import DataFrame, Series
-from typing import List
+from typing import List, Union
 from sklearn.metrics import classification_report
 
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT
 from autogluon.core.data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
 from autogluon.core.learner import AbstractLearner
-from autogluon.core.metrics import confusion_matrix, get_metric
+from autogluon.core.metrics import confusion_matrix, get_metric, Scorer
 from autogluon.core.models.greedy_ensemble.ensemble_selection import EnsembleSelection
 from autogluon.core.utils import get_leaderboard_pareto_frontier, augment_rare_classes, extract_column, compute_weighted_metric
 from autogluon.core.utils import get_pred_from_proba, get_pred_from_proba_df, infer_problem_type
@@ -132,7 +134,13 @@ class AbstractTabularLearner(AbstractLearner):
              feature_prune=False, holdout_frac=0.1, hyperparameters=None, verbosity=2):
         raise NotImplementedError
 
-    def predict_proba(self, X: DataFrame, model=None, as_pandas=True, as_multiclass=True, inverse_transform=True, transform_features=True):
+    def predict_proba(self,
+                      X: DataFrame,
+                      model: str | None = None,
+                      as_pandas: bool = True,
+                      as_multiclass: bool = True,
+                      inverse_transform: bool = True,
+                      transform_features: bool = True):
         X_index = copy.deepcopy(X.index) if as_pandas else None
         if X.empty:
             y_pred_proba = np.array([])
@@ -147,11 +155,23 @@ class AbstractTabularLearner(AbstractLearner):
                                                         inverse_transform=inverse_transform)
         return y_pred_proba
 
-    def predict(self, X: DataFrame, model=None, as_pandas=True, inverse_transform=True, transform_features=True):
+    def predict(self,
+                X: DataFrame,
+                model: str | None = None,
+                as_pandas: bool = True,
+                inverse_transform: bool = True,
+                transform_features: bool = True,
+                *,
+                decision_threshold: float | None = None,
+                ):
+        if decision_threshold is None:
+            decision_threshold = 0.5
         X_index = copy.deepcopy(X.index) if as_pandas else None
         y_pred_proba = self.predict_proba(X=X, model=model, as_pandas=False, as_multiclass=False, inverse_transform=False, transform_features=transform_features)
         problem_type = self.label_cleaner.problem_type_transform or self.problem_type
-        y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=problem_type)
+        y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba,
+                                     problem_type=problem_type,
+                                     decision_threshold=decision_threshold)
         y_pred = self._post_process_predict(y_pred=y_pred,
                                             as_pandas=as_pandas,
                                             index=X_index,
@@ -292,7 +312,9 @@ class AbstractTabularLearner(AbstractLearner):
                       models: List[str] = None,
                       as_pandas: bool = True,
                       transform_features: bool = True,
-                      inverse_transform: bool = True) -> dict:
+                      inverse_transform: bool = True,
+                      *,
+                      decision_threshold: float = None) -> dict:
         """
         Identical to predict_proba_multi, except returns predictions instead of probabilities.
         """
@@ -302,17 +324,29 @@ class AbstractTabularLearner(AbstractLearner):
                                                       transform_features=transform_features,
                                                       inverse_transform=inverse_transform)
         predict_dict = {}
-        if as_pandas:
-            for m in predict_proba_dict:
-                predict_dict[m] = get_pred_from_proba_df(predict_proba_dict[m], problem_type=self.problem_type)
-        else:
-            for m in predict_proba_dict:
-                y_pred = get_pred_from_proba(predict_proba_dict[m], problem_type=self.problem_type)
-                predict_dict[m] = self._post_process_predict(y_pred=y_pred,
-                                                             as_pandas=as_pandas,
-                                                             index=None,
-                                                             inverse_transform=inverse_transform)
+        for m in predict_proba_dict:
+            predict_dict[m] = self.get_pred_from_proba(y_pred_proba=predict_proba_dict[m],
+                                                       decision_threshold=decision_threshold,
+                                                       inverse_transform=inverse_transform)
         return predict_dict
+
+    def get_pred_from_proba(self,
+                            y_pred_proba: np.ndarray | pd.DataFrame,
+                            decision_threshold: float | None = None,
+                            inverse_transform: bool = True) -> np.array | pd.Series:
+        if isinstance(y_pred_proba, pd.DataFrame):
+            y_pred = get_pred_from_proba_df(y_pred_proba,
+                                            problem_type=self.problem_type,
+                                            decision_threshold=decision_threshold)
+        else:
+            y_pred = get_pred_from_proba(y_pred_proba,
+                                         problem_type=self.problem_type,
+                                         decision_threshold=decision_threshold)
+            y_pred = self._post_process_predict(y_pred=y_pred,
+                                                as_pandas=False,
+                                                index=None,
+                                                inverse_transform=inverse_transform)
+        return y_pred
 
     def _validate_fit_input(self, X: DataFrame, **kwargs):
         if self.label not in X.columns:
@@ -425,7 +459,8 @@ class AbstractTabularLearner(AbstractLearner):
         return compute_weighted_metric(y, y_pred, self.eval_metric, w, weight_evaluation=self.weight_evaluation, quantile_levels=self.quantile_levels)
 
     # Scores both learner and all individual models, along with computing the optimal ensemble score + weights (oracle)
-    def score_debug(self, X: DataFrame, y=None, extra_info=False, compute_oracle=False, extra_metrics=None, skip_score=False, silent=False):
+    def score_debug(self, X: DataFrame, y=None, extra_info=False, compute_oracle=False, extra_metrics=None,
+                    decision_threshold=None, skip_score=False, silent=False):
         leaderboard_df = self.leaderboard(extra_info=extra_info, silent=silent)
         if extra_metrics is None:
             extra_metrics = []
@@ -479,6 +514,7 @@ class AbstractTabularLearner(AbstractLearner):
                 scores[model_name] = self._score_with_pred_proba(
                     y_pred_proba_internal=y_pred_proba_internal,
                     metric=self.eval_metric,
+                    decision_threshold=decision_threshold,
                     **scoring_args
                 )
             for metric in extra_metrics:
@@ -488,6 +524,7 @@ class AbstractTabularLearner(AbstractLearner):
                 extra_scores[metric.name][model_name] = self._score_with_pred_proba(
                     y_pred_proba_internal=y_pred_proba_internal,
                     metric=metric,
+                    decision_threshold=decision_threshold,
                     **scoring_args
                 )
 
@@ -572,6 +609,7 @@ class AbstractTabularLearner(AbstractLearner):
                                y_pred_proba_internal,
                                metric,
                                sample_weight=None,
+                               decision_threshold=None,
                                weight_evaluation=None):
         metric = get_metric(metric, self.problem_type, 'leaderboard_metric')
         if weight_evaluation is None:
@@ -579,7 +617,9 @@ class AbstractTabularLearner(AbstractLearner):
         if metric.needs_pred:
             if self.problem_type == BINARY:
                 # Use 1 and 0, otherwise f1 can crash due to unknown pos_label.
-                y_pred = get_pred_from_proba(y_pred_proba_internal, problem_type=self.problem_type)
+                y_pred = self.get_pred_from_proba(y_pred_proba_internal,
+                                                  decision_threshold=decision_threshold,
+                                                  inverse_transform=False)
                 y_tmp = y_internal
             else:
                 y_pred = self.label_cleaner.inverse_transform_proba(y_pred_proba_internal, as_pred=True)
@@ -626,7 +666,7 @@ class AbstractTabularLearner(AbstractLearner):
                 # log_loss / pac_score
                 raise ValueError(f'Multiclass scoring with eval_metric=\'{self.eval_metric.name}\' does not support unknown classes. Unknown classes: {unknown_classes}')
 
-    def evaluate_predictions(self, y_true, y_pred, sample_weight=None, silent=False, auxiliary_metrics=True, detailed_report=False):
+    def evaluate_predictions(self, y_true, y_pred, sample_weight=None, decision_threshold=None, silent=False, auxiliary_metrics=True, detailed_report=False):
         """ Evaluate predictions. Does not support sample weights since this method reports a variety of metrics.
             Args:
                 silent (bool): Should we print which metric is being used as well as performance.
@@ -657,7 +697,7 @@ class AbstractTabularLearner(AbstractLearner):
                                  f'which is not supported by `evaluate_predictions`.')
         if is_proba:
             y_pred_proba = y_pred
-            y_pred = get_pred_from_proba_df(y_pred_proba, problem_type=self.problem_type)
+            y_pred = self.get_pred_from_proba(y_pred_proba=y_pred_proba, decision_threshold=decision_threshold)
             if self.problem_type == BINARY:
                 # roc_auc crashes if this isn't done
                 y_pred_proba = y_pred_proba[self.positive_class]
@@ -723,6 +763,7 @@ class AbstractTabularLearner(AbstractLearner):
                     score = self._score_with_pred_proba(
                         y_pred_proba_internal=y_pred_proba_internal,
                         metric=aux_metric,
+                        decision_threshold=decision_threshold,
                         **scoring_args
                     )
                 else:
@@ -771,9 +812,11 @@ class AbstractTabularLearner(AbstractLearner):
         X = X.drop(self.label, axis=1)
         return X, y
 
-    def leaderboard(self, X=None, y=None, extra_info=False, extra_metrics=None, only_pareto_frontier=False, skip_score=False, silent=False):
+    def leaderboard(self, X=None, y=None, extra_info=False, extra_metrics=None, decision_threshold=None,
+                    only_pareto_frontier=False, skip_score=False, silent=False) -> pd.DataFrame:
         if X is not None:
-            leaderboard = self.score_debug(X=X, y=y, extra_info=extra_info, extra_metrics=extra_metrics, skip_score=skip_score, silent=True)
+            leaderboard = self.score_debug(X=X, y=y, extra_info=extra_info, extra_metrics=extra_metrics,
+                                           decision_threshold=decision_threshold, skip_score=skip_score, silent=True)
         else:
             if extra_metrics:
                 raise AssertionError('`extra_metrics` is only valid when data is specified.')
@@ -894,6 +937,47 @@ class AbstractTabularLearner(AbstractLearner):
                                                 augmentation_data=augmentation_data, augment_method=augment_method, augment_args=augment_args)
         self.save_trainer(trainer=trainer)
         return distilled_model_names
+
+    def transform_labels(self, y, inverse=False, proba=False):
+        if inverse:
+            if proba:
+                y_transformed = self.label_cleaner.inverse_transform_proba(y=y, as_pandas=True)
+            else:
+                y_transformed = self.label_cleaner.inverse_transform(y=y)
+        else:
+            if proba:
+                y_transformed = self.label_cleaner.transform_proba(y=y, as_pandas=True)
+            else:
+                y_transformed = self.label_cleaner.transform(y=y)
+        return y_transformed
+
+    def calibrate_decision_threshold(self,
+                                     data: pd.DataFrame | None = None,
+                                     metric: str | Scorer | None = None,
+                                     model: str = 'best',
+                                     decision_thresholds: int | List[float] = 50,
+                                     verbose: bool = True) -> float:
+        # TODO: docstring
+        if metric is None:
+            metric = self.eval_metric
+
+        weights = None
+        if data is None:
+            X = None
+            y = None
+        else:
+            if self.weight_evaluation:
+                data, weights = extract_column(data, self.sample_weight)
+            X = self.transform_features(X=data)
+            y = self.transform_labels(y=data[self.label])
+
+        return self.load_trainer().calibrate_decision_threshold(X=X,
+                                                                y=y,
+                                                                metric=metric,
+                                                                model=model,
+                                                                weights=weights,
+                                                                decision_thresholds=decision_thresholds,
+                                                                verbose=verbose)
 
     # TODO: Add data info gathering at beginning of .fit() that is used by all learners to add to get_info output
     # TODO: Add feature inference / feature engineering info to get_info output
