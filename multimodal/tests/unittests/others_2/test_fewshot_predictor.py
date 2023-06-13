@@ -3,10 +3,7 @@ import numpy as np
 from autogluon.multimodal.utils.few_shot_learning import FewShotSVMPredictor
 from autogluon.multimodal.utils.misc import shopee_dataset
 
-from ..predictor.test_predictor import (
-    verify_predictor_save_load,
-    verify_realtime_inference,
-)
+from ..predictor.test_predictor import verify_predictor_save_load, verify_realtime_inference
 
 
 def verify_evaluate(test_data, predictor):
