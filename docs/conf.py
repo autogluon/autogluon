@@ -30,7 +30,7 @@ numpydoc_show_class_members = False
 
 googleanalytics_id = "UA-96378503-20"
 
-nb_execution_mode = 'force'
+nb_execution_mode = 'off'
 # nb_execution_raise_on_error=True
 nb_execution_timeout = 3600
 nb_merge_streams = True
