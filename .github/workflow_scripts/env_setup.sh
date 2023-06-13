@@ -18,7 +18,7 @@ function setup_build_contrib_env {
 
 function setup_torch_gpu {
     # Security-patched torch.
-    python3 -m pip install torch==1.13.1+cu116 torchvision==0.14.1+cu116 torchaudio==0.13.1+cu116 --extra-index-url https://download.pytorch.org/whl/cu116
+    python3 -m pip install torch==1.13.1+cu117 torchvision==0.14.1+cu117 torchaudio==0.13.1+cu117 --extra-index-url https://download.pytorch.org/whl/cu117
 }
 
 function setup_torch_cpu {
@@ -27,7 +27,7 @@ function setup_torch_cpu {
 }
 
 function setup_torch_gpu_non_linux {
-    pip3 install torch==1.13.1+cu116 torchvision==0.14.1+cu116 --extra-index-url https://download.pytorch.org/whl/cu116
+    pip3 install torch==1.13.1+cu117 torchvision==0.14.1+cu117 --extra-index-url https://download.pytorch.org/whl/cu117
 }
 
 function setup_torch_cpu_non_linux {
