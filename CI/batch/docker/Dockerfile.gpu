@@ -1,4 +1,4 @@
-FROM 763104351884.dkr.ecr.us-east-1.amazonaws.com/autogluon-training:0.7.0-gpu-py39-cu117-ubuntu20.04
+FROM 763104351884.dkr.ecr.us-east-1.amazonaws.com/autogluon-training:0.6.2-gpu-py38-cu113-ubuntu20.04
 
 ARG AWSCLI_VER=1.22.45
 
