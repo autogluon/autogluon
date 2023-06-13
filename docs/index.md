@@ -261,10 +261,10 @@ hidden:
 
 TabularPredictor <api/autogluon.tabular.TabularPredictor>
 TabularDataset <api/autogluon.core.TabularDataset>
-MultiModalPredictor <api/autogluon.multimodal.MultiModalPredictor>
-TimeSeriesDataFrame <api/autogluon.timeseries.TimeSeriesDataFrame>
-TimeSeriesPredictor <api/autogluon.timeseries.TimeSeriesPredictor>
-FeatureMetadata <api/autogluon.common.features.feature_metadata.FeatureMetadata>
 Tabular Models <api/autogluon.tabular.models.rst>
+MultiModalPredictor <api/autogluon.multimodal.MultiModalPredictor>
+TimeSeriesPredictor <api/autogluon.timeseries.TimeSeriesPredictor>
+TimeSeriesDataFrame <api/autogluon.timeseries.TimeSeriesDataFrame>
 Feature Generators <api/autogluon.features.rst>
+FeatureMetadata <api/autogluon.common.features.feature_metadata.FeatureMetadata>
 ```
