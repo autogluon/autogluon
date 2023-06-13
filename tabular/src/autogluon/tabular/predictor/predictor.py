@@ -3535,6 +3535,7 @@ class TabularPredictor:
             assert predictor_path is not None, "Please either provide `predictor_path` or `log_file_path` to load the log file"
             file_path = os.path.join(predictor_path, "logs", cls._predictor_log_file_name)
         assert os.path.isfile(file_path), f"Log file does not exist at {file_path}"
+        lines = []
         with open(file_path, "r") as f:
             lines = f.readlines()
         return lines
