@@ -661,7 +661,7 @@ class TabularPredictor:
                 If None, then hyperparameter tuning will not be performed.
                 You can either choose to provide a preset
                     Valid preset values:
-                        'auto': Uses the 'random' preset.
+                        'auto': Performs HPO via bayesian optimization search on NN_TORCH and NN_FASTAI models, and random search on other models using local scheduler.
                         'random': Performs HPO via random search using local scheduler.
                 Or provide a dict to specify searchers and schedulers
                     Valid keys:
