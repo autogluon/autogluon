@@ -22,17 +22,17 @@ AutoGluon Multimodal is primarily used for fine-tuning pretrained deep learning 
 For efficient training, it is highly recommended to utilize GPU machines. 
 By default, AutoGluon Multimodal leverages all GPUs available on a single machine. 
 However, if training with a single GPU is too slow due to large models or data, it is advisable to switch to a machine with multiple GPUs. 
-When using AWS instances, starting with G4 or G5 instances is recommended. 
-In cases where GPU memory is insufficient, even with per_gpu_batch_size=1, transitioning to P3dn or P4 instances can be considered.
-P4 and P5 instances generally offer superior speed and memory capabilities, but they also come at a higher cost. 
+When using AWS instances, starting with [G4](https://aws.amazon.com/ec2/instance-types/g4/) or [G5](https://aws.amazon.com/ec2/instance-types/g5/) instances is recommended. 
+In cases where GPU memory is insufficient, even with per_gpu_batch_size=1, transitioning to [p3dn.24xlarge](https://aws.amazon.com/ec2/instance-types/p3/) or [P4](https://aws.amazon.com/ec2/instance-types/p4/) instances can be considered.
+[P4](https://aws.amazon.com/ec2/instance-types/p4/) and [P5](https://press.aboutamazon.com/2023/3/aws-and-nvidia-collaborate-on-next-generation-infrastructure-for-training-large-machine-learning-models-and-building-generative-ai-applications) instances generally offer superior speed and memory capabilities, but they also come at a higher cost. 
 Achieving a balance between performance and cost is essential to find an optimal solution.
 
 
 ## Multi-GPU training encounters RuntimeError: An attempt has been made to start a new process before the current process has finished its bootstrapping phase. How to fix it?
 
-A straightforward solution is to enclose your code within the condition if __name__ == '__main__'. 
+A straightforward solution is to enclose your code within the condition if `__name__ == '__main__'`. 
 By default, we use ddp_spawn as the strategy, which does not fork to initiate the child processes. 
-Hence, it is necessary to employ the proper idiom if __name__ == '__main__' in the main module.
+Hence, it is necessary to employ the proper idiom if `__name__ == '__main__'` in the main module.
 
 
 ## Do I need to preprocess my text or image data before using AutoGluon Multimodal?
