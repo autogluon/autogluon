@@ -11,7 +11,7 @@ conda activate myenv
 4. Install the proper GPU PyTorch version by following the [PyTorch Install Documentation](https://pytorch.org/get-started/locally/) (Recommended). Alternatively, use the following command:
 
 ```bash
-pip install torch==1.13.1+cu116 torchvision==0.14.1+cu116 --extra-index-url https://download.pytorch.org/whl/cu116
+pip install torch==1.13.1+cu117 torchvision==0.14.1+cu117 --extra-index-url https://download.pytorch.org/whl/cu117
 ```
 
 5. Sanity check that your installation is valid and can detect your GPU via testing in Python:
