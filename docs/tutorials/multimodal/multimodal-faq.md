@@ -17,6 +17,7 @@ predictor = MultiModalPredictor.load(SAVE_PATH)
 ```
 
 ## What machine is best for running AutoGluon Multimodal?
+
 AutoGluon Multimodal is primarily used for fine-tuning pretrained deep learning models. 
 For efficient training, it is highly recommended to utilize GPU machines. 
 By default, AutoGluon Multimodal leverages all GPUs available on a single machine. 
@@ -28,6 +29,7 @@ Achieving a balance between performance and cost is essential to find an optimal
 
 
 ## Multi-GPU training encounters RuntimeError: An attempt has been made to start a new process before the current process has finished its bootstrapping phase. How to fix it?
+
 A straightforward solution is to enclose your code within the condition if __name__ == '__main__'. 
 By default, we use ddp_spawn as the strategy, which does not fork to initiate the child processes. 
 Hence, it is necessary to employ the proper idiom if __name__ == '__main__' in the main module.
