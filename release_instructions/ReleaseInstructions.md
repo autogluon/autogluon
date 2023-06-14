@@ -2,7 +2,7 @@
 
 ## Prior to release: 1 week out
 
-* Ensure the version specified in `docs/conf.py`, `VERSION`, and `docs/index.md` align with the intended release version.
+* Ensure the version specified in `docs/conf.py` and `VERSION` align with the intended release version.
 * Check all dependency version ranges.
   * Ensure all dependencies are not capped by major version, unless the reason is documented inline.
     * Example of major version cap: `scikit-learn<2`
