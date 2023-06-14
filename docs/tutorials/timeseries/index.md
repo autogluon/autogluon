@@ -1,21 +1,16 @@
 # Time Series Forecasting
 
-For time series data containing multiple individual series, AutoGluon can produce
-forecasting models to predict future values of each series based on historical
-observations of both this series and all of the other series in the dataset.
-A single call to AutoGluon `TimeSeriesPredictor`'s `fit()` automatically trains
-multiple models on a dataset containing multiple time-series measured over
-the same time period, and does not require you to manually deal with cumbersome
-issues like data cleaning, hyperparameter optimization, model selection, etc.
+AutoGluon can forecast the future values of multiple time series given the historical data and other related covariates.
+A single call to AutoGluon `TimeSeriesPredictor`'s `fit()` method trains multiple models to generate accurate probabilistic forecasts,
+and does not require you to manually deal with cumbersome issues like model selection and hyperparameter tuning.
 
-Most neural network-based models are from the [GluonTS library](https://ts.gluon.ai/).
-Allowed to contain missing values and additional (non-time-varying) static features,
-the data can be loaded from: a CSV file
-or the [GluonTS format](https://ts.gluon.ai/stable/api/gluonts/gluonts.dataset.html).
-AutoGluon-TimeSeries also supports simpler time series models such as exponential
-smoothing or ARIMA, through the [statsmodels library](https://www.statsmodels.org/stable/index.html).
+Under the hood, AutoGluon combines various state of the art forecasting algorithms.
+These include established statical methods like ETS and ARIMA from
+[`StatsForecast`](https://github.com/Nixtla/statsforecast) and [`statsmodels`](https://statsmodels.org/) libraries,
+efficient tree-based forecasters like LightGBM based on [AutoGluon-Tabular](https://auto.gluon.ai/stable/tutorials/tabular/index.html),
+and flexible deep learning models like DeepAR and Temporal Fusion Transformer from [GluonTS](https://ts.gluon.ai/).
 
-
+Check out the [Quick Start Tutorial](forecasting-quick-start.ipynb) to learn how to make accurate forecasts in just 3 lines of code using AutoGluon.
 
 ::::{grid} 2
   :gutter: 3
