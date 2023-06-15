@@ -59,6 +59,7 @@ tabular_presets_dict = dict(
     # Shown to achieve superior results compared to best_quality on OpenML datasets <5000 rows.
     # Note that runtimes might be much longer than usual with this config.
     experimental_zeroshot_hpo={'auto_stack': True, 'hyperparameters': 'zeroshot_hpo'},
+    experimental_zeroshot_hpo_hybrid={'auto_stack': True, 'hyperparameters': 'zeroshot_hpo_hybrid'},
 
     # ------------------------------------------
     # ------------------------------------------
