@@ -38,3 +38,8 @@ known_third_party = [
 line_length = 119
 profile = "black"
 
+
+[tool.codespell]
+skip = '.git,*.pdf,*.svg'
+#
+# ignore-words-list = ''
