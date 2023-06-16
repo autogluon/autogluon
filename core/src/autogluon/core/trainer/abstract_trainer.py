@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 import logging
 import os
@@ -20,10 +22,12 @@ from autogluon.common.utils.try_import import try_import_torch
 
 from .utils import process_hyperparameters
 from ..augmentation.distill_utils import format_distillation_labels, augment_data
+from ..calibrate import calibrate_decision_threshold
 from ..calibrate.conformity_score import compute_conformity_score
 from ..calibrate.temperature_scaling import tune_temperature_scaling
 from ..constants import AG_ARGS, BINARY, MULTICLASS, REGRESSION, QUANTILE, SOFTCLASS, REFIT_FULL_NAME, REFIT_FULL_SUFFIX
 from ..data.label_cleaner import LabelCleanerMulticlassToBinary
+from ..metrics import get_metric, Scorer
 from ..models import AbstractModel, BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel, GreedyWeightedEnsembleModel, SimpleWeightedEnsembleModel
 from ..utils import default_holdout_frac, get_pred_from_proba, generate_train_test_split, infer_eval_metric, compute_permutation_feature_importance, \
     extract_column, compute_weighted_metric, convert_pred_probas_to_df
@@ -646,6 +650,12 @@ class AbstractTrainer:
         return compute_weighted_metric(y, y_pred, self.eval_metric, weights, weight_evaluation=self.weight_evaluation,
                                        quantile_levels=self.quantile_levels)
 
+    def _score_with_y_pred(self, y, y_pred, weights=None, metric=None) -> float:
+        if metric is None:
+            metric = self.eval_metric
+        return compute_weighted_metric(y, y_pred, metric=metric, weights=weights, weight_evaluation=self.weight_evaluation,
+                                       quantile_levels=self.quantile_levels)
+
     # TODO: Slow if large ensemble with many models, could cache output result to speed up cascades during inference
     def _construct_model_pred_order(self, models: List[str]) -> List[str]:
         """
@@ -1184,6 +1194,10 @@ class AbstractTrainer:
 
         self.save()
         return self.get_model_full_dict()
+
+    def get_refit_full_parent(self, model: str) -> str:
+        """Get refit full model's parent. If model does not have a parent, return `model`."""
+        return self.get_model_attribute(model=model, attribute='refit_full_parent', default=model)
 
     # TODO: Take best performance model with lowest inference
     def get_model_best(self, can_infer=None, allow_full=True, infer_limit=None):
@@ -2382,6 +2396,9 @@ class AbstractTrainer:
             model_full_dict = {parent: refit for refit, parent in model_full_dict.items()}
         return model_full_dict
 
+    def model_exists(self, model: str) -> bool:
+        return model in self.get_model_names()
+
     def _get_banned_model_names(self) -> list:
         """Gets all model names which would cause model files to be overwritten if a new model was trained with the name"""
         return self.get_model_names() + list(self._extra_banned_names)
@@ -3046,3 +3063,64 @@ class AbstractTrainer:
                 logger.log(15, f'Temperature term found is: {temp_scalar}')
                 model.params_aux["temperature_scalar"] = temp_scalar
                 model.save()
+
+    def calibrate_decision_threshold(self,
+                                     X: pd.DataFrame | None = None,
+                                     y: np.array | None = None,
+                                     metric: str | Scorer | None = None,
+                                     model: str = 'best',
+                                     weights=None,
+                                     decision_thresholds: int | List[float] = 50,
+                                     verbose: bool = True) -> float:
+        # TODO: Docstring
+        assert self.problem_type == BINARY, f'calibrate_decision_threshold is only available for `problem_type="{BINARY}"`'
+
+        if metric is None:
+            metric = self.eval_metric
+        elif isinstance(metric, str):
+            metric = get_metric(metric, self.problem_type, 'eval_metric')
+
+        if model == 'best':
+            model = self.get_model_best()
+
+        if y is None:
+            # If model is refit_full, use its parent to avoid over-fitting
+            model_parent = self.get_refit_full_parent(model=model)
+            if not self.model_exists(model_parent):
+                raise AssertionError(f'Unable to calibrate the decision threshold on the internal data because the '
+                                     f'model "{model}" is a refit_full model trained on all of the internal data, '
+                                     f'whose parent model "{model_parent}" does not exist or was deleted.\n'
+                                     f'It may have been deleted due to `predictor.fit(..., keep_only_best=True)`. '
+                                     f'Ensure `keep_only_best=False` to be able to calibrate refit_full models.')
+            model = model_parent
+
+            # TODO: Add helpful logging when data is not available, for example post optimize for deployment
+            if self.has_val:
+                # Use validation data
+                X = self.load_X_val()
+                if self.weight_evaluation:
+                    X, weights = extract_column(X=X, col_name=self.sample_weight)
+                y: np.array = self.load_y_val()
+                y_pred_proba = self.predict_proba(X=X, model=model)
+            else:
+                # Use out-of-fold data
+                if self.weight_evaluation:
+                    X = self.load_X()
+                    X, weights = extract_column(X=X, col_name=self.sample_weight)
+                y: np.array = self.load_y()
+                y_pred_proba = self.get_model_oof(model=model)
+        else:
+            y_pred_proba = self.predict_proba(X=X, model=model)
+
+        if not metric.needs_pred:
+            logger.warning(f'WARNING: The provided metric "{metric.name}" does not use class predictions for scoring, '
+                           f'and thus is invalid for decision threshold calibration. '
+                           f'Falling back to `decision_threshold=0.5`.')
+            return 0.5
+
+        return calibrate_decision_threshold(y=y,
+                                            y_pred_proba=y_pred_proba,
+                                            metric=lambda y, y_pred : self._score_with_y_pred(y=y, y_pred=y_pred, weights=weights, metric=metric),
+                                            decision_thresholds=decision_thresholds,
+                                            metric_name=metric.name,
+                                            verbose=verbose)

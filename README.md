@@ -25,7 +25,7 @@ AutoGluon automates machine learning tasks enabling you to easily achieve strong
 # First install package from terminal:
 # pip install -U pip
 # pip install -U setuptools wheel
-# pip install autogluon  # autogluon==0.7.0
+# pip install autogluon  # autogluon==0.8.0
 
 from autogluon.tabular import TabularDataset, TabularPredictor
 train_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')

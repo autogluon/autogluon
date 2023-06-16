@@ -21,7 +21,6 @@ function setup_torch_gpu {
 }
 
 function setup_torch_cpu {
-    PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu reinstall_torch
 }
 
 function setup_torch_gpu_non_linux {

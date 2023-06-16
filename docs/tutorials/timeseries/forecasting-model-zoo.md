@@ -3,7 +3,7 @@
 :::{note}
 This documentation is intended for advanced users and may not be comprehensive.
 
-For a stable public API, refer to TimeSeriesPredictor.
+For a stable public API, refer to the [documentation for `TimeSeriesPredictor`](https://auto.gluon.ai/stable/api/autogluon.timeseries.TimeSeriesPredictor.html).
 :::
 
 This page contains the list of time series forecasting models available in AutoGluon.
@@ -23,11 +23,12 @@ predictor = TimeSeriesPredictor().fit(
 )
 ```
 
-Note that we don't include the `Model` suffix when specifying the model name in `hyperparameters`
-(e.g., the class {class}`~autogluon.timeseries.models.DeepARModel` corresponds to the name `"DeepAR"` in the `hyperparameters` dictionary).
+The model names in the `hyperparameters` dictionary don't have to include the `"Model"` suffix
+(e.g., both `"DeepAR"` and `"DeepARModel"` correspond to {class}`~autogluon.timeseries.models.DeepARModel`).
 
-Also note that some of the models' hyperparameters have names and default values that
-are different from the original libraries.
+Note that some of the models' hyperparameters have names and default values that are different from the original libraries.
+
+
 
 ## Default models
 
@@ -47,12 +48,15 @@ are different from the original libraries.
    SeasonalNaiveModel
    ARIMAModel
    ETSModel
-   ThetaModel
-   AutoETSModel
    AutoARIMAModel
+   AutoETSModel
+   ThetaModel
    DynamicOptimizedThetaModel
    DirectTabularModel
+   RecursiveTabularModel
    DeepARModel
+   DLinearModel
+   PatchTSTModel
    SimpleFeedForwardModel
    TemporalFusionTransformerModel
 
@@ -89,10 +93,10 @@ are different from the original libraries.
 
 ```
 
-### {hidden}`ThetaModel`
+### {hidden}`AutoARIMAModel`
 
 ```{eval-rst}
-.. autoclass:: ThetaModel
+.. autoclass:: AutoARIMAModel
    :members: init
 ```
 
@@ -103,12 +107,13 @@ are different from the original libraries.
    :members: init
 ```
 
-### {hidden}`AutoARIMAModel`
+### {hidden}`ThetaModel`
 
 ```{eval-rst}
-.. autoclass:: AutoARIMAModel
+.. autoclass:: ThetaModel
    :members: init
 ```
+
 
 ### {hidden}`DynamicOptimizedThetaModel`
 
@@ -121,6 +126,14 @@ are different from the original libraries.
 
 ```{eval-rst}
 .. autoclass:: DirectTabularModel
+   :members: init
+
+```
+
+### {hidden}`RecursiveTabularModel`
+
+```{eval-rst}
+.. autoclass:: RecursiveTabularModel
    :members: init
 
 ```
@@ -213,6 +226,11 @@ Models not included in this table currently do not support any additional featur
      - ✓
      - ✓
      - ✓
+   * - :class:`~autogluon.timeseries.models.RecursiveTabularModel`
+     - ✓
+     - ✓
+     - ✓
+     -
    * - :class:`~autogluon.timeseries.models.DeepARModel`
      - ✓
      - ✓

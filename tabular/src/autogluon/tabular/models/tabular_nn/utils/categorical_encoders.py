@@ -3,6 +3,7 @@ Variant of the sklearn OneHotEncoder and OrdinalEncoder that can handle unknown 
 as well as binning of infrequent categories to limit the overall number of categories considered.
 Unknown categories are returned as None in inverse transforms. Always converts input list X to list of the same type elements first (string typically)
 """
+import copy
 from numbers import Integral
 
 import numpy as np
@@ -11,6 +12,8 @@ from scipy import sparse
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.utils import check_array
 from sklearn.utils.validation import check_is_fitted
+
+from autogluon.features.generators import LabelEncoderFeatureGenerator
 
 
 __all__ = [
@@ -400,6 +403,8 @@ class OneHotMergeRaresHandleUnknownEncoder(_BaseEncoder):
         self.handle_unknown = 'ignore'
         self.drop = drop
         self.max_levels = max_levels
+        self._label_encoder = None
+        self._cat_cols = None
     
     def _validate_keywords(self):
         if self.handle_unknown not in ('error', 'ignore'):
@@ -451,7 +456,13 @@ class OneHotMergeRaresHandleUnknownEncoder(_BaseEncoder):
             msg = ("Wrong input for parameter `drop`. Expected "
                    "'first', None or array of objects, got {}")
             raise ValueError(msg.format(type(self.drop)))
-    
+
+    def _convert_cat_to_int(self, X):
+        if self._cat_cols:
+            X = copy.deepcopy(X)
+            X[self._cat_cols] = self._label_encoder.transform(X[self._cat_cols])
+        return X
+
     def fit(self, X, y=None):
         """Fit OneHotEncoder to X.
     
@@ -464,6 +475,11 @@ class OneHotMergeRaresHandleUnknownEncoder(_BaseEncoder):
         -------
         self
         """
+        self._label_encoder = LabelEncoderFeatureGenerator(verbosity=0)
+        self._cat_cols = list(X.select_dtypes(include='category').columns)
+        if self._cat_cols:
+            self._label_encoder.fit(X=X[self._cat_cols])
+        X = self._convert_cat_to_int(X=X)
         X = np.array(X).tolist() # converts all elements in X to the same type (i.e. cannot mix floats, ints, and str)
         self._validate_keywords()
         self._fit(X, handle_unknown=self.handle_unknown)
@@ -483,26 +499,7 @@ class OneHotMergeRaresHandleUnknownEncoder(_BaseEncoder):
                         )
                     )
         return self
-    
-    def fit_transform(self, X, y=None):
-        """Fit OneHotEncoder to X, then transform X.
 
-        Equivalent to fit(X).transform(X) but more convenient.
-
-        Parameters
-        ----------
-        X : array-like, shape [n_samples, n_features]
-            The data to encode.
-
-        Returns
-        -------
-        X_out : sparse matrix if sparse=True else a 2-d array
-            Transformed input.
-        """
-        X = np.array(X).tolist() # converts all elements in X to the same type (i.e. cannot mix floats, ints, and str)
-        self._validate_keywords()
-        return super().fit_transform(X, y)
-    
     def transform(self, X):
         """Transform X using one-hot encoding.
         
@@ -516,6 +513,7 @@ class OneHotMergeRaresHandleUnknownEncoder(_BaseEncoder):
         X_out : sparse matrix if sparse=True else a 2-d array
             Transformed input.
         """
+        X = self._convert_cat_to_int(X=X)
         X = np.array(X).tolist() # converts all elements in X to the same type (i.e. cannot mix floats, ints, and str)
         check_is_fitted(self, 'categories_')
         # validation of X happens in _check_X called by _transform
@@ -751,6 +749,7 @@ class OrdinalMergeRaresHandleUnknownEncoder(_BaseEncoder):
         self.categories = categories
         self.dtype = dtype
         self.max_levels = max_levels
+        self._label_encoder = None
     
     def fit(self, X, y=None):
         """Fit the OrdinalEncoder to X.
@@ -765,6 +764,9 @@ class OrdinalMergeRaresHandleUnknownEncoder(_BaseEncoder):
         self
         
         """
+        self._label_encoder = LabelEncoderFeatureGenerator(verbosity=0)
+        self._label_encoder.fit(X=X)
+        X = self._label_encoder.transform(X)
         X = np.array(X).tolist()  # converts all elements in X to the same type (i.e. cannot mix floats, ints, and str)
         self._fit(X, handle_unknown='ignore')
 
@@ -788,6 +790,7 @@ class OrdinalMergeRaresHandleUnknownEncoder(_BaseEncoder):
             Transformed input.
         
         """
+        X = self._label_encoder.transform(X)
         X_og_array = np.array(X)  # original X array before transform
         X_int, _ = self._transform(X, handle_unknown='ignore')  # will contain zeros for 0th category as well as unknown values.
 

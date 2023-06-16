@@ -179,16 +179,16 @@ class AutoETSModel(AbstractStatsForecastModel):
 
 
 class DynamicOptimizedThetaModel(AbstractStatsForecastModel):
-    """Optimized Theta forecasting model from Fiorucci et al. (2016).
+    """Optimized Theta forecasting model [Fiorucci2016]_.
 
     Based on `statsforecast.models.DynamicOptimizedTheta <https://nixtla.github.io/statsforecast/models.html#dynamic-optimized-theta-method>`_.
 
 
     References
     ----------
-    Fiorucci, Jose et al.
-    "Models for optimising the theta method and their relationship to state space models."
-    International journal of forecasting 32.4 (2016): 1151-1161.
+    .. [Fiorucci2016] Fiorucci, Jose et al.
+        "Models for optimising the theta method and their relationship to state space models."
+        International journal of forecasting 32.4 (2016): 1151-1161.
 
 
     Other Parameters
@@ -223,16 +223,16 @@ class DynamicOptimizedThetaModel(AbstractStatsForecastModel):
 
 
 class ThetaModel(AbstractStatsForecastModel):
-    """Theta forecasting model from Assimakopoulos and Nikolopoulos (2000).
+    """Theta forecasting model [Assimakopoulos2000]_.
 
     Based on `statsforecast.models.Theta <https://nixtla.github.io/statsforecast/models.html#theta>`_.
 
 
     References
     ----------
-    Assimakopoulos, Vassilis, and Konstantinos Nikolopoulos.
-    "The theta model: a decomposition approach to forecasting."
-    International journal of forecasting 16.4 (2000): 521-530.
+    .. [Assimakopoulos2000] Assimakopoulos, Vassilis, and Konstantinos Nikolopoulos.
+        "The theta model: a decomposition approach to forecasting."
+        International journal of forecasting 16.4 (2000): 521-530.
 
 
     Other Parameters

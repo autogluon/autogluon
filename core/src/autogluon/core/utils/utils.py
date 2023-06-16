@@ -4,7 +4,7 @@ import pickle
 import time
 import random
 import sys
-from typing import Callable, List, Tuple
+from typing import Callable, List, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -253,23 +253,42 @@ def augment_rare_classes(X, label, threshold):
     return X
 
 
-def get_pred_from_proba_df(y_pred_proba, problem_type=BINARY):
-    """From input DataFrame of pred_proba, return Series of pred"""
+def get_pred_from_proba_df(y_pred_proba: pd.DataFrame,
+                           problem_type: str = BINARY,
+                           decision_threshold: float = None) -> pd.Series:
+    """
+    From input DataFrame of pred_proba, return Series of pred.
+    The input DataFrame's columns must be the names of the target classes.
+    """
     if problem_type == REGRESSION:
         y_pred = y_pred_proba
     elif problem_type == QUANTILE:
         y_pred = y_pred_proba
+    elif problem_type == BINARY and decision_threshold is not None:
+        negative_class, positive_class = y_pred_proba.columns
+        y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba.values,
+                                     problem_type=problem_type,
+                                     decision_threshold=decision_threshold)
+        y_pred = [positive_class if pred == 1 else negative_class for pred in y_pred]
+        y_pred = pd.Series(data=y_pred, index=y_pred_proba.index)
     else:
         y_pred = y_pred_proba.idxmax(axis=1)
     return y_pred
 
 
-def get_pred_from_proba(y_pred_proba, problem_type=BINARY):
+def get_pred_from_proba(y_pred_proba: np.ndarray, problem_type=BINARY, decision_threshold: float = None):
     if problem_type == BINARY:
+        if decision_threshold is None:
+            decision_threshold = 0.5
         # Using > instead of >= to align with Pandas `.idxmax` logic which picks the left-most column during ties.
         # If this is not done, then predictions can be inconsistent when converting in binary classification from multiclass-form pred_proba and
         # binary-form pred_proba when the pred_proba is 0.5 for positive and negative classes.
-        y_pred = [1 if pred > 0.5 else 0 for pred in y_pred_proba]
+        if len(y_pred_proba.shape) == 2:
+            assert y_pred_proba.shape[1] == 2
+            # Assume positive class is in 2nd position
+            y_pred = [1 if pred > decision_threshold else 0 for pred in y_pred_proba[:, 1]]
+        else:
+            y_pred = [1 if pred > decision_threshold else 0 for pred in y_pred_proba]
     elif problem_type == REGRESSION:
         y_pred = y_pred_proba
     elif problem_type == QUANTILE:
@@ -389,7 +408,7 @@ def generate_train_test_split_combined(data: DataFrame,
 def generate_train_test_split(X: DataFrame,
                               y: Series,
                               problem_type: str,
-                              test_size: float = 0.1,
+                              test_size: Union[float, int] = 0.1,
                               random_state=0,
                               min_cls_count_train=1) -> Tuple[DataFrame, DataFrame, Series, Series]:
     """
@@ -409,6 +428,9 @@ def generate_train_test_split(X: DataFrame,
     test_size : float, default = 0.1
         The proportion of data to use for the test set.
         The remaining (1 - test_size) of data will be used for the training set.
+    test_size : float or int, default = 0.1
+        If float, should be between 0.0 and 1.0 and represent the proportion of the dataset to include in the test split.
+        If int, represents the absolute number of test samples.
     random_state : int, default = 0
         Random seed to use during the split.
     min_cls_count_train : int, default = 1
@@ -423,8 +445,11 @@ def generate_train_test_split(X: DataFrame,
         The train_data and test_data after performing the split, separated into X and y.
 
     """
-    if (test_size <= 0.0) or (test_size >= 1.0):
-        raise ValueError("fraction of data to hold-out must be specified between 0 and 1")
+    if isinstance(test_size, float):
+        if (test_size <= 0.0) or (test_size >= 1.0):
+            raise ValueError("fraction of data to hold-out must be specified between 0 and 1")
+    elif isinstance(test_size, int):
+        assert test_size > 0
     valid_problem_types = [BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE]
     assert problem_type in valid_problem_types, f'Unknown problem type "{problem_type}" | Valid problem types: {valid_problem_types}'
 

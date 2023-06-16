@@ -51,6 +51,16 @@ tabular_presets_dict = dict(
     # Best quality with an additional FTTransformer model, GPU is recommended.
     experimental_best_quality={'auto_stack': True, 'hyperparameters': 'default_FTT'},
 
+    # Best quality with an additional FTTransformer and TabPFN model, GPU is recommended.
+    #  May have **extremely** slow inference speed, to a potentially unusable degree.
+    experimental_extreme_quality={'auto_stack': True, 'hyperparameters': 'extreme'},
+
+    # Experimental simulated model portfolio.
+    # Shown to achieve superior results compared to best_quality on OpenML datasets <5000 rows.
+    # Note that runtimes might be much longer than usual with this config.
+    experimental_zeroshot_hpo={'auto_stack': True, 'hyperparameters': 'zeroshot_hpo'},
+    experimental_zeroshot_hpo_hybrid={'auto_stack': True, 'hyperparameters': 'zeroshot_hpo_hybrid'},
+
     # ------------------------------------------
     # ------------------------------------------
     # ------------------------------------------
