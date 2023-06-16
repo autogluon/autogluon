@@ -122,7 +122,7 @@ class RayResourceManager:
 
     @staticmethod
     def _init_ray():
-        """Initialize ray runtime if not already initialized. Will force the existance of a cluster already being spinned up"""
+        """Initialize ray runtime if not already initialized. Will force the existence of a cluster already being spinned up"""
         try_import_ray()
         import ray
         if not ray.is_initialized():

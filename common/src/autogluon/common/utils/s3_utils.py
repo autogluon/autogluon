@@ -195,7 +195,7 @@ def download_s3_folder(
         logger.log(20, f"Will download {len(s3_to_local_tuple_list)} objects from s3://{bucket}/{prefix} to {local_path}")
     if os.path.isdir(local_path) and not dry_run:
         if error_if_exists:
-            raise ValueError(f"Directory {local_path} already exsists. Please pass in a different `local_path` or set `error_if_exsits` to `False`")
+            raise ValueError(f"Directory {local_path} already exists. Please pass in a different `local_path` or set `error_if_exsits` to `False`")
         if delete_if_exists:
             logger.warning(f"Will delete {local_path} and all its content within because this folder already exists and `delete_if_exists` = `True`")
             shutil.rmtree(local_path)

@@ -31,7 +31,7 @@ class ResourceCalculator(ABC):
         # The head bundle doesn't actually require resources.
         # This memory constraint is a hack (1024 is a random number, unit is bytes) to trick ray to schedule bundles on the same node
         # Currently we force the trial and its underlying folds being trained on the same node to avoid synchronization
-        # TODO: consider seperate the sub-bundle of folding so they can be scheduled on seperate nodes
+        # TODO: consider separate the sub-bundle of folding so they can be scheduled on separate nodes
         return tune.PlacementGroupFactory([{"memory": 1024}, {'CPU': num_cpus, 'GPU': num_gpus}], strategy="STRICT_PACK")
 
 
