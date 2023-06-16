@@ -40,6 +40,6 @@ profile = "black"
 
 
 [tool.codespell]
-skip = '.git,*.pdf,*.svg,*.ipynb,*.csv'
+skip = '.git,*.pdf,*.svg,*.ipynb,*.csv,kaggle_feedback_prize'
 #
 ignore-words-list = 'mape,ans,2st,fo,nd,te,fpr,coo,rouge'
