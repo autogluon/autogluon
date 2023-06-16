@@ -103,7 +103,7 @@ def upload_s3_folder(
         The local folder to upload to s3
     dry_run: bool, default = False
         Whether to perform uploading
-        If True, will isntead log every file that will be uploaded and the s3 path to be uploaded to
+        If True, will instead log every file that will be uploaded and the s3 path to be uploaded to
     verbose: bool, default = True
         Whether to log detailed loggings
     """
@@ -179,7 +179,7 @@ def download_s3_folder(
         If `error_if_exists=True`, deletion will not occur.
     dry_run: bool, default = False
         Whether to perform the directory creation and file downloading.
-        If True, will isntead log every file that will be downloaded and every directory that will be created
+        If True, will instead log every file that will be downloaded and every directory that will be created
     verbose: bool, default = True
         Whether to log detailed loggings
     **kwargs
