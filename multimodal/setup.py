@@ -64,7 +64,7 @@ extras_require = {
     "tests": [
         "black>=22.3,<23.0",
         "isort>=5.10",
-        "datasets>=2.13.0,<=2.14.0",
+        "datasets>=2.13.0,<2.14.0",
         "onnx>=1.14.0,<1.15.0",
         "onnxruntime>=1.15.0,<1.16.0;platform_system=='Darwin'",
         "onnxruntime-gpu>=1.15.0,<1.16.0;platform_system!='Darwin'",
