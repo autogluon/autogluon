@@ -28,7 +28,6 @@ DEPENDENT_PACKAGES = {
     'networkx': '>=3.0,<4',  # Major version cap
     'tqdm': '>=4.38,<5',  # Major version cap
     'Pillow': '>=9.3,<9.6',  # "<{N+2}" upper cap
-    'timm': '>=0.5.4,<0.7',  # "<{N+1}" upper cap
 }
 if LITE_MODE:
     DEPENDENT_PACKAGES = {
