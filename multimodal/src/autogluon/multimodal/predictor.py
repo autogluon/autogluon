@@ -38,7 +38,6 @@ from .constants import (
     BEST,
     BEST_K_MODELS_FILE,
     BINARY,
-    CLASSIFICATION,
     COLUMN_FEATURES,
     DEEPSPEED_MIN_PL_VERSION,
     DEEPSPEED_MODULE,
@@ -2853,13 +2852,3 @@ class MultiModalPredictor(ExportMixin):
             return list_timm_models(pretrained=pretrained)
         else:
             raise ValueError(f"list_supported_models() is not available for problem type: {self._problem_type}")
-
-
-class AutoMMPredictor(MultiModalPredictor):
-    def __init__(self, **kwargs):
-        warnings.warn(
-            "AutoMMPredictor has been renamed as 'MultiModalPredictor'. "
-            "Consider to use MultiModalPredictor instead. Using AutoMMPredictor will "
-            "raise an exception starting in v0.7."
-        )
-        super(AutoMMPredictor, self).__init__(**kwargs)
