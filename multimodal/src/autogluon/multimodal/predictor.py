@@ -82,7 +82,7 @@ from .constants import (
     Y_PRED,
     Y_PRED_PROB,
     Y_TRUE,
-    ZERO_SHOT_IMAGE_CLASSIFICATION,
+    ZERO_SHOT_IMAGE_CLASSIFICATION
 )
 from .data.datamodule import BaseDataModule
 from .data.dataset_mmlab import MultiImageMixDataset
