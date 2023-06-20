@@ -284,6 +284,7 @@ class DocumentProcessor:
                 # Process PDF documents.
                 if feature_modalities[per_col_name] == DOCUMENT_PDF:
                     import fitz
+
                     # Load the pdf file.
                     pdf_doc = fitz.open(per_col_image_features[0])
                     first_page = pdf_doc.load_page(0)

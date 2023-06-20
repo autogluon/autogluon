@@ -75,10 +75,10 @@ extras_require = {
     ]
 }
 
-for test_package in ['PyMuPDF']:
+for test_package in ["PyMuPDF"]:
     tests_require += extras_require[test_package]
 
-extras_require['tests'] = tests_require
+extras_require["tests"] = tests_require
 
 
 if __name__ == "__main__":
