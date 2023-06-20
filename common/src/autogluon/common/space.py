@@ -1,10 +1,8 @@
-
-__all__ = ['Space', 'Categorical', 'Real', 'Int', 'Bool']
+__all__ = ["Space", "Categorical", "Real", "Int", "Bool"]
 
 
 class Space(object):
-    """Basic search space describing set of possible candidate values for hyperparameter.
-    """
+    """Basic search space describing set of possible candidate values for hyperparameter."""
 
     @property
     def default(self):
@@ -17,12 +15,13 @@ class SimpleSpace(Space):
         self._default = default
 
     """Non-nested search space (i.e. corresponds to a single simple hyperparameter)."""
+
     def __repr__(self):
         reprstr = self.__class__.__name__
-        if hasattr(self, 'lower') and hasattr(self, 'upper'):
-            reprstr += ': lower={}, upper={}'.format(self.lower, self.upper)
-        if hasattr(self, 'value'):
-            reprstr += ': value={}'.format(self.value)
+        if hasattr(self, "lower") and hasattr(self, "upper"):
+            reprstr += ": lower={}, upper={}".format(self.lower, self.upper)
+        if hasattr(self, "value"):
+            reprstr += ": value={}".format(self.value)
         return reprstr
 
     @property
@@ -32,8 +31,7 @@ class SimpleSpace(Space):
 
     @default.setter
     def default(self, value):
-        """Set default value for hyperparameter corresponding to this search space. The default value is always tried in the first trial of HPO.
-        """
+        """Set default value for hyperparameter corresponding to this search space. The default value is always tried in the first trial of HPO."""
         self._default = value
 
 
@@ -41,13 +39,14 @@ class DiscreteSpace(SimpleSpace):
     """
     Search space with the requirement of having a discrete number of options, such that it is possible to exhaust the search space.
     """
+
     def __len__(self) -> int:
         """Returns the number of unique spaces within the discrete search space."""
         raise NotImplementedError
 
 
 class Categorical(DiscreteSpace):
-    """Nested search space for hyperparameters which are categorical. Such a hyperparameter takes one value out of the discrete set of provided options. 
+    """Nested search space for hyperparameters which are categorical. Such a hyperparameter takes one value out of the discrete set of provided options.
        The first value in the list of options will be the default value that gets tried first during HPO.
 
     Parameters
@@ -59,6 +58,7 @@ class Categorical(DiscreteSpace):
     --------
     >>> a = Categorical('a', 'b', 'c', 'd')  # 'a' will be default value tried first during HPO
     """
+
     def __init__(self, *data):
         self.data = [*data]
         super().__init__(self.data[0])
@@ -96,18 +96,19 @@ class Real(SimpleSpace):
     default : float (optional)
         Default value tried first during hyperparameter optimization
     log : (True/False)
-        Whether to search the values on a logarithmic rather than linear scale. 
+        Whether to search the values on a logarithmic rather than linear scale.
         This is useful for numeric hyperparameters (such as learning rates) whose search space spans many orders of magnitude.
 
     Examples
     --------
     >>> learning_rate = Real(0.01, 0.1, log=True)
     """
+
     def __init__(self, lower, upper, default=None, log=False):
         if log and lower <= 0:
-            raise AssertionError(f'lower must be greater than 0 when `log=True`. lower: {lower}')
+            raise AssertionError(f"lower must be greater than 0 when `log=True`. lower: {lower}")
         if lower >= upper:
-            raise AssertionError(f'lower must be less than upper. lower: {lower}, upper: {upper}')
+            raise AssertionError(f"lower must be less than upper. lower: {lower}, upper: {upper}")
         if default is None:
             default = lower
         super().__init__(default=default)
@@ -142,6 +143,7 @@ class Int(DiscreteSpace):
     --------
     >>> range = Int(0, 100)
     """
+
     def __init__(self, lower, upper, default=None):
         if default is None:
             default = lower
@@ -151,19 +153,21 @@ class Int(DiscreteSpace):
 
     def convert_to_sklearn(self):
         from scipy.stats import randint
-        return randint(self.lower, self.upper+1)
+
+        return randint(self.lower, self.upper + 1)
 
     def __len__(self):
         return self.upper - self.lower + 1
 
 
 class Bool(Int):
-    """Search space for hyperparameter that is either True or False. 
+    """Search space for hyperparameter that is either True or False.
        `Bool()` serves as shorthand for: `Categorical(True, False)`
 
     Examples
     --------
     >>> pretrained = Bool()
     """
+
     def __init__(self):
         super(Bool, self).__init__(0, 1)

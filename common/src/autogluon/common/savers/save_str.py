@@ -1,5 +1,5 @@
-import os
 import logging
+import os
 
 from ..utils import s3_utils
 
@@ -35,8 +35,9 @@ def save(path, data: str, verbose=True):
     is_s3_path = s3_utils.is_s3_url(path)
     if is_s3_path:
         import boto3
+
         bucket, key = s3_utils.s3_path_to_bucket_prefix(path)
-        s3_client = boto3.client('s3')
+        s3_client = boto3.client("s3")
         s3_client.put_object(Body=data, Bucket=bucket, Key=key)
     else:
         os.makedirs(os.path.dirname(path), exist_ok=True)
