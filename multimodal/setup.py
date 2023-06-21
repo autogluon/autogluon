@@ -35,7 +35,6 @@ install_requires = [
     "timm>=0.9.2,<0.10.0",
     "torch>=1.9,<1.14",
     "torchvision<0.15.0",
-    "fairscale>=0.4.5,<0.4.14",
     "scikit-image>=0.19.1,<0.20.0",
     "pytorch-lightning>=1.9.0,<1.10.0",
     "text-unidecode>=1.3,<1.4",
