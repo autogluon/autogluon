@@ -43,7 +43,7 @@ def time_func(f, args: list = None, kwargs: dict = None, time_limit: float = 0.2
         return avg_time
     if time_limit is None or avg_time < (time_limit / max_repeats):
         time_start_loop = time.time()
-        for i in range(max_repeats-1):
+        for i in range(max_repeats - 1):
             f(*args, **kwargs)
         time_end_loop = time.time()
         total_time_loop = time_end_loop - time_start_loop
@@ -78,12 +78,12 @@ def sample_df_for_time_func(df: DataFrame, sample_size: int, max_sample_size: Op
     len_df = len(df)
     if max_sample_size is None:
         max_sample_size = sample_size
-    assert isinstance(sample_size, int), 'sample_size must be of type int'
-    assert isinstance(max_sample_size, int), 'max_sample_size must be of type int'
+    assert isinstance(sample_size, int), "sample_size must be of type int"
+    assert isinstance(max_sample_size, int), "max_sample_size must be of type int"
     if sample_size < 1:
-        raise AssertionError(f'sample_size must be >=1, but was {sample_size}')
+        raise AssertionError(f"sample_size must be >=1, but was {sample_size}")
     if max_sample_size < 1:
-        raise AssertionError(f'max_sample_size must be >=1, but was {max_sample_size}')
+        raise AssertionError(f"max_sample_size must be >=1, but was {max_sample_size}")
 
     if len_df > sample_size:
         df_out = df.head(sample_size)

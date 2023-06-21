@@ -2,9 +2,8 @@ import copy
 import logging
 import os
 import time
-from typing import Dict
-
 from collections import defaultdict
+from typing import Dict
 
 import numpy as np
 import pandas as pd
@@ -13,9 +12,9 @@ from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.features.types import R_FLOAT, S_STACK
 from autogluon.common.utils.path_converter import PathConverter
 
-from .bagged_ensemble_model import BaggedEnsembleModel
+from ...constants import MULTICLASS, QUANTILE, SOFTCLASS
 from ..abstract.abstract_model import AbstractModel
-from ...constants import MULTICLASS, SOFTCLASS, QUANTILE
+from .bagged_ensemble_model import BaggedEnsembleModel
 
 logger = logging.getLogger(__name__)
 
@@ -33,14 +32,17 @@ class StackerEnsembleModel(BaggedEnsembleModel):
 
     Stacker models can act as base models to other stacker models, enabling multi-layer stack ensembling.
     """
-    def __init__(self,
-                 base_model_names=None,
-                 base_models_dict=None,
-                 base_model_paths_dict=None,
-                 base_model_types_dict=None,
-                 base_model_types_inner_dict=None,
-                 base_model_performances_dict=None,
-                 **kwargs):
+
+    def __init__(
+        self,
+        base_model_names=None,
+        base_models_dict=None,
+        base_model_paths_dict=None,
+        base_model_types_dict=None,
+        base_model_types_inner_dict=None,
+        base_model_performances_dict=None,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
         if base_model_names is None:
             base_model_names = []
@@ -55,9 +57,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         self.base_model_paths_dict = base_model_paths_dict
 
         # FIXME: DO NOT DO THIS, FIX ASAP
-        self.base_model_paths_dict = {
-            k: PathConverter.to_relative(v) for k, v in self.base_model_paths_dict.items()
-        }
+        self.base_model_paths_dict = {k: PathConverter.to_relative(v) for k, v in self.base_model_paths_dict.items()}
 
         self.base_model_types_dict = base_model_types_dict
 
@@ -70,10 +70,17 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         base_model_performances_dict = self._base_model_performances_dict
         base_model_types_inner_dict = self._base_model_types_inner_dict
         if (base_model_performances_dict is not None) and (base_model_types_inner_dict is not None):
-            if self.params['max_base_models_per_type'] > 0:
-                self.base_model_names = self.limit_models_per_type(models=self.base_model_names, model_types=base_model_types_inner_dict, model_scores=base_model_performances_dict, max_base_models_per_type=self.params['max_base_models_per_type'])
-            if self.params['max_base_models'] > 0:
-                self.base_model_names = self.limit_models(models=self.base_model_names, model_scores=base_model_performances_dict, max_base_models=self.params['max_base_models'])
+            if self.params["max_base_models_per_type"] > 0:
+                self.base_model_names = self.limit_models_per_type(
+                    models=self.base_model_names,
+                    model_types=base_model_types_inner_dict,
+                    model_scores=base_model_performances_dict,
+                    max_base_models_per_type=self.params["max_base_models_per_type"],
+                )
+            if self.params["max_base_models"] > 0:
+                self.base_model_names = self.limit_models(
+                    models=self.base_model_names, model_scores=base_model_performances_dict, max_base_models=self.params["max_base_models"]
+                )
 
         for model_name, model in self.base_models_dict.items():
             if model_name not in self.base_model_names:
@@ -81,7 +88,9 @@ class StackerEnsembleModel(BaggedEnsembleModel):
 
         self.stack_column_prefix_lst = copy.deepcopy(self.base_model_names)
         self.stack_columns, self.num_pred_cols_per_model = self.set_stack_columns(stack_column_prefix_lst=self.stack_column_prefix_lst)
-        self.stack_column_prefix_to_model_map = {stack_column_prefix: self.base_model_names[i] for i, stack_column_prefix in enumerate(self.stack_column_prefix_lst)}
+        self.stack_column_prefix_to_model_map = {
+            stack_column_prefix: self.base_model_names[i] for i, stack_column_prefix in enumerate(self.stack_column_prefix_lst)
+        }
 
         self._add_stack_to_feature_metadata()
 
@@ -99,11 +108,11 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         return models_valid
 
     def limit_models(self, models, model_scores, max_base_models):
-        model_types = {model: '' for model in models}
+        model_types = {model: "" for model in models}
         return self.limit_models_per_type(models=models, model_types=model_types, model_scores=model_scores, max_base_models_per_type=max_base_models)
 
     def _set_default_params(self):
-        default_params = {'use_orig_features': True, 'max_base_models': 25, 'max_base_models_per_type': 5}
+        default_params = {"use_orig_features": True, "max_base_models": 25, "max_base_models_per_type": 5}
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
         super()._set_default_params()
@@ -112,7 +121,9 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         if self.stack_column_prefix_lst:
             if infer:
                 if set(self.stack_columns).issubset(set(list(X.columns))):
-                    compute_base_preds = False  # TODO: Consider removing, this can be dangerous but the code to make this work otherwise is complex (must rewrite predict_proba)
+                    compute_base_preds = (
+                        False  # TODO: Consider removing, this can be dangerous but the code to make this work otherwise is complex (must rewrite predict_proba)
+                    )
             if compute_base_preds:
                 X_stacker = []
                 for stack_column_prefix in self.stack_column_prefix_lst:
@@ -126,13 +137,15 @@ class StackerEnsembleModel(BaggedEnsembleModel):
                     else:
                         base_model = self.load_base_model(base_model_name)
                         y_pred_proba = base_model.predict_proba(X)
-                    X_stacker.append(y_pred_proba)  # TODO: This could get very large on a high class count problem. Consider capping to top N most frequent classes and merging least frequent
+                    X_stacker.append(
+                        y_pred_proba
+                    )  # TODO: This could get very large on a high class count problem. Consider capping to top N most frequent classes and merging least frequent
                 X_stacker = self.pred_probas_to_df(X_stacker, index=X.index)
-                if self.params['use_orig_features']:
+                if self.params["use_orig_features"]:
                     X = pd.concat([X_stacker, X], axis=1)
                 else:
                     X = X_stacker
-            elif not self.params['use_orig_features']:
+            elif not self.params["use_orig_features"]:
                 X = X[self.stack_columns]
         X = super().preprocess(X, **kwargs)
         return X
@@ -147,12 +160,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             pred_proba.set_index(index, inplace=True)
         return pred_proba
 
-    def _fit(self,
-             X,
-             y,
-             compute_base_preds=True,
-             time_limit=None,
-             **kwargs):
+    def _fit(self, X, y, compute_base_preds=True, time_limit=None, **kwargs):
         start_time = time.time()
         # TODO: This could be preprocess_nonadaptive=True in general, just have preprocess_nonadaptive=False for child models
         X = self.preprocess(X=X, preprocess_nonadaptive=False, fit=True, compute_base_preds=compute_base_preds)
@@ -174,10 +182,10 @@ class StackerEnsembleModel(BaggedEnsembleModel):
 
     def set_stack_columns(self, stack_column_prefix_lst):
         if self.problem_type in [MULTICLASS, SOFTCLASS]:
-            stack_columns = [stack_column_prefix + '_' + str(cls) for stack_column_prefix in stack_column_prefix_lst for cls in range(self.num_classes)]
+            stack_columns = [stack_column_prefix + "_" + str(cls) for stack_column_prefix in stack_column_prefix_lst for cls in range(self.num_classes)]
             num_pred_cols_per_model = self.num_classes
         elif self.problem_type == QUANTILE:
-            stack_columns = [stack_column_prefix + '_' + str(q) for stack_column_prefix in stack_column_prefix_lst for q in self.quantile_levels]
+            stack_columns = [stack_column_prefix + "_" + str(q) for stack_column_prefix in stack_column_prefix_lst for q in self.quantile_levels]
             num_pred_cols_per_model = len(self.quantile_levels)
         else:
             stack_columns = stack_column_prefix_lst
@@ -186,9 +194,9 @@ class StackerEnsembleModel(BaggedEnsembleModel):
 
     def _hyperparameter_tune(self, X, y, k_fold, hpo_executor, compute_base_preds=True, **kwargs):
         if len(self.models) != 0:
-            raise ValueError('self.models must be empty to call hyperparameter_tune, value: %s' % self.models)
+            raise ValueError("self.models must be empty to call hyperparameter_tune, value: %s" % self.models)
 
-        preprocess_kwargs = {'compute_base_preds': compute_base_preds}
+        preprocess_kwargs = {"compute_base_preds": compute_base_preds}
         return super()._hyperparameter_tune(X=X, y=y, k_fold=k_fold, hpo_executor=hpo_executor, preprocess_kwargs=preprocess_kwargs, **kwargs)
 
     def get_params(self):
@@ -218,9 +226,9 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             num_base_models=len(self.base_model_names),
             base_model_names=self.base_model_names,
         )
-        children_info = info.pop('children_info')
-        info['stacker_info'] = stacker_info
-        info['children_info'] = children_info  # Ensure children_info is last in order
+        children_info = info.pop("children_info")
+        info["stacker_info"] = stacker_info
+        info["children_info"] = children_info  # Ensure children_info is last in order
         return info
 
     def _add_stack_to_feature_metadata(self):

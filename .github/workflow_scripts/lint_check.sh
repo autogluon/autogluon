@@ -15,6 +15,7 @@ function lint_check_all {
     lint_check multimodal 119
     lint_check timeseries 119
     lint_check common 160
+    lint_check core 160
 }
 
 bandit -r multimodal/src -ll

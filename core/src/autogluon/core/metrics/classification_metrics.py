@@ -3,11 +3,11 @@ from typing import Union
 
 import numpy as np
 import pandas as pd
-from scipy.sparse import coo_matrix
 import sklearn
-from sklearn.utils.multiclass import unique_labels
-from sklearn.utils import check_consistent_length
+from scipy.sparse import coo_matrix
 from sklearn.metrics import cohen_kappa_score
+from sklearn.utils import check_consistent_length
+from sklearn.utils.multiclass import unique_labels
 
 try:
     from sklearn.metrics._classification import _check_targets, type_of_target
@@ -20,20 +20,20 @@ logger = logging.getLogger(__name__)
 def balanced_accuracy(solution, prediction):
     y_type, solution, prediction = _check_targets(solution, prediction)
 
-    if y_type not in ["binary", "multiclass", 'multilabel-indicator']:
+    if y_type not in ["binary", "multiclass", "multilabel-indicator"]:
         raise ValueError(f"{y_type} is not supported")
 
-    if y_type == 'binary':
+    if y_type == "binary":
         # Do not transform into any multiclass representation
         pass
 
-    elif y_type == 'multiclass':
+    elif y_type == "multiclass":
         n = len(solution)
         unique_sol, encoded_sol = np.unique(solution, return_inverse=True)
         unique_pred, encoded_pred = np.unique(prediction, return_inverse=True)
         classes = np.unique(np.concatenate((unique_sol, unique_pred)))
-        map_sol = np.array([np.where(classes==c)[0][0] for c in unique_sol])
-        map_pred = np.array([np.where(classes==c)[0][0] for c in unique_pred])
+        map_sol = np.array([np.where(classes == c)[0][0] for c in unique_sol])
+        map_pred = np.array([np.where(classes == c)[0][0] for c in unique_pred])
         # one hot encoding
         sol_ohe = np.zeros((n, len(classes)))
         pred_ohe = np.zeros((n, len(classes)))
@@ -42,11 +42,11 @@ def balanced_accuracy(solution, prediction):
         solution = sol_ohe
         prediction = pred_ohe
 
-    elif y_type == 'multilabel-indicator':
+    elif y_type == "multilabel-indicator":
         solution = solution.toarray()
         prediction = prediction.toarray()
     else:
-        raise NotImplementedError(f'bac_metric does not support task type {y_type}')
+        raise NotImplementedError(f"bac_metric does not support task type {y_type}")
 
     fn = np.sum(np.multiply(solution, (1 - prediction)), axis=0, dtype=float)
     tp = np.sum(np.multiply(solution, prediction), axis=0, dtype=float)
@@ -56,20 +56,14 @@ def balanced_accuracy(solution, prediction):
     pos_num = np.maximum(eps, tp + fn)
     tpr = tp / pos_num  # true positive rate (sensitivity)
 
-    if y_type in ('binary', 'multilabel-indicator'):
-        tn = np.sum(
-            np.multiply((1 - solution), (1 - prediction)),
-            axis=0, dtype=float
-        )
-        fp = np.sum(
-            np.multiply((1 - solution), prediction),
-            axis=0, dtype=float
-        )
+    if y_type in ("binary", "multilabel-indicator"):
+        tn = np.sum(np.multiply((1 - solution), (1 - prediction)), axis=0, dtype=float)
+        fp = np.sum(np.multiply((1 - solution), prediction), axis=0, dtype=float)
         tn = np.maximum(eps, tn)
         neg_num = np.maximum(eps, tn + fp)
         tnr = tn / neg_num  # true negative rate (specificity)
         bac = 0.5 * (tpr + tnr)
-    elif y_type == 'multiclass':
+    elif y_type == "multiclass":
         bac = tpr
     else:
         raise ValueError(y_type)
@@ -104,10 +98,10 @@ def pac(solution, prediction):
         maxi = np.nanmax(sol[np.isfinite(sol)])
         mini = np.nanmin(sol[np.isfinite(sol)])
         if maxi == mini:
-            logger.debug('Warning: cannot normalize array')
+            logger.debug("Warning: cannot normalize array")
             return [solution, prediction]
         diff = maxi - mini
-        mid = (maxi + mini) / 2.
+        mid = (maxi + mini) / 2.0
 
         solution[solution >= mid] = 1
         solution[solution < mid] = 0
@@ -131,7 +125,7 @@ def pac(solution, prediction):
         # Lower gives problems with float32!
         eps = 0.00000003
 
-        if (task == 'multiclass') and (label_num > 1):
+        if (task == "multiclass") and (label_num > 1):
             # Make sure the lines add up to one for multi-class classification
             norma = np.sum(prediction, axis=1)
             for k in range(sample_num):
@@ -151,13 +145,10 @@ def pac(solution, prediction):
         prediction = np.minimum(1 - eps, np.maximum(eps, prediction))
         # Compute the log loss
         pos_class_log_loss = -np.mean(solution * np.log(prediction), axis=0)
-        if (task != 'multiclass') or (label_num == 1):
+        if (task != "multiclass") or (label_num == 1):
             # The multi-label case is a bunch of binary problems.
             # The second class is the negative class for each column.
-            neg_class_log_loss = -np.mean(
-                (1 - solution) * np.log(1 - prediction),
-                axis=0
-            )
+            neg_class_log_loss = -np.mean((1 - solution) * np.log(1 - prediction), axis=0)
             log_loss = pos_class_log_loss + neg_class_log_loss
             # Each column is an independent problem, so we average.
             # The probabilities in one line do not add up to one.
@@ -179,7 +170,7 @@ def pac(solution, prediction):
         """
         eps = 1e-15
         frac_pos_ = np.maximum(eps, frac_pos)
-        if task != 'multiclass':  # binary case
+        if task != "multiclass":  # binary case
             frac_neg = 1 - frac_pos
             frac_neg_ = np.maximum(eps, frac_neg)
             pos_class_log_loss_ = -frac_pos * np.log(frac_pos_)
@@ -203,30 +194,27 @@ def pac(solution, prediction):
     if isinstance(prediction, pd.Series):
         prediction = prediction.values
 
-    if y_type == 'binary':
+    if y_type == "binary":
         if len(solution.shape) == 1:
             solution = solution.reshape((-1, 1))
         if len(prediction.shape) == 1:
             prediction = prediction.reshape((-1, 1))
         if len(prediction.shape) == 2:
             if prediction.shape[1] > 2:
-                raise ValueError(f'A prediction array with probability values '
-                                 f'for {prediction.shape[1]} classes is not a binary '
-                                 f'classification problem')
+                raise ValueError(f"A prediction array with probability values " f"for {prediction.shape[1]} classes is not a binary " f"classification problem")
             # Prediction will be copied into a new binary array - no copy
             prediction = prediction.reshape((-1, 1))
         else:
-            raise ValueError(f'Invalid prediction shape {prediction.shape}')
+            raise ValueError(f"Invalid prediction shape {prediction.shape}")
 
-    elif y_type == 'multiclass':
+    elif y_type == "multiclass":
         if len(solution.shape) == 2:
             if solution.shape[1] > 1:
-                raise ValueError(f'Solution array must only contain one class '
-                                 f'label, but contains {solution.shape[1]}')
+                raise ValueError(f"Solution array must only contain one class " f"label, but contains {solution.shape[1]}")
         elif len(solution.shape) == 1:
             pass
         else:
-            raise ValueError('Solution.shape %s' % solution.shape)
+            raise ValueError("Solution.shape %s" % solution.shape)
 
         # Need to create a multiclass solution and a multiclass predictions
         max_class = prediction.shape[1] - 1
@@ -235,11 +223,11 @@ def pac(solution, prediction):
             solution_binary[i, int(solution[i])] = 1
         solution = solution_binary
 
-    elif y_type == 'multilabel-indicator':
+    elif y_type == "multilabel-indicator":
         solution = solution.copy()
 
     else:
-        raise NotImplementedError(f'pac_score does not support task {y_type}')
+        raise NotImplementedError(f"pac_score does not support task {y_type}")
 
     solution, prediction = normalize_array(solution, prediction.copy())
 
@@ -247,7 +235,7 @@ def pac(solution, prediction):
 
     eps = 1e-7
     # Compute the base log loss (using the prior probabilities)
-    pos_num = 1. * np.sum(solution, axis=0, dtype=float)  # float conversion!
+    pos_num = 1.0 * np.sum(solution, axis=0, dtype=float)  # float conversion!
     frac_pos = pos_num / sample_num  # prior proba of positive class
     the_base_log_loss = prior_log_loss(frac_pos, y_type)
     the_log_loss = log_loss(solution, prediction, y_type)
@@ -263,22 +251,22 @@ def pac(solution, prediction):
     return score
 
 
-def confusion_matrix(solution, prediction, labels=None, weights=None, normalize=None, output_format='numpy_array'):
+def confusion_matrix(solution, prediction, labels=None, weights=None, normalize=None, output_format="numpy_array"):
     """
-        Computes confusion matrix for a given true and predicted targets
-        Parameters:
-            solution - true targets
-            prediction - predicted targets
-            labels - list of labels for which confusion matrix should be calculated
-            weights - list of weights of each target
-            normalize - should the output be normalized. Can take values {'true', 'pred', 'all'}
-            output_format - output format of the matrix. Can take values {'python_list', 'numpy_array', 'pandas_dataframe'}
-        TODO : Add dedicated confusion_matrix function to AbstractLearner
+    Computes confusion matrix for a given true and predicted targets
+    Parameters:
+        solution - true targets
+        prediction - predicted targets
+        labels - list of labels for which confusion matrix should be calculated
+        weights - list of weights of each target
+        normalize - should the output be normalized. Can take values {'true', 'pred', 'all'}
+        output_format - output format of the matrix. Can take values {'python_list', 'numpy_array', 'pandas_dataframe'}
+    TODO : Add dedicated confusion_matrix function to AbstractLearner
     """
     y_type, solution, prediction = _check_targets(solution, prediction)
     # Only binary and multiclass data is supported
     if y_type not in ("binary", "multiclass"):
-        raise ValueError(f'{y_type} dataset is not currently supported')
+        raise ValueError(f"{y_type} dataset is not currently supported")
 
     if labels is None:
         labels = unique_labels(solution, prediction)
@@ -286,7 +274,7 @@ def confusion_matrix(solution, prediction, labels=None, weights=None, normalize=
         # Ensure that label contains only 1-D binary or multi-class array
         labels_type = type_of_target(labels)
         if labels_type not in ("binary", "multiclass"):
-            raise ValueError(f'{labels_type} labels are not supported')
+            raise ValueError(f"{labels_type} labels are not supported")
         labels = np.array(labels)
 
     if weights is None:
@@ -295,7 +283,7 @@ def confusion_matrix(solution, prediction, labels=None, weights=None, normalize=
         # Ensure that weights contains only 1-D integer or float array
         weights_type = type_of_target(weights)
         if weights_type not in ("binary", "multiclass", "continuous"):
-            raise ValueError(f'{weights_type} weights are not supported')
+            raise ValueError(f"{weights_type} weights are not supported")
         weights = np.array(weights)
 
     n_labels = labels.size
@@ -317,25 +305,26 @@ def confusion_matrix(solution, prediction, labels=None, weights=None, normalize=
     prediction = np.array([label_to_index.get(i) for i in prediction[valid_indexes]])
     weights = weights[valid_indexes]
     # For high precision
-    matrix_dtype = np.int64 if weights.dtype.kind in {'i', 'u', 'b'} else np.float64
+    matrix_dtype = np.int64 if weights.dtype.kind in {"i", "u", "b"} else np.float64
     cm = coo_matrix((weights, (solution, prediction)), shape=(n_labels, n_labels), dtype=matrix_dtype).toarray()
-    with np.errstate(all='ignore'):
-        if normalize == 'true':
+    with np.errstate(all="ignore"):
+        if normalize == "true":
             cm = cm / cm.sum(axis=1, keepdims=True)
-        elif normalize == 'pred':
+        elif normalize == "pred":
             cm = cm / cm.sum(axis=0, keepdims=True)
-        elif normalize == 'all':
+        elif normalize == "all":
             cm = cm / cm.sum()
         cm = np.nan_to_num(cm)
-    if output_format == 'python_list':
+    if output_format == "python_list":
         return cm.tolist()
-    elif output_format == 'numpy_array':
+    elif output_format == "numpy_array":
         return cm
-    elif output_format == 'pandas_dataframe':
+    elif output_format == "pandas_dataframe":
         cm_df = pd.DataFrame(data=cm, index=labels, columns=labels)
         return cm_df
     else:
         return cm
+
 
 # TODO Add the "labels" option to metrics that will require the label map.
 #  We will need to update how we use those metrics accordingly.
@@ -367,7 +356,7 @@ def quadratic_kappa(y_true, y_pred):
         else:
             labels = np.arange(y_pred.shape[1])
         y_pred = np.argmax(y_pred, axis=-1)
-    return cohen_kappa_score(y_true, y_pred, labels=labels, weights='quadratic')
+    return cohen_kappa_score(y_true, y_pred, labels=labels, weights="quadratic")
 
 
 # Refer to https://github.com/scikit-learn/scikit-learn/blame/f3f51f9b611bf873bd5836748647221480071a87/sklearn/metrics/_ranking.py#L985-L1000
@@ -424,9 +413,7 @@ def customized_binary_roc_auc_score(y_true: Union[np.array, pd.Series], y_score:
     if tps.size > _OPTIMIZE_INDICES_THRESHOLD:
         # optimize indices only when there is enough size to justify
         # this has no impact on the final score
-        optimal_idxs = np.where(
-            np.r_[True, np.logical_or(np.diff(fps, 2), np.diff(tps, 2)), True]
-        )[0]
+        optimal_idxs = np.where(np.r_[True, np.logical_or(np.diff(fps, 2), np.diff(tps, 2)), True])[0]
         fps = fps[optimal_idxs]
         tps = tps[optimal_idxs]
 

@@ -1,19 +1,15 @@
 from .local_grid_searcher import LocalGridSearcher
 from .local_random_searcher import LocalRandomSearcher
 
-__all__ = ['searcher_factory']
+__all__ = ["searcher_factory"]
 
 SEARCHER_CONFIGS = dict(
-    local_random=dict(
-        searcher_cls=LocalRandomSearcher
-    ),
+    local_random=dict(searcher_cls=LocalRandomSearcher),
     local_grid=dict(
         searcher_cls=LocalGridSearcher,
     ),
     # Fall back to random search since Bayes searcher is not supported
-    bayes=dict(
-        searcher_cls=LocalRandomSearcher
-    ),
+    bayes=dict(searcher_cls=LocalRandomSearcher),
 )
 
 
@@ -53,20 +49,19 @@ def searcher_factory(searcher_name, **kwargs):
     """
     if searcher_name in SEARCHER_CONFIGS:
         searcher_config = SEARCHER_CONFIGS[searcher_name]
-        searcher_cls = searcher_config['searcher_cls']
-        scheduler = kwargs.get('scheduler')
+        searcher_cls = searcher_config["searcher_cls"]
+        scheduler = kwargs.get("scheduler")
 
         # Check if searcher_cls is a lambda - evaluate then
         if isinstance(searcher_cls, type(lambda: 0)):
             searcher_cls = searcher_cls(scheduler)
 
-        if 'supported_schedulers' in searcher_config:
-            supported_schedulers = searcher_config['supported_schedulers']
+        if "supported_schedulers" in searcher_config:
+            supported_schedulers = searcher_config["supported_schedulers"]
             assert scheduler is not None, "Scheduler must set search_options['scheduler']"
-            assert scheduler in supported_schedulers, \
-                f"Searcher '{searcher_name}' only works with schedulers {supported_schedulers} (not with '{scheduler}')"
+            assert scheduler in supported_schedulers, f"Searcher '{searcher_name}' only works with schedulers {supported_schedulers} (not with '{scheduler}')"
 
         searcher = searcher_cls(**kwargs)
         return searcher
     else:
-        raise AssertionError(f'searcher \'{searcher_name}\' is not supported')
+        raise AssertionError(f"searcher '{searcher_name}' is not supported")

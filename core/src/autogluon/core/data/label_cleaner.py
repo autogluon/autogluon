@@ -5,8 +5,7 @@ from typing import Union
 import numpy as np
 from pandas import DataFrame, Series
 
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, SOFTCLASS
-
+from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION, SOFTCLASS
 from autogluon.core.utils import get_pred_from_proba, get_pred_from_proba_df
 
 logger = logging.getLogger(__name__)
@@ -26,7 +25,9 @@ class LabelCleaner:
         self.original_dtype = y.dtype
 
     @staticmethod
-    def construct(problem_type: str, y: Union[Series, np.ndarray, list, DataFrame], y_uncleaned: Union[Series, np.ndarray, list, DataFrame] = None, positive_class=None):
+    def construct(
+        problem_type: str, y: Union[Series, np.ndarray, list, DataFrame], y_uncleaned: Union[Series, np.ndarray, list, DataFrame] = None, positive_class=None
+    ):
         if problem_type == SOFTCLASS:
             return LabelCleanerSoftclass(y)
         y = LabelCleaner._convert_to_valid_series(y)
@@ -55,12 +56,12 @@ class LabelCleaner:
         return np.promote_types(min_dtype, max_dtype)
 
     def to_transformed_dtype(self, y: Union[Series, np.ndarray, list]) -> Series:
-        if y.dtype.kind in ('i', 'u'):
+        if y.dtype.kind in ("i", "u"):
             return y.astype(self.transformed_dtype)
         return y
 
     def to_original_dtype(self, y: Union[Series, np.ndarray, list]) -> Series:
-        if y.dtype.kind in ('i', 'u'):
+        if y.dtype.kind in ("i", "u"):
             return y.astype(self.original_dtype)
         return y
 
@@ -90,8 +91,8 @@ class LabelCleaner:
     def _convert_to_valid_series(y: Union[Series, np.ndarray, list]) -> Series:
         if isinstance(y, np.ndarray) or isinstance(y, list):
             y = Series(y)
-        elif isinstance(y, Series) and y.dtype.name == 'category':
-            y = y.astype('object')
+        elif isinstance(y, Series) and y.dtype.name == "category":
+            y = y.astype("object")
         return y
 
 
@@ -108,8 +109,8 @@ class LabelCleanerMulticlass(LabelCleaner):
         self.inv_map_uncleaned: dict = {v: k for k, v in self.cat_mappings_dependent_var_uncleaned.items()}
 
         self.num_classes = len(self.cat_mappings_dependent_var.keys())
-        self.ordered_class_labels = list(y_uncleaned.astype('category').cat.categories)
-        self.valid_ordered_class_labels = list(y.astype('category').cat.categories)
+        self.ordered_class_labels = list(y_uncleaned.astype("category").cat.categories)
+        self.valid_ordered_class_labels = list(y.astype("category").cat.categories)
         self.ordered_class_labels_transformed = list(range(len(self.valid_ordered_class_labels)))
         self.invalid_class_count = len(self.ordered_class_labels) - len(self.valid_ordered_class_labels)
         self.labels_to_zero_fill = [1 if label not in self.valid_ordered_class_labels else 0 for label in self.ordered_class_labels]
@@ -165,7 +166,7 @@ class LabelCleanerMulticlass(LabelCleaner):
 
     @staticmethod
     def _generate_categorical_mapping(y: Series) -> dict:
-        categories = y.astype('category')
+        categories = y.astype("category")
         cat_mappings_dependent_var = dict(enumerate(categories.cat.categories))
         return cat_mappings_dependent_var
 
@@ -179,7 +180,7 @@ class LabelCleanerBinary(LabelCleaner):
         self.num_classes = 2
         self.unique_values = list(y.unique())
         if len(self.unique_values) != 2:
-            raise AssertionError('y does not contain exactly 2 unique values:', self.unique_values)
+            raise AssertionError("y does not contain exactly 2 unique values:", self.unique_values)
         try:
             self.unique_values.sort()
         except TypeError:
@@ -189,11 +190,10 @@ class LabelCleanerBinary(LabelCleaner):
         pos_class_warning = None
         if positive_class is not None:
             if positive_class not in self.unique_values:
-                raise ValueError(f'positive_class is not a valid class: {self.unique_values} (positive_class={positive_class})')
+                raise ValueError(f"positive_class is not a valid class: {self.unique_values} (positive_class={positive_class})")
             negative_class = [c for c in self.unique_values if c != positive_class][0]
             self.inv_map: dict = {negative_class: 0, positive_class: 1}
-        elif ((str(False) in [str(val) for val in self.unique_values]) and
-              (str(True) in [str(val) for val in self.unique_values])):
+        elif (str(False) in [str(val) for val in self.unique_values]) and (str(True) in [str(val) for val in self.unique_values]):
             false_val = [val for val in self.unique_values if str(val) == str(False)][0]  # may be str or bool
             true_val = [val for val in self.unique_values if str(val) == str(True)][0]  # may be str or bool
             self.inv_map: dict = {false_val: 0, true_val: 1}
@@ -201,12 +201,14 @@ class LabelCleanerBinary(LabelCleaner):
             self.inv_map: dict = {0: 0, 1: 1}
         else:
             self.inv_map: dict = {self.unique_values[0]: 0, self.unique_values[1]: 1}
-            pos_class_warning = f'\tNote: For your binary classification, AutoGluon arbitrarily selected which label-value ' \
-                                f'represents positive ({self.unique_values[1]}) vs negative ({self.unique_values[0]}) class.\n'\
-                                '\tTo explicitly set the positive_class, either rename classes to 1 and 0, or specify positive_class in Predictor init.'
+            pos_class_warning = (
+                f"\tNote: For your binary classification, AutoGluon arbitrarily selected which label-value "
+                f"represents positive ({self.unique_values[1]}) vs negative ({self.unique_values[0]}) class.\n"
+                "\tTo explicitly set the positive_class, either rename classes to 1 and 0, or specify positive_class in Predictor init."
+            )
         poslabel = [lbl for lbl in self.inv_map.keys() if self.inv_map[lbl] == 1][0]
         neglabel = [lbl for lbl in self.inv_map.keys() if self.inv_map[lbl] == 0][0]
-        logger.log(20, 'Selected class <--> label mapping:  class 1 = %s, class 0 = %s' % (poslabel, neglabel))
+        logger.log(20, "Selected class <--> label mapping:  class 1 = %s, class 0 = %s" % (poslabel, neglabel))
         if pos_class_warning is not None:
             logger.log(20, pos_class_warning)
         self.cat_mappings_dependent_var: dict = {v: k for k, v in self.inv_map.items()}

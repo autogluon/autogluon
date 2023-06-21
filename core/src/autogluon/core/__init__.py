@@ -1,14 +1,13 @@
-from  typing import Any
+import warnings
+from typing import Any
+
 from autogluon.common.utils.log_utils import _add_stream_handler
 
+from . import constants, metrics
 from .dataset import TabularDataset
-from . import metrics
-from . import constants
-from .space import Space, Categorical, Real, Int, Bool, spaces
+from .space import Bool, Categorical, Int, Real, Space, spaces
 from .version import __version__
 
-
-import warnings
 
 # TODO: Remove deprecation warning for v1.0
 class DeprecatedSpacesWrapper:
