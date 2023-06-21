@@ -207,7 +207,14 @@ Install AutoGluon using [pip](https://pip.pypa.io/en/stable/installation/):
 pip install autogluon
 ```
 
-AutoGluon supports Linux, MacOS, and Windows. See {doc}`./install` for detailed instructions. 
+AutoGluon supports Linux, MacOS, and Windows. See {doc}`./install` for detailed instructions.
+
+## Community
+
+[![](https://img.shields.io/discord/1043248669505368144?logo=discord&style=flat)](https://discord.gg/wjUmjqAc2N)
+[![Twitter](https://img.shields.io/twitter/follow/autogluon?style=social)](https://twitter.com/autogluon)
+
+Get involved in the AutoGluon community by joining our [Discord](https://discord.gg/wjUmjqAc2N)!
 
 
 ```{toctree}

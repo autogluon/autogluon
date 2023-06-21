@@ -6,22 +6,26 @@ from autogluon.core.metrics import balanced_accuracy, f1, roc_auc
 
 
 def _get_sample_data():
-    y = np.array([
-        1,
-        0,
-        1,
-        1,
-        1,
-        0,
-    ])
-    y_pred_proba = np.array([
-        0.0,
-        0.24,
-        0.25,
-        0.25,
-        0.5,
-        1.0,
-    ])
+    y = np.array(
+        [
+            1,
+            0,
+            1,
+            1,
+            1,
+            0,
+        ]
+    )
+    y_pred_proba = np.array(
+        [
+            0.0,
+            0.24,
+            0.25,
+            0.25,
+            0.5,
+            1.0,
+        ]
+    )
     return y, y_pred_proba
 
 

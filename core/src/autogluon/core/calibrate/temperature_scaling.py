@@ -3,9 +3,8 @@ import numpy as np
 from autogluon.common.utils.try_import import try_import_torch
 
 
-def tune_temperature_scaling(y_val_probs: np.ndarray, y_val: np.ndarray, init_val: float = 1, max_iter: int = 1000,
-                             lr: float = 0.01):
-    '''
+def tune_temperature_scaling(y_val_probs: np.ndarray, y_val: np.ndarray, init_val: float = 1, max_iter: int = 1000, lr: float = 0.01):
+    """
     Tunes a temperature scalar term that divides the logits produced by autogluon model. Logits are generated
     by natural log the predicted probs from model then divides by a temperature scalar, which is tuned
     to minimize cross entropy on validation set.
@@ -25,7 +24,7 @@ def tune_temperature_scaling(y_val_probs: np.ndarray, y_val: np.ndarray, init_va
 
     Return:
     float: The temperature scaling term, returns None if infinity found in logits.
-    '''
+    """
     try_import_torch()
     import torch
 
@@ -48,7 +47,7 @@ def tune_temperature_scaling(y_val_probs: np.ndarray, y_val: np.ndarray, init_va
     def temperature_scale_step():
         optimizer.zero_grad()
         temp = temperature_param.unsqueeze(1).expand(logits.size(0), logits.size(1))
-        new_logits = (logits / temp)
+        new_logits = logits / temp
         loss = nll_criterion(new_logits, y_val_tensor)
         loss.backward()
         scheduler.step()

@@ -146,8 +146,7 @@ def _rename_kwargs(
         if old_name in kwargs:
             if new_name is not None and new_name in kwargs:
                 raise ValueError(
-                    f"{func_name} received both {old_name} and {new_name} as arguments."
-                    f"{old_name} is deprecated, please use {new_name} instead."
+                    f"{func_name} received both {old_name} and {new_name} as arguments." f"{old_name} is deprecated, please use {new_name} instead."
                 )
             print(error)
             _deprecation_warning(
@@ -241,6 +240,7 @@ def Deprecated_args(
 
 def construct_deprecated_wrapper(ag_version) -> Callable:
     """Return Deprecated decorator with ag_version as the local AG version for checking"""
+
     def _decorator(*args, **kwargs):
         return Deprecated(*args, _ag_version=ag_version, **kwargs)
 
@@ -249,6 +249,7 @@ def construct_deprecated_wrapper(ag_version) -> Callable:
 
 def construct_deprecated_args_wrapper(ag_version) -> Callable:
     """Return Deprecated_args decorator with ag_version as the local AG version for checking"""
+
     def _decorator(*args, **kwargs):
         return Deprecated_args(*args, _ag_version=ag_version, **kwargs)
 

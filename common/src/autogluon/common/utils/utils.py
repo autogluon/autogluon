@@ -1,15 +1,16 @@
-from hashlib import md5
-from pathlib import Path
-from datetime import datetime
-
 import logging
 import os
-import pandas as pd
 import platform
 import sys
-from typing import Dict, Any, Optional
+from datetime import datetime
+from hashlib import md5
+from pathlib import Path
+from typing import Any, Dict, Optional
+
+import pandas as pd
 
 from ..version import __version__
+
 try:
     from ..version import __lite__
 except ImportError:
@@ -22,9 +23,7 @@ LITE_MODE: bool = __lite__ is not None and __lite__
 
 def setup_outputdir(path, warn_if_exist=True, create_dir=True, path_suffix=None):
     if path:
-        assert isinstance(
-            path, (str, Path)
-        ), f"Only str and pathlib.Path types are supported for path, got {path} of type {type(path)}."
+        assert isinstance(path, (str, Path)), f"Only str and pathlib.Path types are supported for path, got {path} of type {type(path)}."
     if path_suffix is None:
         path_suffix = ""
     if path_suffix and path_suffix[-1] == os.path.sep:
@@ -56,9 +55,7 @@ def setup_outputdir(path, warn_if_exist=True, create_dir=True, path_suffix=None)
             elif os.path.isdir(path):
                 raise FileExistsError
         except FileExistsError:
-            logger.warning(
-                f'Warning: path already exists! This predictor may overwrite an existing predictor! path="{path}"'
-            )
+            logger.warning(f'Warning: path already exists! This predictor may overwrite an existing predictor! path="{path}"')
     path = os.path.expanduser(path)  # replace ~ with absolute path if it exists
     if path[-1] != os.path.sep:
         path = path + os.path.sep
@@ -136,8 +133,7 @@ def compare_autogluon_metadata(*, original: dict, current: dict, check_packages=
 
 
 def bytes_to_mega_bytes(memory_amount: int) -> int:
-    """ Utility to convert a number of bytes (int) into a number of mega bytes (int)
-    """
+    """Utility to convert a number of bytes (int) into a number of mega bytes (int)"""
     return memory_amount >> 20
 
 

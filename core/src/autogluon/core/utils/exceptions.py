@@ -1,5 +1,3 @@
-
-
 class TimeLimitExceeded(Exception):
     pass
 
@@ -11,8 +9,10 @@ class NotEnoughMemoryError(Exception):
 class NoGPUError(Exception):
     pass
 
+
 class NotEnoughCudaMemoryError(Exception):
     pass
+
 
 class NoValidFeatures(Exception):
     pass

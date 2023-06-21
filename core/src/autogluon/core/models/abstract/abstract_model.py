@@ -13,35 +13,46 @@ import numpy as np
 import pandas as pd
 import scipy
 
-from autogluon.common.utils.distribute_utils import DistributedContext
 from autogluon.common.features.feature_metadata import FeatureMetadata
-from autogluon.common.utils.try_import import try_import_ray
-from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
-from autogluon.common.utils.path_converter import PathConverter
-from autogluon.common.utils.utils import setup_outputdir
+from autogluon.common.utils.distribute_utils import DistributedContext
 from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.log_utils import DuplicateFilter
-from autogluon.common.utils.resource_utils import ResourceManager, RayResourceManager
-from autogluon.common.utils.resource_utils import get_resource_manager
-from autogluon.common.utils.distribute_utils import DistributedContext
+from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
+from autogluon.common.utils.path_converter import PathConverter
+from autogluon.common.utils.resource_utils import RayResourceManager, ResourceManager, get_resource_manager
+from autogluon.common.utils.try_import import try_import_ray
+from autogluon.common.utils.utils import setup_outputdir
 
-from .model_trial import model_trial, skip_hpo
-from ._tags import _DEFAULT_CLASS_TAGS, _DEFAULT_TAGS
 from ... import metrics
-from ...constants import AG_ARG_PREFIX, AG_ARGS_FIT, BINARY, REGRESSION, QUANTILE, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
+from ...constants import (
+    AG_ARG_PREFIX,
+    AG_ARGS_FIT,
+    BINARY,
+    OBJECTIVES_TO_NORMALIZE,
+    QUANTILE,
+    REFIT_FULL_SUFFIX,
+    REGRESSION,
+)
 from ...data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
+from ...hpo.constants import CUSTOM_BACKEND, RAY_BACKEND
 from ...hpo.exceptions import EmptySearchSpace
-from ...hpo.constants import RAY_BACKEND, CUSTOM_BACKEND
 from ...hpo.executors import HpoExecutor, HpoExecutorFactory
 from ...ray.resources_calculator import ResourceCalculator
 from ...scheduler import LocalSequentialScheduler
-from ...utils import get_pred_from_proba, normalize_pred_probas, infer_eval_metric, infer_problem_type, \
-    compute_permutation_feature_importance, compute_weighted_metric
-from ...utils.exceptions import TimeLimitExceeded, NoValidFeatures, NotEnoughMemoryError
+from ...utils import (
+    compute_permutation_feature_importance,
+    compute_weighted_metric,
+    get_pred_from_proba,
+    infer_eval_metric,
+    infer_problem_type,
+    normalize_pred_probas,
+)
+from ...utils.exceptions import NotEnoughMemoryError, NoValidFeatures, TimeLimitExceeded
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_json, save_pkl
 from ...utils.time import sample_df_for_time_func, time_func
-
+from ._tags import _DEFAULT_CLASS_TAGS, _DEFAULT_TAGS
+from .model_trial import model_trial, skip_hpo
 
 logger = logging.getLogger(__name__)
 dup_filter = DuplicateFilter()
@@ -86,20 +97,15 @@ class AbstractModel:
         If None, model defaults are used. This is identical to passing an empty dictionary.
     """
 
-    model_file_name = 'model.pkl'
-    model_info_name = 'info.pkl'
-    model_info_json_name = 'info.json'
+    model_file_name = "model.pkl"
+    model_info_name = "info.pkl"
+    model_info_json_name = "info.json"
 
-    def __init__(self,
-                 path: str = None,
-                 name: str = None,
-                 problem_type: str = None,
-                 eval_metric: Union[str, metrics.Scorer] = None,
-                 hyperparameters=None):
+    def __init__(self, path: str = None, name: str = None, problem_type: str = None, eval_metric: Union[str, metrics.Scorer] = None, hyperparameters=None):
 
         if name is None:
             self.name = self.__class__.__name__
-            logger.log(20, f'Warning: No name was specified for model, defaulting to class name: {self.name}')
+            logger.log(20, f"Warning: No name was specified for model, defaulting to class name: {self.name}")
         else:
             self.name = name  # TODO: v0.1 Consider setting to self._name and having self.name be a property so self.name can't be set outside of self.rename()
 
@@ -112,7 +118,7 @@ class AbstractModel:
             # TODO: Would be ideal to not create dir, but still track that it is unique. However, this isn't possible to do without a global list of used dirs or using UUID.
             path_cur = setup_outputdir(path=None, create_dir=True, path_suffix=path_suffix)
             self.path_root = path_cur.rsplit(self.path_suffix, 1)[0]
-            logger.log(20, f'Warning: No path was specified for model, defaulting to: {self.path_root}')
+            logger.log(20, f"Warning: No path was specified for model, defaulting to: {self.path_root}")
 
         # v0.9 FIXME: This is a hack, change so we aren't vulnerable to self.path_root breaking things
         self.path_root = PathConverter.to_relative(self.path_root)
@@ -127,7 +133,7 @@ class AbstractModel:
         self.conformalize = None
 
         if eval_metric is not None:
-            self.eval_metric = metrics.get_metric(eval_metric, self.problem_type, 'eval_metric')  # Note: we require higher values = better performance
+            self.eval_metric = metrics.get_metric(eval_metric, self.problem_type, "eval_metric")  # Note: we require higher values = better performance
         else:
             self.eval_metric = None
         self.normalize_pred_probas = None
@@ -156,7 +162,9 @@ class AbstractModel:
         self._compiler = None
 
     @classmethod
-    def _init_user_params(cls, params: Optional[Dict[str, Any]] = None, ag_args_fit: str = AG_ARGS_FIT, ag_arg_prefix: str = AG_ARG_PREFIX) -> (Dict[str, Any], Dict[str, Any]):
+    def _init_user_params(
+        cls, params: Optional[Dict[str, Any]] = None, ag_args_fit: str = AG_ARGS_FIT, ag_arg_prefix: str = AG_ARG_PREFIX
+    ) -> (Dict[str, Any], Dict[str, Any]):
         """
         Given the user-specified hyperparameters, split into `params` and `params_aux`.
 
@@ -191,8 +199,10 @@ class AbstractModel:
         assert isinstance(params, dict), f"Invalid dtype of params! Expected dict, but got {type(params)}"
         for k in params.keys():
             if not isinstance(k, str):
-                logger.warning(f'Warning: Specified {cls.__name__} hyperparameter key is not of type str: {k} (type={type(k)}). '
-                               f'There might be a bug in your configuration.')
+                logger.warning(
+                    f"Warning: Specified {cls.__name__} hyperparameter key is not of type str: {k} (type={type(k)}). "
+                    f"There might be a bug in your configuration."
+                )
 
         params_aux = params.pop(ag_args_fit, dict())
         if params_aux is None:
@@ -202,20 +212,24 @@ class AbstractModel:
             param_aux_keys = list(params_aux.keys())
             for k in param_aux_keys:
                 if isinstance(k, str) and k.startswith(ag_arg_prefix):
-                    k_no_prefix = k[len(ag_arg_prefix):]
+                    k_no_prefix = k[len(ag_arg_prefix) :]
                     if k_no_prefix in params_aux:
-                        logger.warning(f'Warning: {cls.__name__} hyperparameter "{k}" is present '
-                                       f'in `ag_args_fit` as both "{k}" and "{k_no_prefix}". '
-                                       f'Will use "{k}" and ignore "{k_no_prefix}".')
+                        logger.warning(
+                            f'Warning: {cls.__name__} hyperparameter "{k}" is present '
+                            f'in `ag_args_fit` as both "{k}" and "{k_no_prefix}". '
+                            f'Will use "{k}" and ignore "{k_no_prefix}".'
+                        )
                     params_aux[k_no_prefix] = params_aux.pop(k)
             param_keys = list(params.keys())
             for k in param_keys:
                 if isinstance(k, str) and k.startswith(ag_arg_prefix):
-                    k_no_prefix = k[len(ag_arg_prefix):]
+                    k_no_prefix = k[len(ag_arg_prefix) :]
                     if k_no_prefix in params_aux:
-                        logger.warning(f'Warning: {cls.__name__} hyperparameter "{k}" is present '
-                                       f'in both `ag_args_fit` and `hyperparameters`. '
-                                       f'Will use `hyperparameters` value.')
+                        logger.warning(
+                            f'Warning: {cls.__name__} hyperparameter "{k}" is present '
+                            f"in both `ag_args_fit` and `hyperparameters`. "
+                            f"Will use `hyperparameters` value."
+                        )
                     params_aux[k_no_prefix] = params.pop(k)
         return params, params_aux
 
@@ -336,8 +350,8 @@ class AbstractModel:
         return {}
 
     def _get_search_space(self):
-        """ Sets up default search space for HPO. Each hyperparameter which user did not specify is converted from
-            default fixed value to default search space.
+        """Sets up default search space for HPO. Each hyperparameter which user did not specify is converted from
+        default fixed value to default search space.
         """
         def_search_space = self._get_default_searchspace().copy()
         # Note: when subclassing AbstractModel, you must define or import get_default_searchspace() from the appropriate location.
@@ -359,7 +373,7 @@ class AbstractModel:
 
     def rename(self, name: str):
         """Renames the model and updates self.path to reflect the updated name."""
-        self.path = self.path[:-len(self.name) - 1] + name + os.path.sep
+        self.path = self.path[: -len(self.name) - 1] + name + os.path.sep
         self.name = name
 
     def preprocess(self, X, preprocess_nonadaptive=True, preprocess_stateful=True, **kwargs):
@@ -418,33 +432,33 @@ class AbstractModel:
             feature_metadata = FeatureMetadata.from_df(X)
         else:
             feature_metadata = copy.deepcopy(feature_metadata)
-        get_features_kwargs = self.params_aux.get('get_features_kwargs', None)
+        get_features_kwargs = self.params_aux.get("get_features_kwargs", None)
         if get_features_kwargs is not None:
             valid_features = feature_metadata.get_features(**get_features_kwargs)
         else:
-            valid_raw_types = self.params_aux.get('valid_raw_types', None)
-            valid_special_types = self.params_aux.get('valid_special_types', None)
-            ignored_type_group_raw = self.params_aux.get('ignored_type_group_raw', None)
-            ignored_type_group_special = self.params_aux.get('ignored_type_group_special', None)
+            valid_raw_types = self.params_aux.get("valid_raw_types", None)
+            valid_special_types = self.params_aux.get("valid_special_types", None)
+            ignored_type_group_raw = self.params_aux.get("ignored_type_group_raw", None)
+            ignored_type_group_special = self.params_aux.get("ignored_type_group_special", None)
             valid_features = feature_metadata.get_features(
                 valid_raw_types=valid_raw_types,
                 valid_special_types=valid_special_types,
                 invalid_raw_types=ignored_type_group_raw,
-                invalid_special_types=ignored_type_group_special
+                invalid_special_types=ignored_type_group_special,
             )
-        get_features_kwargs_extra = self.params_aux.get('get_features_kwargs_extra', None)
+        get_features_kwargs_extra = self.params_aux.get("get_features_kwargs_extra", None)
         if get_features_kwargs_extra is not None:
             valid_features_extra = feature_metadata.get_features(**get_features_kwargs_extra)
             valid_features = [feature for feature in valid_features if feature in valid_features_extra]
         dropped_features = [feature for feature in self.features if feature not in valid_features]
-        logger.log(10, f'\tDropped {len(dropped_features)} of {len(self.features)} features.')
+        logger.log(10, f"\tDropped {len(dropped_features)} of {len(self.features)} features.")
         self.features = [feature for feature in self.features if feature in valid_features]
         self.feature_metadata = feature_metadata.keep_features(self.features)
-        error_if_no_features = self.params_aux.get('error_if_no_features', True)
+        error_if_no_features = self.params_aux.get("error_if_no_features", True)
         if error_if_no_features and not self.features:
             raise NoValidFeatures
         # TODO: If unique_counts == 2 (including NaN), then treat as boolean
-        if self.params_aux.get('drop_unique', True):
+        if self.params_aux.get("drop_unique", True):
             # TODO: Could this be optimized to be faster? This might be a bit slow for large data.
             unique_counts = X[self.features].nunique(axis=0, dropna=False)
             columns_to_drop = list(unique_counts[unique_counts < 2].index)
@@ -454,7 +468,7 @@ class AbstractModel:
         else:
             features_to_drop_internal = None
         if features_to_drop_internal is not None:
-            logger.log(10, f'\tDropped {len(features_to_drop_internal)} of {len(self.features)} internal features: {features_to_drop_internal}')
+            logger.log(10, f"\tDropped {len(features_to_drop_internal)} of {len(self.features)} internal features: {features_to_drop_internal}")
             self._features_internal = [feature for feature in self.features if feature not in features_to_drop_internal]
             self._feature_metadata = self.feature_metadata.keep_features(self._features_internal)
             self._is_features_in_same_as_ex = False
@@ -466,25 +480,25 @@ class AbstractModel:
             raise NoValidFeatures
 
     def _preprocess_fit_args(self, **kwargs):
-        sample_weight = kwargs.get('sample_weight', None)
+        sample_weight = kwargs.get("sample_weight", None)
         if sample_weight is not None and isinstance(sample_weight, str):
             raise ValueError("In model.fit(), sample_weight should be array of sample weight values, not string.")
-        time_limit = kwargs.get('time_limit', None)
-        max_time_limit_ratio = self.params_aux.get('max_time_limit_ratio', 1)
+        time_limit = kwargs.get("time_limit", None)
+        max_time_limit_ratio = self.params_aux.get("max_time_limit_ratio", 1)
         if time_limit is not None:
             time_limit *= max_time_limit_ratio
-        max_time_limit = self.params_aux.get('max_time_limit', None)
+        max_time_limit = self.params_aux.get("max_time_limit", None)
         if max_time_limit is not None:
             if time_limit is None:
                 time_limit = max_time_limit
             else:
                 time_limit = min(time_limit, max_time_limit)
-        min_time_limit = self.params_aux.get('min_time_limit', 0)
+        min_time_limit = self.params_aux.get("min_time_limit", 0)
         if min_time_limit is None:
             time_limit = min_time_limit
         elif time_limit is not None:
             time_limit = max(time_limit, min_time_limit)
-        kwargs['time_limit'] = time_limit
+        kwargs["time_limit"] = time_limit
         kwargs = self._preprocess_fit_resources(**kwargs)
         return kwargs
 
@@ -493,8 +507,8 @@ class AbstractModel:
             self._initialize(**kwargs)
             self._is_initialized = True
 
-        kwargs.pop('feature_metadata', None)
-        kwargs.pop('num_classes', None)
+        kwargs.pop("feature_metadata", None)
+        kwargs.pop("num_classes", None)
         return kwargs
 
     def _initialize(self, X=None, y=None, feature_metadata=None, num_classes=None, **kwargs):
@@ -509,13 +523,7 @@ class AbstractModel:
 
         self._init_params_aux()
 
-        self._init_misc(
-            X=X,
-            y=y,
-            feature_metadata=feature_metadata,
-            num_classes=num_classes,
-            **kwargs
-        )
+        self._init_misc(X=X, y=y, feature_metadata=feature_metadata, num_classes=num_classes, **kwargs)
 
         if X is not None:
             self._preprocess_set_features(X=X, feature_metadata=feature_metadata)
@@ -526,49 +534,52 @@ class AbstractModel:
         """Initialize parameters that depend on self.params_aux being initialized"""
         if self.eval_metric is None:
             self.eval_metric = infer_eval_metric(problem_type=self.problem_type)
-            logger.log(20, f"Model {self.name}'s eval_metric inferred to be '{self.eval_metric.name}' because problem_type='{self.problem_type}' and eval_metric was not specified during init.")
-        self.eval_metric = metrics.get_metric(self.eval_metric, self.problem_type, 'eval_metric')  # Note: we require higher values = better performance
+            logger.log(
+                20,
+                f"Model {self.name}'s eval_metric inferred to be '{self.eval_metric.name}' because problem_type='{self.problem_type}' and eval_metric was not specified during init.",
+            )
+        self.eval_metric = metrics.get_metric(self.eval_metric, self.problem_type, "eval_metric")  # Note: we require higher values = better performance
 
-        self.stopping_metric = self.params_aux.get('stopping_metric', self._get_default_stopping_metric())
-        self.stopping_metric = metrics.get_metric(self.stopping_metric, self.problem_type, 'stopping_metric')
+        self.stopping_metric = self.params_aux.get("stopping_metric", self._get_default_stopping_metric())
+        self.stopping_metric = metrics.get_metric(self.stopping_metric, self.problem_type, "stopping_metric")
 
-        self.quantile_levels = self.params_aux.get('quantile_levels', None)
+        self.quantile_levels = self.params_aux.get("quantile_levels", None)
 
         if self.eval_metric.name in OBJECTIVES_TO_NORMALIZE:
             self.normalize_pred_probas = True
             logger.debug(f"{self.name} predicted probabilities will be transformed to never =0 since eval_metric='{self.eval_metric.name}'")
         else:
             self.normalize_pred_probas = False
-            
-    def _process_user_provided_resource_requirement_to_calculate_total_resource_when_ensemble(self, system_resource, user_specified_total_resource, user_specified_ensemble_resource, resource_type, k_fold):
-        if user_specified_total_resource == 'auto':
+
+    def _process_user_provided_resource_requirement_to_calculate_total_resource_when_ensemble(
+        self, system_resource, user_specified_total_resource, user_specified_ensemble_resource, resource_type, k_fold
+    ):
+        if user_specified_total_resource == "auto":
             user_specified_total_resource = math.inf
-        
+
         # retrieve model level requirement when self is bagged model
         user_specified_model_level_resource = self._get_child_aux_val(key=resource_type, default=None)
         if user_specified_model_level_resource is not None:
-            assert user_specified_model_level_resource <= system_resource, f'Specified {resource_type} per model base is more than the total: {system_resource}'
+            assert user_specified_model_level_resource <= system_resource, f"Specified {resource_type} per model base is more than the total: {system_resource}"
         user_specified_lower_level_resource = user_specified_ensemble_resource
         if user_specified_ensemble_resource is not None:
             if user_specified_model_level_resource is not None:
-                user_specified_lower_level_resource = min(user_specified_model_level_resource * k_fold, user_specified_ensemble_resource, system_resource, user_specified_total_resource)
+                user_specified_lower_level_resource = min(
+                    user_specified_model_level_resource * k_fold, user_specified_ensemble_resource, system_resource, user_specified_total_resource
+                )
         else:
             if user_specified_model_level_resource is not None:
                 user_specified_lower_level_resource = min(user_specified_model_level_resource * k_fold, system_resource, user_specified_total_resource)
         return user_specified_lower_level_resource
-    
+
     def _calculate_total_resources(
-        self,
-        silent: bool = False,
-        total_resources: Optional[Dict[str, Union[int, float]]] = None,
-        parallel_hpo: bool = False,
-        **kwargs
+        self, silent: bool = False, total_resources: Optional[Dict[str, Union[int, float]]] = None, parallel_hpo: bool = False, **kwargs
     ) -> Dict[str, Any]:
         """
         Process user-specified total resources.
         Sanity checks will be done to user-specified total resources to make sure it's legit.
         When user-specified resources are not defined, will instead look at model's default resource requirements.
-        
+
         Will set the calculated total resources in kwargs and return it
         """
         resource_manager = get_resource_manager()
@@ -576,17 +587,21 @@ class AbstractModel:
         system_num_gpus = resource_manager.get_gpu_count_all()
         if total_resources is None:
             total_resources = {}
-        num_cpus = total_resources.get('num_cpus', 'auto')
-        num_gpus = total_resources.get('num_gpus', 'auto')
+        num_cpus = total_resources.get("num_cpus", "auto")
+        num_gpus = total_resources.get("num_gpus", "auto")
         default_num_cpus, default_num_gpus = self._get_default_resources()
         # This could be resource requirement for bagged model or individual model
-        user_specified_lower_level_num_cpus = self._user_params_aux.get('num_cpus', None)
-        user_specified_lower_level_num_gpus = self._user_params_aux.get('num_gpus', None)
+        user_specified_lower_level_num_cpus = self._user_params_aux.get("num_cpus", None)
+        user_specified_lower_level_num_gpus = self._user_params_aux.get("num_gpus", None)
         if user_specified_lower_level_num_cpus is not None:
-            assert user_specified_lower_level_num_cpus <= system_num_cpus, f'Specified num_cpus per {self.__class__.__name__} is more than the total: {system_num_cpus}'
+            assert (
+                user_specified_lower_level_num_cpus <= system_num_cpus
+            ), f"Specified num_cpus per {self.__class__.__name__} is more than the total: {system_num_cpus}"
         if user_specified_lower_level_num_gpus is not None:
-            assert user_specified_lower_level_num_gpus <= system_num_cpus, f'Specified num_gpus per {self.__class__.__name__} is more than the total: {system_num_cpus}'
-        k_fold = kwargs.get('k_fold', None)
+            assert (
+                user_specified_lower_level_num_gpus <= system_num_cpus
+            ), f"Specified num_gpus per {self.__class__.__name__} is more than the total: {system_num_cpus}"
+        k_fold = kwargs.get("k_fold", None)
         if k_fold is not None and k_fold > 0:
             # bagged model will look ag_args_ensemble and ag_args_fit internally to determine resources
             # pass all resources here by default
@@ -596,23 +611,23 @@ class AbstractModel:
                 system_resource=system_num_cpus,
                 user_specified_total_resource=num_cpus,
                 user_specified_ensemble_resource=user_specified_lower_level_num_cpus,
-                resource_type='num_cpus',
-                k_fold=k_fold
+                resource_type="num_cpus",
+                k_fold=k_fold,
             )
             user_specified_lower_level_num_gpus = self._process_user_provided_resource_requirement_to_calculate_total_resource_when_ensemble(
                 system_resource=system_num_gpus,
                 user_specified_total_resource=num_gpus,
                 user_specified_ensemble_resource=user_specified_lower_level_num_gpus,
-                resource_type='num_gpus',
-                k_fold=k_fold
+                resource_type="num_gpus",
+                k_fold=k_fold,
             )
-        if num_cpus != 'auto' and num_cpus > system_num_cpus:
-            logger.warning(f'Specified total num_cpus: {num_cpus}, but only {system_num_cpus} are available. Will use {system_num_cpus} instead')
+        if num_cpus != "auto" and num_cpus > system_num_cpus:
+            logger.warning(f"Specified total num_cpus: {num_cpus}, but only {system_num_cpus} are available. Will use {system_num_cpus} instead")
             num_cpus = system_num_cpus
-        if num_gpus != 'auto' and num_gpus > system_num_gpus:
-            logger.warning(f'Specified total num_gpus: {num_gpus}, but only {system_num_gpus} are available. Will use {system_num_gpus} instead')
+        if num_gpus != "auto" and num_gpus > system_num_gpus:
+            logger.warning(f"Specified total num_gpus: {num_gpus}, but only {system_num_gpus} are available. Will use {system_num_gpus} instead")
             num_gpus = system_num_gpus
-        if num_cpus == 'auto':
+        if num_cpus == "auto":
             if user_specified_lower_level_num_cpus is not None:
                 if not parallel_hpo:
                     num_cpus = user_specified_lower_level_num_cpus
@@ -626,9 +641,11 @@ class AbstractModel:
         else:
             if not parallel_hpo:
                 if user_specified_lower_level_num_cpus is not None:
-                    assert user_specified_lower_level_num_cpus <= num_cpus, f'Specified num_cpus per {self.__class__.__name__} is more than the total specified: {num_cpus}'
+                    assert (
+                        user_specified_lower_level_num_cpus <= num_cpus
+                    ), f"Specified num_cpus per {self.__class__.__name__} is more than the total specified: {num_cpus}"
                     num_cpus = user_specified_lower_level_num_cpus
-        if num_gpus == 'auto':
+        if num_gpus == "auto":
             if user_specified_lower_level_num_gpus is not None:
                 if not parallel_hpo:
                     num_gpus = user_specified_lower_level_num_gpus
@@ -642,55 +659,59 @@ class AbstractModel:
         else:
             if not parallel_hpo:
                 if user_specified_lower_level_num_gpus is not None:
-                    assert user_specified_lower_level_num_gpus <= num_gpus, f'Specified num_gpus per {self.__class__.__name__} is more than the total specified: {num_gpus}'
+                    assert (
+                        user_specified_lower_level_num_gpus <= num_gpus
+                    ), f"Specified num_gpus per {self.__class__.__name__} is more than the total specified: {num_gpus}"
                     num_gpus = user_specified_lower_level_num_gpus
 
-        minimum_model_resources = self.get_minimum_resources(
-            is_gpu_available=(num_gpus > 0)
-        )
-        minimum_model_num_cpus = minimum_model_resources.get('num_cpus', 1)
-        minimum_model_num_gpus = minimum_model_resources.get('num_gpus', 0)
+        minimum_model_resources = self.get_minimum_resources(is_gpu_available=(num_gpus > 0))
+        minimum_model_num_cpus = minimum_model_resources.get("num_cpus", 1)
+        minimum_model_num_gpus = minimum_model_resources.get("num_gpus", 0)
 
         assert system_num_cpus >= num_cpus
         assert system_num_gpus >= num_gpus
 
-        assert system_num_cpus >= minimum_model_num_cpus, f'The total system num_cpus={system_num_cpus} is less than minimum num_cpus={minimum_model_num_cpus} to fit {self.__class__.__name__}. Consider using a machine with more CPUs.'
-        assert system_num_gpus >= minimum_model_num_gpus, f'The total system num_gpus={system_num_gpus} is less than minimum num_gpus={minimum_model_num_gpus} to fit {self.__class__.__name__}. Consider using a machine with more GPUs.'
+        assert (
+            system_num_cpus >= minimum_model_num_cpus
+        ), f"The total system num_cpus={system_num_cpus} is less than minimum num_cpus={minimum_model_num_cpus} to fit {self.__class__.__name__}. Consider using a machine with more CPUs."
+        assert (
+            system_num_gpus >= minimum_model_num_gpus
+        ), f"The total system num_gpus={system_num_gpus} is less than minimum num_gpus={minimum_model_num_gpus} to fit {self.__class__.__name__}. Consider using a machine with more GPUs."
 
-        assert num_cpus >= minimum_model_num_cpus, f'Specified num_cpus={num_cpus} per {self.__class__.__name__} is less than minimum num_cpus={minimum_model_num_cpus}'
-        assert num_gpus >= minimum_model_num_gpus, f'Specified num_gpus={num_gpus} per {self.__class__.__name__} is less than minimum num_gpus={minimum_model_num_gpus}'
-        
-        kwargs['num_cpus'] = num_cpus
-        kwargs['num_gpus'] = num_gpus
+        assert (
+            num_cpus >= minimum_model_num_cpus
+        ), f"Specified num_cpus={num_cpus} per {self.__class__.__name__} is less than minimum num_cpus={minimum_model_num_cpus}"
+        assert (
+            num_gpus >= minimum_model_num_gpus
+        ), f"Specified num_gpus={num_gpus} per {self.__class__.__name__} is less than minimum num_gpus={minimum_model_num_gpus}"
+
+        kwargs["num_cpus"] = num_cpus
+        kwargs["num_gpus"] = num_gpus
         if not silent:
             logger.log(15, f"\tFitting {self.name} with 'num_gpus': {kwargs['num_gpus']}, 'num_cpus': {kwargs['num_cpus']}")
-        
+
         return kwargs
 
     def _preprocess_fit_resources(
-        self,
-        silent: bool = False,
-        total_resources: Optional[Dict[str, Union[int, float]]] = None,
-        parallel_hpo: bool = False,
-        **kwargs
+        self, silent: bool = False, total_resources: Optional[Dict[str, Union[int, float]]] = None, parallel_hpo: bool = False, **kwargs
     ) -> Dict[str, Any]:
         """
         This function should be called to process user-specified total resources.
         Sanity checks will be done to user-specified total resources to make sure it's legit.
         When user-specified resources are not defined, will instead look at model's default resource requirements.
-        
+
         When kwargs contains `num_cpus` and `num_gpus` means this total resources has been calculated by previous layers(i.e. bagged model to model base).
         Will respect this value and check if there's specific maximum resource requirements and enforce those
-        
+
         Will set the calculated resources in kwargs and return it
         """
-        if 'num_cpus' in kwargs and 'num_gpus' in kwargs:
+        if "num_cpus" in kwargs and "num_gpus" in kwargs:
             # This value will only be passed by autogluon through previous layers(i.e. bagged model to model base).
             # We respect this value with highest priority
             # They should always be set to valid values
-            enforced_num_cpus = kwargs.get('num_cpus', None)
-            enforced_num_gpus = kwargs.get('num_gpus', None)
-            assert enforced_num_cpus is not None and enforced_num_cpus != 'auto' and enforced_num_gpus is not None and enforced_num_gpus != 'auto'
+            enforced_num_cpus = kwargs.get("num_cpus", None)
+            enforced_num_gpus = kwargs.get("num_gpus", None)
+            assert enforced_num_cpus is not None and enforced_num_cpus != "auto" and enforced_num_gpus is not None and enforced_num_gpus != "auto"
             # The logic below is needed because ray cluster is running some process in the backend even when it's ready to be used
             # Trying to use all cores on the machine could lead to resource contention situation
             # TODO: remove this logic if ray team can identify what's going on underneath and how to workaround
@@ -700,17 +721,15 @@ class AbstractModel:
             if max_num_gpus is not None:
                 enforced_num_gpus = min(max_num_gpus, enforced_num_gpus)
             if DistributedContext.is_distributed_mode():
-                minimum_model_resources = self.get_minimum_resources(
-                    is_gpu_available=(enforced_num_gpus > 0)
-                )
-                minimum_model_num_cpus = minimum_model_resources.get('num_cpus', 1)
+                minimum_model_resources = self.get_minimum_resources(is_gpu_available=(enforced_num_gpus > 0))
+                minimum_model_num_cpus = minimum_model_resources.get("num_cpus", 1)
                 enforced_num_cpus = max(minimum_model_num_cpus, enforced_num_cpus - 2)  # leave some cpu resources for process running by cluster nodes
             if max_num_cpus is not None:
                 enforced_num_cpus = min(max_num_cpus, enforced_num_cpus)
             kwargs["num_cpus"] = enforced_num_cpus
             kwargs["num_gpus"] = enforced_num_gpus
             return kwargs
-        
+
         return self._calculate_total_resources(silent=silent, total_resources=total_resources, parallel_hpo=parallel_hpo, **kwargs)
 
     def _register_fit_metadata(self, **kwargs):
@@ -722,10 +741,7 @@ class AbstractModel:
             self._is_fit_metadata_registered = True
 
     def _compute_fit_metadata(self, X_val=None, X_unlabeled=None, **kwargs):
-        fit_metadata = dict(
-            val_in_fit=X_val is not None,
-            unlabeled_in_fit=X_unlabeled is not None
-        )
+        fit_metadata = dict(val_in_fit=X_val is not None, unlabeled_in_fit=X_unlabeled is not None)
         return fit_metadata
 
     def get_fit_metadata(self) -> dict:
@@ -733,10 +749,10 @@ class AbstractModel:
         Returns dictionary of metadata related to model fit that isn't related to hyperparameters.
         Must be called after model has been fit.
         """
-        assert self._is_fit_metadata_registered, 'fit_metadata must be registered before calling get_fit_metadata()!'
+        assert self._is_fit_metadata_registered, "fit_metadata must be registered before calling get_fit_metadata()!"
         fit_metadata = dict()
         fit_metadata.update(self._fit_metadata)
-        fit_metadata['predict_1_batch_size'] = self._get_child_aux_val(key='predict_1_batch_size', default=None)
+        fit_metadata["predict_1_batch_size"] = self._get_child_aux_val(key="predict_1_batch_size", default=None)
         return fit_metadata
 
     def _get_child_aux_val(self, key: str, default=None):
@@ -799,9 +815,11 @@ class AbstractModel:
         **kwargs :
             Any additional fit arguments a model supports.
         """
-        kwargs = self.initialize(**kwargs)  # FIXME: This might have to go before self._preprocess_fit_args, but then time_limit might be incorrect in **kwargs init to initialize
+        kwargs = self.initialize(
+            **kwargs
+        )  # FIXME: This might have to go before self._preprocess_fit_args, but then time_limit might be incorrect in **kwargs init to initialize
         kwargs = self._preprocess_fit_args(**kwargs)
-        if 'time_limit' in kwargs and kwargs['time_limit'] is not None and kwargs['time_limit'] <= 0:
+        if "time_limit" in kwargs and kwargs["time_limit"] is not None and kwargs["time_limit"] <= 0:
             logger.warning(f'\tWarning: Model has no time left to train, skipping model... (Time Left = {kwargs["time_limit"]:.1f}s)')
             raise TimeLimitExceeded
 
@@ -824,9 +842,9 @@ class AbstractModel:
         -------
         Returns self
         """
-        predict_1_batch_size = self.params_aux.get('predict_1_batch_size', None)
-        if self.predict_1_time is None and predict_1_batch_size is not None and 'X' in kwargs and kwargs['X'] is not None:
-            X_1 = sample_df_for_time_func(df=kwargs['X'], sample_size=predict_1_batch_size)
+        predict_1_batch_size = self.params_aux.get("predict_1_batch_size", None)
+        if self.predict_1_time is None and predict_1_batch_size is not None and "X" in kwargs and kwargs["X"] is not None:
+            X_1 = sample_df_for_time_func(df=kwargs["X"], sample_size=predict_1_batch_size)
             self.predict_1_time = time_func(f=self.predict, args=[X_1]) / len(X_1)
         return self
 
@@ -837,19 +855,21 @@ class AbstractModel:
         else:
             return self.features
 
-    def _fit(self,
-             X,
-             y,
-             X_val=None,
-             y_val=None,
-             X_unlabeled=None,
-             time_limit=None,
-             sample_weight=None,
-             sample_weight_val=None,
-             num_cpus=None,
-             num_gpus=None,
-             verbosity=2,
-             **kwargs):
+    def _fit(
+        self,
+        X,
+        y,
+        X_val=None,
+        y_val=None,
+        X_unlabeled=None,
+        time_limit=None,
+        sample_weight=None,
+        sample_weight_val=None,
+        num_cpus=None,
+        num_gpus=None,
+        verbosity=2,
+        **kwargs,
+    ):
         """
         Fit model to predict values in y based on X.
 
@@ -1034,18 +1054,12 @@ class AbstractModel:
         model = load_pkl.load(path=file_path, verbose=verbose)
         if reset_paths:
             model.set_contexts(path)
-        if hasattr(model, '_compiler'):
+        if hasattr(model, "_compiler"):
             if model._compiler is not None and not model._compiler.save_in_pkl:
                 model.model = model._compiler.load(path=path)
         return model
 
-    def compute_feature_importance(self,
-                                   X,
-                                   y,
-                                   features=None,
-                                   silent=False,
-                                   importance_as_list=False,
-                                   **kwargs) -> pd.DataFrame:
+    def compute_feature_importance(self, X, y, features=None, silent=False, importance_as_list=False, **kwargs) -> pd.DataFrame:
         if self.features is not None:
             X = X[self.features]
 
@@ -1060,27 +1074,27 @@ class AbstractModel:
 
         if features_to_check:
             fi_df = self._compute_permutation_importance(X=X, y=y, features=features_to_check, silent=silent, importance_as_list=importance_as_list, **kwargs)
-            n = fi_df.iloc[0]['n'] if len(fi_df) > 0 else 1
+            n = fi_df.iloc[0]["n"] if len(fi_df) > 0 else 1
         else:
             fi_df = None
-            n = kwargs.get('num_shuffle_sets', 1)
+            n = kwargs.get("num_shuffle_sets", 1)
 
         if importance_as_list:
             banned_importance = [0] * n
-            results_banned = pd.Series(data=[banned_importance for _ in range(len(banned_features))], index=banned_features, dtype='object')
+            results_banned = pd.Series(data=[banned_importance for _ in range(len(banned_features))], index=banned_features, dtype="object")
         else:
             banned_importance = 0
-            results_banned = pd.Series(data=[banned_importance for _ in range(len(banned_features))], index=banned_features, dtype='float64')
+            results_banned = pd.Series(data=[banned_importance for _ in range(len(banned_features))], index=banned_features, dtype="float64")
 
-        results_banned_df = results_banned.to_frame(name='importance')
-        results_banned_df['stddev'] = 0
-        results_banned_df['n'] = n
-        results_banned_df['n'] = results_banned_df['n'].astype('int64')
+        results_banned_df = results_banned.to_frame(name="importance")
+        results_banned_df["stddev"] = 0
+        results_banned_df["n"] = n
+        results_banned_df["n"] = results_banned_df["n"].astype("int64")
         if fi_df is not None:
             fi_df = pd.concat([fi_df, results_banned_df])
         else:
             fi_df = results_banned_df
-        fi_df = fi_df.sort_values(ascending=False, by='importance')
+        fi_df = fi_df.sort_values(ascending=False, by="importance")
 
         return fi_df
 
@@ -1099,8 +1113,16 @@ class AbstractModel:
         predict_func_kwargs = dict(preprocess_nonadaptive=False)
 
         return compute_permutation_feature_importance(
-            X=X, y=y, features=features, eval_metric=self.eval_metric, predict_func=predict_func, predict_func_kwargs=predict_func_kwargs,
-            transform_func=transform_func, transform_func_kwargs=transform_func_kwargs, silent=silent, **kwargs
+            X=X,
+            y=y,
+            features=features,
+            eval_metric=self.eval_metric,
+            predict_func=predict_func,
+            predict_func_kwargs=predict_func_kwargs,
+            transform_func=transform_func,
+            transform_func_kwargs=transform_func_kwargs,
+            silent=silent,
+            **kwargs,
         )
 
     def can_compile(self, compiler_configs=None):
@@ -1117,7 +1139,7 @@ class AbstractModel:
         if not self.is_fit():
             return False
         compiler = compiler_configs.get("compiler", "native")
-        compiler_fallback_to_native = compiler_configs.get('compiler_fallback_to_native', False)
+        compiler_fallback_to_native = compiler_configs.get("compiler_fallback_to_native", False)
 
         compilers = self._valid_compilers()
         compiler_names = {c.name: c for c in compilers}
@@ -1149,17 +1171,16 @@ class AbstractModel:
             compiler_configs = {}
         compiler = compiler_configs.get("compiler", "native")
         batch_size = compiler_configs.get("batch_size", None)
-        compiler_fallback_to_native = compiler_configs.get('compiler_fallback_to_native', False)
+        compiler_fallback_to_native = compiler_configs.get("compiler_fallback_to_native", False)
 
-        self._compiler = self._get_compiler(compiler=compiler,
-                                            compiler_fallback_to_native=compiler_fallback_to_native)
+        self._compiler = self._get_compiler(compiler=compiler, compiler_fallback_to_native=compiler_fallback_to_native)
         if self._compiler is not None:
             input_types = self._get_input_types(batch_size=batch_size)
             self._compile(input_types=input_types)
 
     def _compile(self, **kwargs):
         """Take the compiler to perform actual compilation."""
-        input_types = kwargs.get('input_types', self._get_input_types(batch_size=None))
+        input_types = kwargs.get("input_types", self._get_input_types(batch_size=None))
         self.model = self._compiler.compile(model=self.model, path=self.path, input_types=input_types)
 
     # FIXME: This won't work for all models, and self._features is not
@@ -1211,14 +1232,15 @@ class AbstractModel:
         compilers = self._valid_compilers()
         compiler_names = {c.name: c for c in compilers}
         if compiler is not None and compiler not in compiler_names:
-            raise AssertionError(f'Unknown compiler: {compiler}. Valid compilers: {compiler_names}')
+            raise AssertionError(f"Unknown compiler: {compiler}. Valid compilers: {compiler_names}")
         if compiler is None:
             return self._default_compiler()
         compiler_cls = compiler_names[compiler]
         if not compiler_cls.can_compile():
             if not compiler_fallback_to_native:
-                raise AssertionError(f'Specified compiler ({compiler}) is unable to compile'
-                                     ' (potentially lacking dependencies) and "compiler_fallback_to_native==False"')
+                raise AssertionError(
+                    f"Specified compiler ({compiler}) is unable to compile" ' (potentially lacking dependencies) and "compiler_fallback_to_native==False"'
+                )
             compiler_cls = self._default_compiler()
         return compiler_cls
 
@@ -1227,7 +1249,7 @@ class AbstractModel:
         if self._compiler is not None:
             return self._compiler.name
         else:
-            return 'native'
+            return "native"
 
     def get_trained_params(self) -> dict:
         """
@@ -1285,17 +1307,13 @@ class AbstractModel:
     def convert_to_refit_full_template(self):
         """After calling this function, returned model should be able to be fit without X_val, y_val using the iterations trained by the original model."""
         params = copy.deepcopy(self.get_params())
-        params['hyperparameters'].update(self.params_trained)
-        params['name'] = params['name'] + REFIT_FULL_SUFFIX
+        params["hyperparameters"].update(self.params_trained)
+        params["name"] = params["name"] + REFIT_FULL_SUFFIX
         template = self.__class__(**params)
 
         return template
 
-    def hyperparameter_tune(self,
-                            hyperparameter_tune_kwargs = 'auto',
-                            hpo_executor: HpoExecutor = None,
-                            time_limit: float = None,
-                            **kwargs):
+    def hyperparameter_tune(self, hyperparameter_tune_kwargs="auto", hpo_executor: HpoExecutor = None, time_limit: float = None, **kwargs):
         """
         Perform hyperparameter tuning of the model, fitting multiple variants of the model based on the search space provided in `hyperparameters` during init.
 
@@ -1354,12 +1372,12 @@ class AbstractModel:
         # if hpo_executor is not None, ensemble has already created the hpo_executor
         if hpo_executor is None:
             hpo_executor = self._get_default_hpo_executor()
-            default_num_trials = kwargs.pop('default_num_trials', None)
+            default_num_trials = kwargs.pop("default_num_trials", None)
             hpo_executor.initialize(hyperparameter_tune_kwargs, default_num_trials=default_num_trials, time_limit=time_limit)
         kwargs = self.initialize(time_limit=time_limit, **kwargs)
         self._register_fit_metadata(**kwargs)
         self._validate_fit_memory_usage(**kwargs)
-        kwargs = self._preprocess_fit_resources(parallel_hpo=hpo_executor.executor_type=='ray', **kwargs)
+        kwargs = self._preprocess_fit_resources(parallel_hpo=hpo_executor.executor_type == "ray", **kwargs)
         self.validate_fit_resources(**kwargs)
         hpo_executor.register_resources(self, **kwargs)
         return self._hyperparameter_tune(hpo_executor=hpo_executor, **kwargs)
@@ -1374,7 +1392,7 @@ class AbstractModel:
         time_start = time.time()
         logger.log(15, "Starting generic AbstractModel hyperparameter tuning for %s model..." % self.name)
         search_space = self._get_search_space()
-        
+
         try:
             hpo_executor.validate_search_space(search_space, self.name)
         except EmptySearchSpace:
@@ -1395,10 +1413,10 @@ class AbstractModel:
             trial_soft_time_limit = max(hpo_executor.time_limit * 0.9, hpo_executor.time_limit - 5)  # 5 seconds max for buffer
 
         fit_kwargs = dict()
-        fit_kwargs['feature_metadata'] = self.feature_metadata
-        fit_kwargs['num_classes'] = self.num_classes
-        fit_kwargs['sample_weight'] = kwargs.get('sample_weight', None)
-        fit_kwargs['sample_weight_val'] = kwargs.get('sample_weight_val', None)
+        fit_kwargs["feature_metadata"] = self.feature_metadata
+        fit_kwargs["num_classes"] = self.num_classes
+        fit_kwargs["sample_weight"] = kwargs.get("sample_weight", None)
+        fit_kwargs["sample_weight_val"] = kwargs.get("sample_weight_val", None)
         train_fn_kwargs = dict(
             model_cls=model_cls,
             init_params=init_params,
@@ -1412,18 +1430,16 @@ class AbstractModel:
         model_estimate_memory_usage = None
         if self.estimate_memory_usage is not None:
             model_estimate_memory_usage = self.estimate_memory_usage(X=X, **kwargs)
-        minimum_resources = self.get_minimum_resources(
-            is_gpu_available=(hpo_executor.resources.get('num_gpus', 0) > 0)
-        )
+        minimum_resources = self.get_minimum_resources(is_gpu_available=(hpo_executor.resources.get("num_gpus", 0) > 0))
         hpo_executor.execute(
             model_trial=model_trial,
             train_fn_kwargs=train_fn_kwargs,
             directory=directory,
-            minimum_cpu_per_trial=minimum_resources.get('num_cpus', 1),
-            minimum_gpu_per_trial=minimum_resources.get('num_gpus', 0),
+            minimum_cpu_per_trial=minimum_resources.get("num_cpus", 1),
+            minimum_gpu_per_trial=minimum_resources.get("num_gpus", 0),
             model_estimate_memory_usage=model_estimate_memory_usage,
-            adapter_type='tabular',
-            tune_config_kwargs={'chdir_to_trial_dir': False}
+            adapter_type="tabular",
+            tune_config_kwargs={"chdir_to_trial_dir": False},
         )
 
         hpo_results = hpo_executor.get_hpo_results(
@@ -1431,7 +1447,7 @@ class AbstractModel:
             model_path_root=self.path_root,
             time_start=time_start,
         )
-        
+
         # cleanup artifacts
         for data_file in [train_path, val_path]:
             try:
@@ -1440,7 +1456,7 @@ class AbstractModel:
                 pass
 
         return hpo_results
-    
+
     def _get_hpo_backend(self):
         """Choose which backend(Ray or Custom) to use for hpo"""
         if DistributedContext.is_distributed_mode():
@@ -1453,7 +1469,7 @@ class AbstractModel:
             try:
                 try_import_ray()
             except Exception as e:
-                warning_msg = f'Will use custom hpo logic because ray import failed. Reason: {str(e)}'
+                warning_msg = f"Will use custom hpo logic because ray import failed. Reason: {str(e)}"
                 dup_filter.attach_filter_targets(warning_msg)
                 logger.warning(warning_msg)
                 backend = CUSTOM_BACKEND
@@ -1480,8 +1496,9 @@ class AbstractModel:
     def get_disk_size(self) -> int:
         # Taken from https://stackoverflow.com/a/1392549
         from pathlib import Path
+
         model_path = Path(self.path)
-        model_disk_size = sum(f.stat().st_size for f in model_path.glob('**/*') if f.is_file())
+        model_disk_size = sum(f.stat().st_size for f in model_path.glob("**/*") if f.is_file())
         return model_disk_size
 
     # TODO: This results in a doubling of memory usage of the model to calculate its size.
@@ -1502,7 +1519,7 @@ class AbstractModel:
         assert self.is_initialized(), "Only estimate memory usage after the model is initialized."
         return self._estimate_memory_usage(**kwargs)
 
-    def validate_fit_resources(self, num_cpus='auto', num_gpus='auto', total_resources=None, **kwargs):
+    def validate_fit_resources(self, num_cpus="auto", num_gpus="auto", total_resources=None, **kwargs):
         """
         Verifies that the provided num_cpus and num_gpus (or defaults if not provided) are sufficient to train the model.
         Raises an AssertionError if not sufficient.
@@ -1514,15 +1531,15 @@ class AbstractModel:
         res_min = self.get_minimum_resources()
         for resource_name in res_min:
             if resource_name not in resources:
-                raise AssertionError(f'Model requires {res_min[resource_name]} {resource_name} to fit, but no available amount was defined.')
+                raise AssertionError(f"Model requires {res_min[resource_name]} {resource_name} to fit, but no available amount was defined.")
             elif res_min[resource_name] > resources[resource_name]:
-                raise AssertionError(f'Model requires {res_min[resource_name]} {resource_name} to fit, but {resources[resource_name]} are available.')
-        total_resources = resources.get('total_resources', None)
+                raise AssertionError(f"Model requires {res_min[resource_name]} {resource_name} to fit, but {resources[resource_name]} are available.")
+        total_resources = resources.get("total_resources", None)
         if total_resources is None:
             total_resources = {}
         for resource_name, resource_value in total_resources.items():
             if resources[resource_name] > resource_value:
-                raise AssertionError(f'Specified {resources[resource_name]} {resource_name} to fit, but only {resource_value} are available in total.')
+                raise AssertionError(f"Specified {resources[resource_name]} {resource_name} to fit, but only {resource_value} are available in total.")
 
     def get_minimum_resources(self, is_gpu_available=False) -> Dict[str, Union[int, float]]:
         """
@@ -1538,7 +1555,7 @@ class AbstractModel:
         Valid keys: 'num_cpus', 'num_gpus'.
         """
         return {
-            'num_cpus': 1,
+            "num_cpus": 1,
         }
 
     def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
@@ -1585,7 +1602,7 @@ class AbstractModel:
             Fit time kwargs, including X, y, X_val, and y_val.
             Can be used to customize estimation of memory usage.
         """
-        max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
+        max_memory_usage_ratio = self.params_aux["max_memory_usage_ratio"]
         if max_memory_usage_ratio is None:
             return  # Skip memory check
 
@@ -1601,28 +1618,38 @@ class AbstractModel:
         max_memory_usage_warning_ratio = mem_warning_threshold * max_memory_usage_ratio
 
         log_ag_args_fit_example = '`predictor.fit(..., ag_args_fit={"ag.max_memory_usage_ratio": VALUE})`'
-        log_ag_args_fit_example = f'\n\t\tTo set the same value for all models, do the following when calling predictor.fit: {log_ag_args_fit_example}'
+        log_ag_args_fit_example = f"\n\t\tTo set the same value for all models, do the following when calling predictor.fit: {log_ag_args_fit_example}"
 
-        log_user_guideline = f'Estimated to require {approx_mem_size_req / 1e9:.3f} GB ' \
-                             f'out of {available_mem / 1e9:.3f} GB available memory ({min_error_memory_ratio*100:.3f}%)... ' \
-                             f'({max_memory_usage_error_ratio*100:.3f}% of avail memory is the max safe size)'
+        log_user_guideline = (
+            f"Estimated to require {approx_mem_size_req / 1e9:.3f} GB "
+            f"out of {available_mem / 1e9:.3f} GB available memory ({min_error_memory_ratio*100:.3f}%)... "
+            f"({max_memory_usage_error_ratio*100:.3f}% of avail memory is the max safe size)"
+        )
         if min_error_memory_ratio > max_memory_usage_error_ratio:
-            log_user_guideline += f'\n\tTo force training the model, specify the model hyperparameter "ag.max_memory_usage_ratio" to a larger value ' \
-                                  f'(currently {max_memory_usage_ratio}, set to >={min_error_memory_ratio + 0.05:.2f} to avoid the error)' \
-                                  f'{log_ag_args_fit_example}'
+            log_user_guideline += (
+                f'\n\tTo force training the model, specify the model hyperparameter "ag.max_memory_usage_ratio" to a larger value '
+                f"(currently {max_memory_usage_ratio}, set to >={min_error_memory_ratio + 0.05:.2f} to avoid the error)"
+                f"{log_ag_args_fit_example}"
+            )
             if min_error_memory_ratio >= 1:
-                log_user_guideline += f'\n\t\tSetting "ag.max_memory_usage_ratio" to values above 1 may result in out-of-memory errors. ' \
-                                      f'You may consider using a machine with more memory as a safer alternative.'
-            logger.warning(f'\tWarning: Not enough memory to safely train model. {log_user_guideline}')
+                log_user_guideline += (
+                    f'\n\t\tSetting "ag.max_memory_usage_ratio" to values above 1 may result in out-of-memory errors. '
+                    f"You may consider using a machine with more memory as a safer alternative."
+                )
+            logger.warning(f"\tWarning: Not enough memory to safely train model. {log_user_guideline}")
             raise NotEnoughMemoryError
         elif min_warning_memory_ratio > max_memory_usage_warning_ratio:
-            log_user_guideline += f'\n\tTo avoid this warning, specify the model hyperparameter "ag.max_memory_usage_ratio" to a larger value ' \
-                                  f'(currently {max_memory_usage_ratio}, set to >={min_warning_memory_ratio + 0.05:.2f} to avoid the warning)' \
-                                  f'{log_ag_args_fit_example}'
+            log_user_guideline += (
+                f'\n\tTo avoid this warning, specify the model hyperparameter "ag.max_memory_usage_ratio" to a larger value '
+                f"(currently {max_memory_usage_ratio}, set to >={min_warning_memory_ratio + 0.05:.2f} to avoid the warning)"
+                f"{log_ag_args_fit_example}"
+            )
             if min_warning_memory_ratio >= 1:
-                log_user_guideline += f'\n\t\tSetting "ag.max_memory_usage_ratio" to values above 1 may result in out-of-memory errors. ' \
-                                      f'You may consider using a machine with more memory as a safer alternative.'
-            logger.warning(f'\tWarning: Potentially not enough memory to safely train model. {log_user_guideline}')
+                log_user_guideline += (
+                    f'\n\t\tSetting "ag.max_memory_usage_ratio" to values above 1 may result in out-of-memory errors. '
+                    f"You may consider using a machine with more memory as a safer alternative."
+                )
+            logger.warning(f"\tWarning: Potentially not enough memory to safely train model. {log_user_guideline}")
 
     def reduce_memory_size(self, remove_fit=True, remove_info=False, requires_save=True, **kwargs):
         """
@@ -1643,9 +1670,10 @@ class AbstractModel:
         DO NOT STORE FILES INSIDE OF THE MODEL DIRECTORY THAT ARE UNRELATED TO AUTOGLUON.
         """
         if not silent:
-            logger.log(30, f'Deleting model {self.name}. All files under {self.path} will be removed.')
-        from pathlib import Path
+            logger.log(30, f"Deleting model {self.name}. All files under {self.path} will be removed.")
         import shutil
+        from pathlib import Path
+
         model_path = Path(self.path)
         # TODO: Report errors?
         shutil.rmtree(path=model_path, ignore_errors=True)
@@ -1655,26 +1683,26 @@ class AbstractModel:
         Returns a dictionary of numerous fields describing the model.
         """
         info = {
-            'name': self.name,
-            'model_type': type(self).__name__,
-            'problem_type': self.problem_type,
-            'eval_metric': self.eval_metric.name,
-            'stopping_metric': self.stopping_metric.name,
-            'fit_time': self.fit_time,
-            'num_classes': self.num_classes,
-            'quantile_levels': self.quantile_levels,
-            'predict_time': self.predict_time,
-            'val_score': self.val_score,
-            'hyperparameters': self.params,
-            'hyperparameters_fit': self.params_trained,  # TODO: Explain in docs that this is for hyperparameters that differ in final model from original hyperparameters, such as epochs (from early stopping)
-            'hyperparameters_nondefault': self.nondefault_params,
+            "name": self.name,
+            "model_type": type(self).__name__,
+            "problem_type": self.problem_type,
+            "eval_metric": self.eval_metric.name,
+            "stopping_metric": self.stopping_metric.name,
+            "fit_time": self.fit_time,
+            "num_classes": self.num_classes,
+            "quantile_levels": self.quantile_levels,
+            "predict_time": self.predict_time,
+            "val_score": self.val_score,
+            "hyperparameters": self.params,
+            "hyperparameters_fit": self.params_trained,  # TODO: Explain in docs that this is for hyperparameters that differ in final model from original hyperparameters, such as epochs (from early stopping)
+            "hyperparameters_nondefault": self.nondefault_params,
             AG_ARGS_FIT: self.params_aux,
-            'num_features': len(self.features) if self.features else None,
-            'features': self.features,
-            'feature_metadata': self.feature_metadata,
+            "num_features": len(self.features) if self.features else None,
+            "features": self.features,
+            "feature_metadata": self.feature_metadata,
             # 'disk_size': self.get_disk_size(),
-            'memory_size': self.get_memory_size(),  # Memory usage of model in bytes
-            'compile_time': self.compile_time if hasattr(self, 'compile_time') else None,
+            "memory_size": self.get_memory_size(),  # Memory usage of model in bytes
+            "compile_time": self.compile_time if hasattr(self, "compile_time") else None,
         }
         return info
 
@@ -1697,13 +1725,13 @@ class AbstractModel:
         json_path = self.path + self.model_info_json_name
         save_json.save(path=json_path, obj=info)
         return info
-    
+
     def _get_maximum_resources(self) -> Dict[str, Union[int, float]]:
         """
         Get the maximum resources allowed to use for this model.
         This can be useful when model not scale well with resources, i.e. cpu cores.
         Return empty dict if no maximum resources needed
-        
+
         Return
         ------
         Dict[str, Union[int, float]]
@@ -1711,7 +1739,6 @@ class AbstractModel:
             value, maximum amount of resources
         """
         return {}
-        
 
     def _get_default_resources(self):
         """
@@ -1745,11 +1772,11 @@ class AbstractModel:
         This is used if stopping_metric was not explicitly specified.
         Models may wish to override this in case a more suitable stopping_metric exists for a given eval_metric.
         """
-        if self.eval_metric.name == 'roc_auc':
-            stopping_metric = 'log_loss'
+        if self.eval_metric.name == "roc_auc":
+            stopping_metric = "log_loss"
         else:
             stopping_metric = self.eval_metric
-        stopping_metric = metrics.get_metric(stopping_metric, self.problem_type, 'stopping_metric')
+        stopping_metric = metrics.get_metric(stopping_metric, self.problem_type, "stopping_metric")
         return stopping_metric
 
     # TODO: v1.0 Move params_aux to params, separate logic as in _get_ag_params, keep `ag.` prefix for ag_args_fit params
@@ -1807,7 +1834,7 @@ class AbstractModel:
         # first get class tags, which are overwritten by any object tags
         collected_tags = self._get_class_tags()
         for base_class in reversed(inspect.getmro(self.__class__)):
-            if hasattr(base_class, '_more_tags'):
+            if hasattr(base_class, "_more_tags"):
                 # need the if because mixins might not have _more_tags
                 # but might do redundant work in estimators
                 # (i.e. calling more tags on BaseEstimator multiple times)
@@ -1824,7 +1851,7 @@ class AbstractModel:
         """
         collected_tags = {}
         for base_class in reversed(inspect.getmro(cls)):
-            if hasattr(base_class, '_class_tags'):
+            if hasattr(base_class, "_class_tags"):
                 # need the if because mixins might not have _class_tags
                 # but might do redundant work in estimators
                 # (i.e. calling more tags on BaseEstimator multiple times)
@@ -1841,6 +1868,6 @@ class AbstractModel:
 
     def _more_tags(self) -> dict:
         return _DEFAULT_TAGS
-    
+
     def _get_model_base(self):
         return self

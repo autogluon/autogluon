@@ -1,15 +1,14 @@
-
 import pandas as pd
 
 from .utils.loaders import load_pd
 
-__all__ = ['TabularDataset']
+__all__ = ["TabularDataset"]
 
 
 class TabularDataset(pd.DataFrame):
     """
-    A dataset in tabular format (with rows = samples, columns = features/variables). 
-    This object is essentially a pandas DataFrame (with some extra attributes) and all existing pandas methods can be applied to it. 
+    A dataset in tabular format (with rows = samples, columns = features/variables).
+    This object is essentially a pandas DataFrame (with some extra attributes) and all existing pandas methods can be applied to it.
     For full list of methods/attributes, see pandas Dataframe documentation: https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html
 
     Parameters
@@ -23,8 +22,8 @@ class TabularDataset(pd.DataFrame):
     file_path: (str)
         Path to data file from which this `TabularDataset` was created.
         None if `data` was a :class:`pd.DataFrame`.
-    
-    Note: In addition to these attributes, `TabularDataset` also shares all the same attributes and methods of a pandas Dataframe. 
+
+    Note: In addition to these attributes, `TabularDataset` also shares all the same attributes and methods of a pandas Dataframe.
     For a detailed list, see:  https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html
 
     Examples
@@ -35,7 +34,7 @@ class TabularDataset(pd.DataFrame):
     >>> train_data.columns
     """
 
-    _metadata = ['file_path']  # preserved properties that will be copied to a new instance of TabularDataset
+    _metadata = ["file_path"]  # preserved properties that will be copied to a new instance of TabularDataset
 
     @property
     def _constructor(self):

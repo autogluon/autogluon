@@ -1,7 +1,7 @@
 import logging
 import os
 
-POINTER_SUFFIX = '.pointer'
+POINTER_SUFFIX = ".pointer"
 
 logger = logging.getLogger(__name__)
 
@@ -15,4 +15,4 @@ def save(path, content_path, verbose=True):
     f.close()
 
     if verbose:
-        logger.log(15, 'Saved pointer file to ' + str(path) + ' pointing to ' + str(content_path))
+        logger.log(15, "Saved pointer file to " + str(path) + " pointing to " + str(content_path))

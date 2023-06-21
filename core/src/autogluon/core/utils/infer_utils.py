@@ -1,14 +1,7 @@
 import pandas as pd
 
 
-def get_model_true_infer_speed_per_row_batch(
-        data,
-        *,
-        predictor,
-        batch_size: int = 100000,
-        repeats=1,
-        persist_models=True,
-        silent=False):
+def get_model_true_infer_speed_per_row_batch(data, *, predictor, batch_size: int = 100000, repeats=1, persist_models=True, silent=False):
     """
     Get per-model true inference speed per row for a given batch size of data.
 
@@ -40,8 +33,10 @@ def get_model_true_infer_speed_per_row_batch(
     """
     import copy
     import time
+
     import numpy as np
     import pandas as pd
+
     data_batch = copy.deepcopy(data)
     len_data = len(data_batch)
     if len_data == batch_size:
@@ -57,10 +52,10 @@ def get_model_true_infer_speed_per_row_batch(
         len_data = len(data_batch)
 
     if len_data != batch_size:
-        raise AssertionError(f'len(data_batch) must equal batch_size! ({len_data} != {batch_size})')
+        raise AssertionError(f"len(data_batch) must equal batch_size! ({len_data} != {batch_size})")
 
     if persist_models:
-        predictor.persist_models(models='all')
+        predictor.persist_models(models="all")
 
     ts = time.time()
     for i in range(repeats):
@@ -70,49 +65,44 @@ def get_model_true_infer_speed_per_row_batch(
     leaderboards = []
     for i in range(repeats):
         leaderboard = predictor.leaderboard(data_batch, skip_score=True, silent=True)
-        leaderboard = leaderboard[leaderboard['can_infer']][['model', 'pred_time_test', 'pred_time_test_marginal']]
-        leaderboard = leaderboard.set_index('model')
+        leaderboard = leaderboard[leaderboard["can_infer"]][["model", "pred_time_test", "pred_time_test_marginal"]]
+        leaderboard = leaderboard.set_index("model")
         leaderboards.append(leaderboard)
     leaderboard = pd.concat(leaderboards)
     time_per_batch_df = leaderboard.groupby(level=0).mean()
-    time_per_batch_df['pred_time_test_with_transform'] = time_per_batch_df['pred_time_test'] + time_transform
+    time_per_batch_df["pred_time_test_with_transform"] = time_per_batch_df["pred_time_test"] + time_transform
     time_per_row_df = time_per_batch_df / batch_size
     time_per_row_transform = time_transform / batch_size
 
     if not silent:
-        print(f'Throughput for batch_size={batch_size}:')
+        print(f"Throughput for batch_size={batch_size}:")
         for index, row in time_per_row_df.iterrows():
-            time_per_row = row['pred_time_test_with_transform']
+            time_per_row = row["pred_time_test_with_transform"]
             time_per_row_print = time_per_row
-            unit = 's'
+            unit = "s"
             if time_per_row_print < 1e-2:
                 time_per_row_print *= 1000
-                unit = 'ms'
+                unit = "ms"
                 if time_per_row_print < 1e-2:
                     time_per_row_print *= 1000
-                    unit = 'μs'
+                    unit = "μs"
             print(f"\t{round(time_per_row_print, 3)}{unit} per row | {index}")
         time_per_row_transform_print = time_per_row_transform
-        unit = 's'
+        unit = "s"
         if time_per_row_transform_print < 1e-2:
             time_per_row_transform_print *= 1000
-            unit = 'ms'
+            unit = "ms"
             if time_per_row_transform_print < 1e-2:
                 time_per_row_transform_print *= 1000
-                unit = 'μs'
+                unit = "μs"
         print(f"\t{round(time_per_row_transform_print, 3)}{unit} per row | transform_features")
 
     return time_per_row_df, time_per_row_transform
 
 
-def get_model_true_infer_speed_per_row_batch_bulk(data: pd.DataFrame,
-                                                  *,
-                                                  predictor,
-                                                  batch_sizes: list = None,
-                                                  repeats=1,
-                                                  persist_models=True,
-                                                  include_transform_features=False,
-                                                  silent=False) -> (pd.DataFrame, pd.DataFrame):
+def get_model_true_infer_speed_per_row_batch_bulk(
+    data: pd.DataFrame, *, predictor, batch_sizes: list = None, repeats=1, persist_models=True, include_transform_features=False, silent=False
+) -> (pd.DataFrame, pd.DataFrame):
     """
     Get per-model true inference speed per row for a list of batch sizes of data.
 
@@ -160,34 +150,31 @@ def get_model_true_infer_speed_per_row_batch_bulk(data: pd.DataFrame,
     infer_transform_dfs = dict()
 
     if persist_models:
-        predictor.persist_models(models='all')
+        predictor.persist_models(models="all")
 
     for batch_size in batch_sizes:
-        infer_df, time_per_row_transform = get_model_true_infer_speed_per_row_batch(data=data,
-                                                                                    predictor=predictor,
-                                                                                    batch_size=batch_size,
-                                                                                    repeats=repeats,
-                                                                                    persist_models=False,
-                                                                                    silent=silent)
+        infer_df, time_per_row_transform = get_model_true_infer_speed_per_row_batch(
+            data=data, predictor=predictor, batch_size=batch_size, repeats=repeats, persist_models=False, silent=silent
+        )
         infer_dfs[batch_size] = infer_df
         infer_transform_dfs[batch_size] = time_per_row_transform
     for key in infer_dfs.keys():
         infer_dfs[key] = infer_dfs[key].reset_index()
-        infer_dfs[key]['batch_size'] = key
+        infer_dfs[key]["batch_size"] = key
 
-    infer_df_full_transform = pd.Series(infer_transform_dfs, name='pred_time_test').to_frame().rename_axis('batch_size')
-    infer_df_full_transform['pred_time_test_marginal'] = infer_df_full_transform['pred_time_test']
-    infer_df_full_transform['pred_time_test_with_transform'] = infer_df_full_transform['pred_time_test']
+    infer_df_full_transform = pd.Series(infer_transform_dfs, name="pred_time_test").to_frame().rename_axis("batch_size")
+    infer_df_full_transform["pred_time_test_marginal"] = infer_df_full_transform["pred_time_test"]
+    infer_df_full_transform["pred_time_test_with_transform"] = infer_df_full_transform["pred_time_test"]
     infer_df_full_transform = infer_df_full_transform.reset_index()
 
     infer_df_full = pd.concat([infer_dfs[key] for key in infer_dfs.keys()])
 
     if include_transform_features:
         infer_df_full_transform_include = infer_df_full_transform.copy()
-        infer_df_full_transform_include['model'] = 'transform_features'
+        infer_df_full_transform_include["model"] = "transform_features"
         infer_df_full = pd.concat([infer_df_full, infer_df_full_transform_include])
 
-    infer_df_full = infer_df_full.sort_values(by=['batch_size'])
+    infer_df_full = infer_df_full.sort_values(by=["batch_size"])
     infer_df_full = infer_df_full.reset_index(drop=True)
 
     return infer_df_full, infer_df_full_transform
