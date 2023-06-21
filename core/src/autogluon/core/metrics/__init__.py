@@ -1,6 +1,6 @@
+import json
 from abc import ABCMeta, abstractmethod
 from functools import partial
-import json
 
 import numpy as np
 import scipy
@@ -12,10 +12,9 @@ try:
 except:
     from sklearn.metrics.classification import _check_targets, type_of_target
 
-from . import classification_metrics
+from ..constants import BINARY, MULTICLASS, QUANTILE, REGRESSION, SOFTCLASS
+from . import classification_metrics, quantile_metrics
 from .classification_metrics import confusion_matrix
-from . import quantile_metrics
-from ..constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, SOFTCLASS
 
 
 class Scorer(object, metaclass=ABCMeta):
@@ -46,6 +45,7 @@ class Scorer(object, metaclass=ABCMeta):
         kwargs to pass to score_func when called.
         For example, kwargs = {"beta": 2} when using sklearn.metrics.fbeta_score where beta is a required argument.
     """
+
     def __init__(self, name: str, score_func: callable, optimum: float, sign: int, kwargs: dict = None):
         self.name = name
         if kwargs is None:
@@ -54,7 +54,7 @@ class Scorer(object, metaclass=ABCMeta):
         self._score_func = score_func
         self._optimum = optimum
         if sign != 1 and sign != -1:
-            raise ValueError(f'sign must be one of [1, -1], but was instead {sign}')
+            raise ValueError(f"sign must be one of [1, -1], but was instead {sign}")
         self._sign = sign
         self.alias = set()
 
@@ -89,7 +89,7 @@ class Scorer(object, metaclass=ABCMeta):
         if k is None:
             k = dict()
         if sample_weight is not None:
-            k['sample_weight'] = sample_weight
+            k["sample_weight"] = sample_weight
 
         return self._score(y_true=y_true, y_pred=y_pred, **k)
 
@@ -125,8 +125,7 @@ class Scorer(object, metaclass=ABCMeta):
 
     def add_alias(self, alias):
         if alias == self.name:
-            raise ValueError(f'The alias "{alias}" is the same as the original name "{self.name}". '
-                             f'This is not allowed.')
+            raise ValueError(f'The alias "{alias}" is the same as the original name "{self.name}". ' f"This is not allowed.")
         self.alias.add(alias)
 
     @property
@@ -202,11 +201,11 @@ class _PredictScorer(Scorer):
             pass  # must be regression, all other task types would return at least two probabilities
         else:
             type_true = type_of_target(y_true)
-            if type_true == 'continuous':
+            if type_true == "continuous":
                 pass
-            elif type_true in ['binary', 'multiclass']:
+            elif type_true in ["binary", "multiclass"]:
                 y_pred = np.argmax(y_pred, axis=1)
-            elif type_true == 'multilabel-indicator':
+            elif type_true == "multilabel-indicator":
                 y_pred[y_pred > 0.5] = 1.0
                 y_pred[y_pred <= 0.5] = 0.0
             else:
@@ -291,14 +290,14 @@ class _QuantileScorer(Scorer):
             y_true = np.array(y_true)
         if isinstance(y_pred, list):
             y_pred = np.array(y_pred)
-        if 'quantile_levels' not in kwargs:
-            raise AssertionError('quantile_levels is required to score quantile metrics')
-        if isinstance(kwargs['quantile_levels'], list):
-            kwargs['quantile_levels'] = np.array(kwargs['quantile_levels'])
+        if "quantile_levels" not in kwargs:
+            raise AssertionError("quantile_levels is required to score quantile metrics")
+        if isinstance(kwargs["quantile_levels"], list):
+            kwargs["quantile_levels"] = np.array(kwargs["quantile_levels"])
 
         type_true = type_of_target(y_true)
 
-        if len(y_pred.shape) == 2 or y_pred.shape[1] >= 1 or type_true == 'continuous':
+        if len(y_pred.shape) == 2 or y_pred.shape[1] >= 1 or type_true == "continuous":
             pass  # must be quantile regression, all other task types would return at least two probabilities
         else:
             raise ValueError(type_true)
@@ -323,26 +322,17 @@ class _QuantileScorer(Scorer):
 
 def _add_scorer_to_metric_dict(metric_dict, scorer):
     if scorer.name in metric_dict:
-        raise ValueError(f'Duplicated score name found! scorer={scorer}, name={scorer.name}. '
-                         f'Consider to register with a different name.')
+        raise ValueError(f"Duplicated score name found! scorer={scorer}, name={scorer.name}. " f"Consider to register with a different name.")
     metric_dict[scorer.name] = scorer
     for alias in scorer.alias:
         if alias in metric_dict:
-            raise ValueError(f'Duplicated alias found! scorer={scorer}, alias={alias}. '
-                             f'Consider to use a different alias.')
+            raise ValueError(f"Duplicated alias found! scorer={scorer}, alias={alias}. " f"Consider to use a different alias.")
         metric_dict[alias] = scorer
 
 
-def make_scorer(name,
-                score_func,
-                *,
-                optimum=1,
-                greater_is_better=True,
-                needs_proba=False,
-                needs_threshold=False,
-                needs_quantile=False,
-                metric_kwargs: dict = None,
-                **kwargs) -> Scorer:
+def make_scorer(
+    name, score_func, *, optimum=1, greater_is_better=True, needs_proba=False, needs_threshold=False, needs_quantile=False, metric_kwargs: dict = None, **kwargs
+) -> Scorer:
     """Make a scorer from a performance metric or loss function.
 
     Factory inspired by scikit-learn which wraps scikit-learn scoring functions
@@ -408,50 +398,33 @@ def make_scorer(name,
 
 
 # Standard regression scores
-r2 = make_scorer('r2',
-                 sklearn.metrics.r2_score)
-mean_squared_error = make_scorer('mean_squared_error',
-                                 sklearn.metrics.mean_squared_error,
-                                 optimum=0,
-                                 greater_is_better=False)
-mean_squared_error.add_alias('mse')
+r2 = make_scorer("r2", sklearn.metrics.r2_score)
+mean_squared_error = make_scorer("mean_squared_error", sklearn.metrics.mean_squared_error, optimum=0, greater_is_better=False)
+mean_squared_error.add_alias("mse")
 
-mean_absolute_error = make_scorer('mean_absolute_error',
-                                  sklearn.metrics.mean_absolute_error,
-                                  optimum=0,
-                                  greater_is_better=False)
-mean_absolute_error.add_alias('mae')
+mean_absolute_error = make_scorer("mean_absolute_error", sklearn.metrics.mean_absolute_error, optimum=0, greater_is_better=False)
+mean_absolute_error.add_alias("mae")
 
-median_absolute_error = make_scorer('median_absolute_error',
-                                    sklearn.metrics.median_absolute_error,
-                                    optimum=0,
-                                    greater_is_better=False)
+median_absolute_error = make_scorer("median_absolute_error", sklearn.metrics.median_absolute_error, optimum=0, greater_is_better=False)
 
-mean_absolute_percentage_error = make_scorer('mean_absolute_percentage_error',
-                                    sklearn.metrics.mean_absolute_percentage_error,
-                                    optimum=0,
-                                    greater_is_better=False)
-mean_absolute_percentage_error.add_alias('mape')
+mean_absolute_percentage_error = make_scorer(
+    "mean_absolute_percentage_error", sklearn.metrics.mean_absolute_percentage_error, optimum=0, greater_is_better=False
+)
+mean_absolute_percentage_error.add_alias("mape")
 
 
 def local_spearmanr(y_true, y_pred):
     return float(scipy.stats.spearmanr(y_true, y_pred)[0])
 
 
-spearmanr = make_scorer('spearmanr',
-                        local_spearmanr,
-                        optimum=1.0,
-                        greater_is_better=True)
+spearmanr = make_scorer("spearmanr", local_spearmanr, optimum=1.0, greater_is_better=True)
 
 
 def local_pearsonr(y_true, y_pred):
     return float(scipy.stats.pearsonr(y_true, y_pred)[0])
 
 
-pearsonr = make_scorer('pearsonr',
-                       local_pearsonr,
-                       optimum=1.0,
-                       greater_is_better=True)
+pearsonr = make_scorer("pearsonr", local_pearsonr, optimum=1.0, greater_is_better=True)
 
 
 def rmse_func(y_true, y_pred, **kwargs):
@@ -461,54 +434,36 @@ def rmse_func(y_true, y_pred, **kwargs):
         return np.sqrt(((y_true - y_pred) ** 2).mean())
 
 
-root_mean_squared_error = make_scorer('root_mean_squared_error',
-                                      rmse_func,
-                                      optimum=0,
-                                      greater_is_better=False)
-root_mean_squared_error.add_alias('rmse')
+root_mean_squared_error = make_scorer("root_mean_squared_error", rmse_func, optimum=0, greater_is_better=False)
+root_mean_squared_error.add_alias("rmse")
 
 # Quantile pinball loss
-pinball_loss = make_scorer('pinball_loss',
-                           quantile_metrics.pinball_loss,
-                           needs_quantile=True,
-                           optimum=0.0,
-                           greater_is_better=False)
-pinball_loss.add_alias('pinball')
+pinball_loss = make_scorer("pinball_loss", quantile_metrics.pinball_loss, needs_quantile=True, optimum=0.0, greater_is_better=False)
+pinball_loss.add_alias("pinball")
 
 
 # Standard Classification Scores
-accuracy = make_scorer('accuracy', sklearn.metrics.accuracy_score)
-accuracy.add_alias('acc')
+accuracy = make_scorer("accuracy", sklearn.metrics.accuracy_score)
+accuracy.add_alias("acc")
 
-balanced_accuracy = make_scorer('balanced_accuracy', classification_metrics.balanced_accuracy)
-f1 = make_scorer('f1', sklearn.metrics.f1_score)
-mcc = make_scorer('mcc', sklearn.metrics.matthews_corrcoef)
+balanced_accuracy = make_scorer("balanced_accuracy", classification_metrics.balanced_accuracy)
+f1 = make_scorer("f1", sklearn.metrics.f1_score)
+mcc = make_scorer("mcc", sklearn.metrics.matthews_corrcoef)
 
 
 # Score functions that need decision values
-roc_auc = make_scorer('roc_auc',
-                      classification_metrics.customized_binary_roc_auc_score,
-                      greater_is_better=True,
-                      needs_threshold=True)
+roc_auc = make_scorer("roc_auc", classification_metrics.customized_binary_roc_auc_score, greater_is_better=True, needs_threshold=True)
 
-roc_auc_ovo_macro = make_scorer('roc_auc_ovo_macro',
-                                sklearn.metrics.roc_auc_score,
-                                multi_class='ovo',
-                                average='macro',
-                                greater_is_better=True,
-                                needs_proba=True,
-                                needs_threshold=False)
+roc_auc_ovo_macro = make_scorer(
+    "roc_auc_ovo_macro", sklearn.metrics.roc_auc_score, multi_class="ovo", average="macro", greater_is_better=True, needs_proba=True, needs_threshold=False
+)
 
-average_precision = make_scorer('average_precision',
-                                sklearn.metrics.average_precision_score,
-                                needs_threshold=True)
-precision = make_scorer('precision',
-                        sklearn.metrics.precision_score)
-recall = make_scorer('recall',
-                     sklearn.metrics.recall_score)
+average_precision = make_scorer("average_precision", sklearn.metrics.average_precision_score, needs_threshold=True)
+precision = make_scorer("precision", sklearn.metrics.precision_score)
+recall = make_scorer("recall", sklearn.metrics.recall_score)
 
 # Register other metrics
-quadratic_kappa = make_scorer('quadratic_kappa', classification_metrics.quadratic_kappa, needs_proba=False)
+quadratic_kappa = make_scorer("quadratic_kappa", classification_metrics.quadratic_kappa, needs_proba=False)
 
 
 def customized_log_loss(y_true, y_pred, eps=1e-15):
@@ -535,28 +490,19 @@ def customized_log_loss(y_true, y_pred, eps=1e-15):
         # First clip the y_pred which is also used in sklearn
         # Convert to float64 to avoid rounding error on the clip operation with epsilon
         y_pred = np.clip(y_pred.astype(float), eps, 1 - eps)
-        return - (y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred)).mean()
+        return -(y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred)).mean()
     else:
-        assert y_pred.ndim == 2, 'Only ndim=2 is supported'
+        assert y_pred.ndim == 2, "Only ndim=2 is supported"
         labels = np.arange(y_pred.shape[1], dtype=np.int32)
-        return sklearn.metrics.log_loss(y_true.astype(np.int32), y_pred,
-                                        labels=labels,
-                                        eps=eps)
+        return sklearn.metrics.log_loss(y_true.astype(np.int32), y_pred, labels=labels, eps=eps)
 
 
 # Score function for probabilistic classification
-log_loss = make_scorer('log_loss',
-                       customized_log_loss,
-                       optimum=0,
-                       greater_is_better=False,
-                       needs_proba=True)
-log_loss.add_alias('nll')
+log_loss = make_scorer("log_loss", customized_log_loss, optimum=0, greater_is_better=False, needs_proba=True)
+log_loss.add_alias("nll")
 
-pac = make_scorer('pac',
-                  classification_metrics.pac,
-                  greater_is_better=True,
-                  needs_proba=True)
-pac.add_alias('pac_score')
+pac = make_scorer("pac", classification_metrics.pac, greater_is_better=True, needs_proba=True)
+pac.add_alias("pac_score")
 
 REGRESSION_METRICS = dict()
 for scorer in [
@@ -596,15 +542,12 @@ for scorer in [
     _add_scorer_to_metric_dict(metric_dict=BINARY_METRICS, scorer=scorer)
 
 
-for name, metric in [('precision', sklearn.metrics.precision_score),
-                     ('recall', sklearn.metrics.recall_score),
-                     ('f1', sklearn.metrics.f1_score)]:
+for name, metric in [("precision", sklearn.metrics.precision_score), ("recall", sklearn.metrics.recall_score), ("f1", sklearn.metrics.f1_score)]:
     globals()[name] = make_scorer(name, metric)
     _add_scorer_to_metric_dict(metric_dict=BINARY_METRICS, scorer=globals()[name])
-    for average in ['macro', 'micro', 'weighted']:
-        qualified_name = '{0}_{1}'.format(name, average)
-        globals()[qualified_name] = make_scorer(qualified_name,
-                                                partial(metric, pos_label=None, average=average))
+    for average in ["macro", "micro", "weighted"]:
+        qualified_name = "{0}_{1}".format(name, average)
+        globals()[qualified_name] = make_scorer(qualified_name, partial(metric, pos_label=None, average=average))
         _add_scorer_to_metric_dict(metric_dict=BINARY_METRICS, scorer=globals()[qualified_name])
         _add_scorer_to_metric_dict(metric_dict=MULTICLASS_METRICS, scorer=globals()[qualified_name])
 
@@ -629,10 +572,11 @@ def get_metric(metric, problem_type=None, metric_type=None) -> Scorer:
     Performs basic check for metric compatibility with given problem type."""
 
     if metric is not None and isinstance(metric, str):
-        if metric == 'soft_log_loss':
+        if metric == "soft_log_loss":
             if problem_type == QUANTILE:
                 raise ValueError(f"{metric_type}={metric} can not be used for quantile problems")
             from .softclass_metrics import soft_log_loss
+
             return soft_log_loss
         if problem_type is not None:
             if problem_type not in METRICS:
@@ -640,11 +584,13 @@ def get_metric(metric, problem_type=None, metric_type=None) -> Scorer:
             if metric not in METRICS[problem_type]:
                 valid_problem_types = _get_valid_metric_problem_types(metric)
                 if valid_problem_types:
-                    raise ValueError(f"{metric_type}='{metric}' is not a valid metric for problem_type='{problem_type}'. Valid problem_types for this metric: {valid_problem_types}")
+                    raise ValueError(
+                        f"{metric_type}='{metric}' is not a valid metric for problem_type='{problem_type}'. Valid problem_types for this metric: {valid_problem_types}"
+                    )
                 else:
-                    raise ValueError(f"Unknown metric '{metric}'. "
-                                     f"Valid metrics for problem_type='{problem_type}':\n"
-                                     f"{list(METRICS[problem_type].keys())}")
+                    raise ValueError(
+                        f"Unknown metric '{metric}'. " f"Valid metrics for problem_type='{problem_type}':\n" f"{list(METRICS[problem_type].keys())}"
+                    )
             return METRICS[problem_type][metric]
         for pt in METRICS:
             if metric in METRICS[pt]:
@@ -652,7 +598,7 @@ def get_metric(metric, problem_type=None, metric_type=None) -> Scorer:
         all_available_metrics = dict()
         for pt in METRICS:
             all_available_metrics[pt] = list(METRICS[pt].keys())
-        all_available_metrics[SOFTCLASS] = ['soft_log_loss']
+        all_available_metrics[SOFTCLASS] = ["soft_log_loss"]
 
         raise ValueError(
             f"{metric_type}='{metric}' is an unknown metric, all available metrics by problem_type are:\n"

@@ -1,6 +1,8 @@
 import numpy as np
 import pytest
+
 from autogluon.core.metrics.quantile_metrics import pinball_loss
+
 
 def test_invalid_quantile_values_shape_raises():
     # Given
@@ -12,25 +14,28 @@ def test_invalid_quantile_values_shape_raises():
     with pytest.raises(ValueError):
         observed_output = pinball_loss(input_target_values, input_quantile_values, input_quantile_levels)
 
+
 def test_mismatched_target_prediction_length_raises():
     # Given
     input_target_values = [1.0, 2.0]
-    input_quantile_values = [[1.0],[2.0],[3.0]]
+    input_quantile_values = [[1.0], [2.0], [3.0]]
     input_quantile_levels = [0.5, 0.75]
 
     # When/Then
     with pytest.raises(ValueError):
         observed_output = pinball_loss(input_target_values, input_quantile_values, input_quantile_levels)
+
 
 def test_mismatched_quantiles_raises():
     # Given
     input_target_values = [1.0, 2.0]
-    input_quantile_values = [[1.0],[2.0]]
+    input_quantile_values = [[1.0], [2.0]]
     input_quantile_levels = [0.5, 0.75]
 
     # When/Then
     with pytest.raises(ValueError):
         observed_output = pinball_loss(input_target_values, input_quantile_values, input_quantile_levels)
+
 
 def test_single_prediction():
     # Given
@@ -43,7 +48,8 @@ def test_single_prediction():
     observed_output = pinball_loss(input_target_values, input_quantile_values, input_quantile_levels)
 
     # Then
-    assert(np.isclose(expected_output, observed_output))
+    assert np.isclose(expected_output, observed_output)
+
 
 def test_multiple_predictions():
     # Given
@@ -56,7 +62,8 @@ def test_multiple_predictions():
     observed_output = pinball_loss(input_target_values, input_quantile_values, input_quantile_levels)
 
     # Then
-    assert(np.isclose(expected_output, observed_output))
+    assert np.isclose(expected_output, observed_output)
+
 
 def test_multiple_predictions_with_weights():
     # Given
@@ -71,4 +78,4 @@ def test_multiple_predictions_with_weights():
     observed_output = pinball_loss(input_target_values, input_quantile_values, input_quantile_levels, input_sample_weights, input_quantile_weights)
 
     # Then
-    assert(np.isclose(expected_output, observed_output))
+    assert np.isclose(expected_output, observed_output)

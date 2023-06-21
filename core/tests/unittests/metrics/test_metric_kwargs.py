@@ -1,8 +1,7 @@
 import numpy as np
 import sklearn.metrics
 
-from autogluon.core.metrics import f1
-from autogluon.core.metrics import make_scorer
+from autogluon.core.metrics import f1, make_scorer
 
 
 def test_metric_kwargs():
@@ -31,9 +30,9 @@ def test_metric_kwargs():
 def test_metric_kwargs_init():
     y_true = np.array([1, 1, 1, 0, 0, 0])
     y_pred = np.array([0, 1, 1, 0, 1, 1])
-    f1_pos_label_0 = make_scorer('f1', sklearn.metrics.f1_score, pos_label=0)
-    f1_pos_label_0_v2 = make_scorer('f1', sklearn.metrics.f1_score, metric_kwargs=dict(pos_label=0))
-    f1_pos_label_0_test_override = make_scorer('f1', sklearn.metrics.f1_score, metric_kwargs=dict(pos_label=0), pos_label=1)
+    f1_pos_label_0 = make_scorer("f1", sklearn.metrics.f1_score, pos_label=0)
+    f1_pos_label_0_v2 = make_scorer("f1", sklearn.metrics.f1_score, metric_kwargs=dict(pos_label=0))
+    f1_pos_label_0_test_override = make_scorer("f1", sklearn.metrics.f1_score, metric_kwargs=dict(pos_label=0), pos_label=1)
 
     score_og = f1(y_true, y_pred)
     score_pos_label_0_og = f1(y_true, y_pred, pos_label=0)

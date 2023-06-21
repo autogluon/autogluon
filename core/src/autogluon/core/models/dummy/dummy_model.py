@@ -1,8 +1,8 @@
 import pandas as pd
 
-from ._dummy_quantile_regressor import DummyQuantileRegressor
+from ...constants import BINARY, MULTICLASS, QUANTILE, REGRESSION
 from .. import AbstractModel
-from ...constants import BINARY, MULTICLASS, REGRESSION, QUANTILE
+from ._dummy_quantile_regressor import DummyQuantileRegressor
 
 
 class DummyModel(AbstractModel):
@@ -10,8 +10,10 @@ class DummyModel(AbstractModel):
     A dummy model that ignores input features and predicts only a constant value.
     Useful for tests and calculating worst-case performance.
     """
+
     def _get_model_type(self):
         from sklearn.dummy import DummyClassifier, DummyRegressor
+
         if self.problem_type == REGRESSION:
             return DummyRegressor
         elif self.problem_type == QUANTILE:
@@ -19,7 +21,7 @@ class DummyModel(AbstractModel):
         elif self.problem_type in [BINARY, MULTICLASS]:
             return DummyClassifier
         else:
-            raise ValueError(f'DummyModel does not support problem_type={self.problem_type}')
+            raise ValueError(f"DummyModel does not support problem_type={self.problem_type}")
 
     def preprocess(self, X: pd.DataFrame, **kwargs):
         return X

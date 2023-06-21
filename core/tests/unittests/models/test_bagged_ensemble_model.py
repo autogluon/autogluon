@@ -1,4 +1,3 @@
-
 import pandas as pd
 
 from autogluon.core.models import BaggedEnsembleModel
@@ -27,14 +26,14 @@ def test_generate_fold_configs():
         n_repeat_end=n_repeats,
     )
 
-    assert fold_fit_args_list[0]['model_name_suffix'] == 'S3F3'
-    assert fold_fit_args_list[-1]['model_name_suffix'] == 'S5F1'
+    assert fold_fit_args_list[0]["model_name_suffix"] == "S3F3"
+    assert fold_fit_args_list[-1]["model_name_suffix"] == "S5F1"
     assert len(fold_fit_args_list) == 5
     assert n_repeats_started == 2
     assert n_repeats_finished == 2
 
-    assert fold_fit_args_list[0]['is_last_fold'] is False
-    assert fold_fit_args_list[1]['is_last_fold'] is False
-    assert fold_fit_args_list[2]['is_last_fold'] is False
-    assert fold_fit_args_list[3]['is_last_fold'] is False
-    assert fold_fit_args_list[4]['is_last_fold'] is True
+    assert fold_fit_args_list[0]["is_last_fold"] is False
+    assert fold_fit_args_list[1]["is_last_fold"] is False
+    assert fold_fit_args_list[2]["is_last_fold"] is False
+    assert fold_fit_args_list[3]["is_last_fold"] is False
+    assert fold_fit_args_list[4]["is_last_fold"] is True

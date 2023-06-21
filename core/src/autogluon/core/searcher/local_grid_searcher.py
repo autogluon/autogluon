@@ -8,8 +8,7 @@ from autogluon.common import space as ag_space
 
 from .local_searcher import LocalSearcher
 
-
-__all__ = ['LocalGridSearcher']
+__all__ = ["LocalGridSearcher"]
 
 logger = logging.getLogger(__name__)
 
@@ -66,9 +65,9 @@ class LocalGridSearcher(LocalSearcher):
         return self._grid_length - self._grid_index
 
     def get_config(self):
-        """ Return new hyperparameter configuration to try next."""
+        """Return new hyperparameter configuration to try next."""
         if len(self) <= 0:
-            raise AssertionError(f'No configs left to get. All {self._grid_length} configs have been accessed already.')
+            raise AssertionError(f"No configs left to get. All {self._grid_length} configs have been accessed already.")
         config = self._params_grid[self._grid_index]
         self._grid_index += 1
         for key, val in config.items():
