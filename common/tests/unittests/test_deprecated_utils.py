@@ -1,11 +1,14 @@
 import pytest
 
-from autogluon.common.utils.deprecated_utils import Deprecated, Deprecated_args, construct_deprecated_wrapper, construct_deprecated_args_wrapper
-
-
-@pytest.mark.parametrize(
-    "mock_version", [("1.0"), ("0.1"), ("0.0.1"), ("0.0.1b20230508"), ("9999b20230508")]  # random dev version
+from autogluon.common.utils.deprecated_utils import (
+    Deprecated,
+    Deprecated_args,
+    construct_deprecated_args_wrapper,
+    construct_deprecated_wrapper,
 )
+
+
+@pytest.mark.parametrize("mock_version", [("1.0"), ("0.1"), ("0.0.1"), ("0.0.1b20230508"), ("9999b20230508")])  # random dev version
 def test_should_deprecate_warning(mock_version):
     with pytest.deprecated_call():
         Deprecated = construct_deprecated_wrapper(mock_version)
@@ -47,6 +50,7 @@ def test_should_raise_deprecate_error(mock_version):
     with pytest.raises(ValueError):
         Deprecated = construct_deprecated_wrapper(mock_version)
         Deprecated_args = construct_deprecated_args_wrapper(mock_version)
+
         @Deprecated(min_version_to_warn="0.0", min_version_to_error="0.0")
         class ShouldDeprecateErrorClass:
             pass
@@ -71,12 +75,11 @@ def test_should_raise_deprecate_error(mock_version):
         func_with_deprecated_args_error(deprecated_arg=1)
 
 
-@pytest.mark.parametrize(
-    "mock_version", [("1.0"), ("0.1"), ("0.0.1"), ("0.0.1b20230508"), ("9999b20230508")]  # random dev version
-)
+@pytest.mark.parametrize("mock_version", [("1.0"), ("0.1"), ("0.0.1"), ("0.0.1b20230508"), ("9999b20230508")])  # random dev version
 def test_should_not_deprecate(mock_version):
     Deprecated = construct_deprecated_wrapper(mock_version)
     Deprecated_args = construct_deprecated_args_wrapper(mock_version)
+
     @Deprecated(min_version_to_warn="9999.0", min_version_to_error="9999.0")
     class NotDeprecatedClass:
         @Deprecated(min_version_to_warn="9999.0", min_version_to_error="9999.0")

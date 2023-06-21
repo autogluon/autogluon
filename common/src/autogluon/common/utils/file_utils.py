@@ -17,10 +17,7 @@ def get_directory_size(path: str) -> int:
     return total_size
 
 
-def get_directory_size_per_file(path: str,
-                                *,
-                                sort_by: str = "size",
-                                include_path_in_name: bool = False) -> pd.Series:
+def get_directory_size_per_file(path: str, *, sort_by: str = "size", include_path_in_name: bool = False) -> pd.Series:
     """
     Returns the size of each file under the path directory in bytes, excluding symbolic links.
 
@@ -59,12 +56,12 @@ def get_directory_size_per_file(path: str,
                     # remove path from file_path in dictionary
                     file_sizes[file_path.split(og_dir_path, 1)[-1]] = file_size
 
-    file_size_series = pd.Series(file_sizes, name='size')
+    file_size_series = pd.Series(file_sizes, name="size")
     if sort_by is None:
         return file_size_series
-    elif sort_by == 'size':
+    elif sort_by == "size":
         return file_size_series.sort_values(ascending=False)
-    elif sort_by == 'name':
+    elif sort_by == "name":
         return file_size_series.sort_index(ascending=True)
     else:
         raise AssertionError(f'sort_by={sort_by} is unknown. Supported values: [None, "size", "name"]')
