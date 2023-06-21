@@ -6,7 +6,7 @@ from pandas import DataFrame, Series
 logger = logging.getLogger(__name__)
 
 
-def clip_and_astype(df: DataFrame, columns: list = None, clip_min=0, clip_max=255, dtype: str = 'uint8') -> DataFrame:
+def clip_and_astype(df: DataFrame, columns: list = None, clip_min=0, clip_max=255, dtype: str = "uint8") -> DataFrame:
     """
     Clips columns in a DataFrame to min and max values, and then converts dtype.
 
@@ -50,4 +50,4 @@ def get_smallest_valid_dtype_int(min_val: int, max_val: int):
     for dtype in [np.uint8, np.uint16, np.uint32, np.uint64]:
         if max_val <= np.iinfo(dtype).max and min_val >= np.iinfo(dtype).min:
             return dtype
-    raise ValueError(f'Value is not able to be represented by {dtypes_to_check[-1].__name__}. (min_val, max_val): ({min_val}, {max_val})')
+    raise ValueError(f"Value is not able to be represented by {dtypes_to_check[-1].__name__}. (min_val, max_val): ({min_val}, {max_val})")

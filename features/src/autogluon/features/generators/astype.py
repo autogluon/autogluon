@@ -4,9 +4,9 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame
 
-from autogluon.common.features.types import R_INT, S_BOOL
 from autogluon.common.features.feature_metadata import FeatureMetadata
-from autogluon.common.features.infer_types import get_type_map_raw, get_type_map_real, get_bool_true_val
+from autogluon.common.features.infer_types import get_bool_true_val, get_type_map_raw, get_type_map_real
+from autogluon.common.features.types import R_INT, S_BOOL
 
 from .abstract import AbstractFeatureGenerator
 
@@ -40,12 +40,15 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
     **kwargs :
         Refer to :class:`AbstractFeatureGenerator` documentation for details on valid key word arguments.
     """
-    def __init__(self,
-                 convert_bool: bool = True,
-                 convert_bool_method: str = "auto",
-                 convert_bool_method_v2_threshold: int = 15,
-                 convert_bool_method_v2_row_threshold: int = 128,
-                 **kwargs):
+
+    def __init__(
+        self,
+        convert_bool: bool = True,
+        convert_bool_method: str = "auto",
+        convert_bool_method_v2_threshold: int = 15,
+        convert_bool_method_v2_row_threshold: int = 128,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
         # FeatureMetadata object based on the original input features real dtypes
         # (will contain dtypes such as 'int16' and 'float32' instead of 'int' and 'float').
@@ -57,15 +60,14 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
         self._convert_bool = convert_bool
         self._convert_bool_method_v2_threshold = convert_bool_method_v2_threshold
         self._convert_bool_method_v2_row_threshold = convert_bool_method_v2_row_threshold
-        if convert_bool_method == 'v1':
+        if convert_bool_method == "v1":
             self._use_fast_bool_method = False
-        elif convert_bool_method == 'v2':
+        elif convert_bool_method == "v2":
             self._use_fast_bool_method = True
-        elif convert_bool_method == 'auto':
+        elif convert_bool_method == "auto":
             self._use_fast_bool_method = "auto"
         else:
-            raise ValueError(f'Unknown `convert_bool_method` value: {convert_bool_method}. '
-                             f'Valid values: ["v1", "v2", "auto"]')
+            raise ValueError(f"Unknown `convert_bool_method` value: {convert_bool_method}. " f'Valid values: ["v1", "v2", "auto"]')
         self._bool_features_list = None
         self._non_bool_features_list = None
         self._bool_features_val = None
@@ -80,12 +82,18 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
             feature_type_raw = self.feature_metadata_in.get_feature_type_raw(feature)
             feature_type_raw_cur = feature_type_raw_cur_dict[feature]
             if feature_type_raw != feature_type_raw_cur:
-                self._log(30, f'\tWARNING: Actual dtype differs from dtype in FeatureMetadata for feature "{feature}". '
-                              f'Actual dtype: {feature_type_raw_cur} | Expected dtype: {feature_type_raw}')
+                self._log(
+                    30,
+                    f'\tWARNING: Actual dtype differs from dtype in FeatureMetadata for feature "{feature}". '
+                    f"Actual dtype: {feature_type_raw_cur} | Expected dtype: {feature_type_raw}",
+                )
                 feature_map_to_update[feature] = feature_type_raw
         if feature_map_to_update:
-            self._log(30, '\tWARNING: Forcefully converting features to expected dtypes. '
-                          'Please manually align the input data with the expected dtypes if issues occur.')
+            self._log(
+                30,
+                "\tWARNING: Forcefully converting features to expected dtypes. "
+                "Please manually align the input data with the expected dtypes if issues occur.",
+            )
             X = X.astype(feature_map_to_update)
 
         self._bool_features = dict()
@@ -107,10 +115,9 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
                         self._bool_features[feature] = feature_bool_val
 
         if self._bool_features:
-            self._log(20, f'\tNote: Converting {len(self._bool_features)} features to boolean dtype '
-                          f'as they only contain 2 unique values.')
+            self._log(20, f"\tNote: Converting {len(self._bool_features)} features to boolean dtype " f"as they only contain 2 unique values.")
             self._set_bool_features_val()
-            if self._use_fast_bool_method == 'auto':
+            if self._use_fast_bool_method == "auto":
                 self._use_fast_bool_method = len(self._bool_features) >= self._convert_bool_method_v2_threshold
             X = self._convert_to_bool(X)
             for feature in self._bool_features:
@@ -135,10 +142,12 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
                     # TODO: Add unit test for this situation, to confirm it is handled properly.
                     with_null = null_count[null_count]
                     with_null_features = list(with_null.index)
-                    logger.warning('WARNING: Int features without null values '
-                                   'at train time contain null values at inference time! '
-                                   'Imputing nulls to 0. To avoid this, pass the features as floats during fit!')
-                    logger.warning(f'WARNING: Int features with nulls: {with_null_features}')
+                    logger.warning(
+                        "WARNING: Int features without null values "
+                        "at train time contain null values at inference time! "
+                        "Imputing nulls to 0. To avoid this, pass the features as floats during fit!"
+                    )
+                    logger.warning(f"WARNING: Int features with nulls: {with_null_features}")
                     X[with_null_features] = X[with_null_features].fillna(0)
 
             if self._type_map_real_opt:
@@ -188,7 +197,7 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
 
     def _convert_to_bool_fast_realtime(self, X: DataFrame) -> DataFrame:
         """Optimized for when X is <= 100 rows"""
-        X_bool_features_np = X[self._bool_features_list].to_numpy(dtype='object')
+        X_bool_features_np = X[self._bool_features_list].to_numpy(dtype="object")
         X_bool_numpy = X_bool_features_np == self._bool_features_val_np
         X_bool = pd.DataFrame(X_bool_numpy, columns=self._bool_features_list, dtype=np.int8, index=X.index)
 
@@ -218,14 +227,14 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
 
     def _set_bool_features_val(self):
         self._bool_features_val = [self._bool_features[f] for f in self._bool_features]
-        self._bool_features_val_np = np.array(self._bool_features_val, dtype='object')
+        self._bool_features_val_np = np.array(self._bool_features_val, dtype="object")
         self._bool_features_list = list(self._bool_features.keys())
         self._non_bool_features_list = [f for f in self.features_in if f not in self._bool_features]
 
     def print_feature_metadata_info(self, log_level=20):
-        self._log(log_level, '\tOriginal Features (exact raw dtype, raw dtype):')
-        self._feature_metadata_in_real.print_feature_metadata_full(self.log_prefix + '\t\t', print_only_one_special=True, log_level=log_level)
+        self._log(log_level, "\tOriginal Features (exact raw dtype, raw dtype):")
+        self._feature_metadata_in_real.print_feature_metadata_full(self.log_prefix + "\t\t", print_only_one_special=True, log_level=log_level)
         super().print_feature_metadata_info(log_level=log_level)
 
     def _more_tags(self):
-        return {'feature_interactions': False}
+        return {"feature_interactions": False}

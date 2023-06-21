@@ -83,12 +83,13 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
     >>>
     >>> X_test_transformed = feature_generator.transform(test_data)
     """
+
     def __init__(self, generators: List[List[AbstractFeatureGenerator]], pre_generators: List[AbstractFeatureGenerator] = None, **kwargs):
         super().__init__(**kwargs)
         if not isinstance(generators, list):
             generators = [[generators]]
         elif len(generators) == 0:
-            raise AssertionError('generators must contain at least one AbstractFeatureGenerator.')
+            raise AssertionError("generators must contain at least one AbstractFeatureGenerator.")
         generators = [generator_group if isinstance(generator_group, list) else [generator_group] for generator_group in generators]
         if pre_generators is None:
             pre_generators = []
@@ -96,6 +97,7 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
             pre_generators = [pre_generators]
         if self.pre_enforce_types:
             from .astype import AsTypeFeatureGenerator
+
             pre_generators = [AsTypeFeatureGenerator()] + pre_generators
             self.pre_enforce_types = False
         pre_generators = [[pre_generator] for pre_generator in pre_generators]
@@ -110,7 +112,7 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
         for generator_group in self.generators:
             for generator in generator_group:
                 if not isinstance(generator, AbstractFeatureGenerator):
-                    raise AssertionError(f'generators contains an object which is not an instance of AbstractFeatureGenerator. Invalid generator: {generator}')
+                    raise AssertionError(f"generators contains an object which is not an instance of AbstractFeatureGenerator. Invalid generator: {generator}")
 
         # FeatureMetadata object based on the original input features that were unused by any feature generator.
         self._feature_metadata_in_unused: FeatureMetadata = None
@@ -118,31 +120,32 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
         feature_metadata = self.feature_metadata_in
         for i in range(len(self.generators)):
-            self._log(20, f'\tStage {i + 1} Generators:')
+            self._log(20, f"\tStage {i + 1} Generators:")
             feature_df_list = []
             generator_group_valid = []
             for generator in self.generators[i]:
                 if generator.is_valid_metadata_in(feature_metadata):
                     if generator.verbosity > self.verbosity:
                         generator.verbosity = self.verbosity
-                    generator.set_log_prefix(log_prefix=self.log_prefix + '\t\t', prepend=True)
+                    generator.set_log_prefix(log_prefix=self.log_prefix + "\t\t", prepend=True)
                     feature_df_list.append(generator.fit_transform(X, feature_metadata_in=feature_metadata, **kwargs))
                     generator_group_valid.append(generator)
                 else:
-                    self._log(15, f'\t\tSkipping {generator.__class__.__name__}: No input feature with required dtypes.')
+                    self._log(15, f"\t\tSkipping {generator.__class__.__name__}: No input feature with required dtypes.")
 
             self.generators[i] = generator_group_valid
 
-            self.generators[i] = [generator for j, generator in enumerate(self.generators[i]) if
-                                  feature_df_list[j] is not None and len(feature_df_list[j].columns) > 0]
+            self.generators[i] = [
+                generator for j, generator in enumerate(self.generators[i]) if feature_df_list[j] is not None and len(feature_df_list[j].columns) > 0
+            ]
             feature_df_list = [feature_df for feature_df in feature_df_list if feature_df is not None and len(feature_df.columns) > 0]
 
             if self.generators[i]:
                 # Raise an exception if generators expect different raw input types for the same feature.
-                FeatureMetadata.join_metadatas([generator.feature_metadata_in for generator in self.generators[i]], shared_raw_features='error_if_diff')
+                FeatureMetadata.join_metadatas([generator.feature_metadata_in for generator in self.generators[i]], shared_raw_features="error_if_diff")
 
             if self.generators[i]:
-                feature_metadata = FeatureMetadata.join_metadatas([generator.feature_metadata for generator in self.generators[i]], shared_raw_features='error')
+                feature_metadata = FeatureMetadata.join_metadatas([generator.feature_metadata for generator in self.generators[i]], shared_raw_features="error")
             else:
                 feature_metadata = FeatureMetadata(type_map_raw=dict())
 
@@ -220,8 +223,9 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
             stage = i + 1
             if stage > 1:
                 if self.generators[stage - 2]:
-                    features_in = FeatureMetadata.join_metadatas([generator.feature_metadata for generator in self.generators[stage - 2]],
-                                                                 shared_raw_features='error').get_features()
+                    features_in = FeatureMetadata.join_metadatas(
+                        [generator.feature_metadata for generator in self.generators[stage - 2]], shared_raw_features="error"
+                    ).get_features()
                 else:
                     features_in = []
             else:

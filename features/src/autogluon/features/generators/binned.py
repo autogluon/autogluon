@@ -4,11 +4,11 @@ import logging
 import pandas as pd
 from pandas import DataFrame
 
-from autogluon.common.features.types import R_INT, R_FLOAT, S_BINNED
+from autogluon.common.features.types import R_FLOAT, R_INT, S_BINNED
 
-from .abstract import AbstractFeatureGenerator
 from .. import binning
 from ..utils import get_smallest_valid_dtype_int
+from .abstract import AbstractFeatureGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 # TODO: Add more parameters (possibly pass in binning function as an argument for full control)
 class BinnedFeatureGenerator(AbstractFeatureGenerator):
     """BinnedFeatureGenerator bins incoming int and float features to num_bins unique int values, maintaining relative rank order."""
+
     def __init__(self, num_bins=10, **kwargs):
         super().__init__(**kwargs)
         self.num_bins = num_bins
@@ -57,4 +58,4 @@ class BinnedFeatureGenerator(AbstractFeatureGenerator):
                     self._astype_map.pop(feature)
 
     def _more_tags(self):
-        return {'feature_interactions': False}
+        return {"feature_interactions": False}

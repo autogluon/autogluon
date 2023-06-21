@@ -1,5 +1,6 @@
 from .abstract import AbstractFeatureGenerator
 from .astype import AsTypeFeatureGenerator
+from .auto_ml_pipeline import AutoMLInterpretablePipelineFeatureGenerator, AutoMLPipelineFeatureGenerator
 from .binned import BinnedFeatureGenerator
 from .bulk import BulkFeatureGenerator
 from .category import CategoryFeatureGenerator
@@ -13,9 +14,7 @@ from .isnan import IsNanFeatureGenerator
 from .label_encoder import LabelEncoderFeatureGenerator
 from .memory_minimize import CategoryMemoryMinimizeFeatureGenerator, NumericMemoryMinimizeFeatureGenerator
 from .one_hot_encoder import OneHotEncoderFeatureGenerator
+from .pipeline import PipelineFeatureGenerator
 from .rename import RenameFeatureGenerator
 from .text_ngram import TextNgramFeatureGenerator
 from .text_special import TextSpecialFeatureGenerator
-
-from .pipeline import PipelineFeatureGenerator
-from .auto_ml_pipeline import AutoMLPipelineFeatureGenerator, AutoMLInterpretablePipelineFeatureGenerator

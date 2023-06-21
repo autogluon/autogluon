@@ -26,6 +26,7 @@ class RenameFeatureGenerator(AbstractFeatureGenerator):
     **kwargs :
         Refer to :class:`AbstractFeatureGenerator` documentation for details on valid key word arguments.
     """
+
     def __init__(self, name_prefix=None, name_suffix=None, inplace=False, **kwargs):
         super().__init__(**kwargs)
         self._name_prefix = name_prefix
@@ -69,6 +70,6 @@ class RenameFeatureGenerator(AbstractFeatureGenerator):
 
     def _more_tags(self):
         return {
-            'feature_interactions': False,
-            'allow_post_generators': False,  # TODO: This might not be necessary anymore
+            "feature_interactions": False,
+            "allow_post_generators": False,  # TODO: This might not be necessary anymore
         }
