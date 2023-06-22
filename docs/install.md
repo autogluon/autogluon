@@ -128,12 +128,12 @@ AutoGluon requires Python version 3.8, 3.9, or 3.10 and is available on Linux, M
   :::::{tab} Conda
   
     ::::{tab} CPU
-    ```{include} install-windows-conda.md
+    ```{include} install-conda-full.md
     ```
     ::::
     
     ::::{tab} GPU
-    ```{include} install-windows-conda.md
+    ```{include} install-windows-conda-gpu.md
     ```
     ::::
   
