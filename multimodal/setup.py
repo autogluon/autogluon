@@ -34,8 +34,7 @@ install_requires = [
     "accelerate>=0.9,<0.17",
     "timm>=0.9.2,<0.10.0",
     "torch>=1.11,<2.1",
-    "torchvision>=0.12.0,<0.16",
-    "fairscale>=0.4.5,<0.4.14",
+    "torchvision>=0.12.0,<0.16.0",
     "scikit-image>=0.19.1,<0.21.0",
     "pytorch-lightning>=2.0.0,<2.1",
     "text-unidecode>=1.3,<1.4",
@@ -55,22 +54,30 @@ install_requires = [
     "jinja2>=3.0.3,<3.2",
     "tensorboard>=2.9,<3",
     "pytesseract>=0.3.9,<0.3.11",
-    "PyMuPDF<=1.21.1",
 ]
 
 install_requires = ag.get_dependency_version_ranges(install_requires)
 
+tests_require = [
+    "black>=22.3,<23.0",
+    "isort>=5.10",
+    "datasets>=2.13.0,<2.14.0",
+    "onnx>=1.14.0,<1.15.0",
+    "onnxruntime>=1.15.0,<1.16.0;platform_system=='Darwin'",
+    "onnxruntime-gpu>=1.15.0,<1.16.0;platform_system!='Darwin'",
+    "tensorrt>=8.6.1,<8.7.0;platform_system=='Linux'",
+]
+
 extras_require = {
-    "tests": [
-        "black>=22.3,<23.0",
-        "isort>=5.10",
-        "datasets>=2.13.0,<2.14.0",
-        "onnx>=1.14.0,<1.15.0",
-        "onnxruntime>=1.15.0,<1.16.0;platform_system=='Darwin'",
-        "onnxruntime-gpu>=1.15.0,<1.16.0;platform_system!='Darwin'",
-        "tensorrt>=8.6.1,<8.7.0;platform_system=='Linux'",
+    "PyMuPDF": [
+        "PyMuPDF<=1.21.1",
     ]
 }
+
+for test_package in ["PyMuPDF"]:
+    tests_require += extras_require[test_package]
+
+extras_require["tests"] = tests_require
 
 
 if __name__ == "__main__":

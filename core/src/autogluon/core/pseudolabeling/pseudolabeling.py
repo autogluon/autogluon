@@ -2,6 +2,7 @@ import logging
 
 import numpy as np
 import pandas as pd
+
 from autogluon.core.constants import PROBLEM_TYPES_CLASSIFICATION
 
 logger = logging.getLogger(__name__)
@@ -34,7 +35,7 @@ def sample_bins_uniformly(y_pred_proba: pd.DataFrame, df_indexes):
     if len(class_keys) < 1:
         return test_pseudo_indices
 
-    logging.log(15, f'Taking {min_count} rows from the following classes: {class_keys}')
+    logging.log(15, f"Taking {min_count} rows from the following classes: {class_keys}")
 
     new_test_pseudo_indices = None
     for k in class_keys:
@@ -51,9 +52,9 @@ def sample_bins_uniformly(y_pred_proba: pd.DataFrame, df_indexes):
     return test_pseudo_indices
 
 
-def filter_pseudo(y_pred_proba_og, problem_type,
-                  min_proportion_prob: float = 0.05, max_proportion_prob: float = 0.6,
-                  threshold: float = 0.95, proportion_sample: float = 0.3):
+def filter_pseudo(
+    y_pred_proba_og, problem_type, min_proportion_prob: float = 0.05, max_proportion_prob: float = 0.6, threshold: float = 0.95, proportion_sample: float = 0.3
+):
     """
     Takes in the predicted probabilities of the model (y_pred_proba_og) and chooses the indices that meet
     a criteria to incorporate into training data. Criteria is determined by problem_type.
@@ -95,7 +96,7 @@ def filter_pseudo(y_pred_proba_og, problem_type,
                 num_rows_threshold = max(np.ceil(min_proportion_prob * num_rows), 1)
             curr_threshold = y_pred_proba_max.sort_values(ascending=False).iloc[int(num_rows_threshold) - 1]
 
-        test_pseudo_indices = (y_pred_proba_max >= curr_threshold)
+        test_pseudo_indices = y_pred_proba_max >= curr_threshold
         test_pseudo_indices = sample_bins_uniformly(y_pred_proba=y_pred_proba_og, df_indexes=test_pseudo_indices)
     else:
         test_pseudo_indices = pd.Series(data=False, index=y_pred_proba_og.index)
@@ -131,21 +132,18 @@ def filter_ensemble_pseudo(predictor, unlabeled_data: pd.DataFrame, num_models: 
     num_models = len(leaderboard)
 
     if num_models < 2:
-        raise Exception('Ensemble pseudo labeling was enabled, but only one model was trained')
+        raise Exception("Ensemble pseudo labeling was enabled, but only one model was trained")
 
     if num_models != num_models:
-        logging.warning(f'Ensemble pseudo labeling expected {original_k}, but only {num_models} fit.')
+        logging.warning(f"Ensemble pseudo labeling expected {original_k}, but only {num_models} fit.")
 
     if predictor.problem_type in PROBLEM_TYPES_CLASSIFICATION:
-        return filter_ensemble_classification(predictor=predictor, unlabeled_data=unlabeled_data,
-                                              leaderboard=leaderboard, num_models=num_models)
+        return filter_ensemble_classification(predictor=predictor, unlabeled_data=unlabeled_data, leaderboard=leaderboard, num_models=num_models)
     else:
-        return filter_pseudo_std_regression(predictor=predictor, unlabeled_data=unlabeled_data,
-                                            leaderboard=leaderboard, num_models=num_models)
+        return filter_pseudo_std_regression(predictor=predictor, unlabeled_data=unlabeled_data, leaderboard=leaderboard, num_models=num_models)
 
 
-def filter_pseudo_std_regression(predictor, unlabeled_data: pd.DataFrame, num_models, leaderboard,
-                                 lower_bound: float = -0.25, upper_bound: float = 0.25):
+def filter_pseudo_std_regression(predictor, unlabeled_data: pd.DataFrame, num_models, leaderboard, lower_bound: float = -0.25, upper_bound: float = 0.25):
     """
     Predicts on unlabeled_data using the top num_models. Then gets standard deviation of each
     row's predictions across the top num_models and the standard deviation across all rows of standard
@@ -168,7 +166,7 @@ def filter_pseudo_std_regression(predictor, unlabeled_data: pd.DataFrame, num_mo
     --------
     pd.Series of indices that met pseudo labeling requirements
     """
-    top_k_models_list = leaderboard.head(num_models)['model']
+    top_k_models_list = leaderboard.head(num_models)["model"]
     top_k_preds = None
 
     for model in top_k_models_list:
@@ -192,15 +190,14 @@ def filter_pseudo_std_regression(predictor, unlabeled_data: pd.DataFrame, num_mo
     return df_filtered[df_filtered], top_k_avg_preds
 
 
-def filter_ensemble_classification(predictor, unlabeled_data: pd.DataFrame, leaderboard,
-                                   num_models, threshold: float = 0.95):
+def filter_ensemble_classification(predictor, unlabeled_data: pd.DataFrame, leaderboard, num_models, threshold: float = 0.95):
     """
     Calculates predictive probabilities of unlabeled data by predicting with top num_models
     then averages pre-row over predictions from top num_models and selects rows where confidence
     (predicted probability of the most likely class) is above threshold. Then samples minimum
     bin count from all bins, where bins are rows of averaged predictions with the same peak
     predicted probability class.
-    
+
     Parameters:
     -----------
     predictor: Fitted TabularPredictor
@@ -214,7 +211,7 @@ def filter_ensemble_classification(predictor, unlabeled_data: pd.DataFrame, lead
     --------
     pd.Series of indices that met pseudo labeling requirements
     """
-    top_k_model_names = leaderboard.head(num_models)['model']
+    top_k_model_names = leaderboard.head(num_models)["model"]
 
     y_pred_proba_ensemble = None
     for model_name in top_k_model_names:
@@ -231,7 +228,7 @@ def filter_ensemble_classification(predictor, unlabeled_data: pd.DataFrame, lead
     # uniform across top k?
     y_pred_proba_ensemble /= num_models
     y_max_prob = y_pred_proba_ensemble.max(axis=1)
-    pseudo_indexes = (y_max_prob >= threshold)
+    pseudo_indexes = y_max_prob >= threshold
     y_pred_ensemble = y_pred_proba_ensemble.idxmax(axis=1)
 
     test_pseudo_indices = sample_bins_uniformly(y_pred_proba=y_pred_proba_ensemble, df_indexes=pseudo_indexes)

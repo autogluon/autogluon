@@ -1,8 +1,7 @@
 import logging
-
 from typing import Optional
 
-_logger_ag = logging.getLogger('autogluon')  # return autogluon root logger
+_logger_ag = logging.getLogger("autogluon")  # return autogluon root logger
 
 
 class DuplicateFilter(object):
@@ -19,6 +18,7 @@ class DuplicateFilter(object):
             logger.info('abc') # will only log once now
         dup_filter.clear_filter_targets() # nothing filtered anymore
     """
+
     def __init__(self, filter_targets=[]):
         self.msgs = set()
         self.filter_targets = set(filter_targets)
@@ -41,7 +41,7 @@ class DuplicateFilter(object):
 
 
 def verbosity2loglevel(verbosity):
-    """ Translates verbosity to logging level. Suppresses warnings if verbosity = 0. """
+    """Translates verbosity to logging level. Suppresses warnings if verbosity = 0."""
     if verbosity <= 0:  # only errors
         # print("Caution: all warnings suppressed")
         log_level = 40
@@ -65,12 +65,12 @@ def set_logger_verbosity(verbosity: int, logger=None):
     elif verbosity > 4:
         verbosity = 4
     logger.setLevel(verbosity2loglevel(verbosity))
-    
+
 
 def add_log_to_file(file_path: str, logger: Optional[logging.Logger] = None):
     """
     Add a FileHandler to the logger so that it can log to a file
-    
+
     Parameters
     ----------
     file_path: str
@@ -91,7 +91,7 @@ def _check_if_kaggle() -> bool:
     """
     root_logger = logging.getLogger()
     for handler in root_logger.root.handlers[:]:
-        if hasattr(handler, 'baseFilename') and (handler.baseFilename == '/tmp/kaggle.log'):  # type: ignore
+        if hasattr(handler, "baseFilename") and (handler.baseFilename == "/tmp/kaggle.log"):  # type: ignore
             return True
     return False
 
@@ -103,7 +103,7 @@ def _add_stream_handler():
     # This function is supposed to be called before any logging from autogluon happens
     if not any(isinstance(h, logging.StreamHandler) for h in _logger_ag.handlers):
         stream_handler = logging.StreamHandler()
-        formatter = logging.Formatter('%(message)s')
+        formatter = logging.Formatter("%(message)s")
         stream_handler.setFormatter(formatter)
         _logger_ag.addHandler(stream_handler)
         _logger_ag.propagate = False
@@ -142,13 +142,13 @@ def convert_time_in_s_to_log_friendly(time_in_sec: float, min_value: float = 0.0
 
     """
     values = [
-        ('s', 1),
-        ('ms', 1e3),
-        ('μs', 1e6),
-        ('ns', 1e9),
+        ("s", 1),
+        ("ms", 1e3),
+        ("μs", 1e6),
+        ("ns", 1e9),
     ]
     time_adjusted = time_in_sec
-    time_unit = 's'
+    time_unit = "s"
     for time_unit, time_factor in values:
         time_adjusted = time_in_sec * time_factor
         if time_adjusted >= min_value:

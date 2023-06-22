@@ -35,10 +35,11 @@ def load(path: str) -> str:
     is_s3_path = s3_utils.is_s3_url(path)
     if is_s3_path:
         import boto3
+
         bucket, key = s3_utils.s3_path_to_bucket_prefix(path)
-        s3_client = boto3.client('s3')
+        s3_client = boto3.client("s3")
         s3_object = s3_client.get_object(Bucket=bucket, Key=key)
-        data = s3_object['Body'].read().decode("utf-8")
+        data = s3_object["Body"].read().decode("utf-8")
     else:
         with open(path, "r") as f:
             data = f.read()

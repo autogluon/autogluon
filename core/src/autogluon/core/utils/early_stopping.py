@@ -1,8 +1,8 @@
-
 class AbstractES:
     """
     Abstract early stopping class
     """
+
     def update(self, cur_round, is_best=False) -> bool:
         raise NotImplementedError
 
@@ -19,6 +19,7 @@ class SimpleES(AbstractES):
     patience : int, default 10
         If no improvement occurs in `patience` rounds or greater, self.early_stop will return True.
     """
+
     def __init__(self, patience=10):
         self.patience = patience
         self.best_round = 0
@@ -71,6 +72,7 @@ class AdaptiveES(AbstractES):
         patience = min(self.max_patience, (max(self.min_patience, round(self.best_round * self.adaptive_rate + self.adaptive_offset))))
         Effectively, patience = self.best_round * self.adaptive_rate + self.adaptive_offset, bound by min_patience and max_patience
     """
+
     def __init__(self, adaptive_rate=0.3, adaptive_offset=10, min_patience=10, max_patience=10000):
         self.adaptive_rate = adaptive_rate
         self.adaptive_offset = adaptive_offset
@@ -107,11 +109,11 @@ class AdaptiveES(AbstractES):
                     self.min_patience,
                     round(best_round * self.adaptive_rate + self.adaptive_offset),
                 )
-            )
+            ),
         )
 
 
 ES_CLASS_MAP = {
-    'simple': SimpleES,
-    'adaptive': AdaptiveES,
+    "simple": SimpleES,
+    "adaptive": AdaptiveES,
 }

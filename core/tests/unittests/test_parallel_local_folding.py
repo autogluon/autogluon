@@ -1,22 +1,22 @@
-import time
 import math
+import time
+
 import numpy as np
 import pandas as pd
 
 from autogluon.common import space
-
-from autogluon.core.models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
-from autogluon.core.models.ensemble.fold_fitting_strategy import ParallelLocalFoldFittingStrategy
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.models import AbstractModel
+from autogluon.core.models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
+from autogluon.core.models.ensemble.fold_fitting_strategy import ParallelLocalFoldFittingStrategy
 from autogluon.core.searcher import LocalRandomSearcher
 
 
 def _prepare_data():
     # prepare an all numeric data so that we don't need to clean labels and features
     data = [[1, 10], [2, 20], [3, 30]]
-    df = pd.DataFrame(data, columns=['Number', 'Age'])
-    label = 'Age'
+    df = pd.DataFrame(data, columns=["Number", "Age"])
+    label = "Age"
     X = df.drop(columns=[label])
     y = df[label]
     return X, y
@@ -41,8 +41,8 @@ def _construct_dummy_fold_strategy(num_jobs, time_limit=None, num_folds_parallel
         oof_pred_proba=np.array([]),
         oof_pred_model_repeats=np.array([]),
         save_folds=True,
-        num_cpus = ResourceManager.get_cpu_count(),
-        num_gpus = ResourceManager.get_gpu_count_all(),
+        num_cpus=ResourceManager.get_cpu_count(),
+        num_gpus=ResourceManager.get_gpu_count_all(),
         num_jobs=num_jobs,
         num_folds_parallel=num_folds_parallel,
         time_limit_fold_ratio=1,
@@ -61,8 +61,8 @@ def _test_resource_allocation_and_time_limit(num_jobs, num_folds_parallel, time_
     time_elapsed = time.time() - time_start
     time_remaining = time_limit - time_elapsed
     time_limit_fold = fold_fitting_strategy._get_fold_time_limit()
-    num_cpus_per_job = resources.get('num_cpus', 0)
-    num_gpus_per_job = resources.get('num_gpus', 0)
+    num_cpus_per_job = resources.get("num_cpus", 0)
+    num_gpus_per_job = resources.get("num_gpus", 0)
     assert batches >= 1
     if batches > 1:
         assert num_jobs <= num_parallel_jobs * batches <= (num_jobs + num_parallel_jobs)

@@ -1,8 +1,8 @@
 from typing import Dict, List
 
-from .constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE
+from .constants import BINARY, MULTICLASS, QUANTILE, REGRESSION, SOFTCLASS
 
-__all__ = ['problem_type_info']
+__all__ = ["problem_type_info"]
 
 
 # Note to developers: This is a free-form class. If you need additional parameters, add them.
@@ -22,10 +22,8 @@ class ProblemType:
             `binary`, `multiclass`, and `softclass` are considered classification problem types.
             `regression` and `quantile` are not considered classification problem types.
     """
-    def __init__(self,
-                 can_predict: bool,
-                 can_predict_proba: bool,
-                 is_classification: bool):
+
+    def __init__(self, can_predict: bool, can_predict_proba: bool, is_classification: bool):
         self.can_predict = can_predict
         self.can_predict_proba = can_predict_proba
         self.is_classification = is_classification
@@ -33,6 +31,7 @@ class ProblemType:
 
 class ProblemTypeInfo:
     """Class that stores all problem_type information, and can vend this information via the provided methods."""
+
     def __init__(self, problem_type_dict: Dict[str, ProblemType]):
         self.problem_type_dict = problem_type_dict
 

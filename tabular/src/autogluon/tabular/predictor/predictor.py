@@ -2380,7 +2380,7 @@ class TabularPredictor:
                 raise ValueError(f'Unknown compiler_configs preset: "{compiler_configs}"')
         self._trainer.compile_models(model_names=models, with_ancestors=with_ancestors, compiler_configs=compiler_configs)
 
-    def persist_models(self, models='best', with_ancestors=True, max_memory=0.1) -> list:
+    def persist_models(self, models='best', with_ancestors=True, max_memory=0.4) -> list:
         """
         Persist models in memory for reduced inference latency. This is particularly important if the models are being used for online-inference where low latency is critical.
         If models are not persisted in memory, they are loaded from disk every time they are asked to make predictions.
@@ -2396,7 +2396,7 @@ class TabularPredictor:
             If True, all ancestor models of the provided models will also be persisted.
             If False, stacker models will not have the models they depend on persisted unless those models were specified in `models`. This will slow down inference as the ancestor models will still need to be loaded from disk for each predict call.
             Only relevant for stacker models.
-        max_memory : float, default = 0.1
+        max_memory : float, default = 0.4
             Proportion of total available memory to allow for the persisted models to use.
             If the models' summed memory usage requires a larger proportion of memory than max_memory, they are not persisted. In this case, the output will be an empty list.
             If None, then models are persisted regardless of estimated memory usage. This can cause out-of-memory errors.

@@ -1,7 +1,8 @@
 import logging
+
 from pandas import DataFrame
 
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE
+from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION
 
 logger = logging.getLogger(__name__)
 
@@ -62,10 +63,14 @@ class CleanerMulticlass(Cleaner):
         sum_after = sum(class_counts_valid)
         percent = sum_after / sum_prior
         if len(valid_classes) < len(class_counts):
-            logger.log(25, 'Warning: Some classes in the training set have fewer than %s examples. AutoGluon will only keep %s out of %s classes for training and will not try to predict the rare classes. '
-                           'To keep more classes, increase the number of datapoints from these rare classes in the training data or reduce label_count_threshold.' % (threshold, len(valid_classes), len(class_counts)))
+            logger.log(
+                25,
+                "Warning: Some classes in the training set have fewer than %s examples. AutoGluon will only keep %s out of %s classes for training and will not try to predict the rare classes. "
+                "To keep more classes, increase the number of datapoints from these rare classes in the training data or reduce label_count_threshold."
+                % (threshold, len(valid_classes), len(class_counts)),
+            )
         if percent < 1.0:
-            logger.log(25, 'Fraction of data from classes with at least %s examples that will be kept for training models: %s' % (threshold, percent))
+            logger.log(25, "Fraction of data from classes with at least %s examples that will be kept for training models: %s" % (threshold, percent))
         return valid_classes
 
     @staticmethod

@@ -8,9 +8,7 @@ class ModelFilter:
     """Class to filter models given user requirements"""
 
     @staticmethod
-    def include_models(
-        models: Union[Dict[str, Any], List[str]], included_model_types: List[str]
-    ) -> Union[Dict[str, Any], List[str]]:
+    def include_models(models: Union[Dict[str, Any], List[str]], included_model_types: List[str]) -> Union[Dict[str, Any], List[str]]:
         """
         Only include models specified in `included_model_types`, other models will be removed
         If model specified in `included_model_types` doesn't present in `models`, will warn users and ignore
@@ -36,15 +34,11 @@ class ModelFilter:
         if included_model_types is not None:
             logger.log(20, f"Included models: {list(included_model_types)} (Specified by `included_model_types`, all other model types will be skipped)")
         if len(missing_models) > 0:
-            logger.warning(
-                f"\tThe models types {list(missing_models)} are not present in the model list specified by the user and will be ignored:"
-            )
+            logger.warning(f"\tThe models types {list(missing_models)} are not present in the model list specified by the user and will be ignored:")
         return included_models
 
     @staticmethod
-    def exclude_models(
-        models: Union[Dict[str, Any], List[str]], excluded_model_types: List[str]
-    ) -> Union[Dict[str, Any], List[str]]:
+    def exclude_models(models: Union[Dict[str, Any], List[str]], excluded_model_types: List[str]) -> Union[Dict[str, Any], List[str]]:
         """
         Exclude models from the current dictionary.
         All models specified in `excluded_model_types` will be removed
@@ -97,9 +91,7 @@ class ModelFilter:
             Updated dictionary or list with correct models
         """
         if included_model_types is not None and excluded_model_types is not None:
-            logger.warning(
-                "Both `included_model_types` and `excluded_model_types` are specified. Will use `included_model_types` only"
-            )
+            logger.warning("Both `included_model_types` and `excluded_model_types` are specified. Will use `included_model_types` only")
             excluded_model_types = None
         if included_model_types is not None:
             return ModelFilter.include_models(models=models, included_model_types=included_model_types)

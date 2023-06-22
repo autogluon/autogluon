@@ -1,7 +1,6 @@
-
 _DEFAULT_TAGS = {
     # Whether the model can produce out-of-fold (or similar) predictions of the training data without being significantly overfit.
-    'valid_oof': False,
+    "valid_oof": False,
     # Whether the model can be refit using the combined train and val data as training and no validation data without issue.
     #  TL;DR: Keep value as False unless you know what you are doing. This is advanced functionality.
     #  If False, when calling predictor.refit_full(), this model will simply be duplicated (if non-bag) or will have the first fold model duplicated (if bag).
@@ -20,12 +19,12 @@ _DEFAULT_TAGS = {
     #  implement a new parameter `final_epoch=10` that forces the model to stop at `final_epoch` (while maintaining the same LR schedule).
     #  This can get very complex to implement correctly for refit_full.
     #  It is recommended in these scenarios to set `can_refit_full` to False until a correct implementation is added.
-    'can_refit_full': False,
+    "can_refit_full": False,
 }
 
 
 _DEFAULT_CLASS_TAGS = {
     # Whether the model can handle raw text input features.
     #  Used for informing the global feature preprocessor on if it should keep raw text features.
-    'handles_text': False,
+    "handles_text": False,
 }

@@ -3,7 +3,7 @@ import platform
 import re
 import sys
 from datetime import datetime
-from importlib.metadata import version, distribution
+from importlib.metadata import distribution, version
 
 import autogluon
 from autogluon.common.utils.nvutil import cudaInit, cudaSystemGetNVMLVersion
@@ -13,9 +13,9 @@ from autogluon.common.utils.resource_utils import ResourceManager
 def _get_autogluon_versions():
     """Retrieve version of all autogluon subpackages and its dependencies"""
     versions = dict()
-    for pkg in list(pkgutil.iter_modules(autogluon.__path__, autogluon.__name__ + '.')):
+    for pkg in list(pkgutil.iter_modules(autogluon.__path__, autogluon.__name__ + ".")):
         # The following packages will be recognized as a submodule by pkgutil -exclude them.
-        if pkg.name in ['autogluon.version', 'autogluon.setup', 'autogluon._internal_']:
+        if pkg.name in ["autogluon.version", "autogluon.setup", "autogluon._internal_"]:
             continue
         try:
             versions[pkg.name] = version(pkg.name)
@@ -34,9 +34,9 @@ def _get_dependency_versions(package):
     # Get all requires for the package
     dependencies = distribution(package).requires
     # Filter-out test dependencies
-    dependencies = [req for req in dependencies if not bool(re.search('extra.*test', req))]
+    dependencies = [req for req in dependencies if not bool(re.search("extra.*test", req))]
     # keep only package name
-    dependencies = [re.findall('[a-zA-Z0-9_\\-]+', req)[0].strip() for req in dependencies]
+    dependencies = [re.findall("[a-zA-Z0-9_\\-]+", req)[0].strip() for req in dependencies]
     versions = dict()
     for dependency in dependencies:
         try:
@@ -57,20 +57,20 @@ def _get_sys_info():
             cuda_version = None
 
     return {
-        'date': datetime.date(datetime.now()),
-        'time': datetime.time(datetime.now()),
-        'python': '.'.join(str(i) for i in sys.version_info),
-        'OS': uname.system,
-        'OS-release': uname.release,
-        'Version': uname.version,
-        'machine': uname.machine,
-        'processor': uname.processor,
-        'num_cores': ResourceManager.get_cpu_count(),
-        'cpu_ram_mb': ResourceManager.get_memory_size(),
-        'cuda version': cuda_version,
-        'num_gpus': ResourceManager.get_gpu_count_all(),
-        'gpu_ram_mb': ResourceManager.get_gpu_free_memory(),
-        'avail_disk_size_mb': ResourceManager.get_available_disk_size(),
+        "date": datetime.date(datetime.now()),
+        "time": datetime.time(datetime.now()),
+        "python": ".".join(str(i) for i in sys.version_info),
+        "OS": uname.system,
+        "OS-release": uname.release,
+        "Version": uname.version,
+        "machine": uname.machine,
+        "processor": uname.processor,
+        "num_cores": ResourceManager.get_cpu_count(),
+        "cpu_ram_mb": ResourceManager.get_memory_size(),
+        "cuda version": cuda_version,
+        "num_gpus": ResourceManager.get_gpu_count_all(),
+        "gpu_ram_mb": ResourceManager.get_gpu_free_memory(),
+        "avail_disk_size_mb": ResourceManager.get_available_disk_size(),
     }
 
 

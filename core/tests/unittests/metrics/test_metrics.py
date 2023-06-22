@@ -4,9 +4,8 @@ import numpy as np
 import pytest
 import sklearn
 
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE
+from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION
 from autogluon.core.metrics import METRICS, Scorer, rmse_func
-
 
 BINARY_METRICS = list(METRICS[BINARY].keys())
 MULTICLASS_METRICS = list(METRICS[MULTICLASS].keys())
@@ -82,17 +81,21 @@ EXPECTED_QUANTILE_METRICS = {
 }
 
 
-@pytest.mark.parametrize("metrics,expected_metrics_and_aliases", [
-    [METRICS[BINARY], EXPECTED_BINARY_METRICS],
-    [METRICS[MULTICLASS], EXPECTED_MULTICLASS_METRICS],
-    [METRICS[REGRESSION], EXPECTED_REGRESSION_METRICS],
-    [METRICS[QUANTILE], EXPECTED_QUANTILE_METRICS],
-], ids=[
-    BINARY,
-    MULTICLASS,
-    REGRESSION,
-    QUANTILE,
-])  # noqa
+@pytest.mark.parametrize(
+    "metrics,expected_metrics_and_aliases",
+    [
+        [METRICS[BINARY], EXPECTED_BINARY_METRICS],
+        [METRICS[MULTICLASS], EXPECTED_MULTICLASS_METRICS],
+        [METRICS[REGRESSION], EXPECTED_REGRESSION_METRICS],
+        [METRICS[QUANTILE], EXPECTED_QUANTILE_METRICS],
+    ],
+    ids=[
+        BINARY,
+        MULTICLASS,
+        REGRESSION,
+        QUANTILE,
+    ],
+)  # noqa
 def test_metric_exists(metrics: dict, expected_metrics_and_aliases: set):
     """
     Ensure all expected metrics are present and no unexpected metrics are present
@@ -108,12 +111,14 @@ def test_metric_exists(metrics: dict, expected_metrics_and_aliases: set):
     if len(diff_metrics) > 0:
         missing_metrics = expected_metrics_and_aliases.difference(seen_metrics)
         if len(missing_metrics) > 0:
-            raise AssertionError(f'Missing metrics: {list(missing_metrics)}')
+            raise AssertionError(f"Missing metrics: {list(missing_metrics)}")
         else:
             unknown_metrics = seen_metrics.difference(expected_metrics_and_aliases)
-            raise AssertionError(f'Invalid metrics (If you have added a new metric, '
-                                 f'please include it in the variable `expected_metrics_and_aliases`):'
-                                 f'\n\t{list(unknown_metrics)}')
+            raise AssertionError(
+                f"Invalid metrics (If you have added a new metric, "
+                f"please include it in the variable `expected_metrics_and_aliases`):"
+                f"\n\t{list(unknown_metrics)}"
+            )
 
 
 @pytest.mark.parametrize("metric", BINARY_METRICS, ids=BINARY_METRICS)  # noqa
@@ -178,12 +183,10 @@ def _assert_imperfect_score(scorer: Scorer, abs_tol=1e-5):
     assert not isclose(score, scorer.optimum, abs_tol=abs_tol)
 
 
-@pytest.mark.parametrize("sample_weight",
-                        [None,
-                        np.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.2, 0.3])])
+@pytest.mark.parametrize("sample_weight", [None, np.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.2, 0.3])])
 def test_rmse_with_sklearn(sample_weight):
     """
-    Ensure 
+    Ensure
     (1) Without sample_weight, AutoGluon's custom rmse produces the same result as sklearn's rmse
     (2) With sample_weight, computed wrmse is as expected
     """
@@ -192,7 +195,8 @@ def test_rmse_with_sklearn(sample_weight):
     expected_rmse = sklearn.metrics.mean_squared_error(y_true, y_pred, squared=False, sample_weight=sample_weight)
 
     kwargs = {"y_true": y_true, "y_pred": y_pred}
-    if sample_weight is not None: kwargs["sample_weight"] = sample_weight
+    if sample_weight is not None:
+        kwargs["sample_weight"] = sample_weight
     computed_rmse = rmse_func(**kwargs)
 
     assert np.isclose(computed_rmse, expected_rmse)

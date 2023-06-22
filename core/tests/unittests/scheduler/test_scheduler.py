@@ -1,9 +1,9 @@
-import numpy as np
 import pickle
 import time
 
-from autogluon.common import space
+import numpy as np
 
+from autogluon.common import space
 from autogluon.core.scheduler import LocalSequentialScheduler
 
 
@@ -15,13 +15,11 @@ def test_local_sequential_scheduler():
     )
 
     def train_fn(args, reporter):
-        for e in range(args['epochs']):
+        for e in range(args["epochs"]):
             dummy_reward = 1 - np.power(1.8, -np.random.uniform(e, 2 * e))
             reporter(epoch=e + 1, reward=dummy_reward, lr=args.lr, wd=args.wd)
 
-    scheduler = LocalSequentialScheduler(train_fn,
-                                         search_space=search_space,
-                                         num_trials=10)
+    scheduler = LocalSequentialScheduler(train_fn, search_space=search_space, num_trials=10)
     scheduler.run()
     scheduler.join_jobs()
     best_config = scheduler.get_best_config()
@@ -31,7 +29,7 @@ def test_local_sequential_scheduler():
 
 def test_timeout_scheduler():
     search_space = dict(
-        lr=space.Real(1E-5, 1E-3),
+        lr=space.Real(1e-5, 1e-3),
     )
 
     def train_fn(args, reporter):
@@ -39,11 +37,7 @@ def test_timeout_scheduler():
         time.sleep(0.01)
         reporter(reward=time.time() - start_tick, time_attr=0)
 
-    scheduler = LocalSequentialScheduler(train_fn,
-                                         search_space=search_space,
-                                         num_trials=7,
-                                         time_attr='time_attr',
-                                         time_out=0.025)
+    scheduler = LocalSequentialScheduler(train_fn, search_space=search_space, num_trials=7, time_attr="time_attr", time_out=0.025)
     scheduler.run()
     scheduler.join_jobs()
     assert len(scheduler.config_history) <= 2

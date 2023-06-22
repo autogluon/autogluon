@@ -8,19 +8,13 @@ logger = logging.getLogger(__name__)
 
 
 _scheduler_presets = {
-    'auto': {'scheduler': 'local', 'searcher': 'local_random'},
-    'local_random': {'scheduler': 'local', 'searcher': 'local_random'},
-    'random': {'scheduler': 'local', 'searcher': 'random'},
+    "auto": {"scheduler": "local", "searcher": "local_random"},
+    "local_random": {"scheduler": "local", "searcher": "local_random"},
+    "random": {"scheduler": "local", "searcher": "random"},
 }
 
 
-def scheduler_factory(
-        hyperparameter_tune_kwargs,
-        time_out: float = None,
-        num_trials: int = None,
-        nthreads_per_trial='all',
-        ngpus_per_trial='all',
-        **kwargs):
+def scheduler_factory(hyperparameter_tune_kwargs, time_out: float = None, num_trials: int = None, nthreads_per_trial="all", ngpus_per_trial="all", **kwargs):
     """
     Constructs a scheduler via lazy initialization based on the input hyperparameter_tune_kwargs.
     The output will contain the scheduler class and init arguments except for the `train_fn` argument, which must be specified downstream.
@@ -72,9 +66,9 @@ def scheduler_factory(
         hyperparameter_tune_kwargs = get_hyperparameter_tune_kwargs_preset(hyperparameter_tune_kwargs)
     if not isinstance(hyperparameter_tune_kwargs, dict):
         raise ValueError(f"hyperparameter_tune_kwargs must be of type str or dict, but is type: {type(hyperparameter_tune_kwargs)}")
-    if 'scheduler' not in hyperparameter_tune_kwargs:
+    if "scheduler" not in hyperparameter_tune_kwargs:
         raise ValueError(f"Required key 'scheduler' is not present in hyperparameter_tune_kwargs: {hyperparameter_tune_kwargs}")
-    if 'searcher' not in hyperparameter_tune_kwargs:
+    if "searcher" not in hyperparameter_tune_kwargs:
         raise ValueError(f"Required key 'searcher' is not present in hyperparameter_tune_kwargs: {hyperparameter_tune_kwargs}")
     if num_trials is None and time_out is not None:
         num_trials = 1000
@@ -88,31 +82,32 @@ def scheduler_factory(
         **kwargs,
     )
 
-    scheduler_cls = hyperparameter_tune_kwargs.get('scheduler', 'unknown')
+    scheduler_cls = hyperparameter_tune_kwargs.get("scheduler", "unknown")
     if isinstance(scheduler_cls, str):
         scheduler_cls = get_scheduler_from_preset(scheduler_cls)
     if not inspect.isclass(scheduler_cls):
-        raise ValueError(f'scheduler_cls must be a class, but was instead: {scheduler_cls}')
+        raise ValueError(f"scheduler_cls must be a class, but was instead: {scheduler_cls}")
 
-    if scheduler_params['time_out'] is None:
-        scheduler_params.pop('time_out', None)
+    if scheduler_params["time_out"] is None:
+        scheduler_params.pop("time_out", None)
     return scheduler_cls, scheduler_params
 
 
 def get_scheduler_from_preset(scheduler_cls):
     scheduler_cls = scheduler_cls.lower()
     if scheduler_cls not in schedulers.keys():
-        raise ValueError(f"Required key 'scheduler' in hyperparameter_tune_kwargs must be one of the "
-                         f"values {schedulers.keys()}, but was instead: {scheduler_cls}")
+        raise ValueError(
+            f"Required key 'scheduler' in hyperparameter_tune_kwargs must be one of the " f"values {schedulers.keys()}, but was instead: {scheduler_cls}"
+        )
     scheduler_cls = schedulers.get(scheduler_cls)
     return scheduler_cls
 
 
 def get_hyperparameter_tune_kwargs_preset(preset: str):
     # TODO: re-enable bayesopt after it's been implemented
-    if preset == 'bayesopt':
-        logger.warning(f'Bayesopt hyperparameter tuning is currently disabled. Will use random hyperparameter tuning instead.')
-        preset = 'random'
+    if preset == "bayesopt":
+        logger.warning(f"Bayesopt hyperparameter tuning is currently disabled. Will use random hyperparameter tuning instead.")
+        preset = "random"
     if preset not in _scheduler_presets:
         raise ValueError(f'Invalid hyperparameter_tune_kwargs preset value "{preset}". Valid presets: {list(_scheduler_presets.keys())}')
     return _scheduler_presets[preset].copy()

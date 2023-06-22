@@ -1,7 +1,6 @@
 import logging
 import os
 import pathlib
-
 from typing import List, Optional, Union
 
 logger = logging.getLogger(__name__)
@@ -9,9 +8,10 @@ logger = logging.getLogger(__name__)
 
 def list_bucket_s3(bucket):
     import boto3
-    logger.log(15, 'Listing s3 bucket: ' + str(bucket))
 
-    s3bucket = boto3.resource('s3')
+    logger.log(15, "Listing s3 bucket: " + str(bucket))
+
+    s3bucket = boto3.resource("s3")
     my_bucket = s3bucket.Bucket(bucket)
     files = []
     for object in my_bucket.objects.all():
@@ -22,10 +22,11 @@ def list_bucket_s3(bucket):
 
 def download(input_bucket, input_prefix, local_path):
     import boto3
+
     directory = os.path.dirname(local_path)
     pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
 
-    s3 = boto3.resource('s3')
+    s3 = boto3.resource("s3")
     s3.Bucket(input_bucket).download_file(input_prefix, local_path)
 
 
@@ -35,12 +36,14 @@ def download(input_bucket, input_prefix, local_path):
 # TODO: consider using a single parameter supporting wildcards or regex - this will solve all possible use cases for filtering
 #   list_bucket_prefix_suffix_contains_s3(..., exclude=['**/*.bak', '**/data/*_excl.csv'])
 # TODO: Add unit tests for non-boto3 logic
-def list_bucket_prefix_suffix_contains_s3(bucket: str,
-                                          prefix: str,
-                                          suffix: Optional[Union[str, List[str]]] = None,
-                                          exclude_suffix: Optional[Union[str, List[str]]] = None,
-                                          contains: Optional[Union[str, List[str]]] = None,
-                                          exclude_contains: Optional[Union[str, List[str]]] = None) -> List[str]:
+def list_bucket_prefix_suffix_contains_s3(
+    bucket: str,
+    prefix: str,
+    suffix: Optional[Union[str, List[str]]] = None,
+    exclude_suffix: Optional[Union[str, List[str]]] = None,
+    contains: Optional[Union[str, List[str]]] = None,
+    exclude_contains: Optional[Union[str, List[str]]] = None,
+) -> List[str]:
     """
     Returns a list of file paths within an S3 bucket that satisfies the constraints.
 
@@ -71,6 +74,7 @@ def list_bucket_prefix_suffix_contains_s3(bucket: str,
 
     """
     import boto3
+
     if exclude_suffix is None:
         exclude_suffix = []
     if exclude_contains is None:
@@ -84,7 +88,7 @@ def list_bucket_prefix_suffix_contains_s3(bucket: str,
     if exclude_contains is not None and not isinstance(exclude_contains, list):
         exclude_contains = [exclude_contains]
 
-    s3 = boto3.resource('s3')
+    s3 = boto3.resource("s3")
     my_bucket = s3.Bucket(bucket)
 
     files = []

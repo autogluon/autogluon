@@ -4,7 +4,7 @@ import sys
 sys.path = ['.', '..'] + sys.path
 
 project = 'AutoGluon'
-release = '0.8.0'
+release = '0.8.1'
 copyright = '2023, All authors. Licensed under Apache 2.0.'
 author = 'AutoGluon contributors'
 
@@ -28,7 +28,7 @@ myst_enable_extensions = ['colon_fence', 'deflist', 'dollarmath', 'html_image', 
 autosummary_generate = True
 numpydoc_show_class_members = False
 
-googleanalytics_id = "UA-96378503-20"
+googleanalytics_id = "G-6XDS99SP0C"
 
 nb_execution_mode = 'force'
 # nb_execution_raise_on_error=True
