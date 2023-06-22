@@ -1,11 +1,9 @@
-
 import logging
 import time
 
 from autogluon.common.utils.resource_utils import ResourceManager
 
 from .catboost_utils import CATBOOST_QUANTILE_PREFIX
-
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +21,7 @@ class MemoryCheckCallback:
     verbose : bool, default = False
         Whether to log information on memory status even if memory usage is low.
     """
+
     def __init__(self, period: int = 10, verbose=False):
         self.period = period
         self.init_mem_rss = ResourceManager.get_memory_rss()
@@ -36,7 +35,7 @@ class MemoryCheckCallback:
         if iteration % self._cur_period == 0:
             not_enough_memory = self.memory_check(iteration)
             if not_enough_memory:
-                logger.log(20, f'\tRan low on memory, early stopping on iteration {info.iteration}.')
+                logger.log(20, f"\tRan low on memory, early stopping on iteration {info.iteration}.")
                 return False
         return True
 
@@ -53,20 +52,21 @@ class MemoryCheckCallback:
 
         early_stop = False
         if model_size_memory_ratio > 1.0:
-            logger.warning(f'Warning: Large model size may cause OOM error if training continues')
+            logger.warning(f"Warning: Large model size may cause OOM error if training continues")
             early_stop = True
 
         if available_mb < 512:  # Less than 500 MB
-            logger.warning(f'Warning: Low available memory may cause OOM error if training continues')
+            logger.warning(f"Warning: Low available memory may cause OOM error if training continues")
             early_stop = True
 
         if early_stop:
-            logger.warning('Warning: Early stopped model prior to optimal result to avoid OOM error. '
-                           'Please increase available memory to avoid subpar model quality.')
-            logger.warning(f'Available Memory: {available_mb} MB, Estimated Model size: {estimated_model_size_mb} MB')
+            logger.warning(
+                "Warning: Early stopped model prior to optimal result to avoid OOM error. " "Please increase available memory to avoid subpar model quality."
+            )
+            logger.warning(f"Available Memory: {available_mb} MB, Estimated Model size: {estimated_model_size_mb} MB")
             return True
         elif self.verbose or (model_size_memory_ratio > 0.25):
-            logging.debug(f'Available Memory: {available_mb} MB, Estimated Model size: {estimated_model_size_mb} MB')
+            logging.debug(f"Available Memory: {available_mb} MB, Estimated Model size: {estimated_model_size_mb} MB")
 
         if model_size_memory_ratio > 0.5:
             self._cur_period = 1  # Increase rate of memory check if model gets large enough to cause OOM potentially
@@ -89,6 +89,7 @@ class TimeCheckCallback:
     time_limit : float
         The time in seconds before stopping training.
     """
+
     def __init__(self, time_start, time_limit):
         self.time_end = time_start + time_limit
         self.time_start = time_start
@@ -96,8 +97,8 @@ class TimeCheckCallback:
     def after_iteration(self, info):
         time_cur = time.time()
         time_per_iter = (time_cur - self.time_start) / info.iteration
-        if self.time_end < (time_cur + 2*time_per_iter):
-            logger.log(20, f'\tRan out of time, early stopping on iteration {info.iteration}.')
+        if self.time_end < (time_cur + 2 * time_per_iter):
+            logger.log(20, f"\tRan out of time, early stopping on iteration {info.iteration}.")
             return False
         return True
 
@@ -118,9 +119,11 @@ class EarlyStoppingCallback:
     compare_key : str, default = 'validation'
         The data to use for scoring. It is recommended to keep as default.
     """
-    def __init__(self, stopping_rounds, eval_metric, compare_key='validation'):
+
+    def __init__(self, stopping_rounds, eval_metric, compare_key="validation"):
         if isinstance(stopping_rounds, int):
             from autogluon.core.utils.early_stopping import SimpleES
+
             self.es = SimpleES(patience=stopping_rounds)
         else:
             self.es = stopping_rounds[0](**stopping_rounds[1])
@@ -130,6 +133,7 @@ class EarlyStoppingCallback:
         if isinstance(eval_metric, str):
             # FIXME: Avoid using private API! (https://github.com/autogluon/autogluon/issues/1381)
             from catboost._catboost import is_maximizable_metric
+
             is_max_optimal = is_maximizable_metric(eval_metric)
             eval_metric_name = eval_metric
         else:

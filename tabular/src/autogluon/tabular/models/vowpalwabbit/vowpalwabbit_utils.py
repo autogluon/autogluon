@@ -1,5 +1,6 @@
 import pandas as pd
-from autogluon.common.features.types import S_TEXT, R_INT, R_FLOAT, R_CATEGORY
+
+from autogluon.common.features.types import R_CATEGORY, R_FLOAT, R_INT, S_TEXT
 
 
 class VWFeaturesConverter:
@@ -8,8 +9,8 @@ class VWFeaturesConverter:
     Ref: https://github.com/VowpalWabbit/vowpal_wabbit/wiki/Input-format
     """
 
-    PIPE = '|'
-    SPACE = ' '
+    PIPE = "|"
+    SPACE = " "
 
     # TODO: Add support for different namespaces
 
@@ -26,23 +27,19 @@ class VWFeaturesConverter:
         for feature in feature_metadata:
             raw_feature, special_feature = feature_metadata[feature]
             if X_out is None:
-                X_out = self.PIPE + self.SPACE + self.__generate_namespace_based_on_ml_type(
-                    X[feature],
-                    raw_feature,
-                    special_feature,
-                    feature
-                ).astype('str') + self.SPACE
+                X_out = (
+                    self.PIPE
+                    + self.SPACE
+                    + self.__generate_namespace_based_on_ml_type(X[feature], raw_feature, special_feature, feature).astype("str")
+                    + self.SPACE
+                )
             else:
-                X_out += '' + self.SPACE + self.__generate_namespace_based_on_ml_type(
-                    X[feature],
-                    raw_feature,
-                    special_feature,
-                    feature
-                ).astype('str') + self.SPACE
+                X_out += (
+                    "" + self.SPACE + self.__generate_namespace_based_on_ml_type(X[feature], raw_feature, special_feature, feature).astype("str") + self.SPACE
+                )
         return X_out
 
-    def __generate_namespace_based_on_ml_type(self, input_series, raw_feature, special_feature,
-                                              feature_name=None):
+    def __generate_namespace_based_on_ml_type(self, input_series, raw_feature, special_feature, feature_name=None):
         """
         Based on the type of feature, preprocess/sanify these features so that it is in VW format
         Only use raw text, numeric integer, numeric decimals, and category
@@ -68,29 +65,29 @@ class VWFeaturesConverter:
 
     def __preprocess_text(self, s) -> str:
         if pd.isnull(s):
-            return ''
+            return ""
         s = " ".join(str(s).split())
         # Added split to remove tabs spaces since tab is used as separator
         text = self.__sanify(s)
         return text
 
     def __sanify(self, s) -> str:
-        '''
+        """
         The sanify is performed because : and | are reserved by vowpal wabbit for distinguishing namespaces and numeric
         data
         @param s: input string
         @returns string
-        '''
-        return str(s).replace(":", ";").replace('|', '/')
+        """
+        return str(s).replace(":", ";").replace("|", "/")
 
     def __numeric_namespace_generator(self, feature, feature_name) -> str:
         if pd.isnull(feature):
-            return ''
-        return feature_name + ':' + str(feature)
+            return ""
+        return feature_name + ":" + str(feature)
 
     def __categorical_namespace_generator(self, feature, feature_name) -> str:
         if pd.isnull(feature):
-            return ''
+            return ""
         else:
-            feature = str(feature).replace(' ', '_')
-            return feature_name + '=' + self.__sanify(feature)
+            feature = str(feature).replace(" ", "_")
+            return feature_name + "=" + self.__sanify(feature)

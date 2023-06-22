@@ -1,7 +1,7 @@
 "Implements various metrics to measure training accuracy"
+import numpy as np
 import torch
 import torch.nn as nn
-import numpy as np
 from sklearn.isotonic import IsotonicRegression
 
 
@@ -15,7 +15,7 @@ def isotonic(input_data, quantile_list):
 
 
 class HuberPinballLoss(nn.Module):
-    __name__ = 'huber_pinball_loss'
+    __name__ = "huber_pinball_loss"
 
     def __init__(self, quantile_levels, alpha=0.01):
         super(HuberPinballLoss, self).__init__()
@@ -36,13 +36,9 @@ class HuberPinballLoss(nn.Module):
         if self.alpha == 0.0:
             loss_data = torch.max(self.quantile_levels * error_data, (self.quantile_levels - 1) * error_data)
         else:
-            loss_data = torch.where(torch.abs(error_data) < self.alpha,
-                                    0.5 * error_data * error_data,
-                                    self.alpha * (torch.abs(error_data) - 0.5 * self.alpha))
+            loss_data = torch.where(torch.abs(error_data) < self.alpha, 0.5 * error_data * error_data, self.alpha * (torch.abs(error_data) - 0.5 * self.alpha))
             loss_data = loss_data / self.alpha
 
-            scale = torch.where(error_data >= 0,
-                                torch.ones_like(error_data) * self.quantile_levels,
-                                torch.ones_like(error_data) * (1 - self.quantile_levels))
+            scale = torch.where(error_data >= 0, torch.ones_like(error_data) * self.quantile_levels, torch.ones_like(error_data) * (1 - self.quantile_levels))
             loss_data *= scale
         return loss_data.mean()

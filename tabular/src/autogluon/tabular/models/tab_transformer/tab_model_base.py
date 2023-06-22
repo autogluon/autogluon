@@ -14,7 +14,9 @@ class TabNet(nn.Module):
         """
         super().__init__()
         import torch.nn as nn
+
         from .tab_transformer import TabTransformer
+
         self.embed = TabTransformer(**params)
 
         relu = nn.ReLU()
@@ -38,8 +40,7 @@ class TabNet(nn.Module):
 
 
 class TabModelBase(nn.Module):
-    def __init__(self, n_cont_features, norm_class_name, cat_feat_origin_cards, max_emb_dim,
-                 p_dropout, one_hot_embeddings, drop_whole_embeddings):
+    def __init__(self, n_cont_features, norm_class_name, cat_feat_origin_cards, max_emb_dim, p_dropout, one_hot_embeddings, drop_whole_embeddings):
         super().__init__()
         """
         Base class for all TabTransformer models
@@ -67,11 +68,12 @@ class TabModelBase(nn.Module):
         self.cat_initializers = nn.ModuleDict()
 
         from .tab_transformer_encoder import EmbeddingInitializer
+
         if isinstance(self.cat_feat_origin_cards, list):
             for col_name, card in self.cat_feat_origin_cards:
-                self.cat_initializers[col_name] = EmbeddingInitializer(card, max_emb_dim, p_dropout,
-                                                                       drop_whole_embeddings=drop_whole_embeddings,
-                                                                       one_hot=one_hot_embeddings)
+                self.cat_initializers[col_name] = EmbeddingInitializer(
+                    card, max_emb_dim, p_dropout, drop_whole_embeddings=drop_whole_embeddings, one_hot=one_hot_embeddings
+                )
             self.init_feat_dim = sum(i.emb_dim for i in self.cat_initializers.values()) + self.n_cont_features
 
     def forward(self, input):
