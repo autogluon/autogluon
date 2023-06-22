@@ -7,8 +7,8 @@ from typing import Dict, List
 
 from pandas import DataFrame, Series
 
-from autogluon.common.features.infer_types import get_type_map_raw, get_type_map_real, get_type_group_map_special
 from autogluon.common.features.feature_metadata import FeatureMetadata
+from autogluon.common.features.infer_types import get_type_group_map_special, get_type_map_raw, get_type_map_real
 from autogluon.common.savers import save_pkl
 
 from ..utils import is_useless_feature
@@ -110,6 +110,7 @@ class AbstractFeatureGenerator:
         This is only used in the print_feature_metadata_info method and is intended for introspection. It can be safely set to None to reduce memory and
         disk usage post-fit.
     """
+
     def __init__(
         self,
         features_in: list = None,
@@ -123,10 +124,10 @@ class AbstractFeatureGenerator:
         name_prefix: str = None,
         name_suffix: str = None,
         infer_features_in_args: dict = None,
-        infer_features_in_args_strategy='overwrite',
+        infer_features_in_args_strategy="overwrite",
         banned_feature_special_types: List[str] = None,
-        log_prefix='',
-        verbosity=2
+        log_prefix="",
+        verbosity=2,
     ):
         self._is_fit = False  # Whether the feature generator has been fit
         self.features_in = features_in  # Original features to use as input to feature generation
@@ -144,19 +145,19 @@ class AbstractFeatureGenerator:
         self._feature_metadata_before_post = None  # FeatureMetadata directly prior to applying self._post_generators.
         self._infer_features_in_args = self.get_default_infer_features_in_args()
         if infer_features_in_args is not None:
-            if infer_features_in_args_strategy == 'overwrite':
+            if infer_features_in_args_strategy == "overwrite":
                 self._infer_features_in_args = copy.deepcopy(infer_features_in_args)
-            elif infer_features_in_args_strategy == 'update':
+            elif infer_features_in_args_strategy == "update":
                 self._infer_features_in_args.update(infer_features_in_args)
             else:
                 raise ValueError(f"infer_features_in_args_strategy must be one of: {['overwrite', 'update']}, but was: '{infer_features_in_args_strategy}'")
         if banned_feature_special_types:
-            if 'invalid_special_types' not in self._infer_features_in_args:
-                self._infer_features_in_args['invalid_special_types'] = banned_feature_special_types
+            if "invalid_special_types" not in self._infer_features_in_args:
+                self._infer_features_in_args["invalid_special_types"] = banned_feature_special_types
             else:
                 for f in banned_feature_special_types:
-                    if f not in self._infer_features_in_args['invalid_special_types']:
-                        self._infer_features_in_args['invalid_special_types'].append(f)
+                    if f not in self._infer_features_in_args["invalid_special_types"]:
+                        self._infer_features_in_args["invalid_special_types"].append(f)
 
         if post_generators is None:
             post_generators = []
@@ -165,16 +166,20 @@ class AbstractFeatureGenerator:
         self._post_generators: list = post_generators
         if post_drop_duplicates:
             from .drop_duplicates import DropDuplicatesFeatureGenerator
+
             self._post_generators.append(DropDuplicatesFeatureGenerator(post_drop_duplicates=False))
         if name_prefix or name_suffix:
             from .rename import RenameFeatureGenerator
+
             # inplace=False required to avoid altering outer context: refer to https://github.com/autogluon/autogluon/issues/2688
             self._post_generators.append(RenameFeatureGenerator(name_prefix=name_prefix, name_suffix=name_suffix, inplace=False))
 
         if self._post_generators:
-            if not self.get_tags().get('allow_post_generators', True):
-                raise AssertionError(f'{self.__class__.__name__} is not allowed to have post_generators, '
-                                     f'but found: {[generator.__class__.__name__ for generator in self._post_generators]}')
+            if not self.get_tags().get("allow_post_generators", True):
+                raise AssertionError(
+                    f"{self.__class__.__name__} is not allowed to have post_generators, "
+                    f"but found: {[generator.__class__.__name__ for generator in self._post_generators]}"
+                )
 
         self.pre_enforce_types = pre_enforce_types
         self._pre_astype_generator = None
@@ -232,9 +237,9 @@ class AbstractFeatureGenerator:
 
         """
         start_time = time.time()
-        self._log(20, f'Fitting {self.__class__.__name__}...')
+        self._log(20, f"Fitting {self.__class__.__name__}...")
         if self._is_fit:
-            raise AssertionError(f'{self.__class__.__name__} is already fit.')
+            raise AssertionError(f"{self.__class__.__name__} is already fit.")
         self._pre_fit_validate(X=X, y=y, feature_metadata_in=feature_metadata_in, **kwargs)
 
         if self.reset_index:
@@ -264,8 +269,10 @@ class AbstractFeatureGenerator:
                 self._remove_features_in(self._useless_features_in)
         if self.pre_enforce_types:
             from .astype import AsTypeFeatureGenerator
+
             self._pre_astype_generator = AsTypeFeatureGenerator(
-                features_in=self.features_in, feature_metadata_in=self.feature_metadata_in, log_prefix=self.log_prefix + '\t')
+                features_in=self.features_in, feature_metadata_in=self.feature_metadata_in, log_prefix=self.log_prefix + "\t"
+            )
             self._pre_astype_generator.fit(X)
 
         # TODO: Add option to return feature_metadata instead to avoid data copy
@@ -276,7 +283,8 @@ class AbstractFeatureGenerator:
         self._feature_metadata_before_post = FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_family_groups_special)
         if self._post_generators:
             X_out, self.feature_metadata, self._post_generators = self._fit_generators(
-                X=X_out, y=y, feature_metadata=self._feature_metadata_before_post, generators=self._post_generators, **kwargs)
+                X=X_out, y=y, feature_metadata=self._feature_metadata_before_post, generators=self._post_generators, **kwargs
+            )
         else:
             self.feature_metadata = self._feature_metadata_before_post
         type_map_real = get_type_map_real(X_out)
@@ -314,7 +322,7 @@ class AbstractFeatureGenerator:
         X_out : DataFrame object which is the transformed version of the input data X.
         """
         if not self._is_fit:
-            raise AssertionError(f'{self.__class__.__name__} is not fit.')
+            raise AssertionError(f"{self.__class__.__name__} is not fit.")
         if self.reset_index:
             X_index = copy.deepcopy(X.index)
             # TODO: Theoretically inplace=True avoids data copy, but can lead to altering of original DataFrame outside of method context.
@@ -333,9 +341,11 @@ class AbstractFeatureGenerator:
             for col in self.features_in:
                 if col not in X.columns:
                     missing_cols.append(col)
-            raise KeyError(f'{len(missing_cols)} required columns are missing from the provided dataset to transform using {self.__class__.__name__}. '
-                           f'{len(missing_cols)} missing columns: {missing_cols} | '
-                           f'{len(list(X.columns))} available columns: {list(X.columns)}')
+            raise KeyError(
+                f"{len(missing_cols)} required columns are missing from the provided dataset to transform using {self.__class__.__name__}. "
+                f"{len(missing_cols)} missing columns: {missing_cols} | "
+                f"{len(list(X.columns))} available columns: {list(X.columns)}"
+            )
         if self._pre_astype_generator:
             X = self._pre_astype_generator.transform(X)
         X_out = self._transform(X)
@@ -416,11 +426,16 @@ class AbstractFeatureGenerator:
         if self.feature_metadata_in is None:
             self.feature_metadata_in = feature_metadata_in
         elif feature_metadata_in is not None:
-            self._log(30, '\tWarning: feature_metadata_in passed as input to fit_transform, but self.feature_metadata_in was already set. '
-                          'Ignoring feature_metadata_in.')
+            self._log(
+                30,
+                "\tWarning: feature_metadata_in passed as input to fit_transform, but self.feature_metadata_in was already set. "
+                "Ignoring feature_metadata_in.",
+            )
         if self.feature_metadata_in is None:
-            self._log(20, '\tInferring data type of each feature based on column values. Set feature_metadata_in to manually specify special '
-                          'dtypes of the features.')
+            self._log(
+                20,
+                "\tInferring data type of each feature based on column values. Set feature_metadata_in to manually specify special " "dtypes of the features.",
+            )
             self.feature_metadata_in = self._infer_feature_metadata_in(X=X)
         if self.features_in is None:
             self.features_in = self._infer_features_in(X=X)
@@ -479,7 +494,7 @@ class AbstractFeatureGenerator:
         """
         for generator in generators:
             generator.verbosity = min(self.verbosity, generator.verbosity)
-            generator.set_log_prefix(log_prefix=self.log_prefix + '\t', prepend=True)
+            generator.set_log_prefix(log_prefix=self.log_prefix + "\t", prepend=True)
             X = generator.fit_transform(X=X, y=y, feature_metadata_in=feature_metadata, **kwargs)
             feature_metadata = generator.feature_metadata
         return X, feature_metadata, generators
@@ -540,8 +555,10 @@ class AbstractFeatureGenerator:
             self.feature_metadata = self.feature_metadata.remove_features(features=features)
             self.feature_metadata_real = self.feature_metadata_real.remove_features(features=features)
             self.features_out = self.feature_metadata.get_features()
-            feature_links_chain[-1] = {feature_in: [feature_out for feature_out in features_out if feature_out not in features] for feature_in, features_out in
-                                       feature_links_chain[-1].items()}
+            feature_links_chain[-1] = {
+                feature_in: [feature_out for feature_out in features_out if feature_out not in features]
+                for feature_in, features_out in feature_links_chain[-1].items()
+            }
         self._remove_unused_features(feature_links_chain=feature_links_chain)
 
     def _remove_unused_features(self, feature_links_chain):
@@ -569,7 +586,7 @@ class AbstractFeatureGenerator:
         """
         if y is not None and isinstance(y, Series):
             if list(y.index) != list(X.index):
-                raise AssertionError(f'y.index and X.index must be equal when fitting {self.__class__.__name__}, but they differ.')
+                raise AssertionError(f"y.index and X.index must be equal when fitting {self.__class__.__name__}, but they differ.")
 
     def _post_fit_cleanup(self):
         """
@@ -587,7 +604,7 @@ class AbstractFeatureGenerator:
             for column in count_dict:
                 if count_dict[column] > 1:
                     invalid_columns.append(column)
-            raise AssertionError(f'Columns appear multiple times in X. Columns must be unique. Invalid columns: {invalid_columns}')
+            raise AssertionError(f"Columns appear multiple times in X. Columns must be unique. Invalid columns: {invalid_columns}")
 
     # TODO: Move to a generator
     @staticmethod
@@ -616,7 +633,7 @@ class AbstractFeatureGenerator:
         if verb_min is None or self.verbosity >= verb_min:
             if log_prefix is None:
                 log_prefix = self.log_prefix
-            logger.log(level, f'{log_prefix}{msg}')
+            logger.log(level, f"{log_prefix}{msg}")
 
     def is_fit(self):
         return self._is_fit
@@ -644,7 +661,7 @@ class AbstractFeatureGenerator:
     def _get_feature_links(self, features_in: List[str], features_out: List[str]) -> Dict[str, List[str]]:
         """Returns feature links ignoring all pre and post generators."""
         feature_links = {}
-        if self.get_tags().get('feature_interactions', True):
+        if self.get_tags().get("feature_interactions", True):
             for feature_in in features_in:
                 feature_links[feature_in] = features_out
         else:
@@ -695,7 +712,7 @@ class AbstractFeatureGenerator:
                 if i == 0:
                     features_in = self._feature_metadata_before_post.get_features()
                 else:
-                    features_in = self._post_generators[i-1].features_out
+                    features_in = self._post_generators[i - 1].features_out
                 features_in_list.append(features_in)
         return self._get_unused_features_generic(feature_links_chain=feature_links_chain, features_in_list=features_in_list)
 
@@ -730,8 +747,8 @@ class AbstractFeatureGenerator:
             Log level of the logging statements.
         """
         if self.fit_time:
-            self._log(log_level, f'\t{round(self.fit_time, 1)}s = Fit runtime')
-            self._log(log_level, f'\t{len(self.features_in)} features in original data used to generate {len(self.features_out)} features in processed data.')
+            self._log(log_level, f"\t{round(self.fit_time, 1)}s = Fit runtime")
+            self._log(log_level, f"\t{len(self.features_in)} features in original data used to generate {len(self.features_out)} features in processed data.")
 
     def print_feature_metadata_info(self, log_level: int = 20):
         """
@@ -742,13 +759,13 @@ class AbstractFeatureGenerator:
         log_level : int, default 20
             Log level of the logging statements.
         """
-        self._log(log_level, '\tTypes of features in original data (raw dtype, special dtypes):')
-        self.feature_metadata_in.print_feature_metadata_full(self.log_prefix + '\t\t', log_level=log_level)
+        self._log(log_level, "\tTypes of features in original data (raw dtype, special dtypes):")
+        self.feature_metadata_in.print_feature_metadata_full(self.log_prefix + "\t\t", log_level=log_level)
         if self.feature_metadata_real:
-            self._log(log_level-5, '\tTypes of features in processed data (exact raw dtype, raw dtype):')
-            self.feature_metadata_real.print_feature_metadata_full(self.log_prefix + '\t\t', print_only_one_special=True, log_level=log_level-5)
-        self._log(log_level, '\tTypes of features in processed data (raw dtype, special dtypes):')
-        self.feature_metadata.print_feature_metadata_full(self.log_prefix + '\t\t', log_level=log_level)
+            self._log(log_level - 5, "\tTypes of features in processed data (exact raw dtype, raw dtype):")
+            self.feature_metadata_real.print_feature_metadata_full(self.log_prefix + "\t\t", print_only_one_special=True, log_level=log_level - 5)
+        self._log(log_level, "\tTypes of features in processed data (raw dtype, special dtypes):")
+        self.feature_metadata.print_feature_metadata_full(self.log_prefix + "\t\t", log_level=log_level)
 
     def save(self, path: str):
         save_pkl.save(path=path, object=self)
@@ -774,7 +791,7 @@ class AbstractFeatureGenerator:
         """Gets the tags for this generator."""
         collected_tags = {}
         for base_class in reversed(inspect.getmro(self.__class__)):
-            if hasattr(base_class, '_more_tags'):
+            if hasattr(base_class, "_more_tags"):
                 # need the if because mixins might not have _more_tags
                 # but might do redundant work in estimators
                 # (i.e. calling more tags on BaseEstimator multiple times)

@@ -5,7 +5,16 @@ import pandas as pd
 from pandas import DataFrame
 from pandas.api.types import CategoricalDtype
 
-from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_OBJECT, S_DATETIME_AS_OBJECT, S_IMAGE_PATH, S_IMAGE_BYTEARRAY, S_TEXT, S_TEXT_AS_CATEGORY
+from autogluon.common.features.types import (
+    R_BOOL,
+    R_CATEGORY,
+    R_OBJECT,
+    S_DATETIME_AS_OBJECT,
+    S_IMAGE_BYTEARRAY,
+    S_IMAGE_PATH,
+    S_TEXT,
+    S_TEXT_AS_CATEGORY,
+)
 
 from .abstract import AbstractFeatureGenerator
 from .memory_minimize import CategoryMemoryMinimizeFeatureGenerator
@@ -55,20 +64,28 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
         Refer to :class:`AbstractFeatureGenerator` documentation for details on valid key word arguments.
     """
 
-    def __init__(self, stateful_categories=True, minimize_memory=True, cat_order='original', minimum_cat_count: int = 2, maximum_num_cat: int = None,
-                 fillna: str = None, **kwargs):
+    def __init__(
+        self,
+        stateful_categories=True,
+        minimize_memory=True,
+        cat_order="original",
+        minimum_cat_count: int = 2,
+        maximum_num_cat: int = None,
+        fillna: str = None,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
         self._stateful_categories = stateful_categories
         if minimum_cat_count is not None and minimum_cat_count < 1:
             minimum_cat_count = None
-        if cat_order not in ['original', 'alphanumeric', 'count']:
+        if cat_order not in ["original", "alphanumeric", "count"]:
             raise ValueError(f"cat_order must be one of {['original', 'alphanumeric', 'count']}, but was: {cat_order}")
         self.cat_order = cat_order
         self._minimum_cat_count = minimum_cat_count
         self._maximum_num_cat = maximum_num_cat
         self.category_map = None
         if fillna is not None:
-            if fillna not in ['mode']:
+            if fillna not in ["mode"]:
                 raise ValueError(f"fillna={fillna} is not a valid value. Valid values: {[None, 'mode']}")
         self._fillna = fillna
         self._fillna_flag = self._fillna is not None
@@ -88,8 +105,9 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
         feature_metadata_out_type_group_map_special = copy.deepcopy(self.feature_metadata_in.type_group_map_special)
         if S_TEXT in feature_metadata_out_type_group_map_special:
             text_features = feature_metadata_out_type_group_map_special.pop(S_TEXT)
-            feature_metadata_out_type_group_map_special[S_TEXT_AS_CATEGORY] += [feature for feature in text_features if
-                                                                                feature not in feature_metadata_out_type_group_map_special[S_TEXT_AS_CATEGORY]]
+            feature_metadata_out_type_group_map_special[S_TEXT_AS_CATEGORY] += [
+                feature for feature in text_features if feature not in feature_metadata_out_type_group_map_special[S_TEXT_AS_CATEGORY]
+            ]
         return X_out, feature_metadata_out_type_group_map_special
 
     def _transform(self, X: DataFrame) -> DataFrame:
@@ -97,10 +115,7 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
 
     @staticmethod
     def get_default_infer_features_in_args() -> dict:
-        return dict(
-            valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL],
-            invalid_special_types=[S_DATETIME_AS_OBJECT, S_IMAGE_PATH, S_IMAGE_BYTEARRAY]
-        )
+        return dict(valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL], invalid_special_types=[S_DATETIME_AS_OBJECT, S_IMAGE_PATH, S_IMAGE_BYTEARRAY])
 
     def _generate_features_category(self, X: DataFrame) -> DataFrame:
         if self.features_in:
@@ -120,32 +135,32 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
         if self.features_in:
             fill_nan_map = dict()
             category_map = dict()
-            X_category = X.astype('category')
+            X_category = X.astype("category")
             for column in X_category:
                 rank = X_category[column].value_counts().sort_values(ascending=True)
                 if self._minimum_cat_count is not None:
                     rank = rank[rank >= self._minimum_cat_count]
                 if self._maximum_num_cat is not None:
-                    rank = rank[-self._maximum_num_cat:]
-                if self.cat_order == 'count' or self._minimum_cat_count is not None or self._maximum_num_cat is not None:
+                    rank = rank[-self._maximum_num_cat :]
+                if self.cat_order == "count" or self._minimum_cat_count is not None or self._maximum_num_cat is not None:
                     category_list = list(rank.index)  # category_list in 'count' order
                     if len(category_list) > 1:
-                        if self.cat_order == 'original':
+                        if self.cat_order == "original":
                             original_cat_order = list(X_category[column].cat.categories)
                             set_category_list = set(category_list)
                             category_list = [cat for cat in original_cat_order if cat in set_category_list]
-                        elif self.cat_order == 'alphanumeric':
+                        elif self.cat_order == "alphanumeric":
                             category_list.sort()
                     X_category[column] = X_category[column].astype(CategoricalDtype(categories=category_list))  # TODO: Remove columns if all NaN after this?
                     X_category[column] = X_category[column].cat.reorder_categories(category_list)
-                elif self.cat_order == 'alphanumeric':
+                elif self.cat_order == "alphanumeric":
                     category_list = list(X_category[column].cat.categories)
                     category_list.sort()
                     X_category[column] = X_category[column].astype(CategoricalDtype(categories=category_list))
                     X_category[column] = X_category[column].cat.reorder_categories(category_list)
                 category_map[column] = copy.deepcopy(X_category[column].cat.categories)
                 if self._fillna_flag:
-                    if self._fillna == 'mode':
+                    if self._fillna == "mode":
                         if len(rank) > 0:
                             fill_nan_map[column] = list(rank.index)[-1]
             if not self._fillna_flag:
@@ -166,4 +181,4 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
                     self._fillna_map.pop(feature)
 
     def _more_tags(self):
-        return {'feature_interactions': False}
+        return {"feature_interactions": False}

@@ -25,10 +25,11 @@ class IsNanFeatureGenerator(AbstractFeatureGenerator):
     **kwargs :
         Refer to :class:`AbstractFeatureGenerator` documentation for details on valid key word arguments.
     """
+
     def __init__(self, null_map=None, **kwargs):
         super().__init__(**kwargs)
         if null_map is None:
-            null_map = {R_OBJECT: ''}
+            null_map = {R_OBJECT: ""}
         self.null_map = null_map
         self._null_feature_map = None
 
@@ -49,9 +50,9 @@ class IsNanFeatureGenerator(AbstractFeatureGenerator):
         for feature in self.features_in:
             if feature in self._null_feature_map:
                 null_val = self._null_feature_map[feature]
-                is_nan_features['__nan__.' + feature] = (X[feature] == null_val).astype(np.uint8)
+                is_nan_features["__nan__." + feature] = (X[feature] == null_val).astype(np.uint8)
             else:
-                is_nan_features['__nan__.' + feature] = X[feature].isnull().astype(np.uint8)
+                is_nan_features["__nan__." + feature] = X[feature].isnull().astype(np.uint8)
         return pd.DataFrame(is_nan_features, index=X.index)
 
     @staticmethod
@@ -66,4 +67,4 @@ class IsNanFeatureGenerator(AbstractFeatureGenerator):
                     self._null_feature_map.pop(feature)
 
     def _more_tags(self):
-        return {'feature_interactions': False}
+        return {"feature_interactions": False}

@@ -1,4 +1,3 @@
-
 from autogluon.features.generators import AsTypeFeatureGenerator
 
 
@@ -9,24 +8,24 @@ def test_astype_feature_generator(generator_helper, data_helper):
     generator = AsTypeFeatureGenerator(reset_index=True)
 
     expected_feature_metadata_in_full = {
-        ('category', ()): ['cat'],
-        ('datetime', ()): ['datetime'],
-        ('float', ()): ['float'],
-        ('int', ()): ['int_bool', 'int'],
-        ('object', ()): ['obj'],
-        ('object', ('datetime_as_object',)): ['datetime_as_object'],
-        ('object', ('text',)): ['text']
+        ("category", ()): ["cat"],
+        ("datetime", ()): ["datetime"],
+        ("float", ()): ["float"],
+        ("int", ()): ["int_bool", "int"],
+        ("object", ()): ["obj"],
+        ("object", ("datetime_as_object",)): ["datetime_as_object"],
+        ("object", ("text",)): ["text"],
     }
 
     expected_feature_metadata_full = {
-        ('category', ()): ['cat'],
-        ('datetime', ()): ['datetime'],
-        ('float', ()): ['float'],
-        ('int', ()): ['int'],
-        ('int', ('bool',)): ['int_bool'],
-        ('object', ()): ['obj'],
-        ('object', ('datetime_as_object',)): ['datetime_as_object'],
-        ('object', ('text',)): ['text']
+        ("category", ()): ["cat"],
+        ("datetime", ()): ["datetime"],
+        ("float", ()): ["float"],
+        ("int", ()): ["int"],
+        ("int", ("bool",)): ["int_bool"],
+        ("object", ()): ["obj"],
+        ("object", ("datetime_as_object",)): ["datetime_as_object"],
+        ("object", ("text",)): ["text"],
     }
 
     # When
@@ -44,14 +43,14 @@ def test_astype_feature_generator_bool(generator_helper, data_helper):
     # Given
     input_data = data_helper.generate_bool_feature_int()
 
-    generator = AsTypeFeatureGenerator(convert_bool_method='v2')  # v2 doesn't edit in-place, so no need to reset_index
+    generator = AsTypeFeatureGenerator(convert_bool_method="v2")  # v2 doesn't edit in-place, so no need to reset_index
 
     expected_feature_metadata_in_full = {
-        ('int', ()): ['int_bool'],
+        ("int", ()): ["int_bool"],
     }
 
     expected_feature_metadata_full = {
-        ('int', ('bool',)): ['int_bool'],
+        ("int", ("bool",)): ["int_bool"],
     }
 
     # When
@@ -70,12 +69,12 @@ def test_astype_feature_generator_bool_edgecase_with_nan(generator_helper, data_
     generator = AsTypeFeatureGenerator(reset_index=True)
 
     expected_feature_metadata_in_full = {
-        ('float', ()): ['edgecase_with_nan_bool'],
+        ("float", ()): ["edgecase_with_nan_bool"],
     }
 
     # Since only NaN, don't convert to boolean
     expected_feature_metadata_full = {
-        ('int', ('bool',)): ['edgecase_with_nan_bool'],
+        ("int", ("bool",)): ["edgecase_with_nan_bool"],
     }
 
     # When
@@ -87,7 +86,7 @@ def test_astype_feature_generator_bool_edgecase_with_nan(generator_helper, data_
     )
 
     # Ensure `NaN` and `None` are mapped to 0, even if they are ordered first.
-    assert list(output_data['edgecase_with_nan_bool']) == [0, 1, 0, 1]
+    assert list(output_data["edgecase_with_nan_bool"]) == [0, 1, 0, 1]
 
 
 def test_astype_feature_generator_bool_edgecase(generator_helper, data_helper):
@@ -97,13 +96,11 @@ def test_astype_feature_generator_bool_edgecase(generator_helper, data_helper):
     generator = AsTypeFeatureGenerator(reset_index=True)
 
     expected_feature_metadata_in_full = {
-        ('float', ()): ['edgecase_bool'],
+        ("float", ()): ["edgecase_bool"],
     }
 
     # Since only NaN, don't convert to boolean
-    expected_feature_metadata_full = {
-        ('float', ()): ['edgecase_bool']
-    }
+    expected_feature_metadata_full = {("float", ()): ["edgecase_bool"]}
 
     # When
     output_data = generator_helper.fit_transform_assert(
@@ -124,13 +121,13 @@ def test_astype_feature_generator_bool_extreme_edgecase(generator_helper, data_h
 
     generator_1 = AsTypeFeatureGenerator(reset_index=True)
     generator_2 = AsTypeFeatureGenerator(convert_bool_method_v2_threshold=1)
-    generator_3 = AsTypeFeatureGenerator(convert_bool_method='v2')
-    generator_4 = AsTypeFeatureGenerator(convert_bool_method='v2', convert_bool_method_v2_row_threshold=-1)
+    generator_3 = AsTypeFeatureGenerator(convert_bool_method="v2")
+    generator_4 = AsTypeFeatureGenerator(convert_bool_method="v2", convert_bool_method_v2_row_threshold=-1)
     expected_feature_metadata_in_full = {
-        ('object', ()): ['edgecase_extreme_bool'],
+        ("object", ()): ["edgecase_extreme_bool"],
     }
     expected_feature_metadata_full = {
-        ('int', ('bool',)): ['edgecase_extreme_bool'],
+        ("int", ("bool",)): ["edgecase_extreme_bool"],
     }
 
     out_list = []
@@ -144,5 +141,5 @@ def test_astype_feature_generator_bool_extreme_edgecase(generator_helper, data_h
         )
         out_list.append(output_data)
 
-    for i in range(len(out_list)-1):
-        assert out_list[i].equals(out_list[i+1])
+    for i in range(len(out_list) - 1):
+        assert out_list[i].equals(out_list[i + 1])

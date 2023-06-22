@@ -32,10 +32,11 @@ class FillNaFeatureGenerator(AbstractFeatureGenerator):
     **kwargs :
         Refer to :class:`AbstractFeatureGenerator` documentation for details on valid key word arguments.
     """
+
     def __init__(self, fillna_map=None, fillna_default=np.nan, inplace=False, **kwargs):
         super().__init__(**kwargs)
         if fillna_map is None:
-            fillna_map = {R_OBJECT: ''}
+            fillna_map = {R_OBJECT: ""}
         self.fillna_map = fillna_map
         self.fillna_default = fillna_default
         self._fillna_feature_map = None
@@ -70,4 +71,4 @@ class FillNaFeatureGenerator(AbstractFeatureGenerator):
                 self._fillna_feature_map.pop(feature, None)
 
     def _more_tags(self):
-        return {'feature_interactions': False}
+        return {"feature_interactions": False}
