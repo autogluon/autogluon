@@ -1,12 +1,12 @@
-import time
 import logging
+import time
 
-from autogluon.common.features.types import R_BOOL, R_INT, R_FLOAT, R_CATEGORY
+from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT
 from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_xgboost
-from autogluon.core.constants import MULTICLASS, REGRESSION, SOFTCLASS, PROBLEM_TYPES_CLASSIFICATION
+from autogluon.core.constants import MULTICLASS, PROBLEM_TYPES_CLASSIFICATION, REGRESSION, SOFTCLASS
 from autogluon.core.models import AbstractModel
 from autogluon.core.models._utils import get_early_stopping_rounds
 
@@ -23,6 +23,7 @@ class XGBoostModel(AbstractModel):
 
     Hyperparameter options: https://xgboost.readthedocs.io/en/latest/parameter.html
     """
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._ohe: bool = True
@@ -65,26 +66,15 @@ class XGBoostModel(AbstractModel):
 
         return X
 
-    def _fit(self,
-             X,
-             y,
-             X_val=None,
-             y_val=None,
-             time_limit=None,
-             num_gpus=0,
-             num_cpus=None,
-             sample_weight=None,
-             sample_weight_val=None,
-             verbosity=2,
-             **kwargs):
+    def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, num_gpus=0, num_cpus=None, sample_weight=None, sample_weight_val=None, verbosity=2, **kwargs):
         # TODO: utilize sample_weight_val in early-stopping if provided
         start_time = time.time()
         ag_params = self._get_ag_params()
         params = self._get_model_params()
         if num_cpus:
-            params['n_jobs'] = num_cpus
-        max_category_levels = params.pop('proc.max_category_levels', 100)
-        enable_categorical = params.get('enable_categorical', False)
+            params["n_jobs"] = num_cpus
+        max_category_levels = params.pop("proc.max_category_levels", 100)
+        enable_categorical = params.get("enable_categorical", False)
         if enable_categorical:
             """Skip one-hot-encoding and pass categoricals directly to XGBoost"""
             self._ohe = False
@@ -106,10 +96,10 @@ class XGBoostModel(AbstractModel):
         num_rows_train = X.shape[0]
 
         eval_set = []
-        if 'eval_metric' not in params:
+        if "eval_metric" not in params:
             eval_metric = self.get_eval_metric()
             if eval_metric is not None:
-                params['eval_metric'] = eval_metric
+                params["eval_metric"] = eval_metric
 
         if X_val is None:
             early_stopping_rounds = None
@@ -117,43 +107,40 @@ class XGBoostModel(AbstractModel):
         else:
             X_val = self.preprocess(X_val, is_train=False)
             eval_set.append((X_val, y_val))
-            early_stopping_rounds = ag_params.get('early_stop', 'adaptive')
+            early_stopping_rounds = ag_params.get("early_stop", "adaptive")
             if isinstance(early_stopping_rounds, (str, tuple, list)):
                 early_stopping_rounds = self._get_early_stopping_rounds(num_rows_train=num_rows_train, strategy=early_stopping_rounds)
 
         if num_gpus != 0:
-            params['tree_method'] = 'gpu_hist'
-            if 'gpu_id' not in params:
-                params['gpu_id'] = 0
-        elif 'tree_method' not in params:
-            params['tree_method'] = 'hist'
+            params["tree_method"] = "gpu_hist"
+            if "gpu_id" not in params:
+                params["gpu_id"] = 0
+        elif "tree_method" not in params:
+            params["tree_method"] = "hist"
 
         try_import_xgboost()
-        from .callbacks import EarlyStoppingCustom
         from xgboost.callback import EvaluationMonitor
-        if eval_set is not None and 'callbacks' not in params:
+
+        from .callbacks import EarlyStoppingCustom
+
+        if eval_set is not None and "callbacks" not in params:
             callbacks = []
             if log_period is not None:
                 callbacks.append(EvaluationMonitor(period=log_period))
             callbacks.append(EarlyStoppingCustom(early_stopping_rounds, start_time=start_time, time_limit=time_limit, verbose=verbose))
-            params['callbacks'] = callbacks
+            params["callbacks"] = callbacks
 
         from xgboost import XGBClassifier, XGBRegressor
+
         model_type = XGBClassifier if self.problem_type in PROBLEM_TYPES_CLASSIFICATION else XGBRegressor
         self.model = model_type(**params)
-        self.model.fit(
-            X=X,
-            y=y,
-            eval_set=eval_set,
-            verbose=False,
-            sample_weight=sample_weight
-        )
+        self.model.fit(X=X, y=y, eval_set=eval_set, verbose=False, sample_weight=sample_weight)
 
         bst = self.model.get_booster()
         # TODO: Investigate speed-ups from GPU inference
         # bst.set_param({"predictor": "gpu_predictor"})
 
-        self.params_trained['n_estimators'] = bst.best_ntree_limit
+        self.params_trained["n_estimators"] = bst.best_ntree_limit
         # Don't save the callback or eval_metric objects
         self.model.set_params(callbacks=None, eval_metric=None)
 
@@ -167,7 +154,7 @@ class XGBoostModel(AbstractModel):
         y_pred_proba = self.model.predict_proba(X)
         return self._convert_proba_to_unified_form(y_pred_proba)
 
-    def _get_early_stopping_rounds(self, num_rows_train, strategy='auto'):
+    def _get_early_stopping_rounds(self, num_rows_train, strategy="auto"):
         return get_early_stopping_rounds(num_rows_train=num_rows_train, strategy=strategy)
 
     def _get_num_classes(self, y):
@@ -183,7 +170,7 @@ class XGBoostModel(AbstractModel):
         return num_classes
 
     def _ag_params(self) -> set:
-        return {'early_stop'}
+        return {"early_stop"}
 
     def _estimate_memory_usage(self, X, **kwargs):
         num_classes = self.num_classes if self.num_classes else 1  # self.num_classes could be None after initialization if it's a regression problem
@@ -192,17 +179,16 @@ class XGBoostModel(AbstractModel):
         return approx_mem_size_req
 
     def _validate_fit_memory_usage(self, mem_error_threshold: float = 1.0, mem_warning_threshold: float = 0.75, mem_size_threshold: int = 1e9, **kwargs):
-        return super()._validate_fit_memory_usage(mem_error_threshold=mem_error_threshold,
-                                                  mem_warning_threshold=mem_warning_threshold,
-                                                  mem_size_threshold=mem_size_threshold,
-                                                  **kwargs)
+        return super()._validate_fit_memory_usage(
+            mem_error_threshold=mem_error_threshold, mem_warning_threshold=mem_warning_threshold, mem_size_threshold=mem_size_threshold, **kwargs
+        )
 
     def get_minimum_resources(self, is_gpu_available=False):
         minimum_resources = {
-            'num_cpus': 1,
+            "num_cpus": 1,
         }
         if is_gpu_available:
-            minimum_resources['num_gpus'] = 0.5
+            minimum_resources["num_gpus"] = 0.5
         return minimum_resources
 
     @disable_if_lite_mode(ret=(1, 0))
@@ -220,7 +206,7 @@ class XGBoostModel(AbstractModel):
         path = super().save(path=path, verbose=verbose)
         if _model is not None:
             # Halves disk usage compared to .json / .pkl
-            _model.save_model(path + 'xgb.ubj')
+            _model.save_model(path + "xgb.ubj")
         self.model = _model
         return path
 
@@ -230,11 +216,11 @@ class XGBoostModel(AbstractModel):
         if model._xgb_model_type is not None:
             model.model = model._xgb_model_type()
             # Much faster to load using .ubj than .json (10x+ speedup)
-            model.model.load_model(path + 'xgb.ubj')
+            model.model.load_model(path + "xgb.ubj")
             model._xgb_model_type = None
         return model
 
     def _more_tags(self):
         # `can_refit_full=True` because n_estimators is communicated at end of `_fit`:
         #  self.params_trained['n_estimators'] = bst.best_ntree_limit
-        return {'can_refit_full': True}
+        return {"can_refit_full": True}

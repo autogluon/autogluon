@@ -1,10 +1,10 @@
 import numpy as np
 import pandas as pd
 
-from autogluon.features.generators import LabelEncoderFeatureGenerator
 from autogluon.core.constants import BINARY, MULTICLASS
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils import generate_train_test_split
+from autogluon.features.generators import LabelEncoderFeatureGenerator
 
 
 class TabPFNModel(AbstractModel):
@@ -22,20 +22,21 @@ class TabPFNModel(AbstractModel):
     To use this model, `tabpfn` must be installed.
     To install TabPFN, you can run `pip install autogluon.tabular[tabpfn]` or `pip install tabpfn`.
     """
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._feature_generator = None
 
     def _fit(self, X: pd.DataFrame, y: pd.Series, **kwargs):
         from tabpfn import TabPFNClassifier
+
         ag_params = self._get_ag_params()
-        sample_rows = ag_params.get('sample_rows')
-        max_features = ag_params.get('max_features')
-        max_classes = ag_params.get('max_classes')
+        sample_rows = ag_params.get("sample_rows")
+        max_features = ag_params.get("max_features")
+        max_classes = ag_params.get("max_classes")
         if max_classes is not None and self.num_classes > max_classes:
             # TODO: Move to earlier stage when problem_type is checked
-            raise AssertionError(f'Max allowed classes for the model is {max_classes}, '
-                                 f'but found {self.num_classes} classes.')
+            raise AssertionError(f"Max allowed classes for the model is {max_classes}, " f"but found {self.num_classes} classes.")
 
         # TODO: Make sample_rows generic
         if sample_rows is not None and len(X) > sample_rows:
@@ -44,14 +45,12 @@ class TabPFNModel(AbstractModel):
         num_features = X.shape[1]
         # TODO: Make max_features generic
         if max_features is not None and num_features > max_features:
-            raise AssertionError(f'Max allowed features for the model is {max_features}, '
-                                 f'but found {num_features} features.')
+            raise AssertionError(f"Max allowed features for the model is {max_features}, " f"but found {num_features} features.")
         hyp = self._get_model_params()
-        N_ensemble_configurations = hyp.get('N_ensemble_configurations')
-        self.model = TabPFNClassifier(
-            device='cpu',  # TODO: Add GPU option
-            N_ensemble_configurations=N_ensemble_configurations
-        ).fit(X, y, overwrite_warning=True)
+        N_ensemble_configurations = hyp.get("N_ensemble_configurations")
+        self.model = TabPFNClassifier(device="cpu", N_ensemble_configurations=N_ensemble_configurations).fit(  # TODO: Add GPU option
+            X, y, overwrite_warning=True
+        )
 
     # TODO: Make this generic by creating a generic `preprocess_train` and putting this logic prior to `_preprocess`.
     def _subsample_train(self, X: pd.DataFrame, y: pd.Series, num_rows: int, random_state=0) -> (pd.DataFrame, pd.Series):
@@ -89,7 +88,7 @@ class TabPFNModel(AbstractModel):
         Model quality improvement diminishes significantly beyond `N_ensemble_configurations=8`.
         """
         default_params = {
-            'N_ensemble_configurations': 1,
+            "N_ensemble_configurations": 1,
         }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
@@ -98,7 +97,7 @@ class TabPFNModel(AbstractModel):
     def _get_default_ag_args(cls) -> dict:
         default_ag_args = super()._get_default_ag_args()
         extra_ag_args = {
-            'problem_types': [BINARY, MULTICLASS],
+            "problem_types": [BINARY, MULTICLASS],
         }
         default_ag_args.update(extra_ag_args)
         return default_ag_args
@@ -119,10 +118,10 @@ class TabPFNModel(AbstractModel):
         default_auxiliary_params = super()._get_default_auxiliary_params()
         default_auxiliary_params.update(
             {
-                'sample_rows': 4096,
+                "sample_rows": 4096,
                 # 'max_rows': 20000,
-                'max_features': 100,
-                'max_classes': 10,
+                "max_features": 100,
+                "max_classes": 10,
             }
         )
         return default_auxiliary_params
@@ -137,18 +136,18 @@ class TabPFNModel(AbstractModel):
         """
         default_ag_args_ensemble = super()._get_default_ag_args_ensemble(**kwargs)
         extra_ag_args_ensemble = {
-            'max_sets': 1,
-            'fold_fitting_strategy': 'sequential_local',
+            "max_sets": 1,
+            "fold_fitting_strategy": "sequential_local",
         }
         default_ag_args_ensemble.update(extra_ag_args_ensemble)
         return default_ag_args_ensemble
 
     def _ag_params(self) -> set:
-        return {'sample_rows', 'max_features', 'max_classes'}
+        return {"sample_rows", "max_features", "max_classes"}
 
     def _more_tags(self) -> dict:
         """
         Because TabPFN doesn't use validation data for early stopping, it supports refit_full natively.
         """
-        tags = {'can_refit_full': True}
+        tags = {"can_refit_full": True}
         return tags

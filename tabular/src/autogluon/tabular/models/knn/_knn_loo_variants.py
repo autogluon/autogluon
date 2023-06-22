@@ -13,7 +13,7 @@ from sklearn.utils.extmath import weighted_mode
 # TODO: Code is largely identical to `predict` and `predict_proba` methods, but due to how those methods are coded, we can't call them directly.
 #  This means if code within those methods changes, the LOO equivalents may start to become outdated.
 
-__all__ = ['KNeighborsClassifierLOOMixin', 'KNeighborsRegressorLOOMixin']
+__all__ = ["KNeighborsClassifierLOOMixin", "KNeighborsRegressorLOOMixin"]
 
 
 class KNeighborsClassifierLOOMixin:

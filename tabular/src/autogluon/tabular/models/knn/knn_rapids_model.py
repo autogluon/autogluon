@@ -1,10 +1,10 @@
 import logging
 
-from autogluon.core.constants import REGRESSION
 from autogluon.common.utils.try_import import try_import_rapids_cuml
+from autogluon.core.constants import REGRESSION
 
-from .knn_model import KNNModel
 from .._utils.rapids_utils import RapidsModelMixin
+from .knn_model import KNNModel
 
 logger = logging.getLogger(__name__)
 
@@ -25,9 +25,11 @@ class KNNRapidsModel(RapidsModelMixin, KNNModel):
     conda activate rapids-21.06
     pip install --pre autogluon.tabular[all]
     """
+
     def _get_model_type(self):
         try_import_rapids_cuml()
         from cuml.neighbors import KNeighborsClassifier, KNeighborsRegressor
+
         if self.problem_type == REGRESSION:
             return KNeighborsRegressor
         else:

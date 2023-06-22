@@ -2,12 +2,12 @@ import logging
 
 import numpy as np
 
-from autogluon.core.constants import REGRESSION
 from autogluon.common.utils.try_import import try_import_rapids_cuml
+from autogluon.core.constants import REGRESSION
 
+from .._utils.rapids_utils import RapidsModelMixin
 from .hyperparameters.parameters import get_param_baseline
 from .lr_model import LinearModel
-from .._utils.rapids_utils import RapidsModelMixin
 
 logger = logging.getLogger(__name__)
 
@@ -24,14 +24,16 @@ class LinearRapidsModel(RapidsModelMixin, LinearModel):
     conda activate rapids-21.06
     pip install --pre autogluon.tabular[all]
     """
+
     def _get_model_type(self):
-        penalty = self.params.get('penalty', 'L2')
+        penalty = self.params.get("penalty", "L2")
         try_import_rapids_cuml()
-        from cuml.linear_model import LogisticRegression, Ridge, Lasso
+        from cuml.linear_model import Lasso, LogisticRegression, Ridge
+
         if self.problem_type == REGRESSION:
-            if penalty == 'L2':
+            if penalty == "L2":
                 model_type = Ridge
-            elif penalty == 'L1':
+            elif penalty == "L1":
                 model_type = Lasso
             else:
                 raise AssertionError(f'Unknown value for penalty "{penalty}" - supported types are ["L1", "L2"]')
@@ -40,9 +42,9 @@ class LinearRapidsModel(RapidsModelMixin, LinearModel):
         return model_type
 
     def _set_default_params(self):
-        default_params = {'fit_intercept': True, 'max_iter': 10000}
+        default_params = {"fit_intercept": True, "max_iter": 10000}
         if self.problem_type != REGRESSION:
-            default_params.update({'solver': 'qn'})
+            default_params.update({"solver": "qn"})
         default_params.update(get_param_baseline())
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
@@ -54,5 +56,5 @@ class LinearRapidsModel(RapidsModelMixin, LinearModel):
         return X
 
     def _fit(self, X, y, **kwargs):
-        kwargs.pop('sample_weight', None)  # sample_weight is not supported
+        kwargs.pop("sample_weight", None)  # sample_weight is not supported
         super()._fit(X=X, y=y, **kwargs)

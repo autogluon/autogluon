@@ -6,52 +6,54 @@ The modification allows the option of fixing the attention map
 """
 
 import math
-from typing import Tuple, Optional
+from typing import Optional, Tuple
 
 import torch
 import torch.nn.functional as F
+
 # Needed for pytorch 1.7 and 1.2
 try:
-    from torch.overrides import has_torch_function, handle_torch_function
+    from torch.overrides import handle_torch_function, has_torch_function
 # Needed for pytorch 1.6
 except ImportError:
     from torch._overrides import has_torch_function, handle_torch_function
-from torch.nn import Module
-from torch.nn import init
-from torch.nn.functional import linear, softmax, dropout
-from torch.nn.init import xavier_uniform_, constant_, xavier_normal_
+
+from torch.nn import Module, init
+from torch.nn.functional import dropout, linear, softmax
+from torch.nn.init import constant_, xavier_normal_, xavier_uniform_
 from torch.nn.modules.dropout import Dropout
 from torch.nn.modules.normalization import LayerNorm
 from torch.nn.parameter import Parameter
 
 
-def multi_head_attention_forward(self,
-                                 query,  # type: Tensor
-                                 key,  # type: Tensor
-                                 value,  # type: Tensor
-                                 embed_dim_to_check,  # type: int
-                                 num_heads,  # type: int
-                                 in_proj_weight,  # type: Tensor
-                                 in_proj_bias,  # type: Tensor
-                                 bias_k,  # type: Optional[Tensor]
-                                 bias_v,  # type: Optional[Tensor]
-                                 add_zero_attn,  # type: bool
-                                 dropout_p,  # type: float
-                                 out_proj_weight,  # type: Tensor
-                                 out_proj_bias,
-                                 fixed_k=None,  # type: Tensor
-                                 fixed_q=None,  # type: Tensor
-                                 training=True,  # type: bool
-                                 key_padding_mask=None,  # type: Optional[Tensor]
-                                 need_weights=True,  # type: bool
-                                 attn_mask=None,  # type: Optional[Tensor]
-                                 use_separate_proj_weight=False,  # type: bool
-                                 q_proj_weight=None,  # type: Optional[Tensor]
-                                 k_proj_weight=None,  # type: Optional[Tensor]
-                                 v_proj_weight=None,  # type: Optional[Tensor]
-                                 static_k=None,  # type: Optional[Tensor]
-                                 static_v=None  # type: Optional[Tensor]
-                                 ):
+def multi_head_attention_forward(
+    self,
+    query,  # type: Tensor
+    key,  # type: Tensor
+    value,  # type: Tensor
+    embed_dim_to_check,  # type: int
+    num_heads,  # type: int
+    in_proj_weight,  # type: Tensor
+    in_proj_bias,  # type: Tensor
+    bias_k,  # type: Optional[Tensor]
+    bias_v,  # type: Optional[Tensor]
+    add_zero_attn,  # type: bool
+    dropout_p,  # type: float
+    out_proj_weight,  # type: Tensor
+    out_proj_bias,
+    fixed_k=None,  # type: Tensor
+    fixed_q=None,  # type: Tensor
+    training=True,  # type: bool
+    key_padding_mask=None,  # type: Optional[Tensor]
+    need_weights=True,  # type: bool
+    attn_mask=None,  # type: Optional[Tensor]
+    use_separate_proj_weight=False,  # type: bool
+    q_proj_weight=None,  # type: Optional[Tensor]
+    k_proj_weight=None,  # type: Optional[Tensor]
+    v_proj_weight=None,  # type: Optional[Tensor]
+    static_k=None,  # type: Optional[Tensor]
+    static_v=None,  # type: Optional[Tensor]
+):
     # type: (...) -> Tuple[Tensor, Optional[Tensor]]
     """
     Args:
@@ -108,18 +110,35 @@ def multi_head_attention_forward(self,
     """
 
     if not torch.jit.is_scripting():
-        tens_ops = (query, key, value, in_proj_weight, in_proj_bias, bias_k, bias_v,
-                    out_proj_weight, out_proj_bias)
+        tens_ops = (query, key, value, in_proj_weight, in_proj_bias, bias_k, bias_v, out_proj_weight, out_proj_bias)
         if any([type(t) is not torch.Tensor for t in tens_ops]) and has_torch_function(tens_ops):
             return handle_torch_function(
-                self.multi_head_attention_forward, tens_ops, query, key, value,
-                embed_dim_to_check, num_heads, in_proj_weight, in_proj_bias,
-                bias_k, bias_v, add_zero_attn, dropout_p, out_proj_weight,
-                out_proj_bias, training=training, key_padding_mask=key_padding_mask,
-                need_weights=need_weights, attn_mask=attn_mask,
+                self.multi_head_attention_forward,
+                tens_ops,
+                query,
+                key,
+                value,
+                embed_dim_to_check,
+                num_heads,
+                in_proj_weight,
+                in_proj_bias,
+                bias_k,
+                bias_v,
+                add_zero_attn,
+                dropout_p,
+                out_proj_weight,
+                out_proj_bias,
+                training=training,
+                key_padding_mask=key_padding_mask,
+                need_weights=need_weights,
+                attn_mask=attn_mask,
                 use_separate_proj_weight=use_separate_proj_weight,
-                q_proj_weight=q_proj_weight, k_proj_weight=k_proj_weight,
-                v_proj_weight=v_proj_weight, static_k=static_k, static_v=static_v)
+                q_proj_weight=q_proj_weight,
+                k_proj_weight=k_proj_weight,
+                v_proj_weight=v_proj_weight,
+                static_k=static_k,
+                static_v=static_v,
+            )
     tgt_len, bsz, embed_dim = query.size()
 
     assert embed_dim == embed_dim_to_check
@@ -193,13 +212,13 @@ class MultiheadAttention(Module):
         >>> multihead_attn = nn.MultiheadAttention(embed_dim, num_heads)
         >>> attn_output, attn_output_weights = multihead_attn(query, key, value)
     """
+
     __annotations__ = {
-        'bias_k': torch._jit_internal.Optional[torch.Tensor],
-        'bias_v': torch._jit_internal.Optional[torch.Tensor],
+        "bias_k": torch._jit_internal.Optional[torch.Tensor],
+        "bias_v": torch._jit_internal.Optional[torch.Tensor],
     }
 
-    def __init__(self, embed_dim, n_cat_embeddings, num_heads, dropout=0., bias=True, add_bias_kv=False,
-                 add_zero_attn=False, kdim=None, vdim=None):
+    def __init__(self, embed_dim, n_cat_embeddings, num_heads, dropout=0.0, bias=True, add_bias_kv=False, add_zero_attn=False, kdim=None, vdim=None):
         super().__init__()
 
         self.embed_dim = embed_dim
@@ -216,21 +235,21 @@ class MultiheadAttention(Module):
             self.q_proj_weight = Parameter(torch.Tensor(embed_dim, embed_dim))
             self.k_proj_weight = Parameter(torch.Tensor(embed_dim, self.kdim))
             self.v_proj_weight = Parameter(torch.Tensor(embed_dim, self.vdim))
-            self.register_parameter('in_proj_weight', None)
-            self.register_parameter('fixed_k', None)
+            self.register_parameter("in_proj_weight", None)
+            self.register_parameter("fixed_k", None)
         else:
             self.in_proj_weight = Parameter(torch.empty(embed_dim, embed_dim))
             # self.in_proj_weight = Parameter(torch.empty(2 * embed_dim, embed_dim))
             self.fixed_k = Parameter(torch.empty(n_cat_embeddings, embed_dim))
             self.fixed_q = Parameter(torch.empty(n_cat_embeddings, embed_dim))
-            self.register_parameter('q_proj_weight', None)
-            self.register_parameter('k_proj_weight', None)
-            self.register_parameter('v_proj_weight', None)
+            self.register_parameter("q_proj_weight", None)
+            self.register_parameter("k_proj_weight", None)
+            self.register_parameter("v_proj_weight", None)
 
         if bias:
             self.in_proj_bias = Parameter(torch.empty(embed_dim))
         else:
-            self.register_parameter('in_proj_bias', None)
+            self.register_parameter("in_proj_bias", None)
         self.out_proj = _LinearWithBias(embed_dim, embed_dim)
 
         if add_bias_kv:
@@ -254,8 +273,8 @@ class MultiheadAttention(Module):
             xavier_uniform_(self.v_proj_weight)
 
         if self.in_proj_bias is not None:
-            constant_(self.in_proj_bias, 0.)
-            constant_(self.out_proj.bias, 0.)
+            constant_(self.in_proj_bias, 0.0)
+            constant_(self.out_proj.bias, 0.0)
         if self.bias_k is not None:
             xavier_normal_(self.bias_k)
         if self.bias_v is not None:
@@ -263,60 +282,75 @@ class MultiheadAttention(Module):
 
     def __setstate__(self, state):
         # Support loading old MultiheadAttention checkpoints generated by v1.1.0
-        if '_qkv_same_embed_dim' not in state:
-            state['_qkv_same_embed_dim'] = True
+        if "_qkv_same_embed_dim" not in state:
+            state["_qkv_same_embed_dim"] = True
 
         super().__setstate__(state)
 
-    def forward(self, query, key, value, key_padding_mask=None,
-                need_weights=True, attn_mask=None):
+    def forward(self, query, key, value, key_padding_mask=None, need_weights=True, attn_mask=None):
         # type: (Tensor, Tensor, Tensor, Optional[Tensor], bool, Optional[Tensor]) -> Tuple[Tensor, Optional[Tensor]]
         """
-    Args:
-        query, key, value: map a query and a set of key-value pairs to an output.
-            See "Attention Is All You Need" for more details.
-        key_padding_mask: if provided, specified padding elements in the key will
-            be ignored by the attention. When given a binary mask and a value is True,
-            the corresponding value on the attention layer will be ignored. When given
-            a byte mask and a value is non-zero, the corresponding value on the attention
-            layer will be ignored
-        need_weights: output attn_output_weights.
-        attn_mask: 2D or 3D mask that prevents attention to certain positions. A 2D mask will be broadcasted for all
-            the batches while a 3D mask allows to specify a different mask for the entries of each batch.
+        Args:
+            query, key, value: map a query and a set of key-value pairs to an output.
+                See "Attention Is All You Need" for more details.
+            key_padding_mask: if provided, specified padding elements in the key will
+                be ignored by the attention. When given a binary mask and a value is True,
+                the corresponding value on the attention layer will be ignored. When given
+                a byte mask and a value is non-zero, the corresponding value on the attention
+                layer will be ignored
+            need_weights: output attn_output_weights.
+            attn_mask: 2D or 3D mask that prevents attention to certain positions. A 2D mask will be broadcasted for all
+                the batches while a 3D mask allows to specify a different mask for the entries of each batch.
 
-    Shape:
-        - Inputs:
-        - query: :math:`(L, N, E)` where L is the target sequence length, N is the batch size, E is
-          the embedding dimension.
-        - key: :math:`(S, N, E)`, where S is the source sequence length, N is the batch size, E is
-          the embedding dimension.
-        - value: :math:`(S, N, E)` where S is the source sequence length, N is the batch size, E is
-          the embedding dimension.
-        - key_padding_mask: :math:`(N, S)` where N is the batch size, S is the source sequence length.
-          If a ByteTensor is provided, the non-zero positions will be ignored while the position
-          with the zero positions will be unchanged. If a BoolTensor is provided, the positions with the
-          value of ``True`` will be ignored while the position with the value of ``False`` will be unchanged.
-        - attn_mask: 2D mask :math:`(L, S)` where L is the target sequence length, S is the source sequence length.
-          3D mask :math:`(N*num_heads, L, S)` where N is the batch size, L is the target sequence length,
-          S is the source sequence length. attn_mask ensure that position i is allowed to attend the unmasked
-          positions. If a ByteTensor is provided, the non-zero positions are not allowed to attend
-          while the zero positions will be unchanged. If a BoolTensor is provided, positions with ``True``
-          is not allowed to attend while ``False`` values will be unchanged. If a FloatTensor
-          is provided, it will be added to the attention weight.
+        Shape:
+            - Inputs:
+            - query: :math:`(L, N, E)` where L is the target sequence length, N is the batch size, E is
+              the embedding dimension.
+            - key: :math:`(S, N, E)`, where S is the source sequence length, N is the batch size, E is
+              the embedding dimension.
+            - value: :math:`(S, N, E)` where S is the source sequence length, N is the batch size, E is
+              the embedding dimension.
+            - key_padding_mask: :math:`(N, S)` where N is the batch size, S is the source sequence length.
+              If a ByteTensor is provided, the non-zero positions will be ignored while the position
+              with the zero positions will be unchanged. If a BoolTensor is provided, the positions with the
+              value of ``True`` will be ignored while the position with the value of ``False`` will be unchanged.
+            - attn_mask: 2D mask :math:`(L, S)` where L is the target sequence length, S is the source sequence length.
+              3D mask :math:`(N*num_heads, L, S)` where N is the batch size, L is the target sequence length,
+              S is the source sequence length. attn_mask ensure that position i is allowed to attend the unmasked
+              positions. If a ByteTensor is provided, the non-zero positions are not allowed to attend
+              while the zero positions will be unchanged. If a BoolTensor is provided, positions with ``True``
+              is not allowed to attend while ``False`` values will be unchanged. If a FloatTensor
+              is provided, it will be added to the attention weight.
 
-        - Outputs:
-        - attn_output: :math:`(L, N, E)` where L is the target sequence length, N is the batch size,
-          E is the embedding dimension.
-        - attn_output_weights: :math:`(N, L, S)` where N is the batch size,
-          L is the target sequence length, S is the source sequence length.
+            - Outputs:
+            - attn_output: :math:`(L, N, E)` where L is the target sequence length, N is the batch size,
+              E is the embedding dimension.
+            - attn_output_weights: :math:`(N, L, S)` where N is the batch size,
+              L is the target sequence length, S is the source sequence length.
         """
 
-        return multi_head_attention_forward(self,
-            query=query, key=key, value=value, embed_dim_to_check=self.embed_dim, num_heads=self.num_heads,
-            in_proj_weight=self.in_proj_weight, in_proj_bias=self.in_proj_bias, bias_k=self.bias_k, bias_v=self.bias_v,
-            add_zero_attn=self.add_zero_attn, dropout_p=self.dropout, out_proj_weight=self.out_proj.weight,
-            out_proj_bias=self.out_proj.bias, fixed_k=self.fixed_k, fixed_q=self.fixed_q, training=self.training,
-            key_padding_mask=key_padding_mask, need_weights=need_weights, attn_mask=attn_mask)
+        return multi_head_attention_forward(
+            self,
+            query=query,
+            key=key,
+            value=value,
+            embed_dim_to_check=self.embed_dim,
+            num_heads=self.num_heads,
+            in_proj_weight=self.in_proj_weight,
+            in_proj_bias=self.in_proj_bias,
+            bias_k=self.bias_k,
+            bias_v=self.bias_v,
+            add_zero_attn=self.add_zero_attn,
+            dropout_p=self.dropout,
+            out_proj_weight=self.out_proj.weight,
+            out_proj_bias=self.out_proj.bias,
+            fixed_k=self.fixed_k,
+            fixed_q=self.fixed_q,
+            training=self.training,
+            key_padding_mask=key_padding_mask,
+            need_weights=need_weights,
+            attn_mask=attn_mask,
+        )
 
 
 class Linear(Module):
@@ -348,7 +382,7 @@ class Linear(Module):
         torch.Size([128, 30])
     """
 
-    __constants__ = ['in_features', 'out_features']
+    __constants__ = ["in_features", "out_features"]
     in_features: int
     out_features: int
     weight: torch.Tensor
@@ -362,7 +396,7 @@ class Linear(Module):
         if bias:
             self.bias = Parameter(torch.Tensor(out_features))
         else:
-            self.register_parameter('bias', None)
+            self.register_parameter("bias", None)
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
@@ -376,9 +410,7 @@ class Linear(Module):
         return F.linear(input, self.weight, self.bias)
 
     def extra_repr(self) -> str:
-        return 'in_features={}, out_features={}, bias={}'.format(
-            self.in_features, self.out_features, self.bias is not None
-        )
+        return "in_features={}, out_features={}, bias={}".format(self.in_features, self.out_features, self.bias is not None)
 
 
 # This class exists solely for Transformer; it has an annotation stating
@@ -429,12 +461,11 @@ class TransformerEncoderLayerModified(Module):
         self.activation = _get_activation_fn(activation)
 
     def __setstate__(self, state):
-        if 'activation' not in state:
-            state['activation'] = F.relu
+        if "activation" not in state:
+            state["activation"] = F.relu
         super().__setstate__(state)
 
-    def forward(self, src: torch.Tensor, src_mask: Optional[torch.Tensor] = None,
-                src_key_padding_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+    def forward(self, src: torch.Tensor, src_mask: Optional[torch.Tensor] = None, src_key_padding_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
         """Pass the input through the encoder layer.
 
         Args:
@@ -445,8 +476,7 @@ class TransformerEncoderLayerModified(Module):
         Shape:
             see the docs in Transformer class.
         """
-        src2 = self.self_attn(src, src, src, attn_mask=src_mask,
-                              key_padding_mask=src_key_padding_mask)[0]
+        src2 = self.self_attn(src, src, src, attn_mask=src_mask, key_padding_mask=src_key_padding_mask)[0]
         src = src + self.dropout1(src2)
         src = self.norm1(src)
         src2 = self.linear2(self.dropout(self.activation(self.linear1(src))))

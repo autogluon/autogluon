@@ -24,17 +24,15 @@ class InterpretableTabularPredictor(TabularPredictor):
 
     Stacking and bagging are not available in this predictor to preserve interpretability.
     """
-    def fit(self,
-            train_data,
-            tuning_data=None,
-            time_limit=None,
-            *,
-            presets='interpretable',
-            **kwargs):
-        logger.log(30, f'EXPERIMENTAL WARNING: Fitting {self.__class__.__name__}\n'
-                       f'\tThis class is experimental and could be removed without warning in a future release.\n'
-                       f'\tTo avoid confusing results, please only provide categorical and numeric features.\n'
-                       f'\tText and datetime features will result in confusing rules that are hard to interpret.')
+
+    def fit(self, train_data, tuning_data=None, time_limit=None, *, presets="interpretable", **kwargs):
+        logger.log(
+            30,
+            f"EXPERIMENTAL WARNING: Fitting {self.__class__.__name__}\n"
+            f"\tThis class is experimental and could be removed without warning in a future release.\n"
+            f"\tTo avoid confusing results, please only provide categorical and numeric features.\n"
+            f"\tText and datetime features will result in confusing rules that are hard to interpret.",
+        )
 
         return super().fit(
             train_data=train_data,
@@ -47,14 +45,14 @@ class InterpretableTabularPredictor(TabularPredictor):
     def _validate_fit_extra_kwargs(self, kwargs, extra_valid_keys=None) -> dict:
         kwargs = super()._validate_fit_extra_kwargs(kwargs=kwargs, extra_valid_keys=extra_valid_keys)
         print(kwargs)
-        if 'num_bag_folds' in kwargs and kwargs['num_bag_folds'] is not None and kwargs['num_bag_folds'] > 1:
-            raise ValueError(f'{self.__class__.__name__} does not support `num_bag_folds`.')
-        if 'num_bag_sets' in kwargs and kwargs['num_bag_sets'] is not None and kwargs['num_bag_sets'] > 1:
-            raise ValueError(f'{self.__class__.__name__} does not support `num_bag_sets`.')
-        if 'num_stack_levels' in kwargs and kwargs['num_stack_levels'] is not None and kwargs['num_stack_levels'] >= 1:
-            raise ValueError(f'{self.__class__.__name__} does not support `num_stack_levels`.')
-        if 'auto_stack' in kwargs and kwargs['auto_stack']:
-            raise ValueError(f'{self.__class__.__name__} does not support `auto_stack`.')
+        if "num_bag_folds" in kwargs and kwargs["num_bag_folds"] is not None and kwargs["num_bag_folds"] > 1:
+            raise ValueError(f"{self.__class__.__name__} does not support `num_bag_folds`.")
+        if "num_bag_sets" in kwargs and kwargs["num_bag_sets"] is not None and kwargs["num_bag_sets"] > 1:
+            raise ValueError(f"{self.__class__.__name__} does not support `num_bag_sets`.")
+        if "num_stack_levels" in kwargs and kwargs["num_stack_levels"] is not None and kwargs["num_stack_levels"] >= 1:
+            raise ValueError(f"{self.__class__.__name__} does not support `num_stack_levels`.")
+        if "auto_stack" in kwargs and kwargs["auto_stack"]:
+            raise ValueError(f"{self.__class__.__name__} does not support `auto_stack`.")
         return kwargs
 
     def leaderboard_interpretable(self, silent=False, **kwargs) -> pd.DataFrame:
@@ -70,14 +68,14 @@ class InterpretableTabularPredictor(TabularPredictor):
         complexities = []
         info = self.info()
         for i in range(leaderboard.shape[0]):
-            model_name = leaderboard.iloc[i]['model']
-            complexities.append(info['model_info'][model_name].get('complexity', np.nan))
-        leaderboard.insert(2, 'complexity', complexities)  # insert directly after score_test/score_val
+            model_name = leaderboard.iloc[i]["model"]
+            complexities.append(info["model_info"][model_name].get("complexity", np.nan))
+        leaderboard.insert(2, "complexity", complexities)  # insert directly after score_test/score_val
         leaderboard = leaderboard[~pd.isna(leaderboard.complexity)]  # remove non-interpretable models
-        score_col = 'score_test' if 'score_test' in leaderboard.columns else 'score_val'
-        leaderboard = leaderboard.sort_values(by=[score_col, 'complexity'], ascending=[False, True], ignore_index=True)
+        score_col = "score_test" if "score_test" in leaderboard.columns else "score_val"
+        leaderboard = leaderboard.sort_values(by=[score_col, "complexity"], ascending=[False, True], ignore_index=True)
         if not silent:
-            with pd.option_context('display.max_rows', None, 'display.max_columns', None, 'display.width', 1000):
+            with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):
                 print(leaderboard)
         return leaderboard
 
@@ -98,14 +96,14 @@ class InterpretableTabularPredictor(TabularPredictor):
             summaries_filtered = summaries[summaries.complexity <= complexity_threshold]
             if summaries_filtered.shape[0] == 0:
                 summaries_filtered = summaries
-            model_name = summaries_filtered.iloc[0]['model']  # best model is at top
+            model_name = summaries_filtered.iloc[0]["model"]  # best model is at top
         agmodel = self._trainer.load_model(model_name)
         imodel = agmodel.model
         print(imodel)
 
     # TODO: I have not been able to extract any insight from the output of this method.
     #  I don't see how it is useful.
-    def explain_classification_errors(self, data, model = None, print_rules: bool = True):
+    def explain_classification_errors(self, data, model=None, print_rules: bool = True):
         """Explain classification errors by fitting a rule-based model to them
 
         Parameters
@@ -126,6 +124,7 @@ class InterpretableTabularPredictor(TabularPredictor):
             Interpretable rule-based classifier with fit/predict methods
         """
         import imodels
+
         if model is None:
             model = self.get_model_best()
         data = self._get_dataset(data)

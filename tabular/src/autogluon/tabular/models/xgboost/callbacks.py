@@ -1,5 +1,5 @@
-import time
 import logging
+import time
 
 from xgboost.callback import EarlyStopping
 
@@ -20,6 +20,7 @@ class EarlyStoppingCustom(EarlyStopping):
        If int, The possible number of rounds without the trend occurrence.
        If tuple, contains early stopping class as first element and class init kwargs as second element.
     """
+
     def __init__(self, rounds, time_limit=None, start_time=None, verbose=False, min_delta=2e-6, **kwargs):
         if rounds is None:
             # Disable early stopping via rounds
@@ -66,7 +67,10 @@ class EarlyStoppingCustom(EarlyStopping):
             time_left = self.time_limit - time_elapsed
             if time_left <= 0:
                 if self.verbose:
-                    logger.log(20, f"Ran out of time, early stopping on iteration {epoch}. Best iteration is: \t[{model.attr('best_iteration')}]\t{model.attr('best_score')}")
+                    logger.log(
+                        20,
+                        f"Ran out of time, early stopping on iteration {epoch}. Best iteration is: \t[{model.attr('best_iteration')}]\t{model.attr('best_score')}",
+                    )
                 return True
         return False
 
@@ -82,14 +86,16 @@ class EarlyStoppingCustom(EarlyStopping):
         model_size_memory_ratio = estimated_model_size_mb / available_mb
 
         if (model_size_memory_ratio > 1.0) or (available_mb < 512):
-            logger.warning('Warning: Large XGB model size may cause OOM error if training continues')
-            logger.warning(f'Available Memory: {available_mb} MB')
-            logger.warning(f'Estimated XGB model size: {estimated_model_size_mb} MB')
+            logger.warning("Warning: Large XGB model size may cause OOM error if training continues")
+            logger.warning(f"Available Memory: {available_mb} MB")
+            logger.warning(f"Estimated XGB model size: {estimated_model_size_mb} MB")
             if self.verbose:
-                logger.warning(f'Warning: Early stopped XGB model prior to optimal result to avoid OOM error. Please increase available memory to avoid subpar model quality.\n')
+                logger.warning(
+                    f"Warning: Early stopped XGB model prior to optimal result to avoid OOM error. Please increase available memory to avoid subpar model quality.\n"
+                )
                 logger.warning(f"Early stopping. Best iteration is: \t[{model.attr('best_iteration')}]\t{model.attr('best_score')}")
             return True
         elif self.verbose and (model_size_memory_ratio > 0.25):
-            logger.log(15, f'Available Memory: {available_mb} MB')
-            logger.log(15, f'Estimated XGB model size: {estimated_model_size_mb} MB')
+            logger.log(15, f"Available Memory: {available_mb} MB")
+            logger.log(15, f"Estimated XGB model size: {estimated_model_size_mb} MB")
         return False

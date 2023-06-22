@@ -1,19 +1,18 @@
 import logging
 import math
-import pickle
 import os
+import pickle
 import sys
 import time
 
 import numpy as np
 
-from autogluon.common.features.types import R_BOOL, R_INT, R_FLOAT, R_CATEGORY
+from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT
 from autogluon.common.utils.resource_utils import ResourceManager
-from autogluon.core.constants import MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE
+from autogluon.core.constants import MULTICLASS, QUANTILE, REGRESSION, SOFTCLASS
+from autogluon.core.models import AbstractModel
 from autogluon.core.utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded
 from autogluon.core.utils.utils import normalize_pred_probas
-
-from autogluon.core.models import AbstractModel
 from autogluon.features.generators import LabelEncoderFeatureGenerator
 
 from .compilers.native import RFNativeCompiler
@@ -26,6 +25,7 @@ class RFModel(AbstractModel):
     """
     Random Forest model (scikit-learn): https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestClassifier.html
     """
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._feature_generator = None
@@ -35,8 +35,9 @@ class RFModel(AbstractModel):
     def _get_model_type(self):
         if self.problem_type == QUANTILE:
             from .rf_quantile import RandomForestQuantileRegressor
+
             return RandomForestQuantileRegressor
-        if self.params_aux.get('use_daal', False):
+        if self.params_aux.get("use_daal", False):
             # Disabled by default because OOB score does not yet work properly
             try:
                 # FIXME: sklearnex OOB score is broken, returns biased predictions. Without this optimization, can't compute Efficient OOF.
@@ -48,13 +49,16 @@ class RFModel(AbstractModel):
                 #       and we would need to waste extra time to compute the proper pred_time_val post-fit.
                 #       Therefore with sklearnex enabled, pred_time_val is incorrect.
                 from sklearnex.ensemble import RandomForestClassifier, RandomForestRegressor
-                logger.log(15, '\tUsing sklearnex RF backend...')
+
+                logger.log(15, "\tUsing sklearnex RF backend...")
                 self._daal = True
             except:
                 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+
                 self._daal = False
         else:
             from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+
             self._daal = False
         if self.problem_type in [REGRESSION, SOFTCLASS]:
             return RandomForestRegressor
@@ -77,7 +81,7 @@ class RFModel(AbstractModel):
         default_params = {
             # TODO: 600 is much better, but increases info leakage in stacking -> therefore 300 is ~equal in stack ensemble final quality.
             #  Consider adding targeted noise to OOF to avoid info leakage, or increase `min_samples_leaf`.
-            'n_estimators': 300,
+            "n_estimators": 300,
             # Cap leaf nodes to 15000 to avoid large datasets using unreasonable amounts of memory/disk for RF/XT.
             #  Ensures that memory and disk usage of RF model with 300 n_estimators is at most ~500 MB for binary/regression, ~200 MB per class for multiclass.
             #  This has no effect on datasets with <=15000 rows, and minimal to no impact on datasets with <50000 rows.
@@ -85,10 +89,10 @@ class RFModel(AbstractModel):
             #  For example, when left uncapped, RF can use 5 GB of disk for a regression dataset with 2M rows.
             #  Multiply by the 8 RF/XT models in config for best quality / high quality and this is 40 GB of tree models, which is unreasonable.
             #  This size scales linearly with number of rows.
-            'max_leaf_nodes': 15000,
-            'n_jobs': -1,
-            'random_state': 0,
-            'bootstrap': True,  # Required for OOB estimates, setting to False will raise exception if bagging.
+            "max_leaf_nodes": 15000,
+            "n_jobs": -1,
+            "random_state": 0,
+            "bootstrap": True,  # Required for OOB estimates, setting to False will raise exception if bagging.
             # TODO: min_samples_leaf=5 is too large on most problems, however on some datasets it helps a lot (airlines likes >40 min_samples_leaf, adult likes 2 much better than 1)
             #  This value would need to be tuned per dataset, likely very worthwhile.
             #  Higher values = less OOF info leak, default = 1, which maximizes info leak.
@@ -121,7 +125,7 @@ class RFModel(AbstractModel):
 
     def _estimate_memory_usage(self, X, **kwargs):
         params = self._get_model_params()
-        n_estimators_final = params['n_estimators']
+        n_estimators_final = params["n_estimators"]
         if isinstance(n_estimators_final, int):
             n_estimators_minimum = min(40, n_estimators_final)
         else:  # if search space
@@ -132,34 +136,27 @@ class RFModel(AbstractModel):
         return expected_min_memory_usage
 
     def _validate_fit_memory_usage(self, mem_error_threshold: float = 0.5, mem_warning_threshold: float = 0.4, mem_size_threshold: int = 1e7, **kwargs):
-        return super()._validate_fit_memory_usage(mem_error_threshold=mem_error_threshold,
-                                                  mem_warning_threshold=mem_warning_threshold,
-                                                  mem_size_threshold=mem_size_threshold,
-                                                  **kwargs)
+        return super()._validate_fit_memory_usage(
+            mem_error_threshold=mem_error_threshold, mem_warning_threshold=mem_warning_threshold, mem_size_threshold=mem_size_threshold, **kwargs
+        )
 
     def _expected_mem_usage(self, n_estimators_final, bytes_per_estimator):
         available_mem = ResourceManager.get_available_virtual_mem()
         return n_estimators_final * bytes_per_estimator / available_mem
 
-    def _fit(self,
-             X,
-             y,
-             num_cpus=-1,
-             time_limit=None,
-             sample_weight=None,
-             **kwargs):
+    def _fit(self, X, y, num_cpus=-1, time_limit=None, sample_weight=None, **kwargs):
         time_start = time.time()
 
         model_cls = self._get_model_type()
 
-        max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
+        max_memory_usage_ratio = self.params_aux["max_memory_usage_ratio"]
         params = self._get_model_params()
-        if 'n_jobs' not in params:
-            params['n_jobs'] = num_cpus
-        n_estimators_final = params['n_estimators']
+        if "n_jobs" not in params:
+            params["n_jobs"] = num_cpus
+        n_estimators_final = params["n_estimators"]
 
         n_estimators_minimum = min(40, n_estimators_final)
-        n_estimators_test = min(4, max(1, math.floor(n_estimators_minimum/5)))
+        n_estimators_test = min(4, max(1, math.floor(n_estimators_minimum / 5)))
 
         X = self.preprocess(X)
         n_estimator_increments = [n_estimators_final]
@@ -171,29 +168,29 @@ class RFModel(AbstractModel):
         if n_estimators_final > n_estimators_test * 2:
             if self.problem_type == MULTICLASS:
                 n_estimator_increments = [n_estimators_test, n_estimators_final]
-                params['warm_start'] = True
+                params["warm_start"] = True
             else:
                 if expected_memory_usage > (0.05 * max_memory_usage_ratio):  # Somewhat arbitrary, consider finding a better value, should it scale by cores?
                     # Causes ~10% training slowdown, so try to avoid if memory is not an issue
                     n_estimator_increments = [n_estimators_test, n_estimators_final]
-                    params['warm_start'] = True
+                    params["warm_start"] = True
 
-        params['n_estimators'] = n_estimator_increments[0]
+        params["n_estimators"] = n_estimator_increments[0]
         if self._daal:
-            if params.get('warm_start', False):
-                params['warm_start'] = False
+            if params.get("warm_start", False):
+                params["warm_start"] = False
             # FIXME: This is inefficient but sklearnex doesn't support computing oob_score after training
-            params['oob_score'] = True
+            params["oob_score"] = True
 
         model = model_cls(**params)
 
         time_train_start = time.time()
         for i, n_estimators in enumerate(n_estimator_increments):
             if i != 0:
-                if params.get('warm_start', False):
+                if params.get("warm_start", False):
                     model.n_estimators = n_estimators
                 else:
-                    params['n_estimators'] = n_estimators
+                    params["n_estimators"] = n_estimators
                     model = model_cls(**params)
             model = model.fit(X, y, sample_weight=sample_weight)
             if (i == 0) and (len(n_estimator_increments) > 1):
@@ -210,29 +207,35 @@ class RFModel(AbstractModel):
 
                 if n_estimators_final > n_estimators_ideal:
                     if n_estimators_ideal < n_estimators_minimum:
-                        logger.warning(f'\tWarning: Model is expected to require {round(model_memory_ratio*100, 2)}% of available memory...')
+                        logger.warning(f"\tWarning: Model is expected to require {round(model_memory_ratio*100, 2)}% of available memory...")
                         raise NotEnoughMemoryError  # don't train full model to avoid OOM error
-                    logger.warning(f'\tWarning: Reducing model \'n_estimators\' from {n_estimators_final} -> {n_estimators_ideal} due to low memory. Expected memory usage reduced from {round(model_memory_ratio*100, 2)}% -> {round(ideal_memory_ratio*100, 2)}% of available memory...')
+                    logger.warning(
+                        f"\tWarning: Reducing model 'n_estimators' from {n_estimators_final} -> {n_estimators_ideal} due to low memory. Expected memory usage reduced from {round(model_memory_ratio*100, 2)}% -> {round(ideal_memory_ratio*100, 2)}% of available memory..."
+                    )
 
                 if time_limit is not None:
                     time_expected = time_train_start - time_start + (time_elapsed * n_estimators_ideal / n_estimators)
                     n_estimators_time = math.floor((time_limit - time_train_start + time_start) * n_estimators / time_elapsed)
                     if n_estimators_time < n_estimators_ideal:
                         if n_estimators_time < n_estimators_minimum:
-                            logger.warning(f'\tWarning: Model is expected to require {round(time_expected, 1)}s to train, which exceeds the maximum time limit of {round(time_limit, 1)}s, skipping model...')
+                            logger.warning(
+                                f"\tWarning: Model is expected to require {round(time_expected, 1)}s to train, which exceeds the maximum time limit of {round(time_limit, 1)}s, skipping model..."
+                            )
                             raise TimeLimitExceeded
-                        logger.warning(f'\tWarning: Reducing model \'n_estimators\' from {n_estimators_ideal} -> {n_estimators_time} due to low time. Expected time usage reduced from {round(time_expected, 1)}s -> {round(time_limit, 1)}s...')
+                        logger.warning(
+                            f"\tWarning: Reducing model 'n_estimators' from {n_estimators_ideal} -> {n_estimators_time} due to low time. Expected time usage reduced from {round(time_expected, 1)}s -> {round(time_limit, 1)}s..."
+                        )
                         n_estimators_ideal = n_estimators_time
 
                 for j in range(len(n_estimator_increments)):
                     if n_estimator_increments[j] > n_estimators_ideal:
                         n_estimator_increments[j] = n_estimators_ideal
-        if self._daal and model.criterion != 'entropy':
+        if self._daal and model.criterion != "entropy":
             # TODO: entropy is not accelerated by sklearnex, need to not set estimators_ to None to avoid crash
             # This reduces memory usage / disk usage.
             model.estimators_ = None
         self.model = model
-        self.params_trained['n_estimators'] = self.model.n_estimators
+        self.params_trained["n_estimators"] = self.model.n_estimators
 
     # TODO: Remove this after simplifying _predict_proba to reduce code duplication. This is only present for SOFTCLASS support.
     def _predict_proba(self, X, **kwargs):
@@ -270,12 +273,12 @@ class RFModel(AbstractModel):
     # FIXME: Unknown if this works with quantile regression
     def _get_oof_pred_proba(self, X, y, **kwargs):
         if not self.model.bootstrap:
-            raise ValueError('Forest models must set `bootstrap=True` to compute out-of-fold predictions via out-of-bag predictions.')
+            raise ValueError("Forest models must set `bootstrap=True` to compute out-of-fold predictions via out-of-bag predictions.")
 
         oob_is_not_set = getattr(self.model, "oob_decision_function_", None) is None and getattr(self.model, "oob_prediction_", None) is None
 
         if oob_is_not_set and self._daal:
-            raise AssertionError('DAAL forest backend does not support out-of-bag predictions.')
+            raise AssertionError("DAAL forest backend does not support out-of-bag predictions.")
 
         # TODO: This can also be done via setting `oob_score=True` in model params,
         #  but getting the correct `pred_time_val` that way is not easy, since we can't time the internal call.
@@ -285,7 +288,8 @@ class RFModel(AbstractModel):
             if getattr(self.model, "n_classes_", None) is not None:
                 if self.model.n_outputs_ == 1:
                     self.model.n_classes_ = [self.model.n_classes_]
-            from sklearn.tree._tree import DTYPE, DOUBLE
+            from sklearn.tree._tree import DOUBLE, DTYPE
+
             X, y = self.model._validate_data(X, y, multi_output=True, accept_sparse="csc", dtype=DTYPE)
             if y.ndim == 1:
                 # reshape is necessary to preserve the data contiguity against vs
@@ -312,14 +316,15 @@ class RFModel(AbstractModel):
             y_oof_pred_proba = self.model.oob_prediction_
             self.model.oob_prediction_ = None  # save memory
         else:
-            raise AssertionError(f'Model class {type(self.model)} does not support out-of-fold prediction generation.')
+            raise AssertionError(f"Model class {type(self.model)} does not support out-of-fold prediction generation.")
 
         # TODO: Regression does not return NaN for missing rows, instead it sets them to 0. This makes life hard.
         #  The below code corrects the missing rows to NaN instead of 0.
         # Don't bother if >60 trees, near impossible to have missing
         # If using 68% of data for training, chance of missing for each row is 1 in 11 billion.
         if self.problem_type == REGRESSION and self.model.n_estimators <= 60:
-            from sklearn.ensemble._forest import _get_n_samples_bootstrap, _generate_unsampled_indices
+            from sklearn.ensemble._forest import _generate_unsampled_indices, _get_n_samples_bootstrap
+
             n_samples = len(y)
 
             n_predictions = np.zeros(n_samples)
@@ -354,18 +359,18 @@ class RFModel(AbstractModel):
     def _get_default_ag_args_ensemble(cls, problem_type=None, **kwargs) -> dict:
         default_ag_args_ensemble = super()._get_default_ag_args_ensemble(problem_type=problem_type, **kwargs)
         if problem_type != QUANTILE:  # use_child_oof not supported in quantile regression
-            extra_ag_args_ensemble = {'use_child_oof': True}
+            extra_ag_args_ensemble = {"use_child_oof": True}
             default_ag_args_ensemble.update(extra_ag_args_ensemble)
         return default_ag_args_ensemble
 
     def _more_tags(self):
         # `can_refit_full=True` because final n_estimators is communicated at end of `_fit`:
         #  `self.params_trained['n_estimators'] = self.model.n_estimators`
-        tags = {'can_refit_full': True}
+        tags = {"can_refit_full": True}
         if self.problem_type == QUANTILE:
-            tags['valid_oof'] = False  # not supported in quantile regression
+            tags["valid_oof"] = False  # not supported in quantile regression
         else:
-            tags['valid_oof'] = True
+            tags["valid_oof"] = True
         return tags
 
     def _valid_compilers(self):

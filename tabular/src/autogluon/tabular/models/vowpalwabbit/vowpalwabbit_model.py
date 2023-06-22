@@ -4,12 +4,27 @@ import time
 import numpy as np
 import pandas as pd
 
-from autogluon.core.models import AbstractModel
-from autogluon.common.features.types import R_INT, R_FLOAT, R_CATEGORY, R_OBJECT, S_IMAGE_PATH, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL
+from autogluon.common.features.types import (
+    R_CATEGORY,
+    R_FLOAT,
+    R_INT,
+    R_OBJECT,
+    S_IMAGE_PATH,
+    S_TEXT_AS_CATEGORY,
+    S_TEXT_NGRAM,
+    S_TEXT_SPECIAL,
+)
 from autogluon.common.utils.try_import import try_import_vowpalwabbit
-from autogluon.core.constants import BINARY, REGRESSION, MULTICLASS, \
-    PROBLEM_TYPES_CLASSIFICATION, PROBLEM_TYPES_REGRESSION
+from autogluon.core.constants import (
+    BINARY,
+    MULTICLASS,
+    PROBLEM_TYPES_CLASSIFICATION,
+    PROBLEM_TYPES_REGRESSION,
+    REGRESSION,
+)
+from autogluon.core.models import AbstractModel
 from autogluon.core.utils.exceptions import TimeLimitExceeded
+
 from .vowpalwabbit_utils import VWFeaturesConverter
 
 logger = logging.getLogger(__name__)
@@ -22,11 +37,12 @@ class VowpalWabbitModel(AbstractModel):
     VowpalWabbit Command Line args: https://github.com/VowpalWabbit/vowpal_wabbit/wiki/Command-line-arguments
 
     """
-    model_internals_file_name = 'model-internals.pkl'
+
+    model_internals_file_name = "model-internals.pkl"
 
     # Ref: https://github.com/VowpalWabbit/vowpal_wabbit/wiki/Loss-functions
-    CLASSIFICATION_LOSS_FUNCTIONS = ['logistic', 'hinge']
-    REGRESSION_LOSS_FUNCTIONS = ['squared', 'quantile', 'poisson', 'classic']
+    CLASSIFICATION_LOSS_FUNCTIONS = ["logistic", "hinge"]
+    REGRESSION_LOSS_FUNCTIONS = ["squared", "quantile", "poisson", "classic"]
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -44,15 +60,13 @@ class VowpalWabbitModel(AbstractModel):
         return X_series
 
     # The `_fit` method takes the input training data (and optionally the validation data) and trains the model.
-    def _fit(self,
-             X: pd.DataFrame,  # training data
-             y: pd.Series,  # training labels
-             time_limit=None,
-             verbosity=2,
-             **kwargs):  # kwargs includes many other potential inputs, refer to AbstractModel documentation for details
+    def _fit(
+        self, X: pd.DataFrame, y: pd.Series, time_limit=None, verbosity=2, **kwargs  # training data  # training labels
+    ):  # kwargs includes many other potential inputs, refer to AbstractModel documentation for details
         time_start = time.time()
         try_import_vowpalwabbit()
         import vowpalwabbit
+
         seed = 0  # Random seed
 
         # Valid self.problem_type values include ['binary', 'multiclass', 'regression', 'quantile', 'softclass']
@@ -64,38 +78,38 @@ class VowpalWabbitModel(AbstractModel):
         # passes: Used as epochs
 
         params = self._get_model_params()
-        params['loss_function'] = params.get('loss_function', self._get_default_loss_function())
-        passes = params.pop('passes')
+        params["loss_function"] = params.get("loss_function", self._get_default_loss_function())
+        passes = params.pop("passes")
 
         # Make sure to call preprocess on X near the start of `_fit`.
         # This is necessary because the data is converted via preprocess during predict, and needs to be in the same format as during fit.
         X_series = self.preprocess(X, is_train=True)
 
-        self._validate_loss_function(loss_function=params['loss_function'])
+        self._validate_loss_function(loss_function=params["loss_function"])
 
         # VW expects label from 1 to N for Binary and Multiclass classification problems
         # AutoGluon does label encoding from 0 to N-1, hence we increment the value of y by 1
         if self.problem_type != REGRESSION:
             y = y.apply(lambda row: row + 1)
-        y = y.astype(str) + ' '
+        y = y.astype(str) + " "
 
         # Concatenate y and X to get the training data in VW format
         final_training_data = y + X_series
         final_training_data = final_training_data.tolist()
 
         extra_params = {
-            'cache_file': 'train.cache',
-            'holdout_off': True,
+            "cache_file": "train.cache",
+            "holdout_off": True,
         }
 
         if verbosity <= 3:
-            extra_params['quiet'] = True
+            extra_params["quiet"] = True
 
         # Initialize the model
         if self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
             # Ref: https://github.com/VowpalWabbit/vowpal_wabbit/wiki/Predicting-probabilities#multi-class---oaa
-            extra_params['oaa'] = self.num_classes
-            extra_params['probabilities'] = True
+            extra_params["oaa"] = self.num_classes
+            extra_params["probabilities"] = True
         self.model = vowpalwabbit.Workspace(**params, **extra_params)
 
         time_start_fit = time.time()
@@ -117,11 +131,11 @@ class VowpalWabbitModel(AbstractModel):
                 time_fit_used = time.time() - time_start_fit
                 time_fit_used_per_epoch = time_fit_used / epoch
                 time_left = time_limit_fit - time_fit_used
-                if time_left <= (time_fit_used_per_epoch*2):
-                    logger.log(30, f'\tEarly stopping due to lack of time. Fit {epoch}/{passes} passes...')
+                if time_left <= (time_fit_used_per_epoch * 2):
+                    logger.log(30, f"\tEarly stopping due to lack of time. Fit {epoch}/{passes} passes...")
                     break
 
-        self.params_trained['passes'] = epoch
+        self.params_trained["passes"] = epoch
 
     def _train_single_epoch(self, training_data):
         row_order = np.arange(0, len(training_data))
@@ -134,20 +148,20 @@ class VowpalWabbitModel(AbstractModel):
         # Ref: https://github.com/VowpalWabbit/vowpal_wabbit/wiki/Loss-functions
         if loss_function:
             if self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
-                assert loss_function in self.CLASSIFICATION_LOSS_FUNCTIONS, \
-                    f'For {self.problem_type} problem, VW supports: {self.CLASSIFICATION_LOSS_FUNCTIONS}. ' \
-                    f'Got loss_function:{loss_function}'
+                assert loss_function in self.CLASSIFICATION_LOSS_FUNCTIONS, (
+                    f"For {self.problem_type} problem, VW supports: {self.CLASSIFICATION_LOSS_FUNCTIONS}. " f"Got loss_function:{loss_function}"
+                )
             elif self.problem_type in PROBLEM_TYPES_REGRESSION:
-                assert loss_function in self.REGRESSION_LOSS_FUNCTIONS, \
-                    f'For {self.problem_type} problem, VW supports: {self.REGRESSION_LOSS_FUNCTIONS}. ' \
-                    f'Got loss_function:{loss_function}'
+                assert loss_function in self.REGRESSION_LOSS_FUNCTIONS, (
+                    f"For {self.problem_type} problem, VW supports: {self.REGRESSION_LOSS_FUNCTIONS}. " f"Got loss_function:{loss_function}"
+                )
 
     def _get_default_loss_function(self) -> str:
         # Ref: https://github.com/VowpalWabbit/vowpal_wabbit/wiki/Loss-functions
         if self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
-            return 'logistic'
+            return "logistic"
         else:
-            return 'squared'
+            return "squared"
 
     def save(self, path: str = None, verbose=True) -> str:
         """
@@ -183,6 +197,7 @@ class VowpalWabbitModel(AbstractModel):
         """
         try_import_vowpalwabbit()
         import vowpalwabbit
+
         # Load Abstract Model. This is without the internal model
         model = super().load(path, reset_paths=reset_paths, verbose=verbose)
         params = model._get_model_params()
@@ -193,7 +208,7 @@ class VowpalWabbitModel(AbstractModel):
             model_load_params = f" -i {file_path} --quiet"
             if model.problem_type in PROBLEM_TYPES_CLASSIFICATION:
                 model_load_params += " --probabilities --loss_function=logistic"
-            if params['sparse_weights']:
+            if params["sparse_weights"]:
                 model_load_params += " --sparse_weights"
 
             model.model = vowpalwabbit.Workspace(model_load_params)
@@ -216,12 +231,12 @@ class VowpalWabbitModel(AbstractModel):
     # User-specified parameters will override these values on a key-by-key basis.
     def _set_default_params(self):
         default_params = {
-            'passes': 10,  # TODO: Much better if 500+, revisit this if wanting to use VW to get strong results
-            'bit_precision': 32,
-            'ngram': 2,
-            'skips': 1,
-            'learning_rate': 1,
-            'sparse_weights': True,
+            "passes": 10,  # TODO: Much better if 500+, revisit this if wanting to use VW to get strong results
+            "bit_precision": 32,
+            "ngram": 2,
+            "skips": 1,
+            "learning_rate": 1,
+            "sparse_weights": True,
         }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
@@ -233,8 +248,7 @@ class VowpalWabbitModel(AbstractModel):
         # Ignore the below mentioned special types. Only those features that are not of the below mentioned
         # type are passed to the model for training list are passed features
         extra_auxiliary_params = dict(
-            valid_raw_types=[R_INT, R_FLOAT, R_CATEGORY, R_OBJECT],
-            ignored_type_group_special=[S_IMAGE_PATH, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL]
+            valid_raw_types=[R_INT, R_FLOAT, R_CATEGORY, R_OBJECT], ignored_type_group_special=[S_IMAGE_PATH, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL]
         )
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
@@ -243,16 +257,16 @@ class VowpalWabbitModel(AbstractModel):
     def _get_default_ag_args(cls) -> dict:
         default_ag_args = super()._get_default_ag_args()
         extra_ag_args = {
-            'valid_stacker': False,
-            'problem_types': [BINARY, MULTICLASS, REGRESSION],
+            "valid_stacker": False,
+            "problem_types": [BINARY, MULTICLASS, REGRESSION],
         }
         default_ag_args.update(extra_ag_args)
         return default_ag_args
 
     def _more_tags(self):
         # `can_refit_full=True` because best epoch is communicated at end of `_fit`: `self.params_trained['passes'] = epoch`
-        return {'can_refit_full': True}
+        return {"can_refit_full": True}
 
     @classmethod
     def _class_tags(cls):
-        return {'handles_text': True}
+        return {"handles_text": True}

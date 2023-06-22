@@ -76,12 +76,8 @@ def quantile_transformer_converter(scope, operator, container):
         )
         references = np.clip(norm.ppf(op.references_), -5.2, 5.2).astype(dtype)
         cst = np.broadcast_to(references, (batch_size, n_quantiles))
-        argmin_reshaped = OnnxReshape(
-            argmin, np.array([batch_size, 1], dtype=np.int64), output_names=[f"reshape_col{feature_idx}"]
-        )
-        ref = OnnxGatherElements(
-            cst, argmin_reshaped, axis=1, op_version=opv, output_names=[f"gathernd_col{feature_idx}"]
-        )
+        argmin_reshaped = OnnxReshape(argmin, np.array([batch_size, 1], dtype=np.int64), output_names=[f"reshape_col{feature_idx}"])
+        ref = OnnxGatherElements(cst, argmin_reshaped, axis=1, op_version=opv, output_names=[f"gathernd_col{feature_idx}"])
         Y_col.append(OnnxReshape(ref, np.array([batch_size, 1], dtype=np.int64), output_names=[f"Y_col{feature_idx}"]))
     Y = OnnxConcat(*Y_col, axis=1, op_version=opv, output_names=out[:1])
     Y.add_to(scope, container)
@@ -140,9 +136,7 @@ def _encoder_handle_unknown_transformer_converter(scope, operator, container, na
     num_categories = len(op.categories_)
 
     C_col = op.categories_
-    X_col = OnnxSplit(
-        X, axis=1, output_names=[f"{name_prefix}X_col{x}" for x in range(num_categories)], op_version=opv
-    )
+    X_col = OnnxSplit(X, axis=1, output_names=[f"{name_prefix}X_col{x}" for x in range(num_categories)], op_version=opv)
     X_col.add_to(scope, container)
     Y_col = []
     for feature_idx in range(num_categories):
@@ -405,27 +399,17 @@ def skl2onnx_common_utils_get_column_index(i, inputs):
         pos = 0
         end = inputs[0].type.shape[1] if isinstance(inputs[0].type, TensorType) else 1
         if end is None:
-            raise RuntimeError(
-                "Cannot extract a specific column {0} when "
-                "one input ('{1}') has unknown "
-                "dimension.".format(i, inputs[0])
-            )
+            raise RuntimeError("Cannot extract a specific column {0} when " "one input ('{1}') has unknown " "dimension.".format(i, inputs[0]))
         while True:
             if pos <= i < end:
                 return (vi, i - pos)
             vi += 1
             pos = end
             if vi >= len(inputs):
-                raise RuntimeError(
-                    "Input {} (i={}, end={}) is not available in\n{}".format(vi, i, end, pprint.pformat(inputs))
-                )
+                raise RuntimeError("Input {} (i={}, end={}) is not available in\n{}".format(vi, i, end, pprint.pformat(inputs)))
             rel_end = inputs[vi].type.shape[1] if isinstance(inputs[vi].type, TensorType) else 1
             if rel_end is None:
-                raise RuntimeError(
-                    "Cannot extract a specific column {0} when "
-                    "one input ('{1}') has unknown "
-                    "dimension.".format(i, inputs[vi])
-                )
+                raise RuntimeError("Cannot extract a specific column {0} when " "one input ('{1}') has unknown " "dimension.".format(i, inputs[vi]))
             end += rel_end
     else:
         for ind, inp in enumerate(inputs):

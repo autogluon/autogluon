@@ -1,9 +1,10 @@
 import logging
+
+import numpy as np
 import torch
 import torch.nn as nn
-import numpy as np
 
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE
+from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION, SOFTCLASS
 
 from ..utils.nn_architecture_utils import get_embed_sizes
 
@@ -14,21 +15,15 @@ class EmbedNet(nn.Module):
     """
     y_range: Used specifically for regression. = None for classification.
     """
-    def __init__(self,
-                 problem_type,
-                 num_net_outputs=None,
-                 quantile_levels=None,
-                 train_dataset=None,
-                 architecture_desc=None,
-                 device=None,
-                 **kwargs):
+
+    def __init__(self, problem_type, num_net_outputs=None, quantile_levels=None, train_dataset=None, architecture_desc=None, device=None, **kwargs):
         if (architecture_desc is None) and (train_dataset is None):
             raise ValueError("train_dataset cannot = None if architecture_desc=None")
         super().__init__()
         self.problem_type = problem_type
-        if self. problem_type == QUANTILE:
-            self.register_buffer('quantile_levels', torch.Tensor(quantile_levels).float().reshape(1, -1))
-        self.device = torch.device('cpu') if device is None else device
+        if self.problem_type == QUANTILE:
+            self.register_buffer("quantile_levels", torch.Tensor(quantile_levels).float().reshape(1, -1))
+        self.device = torch.device("cpu") if device is None else device
         if architecture_desc is None:
             params = self._set_params(**kwargs)
             # adpatively specify network architecture based on training dataset
@@ -43,15 +38,15 @@ class EmbedNet(nn.Module):
         else:
             # ignore train_dataset, params, etc. Recreate architecture based on description:
             self.architecture_desc = architecture_desc
-            self.has_vector_features = architecture_desc['has_vector_features']
-            self.has_embed_features = architecture_desc['has_embed_features']
-            self.from_logits = architecture_desc['from_logits']
-            params = architecture_desc['params']
+            self.has_vector_features = architecture_desc["has_vector_features"]
+            self.has_embed_features = architecture_desc["has_embed_features"]
+            self.from_logits = architecture_desc["from_logits"]
+            params = architecture_desc["params"]
             if self.has_embed_features:
-                num_categs_per_feature = architecture_desc['num_categs_per_feature']
-                embed_dims = architecture_desc['embed_dims']
+                num_categs_per_feature = architecture_desc["num_categs_per_feature"]
+                embed_dims = architecture_desc["embed_dims"]
             if self.has_vector_features:
-                vector_dims = architecture_desc['vector_dims']
+                vector_dims = architecture_desc["vector_dims"]
         # init input size
         input_size = 0
 
@@ -59,8 +54,7 @@ class EmbedNet(nn.Module):
         if self.has_embed_features:
             self.embed_blocks = nn.ModuleList()
             for i in range(len(num_categs_per_feature)):
-                self.embed_blocks.append(nn.Embedding(num_embeddings=num_categs_per_feature[i],
-                                                      embedding_dim=embed_dims[i]))
+                self.embed_blocks.append(nn.Embedding(num_embeddings=num_categs_per_feature[i], embedding_dim=embed_dims[i]))
                 input_size += embed_dims[i]
 
         # update input size
@@ -69,71 +63,76 @@ class EmbedNet(nn.Module):
 
         # activation
         act_fn = nn.Identity()
-        if params['activation'] == 'elu':
+        if params["activation"] == "elu":
             act_fn = nn.ELU()
-        elif params['activation'] == 'relu':
+        elif params["activation"] == "relu":
             act_fn = nn.ReLU()
-        elif params['activation'] == 'tanh':
+        elif params["activation"] == "tanh":
             act_fn = nn.Tanh()
 
         layers = []
-        if params['use_batchnorm']:
+        if params["use_batchnorm"]:
             layers.append(nn.BatchNorm1d(input_size))
-        layers.append(nn.Linear(input_size, params['hidden_size']))
+        layers.append(nn.Linear(input_size, params["hidden_size"]))
         layers.append(act_fn)
-        for _ in range(params['num_layers'] - 1):
-            if params['use_batchnorm']:
-                layers.append(nn.BatchNorm1d(params['hidden_size']))
-            layers.append(nn.Dropout(params['dropout_prob']))
-            layers.append(nn.Linear(params['hidden_size'], params['hidden_size']))
+        for _ in range(params["num_layers"] - 1):
+            if params["use_batchnorm"]:
+                layers.append(nn.BatchNorm1d(params["hidden_size"]))
+            layers.append(nn.Dropout(params["dropout_prob"]))
+            layers.append(nn.Linear(params["hidden_size"], params["hidden_size"]))
             layers.append(act_fn)
-        layers.append(nn.Linear(params['hidden_size'], num_net_outputs))
+        layers.append(nn.Linear(params["hidden_size"], num_net_outputs))
         self.main_block = nn.Sequential(*layers)
 
         if self.problem_type in [REGRESSION, QUANTILE]:  # set range for output
-            y_range = params['y_range']  # Used specifically for regression. = None for classification.
+            y_range = params["y_range"]  # Used specifically for regression. = None for classification.
             self.y_constraint = None  # determines if Y-predictions should be constrained
             if y_range is not None:
                 if y_range[0] == -np.inf and y_range[1] == np.inf:
                     self.y_constraint = None  # do not worry about Y-range in this case
                 elif y_range[0] >= 0 and y_range[1] == np.inf:
-                    self.y_constraint = 'nonnegative'
+                    self.y_constraint = "nonnegative"
                 elif y_range[0] == -np.inf and y_range[1] <= 0:
-                    self.y_constraint = 'nonpositive'
+                    self.y_constraint = "nonpositive"
                 else:
-                    self.y_constraint = 'bounded'
+                    self.y_constraint = "bounded"
                 self.y_lower = y_range[0]
                 self.y_upper = y_range[1]
                 self.y_span = self.y_upper - self.y_lower
 
         if self.problem_type == QUANTILE:
-            self.alpha = params['alpha']  # for huber loss
+            self.alpha = params["alpha"]  # for huber loss
         if self.problem_type == SOFTCLASS:
             self.log_softmax = torch.nn.LogSoftmax(dim=1)
         if self.problem_type in [BINARY, MULTICLASS, SOFTCLASS]:
             self.softmax = torch.nn.Softmax(dim=1)
         if architecture_desc is None:  # Save Architecture description
-            self.architecture_desc = {'has_vector_features': self.has_vector_features,
-                                      'has_embed_features': self.has_embed_features,
-                                      'params': params, 'num_net_outputs': num_net_outputs,
-                                      'from_logits': self.from_logits}
+            self.architecture_desc = {
+                "has_vector_features": self.has_vector_features,
+                "has_embed_features": self.has_embed_features,
+                "params": params,
+                "num_net_outputs": num_net_outputs,
+                "from_logits": self.from_logits,
+            }
             if self.has_embed_features:
-                self.architecture_desc['num_categs_per_feature'] = num_categs_per_feature
-                self.architecture_desc['embed_dims'] = embed_dims
+                self.architecture_desc["num_categs_per_feature"] = num_categs_per_feature
+                self.architecture_desc["embed_dims"] = embed_dims
             if self.has_vector_features:
-                self.architecture_desc['vector_dims'] = vector_dims
+                self.architecture_desc["vector_dims"] = vector_dims
 
-    def _set_params(self,
-                    num_layers=4,
-                    hidden_size=128,
-                    activation='relu',
-                    use_batchnorm=False,
-                    dropout_prob=0.1,
-                    y_range=None,
-                    alpha=0.01,
-                    max_embedding_dim=100,
-                    embed_exponent=0.56,
-                    embedding_size_factor=1.0):
+    def _set_params(
+        self,
+        num_layers=4,
+        hidden_size=128,
+        activation="relu",
+        use_batchnorm=False,
+        dropout_prob=0.1,
+        y_range=None,
+        alpha=0.01,
+        max_embedding_dim=100,
+        embed_exponent=0.56,
+        embedding_size_factor=1.0,
+    ):
         return dict(
             num_layers=num_layers,
             hidden_size=hidden_size,
@@ -149,7 +148,7 @@ class EmbedNet(nn.Module):
 
     def init_params(self):
         for layer in self.children():
-            if hasattr(layer, 'reset_parameters'):
+            if hasattr(layer, "reset_parameters"):
                 layer.reset_parameters()
 
     def forward(self, data_batch):
@@ -173,9 +172,9 @@ class EmbedNet(nn.Module):
             if self.y_constraint is None:
                 return output_data
             else:
-                if self.y_constraint == 'nonnegative':
+                if self.y_constraint == "nonnegative":
                     return self.y_lower + torch.abs(output_data)
-                elif self.y_constraint == 'nonpositive':
+                elif self.y_constraint == "nonpositive":
                     return self.y_upper - torch.abs(output_data)
                 else:
                     return torch.sigmoid(output_data) * self.y_span + self.y_lower
@@ -190,13 +189,9 @@ class EmbedNet(nn.Module):
             loss_data = torch.max(self.quantile_levels * error_data, (self.quantile_levels - 1) * error_data)
             return loss_data.mean()
 
-        loss_data = torch.where(torch.abs(error_data) < self.alpha,
-                                0.5 * error_data * error_data,
-                                self.alpha * (torch.abs(error_data) - 0.5 * self.alpha))
+        loss_data = torch.where(torch.abs(error_data) < self.alpha, 0.5 * error_data * error_data, self.alpha * (torch.abs(error_data) - 0.5 * self.alpha))
         loss_data /= self.alpha
-        scale = torch.where(error_data >= 0,
-                            torch.ones_like(error_data) * self.quantile_levels,
-                            torch.ones_like(error_data) * (1 - self.quantile_levels))
+        scale = torch.where(error_data >= 0, torch.ones_like(error_data) * self.quantile_levels, torch.ones_like(error_data) * (1 - self.quantile_levels))
         loss_data *= scale
         return loss_data.mean()
 
@@ -242,7 +237,6 @@ class EmbedNet(nn.Module):
                 predict_data = predict_data.flatten()
             return loss_function(predict_data, target_data)
 
-
     def predict(self, input_data):
         self.eval()
         with torch.no_grad():
@@ -254,5 +248,5 @@ class EmbedNet(nn.Module):
             elif self.problem_type == REGRESSION:
                 predict_data = predict_data.flatten()
             if self.problem_type == BINARY:
-                predict_data = predict_data[:,1]
+                predict_data = predict_data[:, 1]
             return predict_data.data.cpu().numpy()

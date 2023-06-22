@@ -1,20 +1,20 @@
 import logging
 
-from autogluon.core.constants import REGRESSION, SOFTCLASS
 from autogluon.common.utils.try_import import try_import_rapids_cuml
+from autogluon.core.constants import REGRESSION, SOFTCLASS
 
-from .rf_model import RFModel
 from .._utils.rapids_utils import RapidsModelMixin
+from .rf_model import RFModel
 
 logger = logging.getLogger(__name__)
 
 
 # TODO: Improve memory safety
 # TODO: Respect time limit
-# TODO: Depending on max_depth parameter, RFRapidsModel is slower than RFModel. 
-#  A lower max_depth (e.g., 16) results in a RFRapidsModel that is faster than RFModel, 
+# TODO: Depending on max_depth parameter, RFRapidsModel is slower than RFModel.
+#  A lower max_depth (e.g., 16) results in a RFRapidsModel that is faster than RFModel,
 #  but a higher max_depth (e.g., approximating unlimited depth)
-#  results in a RFRapidsModel that is significantly slower than RFModel. 
+#  results in a RFRapidsModel that is significantly slower than RFModel.
 #  Refer to https://github.com/rapidsai/cuml/issues/1977
 class RFRapidsModel(RapidsModelMixin, RFModel):
     """
@@ -27,9 +27,11 @@ class RFRapidsModel(RapidsModelMixin, RFModel):
     conda activate rapids-21.06
     pip install --pre autogluon.tabular[all]
     """
+
     def _get_model_type(self):
         try_import_rapids_cuml()
         from cuml.ensemble import RandomForestClassifier, RandomForestRegressor
+
         if self.problem_type in [REGRESSION, SOFTCLASS]:
             return RandomForestRegressor
         else:
@@ -37,9 +39,9 @@ class RFRapidsModel(RapidsModelMixin, RFModel):
 
     def _set_default_params(self):
         default_params = {
-            'n_estimators': 300,
-            'max_depth': 99,  # RAPIDS does not allow unlimited depth, so this approximates it.
-            'random_state': 0,
+            "n_estimators": 300,
+            "max_depth": 99,  # RAPIDS does not allow unlimited depth, so this approximates it.
+            "random_state": 0,
         }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
@@ -48,4 +50,4 @@ class RFRapidsModel(RapidsModelMixin, RFModel):
         X = self.preprocess(X)
         self.model = self._get_model_type()(**self._get_model_params())
         self.model = self.model.fit(X, y)
-        self.params_trained['n_estimators'] = self.model.n_estimators
+        self.params_trained["n_estimators"] = self.model.n_estimators

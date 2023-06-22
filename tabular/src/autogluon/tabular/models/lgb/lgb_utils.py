@@ -7,29 +7,28 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame, Series
 
+from autogluon.common.utils.try_import import try_import_lightgbm
 from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION, SOFTCLASS
 from autogluon.core.utils.exceptions import TimeLimitExceeded
-from autogluon.common.utils.try_import import try_import_lightgbm
-
 
 # Mapping to specialized LightGBM metrics that are much faster than the standard metric computation
 _ag_to_lgbm_metric_dict = {
     BINARY: dict(
-        accuracy='binary_error',
-        log_loss='binary_logloss',
-        roc_auc='auc',
+        accuracy="binary_error",
+        log_loss="binary_logloss",
+        roc_auc="auc",
     ),
     MULTICLASS: dict(
-        accuracy='multi_error',
-        log_loss='multi_logloss',
+        accuracy="multi_error",
+        log_loss="multi_logloss",
     ),
     QUANTILE: dict(
-        pinball_loss='quantile',
+        pinball_loss="quantile",
     ),
     REGRESSION: dict(
-        mean_absolute_error='l1',
-        mean_squared_error='l2',
-        root_mean_squared_error='rmse',
+        mean_absolute_error="l1",
+        mean_squared_error="l2",
+        root_mean_squared_error="rmse",
     ),
 }
 
@@ -41,48 +40,58 @@ def convert_ag_metric_to_lgbm(ag_metric_name, problem_type):
 def func_generator(metric, is_higher_better, needs_pred_proba, problem_type):
     if needs_pred_proba:
         if problem_type == MULTICLASS:
+
             def function_template(y_hat, data):
                 y_true = data.get_label()
                 y_hat = y_hat.reshape(len(np.unique(y_true)), -1).T
                 return metric.name, metric(y_true, y_hat), is_higher_better
+
         elif problem_type == SOFTCLASS:  # metric must take in soft labels array, like soft_log_loss
+
             def function_template(y_hat, data):
                 y_true = data.softlabels
                 y_hat = y_hat.reshape(y_true.shape[1], -1).T
                 y_hat = np.exp(y_hat)
-                y_hat = np.multiply(y_hat, 1/np.sum(y_hat, axis=1)[:, np.newaxis])
+                y_hat = np.multiply(y_hat, 1 / np.sum(y_hat, axis=1)[:, np.newaxis])
                 return metric.name, metric(y_true, y_hat), is_higher_better
+
         else:
+
             def function_template(y_hat, data):
                 y_true = data.get_label()
                 return metric.name, metric(y_true, y_hat), is_higher_better
+
     else:
         if problem_type == MULTICLASS:
+
             def function_template(y_hat, data):
                 y_true = data.get_label()
                 y_hat = y_hat.reshape(len(np.unique(y_true)), -1)
                 y_hat = y_hat.argmax(axis=0)
                 return metric.name, metric(y_true, y_hat), is_higher_better
+
         else:
+
             def function_template(y_hat, data):
                 y_true = data.get_label()
                 y_hat = np.round(y_hat)
                 return metric.name, metric(y_true, y_hat), is_higher_better
+
     return function_template
 
 
 def softclass_lgbobj(preds, train_data):
-    """ Custom LightGBM loss function for soft (probabilistic, vector-valued) class-labels only,
-        which have been appended to lgb.Dataset (train_data) as additional ".softlabels" attribute (2D numpy array).
+    """Custom LightGBM loss function for soft (probabilistic, vector-valued) class-labels only,
+    which have been appended to lgb.Dataset (train_data) as additional ".softlabels" attribute (2D numpy array).
     """
     softlabels = train_data.softlabels
     num_classes = softlabels.shape[1]
-    preds=np.reshape(preds, (len(softlabels), num_classes), order='F')
+    preds = np.reshape(preds, (len(softlabels), num_classes), order="F")
     preds = np.exp(preds)
-    preds = np.multiply(preds, 1/np.sum(preds, axis=1)[:, np.newaxis])
-    grad = (preds - softlabels)
-    hess = 2.0 * preds * (1.0-preds)
-    return grad.flatten('F'), hess.flatten('F')
+    preds = np.multiply(preds, 1 / np.sum(preds, axis=1)[:, np.newaxis])
+    grad = preds - softlabels
+    hess = 2.0 * preds * (1.0 - preds)
+    return grad.flatten("F"), hess.flatten("F")
 
 
 def construct_dataset(x: DataFrame, y: Series, location=None, reference=None, params=None, save=False, weight=None):
@@ -93,7 +102,7 @@ def construct_dataset(x: DataFrame, y: Series, location=None, reference=None, pa
 
     if save:
         assert location is not None
-        saving_path = f'{location}.bin'
+        saving_path = f"{location}.bin"
         if os.path.exists(saving_path):
             os.remove(saving_path)
 
@@ -107,8 +116,8 @@ def construct_dataset(x: DataFrame, y: Series, location=None, reference=None, pa
 def train_lgb_model(early_stopping_callback_kwargs=None, **train_params):
     import lightgbm as lgb
 
-    if train_params['params']['objective'] == 'quantile':
-        quantile_levels = train_params['params'].pop('quantile_levels')
+    if train_params["params"]["objective"] == "quantile":
+        quantile_levels = train_params["params"].pop("quantile_levels")
         booster = QuantileBooster(quantile_levels=quantile_levels, early_stopping_callback_kwargs=early_stopping_callback_kwargs)
         return booster.fit(**train_params)
     else:
@@ -117,11 +126,12 @@ def train_lgb_model(early_stopping_callback_kwargs=None, **train_params):
 
 class QuantileBooster:
     """Wrapper that trains a separate LGBM Booster for each quantile level."""
+
     def __init__(self, quantile_levels: List[float], early_stopping_callback_kwargs: Optional[dict] = None):
         if quantile_levels is None:
             raise AssertionError
         if not all(0 < q < 1 for q in quantile_levels):
-            raise AssertionError(f'quantile_levels must fulfill 0 < q < 1, provided quantile_levels: {quantile_levels}')
+            raise AssertionError(f"quantile_levels must fulfill 0 < q < 1, provided quantile_levels: {quantile_levels}")
 
         self.quantile_levels = quantile_levels
 
@@ -130,23 +140,24 @@ class QuantileBooster:
 
         if early_stopping_callback_kwargs is not None:
             self.early_stopping_callback_kwargs = early_stopping_callback_kwargs
-            self.time_limit_global = early_stopping_callback_kwargs.pop('time_limit')
+            self.time_limit_global = early_stopping_callback_kwargs.pop("time_limit")
         self.model_dict = {}
 
     def fit(self, **train_params_base):
         import lightgbm as lgb
+
         from .callbacks import early_stopping_custom
 
         start_time_global = time.time()
 
         for q in self.quantile_levels:
             train_params = copy.deepcopy(train_params_base)
-            train_params['params']['alpha'] = q
+            train_params["params"]["alpha"] = q
             if self.early_stopping_callback_kwargs is not None:
                 es_kwargs = copy.deepcopy(self.early_stopping_callback_kwargs)
                 if self.time_limit_global is not None:
-                    es_kwargs['start_time'] = time.time()
-                    es_kwargs['time_limit'] = self.time_limit_global / len(self.quantile_levels)
+                    es_kwargs["start_time"] = time.time()
+                    es_kwargs["time_limit"] = self.time_limit_global / len(self.quantile_levels)
                 # Don't add a logging callback to avoid printing logs for each base booster
                 train_params["callbacks"] = [early_stopping_custom(**es_kwargs)]
             else:

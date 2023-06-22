@@ -58,7 +58,7 @@ class BERTPretext(nn.Module):
             predict the pretext label.
     """
 
-    def __init__(self, cat_feat_origin_cards, device, hidden_dim, replacement_noise='random', p_replace=0.3):
+    def __init__(self, cat_feat_origin_cards, device, hidden_dim, replacement_noise="random", p_replace=0.3):
         super().__init__()
         self.cat_feat_origin_cards = cat_feat_origin_cards
         self.device = device
@@ -91,13 +91,13 @@ class BERTPretext(nn.Module):
 
         orig_cat_feats = deepcopy(cat_feats.detach())
 
-        if self.replacement_noise == 'swap':
+        if self.replacement_noise == "swap":
             n_cat = cat_feats.shape[1]
             cols_to_shuffle = np.random.choice(n_cat, int(self.p_replace * n_cat), replace=False)
             for col in cols_to_shuffle:
                 cat_feats[:, col] = cat_feats[:, col][torch.randperm(cat_feats.shape[0])]
 
-        elif self.replacement_noise == 'random':
+        elif self.replacement_noise == "random":
             locs_to_replace = torch.empty_like(cat_feats, dtype=float).uniform_() < self.p_replace
             col_cardinalities = torch.LongTensor([i[1] for i in self.cat_feat_origin_cards]).to(cat_feats)
             col_cardinalities = col_cardinalities.unsqueeze(0).expand_as(cat_feats)
@@ -117,13 +117,11 @@ class BERTPretext(nn.Module):
             cat_feats[extra_replace] = extra_minus1
             assert torch.all(~(cat_feats[extra_replace] == orig_cat_feats[extra_replace])).item() is True
 
-        elif self.replacement_noise == 'low_rank':
+        elif self.replacement_noise == "low_rank":
             assert self.p_replace + 0.2 <= 1, "p_replace too big, lower it!"
-            weights = torch.tensor([self.p_replace, 0.1, 0.9 - self.p_replace],
-                                   dtype=torch.float)  # 0=pad, 1=replace with random value, 2=dont change
+            weights = torch.tensor([self.p_replace, 0.1, 0.9 - self.p_replace], dtype=torch.float)  # 0=pad, 1=replace with random value, 2=dont change
 
-            locs_to_change = torch.multinomial(weights, np.prod(cat_feats.shape), replacement=True).view(
-                cat_feats.shape)
+            locs_to_change = torch.multinomial(weights, np.prod(cat_feats.shape), replacement=True).view(cat_feats.shape)
             col_cardinalities = torch.LongTensor([i[1] for i in self.cat_feat_origin_cards]).to(cat_feats)
             col_cardinalities = col_cardinalities.unsqueeze(0).expand_as(cat_feats)
 

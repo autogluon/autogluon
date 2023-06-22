@@ -1,16 +1,15 @@
 import logging
-
-import numpy as np
 import math
 import time
-
 from typing import Dict, Union
 
-from autogluon.common.features.types import R_INT, R_FLOAT, S_BOOL
+import numpy as np
+
+from autogluon.common.features.types import R_FLOAT, R_INT, S_BOOL
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
-from autogluon.core.utils.exceptions import NotEnoughMemoryError
 from autogluon.core.models import AbstractModel
+from autogluon.core.utils.exceptions import NotEnoughMemoryError
 from autogluon.core.utils.utils import normalize_pred_probas
 
 logger = logging.getLogger(__name__)
@@ -21,17 +20,19 @@ class KNNModel(AbstractModel):
     """
     KNearestNeighbors model (scikit-learn): https://scikit-learn.org/stable/modules/generated/sklearn.neighbors.KNeighborsClassifier.html
     """
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._X_unused_index = None  # Keeps track of unused training data indices, necessary for LOO OOF generation
 
     def _get_model_type(self):
-        if self.params_aux.get('use_daal', True):
+        if self.params_aux.get("use_daal", True):
             try:
                 # TODO: Add more granular switch, currently this affects all future KNN models even if they had `use_daal=False`
                 from sklearnex.neighbors import KNeighborsClassifier, KNeighborsRegressor
+
                 # sklearnex backend for KNN seems to be 20-40x+ faster than native sklearn with no downsides.
-                logger.log(15, '\tUsing sklearnex KNN backend...')
+                logger.log(15, "\tUsing sklearnex KNN backend...")
             except:
                 from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
         else:
@@ -48,7 +49,7 @@ class KNNModel(AbstractModel):
 
     def _set_default_params(self):
         default_params = {
-            'weights': 'uniform',
+            "weights": "uniform",
         }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
@@ -65,14 +66,14 @@ class KNNModel(AbstractModel):
     @classmethod
     def _get_default_ag_args(cls) -> dict:
         default_ag_args = super()._get_default_ag_args()
-        extra_ag_args = {'valid_stacker': False}
+        extra_ag_args = {"valid_stacker": False}
         default_ag_args.update(extra_ag_args)
         return default_ag_args
 
     @classmethod
     def _get_default_ag_args_ensemble(cls, **kwargs) -> dict:
         default_ag_args_ensemble = super()._get_default_ag_args_ensemble(**kwargs)
-        extra_ag_args_ensemble = {'use_child_oof': True}
+        extra_ag_args_ensemble = {"use_child_oof": True}
         default_ag_args_ensemble.update(extra_ag_args_ensemble)
         return default_ag_args_ensemble
 
@@ -81,18 +82,12 @@ class KNNModel(AbstractModel):
         spaces = {}
         return spaces
 
-    def _fit(self,
-             X,
-             y,
-             num_cpus=-1,
-             time_limit=None,
-             sample_weight=None,
-             **kwargs):
+    def _fit(self, X, y, num_cpus=-1, time_limit=None, sample_weight=None, **kwargs):
         time_start = time.time()
         X = self.preprocess(X)
         params = self._get_model_params()
-        if 'n_jobs' not in params:
-            params['n_jobs'] = num_cpus
+        if "n_jobs" not in params:
+            params["n_jobs"] = num_cpus
         if sample_weight is not None:  # TODO: support
             logger.log(15, "sample_weight not yet supported for KNNModel, this model will ignore them in training.")
 
@@ -105,14 +100,13 @@ class KNNModel(AbstractModel):
 
     def _estimate_memory_usage(self, X, **kwargs):
         model_size_bytes = 4 * X.shape[0] * X.shape[1]  # Assuming float32 types
-        expected_final_model_size_bytes = model_size_bytes * 3.6 # Roughly what can be expected of the final KNN model in memory size
+        expected_final_model_size_bytes = model_size_bytes * 3.6  # Roughly what can be expected of the final KNN model in memory size
         return expected_final_model_size_bytes
 
     def _validate_fit_memory_usage(self, mem_error_threshold: float = 0.2, mem_warning_threshold: float = 0.15, mem_size_threshold: int = 1e7, **kwargs):
-        return super()._validate_fit_memory_usage(mem_error_threshold=mem_error_threshold,
-                                                  mem_warning_threshold=mem_warning_threshold,
-                                                  mem_size_threshold=mem_size_threshold,
-                                                  **kwargs)
+        return super()._validate_fit_memory_usage(
+            mem_error_threshold=mem_error_threshold, mem_warning_threshold=mem_warning_threshold, mem_size_threshold=mem_size_threshold, **kwargs
+        )
 
     # TODO: Won't work for RAPIDS without modification
     # TODO: Technically isn't OOF, but can be used inplace of OOF. Perhaps rename to something more accurate?
@@ -128,6 +122,7 @@ class KNNModel(AbstractModel):
 
     def _get_oof_pred_proba(self, X, **kwargs):
         from ._knn_loo_variants import KNeighborsClassifierLOOMixin, KNeighborsRegressorLOOMixin
+
         if self.problem_type in [BINARY, MULTICLASS]:
             y_oof_pred_proba = KNeighborsClassifierLOOMixin.predict_proba_loo(self.model)
         else:
@@ -152,15 +147,7 @@ class KNNModel(AbstractModel):
         return y_oof_pred_proba
 
     # TODO: Consider making this fully generic and available to all models
-    def _fit_with_samples(self,
-                          X,
-                          y,
-                          model_params,
-                          time_limit,
-                          start_samples=10000,
-                          max_samples=None,
-                          sample_growth_factor=2,
-                          sample_time_growth_factor=8):
+    def _fit_with_samples(self, X, y, model_params, time_limit, start_samples=10000, max_samples=None, sample_growth_factor=2, sample_time_growth_factor=8):
         """
         Fit model with samples of the data repeatedly, gradually increasing the amount of data until time_limit is reached or all data is used.
 
@@ -210,7 +197,7 @@ class KNNModel(AbstractModel):
             return chunk.sample(n=n, replace=False, random_state=0)
 
         if self.problem_type != REGRESSION:
-            y_df = y.to_frame(name='label').reset_index(drop=True)
+            y_df = y.to_frame(name="label").reset_index(drop=True)
         else:
             y_df = None
 
@@ -223,7 +210,7 @@ class KNNModel(AbstractModel):
                 if self.problem_type == REGRESSION:
                     idx = np.random.choice(num_rows_max, size=samples, replace=False)
                 else:
-                    idx = y_df.groupby('label', group_keys=False).apply(sample_func, frac=samples/num_rows_max).index
+                    idx = y_df.groupby("label", group_keys=False).apply(sample_func, frac=samples / num_rows_max).index
                 X_samp = X[idx, :]
                 y_samp = y.iloc[idx]
             else:
@@ -236,20 +223,21 @@ class KNNModel(AbstractModel):
             time_limit_left = time_limit - (time_fit_end_sample - time_start)
             time_fit_sample = time_limit_left_prior - time_limit_left
             time_required_for_next = time_fit_sample * sample_time_growth_factor
-            logger.log(15, f'\t{round(time_fit_sample, 2)}s \t= Train Time (Using {samples}/{num_rows_max} rows) ({round(time_limit_left, 2)}s remaining time)')
+            logger.log(15, f"\t{round(time_fit_sample, 2)}s \t= Train Time (Using {samples}/{num_rows_max} rows) ({round(time_limit_left, 2)}s remaining time)")
             if time_required_for_next > time_limit_left and i != len(num_rows_samples) - 1:
-                logger.log(20, f'\tNot enough time to train KNN model on all training rows. Fit {samples}/{num_rows_max} rows. (Training KNN model on {num_rows_samples[i+1]} rows is expected to take {round(time_required_for_next, 2)}s)')
+                logger.log(
+                    20,
+                    f"\tNot enough time to train KNN model on all training rows. Fit {samples}/{num_rows_max} rows. (Training KNN model on {num_rows_samples[i+1]} rows is expected to take {round(time_required_for_next, 2)}s)",
+                )
                 break
         if idx is not None:
             idx = set(idx)
             self._X_unused_index = [i for i in range(num_rows_max) if i not in idx]
         return self.model
-    
+
     def _get_maximum_resources(self) -> Dict[str, Union[int, float]]:
         # use at most 32 cpus to avoid OpenBLAS error: https://github.com/autogluon/autogluon/issues/1020
-        return {
-            "num_cpus": 32
-        }
+        return {"num_cpus": 32}
 
     def _get_default_resources(self):
         # use at most 32 cpus to avoid OpenBLAS error: https://github.com/autogluon/autogluon/issues/1020
@@ -259,14 +247,15 @@ class KNNModel(AbstractModel):
 
     def _more_tags(self):
         return {
-            'valid_oof': True,
-            'can_refit_full': True,
+            "valid_oof": True,
+            "can_refit_full": True,
         }
 
 
 class FAISSModel(KNNModel):
     def _get_model_type(self):
         from .knn_utils import FAISSNeighborsClassifier, FAISSNeighborsRegressor
+
         if self.problem_type == REGRESSION:
             return FAISSNeighborsRegressor
         else:
@@ -274,7 +263,7 @@ class FAISSModel(KNNModel):
 
     def _set_default_params(self):
         default_params = {
-            'index_factory_string': 'Flat',
+            "index_factory_string": "Flat",
         }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
@@ -283,9 +272,9 @@ class FAISSModel(KNNModel):
     @classmethod
     def _get_default_ag_args_ensemble(cls, **kwargs) -> dict:
         default_ag_args_ensemble = super()._get_default_ag_args_ensemble(**kwargs)
-        extra_ag_args_ensemble = {'use_child_oof': False}
+        extra_ag_args_ensemble = {"use_child_oof": False}
         default_ag_args_ensemble.update(extra_ag_args_ensemble)
         return default_ag_args_ensemble
 
     def _more_tags(self):
-        return {'valid_oof': False}
+        return {"valid_oof": False}

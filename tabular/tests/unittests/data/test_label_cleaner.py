@@ -3,31 +3,37 @@ import pandas as pd
 import pytest
 
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
-from autogluon.core.data.label_cleaner import LabelCleaner, LabelCleanerBinary, LabelCleanerMulticlass, LabelCleanerMulticlassToBinary, LabelCleanerDummy
+from autogluon.core.data.label_cleaner import (
+    LabelCleaner,
+    LabelCleanerBinary,
+    LabelCleanerDummy,
+    LabelCleanerMulticlass,
+    LabelCleanerMulticlassToBinary,
+)
 
 
 def test_label_cleaner_binary():
     # Given
     problem_type = BINARY
-    input_labels_numpy = np.array(['l1', 'l2', 'l2', 'l1', 'l1', 'l2'])
+    input_labels_numpy = np.array(["l1", "l2", "l2", "l1", "l1", "l2"])
     input_labels = pd.Series(input_labels_numpy)
-    input_labels_category = input_labels.astype('category')
+    input_labels_category = input_labels.astype("category")
     input_labels_with_shifted_index = input_labels.copy()
     input_labels_with_shifted_index.index += 5
-    input_labels_new = np.array(['new', 'l1', 'l2'])
-    expected_output_labels = pd.Series([0, 1, 1, 0, 0, 1], dtype='uint8')
-    expected_output_labels_pos_class_l1 = pd.Series([1, 0, 0, 1, 1, 0], dtype='uint8')
+    input_labels_new = np.array(["new", "l1", "l2"])
+    expected_output_labels = pd.Series([0, 1, 1, 0, 0, 1], dtype="uint8")
+    expected_output_labels_pos_class_l1 = pd.Series([1, 0, 0, 1, 1, 0], dtype="uint8")
     expected_output_labels_new = pd.Series([np.nan, 0, 1])
     expected_output_labels_new_pos_class_l1 = pd.Series([np.nan, 1, 0])
-    expected_output_labels_new_inverse = pd.Series([np.nan, 'l1', 'l2'])
+    expected_output_labels_new_inverse = pd.Series([np.nan, "l1", "l2"])
 
     # When
     label_cleaner = LabelCleaner.construct(problem_type=problem_type, y=input_labels)  # positive_class='l2'
-    label_cleaner_pos_class_l1 = LabelCleaner.construct(problem_type=problem_type, y=input_labels, positive_class='l1')
+    label_cleaner_pos_class_l1 = LabelCleaner.construct(problem_type=problem_type, y=input_labels, positive_class="l1")
 
     # Raise exception
     with pytest.raises(ValueError):
-        LabelCleaner.construct(problem_type=problem_type, y=input_labels, positive_class='unknown_class')
+        LabelCleaner.construct(problem_type=problem_type, y=input_labels, positive_class="unknown_class")
 
     # Raise exception
     with pytest.raises(AssertionError):
@@ -36,8 +42,8 @@ def test_label_cleaner_binary():
     # Then
     assert isinstance(label_cleaner, LabelCleanerBinary)
     assert label_cleaner.problem_type_transform == BINARY
-    assert label_cleaner.cat_mappings_dependent_var == {0: 'l1', 1: 'l2'}
-    assert label_cleaner_pos_class_l1.cat_mappings_dependent_var == {0: 'l2', 1: 'l1'}
+    assert label_cleaner.cat_mappings_dependent_var == {0: "l1", 1: "l2"}
+    assert label_cleaner_pos_class_l1.cat_mappings_dependent_var == {0: "l2", 1: "l1"}
 
     output_labels = label_cleaner.transform(input_labels)
     output_labels_pos_class_l1 = label_cleaner_pos_class_l1.transform(input_labels)
@@ -75,11 +81,11 @@ def test_label_cleaner_multiclass():
     problem_type = MULTICLASS
     input_labels_numpy = np.array([2, 4, 2, 2, 4, 1])
     input_labels = pd.Series(input_labels_numpy)
-    input_labels_category = input_labels.astype('category')
+    input_labels_category = input_labels.astype("category")
     input_labels_with_shifted_index = input_labels.copy()
     input_labels_with_shifted_index.index += 5
     input_labels_new = np.array([3, 5, 2])
-    expected_output_labels = pd.Series([1, 2, 1, 1, 2, 0], dtype='uint8')
+    expected_output_labels = pd.Series([1, 2, 1, 1, 2, 0], dtype="uint8")
     expected_output_labels_new = pd.Series([np.nan, np.nan, 1])
     expected_output_labels_new_inverse = pd.Series([np.nan, np.nan, 2])
 
@@ -117,23 +123,19 @@ def test_label_cleaner_multiclass():
 def test_label_cleaner_multiclass_to_binary():
     # Given
     problem_type = MULTICLASS
-    input_labels_numpy = np.array(['l1', 'l2', 'l2', 'l1', 'l1', 'l2'])
+    input_labels_numpy = np.array(["l1", "l2", "l2", "l1", "l1", "l2"])
     input_labels = pd.Series(input_labels_numpy)
-    input_labels_uncleaned = pd.Series(['l0', 'l1', 'l2', 'l2', 'l1', 'l1', 'l2', 'l3', 'l4'])
-    input_labels_category = input_labels.astype('category')
+    input_labels_uncleaned = pd.Series(["l0", "l1", "l2", "l2", "l1", "l1", "l2", "l3", "l4"])
+    input_labels_category = input_labels.astype("category")
     input_labels_with_shifted_index = input_labels.copy()
     input_labels_with_shifted_index.index += 5
-    input_labels_new = np.array(['l0', 'l1', 'l2'])
+    input_labels_new = np.array(["l0", "l1", "l2"])
     input_labels_proba_transformed = pd.Series([0.7, 0.2, 0.5], index=[5, 2, 8])
-    expected_output_labels = pd.Series([0, 1, 1, 0, 0, 1], dtype='uint8')
+    expected_output_labels = pd.Series([0, 1, 1, 0, 0, 1], dtype="uint8")
     expected_output_labels_new = pd.Series([np.nan, 0, 1])
-    expected_output_labels_new_inverse = pd.Series([np.nan, 'l1', 'l2'])
+    expected_output_labels_new_inverse = pd.Series([np.nan, "l1", "l2"])
     expected_output_labels_proba_transformed_inverse = pd.DataFrame(
-        data=[
-            [0, 0.3, 0.7, 0, 0],
-            [0, 0.8, 0.2, 0, 0],
-            [0, 0.5, 0.5, 0, 0]
-        ], index=[5, 2, 8], columns=['l0', 'l1', 'l2', 'l3', 'l4'], dtype=np.float32
+        data=[[0, 0.3, 0.7, 0, 0], [0, 0.8, 0.2, 0, 0], [0, 0.5, 0.5, 0, 0]], index=[5, 2, 8], columns=["l0", "l1", "l2", "l3", "l4"], dtype=np.float32
     )
 
     # When
@@ -142,7 +144,7 @@ def test_label_cleaner_multiclass_to_binary():
     # Then
     assert isinstance(label_cleaner, LabelCleanerMulticlassToBinary)
     assert label_cleaner.problem_type_transform == BINARY
-    assert label_cleaner.cat_mappings_dependent_var == {0: 'l1', 1: 'l2'}
+    assert label_cleaner.cat_mappings_dependent_var == {0: "l1", 1: "l2"}
 
     output_labels = label_cleaner.transform(input_labels)
     output_labels_with_numpy = label_cleaner.transform(input_labels_numpy)
@@ -206,11 +208,13 @@ def test_label_cleaner_regression():
 def test_label_softclass():
     # Given
     problem_type = SOFTCLASS
-    input_labels = pd.DataFrame([
-        [0, 1, 0, 0, 0, 0],
-        [1, 0, 0, 0, 0, 0],
-        [0, 0, 0.3, 0.6, 0.1, 0],
-    ])
+    input_labels = pd.DataFrame(
+        [
+            [0, 1, 0, 0, 0, 0],
+            [1, 0, 0, 0, 0, 0],
+            [0, 0, 0.3, 0.6, 0.1, 0],
+        ]
+    )
 
     # When
     label_cleaner = LabelCleaner.construct(problem_type=problem_type, y=input_labels, y_uncleaned=None)

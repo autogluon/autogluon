@@ -25,22 +25,24 @@
                                                - Pytorch scores are slightly different, all else same.
 
 """
-import sys
-import math
 import hashlib
+import math
+import sys
 
 import numpy as np
 import pytest
 
 from autogluon.tabular import TabularDataset, TabularPredictor
-from .utils import tests, make_dataset
+
+from .utils import make_dataset, tests
 
 
 # Lots of test data since inference is fast and we want a score that's very reflective of model quality,
 # despite very fast training times.
 # Round to given accuracy.  The 8 is to remove floating point rounding errors.
-def myfloor(x, base=.01):
-    return round(base * math.floor(float(x)/base),8)
+def myfloor(x, base=0.01):
+    return round(base * math.floor(float(x) / base), 8)
+
 
 @pytest.mark.regression
 def inner_test_tabular(testname):
@@ -48,76 +50,78 @@ def inner_test_tabular(testname):
     # Find the named test
     test = None
     for t in tests:
-        if t['name'] == testname:
+        if t["name"] == testname:
             test = t
     assert test is not None, f"Could not find test {testname}"
- 
+
     # Build the dataset
     (dftrain, dftest) = make_dataset(request=test, seed=0)
 
-    # Check the synthetic dataset itself hasn't changed.  We round it to 3dp otherwise tiny floating point differences  
+    # Check the synthetic dataset itself hasn't changed.  We round it to 3dp otherwise tiny floating point differences
     # between platforms can give a different hash that still yields same prediction scores.
     # Ultimately it doesn't matter how we do this as long as the same dataset gives the same hash function on
     # different python versions and architectures.
     current_hash = hashlib.sha256(dftrain.round(decimals=3).values.tobytes()).hexdigest()[0:10]
     proposedconfig = "Proposed new config:\n"
     proposedconfig += f"'dataset_hash' : '{current_hash}',"
-    assert current_hash == test['dataset_hash'], f"Test '{testname}' input dataset has changed.  All scores will change.\n" + proposedconfig
+    assert current_hash == test["dataset_hash"], f"Test '{testname}' input dataset has changed.  All scores will change.\n" + proposedconfig
 
     # Now run the Predictor 1 or more times with various parameters, and make sure we get
     # back the expected results.
 
     # Params can either omitted, or a single run, or a list of runs.
-    if 'params' not in test:
-        test['params'] = { 'predict' : {}, 'fit' : {} }
-    if not isinstance(test['params'], list):
-        test['params'] = [ test['params'] ]
-    for params in test['params']:
+    if "params" not in test:
+        test["params"] = {"predict": {}, "fit": {}}
+    if not isinstance(test["params"], list):
+        test["params"] = [test["params"]]
+    for params in test["params"]:
 
-        # Run this model and set of params		
-        predictor = TabularPredictor(label='label', **params['predict'])
-        predictor.fit(dftrain, **params['fit'])
+        # Run this model and set of params
+        predictor = TabularPredictor(label="label", **params["predict"])
+        predictor.fit(dftrain, **params["fit"])
         leaderboard = predictor.leaderboard(dftest, silent=True)
-        leaderboard = leaderboard.sort_values(by='model') # So we can pre-generate sample config in alphabetical order
+        leaderboard = leaderboard.sort_values(by="model")  # So we can pre-generate sample config in alphabetical order
 
         # Store proposed new config based on the current run, in case the developer wants to keep thee results (just cut and paste).
         proposedconfig = "Proposed new config:\n"
-        proposedconfig += "'expected_score_range' : {\n";
-        for model in leaderboard['model']:
-            midx_in_leaderboard = leaderboard.index.values[leaderboard['model'] == model][0]
-            if np.isnan(leaderboard['score_test'][midx_in_leaderboard]): 
-                 values = "np.nan, np.nan"
+        proposedconfig += "'expected_score_range' : {\n"
+        for model in leaderboard["model"]:
+            midx_in_leaderboard = leaderboard.index.values[leaderboard["model"] == model][0]
+            if np.isnan(leaderboard["score_test"][midx_in_leaderboard]):
+                values = "np.nan, np.nan"
             else:
-                 if model in test['expected_score_range'] and not np.isnan(test['expected_score_range'][model][1]):
-                     currentprecision = test['expected_score_range'][model][1]
-                 else:
-                     currentprecision = 0.01
-                 values = "{}, {}".format(myfloor(leaderboard['score_test'][midx_in_leaderboard], currentprecision), currentprecision)
+                if model in test["expected_score_range"] and not np.isnan(test["expected_score_range"][model][1]):
+                    currentprecision = test["expected_score_range"][model][1]
+                else:
+                    currentprecision = 0.01
+                values = "{}, {}".format(myfloor(leaderboard["score_test"][midx_in_leaderboard], currentprecision), currentprecision)
             proposedconfig += f"    '{model}': ({values}),\n"
         proposedconfig += "},\n"
 
         # First validate the model list was as expected.
-        assert set(leaderboard['model']) == set(test['expected_score_range'].keys()), (f"Test '{testname}' params {params} got unexpected model list.\n" + proposedconfig)
+        assert set(leaderboard["model"]) == set(test["expected_score_range"].keys()), (
+            f"Test '{testname}' params {params} got unexpected model list.\n" + proposedconfig
+        )
 
         # Now validate the scores for each model were as expected.
         all_assertions_met = True
         currentconfig = "Existing config:\n"
-        currentconfig += "'expected_score_range' : {\n";
-        for model in sorted(test['expected_score_range']):
-            midx_in_leaderboard = leaderboard.index.values[leaderboard['model'] == model][0]
-            assert leaderboard['model'][midx_in_leaderboard] == model
-            expectedrange = test['expected_score_range'][model][1]
-            expectedmin = test['expected_score_range'][model][0]
+        currentconfig += "'expected_score_range' : {\n"
+        for model in sorted(test["expected_score_range"]):
+            midx_in_leaderboard = leaderboard.index.values[leaderboard["model"] == model][0]
+            assert leaderboard["model"][midx_in_leaderboard] == model
+            expectedrange = test["expected_score_range"][model][1]
+            expectedmin = test["expected_score_range"][model][0]
             expectedmax = expectedmin + expectedrange
 
             if np.isnan(expectedmin):
-                 values = "np.nan, np.nan"
+                values = "np.nan, np.nan"
             else:
-                 values = "{}, {}".format(expectedmin, expectedrange)
-            
-            if (((leaderboard['score_test'][midx_in_leaderboard] >= expectedmin) and 
-               (leaderboard['score_test'][midx_in_leaderboard] <= expectedmax)) or  
-               (np.isnan(leaderboard['score_test'][midx_in_leaderboard]) and np.isnan(expectedmin))):
+                values = "{}, {}".format(expectedmin, expectedrange)
+
+            if ((leaderboard["score_test"][midx_in_leaderboard] >= expectedmin) and (leaderboard["score_test"][midx_in_leaderboard] <= expectedmax)) or (
+                np.isnan(leaderboard["score_test"][midx_in_leaderboard]) and np.isnan(expectedmin)
+            ):
                 currentconfig += f"    '{model}': ({values}),\n"
             else:
                 currentconfig += f"    '{model}': ({values}), # <--- not met, got {leaderboard['score_test'][midx_in_leaderboard]} \n"
@@ -127,27 +131,30 @@ def inner_test_tabular(testname):
         assert all_assertions_met, f"Test '{testname}', params {params} had unexpected scores:\n" + currentconfig + proposedconfig
 
         # Clean up this model created with specific params.
-        predictor.delete_models(models_to_keep=[], dry_run=False)  
+        predictor.delete_models(models_to_keep=[], dry_run=False)
 
 
 # The tests are all run individually rather than in 1 big loop that simply goes through the tests dictionary.
 # This is so we easily remove some tests if necessary.
-@pytest.mark.parametrize("testname", [
-    'small regression',
-    'small regression excluded models',
-    'small regression light hyperparameters',
-    'small regression very light hyperparameters',
-    'small regression toy hyperparameters',
-    'small regression high quality',
-    'small regression best quality',
-    'small regression with categorical',
-    'small regression metric mae',
-    'small classification',
-    'small classification boolean',
-])
+@pytest.mark.parametrize(
+    "testname",
+    [
+        "small regression",
+        "small regression excluded models",
+        "small regression light hyperparameters",
+        "small regression very light hyperparameters",
+        "small regression toy hyperparameters",
+        "small regression high quality",
+        "small regression best quality",
+        "small regression with categorical",
+        "small regression metric mae",
+        "small classification",
+        "small classification boolean",
+    ],
+)
 
 # These results have only been confirmed for Linux.  Windows is known to give different results for Pytorch.
-@pytest.mark.skipif(sys.platform != 'linux', reason='Scores only confirmed on Linux')
+@pytest.mark.skipif(sys.platform != "linux", reason="Scores only confirmed on Linux")
 @pytest.mark.regression
 def test_tabular_score(testname):
     inner_test_tabular(testname)

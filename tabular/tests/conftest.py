@@ -2,31 +2,24 @@ import copy
 import os
 import shutil
 import uuid
-import pytest
-
 from contextlib import contextmanager
 from typing import List
 
-from autogluon.common.utils.resource_utils import ResourceManager
+import pytest
+
 from autogluon.common.utils.path_converter import PathConverter
-from autogluon.core.utils import download, unzip
+from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.data.label_cleaner import LabelCleaner
-from autogluon.core.utils import infer_problem_type, generate_train_test_split
+from autogluon.core.utils import download, generate_train_test_split, infer_problem_type, unzip
 from autogluon.features.generators import AutoMLPipelineFeatureGenerator
 from autogluon.tabular import TabularDataset, TabularPredictor
 
 
 def pytest_addoption(parser):
-    parser.addoption(
-        "--runslow", action="store_true", default=False, help="run slow tests"
-    )
-    parser.addoption(
-        "--runregression", action="store_true", default=False, help="run regression tests"
-    )
-    parser.addoption(
-        "--runpyodide", action="store_true", default=False, help="run Pyodide tests"
-    )
+    parser.addoption("--runslow", action="store_true", default=False, help="run slow tests")
+    parser.addoption("--runregression", action="store_true", default=False, help="run regression tests")
+    parser.addoption("--runpyodide", action="store_true", default=False, help="run Pyodide tests")
 
 
 def pytest_configure(config):
@@ -39,11 +32,7 @@ def pytest_collection_modifyitems(config, items):
     skip_slow = pytest.mark.skip(reason="need --runslow option to run")
     skip_regression = pytest.mark.skip(reason="need --runregression option to run")
     skip_pyodide = pytest.mark.skip(reason="need --runpyodide option to run")
-    custom_markers = dict(
-        slow=skip_slow,
-        regression=skip_regression,
-        pyodide=skip_pyodide
-    )
+    custom_markers = dict(slow=skip_slow, regression=skip_regression, pyodide=skip_pyodide)
     if config.getoption("--runslow"):
         # --runslow given in cli: do not skip slow tests
         custom_markers.pop("slow", None)
@@ -64,48 +53,48 @@ class DatasetLoaderHelper:
     dataset_info_dict = dict(
         # Binary dataset
         adult={
-            'url': 'https://autogluon.s3.amazonaws.com/datasets/AdultIncomeBinaryClassification.zip',
-            'name': 'AdultIncomeBinaryClassification',
-            'problem_type': BINARY,
-            'label': 'class',
+            "url": "https://autogluon.s3.amazonaws.com/datasets/AdultIncomeBinaryClassification.zip",
+            "name": "AdultIncomeBinaryClassification",
+            "problem_type": BINARY,
+            "label": "class",
         },
         # Multiclass big dataset with 7 classes, all features are numeric. Runs SLOW.
         covertype={
-            'url': 'https://autogluon.s3.amazonaws.com/datasets/CoverTypeMulticlassClassification.zip',
-            'name': 'CoverTypeMulticlassClassification',
-            'problem_type': MULTICLASS,
-            'label': 'Cover_Type',
+            "url": "https://autogluon.s3.amazonaws.com/datasets/CoverTypeMulticlassClassification.zip",
+            "name": "CoverTypeMulticlassClassification",
+            "problem_type": MULTICLASS,
+            "label": "Cover_Type",
         },
         # Subset of covertype dataset with 3k train/test rows. Ratio of labels is preserved.
         covertype_small={
-            'url': 'https://autogluon.s3.amazonaws.com/datasets/CoverTypeMulticlassClassificationSmall.zip',
-            'name': 'CoverTypeMulticlassClassificationSmall',
-            'problem_type': MULTICLASS,
-            'label': 'Cover_Type',
+            "url": "https://autogluon.s3.amazonaws.com/datasets/CoverTypeMulticlassClassificationSmall.zip",
+            "name": "CoverTypeMulticlassClassificationSmall",
+            "problem_type": MULTICLASS,
+            "label": "Cover_Type",
         },
         # Regression with mixed feature-types, skewed Y-values.
         ames={
-            'url': 'https://autogluon.s3.amazonaws.com/datasets/AmesHousingPriceRegression.zip',
-            'name': 'AmesHousingPriceRegression',
-            'problem_type': REGRESSION,
-            'label': 'SalePrice',
+            "url": "https://autogluon.s3.amazonaws.com/datasets/AmesHousingPriceRegression.zip",
+            "name": "AmesHousingPriceRegression",
+            "problem_type": REGRESSION,
+            "label": "SalePrice",
         },
         # Regression with multiple text field and categorical
         sts={
-            'url': 'https://autogluon-text.s3.amazonaws.com/glue_sts.zip',
-            'name': 'glue_sts',
-            'problem_type': REGRESSION,
-            'label': 'score',
-        }
+            "url": "https://autogluon-text.s3.amazonaws.com/glue_sts.zip",
+            "name": "glue_sts",
+            "problem_type": REGRESSION,
+            "label": "score",
+        },
     )
 
     @staticmethod
-    def load_dataset(name: str, directory_prefix: str = './datasets/'):
+    def load_dataset(name: str, directory_prefix: str = "./datasets/"):
         dataset_info = copy.deepcopy(DatasetLoaderHelper.dataset_info_dict[name])
-        train_file = dataset_info.pop('train_file', 'train_data.csv')
-        test_file = dataset_info.pop('test_file', 'test_data.csv')
-        name_inner = dataset_info.pop('name')
-        url = dataset_info.pop('url', None)
+        train_file = dataset_info.pop("train_file", "train_data.csv")
+        test_file = dataset_info.pop("test_file", "test_data.csv")
+        name_inner = dataset_info.pop("name")
+        url = dataset_info.pop("url", None)
         train_data, test_data = DatasetLoaderHelper.load_data(
             directory_prefix=directory_prefix,
             train_file=train_file,
@@ -137,22 +126,24 @@ class DatasetLoaderHelper:
 
 class FitHelper:
     @staticmethod
-    def fit_and_validate_dataset(dataset_name,
-                                 fit_args,
-                                 init_args=None,
-                                 sample_size=1000,
-                                 refit_full=True,
-                                 delete_directory=True,
-                                 extra_metrics=None,
-                                 expected_model_count=2,
-                                 path_as_absolute=False,
-                                 compile_models=False,
-                                 compiler_configs=None):
+    def fit_and_validate_dataset(
+        dataset_name,
+        fit_args,
+        init_args=None,
+        sample_size=1000,
+        refit_full=True,
+        delete_directory=True,
+        extra_metrics=None,
+        expected_model_count=2,
+        path_as_absolute=False,
+        compile_models=False,
+        compiler_configs=None,
+    ):
         if compiler_configs is None:
             compiler_configs = {}
-        directory_prefix = './datasets/'
+        directory_prefix = "./datasets/"
         train_data, test_data, dataset_info = DatasetLoaderHelper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
-        label = dataset_info['label']
+        label = dataset_info["label"]
         _init_args = dict(
             label=label,
         )
@@ -162,12 +153,12 @@ class FitHelper:
             init_args = copy.deepcopy(init_args)
             _init_args.update(init_args)
             init_args = _init_args
-        if 'path' not in init_args:
-            init_args['path'] = os.path.join(directory_prefix, dataset_name, f'AutogluonOutput_{uuid.uuid4()}')
+        if "path" not in init_args:
+            init_args["path"] = os.path.join(directory_prefix, dataset_name, f"AutogluonOutput_{uuid.uuid4()}")
         if path_as_absolute:
-            init_args['path'] = PathConverter.to_absolute(path=init_args['path'])
-            assert PathConverter._is_absolute(path=init_args['path'])
-        save_path = init_args['path']
+            init_args["path"] = PathConverter.to_absolute(path=init_args["path"])
+            assert PathConverter._is_absolute(path=init_args["path"])
+        save_path = init_args["path"]
         predictor = FitHelper.fit_dataset(train_data=train_data, init_args=init_args, fit_args=fit_args, sample_size=sample_size)
         if compile_models:
             predictor.compile_models(models="all", compiler_configs=compiler_configs)
@@ -191,7 +182,7 @@ class FitHelper:
             refit_model_names = predictor.refit_full()
             assert len(refit_model_names) == expected_model_count
             refit_model_name = refit_model_names[model_name]
-            assert '_FULL' in refit_model_name
+            assert "_FULL" in refit_model_name
             predictor.predict(test_data, model=refit_model_name)
             if predictor.can_predict_proba:
                 predictor.predict_proba(test_data, model=refit_model_name)
@@ -207,13 +198,9 @@ class FitHelper:
         return predictor
 
     @staticmethod
-    def fit_and_validate_dataset_with_cascade(dataset_name,
-                                              fit_args,
-                                              cascade: List[str],
-                                              sample_size=1000,
-                                              refit_full=True,
-                                              delete_directory=True,
-                                              expected_model_count=2):
+    def fit_and_validate_dataset_with_cascade(
+        dataset_name, fit_args, cascade: List[str], sample_size=1000, refit_full=True, delete_directory=True, expected_model_count=2
+    ):
         predictor = FitHelper.fit_and_validate_dataset(
             dataset_name=dataset_name,
             fit_args=fit_args,
@@ -222,7 +209,7 @@ class FitHelper:
             expected_model_count=expected_model_count,
             delete_directory=False,
         )
-        directory_prefix = './datasets/'
+        directory_prefix = "./datasets/"
         train_data, test_data, dataset_info = DatasetLoaderHelper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
 
         predictor.predict(test_data, model=cascade)
@@ -242,10 +229,12 @@ class FitHelper:
 class ModelFitHelper:
     @staticmethod
     def fit_and_validate_dataset(dataset_name, model, fit_args, sample_size=1000):
-        directory_prefix = './datasets/'
+        directory_prefix = "./datasets/"
         train_data, test_data, dataset_info = DatasetLoaderHelper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
-        label = dataset_info['label']
-        model, label_cleaner, feature_generator = ModelFitHelper.fit_dataset(train_data=train_data, model=model, label=label, fit_args=fit_args, sample_size=sample_size)
+        label = dataset_info["label"]
+        model, label_cleaner, feature_generator = ModelFitHelper.fit_dataset(
+            train_data=train_data, model=model, label=label, fit_args=fit_args, sample_size=sample_size
+        )
         if sample_size is not None and sample_size < len(test_data):
             test_data = test_data.sample(n=sample_size, random_state=0)
 
@@ -274,8 +263,8 @@ class ModelFitHelper:
 
         model.fit(X=X, y=y, X_val=X_val, y_val=y_val, **fit_args)
         return model, label_cleaner, feature_generator
-    
-    
+
+
 @contextmanager
 def mock_system_resourcses(num_cpus=None, num_gpus=None):
     original_get_cpu_count = ResourceManager.get_cpu_count
@@ -317,6 +306,7 @@ def mock_num_cpus():
 @pytest.fixture
 def mock_num_gpus():
     return 2
+
 
 @pytest.fixture
 def k_fold():

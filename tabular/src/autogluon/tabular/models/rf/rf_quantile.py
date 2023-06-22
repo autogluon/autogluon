@@ -35,16 +35,13 @@
 # DAMAGE.
 
 import logging
-import pandas as pd
-import numpy as np
 from functools import partial
-from sklearn.tree import BaseDecisionTree
-from sklearn.tree import DecisionTreeRegressor
-from sklearn.tree import ExtraTreeRegressor
+
+import numpy as np
+import pandas as pd
 from sklearn.ensemble._forest import ForestRegressor
-from sklearn.utils import check_array
-from sklearn.utils import check_X_y
-from sklearn.utils import check_random_state
+from sklearn.tree import BaseDecisionTree, DecisionTreeRegressor, ExtraTreeRegressor
+from sklearn.utils import check_array, check_random_state, check_X_y
 
 logger = logging.getLogger(__name__)
 
@@ -554,9 +551,7 @@ class BaseForestQuantileRegressor(ForestRegressor):
         samples_with_weighted_neighbors = get_weighted_neighbors_dataframe(
             X_leaves=X_leaves, y_train_leaves=self.y_train_leaves_, y_train=self.y_train_, y_weights=self.y_weights_
         )
-        quantile_preds = samples_with_weighted_neighbors.groupby("item_id").apply(
-            partial(get_quantiles, quantile_levels=quantile_levels)
-        )
+        quantile_preds = samples_with_weighted_neighbors.groupby("item_id").apply(partial(get_quantiles, quantile_levels=quantile_levels))
         return np.stack(quantile_preds.values.tolist())
 
 

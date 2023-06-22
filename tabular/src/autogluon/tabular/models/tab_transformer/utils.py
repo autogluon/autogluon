@@ -1,18 +1,19 @@
+import logging
+
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader, Dataset
 
 from . import tab_transformer_encoder
-from .tab_transformer_encoder import WontEncodeError, NullEnc
-import logging
+from .tab_transformer_encoder import NullEnc, WontEncodeError
 
 logger = logging.getLogger(__name__)
 
 
 def augmentation(data, target, **params):
     shape = data.shape
-    cat_data = torch.cat([data for _ in range(params['num_augs'])])
-    target = torch.cat([target for _ in range(params['num_augs'])]).view(-1)
-    locs_to_mask = torch.empty_like(cat_data, dtype=float).uniform_() < params['aug_mask_prob']
+    cat_data = torch.cat([data for _ in range(params["num_augs"])])
+    target = torch.cat([target for _ in range(params["num_augs"])]).view(-1)
+    locs_to_mask = torch.empty_like(cat_data, dtype=float).uniform_() < params["aug_mask_prob"]
     cat_data[locs_to_mask] = 0
     cat_data = cat_data.view(-1, shape[-1])
     return cat_data, target
@@ -63,18 +64,18 @@ class TabTransformerDataset(Dataset):
         if self.encoders is not None:
             self.feature_encoders = {}
             for c in self.columns:
-                col = self.raw_data[c['name']]
-                enc = tab_transformer_encoder.__dict__[self.encoders[c['type']]]()
+                col = self.raw_data[c["name"]]
+                enc = tab_transformer_encoder.__dict__[self.encoders[c["type"]]]()
 
-                if c['type'] == 'SCALAR' and col.nunique() < 32:
+                if c["type"] == "SCALAR" and col.nunique() < 32:
                     logger.log(15, f"Column {c['name']} shouldn't be encoded as SCALAR. Switching to CATEGORICAL.")
-                    enc = tab_transformer_encoder.__dict__[self.encoders['CATEGORICAL']]()
+                    enc = tab_transformer_encoder.__dict__[self.encoders["CATEGORICAL"]]()
                 try:
                     enc.fit(col)
                 except WontEncodeError as e:
                     logger.log(15, f"Not encoding column '{c['name']}': {e}")
                     enc = NullEnc()
-                self.feature_encoders[c['name']] = enc
+                self.feature_encoders[c["name"]] = enc
 
     def encode(self, feature_encoders):
         if self.encoders is not None:
@@ -85,16 +86,15 @@ class TabTransformerDataset(Dataset):
             self.cont_feat_origin = []
             cont_features = []
             for c in self.columns:
-                enc = feature_encoders[c['name']]
-                col = self.raw_data[c['name']]
+                enc = feature_encoders[c["name"]]
+                col = self.raw_data[c["name"]]
                 cat_feats = enc.enc_cat(col)
                 if cat_feats is not None:
-                    self.cat_feat_origin_cards += [(f'{c["name"]}_{i}_{c["type"]}', card) for i, card in
-                                                   enumerate(enc.cat_cards)]
+                    self.cat_feat_origin_cards += [(f'{c["name"]}_{i}_{c["type"]}', card) for i, card in enumerate(enc.cat_cards)]
                     cat_features.append(cat_feats)
                 cont_feats = enc.enc_cont(col)
                 if cont_feats is not None:
-                    self.cont_feat_origin += [c['name']] * enc.cont_dim
+                    self.cont_feat_origin += [c["name"]] * enc.cont_dim
                     cont_features.append(cont_feats)
             if cat_features:
                 self.cat_data = torch.cat(cat_features, dim=1)

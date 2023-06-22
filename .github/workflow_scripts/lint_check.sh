@@ -17,6 +17,7 @@ function lint_check_all {
     lint_check common 160
     lint_check core 160
     lint_check features 160
+    lint_check tabular 160
 }
 
 bandit -r multimodal/src -ll
