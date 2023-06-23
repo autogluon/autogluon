@@ -3383,7 +3383,7 @@ class AbstractTrainer:
                 if self.model_best in models:
                     model_name = self.model_best
             if model_name is None:
-                self.get_model_best(can_infer=True)
+                model_name = self.get_model_best(can_infer=True)
 
         model_full_dict = self.get_model_full_dict()
         model_name_og = model_name
