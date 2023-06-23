@@ -3378,12 +3378,16 @@ class AbstractTrainer:
             return
 
         if model_name is None:
+            if self.has_val:
+                can_infer = True
+            else:
+                can_infer = None
             if self.model_best is not None:
-                models = self.get_model_names(can_infer=True)
+                models = self.get_model_names(can_infer=can_infer)
                 if self.model_best in models:
                     model_name = self.model_best
             if model_name is None:
-                model_name = self.get_model_best(can_infer=True)
+                model_name = self.get_model_best(can_infer=can_infer)
 
         model_full_dict = self.get_model_full_dict()
         model_name_og = model_name
