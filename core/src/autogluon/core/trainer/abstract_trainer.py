@@ -183,16 +183,16 @@ class AbstractTrainer:
 
     @property
     def path_utils(self) -> str:
-        return self.path_root + "utils" + os.path.sep
+        return str(Path(self.path_root) / "utils")
 
     @property
     def _path_attr(self) -> str:
         """Path to cached model graph attributes"""
-        return f"{self.path_utils}attr{os.path.sep}"
+        return str(Path(self.path_utils) / "attr")
 
     @property
     def path_data(self) -> str:
-        return self.path_utils + "data" + os.path.sep
+        return str(Path(self.path_utils) / "data")
 
     @property
     def has_val(self) -> bool:
@@ -201,25 +201,25 @@ class AbstractTrainer:
 
     def load_X(self):
         if self._X_saved:
-            path = self.path_data + "X.pkl"
+            path = str(Path(self.path_data) / "X.pkl")
             return load_pkl.load(path=path)
         return None
 
     def load_X_val(self):
         if self._X_val_saved:
-            path = self.path_data + "X_val.pkl"
+            path = str(Path(self.path_data) / "X_val.pkl")
             return load_pkl.load(path=path)
         return None
 
     def load_y(self):
         if self._y_saved:
-            path = self.path_data + "y.pkl"
+            path = str(Path(self.path_data) / "y.pkl")
             return load_pkl.load(path=path)
         return None
 
     def load_y_val(self):
         if self._y_val_saved:
-            path = self.path_data + "y_val.pkl"
+            path = str(Path(self.path_data) / "y_val.pkl")
             return load_pkl.load(path=path)
         return None
 
@@ -232,22 +232,22 @@ class AbstractTrainer:
         return X, y, X_val, y_val
 
     def save_X(self, X, verbose=True):
-        path = self.path_data + "X.pkl"
+        path = str(Path(self.path_data) / "X.pkl")
         save_pkl.save(path=path, object=X, verbose=verbose)
         self._X_saved = True
 
     def save_X_val(self, X, verbose=True):
-        path = self.path_data + "X_val.pkl"
+        path = str(Path(self.path_data) / "X_val.pkl")
         save_pkl.save(path=path, object=X, verbose=verbose)
         self._X_val_saved = True
 
     def save_y(self, y, verbose=True):
-        path = self.path_data + "y.pkl"
+        path = str(Path(self.path_data) / "y.pkl")
         save_pkl.save(path=path, object=y, verbose=verbose)
         self._y_saved = True
 
     def save_y_val(self, y, verbose=True):
-        path = self.path_data + "y_val.pkl"
+        path = str(Path(self.path_data) / "y_val.pkl")
         save_pkl.save(path=path, object=y, verbose=verbose)
         self._y_val_saved = True
 
@@ -1892,11 +1892,11 @@ class AbstractTrainer:
 
     def _path_attr_model(self, model: str):
         """Returns directory where attributes are cached"""
-        return f"{self._path_attr}{model}{os.path.sep}"
+        return str(Path(self._path_attr) / model)
 
     def _path_to_model_attr(self, model: str, attribute: str):
         """Returns pkl file path for a cached model attribute"""
-        return f"{self._path_attr_model(model)}{attribute}.pkl"
+        return str(Path(self._path_attr_model(model)) / f"{attribute}.pkl")
 
     def _save_model_y_pred_proba_val(self, model: str, y_pred_proba_val):
         """Cache y_pred_proba_val for later reuse to avoid redundant predict calls"""
@@ -2926,10 +2926,10 @@ class AbstractTrainer:
     ):
         if remove_data and self.is_data_saved:
             data_files = [
-                self.path_data + "X.pkl",
-                self.path_data + "X_val.pkl",
-                self.path_data + "y.pkl",
-                self.path_data + "y_val.pkl",
+                str(Path(self.path_data) / "X.pkl"),
+                str(Path(self.path_data) / "X_val.pkl"),
+                str(Path(self.path_data) / "y.pkl"),
+                str(Path(self.path_data) / "y_val.pkl"),
             ]
             for data_file in data_files:
                 try:
