@@ -5,6 +5,7 @@ class TorchThreadManager:
     """
     Temporary updates torch num_threads to the specified value within the context, then reverts to the original num_threads upon exit.
     """
+
     def __init__(self, num_threads):
         self.num_threads = num_threads
         self.num_threads_og = None

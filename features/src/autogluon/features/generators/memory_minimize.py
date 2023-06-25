@@ -5,8 +5,8 @@ from pandas import DataFrame, RangeIndex
 
 from autogluon.common.features.types import R_CATEGORY, R_INT
 
-from . import AbstractFeatureGenerator
 from ..utils import clip_and_astype
+from . import AbstractFeatureGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +16,7 @@ class CategoryMemoryMinimizeFeatureGenerator(AbstractFeatureGenerator):
     Minimizes memory usage of category features by converting the category values to monotonically increasing int values.
     This is important for category features with string values which can take up significant memory despite the string information not being used downstream.
     """
+
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
         self._category_maps = self._get_category_map(X=X)
 
@@ -54,7 +55,7 @@ class CategoryMemoryMinimizeFeatureGenerator(AbstractFeatureGenerator):
                     self._category_maps.pop(feature)
 
     def _more_tags(self):
-        return {'feature_interactions': False}
+        return {"feature_interactions": False}
 
 
 # TODO: What about nulls / unknowns?
@@ -68,6 +69,7 @@ class NumericMemoryMinimizeFeatureGenerator(AbstractFeatureGenerator):
     **kwargs :
         Refer to :class:`AbstractFeatureGenerator` documentation for details on valid key word arguments.
     """
+
     def __init__(self, dtype_out=np.uint8, **kwargs):
         super().__init__(**kwargs)
         self.dtype_out, self._clip_min, self._clip_max = self._get_dtype_clip_args(dtype_out)
@@ -95,4 +97,4 @@ class NumericMemoryMinimizeFeatureGenerator(AbstractFeatureGenerator):
         return clip_and_astype(df=X, clip_min=self._clip_min, clip_max=self._clip_max, dtype=self.dtype_out)
 
     def _more_tags(self):
-        return {'feature_interactions': False}
+        return {"feature_interactions": False}

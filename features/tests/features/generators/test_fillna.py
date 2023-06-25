@@ -10,28 +10,19 @@ def test_fillna_feature_generator(generator_helper, data_helper):
     # Given
     input_data = data_helper.generate_multi_feature_full()
     expected_output_data = input_data.fillna(
-        {
-            'int': np.nan,
-            'float': np.nan,
-            'obj': '',
-            'cat': np.nan,
-            'datetime': np.nan,
-            'text': '',
-            'datetime_as_object': ''
-        },
-        downcast=False
+        {"int": np.nan, "float": np.nan, "obj": "", "cat": np.nan, "datetime": np.nan, "text": "", "datetime_as_object": ""}, downcast=False
     )
 
     generator = FillNaFeatureGenerator()
 
     expected_feature_metadata_in_full = {
-        ('category', ()): ['cat'],
-        ('datetime', ()): ['datetime'],
-        ('float', ()): ['float'],
-        ('int', ()): ['int_bool', 'int'],
-        ('object', ()): ['obj'],
-        ('object', ('datetime_as_object',)): ['datetime_as_object'],
-        ('object', ('text',)): ['text']
+        ("category", ()): ["cat"],
+        ("datetime", ()): ["datetime"],
+        ("float", ()): ["float"],
+        ("int", ()): ["int_bool", "int"],
+        ("object", ()): ["obj"],
+        ("object", ("datetime_as_object",)): ["datetime_as_object"],
+        ("object", ("text",)): ["text"],
     }
 
     expected_feature_metadata_full = expected_feature_metadata_in_full
@@ -51,17 +42,17 @@ def test_fillna_feature_generator(generator_helper, data_helper):
 # This test confirms that this unwanted conversion does not happen.
 def test_fillna_object_edgecase_feature_generator(generator_helper, data_helper):
     # Given
-    input_data = data_helper.generate_int_feature().to_frame('int_as_object')
-    input_data = input_data.astype('object')
+    input_data = data_helper.generate_int_feature().to_frame("int_as_object")
+    input_data = input_data.astype("object")
     edge_case_input = copy.deepcopy(input_data)
     input_data.loc[0] = np.nan
     expected_output_data = copy.deepcopy(input_data)
-    expected_output_data.loc[0] = ''
+    expected_output_data.loc[0] = ""
 
     generator = FillNaFeatureGenerator()
 
     expected_feature_metadata_in_full = {
-        ('object', ()): ['int_as_object'],
+        ("object", ()): ["int_as_object"],
     }
 
     expected_feature_metadata_full = expected_feature_metadata_in_full

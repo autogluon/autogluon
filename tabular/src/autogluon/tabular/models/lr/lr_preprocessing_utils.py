@@ -22,7 +22,6 @@ class OheFeaturesGenerator(BaseEstimator, TransformerMixin):
 
 
 class NlpDataPreprocessor(BaseEstimator, TransformerMixin):
-
     def __init__(self, nlp_cols):
         self.nlp_cols = nlp_cols
 
@@ -32,6 +31,6 @@ class NlpDataPreprocessor(BaseEstimator, TransformerMixin):
     def transform(self, X, y=None):
         X = X[self.nlp_cols].copy()
         for c in self.nlp_cols:
-            X[c] = X[c].astype(str).fillna(' ')
-        X = X.apply(' '.join, axis=1).str.replace('[ ]+', ' ', regex=True)
+            X[c] = X[c].astype(str).fillna(" ")
+        X = X.apply(" ".join, axis=1).str.replace("[ ]+", " ", regex=True)
         return X.values.tolist()

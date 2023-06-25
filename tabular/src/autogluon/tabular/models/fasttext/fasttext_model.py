@@ -9,9 +9,9 @@ import tempfile
 import numpy as np
 import pandas as pd
 
+from autogluon.common.features.types import S_TEXT
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_fasttext
-from autogluon.common.features.types import S_TEXT
 from autogluon.core.constants import BINARY, MULTICLASS
 from autogluon.core.models import AbstractModel
 
@@ -46,34 +46,28 @@ class FastTextModel(AbstractModel):
     @classmethod
     def _get_default_ag_args(cls) -> dict:
         default_ag_args = super()._get_default_ag_args()
-        extra_ag_args = {'valid_stacker': False, 'problem_types': [BINARY, MULTICLASS]}
+        extra_ag_args = {"valid_stacker": False, "problem_types": [BINARY, MULTICLASS]}
         default_ag_args.update(extra_ag_args)
         return default_ag_args
 
-    def _fit(self,
-             X,
-             y,
-             sample_weight=None,
-             **kwargs):
+    def _fit(self, X, y, sample_weight=None, **kwargs):
         if self.problem_type not in (BINARY, MULTICLASS):
-            raise ValueError(
-                "FastText model only supports binary or multiclass classification"
-            )
+            raise ValueError("FastText model only supports binary or multiclass classification")
 
         try_import_fasttext()
         import fasttext
 
         params = self._get_model_params()
-        quantize_model = params.pop('quantize_model', True)
+        quantize_model = params.pop("quantize_model", True)
 
-        verbosity = kwargs.get('verbosity', 2)
-        if 'verbose' not in params:
+        verbosity = kwargs.get("verbosity", 2)
+        if "verbose" not in params:
             if verbosity <= 2:
-                params['verbose'] = 0
+                params["verbose"] = 0
             elif verbosity == 3:
-                params['verbose'] = 1
+                params["verbose"] = 1
             else:
-                params['verbose'] = 2
+                params["verbose"] = 2
 
         if sample_weight is not None:
             logger.log(15, "sample_weight not yet supported for FastTextModel, this model will ignore them in training.")
@@ -106,8 +100,7 @@ class FastTextModel(AbstractModel):
     def _preprocess(self, X: pd.DataFrame, **kwargs) -> list:
         X = super()._preprocess(X, **kwargs)
         text_col = (
-            X
-            .astype(str)
+            X.astype(str)
             .fillna(" ")
             .apply(lambda r: " ".join(v for v in r.values), axis=1)
             .str.lower()
@@ -135,9 +128,7 @@ class FastTextModel(AbstractModel):
 
         recs = []
         for labels, probs in zip(pred_labels, pred_probs):
-            recs.append(
-                dict(zip((self._label_inv_map[label] for label in labels), probs))
-            )
+            recs.append(dict(zip((self._label_inv_map[label] for label in labels), probs)))
 
         y_pred_proba: np.ndarray = pd.DataFrame(recs).sort_index(axis=1).values
         return self._convert_proba_to_unified_form(y_pred_proba)
@@ -165,11 +156,12 @@ class FastTextModel(AbstractModel):
         if model._load_model:
             try_import_fasttext()
             import fasttext
+
             fasttext_model_file_name = model.path + cls.model_bin_file_name
             # TODO: hack to subpress a deprecation warning from fasttext
             # remove it once official fasttext is updated beyond 0.9.2
             # https://github.com/facebookresearch/fastText/issues/1067
-            with open(os.devnull, 'w') as f, contextlib.redirect_stderr(f):
+            with open(os.devnull, "w") as f, contextlib.redirect_stderr(f):
                 model.model = fasttext.load_model(fasttext_model_file_name)
         model._load_model = None
         return model
@@ -179,8 +171,8 @@ class FastTextModel(AbstractModel):
 
     def _more_tags(self):
         # `can_refit_full=True` because validation data is not used and there is no form of early stopping implemented.
-        return {'can_refit_full': True}
+        return {"can_refit_full": True}
 
     @classmethod
     def _class_tags(cls):
-        return {'handles_text': True}
+        return {"handles_text": True}

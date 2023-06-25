@@ -1,4 +1,6 @@
-import copy, logging
+import copy
+import logging
+
 import pandas as pd
 
 logger = logging.getLogger(__name__)
@@ -26,26 +28,26 @@ class FeaturePruner:
 
     def evaluate(self):
         untuned_score = self.score_in_iter[0]
-        logger.debug('untuned_score: %s' % untuned_score)
-        logger.debug('best_score: %s' % self.best_score)
-        logger.debug('best_iteration: %s' % self.best_iteration)
+        logger.debug("untuned_score: %s" % untuned_score)
+        logger.debug("best_score: %s" % self.best_score)
+        logger.debug("best_iteration: %s" % self.best_iteration)
 
         data_dict = {
-            'score': self.score_in_iter,
-            'feature_count': self.valid_feature_counts,
-            'threshold': self.thresholds,
+            "score": self.score_in_iter,
+            "feature_count": self.valid_feature_counts,
+            "threshold": self.thresholds,
         }
         logger.debug(self.gain_dfs[self.best_iteration])
         z = pd.DataFrame(data=data_dict)
         # logger.debug(z)
-        z_sorted = z.sort_values(by=['score'], ascending=False)
+        z_sorted = z.sort_values(by=["score"], ascending=False)
         # logger.debug(z_sorted)
 
     # TODO: CV5 instead of holdout? Should be better
     # TODO: Add holdout here, it is overfitting with Logistic Regression
     def tune(self, X, y, X_val, y_val, X_holdout, y_holdout, total_runs=999):
         objective_goal_is_negative = False  # Fixed to false if using sklearn scorers # self.model_base.problem_type == REGRESSION  # TODO: if objective function goal = lower (logloss, MAE, etc.)
-        logger.log(15, 'Feature-pruning '+str(self.model_base.name)+' for '+str(total_runs)+' runs...')
+        logger.log(15, "Feature-pruning " + str(self.model_base.name) + " for " + str(total_runs) + " runs...")
 
         if len(self.features_in_iter) == 0:
             valid_features = X.columns.values
@@ -56,7 +58,7 @@ class FeaturePruner:
         iter_start = self.cur_iteration
         for iteration in range(self.cur_iteration, total_runs):
             self.cur_iteration = iteration
-            logger.debug('iteration: %s ' % iteration)
+            logger.debug("iteration: %s " % iteration)
             X_subset = X[valid_features].copy()
             X_val_subset = X_val[valid_features].copy()
             self.thresholds.append(self.threshold)
@@ -72,16 +74,16 @@ class FeaturePruner:
             banned_features = []
 
             feature_importance = None
-            if hasattr(model_iter.model, 'feature_importances_'):
+            if hasattr(model_iter.model, "feature_importances_"):
                 feature_importance = model_iter.model.feature_importances_
-            elif hasattr(model_iter.model, 'feature_importance'):
+            elif hasattr(model_iter.model, "feature_importance"):
                 feature_importance = model_iter.model.feature_importance()
 
             if feature_importance is not None:
                 a = pd.Series(data=feature_importance, index=X_subset.columns)
                 unused_features = a[a == 0]
 
-                logger.log(15, 'Unused features after pruning: '+ str(list(unused_features.index)))
+                logger.log(15, "Unused features after pruning: " + str(list(unused_features.index)))
                 features_to_use = [feature for feature in valid_features if feature not in unused_features.index]
                 banned_features += list(unused_features.index)
             else:
@@ -90,14 +92,14 @@ class FeaturePruner:
             cur_score_val = model_iter.score(X=X_val_subset, y=y_val)
             cur_score = model_iter.score(X=X_holdout[valid_features], y=y_holdout)
 
-            logger.log(15, 'Iter '+str(iteration)+'  Score: '+str(cur_score))
-            logger.log(15, 'Iter '+str(iteration)+ '  Score Val: '+str(cur_score_val))
+            logger.log(15, "Iter " + str(iteration) + "  Score: " + str(cur_score))
+            logger.log(15, "Iter " + str(iteration) + "  Score Val: " + str(cur_score_val))
             if objective_goal_is_negative:
                 cur_score = -cur_score
 
             if self.best_score == 0 or cur_score > self.best_score:
                 logger.log(15, "New best score found!")
-                logger.log(15, str(cur_score)+ ' > '+str(self.best_score))
+                logger.log(15, str(cur_score) + " > " + str(self.best_score))
                 self.best_score = cur_score
                 self.best_iteration = iteration
                 iter_since_best = 0
@@ -125,13 +127,13 @@ class FeaturePruner:
             banned_df = gain_df.loc[gain_df >= self.threshold].index
             banned_features += list(banned_df)
 
-            logger.log(15, "Banned features: "+str(banned_features))
+            logger.log(15, "Banned features: " + str(banned_features))
             self.banned_features_in_iter.append(banned_features)
             valid_features = [feature for feature in valid_features if feature not in banned_features]
 
             if len(valid_features) == 0:
-                logger.log(15, 'No more features to remove, Feature pruning complete')
-                logger.log(15, "score_in_iter: "+str(self.score_in_iter))
+                logger.log(15, "No more features to remove, Feature pruning complete")
+                logger.log(15, "score_in_iter: " + str(self.score_in_iter))
                 self.tuned = True
                 break
         self.tuned = True
@@ -139,13 +141,13 @@ class FeaturePruner:
     @staticmethod
     def adjust_threshold(gain_df, threshold):
         if gain_df.shape[0] == 0:
-            raise BaseException('ran out of features to prune!')
+            raise BaseException("ran out of features to prune!")
         banned_df = gain_df.loc[gain_df >= threshold].index
         banned_features = list(banned_df)
 
         if len(banned_features) == 0:
             if threshold < -100000000:  # FIXME: Hacked for regression
-                raise BaseException('threshold already max!')
+                raise BaseException("threshold already max!")
             elif threshold > 0.000001:
                 threshold_new = threshold / 2
             elif threshold > 0:
@@ -157,7 +159,7 @@ class FeaturePruner:
             else:
                 threshold_new = gain_df.max()
 
-            logger.log(10, 'Adjusting threshold to %s' % threshold_new)
+            logger.log(10, "Adjusting threshold to %s" % threshold_new)
             return FeaturePruner.adjust_threshold(gain_df=gain_df, threshold=threshold_new)
         else:
             return threshold

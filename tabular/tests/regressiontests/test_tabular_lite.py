@@ -3,6 +3,7 @@
     and using conftest.py from pyodide root directory.
 """
 from pathlib import Path
+
 import pytest
 
 ROOT_PATH = Path(__file__).parent.parent.parent.parent
@@ -19,13 +20,13 @@ def selenium_standalone_micropip(selenium_standalone):
         ("tabular", f"{WHL_PREFIX}.tabular-*.whl"),
         ("autogluon", f"{WHL_PREFIX}-*.whl"),
     ]:
-        wheel_path = [f"{regex_path_str[0]}/dist/{w.name}"
-                      for w in (ROOT_PATH / regex_path_str[0] / "dist").glob(regex_path_str[1])]
+        wheel_path = [f"{regex_path_str[0]}/dist/{w.name}" for w in (ROOT_PATH / regex_path_str[0] / "dist").glob(regex_path_str[1])]
         assert len(wheel_path) == 1
         wheel_path = wheel_path[0]
         wheel_paths.append(wheel_path)
 
     from pytest_pyodide import spawn_web_server
+
     with spawn_web_server(ROOT_PATH) as server:
         server_hostname, server_port, _ = server
         base_url = f"http://{server_hostname}:{server_port}/"
@@ -51,19 +52,27 @@ def selenium_standalone_micropip(selenium_standalone):
 @pytest.mark.pyodide
 def test_train_classifier(selenium_standalone_micropip):
     from pytest_pyodide import run_in_pyodide
+
     @run_in_pyodide(packages=["xgboost", "pandas", "numpy", "scipy", "scikit-learn", "lightgbm"])
     async def run(selenium, test, train_data, test_data):
-        expected_score_range = test['expected_score_range']
-        expected_score_range = {k: (v[0], 0.02) for k, v in expected_score_range.items() if k not in [
-            'CatBoost', 'NeuralNetFastAI', 'NeuralNetTorch',
-        ]}
+        expected_score_range = test["expected_score_range"]
+        expected_score_range = {
+            k: (v[0], 0.02)
+            for k, v in expected_score_range.items()
+            if k
+            not in [
+                "CatBoost",
+                "NeuralNetFastAI",
+                "NeuralNetTorch",
+            ]
+        }
 
         from autogluon.tabular import TabularPredictor
 
         print(train_data.head())
-        label = 'label'
+        label = "label"
         print("Summary of class variable: \n", train_data[label].describe())
-        save_path = 'agModels-predictClass'  # specifies folder to store trained models
+        save_path = "agModels-predictClass"  # specifies folder to store trained models
         predictor = TabularPredictor(label=label, path=save_path).fit(train_data)
 
         y_test = test_data[label]  # values to predict
@@ -79,12 +88,15 @@ def test_train_classifier(selenium_standalone_micropip):
         trained_models = leaderboard[leaderboard.columns[0]]
         print(trained_models)
         assert set(trained_models) == set(expected_score_range.keys()), "Not all models were trained"
-        for model in leaderboard['model']:
-            score = leaderboard[leaderboard['model'] == model]['score_test'].values[0]
+        for model in leaderboard["model"]:
+            score = leaderboard[leaderboard["model"] == model]["score_test"].values[0]
             score_range = expected_score_range[model]
-            assert score_range[0] - score_range[1] <= score <= score_range[0] + score_range[1], f"Score for {model} ({score}) is out of expected range {score_range}"
+            assert (
+                score_range[0] - score_range[1] <= score <= score_range[0] + score_range[1]
+            ), f"Score for {model} ({score}) is out of expected range {score_range}"
 
-    from .utils import tests, make_dataset
+    from .utils import make_dataset, tests
+
     test_case = tests[-1]
     data_train, data_test = make_dataset(request=test_case, seed=0)
     run(selenium_standalone_micropip, test_case, data_train, data_test)

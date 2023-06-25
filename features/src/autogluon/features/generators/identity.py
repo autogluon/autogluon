@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 class IdentityFeatureGenerator(AbstractFeatureGenerator):
     """IdentityFeatureGenerator simply passes the data along without alterations."""
+
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
         X_out = self._transform(X)
         return X_out, self.feature_metadata_in.type_group_map_special
@@ -21,4 +22,4 @@ class IdentityFeatureGenerator(AbstractFeatureGenerator):
         return dict()
 
     def _more_tags(self):
-        return {'feature_interactions': False}
+        return {"feature_interactions": False}

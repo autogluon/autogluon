@@ -1,8 +1,10 @@
 import math
-import numpy as np
 
+import numpy as np
 from catboost import MultiRegressionCustomMetric, MultiRegressionCustomObjective
+
 from autogluon.core.metrics.softclass_metrics import EPS
+
 from .catboost_utils import CustomMetric
 
 
@@ -27,18 +29,18 @@ class SoftclassCustomMetric(CustomMetric):
             assert len(target[0]) == len(approxes[0])
             weight_sum = len(target)
             # TODO: inefficient copy of approxes, targets to np.array from provided UniTuple (required for JIT to work)
-            approxes2 = np.zeros((len(approxes[0]),len(approxes)))
-            target2 = np.zeros((len(approxes[0]),len(approxes)))
+            approxes2 = np.zeros((len(approxes[0]), len(approxes)))
+            target2 = np.zeros((len(approxes[0]), len(approxes)))
             for i in range(len(approxes)):
-                approxes2[:,i] = approxes[i]
-                target2[:,i] = target[i]
+                approxes2[:, i] = approxes[i]
+                target2[:, i] = target[i]
             approxes = approxes2
             target = target2
             approxes = np.exp(approxes)
-            approxes = (approxes.T/approxes.sum(axis=1)).T  # softmax
+            approxes = (approxes.T / approxes.sum(axis=1)).T  # softmax
             # Numpy implementation of soft logloss:
             approxes = np.clip(approxes, a_min=EPS, a_max=None)  # clip 0s to avoid NaN
-            approxes = (approxes.T/approxes.sum(axis=1)).T  # renormalize
+            approxes = (approxes.T / approxes.sum(axis=1)).T  # renormalize
             losses = np.multiply(np.log(approxes), target).sum(axis=1)
             error_sum = np.mean(losses)
             return error_sum, weight_sum
@@ -69,7 +71,6 @@ class SoftclassObjective(object):
             for x in exp_approx:
                 exp_sum += x
             exp_approx = [val / exp_sum for val in exp_approx]
-            grad = [(targets[j] - exp_approx[j])*weight for j in range(len(targets))]
-            hess = [[(exp_approx[j] * exp_approx[j2] - (j==j2)*exp_approx[j]) * weight
-                    for j in range(len(targets))] for j2 in range(len(targets))]
+            grad = [(targets[j] - exp_approx[j]) * weight for j in range(len(targets))]
+            hess = [[(exp_approx[j] * exp_approx[j2] - (j == j2) * exp_approx[j]) * weight for j in range(len(targets))] for j2 in range(len(targets))]
             return (grad, hess)

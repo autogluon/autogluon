@@ -2,8 +2,8 @@ import logging
 
 from pandas import DataFrame
 
-from autogluon.common.features.types import R_CATEGORY, R_OBJECT, S_TEXT, S_IMAGE_PATH, S_IMAGE_BYTEARRAY
 from autogluon.common.features.feature_metadata import FeatureMetadata
+from autogluon.common.features.types import R_CATEGORY, R_OBJECT, S_IMAGE_BYTEARRAY, S_IMAGE_PATH, S_TEXT
 
 from .abstract import AbstractFeatureGenerator
 
@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 # TODO: Not necessary to exist after fitting, can just update outer context feature_out/feature_in and then delete this
 class DropUniqueFeatureGenerator(AbstractFeatureGenerator):
     """Drops features which only have 1 unique value or which have nearly no repeated values (based on max_unique_ratio) and are of category or object type."""
+
     def __init__(self, max_unique_ratio=0.99, **kwargs):
         super().__init__(**kwargs)
         self.max_unique_ratio = max_unique_ratio
@@ -41,8 +42,7 @@ class DropUniqueFeatureGenerator(AbstractFeatureGenerator):
             # Drop features that are always the same
             if unique_value_count == 1:
                 features_to_drop.append(column)
-            elif feature_metadata.get_feature_type_raw(column) in [R_CATEGORY, R_OBJECT]\
-                    and (unique_value_count > max_unique_value_count):
+            elif feature_metadata.get_feature_type_raw(column) in [R_CATEGORY, R_OBJECT] and (unique_value_count > max_unique_value_count):
                 special_types = feature_metadata.get_feature_types_special(column)
                 if S_TEXT in special_types:
                     # We should not drop a text column
@@ -58,4 +58,4 @@ class DropUniqueFeatureGenerator(AbstractFeatureGenerator):
         return features_to_drop
 
     def _more_tags(self):
-        return {'feature_interactions': False}
+        return {"feature_interactions": False}

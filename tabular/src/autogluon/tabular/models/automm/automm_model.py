@@ -6,18 +6,27 @@ from typing import Dict, Optional
 
 import pandas as pd
 
-from autogluon.common.features.types import R_OBJECT, R_INT, R_FLOAT, R_CATEGORY, \
-    S_TEXT, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL, S_IMAGE_PATH
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
+from autogluon.common.features.types import (
+    R_CATEGORY,
+    R_FLOAT,
+    R_INT,
+    R_OBJECT,
+    S_IMAGE_PATH,
+    S_TEXT,
+    S_TEXT_AS_CATEGORY,
+    S_TEXT_NGRAM,
+    S_TEXT_SPECIAL,
+)
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_autogluon_multimodal
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.models import AbstractModel
 
 logger = logging.getLogger(__name__)
 
 
 class MultiModalPredictorModel(AbstractModel):
-    _NN_MODEL_NAME = 'automm_model'
+    _NN_MODEL_NAME = "automm_model"
 
     def __init__(self, **kwargs):
         """Wrapper of autogluon.multimodal.MultiModalPredictor.
@@ -71,8 +80,8 @@ class MultiModalPredictorModel(AbstractModel):
     def _get_default_ag_args(cls) -> dict:
         default_ag_args = super()._get_default_ag_args()
         extra_ag_args = {
-            'valid_stacker': False,
-            'problem_types': [BINARY, MULTICLASS, REGRESSION],
+            "valid_stacker": False,
+            "problem_types": [BINARY, MULTICLASS, REGRESSION],
         }
         default_ag_args.update(extra_ag_args)
         return default_ag_args
@@ -81,7 +90,7 @@ class MultiModalPredictorModel(AbstractModel):
     @classmethod
     def _get_default_ag_args_ensemble(cls, **kwargs) -> dict:
         default_ag_args_ensemble = super()._get_default_ag_args_ensemble(**kwargs)
-        extra_ag_args_ensemble = {'fold_fitting_strategy': 'sequential_local'}
+        extra_ag_args_ensemble = {"fold_fitting_strategy": "sequential_local"}
         default_ag_args_ensemble.update(extra_ag_args_ensemble)
         return default_ag_args_ensemble
 
@@ -99,14 +108,16 @@ class MultiModalPredictorModel(AbstractModel):
             X_val = self.preprocess(X=X_val, **kwargs)
         return X, y, X_val, y_val
 
-    def _fit(self,
-             X: pd.DataFrame,
-             y: pd.Series,
-             X_val: Optional[pd.DataFrame] = None,
-             y_val: Optional[pd.Series] = None,
-             time_limit: Optional[int] = None,
-             sample_weight=None,
-             **kwargs):
+    def _fit(
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
+        X_val: Optional[pd.DataFrame] = None,
+        y_val: Optional[pd.Series] = None,
+        time_limit: Optional[int] = None,
+        sample_weight=None,
+        **kwargs,
+    ):
         """The internal fit function
 
         Parameters
@@ -131,36 +142,37 @@ class MultiModalPredictorModel(AbstractModel):
         from autogluon.multimodal import MultiModalPredictor
 
         # Decide name of the label column
-        if 'label' in X.columns:
+        if "label" in X.columns:
             label_col_id = 0
             while True:
-                self._label_column_name = 'label{}'.format(label_col_id)
+                self._label_column_name = "label{}".format(label_col_id)
                 if self._label_column_name not in X.columns:
                     break
                 label_col_id += 1
         else:
-            self._label_column_name = 'label'
+            self._label_column_name = "label"
 
         X, y, X_val, y_val = self.preprocess_fit(X=X, y=y, X_val=X_val, y_val=y_val)
         params = self._get_model_params()
-        max_features = params.pop('_max_features', None)  # FIXME: `_max_features` is a hack. Instead use ag_args_fit and make generic
+        max_features = params.pop("_max_features", None)  # FIXME: `_max_features` is a hack. Instead use ag_args_fit and make generic
         num_features = len(X.columns)
         if max_features is not None and num_features > max_features:
-            raise AssertionError(f'Feature count ({num_features}) is greater than max allowed features ({max_features}) for {self.name}. Skipping model... '
-                                 f'To increase the max allowed features, specify the value via the `_max_features` parameter '
-                                 f'(Fully ignore by specifying `None`. '
-                                 f'`_max_features` is experimental and will likely change API without warning in future releases.')
+            raise AssertionError(
+                f"Feature count ({num_features}) is greater than max allowed features ({max_features}) for {self.name}. Skipping model... "
+                f"To increase the max allowed features, specify the value via the `_max_features` parameter "
+                f"(Fully ignore by specifying `None`. "
+                f"`_max_features` is experimental and will likely change API without warning in future releases."
+            )
 
         # Get arguments from kwargs
-        verbosity = kwargs.get('verbosity', 2)
+        verbosity = kwargs.get("verbosity", 2)
         if verbosity <= 2:
             enable_progress_bar = False
         else:
             enable_progress_bar = True
-        num_gpus = kwargs.get('num_gpus', None)
+        num_gpus = kwargs.get("num_gpus", None)
         if sample_weight is not None:  # TODO: support
-            logger.log(15, "sample_weight not yet supported for MultiModalPredictorModel, "
-                           "this model will ignore them in training.")
+            logger.log(15, "sample_weight not yet supported for MultiModalPredictorModel, " "this model will ignore them in training.")
 
         # Need to deep copy to avoid altering outer context
         X = X.copy()
@@ -172,7 +184,7 @@ class MultiModalPredictorModel(AbstractModel):
         column_types = self._construct_column_types()
 
         verbosity_text = max(0, verbosity - 1)
-        root_logger = logging.getLogger('autogluon')
+        root_logger = logging.getLogger("autogluon")
         root_log_level = root_logger.level
         # in self.save(), the model is saved to automm_nn_path
         automm_nn_path = os.path.join(self.path, self._NN_MODEL_NAME)
@@ -186,9 +198,9 @@ class MultiModalPredictorModel(AbstractModel):
         )
 
         if num_gpus is not None:
-            params['env.num_gpus'] = num_gpus
-        presets = params.pop('presets', None)
-        seed = params.pop('seed', 0)
+            params["env.num_gpus"] = num_gpus
+        presets = params.pop("presets", None)
+        seed = params.pop("seed", 0)
 
         self.model.fit(
             train_data=X,
@@ -234,6 +246,7 @@ class MultiModalPredictorModel(AbstractModel):
         if model._load_model:
             try_import_autogluon_multimodal()
             from autogluon.multimodal import MultiModalPredictor
+
             model.model = MultiModalPredictor.load(os.path.join(path, cls._NN_MODEL_NAME))
         model._load_model = None
         return model
@@ -257,8 +270,8 @@ class MultiModalPredictorModel(AbstractModel):
 
     def get_minimum_resources(self, is_gpu_available=False) -> Dict[str, int]:
         return {
-            'num_cpus': 1,
-            'num_gpus': 1,
+            "num_cpus": 1,
+            "num_gpus": 1,
         }
 
     def _construct_column_types(self) -> dict:
@@ -269,17 +282,17 @@ class MultiModalPredictorModel(AbstractModel):
         features_numerical = set(self._feature_metadata.get_features(valid_raw_types=[R_INT, R_FLOAT]))
 
         key_map = {
-            'image_path': features_image_path,
-            'text': features_text,
-            'categorical': features_categorical,
-            'numerical': features_numerical,
+            "image_path": features_image_path,
+            "text": features_text,
+            "categorical": features_categorical,
+            "numerical": features_numerical,
         }
 
         features = self._feature_metadata.get_features()
 
         column_types = {}
         for feature in features:
-            for key in ['image_path', 'text', 'categorical', 'numerical']:
+            for key in ["image_path", "text", "categorical", "numerical"]:
                 if feature in key_map[key]:
                     column_types[feature] = key
                     break
@@ -287,8 +300,8 @@ class MultiModalPredictorModel(AbstractModel):
 
     def _more_tags(self):
         # `can_refit_full=False` because MultiModalPredictor does not communicate how to train until the best epoch in refit_full.
-        return {'can_refit_full': False}
+        return {"can_refit_full": False}
 
     @classmethod
     def _class_tags(cls):
-        return {'handles_text': True}
+        return {"handles_text": True}
