@@ -2,13 +2,13 @@
 Module including wrappers for PyTorch implementations of models in GluonTS
 """
 import logging
+import os
 import shutil
 from datetime import timedelta
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Type
 
 import gluonts
-import os
 import numpy as np
 import torch
 from gluonts.core.component import from_hyperparameters
