@@ -1,3 +1,4 @@
+import warnings
 from typing import Tuple
 
 import numpy as np
@@ -57,13 +58,13 @@ def generate_train_and_test_data(
 @pytest.mark.parametrize("use_known_covariates", [True, False])
 @pytest.mark.parametrize("use_static_features_continuous", [True, False])
 @pytest.mark.parametrize("use_static_features_categorical", [True, False])
-@pytest.mark.parametrize("ignore_time_index", [True, False])
+@pytest.mark.parametrize("eval_metric", ["mean_wQuantileLoss", "MASE"])
 def test_predictor_smoke_test(
     use_known_covariates,
     use_past_covariates,
     use_static_features_continuous,
     use_static_features_categorical,
-    ignore_time_index,
+    eval_metric,
 ):
     prediction_length = 5
     hyperparameters = {
@@ -76,6 +77,10 @@ def test_predictor_smoke_test(
         "DeepAR": DUMMY_MODEL_HPARAMS,
         "SimpleFeedForward": DUMMY_MODEL_HPARAMS,
         "TemporalFusionTransformer": DUMMY_MODEL_HPARAMS,
+        "Theta": {},
+        # Override default hyperparameters for faster training
+        "AutoARIMA": {"max_p": 2},
+        "AutoETS": {"model": "AAA"},
     }
 
     train_data, test_data = generate_train_and_test_data(
@@ -88,26 +93,28 @@ def test_predictor_smoke_test(
 
     known_covariates_names = [col for col in train_data if col.startswith("known_")]
 
-    predictor = TimeSeriesPredictor(
-        target=TARGET_COLUMN,
-        prediction_length=prediction_length,
-        known_covariates_names=known_covariates_names if len(known_covariates_names) > 0 else None,
-        ignore_time_index=ignore_time_index,
-    )
-    predictor.fit(
-        train_data,
-        hyperparameters=hyperparameters,
-    )
-    predictor.score(test_data)
-    leaderboard = predictor.leaderboard(test_data)
+    with warnings.catch_warnings():
+        # Ensure that no warnings are raised
+        warnings.simplefilter("error")
+
+        predictor = TimeSeriesPredictor(
+            target=TARGET_COLUMN,
+            prediction_length=prediction_length,
+            known_covariates_names=known_covariates_names if len(known_covariates_names) > 0 else None,
+            eval_metric=eval_metric,
+        )
+        predictor.fit(
+            train_data,
+            hyperparameters=hyperparameters,
+        )
+        predictor.score(test_data)
+        leaderboard = predictor.leaderboard(test_data)
 
     assert len(leaderboard) == len(hyperparameters) + 1
 
     known_covariates = test_data.slice_by_timestep(-prediction_length, None)[known_covariates_names]
     predictions = predictor.predict(train_data, known_covariates=known_covariates)
 
-    if ignore_time_index:
-        test_data = test_data.get_reindexed_view(freq="S")
     future_test_data = test_data.slice_by_timestep(-prediction_length, None)
 
     assert predictions.index.equals(future_test_data.index)
