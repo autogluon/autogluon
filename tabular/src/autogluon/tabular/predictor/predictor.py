@@ -2605,6 +2605,8 @@ class TabularPredictor:
         self._assert_is_fit("refit_full")
         ts = time.time()
         model_best = self._get_model_best(can_infer=None)
+        if model == "best":
+            model = model_best
         logger.log(
             20,
             "Refitting models via `predictor.refit_full` using all of the data (combined train and validation)...\n"
