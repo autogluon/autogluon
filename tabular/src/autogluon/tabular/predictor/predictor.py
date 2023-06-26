@@ -3593,7 +3593,7 @@ class TabularPredictor:
         """
         Inner load method, called in `load`.
         """
-        predictor: TabularPredictor = load_pkl.load(path=path + cls.predictor_file_name)
+        predictor: TabularPredictor = load_pkl.load(path=os.path.join(path + cls.predictor_file_name))
         learner = predictor._learner_type.load(path)
         predictor._set_post_fit_vars(learner=learner)
         return predictor

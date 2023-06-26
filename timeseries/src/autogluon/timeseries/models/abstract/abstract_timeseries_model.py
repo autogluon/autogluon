@@ -35,7 +35,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         is fit to forecast.
     name : str, default = None
         Name of the subdirectory inside path where model will be saved.
-        The final model directory will be path+name+os.path.sep()
+        The final model directory will be os.path.join(path, name)
         If None, defaults to the model's class name: self.__class__.__name__
     metadata: CovariateMetadata
         A mapping of different covariate types known to autogluon.timeseries to column names
@@ -401,7 +401,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         except EmptySearchSpace:
             return skip_hpo(self, train_data, val_data, time_limit=hpo_executor.time_limit)
 
-        self.set_contexts(os.path.abspath(self.path) + os.path.sep)
+        self.set_contexts(os.path.abspath(self.path))
         directory = self.path
         dataset_train_filename = "dataset_train.pkl"
         train_path = os.path.join(self.path, dataset_train_filename)

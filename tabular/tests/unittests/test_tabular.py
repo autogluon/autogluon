@@ -214,7 +214,7 @@ def test_advanced_functionality():
     with pytest.raises(AssertionError):
         # Ensure don't overwrite existing predictor
         predictor.clone(path=predictor.path)
-    path_clone = predictor.clone(path=predictor.path[:-1] + "_clone" + os.path.sep)
+    path_clone = predictor.clone(path=predictor.path + "_clone")
     predictor_clone = TabularPredictor.load(path_clone)
     assert predictor.path != predictor_clone.path
     if predictor_clone.can_predict_proba:
@@ -226,7 +226,7 @@ def test_advanced_functionality():
     assert len(leaderboard) == len(leaderboard_clone)
 
     # Test cloning for deployment logic
-    path_clone_for_deployment_og = predictor.path[:-1] + "_clone_for_deployment" + os.path.sep
+    path_clone_for_deployment_og = predictor.path + "_clone_for_deployment"
     with pytest.raises(FileNotFoundError):
         # Assert that predictor does not exist originally
         TabularPredictor.load(path_clone_for_deployment_og)

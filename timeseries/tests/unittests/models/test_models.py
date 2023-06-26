@@ -51,7 +51,7 @@ def trained_models():
     for model_class, prediction_length in itertools.product(TESTABLE_MODELS, TESTABLE_PREDICTION_LENGTHS):
         temp_model_path = tempfile.mkdtemp()
         model = model_class(
-            path=temp_model_path + os.path.sep,
+            path=temp_model_path,
             freq="H",
             prediction_length=prediction_length,
             hyperparameters=DUMMY_HYPERPARAMETERS,

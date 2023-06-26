@@ -130,9 +130,9 @@ def test_continuous_training_save_path():
 
     # continue training
     predictor.fit(train_data=dataset.train_df, time_limit=10)
-    assert predictor.path != abs_path and f"AutogluonModels{os.path.sep}ag-" in predictor.path
+    assert predictor.path != abs_path and os.path.join("AutogluonModels", "ag-") in predictor.path
 
     # load a saved predictor and continue training
     predictor_loaded = MultiModalPredictor.load(save_path)
     predictor_loaded.fit(train_data=dataset.train_df, time_limit=10)
-    assert predictor_loaded.path != abs_path and f"AutogluonModels{os.path.sep}ag-" in predictor.path
+    assert predictor_loaded.path != abs_path and os.path.join("AutogluonModels", "ag-") in predictor.path

@@ -179,7 +179,7 @@ class AbstractTrainer:
     # path_root is the directory containing learner.pkl
     @property
     def path_root(self) -> str:
-        return self.path.rsplit(os.path.sep, maxsplit=2)[0] + os.path.sep
+        return self.path.rsplit(os.path.sep, maxsplit=2)[0]
 
     @property
     def path_utils(self) -> str:
@@ -294,19 +294,12 @@ class AbstractTrainer:
     def set_contexts(self, path_context):
         self.path, model_paths = self.create_contexts(path_context)
         for model, path in model_paths.items():
-            self.set_model_attribute(model=model, attribute="path", val=path)
+            # reconstruct model path given trainer path and model's relative path
+            self.set_model_attribute(model=model, attribute="path", val=os.path.join(self.path, path))
 
     def create_contexts(self, path_context: str) -> (str, dict):
-        self.path = PathConverter.to_current(self.path)
         path = path_context
         model_paths = self.get_models_attribute_dict(attribute="path")
-        model_paths = {model: PathConverter.to_current(model_path) for model, model_path in model_paths.items()}
-        for model, prev_path in model_paths.items():
-            prev_path = os.path.abspath(prev_path) + os.path.sep
-            abs_path = os.path.abspath(self.path) + os.path.sep
-            model_local_path = prev_path.split(abs_path, 1)[1]
-            new_path = path + model_local_path
-            model_paths[model] = new_path
 
         return path, model_paths
 
@@ -1416,7 +1409,7 @@ class AbstractTrainer:
         models = self.models
         if self.low_memory:
             self.models = {}
-        save_pkl.save(path=self.path + self.trainer_file_name, object=self)
+        save_pkl.save(path=os.path.join(self.path, self.trainer_file_name), object=self)
         if self.low_memory:
             self.models = models
 
@@ -1859,7 +1852,7 @@ class AbstractTrainer:
             predict_child_time=predict_child_time,
             predict_1_child_time=predict_1_child_time,
             val_score=model.val_score,
-            path=model.path,
+            path=os.path.relpath(model.path, self.path),  # model's relative path to trainer
             type=type(model),  # Outer type, can be BaggedEnsemble, StackEnsemble (Type that is able to load the model)
             type_inner=type_inner,  # Inner type, if Ensemble then it is the type of the inner model (May not be able to load with this type)
             can_infer=model.can_infer(),
@@ -3031,7 +3024,7 @@ class AbstractTrainer:
 
     @classmethod
     def load(cls, path, reset_paths=False):
-        load_path = path + cls.trainer_file_name
+        load_path = os.path.join(path, cls.trainer_file_name)
         if not reset_paths:
             return load_pkl.load(path=load_path)
         else:
@@ -3042,7 +3035,7 @@ class AbstractTrainer:
 
     @classmethod
     def load_info(cls, path, reset_paths=False, load_model_if_required=True):
-        load_path = path + cls.trainer_info_name
+        load_path = os.path.join(path, cls.trainer_info_name)
         try:
             return load_pkl.load(path=load_path)
         except:
@@ -3055,8 +3048,8 @@ class AbstractTrainer:
     def save_info(self, include_model_info=False):
         info = self.get_info(include_model_info=include_model_info)
 
-        save_pkl.save(path=self.path + self.trainer_info_name, object=info)
-        save_json.save(path=self.path + self.trainer_info_json_name, obj=info)
+        save_pkl.save(path=os.path.join(self.path, self.trainer_info_name), object=info)
+        save_json.save(path=os.path.join(self.path, self.trainer_info_json_name), obj=info)
         return info
 
     def _process_hyperparameters(self, hyperparameters: dict) -> dict:

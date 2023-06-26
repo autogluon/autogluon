@@ -98,15 +98,15 @@ class SimpleAbstractTrainer:
 
     @property
     def path_root(self) -> str:
-        return self.path.rsplit(os.path.sep, maxsplit=2)[0] + os.path.sep
+        return self.path.rsplit(os.path.sep, maxsplit=2)[0]
 
     @property
     def path_utils(self) -> str:
-        return self.path_root + "utils" + os.path.sep
+        return os.path.join(self.path_root, "utils")
 
     @property
     def path_data(self) -> str:
-        return self.path_utils + "data" + os.path.sep
+        return os.path.join(self.path_utils, "data")
 
     @property
     def path_pkl(self) -> str:

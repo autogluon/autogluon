@@ -72,7 +72,7 @@ def test_dummy_binary_absolute_path(fit_helper):
         hyperparameters={DummyModel: {}},
     )
     path = Path(".") / "AG_test"
-    path = str(path.resolve()) + os.path.sep
+    path = str(path.resolve())
     init_args = dict(path=path)
 
     dataset_name = "adult"
@@ -98,7 +98,7 @@ def test_dummy_binary_model_absolute_path(model_fit_helper):
     """Test that absolute path works"""
     fit_args = dict()
     path = Path(".") / "AG_test"
-    path = str(path.resolve()) + os.path.sep
+    path = str(path.resolve())
     model = DummyModel(path=path)
     dataset_name = "adult"
     model_fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, model=model, fit_args=fit_args)

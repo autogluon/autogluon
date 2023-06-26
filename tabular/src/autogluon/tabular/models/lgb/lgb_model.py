@@ -298,14 +298,14 @@ class LGBModel(AbstractModel):
                 y_val = None
 
         # X, W_train = self.convert_to_weight(X=X)
-        dataset_train = construct_dataset(x=X, y=y, location=f"{self.path}datasets{os.path.sep}train", params=data_params, save=save, weight=sample_weight)
+        dataset_train = construct_dataset(x=X, y=y, location=os.path.join("self.path", "datasets", "train"), params=data_params, save=save, weight=sample_weight)
         # dataset_train = construct_dataset_lowest_memory(X=X, y=y, location=self.path + 'datasets/train', params=data_params)
         if X_val is not None:
             # X_val, W_val = self.convert_to_weight(X=X_val)
             dataset_val = construct_dataset(
                 x=X_val,
                 y=y_val,
-                location=f"{self.path}datasets{os.path.sep}val",
+                location=os.path.join(self.path, "datasets", "val"),
                 reference=dataset_train,
                 params=data_params,
                 save=save,

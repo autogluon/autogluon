@@ -374,7 +374,7 @@ class BaggedEnsembleModel(AbstractModel):
         if self._n_repeats != 0:
             raise ValueError(f"n_repeats must equal 0 when fitting a single model with k_fold == 1, value: {self._n_repeats}")
         model_base.name = f"{model_base.name}S1F1"
-        model_base.set_contexts(path_context=self.path + model_base.name + os.path.sep)
+        model_base.set_contexts(path_context=os.path.join(self.path, model_base.name))
         time_start_fit = time.time()
         model_base.fit(X=X, y=y, time_limit=time_limit, **kwargs)
         model_base.fit_time = time.time() - time_start_fit
@@ -748,7 +748,7 @@ class BaggedEnsembleModel(AbstractModel):
 
     def load_child(self, model: Union[AbstractModel, str], verbose=False) -> AbstractModel:
         if isinstance(model, str):
-            child_path = self.create_contexts(self.path + model + os.path.sep)
+            child_path = self.create_contexts(os.path.join(self.path, model))
             return self._child_type.load(path=child_path, verbose=verbose)
         else:
             return model
@@ -788,7 +788,7 @@ class BaggedEnsembleModel(AbstractModel):
         if path is None:
             path = self.path
         child = self.load_child(model)
-        child.set_contexts(path + child.name + os.path.sep)
+        child.set_contexts(os.path.join(path, child.name))
         child.save(verbose=verbose)
 
     def can_compile(self, compiler_configs=None):
@@ -975,7 +975,7 @@ class BaggedEnsembleModel(AbstractModel):
     def persist_child_models(self, reset_paths=True):
         for i, model_name in enumerate(self.models):
             if isinstance(model_name, str):
-                child_path = self.create_contexts(self.path + model_name + os.path.sep)
+                child_path = self.create_contexts(os.path.join(self.path, model_name))
                 child_model = self._child_type.load(path=child_path, reset_paths=reset_paths, verbose=True)
                 self.models[i] = child_model
 
@@ -1136,7 +1136,7 @@ class BaggedEnsembleModel(AbstractModel):
         child_info_dict = dict()
         for model in self.models:
             if isinstance(model, str):
-                child_path = self.create_contexts(self.path + model + os.path.sep)
+                child_path = self.create_contexts(os.path.join(self.path, model))
                 child_info_dict[model] = self._child_type.load_info(child_path)
             else:
                 child_info_dict[model.name] = model.get_info()

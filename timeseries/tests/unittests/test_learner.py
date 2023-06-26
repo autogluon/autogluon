@@ -31,7 +31,7 @@ def trained_learners():
     for hp in TEST_HYPERPARAMETER_SETTINGS:
         temp_model_path = tempfile.mkdtemp()
         learner = TimeSeriesLearner(
-            path_context=temp_model_path + os.path.sep,
+            path_context=temp_model_path,
             eval_metric="MASE",
             prediction_length=3,
         )

@@ -322,7 +322,7 @@ class SequentialLocalFoldFittingStrategy(FoldFittingStrategy):
         y_fold, y_val_fold = self.y.iloc[train_index], self.y.iloc[val_index]
         fold_model = copy.deepcopy(model_base)
         fold_model.name = f"{fold_model.name}{model_name_suffix}"
-        fold_model.set_contexts(self.bagged_ensemble_model.path + fold_model.name + os.path.sep)
+        fold_model.set_contexts(os.path.join(self.bagged_ensemble_model.path, fold_model.name))
         kwargs_fold = kwargs.copy()
         is_pseudo = self.X_pseudo is not None and self.y_pseudo is not None
         if self.sample_weight is not None:
@@ -379,7 +379,7 @@ def _ray_fit(
     train_index, val_index = fold
     fold_model = copy.deepcopy(model_base)
     fold_model.name = f"{fold_model.name}{model_name_suffix}"
-    fold_model_local_save_path = bagged_ensemble_model_path + fold_model.name + os.path.sep
+    fold_model_local_save_path = os.path.join(bagged_ensemble_model_path, fold_model.name)
     fold_model.set_contexts(fold_model_local_save_path)
     if type(X) == str and type(y) == str:
         with open(X, "rb") as X_f, open(y, "rb") as y_f:

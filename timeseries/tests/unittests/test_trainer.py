@@ -33,7 +33,7 @@ def trained_trainers():
     for hp in TEST_HYPERPARAMETER_SETTINGS:
         temp_model_path = tempfile.mkdtemp()
         trainer = AutoTimeSeriesTrainer(
-            path=temp_model_path + os.path.sep,
+            path=temp_model_path,
             eval_metric="MAPE",
             prediction_length=3,
         )
@@ -390,7 +390,7 @@ def trained_and_refit_trainers():
     def fit_trainer():
         temp_model_path = tempfile.mkdtemp()
         trainer = AutoTimeSeriesTrainer(
-            path=temp_model_path + os.path.sep,
+            path=temp_model_path,
             prediction_length=3,
         )
         trainer.fit(

@@ -443,7 +443,7 @@ class RayHpoExecutor(HpoExecutor):
             trial_id = details.get("trial_id")
             file_id = trial_id  # unique identifier to files from this trial
             trial_model_name = os.path.join(model_name, file_id)
-            trial_model_path = model_path_root + trial_model_name + os.path.sep
+            trial_model_path = os.path.join(model_path_root, trial_model_name)
             hpo_models[trial_model_name] = dict(path=trial_model_path)
 
             hpo_models[trial_model_name] = dict(
@@ -552,7 +552,7 @@ class CustomHpoExecutor(HpoExecutor):
             # TODO: ignore models which were killed early by scheduler (eg. in Hyperband). How to ID these?
             file_id = f"T{trial+1}"  # unique identifier to files from this trial
             trial_model_name = os.path.join(model_name, file_id)
-            trial_model_path = model_path_root + trial_model_name + os.path.sep
+            trial_model_path = os.path.join(model_path_root, trial_model_name)
             trial_reward = self.scheduler.searcher.get_reward(hpo_results["config_history"][trial])
             if trial_reward is None or trial_reward == float("-inf"):
                 continue

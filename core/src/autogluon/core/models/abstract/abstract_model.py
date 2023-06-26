@@ -70,7 +70,7 @@ class AbstractModel:
         If None, a new unique time-stamped directory is chosen.
     name : str, default = None
         Name of the subdirectory inside path where model will be saved.
-        The final model directory will be path+name+os.path.sep()
+        The final model directory will be os.path.join(path, name)
         If None, defaults to the model's class name: self.__class__.__name__
     problem_type : str, default = None
         Type of prediction problem, i.e. is this a binary/multiclass classification or regression problem (options: 'binary', 'multiclass', 'regression').
@@ -112,9 +112,6 @@ class AbstractModel:
         self.path_root = path
         if self.path_root is None:
             path_suffix = self.name
-            if len(self.name) > 0:
-                if self.name[0] != os.path.sep:
-                    path_suffix = os.path.sep + path_suffix
             # TODO: Would be ideal to not create dir, but still track that it is unique. However, this isn't possible to do without a global list of used dirs or using UUID.
             path_cur = setup_outputdir(path=None, create_dir=True, path_suffix=path_suffix)
             self.path_root = path_cur.rsplit(self.path_suffix, 1)[0]
@@ -256,7 +253,7 @@ class AbstractModel:
 
     @property
     def path_suffix(self):
-        return self.name + os.path.sep
+        return self.name
 
     def is_valid(self) -> bool:
         """
@@ -373,7 +370,10 @@ class AbstractModel:
 
     def rename(self, name: str):
         """Renames the model and updates self.path to reflect the updated name."""
-        self.path = self.path[: -len(self.name) - 1] + name + os.path.sep
+        if self.name is not None and len(self.name) > 0:
+            self.path = os.path.join(os.path.dirname(self.path), name)
+        else:
+            self.path = os.path.join(self.path, name)
         self.name = name
 
     def preprocess(self, X, preprocess_nonadaptive=True, preprocess_stateful=True, **kwargs):
@@ -1050,7 +1050,7 @@ class AbstractModel:
         model : cls
             Loaded model object.
         """
-        file_path = path + cls.model_file_name
+        file_path = os.path.join(path, cls.model_file_name)
         model = load_pkl.load(path=file_path, verbose=verbose)
         if reset_paths:
             model.set_contexts(path)
