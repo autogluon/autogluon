@@ -120,7 +120,7 @@ class AbstractModel:
         # v0.9 FIXME: This is a hack, change so we aren't vulnerable to self.path_root breaking things
         self.path_root = PathConverter.to_relative(self.path_root)
 
-        self.path = self.create_contexts(self.path_root + self.path_suffix)  # TODO: Make this path a function for consistency.
+        self.path = self.create_contexts(os.path.join(self.path_root, self.path_suffix))  # TODO: Make this path a function for consistency.
 
         self.num_classes = None
         self.model = None
@@ -1002,7 +1002,7 @@ class AbstractModel:
             Path to the saved model, minus the file name.
             This should generally be a directory path ending with a '/' character (or appropriate path separator value depending on OS).
             If None, self.path is used.
-            The final model file is typically saved to path + self.model_file_name.
+            The final model file is typically saved to os.path.join(path, self.model_file_name).
         verbose : bool, default True
             Whether to log the location of the saved file.
 
@@ -1037,7 +1037,7 @@ class AbstractModel:
         path : str
             Path to the saved model, minus the file name.
             This should generally be a directory path ending with a '/' character (or appropriate path separator value depending on OS).
-            The model file is typically located in path + cls.model_file_name.
+            The model file is typically located in os.path.join(path, cls.model_file_name).
         reset_paths : bool, default True
             Whether to reset the self.path value of the loaded model to be equal to path.
             It is highly recommended to keep this value as True unless accessing the original self.path value is important.
@@ -1708,7 +1708,7 @@ class AbstractModel:
 
     @classmethod
     def load_info(cls, path, load_model_if_required=True) -> dict:
-        load_path = path + cls.model_info_name
+        load_path = os.path.join(path, cls.model_info_name)
         try:
             return load_pkl.load(path=load_path)
         except:
@@ -1721,8 +1721,8 @@ class AbstractModel:
     def save_info(self) -> dict:
         info = self.get_info()
 
-        save_pkl.save(path=self.path + self.model_info_name, object=info)
-        json_path = self.path + self.model_info_json_name
+        save_pkl.save(path=os.path.join(self.path, self.model_info_name), object=info)
+        json_path = os.path.join(self.path, self.model_info_json_name)
         save_json.save(path=json_path, obj=info)
         return info
 

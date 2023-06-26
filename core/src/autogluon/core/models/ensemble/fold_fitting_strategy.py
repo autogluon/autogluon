@@ -555,7 +555,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                     model_sync_path: str = self.model_sync_path + fold_model
                     if not model_sync_path.endswith("/"):
                         model_sync_path += "/"
-                self.sync_model_artifact(local_path=os.path.join(self.bagged_ensemble_model.path + fold_model), model_sync_path=model_sync_path)
+                self.sync_model_artifact(local_path=os.path.join(self.bagged_ensemble_model.path, fold_model), model_sync_path=model_sync_path)
             except TimeLimitExceeded:
                 # Terminate all ray tasks because a fold failed
                 self.terminate_all_unfinished_tasks(unfinished)

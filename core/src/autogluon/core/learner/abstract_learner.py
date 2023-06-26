@@ -122,7 +122,7 @@ class AbstractLearner:
     # TODO: avoid re-computing paths on all models path_context -> path for v0.1
     @classmethod
     def load_info(cls, path, reset_paths=True, load_model_if_required=True):
-        load_path = path + cls.learner_info_name
+        load_path = os.path.join(path, cls.learner_info_name)
         try:
             return load_pkl.load(path=load_path)
         except Exception as e:
@@ -135,8 +135,8 @@ class AbstractLearner:
     def save_info(self, include_model_info=False):
         info = self.get_info(include_model_info=include_model_info)
 
-        save_pkl.save(path=self.path + self.learner_info_name, object=info)
-        save_json.save(path=self.path + self.learner_info_json_name, obj=info)
+        save_pkl.save(path=os.path.join(self.path, self.learner_info_name), object=info)
+        save_json.save(path=os.path.join(self.path, self.learner_info_json_name), obj=info)
         return info
 
     def get_info(self, **kwargs):

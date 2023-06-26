@@ -1842,7 +1842,9 @@ class AbstractTrainer:
             # Cache y_pred_proba_val for later reuse to avoid redundant predict calls
             self._save_model_y_pred_proba_val(model=model.name, y_pred_proba_val=y_pred_proba_val)
             extra_attributes["cached_y_pred_proba_val"] = True
-
+        
+        print(model.path)
+        print(self.path)
         self.model_graph.add_node(
             model.name,
             fit_time=model.fit_time,

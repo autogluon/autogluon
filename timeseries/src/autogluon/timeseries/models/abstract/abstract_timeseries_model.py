@@ -118,7 +118,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         # Save self._oof_predictions as a separate file, not model attribute
         if self._oof_predictions is not None:
             save_pkl.save(
-                path=os.path.join(self.path + "utils", self._oof_filename),
+                path=os.path.join(self.path, "utils", self._oof_filename),
                 object=self._oof_predictions,
                 verbose=verbose,
             )
@@ -140,7 +140,7 @@ class AbstractTimeSeriesModel(AbstractModel):
     @classmethod
     def load_oof_predictions(cls, path: str, verbose: bool = True) -> TimeSeriesDataFrame:
         """Load the cached OOF predictions from disk."""
-        return load_pkl.load(path=os.path.join(path + "utils", cls._oof_filename), verbose=verbose)
+        return load_pkl.load(path=os.path.join(path, "utils", cls._oof_filename), verbose=verbose)
 
     def get_oof_predictions(self):
         if self._oof_predictions is None:

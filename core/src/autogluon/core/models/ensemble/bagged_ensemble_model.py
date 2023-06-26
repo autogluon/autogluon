@@ -954,7 +954,7 @@ class BaggedEnsembleModel(AbstractModel):
     @classmethod
     def load_oof(cls, path, verbose=True):
         try:
-            oof = load_pkl.load(path=os.path.join(path + "utils", cls._oof_filename), verbose=verbose)
+            oof = load_pkl.load(path=os.path.join(path, "utils", cls._oof_filename), verbose=verbose)
             oof_pred_proba = oof["_oof_pred_proba"]
             oof_pred_model_repeats = oof["_oof_pred_model_repeats"]
         except FileNotFoundError:
@@ -968,7 +968,7 @@ class BaggedEnsembleModel(AbstractModel):
         if self._oof_pred_proba is not None:
             pass
         else:
-            oof = load_pkl.load(path=os.path.join(self.path + "utils", self._oof_filename))
+            oof = load_pkl.load(path=os.path.join(self.path, "utils", self._oof_filename))
             self._oof_pred_proba = oof["_oof_pred_proba"]
             self._oof_pred_model_repeats = oof["_oof_pred_model_repeats"]
 
@@ -992,10 +992,10 @@ class BaggedEnsembleModel(AbstractModel):
         return model_names
 
     def load_model_base(self):
-        return load_pkl.load(path=os.path.join(self.path + "utils", "model_template.pkl"))
+        return load_pkl.load(path=os.path.join(self.path, "utils", "model_template.pkl"))
 
     def save_model_base(self, model_base):
-        save_pkl.save(path=os.path.join(self.path + "utils", "model_template.pkl"), object=model_base)
+        save_pkl.save(path=os.path.join(self.path, "utils", "model_template.pkl"), object=model_base)
 
     def save(self, path=None, verbose=True, save_oof=True, save_children=False) -> str:
         if path is None:
@@ -1007,7 +1007,7 @@ class BaggedEnsembleModel(AbstractModel):
 
         if save_oof and self._oof_pred_proba is not None:
             save_pkl.save(
-                path=os.path.join(path + "utils", self._oof_filename),
+                path=os.path.join(path, "utils", self._oof_filename),
                 object={
                     "_oof_pred_proba": self._oof_pred_proba,
                     "_oof_pred_model_repeats": self._oof_pred_model_repeats,
@@ -1029,20 +1029,20 @@ class BaggedEnsembleModel(AbstractModel):
         super().reduce_memory_size(remove_fit=remove_fit, remove_info=remove_info, requires_save=requires_save, **kwargs)
         if remove_fit_stack:
             try:
-                os.remove(os.path.join(self.path + "utils", self._oof_filename))
+                os.remove(os.path.join(self.path, "utils", self._oof_filename))
             except FileNotFoundError:
                 pass
             if requires_save:
                 self._oof_pred_proba = None
                 self._oof_pred_model_repeats = None
             try:
-                os.remove(os.path.join(self.path + "utils", "model_template.pkl"))
+                os.remove(os.path.join(self.path, "utils", "model_template.pkl"))
             except FileNotFoundError:
                 pass
             if requires_save:
                 self.model_base = None
             try:
-                os.rmdir(self.path + "utils")
+                os.rmdir(self.path, "utils")
             except OSError:
                 pass
         if reduce_children:

@@ -32,12 +32,12 @@ class AbstractNativeCompiler:
     @staticmethod
     def save(model, path: str):
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path + "model_native.pkl", "wb") as fp:
+        with open(os.path.join(path, "model_native.pkl"), "wb") as fp:
             fp.write(pickle.dumps(model))
 
     @staticmethod
     def load(path: str):
-        with open(path + "model_native.pkl", "rb") as fp:
+        with open(os.path.join(path, "model_native.pkl"), "rb") as fp:
             pkl = fp.read()
         return pickle.loads(pkl)
 

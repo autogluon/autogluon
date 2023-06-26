@@ -3531,20 +3531,20 @@ class TabularPredictor:
 
     @classmethod
     def _load_version_file(cls, path) -> str:
-        version_file_path = path + cls._predictor_version_file_name
+        version_file_path = os.path.join(path, cls._predictor_version_file_name)
         version = load_str.load(path=version_file_path)
         return version
 
     @classmethod
     def _load_metadata_file(cls, path: str, silent=True):
-        metadata_file_path = path + cls._predictor_metadata_file_name
+        metadata_file_path = os.path.join(path, cls._predictor_metadata_file_name)
         return load_json.load(path=metadata_file_path, verbose=not silent)
 
     def _save_version_file(self, silent=False):
         from ..version import __version__
 
         version_file_contents = f"{__version__}"
-        version_file_path = self.path + self._predictor_version_file_name
+        version_file_path = os.path.join(self.path, self._predictor_version_file_name)
         save_str.save(path=version_file_path, data=version_file_contents, verbose=not silent)
 
     def _save_metadata_file(self, silent=False):
@@ -3552,7 +3552,7 @@ class TabularPredictor:
         Save metadata json file to disk containing information such as
         python version, autogluon version, installed packages, operating system, etc.
         """
-        metadata_file_path = self.path + self._predictor_metadata_file_name
+        metadata_file_path = os.path.join(self.path, self._predictor_metadata_file_name)
 
         metadata = get_autogluon_metadata()
 
@@ -3577,7 +3577,7 @@ class TabularPredictor:
         self._learner.save()
         self._learner = None
         self._trainer = None
-        save_pkl.save(path=path + self.predictor_file_name, object=self)
+        save_pkl.save(path=os.path.join(path, self.predictor_file_name), object=self)
         self._learner = tmp_learner
         self._trainer = tmp_trainer
         self._save_version_file(silent=silent)
@@ -3593,7 +3593,7 @@ class TabularPredictor:
         """
         Inner load method, called in `load`.
         """
-        predictor: TabularPredictor = load_pkl.load(path=os.path.join(path + cls.predictor_file_name))
+        predictor: TabularPredictor = load_pkl.load(path=os.path.join(path, cls.predictor_file_name))
         learner = predictor._learner_type.load(path)
         predictor._set_post_fit_vars(learner=learner)
         return predictor
@@ -3641,7 +3641,7 @@ class TabularPredictor:
             version_saved = cls._load_version_file(path=path)
         except:
             logger.warning(
-                f'WARNING: Could not find version file at "{path + cls._predictor_version_file_name}".\n'
+                f'WARNING: Could not find version file at "{os.path.join(path, cls._predictor_version_file_name)}".\n'
                 f"This means that the predictor was fit in a version `<=0.3.1`."
             )
             version_saved = None
@@ -3668,7 +3668,7 @@ class TabularPredictor:
             metadata_init = cls._load_metadata_file(path=path)
         except:
             logger.warning(
-                f'WARNING: Could not find metadata file at "{path + cls._predictor_metadata_file_name}".\n'
+                f'WARNING: Could not find metadata file at "{os.path.join(path, cls._predictor_metadata_file_name)}".\n'
                 f"This could mean that the predictor was fit in a version `<=0.5.2`."
             )
             metadata_init = None

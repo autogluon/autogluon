@@ -110,7 +110,7 @@ class SimpleAbstractTrainer:
 
     @property
     def path_pkl(self) -> str:
-        return self.path + self.trainer_file_name
+        return os.path.join(self.path, self.trainer_file_name)
 
     def set_contexts(self, path_context: str) -> None:
         self.path, model_paths = self.create_contexts(path_context)
@@ -124,7 +124,7 @@ class SimpleAbstractTrainer:
         model_paths = self.get_models_attribute_dict(attribute="path")
         for model, prev_path in model_paths.items():
             model_local_path = prev_path.split(self.path, 1)[1]
-            new_path = path + model_local_path
+            new_path = os.path.join(path, model_local_path)
             model_paths[model] = new_path
 
         return path, model_paths
@@ -144,7 +144,7 @@ class SimpleAbstractTrainer:
 
     @classmethod
     def load(cls, path: str, reset_paths: bool = False) -> "SimpleAbstractTrainer":
-        load_path = path + cls.trainer_file_name
+        load_path = os.path.join(path, cls.trainer_file_name)
         if not reset_paths:
             return load_pkl.load(path=load_path)
         else:
@@ -207,7 +207,7 @@ class SimpleAbstractTrainer:
 
     @classmethod
     def load_info(cls, path, reset_paths=False, load_model_if_required=True) -> Dict[str, Any]:
-        load_path = path + cls.trainer_info_name
+        load_path = os.path.join(path, cls.trainer_info_name)
         try:
             return load_pkl.load(path=load_path)
         except:  # noqa
@@ -220,8 +220,8 @@ class SimpleAbstractTrainer:
     def save_info(self, include_model_info: bool = False):
         info = self.get_info(include_model_info=include_model_info)
 
-        save_pkl.save(path=self.path + self.trainer_info_name, object=info)
-        save_json.save(path=self.path + self.trainer_info_json_name, obj=info)
+        save_pkl.save(path=os.path.join(self.path, self.trainer_info_name), object=info)
+        save_json.save(path=os.path.join(self.path, self.trainer_info_json_name), obj=info)
         return info
 
     def get_info(self, include_model_info: bool = False) -> Dict[str, Any]:

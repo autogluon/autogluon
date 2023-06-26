@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Type
 
 import gluonts
+import os
 import numpy as np
 import torch
 from gluonts.core.component import from_hyperparameters
@@ -115,7 +116,7 @@ class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
     @classmethod
     def load(cls, path: str, reset_paths: bool = True, verbose: bool = True) -> "AbstractGluonTSModel":
         with torch_warning_filter():
-            model = load_pkl.load(path=path + cls.model_file_name, verbose=verbose)
+            model = load_pkl.load(path=os.path.join(path, cls.model_file_name), verbose=verbose)
             if reset_paths:
                 model.set_contexts(path)
             model.gts_predictor = GluonTSPyTorchPredictor.deserialize(Path(path) / cls.gluonts_model_path)

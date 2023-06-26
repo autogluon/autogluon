@@ -190,7 +190,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         cls, path: str, reset_paths: bool = True, load_oof: bool = False, verbose: bool = True
     ) -> AbstractTimeSeriesModel:
         model = super().load(path=path, reset_paths=reset_paths, load_oof=load_oof, verbose=verbose)
-        most_recent_model_path = model.path + os.sep + cls._most_recent_model_folder + os.sep
+        most_recent_model_path = os.path.join(model.path, cls._most_recent_model_folder)
         model.most_recent_model = model.model_base_type.load(
             most_recent_model_path,
             reset_paths=reset_paths,

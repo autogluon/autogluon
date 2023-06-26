@@ -183,7 +183,7 @@ class VowpalWabbitModel(AbstractModel):
         self.model = __model
         # Export model
         if self._load_model:
-            file_path = path + self.model_internals_file_name
+            file_path = os.path.join(path, self.model_internals_file_name)
             self.model.save(file_path)
         self._load_model = None
         return path
@@ -203,7 +203,7 @@ class VowpalWabbitModel(AbstractModel):
         params = model._get_model_params()
         # Load the internal model file
         if model._load_model:
-            file_path = path + cls.model_internals_file_name
+            file_path = os.path.join(path, cls.model_internals_file_name)
 
             model_load_params = f" -i {file_path} --quiet"
             if model.problem_type in PROBLEM_TYPES_CLASSIFICATION:
