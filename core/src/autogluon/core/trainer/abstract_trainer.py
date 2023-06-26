@@ -1564,7 +1564,7 @@ class AbstractTrainer:
                 path = self.get_model_attribute(model=model_name, attribute="path")
             if model_type is None:
                 model_type = self.get_model_attribute(model=model_name, attribute="type")
-            return model_type.load(path=path, reset_paths=self.reset_paths)
+            return model_type.load(path=os.path.join(self.path, path), reset_paths=self.reset_paths)
 
     def unpersist_models(self, model_names="all") -> list:
         if model_names == "all":
@@ -1845,6 +1845,7 @@ class AbstractTrainer:
         
         print(model.path)
         print(self.path)
+        print(os.path.relpath(model.path, self.path))
         self.model_graph.add_node(
             model.name,
             fit_time=model.fit_time,
