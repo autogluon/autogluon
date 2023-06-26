@@ -1116,7 +1116,7 @@ class AbstractTrainer:
         model_type = self.get_model_attribute(model=model, attribute="type")
         if issubclass(model_type, BaggedEnsembleModel):
             model_path = self.get_model_attribute(model=model, attribute="path")
-            return model_type.load_oof(path=model_path)
+            return model_type.load_oof(path=os.path.join(self.path, model_path))
         else:
             raise AssertionError(f"Model {model} must be a BaggedEnsembleModel to return oof_pred_proba")
 
@@ -1561,7 +1561,7 @@ class AbstractTrainer:
             return self.models[model_name]
         else:
             if path is None:
-                path = self.get_model_attribute(model=model_name, attribute="path")
+                path = self.get_model_attribute(model=model_name, attribute="path")  # get relative location of the model to the trainer
             if model_type is None:
                 model_type = self.get_model_attribute(model=model_name, attribute="type")
             return model_type.load(path=os.path.join(self.path, path), reset_paths=self.reset_paths)
@@ -2033,7 +2033,7 @@ class AbstractTrainer:
                 model_names_trained = []
                 self._extra_banned_names.add(model.name)
                 for model_hpo_name, model_info in hpo_models.items():
-                    model_hpo = self.load_model(model_hpo_name, path=model_info["path"], model_type=type(model))
+                    model_hpo = self.load_model(model_hpo_name, path=os.path.relpath(model_info["path"], self.path), model_type=type(model))
                     logger.log(20, f"Fitted model: {model_hpo.name} ...")
                     if self._add_model(model=model_hpo, stack_name=stack_name, level=level):
                         model_names_trained.append(model_hpo.name)
