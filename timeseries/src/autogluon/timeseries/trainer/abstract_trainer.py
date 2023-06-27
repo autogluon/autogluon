@@ -113,21 +113,12 @@ class SimpleAbstractTrainer:
         return os.path.join(self.path, self.trainer_file_name)
 
     def set_contexts(self, path_context: str) -> None:
-        self.path, model_paths = self.create_contexts(path_context)
-        for model, path in model_paths.items():
-            self.set_model_attribute(model=model, attribute="path", val=path)
+        self.path = self.create_contexts(path_context)
 
-    def create_contexts(self, path_context: str) -> Tuple[str, dict]:
+    def create_contexts(self, path_context: str) -> str:
         path = path_context
-        # TODO: consider keeping track of model path suffixes in model_graph instead
-        # TODO: of full paths
-        model_paths = self.get_models_attribute_dict(attribute="path")
-        for model, prev_path in model_paths.items():
-            model_local_path = prev_path.split(self.path, 1)[1]
-            new_path = os.path.join(path, model_local_path)
-            model_paths[model] = new_path
 
-        return path, model_paths
+        return path
 
     def save(self) -> None:
         # todo: remove / revise low_memory logic
@@ -173,7 +164,7 @@ class SimpleAbstractTrainer:
             path = self.get_model_attribute(model=model_name, attribute="path")
         if model_type is None:
             model_type = self.get_model_attribute(model=model_name, attribute="type")
-        return model_type.load(path=path, reset_paths=self.reset_paths)
+        return model_type.load(path=os.path.join(self.path, path), reset_paths=self.reset_paths)
 
     def construct_model_templates(self, hyperparameters: Union[str, Dict[str, Any]], **kwargs):
         raise NotImplementedError
@@ -356,7 +347,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             If ``base_models`` are provided and ``model`` is not a ``AbstractTimeSeriesEnsembleModel``.
         """
         node_attrs = dict(
-            path=model.path,
+            path=os.path.relpath(model.path, self.path),
             type=type(model),
             fit_time=model.fit_time,
             predict_time=model.predict_time,
