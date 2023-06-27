@@ -1042,7 +1042,7 @@ class BaggedEnsembleModel(AbstractModel):
             if requires_save:
                 self.model_base = None
             try:
-                os.rmdir(self.path, "utils")
+                os.rmdir(os.path.join(self.path, "utils"))
             except OSError:
                 pass
         if reduce_children:
