@@ -292,16 +292,12 @@ class AbstractTrainer:
         return self.get_model_attribute(model=model_name, attribute="level")
 
     def set_contexts(self, path_context):
-        self.path, model_paths = self.create_contexts(path_context)
-        for model, path in model_paths.items():
-            # reconstruct model path given trainer path and model's relative path
-            self.set_model_attribute(model=model, attribute="path", val=os.path.join(self.path, path))
+        self.path = self.create_contexts(path_context)
 
-    def create_contexts(self, path_context: str) -> (str, dict):
+    def create_contexts(self, path_context: str) -> str:
         path = path_context
-        model_paths = self.get_models_attribute_dict(attribute="path")
 
-        return path, model_paths
+        return path
 
     def fit(self, X, y, hyperparameters: dict, X_val=None, y_val=None, **kwargs):
         raise NotImplementedError
@@ -1564,6 +1560,9 @@ class AbstractTrainer:
                 path = self.get_model_attribute(model=model_name, attribute="path")  # get relative location of the model to the trainer
             if model_type is None:
                 model_type = self.get_model_attribute(model=model_name, attribute="type")
+            print("trainer load_model")
+            print(path)
+            print(self.path)
             return model_type.load(path=os.path.join(self.path, path), reset_paths=self.reset_paths)
 
     def unpersist_models(self, model_names="all") -> list:
@@ -1616,6 +1615,8 @@ class AbstractTrainer:
             else:
                 save_bag_folds = True
 
+        base_model_paths_dict = self.get_models_attribute_dict(attribute="path", models=base_model_names)
+        base_model_paths_dict = {key: os.path.join(self.path, val) for key, val in base_model_paths_dict.items()}
         weighted_ensemble_model, _ = get_models_func(
             hyperparameters={
                 "default": {
@@ -1625,7 +1626,7 @@ class AbstractTrainer:
             ensemble_type=WeightedEnsembleModel,
             ensemble_kwargs=dict(
                 base_model_names=base_model_names,
-                base_model_paths_dict=self.get_models_attribute_dict(attribute="path", models=base_model_names),
+                base_model_paths_dict=base_model_paths_dict,
                 base_model_types_dict=self.get_models_attribute_dict(attribute="type", models=base_model_names),
                 base_model_types_inner_dict=self.get_models_attribute_dict(attribute="type_inner", models=base_model_names),
                 base_model_performances_dict=self.get_models_attribute_dict(attribute="val_score", models=base_model_names),
@@ -1843,9 +1844,11 @@ class AbstractTrainer:
             self._save_model_y_pred_proba_val(model=model.name, y_pred_proba_val=y_pred_proba_val)
             extra_attributes["cached_y_pred_proba_val"] = True
 
+        print("_add_model")
         print(model.path)
         print(self.path)
         print(os.path.relpath(model.path, self.path))
+        print("exit _add_model")
         self.model_graph.add_node(
             model.name,
             fit_time=model.fit_time,
@@ -2912,7 +2915,7 @@ class AbstractTrainer:
             if isinstance(model, str):
                 model_type = self.get_model_attribute(model=model, attribute="type")
                 model_path = self.get_model_attribute(model=model, attribute="path")
-                model_info_dict[model] = model_type.load_info(path=model_path)
+                model_info_dict[model] = model_type.load_info(path=os.path.join(self.path, model_path))
             else:
                 model_info_dict[model.name] = model.get_info()
         return model_info_dict

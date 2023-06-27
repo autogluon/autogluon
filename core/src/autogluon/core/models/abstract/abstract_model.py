@@ -1051,6 +1051,9 @@ class AbstractModel:
             Loaded model object.
         """
         file_path = os.path.join(path, cls.model_file_name)
+        print("model load")
+        print(path)
+        print(file_path)
         model = load_pkl.load(path=file_path, verbose=verbose)
         if reset_paths:
             model.set_contexts(path)
