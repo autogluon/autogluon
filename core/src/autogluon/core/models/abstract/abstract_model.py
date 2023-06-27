@@ -117,9 +117,6 @@ class AbstractModel:
             self.path_root = path_cur.rsplit(self.path_suffix, 1)[0]
             logger.log(20, f"Warning: No path was specified for model, defaulting to: {self.path_root}")
 
-        # v0.9 FIXME: This is a hack, change so we aren't vulnerable to self.path_root breaking things
-        self.path_root = PathConverter.to_relative(self.path_root)
-
         self.path = self.create_contexts(os.path.join(self.path_root, self.path_suffix))  # TODO: Make this path a function for consistency.
 
         self.num_classes = None

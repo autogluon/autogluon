@@ -101,7 +101,6 @@ class AbstractTrainer:
         verbosity=2,
     ):
         self.path = path
-        self.path = PathConverter.to_relative(self.path)
         self.problem_type = problem_type
         self.feature_metadata = feature_metadata
         self.save_data = save_data
