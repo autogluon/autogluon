@@ -48,6 +48,12 @@ install_requires = (
 extras_require = {
     "ray": [
         "ray[default]>=2.3,<2.4",
+        # https://github.com/grpc/grpc/issues/31885
+        # version range set to allign with ray's updated version range:
+        # https://github.com/ray-project/ray/blob/master/python/setup.py#L259-L261
+        # TODO: remove the pin once issue resolved
+        "grpcio >= 1.42.0, <= 1.50.0",
+        "protobuf>=3.15.3,<=3.20.2",  # pin version to allign with transformers
     ],
     "raytune": [
         "ray[tune]>=2.3,<2.4",
