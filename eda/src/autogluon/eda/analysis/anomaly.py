@@ -40,7 +40,7 @@ def _suod_silent_print(silent=True):  # pragma: no cover
     orig_fn = joblib.Parallel._print
     orig_print = __builtin__.print
 
-    def silent_print(self, msg, msg_args):
+    def silent_print(*args, **kwargs):
         return
 
     def _silent_print(*args, **kwargs):
