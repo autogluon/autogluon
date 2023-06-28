@@ -39,7 +39,6 @@ class SimpleAbstractTrainer:
 
     def __init__(self, path: str, low_memory: bool, save_data: bool, *args, **kwargs):
         self.path = path
-        self.path = PathConverter.to_relative(self.path)
         self.reset_paths = False
 
         self.low_memory = low_memory
@@ -287,19 +286,19 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         self.hpo_results = {}
 
     def save_train_data(self, data: TimeSeriesDataFrame, verbose: bool = True) -> None:
-        path = self.path_data + "train.pkl"
+        path = os.path.join(self.path_data, "train.pkl")
         save_pkl.save(path=path, object=data, verbose=verbose)
 
     def save_val_data(self, data: TimeSeriesDataFrame, verbose: bool = True) -> None:
-        path = self.path_data + "val.pkl"
+        path = os.path.join(self.path_data, "val.pkl")
         save_pkl.save(path=path, object=data, verbose=verbose)
 
     def load_train_data(self) -> TimeSeriesDataFrame:
-        path = self.path_data + "train.pkl"
+        path = os.path.join(self.path_data, "train.pkl")
         return load_pkl.load(path=path)
 
     def load_val_data(self) -> Optional[TimeSeriesDataFrame]:
-        path = self.path_data + "val.pkl"
+        path = os.path.join(self.path_data, "val.pkl")
         if os.path.exists(path):
             return load_pkl.load(path=path)
         else:
