@@ -25,7 +25,7 @@ class RFRapidsModel(RapidsModelMixin, RFModel):
 
     conda create -n rapids-21.06 -c rapidsai -c nvidia -c conda-forge rapids=21.06 python=3.8 cudatoolkit=11.2
     conda activate rapids-21.06
-    pip install --pre autogluon.tabular[all]
+    pip install autogluon.tabular[all]
     """
 
     def _get_model_type(self):
