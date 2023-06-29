@@ -190,6 +190,7 @@ def hyperparameter_tune(hyperparameter_tune_kwargs, resources, is_matching=False
             total_resources=resources,
             minimum_gpu_per_trial=1.0 if resources["num_gpus"] > 0 else 0.0,
             time_budget_s=time_budget_s,
+            tune_config_kwargs={"reuse_actors": False},  # reuse_actors cause crashing in ray tune
             run_config_kwargs=run_config_kwargs,
             verbose=2,
         )
