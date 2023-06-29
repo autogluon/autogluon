@@ -88,6 +88,7 @@ def default(presets: str = DEFAULT):
 
             hyperparameters.update(
                 {
+                    "env.per_gpu_batch_size": 2,  # Cover some corner cases of HPO on multimodal data.
                     "model.hf_text.checkpoint_name": tune.choice(
                         [
                             "google/electra-base-discriminator",
