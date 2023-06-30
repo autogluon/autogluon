@@ -53,7 +53,7 @@ extras_require = {
         # https://github.com/ray-project/ray/blob/master/python/setup.py#L259-L261
         # TODO: remove the pin once issue resolved
         "grpcio >= 1.42.0, <= 1.50.0",
-        "pydantic<2.0"
+        "pydantic<2.0"  # https://github.com/ray-project/ray/issues/36990
     ],
     "raytune": [
         "ray[tune]>=2.3,<2.4",
