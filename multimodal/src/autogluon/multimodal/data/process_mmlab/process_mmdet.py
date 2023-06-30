@@ -65,7 +65,7 @@ class MMDetProcessor(MMLabProcessor):
             requires_column_info=requires_column_info,
         )
 
-        # for yolox we seperate loading pipeline to support multi_image_mix_dataset
+        # for yolox we separate loading pipeline to support multi_image_mix_dataset
         if "loading_pipeline" in self.cfg.keys():
             self.load_processor = Compose(self.cfg.loading_pipeline)
 

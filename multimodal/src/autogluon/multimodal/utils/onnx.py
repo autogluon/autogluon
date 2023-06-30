@@ -120,7 +120,7 @@ class OnnxModule(object):
 
     def __call__(self, *args):
         """
-        Make the module callable like torch.nn.Module, while runnning forward pass with onnxruntime.
+        Make the module callable like torch.nn.Module, while running forward pass with onnxruntime.
 
         Parameters
         ----------

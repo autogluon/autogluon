@@ -33,7 +33,7 @@ def save(
 ):
     """
     Save pandas DataFrame to the file path.
-    If local path, directories will be created autmatically if necessary to save the file.
+    If local path, directories will be created automatically if necessary to save the file.
         If local, will be relative to working directory unless specified as absolute.
     If S3 path, you must have permissions to save to the S3 location available via boto3 in the current session.
 

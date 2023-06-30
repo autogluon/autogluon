@@ -295,7 +295,7 @@ def customize_model_names(
         ["timm_image_123", "hf_text_abc"], then `config.timm_image` and `config.hf_text`
         are changed to `config.timm_image_123` and `config.hf_text_abc`.
     advanced_hyperparameters
-        The hyperparameters whose values are compelx objects, which can't be stored in config.
+        The hyperparameters whose values are complex objects, which can't be stored in config.
 
     Returns
     -------
