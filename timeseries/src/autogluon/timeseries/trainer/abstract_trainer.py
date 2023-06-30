@@ -189,7 +189,7 @@ class SimpleAbstractTrainer:
                     model = self.models[model]
             if isinstance(model, str):
                 model_type = self.get_model_attribute(model=model, attribute="type")
-                model_path = self.get_model_attribute(model=model, attribute="path")
+                model_path = os.path.join(self.path, self.get_model_attribute(model=model, attribute="path"))
                 model_info_dict[model] = model_type.load_info(path=model_path)
             else:
                 model_info_dict[model.name] = model.get_info()
@@ -320,7 +320,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         self.models = models
 
     def _get_model_oof_predictions(self, model_name: str) -> TimeSeriesDataFrame:
-        model_path = self.get_model_attribute(model=model_name, attribute="path")
+        model_path = os.path.join(self.path, self.get_model_attribute(model=model_name, attribute="path"))
         model_type = self.get_model_attribute(model=model_name, attribute="type")
         return model_type.load_oof_predictions(path=model_path)
 
@@ -434,7 +434,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         model_names_trained = []
         # add each of the trained HPO configurations to the trained models
         for model_hpo_name, model_info in hpo_models.items():
-            model_path = model_info["path"]
+            model_path = os.path.join(self.path, model_info["path"])
             # Only load model configurations that didn't fail
             if Path(model_path).exists():
                 model_hpo = self.load_model(model_hpo_name, path=model_path, model_type=type(model))
@@ -727,7 +727,6 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             fit_time=ensemble.fit_time,
             predict_time=ensemble.predict_time,
         )
-
         self._add_model(model=ensemble, base_models=ensemble.model_names)
         self.save_model(model=ensemble)
         return ensemble.name
