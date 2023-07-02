@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 
 from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT, S_TEXT_AS_CATEGORY, S_TEXT_NGRAM
+from autogluon.common.loaders.load_pkl import SafeTorchUnpicklerCPU
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_torch
 from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION, SOFTCLASS
@@ -612,7 +613,18 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         """
         import torch
 
-        model: TabularNeuralNetTorchModel = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
+        model: TabularNeuralNetTorchModel = None
+
+        # Check if no GPU backends available, then safely load model in CPU.
+        # Otherwise, try to use the default loader.
+        if not torch.cuda.is_available() and not torch.backends.mps.is_available():
+            file_path = path + cls.model_file_name
+            with open(file_path, "rb") as f:
+                model = SafeTorchUnpicklerCPU(f).load()
+            if reset_paths:
+                model.set_contexts(path)
+        else:
+            model = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
 
         # Put the model on the same device it was train on (GPU/MPS) if it is available; otherwise use CPU
         if model.model is not None:

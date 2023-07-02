@@ -77,3 +77,27 @@ def load_with_fn(path, pickle_fn, format=None, verbose=True):
     with open(path, "rb") as fin:
         object = pickle_fn(fin)
     return object
+
+
+class SafeTorchUnpicklerCPU(pickle.Unpickler):
+    """
+    SafeTorchUnpicklerCPU class for safely unpickling objects with underlying
+    Torch model previously trained on a device not currently available.
+    (e.g., 'cuda' or 'mps')
+
+    PyTorch issue not yet fixed at https://github.com/pytorch/pytorch/issues/16797
+    """
+
+    def find_class(self, module, name):
+        """
+        Method to return the correct method for loading the object.
+        If attempting to load the actual Torch model, return the safe torch.load method using cpu.
+        For all the other objects (e.g., the TabularNeuralNetTorchModel wrapper) use the default method.
+        """
+
+        import torch
+
+        if module == "torch.storage" and name == "_load_from_bytes":
+            return lambda b: torch.load(io.BytesIO(b), map_location=torch.device("cpu"))
+        else:
+            return super().find_class(module, name)
