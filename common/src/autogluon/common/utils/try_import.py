@@ -30,13 +30,13 @@ def try_import_mxboard():
 
 
 def try_import_ray() -> ModuleType:
-    RAY_MAX_VERSION = "2.4.0"
+    RAY_MAX_VERSION = "2.7.0"  # sync with core/setup.py
     ray_max_version_os_map = dict(
         Darwin=RAY_MAX_VERSION,
         Windows=RAY_MAX_VERSION,
         Linux=RAY_MAX_VERSION,
     )
-    ray_min_version = "2.2.0"
+    ray_min_version = "2.5.1"
     current_os = platform.system()
     ray_max_version = ray_max_version_os_map.get(current_os, RAY_MAX_VERSION)
     try:
@@ -58,57 +58,6 @@ def try_import_ray() -> ModuleType:
             "or use sequential fold fitting by passing `sequential_local` to `ag_args_ensemble` when calling tabular.fit"
             "For example: `predictor.fit(..., ag_args_ensemble={'fold_fitting_strategy': 'sequential_local'})`"
         )
-
-
-def try_import_ray_lightning():
-    """This function tries to import ray lightning and check if the compatible pytorch lightning version is installed"""
-    supported_ray_lightning_min_version = "0.2.0"
-    supported_ray_lightning_max_version = "0.3.0"
-    ray_lightning_torch_lightning_compatibility_map = {
-        "0.2.x": "1.5.x",
-    }
-    ray_lightining_torch_lightning_compatibility_range_map = {
-        ("0.2.0", "0.3.0"): ("1.5.0", "1.6.0"),
-    }
-    try:
-        import pkg_resources
-        import pytorch_lightning
-        import ray_lightning
-        from packaging import version
-
-        ray_lightning_version = pkg_resources.get_distribution("ray_lightning").version  # ray_lightning doesn't have __version__...
-
-        if not (
-            version.parse(supported_ray_lightning_min_version) <= version.parse(ray_lightning_version) < version.parse(supported_ray_lightning_max_version)
-        ):
-            logger.log(
-                f"ray_lightning=={ray_lightning_version} detected. "
-                f"{supported_ray_lightning_min_version} <= ray_lighting < {supported_ray_lightning_max_version} is required."
-                "You can use pip to install certain version of ray_lightning."
-                f"Supported ray_lightning versions and the compatible torch lightning versions are {ray_lightning_torch_lightning_compatibility_map}."
-            )
-            return False
-
-        for ray_lightning_versions, torch_lightning_versions in ray_lightining_torch_lightning_compatibility_range_map.items():
-            ray_lightning_min_version, ray_lightning_max_version = ray_lightning_versions
-            torch_lightning_min_version, torch_lightning_max_version = torch_lightning_versions
-            if version.parse(ray_lightning_min_version) <= version.parse(ray_lightning_version) < version.parse(ray_lightning_max_version):
-                if not (
-                    version.parse(torch_lightning_min_version) <= version.parse(pytorch_lightning.__version__) < version.parse(torch_lightning_max_version)
-                ):
-                    logger.log(
-                        f"Found ray_lightning {ray_lightning_version} that's not compatible with pytorch_lightning."
-                        f"The compatible version of pytorch_lightning is >= {torch_lightning_min_version} and < {torch_lightning_max_version}."
-                    )
-                    return False
-        return True
-
-    except ImportError:
-        logger.info(
-            "You can enable each individual trial using multiple gpus by installing ray_lightning."
-            f"Supported ray_lightning versions and the compatible torch lightning versions are {ray_lightning_torch_lightning_compatibility_map}."
-        )
-        return False
 
 
 def try_import_catboost():
@@ -175,7 +124,7 @@ def try_import_torch():
         import torch
     except ImportError as e:
         raise ImportError(
-            "Unable to import dependency torch\n" "A quick tip is to install via `pip install torch`.\n" "The minimum torch version is currently 1.6."
+            "Unable to import dependency torch\n" "A quick tip is to install via `pip install torch`.\n" "The minimum torch version is currently 1.11."
         )
 
 
