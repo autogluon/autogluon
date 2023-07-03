@@ -32,7 +32,7 @@ install_requires = [
     "torch>=1.11,<2.1",
     "pytorch-lightning>=2.0.0,<2.1",
     "networkx",  # version range defined in `core/_setup_utils.py`
-    # TODO: update statsforecast to v1.5.0 - resolve antlr4-python3-runtime depedency clash with multimodal
+    # TODO: update statsforecast to v1.5.0 - resolve antlr4-python3-runtime dependency clash with multimodal
     "statsforecast>=1.4.0,<1.5",
     "mlforecast>=0.7.0,<0.7.4",
     "tqdm",  # version range defined in `core/_setup_utils.py`

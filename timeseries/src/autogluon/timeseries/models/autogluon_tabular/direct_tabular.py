@@ -16,6 +16,7 @@ from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSer
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.local.abstract_local_model import AG_DEFAULT_N_JOBS
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
+from autogluon.timeseries.utils.warning_filters import statsmodels_joblib_warning_filter, statsmodels_warning_filter
 
 logger = logging.getLogger(__name__)
 
@@ -220,16 +221,17 @@ class DirectTabularModel(AbstractTimeSeriesModel):
             See the docstring of get_lags for the description of the parameters.
             """
             # TODO: Expose n_jobs to the user as a hyperparameter
-            lags_per_item = Parallel(n_jobs=AG_DEFAULT_N_JOBS)(
-                delayed(get_lags)(
-                    ts,
-                    lag_indices,
-                    prediction_length=prediction_length,
-                    max_rows_per_item=max_rows_per_item,
-                    mask=mask,
+            with statsmodels_joblib_warning_filter(), statsmodels_warning_filter():
+                lags_per_item = Parallel(n_jobs=AG_DEFAULT_N_JOBS)(
+                    delayed(get_lags)(
+                        ts,
+                        lag_indices,
+                        prediction_length=prediction_length,
+                        max_rows_per_item=max_rows_per_item,
+                        mask=mask,
+                    )
+                    for ts in all_series
                 )
-                for ts in all_series
-            )
             features = np.concatenate(lags_per_item)
             return pd.DataFrame(features, columns=[f"{name}_lag_{idx}" for idx in lag_indices])
 
@@ -386,7 +388,7 @@ class DirectTabularModel(AbstractTimeSeriesModel):
         # Predict for batches (instead of using full dataset) to avoid high memory usage
         batches = features.groupby(np.arange(len(features)) // self.PREDICTION_BATCH_SIZE, sort=False)
         predictions = pd.concat([self.tabular_predictor.predict(batch) for _, batch in batches])
-        predictions.set_index(data_future.index, inplace=True)
+        predictions.index = data_future.index
 
         predictions = self._postprocess_predictions(predictions)
 

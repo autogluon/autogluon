@@ -25,7 +25,7 @@ class AbstractAnalysis(ABC, StateCheckMixin):
     When called, the execution flow is the following:
     - gather `args` from the parent levels of analysis hierarchy; this is done to avoid referencing same args on each
         nested component (i.e. `train_data` can be specified at the top and all the children will be able to access it
-        via `args` on all levels (unless overriden by one of the components in the hierarchy)
+        via `args` on all levels (unless overridden by one of the components in the hierarchy)
     - call `_fit` function for each component that returned `True` from `can_handle` call
 
     Please note: `state` is shared across the whole analysis hierarchy. If two components change the same space, then

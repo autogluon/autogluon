@@ -88,3 +88,12 @@ def test_when_static_features_present_then_prediction_works(temp_model_path):
     model = DirectTabularModel(path=temp_model_path)
     model.fit(train_data=data, time_limit=2)
     model.predict(data)
+
+
+@pytest.mark.parametrize("eval_metric", ["RMSE", "mean_wQuantileLoss", "MAPE", None])
+def test_when_eval_metric_is_changed_then_model_can_predict(temp_model_path, eval_metric):
+    data = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME.copy()
+    model = DirectTabularModel(path=temp_model_path, eval_metric=eval_metric)
+    model.fit(train_data=data)
+    predictions = model.predict(data)
+    assert len(predictions) == data.num_items * model.prediction_length

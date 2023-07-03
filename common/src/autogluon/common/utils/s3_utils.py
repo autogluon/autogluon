@@ -95,7 +95,7 @@ def upload_s3_folder(*, bucket: str, prefix: str, folder_to_upload: str, dry_run
         The local folder to upload to s3
     dry_run: bool, default = False
         Whether to perform uploading
-        If True, will isntead log every file that will be uploaded and the s3 path to be uploaded to
+        If True, will instead log every file that will be uploaded and the s3 path to be uploaded to
     verbose: bool, default = True
         Whether to log detailed loggings
     """
@@ -167,7 +167,7 @@ def download_s3_folder(
         If `error_if_exists=True`, deletion will not occur.
     dry_run: bool, default = False
         Whether to perform the directory creation and file downloading.
-        If True, will isntead log every file that will be downloaded and every directory that will be created
+        If True, will instead log every file that will be downloaded and every directory that will be created
     verbose: bool, default = True
         Whether to log detailed loggings
     **kwargs
@@ -179,7 +179,7 @@ def download_s3_folder(
         logger.log(20, f"Will download {len(s3_to_local_tuple_list)} objects from s3://{bucket}/{prefix} to {local_path}")
     if os.path.isdir(local_path) and not dry_run:
         if error_if_exists:
-            raise ValueError(f"Directory {local_path} already exsists. Please pass in a different `local_path` or set `error_if_exsits` to `False`")
+            raise ValueError(f"Directory {local_path} already exists. Please pass in a different `local_path` or set `error_if_exsits` to `False`")
         if delete_if_exists:
             logger.warning(f"Will delete {local_path} and all its content within because this folder already exists and `delete_if_exists` = `True`")
             shutil.rmtree(local_path)
