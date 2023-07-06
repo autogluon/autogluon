@@ -178,7 +178,7 @@ class AbstractTrainer:
     # path_root is the directory containing learner.pkl
     @property
     def path_root(self) -> str:
-        return self.path.rsplit(os.path.sep, maxsplit=2)[0]
+        return os.path.dirname(self.path)
 
     @property
     def path_utils(self) -> str:
@@ -1559,9 +1559,6 @@ class AbstractTrainer:
                 path = self.get_model_attribute(model=model_name, attribute="path")  # get relative location of the model to the trainer
             if model_type is None:
                 model_type = self.get_model_attribute(model=model_name, attribute="type")
-            print("trainer load_model")
-            print(path)
-            print(self.path)
             return model_type.load(path=os.path.join(self.path, path), reset_paths=self.reset_paths)
 
     def unpersist_models(self, model_names="all") -> list:
@@ -1843,11 +1840,6 @@ class AbstractTrainer:
             self._save_model_y_pred_proba_val(model=model.name, y_pred_proba_val=y_pred_proba_val)
             extra_attributes["cached_y_pred_proba_val"] = True
 
-        print("_add_model")
-        print(model.path)
-        print(self.path)
-        print(os.path.relpath(model.path, self.path))
-        print("exit _add_model")
         self.model_graph.add_node(
             model.name,
             fit_time=model.fit_time,

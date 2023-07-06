@@ -39,6 +39,7 @@ class SimpleAbstractTrainer:
 
     def __init__(self, path: str, low_memory: bool, save_data: bool, *args, **kwargs):
         self.path = path
+        print(f"TRAINER INIT self.path {self.path}")
         self.reset_paths = False
 
         self.low_memory = low_memory
@@ -97,7 +98,9 @@ class SimpleAbstractTrainer:
 
     @property
     def path_root(self) -> str:
-        return self.path.rsplit(os.path.sep, maxsplit=2)[0]
+        print(f"path root: {os.path.dirname(self.path)}")
+        print(f"self.path: {self.path}")
+        return os.path.dirname(self.path)
 
     @property
     def path_utils(self) -> str:
@@ -298,7 +301,9 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         return load_pkl.load(path=path)
 
     def load_val_data(self) -> Optional[TimeSeriesDataFrame]:
+        print("load_val_data")
         path = os.path.join(self.path_data, "val.pkl")
+        print(f"path: {path}")
         if os.path.exists(path):
             return load_pkl.load(path=path)
         else:
