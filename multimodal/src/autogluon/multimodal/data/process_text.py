@@ -11,7 +11,7 @@ from omegaconf import DictConfig
 from torch import nn
 from transformers import AutoConfig, AutoTokenizer, BertTokenizer, CLIPTokenizer, ElectraTokenizer
 
-from ..constants import AUTOMM, CHOICES_IDS, COLUMN, TEXT, TEXT_SEGMENT_IDS, TEXT_TOKEN_IDS, TEXT_VALID_LENGTH
+from ..constants import CHOICES_IDS, COLUMN, TEXT, TEXT_SEGMENT_IDS, TEXT_TOKEN_IDS, TEXT_VALID_LENGTH
 from .collator import PadCollator, StackCollator
 from .template_engine import TemplateEngine
 from .trivial_augmenter import TrivialAugment
@@ -34,45 +34,6 @@ ALL_TOKENIZERS = {
     "electra": ElectraTokenizer,
     "hf_auto": AutoTokenizer,
 }
-
-
-def construct_text_augmenter(
-    augment_maxscale: float,
-    augment_types: List[str],
-) -> Optional[TrivialAugment]:
-    """
-    Build up a text augmentor from the provided list of augmentation types
-
-    Parameters
-    ----------
-    augment_maxscale:
-        maximum scale for text augmentation
-    augment_types
-        A list of text augment types.
-
-    Returns
-    -------
-    A trivial augment instance.
-    """
-    if augment_maxscale == 0.0 or augment_maxscale is None:
-        return None
-
-    if augment_types is None or len(augment_types) == 0:
-        return TrivialAugment(TEXT, max_strength=augment_maxscale)
-    else:
-        auglist = []
-        for aug_type in augment_types:
-
-            if "(" in aug_type:
-                trans_mode = aug_type[0 : aug_type.find("(")]
-                args = ast.literal_eval(aug_type[aug_type.find("(") :])
-            else:
-                trans_mode = aug_type
-                args = None
-
-            auglist.append((trans_mode, args))
-
-        return TrivialAugment(TEXT, augment_maxscale, auglist)
 
 
 class TextProcessor:
@@ -180,7 +141,7 @@ class TextProcessor:
         self.train_augment_types = train_augment_types
         self.text_detection_length = text_detection_length
         self.text_trivial_aug_maxscale = text_trivial_aug_maxscale
-        self.train_augmenter = construct_text_augmenter(self.text_trivial_aug_maxscale, self.train_augment_types)
+        self.train_augmenter = self.construct_text_augmenter(self.text_trivial_aug_maxscale, self.train_augment_types)
         self.template_config = template_config
         if self.template_config.turn_on:
             self.template_engine = TemplateEngine(self.template_config)
@@ -493,6 +454,45 @@ class TextProcessor:
         else:
             return np.minimum(lengths, max_length)
 
+    @staticmethod
+    def construct_text_augmenter(
+        augment_maxscale: float,
+        augment_types: List[str],
+    ) -> Optional[TrivialAugment]:
+        """
+        Build up a text augmentor from the provided list of augmentation types
+
+        Parameters
+        ----------
+        augment_maxscale:
+            maximum scale for text augmentation
+        augment_types
+            A list of text augment types.
+
+        Returns
+        -------
+        A trivial augment instance.
+        """
+        if augment_maxscale == 0.0 or augment_maxscale is None:
+            return None
+
+        if augment_types is None or len(augment_types) == 0:
+            return TrivialAugment(TEXT, max_strength=augment_maxscale)
+        else:
+            auglist = []
+            for aug_type in augment_types:
+
+                if "(" in aug_type:
+                    trans_mode = aug_type[0 : aug_type.find("(")]
+                    args = ast.literal_eval(aug_type[aug_type.find("(") :])
+                else:
+                    trans_mode = aug_type
+                    args = None
+
+                auglist.append((trans_mode, args))
+
+            return TrivialAugment(TEXT, augment_maxscale, auglist)
+
     def __call__(
         self,
         texts: Dict[str, str],
@@ -529,7 +529,9 @@ class TextProcessor:
             if k != "train_augmenter":
                 setattr(result, k, deepcopy(v, memo))
         # manual reconstruct augmenter
-        result.train_augmenter = construct_text_augmenter(result.text_trivial_aug_maxscale, result.train_augment_types)
+        result.train_augmenter = self.construct_text_augmenter(
+            result.text_trivial_aug_maxscale, result.train_augment_types
+        )
         return result
 
     def __getstate__(self):
@@ -539,6 +541,6 @@ class TextProcessor:
 
     def __setstate__(self, state):
         self.__dict__ = state
-        self.train_augmenter = construct_text_augmenter(
+        self.train_augmenter = self.construct_text_augmenter(
             state["text_trivial_aug_maxscale"], state["train_augment_types"]
         )
