@@ -1849,7 +1849,7 @@ class AbstractTrainer:
             predict_child_time=predict_child_time,
             predict_1_child_time=predict_1_child_time,
             val_score=model.val_score,
-            path=os.path.relpath(model.path, self.path),  # model's relative path to trainer
+            path=os.path.relpath(model.path, self.path).split(os.sep),  # model's relative path to trainer
             type=type(model),  # Outer type, can be BaggedEnsemble, StackEnsemble (Type that is able to load the model)
             type_inner=type_inner,  # Inner type, if Ensemble then it is the type of the inner model (May not be able to load with this type)
             can_infer=model.can_infer(),
@@ -2647,6 +2647,8 @@ class AbstractTrainer:
                 return kwargs["default"]
             else:
                 raise ValueError(f"Model does not contain attribute: (model={model}, attribute={attribute})")
+        if attribute == "path":
+            return os.path.join(*self.model_graph.nodes[model][attribute])
         return self.model_graph.nodes[model][attribute]
 
     def set_model_attribute(self, model, attribute: str, val):

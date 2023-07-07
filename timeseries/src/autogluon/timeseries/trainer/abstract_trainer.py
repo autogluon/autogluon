@@ -39,7 +39,6 @@ class SimpleAbstractTrainer:
 
     def __init__(self, path: str, low_memory: bool, save_data: bool, *args, **kwargs):
         self.path = path
-        print(f"TRAINER INIT self.path {self.path}")
         self.reset_paths = False
 
         self.low_memory = low_memory
@@ -88,6 +87,8 @@ class SimpleAbstractTrainer:
         """Get a member attribute for given model from the `model_graph`."""
         if not isinstance(model, str):
             model = model.name
+        if attribute == "path":
+            return os.path.join(*self.model_graph.nodes[model][attribute])
         return self.model_graph.nodes[model][attribute]
 
     def set_model_attribute(self, model: Union[str, AbstractModel], attribute: str, val):
@@ -98,8 +99,6 @@ class SimpleAbstractTrainer:
 
     @property
     def path_root(self) -> str:
-        print(f"path root: {os.path.dirname(self.path)}")
-        print(f"self.path: {self.path}")
         return os.path.dirname(self.path)
 
     @property
@@ -301,9 +300,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         return load_pkl.load(path=path)
 
     def load_val_data(self) -> Optional[TimeSeriesDataFrame]:
-        print("load_val_data")
         path = os.path.join(self.path_data, "val.pkl")
-        print(f"path: {path}")
         if os.path.exists(path):
             return load_pkl.load(path=path)
         else:
@@ -351,7 +348,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             If ``base_models`` are provided and ``model`` is not a ``AbstractTimeSeriesEnsembleModel``.
         """
         node_attrs = dict(
-            path=os.path.relpath(model.path, self.path),
+            path=os.path.relpath(model.path, self.path).split(os.sep),
             type=type(model),
             fit_time=model.fit_time,
             predict_time=model.predict_time,
