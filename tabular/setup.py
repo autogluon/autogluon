@@ -66,7 +66,7 @@ extras_require = {
     ],
     "vowpalwabbit": [
         # FIXME: 9.5+ causes VW to save an empty model which always predicts 0. Confirmed on MacOS (Intel CPU). Unknown how to fix.
-        "vowpalwabbit>=9,<9.5",
+        "vowpalwabbit>=9,<9.9",
     ],
     "skl2onnx": [
         "skl2onnx>=1.13.0,<1.14.0",

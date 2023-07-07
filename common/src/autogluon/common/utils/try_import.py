@@ -220,10 +220,10 @@ def try_import_vowpalwabbit():
 
         vowpalwabbit_version = parse_version(vowpalwabbit.__version__)
         assert vowpalwabbit_version >= parse_version("9.0.0") and vowpalwabbit_version < parse_version(
-            "9.5.0"
-        ), f"Currently, we only support vowpalwabbit version >=9.0 and <9.5. Found vowpalwabbit version: {vowpalwabbit_version}"
+            "9.9.0"
+        ), f"Currently, we only support vowpalwabbit version >=9.0 and <9.9. Found vowpalwabbit version: {vowpalwabbit_version}"
     except ImportError:
-        raise ImportError("`import vowpalwabbit` failed.\n" "A quick tip is to install via `pip install vowpalwabbit>=9,<9.5")
+        raise ImportError("`import vowpalwabbit` failed.\n" "A quick tip is to install via `pip install vowpalwabbit>=9,<9.9")
 
 
 def try_import_fasttext():
