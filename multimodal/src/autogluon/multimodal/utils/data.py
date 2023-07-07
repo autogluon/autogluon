@@ -157,6 +157,7 @@ def create_data_processor(
             train_augment_types=OmegaConf.select(model_config, "text_train_augment_types"),
             template_config=getattr(config.data, "templates", OmegaConf.create({"turn_on": False})),
             normalize_text=getattr(config.data.text, "normalize_text", False),
+            use_fast=OmegaConf.select(model_config, "use_fast", default=True),
         )
     elif data_type == CATEGORICAL:
         data_processor = CategoricalProcessor(
