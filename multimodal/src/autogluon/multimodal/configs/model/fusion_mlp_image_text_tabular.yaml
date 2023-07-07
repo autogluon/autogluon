@@ -62,7 +62,7 @@ model:
     data_types:
       - "text"
     tokenizer_name: "hf_auto"
-    use_fast: null  # Use a fast Rust-based tokenizer if it is supported for a given model. If a fast tokenizer is not available for a given model, a normal Python-based tokenizer is returned instead.
+    use_fast: True  # Use a fast Rust-based tokenizer if it is supported for a given model. If a fast tokenizer is not available for a given model, a normal Python-based tokenizer is returned instead.
     max_text_len: 512  # If None or <=0, then use the max length of pretrained models.
     insert_sep: True
     low_cpu_mem_usage: False

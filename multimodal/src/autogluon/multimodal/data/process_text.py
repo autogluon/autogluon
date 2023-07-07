@@ -95,7 +95,7 @@ class TextProcessor:
         train_augment_types: Optional[List[str]] = None,
         template_config: Optional[DictConfig] = None,
         normalize_text: Optional[bool] = False,
-        use_fast: Optional[bool] = None,
+        use_fast: Optional[bool] = True,
     ):
         """
         Parameters
@@ -417,7 +417,7 @@ class TextProcessor:
     def get_pretrained_tokenizer(
         tokenizer_name: str,
         checkpoint_name: str,
-        use_fast: Optional[bool] = None,
+        use_fast: Optional[bool] = True,
     ):
         """
         Load the tokenizer for a pre-trained huggingface checkpoint.
@@ -439,10 +439,7 @@ class TextProcessor:
         """
         try:
             tokenizer_class = ALL_TOKENIZERS[tokenizer_name]
-            if use_fast is None:  # to be backward compatible
-                return tokenizer_class.from_pretrained(checkpoint_name)
-            else:
-                return tokenizer_class.from_pretrained(checkpoint_name, use_fast=use_fast)
+            return tokenizer_class.from_pretrained(checkpoint_name, use_fast=use_fast)
         except TypeError as e:
             try:
                 tokenizer_class = ALL_TOKENIZERS["bert"]
