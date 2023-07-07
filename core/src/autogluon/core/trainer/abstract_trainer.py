@@ -2629,7 +2629,10 @@ class AbstractTrainer:
                 if not isinstance(model, str):
                     model = model.name
                 model_names.append(model)
-            models_attribute_dict = {key: val for key, val in models_attribute_dict.items() if key in model_names}
+            if attribute == "path":
+                models_attribute_dict = {key: os.path.join(*val) for key, val in models_attribute_dict.items() if key in model_names}
+            else:
+                models_attribute_dict = {key: val for key, val in models_attribute_dict.items() if key in model_names}
         return models_attribute_dict
 
     def get_model_attribute(self, model, attribute: str, **kwargs):
