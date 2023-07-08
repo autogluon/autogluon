@@ -101,6 +101,10 @@ class CategoricalMLP(nn.Module):
         return f"{self.prefix}_{CATEGORICAL}"
 
     @property
+    def input_keys(self):
+        return [self.categorical_key]
+
+    @property
     def label_key(self):
         return f"{self.prefix}_{LABEL}"
 

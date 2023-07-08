@@ -160,6 +160,15 @@ def verify_no_redundant_model_configs(predictor):
             "auto",
         ),
         (
+            "petfinder",
+            ["numerical_mlp", "categorical_mlp", "fusion_mlp"],
+            None,
+            None,
+            BEST,
+            BIT_FIT,
+            "auto",
+        ),
+        (
             "hateful_memes",
             ["timm_image"],
             None,
@@ -222,6 +231,8 @@ def test_predictor(
         "optimization.top_k_average_method": top_k_average_method,
         "optimization.efficient_finetune": efficient_finetune,
         "optimization.loss_function": loss_function,
+        "data.categorical.convert_to_text": False,  # ensure the categorical model is used.
+        "data.numerical.convert_to_text": False,  # ensure the numerical model is used.
     }
     if text_backbone is not None:
         if "t_few" in model_names:
