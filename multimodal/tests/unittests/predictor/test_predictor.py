@@ -222,6 +222,8 @@ def test_predictor(
         "optimization.top_k_average_method": top_k_average_method,
         "optimization.efficient_finetune": efficient_finetune,
         "optimization.loss_function": loss_function,
+        "data.categorical.convert_to_text": False,  # ensure the categorical model is used.
+        "data.numerical.convert_to_text": False,  # ensure the numerical model is used.
     }
     if text_backbone is not None:
         if "t_few" in model_names:
