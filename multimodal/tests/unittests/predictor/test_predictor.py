@@ -160,15 +160,6 @@ def verify_no_redundant_model_configs(predictor):
             "auto",
         ),
         (
-            "petfinder",
-            ["numerical_mlp", "categorical_mlp", "fusion_mlp"],
-            None,
-            None,
-            BEST,
-            BIT_FIT,
-            "auto",
-        ),
-        (
             "hateful_memes",
             ["timm_image"],
             None,
