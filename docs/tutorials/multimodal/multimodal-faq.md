@@ -54,14 +54,19 @@ and [Feedback Prize - Predicting Effective Arguments](https://github.com/autoglu
 You may refer to these examples for more details.
 
 # How does AutoGluon MultiModal handle multiple images per sample?
-We offer two ways: 1) using multiple image columns in a dataframe; 2) joining multiple image paths together with semicolons. 
-You can also use a combination of these two options. 
-During processing, we forward all the images through one image backbone and average their features and logits for the final feature representation or prediction.
+
+We provide two options:
+1. Utilizing multiple image columns in a dataframe.
+2. Concatenating multiple image paths with semicolons.
+
+These options can be used individually or in combination.
+During processing, we pass all images through a single image backbone and average their features and logits to obtain the final representation or prediction.
 
 # How does AutoGluon MultiModal handle multiple text columns in a dataframe?
-We tokenize each text field separately and concatenate them into one token sequence before feeding it into the model.
-The order of multiple text columns in the concatenated sequence follow the order of `sorted(X.columns)`, where `X` is your dataframe. 
-The maximum length of the token sequence is controlled by hyperparameter `hf_text.max_text_len`, whose default is 512. 
-If the sequence length exceeds the limit, we would truncate the text fields iteratively and each iteration only truncates the longest text field. 
-Therefore, the short text fields are less likely to be affected during the sequence truncation.
-In addition, you can determine whether to insert separation tokens among different text fields by setting hyperparameter `hf_text.insert_sep`, whose default is True.
+
+We tokenize each text field individually and then concatenate them into a single token sequence before feeding it into the model. 
+The order of the text columns in the concatenated sequence follows the order of `sorted(X.columns)`, where `X` represents the dataframe.
+The maximum length of the token sequence is determined by the hyperparameter `hf_text.max_text_len`, with a default value of 512. 
+If the sequence length exceeds this limit, we perform iterative truncation by removing one token from the tail of the longest text field in each iteration. 
+This approach ensures that shorter text fields are less likely to be affected during the sequence truncation process.
+Furthermore, you can control the inclusion of separation tokens among different text fields by adjusting the hyperparameter `hf_text.insert_sep`, which is set to True by default.
