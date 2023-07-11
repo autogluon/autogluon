@@ -57,10 +57,11 @@ You may refer to these examples for more details.
 
 We provide two options:
 1. Utilizing multiple image columns in a dataframe.
-2. Concatenating multiple image paths with semicolons.
+2. Concatenating multiple image paths with semicolons and putting them into one dataframe column.
 
 These options can be used individually or in combination.
-During processing, we pass all images through a single image backbone and average their features and logits to obtain the final representation or prediction.
+During processing, we pass all images through a single image backbone and average their features and logits to obtain the final representation or prediction. 
+Note that for option 2, the maximum number of images allowed for one dataframe column can be controlled via hyperparameter `timm_image.max_img_num_per_col`, which has a default value of 2.
 
 ## How does AutoGluon MultiModal handle multiple text columns in a dataframe?
 
