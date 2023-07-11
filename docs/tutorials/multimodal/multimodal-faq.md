@@ -53,7 +53,7 @@ We used this script in our examples about [Petfinder Pawpularity](https://github
 and [Feedback Prize - Predicting Effective Arguments](https://github.com/autogluon/autogluon/tree/master/examples/automm/kaggle_feedback_prize). 
 You may refer to these examples for more details.
 
-# How does AutoGluon MultiModal handle multiple images per sample?
+## How does AutoGluon MultiModal handle multiple images per sample?
 
 We provide two options:
 1. Utilizing multiple image columns in a dataframe.
@@ -62,7 +62,7 @@ We provide two options:
 These options can be used individually or in combination.
 During processing, we pass all images through a single image backbone and average their features and logits to obtain the final representation or prediction.
 
-# How does AutoGluon MultiModal handle multiple text columns in a dataframe?
+## How does AutoGluon MultiModal handle multiple text columns in a dataframe?
 
 We tokenize each text field individually and then concatenate them into a single token sequence before feeding it into the model. 
 The order of the text columns in the concatenated sequence follows the order of `sorted(X.columns)`, where `X` represents the dataframe.
