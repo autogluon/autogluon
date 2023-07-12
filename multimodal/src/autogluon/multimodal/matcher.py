@@ -890,12 +890,8 @@ class MultiModalMatcher:
             model_summary,
         ]
 
-        use_ray_lightning = "_ray_lightning_plugin" in hpo_kwargs
         if hpo_mode:
-            if use_ray_lightning:
-                from ray_lightning.tune import TuneReportCheckpointCallback
-            else:
-                from ray.tune.integration.pytorch_lightning import TuneReportCheckpointCallback
+            from ray.tune.integration.pytorch_lightning import TuneReportCheckpointCallback
             tune_report_callback = TuneReportCheckpointCallback(
                 {f"{task.validation_metric_name}": f"{task.validation_metric_name}"},
                 filename=RAY_TUNE_CHECKPOINT,
@@ -935,11 +931,9 @@ class MultiModalMatcher:
                 strategy = config.env.strategy
         else:
             # we don't support running each trial in parallel without ray lightning
-            if use_ray_lightning:
-                strategy = hpo_kwargs.get("_ray_lightning_plugin")
-            else:
-                strategy = None
-                num_gpus = min(num_gpus, 1)
+            # TODO: checkout lightning support for ray tune for multi gpu support
+            strategy = None
+            num_gpus = min(num_gpus, 1)
 
         config.env.num_gpus = num_gpus
         config.env.precision = precision
@@ -956,7 +950,6 @@ class MultiModalMatcher:
                 devices=get_available_devices(
                     num_gpus=num_gpus,
                     auto_select_gpus=config.env.auto_select_gpus,
-                    use_ray_lightning=use_ray_lightning,
                 ),
                 num_nodes=config.env.num_nodes,
                 precision=precision,
