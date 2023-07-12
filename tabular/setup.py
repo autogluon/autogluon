@@ -27,6 +27,7 @@ install_requires = [
     "pandas",  # version range defined in `core/_setup_utils.py`
     "scikit-learn",  # version range defined in `core/_setup_utils.py`
     "networkx",  # version range defined in `core/_setup_utils.py`
+    "google-cloud-storage"
     f"{ag.PACKAGE_NAME}.core=={version}",
     f"{ag.PACKAGE_NAME}.features=={version}",
 ]

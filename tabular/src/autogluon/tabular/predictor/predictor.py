@@ -7,6 +7,8 @@ import math
 import os
 import pprint
 import shutil
+import pickle
+import io
 import time
 import warnings
 from typing import List, Optional, Tuple, Union
@@ -59,6 +61,8 @@ from ..configs.hyperparameter_configs import get_hyperparameter_config
 from ..configs.presets_configs import tabular_presets_alias, tabular_presets_dict
 from ..learner import AbstractTabularLearner, DefaultLearner
 from ..trainer.model_presets.presets import MODEL_TYPES
+
+from google.cloud import storage
 
 logger = logging.getLogger(__name__)  # return autogluon root logger
 
@@ -235,6 +239,7 @@ class TabularPredictor:
         sample_weight=None,
         weight_evaluation=False,
         groups=None,
+        gcs_config=None,
         **kwargs,
     ):
         self.verbosity = verbosity
@@ -271,6 +276,10 @@ class TabularPredictor:
         )
         self._learner_type = type(self._learner)
         self._trainer = None
+
+        if gcs_config is not None:
+            credentials = gcs_config['credentials']
+            self.gcs_client = storage.Client(credentials = credentials)
 
     @property
     def class_labels(self):
@@ -3577,7 +3586,18 @@ class TabularPredictor:
         self._learner.save()
         self._learner = None
         self._trainer = None
-        save_pkl.save(path=path + self.predictor_file_name, object=self)
+        if self.gcs_config:
+            # Upload to GCS bucket
+            bucket = self.gcs_client.bucket(self.gcs_config['bucket'])
+            blob = bucket.blob(path + self.predictor_file_name)
+            byte_stream = io.BytesIO()
+            pickle.dump(self, byte_stream)
+            byte_stream.seek(0)
+            blob.upload_from_file(byte_stream)
+
+        else:
+            save_pkl.save(path=path + self.predictor_file_name, object=self)
+
         self._learner = tmp_learner
         self._trainer = tmp_trainer
         self._save_version_file(silent=silent)
