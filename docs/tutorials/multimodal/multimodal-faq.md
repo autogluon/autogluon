@@ -53,3 +53,22 @@ We used this script in our examples about [Petfinder Pawpularity](https://github
 and [Feedback Prize - Predicting Effective Arguments](https://github.com/autogluon/autogluon/tree/master/examples/automm/kaggle_feedback_prize). 
 You may refer to these examples for more details.
 
+## How does AutoGluon MultiModal handle multiple images per sample?
+
+We provide two options:
+1. Utilizing multiple image columns in a dataframe.
+2. Concatenating multiple image paths with semicolons and putting them into one dataframe column.
+
+These options can be used individually or in combination. All the image columns are automatically detected.
+During processing, we pass all images through a single image backbone and average their features and logits to obtain the final representation or prediction. 
+Note that for option 2, the maximum number of images allowed for one dataframe column can be controlled via hyperparameter `timm_image.max_img_num_per_col`, which has a default value of 2.
+
+## How does AutoGluon MultiModal handle multiple text columns in a dataframe?
+
+The detection of all text columns is automated.
+We tokenize each text field individually and then concatenate them into a single token sequence before feeding it into the model. 
+The order of the text columns in the concatenated sequence follows the order of `sorted(X.columns)`, where `X` represents the dataframe.
+The maximum length of the token sequence is determined by the hyperparameter `hf_text.max_text_len`, with a default value of 512. 
+If the sequence length exceeds this limit, we perform iterative truncation by removing one token from the tail of the longest text field in each iteration. 
+This approach ensures that shorter text fields are less likely to be affected during the sequence truncation process.
+Furthermore, you can control the inclusion of separation tokens among different text fields by adjusting the hyperparameter `hf_text.insert_sep`, which is set to True by default.
