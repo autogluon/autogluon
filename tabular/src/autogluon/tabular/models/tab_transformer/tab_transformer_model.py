@@ -340,7 +340,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
 
                     best_val_epoch = e
                     os.makedirs(os.path.dirname(self.path), exist_ok=True)
-                    torch.save(self.model, self.path + self._temp_file_name)
+                    torch.save(self.model, os.path.join(self.path, self._temp_file_name))
 
             # If time limit has exceeded or we haven't improved in some number of epochs, stop early.
             if e - best_val_epoch > epochs_wo_improve:
@@ -354,8 +354,8 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
 
         if loader_val is not None:
             try:
-                self.model = torch.load(self.path + self._temp_file_name)
-                os.remove(self.path + self._temp_file_name)
+                self.model = torch.load(os.path.join(self.path, self._temp_file_name))
+                os.remove(os.path.join(self.path, self._temp_file_name))
             except:
                 pass
             logger.log(15, "Best model found in epoch %d" % best_val_epoch)
@@ -489,7 +489,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
         if path is None:
             path = self.path
 
-        params_filepath = path + self.params_file_name
+        params_filepath = os.path.join(path, self.params_file_name)
 
         os.makedirs(os.path.dirname(path), exist_ok=True)
 
@@ -508,11 +508,11 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
     def load(cls, path: str, reset_paths=False, verbose=True):
         import torch
 
-        obj: TabTransformerModel = load_pkl.load(path=path + cls.model_file_name, verbose=verbose)
+        obj: TabTransformerModel = load_pkl.load(path=os.path.join(path, cls.model_file_name), verbose=verbose)
         if reset_paths:
             obj.set_contexts(path)
 
-        obj.model = torch.load(path + cls.params_file_name)
+        obj.model = torch.load(os.path.join(path, cls.params_file_name))
 
         return obj
 

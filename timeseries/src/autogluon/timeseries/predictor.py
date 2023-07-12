@@ -1,4 +1,5 @@
 import logging
+import os
 import pprint
 import time
 import warnings
@@ -675,7 +676,7 @@ class TimeSeriesPredictor:
 
     @classmethod
     def _load_version_file(cls, path: str) -> str:
-        version_file_path = path + cls._predictor_version_file_name
+        version_file_path = os.path.join(path, cls._predictor_version_file_name)
         version = load_str.load(path=version_file_path)
         return version
 
@@ -705,7 +706,7 @@ class TimeSeriesPredictor:
             version_saved = cls._load_version_file(path=path)
         except:
             logger.warning(
-                f'WARNING: Could not find version file at "{path + cls._predictor_version_file_name}".\n'
+                f'WARNING: Could not find version file at "{os.path.join(path, cls._predictor_version_file_name)}".\n'
                 f"This means that the predictor was fit in a version `<=0.7.0`."
             )
             version_saved = "Unknown (Likely <=0.7.0)"
@@ -719,14 +720,14 @@ class TimeSeriesPredictor:
 
         logger.info(f"Loading predictor from path {path}")
         learner = AbstractLearner.load(path)
-        predictor = load_pkl.load(path=learner.path + cls.predictor_file_name)
+        predictor = load_pkl.load(path=os.path.join(learner.path, cls.predictor_file_name))
         predictor._learner = learner
         predictor.path = learner.path
         return predictor
 
     def _save_version_file(self):
         version_file_contents = current_ag_version
-        version_file_path = self.path + self._predictor_version_file_name
+        version_file_path = os.path.join(self.path, self._predictor_version_file_name)
         save_str.save(path=version_file_path, data=version_file_contents, verbose=False)
 
     def save(self) -> None:
@@ -737,7 +738,7 @@ class TimeSeriesPredictor:
         """
         tmp_learner = self._learner
         self._learner = None
-        save_pkl.save(path=tmp_learner.path + self.predictor_file_name, object=self)
+        save_pkl.save(path=os.path.join(tmp_learner.path, self.predictor_file_name), object=self)
         self._learner = tmp_learner
         self._save_version_file()
 

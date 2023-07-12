@@ -30,7 +30,7 @@ def model_trial(
         model = init_model(
             args, model_cls, init_params, backend=hpo_executor.executor_type, is_bagged_model=is_bagged_model
         )
-        model.set_contexts(path_context=model.path_root + model.name + os.path.sep)
+        model.set_contexts(path_context=os.path.join(model.path_root, model.name))
 
         train_data = load_pkl.load(train_path)
         val_data = load_pkl.load(val_path)

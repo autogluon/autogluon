@@ -374,7 +374,7 @@ class BaggedEnsembleModel(AbstractModel):
         if self._n_repeats != 0:
             raise ValueError(f"n_repeats must equal 0 when fitting a single model with k_fold == 1, value: {self._n_repeats}")
         model_base.name = f"{model_base.name}S1F1"
-        model_base.set_contexts(path_context=self.path + model_base.name + os.path.sep)
+        model_base.set_contexts(path_context=os.path.join(self.path, model_base.name))
         time_start_fit = time.time()
         model_base.fit(X=X, y=y, time_limit=time_limit, **kwargs)
         model_base.fit_time = time.time() - time_start_fit
@@ -748,7 +748,7 @@ class BaggedEnsembleModel(AbstractModel):
 
     def load_child(self, model: Union[AbstractModel, str], verbose=False) -> AbstractModel:
         if isinstance(model, str):
-            child_path = self.create_contexts(self.path + model + os.path.sep)
+            child_path = self.create_contexts(os.path.join(self.path, model))
             return self._child_type.load(path=child_path, verbose=verbose)
         else:
             return model
@@ -788,7 +788,7 @@ class BaggedEnsembleModel(AbstractModel):
         if path is None:
             path = self.path
         child = self.load_child(model)
-        child.set_contexts(path + child.name + os.path.sep)
+        child.set_contexts(os.path.join(path, child.name))
         child.save(verbose=verbose)
 
     def can_compile(self, compiler_configs=None):
@@ -954,7 +954,7 @@ class BaggedEnsembleModel(AbstractModel):
     @classmethod
     def load_oof(cls, path, verbose=True):
         try:
-            oof = load_pkl.load(path=os.path.join(path + "utils", cls._oof_filename), verbose=verbose)
+            oof = load_pkl.load(path=os.path.join(path, "utils", cls._oof_filename), verbose=verbose)
             oof_pred_proba = oof["_oof_pred_proba"]
             oof_pred_model_repeats = oof["_oof_pred_model_repeats"]
         except FileNotFoundError:
@@ -968,14 +968,14 @@ class BaggedEnsembleModel(AbstractModel):
         if self._oof_pred_proba is not None:
             pass
         else:
-            oof = load_pkl.load(path=os.path.join(self.path + "utils", self._oof_filename))
+            oof = load_pkl.load(path=os.path.join(self.path, "utils", self._oof_filename))
             self._oof_pred_proba = oof["_oof_pred_proba"]
             self._oof_pred_model_repeats = oof["_oof_pred_model_repeats"]
 
     def persist_child_models(self, reset_paths=True):
         for i, model_name in enumerate(self.models):
             if isinstance(model_name, str):
-                child_path = self.create_contexts(self.path + model_name + os.path.sep)
+                child_path = self.create_contexts(os.path.join(self.path, model_name))
                 child_model = self._child_type.load(path=child_path, reset_paths=reset_paths, verbose=True)
                 self.models[i] = child_model
 
@@ -992,10 +992,10 @@ class BaggedEnsembleModel(AbstractModel):
         return model_names
 
     def load_model_base(self):
-        return load_pkl.load(path=os.path.join(self.path + "utils", "model_template.pkl"))
+        return load_pkl.load(path=os.path.join(self.path, "utils", "model_template.pkl"))
 
     def save_model_base(self, model_base):
-        save_pkl.save(path=os.path.join(self.path + "utils", "model_template.pkl"), object=model_base)
+        save_pkl.save(path=os.path.join(self.path, "utils", "model_template.pkl"), object=model_base)
 
     def save(self, path=None, verbose=True, save_oof=True, save_children=False) -> str:
         if path is None:
@@ -1007,7 +1007,7 @@ class BaggedEnsembleModel(AbstractModel):
 
         if save_oof and self._oof_pred_proba is not None:
             save_pkl.save(
-                path=os.path.join(path + "utils", self._oof_filename),
+                path=os.path.join(path, "utils", self._oof_filename),
                 object={
                     "_oof_pred_proba": self._oof_pred_proba,
                     "_oof_pred_model_repeats": self._oof_pred_model_repeats,
@@ -1029,20 +1029,20 @@ class BaggedEnsembleModel(AbstractModel):
         super().reduce_memory_size(remove_fit=remove_fit, remove_info=remove_info, requires_save=requires_save, **kwargs)
         if remove_fit_stack:
             try:
-                os.remove(os.path.join(self.path + "utils", self._oof_filename))
+                os.remove(os.path.join(self.path, "utils", self._oof_filename))
             except FileNotFoundError:
                 pass
             if requires_save:
                 self._oof_pred_proba = None
                 self._oof_pred_model_repeats = None
             try:
-                os.remove(os.path.join(self.path + "utils", "model_template.pkl"))
+                os.remove(os.path.join(self.path, "utils", "model_template.pkl"))
             except FileNotFoundError:
                 pass
             if requires_save:
                 self.model_base = None
             try:
-                os.rmdir(self.path + "utils")
+                os.rmdir(os.path.join(self.path, "utils"))
             except OSError:
                 pass
         if reduce_children:
@@ -1136,7 +1136,7 @@ class BaggedEnsembleModel(AbstractModel):
         child_info_dict = dict()
         for model in self.models:
             if isinstance(model, str):
-                child_path = self.create_contexts(self.path + model + os.path.sep)
+                child_path = self.create_contexts(os.path.join(self.path, model))
                 child_info_dict[model] = self._child_type.load_info(child_path)
             else:
                 child_info_dict[model.name] = model.get_info()

@@ -597,7 +597,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         path : str
             Path to the saved model, minus the file name.
             This should generally be a directory path ending with a '/' character (or appropriate path separator value depending on OS).
-            The model file is typically located in path + cls.model_file_name.
+            The model file is typically located in os.path.join(path, cls.model_file_name).
         reset_paths : bool, default True
             Whether to reset the self.path value of the loaded model to be equal to path.
             It is highly recommended to keep this value as True unless accessing the original self.path value is important.

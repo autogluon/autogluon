@@ -38,5 +38,5 @@ def pytest_collection_modifyitems(config, items):
 def temp_model_path():
     """Pytest fixture to save as model paths that clean up after themselves"""
     td = tempfile.mkdtemp()
-    yield td + os.path.sep
+    yield td
     shutil.rmtree(td)

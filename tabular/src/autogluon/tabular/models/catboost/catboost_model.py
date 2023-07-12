@@ -115,7 +115,7 @@ class CatBoostModel(AbstractModel):
                 except:
                     pass
                 else:
-                    params["train_dir"] = self.path + "catboost_info"
+                    params["train_dir"] = os.path.join(self.path, "catboost_info")
 
         # TODO: Add more control over these params (specifically early_stopping_rounds)
         verbosity = kwargs.get("verbosity", 2)
