@@ -892,6 +892,7 @@ class MultiModalMatcher:
 
         if hpo_mode:
             from ray.tune.integration.pytorch_lightning import TuneReportCheckpointCallback
+
             tune_report_callback = TuneReportCheckpointCallback(
                 {f"{task.validation_metric_name}": f"{task.validation_metric_name}"},
                 filename=RAY_TUNE_CHECKPOINT,
