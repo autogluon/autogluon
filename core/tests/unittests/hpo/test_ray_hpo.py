@@ -5,7 +5,6 @@ from ray import tune
 
 from autogluon.core.hpo.ray_hpo import (
     AutommRayTuneAdapter,
-    AutommRayTuneLightningAdapter,
     RayTuneAdapter,
     TabularRayTuneAdapter,
     run,

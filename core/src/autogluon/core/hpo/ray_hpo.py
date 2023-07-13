@@ -473,7 +473,6 @@ class RayTuneAdapterFactory:
         TabularRayTuneAdapter,
         TimeSeriesRayTuneAdapter,
         AutommRayTuneAdapter,
-        AutommRayTuneLightningAdapter,
     ]
 
     __type_to_adapter = {cls().adapter_type: cls for cls in __supported_adapters}
