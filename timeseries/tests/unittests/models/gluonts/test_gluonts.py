@@ -11,7 +11,6 @@ from autogluon.timeseries.models.gluonts import (
     SimpleFeedForwardModel,
     TemporalFusionTransformerModel,
 )
-from autogluon.timeseries.models.gluonts.torch.models import AbstractGluonTSPyTorchModel
 from autogluon.timeseries.utils.features import TimeSeriesFeatureGenerator
 
 from ...common import DATAFRAME_WITH_COVARIATES, DATAFRAME_WITH_STATIC, DUMMY_TS_DATAFRAME
@@ -83,10 +82,7 @@ def test_when_models_saved_then_gluonts_predictors_can_be_loaded(model_class, te
     loaded_model = model.__class__.load(path=model.path)
 
     assert model.gluonts_estimator_class is loaded_model.gluonts_estimator_class
-    if isinstance(model, AbstractGluonTSPyTorchModel):
-        assert loaded_model.gts_predictor.to(model.gts_predictor.device) == model.gts_predictor
-    else:
-        assert loaded_model.gts_predictor == model.gts_predictor
+    assert loaded_model.gts_predictor.to(model.gts_predictor.device) == model.gts_predictor
 
 
 @pytest.fixture(scope="module")
