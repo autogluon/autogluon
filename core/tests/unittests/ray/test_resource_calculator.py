@@ -5,8 +5,6 @@ from autogluon.core.ray.resources_calculator import (
     CpuResourceCalculator,
     GpuResourceCalculator,
     NonParallelGpuResourceCalculator,
-    RayLightningCpuResourceCalculator,
-    RayLightningGpuResourceCalculator,
     ResourceCalculatorFactory,
 )
 
