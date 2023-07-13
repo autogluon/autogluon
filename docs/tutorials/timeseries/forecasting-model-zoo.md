@@ -181,7 +181,7 @@ Note that some of the models' hyperparameters have names and default values that
 
 ## MXNet Models
 
-MXNet models from GluonTS have been deprecated as of AutoGluon v0.9 because of dependency conflicts caused by MXNet.
+MXNet models from GluonTS have been deprecated because of dependency conflicts caused by MXNet.
 
 
 ## Additional features
