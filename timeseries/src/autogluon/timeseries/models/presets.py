@@ -192,9 +192,12 @@ def get_preset_models(
                 raise ValueError(f"Model {model} is not supported yet.")
             if model in excluded_models:
                 logger.info(
-                    f"\tFound '{model}' model in hyperparameters, but '{model}' "
+                    f"\tFound '{model}' model in `hyperparameters`, but '{model}' "
                     "is present in `excluded_model_types` and will be removed."
                 )
+                continue
+            if "mxnet" in model.lower():
+                logger.info(f"\tMXNet model '{model}' given in `hyperparameters` is deprecated and won't be trained. ")
                 continue
             model_type = MODEL_TYPES[model]
         elif isinstance(model, type):
