@@ -1,6 +1,7 @@
 import logging
 import os
 import shutil
+from datetime import timedelta
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterator, List, Optional, Type
 
@@ -9,6 +10,7 @@ import gluonts.core.settings
 import numpy as np
 import pandas as pd
 import torch
+from gluonts.core.component import from_hyperparameters
 from gluonts.dataset.common import Dataset as GluonTSDataset
 from gluonts.dataset.field_names import FieldName
 from gluonts.model.forecast import Forecast, QuantileForecast, SampleForecast
@@ -247,7 +249,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
     def _get_estimator_init_args(self) -> Dict[str, Any]:
         """Get GluonTS specific constructor arguments for estimator objects, an alias to `self._get_model_params`
         for better readability."""
-        init_kwargs = super()._get_estimator_init_args()
+        init_kwargs = self._get_model_params()
         # Map MXNet kwarg names to PyTorch Lightning kwarg names
         init_kwargs.setdefault("lr", init_kwargs.get("learning_rate", 1e-3))
         init_kwargs.setdefault("max_epochs", init_kwargs.get("epochs"))
@@ -369,6 +371,8 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
     def _get_callbacks(self, time_limit: int, *args, **kwargs) -> List[Callable]:
         """Retrieve a list of callback objects for the GluonTS trainer"""
+        from pytorch_lightning.callbacks import Timer
+
         return [Timer(timedelta(seconds=time_limit))] if time_limit is not None else []
 
     def predict(
