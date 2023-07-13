@@ -4,7 +4,6 @@ import numpy as np
 import pytest
 from gluonts.model.predictor import Predictor as GluonTSPredictor
 
-import autogluon.timeseries as agts
 from autogluon.timeseries.models.gluonts import (
     DeepARModel,
     DLinearModel,
@@ -17,30 +16,18 @@ from autogluon.timeseries.utils.features import TimeSeriesFeatureGenerator
 
 from ...common import DATAFRAME_WITH_COVARIATES, DATAFRAME_WITH_STATIC, DUMMY_TS_DATAFRAME
 
-if agts.MXNET_INSTALLED:
-    from .mx.test_mx import (
-        TESTABLE_MX_MODELS,
-        TESTABLE_MX_MODELS_WITH_KNOWN_COVARIATES,
-        TESTABLE_MX_MODELS_WITH_STATIC_FEATURES,
-    )
-else:
-    TESTABLE_MX_MODELS = []
-    TESTABLE_MX_MODELS_WITH_STATIC_FEATURES = []
-    TESTABLE_MX_MODELS_WITH_KNOWN_COVARIATES = []
-
-MODELS_WITH_STATIC_FEATURES = [DeepARModel, TemporalFusionTransformerModel] + TESTABLE_MX_MODELS_WITH_STATIC_FEATURES
-MODELS_WITH_KNOWN_COVARIATES = [DeepARModel, TemporalFusionTransformerModel] + TESTABLE_MX_MODELS_WITH_KNOWN_COVARIATES
+MODELS_WITH_STATIC_FEATURES = [DeepARModel, TemporalFusionTransformerModel]
+MODELS_WITH_KNOWN_COVARIATES = [DeepARModel, TemporalFusionTransformerModel]
 MODELS_WITH_STATIC_FEATURES_AND_KNOWN_COVARIATES = [
     m for m in MODELS_WITH_STATIC_FEATURES if m in MODELS_WITH_KNOWN_COVARIATES
 ]
-TESTABLE_PYTORCH_MODELS = [
+TESTABLE_MODELS = [
     DeepARModel,
     DLinearModel,
     PatchTSTModel,
     SimpleFeedForwardModel,
     TemporalFusionTransformerModel,
 ]
-TESTABLE_MODELS = TESTABLE_MX_MODELS + TESTABLE_PYTORCH_MODELS
 
 
 DUMMY_HYPERPARAMETERS = {"epochs": 1, "num_batches_per_epoch": 1}
@@ -143,10 +130,7 @@ def test_given_fit_with_static_features_when_predicting_then_static_features_are
     df, metadata = df_with_static
     model = model_class(hyperparameters=DUMMY_HYPERPARAMETERS, metadata=metadata)
     model.fit(train_data=df)
-    if model.name.endswith("MXNet"):
-        predictor_method = "gluonts.mx.model.predictor.RepresentableBlockPredictor.predict"
-    else:
-        predictor_method = "gluonts.torch.model.predictor.PyTorchPredictor.predict"
+    predictor_method = "gluonts.torch.model.predictor.PyTorchPredictor.predict"
     with mock.patch(predictor_method) as mock_predict:
         try:
             model.predict(df)

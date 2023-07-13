@@ -52,26 +52,6 @@ MODEL_TYPES = dict(
     ETS=ETSModel,
     ThetaStatsmodels=ThetaStatsmodelsModel,
 )
-if agts.MXNET_INSTALLED:
-    from .gluonts.mx import (
-        DeepARMXNetModel,
-        MQCNNMXNetModel,
-        MQRNNMXNetModel,
-        SimpleFeedForwardMXNetModel,
-        TemporalFusionTransformerMXNetModel,
-        TransformerMXNetModel,
-    )
-
-    MODEL_TYPES.update(
-        dict(
-            DeepARMXNet=DeepARMXNetModel,
-            SimpleFeedForwardMXNet=SimpleFeedForwardMXNetModel,
-            MQCNNMXNet=MQCNNMXNetModel,
-            MQRNNMXNet=MQRNNMXNetModel,
-            TransformerMXNet=TransformerMXNetModel,
-            TemporalFusionTransformerMXNet=TemporalFusionTransformerMXNetModel,
-        )
-    )
 
 DEFAULT_MODEL_NAMES = {v: k for k, v in MODEL_TYPES.items()}
 DEFAULT_MODEL_PRIORITY = dict(
@@ -91,12 +71,6 @@ DEFAULT_MODEL_PRIORITY = dict(
     ThetaStatsmodels=90,
     SimpleFeedForward=30,
     DynamicOptimizedTheta=30,
-    DeepARMXNet=50,
-    SimpleFeedForwardMXNet=30,
-    TemporalFusionTransformerMXNet=50,
-    TransformerMXNet=30,
-    MQCNNMXNet=10,
-    MQRNNMXNet=10,
 )
 DEFAULT_CUSTOM_MODEL_PRIORITY = 0
 
