@@ -418,7 +418,7 @@ class TextProcessor:
         lengths: List[int],
         max_length: int,
         do_merge: bool = False,
-    ) -> np.ndarray:
+    ) -> List:
         """
         Get the trimmed lengths of multiple text token sequences. It will make sure that
         the trimmed length is smaller than or equal to the max_length.
@@ -449,7 +449,7 @@ class TextProcessor:
         if do_merge:
             total_length = sum(lengths)
             if total_length <= max_length:
-                return lengths
+                return list(lengths)
             trimmed_lengths = np.zeros_like(lengths)
             while sum(trimmed_lengths) != max_length:
                 remainder = max_length - sum(trimmed_lengths)
@@ -462,9 +462,9 @@ class TextProcessor:
                 else:
                     increment = min(min(nonzero_budgets), remainder // len(nonzero_idx))
                     trimmed_lengths[nonzero_idx] += increment
-            return trimmed_lengths
+            return list(trimmed_lengths)
         else:
-            return np.minimum(lengths, max_length)
+            return list(np.minimum(lengths, max_length))
 
     @staticmethod
     def construct_text_augmenter(
