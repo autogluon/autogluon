@@ -3,13 +3,7 @@ import tempfile
 import pytest
 from ray import tune
 
-from autogluon.core.hpo.ray_hpo import (
-    AutommRayTuneAdapter,
-    AutommRayTuneLightningAdapter,
-    RayTuneAdapter,
-    TabularRayTuneAdapter,
-    run,
-)
+from autogluon.core.hpo.ray_hpo import AutommRayTuneAdapter, RayTuneAdapter, TabularRayTuneAdapter, run
 from autogluon.core.hpo.ray_tune_constants import SCHEDULER_PRESETS, SEARCHER_PRESETS
 
 
