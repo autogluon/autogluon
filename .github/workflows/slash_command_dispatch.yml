@@ -15,7 +15,7 @@ jobs:
         id: sha
         uses: actions/github-script@v4
         with:
-          result-encoding: string
+#           result-encoding: string
           script: |
             const { owner, repo, number } = context.issue;
             const pr = await github.pulls.get({
@@ -23,7 +23,7 @@ jobs:
               repo,
               pull_number: number,
             });
-            return pr.data.head.repo.full_name
+            return pr.data.head.repo
       - name: echo
         run: echo ${{ steps.sha.outputs.result }}
 #       - name: Slash Command Dispatch
