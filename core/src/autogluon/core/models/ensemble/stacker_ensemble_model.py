@@ -54,11 +54,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             base_model_types_dict = {}
         self.base_model_names = base_model_names
         self.base_models_dict: Dict[str, AbstractModel] = base_models_dict  # String name -> Model objects
-        self.base_model_paths_dict = base_model_paths_dict
-
-        # FIXME: DO NOT DO THIS, FIX ASAP
-        self.base_model_paths_dict = {k: PathConverter.to_relative(v) for k, v in self.base_model_paths_dict.items()}
-
+        self.base_model_paths_dict = {key: os.path.relpath(val, self.path) for key, val in base_model_paths_dict.items()}
         self.base_model_types_dict = base_model_types_dict
 
         # TODO: Consider deleting these variables after initialization
@@ -168,18 +164,6 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             time_limit = time_limit - (time.time() - start_time)
         return super()._fit(X=X, y=y, time_limit=time_limit, **kwargs)
 
-    def set_contexts(self, path_context):
-        path_root_orig = self.path_root
-        path_root_orig = PathConverter.to_current(path_root_orig)
-        self.path_root = path_root_orig
-        abs_path_root_orig = os.path.abspath(path_root_orig) + os.path.sep
-        self.base_model_paths_dict = {model: PathConverter.to_current(model_path) for model, model_path in self.base_model_paths_dict.items()}
-        super().set_contexts(path_context=path_context)
-        for model, model_path in self.base_model_paths_dict.items():
-            model_path = os.path.abspath(model_path) + os.path.sep
-            model_local_path = model_path.split(abs_path_root_orig, 1)[1]
-            self.base_model_paths_dict[model] = self.path_root + model_local_path
-
     def set_stack_columns(self, stack_column_prefix_lst):
         if self.problem_type in [MULTICLASS, SOFTCLASS]:
             stack_columns = [stack_column_prefix + "_" + str(cls) for stack_column_prefix in stack_column_prefix_lst for cls in range(self.num_classes)]
@@ -216,7 +200,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             model = self.base_models_dict[model_name]
         else:
             model_type = self.base_model_types_dict[model_name]
-            model_path = self.base_model_paths_dict[model_name]
+            model_path = os.path.join(self.path, self.base_model_paths_dict[model_name])
             model = model_type.load(model_path)
         return model
 

@@ -110,14 +110,14 @@ class RFOnnxCompiler:
     def save(model, path: str) -> str:
         """Save the compiled model into onnx file format."""
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path + "model.onnx", "wb") as f:
+        with open(os.path.join(path, "model.onnx"), "wb") as f:
             f.write(model.SerializeToString())
-        return path + "model.onnx"
+        return os.path.join(path, "model.onnx")
 
     @staticmethod
     def load(path: str) -> RFOnnxPredictor:
         """Load from the path that contains an onnx file."""
         import onnx
 
-        onnx_bytes = onnx.load(path + "model.onnx")
+        onnx_bytes = onnx.load(os.path.join(path, "model.onnx"))
         return RFOnnxPredictor(model=onnx_bytes)

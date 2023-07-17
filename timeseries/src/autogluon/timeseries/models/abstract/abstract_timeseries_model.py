@@ -35,7 +35,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         is fit to forecast.
     name : str, default = None
         Name of the subdirectory inside path where model will be saved.
-        The final model directory will be path+name+os.path.sep()
+        The final model directory will be os.path.join(path, name)
         If None, defaults to the model's class name: self.__class__.__name__
     metadata: CovariateMetadata
         A mapping of different covariate types known to autogluon.timeseries to column names
@@ -118,7 +118,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         # Save self._oof_predictions as a separate file, not model attribute
         if self._oof_predictions is not None:
             save_pkl.save(
-                path=os.path.join(self.path + "utils", self._oof_filename),
+                path=os.path.join(self.path, "utils", self._oof_filename),
                 object=self._oof_predictions,
                 verbose=verbose,
             )
@@ -140,7 +140,7 @@ class AbstractTimeSeriesModel(AbstractModel):
     @classmethod
     def load_oof_predictions(cls, path: str, verbose: bool = True) -> TimeSeriesDataFrame:
         """Load the cached OOF predictions from disk."""
-        return load_pkl.load(path=os.path.join(path + "utils", cls._oof_filename), verbose=verbose)
+        return load_pkl.load(path=os.path.join(path, "utils", cls._oof_filename), verbose=verbose)
 
     def get_oof_predictions(self):
         if self._oof_predictions is None:
@@ -401,7 +401,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         except EmptySearchSpace:
             return skip_hpo(self, train_data, val_data, time_limit=hpo_executor.time_limit)
 
-        self.set_contexts(os.path.abspath(self.path) + os.path.sep)
+        self.set_contexts(os.path.abspath(self.path))
         directory = self.path
         dataset_train_filename = "dataset_train.pkl"
         train_path = os.path.join(self.path, dataset_train_filename)

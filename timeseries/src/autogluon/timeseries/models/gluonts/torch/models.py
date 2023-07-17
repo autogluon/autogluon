@@ -2,6 +2,7 @@
 Module including wrappers for PyTorch implementations of models in GluonTS
 """
 import logging
+import os
 import shutil
 from datetime import timedelta
 from pathlib import Path
@@ -115,7 +116,7 @@ class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
     @classmethod
     def load(cls, path: str, reset_paths: bool = True, verbose: bool = True) -> "AbstractGluonTSModel":
         with torch_warning_filter():
-            model = load_pkl.load(path=path + cls.model_file_name, verbose=verbose)
+            model = load_pkl.load(path=os.path.join(path, cls.model_file_name), verbose=verbose)
             if reset_paths:
                 model.set_contexts(path)
             model.gts_predictor = GluonTSPyTorchPredictor.deserialize(Path(path) / cls.gluonts_model_path)

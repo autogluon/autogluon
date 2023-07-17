@@ -40,6 +40,7 @@ others_2:
 - t5-small
 - microsoft/layoutlmv3-base
 - microsoft/layoutlmv2-base-uncased
+- albert-base-v2
 predictor:
 - CLTL/MedRoBERTa.nl
 - google/electra-small-discriminator

@@ -110,42 +110,6 @@ In the following, we decomposed the functionalities of AutoMM and prepared step-
 
   How to use pd.DataFrame format for object detection
 :::
-
-:::{grid-item-card} Fast Finetune on COCO Format Dataset
-  :link: object_detection/finetune/detection_fast_finetune_coco.html
-
-  How to fast finetune a pretrained model on a dataset in COCO format.
-:::
-
-:::{grid-item-card} High Performance Finetune on COCO Format Dataset
-  :link: object_detection/finetune/detection_high_performance_finetune_coco.html
-
-  How to finetune a pretrained model on a dataset in COCO format with high performance.
-:::
-
-:::{grid-item-card} Evaluate Pretrained YOLOv3 on COCO Format Dataset
-  :link: object_detection/evaluation/detection_eval_yolov3_coco.html
-
-  How to evaluate the very fast pretrained YOLOv3 model on dataset in COCO format.
-:::
-
-:::{grid-item-card} Evaluate Pretrained Faster R-CNN on COCO Format Dataset
-  :link: object_detection/evaluation/detection_eval_fasterrcnn_coco.html
-
-  How to evaluate the pretrained Faster R-CNN model with high performance on dataset in COCO format.
-:::
-
-:::{grid-item-card} Evaluate Pretrained Deformable DETR on COCO Format Dataset
-  :link: object_detection/evaluation/detection_eval_ddetr_coco.html
-
-  How to evaluate the pretrained Deformable DETR model with higher performance on dataset in COCO format
-:::
-
-:::{grid-item-card} Evaluate Pretrained Faster R-CNN on VOC Format Dataset
-  :link: object_detection/evaluation/detection_eval_fasterrcnn_voc.html
-
-  How to evaluate the pretrained Faster R-CNN model on dataset in VOC format
-:::
 ::::
 
 

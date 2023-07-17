@@ -1,4 +1,5 @@
 import logging
+import os
 import time
 
 from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT
@@ -206,7 +207,7 @@ class XGBoostModel(AbstractModel):
         path = super().save(path=path, verbose=verbose)
         if _model is not None:
             # Halves disk usage compared to .json / .pkl
-            _model.save_model(path + "xgb.ubj")
+            _model.save_model(os.path.join(path, "xgb.ubj"))
         self.model = _model
         return path
 
@@ -216,7 +217,7 @@ class XGBoostModel(AbstractModel):
         if model._xgb_model_type is not None:
             model.model = model._xgb_model_type()
             # Much faster to load using .ubj than .json (10x+ speedup)
-            model.model.load_model(path + "xgb.ubj")
+            model.model.load_model(os.path.join(path, "xgb.ubj"))
             model._xgb_model_type = None
         return model
 
