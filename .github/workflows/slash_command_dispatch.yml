@@ -25,7 +25,7 @@ jobs:
             });
             return pr.data.head.repo
       - name: echo
-        run: echo ${{ steps.sha.outputs.result }}
+        run: echo ${{ steps.sha.outputs.result.full_name }}
 #       - name: Slash Command Dispatch
 #         id: scd
 #         uses: peter-evans/slash-command-dispatch@v2.3.0
