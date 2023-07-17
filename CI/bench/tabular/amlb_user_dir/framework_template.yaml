@@ -1,0 +1,39 @@
+---
+
+#########################
+### AutoML frameworks ###
+#########################
+
+######### Do Not Remove #########
+AutoGluon:
+  version: "latest"
+######### Do Not Remove #########
+
+
+AutoGluon_best:
+  extends: AutoGluon
+  repo: https://github.com/autogluon/autogluon.git
+  version: master  # branch name
+  params:  # TabularPredictor.fit(params)
+    presets: best_quality
+
+AutoGluon_high:
+  extends: AutoGluon
+  repo: https://github.com/autogluon/autogluon.git
+  version: master  # branch name
+  params:  # TabularPredictor.fit(params)
+    presets: high_quality
+
+AutoGluon_good:
+  extends: AutoGluon
+  repo: https://github.com/autogluon/autogluon.git
+  version: master  # branch name
+  params:  # TabularPredictor.fit(params)
+    presets: good_quality
+
+AutoGluon_medium:
+  extends: AutoGluon
+  repo: https://github.com/autogluon/autogluon.git
+  version: master  # branch name
+  params:  # TabularPredictor.fit(params)
+    presets: medium_quality
