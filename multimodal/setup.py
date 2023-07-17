@@ -33,7 +33,7 @@ install_requires = [
     "evaluate>=0.2.2,<0.4.0",
     "accelerate>=0.9,<0.17",
     "timm>=0.9.2,<0.10.0",
-    "torch>=1.9,<1.14",
+    "torch>=2.0,<2.1",
     "torchvision<0.15.0",
     "scikit-image>=0.19.1,<0.20.0",
     "pytorch-lightning>=1.9.0,<1.10.0",

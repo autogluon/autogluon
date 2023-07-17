@@ -9,11 +9,7 @@ source $(dirname "$0")/env_setup.sh
 
 setup_build_env
 
-if [ "$IS_PLATFORM_TEST" = "true" ]
-then
-    setup_torch_cpu_non_linux
-else
-    setup_torch_gpu
+if ! [ "$IS_PLATFORM_TEST" = "true" ]
     export CUDA_VISIBLE_DEVICES=0
 fi
 

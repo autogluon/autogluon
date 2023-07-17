@@ -16,24 +16,6 @@ function setup_build_contrib_env {
     export AUTOMM_TUTORIAL_MODE=1 # Disable progress bar in AutoMMPredictor
 }
 
-function setup_torch_gpu {
-    # Security-patched torch.
-    python3 -m pip install torch==1.13.1+cu117 torchvision==0.14.1+cu117 torchaudio==0.13.1+cu117 --extra-index-url https://download.pytorch.org/whl/cu117
-}
-
-function setup_torch_cpu {
-    # Security-patched torch
-    python3 -m pip install torch==1.13.1 torchvision==0.14.1 torchaudio==0.13.1 --extra-index-url https://download.pytorch.org/whl/cpu
-}
-
-function setup_torch_gpu_non_linux {
-    pip3 install torch==1.13.1+cu117 torchvision==0.14.1+cu117 --extra-index-url https://download.pytorch.org/whl/cu117
-}
-
-function setup_torch_cpu_non_linux {
-    pip3 install torch==1.13.1 torchvision==0.14.1
-}
-
 function setup_hf_model_mirror {
     pip3 install PyYAML
     SUB_FOLDER="$1"
