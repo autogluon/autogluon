@@ -325,7 +325,7 @@ def get_available_devices(num_gpus: int, auto_select_gpus: bool):
     -------
     The available devices.
     """
-    if num_gpus > 0:  # ray lightning requires not specifying gpus
+    if num_gpus > 0:
         if auto_select_gpus:
             devices = find_usable_cuda_devices(num_gpus)
         else:
