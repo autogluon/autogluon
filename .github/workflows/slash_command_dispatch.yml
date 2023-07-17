@@ -11,19 +11,21 @@ jobs:
         env:
           GITHUB_CONTEXT: ${{ toJSON(github) }}
         run: echo "$GITHUB_CONTEXT"
-#       - name: Get PR SHA
-#         id: sha
-#         uses: actions/github-script@v4
-#         with:
-#           result-encoding: string
-#           script: |
-#             const { owner, repo, number } = context.issue;
-#             const pr = await github.pulls.get({
-#               owner,
-#               repo,
-#               pull_number: number,
-#             });
-#             return pr.data.head.sha
+      - name: Get PR SHA
+        id: sha
+        uses: actions/github-script@v4
+        with:
+          result-encoding: string
+          script: |
+            const { owner, repo, number } = context.issue;
+            const pr = await github.pulls.get({
+              owner,
+              repo,
+              pull_number: number,
+            });
+            return pr.data
+      - name: echo
+        run: echo ${{ steps.sha.outputs.result }}
 #       - name: Slash Command Dispatch
 #         id: scd
 #         uses: peter-evans/slash-command-dispatch@v2.3.0
