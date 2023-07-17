@@ -23,7 +23,7 @@ jobs:
               repo,
               pull_number: number,
             });
-            return pr.data
+            return pr.data.head.ref
       - name: echo
         run: echo ${{ steps.sha.outputs.result }}
 #       - name: Slash Command Dispatch
