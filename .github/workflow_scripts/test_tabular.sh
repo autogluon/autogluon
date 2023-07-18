@@ -10,6 +10,7 @@ source $(dirname "$0")/env_setup.sh
 setup_build_env
 
 if ! [ "$IS_PLATFORM_TEST" = "true" ]
+then
     export CUDA_VISIBLE_DEVICES=0
 fi
 
