@@ -39,6 +39,7 @@ def test_AnomalyDetector__defaults_init():
     assert ad._suod_kwargs["n_jobs"] > 0
     ad._suod_kwargs.pop("n_jobs")
     assert ad._suod_kwargs == {
+        "bps_flag": False,
         "combination": "average",
         "some_kwarg": "value",
         "verbose": False,
