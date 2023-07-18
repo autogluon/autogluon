@@ -2,32 +2,16 @@
 Module including wrappers for PyTorch implementations of models in GluonTS
 """
 import logging
-import os
-import shutil
-from datetime import timedelta
-from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Type
+from typing import Any, Dict, Type
 
-import gluonts
-import numpy as np
-import torch
-from gluonts.core.component import from_hyperparameters
-from gluonts.model.forecast import QuantileForecast
 from gluonts.torch.model.d_linear import DLinearEstimator
 from gluonts.torch.model.deepar import DeepAREstimator
 from gluonts.torch.model.estimator import PyTorchLightningEstimator as GluonTSPyTorchLightningEstimator
-from gluonts.torch.model.forecast import DistributionForecast
 from gluonts.torch.model.patch_tst import PatchTSTEstimator
-from gluonts.torch.model.predictor import PyTorchPredictor as GluonTSPyTorchPredictor
 from gluonts.torch.model.simple_feedforward import SimpleFeedForwardEstimator
 from gluonts.torch.model.tft import TemporalFusionTransformerEstimator
-from pytorch_lightning.callbacks import Timer
 
-from autogluon.core.hpo.constants import CUSTOM_BACKEND
-from autogluon.core.utils.loaders import load_pkl
-from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
-from autogluon.timeseries.utils.warning_filters import torch_warning_filter
 
 # FIXME: introduces cpflows dependency. We exclude this model until a future release.
 # from gluonts.torch.model.mqf2 import MQF2MultiHorizonEstimator
@@ -38,110 +22,9 @@ from autogluon.timeseries.utils.warning_filters import torch_warning_filter
 
 
 logger = logging.getLogger(__name__)
-gts_logger = logging.getLogger(gluonts.__name__)
-pl_loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict if "pytorch_lightning" in name]
 
 
-class AbstractGluonTSPyTorchModel(AbstractGluonTSModel):
-    gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator]
-    float_dtype: Type = np.float32
-
-    def _get_hpo_backend(self):
-        return CUSTOM_BACKEND
-
-    def _get_estimator_init_args(self) -> Dict[str, Any]:
-        """Get GluonTS specific constructor arguments for estimator objects, an alias to
-        `self._get_model_params` for better readability."""
-        init_kwargs = super()._get_estimator_init_args()
-        # Map MXNet kwarg names to PyTorch Lightning kwarg names
-        init_kwargs.setdefault("lr", init_kwargs.get("learning_rate", 1e-3))
-        init_kwargs.setdefault("max_epochs", init_kwargs.get("epochs"))
-        return init_kwargs
-
-    def _get_estimator(self) -> GluonTSPyTorchLightningEstimator:
-        """Return the GluonTS Estimator object for the model"""
-
-        # As GluonTSPyTorchLightningEstimator objects do not implement `from_hyperparameters` convenience
-        # constructors, we re-implement the logic here.
-        # we translate the "epochs" parameter to "max_epochs" for consistency in the AbstractGluonTSModel
-        # interface
-
-        init_args = self._get_estimator_init_args()
-
-        trainer_kwargs = {}
-        epochs = init_args.get("max_epochs")
-        callbacks = init_args.get("callbacks", [])
-
-        # TODO: Provide trainer_kwargs outside the function (e.g., to specify # of GPUs)?
-        if epochs is not None:
-            trainer_kwargs.update({"max_epochs": epochs})
-        trainer_kwargs.update({"callbacks": callbacks, "enable_progress_bar": False})
-        trainer_kwargs["default_root_dir"] = self.path
-
-        if torch.cuda.is_available():
-            trainer_kwargs["accelerator"] = "gpu"
-            trainer_kwargs["devices"] = 1
-
-        return from_hyperparameters(
-            self.gluonts_estimator_class,
-            trainer_kwargs=trainer_kwargs,
-            **init_args,
-        )
-
-    def _get_callbacks(self, time_limit: int, *args, **kwargs) -> List[Callable]:
-        return [Timer(timedelta(seconds=time_limit))] if time_limit is not None else []
-
-    def _fit(
-        self,
-        train_data: TimeSeriesDataFrame,
-        val_data: Optional[TimeSeriesDataFrame] = None,
-        time_limit: int = None,
-        **kwargs,
-    ) -> None:
-        verbosity = kwargs.get("verbosity", 2)
-        for pl_logger in pl_loggers:
-            pl_logger.setLevel(logging.ERROR if verbosity <= 3 else logging.INFO)
-        super()._fit(train_data=train_data, val_data=val_data, time_limit=time_limit, **kwargs)
-        lightning_logs_dir = Path(self.path) / "lightning_logs"
-        if lightning_logs_dir.exists() and lightning_logs_dir.is_dir():
-            logger.debug(f"Removing lightning_logs directory {lightning_logs_dir}")
-            shutil.rmtree(lightning_logs_dir)
-
-    def save(self, path: str = None, **kwargs) -> str:
-        # we flush callbacks instance variable if it has been set. it can keep weak references
-        # which breaks training
-        self.callbacks = []
-        return super().save(path, **kwargs)
-
-    @classmethod
-    def load(cls, path: str, reset_paths: bool = True, verbose: bool = True) -> "AbstractGluonTSModel":
-        with torch_warning_filter():
-            model = load_pkl.load(path=os.path.join(path, cls.model_file_name), verbose=verbose)
-            if reset_paths:
-                model.set_contexts(path)
-            model.gts_predictor = GluonTSPyTorchPredictor.deserialize(Path(path) / cls.gluonts_model_path)
-        return model
-
-    @staticmethod
-    def _distribution_to_quantile_forecast(
-        forecast: DistributionForecast, quantile_levels: List[float]
-    ) -> QuantileForecast:
-        # Compute all quantiles in parallel instead of a for-loop
-        quantiles = torch.tensor(quantile_levels, device=forecast.distribution.mean.device).reshape(-1, 1)
-        quantile_predictions = forecast.distribution.icdf(quantiles).cpu().detach().numpy()
-        forecast_arrays = np.vstack([forecast.mean, quantile_predictions])
-        forecast_keys = ["mean"] + [str(q) for q in quantile_levels]
-
-        forecast_init_args = dict(
-            forecast_arrays=forecast_arrays,
-            start_date=forecast.start_date,
-            forecast_keys=forecast_keys,
-            item_id=str(forecast.item_id),
-        )
-        return QuantileForecast(**forecast_init_args)
-
-
-class DeepARModel(AbstractGluonTSPyTorchModel):
+class DeepARModel(AbstractGluonTSModel):
     """Autoregressive forecasting model based on a recurrent neural network [Salinas2020]_.
 
     Based on `gluonts.torch.model.deepar.DeepAREstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.torch.model.deepar.html>`_.
@@ -201,7 +84,7 @@ class DeepARModel(AbstractGluonTSPyTorchModel):
         return init_kwargs
 
 
-class SimpleFeedForwardModel(AbstractGluonTSPyTorchModel):
+class SimpleFeedForwardModel(AbstractGluonTSModel):
     """Simple feedforward neural network that simultaneously predicts all future values.
 
     Based on `gluonts.torch.model.simple_feedforward.SimpleFeedForwardEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.torch.model.simple_feedforward.html>`_.
@@ -233,7 +116,7 @@ class SimpleFeedForwardModel(AbstractGluonTSPyTorchModel):
     gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator] = SimpleFeedForwardEstimator
 
 
-class TemporalFusionTransformerModel(AbstractGluonTSPyTorchModel):
+class TemporalFusionTransformerModel(AbstractGluonTSModel):
     """Combines LSTM with a transformer layer to predict the quantiles of all future target values [Lim2021]_.
 
     Based on `gluonts.torch.model.tft.TemporalFusionTransformerEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.torch.model.tft.html>`_.
@@ -299,7 +182,7 @@ class TemporalFusionTransformerModel(AbstractGluonTSPyTorchModel):
         return init_kwargs
 
 
-class DLinearModel(AbstractGluonTSPyTorchModel):
+class DLinearModel(AbstractGluonTSModel):
     """Simple feedforward neural network that subtracts trend before forecasting [Zeng2023]_.
 
     Based on `gluonts.torch.model.d_linear.DLinearEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.torch.model.d_linear.html>`_.
@@ -340,7 +223,7 @@ class DLinearModel(AbstractGluonTSPyTorchModel):
         return 96
 
 
-class PatchTSTModel(AbstractGluonTSPyTorchModel):
+class PatchTSTModel(AbstractGluonTSModel):
     """Transformer-based forecaster that segments each time series into patches [Nie2023]_.
 
     Based on `gluonts.torch.model.d_linear.PatchTSTEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.torch.model.patch_tst.html>`_.
