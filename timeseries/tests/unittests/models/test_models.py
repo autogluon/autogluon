@@ -209,10 +209,6 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_has_
         quantile_levels=quantile_levels,
         hyperparameters=DUMMY_HYPERPARAMETERS,
     )
-    # TFT cannot handle arbitrary quantiles
-    if "TemporalFusionTransformerMXNet" in model.name:
-        return
-
     model.fit(train_data=DUMMY_TS_DATAFRAME)
     predictions = model.predict(DUMMY_TS_DATAFRAME, quantile_levels=quantile_levels)
 
