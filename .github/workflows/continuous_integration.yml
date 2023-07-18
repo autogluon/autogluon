@@ -22,6 +22,23 @@ jobs:
         run: |
           echo This is a restricted branch reserved for certain modules. Please use another branch instead
           exit 1
+  generate_bench_configs:
+    needs: branch_check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Setup Env Vars
+        uses: ./.github/actions/setup-env-vars
+      - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmarkConfig
+        role-duration-seconds: 3600
+        aws-region: us-east-1
+      - name: Generate bench configs
+        run: |
+          /bin/bash CI/bench/generate_amlb_user_dir.sh
   lint_check:
     needs: branch_check
     runs-on: ubuntu-latest
