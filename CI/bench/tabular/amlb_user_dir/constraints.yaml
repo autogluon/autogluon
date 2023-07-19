@@ -1,0 +1,31 @@
+---
+
+1h:
+  folds: 10
+  max_runtime_seconds: 3600
+  cores: 4
+  min_vol_size_mb: 100000
+
+4h:
+  folds: 10
+  max_runtime_seconds: 14400
+  cores: 8
+  min_vol_size_mb: 100000
+
+8h:
+  folds: 10
+  max_runtime_seconds: 28800
+  cores: 8
+  min_vol_size_mb: 100000
+
+16h:
+  folds: 10
+  max_runtime_seconds: 57600
+  cores: 8
+  min_vol_size_mb: 100000
+
+24h:
+  folds: 10
+  max_runtime_seconds: 86400
+  cores: 8
+  min_vol_size_mb: 100000

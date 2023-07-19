@@ -5,8 +5,6 @@ from autogluon.core.ray.resources_calculator import (
     CpuResourceCalculator,
     GpuResourceCalculator,
     NonParallelGpuResourceCalculator,
-    RayLightningCpuResourceCalculator,
-    RayLightningGpuResourceCalculator,
     ResourceCalculatorFactory,
 )
 
@@ -146,7 +144,7 @@ def test_non_parallel_gpu_calculator():
     assert expected_batches == resources_info["batches"]
 
 
-@pytest.mark.parametrize("calculator_type", ["cpu", "gpu", "non_parallel_gpu", "ray_lightning_cpu", "ray_lightning_gpu"])
+@pytest.mark.parametrize("calculator_type", ["cpu", "gpu", "non_parallel_gpu"])
 def test_resource_not_enough(calculator_type):
     num_cpus = 0
     num_gpus = 0
@@ -161,32 +159,3 @@ def test_resource_not_enough(calculator_type):
             minimum_cpu_per_job=1,
             minimum_gpu_per_job=1,
         )
-
-
-def test_ray_lightning_gpu_calculator():
-    num_cpus = 32
-    num_gpus = 4
-    num_jobs = 20
-
-    calculator = ResourceCalculatorFactory.get_resource_calculator(calculator_type="ray_lightning_gpu")
-    assert type(calculator) == RayLightningGpuResourceCalculator
-
-    resources_info = calculator.get_resources_per_job(
-        total_num_cpus=num_cpus,
-        total_num_gpus=num_gpus,
-        num_jobs=num_jobs,
-        minimum_cpu_per_job=1,
-        minimum_gpu_per_job=1,  # allows 4 jobs to run in parallel
-    )
-
-    expected_num_parallel_jobs = 4
-    # For cpu, each trial uses 1 cpu for the master process, and worker process can split the rest
-    expected_resources_per_trial = dict(
-        CPU=(num_cpus - expected_num_parallel_jobs) // expected_num_parallel_jobs + 1,
-        GPU=num_gpus / expected_num_parallel_jobs,
-    )
-    expected_batches = 5
-
-    assert expected_resources_per_trial == resources_info["resources_per_job"].required_resources
-    assert expected_num_parallel_jobs == resources_info["num_parallel_jobs"]
-    assert expected_batches == resources_info["batches"]

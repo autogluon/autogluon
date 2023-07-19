@@ -392,7 +392,7 @@ class RayHpoExecutor(HpoExecutor):
             Type of adapter used by ray hpo experiment.
             Adapters are used to provide custom info or behavior that's module specific to the ray hpo experiment.
             For more info, please refer to `autogluon/core/hpo/ray_hpo`
-            Valid values are ['tabular', 'timeseries', 'automm', 'automm_ray_lightning']
+            Valid values are ['tabular', 'timeseries', 'automm']
         trainable_is_parallel
             Whether the trainable itself will use ray to run parallel job or not.
         tune_config_kwargs

@@ -1,0 +1,315 @@
+---
+# Combines openml/s/269 and openml/s/271
+# Locally stored instead of fetched from openml to avoid server errors
+
+- name: APSFailure
+  openml_task_id: 168868
+
+- name: Airlines_DepDelay_10M
+  openml_task_id: 359929
+
+- name: Allstate_Claims_Severity
+  openml_task_id: 233212
+
+- name: Amazon_employee_access
+  openml_task_id: 359979
+
+- name: Australian
+  openml_task_id: 146818
+
+- name: Bioresponse
+  openml_task_id: 359967
+
+- name: Brazilian_houses
+  openml_task_id: 359938
+
+- name: Buzzinsocialmedia_Twitter
+  openml_task_id: 233213
+
+- name: Click_prediction_small
+  openml_task_id: 359992
+
+- name: Diabetes130US
+  openml_task_id: 211986
+
+- name: Fashion-MNIST
+  openml_task_id: 359976
+
+- name: GesturePhaseSegmentationProcessed
+  openml_task_id: 359970
+
+- name: Higgs
+  openml_task_id: 360114
+
+- name: Internet-Advertisements
+  openml_task_id: 359966
+
+- name: KDDCup09-Upselling
+  openml_task_id: 360975
+
+- name: KDDCup09_appetency
+  openml_task_id: 3945
+
+- name: KDDCup99
+  openml_task_id: 360112
+
+- name: MIP-2016-regression
+  openml_task_id: 360945
+
+- name: Mercedes_Benz_Greener_Manufacturing
+  openml_task_id: 233215
+
+- name: MiniBooNE
+  openml_task_id: 359990
+
+- name: Moneyball
+  openml_task_id: 167210
+
+- name: OnlineNewsPopularity
+  openml_task_id: 359941
+
+- name: PhishingWebsites
+  openml_task_id: 359971
+
+- name: QSAR-TID-10980
+  openml_task_id: 360933
+
+- name: QSAR-TID-11
+  openml_task_id: 360932
+
+- name: SAT11-HAND-runtime-regression
+  openml_task_id: 359948
+
+- name: Santander_transaction_value
+  openml_task_id: 233214
+
+- name: Satellite
+  openml_task_id: 359975
+
+- name: Yolanda
+  openml_task_id: 317614
+
+- name: abalone
+  openml_task_id: 359944
+
+- name: ada
+  openml_task_id: 190411
+
+- name: adult
+  openml_task_id: 359983
+
+- name: airlines
+  openml_task_id: 189354
+
+- name: albert
+  openml_task_id: 189356
+
+- name: amazon-commerce-reviews
+  openml_task_id: 10090
+
+- name: arcene
+  openml_task_id: 190412
+
+- name: bank-marketing
+  openml_task_id: 359982
+
+- name: black_friday
+  openml_task_id: 359937
+
+- name: blood-transfusion-service-center
+  openml_task_id: 359955
+
+- name: boston
+  openml_task_id: 359950
+
+- name: car
+  openml_task_id: 359960
+
+- name: christine
+  openml_task_id: 359973
+
+- name: churn
+  openml_task_id: 359968
+
+- name: cmc
+  openml_task_id: 359959
+
+- name: cnae-9
+  openml_task_id: 359957
+
+- name: colleges
+  openml_task_id: 359942
+
+- name: connect-4
+  openml_task_id: 359977
+
+- name: covertype
+  openml_task_id: 7593
+
+- name: credit-g
+  openml_task_id: 168757
+
+- name: diamonds
+  openml_task_id: 233211
+
+- name: dilbert
+  openml_task_id: 168909
+
+- name: dionis
+  openml_task_id: 189355
+
+- name: dna
+  openml_task_id: 359964
+
+- name: elevators
+  openml_task_id: 359936
+
+- name: eucalyptus
+  openml_task_id: 359954
+
+- name: fabert
+  openml_task_id: 168910
+
+- name: first-order-theorem-proving
+  openml_task_id: 359969
+
+- name: gina
+  openml_task_id: 189922
+
+- name: guillermo
+  openml_task_id: 359988
+
+- name: helena
+  openml_task_id: 359984
+
+- name: house_16H
+  openml_task_id: 359952
+
+- name: house_prices_nominal
+  openml_task_id: 359951
+
+- name: house_sales
+  openml_task_id: 359949
+
+- name: jannis
+  openml_task_id: 211979
+
+- name: jasmine
+  openml_task_id: 168911
+
+- name: jungle_chess_2pcs_raw_endgame_complete
+  openml_task_id: 359981
+
+- name: kc1
+  openml_task_id: 359962
+
+- name: kick
+  openml_task_id: 359991
+
+- name: kr-vs-kp
+  openml_task_id: 359965
+
+- name: madeline
+  openml_task_id: 190392
+
+- name: mfeat-factors
+  openml_task_id: 359961
+
+- name: micro-mass
+  openml_task_id: 359953
+
+- name: nomao
+  openml_task_id: 359980
+
+- name: numerai28.6
+  openml_task_id: 167120
+
+- name: nyc-taxi-green-dec-2016
+  openml_task_id: 359943
+
+- name: okcupid-stem
+  openml_task_id: 359993
+
+- name: ozone-level-8hr
+  openml_task_id: 190137
+
+- name: pc4
+  openml_task_id: 359958
+
+- name: philippine
+  openml_task_id: 190410
+
+- name: phoneme
+  openml_task_id: 168350
+
+- name: pol
+  openml_task_id: 359946
+
+- name: porto-seguro
+  openml_task_id: 360113
+
+- name: qsar-biodeg
+  openml_task_id: 359956
+
+- name: quake
+  openml_task_id: 359930
+
+- name: riccardo
+  openml_task_id: 359989
+
+- name: robert
+  openml_task_id: 359986
+
+- name: segment
+  openml_task_id: 359963
+
+- name: sensory
+  openml_task_id: 359931
+
+- name: sf-police-incidents
+  openml_task_id: 359994
+
+- name: shuttle
+  openml_task_id: 359987
+
+- name: socmob
+  openml_task_id: 359932
+
+- name: space_ga
+  openml_task_id: 359933
+
+- name: steel-plates-fault
+  openml_task_id: 168784
+
+- name: sylvine
+  openml_task_id: 359972
+
+- name: tecator
+  openml_task_id: 359934
+
+- name: topo_2_1
+  openml_task_id: 359939
+
+- name: us_crime
+  openml_task_id: 359945
+
+- name: vehicle
+  openml_task_id: 190146
+
+- name: volkert
+  openml_task_id: 359985
+
+- name: wilt
+  openml_task_id: 146820
+
+- name: wine-quality-white
+  openml_task_id: 359974
+
+- name: wine_quality
+  openml_task_id: 359935
+
+- name: yeast
+  openml_task_id: 2073
+
+- name: yprop_4_1
+  openml_task_id: 359940
