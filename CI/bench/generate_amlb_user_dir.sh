@@ -9,9 +9,9 @@ PR_NUMBER=$4
 python $(dirname "$0")/tabular/generate_framework.py --repository $REPOSITORY --branch $BRANCH
 if [ -n "$PR_NUMBER" ]
 then
-    CONFIG_PATH=tabular/$PR_NUMBER/
+    CONFIG_PATH=tabular/$PR_NUMBER
 else
-    CONFIG_PATH=tabular/$BRANCH/
+    CONFIG_PATH=tabular/$BRANCH
 fi
 
 # keep commit sha for future reference
