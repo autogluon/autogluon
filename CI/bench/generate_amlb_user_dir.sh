@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 REPOSITORY=$1
-BRANCH=$2
+BRANCH=$(basename $2)
 PR_NUMBER=$3
 
 # generate tabular configs
