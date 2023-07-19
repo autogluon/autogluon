@@ -12,4 +12,4 @@ then
 else
     CONFIG_PATH=$MODULE/$BRANCH/
 fi
-aws s3 cp --recursive $(dirname "$0")/tabular/amlb_user_dir/* s3://autogluon-ci-benchmark/configs/$CONFIG_PATH
+aws s3 cp --recursive $(dirname "$0")/tabular/amlb_user_dir/ s3://autogluon-ci-benchmark/configs/$CONFIG_PATH
