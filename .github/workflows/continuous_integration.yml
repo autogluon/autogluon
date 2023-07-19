@@ -39,7 +39,7 @@ jobs:
       - name: Generate bench configs (For Push)
         if: ${{ github.event_name == 'push' }}
         run: |
-          /bin/bash CI/bench/generate_amlb_user_dir.sh ${{ env.GIT_REPO }} ${{ $BRANCH }}
+          /bin/bash CI/bench/generate_amlb_user_dir.sh ${{ env.GIT_REPO }} ${{ env.BRANCH }}
       - name: Generate bench configs (For Pull Request)
         if: ${{ github.event_name == 'pull_request_target' }}
         run: |
