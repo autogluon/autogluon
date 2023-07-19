@@ -28,5 +28,3 @@ for framework in frameworks.values():
 
 with open(framework_benchmark_file, "w") as f:
     yaml.safe_dump(frameworks, f)
-
-

@@ -31,14 +31,19 @@ jobs:
       - name: Setup Env Vars
         uses: ./.github/actions/setup-env-vars
       - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v1
-      with:
-        role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmarkConfig
-        role-duration-seconds: 3600
-        aws-region: us-east-1
-      - name: Generate bench configs
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmarkConfig
+          role-duration-seconds: 3600
+          aws-region: us-east-1
+      - name: Generate bench configs (For Push)
+        if: ${{ github.event_name == 'push' }}
         run: |
-          /bin/bash CI/bench/generate_amlb_user_dir.sh
+          /bin/bash CI/bench/generate_amlb_user_dir.sh '$GIT_REPO' '$BRANCH'
+      - name: Generate bench configs (For Pull Request)
+        if: ${{ github.event_name == 'pull_request_target' }}
+        run: |
+          /bin/bash CI/bench/generate_amlb_user_dir.sh '$GIT_REPO' '$BRANCH' '$PR_NUMBER'
   # lint_check:
   #   needs: branch_check
   #   runs-on: ubuntu-latest
