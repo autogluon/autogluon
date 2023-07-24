@@ -498,11 +498,14 @@ class AbstractModel:
             time_limit = max(time_limit, min_time_limit)
         kwargs["time_limit"] = time_limit
         if time_limit_og != time_limit:
-            logger.log(20, f"\tTime limit adjusted due to model hyperparameters: "
-                           f"{time_limit_og:.2f}s -> {time_limit:.2f}s "
-                           f"(ag.max_time_limit={max_time_limit}, "
-                           f"ag.max_time_limit_ratio={max_time_limit_ratio}, "
-                           f"ag.min_time_limit={min_time_limit})")
+            logger.log(
+                20,
+                f"\tTime limit adjusted due to model hyperparameters: "
+                f"{time_limit_og:.2f}s -> {time_limit:.2f}s "
+                f"(ag.max_time_limit={max_time_limit}, "
+                f"ag.max_time_limit_ratio={max_time_limit_ratio}, "
+                f"ag.min_time_limit={min_time_limit})",
+            )
         kwargs = self._preprocess_fit_resources(**kwargs)
         return kwargs
 
