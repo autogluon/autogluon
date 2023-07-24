@@ -27,13 +27,13 @@ install_requires = [
     "Pillow",  # version range defined in `core/_setup_utils.py`
     "tqdm",  # version range defined in `core/_setup_utils.py`
     "boto3",  # version range defined in `core/_setup_utils.py`
+    "torch",  # version range defined in `core/_setup_utils.py`
     "requests>=2.21,<3",
     "jsonschema>=4.14,<4.18",
     "seqeval>=1.2.2,<1.3.0",
     "evaluate>=0.2.2,<0.4.0",
     "accelerate>=0.9,<0.17",
     "timm>=0.9.2,<0.10.0",
-    "torch>=1.13,<2.1",
     "torchvision>=0.15.0,<0.16.0",
     "scikit-image>=0.19.1,<0.20.0",
     "pytorch-lightning>=1.9.0,<1.10.0",
