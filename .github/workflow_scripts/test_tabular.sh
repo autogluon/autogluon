@@ -9,11 +9,8 @@ source $(dirname "$0")/env_setup.sh
 
 setup_build_env
 
-if [ "$IS_PLATFORM_TEST" = "true" ]
+if ! [ "$IS_PLATFORM_TEST" = "true" ]
 then
-    setup_torch_cpu_non_linux
-else
-    setup_torch_gpu
     export CUDA_VISIBLE_DEVICES=0
 fi
 
@@ -22,11 +19,11 @@ install_local_packages "common/[tests]" "core/[all,tests]" "features/"
 if [ "$IS_PLATFORM_TEST" = "true" ]
 then
     install_tabular_platforms "[all,tests]"
+    install_multimodal_no_groundingdino "[tests]"
 else
     install_tabular "[all,tests]"
+    install_multimodal "[tests]"
 fi
-
-install_multimodal "[tests]"
 
 cd tabular/
 if [ -n "$ADDITIONAL_TEST_ARGS" ]
