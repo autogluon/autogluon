@@ -331,7 +331,7 @@ def get_available_devices(num_gpus: int, auto_select_gpus: bool):
         else:
             devices = num_gpus
     else:
-        devices = None
+        devices = "auto"
 
     return devices
 
