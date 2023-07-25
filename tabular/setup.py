@@ -48,7 +48,7 @@ extras_require = {
         "xgboost>=1.6,<1.8",
     ],
     "fastai": [
-        "torch>=1.9,<1.14",
+        "torch",  # version range defined in `core/_setup_utils.py`
         "fastai>=2.3.1,<2.8",
     ],
     "tabpfn": [
@@ -92,6 +92,7 @@ for test_package in ["tabpfn", "imodels", "vowpalwabbit", "skl2onnx"]:
     test_requires += extras_require[test_package]
 extras_require["tests"] = test_requires
 install_requires = ag.get_dependency_version_ranges(install_requires)
+extras_require = {key: ag.get_dependency_version_ranges(value) for key, value in extras_require.items()}
 
 if __name__ == "__main__":
     ag.create_version_file(version=version, submodule=submodule)
