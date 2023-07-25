@@ -1712,6 +1712,10 @@ class AbstractModel:
             # 'disk_size': self.get_disk_size(),
             "memory_size": self.get_memory_size(),  # Memory usage of model in bytes
             "compile_time": self.compile_time if hasattr(self, "compile_time") else None,
+            "is_initialized": self.is_initialized(),
+            "is_fit": self.is_fit(),
+            "is_valid": self.is_valid(),
+            "can_infer": self.can_infer(),
         }
         return info
 

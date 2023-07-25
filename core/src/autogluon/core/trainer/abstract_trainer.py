@@ -4,10 +4,12 @@ import copy
 import logging
 import os
 import shutil
+import sys
 import time
+import traceback
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import networkx as nx
 import numpy as np
@@ -172,6 +174,7 @@ class AbstractTrainer:
         self._extra_banned_names = set()  # Names which are banned but are not used by a trained model.
 
         self._models_failed_to_train = []  # List of models which failed to train
+        self._models_failed_to_train_errors = dict()  # Dict of model name -> model failure metadata
 
         # self._exceptions_list = []  # TODO: Keep exceptions list for debugging during benchmarking.
 
@@ -1795,46 +1798,85 @@ class AbstractTrainer:
             model.val_score = score
             # TODO: Add recursive=True to avoid repeatedly loading models each time this is called for bagged ensembles (especially during repeated bagging)
             self.save_model(model=model)
-        except TimeLimitExceeded:
-            logger.log(20, f"\tTime limit exceeded... Skipping {model.name}.")
-            # logger.log(20, '\tTime wasted: ' + str(time.time() - fit_start_time))
-            self._models_failed_to_train.append(model.name)
-            del model
-        except NotEnoughMemoryError:
-            logger.warning(f"\tNot enough memory to train {model.name}... Skipping this model.")
-            self._models_failed_to_train.append(model.name)
-            del model
-        except NoValidFeatures:
-            logger.warning(f"\tNo valid features to train {model.name}... Skipping this model.")
-            self._models_failed_to_train.append(model.name)
-            del model
-        except NoGPUError:
-            logger.warning(f"\tNo GPUs available to train {model.name}... Skipping this model.")
-            self._models_failed_to_train.append(model.name)
-            del model
-        except NotEnoughCudaMemoryError:
-            logger.warning(f"\tNot enough CUDA memory available to train {model.name}... Skipping this model.")
-            self._models_failed_to_train.append(model.name)
-            del model
-        except ImportError as err:
-            logger.error(f"\tWarning: Exception caused {model.name} to fail during training (ImportError)... Skipping this model.")
-            logger.error(f"\t\t{err}")
-            self._models_failed_to_train.append(model.name)
-            if self.verbosity > 2:
-                logger.exception("Detailed Traceback:")
         except Exception as err:
-            logger.error(f"\tWarning: Exception caused {model.name} to fail during training... Skipping this model.")
-            logger.error(f"\t\t{err}")
+            del_model = True
+            if isinstance(err, TimeLimitExceeded):
+                logger.log(20, f"\tTime limit exceeded... Skipping {model.name}.")
+            elif isinstance(err, NotEnoughMemoryError):
+                logger.warning(f"\tNot enough memory to train {model.name}... Skipping this model.")
+            elif isinstance(err, NoValidFeatures):
+                logger.warning(f"\tNo valid features to train {model.name}... Skipping this model.")
+            elif isinstance(err, NoGPUError):
+                logger.warning(f"\tNo GPUs available to train {model.name}... Skipping this model.")
+            elif isinstance(err, NotEnoughCudaMemoryError):
+                logger.warning(f"\tNot enough CUDA memory available to train {model.name}... Skipping this model.")
+            elif isinstance(err, ImportError):
+                logger.error(f"\tWarning: Exception caused {model.name} to fail during training (ImportError)... Skipping this model.")
+                logger.error(f"\t\t{err}")
+                del_model = False
+                if self.verbosity > 2:
+                    logger.exception("Detailed Traceback:")
+            else:  # all other exceptions
+                logger.error(f"\tWarning: Exception caused {model.name} to fail during training... Skipping this model.")
+                logger.error(f"\t\t{err}")
+                if self.verbosity > 0:
+                    logger.exception("Detailed Traceback:")
+            crash_time = time.time()
+            total_time = crash_time - fit_start_time
+            tb = traceback.format_exc()
+            model_info = self.get_model_info(model=model)
             self._models_failed_to_train.append(model.name)
-            if self.verbosity > 0:
-                logger.exception("Detailed Traceback:")
-            del model
+            self._models_failed_to_train_errors[model.name] = dict(
+                exc_type=err.__class__.__name__,
+                exc_str=str(err),
+                exc_traceback=tb,
+                model_info=model_info,
+                total_time=total_time,
+            )
+
+            if del_model:
+                del model
         else:
             self._add_model(model=model, stack_name=stack_name, level=level, y_pred_proba_val=y_pred_proba_val)
             model_names_trained.append(model.name)
             if self.low_memory:
                 del model
         return model_names_trained
+
+    # FIXME: v1.0 Move to AbstractModel for most fields
+    def _get_model_metadata(self, model: AbstractModel, stack_name: str = "core", level: int = 1) -> Dict[str, Any]:
+        """
+        Returns the model metadata used to initialize a node in the DAG (self.model_graph).
+        """
+        if isinstance(model, BaggedEnsembleModel):
+            type_inner = model._child_type
+        else:
+            type_inner = type(model)
+        num_children = len(model.models) if hasattr(model, "models") else 1
+        predict_child_time = model.predict_time / num_children if model.predict_time is not None else None
+        predict_1_child_time = model.predict_1_time / num_children if model.predict_1_time is not None else None
+        fit_metadata = model.get_fit_metadata()
+
+        model_metadata = dict(
+            fit_time=model.fit_time,
+            compile_time=model.compile_time,
+            predict_time=model.predict_time,
+            predict_1_time=model.predict_1_time,
+            predict_child_time=predict_child_time,
+            predict_1_child_time=predict_1_child_time,
+            val_score=model.val_score,
+            path=os.path.relpath(model.path, self.path).split(os.sep),  # model's relative path to trainer
+            type=type(model),  # Outer type, can be BaggedEnsemble, StackEnsemble (Type that is able to load the model)
+            type_inner=type_inner,  # Inner type, if Ensemble then it is the type of the inner model (May not be able to load with this type)
+            can_infer=model.can_infer(),
+            can_fit=model.can_fit(),
+            is_valid=model.is_valid(),
+            stack_name=stack_name,
+            level=level,
+            num_children=num_children,
+            **fit_metadata,
+        )
+        return model_metadata
 
     def _add_model(self, model: AbstractModel, stack_name: str = "core", level: int = 1, y_pred_proba_val=None, _is_refit=False) -> bool:
         """
@@ -1863,41 +1905,16 @@ class AbstractTrainer:
             )
             return False
         # TODO: Add to HPO
-        if isinstance(model, BaggedEnsembleModel):
-            type_inner = model._child_type
-        else:
-            type_inner = type(model)
-        num_children = len(model.models) if hasattr(model, "models") else 1
-        predict_child_time = model.predict_time / num_children if model.predict_time is not None else None
-        predict_1_child_time = model.predict_1_time / num_children if model.predict_1_time is not None else None
-        fit_metadata = model.get_fit_metadata()
 
-        extra_attributes = dict()
+        node_attributes = self._get_model_metadata(model=model, stack_name=stack_name, level=level)
         if y_pred_proba_val is not None:
             # Cache y_pred_proba_val for later reuse to avoid redundant predict calls
             self._save_model_y_pred_proba_val(model=model.name, y_pred_proba_val=y_pred_proba_val)
-            extra_attributes["cached_y_pred_proba_val"] = True
+            node_attributes["cached_y_pred_proba_val"] = True
 
         self.model_graph.add_node(
             model.name,
-            fit_time=model.fit_time,
-            compile_time=model.compile_time,
-            predict_time=model.predict_time,
-            predict_1_time=model.predict_1_time,
-            predict_child_time=predict_child_time,
-            predict_1_child_time=predict_1_child_time,
-            val_score=model.val_score,
-            path=os.path.relpath(model.path, self.path).split(os.sep),  # model's relative path to trainer
-            type=type(model),  # Outer type, can be BaggedEnsemble, StackEnsemble (Type that is able to load the model)
-            type_inner=type_inner,  # Inner type, if Ensemble then it is the type of the inner model (May not be able to load with this type)
-            can_infer=model.can_infer(),
-            can_fit=model.can_fit(),
-            is_valid=model.is_valid(),
-            stack_name=stack_name,
-            level=level,
-            num_children=num_children,
-            **fit_metadata,
-            **extra_attributes,
+            **node_attributes,
         )
         if isinstance(model, StackerEnsembleModel):
             prior_models = self.get_model_names()
@@ -2761,6 +2778,47 @@ class AbstractTrainer:
         """Gets all model names which would cause model files to be overwritten if a new model was trained with the name"""
         return self.get_model_names() + list(self._extra_banned_names)
 
+    # TODO: Docstring
+    def _flatten_model_info(self, model_info: dict) -> dict:
+        model_info_keys = [
+            "num_features",
+            "model_type",
+            "hyperparameters",
+            "hyperparameters_fit",
+            "ag_args_fit",
+            "features",
+            "is_initialized",
+            "is_fit",
+            "is_valid",
+            "can_infer",
+        ]
+        model_info_flat = {k: v for k, v in model_info.items() if k in model_info_keys}
+
+        custom_info = {}
+        bagged_info = model_info.get("bagged_info", {})
+        custom_info["num_models"] = bagged_info.get("num_child_models", 1)
+        custom_info["memory_size"] = bagged_info.get("max_memory_size", model_info["memory_size"])
+        custom_info["memory_size_min"] = bagged_info.get("min_memory_size", model_info["memory_size"])
+        custom_info["compile_time"] = bagged_info.get("compile_time", model_info["compile_time"])
+        custom_info["child_model_type"] = bagged_info.get("child_model_type", None)
+        custom_info["child_hyperparameters"] = bagged_info.get("child_hyperparameters", None)
+        custom_info["child_hyperparameters_fit"] = bagged_info.get("child_hyperparameters_fit", None)
+        custom_info["child_ag_args_fit"] = bagged_info.get("child_ag_args_fit", None)
+
+        model_info_keys = [
+            "num_models",
+            "memory_size",
+            "memory_size_min",
+            "compile_time",
+            "child_model_type",
+            "child_hyperparameters",
+            "child_hyperparameters_fit",
+            "child_ag_args_fit",
+        ]
+        for key in model_info_keys:
+            model_info_flat[key] = custom_info[key]
+        return model_info_flat
+
     def leaderboard(self, extra_info=False):
         model_names = self.get_model_names()
         score_val = []
@@ -2897,7 +2955,95 @@ class AbstractTrainer:
 
         return df_sorted
 
-    def get_info(self, include_model_info=False) -> dict:
+    def get_model_failures(self) -> pd.DataFrame:
+        """
+        [Advanced] Get the model failures that occurred during the fitting of this predictor, in the form of a pandas DataFrame.
+
+        This is useful for in-depth debugging of model failures and identifying bugs.
+
+        Returns
+        -------
+        model_failures_df: pd.DataFrame
+            A DataFrame of model failures. Each row corresponds to a model failure, and columns correspond to meta information about that model.
+        """
+        model_infos = dict()
+        for i, (model_name, model_info) in enumerate(self._models_failed_to_train_errors.items()):
+            model_info = copy.deepcopy(model_info)
+            model_info_inner = model_info["model_info"]
+
+            model_info_inner = self._flatten_model_info(model_info_inner)
+
+            valid_keys = [
+                "exc_type",
+                "exc_str",
+                "exc_traceback",
+                "total_time",
+            ]
+            valid_keys_inner = [
+                # "name",
+                "model_type",
+                "hyperparameters",
+                "hyperparameters_fit",
+                "is_initialized",
+                "is_fit",
+                "is_valid",
+                "can_infer",
+                "num_features",
+                "memory_size",
+                "num_models",
+                "child_model_type",
+                "child_hyperparameters",
+                "child_hyperparameters_fit",
+            ]
+            # FIXME: Combine with others
+            # model_info_extra =
+            model_info_out = {k: v for k, v in model_info.items() if k in valid_keys}
+            model_info_inner_out = {k: v for k, v in model_info_inner.items() if k in valid_keys_inner}
+
+            model_info_out.update(model_info_inner_out)
+            model_info_out["model"] = model_name
+            model_info_out["exc_order"] = i + 1
+
+            model_infos[model_name] = model_info_out
+
+        df = pd.DataFrame(
+            data=model_infos,
+        ).T
+
+        explicit_order = [
+            "model",
+            "exc_type",
+            "total_time",
+            "model_type",
+            "child_model_type",
+            # "stack_level",
+            "is_initialized",
+            "is_fit",
+            "is_valid",
+            "can_infer",
+            # "fit_order",
+            "num_features",
+            "num_models",
+            "memory_size",
+            "hyperparameters",
+            "hyperparameters_fit",
+            "child_hyperparameters",
+            "child_hyperparameters_fit",
+            "exc_str",
+            "exc_traceback",
+            "exc_order",
+        ]
+
+        df_columns_lst = list(df.columns)
+        explicit_order = [column for column in explicit_order if column in df_columns_lst]
+        df_columns_other = [column for column in df_columns_lst if column not in explicit_order]
+        df_columns_new = explicit_order + df_columns_other
+        df_sorted = df[df_columns_new]
+        df_sorted = df_sorted.reset_index(drop=True)
+
+        return df_sorted
+
+    def get_info(self, include_model_info=False, include_model_failures=True) -> dict:
         num_models_trained = len(self.get_model_names())
         if self.model_best is not None:
             best_model = self.model_best
@@ -2955,23 +3101,33 @@ class AbstractTrainer:
 
         if include_model_info:
             info["model_info"] = self.get_models_info()
+        if include_model_failures:
+            info["model_info_failures"] = copy.deepcopy(self._models_failed_to_train_errors)
 
         return info
 
-    def get_models_info(self, models: List[str] = None) -> dict:
+    def get_model_info(self, model: str | AbstractModel) -> Dict[str, Any]:
+        if isinstance(model, str):
+            if model in self.models.keys():
+                model = self.models[model]
+        if isinstance(model, str):
+            model_type = self.get_model_attribute(model=model, attribute="type")
+            model_path = self.get_model_attribute(model=model, attribute="path")
+            model_info = model_type.load_info(path=os.path.join(self.path, model_path))
+        else:
+            model_info = model.get_info()
+        return model_info
+
+    def get_models_info(self, models: List[str | AbstractModel] = None) -> Dict[str, Dict[str, Any]]:
         if models is None:
             models = self.get_model_names()
         model_info_dict = dict()
         for model in models:
             if isinstance(model, str):
-                if model in self.models.keys():
-                    model = self.models[model]
-            if isinstance(model, str):
-                model_type = self.get_model_attribute(model=model, attribute="type")
-                model_path = self.get_model_attribute(model=model, attribute="path")
-                model_info_dict[model] = model_type.load_info(path=os.path.join(self.path, model_path))
+                model_name = model
             else:
-                model_info_dict[model.name] = model.get_info()
+                model_name = model.name
+            model_info_dict[model_name] = self.get_model_info(model=model)
         return model_info_dict
 
     def reduce_memory_size(
@@ -3000,6 +3156,9 @@ class AbstractTrainer:
                 os.rmdir(self.path_utils)
             except OSError:
                 pass
+        if remove_info and requires_save:
+            # Remove model failure info artifacts
+            self._models_failed_to_train_errors = dict()
         models = self.get_model_names()
         for model in models:
             model = self.load_model(model)
