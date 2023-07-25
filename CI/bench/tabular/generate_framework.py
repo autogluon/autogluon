@@ -14,8 +14,8 @@ args = parser.parse_args()
 
 repository = args.repository
 branch = args.branch
-framework_template_file = os.path.join(os.path.dirname(__file__), "amlb_user_dir", "framework_template.yaml")
-framework_benchmark_file = os.path.join(os.path.dirname(framework_template_file), "framework_benchmark.yaml")
+framework_template_file = os.path.join(os.path.dirname(__file__), "amlb_user_dir", "frameworks_template.yaml")
+framework_benchmark_file = os.path.join(os.path.dirname(framework_template_file), "frameworks_benchmark.yaml")
 
 frameworks = {}
 with open(framework_template_file, "r") as f:
