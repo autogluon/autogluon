@@ -2446,7 +2446,9 @@ class AbstractTrainer:
             **kwargs,
         )
         if len(self.get_model_names()) == 0:
-            raise ValueError("AutoGluon did not successfully train any models")
+            # FIXME: Add toggle
+            logger.log(30, "Warning: AutoGluon did not successfully train any models")
+            # raise ValueError("AutoGluon did not successfully train any models")
         return model_names_fit
 
     def _predict_model(self, X, model, model_pred_proba_dict=None, cascade=False):
