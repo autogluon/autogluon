@@ -1300,6 +1300,7 @@ class MultiModalPredictor(ExportMixin):
             lr_mult=config.optimization.lr_mult,
             weight_decay=config.optimization.weight_decay,
             warmup_steps=config.optimization.warmup_steps,
+            track_grad_norm=OmegaConf.select(config, "optimization.track_grad_norm", default=-1),
         )
         metrics_kwargs = dict(
             validation_metric=validation_metric,

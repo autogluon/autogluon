@@ -6,6 +6,7 @@ import torch
 import torch.nn.functional as F
 import torchmetrics
 from omegaconf import DictConfig
+from pytorch_lightning.utilities import grad_norm
 from torch import nn
 from torch.nn.modules.loss import _Loss
 from torchmetrics.aggregation import BaseAggregator
@@ -55,6 +56,7 @@ class DistillerLitModule(pl.LightningModule):
         validation_metric_name: Optional[str] = None,
         custom_metric_func: Callable = None,
         test_metric: Optional[torchmetrics.Metric] = None,
+        track_grad_norm: Optional[Union[int, str]] = -1,
     ):
         """
         Parameters
@@ -137,6 +139,9 @@ class DistillerLitModule(pl.LightningModule):
             Refer to https://github.com/PyTorchLightning/metrics/blob/master/torchmetrics/aggregation.py
         test_metric
             A torchmetrics module used in the test stage, e.g., torchmetrics.Accuracy().
+        track_grad_norm
+            Track the p-norm of gradients during training. May be set to ‘inf’ infinity-norm.
+            If using Automatic Mixed Precision (AMP), the gradients will be unscaled before logging them.
         """
         super().__init__()
         self.optim_type = optim_type
@@ -185,6 +190,7 @@ class DistillerLitModule(pl.LightningModule):
 
         self.output_feature_adaptor = output_feature_adaptor
         self.rkd_loss_func = rkd_loss_func
+        self.track_grad_norm = track_grad_norm
 
     def _compute_hard_label_loss(
         self,
@@ -513,3 +519,8 @@ class DistillerLitModule(pl.LightningModule):
         sched = {"scheduler": scheduler, "interval": "step"}
         logger.debug("done configuring optimizer and scheduler")
         return [optimizer], [sched]
+
+    def on_before_optimizer_step(self, optimizer):
+        # If using mixed precision, the gradients are already unscaled here
+        if self.track_grad_norm != -1:
+            self.log_dict(grad_norm(self, norm_type=self.track_grad_norm))

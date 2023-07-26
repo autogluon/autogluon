@@ -5,6 +5,7 @@ import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
 import torchmetrics
+from pytorch_lightning.utilities import grad_norm
 from torch import nn
 from torch.nn.modules.loss import _Loss
 from torchmetrics.aggregation import BaseAggregator
@@ -47,6 +48,7 @@ class LitModule(pl.LightningModule):
         mixup_off_epoch: Optional[int] = 0,
         model_postprocess_fn: Callable = None,
         skip_final_val: Optional[bool] = False,
+        track_grad_norm: Optional[Union[int, str]] = -1,
     ):
         """
         Parameters
@@ -109,6 +111,9 @@ class LitModule(pl.LightningModule):
             - lora, lora_bias, lora_norm (only finetunes decomposition matrices inserted into model, in combination with either bit_fit or norm_fit)
             - ia3, ia3_bias, ia3_norm (adds vector that scales activations by learned vectors, in combination with either bit_fit or norm_fit)
             - None (do not use efficient finetuning strategies)
+        track_grad_norm
+            Track the p-norm of gradients during training. May be set to ‘inf’ infinity-norm.
+            If using Automatic Mixed Precision (AMP), the gradients will be unscaled before logging them.
 
         """
         super().__init__()
@@ -129,6 +134,7 @@ class LitModule(pl.LightningModule):
         self.model_postprocess_fn = model_postprocess_fn
         self.trainable_param_names = trainable_param_names if trainable_param_names else []
         self.skip_final_val = skip_final_val
+        self.track_grad_norm = track_grad_norm
 
     def _compute_template_loss(
         self,
@@ -390,3 +396,8 @@ class LitModule(pl.LightningModule):
         sched = {"scheduler": scheduler, "interval": "step"}
         logger.debug("done configuring optimizer and scheduler")
         return [optimizer], [sched]
+
+    def on_before_optimizer_step(self, optimizer):
+        # If using mixed precision, the gradients are already unscaled here
+        if self.track_grad_norm != -1:
+            self.log_dict(grad_norm(self, norm_type=self.track_grad_norm))
