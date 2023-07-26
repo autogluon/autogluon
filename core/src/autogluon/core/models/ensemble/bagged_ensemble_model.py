@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 import inspect
 import logging
@@ -1112,10 +1114,10 @@ class BaggedEnsembleModel(AbstractModel):
 
         return info
 
-    def get_memory_size(self):
+    def get_memory_size(self, allow_exception: bool = False) -> int | None:
         models = self.models
         self.models = None
-        memory_size = super().get_memory_size()
+        memory_size = super().get_memory_size(allow_exception=allow_exception)
         self.models = models
         return memory_size
 

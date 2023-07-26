@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 import gc
 import inspect
@@ -1510,11 +1512,37 @@ class AbstractModel:
         model_disk_size = sum(f.stat().st_size for f in model_path.glob("**/*") if f.is_file())
         return model_disk_size
 
-    # TODO: This results in a doubling of memory usage of the model to calculate its size.
-    #  If the model takes ~40%+ of memory, this may result in an OOM error.
-    #  This is generally not an issue because the model already needed to do this when being saved to disk, so the error would have been triggered earlier.
-    #  Consider using Pympler package for memory efficiency: https://pympler.readthedocs.io/en/latest/asizeof.html#asizeof
-    def get_memory_size(self) -> int:
+    def get_memory_size(self, allow_exception: bool = False) -> int | None:
+        """
+        Pickled the model object (self) and returns the size in bytes.
+        Will raise an exception if `self` cannot be pickled.
+
+        Note: This will temporarily double the memory usage of the model, as both the original and the pickled version will exist in memory.
+        This can lead to an out-of-memory error if the model is larger than the remaining available memory.
+
+        Parameters
+        ----------
+        allow_exception: bool, default = False
+            If True and an exception occurs during the memory size calculation, will return None instead of raising the exception.
+            For example, if a model failed during fit and had a messy internal state, and then `get_memory_size` was called,
+            it may still contain a non-serializable object. By setting `allow_exception=True`, we avoid crashing in this scenario.
+            For example: "AttributeError: Can't pickle local object 'func_generator.<locals>.custom_metric'"
+
+        Returns
+        -------
+        memory_size: int | None
+            The memory size in bytes of the pickled model object.
+            None if an exception occurred and `allow_exception=True`.
+        """
+        if allow_exception:
+            try:
+                return self._get_memory_size()
+            except:
+                return None
+        else:
+            return self._get_memory_size()
+
+    def _get_memory_size(self) -> int:
         gc.collect()  # Try to avoid OOM error
         return sys.getsizeof(pickle.dumps(self, protocol=4))
 
@@ -1710,7 +1738,7 @@ class AbstractModel:
             "features": self.features,
             "feature_metadata": self.feature_metadata,
             # 'disk_size': self.get_disk_size(),
-            "memory_size": self.get_memory_size(),  # Memory usage of model in bytes
+            "memory_size": self.get_memory_size(allow_exception=True),  # Memory usage of model in bytes
             "compile_time": self.compile_time if hasattr(self, "compile_time") else None,
             "is_initialized": self.is_initialized(),
             "is_fit": self.is_fit(),
