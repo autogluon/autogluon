@@ -28,9 +28,9 @@ install_requires = [
     "scipy",  # version range defined in `core/_setup_utils.py`
     "pandas",  # version range defined in `core/_setup_utils.py`
     "torch",  # version range defined in `core/_setup_utils.py`
+    "pytorch-lightning",  # version range defined in `core/_setup_utils.py`
     "statsmodels>=0.13.0,<0.15",
     "gluonts>=0.13.1,<0.14",
-    "pytorch-lightning>=2.0.0,<2.1",
     "networkx",  # version range defined in `core/_setup_utils.py`
     # TODO: update statsforecast to v1.5.0 - resolve antlr4-python3-runtime dependency clash with multimodal
     "statsforecast>=1.4.0,<1.5",
