@@ -290,7 +290,7 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
 
         estimator = TabularEstimator(
             predictor_init_kwargs={
-                "path": self.path + os.sep + "point_predictor",
+                "path": os.path.join(self.path, "point_predictor"),
                 "problem_type": ag.constants.REGRESSION,
                 "eval_metric": self.TIMESERIES_METRIC_TO_TABULAR_METRIC[self.eval_metric],
                 "verbosity": verbosity - 2,

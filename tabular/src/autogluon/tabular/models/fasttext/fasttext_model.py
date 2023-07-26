@@ -143,7 +143,7 @@ class FastTextModel(AbstractModel):
         # save fasttext model: fasttext model cannot be pickled; saved it separately
         # TODO: s3 support
         if self._load_model:
-            fasttext_model_file_name = path + self.model_bin_file_name
+            fasttext_model_file_name = os.path.join(path, self.model_bin_file_name)
             self.model.save_model(fasttext_model_file_name)
         self._load_model = None
         return path
@@ -157,7 +157,7 @@ class FastTextModel(AbstractModel):
             try_import_fasttext()
             import fasttext
 
-            fasttext_model_file_name = model.path + cls.model_bin_file_name
+            fasttext_model_file_name = os.path.join(model.path, cls.model_bin_file_name)
             # TODO: hack to subpress a deprecation warning from fasttext
             # remove it once official fasttext is updated beyond 0.9.2
             # https://github.com/facebookresearch/fastText/issues/1067

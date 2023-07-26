@@ -16,25 +16,6 @@ function setup_build_contrib_env {
     export AUTOMM_TUTORIAL_MODE=1 # Disable progress bar in AutoMMPredictor
 }
 
-function setup_torch_gpu {
-    PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cu118 reinstall_torch
-}
-
-function setup_torch_cpu {
-}
-
-function setup_torch_gpu_non_linux {
-    setup_torch_gpu
-}
-
-function setup_torch_cpu_non_linux {
-    setup_torch_cpu
-}
-
-function reinstall_torch {
-    pip3 install --force-reinstall torchvision~=0.15.1
-}
-
 function setup_hf_model_mirror {
     pip3 install PyYAML
     SUB_FOLDER="$1"

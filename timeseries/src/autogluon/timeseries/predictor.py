@@ -1,10 +1,12 @@
 import logging
+import os
 import pprint
 import time
 import warnings
 from typing import Any, Dict, List, Optional, Type, Union
 
 import pandas as pd
+import pytorch_lightning as pl
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.utils import check_saved_predictor_version, setup_outputdir
@@ -13,10 +15,9 @@ from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
 from autogluon.timeseries import __version__ as current_ag_version
 from autogluon.timeseries.configs import TIMESERIES_PRESETS_CONFIGS
-from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
+from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
 from autogluon.timeseries.learner import AbstractLearner, TimeSeriesLearner
 from autogluon.timeseries.trainer import AbstractTimeSeriesTrainer
-from autogluon.timeseries.utils.random import set_random_seed
 
 logger = logging.getLogger(__name__)
 
@@ -422,28 +423,25 @@ class TimeSeriesPredictor:
             Hyperparameter tuning strategy and kwargs (for example, how many HPO trials to run). If ``None``, then
             hyperparameter tuning will not be performed.
 
-            Ray Tune backend is used to tune deep-learning forecasting models from GluonTS implemented in MXNet. All
-            other models use a custom HPO backed based on random search.
+            Currently, only HPO based on random search is supported for time series models.
 
-            Can be set to a string to choose one of available presets:
+            Setting this parameter to string ``"random"`` performs 10 trials of random search per model.
 
-            - ``"random"``: 10 trials of random search
-            - ``"auto"``: 10 trials of bayesian optimization GluonTS MXNet models, 10 trials of random search for other models
-
-            Alternatively, a dict can be passed for more fine-grained control. The dict must include the following keys
+            We can change the number of random search trials per model by passing a dictionary as `hyperparameter_tune_kwargs`.
+            The dict must include the following keys
 
             - ``"num_trials"``: int, number of configurations to train for each tuned model
-            - ``"searcher"``: one of ``"random"`` (random search), ``"bayes"`` (bayesian optimization for GluonTS MXNet models, random search for other models) and ``"auto"`` (same as ``"bayes"``).
-            - ``"scheduler"``: the only supported option is ``"local"`` (all models trained on the same machine)
+            - ``"searcher"``: currently, the only supported option is ``"random"`` (random search)
+            - ``"scheduler"``: currently, the only supported option is ``"local"`` (all models trained on the same machine)
 
             Example::
 
                 predictor.fit(
                     ...
                     hyperparameter_tune_kwargs={
-                        "scheduler": "local",
-                        "searcher": "auto",
                         "num_trials": 5,
+                        "searcher": "random",
+                        "scheduler": "local",
                     },
                 )
         excluded_model_types: List[str], optional
@@ -525,7 +523,7 @@ class TimeSeriesPredictor:
         logger.info("=====================================================")
 
         if random_seed is not None:
-            set_random_seed(random_seed)
+            pl.seed_everything(random_seed)
 
         time_left = None if time_limit is None else time_limit - (time.time() - time_start)
         self._learner.fit(
@@ -623,7 +621,7 @@ class TimeSeriesPredictor:
                 2020-03-05     8.3
         """
         if random_seed is not None:
-            set_random_seed(random_seed)
+            pl.seed_everything(random_seed)
         # Don't use data.item_ids in case data is not a TimeSeriesDataFrame
         original_item_id_order = data.reset_index()[ITEMID].unique()
         data = self._check_and_prepare_data_frame(data)
@@ -675,7 +673,7 @@ class TimeSeriesPredictor:
 
     @classmethod
     def _load_version_file(cls, path: str) -> str:
-        version_file_path = path + cls._predictor_version_file_name
+        version_file_path = os.path.join(path, cls._predictor_version_file_name)
         version = load_str.load(path=version_file_path)
         return version
 
@@ -705,7 +703,7 @@ class TimeSeriesPredictor:
             version_saved = cls._load_version_file(path=path)
         except:
             logger.warning(
-                f'WARNING: Could not find version file at "{path + cls._predictor_version_file_name}".\n'
+                f'WARNING: Could not find version file at "{os.path.join(path, cls._predictor_version_file_name)}".\n'
                 f"This means that the predictor was fit in a version `<=0.7.0`."
             )
             version_saved = "Unknown (Likely <=0.7.0)"
@@ -719,14 +717,14 @@ class TimeSeriesPredictor:
 
         logger.info(f"Loading predictor from path {path}")
         learner = AbstractLearner.load(path)
-        predictor = load_pkl.load(path=learner.path + cls.predictor_file_name)
+        predictor = load_pkl.load(path=os.path.join(learner.path, cls.predictor_file_name))
         predictor._learner = learner
         predictor.path = learner.path
         return predictor
 
     def _save_version_file(self):
         version_file_contents = current_ag_version
-        version_file_path = self.path + self._predictor_version_file_name
+        version_file_path = os.path.join(self.path, self._predictor_version_file_name)
         save_str.save(path=version_file_path, data=version_file_contents, verbose=False)
 
     def save(self) -> None:
@@ -737,7 +735,7 @@ class TimeSeriesPredictor:
         """
         tmp_learner = self._learner
         self._learner = None
-        save_pkl.save(path=tmp_learner.path + self.predictor_file_name, object=self)
+        save_pkl.save(path=os.path.join(tmp_learner.path, self.predictor_file_name), object=self)
         self._learner = tmp_learner
         self._save_version_file()
 

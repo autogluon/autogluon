@@ -70,7 +70,7 @@ class AbstractModel:
         If None, a new unique time-stamped directory is chosen.
     name : str, default = None
         Name of the subdirectory inside path where model will be saved.
-        The final model directory will be path+name+os.path.sep()
+        The final model directory will be os.path.join(path, name)
         If None, defaults to the model's class name: self.__class__.__name__
     problem_type : str, default = None
         Type of prediction problem, i.e. is this a binary/multiclass classification or regression problem (options: 'binary', 'multiclass', 'regression').
@@ -112,18 +112,12 @@ class AbstractModel:
         self.path_root = path
         if self.path_root is None:
             path_suffix = self.name
-            if len(self.name) > 0:
-                if self.name[0] != os.path.sep:
-                    path_suffix = os.path.sep + path_suffix
             # TODO: Would be ideal to not create dir, but still track that it is unique. However, this isn't possible to do without a global list of used dirs or using UUID.
             path_cur = setup_outputdir(path=None, create_dir=True, path_suffix=path_suffix)
             self.path_root = path_cur.rsplit(self.path_suffix, 1)[0]
             logger.log(20, f"Warning: No path was specified for model, defaulting to: {self.path_root}")
 
-        # v0.9 FIXME: This is a hack, change so we aren't vulnerable to self.path_root breaking things
-        self.path_root = PathConverter.to_relative(self.path_root)
-
-        self.path = self.create_contexts(self.path_root + self.path_suffix)  # TODO: Make this path a function for consistency.
+        self.path = self.create_contexts(os.path.join(self.path_root, self.path_suffix))  # TODO: Make this path a function for consistency.
 
         self.num_classes = None
         self.model = None
@@ -256,7 +250,7 @@ class AbstractModel:
 
     @property
     def path_suffix(self):
-        return self.name + os.path.sep
+        return self.name
 
     def is_valid(self) -> bool:
         """
@@ -373,7 +367,10 @@ class AbstractModel:
 
     def rename(self, name: str):
         """Renames the model and updates self.path to reflect the updated name."""
-        self.path = self.path[: -len(self.name) - 1] + name + os.path.sep
+        if self.name is not None and len(self.name) > 0:
+            self.path = os.path.join(os.path.dirname(self.path), name)
+        else:
+            self.path = os.path.join(self.path, name)
         self.name = name
 
     def preprocess(self, X, preprocess_nonadaptive=True, preprocess_stateful=True, **kwargs):
@@ -484,6 +481,7 @@ class AbstractModel:
         if sample_weight is not None and isinstance(sample_weight, str):
             raise ValueError("In model.fit(), sample_weight should be array of sample weight values, not string.")
         time_limit = kwargs.get("time_limit", None)
+        time_limit_og = time_limit
         max_time_limit_ratio = self.params_aux.get("max_time_limit_ratio", 1)
         if time_limit is not None:
             time_limit *= max_time_limit_ratio
@@ -499,6 +497,17 @@ class AbstractModel:
         elif time_limit is not None:
             time_limit = max(time_limit, min_time_limit)
         kwargs["time_limit"] = time_limit
+        if time_limit_og != time_limit:
+            time_limit_og_str = f"{time_limit_og:.2f}s" if time_limit_og is not None else "None"
+            time_limit_str = f"{time_limit:.2f}s" if time_limit is not None else "None"
+            logger.log(
+                20,
+                f"\tTime limit adjusted due to model hyperparameters: "
+                f"{time_limit_og_str} -> {time_limit_str} "
+                f"(ag.max_time_limit={max_time_limit}, "
+                f"ag.max_time_limit_ratio={max_time_limit_ratio}, "
+                f"ag.min_time_limit={min_time_limit})",
+            )
         kwargs = self._preprocess_fit_resources(**kwargs)
         return kwargs
 
@@ -1002,7 +1011,7 @@ class AbstractModel:
             Path to the saved model, minus the file name.
             This should generally be a directory path ending with a '/' character (or appropriate path separator value depending on OS).
             If None, self.path is used.
-            The final model file is typically saved to path + self.model_file_name.
+            The final model file is typically saved to os.path.join(path, self.model_file_name).
         verbose : bool, default True
             Whether to log the location of the saved file.
 
@@ -1037,7 +1046,7 @@ class AbstractModel:
         path : str
             Path to the saved model, minus the file name.
             This should generally be a directory path ending with a '/' character (or appropriate path separator value depending on OS).
-            The model file is typically located in path + cls.model_file_name.
+            The model file is typically located in os.path.join(path, cls.model_file_name).
         reset_paths : bool, default True
             Whether to reset the self.path value of the loaded model to be equal to path.
             It is highly recommended to keep this value as True unless accessing the original self.path value is important.
@@ -1050,7 +1059,7 @@ class AbstractModel:
         model : cls
             Loaded model object.
         """
-        file_path = path + cls.model_file_name
+        file_path = os.path.join(path, cls.model_file_name)
         model = load_pkl.load(path=file_path, verbose=verbose)
         if reset_paths:
             model.set_contexts(path)
@@ -1708,7 +1717,7 @@ class AbstractModel:
 
     @classmethod
     def load_info(cls, path, load_model_if_required=True) -> dict:
-        load_path = path + cls.model_info_name
+        load_path = os.path.join(path, cls.model_info_name)
         try:
             return load_pkl.load(path=load_path)
         except:
@@ -1721,8 +1730,8 @@ class AbstractModel:
     def save_info(self) -> dict:
         info = self.get_info()
 
-        save_pkl.save(path=self.path + self.model_info_name, object=info)
-        json_path = self.path + self.model_info_json_name
+        save_pkl.save(path=os.path.join(self.path, self.model_info_name), object=info)
+        json_path = os.path.join(self.path, self.model_info_json_name)
         save_json.save(path=json_path, obj=info)
         return info
 

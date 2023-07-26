@@ -77,7 +77,7 @@ def init_model(args, model_cls, init_params, backend, is_bagged_model=False):
         if "hyperparameters" not in init_params:
             init_params["hyperparameters"] = {}
         init_params["hyperparameters"].update(args)
-    init_params["name"] = init_params["name"] + os.path.sep + file_prefix
+    init_params["name"] = os.path.join(init_params["name"], file_prefix)
 
     return model_cls(**init_params)
 

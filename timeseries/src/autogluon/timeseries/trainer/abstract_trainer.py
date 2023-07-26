@@ -39,7 +39,6 @@ class SimpleAbstractTrainer:
 
     def __init__(self, path: str, low_memory: bool, save_data: bool, *args, **kwargs):
         self.path = path
-        self.path = PathConverter.to_relative(self.path)
         self.reset_paths = False
 
         self.low_memory = low_memory
@@ -88,6 +87,8 @@ class SimpleAbstractTrainer:
         """Get a member attribute for given model from the `model_graph`."""
         if not isinstance(model, str):
             model = model.name
+        if attribute == "path":
+            return os.path.join(*self.model_graph.nodes[model][attribute])
         return self.model_graph.nodes[model][attribute]
 
     def set_model_attribute(self, model: Union[str, AbstractModel], attribute: str, val):
@@ -98,36 +99,27 @@ class SimpleAbstractTrainer:
 
     @property
     def path_root(self) -> str:
-        return self.path.rsplit(os.path.sep, maxsplit=2)[0] + os.path.sep
+        return os.path.dirname(self.path)
 
     @property
     def path_utils(self) -> str:
-        return self.path_root + "utils" + os.path.sep
+        return os.path.join(self.path_root, "utils")
 
     @property
     def path_data(self) -> str:
-        return self.path_utils + "data" + os.path.sep
+        return os.path.join(self.path_utils, "data")
 
     @property
     def path_pkl(self) -> str:
-        return self.path + self.trainer_file_name
+        return os.path.join(self.path, self.trainer_file_name)
 
     def set_contexts(self, path_context: str) -> None:
-        self.path, model_paths = self.create_contexts(path_context)
-        for model, path in model_paths.items():
-            self.set_model_attribute(model=model, attribute="path", val=path)
+        self.path = self.create_contexts(path_context)
 
-    def create_contexts(self, path_context: str) -> Tuple[str, dict]:
+    def create_contexts(self, path_context: str) -> str:
         path = path_context
-        # TODO: consider keeping track of model path suffixes in model_graph instead
-        # TODO: of full paths
-        model_paths = self.get_models_attribute_dict(attribute="path")
-        for model, prev_path in model_paths.items():
-            model_local_path = prev_path.split(self.path, 1)[1]
-            new_path = path + model_local_path
-            model_paths[model] = new_path
 
-        return path, model_paths
+        return path
 
     def save(self) -> None:
         # todo: remove / revise low_memory logic
@@ -144,7 +136,7 @@ class SimpleAbstractTrainer:
 
     @classmethod
     def load(cls, path: str, reset_paths: bool = False) -> "SimpleAbstractTrainer":
-        load_path = path + cls.trainer_file_name
+        load_path = os.path.join(path, cls.trainer_file_name)
         if not reset_paths:
             return load_pkl.load(path=load_path)
         else:
@@ -173,7 +165,7 @@ class SimpleAbstractTrainer:
             path = self.get_model_attribute(model=model_name, attribute="path")
         if model_type is None:
             model_type = self.get_model_attribute(model=model_name, attribute="type")
-        return model_type.load(path=path, reset_paths=self.reset_paths)
+        return model_type.load(path=os.path.join(self.path, path), reset_paths=self.reset_paths)
 
     def construct_model_templates(self, hyperparameters: Union[str, Dict[str, Any]], **kwargs):
         raise NotImplementedError
@@ -199,7 +191,7 @@ class SimpleAbstractTrainer:
                     model = self.models[model]
             if isinstance(model, str):
                 model_type = self.get_model_attribute(model=model, attribute="type")
-                model_path = self.get_model_attribute(model=model, attribute="path")
+                model_path = os.path.join(self.path, self.get_model_attribute(model=model, attribute="path"))
                 model_info_dict[model] = model_type.load_info(path=model_path)
             else:
                 model_info_dict[model.name] = model.get_info()
@@ -207,7 +199,7 @@ class SimpleAbstractTrainer:
 
     @classmethod
     def load_info(cls, path, reset_paths=False, load_model_if_required=True) -> Dict[str, Any]:
-        load_path = path + cls.trainer_info_name
+        load_path = os.path.join(path, cls.trainer_info_name)
         try:
             return load_pkl.load(path=load_path)
         except:  # noqa
@@ -220,8 +212,8 @@ class SimpleAbstractTrainer:
     def save_info(self, include_model_info: bool = False):
         info = self.get_info(include_model_info=include_model_info)
 
-        save_pkl.save(path=self.path + self.trainer_info_name, object=info)
-        save_json.save(path=self.path + self.trainer_info_json_name, obj=info)
+        save_pkl.save(path=os.path.join(self.path, self.trainer_info_name), object=info)
+        save_json.save(path=os.path.join(self.path, self.trainer_info_json_name), obj=info)
         return info
 
     def get_info(self, include_model_info: bool = False) -> Dict[str, Any]:
@@ -296,19 +288,19 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         self.hpo_results = {}
 
     def save_train_data(self, data: TimeSeriesDataFrame, verbose: bool = True) -> None:
-        path = self.path_data + "train.pkl"
+        path = os.path.join(self.path_data, "train.pkl")
         save_pkl.save(path=path, object=data, verbose=verbose)
 
     def save_val_data(self, data: TimeSeriesDataFrame, verbose: bool = True) -> None:
-        path = self.path_data + "val.pkl"
+        path = os.path.join(self.path_data, "val.pkl")
         save_pkl.save(path=path, object=data, verbose=verbose)
 
     def load_train_data(self) -> TimeSeriesDataFrame:
-        path = self.path_data + "train.pkl"
+        path = os.path.join(self.path_data, "train.pkl")
         return load_pkl.load(path=path)
 
     def load_val_data(self) -> Optional[TimeSeriesDataFrame]:
-        path = self.path_data + "val.pkl"
+        path = os.path.join(self.path_data, "val.pkl")
         if os.path.exists(path):
             return load_pkl.load(path=path)
         else:
@@ -330,7 +322,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         self.models = models
 
     def _get_model_oof_predictions(self, model_name: str) -> TimeSeriesDataFrame:
-        model_path = self.get_model_attribute(model=model_name, attribute="path")
+        model_path = os.path.join(self.path, self.get_model_attribute(model=model_name, attribute="path"))
         model_type = self.get_model_attribute(model=model_name, attribute="type")
         return model_type.load_oof_predictions(path=model_path)
 
@@ -356,7 +348,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             If ``base_models`` are provided and ``model`` is not a ``AbstractTimeSeriesEnsembleModel``.
         """
         node_attrs = dict(
-            path=model.path,
+            path=os.path.relpath(model.path, self.path).split(os.sep),
             type=type(model),
             fit_time=model.fit_time,
             predict_time=model.predict_time,
@@ -444,7 +436,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         model_names_trained = []
         # add each of the trained HPO configurations to the trained models
         for model_hpo_name, model_info in hpo_models.items():
-            model_path = model_info["path"]
+            model_path = os.path.join(self.path, model_info["path"])
             # Only load model configurations that didn't fail
             if Path(model_path).exists():
                 model_hpo = self.load_model(model_hpo_name, path=model_path, model_type=type(model))
@@ -737,7 +729,6 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             fit_time=ensemble.fit_time,
             predict_time=ensemble.predict_time,
         )
-
         self._add_model(model=ensemble, base_models=ensemble.model_names)
         self.save_model(model=ensemble)
         return ensemble.name

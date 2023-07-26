@@ -457,51 +457,6 @@ class AutommRayTuneAdapter(RayTuneAdapter):
         return trainable_args
 
 
-class AutommRayTuneLightningAdapter(RayTuneAdapter):
-
-    supported_searchers = ["random", "bayes"]
-    supported_schedulers = ["FIFO", "ASHA"]
-
-    def __init__(self):
-        super().__init__()
-        self.num_workers = None
-        self.cpu_per_worker = None
-
-    @property
-    def adapter_type(self):
-        return "automm_ray_lightning"
-
-    def check_user_provided_resources_per_trial(self, resources_per_trial: Optional[dict] = None):
-        if resources_per_trial is not None:
-            # Ray Lightning provides a way to get the resources_per_trial because of the complexity of head process and worker process.
-            # It's non-trivial to let the user to specify it. Hence we disable such option
-            logger.warning("AutoMM does not support customized resources_per_trial. We will calculate it for you instead.")
-
-    def get_resource_calculator(self, num_gpus):
-        return ResourceCalculatorFactory.get_resource_calculator(calculator_type="ray_lightning_cpu" if num_gpus == 0 else "ray_lightning_gpu")
-
-    def update_resource_info(self, resources_info: dict):
-        self.num_parallel_jobs = resources_info.get("num_parallel_jobs", None)
-        self.cpu_per_job = resources_info.get("cpu_per_job", None)
-        self.gpu_per_job = resources_info.get("gpu_per_job", None)
-        self.num_workers = resources_info.get("num_workers", None)
-        self.cpu_per_worker = resources_info.get("cpu_per_worker", None)
-        self.resources_per_trial = resources_info.get("resources_per_job", None)
-
-    def trainable_args_update_method(self, trainable_args: dict) -> dict:
-        from ray_lightning import RayPlugin
-
-        trainable_args["hyperparameters"]["env.num_gpus"] = self.gpu_per_job
-        trainable_args["hyperparameters"]["env.num_workers"] = self.cpu_per_job
-        trainable_args["hyperparameters"]["env.num_nodes"] = 1  # num_nodes is not needed by ray lightning. Setting it to default, which is 1
-        trainable_args["_ray_lightning_plugin"] = RayPlugin(
-            num_workers=self.num_workers,
-            num_cpus_per_worker=self.cpu_per_worker,
-            use_gpu=self.gpu_per_job is not None,
-        )
-        return trainable_args
-
-
 class TimeSeriesRayTuneAdapter(TabularRayTuneAdapter):
 
     supported_searchers = ["random", "bayes"]
@@ -518,7 +473,6 @@ class RayTuneAdapterFactory:
         TabularRayTuneAdapter,
         TimeSeriesRayTuneAdapter,
         AutommRayTuneAdapter,
-        AutommRayTuneLightningAdapter,
     ]
 
     __type_to_adapter = {cls().adapter_type: cls for cls in __supported_adapters}

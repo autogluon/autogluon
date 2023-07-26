@@ -112,7 +112,10 @@ class AnomalyDetector:
         # Can't go beyond 4 - SUOD is throwing errors
         num_cpus = min(ResourceManager.get_cpu_count(), 4)
 
-        suod_defaults = dict(base_estimators=self.detector_list, n_jobs=num_cpus, combination="average", verbose=False)
+        # Don't use `bps_flag=True` - it's using pre-trained models which aren't loading in newer versions of sklearn
+        suod_defaults = dict(
+            base_estimators=self.detector_list, n_jobs=num_cpus, combination="average", bps_flag=False, verbose=False
+        )
         self._suod_kwargs = {**suod_defaults, **detector_kwargs}
         self._detectors: Optional[List[BaseDetector]] = None
         self._train_index_to_detector: Optional[Dict[int, Any]] = None

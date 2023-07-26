@@ -31,6 +31,7 @@ from autogluon.multimodal.constants import (
 )
 from autogluon.multimodal.data.infer_types import infer_ner_column_type, infer_problem_type
 from autogluon.multimodal.data.label_encoder import CustomLabelEncoder
+from autogluon.multimodal.data.process_text import TextProcessor
 from autogluon.multimodal.data.utils import process_ner_annotations
 from autogluon.multimodal.utils import (
     apply_omegaconf_overrides,
@@ -525,3 +526,30 @@ def test_infer_problem_type(y_data, provided_problem_type, gt_problem_type):
         provided_problem_type=provided_problem_type,
     )
     assert inferred_problem_type == gt_problem_type
+
+
+@pytest.mark.parametrize(
+    "lengths,max_length,do_merge,gt_trimmed_lengths",
+    [
+        ([7, 8, 9], 29, True, [7, 8, 9]),
+        ([7, 8, 9], 24, True, [7, 8, 9]),
+        ([7, 8, 9], 23, True, [7, 8, 8]),
+        ([7, 8, 9], 22, True, [7, 8, 7]),
+        ([7, 8, 9], 21, True, [7, 7, 7]),
+        ([7, 8, 9], 20, True, [7, 7, 6]),
+        ([7, 8, 9], 19, True, [7, 6, 6]),
+        ([7, 8, 9], 18, True, [6, 6, 6]),
+        ([7, 8, 9], 10, False, [7, 8, 9]),
+        ([7, 8, 9], 9, False, [7, 8, 9]),
+        ([7, 8, 9], 8, False, [7, 8, 8]),
+        ([7, 8, 9], 7, False, [7, 7, 7]),
+        ([7, 8, 9], 6, False, [6, 6, 6]),
+    ],
+)
+def test_trim_token_sequence(lengths, max_length, do_merge, gt_trimmed_lengths):
+    trimmed_lengths = TextProcessor.get_trimmed_lengths(
+        lengths=lengths,
+        max_length=max_length,
+        do_merge=do_merge,
+    )
+    assert trimmed_lengths == gt_trimmed_lengths

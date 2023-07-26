@@ -45,7 +45,7 @@ extras_require = {
         "xgboost>=1.6,<1.8",
     ],
     "fastai": [
-        "torch>=1.11,<2.1",
+        "torch",  # version range defined in `core/_setup_utils.py`
         "fastai>=2.3.1,<2.8",
     ],
     "tabpfn": [
@@ -63,7 +63,7 @@ extras_require = {
     ],
     "vowpalwabbit": [
         # FIXME: 9.5+ causes VW to save an empty model which always predicts 0. Confirmed on MacOS (Intel CPU). Unknown how to fix.
-        "vowpalwabbit>=9,<9.5",
+        "vowpalwabbit>=9,<9.9",
     ],
     "skl2onnx": [
         "skl2onnx>=1.13.0,<1.14.0",
@@ -89,6 +89,7 @@ for test_package in ["tabpfn", "imodels", "vowpalwabbit", "skl2onnx"]:
     test_requires += extras_require[test_package]
 extras_require["tests"] = test_requires
 install_requires = ag.get_dependency_version_ranges(install_requires)
+extras_require = {key: ag.get_dependency_version_ranges(value) for key, value in extras_require.items()}
 
 if __name__ == "__main__":
     ag.create_version_file(version=version, submodule=submodule)

@@ -51,7 +51,7 @@ def trained_models():
     for model_class, prediction_length in itertools.product(TESTABLE_MODELS, TESTABLE_PREDICTION_LENGTHS):
         temp_model_path = tempfile.mkdtemp()
         model = model_class(
-            path=temp_model_path + os.path.sep,
+            path=temp_model_path,
             freq="H",
             prediction_length=prediction_length,
             hyperparameters=DUMMY_HYPERPARAMETERS,
@@ -209,10 +209,6 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_has_
         quantile_levels=quantile_levels,
         hyperparameters=DUMMY_HYPERPARAMETERS,
     )
-    # TFT cannot handle arbitrary quantiles
-    if "TemporalFusionTransformerMXNet" in model.name:
-        return
-
     model.fit(train_data=DUMMY_TS_DATAFRAME)
     predictions = model.predict(DUMMY_TS_DATAFRAME, quantile_levels=quantile_levels)
 

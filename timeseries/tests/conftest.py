@@ -11,13 +11,8 @@ def pytest_addoption(parser):
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "slow: mark test as slow to run")
-    # known mxnet warnings
-    config.addinivalue_line("filterwarnings", "ignore:In accordance with NEP 32:DeprecationWarning")
-    config.addinivalue_line("filterwarnings", "ignore:.np.bool:DeprecationWarning")
 
     # known gluonts warnings
-    config.addinivalue_line("filterwarnings", "ignore::DeprecationWarning:.*gluonts.mx.distribution.*")
-    config.addinivalue_line("filterwarnings", "ignore::DeprecationWarning:.*gluonts.mx.trainer.*")
     config.addinivalue_line("filterwarnings", "ignore:Using `json`-module:UserWarning")
 
     # pandas future warnings on timestamp freq being deprecated
@@ -38,5 +33,5 @@ def pytest_collection_modifyitems(config, items):
 def temp_model_path():
     """Pytest fixture to save as model paths that clean up after themselves"""
     td = tempfile.mkdtemp()
-    yield td + os.path.sep
+    yield td
     shutil.rmtree(td)
