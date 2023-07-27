@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 import logging
 import time
@@ -351,7 +353,16 @@ class NNFastAiTabularModel(AbstractModel):
 
         return bs
 
-    def _get_epochs_number(self, samples_num, epochs, batch_size, time_left=None, min_batches_count=30, default_epochs=30):
+    def _get_epochs_number(
+        self,
+        samples_num: int,
+        epochs: int | str,
+        batch_size: int,
+        time_left: float | None = None,
+        min_batches_count: int = 30,
+        default_epochs: int = 30,
+    ) -> int:
+        """Get the number of epochs to train during fit"""
         if epochs == "auto":
             batches_count = int(samples_num / batch_size) + 1
             if not time_left:
@@ -370,7 +381,8 @@ class NNFastAiTabularModel(AbstractModel):
                 )
         return epochs
 
-    def _measure_batch_times(self, min_batches_count):
+    def _measure_batch_times(self, min_batches_count: int) -> float:
+        """Returns the time in seconds taken to fit a single batch"""
         from fastai.callback.core import CancelFitException
 
         from .callbacks import BatchTimeTracker
@@ -383,6 +395,9 @@ class NNFastAiTabularModel(AbstractModel):
         except CancelFitException:
             pass  # expected early exit
         batch_time = batch_time_tracker_callback.batch_measured_time
+        if batch_time is None or batch_time < 0.00001:
+            # Fixes rare issue where batch_time = None if the operation occurs too quickly
+            batch_time = 0.00001
         return batch_time
 
     def _generate_datasets(self, X, y, X_val, y_val):

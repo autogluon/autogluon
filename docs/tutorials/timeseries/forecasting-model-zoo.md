@@ -181,28 +181,8 @@ Note that some of the models' hyperparameters have names and default values that
 
 ## MXNet Models
 
-Following MXNet-based models from GluonTS are available in AutoGluon.
+MXNet models from GluonTS have been deprecated because of dependency conflicts caused by MXNet.
 
-- `DeepARMXNetModel`
-- `MQCNNMXNetModel`
-- `MQRNNMXNetModel`
-- `SimpleFeedForwardMXNetModel`
-- `TemporalFusionTransformerMXNetModel`
-- `TransformerMXNetModel`
-
-Documentation and hyperparameter settings for these models can be found [here](https://github.com/autogluon/autogluon/blob/master/timeseries/src/autogluon/timeseries/models/gluonts/mx/models.py).
-
-Using the above models requires installing Apache MXNet v1.9. This can be done as follows:
-
-```
-python -m pip install mxnet~=1.9
-```
-
-If you want to use a GPU, install the version of MXNet that matches your CUDA version. See the
-MXNet [documentation](https://mxnet.apache.org/versions/1.9.1/get_started?) for more info.
-
-If a GPU is available and MXNet version with CUDA is installed, all the MXNet models will be trained using the GPU.
-Otherwise, the models will be trained on CPU.
 
 ## Additional features
 
@@ -241,19 +221,4 @@ Models not included in this table currently do not support any additional featur
      - ✓
      - ✓
      - ✓
-   * - :class:`~autogluon.timeseries.models.gluonts.mx.DeepARMXNetModel`
-     - ✓
-     - ✓
-     - ✓
-     -
-   * - :class:`~autogluon.timeseries.models.gluonts.mx.MQCNNMXNetModel`
-     - ✓
-     - ✓
-     - ✓
-     - ✓
-   * - :class:`~autogluon.timeseries.models.gluonts.mx.TemporalFusionTransformerMXNetModel`
-     - ✓
-     -
-     - ✓
-     -
 ```

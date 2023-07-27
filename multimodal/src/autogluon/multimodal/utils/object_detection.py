@@ -9,6 +9,7 @@ import defusedxml.ElementTree as ET
 import numpy as np
 import pandas as pd
 import PIL
+from torchmetrics.detection.mean_ap import MeanAveragePrecision
 
 from ..constants import (
     AUTOMM,
@@ -888,10 +889,6 @@ def cocoeval_torchmetrics(outputs: List):
     -------
     The mAP result.
     """
-
-    import torch
-
-    from . import MeanAveragePrecision
 
     map_metric = MeanAveragePrecision(box_format="xyxy", iou_type="bbox", class_metrics=False)
 
