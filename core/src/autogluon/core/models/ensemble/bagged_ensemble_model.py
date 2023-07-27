@@ -879,7 +879,7 @@ class BaggedEnsembleModel(AbstractModel):
     def convert_to_template_child(self):
         return self._get_model_base().convert_to_template()
 
-    def _get_compressed_params(self, model_params_list=None):
+    def _get_compressed_params(self, model_params_list=None) -> dict:
         if model_params_list is None:
             model_params_list = [self.load_child(child).get_trained_params() for child in self.models]
 
