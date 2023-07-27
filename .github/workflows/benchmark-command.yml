@@ -86,7 +86,7 @@ jobs:
         with:
           python-version: '3.8'
       - name: Setup npm
-      - uses: actions/setup-node@v3
+        uses: actions/setup-node@v3
         with:
           node-version: 'latest'
       - name: Install autogluon bench
