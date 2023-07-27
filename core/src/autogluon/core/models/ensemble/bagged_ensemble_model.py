@@ -883,6 +883,8 @@ class BaggedEnsembleModel(AbstractModel):
         if model_params_list is None:
             model_params_list = [self.load_child(child).get_trained_params() for child in self.models]
 
+        if len(model_params_list) == 0:
+            return dict()
         model_params_compressed = dict()
         for param in model_params_list[0].keys():
             model_param_vals = [model_params[param] for model_params in model_params_list]
