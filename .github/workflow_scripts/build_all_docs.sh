@@ -59,6 +59,7 @@ install_all_no_tests
 LOCAL_DOC_PATH=_build/html
 
 cd docs
+rm -rf tutorials/eda  # disable eda temporarily
 sphinx-build -D nb_execution_mode=off -b html . $LOCAL_DOC_PATH
 
 rm -rf "$LOCAL_DOC_PATH/.doctrees/" # remove build artifacts that are not needed to serve webpage
