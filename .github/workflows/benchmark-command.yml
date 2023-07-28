@@ -44,6 +44,9 @@ on:
         description: 'Branch or PR number to run the benchmark on'
         required: true
       
+permissions:
+  id-token: write
+  contents: read
 
 jobs:
   setup:
