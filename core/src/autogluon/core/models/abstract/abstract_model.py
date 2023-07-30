@@ -122,6 +122,7 @@ class AbstractModel:
         self.path = self.create_contexts(os.path.join(self.path_root, self.path_suffix))  # TODO: Make this path a function for consistency.
 
         self.num_classes = None
+        self.quantile_levels = None
         self.model = None
         self.problem_type = problem_type
 
@@ -132,6 +133,7 @@ class AbstractModel:
             self.eval_metric = metrics.get_metric(eval_metric, self.problem_type, "eval_metric")  # Note: we require higher values = better performance
         else:
             self.eval_metric = None
+        self.stopping_metric = None
         self.normalize_pred_probas = None
 
         self.features = None  # External features, do not use internally
@@ -151,6 +153,7 @@ class AbstractModel:
         self.params = {}
         self.params_aux = {}
         self.params_trained = dict()
+        self.nondefault_params = []
         self._is_initialized = False
         self._is_fit_metadata_registered = False
         self._fit_metadata = dict()
@@ -1724,7 +1727,7 @@ class AbstractModel:
             "model_type": type(self).__name__,
             "problem_type": self.problem_type,
             "eval_metric": self.eval_metric.name,
-            "stopping_metric": self.stopping_metric.name,
+            "stopping_metric": self.stopping_metric.name if self.stopping_metric is not None else None,
             "fit_time": self.fit_time,
             "num_classes": self.num_classes,
             "quantile_levels": self.quantile_levels,
