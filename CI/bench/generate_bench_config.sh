@@ -28,4 +28,3 @@ agbench generate-cloud-config \
 --amlb-constraint $TIME_LIMIT \
 --amlb-user-dir $(dirname "$0")/amlb_user_dir \
 --git-uri-branch https://github.com/openml/automlbenchmark.git#stable
-
