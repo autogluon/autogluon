@@ -82,6 +82,10 @@ jobs:
           sudo rm -f /swapfile
           sudo apt clean
           docker system prune -af
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
           df -h
       - name: Checkout repository for PR
         if: (github.event_name == 'workflow_dispatch')
