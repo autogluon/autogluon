@@ -31,7 +31,6 @@ class TimeSeriesLearner(AbstractLearner):
         eval_metric: Optional[str] = None,
         eval_metric_seasonal_period: Optional[int] = None,
         prediction_length: int = 1,
-        ignore_time_index: bool = False,
         cache_predictions: bool = True,
         **kwargs,
     ):
@@ -46,7 +45,6 @@ class TimeSeriesLearner(AbstractLearner):
             "quantile_levels",
             kwargs.get("quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]),
         )
-        self.ignore_time_index = ignore_time_index
         self.cache_predictions = cache_predictions
 
         self.feature_generator = TimeSeriesFeatureGenerator(
@@ -160,28 +158,13 @@ class TimeSeriesLearner(AbstractLearner):
             )
 
         forecast_index = get_forecast_horizon_index_ts_dataframe(data, prediction_length=self.prediction_length)
-        if self.ignore_time_index:
-            logger.warning(
-                "Because `ignore_time_index=True`, the predictor will ignore the time index of `known_covariates`. "
-                "Please make sure that `known_covariates` contain only the future values of the known covariates "
-                "(and the past values are not included)."
+        try:
+            known_covariates = known_covariates.loc[forecast_index]
+        except KeyError:
+            raise ValueError(
+                f"known_covariates should include the values for prediction_length={self.prediction_length} "
+                "many time steps into the future."
             )
-            known_covariates = known_covariates.loc[forecast_index.unique(level=ITEMID)]
-            if (known_covariates.num_timesteps_per_item() < self.prediction_length).any():
-                raise ValueError(
-                    f"known_covariates should include the values for prediction_length={self.prediction_length} "
-                    "many time steps into the future."
-                )
-            known_covariates = known_covariates.slice_by_timestep(None, self.prediction_length)
-            known_covariates.index = forecast_index
-        else:
-            try:
-                known_covariates = known_covariates.loc[forecast_index]
-            except KeyError:
-                raise ValueError(
-                    f"known_covariates should include the values for prediction_length={self.prediction_length} "
-                    "many time steps into the future."
-                )
         return known_covariates
 
     def predict(

@@ -9,6 +9,7 @@ import pandas as pd
 import pytorch_lightning as pl
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
+from autogluon.common.utils.deprecated_utils import Deprecated_args
 from autogluon.common.utils.utils import check_saved_predictor_version, setup_outputdir
 from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl, load_str
@@ -47,6 +48,8 @@ class TimeSeriesPredictor:
         The forecast horizon, i.e., How many time steps into the future the models should be trained to predict.
         For example, if time series contain daily observations, setting ``prediction_length = 3`` will train
         models that predict up to 3 days into the future from the most recent observation.
+    freq : str, optional
+        If provided, will convert
     eval_metric : str, default = "mean_wQuantileLoss"
         Metric by which predictions will be ultimately evaluated on future test data. AutoGluon tunes hyperparameters
         in order to improve this metric on validation data, and ranks models (on validation data) according to this
@@ -89,10 +92,6 @@ class TimeSeriesPredictor:
         If using ``logging``, you can alternatively control amount of information printed via ``logger.setLevel(L)``,
         where ``L`` ranges from 0 to 50 (Note: higher values of ``L`` correspond to fewer print statements, opposite
         of verbosity levels).
-    ignore_time_index : bool, default = False
-        If True, the predictor will ignore the datetime indexes during both training and testing, and will replace
-        the data indexes with dummy timestamps in second frequency. In this case, the forecast output time indexes will
-        be arbitrary values, and seasonality will be turned off for local models.
     cache_predictions : bool, default = True
         If True, the predictor will cache and reuse the predictions made by individual models whenever
         :meth:`~autogluon.timeseries.TimeSeriesPredictor.predict`, :meth:`~autogluon.timeseries.TimeSeriesPredictor.leaderboard`,
@@ -106,6 +105,7 @@ class TimeSeriesPredictor:
     predictor_file_name = "predictor.pkl"
     _predictor_version_file_name = "__version__"
 
+    @Deprecated_args(min_version_to_warn="0.9", min_version_to_error="1.0", ignore_time_index=None)
     def __init__(
         self,
         target: Optional[str] = None,
@@ -116,19 +116,16 @@ class TimeSeriesPredictor:
         path: Optional[str] = None,
         verbosity: int = 2,
         quantile_levels: Optional[List[float]] = None,
-        ignore_time_index: bool = False,
         cache_predictions: bool = True,
         learner_type: Type[AbstractLearner] = TimeSeriesLearner,
         learner_kwargs: Optional[dict] = None,
         label: Optional[str] = None,
-        quantiles: Optional[List[float]] = None,
-        validation_splitter: Optional[Any] = None,
+        ignore_time_index: bool = False,
     ):
         self.verbosity = verbosity
         set_logger_verbosity(self.verbosity, logger=logger)
         self.path = setup_outputdir(path)
 
-        self.ignore_time_index = ignore_time_index
         self.cache_predictions = cache_predictions
         if target is not None and label is not None:
             raise ValueError("Both `label` and `target` are specified. Please specify at most one of these arguments.")
@@ -153,17 +150,6 @@ class TimeSeriesPredictor:
             quantile_levels = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
         self.quantile_levels = sorted(quantile_levels)
 
-        if validation_splitter is not None:
-            warnings.warn(
-                "`validation_splitter` argument has been deprecated as of v0.8.0. "
-                "Please use the `num_val_windows` argument of `TimeSeriesPredictor.fit` instead."
-            )
-        if quantiles is not None:
-            warnings.warn(
-                "`quantiles` argument has been deprecated as of v0.8.0. "
-                "Please use the `quantile_levels` argument instead."
-            )
-
         if learner_kwargs is None:
             learner_kwargs = {}
         learner_kwargs = learner_kwargs.copy()
@@ -176,7 +162,6 @@ class TimeSeriesPredictor:
                 known_covariates_names=self.known_covariates_names,
                 prediction_length=self.prediction_length,
                 quantile_levels=self.quantile_levels,
-                ignore_time_index=ignore_time_index,
                 cache_predictions=self.cache_predictions,
             )
         )
@@ -188,9 +173,7 @@ class TimeSeriesPredictor:
         return self._learner.load_trainer()  # noqa
 
     def _check_and_prepare_data_frame(self, df: Union[TimeSeriesDataFrame, pd.DataFrame]) -> TimeSeriesDataFrame:
-        """Ensure that TimeSeriesDataFrame has a frequency, or replace its time index with a dummy if
-        ``self.ignore_time_index`` is True.
-        """
+        """Ensure that TimeSeriesDataFrame has a frequency."""
         if df is None:
             return df
         if not isinstance(df, TimeSeriesDataFrame):
@@ -205,18 +188,14 @@ class TimeSeriesPredictor:
                 raise ValueError(
                     f"Please provide data in TimeSeriesDataFrame format (received an object of type {type(df)})."
                 )
-        if self.ignore_time_index:
-            df = df.get_reindexed_view(freq="S")
         # MultiIndex.is_monotonic_increasing checks if index is sorted by ["item_id", "timestamp"]
         if not df.index.is_monotonic_increasing:
             df = df.sort_index()
             df._cached_freq = None  # in case frequency was incorrectly cached as IRREGULAR_TIME_INDEX_FREQSTR
         if df.freq is None:
             raise ValueError(
-                "Frequency not provided and cannot be inferred. This is often due to the "
-                "time index of the data being irregularly sampled. Please ensure that the "
-                "data set used has a uniform time index, or create the `TimeSeriesPredictor` "
-                "setting `ignore_time_index=True`."
+                "Frequency not provided and cannot be inferred. Please set the expected data frequency when creating "
+                "the predictor with `TimeSeriesPredictor(freq=...)`, or ensure that the data has a uniform time index."
             )
         # Check if frequency is supported
         offset = pd.tseries.frequencies.to_offset(df.freq)
