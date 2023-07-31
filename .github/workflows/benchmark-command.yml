@@ -92,16 +92,6 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: 'latest'
-      - name: Install autogluon bench
-        shell: bash -l {0}
-        run: |
-          nvm install 20
-          npm install -g aws-cdk
-          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-          unzip awscliv2.zip
-          sudo ./aws/install
-          pip install -U autogluon.bench
-          cdk --version
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -111,6 +101,12 @@ jobs:
       - name: Run benchmark
         shell: bash -l {0}
         run: |
-         cdk --version
-         /bin/bash CI/bench/generate_bench_config.sh ${{ github.event.inputs.module }} ${{ github.event.inputs.preset }} ${{ github.event.inputs.benchmark }} ${{ github.event.inputs.time_limit }} ${{ github.event.inputs.branch_or_pr_number }}
-         agbench run ${{ github.event.inputs.module }}_cloud_configs.yaml --wait
+          nvm install 20
+          npm install -g aws-cdk
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip awscliv2.zip
+          sudo ./aws/install
+          pip install -U autogluon.bench
+          cdk --version
+          /bin/bash CI/bench/generate_bench_config.sh ${{ github.event.inputs.module }} ${{ github.event.inputs.preset }} ${{ github.event.inputs.benchmark }} ${{ github.event.inputs.time_limit }} ${{ github.event.inputs.branch_or_pr_number }}
+          agbench run ${{ github.event.inputs.module }}_cloud_configs.yaml --wait
