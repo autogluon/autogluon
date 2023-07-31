@@ -75,7 +75,14 @@ jobs:
     defaults:
       run:
         shell: bash
-    steps:  
+    steps:
+      - name: free disk space
+        run: |
+          sudo swapoff -a
+          sudo rm -f /swapfile
+          sudo apt clean
+          docker system prune -af
+          df -h
       - name: Checkout repository for PR
         if: (github.event_name == 'workflow_dispatch')
         uses: actions/checkout@v2
