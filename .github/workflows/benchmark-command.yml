@@ -109,3 +109,4 @@ jobs:
           pip install -U autogluon.bench
           cdk --version
           /bin/bash CI/bench/generate_bench_config.sh ${{ github.event.inputs.module }} ${{ github.event.inputs.preset }} ${{ github.event.inputs.benchmark }} ${{ github.event.inputs.time_limit }} ${{ github.event.inputs.branch_or_pr_number }}
+          agbench run ${{ github.event.inputs.module }}_cloud_configs.yaml --wait
