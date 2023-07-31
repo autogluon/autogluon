@@ -6,7 +6,7 @@ SHORT_SHA=$3
 PR_NUMBER=$4
 
 # generate tabular configs
-python $(dirname "$0")/tabular/generate_framework.py --repository $REPOSITORY --branch $BRANCH
+python $(dirname "$0")/tabular/generate_framework.py --repository https://github.com/$REPOSITORY.git --branch $BRANCH
 if [ -n "$PR_NUMBER" ]
 then
     CONFIG_PATH=tabular/$PR_NUMBER
