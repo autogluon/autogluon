@@ -46,6 +46,7 @@ class NerLitModule(LitModule):
         mixup_fn: Optional[MixupModule] = None,
         mixup_off_epoch: Optional[int] = 0,
         model_postprocess_fn: Callable = None,
+        track_grad_norm: Optional[Union[int, str]] = -1,
     ):
         """
         Parameters
@@ -108,29 +109,33 @@ class NerLitModule(LitModule):
             - lora, lora_bias, lora_norm (only finetunes decomposition matrices inserted into model, in combination with either bit_fit or norm_fit)
             - ia3, ia3_bias, ia3_norm (adds vector that scales activations by learned vectors, in combination with either bit_fit or norm_fit)
             - None (do not use efficient finetuning strategies)
+        track_grad_norm
+            Track the p-norm of gradients during training. May be set to ‘inf’ infinity-norm.
+            If using Automatic Mixed Precision (AMP), the gradients will be unscaled before logging them.
 
         """
         super().__init__(
-            model,
-            optim_type,
-            lr_choice,
-            lr_schedule,
-            lr,
-            lr_decay,
-            end_lr,
-            lr_mult,
-            weight_decay,
-            warmup_steps,
-            loss_func,
-            validation_metric,
-            validation_metric_name,
-            custom_metric_func,
-            test_metric,
-            efficient_finetune,
-            trainable_param_names,
-            mixup_fn,
-            mixup_off_epoch,
-            model_postprocess_fn,
+            model=model,
+            optim_type=optim_type,
+            lr_choice=lr_choice,
+            lr_schedule=lr_schedule,
+            lr=lr,
+            lr_decay=lr_decay,
+            end_lr=end_lr,
+            lr_mult=lr_mult,
+            weight_decay=weight_decay,
+            warmup_steps=warmup_steps,
+            loss_func=loss_func,
+            validation_metric=validation_metric,
+            validation_metric_name=validation_metric_name,
+            custom_metric_func=custom_metric_func,
+            test_metric=test_metric,
+            efficient_finetune=efficient_finetune,
+            trainable_param_names=trainable_param_names,
+            mixup_fn=mixup_fn,
+            mixup_off_epoch=mixup_off_epoch,
+            model_postprocess_fn=model_postprocess_fn,
+            track_grad_norm=track_grad_norm,
         )
 
     def _compute_loss(
