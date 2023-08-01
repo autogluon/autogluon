@@ -164,26 +164,26 @@ jobs:
           job-type: CI-WASM
           job-name: AutoGluon-Lite
           command: chmod +x ./.github/workflow_scripts/test_tabular_lite.sh && ./.github/workflow_scripts/test_tabular_lite.sh
-  test_eda:
-    needs: lint_check
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Check if changes beside docs
-        uses: dorny/paths-filter@v2
-        id: changes
-        with:
-          filters: |
-            other_than_docs:
-              - '!(docs/**)**'
-      - name: Test EDA on AWS Batch
-        if: steps.changes.outputs.other_than_docs == 'true'
-        uses: ./.github/actions/submit-job
-        with:
-          job-type: CI-CPU
-          job-name: AutoGluon-EDA
-          command: chmod +x ./.github/workflow_scripts/test_eda.sh && ./.github/workflow_scripts/test_eda.sh
+  # test_eda:
+  #   needs: lint_check
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v2
+  #     - name: Check if changes beside docs
+  #       uses: dorny/paths-filter@v2
+  #       id: changes
+  #       with:
+  #         filters: |
+  #           other_than_docs:
+  #             - '!(docs/**)**'
+  #     - name: Test EDA on AWS Batch
+  #       if: steps.changes.outputs.other_than_docs == 'true'
+  #       uses: ./.github/actions/submit-job
+  #       with:
+  #         job-type: CI-CPU
+  #         job-name: AutoGluon-EDA
+  #         command: chmod +x ./.github/workflow_scripts/test_eda.sh && ./.github/workflow_scripts/test_eda.sh
   test_multimodal_predictor:
     needs: lint_check
     runs-on: ubuntu-latest
@@ -285,7 +285,7 @@ jobs:
           job-name: AutoGluon-Install
           command: chmod +x ./.github/workflow_scripts/test_install.sh && ./.github/workflow_scripts/test_install.sh
   build_tabular_prediction_tutorial:
-    needs: [test_common, test_core, test_features, test_tabular, test_eda, test_multimodal_predictor, test_multimodal_others, test_multimodal_others_2, test_timeseries, test_tabular_lite, test_install]
+    needs: [test_common, test_core, test_features, test_tabular, test_multimodal_predictor, test_multimodal_others, test_multimodal_others_2, test_timeseries, test_tabular_lite, test_install]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -302,7 +302,7 @@ jobs:
     strategy:
       matrix:
         SUB_DOC: ["advanced_topics", "image_prediction", "matching", "object_detection", "text_prediction", "document", "multimodal_prediction"]
-    needs: [test_common, test_core, test_features, test_tabular, test_eda, test_multimodal_predictor, test_multimodal_others, test_multimodal_others_2, test_timeseries, test_install]
+    needs: [test_common, test_core, test_features, test_tabular, test_multimodal_predictor, test_multimodal_others, test_multimodal_others_2, test_timeseries, test_install]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -316,7 +316,7 @@ jobs:
           job-name: AutoGluon-BuildMultimodal
           command: chmod +x ./.github/workflow_scripts/build_multimodal_tutorial.sh && ./.github/workflow_scripts/build_multimodal_tutorial.sh '${{ matrix.SUB_DOC }}' '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
   build_cloud_fit_deploy_tutorial:
-    needs: [test_common, test_core, test_features, test_tabular, test_eda, test_multimodal_predictor, test_multimodal_others, test_multimodal_others_2, test_timeseries, test_install]
+    needs: [test_common, test_core, test_features, test_tabular, test_multimodal_predictor, test_multimodal_others, test_multimodal_others_2, test_timeseries, test_install]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -330,7 +330,7 @@ jobs:
           job-name: AutoGluon-BuildCloudFitDeploy
           command: chmod +x ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh && ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
   build_timeseries_tutorial:
-    needs: [test_common, test_core, test_features, test_tabular, test_eda, test_multimodal_predictor, test_multimodal_others, test_multimodal_others_2, test_timeseries, test_install]
+    needs: [test_common, test_core, test_features, test_tabular, test_multimodal_predictor, test_multimodal_others, test_multimodal_others_2, test_timeseries, test_install]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -343,22 +343,22 @@ jobs:
           job-type: CI-GPU
           job-name: AutoGluon-BuildTimeseries
           command: chmod +x ./.github/workflow_scripts/build_timeseries_tutorial.sh && ./.github/workflow_scripts/build_timeseries_tutorial.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
-  build_eda_tutorial:
-    needs: [test_common, test_core, test_features, test_tabular, test_eda, test_multimodal_predictor, test_multimodal_others, test_multimodal_others_2, test_timeseries, test_install]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Setup Env Vars
-        uses: ./.github/actions/setup-env-vars
-      - name: Build EDA Tutorial on AWS Batch
-        uses: ./.github/actions/submit-job
-        with:
-          job-type: CI-GPU
-          job-name: AutoGluon-BuildEda
-          command: chmod +x ./.github/workflow_scripts/build_eda_tutorial.sh && ./.github/workflow_scripts/build_eda_tutorial.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
+  # build_eda_tutorial:
+  #   needs: [test_common, test_core, test_features, test_tabular, test_eda, test_multimodal_predictor, test_multimodal_others, test_multimodal_others_2, test_timeseries, test_install]
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v2
+  #     - name: Setup Env Vars
+  #       uses: ./.github/actions/setup-env-vars
+  #     - name: Build EDA Tutorial on AWS Batch
+  #       uses: ./.github/actions/submit-job
+  #       with:
+  #         job-type: CI-GPU
+  #         job-name: AutoGluon-BuildEda
+  #         command: chmod +x ./.github/workflow_scripts/build_eda_tutorial.sh && ./.github/workflow_scripts/build_eda_tutorial.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
   build_all_docs:
-    needs: [build_tabular_prediction_tutorial, build_multimodal_tutorial, build_cloud_fit_deploy_tutorial, build_timeseries_tutorial, build_eda_tutorial]
+    needs: [build_tabular_prediction_tutorial, build_multimodal_tutorial, build_cloud_fit_deploy_tutorial, build_timeseries_tutorial]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository

@@ -241,7 +241,7 @@ Tabular <tutorials/tabular/index>
 Multimodal <tutorials/multimodal/index>
 Time Series <tutorials/timeseries/index>
 tutorials/cloud_fit_deploy/index
-EDA <tutorials/eda/index>
+<!-- EDA <tutorials/eda/index> -->
 ```
 
 ```{toctree}
