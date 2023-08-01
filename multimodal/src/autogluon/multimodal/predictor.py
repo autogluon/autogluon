@@ -18,6 +18,7 @@ from typing import Dict, List, Optional, Union
 import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
+from pytorch_lightning.strategies import DeepSpeedStrategy
 import torch
 import transformers
 import yaml
@@ -1658,7 +1659,7 @@ class MultiModalPredictor(ExportMixin):
         if not standalone:
             checkpoint = {"state_dict": avg_state_dict}
         else:
-            if strategy and hasattr(strategy, "strategy_name") and strategy.strategy_name == DEEPSPEED_STRATEGY:
+            if isinstance(strategy, DeepSpeedStrategy):
                 checkpoint = {
                     "state_dict": {
                         name.partition("module.")[2]: param

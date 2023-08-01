@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import pytorch_lightning as pl
 import torch
-from pytorch_lightning.plugins.io.checkpoint_plugin import CheckpointIO
+from pytorch_lightning.strategies import DeepSpeedStrategy
 from pytorch_lightning.utilities.rank_zero import rank_zero_warn
 
 from ..constants import AUTOMM, DEEPSPEED_STRATEGY
@@ -182,7 +182,7 @@ class AutoMMModelCheckpoint(pl.callbacks.ModelCheckpoint):
 
     def _save_checkpoint(self, trainer, filepath):
         # Deepspeed saves model and optimizer states in a shared state in a separate folder
-        if trainer.strategy.strategy_name == DEEPSPEED_STRATEGY:
+        if isinstance(trainer.strategy, DeepSpeedStrategy):
             trainer.save_checkpoint(filepath + "-dir", self.save_weights_only)
         else:
             trainer.save_checkpoint(filepath, self.save_weights_only)

@@ -6,6 +6,7 @@ import torch
 import torch.nn.functional as F
 import torchmetrics
 from pytorch_lightning.utilities import grad_norm
+from pytorch_lightning.strategies import DeepSpeedStrategy
 from torch import nn
 from torch.nn.modules.loss import _Loss
 from torchmetrics.aggregation import BaseAggregator
@@ -361,7 +362,7 @@ class LitModule(pl.LightningModule):
 
         logger.debug(f"trainer.max_steps: {self.trainer.max_steps}")
         if self.trainer.max_steps is None or -1:
-            if "deepspeed" in self.trainer.strategy.strategy_name:
+            if isinstance(self.trainer.strategy, DeepSpeedStrategy):
                 max_steps = 1
             else:
                 max_steps = (
