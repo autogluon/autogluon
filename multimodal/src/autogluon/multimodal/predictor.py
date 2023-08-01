@@ -18,12 +18,12 @@ from typing import Dict, List, Optional, Union
 import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
-from pytorch_lightning.strategies import DeepSpeedStrategy
 import torch
 import transformers
 import yaml
 from omegaconf import OmegaConf
 from packaging import version
+from pytorch_lightning.strategies import DeepSpeedStrategy
 from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel

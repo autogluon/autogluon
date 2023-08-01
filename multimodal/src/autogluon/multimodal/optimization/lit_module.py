@@ -5,8 +5,8 @@ import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
 import torchmetrics
-from pytorch_lightning.utilities import grad_norm
 from pytorch_lightning.strategies import DeepSpeedStrategy
+from pytorch_lightning.utilities import grad_norm
 from torch import nn
 from torch.nn.modules.loss import _Loss
 from torchmetrics.aggregation import BaseAggregator
