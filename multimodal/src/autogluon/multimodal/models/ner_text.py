@@ -4,7 +4,6 @@ from typing import Dict, List, Optional, Tuple
 import torch
 import torch.nn.functional as F
 from torch import nn
-from transformers import AutoTokenizer
 from transformers import logging as hf_logging
 
 from ..constants import (
@@ -23,7 +22,7 @@ from ..constants import (
     WORD_OFFSETS,
 )
 from .huggingface_text import HFAutoModelForTextPrediction
-from .utils import DummyLayer, assign_layer_ids, get_column_features, get_hf_config_and_model, init_weights
+from .utils import assign_layer_ids, get_column_features, get_pretrained_tokenizer
 
 hf_logging.set_verbosity_error()
 
@@ -44,6 +43,7 @@ class HFAutoModelForNER(HFAutoModelForTextPrediction):
         gradient_checkpointing: Optional[bool] = False,
         low_cpu_mem_usage: Optional[bool] = False,
         pretrained: Optional[bool] = True,
+        tokenizer_name: Optional[str] = "hf_auto",
     ):
         """
         Load a pretrained huggingface text transformer backbone.
@@ -67,7 +67,10 @@ class HFAutoModelForNER(HFAutoModelForTextPrediction):
             Whether to turn on the optimization of reducing the peak CPU memory usage when loading the pretrained model.
         pretrained
             Whether using the pretrained weights. If pretrained=True, download the pretrained model.
+        tokenizer_name
+            Name of the huggingface tokenizer type.
         """
+        logger.debug(f"initializing {checkpoint_name}")
         super().__init__(
             prefix=prefix,
             checkpoint_name=checkpoint_name,
@@ -76,15 +79,16 @@ class HFAutoModelForNER(HFAutoModelForTextPrediction):
             gradient_checkpointing=gradient_checkpointing,
             low_cpu_mem_usage=low_cpu_mem_usage,
             pretrained=pretrained,
+            tokenizer_name=tokenizer_name,
         )
-
-        logger.debug(f"initializing {checkpoint_name}")
 
         if self.config.model_type in {"gpt2", "roberta"}:
             # Refer to this PR: https://github.com/huggingface/transformers/pull/12116
-            self.tokenizer = AutoTokenizer.from_pretrained(checkpoint_name, add_prefix_space=True)
-        else:
-            self.tokenizer = AutoTokenizer.from_pretrained(checkpoint_name)
+            self.tokenizer = get_pretrained_tokenizer(
+                tokenizer_name=self.tokenizer_name,
+                checkpoint_name=self.checkpoint_name,
+                add_prefix_space=True,
+            )
 
         # some checkpoint such as deberta does not specify model_max_length
         # here, we reset it using model config.

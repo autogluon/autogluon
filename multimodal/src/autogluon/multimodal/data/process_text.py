@@ -9,7 +9,6 @@ import numpy as np
 from nptyping import NDArray
 from omegaconf import DictConfig
 from torch import nn
-from transformers import AutoConfig, AutoTokenizer, BertTokenizer, CLIPTokenizer, ElectraTokenizer
 
 from ..constants import CHOICES_IDS, COLUMN, TEXT, TEXT_SEGMENT_IDS, TEXT_TOKEN_IDS, TEXT_VALID_LENGTH
 from .collator import PadCollator, StackCollator
@@ -28,14 +27,6 @@ logger = logging.getLogger(__name__)
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 
-ALL_TOKENIZERS = {
-    "bert": BertTokenizer,
-    "clip": CLIPTokenizer,
-    "electra": ElectraTokenizer,
-    "hf_auto": AutoTokenizer,
-}
-
-
 class TextProcessor:
     """
     Prepare text data for the model specified by "prefix". For multiple models requiring text data,
@@ -45,7 +36,6 @@ class TextProcessor:
     def __init__(
         self,
         model: nn.Module,
-        tokenizer_name: Optional[str] = "hf_auto",
         max_len: Optional[int] = None,
         insert_sep: Optional[bool] = True,
         text_segment_num: Optional[int] = 1,
@@ -56,15 +46,12 @@ class TextProcessor:
         train_augment_types: Optional[List[str]] = None,
         template_config: Optional[DictConfig] = None,
         normalize_text: Optional[bool] = False,
-        use_fast: Optional[bool] = True,
     ):
         """
         Parameters
         ----------
         model
             The model for which this processor would be created.
-        tokenizer_name
-            Name of the huggingface tokenizer type (default "hf_auto").
         max_len
             The maximum length of text tokens.
         insert_sep
@@ -87,24 +74,12 @@ class TextProcessor:
             Whether to normalize text to resolve encoding problems.
             Examples of normalized texts can be found at
             https://github.com/autogluon/autogluon/tree/master/examples/automm/kaggle_feedback_prize#15-a-few-examples-of-normalized-texts
-        use_fast
-            Use a fast Rust-based tokenizer if it is supported for a given model.
-            If a fast tokenizer is not available for a given model, a normal Python-based tokenizer is returned instead.
-            See: https://huggingface.co/docs/transformers/model_doc/auto#transformers.AutoTokenizer.from_pretrained.use_fast
-
         """
         self.prefix = model.prefix
-        self.tokenizer_name = tokenizer_name
         self.requires_column_info = requires_column_info
-        # Use the model's tokenizer if it exists.
-        if hasattr(model, "tokenizer"):
-            self.tokenizer = model.tokenizer
-        else:
-            self.tokenizer = self.get_pretrained_tokenizer(
-                tokenizer_name=tokenizer_name,
-                checkpoint_name=model.checkpoint_name,
-                use_fast=use_fast,
-            )
+        self.tokenizer_name = model.tokenizer_name
+        # model should have a tokenizer
+        self.tokenizer = model.tokenizer
         if hasattr(self.tokenizer, "deprecation_warnings"):
             # Disable the warning "Token indices sequence length is longer than the specified maximum sequence..."
             # See https://github.com/huggingface/transformers/blob/6ac77534bfe97c00e0127bb4fc846ae0faf1c9c5/src/transformers/tokenization_utils_base.py#L3362
@@ -373,45 +348,6 @@ class TextProcessor:
         if cls_id is None or sep_id is None or eos_id is None:
             raise ValueError(f"tokenizer class: {tokenizer.__class__.__name__} has no valid cls, sep, and eos ids.")
         return cls_id, sep_id, eos_id
-
-    @staticmethod
-    def get_pretrained_tokenizer(
-        tokenizer_name: str,
-        checkpoint_name: str,
-        use_fast: Optional[bool] = True,
-    ):
-        """
-        Load the tokenizer for a pre-trained huggingface checkpoint.
-
-        Parameters
-        ----------
-        tokenizer_name
-            The tokenizer type, e.g., "bert", "clip", "electra", and "hf_auto".
-        checkpoint_name
-            Name of a pre-trained checkpoint.
-        use_fast
-            Use a fast Rust-based tokenizer if it is supported for a given model.
-            If a fast tokenizer is not available for a given model, a normal Python-based tokenizer is returned instead.
-            See: https://huggingface.co/docs/transformers/model_doc/auto#transformers.AutoTokenizer.from_pretrained.use_fast
-
-        Returns
-        -------
-        A tokenizer instance.
-        """
-        try:
-            tokenizer_class = ALL_TOKENIZERS[tokenizer_name]
-            return tokenizer_class.from_pretrained(checkpoint_name, use_fast=use_fast)
-        except TypeError as e:
-            try:
-                tokenizer_class = ALL_TOKENIZERS["bert"]
-                tokenizer = tokenizer_class.from_pretrained(checkpoint_name)
-                logger.warning(
-                    f"Current checkpoint {checkpoint_name} does not support AutoTokenizer. "
-                    "Switch to BertTokenizer instead."
-                )
-                return tokenizer
-            except:
-                raise e
 
     @staticmethod
     def get_trimmed_lengths(

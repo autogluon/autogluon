@@ -7,16 +7,12 @@ import numpy as np
 from nptyping import NDArray
 from omegaconf import DictConfig
 from torch import nn
-from transformers import AutoConfig, AutoTokenizer, BertTokenizer, CLIPTokenizer, ElectraTokenizer
 
 from ..constants import AUTOMM, NER_ANNOTATION, NER_TEXT, TEXT, TEXT_NER
 from .collator import PadCollator, StackCollator
 from .utils import process_ner_annotations, tokenize_ner_text
 
 logger = logging.getLogger(__name__)
-
-# Disable tokenizer parallelism
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 
 class NerProcessor:
@@ -28,7 +24,7 @@ class NerProcessor:
         self,
         model: nn.Module,
         max_len: Optional[int] = None,
-        config: Optional[DictConfig] = None,
+        entity_map: Optional[DictConfig] = None,
     ):
         """
         Parameters
@@ -37,8 +33,8 @@ class NerProcessor:
             The NER model.
         max_len
             The max length of the tokenizer.
-        config
-            Config dictionary.
+        entity_map
+            The map between tags and tag indexes. e.g., {"PER":2, "LOC":3}.
         """
         self.prefix = model.prefix
         self.text_token_ids_key = model.text_token_ids_key
@@ -51,8 +47,10 @@ class NerProcessor:
         self.tokenizer = None
         self.tokenizer_name = model.prefix
         self.max_len = max_len
-        self.config = config
+        self.entity_map = entity_map
 
+        # Disable tokenizer parallelism
+        os.environ["TOKENIZERS_PARALLELISM"] = "false"
         if self.prefix == NER_TEXT:
             self.tokenizer = model.tokenizer
 
@@ -67,13 +65,6 @@ class NerProcessor:
                 self.max_len = min(max_len, self.tokenizer.model_max_length)
 
             self.tokenizer.model_max_length = self.max_len
-
-    @staticmethod
-    def get_pretrained_tokenizer(
-        tokenizer_name: str,
-        checkpoint_name: str,
-    ):
-        return AutoTokenizer.from_pretrained(checkpoint_name)
 
     def collate_fn(self, text_column_names: Optional[List] = None) -> Dict:
         """
@@ -134,7 +125,7 @@ class NerProcessor:
         if is_training or annotation_column is not None:
             ner_annotation = all_features[annotation_column]
             label, col_tokens, token_to_word_mappings, word_offsets = process_ner_annotations(
-                ner_annotation, ner_text, self.config.entity_map, self.tokenizer
+                ner_annotation, ner_text, self.entity_map, self.tokenizer
             )
             ret.update({self.label_key: label})
         else:
