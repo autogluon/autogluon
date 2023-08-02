@@ -18,6 +18,7 @@ then
 fi
 
 agbench generate-cloud-config \
+--prefix ag-bench-$INSTANCE_TYPE \
 --module $MODULE \
 --cdk-deploy-account $CDK_DEPLOY_ACCOUNT \
 --cdk-deploy-region $CDK_DEPLOY_REGION \
