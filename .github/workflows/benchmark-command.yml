@@ -79,12 +79,7 @@ jobs:
       - name: Free Disk Space (Ubuntu)
         uses: jlumbroso/free-disk-space@main
         with:
-          # this might remove tools that are actually needed,
-          # if set to "true" but frees about 6 GB
           tool-cache: false
-
-          # all of these default to true, but feel free to set to
-          # "false" if necessary for your workflow
           android: true
           dotnet: true
           haskell: true
@@ -116,7 +111,6 @@ jobs:
       - name: Run benchmark
         shell: bash -l {0}
         run: |
-          df -h
           nvm install 20
           npm install -g aws-cdk
           curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
@@ -125,6 +119,4 @@ jobs:
           pip install -U autogluon.bench
           cdk --version
           /bin/bash CI/bench/generate_bench_config.sh ${{ github.event.inputs.module }} ${{ github.event.inputs.preset }} ${{ github.event.inputs.benchmark }} ${{ github.event.inputs.time_limit }} ${{ github.event.inputs.branch_or_pr_number }}
-          df -h
           agbench run ${{ github.event.inputs.module }}_cloud_configs.yaml --wait
-          df -h
