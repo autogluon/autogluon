@@ -89,7 +89,7 @@ jobs:
           dotnet: true
           haskell: true
           large-packages: true
-          docker-images: false
+          docker-images: true
           swap-storage: true
       - name: Checkout repository for PR
         if: (github.event_name == 'workflow_dispatch')
@@ -116,6 +116,7 @@ jobs:
       - name: Run benchmark
         shell: bash -l {0}
         run: |
+          df -h
           nvm install 20
           npm install -g aws-cdk
           curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
@@ -124,4 +125,4 @@ jobs:
           pip install -U autogluon.bench
           cdk --version
           /bin/bash CI/bench/generate_bench_config.sh ${{ github.event.inputs.module }} ${{ github.event.inputs.preset }} ${{ github.event.inputs.benchmark }} ${{ github.event.inputs.time_limit }} ${{ github.event.inputs.branch_or_pr_number }}
-          agbench run ${{ github.event.inputs.module }}_cloud_configs.yaml --wait
+          df -h
