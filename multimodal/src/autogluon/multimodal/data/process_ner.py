@@ -45,7 +45,7 @@ class NerProcessor:
         self.label_key = model.label_key
 
         self.tokenizer = None
-        self.tokenizer_name = model.prefix
+        self.tokenizer_name = model.tokenizer_name
         self.max_len = max_len
         self.entity_map = entity_map
 

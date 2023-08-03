@@ -101,6 +101,7 @@ class DocumentProcessor:
         # For document text processing.
         # Disable tokenizer parallelism
         os.environ["TOKENIZERS_PARALLELISM"] = "false"
+        self.tokenizer_name = model.tokenizer_name
         self.tokenizer = model.tokenizer
         if text_max_len is None or text_max_len <= 0:
             self.text_max_len = self.tokenizer.model_max_length
