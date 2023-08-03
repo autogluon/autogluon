@@ -23,6 +23,7 @@ import transformers
 import yaml
 from omegaconf import OmegaConf
 from packaging import version
+from pytorch_lightning.strategies import DeepSpeedStrategy
 from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
@@ -1300,6 +1301,7 @@ class MultiModalPredictor(ExportMixin):
             lr_mult=config.optimization.lr_mult,
             weight_decay=config.optimization.weight_decay,
             warmup_steps=config.optimization.warmup_steps,
+            track_grad_norm=OmegaConf.select(config, "optimization.track_grad_norm", default=-1),
         )
         metrics_kwargs = dict(
             validation_metric=validation_metric,
@@ -1454,7 +1456,6 @@ class MultiModalPredictor(ExportMixin):
             else:
                 strategy = config.env.strategy
         else:
-            # we don't support running each trial in parallel without ray lightning
             strategy = "auto"
             num_gpus = min(num_gpus, 1)
 
@@ -1658,7 +1659,7 @@ class MultiModalPredictor(ExportMixin):
         if not standalone:
             checkpoint = {"state_dict": avg_state_dict}
         else:
-            if strategy and hasattr(strategy, "strategy_name") and strategy.strategy_name == DEEPSPEED_STRATEGY:
+            if isinstance(strategy, DeepSpeedStrategy):
                 checkpoint = {
                     "state_dict": {
                         name.partition("module.")[2]: param
@@ -1778,7 +1779,7 @@ class MultiModalPredictor(ExportMixin):
 
         with apply_log_filter(log_filter):
             evaluator = pl.Trainer(
-                accelerator="gpu" if num_gpus > 0 else None,
+                accelerator="gpu" if num_gpus > 0 else "auto",
                 devices=get_available_devices(num_gpus=num_gpus, auto_select_gpus=self._config.env.auto_select_gpus),
                 num_nodes=self._config.env.num_nodes,
                 precision=precision,

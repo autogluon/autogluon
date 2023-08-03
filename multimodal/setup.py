@@ -28,6 +28,7 @@ install_requires = [
     "tqdm",  # version range defined in `core/_setup_utils.py`
     "boto3",  # version range defined in `core/_setup_utils.py`
     "torch",  # version range defined in `core/_setup_utils.py`
+    "pytorch-lightning",  # version range defined in `core/_setup_utils.py`
     "requests>=2.21,<3",
     "jsonschema>=4.14,<4.18",
     "seqeval>=1.2.2,<1.3.0",
@@ -36,7 +37,6 @@ install_requires = [
     "timm>=0.9.2,<0.10.0",
     "torchvision>=0.14.0,<0.16.0",  # torch 1.13 requires torchvision 0.14. Increase it to 0.15 when dropping the support of torch 1.13.
     "scikit-image>=0.19.1,<0.21.0",
-    "pytorch-lightning>=2.0.0,<2.1",
     "text-unidecode>=1.3,<1.4",
     "torchmetrics>=1.0.0,<1.1.0",
     "transformers[sentencepiece]>=4.23.0,<4.27.0",

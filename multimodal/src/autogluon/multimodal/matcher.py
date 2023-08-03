@@ -842,6 +842,7 @@ class MultiModalMatcher:
             lr_mult=config.optimization.lr_mult,
             weight_decay=config.optimization.weight_decay,
             warmup_steps=config.optimization.warmup_steps,
+            track_grad_norm=OmegaConf.select(config, "optimization.track_grad_norm", default=-1),
         )
         metrics_kwargs = dict(
             validation_metric=validation_metric,
@@ -931,7 +932,6 @@ class MultiModalMatcher:
             else:
                 strategy = config.env.strategy
         else:
-            # we don't support running each trial in parallel without ray lightning
             # TODO: checkout lightning support for ray tune for multi gpu support
             strategy = "auto"
             num_gpus = min(num_gpus, 1)
@@ -1289,7 +1289,7 @@ class MultiModalMatcher:
         log_filter = LogFilter(blacklist_msgs)
         with apply_log_filter(log_filter):
             evaluator = pl.Trainer(
-                accelerator="gpu" if num_gpus > 0 else None,
+                accelerator="gpu" if num_gpus > 0 else "auto",
                 devices=get_available_devices(num_gpus=num_gpus, auto_select_gpus=self._config.env.auto_select_gpus),
                 num_nodes=self._config.env.num_nodes,
                 precision=precision,
