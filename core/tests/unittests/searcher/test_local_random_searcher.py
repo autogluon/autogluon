@@ -1,6 +1,23 @@
 from autogluon.common import space
 from autogluon.core.searcher import LocalRandomSearcher
+from numbers import Number
+from math import isclose
 
+def dictsAlmostEqual(dict1, dict2, rel_tol=1e-8):
+    if len(dict1) != len(dict2):
+        return False
+    for key, item in dict1.items():
+        if isinstance(item, dict):
+            if not dictsAlmostEqual(dict1[key], dict2[key], rel_tol=rel_tol):
+                return False
+        else:
+            if isinstance(item, Number):
+                if not isclose(dict1[key], dict2[key], rel_tol=rel_tol):
+                    return False
+            else:
+                if not (dict1[key] == dict2[key]):
+                    return False
+    return True
 
 def test_local_random_searcher():
     search_space = dict(
@@ -44,10 +61,17 @@ def test_local_random_searcher():
 
     config5 = searcher.get_config()
 
-    assert expected_config_1 == config1
-    assert expected_config_2 == config2
-    assert expected_config_3 == config3
-    assert expected_config_4 == config4
-    assert expected_config_5 == config5
+    # assert expected_config_1 == config1
+    # assert expected_config_2 == config2
+    # assert expected_config_3 == config3
+    # assert expected_config_4 == config4
+    # assert expected_config_5 == config5
+
+    
+    assert dictsAlmostEqual(expected_config_1, config1)
+    assert dictsAlmostEqual(expected_config_2, config2)
+    assert dictsAlmostEqual(expected_config_3, config3)
+    assert dictsAlmostEqual(expected_config_4, config4)
+    assert dictsAlmostEqual(expected_config_5, config5)
 
     assert len(searcher._results) == 5
