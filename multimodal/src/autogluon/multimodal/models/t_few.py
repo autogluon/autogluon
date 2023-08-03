@@ -8,7 +8,7 @@ from typing import Dict, List, Optional, Tuple
 import torch
 import torch.nn.functional as F
 from torch import nn
-from transformers import AutoConfig, AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoConfig, AutoModelForSeq2SeqLM
 from transformers import logging as hf_logging
 
 from ..constants import (
@@ -26,7 +26,7 @@ from ..constants import (
     TEXT_TOKEN_IDS,
     TEXT_VALID_LENGTH,
 )
-from .utils import DummyLayer, assign_layer_ids, get_column_features
+from .utils import DummyLayer, assign_layer_ids, get_column_features, get_pretrained_tokenizer
 
 hf_logging.set_verbosity_error()
 
@@ -55,6 +55,7 @@ class TFewModel(nn.Module):
         gradient_checkpointing: Optional[bool] = False,
         low_cpu_mem_usage: Optional[bool] = False,
         pretrained: Optional[bool] = True,
+        tokenizer_name: Optional[str] = "hf_auto",
     ):
         """
         Load a pretrained T5-based text transformer backbone.
@@ -84,6 +85,8 @@ class TFewModel(nn.Module):
             Whether to turn on the optimization of reducing the peak CPU memory usage when loading the pretrained model.
         pretrained
             Whether using the pretrained weights. If pretrained=True, download the pretrained model.
+        tokenizer_name
+            Name of the huggingface tokenizer type.
         """
         super().__init__()
         logger.debug(f"initializing {checkpoint_name}")
@@ -98,7 +101,11 @@ class TFewModel(nn.Module):
         else:
             self.model = AutoModelForSeq2SeqLM.from_config(self.config)
 
-        self.tokenizer = AutoTokenizer.from_pretrained(checkpoint_name)
+        self.tokenizer_name = tokenizer_name
+        self.tokenizer = get_pretrained_tokenizer(
+            tokenizer_name=self.tokenizer_name,
+            checkpoint_name=self.checkpoint_name,
+        )
         self.eos_token = self.tokenizer.eos_token
         self.out_features = (
             self.model.config.hidden_size

@@ -12,16 +12,12 @@ from nptyping import NDArray
 from PIL import ImageFile
 from torch import nn
 from torchvision import transforms
-from transformers import AutoTokenizer
 
 from ..constants import AUTOMM, BBOX, DOCUMENT_PDF
 from .collator import PadCollator, StackCollator
 from .utils import construct_image_processor, image_mean_std
 
 logger = logging.getLogger(__name__)
-
-# Disable tokenizer parallelism
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 
 class DocumentProcessor:
@@ -103,6 +99,9 @@ class DocumentProcessor:
         self.sep_token_box = [1000, 1000, 1000, 1000]  # sep box token
 
         # For document text processing.
+        # Disable tokenizer parallelism
+        os.environ["TOKENIZERS_PARALLELISM"] = "false"
+        self.tokenizer_name = model.tokenizer_name
         self.tokenizer = model.tokenizer
         if text_max_len is None or text_max_len <= 0:
             self.text_max_len = self.tokenizer.model_max_length
@@ -115,13 +114,6 @@ class DocumentProcessor:
             self.text_max_len = min(text_max_len, self.tokenizer.model_max_length)
 
         self.tokenizer.model_max_length = self.text_max_len
-
-    @staticmethod
-    def get_pretrained_tokenizer(
-        tokenizer_name: str,
-        checkpoint_name: str,
-    ):
-        return AutoTokenizer.from_pretrained(checkpoint_name)
 
     def collate_fn(self, text_column_names: Optional[List] = None) -> Dict:
         """

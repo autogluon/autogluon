@@ -196,6 +196,7 @@ def create_model(
             checkpoint_name=model_config.checkpoint_name,
             num_classes=num_classes,
             pretrained=pretrained,
+            tokenizer_name=model_config.tokenizer_name,
         )
     elif model_name.lower().startswith(TIMM_IMAGE):
         model = TimmAutoModelForImagePrediction(
@@ -214,6 +215,8 @@ def create_model(
             gradient_checkpointing=OmegaConf.select(model_config, "gradient_checkpointing"),
             low_cpu_mem_usage=OmegaConf.select(model_config, "low_cpu_mem_usage", default=False),
             pretrained=pretrained,
+            tokenizer_name=model_config.tokenizer_name,
+            use_fast=OmegaConf.select(model_config, "use_fast", default=True),
         )
     elif model_name.lower().startswith(T_FEW):
         model = TFewModel(
@@ -226,6 +229,7 @@ def create_model(
             gradient_checkpointing=OmegaConf.select(model_config, "gradient_checkpointing"),
             low_cpu_mem_usage=OmegaConf.select(model_config, "low_cpu_mem_usage", default=False),
             pretrained=pretrained,
+            tokenizer_name=model_config.tokenizer_name,
         )
     elif model_name.lower().startswith(NUMERICAL_MLP):
         model = NumericalMLP(
@@ -306,6 +310,7 @@ def create_model(
             gradient_checkpointing=OmegaConf.select(model_config, "gradient_checkpointing"),
             low_cpu_mem_usage=OmegaConf.select(model_config, "low_cpu_mem_usage", default=False),
             pretrained=pretrained,
+            tokenizer_name=model_config.tokenizer_name,
         )
     elif model_name.lower().startswith(MMDET_IMAGE):
         model = MMDetAutoModelForObjectDetection(
@@ -341,6 +346,7 @@ def create_model(
             gradient_checkpointing=OmegaConf.select(model_config, "gradient_checkpointing"),
             low_cpu_mem_usage=OmegaConf.select(model_config, "low_cpu_mem_usage", default=False),
             pretrained=pretrained,
+            tokenizer_name=model_config.tokenizer_name,
         )
     elif model_name.lower().startswith(FUSION_MLP):
         model = functools.partial(

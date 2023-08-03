@@ -2,7 +2,6 @@ import pandas as pd
 import pytest
 from ray import tune
 
-from autogluon.core.hpo.ray_tune_constants import SCHEDULER_PRESETS, SEARCHER_PRESETS
 from autogluon.multimodal import MultiModalPredictor
 
 
@@ -28,7 +27,10 @@ def get_data():
 
 @pytest.mark.parametrize(
     "checkpoint_name,searcher,scheduler",
-    [("google/electra-small-discriminator", "bayes", "FIFO")],
+    [
+        ("google/electra-small-discriminator", None, None),
+        ("google/electra-small-discriminator", "bayes", "FIFO"),
+    ],
 )
 def test_ner(checkpoint_name, searcher, scheduler):
     train_data = get_data()

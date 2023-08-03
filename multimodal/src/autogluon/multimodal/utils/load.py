@@ -5,6 +5,7 @@ from typing import Dict, List, Optional, Tuple, Union
 
 from ..constants import LAST_CHECKPOINT, MODEL_CHECKPOINT
 from ..data import DocumentProcessor, NerProcessor, TextProcessor
+from ..models.utils import get_pretrained_tokenizer
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ def load_text_tokenizers(
     for per_text_processor in text_processors:
         if isinstance(per_text_processor.tokenizer, str):
             per_path = os.path.join(path, per_text_processor.tokenizer)
-            per_text_processor.tokenizer = per_text_processor.get_pretrained_tokenizer(
+            per_text_processor.tokenizer = get_pretrained_tokenizer(
                 tokenizer_name=per_text_processor.tokenizer_name,
                 checkpoint_name=per_path,
             )
