@@ -17,9 +17,6 @@ function setup_build_contrib_env {
 }
 
 function setup_benchmark_env {
-    curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-    unzip awscliv2.zip
-    sudo ./aws/install
     pip install -U autogluon.bench
 }
 
