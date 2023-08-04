@@ -113,4 +113,4 @@ jobs:
         run: |
           nvm install 20
           npm install -g aws-cdk
-          /bin/bash ./.github/workflow_scripts/run_benchmark.sh {{ github.event.inputs.module }} ${{ github.event.inputs.preset }} ${{ github.event.inputs.benchmark }} ${{ github.event.inputs.time_limit }} ${{ github.event.inputs.branch_or_pr_number }} ${{ github.event.inputs.pr-sha }}
+          /bin/bash ./.github/workflow_scripts/run_benchmark.sh ${{ github.event.inputs.module }} ${{ github.event.inputs.preset }} ${{ github.event.inputs.benchmark }} ${{ github.event.inputs.time_limit }} ${{ github.event.inputs.branch_or_pr_number }} ${{ github.event.inputs.pr-sha }}
