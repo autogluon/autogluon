@@ -16,6 +16,15 @@ function setup_build_contrib_env {
     export AUTOMM_TUTORIAL_MODE=1 # Disable progress bar in AutoMMPredictor
 }
 
+function setup_benchmark_env {
+    nvm install 20
+    npm install -g aws-cdk
+    curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+    unzip awscliv2.zip
+    sudo ./aws/install
+    pip install -U autogluon.bench
+}
+
 function setup_hf_model_mirror {
     pip3 install PyYAML
     SUB_FOLDER="$1"
