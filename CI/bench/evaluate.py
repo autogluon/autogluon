@@ -57,6 +57,7 @@ paths = []
 frameworks = []
 for file in os.listdir("./results"):
     if file.endswith(".csv"):
+        file = os.path.join("./results", file)
         df = pd.read_csv(file)
         paths.append(os.path.basename(file))
         frameworks += list(df["framework"].unique())
