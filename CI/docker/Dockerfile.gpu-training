@@ -1,4 +1,4 @@
-FROM 763104351884.dkr.ecr.us-east-1.amazonaws.com/autogluon-training:0.7.0-gpu-py39-cu117-ubuntu20.04
+FROM 763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-training:2.0.0-gpu-py310-cu118-ubuntu20.04-sagemaker
 
 RUN apt-get update \
  && apt-get -y upgrade \
