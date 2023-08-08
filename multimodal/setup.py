@@ -32,7 +32,7 @@ install_requires = [
     "requests>=2.21,<3",
     "jsonschema>=4.14,<4.18",
     "seqeval>=1.2.2,<1.3.0",
-    "evaluate>=0.4.0,<0.5.0",
+    "evaluate>=0.2.2,<0.5.0",
     "accelerate>=0.9,<0.17",
     "timm>=0.9.2,<0.10.0",
     "torchvision>=0.14.0,<0.16.0",  # torch 1.13 requires torchvision 0.14. Increase it to 0.15 when dropping the support of torch 1.13.
@@ -60,11 +60,11 @@ install_requires = ag.get_dependency_version_ranges(install_requires)
 tests_require = [
     "black>=22.3,<23.0",
     "isort>=5.10",
-    "datasets>=2.13.0,<2.14.0",
-    "onnx>=1.14.0,<1.15.0",
-    "onnxruntime>=1.15.0,<1.16.0;platform_system=='Darwin'",
-    "onnxruntime-gpu>=1.15.0,<1.16.0;platform_system!='Darwin'",
-    "tensorrt>=8.6.1,<8.7.0;platform_system=='Linux'",
+    "datasets>=2.7.0,<2.14.0",
+    "onnx>=1.13.0,<1.15.0",
+    "onnxruntime>=1.13.0,<1.16.0;platform_system=='Darwin'",
+    "onnxruntime-gpu>=1.13.0,<1.16.0;platform_system!='Darwin'",
+    "tensorrt>=8.5.3.1,<8.7.0;platform_system=='Linux'",
 ]
 
 extras_require = {
