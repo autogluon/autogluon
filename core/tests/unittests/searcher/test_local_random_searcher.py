@@ -3,6 +3,7 @@ from autogluon.core.searcher import LocalRandomSearcher
 from numbers import Number
 from math import isclose
 
+
 def dictsAlmostEqual(dict1, dict2, rel_tol=1e-8):
     if len(dict1) != len(dict2):
         return False
@@ -18,6 +19,7 @@ def dictsAlmostEqual(dict1, dict2, rel_tol=1e-8):
                 if not (dict1[key] == dict2[key]):
                     return False
     return True
+
 
 def test_local_random_searcher():
     search_space = dict(
