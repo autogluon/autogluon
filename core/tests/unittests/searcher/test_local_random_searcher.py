@@ -1,7 +1,8 @@
-from autogluon.common import space
-from autogluon.core.searcher import LocalRandomSearcher
 from numbers import Number
 from math import isclose
+
+from autogluon.common import space
+from autogluon.core.searcher import LocalRandomSearcher
 
 
 def dictsAlmostEqual(dict1, dict2, rel_tol=1e-8):
