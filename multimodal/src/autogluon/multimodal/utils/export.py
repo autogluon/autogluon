@@ -29,7 +29,7 @@ class ExportMixin:
 
         Parameters
         ----------
-        path : str
+        save_path : str
             Path to directory where models and configs should be saved.
         """
 
@@ -61,17 +61,11 @@ class ExportMixin:
                 f"No models available for dump. Current supported models are: {supported_models.keys()}"
             )
 
-        # get tokenizers for hf_text
-        text_processors = self._data_processors.get(TEXT, {})
-        tokenizers = {}
-        for per_processor in text_processors:
-            tokenizers[per_processor.prefix] = per_processor.tokenizer
-
         for model_key in models:
             for per_model in models[model_key]:
                 subdir = os.path.join(save_path, per_model.prefix)
                 os.makedirs(subdir, exist_ok=True)
-                per_model.save(save_path=subdir, tokenizers=tokenizers)
+                per_model.save(save_path=subdir)
 
         return save_path
 

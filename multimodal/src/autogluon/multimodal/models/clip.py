@@ -18,7 +18,13 @@ from ..constants import (
     TEXT_TOKEN_IDS,
     TEXT_VALID_LENGTH,
 )
-from .utils import assign_layer_ids, get_column_features, get_hf_config_and_model, init_weights
+from .utils import (
+    assign_layer_ids,
+    get_column_features,
+    get_hf_config_and_model,
+    get_pretrained_tokenizer,
+    init_weights,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +41,7 @@ class CLIPForImageText(nn.Module):
         checkpoint_name: str,
         num_classes: Optional[int] = None,
         pretrained: Optional[bool] = True,
+        tokenizer_name: Optional[str] = "clip",
     ):
         """
         Load the pretrained CLIP from huggingface transformers.
@@ -49,6 +56,8 @@ class CLIPForImageText(nn.Module):
             The number of classes. 1 for a regression task.
         pretrained
             Whether using the pretrained weights. If pretrained=True, download the pretrained model.
+        tokenizer_name
+            Name of the huggingface tokenizer type.
         """
         super().__init__()
         logger.debug(f"initializing {checkpoint_name}")
@@ -56,6 +65,11 @@ class CLIPForImageText(nn.Module):
         self.num_classes = num_classes
 
         self.config, self.model = get_hf_config_and_model(checkpoint_name=checkpoint_name, pretrained=pretrained)
+        self.tokenizer_name = tokenizer_name
+        self.tokenizer = get_pretrained_tokenizer(
+            tokenizer_name=self.tokenizer_name,
+            checkpoint_name=self.checkpoint_name,
+        )
 
         self.out_features = self.model.config.projection_dim
 

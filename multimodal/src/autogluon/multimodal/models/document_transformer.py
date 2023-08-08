@@ -2,9 +2,6 @@ import inspect
 import logging
 from typing import Callable, Dict, List, Optional, Tuple, Union, cast
 
-import torch
-from torch import nn
-from transformers import AutoTokenizer, LayoutLMTokenizer, LayoutLMTokenizerFast, RobertaTokenizerFast
 from transformers import logging as hf_logging
 
 from ..constants import (
@@ -26,7 +23,7 @@ from ..constants import (
     TOKEN_TYPE_IDS,
 )
 from .huggingface_text import HFAutoModelForTextPrediction
-from .utils import DummyLayer, assign_layer_ids, get_column_features, get_hf_config_and_model, init_weights
+from .utils import get_column_features
 
 hf_logging.set_verbosity_error()
 
@@ -47,6 +44,7 @@ class DocumentTransformer(HFAutoModelForTextPrediction):
         gradient_checkpointing: Optional[bool] = False,
         low_cpu_mem_usage: Optional[bool] = False,
         pretrained: Optional[bool] = True,
+        tokenizer_name: Optional[str] = "hf_auto",
     ):
         """
         Load a pretrained huggingface layout-aware document transformer backbone.
@@ -77,7 +75,10 @@ class DocumentTransformer(HFAutoModelForTextPrediction):
             Whether to turn on the optimization of reducing the peak CPU memory usage when loading the pretrained model.
         pretrained
             Whether using the pretrained weights. If pretrained=True, download the pretrained model.
+        tokenizer_name
+            Name of the huggingface tokenizer type.
         """
+        logger.debug(f"initializing {checkpoint_name}")
         super().__init__(
             prefix=prefix,
             checkpoint_name=checkpoint_name,
@@ -86,16 +87,14 @@ class DocumentTransformer(HFAutoModelForTextPrediction):
             gradient_checkpointing=gradient_checkpointing,
             low_cpu_mem_usage=low_cpu_mem_usage,
             pretrained=pretrained,
+            tokenizer_name=tokenizer_name,
         )
-        logger.debug(f"initializing {checkpoint_name}")
-
-        self.tokenizer = AutoTokenizer.from_pretrained(checkpoint_name)
-        self.is_text_only_flag = self.is_text_only(self.tokenizer)
+        self.is_text_only_flag = self.is_text_only()
 
         if self.is_text_only_flag:
             logger.debug(f"Checkpoint: {checkpoint_name} uses the text data only for classification.")
 
-    def is_text_only(self, tokenizer):
+    def is_text_only(self):
         """
         Check the tokenizer to see if it is a text only tokenizer.
 
@@ -108,7 +107,7 @@ class DocumentTransformer(HFAutoModelForTextPrediction):
         -------
         True if the tokenizer only accept text, otherwise, False.
         """
-        model_args = list(inspect.signature(tokenizer.__call__).parameters.keys())
+        model_args = list(inspect.signature(self.tokenizer.__call__).parameters.keys())
         # Tokenizers of document foundation models usually have a "boxes" argument.
         if "boxes" not in model_args:
             return True

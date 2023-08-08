@@ -2594,6 +2594,7 @@ class MultiModalPredictor(ExportMixin):
                 TEXT,
                 TEXT_NER,
                 NER,
+                DOCUMENT,
             ]:  # NER is included for backward compatibility
                 if modality in data_processors:
                     data_processors[modality] = load_text_tokenizers(

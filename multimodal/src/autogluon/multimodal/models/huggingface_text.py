@@ -3,7 +3,6 @@ from typing import Dict, List, Optional, Tuple
 
 import torch
 from torch import nn
-from transformers import AutoTokenizer
 from transformers import logging as hf_logging
 from transformers.models.t5 import T5PreTrainedModel
 
@@ -19,7 +18,14 @@ from ..constants import (
     TEXT_TOKEN_IDS,
     TEXT_VALID_LENGTH,
 )
-from .utils import DummyLayer, assign_layer_ids, get_column_features, get_hf_config_and_model, init_weights
+from .utils import (
+    DummyLayer,
+    assign_layer_ids,
+    get_column_features,
+    get_hf_config_and_model,
+    get_pretrained_tokenizer,
+    init_weights,
+)
 
 hf_logging.set_verbosity_error()
 
@@ -41,6 +47,8 @@ class HFAutoModelForTextPrediction(nn.Module):
         gradient_checkpointing: Optional[bool] = False,
         low_cpu_mem_usage: Optional[bool] = False,
         pretrained: Optional[bool] = True,
+        tokenizer_name: Optional[str] = "hf_auto",
+        use_fast: Optional[bool] = True,
     ):
         """
         Load a pretrained huggingface text transformer backbone.
@@ -72,6 +80,12 @@ class HFAutoModelForTextPrediction(nn.Module):
             Whether to turn on the optimization of reducing the peak CPU memory usage when loading the pretrained model.
         pretrained
             Whether using the pretrained weights. If pretrained=True, download the pretrained model.
+        tokenizer_name
+            Name of the huggingface tokenizer type.
+        use_fast
+            Use a fast Rust-based tokenizer if it is supported for a given model.
+            If a fast tokenizer is not available for a given model, a normal Python-based tokenizer is returned instead.
+            See: https://huggingface.co/docs/transformers/model_doc/auto#transformers.AutoTokenizer.from_pretrained.use_fast
         """
         super().__init__()
         logger.debug(f"initializing {checkpoint_name}")
@@ -81,7 +95,12 @@ class HFAutoModelForTextPrediction(nn.Module):
         self.config, self.model = get_hf_config_and_model(
             checkpoint_name=checkpoint_name, pretrained=pretrained, low_cpu_mem_usage=low_cpu_mem_usage
         )
-        self._hf_model_input_names = AutoTokenizer.from_pretrained(checkpoint_name).model_input_names
+        self.tokenizer_name = tokenizer_name
+        self.tokenizer = get_pretrained_tokenizer(
+            tokenizer_name=self.tokenizer_name,
+            checkpoint_name=self.checkpoint_name,
+            use_fast=use_fast,
+        )
 
         if isinstance(self.model, T5PreTrainedModel):
             self.is_t5 = True
@@ -188,7 +207,7 @@ class HFAutoModelForTextPrediction(nn.Module):
                 attention_mask=text_masks,
             )
         else:
-            if "token_type_ids" in self._hf_model_input_names:
+            if "token_type_ids" in self.tokenizer.model_input_names:
                 outputs = self.model(
                     input_ids=text_token_ids,
                     token_type_ids=text_segment_ids,
@@ -292,9 +311,7 @@ class HFAutoModelForTextPrediction(nn.Module):
 
         return name_to_id
 
-    def save(self, save_path: str = "./", tokenizers: Optional[dict] = None):
+    def save(self, save_path: str = "./"):
         self.model.save_pretrained(save_path)
-        logger.info(f"Model weights for {self.prefix} are saved to {save_path}.")
-        if self.prefix in tokenizers:
-            tokenizers[self.prefix].save_pretrained(save_path)
-            logger.info(f"Tokenizer {self.prefix} saved to {save_path}.")
+        self.tokenizer.save_pretrained(save_path)
+        logger.info(f"Model weights and tokenizer for {self.prefix} are saved to {save_path}.")
