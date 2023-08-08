@@ -1,5 +1,5 @@
-from numbers import Number
 from math import isclose
+from numbers import Number
 
 from autogluon.common import space
 from autogluon.core.searcher import LocalRandomSearcher
