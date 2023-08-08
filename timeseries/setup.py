@@ -51,8 +51,9 @@ extras_require = {
         "isort>=5.10",
         "black>=22.3,<23.0",
     ],
-    "all": [],
 }
+
+extras_require["all"] = []
 
 install_requires = ag.get_dependency_version_ranges(install_requires)
 
