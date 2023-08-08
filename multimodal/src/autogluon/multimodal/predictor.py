@@ -39,12 +39,11 @@ from .constants import (
     BEST,
     BEST_K_MODELS_FILE,
     BINARY,
-    CLASSIFICATION,
     COLUMN_FEATURES,
+    DDP,
     DEEPSPEED_MIN_PL_VERSION,
     DEEPSPEED_MODULE,
     DEEPSPEED_OFFLOADING,
-    DEEPSPEED_STRATEGY,
     DEPRECATED_ZERO_SHOT,
     DOCUMENT,
     FEATURE_EXTRACTION,
@@ -114,7 +113,7 @@ from .utils import (
     AutoMMModelCheckpoint,
     AutoMMModelCheckpointIO,
     CustomUnpickler,
-    DDPCacheWriter,
+    DDPPredictionWriter,
     ExportMixin,
     LogFilter,
     apply_log_filter,
@@ -1737,12 +1736,10 @@ class MultiModalPredictor(ExportMixin):
         )
 
         callbacks = []
-        if strategy == "ddp":
-            if self._problem_type != OBJECT_DETECTION:
-                raise NotImplementedError(f"inference using ddp is only implemented for {OBJECT_DETECTION}")
-            else:
-                pred_writer = DDPCacheWriter(pipeline=self._problem_type, write_interval="epoch")
-                callbacks = [pred_writer]
+        pred_writer = None
+        if isinstance(strategy, str) and DDP in strategy:
+            pred_writer = DDPPredictionWriter(output_dir=self._save_path, write_interval="epoch")
+            callbacks = [pred_writer]
 
         if self._problem_type == NER:
             task = NerLitModule(
@@ -1803,17 +1800,14 @@ class MultiModalPredictor(ExportMixin):
                 outputs = evaluator.predict(
                     task,
                     datamodule=predict_dm,
-                    return_predictions=not callbacks,
+                    return_predictions=pred_writer is None,
                 )
 
-                if strategy == "ddp":
-                    if evaluator.global_rank != 0:
-                        sys.exit(f"Prediction finished, exit the process with global_rank={evaluator.global_rank}...")
-                    else:
+                if pred_writer is not None:
+                    if evaluator.global_rank == 0:
                         outputs = pred_writer.collect_all_gpu_results(num_gpus=num_gpus)
-                elif self._problem_type == OBJECT_DETECTION:
-                    # Unpack outputs for object detection while using single gpu
-                    outputs = [output for batch_outputs in outputs for output in batch_outputs]
+                    else:
+                        sys.exit(f"Prediction finished, exit the process with global_rank={evaluator.global_rank}...")
         return outputs
 
     def _on_predict_start(

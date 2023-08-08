@@ -2,26 +2,23 @@ import logging
 from typing import Callable, Dict, List, Optional, Tuple, Union
 
 import pandas as pd
-import pytorch_lightning as pl
 import torch
 from omegaconf import OmegaConf
 from scipy.special import softmax
 from torch import nn
 
 from ..constants import (
-    AUTOMM,
     BBOX,
     COLUMN_FEATURES,
+    DDP,
     FEATURES,
     IMAGE,
     IMAGE_META,
     LOGITS,
     MASKS,
-    NER,
     NER_ANNOTATION,
     NER_RET,
     OBJECT_DETECTION,
-    OPEN_VOCABULARY_OBJECT_DETECTION,
     OVD_RET,
     PROBABILITY,
     PROMPT,
@@ -42,7 +39,6 @@ from .environment import (
     infer_precision,
     move_to_device,
 )
-from .log import LogFilter, apply_log_filter
 from .matcher import compute_matching_probability
 from .misc import tensor_to_ndarray
 
@@ -501,14 +497,14 @@ def predict(
             requires_label=requires_label,
         )
 
-    strategy = "dp"  # default used in inference.
+    strategy = predictor._config.env.strategy  # default used in inference.
 
     num_gpus = compute_num_gpus(config_num_gpus=predictor._config.env.num_gpus, strategy=strategy)
 
     if predictor._problem_type == OBJECT_DETECTION:
-        strategy = "ddp"
+        strategy = DDP
 
-    if strategy == "ddp" and predictor._fit_called and predictor._problem_type == OBJECT_DETECTION:
+    if strategy == DDP and predictor._fit_called and predictor._problem_type == OBJECT_DETECTION:
         num_gpus = 1  # While using DDP, we can only use single gpu after fit is called
 
     if num_gpus <= 1:
