@@ -21,7 +21,7 @@ jobs:
         role-duration-seconds: 3600
         aws-region: us-east-1
     - name: Free Disk Space (Ubuntu)
-        uses: jlumbroso/free-disk-space@main
+        uses: jlumbroso/free-disk-space@v1.2.0
         with:
           tool-cache: false
           android: true
@@ -48,7 +48,7 @@ jobs:
         role-duration-seconds: 3600
         aws-region: us-east-1
     - name: Free Disk Space (Ubuntu)
-        uses: jlumbroso/free-disk-space@main
+        uses: jlumbroso/free-disk-space@v1.2.0
         with:
           tool-cache: false
           android: true
@@ -75,7 +75,7 @@ jobs:
         role-duration-seconds: 3600
         aws-region: us-east-1
     - name: Free Disk Space (Ubuntu)
-        uses: jlumbroso/free-disk-space@main
+        uses: jlumbroso/free-disk-space@v1.2.0
         with:
           tool-cache: false
           android: true
@@ -102,7 +102,7 @@ jobs:
         role-duration-seconds: 3600
         aws-region: us-east-1
     - name: Free Disk Space (Ubuntu)
-        uses: jlumbroso/free-disk-space@main
+        uses: jlumbroso/free-disk-space@v1.2.0
         with:
           tool-cache: false
           android: true
