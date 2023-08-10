@@ -20,13 +20,16 @@ jobs:
         role-to-assume: arn:aws:iam::369469875935:role/CloudCIECRRole
         role-duration-seconds: 3600
         aws-region: us-east-1
-    - name: free disk space
-      run: |
-        sudo swapoff -a
-        sudo rm -f /swapfile
-        sudo apt clean
-        docker system prune -af
-        df -h
+    - name: Free Disk Space (Ubuntu)
+      uses: jlumbroso/free-disk-space@v1.2.0
+      with:
+        tool-cache: false
+        android: true
+        dotnet: true
+        haskell: true
+        large-packages: true
+        docker-images: true
+        swap-storage: true
     - name: Build the Docker image
       run: |
         cd CI/docker
@@ -44,13 +47,16 @@ jobs:
         role-to-assume: arn:aws:iam::369469875935:role/CloudCIECRRole
         role-duration-seconds: 3600
         aws-region: us-east-1
-    - name: free disk space
-      run: |
-        sudo swapoff -a
-        sudo rm -f /swapfile
-        sudo apt clean
-        docker system prune -af
-        df -h
+    - name: Free Disk Space (Ubuntu)
+      uses: jlumbroso/free-disk-space@v1.2.0
+      with:
+        tool-cache: false
+        android: true
+        dotnet: true
+        haskell: true
+        large-packages: true
+        docker-images: true
+        swap-storage: true
     - name: Build the Docker image
       run: |
         cd CI/docker
@@ -68,13 +74,16 @@ jobs:
         role-to-assume: arn:aws:iam::369469875935:role/CloudCIECRRole
         role-duration-seconds: 3600
         aws-region: us-east-1
-    - name: free disk space
-      run: |
-        sudo swapoff -a
-        sudo rm -f /swapfile
-        sudo apt clean
-        docker system prune -af
-        df -h
+    - name: Free Disk Space (Ubuntu)
+      uses: jlumbroso/free-disk-space@v1.2.0
+      with:
+        tool-cache: false
+        android: true
+        dotnet: true
+        haskell: true
+        large-packages: true
+        docker-images: true
+        swap-storage: true
     - name: Build the Docker image
       run: |
         cd CI/docker
@@ -92,13 +101,16 @@ jobs:
         role-to-assume: arn:aws:iam::369469875935:role/CloudCIECRRole
         role-duration-seconds: 3600
         aws-region: us-east-1
-    - name: free disk space
-      run: |
-        sudo swapoff -a
-        sudo rm -f /swapfile
-        sudo apt clean
-        docker system prune -af
-        df -h
+    - name: Free Disk Space (Ubuntu)
+      uses: jlumbroso/free-disk-space@v1.2.0
+      with:
+        tool-cache: false
+        android: true
+        dotnet: true
+        haskell: true
+        large-packages: true
+        docker-images: true
+        swap-storage: true
     - name: Build the Docker image
       run: |
         cd CI/docker

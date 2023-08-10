@@ -1,0 +1,115 @@
+name: Benchmark
+on:
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: 'The repository from which the slash command was dispatched'
+        required: true
+      comment-id:
+        description: 'The comment-id of the slash command'
+        required: true
+      pr-sha:
+        description: 'The pr-sha of which the slash command was dispatched'
+        required: true
+      module:
+        description: 'Which module to run the benchmark on'
+        required: true
+        options:
+          - tabular
+      preset:
+        description: 'Preset to run for tabular'
+        required: true
+        options:
+          - best
+          - high
+          - good
+          - medium
+      benchmark:
+        description: 'Benchmark to run'
+        required: true
+        options:
+          - full
+          - test
+      time_limit:
+        description: 'Time limit for the benchmark to run'
+        required: true
+        options:
+          - 1h
+          - 4h
+          - 8h
+          - 16h
+          - 24h
+      branch_or_pr_number:
+        description: 'Branch or PR number to run the benchmark on'
+        required: true
+      
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create URL to the run output
+        if: (github.event_name == 'workflow_dispatch')
+        id: vars
+        run: echo ::set-output name=run-url::https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+
+      - name: Create comment
+        if: (github.event_name == 'workflow_dispatch')
+        uses: peter-evans/create-or-update-comment@v1
+        with:
+          token: ${{ secrets.PAT }}
+          repository: ${{ github.event.inputs.repository }}
+          comment-id: ${{ github.event.inputs.comment-id }}
+          body: |
+            [Benchmark Output][1]
+
+            [1]: ${{ steps.vars.outputs.run-url }}
+
+  benchmark:
+    needs: setup
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+      - name: Checkout repository for PR
+        if: (github.event_name == 'workflow_dispatch')
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.inputs.pr-sha }}
+      - name: Checkout repository for nightly test
+        if: (github.event_name == 'schedule')
+        uses: actions/checkout@v2
+      - name: Setup Python
+        uses: actions/setup-python@v1
+        with:
+          python-version: '3.9'
+      - name: Setup npm
+        uses: actions/setup-node@v3
+        with:
+          node-version: 'latest'
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
+          role-duration-seconds: 14400
+          aws-region: us-east-1
+      - name: Run benchmark
+        shell: bash -l {0}
+        run: |
+          nvm install 20
+          npm install -g aws-cdk
+          /bin/bash ./.github/workflow_scripts/run_benchmark.sh ${{ github.event.inputs.module }} ${{ github.event.inputs.preset }} ${{ github.event.inputs.benchmark }} ${{ github.event.inputs.time_limit }} ${{ github.event.inputs.branch_or_pr_number }} ${{ github.event.inputs.pr-sha }}

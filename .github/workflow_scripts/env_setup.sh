@@ -16,6 +16,10 @@ function setup_build_contrib_env {
     export AUTOMM_TUTORIAL_MODE=1 # Disable progress bar in AutoMMPredictor
 }
 
+function setup_benchmark_env {
+    pip install -U autogluon.bench
+}
+
 function setup_hf_model_mirror {
     pip3 install PyYAML
     SUB_FOLDER="$1"
