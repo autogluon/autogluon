@@ -129,7 +129,7 @@ class DDPPredictionWriter(BasePredictionWriter):
             A list of batch results. Each batch is one (nested) dictionary.
         """
         results = dict()
-        if len(x[0]) == 0:  # dict is emtpy
+        if len(x[0]) == 0:  # dict is empty
             return dict()
         for k, v in x[0].items():
             if k == WEIGHT:  # ignore the key
