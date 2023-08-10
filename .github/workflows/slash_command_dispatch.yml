@@ -46,6 +46,7 @@ jobs:
         if: steps.scd.outputs.error-message
         uses: peter-evans/create-or-update-comment@v1
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
           comment-id: ${{ github.event.comment.id }}
           body: |
             > ${{ steps.scd.outputs.error-message }}
