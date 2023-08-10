@@ -16,7 +16,7 @@ def test_pipeline_feature_generator(generator_helper, data_helper):
     # Given
     input_data = data_helper.generate_multi_feature_full()
 
-    toy_vectorizer = CountVectorizer(min_df=2, ngram_range=(1, 3), max_features=10, dtype=np.uint8)
+    toy_vectorizer = CountVectorizer(min_df=2, ngram_range=(1, 3), max_features=1000, dtype=np.uint8)
 
     text_ngram_feature_generator = TextNgramFeatureGenerator(vectorizer=toy_vectorizer)
     text_ngram_feature_generator.max_memory_ratio = None  # Necessary in test to avoid CI non-deterministically pruning ngram counts.
@@ -66,7 +66,7 @@ def test_pipeline_feature_generator(generator_helper, data_helper):
     ]
 
     expected_output_data_feat_lower_ratio = [3, 2, 0, 3, 3, 3, 3, 3, 1]
-    expected_output_data_feat_total = [1, 3, 0, 0, 7, 1, 3, 7, 3]
+    expected_output_data_feat_total = [1, 3, 0, 0, 9, 1, 3, 9, 3]
 
     # When
     output_data = generator_helper.fit_transform_assert(

@@ -1,4 +1,6 @@
-FROM 763104351884.dkr.ecr.us-east-1.amazonaws.com/autogluon-training:0.6.2-gpu-py38-cu113-ubuntu20.04
+FROM 763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-training:2.0.1-gpu-py310-cu118-ubuntu20.04-ec2
+
+ENV LD_LIBRARY_PATH /usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
 
 ARG AWSCLI_VER=1.22.45
 

@@ -44,7 +44,7 @@ def test_one_hot_encoder_feature_generator_advanced(generator_helper, data_helpe
         ("int", ()): ["int"],
     }
     # TODO: improve readability of names when max_levels is specified
-    expected_feature_metadata_full = {("int", ("bool",)): ["x0_0", "x0_13", "x0_2", "x0_5", "x1_13", "x1_a", "x1_c", "x1_d"]}
+    expected_feature_metadata_full = {("int", ("bool",)): ["x0_0", "x0_13", "x0_2", "x0_3", "x1_13", "x1_a", "x1_b", "x1_d"]}
 
     expected_output_data_int_0_val = [0, 1, 0, 0, 0, 0, 0, 1, 0]
 
