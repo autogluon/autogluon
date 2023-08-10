@@ -14,23 +14,25 @@ expected_feature_metadata_full = {
         "__nlp__.end of",
         "__nlp__.end of the",
         "__nlp__.of",
+        "__nlp__.of the",
         "__nlp__.sentence",
         "__nlp__.sentence breaks",
         "__nlp__.the",
         "__nlp__.the end",
+        "__nlp__.the end of",
         "__nlp__.world",
         "__nlp__._total_",
     ]
 }
 
-expected_output_data_feat_total = [1, 3, 0, 0, 7, 1, 3, 7, 3]
+expected_output_data_feat_total = [1, 3, 0, 0, 9, 1, 3, 9, 3]
 
 
 def test_text_ngram_feature_generator(generator_helper, data_helper):
     # Given
     input_data = data_helper.generate_multi_feature_full()
 
-    toy_vectorizer = CountVectorizer(min_df=2, ngram_range=(1, 3), max_features=10, dtype=np.uint8)
+    toy_vectorizer = CountVectorizer(min_df=2, ngram_range=(1, 3), max_features=1000, dtype=np.uint8)
 
     # max_memory_ratio=None in test to avoid CI reducing ngrams non-deterministically.
     generator = TextNgramFeatureGenerator(max_memory_ratio=None, vectorizer=toy_vectorizer)
@@ -69,7 +71,7 @@ def test_text_ngram_feature_generator_categorical_nan(generator_helper, data_hel
         type_map_special=type_map_special,
     )
 
-    toy_vectorizer = CountVectorizer(min_df=2, ngram_range=(1, 3), max_features=10, dtype=np.uint8)
+    toy_vectorizer = CountVectorizer(min_df=2, ngram_range=(1, 3), max_features=1000, dtype=np.uint8)
 
     # max_memory_ratio=None in test to avoid CI reducing ngrams non-deterministically.
     generator = TextNgramFeatureGenerator(max_memory_ratio=None, vectorizer=toy_vectorizer)
