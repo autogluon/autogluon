@@ -21,6 +21,7 @@ for root, dirs, files in os.walk(config_path):
     for file in files:
         if file == "tabular_cloud_configs.yaml":
             config_file = os.path.join(root, file)
+            break
 
 with open(config_file, "r") as f:
     config = yaml.safe_load(f)

@@ -16,7 +16,6 @@ on:
         required: true
         options:
           - tabular
-          - multimodal
       preset:
         description: 'Preset to run for tabular'
         required: true
