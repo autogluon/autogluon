@@ -21,15 +21,15 @@ jobs:
         role-duration-seconds: 3600
         aws-region: us-east-1
     - name: Free Disk Space (Ubuntu)
-        uses: jlumbroso/free-disk-space@v1.2.0
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
+      uses: jlumbroso/free-disk-space@v1.2.0
+      with:
+        tool-cache: false
+        android: true
+        dotnet: true
+        haskell: true
+        large-packages: true
+        docker-images: true
+        swap-storage: true
     - name: Build the Docker image
       run: |
         cd CI/docker
@@ -48,15 +48,15 @@ jobs:
         role-duration-seconds: 3600
         aws-region: us-east-1
     - name: Free Disk Space (Ubuntu)
-        uses: jlumbroso/free-disk-space@v1.2.0
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
+      uses: jlumbroso/free-disk-space@v1.2.0
+      with:
+        tool-cache: false
+        android: true
+        dotnet: true
+        haskell: true
+        large-packages: true
+        docker-images: true
+        swap-storage: true
     - name: Build the Docker image
       run: |
         cd CI/docker
@@ -75,15 +75,15 @@ jobs:
         role-duration-seconds: 3600
         aws-region: us-east-1
     - name: Free Disk Space (Ubuntu)
-        uses: jlumbroso/free-disk-space@v1.2.0
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
+      uses: jlumbroso/free-disk-space@v1.2.0
+      with:
+        tool-cache: false
+        android: true
+        dotnet: true
+        haskell: true
+        large-packages: true
+        docker-images: true
+        swap-storage: true
     - name: Build the Docker image
       run: |
         cd CI/docker
@@ -102,15 +102,15 @@ jobs:
         role-duration-seconds: 3600
         aws-region: us-east-1
     - name: Free Disk Space (Ubuntu)
-        uses: jlumbroso/free-disk-space@v1.2.0
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
+      uses: jlumbroso/free-disk-space@v1.2.0
+      with:
+        tool-cache: false
+        android: true
+        dotnet: true
+        haskell: true
+        large-packages: true
+        docker-images: true
+        swap-storage: true
     - name: Build the Docker image
       run: |
         cd CI/docker
