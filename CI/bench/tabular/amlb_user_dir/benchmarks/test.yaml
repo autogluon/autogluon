@@ -1,0 +1,6 @@
+---
+# Combines openml/s/269 and openml/s/271
+# Locally stored instead of fetched from openml to avoid server errors
+
+- name: adult
+  openml_task_id: 359983
