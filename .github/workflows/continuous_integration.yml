@@ -405,15 +405,3 @@ jobs:
           body: |
             Job PR-${{ github.event.number }}-${{ env.SHORT_SHA }} is done.
             Docs are uploaded to http://autogluon-staging.s3-website-us-west-2.amazonaws.com/PR-${{ github.event.number }}/${{ env.SHORT_SHA }}/index.html
-      - name: Download code coverage results
-        uses: actions/download-artifact@v3
-        with:
-          name: dashboard-website
-      - id: get-comment-body
-        run: body="$(cat website.txt)"
-      - name: Comment Dashboard Website Link on PR
-        if: ${{ github.event_name == 'pull_request_target' }}
-        uses: peter-evans/create-or-update-comment@v2.0.0
-        with:
-          issue-number: ${{ github.event.number }}
-          body: ${{ steps.get-comment-body.outputs.body }}

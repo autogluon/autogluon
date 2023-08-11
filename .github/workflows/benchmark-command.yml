@@ -118,3 +118,16 @@ jobs:
         with:
           name: dashboard-website
           path: ./website.txt
+      - name: Download code coverage results
+        uses: actions/download-artifact@v3
+        with:
+          name: dashboard-website
+      - id: get-comment-body
+        run: body="$(cat website.txt)"
+      - name: Comment Dashboard Website Link on PR
+        if: ${{ github.event_name == 'pull_request_target' }}
+        uses: peter-evans/create-or-update-comment@v2.0.0
+        with:
+          issue-number: ${{ github.event.number }}
+          body: ${{ steps.get-comment-body.outputs.body }}
+      
