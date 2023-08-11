@@ -113,7 +113,9 @@ jobs:
         with:
           name: dashboard-website
       - id: get-comment-body
-        run: body="$(cat website.txt)"
+        run: |
+          body="$(cat website.txt)"
+          echo "::set-output name=body::$body"
       - name: Comment Dashboard Website Link on PR
         if: ${{ github.event_name == 'pull_request_target' }}
         uses: peter-evans/create-or-update-comment@v2.0.0
