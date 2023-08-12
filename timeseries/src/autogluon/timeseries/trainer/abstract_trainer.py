@@ -264,10 +264,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         super().__init__(path=path, save_data=save_data, low_memory=True, **kwargs)
 
         self.prediction_length = prediction_length
-        self.quantile_levels = kwargs.get(
-            "quantile_levels",
-            kwargs.get("quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]),
-        )
+        self.quantile_levels = kwargs.get("quantile_levels", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
         self.target = kwargs.get("target", "target")
         self.metadata = kwargs.get("metadata", CovariateMetadata())
         self.is_data_saved = False

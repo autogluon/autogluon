@@ -4,7 +4,7 @@ import copy
 import itertools
 import logging
 from collections.abc import Iterable
-from typing import Any, List, Optional, Tuple, Type
+from typing import Any, Callable, List, Optional, Tuple, Type, Union
 
 import numpy as np
 import pandas as pd
@@ -322,7 +322,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
         id_column: Optional[str] = None,
         timestamp_column: Optional[str] = None,
     ) -> pd.DataFrame:
-
         df = df.copy()
         if id_column is not None:
             assert id_column in df.columns, f"Column '{id_column}' not found!"
@@ -694,6 +693,9 @@ class TimeSeriesDataFrame(pd.DataFrame):
             else:
                 return self
 
+        # TODO: Check if static_features preserved
+        return self.groupby(level=ITEMID, sort=False).resample(freq, level=TIMESTAMP).mean()
+
         filled_series = []
         for item_id, time_series in self.groupby(level=ITEMID, sort=False):
             time_series = time_series.droplevel(ITEMID)
@@ -707,6 +709,24 @@ class TimeSeriesDataFrame(pd.DataFrame):
             filled_series.append(pd.concat({item_id: resampled_ts}, names=[ITEMID]))
 
         return TimeSeriesDataFrame(pd.concat(filled_series), static_features=self.static_features)
+
+    def convert_frequency(
+        self,
+        freq: Union[str, pd.DateOffset],
+        aggregation: Union[str, Callable] = "mean",
+        **kwargs,
+    ) -> "TimeSeriesDataFrame":
+        """Convert each time series in the data frame to the given frequency.
+
+        This method is useful for the following two purposes:
+        1. Convert an irregularly-sampled time series to a regular index.
+        2. Aggregating time series data by downsampling (e.g., convert daily sales into weekly sales)
+
+        Parameters
+        ----------
+        freq : str
+        """
+        return self.groupby(level=ITEMID, sort=False).resample(freq, level=TIMESTAMP, **kwargs).agg(aggregation)
 
     def fill_missing_values(self, method: str = "auto", value: float = 0.0) -> "TimeSeriesDataFrame":
         """Fill missing values represented by NaN.
@@ -765,7 +785,9 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
         grouped_df = pd.DataFrame(self).groupby(level=ITEMID, sort=False, group_keys=False)
         if method == "auto":
-            filled_df = grouped_df.fillna(method="ffill").fillna(method="bfill")
+            filled_df = grouped_df.fillna(method="ffill")
+            # Fill missing values at the start of each time series with bfill
+            filled_df = filled_df.groupby(level=ITEMID, sort=False, group_keys=False).fillna(method="bfill")
         elif method in ["ffill", "pad"]:
             filled_df = grouped_df.fillna(method="ffill")
         elif method in ["bfill", "backfill"]:
@@ -789,6 +811,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         ----------
         how : {"any", "all"}, default = "any"
             Determine if row or column is removed from TimeSeriesDataFrame, when we have at least one NaN or all NaN.
+
             - "any" : If any NaN values are present, drop that row or column.
             - "all" : If all values are NaN, drop that row or column.
         """
