@@ -248,7 +248,7 @@ class TimeSeriesPredictor:
         else:
             if df.freq != self.freq:
                 df = df.convert_frequency(freq=self.freq)
-                logger.warning(f"{name} has been resampled at frequency '{self.freq}'.")
+                logger.warning(f"{name} with frequency '{self.freq}' has been resampled to frequency '{self.freq}'.")
 
         # TODO: Add support for all pandas frequencies
         offset = pd.tseries.frequencies.to_offset(df.freq)
@@ -285,7 +285,7 @@ class TimeSeriesPredictor:
         if data.num_timesteps_per_item().min() <= self.prediction_length:
             raise ValueError(
                 f"Cannot reserve last prediction_length={self.prediction_length} time steps for evaluation in some "
-                f"time series in {name}. Please make sure that {data} includes both historic and future data, and that"
+                f"time series in {name}. Please make sure that {name} includes both historic and future data, and that"
                 f"all time series have length > prediction_length (at least {self.prediction_length + 1})"
             )
 
@@ -534,16 +534,18 @@ class TimeSeriesPredictor:
             verbosity = self.verbosity
         set_logger_verbosity(verbosity)
 
-        # TODO: Make sure that all relevant fit_args are listed here
         fit_args = dict(
             prediction_length=self.prediction_length,
             target=self.target,
+            eval_metric=self.eval_metric,
+            quantile_levels=self.quantile_levels,
+            freq=self.freq,
             time_limit=time_limit,
-            evaluation_metric=self.eval_metric,
             hyperparameters=hyperparameters,
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             excluded_model_types=excluded_model_types,
             num_val_windows=num_val_windows,
+            refit_full=refit_full,
             enable_ensemble=enable_ensemble,
             random_seed=random_seed,
             verbosity=verbosity,

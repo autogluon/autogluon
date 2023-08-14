@@ -650,7 +650,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
         return df_view
 
-    @Deprecated(min_version_to_warn=0.9, min_version_to_error=1.0, new="convert_frequency")
+    @Deprecated(min_version_to_warn="0.9", min_version_to_error="1.0", new="convert_frequency")
     def to_regular_index(self, freq: str) -> TimeSeriesDataFrame:
         """Fill the gaps in an irregularly-sampled time series with NaNs.
 
@@ -932,6 +932,9 @@ class TimeSeriesDataFrame(pd.DataFrame):
         0       2020-12-31    10.0
                 2021-12-31    26.0
         """
+        if self.freq == pd.tseries.frequencies.to_offset(freq).freqstr:
+            return self
+
         # We need to aggregate categorical columns separately because .agg("mean") deletes all non-numeric columns
         aggregation = {}
         for col in self.columns:
@@ -940,7 +943,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
             else:
                 aggregation[col] = agg_categorical
 
-        resampled_df = (
+        resampled_df = TimeSeriesDataFrame(
             self.groupby(level=ITEMID, sort=False).resample(freq, level=TIMESTAMP, **kwargs).agg(aggregation)
         )
         resampled_df.static_features = self.static_features
