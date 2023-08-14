@@ -55,7 +55,7 @@ class TimeSeriesPredictor:
         1. The time series data has irregular timestamps, so frequency cannot be inferred automatically.
         2. You would like to resample the original data at a different frequency (for example, convert hourly measurements into daily measurements).
 
-        If `freq` is provided when creating the predictor, all data passed to the predictor will be automatically
+        If ``freq`` is provided when creating the predictor, all data passed to the predictor will be automatically
         resampled at this frequency.
     eval_metric : str, default = "mean_wQuantileLoss"
         Metric by which predictions will be ultimately evaluated on future test data. AutoGluon tunes hyperparameters
@@ -247,8 +247,8 @@ class TimeSeriesPredictor:
                 logger.info(f"Inferred data frequency {df.freq}")
         else:
             if df.freq != self.freq:
-                df = df.convert_frequency(self.freq)
-                logger.warning(f"{name} will be resampled to match the predictor frequency.")
+                df = df.convert_frequency(freq=self.freq)
+                logger.warning(f"{name} has been resampled at frequency '{self.freq}'.")
 
         # TODO: Add support for all pandas frequencies
         offset = pd.tseries.frequencies.to_offset(df.freq)
