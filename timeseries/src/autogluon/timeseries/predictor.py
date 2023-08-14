@@ -244,11 +244,11 @@ class TimeSeriesPredictor:
                 )
             else:
                 self.freq = df.freq
-                logger.info(f"Inferred data frequency {df.freq}")
+                logger.info(f"Inferred data frequency: {df.freq}")
         else:
             if df.freq != self.freq:
+                logger.warning(f"{name} with frequency '{df.freq}' has been resampled to frequency '{self.freq}'.")
                 df = df.convert_frequency(freq=self.freq)
-                logger.warning(f"{name} with frequency '{self.freq}' has been resampled to frequency '{self.freq}'.")
 
         # TODO: Add support for all pandas frequencies
         offset = pd.tseries.frequencies.to_offset(df.freq)
@@ -555,7 +555,7 @@ class TimeSeriesPredictor:
         if presets is not None:
             logger.info(f"Setting presets to: {presets}")
         logger.info("Fitting with arguments:")
-        logger.info(f"{pprint.pformat(fit_args)}")
+        logger.info(f"{pprint.pformat(fit_args)}\n")
 
         train_data = self._check_and_prepare_data_frame(train_data, name="train_data")
         logger.info(
