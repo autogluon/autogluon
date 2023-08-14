@@ -689,103 +689,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
         """
         return self.convert_frequency(freq=freq)
 
-    def convert_frequency(
-        self,
-        freq: Union[str, pd.DateOffset],
-        agg_numeric: str = "mean",
-        agg_categorical: str = "first",
-        **kwargs,
-    ) -> TimeSeriesDataFrame:
-        """Convert each time series in the data frame to the given frequency.
-
-        This method is useful for two purposes:
-
-        1. Converting an irregularly-sampled time series to a regular time index.
-        2. Aggregating time series data by downsampling (e.g., convert daily sales into weekly sales)
-
-        Parameters
-        ----------
-        freq : Union[str, pd.DateOffset]
-            Frequency to which the data should be converted. See [pandas frequency aliases](https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases)
-            for supported values.
-        agg_numeric : {"max", "min", "sum", "mean", "median", "first", "last"}, default = "mean"
-            Aggregation method applied to numeric columns.
-        agg_categorical : {"first", "last"}, default = "first"
-            Aggregation method applied to categorical columns.
-        **kwargs
-            Additional keywords arguments that will be passed to ``pandas.DataFrameGroupBy.resample``.
-
-        Returns
-        -------
-        ts_df : TimeSeriesDataFrame
-            A new time series dataframe with time series resampled at the new frequency. Output may contain missing
-            values represented by ``NaN`` if original data does not have information for the given period.
-
-        Examples
-        --------
-        Convert irregularly-sampled time series data to a regular index
-        >>> ts_df
-                            target
-        item_id timestamp
-        0       2019-01-01     NaN
-                2019-01-03     1.0
-                2019-01-06     2.0
-                2019-01-07     NaN
-        1       2019-02-04     3.0
-                2019-02-07     4.0
-
-        >>> ts_df.convert_frequency(freq="D")
-                            target
-        item_id timestamp
-        0       2019-01-01     NaN
-                2019-01-02     NaN
-                2019-01-03     1.0
-                2019-01-04     NaN
-                2019-01-05     NaN
-                2019-01-06     2.0
-                2019-01-07     NaN
-        1       2019-02-04     3.0
-                2019-02-05     NaN
-                2019-02-06     NaN
-                2019-02-07     4.0
-
-        Downsample quarterly data to yearly frequency
-        >>> ts_df
-                            target
-        item_id timestamp
-        0       2020-03-31     1.0
-                2020-06-30     2.0
-                2020-09-30     3.0
-                2020-12-31     4.0
-                2021-03-31     5.0
-                2021-06-30     6.0
-                2021-09-30     7.0
-                2021-12-31     8.0
-        >>> ts_df.convert_frequency("Y")
-                            target
-        item_id timestamp
-        0       2020-12-31     2.5
-                2021-12-31     6.5
-        >>> ts_df.convert_frequency("Y", agg_numeric="sum")
-                            target
-        item_id timestamp
-        0       2020-12-31    10.0
-                2021-12-31    26.0
-        """
-        # We need to aggregate categorical columns separately because .agg("mean") deletes all non-numeric columns
-        aggregation = {}
-        for col in self.columns:
-            if pd.api.types.is_numeric_dtype(self.dtypes[col]):
-                aggregation[col] = agg_numeric
-            else:
-                aggregation[col] = agg_categorical
-
-        resampled_df = (
-            self.groupby(level=ITEMID, sort=False).resample(freq, level=TIMESTAMP, **kwargs).agg(aggregation)
-        )
-        resampled_df.static_features = self.static_features
-        return resampled_df
-
     def fill_missing_values(self, method: str = "auto", value: float = 0.0) -> TimeSeriesDataFrame:
         """Fill missing values represented by NaN.
 
@@ -945,3 +848,100 @@ class TimeSeriesDataFrame(pd.DataFrame):
                     data.static_features.index = data.static_features.index.astype(str)
                     data.static_features.index += suffix
         return train_data, test_data
+
+    def convert_frequency(
+        self,
+        freq: Union[str, pd.DateOffset],
+        agg_numeric: str = "mean",
+        agg_categorical: str = "first",
+        **kwargs,
+    ) -> TimeSeriesDataFrame:
+        """Convert each time series in the data frame to the given frequency.
+
+        This method is useful for two purposes:
+
+        1. Converting an irregularly-sampled time series to a regular time index.
+        2. Aggregating time series data by downsampling (e.g., convert daily sales into weekly sales)
+
+        Parameters
+        ----------
+        freq : Union[str, pd.DateOffset]
+            Frequency to which the data should be converted. See [pandas frequency aliases](https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases)
+            for supported values.
+        agg_numeric : {"max", "min", "sum", "mean", "median", "first", "last"}, default = "mean"
+            Aggregation method applied to numeric columns.
+        agg_categorical : {"first", "last"}, default = "first"
+            Aggregation method applied to categorical columns.
+        **kwargs
+            Additional keywords arguments that will be passed to ``pandas.DataFrameGroupBy.resample``.
+
+        Returns
+        -------
+        ts_df : TimeSeriesDataFrame
+            A new time series dataframe with time series resampled at the new frequency. Output may contain missing
+            values represented by ``NaN`` if original data does not have information for the given period.
+
+        Examples
+        --------
+        Convert irregularly-sampled time series data to a regular index
+        >>> ts_df
+                            target
+        item_id timestamp
+        0       2019-01-01     NaN
+                2019-01-03     1.0
+                2019-01-06     2.0
+                2019-01-07     NaN
+        1       2019-02-04     3.0
+                2019-02-07     4.0
+
+        >>> ts_df.convert_frequency(freq="D")
+                            target
+        item_id timestamp
+        0       2019-01-01     NaN
+                2019-01-02     NaN
+                2019-01-03     1.0
+                2019-01-04     NaN
+                2019-01-05     NaN
+                2019-01-06     2.0
+                2019-01-07     NaN
+        1       2019-02-04     3.0
+                2019-02-05     NaN
+                2019-02-06     NaN
+                2019-02-07     4.0
+
+        Downsample quarterly data to yearly frequency
+        >>> ts_df
+                            target
+        item_id timestamp
+        0       2020-03-31     1.0
+                2020-06-30     2.0
+                2020-09-30     3.0
+                2020-12-31     4.0
+                2021-03-31     5.0
+                2021-06-30     6.0
+                2021-09-30     7.0
+                2021-12-31     8.0
+        >>> ts_df.convert_frequency("Y")
+                            target
+        item_id timestamp
+        0       2020-12-31     2.5
+                2021-12-31     6.5
+        >>> ts_df.convert_frequency("Y", agg_numeric="sum")
+                            target
+        item_id timestamp
+        0       2020-12-31    10.0
+                2021-12-31    26.0
+        """
+        # We need to aggregate categorical columns separately because .agg("mean") deletes all non-numeric columns
+        aggregation = {}
+        for col in self.columns:
+            if pd.api.types.is_numeric_dtype(self.dtypes[col]):
+                aggregation[col] = agg_numeric
+            else:
+                aggregation[col] = agg_categorical
+
+        resampled_df = (
+            self.groupby(level=ITEMID, sort=False).resample(freq, level=TIMESTAMP, **kwargs).agg(aggregation)
+        )
+        resampled_df.static_features = self.static_features
+        return resampled_df
