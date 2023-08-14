@@ -7,8 +7,8 @@ from typing import Any, Dict, List, Optional, Type, Union
 import pandas as pd
 import pytorch_lightning as pl
 
-from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.deprecated_utils import Deprecated_args
+from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.utils import check_saved_predictor_version, setup_outputdir
 from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl, load_str
@@ -152,6 +152,12 @@ class TimeSeriesPredictor:
 
         self.prediction_length = prediction_length
         self.freq = freq
+        if self.freq is not None:
+            # Standardize frequency string (e.g., "min" -> "T", "Y" -> "A-DEC")
+            std_freq = pd.tseries.frequencies.to_offset(self.freq).freqstr
+            if std_freq != str(self.freq):
+                logger.info(f"Frequency '{self.freq}' stored as '{std_freq}'")
+            self.freq = std_freq
         self.eval_metric = eval_metric
         self.eval_metric_seasonal_period = eval_metric_seasonal_period
         if quantile_levels is None:
@@ -206,7 +212,22 @@ class TimeSeriesPredictor:
         data: Union[TimeSeriesDataFrame, pd.DataFrame, str],
         name: str = "data",
     ) -> TimeSeriesDataFrame:
-        """Ensure that TimeSeriesDataFrame has a sorted index, valid frequency, and contains no missing values."""
+        """Ensure that TimeSeriesDataFrame has a sorted index, valid frequency, and contains no missing values.
+
+        If self.freq is None, then self.freq of the predictor will be set to the frequency of the data.
+
+        Parameters
+        ----------
+        data : Union[TimeSeriesDataFrame, pd.DataFrame, str]
+            Data as a data frame or path to file storing the data.
+        name : str
+            Name of the data that will be used in log messages (e.g., 'train_data', 'tuning_data', or 'data').
+
+        Returns
+        -------
+        df : TimeSeriesDataFrame
+            Preprocessed data in TimeSeriesDataFrame format.
+        """
         df = self._to_data_frame(data, name=name)
         # MultiIndex.is_monotonic_increasing checks if index is sorted by ["item_id", "timestamp"]
         if not df.index.is_monotonic_increasing:
@@ -250,7 +271,7 @@ class TimeSeriesPredictor:
             )
             df = df.fill_missing_values()
             if df.isna().values.any():
-                raise ValueError(f"Some time series in {name}")
+                raise ValueError(f"Some time series in {name} consist completely of NaN values. Please remove them.")
 
         # Ensure that time series are long enough
         if (df.num_timesteps_per_item() <= 2).any():
