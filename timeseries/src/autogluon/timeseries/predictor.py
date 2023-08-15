@@ -48,7 +48,7 @@ class TimeSeriesPredictor:
         For example, if time series contain daily observations, setting ``prediction_length = 3`` will train
         models that predict up to 3 days into the future from the most recent observation.
     freq : str, optional
-        Frequency of the time series data (see [pandas documentation](https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases)
+        Frequency of the time series data (see `pandas documentation https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases`_
         for available frequencies). By default, the predictor will attempt to automatically infer the frequency from
         the data. This argument should only be explicitly set in two cases:
 
