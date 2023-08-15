@@ -25,5 +25,5 @@ cwd=`pwd`
 ls data/results/output/openml/ag_eval/pairwise/* | grep .csv > $cwd/agg_csv.txt
 filename=`head -1 $cwd/agg_csv.txt`
 prefix=$BRANCH_OR_PR_NUMBER/$SHA
-agdash --per_dataset_csv  'data/results/output/openml/ag_eval/results_ranked_by_dataset_all.csv' --agg_dataset_csv $filename --s3_prefix $prefix --s3_bucket ag-dashboard-test --s3_region us-east-2 > $cwd/out.txt
+agdash --per_dataset_csv  'data/results/output/openml/ag_eval/results_ranked_by_dataset_all.csv' --agg_dataset_csv $filename --s3_prefix benchmark-dashboard/$prefix --s3_bucket autogluon-staging --s3_region us-west-2 > $cwd/out.txt
 tail -1 $cwd/out.txt > $cwd/website.txt
