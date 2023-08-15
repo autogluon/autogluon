@@ -120,16 +120,19 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: dashboard-website
-      - id: get-comment-body
+      - name: get dashboard website
+        id: website
         run: |
           body="$(cat website.txt)"
           echo ::set-output name=body::$body
       - name: Comment Dashboard Website Link on PR
-        if: ${{ github.event_name == 'pull_request_target' }}
         uses: peter-evans/create-or-update-comment@v2.0.0
         with:
           token: ${{ secrets.PAT }}
           repository: ${{ github.event.inputs.repository }}
           comment-id: ${{ github.event.inputs.comment-id }}
-          body: ${{ steps.get-comment-body.outputs.body }}
+          body: |
+            [Dashboard Website][1]
+          
+            [1]  ${{ steps.website.outputs.body }}
       
