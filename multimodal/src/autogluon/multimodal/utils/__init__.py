@@ -1,4 +1,4 @@
-from .cache import DDPCacheWriter
+from .cache import DDPPredictionWriter
 from .checkpoint import AutoMMModelCheckpoint, AutoMMModelCheckpointIO, average_checkpoints
 from .config import (
     apply_omegaconf_overrides,

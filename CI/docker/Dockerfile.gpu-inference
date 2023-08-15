@@ -8,7 +8,7 @@ RUN apt-get update \
 
 RUN pip3 install -U pip
 RUN pip3 install -U setuptools wheel
-RUN pip freeze | grep autogluon | xargs pip uninstall -y
+RUN pip3 install -U numpy==1.24.4  # to match training container numpy version
 
 RUN git clone https://github.com/autogluon/autogluon.git
 COPY full_install_image.sh autogluon/
