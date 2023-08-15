@@ -131,8 +131,5 @@ jobs:
           token: ${{ secrets.PAT }}
           repository: ${{ github.event.inputs.repository }}
           comment-id: ${{ github.event.inputs.comment-id }}
-          body: |
-            [Dashboard Website][1]
-          
-            [1]  ${{ steps.website.outputs.body }}
+          body: ${{ steps.website.outputs.body }}
       
