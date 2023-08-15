@@ -48,9 +48,11 @@ class TimeSeriesPredictor:
         For example, if time series contain daily observations, setting ``prediction_length = 3`` will train
         models that predict up to 3 days into the future from the most recent observation.
     freq : str, optional
-        Frequency of the time series data (see `pandas documentation https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases`_
-        for available frequencies). By default, the predictor will attempt to automatically infer the frequency from
-        the data. This argument should only be explicitly set in two cases:
+        Frequency of the time series data (see `pandas documentation <https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases>`_
+        for available frequencies). For example, ``"D"`` for daily data or ``"H"`` for hourly data.
+
+        By default, the predictor will attempt to automatically infer the frequency from the data. This argument should
+        only be set in two cases:
 
         1. The time series data has irregular timestamps, so frequency cannot be inferred automatically.
         2. You would like to resample the original data at a different frequency (for example, convert hourly measurements into daily measurements).
@@ -72,7 +74,7 @@ class TimeSeriesPredictor:
         For more information about these metrics, see https://docs.aws.amazon.com/forecast/latest/dg/metrics.html.
     eval_metric_seasonal_period : int, optional
         Seasonal period used to compute the mean absolute scaled error (MASE) evaluation metric. This parameter is only
-        used if ``eval_metric="MASE"`. See https://en.wikipedia.org/wiki/Mean_absolute_scaled_error for more details.
+        used if ``eval_metric="MASE"``. See https://en.wikipedia.org/wiki/Mean_absolute_scaled_error for more details.
         Defaults to ``None``, in which case the seasonal period is computed based on the data frequency.
     known_covariates_names: List[str], optional
         Names of the covariates that are known in advance for all time steps in the forecast horizon. These are also
@@ -124,7 +126,7 @@ class TimeSeriesPredictor:
         verbosity: int = 2,
         quantile_levels: Optional[List[float]] = None,
         cache_predictions: bool = True,
-        learner_type: Type[AbstractLearner] = TimeSeriesLearner,
+        learner_type: Optional[Type[AbstractLearner]] = None,
         learner_kwargs: Optional[dict] = None,
         label: Optional[str] = None,
         ignore_time_index: bool = False,
@@ -179,6 +181,9 @@ class TimeSeriesPredictor:
                 cache_predictions=self.cache_predictions,
             )
         )
+        # Using `TimeSeriesLearner` as default argument breaks doc generation with Sphnix
+        if learner_type is None:
+            learner_type = TimeSeriesLearner
         self._learner: AbstractLearner = learner_type(**learner_kwargs)
         self._learner_type = type(self._learner)
 

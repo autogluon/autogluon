@@ -884,6 +884,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         Examples
         --------
         Convert irregularly-sampled time series data to a regular index
+
         >>> ts_df
                             target
         item_id timestamp
@@ -893,7 +894,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 2019-01-07     NaN
         1       2019-02-04     3.0
                 2019-02-07     4.0
-
         >>> ts_df.convert_frequency(freq="D")
                             target
         item_id timestamp
@@ -910,6 +910,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 2019-02-07     4.0
 
         Downsample quarterly data to yearly frequency
+
         >>> ts_df
                             target
         item_id timestamp
