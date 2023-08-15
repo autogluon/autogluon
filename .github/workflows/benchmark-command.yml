@@ -123,7 +123,7 @@ jobs:
       - id: get-comment-body
         run: |
           body="$(cat website.txt)"
-          echo "::set-output name=body::$body"
+          echo ::set-output name=body::$body
       - name: Comment Dashboard Website Link on PR
         if: ${{ github.event_name == 'pull_request_target' }}
         uses: peter-evans/create-or-update-comment@v2.0.0
@@ -131,6 +131,5 @@ jobs:
           token: ${{ secrets.PAT }}
           repository: ${{ github.event.inputs.repository }}
           comment-id: ${{ github.event.inputs.comment-id }}
-          issue-number: ${{ github.event.number }}
           body: ${{ steps.get-comment-body.outputs.body }}
       
