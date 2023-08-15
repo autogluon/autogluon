@@ -60,7 +60,7 @@ install_requires = ag.get_dependency_version_ranges(install_requires)
 tests_require = [
     "black>=22.3,<23.0",
     "isort>=5.10",
-    "datasets>=2.14.0,<2.15.0",
+    "datasets>=2.14.4,<2.15.0",
     "onnx>=1.13.0,<1.14.0",
     "onnxruntime>=1.13.0,<1.14.0;platform_system=='Darwin'",
     "onnxruntime-gpu>=1.13.0,<1.14.0;platform_system!='Darwin'",
