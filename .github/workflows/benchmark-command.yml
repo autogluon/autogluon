@@ -110,7 +110,7 @@ jobs:
           path: ./website.txt
   
   dashboard: 
-    needs: setup
+    needs: benchmark
     runs-on: ubuntu-latest
     defaults:
       run:
