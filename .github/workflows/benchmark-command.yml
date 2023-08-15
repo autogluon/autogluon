@@ -108,6 +108,14 @@ jobs:
         with:
           name: dashboard-website
           path: ./website.txt
+  
+  dashboard: 
+    needs: setup
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
       - name: Download code coverage results
         uses: actions/download-artifact@v3
         with:
