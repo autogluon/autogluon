@@ -157,7 +157,7 @@ class SeasonalAverageModel(AbstractLocalModel):
         result = stats_per_season.reindex(season_in_forecast_horizon)
 
         if np.any(result.isna().values):
-            # Use statics over all timesteps to fill values for seasons that are missing from training data
+            # Use statistics over all timesteps to fill values for seasons that are missing from training data
             stats_marginal = time_series.agg(agg_functions)
             result = result.fillna(stats_marginal)
         return result
