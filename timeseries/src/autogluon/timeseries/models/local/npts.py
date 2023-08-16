@@ -1,4 +1,5 @@
 import pandas as pd
+
 from autogluon.timeseries.models.local.abstract_local_model import AbstractLocalModel
 
 
@@ -18,6 +19,14 @@ class NPTSModel(AbstractLocalModel):
         Scaling factor used in the exponential kernel.
     use_seasonal_variant : bool, default = True
         Whether to use the seasonal variant of the model.
+    n_jobs : int or float, default = 0.5
+        Number of CPU cores used to fit the models in parallel.
+        When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
+        When set to a positive integer, that many cores are used.
+        When set to -1, all CPU cores are used.
+    max_ts_length : int, default = 2500
+        If not None, only the last ``max_ts_length`` time steps of each time series will be used to train the model.
+        This significantly speeds up fitting and usually leads to no change in accuracy.
     """
 
     allowed_local_model_args = [
