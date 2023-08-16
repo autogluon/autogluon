@@ -1,9 +1,10 @@
 import logging
 import os
+import shutil
 import time
 import uuid
 from pathlib import Path
-from typing import Any, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence
 
 import pytorch_lightning as pl
 import torch
@@ -100,12 +101,13 @@ class DDPPredictionWriter(BasePredictionWriter):
             time.sleep(self.sleep_time)
         sample_indices = torch.load(sample_indices_file)
         predictions = torch.load(predictions_file)
-        os.remove(sample_indices_file)
-        os.remove(predictions_file)
+
         return sample_indices, predictions
 
     def flatten(self, x):
         """
+        Flatten nested lists into one list.
+
         Parameters
         ----------
         x
@@ -115,6 +117,57 @@ class DDPPredictionWriter(BasePredictionWriter):
             return [a for i in x for a in self.flatten(i)]
         else:
             return [x]
+
+    def collate(self, x: List[Dict]):
+        """
+        Collate a list of dictionaries into one.
+        Each value is a tensor concatenated from a list of batch tensors.
+
+        Parameters
+        ----------
+        x
+            A list of batch results. Each batch is one (nested) dictionary.
+        """
+        results = dict()
+        if len(x[0]) == 0:  # dict is empty
+            return dict()
+        for k, v in x[0].items():
+            if k == WEIGHT:  # ignore the key
+                continue
+            elif isinstance(v, dict):
+                results[k] = self.collate([i[k] for i in x])
+            elif isinstance(v, torch.Tensor):
+                results[k] = torch.cat([i[k] for i in x])
+            else:
+                raise ValueError(
+                    f"Unsupported data type {type(v)} is found in prediction results. "
+                    f"We only support dictionary with torch tensor values."
+                )
+
+        return results
+
+    def sort(self, x: Dict, indices: List):
+        """
+        Sort the values of each key according to the indices.
+        This is to make sure that prediction results follow the order of input samples.
+
+        Parameters
+        ----------
+        x
+            A dictionary with all the predictions.
+        indices
+            A list of indices.
+        """
+        results = dict()
+        for k, v in x.items():
+            if isinstance(v, dict):
+                results[k] = self.sort(v, indices)
+            else:
+                assert len(indices) == len(v)
+                results[k] = [x for _, x in sorted(zip(indices, v), key=lambda ele: ele[0])]
+                results[k] = torch.stack(results[k])
+
+        return results
 
     def collect_all_gpu_results(self, num_gpus):
         """
@@ -131,17 +184,8 @@ class DDPPredictionWriter(BasePredictionWriter):
             predictions += self.flatten(predictions_per_rank)
 
         assert sorted(sample_indices) == list(range(len(sample_indices)))
-        output_keys = [k for k in predictions[0].keys() if k != WEIGHT]  # weight is not needed in prediction outputs
-
-        sorted_predictions = dict()
-        for k in output_keys:
-            predictions_per_key = torch.cat([batch_preds[k] for batch_preds in predictions])
-            assert len(predictions_per_key) == len(sample_indices)
-            sorted_predictions[k] = [
-                x for _, x in sorted(zip(sample_indices, predictions_per_key), key=lambda ele: ele[0])
-            ]
-            sorted_predictions[k] = torch.stack(sorted_predictions[k])
-
-        os.rmdir(self.output_dir)
+        predictions = self.collate(predictions)
+        sorted_predictions = self.sort(predictions, indices=sample_indices)
+        shutil.rmtree(self.output_dir)
 
         return [sorted_predictions]
