@@ -1,6 +1,7 @@
 import joblib.externals.loky
 
 from .naive import NaiveModel, SeasonalNaiveModel
+from .npts import NPTSModel
 from .statsforecast import AutoARIMAModel, AutoETSModel, DynamicOptimizedThetaModel, ThetaModel
 from .statsmodels import ARIMAModel, ETSModel, ThetaStatsmodelsModel
 

@@ -11,6 +11,7 @@ from autogluon.timeseries.models.local import (
     DynamicOptimizedThetaModel,
     ETSModel,
     NaiveModel,
+    NPTSModel,
     SeasonalNaiveModel,
     ThetaModel,
     ThetaStatsmodelsModel,
@@ -31,6 +32,7 @@ TESTABLE_MODELS = [
     ETSModel,
     ThetaModel,
     NaiveModel,
+    NPTSModel,
     SeasonalNaiveModel,
     ThetaStatsmodelsModel,
 ]
