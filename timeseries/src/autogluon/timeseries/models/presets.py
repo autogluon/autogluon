@@ -4,7 +4,6 @@ import re
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Type, Union
 
-import autogluon.timeseries as agts
 from autogluon.common import space
 from autogluon.core import constants
 
@@ -12,6 +11,7 @@ from . import (
     ARIMAModel,
     AutoARIMAModel,
     AutoETSModel,
+    AverageModel,
     DeepARModel,
     DirectTabularModel,
     DLinearModel,
@@ -21,6 +21,7 @@ from . import (
     NPTSModel,
     PatchTSTModel,
     RecursiveTabularModel,
+    SeasonalAverageModel,
     SeasonalNaiveModel,
     SimpleFeedForwardModel,
     TemporalFusionTransformerModel,
@@ -43,6 +44,8 @@ MODEL_TYPES = dict(
     TemporalFusionTransformer=TemporalFusionTransformerModel,
     RecursiveTabular=RecursiveTabularModel,
     DirectTabular=DirectTabularModel,
+    Average=AverageModel,
+    SeasonalAverage=SeasonalAverageModel,
     Naive=NaiveModel,
     SeasonalNaive=SeasonalNaiveModel,
     AutoETS=AutoETSModel,
