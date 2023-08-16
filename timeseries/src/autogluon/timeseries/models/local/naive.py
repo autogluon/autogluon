@@ -101,6 +101,7 @@ class AverageModel(AbstractLocalModel):
         This significantly speeds up fitting and usually leads to no change in accuracy.
     """
 
+    allowed_local_model_args = ["seasonal_period"]
     default_max_ts_length = None
 
     def _predict_with_local_model(

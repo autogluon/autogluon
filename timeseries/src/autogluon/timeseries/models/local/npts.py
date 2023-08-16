@@ -33,6 +33,7 @@ class NPTSModel(AbstractLocalModel):
         "kernel_type",
         "exp_kernel_weights",
         "use_seasonal_model",
+        "seasonal_period",
     ]
 
     def _predict_with_local_model(
