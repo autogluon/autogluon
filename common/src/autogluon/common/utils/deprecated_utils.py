@@ -27,7 +27,7 @@ def _deprecation_warning(
         warnings.warn(
             f"Deprecation Warning: {msg}. This will raise an error in the future!",
             category=DeprecationWarning,
-            stacklevel=2,
+            stacklevel=3,
         )
 
 
