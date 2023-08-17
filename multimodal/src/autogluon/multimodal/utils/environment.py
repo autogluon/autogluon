@@ -11,7 +11,7 @@ from torch import nn
 
 from autogluon.common.utils.resource_utils import ResourceManager
 
-from ..constants import AUTOMM, OBJECT_DETECTION, OCR
+from ..constants import DDP, OBJECT_DETECTION, OCR
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +55,7 @@ def compute_num_gpus(config_num_gpus: Union[int, float, List], strategy: str):
                 UserWarning,
             )
 
-    if is_interactive() and num_gpus > 1 and strategy in ["ddp", "ddp_spawn"]:
+    if is_interactive() and num_gpus > 1 and strategy.startswith(DDP):
         warnings.warn(
             "Interactive environment is detected. Currently, MultiModalPredictor does not support multi-gpu "
             "training under an interactive environment due to the limitation of ddp / ddp_spawn strategies "
