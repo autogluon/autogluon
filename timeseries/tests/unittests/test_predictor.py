@@ -1,5 +1,6 @@
 """Unit tests for predictors"""
 import copy
+import tempfile
 from unittest import mock
 
 import numpy as np
@@ -15,7 +16,7 @@ from autogluon.timeseries.predictor import TimeSeriesPredictor
 from .common import DUMMY_TS_DATAFRAME
 
 TEST_HYPERPARAMETER_SETTINGS = [
-    {"SimpleFeedForward": {"epochs": 1}},
+    {"SimpleFeedForward": {"epochs": 1, "num_batches_per_epoch": 1}},
     {"ETS": {"maxiter": 1}, "SimpleFeedForward": {"epochs": 1, "num_batches_per_epoch": 1}},
 ]
 
@@ -251,142 +252,6 @@ def test_given_hyperparameters_when_predictor_called_and_loaded_back_then_loaded
     assert not np.any(np.isnan(predictions))
 
 
-@pytest.fixture(
-    scope="module",
-    params=[
-        [
-            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00", "2020-01-04 00:01:00"],
-        ],
-        [
-            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:00", "2020-01-04 00:00:00"],
-            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:00", "2020-01-04 00:00:01"],
-        ],
-        [
-            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:00", "2020-01-04 00:00:00"],
-            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:00", "2020-01-05 00:00:00"],
-        ],
-        [
-            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00", "2020-01-04 00:00:00"],
-            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00", "2020-01-04 00:00:00"],
-            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00", "2020-01-04 00:00:00"],
-        ],
-    ],
-)
-def irregular_timestamp_data_frame(request):
-    df_tuples = []
-    for i, ts in enumerate(request.param):
-        for t in ts:
-            df_tuples.append((i, pd.Timestamp(t), np.random.rand()))
-    return TimeSeriesDataFrame.from_data_frame(pd.DataFrame(df_tuples, columns=[ITEMID, TIMESTAMP, "target"]))
-
-
-def test_given_irregular_time_series_when_predictor_called_with_ignore_then_training_is_performed(
-    temp_model_path, irregular_timestamp_data_frame
-):
-    df = irregular_timestamp_data_frame
-    predictor = TimeSeriesPredictor(
-        path=temp_model_path,
-        eval_metric="MAPE",
-        ignore_time_index=True,
-    )
-    predictor.fit(
-        train_data=df,
-        hyperparameters={"DeepAR": {"epochs": 1}},
-        tuning_data=df,
-    )
-    assert "DeepAR" in predictor.get_model_names()
-
-
-def test_given_irregular_time_series_and_no_tuning_when_predictor_called_with_ignore_then_training_is_performed(
-    temp_model_path, irregular_timestamp_data_frame
-):
-    df = irregular_timestamp_data_frame
-    predictor = TimeSeriesPredictor(
-        path=temp_model_path,
-        eval_metric="MAPE",
-        ignore_time_index=True,
-    )
-    predictor.fit(
-        train_data=df,
-        hyperparameters={"SimpleFeedForward": {"epochs": 1}},
-    )
-    assert "SimpleFeedForward" in predictor.get_model_names()
-
-
-def test_given_irregular_time_series_when_predictor_called_without_ignore_then_training_fails(
-    temp_model_path, irregular_timestamp_data_frame
-):
-    df = irregular_timestamp_data_frame
-    predictor = TimeSeriesPredictor(
-        path=temp_model_path,
-        eval_metric="MAPE",
-        ignore_time_index=False,
-    )
-    with pytest.raises(ValueError):
-        predictor.fit(
-            train_data=df,
-            hyperparameters={"SimpleFeedForward": {"epochs": 1}},
-        )
-
-
-def test_given_irregular_time_series_when_predictor_called_with_ignore_then_predictor_can_predict(
-    temp_model_path, irregular_timestamp_data_frame
-):
-    df = irregular_timestamp_data_frame
-    predictor = TimeSeriesPredictor(
-        path=temp_model_path,
-        eval_metric="MAPE",
-        ignore_time_index=True,
-    )
-    predictor.fit(
-        train_data=df,
-        hyperparameters={"SimpleFeedForward": {"epochs": 1}},
-    )
-    predictions = predictor.predict(df)
-
-    assert isinstance(predictions, TimeSeriesDataFrame)
-
-    predicted_item_index = predictions.item_ids
-    assert all(predicted_item_index == df.item_ids)  # noqa
-    assert all(len(predictions.loc[i]) == 1 for i in predicted_item_index)
-    assert not np.any(np.isnan(predictions))
-
-
-def test_given_irregular_time_series_when_predictor_called_without_ignore_then_predictor_cannot_predict(
-    temp_model_path, irregular_timestamp_data_frame
-):
-    df = irregular_timestamp_data_frame
-    predictor = TimeSeriesPredictor(
-        path=temp_model_path,
-        eval_metric="MAPE",
-        ignore_time_index=False,
-    )
-    predictor.fit(
-        train_data=DUMMY_TS_DATAFRAME.get_reindexed_view(),
-        hyperparameters={"SimpleFeedForward": {"epochs": 1}},
-    )
-    with pytest.raises(ValueError, match="irregularly sampled"):
-        _ = predictor.predict(df)
-
-
-@pytest.mark.parametrize("ignore_time_index", [True, False])
-def test_when_predictor_called_and_loaded_back_then_ignore_time_index_persists(temp_model_path, ignore_time_index):
-    predictor = TimeSeriesPredictor(
-        path=temp_model_path,
-        prediction_length=2,
-        ignore_time_index=ignore_time_index,
-    )
-    predictor.fit(
-        train_data=DUMMY_TS_DATAFRAME,
-        hyperparameters={"SimpleFeedForward": {"epochs": 1}},
-    )
-    predictor.save()
-    del predictor
-
-    loaded_predictor = TimeSeriesPredictor.load(temp_model_path)
-    assert loaded_predictor.ignore_time_index == ignore_time_index
-
-
 def test_given_enable_ensemble_true_when_predictor_called_then_ensemble_is_fitted(temp_model_path):
     predictor = TimeSeriesPredictor(
         path=temp_model_path,
@@ -552,21 +417,55 @@ def test_when_info_is_called_then_all_keys_and_models_are_included(temp_model_pa
     assert len(info["model_info"]) == num_models
 
 
-def test_when_train_data_contains_nans_then_exception_is_raised(temp_model_path):
+def test_when_train_data_contains_nans_then_predictor_can_fit(temp_model_path):
     predictor = TimeSeriesPredictor(path=temp_model_path)
     df = DUMMY_TS_DATAFRAME.copy()
     df.iloc[5] = np.nan
-    with pytest.raises(ValueError, match="missing values"):
-        predictor.fit(df)
+    predictor.fit(
+        df,
+        hyperparameters=TEST_HYPERPARAMETER_SETTINGS[0],
+    )
+    assert "SimpleFeedForward" in predictor.get_model_names()
 
 
-def test_when_prediction_data_contains_nans_then_exception_is_raised(temp_model_path):
+def test_when_prediction_data_contains_nans_then_predictor_can_predict(temp_model_path):
     predictor = TimeSeriesPredictor(path=temp_model_path)
     predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
     df = DUMMY_TS_DATAFRAME.copy()
     df.iloc[5] = np.nan
-    with pytest.raises(ValueError, match="missing values"):
-        predictor.predict(df)
+    predictions = predictor.predict(df)
+    assert isinstance(predictions, TimeSeriesDataFrame)
+    assert not np.any(np.isnan(predictions))
+
+
+def test_when_some_time_series_contain_only_nans_then_exception_is_raised(temp_model_path):
+    predictor = TimeSeriesPredictor(path=temp_model_path)
+    df = TimeSeriesDataFrame.from_iterable_dataset(
+        [
+            {"target": [float(5)] * 10, "start": pd.Period("2020-01-01", "D")},
+            {"target": [float("nan")] * 10, "start": pd.Period("2020-01-01", "D")},
+        ]
+    )
+    with pytest.raises(ValueError, match="consist completely of NaN values"):
+        predictor._check_and_prepare_data_frame(df)
+
+
+@pytest.mark.parametrize("method", ["score", "leaderboard"])
+def test_when_scoring_method_receives_only_future_data_then_exception_is_raised(temp_model_path, method):
+    prediction_length = 3
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length)
+    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
+    future_data = DUMMY_TS_DATAFRAME.slice_by_timestep(-prediction_length, None)
+    with pytest.raises(ValueError, match=" data includes both historic and future data"):
+        getattr(predictor, method)(data=future_data)
+
+
+def test_when_fit_receives_only_future_data_as_tuning_data_then_exception_is_raised(temp_model_path):
+    prediction_length = 3
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length)
+    future_data = DUMMY_TS_DATAFRAME.slice_by_timestep(-prediction_length, None)
+    with pytest.raises(ValueError, match="tuning\_data includes both historic and future data"):
+        predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}}, tuning_data=future_data)
 
 
 def test_given_data_is_in_dataframe_format_then_predictor_works(temp_model_path):
@@ -577,6 +476,18 @@ def test_given_data_is_in_dataframe_format_then_predictor_works(temp_model_path)
     predictor.score(df)
     predictions = predictor.predict(df)
     assert isinstance(predictions, TimeSeriesDataFrame)
+
+
+def test_given_data_is_in_str_format_then_predictor_works(temp_model_path):
+    df = pd.DataFrame(DUMMY_TS_DATAFRAME.reset_index())
+    with tempfile.NamedTemporaryFile("w") as data_path:
+        df.to_csv(data_path, index=False)
+        predictor = TimeSeriesPredictor(path=temp_model_path)
+        predictor.fit(df, hyperparameters={"Naive": {}})
+        predictor.leaderboard(df)
+        predictor.score(df)
+        predictions = predictor.predict(df)
+        assert isinstance(predictions, TimeSeriesDataFrame)
 
 
 @pytest.mark.parametrize("rename_columns", [{TIMESTAMP: "custom_timestamp"}, {ITEMID: "custom_item_id"}])
@@ -596,6 +507,15 @@ def test_given_data_is_not_sorted_then_predictor_can_fit_and_predict(temp_model_
     predictor.fit(ts_df, hyperparameters={"Naive": {}})
     predictions = predictor.predict(ts_df)
     assert len(predictions) == predictor.prediction_length * ts_df.num_items
+
+
+def test_given_data_is_not_sorted_then_preprocessed_data_is_sorted(temp_model_path):
+    shuffled_df = pd.DataFrame(DUMMY_TS_DATAFRAME).sample(frac=1.0)
+    ts_df = TimeSeriesDataFrame(shuffled_df)
+
+    predictor = TimeSeriesPredictor(path=temp_model_path)
+    ts_df_processed = predictor._check_and_prepare_data_frame(ts_df)
+    assert ts_df_processed.index.is_monotonic_increasing
 
 
 def test_when_both_argument_aliases_are_passed_to_init_then_exception_is_raised(temp_model_path):
@@ -681,3 +601,133 @@ def test_when_use_cache_is_set_to_false_then_cached_predictions_are_ignored(temp
             mock_get_cached_pred_dicts.assert_called()
         else:
             mock_get_cached_pred_dicts.assert_not_called()
+
+
+@pytest.fixture(
+    scope="module",
+    params=[
+        [
+            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00", "2020-01-04 00:01:00"],
+        ],
+        [
+            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:00", "2020-01-04 00:00:00"],
+            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:00", "2020-01-04 00:00:01"],
+        ],
+        [
+            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:00", "2020-01-04 00:00:00"],
+            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:00", "2020-01-05 00:00:00"],
+        ],
+        [
+            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00", "2020-01-04 00:00:00"],
+            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00", "2020-01-04 00:00:00"],
+            ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00", "2020-01-04 00:00:00"],
+        ],
+    ],
+)
+def irregular_timestamp_data_frame(request):
+    df_tuples = []
+    for i, ts in enumerate(request.param):
+        for t in ts:
+            df_tuples.append((i, pd.Timestamp(t), np.random.rand()))
+    return TimeSeriesDataFrame.from_data_frame(pd.DataFrame(df_tuples, columns=[ITEMID, TIMESTAMP, "target"]))
+
+
+def test_given_irregular_time_series_when_predictor_called_with_freq_then_predictor_can_predict(
+    temp_model_path, irregular_timestamp_data_frame
+):
+    df = irregular_timestamp_data_frame
+    predictor = TimeSeriesPredictor(
+        path=temp_model_path,
+        freq="D",
+    )
+    predictor.fit(
+        train_data=df,
+        hyperparameters=TEST_HYPERPARAMETER_SETTINGS[0],
+        tuning_data=df,
+    )
+    predictions = predictor.predict(df)
+    assert isinstance(df, TimeSeriesDataFrame)
+    assert not np.any(np.isnan(predictions))
+    assert all(len(predictions.loc[i]) == 1 for i in df.item_ids)
+    assert "SimpleFeedForward" in predictor.get_model_names()
+
+
+def test_given_irregular_time_series_and_no_tuning_when_predictor_called_with_freq_then_predictor_can_predict(
+    temp_model_path, irregular_timestamp_data_frame
+):
+    df = irregular_timestamp_data_frame
+    predictor = TimeSeriesPredictor(
+        path=temp_model_path,
+        freq="D",
+    )
+    predictor.fit(
+        train_data=df,
+        hyperparameters=TEST_HYPERPARAMETER_SETTINGS[0],
+    )
+    predictions = predictor.predict(df)
+    assert isinstance(df, TimeSeriesDataFrame)
+    assert not np.any(np.isnan(predictions))
+    assert all(len(predictions.loc[i]) == 1 for i in df.item_ids)
+    assert "SimpleFeedForward" in predictor.get_model_names()
+
+
+@pytest.mark.parametrize("predictor_freq", ["H", "3H", "20T"])
+def test_given_regular_time_series_when_predictor_called_with_freq_then_predictions_have_predictor_freq(
+    temp_model_path, predictor_freq
+):
+    df = DUMMY_TS_DATAFRAME.copy()
+    predictor = TimeSeriesPredictor(
+        path=temp_model_path,
+        freq=predictor_freq,
+        prediction_length=3,
+    )
+    predictor.fit(
+        train_data=df,
+        hyperparameters=TEST_HYPERPARAMETER_SETTINGS[0],
+    )
+    predictions = predictor.predict(df)
+    assert predictions.freq == predictor_freq
+
+
+def test_given_irregular_time_series_when_predictor_called_without_freq_then_training_fails(
+    temp_model_path, irregular_timestamp_data_frame
+):
+    df = irregular_timestamp_data_frame
+    predictor = TimeSeriesPredictor(
+        path=temp_model_path,
+    )
+    with pytest.raises(ValueError, match="expected data frequency"):
+        predictor.fit(
+            train_data=df,
+            hyperparameters=TEST_HYPERPARAMETER_SETTINGS[0],
+        )
+
+
+def test_given_regular_time_series_when_predictor_called_without_freq_then_freq_is_inferred(temp_model_path):
+    predictor = TimeSeriesPredictor(
+        path=temp_model_path,
+    )
+    assert predictor.freq is None
+    predictor.fit(
+        train_data=DUMMY_TS_DATAFRAME,
+        hyperparameters=TEST_HYPERPARAMETER_SETTINGS[0],
+    )
+    assert predictor.freq is not None
+    assert predictor.freq == DUMMY_TS_DATAFRAME.freq
+
+
+def test_given_regular_time_series_when_predictor_loaded_from_disk_then_inferred_freq_persists(temp_model_path):
+    predictor = TimeSeriesPredictor(
+        path=temp_model_path,
+    )
+    assert predictor.freq is None
+    predictor.fit(
+        train_data=DUMMY_TS_DATAFRAME,
+        hyperparameters=TEST_HYPERPARAMETER_SETTINGS[0],
+    )
+    predictor.save()
+    del predictor
+
+    loaded_predictor = TimeSeriesPredictor.load(temp_model_path)
+    assert loaded_predictor.freq is not None
+    assert loaded_predictor.freq == DUMMY_TS_DATAFRAME.freq

@@ -105,10 +105,7 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         self.freq: str = freq
         self.prediction_length: int = prediction_length
-        self.quantile_levels = kwargs.get(
-            "quantile_levels",
-            kwargs.get("quantiles", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]),
-        )
+        self.quantile_levels = kwargs.get("quantile_levels", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
         self._oof_predictions: Optional[TimeSeriesDataFrame] = None
 
     def __repr__(self) -> str:
