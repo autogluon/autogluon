@@ -46,6 +46,8 @@ Note that some of the models' hyperparameters have names and default values that
 
    NaiveModel
    SeasonalNaiveModel
+   AverageModel
+   SeasonalAverageModel
    ARIMAModel
    ETSModel
    AutoARIMAModel
@@ -62,14 +64,16 @@ Note that some of the models' hyperparameters have names and default values that
 
 ```
 
-### {hidden}`NaiveModel`
+## Baseline models
+
+### {hidden}`Naive`
 
 ```{eval-rst}
 .. autoclass:: NaiveModel
    :members: init
 ```
 
-### {hidden}`SeasonalNaiveModel`
+### {hidden}`SeasonalNaive`
 
 ```{eval-rst}
 .. autoclass:: SeasonalNaiveModel
@@ -77,7 +81,24 @@ Note that some of the models' hyperparameters have names and default values that
 
 ```
 
-### {hidden}`ARIMAModel`
+### {hidden}`Average`
+
+```{eval-rst}
+.. autoclass:: AverageModel
+   :members: init
+```
+
+### {hidden}`SeasonalAverage`
+
+```{eval-rst}
+.. autoclass:: SeasonalAverageModel
+   :members: init
+
+```
+
+## Statistical models
+
+### {hidden}`ARIMA`
 
 ```{eval-rst}
 .. autoclass:: ARIMAModel
@@ -85,7 +106,7 @@ Note that some of the models' hyperparameters have names and default values that
 
 ```
 
-### {hidden}`ETSModel`
+### {hidden}`ETS`
 
 ```{eval-rst}
 .. autoclass:: ETSModel
@@ -93,21 +114,21 @@ Note that some of the models' hyperparameters have names and default values that
 
 ```
 
-### {hidden}`AutoARIMAModel`
+### {hidden}`AutoARIMA`
 
 ```{eval-rst}
 .. autoclass:: AutoARIMAModel
    :members: init
 ```
 
-### {hidden}`AutoETSModel`
+### {hidden}`AutoETS`
 
 ```{eval-rst}
 .. autoclass:: AutoETSModel
    :members: init
 ```
 
-### {hidden}`ThetaModel`
+### {hidden}`Theta`
 
 ```{eval-rst}
 .. autoclass:: ThetaModel
@@ -115,30 +136,24 @@ Note that some of the models' hyperparameters have names and default values that
 ```
 
 
-### {hidden}`DynamicOptimizedThetaModel`
+### {hidden}`DynamicOptimizedTheta`
 
 ```{eval-rst}
 .. autoclass:: DynamicOptimizedThetaModel
    :members: init
 ```
 
-### {hidden}`DirectTabularModel`
+### {hidden}`NPTS`
 
 ```{eval-rst}
-.. autoclass:: DirectTabularModel
+.. autoclass:: NPTSModel
    :members: init
 
 ```
 
-### {hidden}`RecursiveTabularModel`
+## Deep learning models
 
-```{eval-rst}
-.. autoclass:: RecursiveTabularModel
-   :members: init
-
-```
-
-### {hidden}`DeepARModel`
+### {hidden}`DeepAR`
 
 ```{eval-rst}
 .. autoclass:: DeepARModel
@@ -146,7 +161,7 @@ Note that some of the models' hyperparameters have names and default values that
 
 ```
 
-### {hidden}`DLinearModel`
+### {hidden}`DLinear`
 
 ```{eval-rst}
 .. autoclass:: DLinearModel
@@ -154,7 +169,7 @@ Note that some of the models' hyperparameters have names and default values that
 
 ```
 
-### {hidden}`PatchTSTModel`
+### {hidden}`PatchTST`
 
 ```{eval-rst}
 .. autoclass:: PatchTSTModel
@@ -162,7 +177,7 @@ Note that some of the models' hyperparameters have names and default values that
 
 ```
 
-### {hidden}`SimpleFeedForwardModel`
+### {hidden}`SimpleFeedForward`
 
 ```{eval-rst}
 .. autoclass:: SimpleFeedForwardModel
@@ -170,12 +185,30 @@ Note that some of the models' hyperparameters have names and default values that
 
 ```
 
-### {hidden}`TemporalFusionTransformerModel`
+### {hidden}`TemporalFusionTransformer`
 
 ```{eval-rst}
 .. autoclass:: TemporalFusionTransformerModel
    :members: init
 
+
+```
+
+## Tabular models
+
+### {hidden}`DirectTabular`
+
+```{eval-rst}
+.. autoclass:: DirectTabularModel
+   :members: init
+
+```
+
+### {hidden}`RecursiveTabular`
+
+```{eval-rst}
+.. autoclass:: RecursiveTabularModel
+   :members: init
 
 ```
 
