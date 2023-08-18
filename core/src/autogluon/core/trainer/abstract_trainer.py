@@ -397,7 +397,7 @@ class AbstractTrainer:
             )
             model_names_fit += base_model_names + aux_models
         if self.model_best is None and len(model_names_fit) != 0:
-            self.model_best = self.get_model_best(can_infer=True, infer_limit=infer_limit)
+            self.model_best = self.get_model_best(can_infer=True, infer_limit=infer_limit, infer_limit_as_child=True)
         self._time_limit = None
         self.save()
         return model_names_fit
@@ -1357,8 +1357,34 @@ class AbstractTrainer:
         """Get refit full model's parent. If model does not have a parent, return `model`."""
         return self.get_model_attribute(model=model, attribute="refit_full_parent", default=model)
 
-    # TODO: Take best performance model with lowest inference
-    def get_model_best(self, can_infer=None, allow_full=True, infer_limit=None):
+    def get_model_best(self, can_infer: bool = None, allow_full: bool = True, infer_limit: float = None, infer_limit_as_child: bool = False) -> str:
+        """
+        Returns the name of the model with the best validation score that satisfies all specified constraints.
+        If no model satisfies the constraints, an AssertionError will be raised.
+
+        Parameters
+        ----------
+        can_infer: bool, default = None
+            If True, only consider models that can infer.
+            If False, only consider models that can't infer.
+            If None, consider all models.
+        allow_full: bool, default = True
+            If True, consider all models.
+            If False, disallow refit_full models.
+        infer_limit: float, default = None
+            The maximum time in seconds per sample that a model is allowed to take during inference.
+            If None, consider all models.
+            If specified, consider only models that have a lower predict time per sample than `infer_limit`.
+        infer_limit_as_child: bool, default = False
+            If True, use the predict time per sample of the (theoretical) refit version of the model.
+                If the model is already refit, the predict time per sample is unchanged.
+            If False, use the predict time per sample of the model.
+
+        Returns
+        -------
+        model: str
+            The string name of the model with the best metric score that satisfies all constraints.
+        """
         models = self.get_model_names(can_infer=can_infer)
         if not models:
             raise AssertionError("Trainer has no fit models that can infer.")
@@ -1366,8 +1392,13 @@ class AbstractTrainer:
         if not allow_full:
             models = [model for model in models if model not in models_full]
 
+        predict_1_time_attribute = None
         if infer_limit is not None:
-            models_predict_1_time = self.get_models_attribute_full(models=models, attribute="predict_1_time")
+            if infer_limit_as_child:
+                predict_1_time_attribute = "predict_1_child_time"
+            else:
+                predict_1_time_attribute = "predict_1_time"
+            models_predict_1_time = self.get_models_attribute_full(models=models, attribute=predict_1_time_attribute)
             for model_key in models_predict_1_time:
                 if models_predict_1_time[model_key] > infer_limit:
                     models.remove(model_key)
@@ -1377,7 +1408,9 @@ class AbstractTrainer:
                 f"Trainer has no fit models that can infer while satisfying the constraints: (infer_limit={infer_limit}, allow_full={allow_full})."
             )
         model_performances = self.get_models_attribute_dict(models=models, attribute="val_score")
-        models_predict_time = self.get_models_attribute_full(models=models, attribute="predict_time")  # FIXME: Refit_full???
+
+        predict_time_attr = predict_1_time_attribute if predict_1_time_attribute is not None else "predict_time"
+        models_predict_time = self.get_models_attribute_full(models=models, attribute=predict_time_attr)
 
         perfs = [(m, model_performances[m], models_predict_time[m]) for m in models if model_performances[m] is not None]
         if not perfs:
