@@ -1251,8 +1251,9 @@ class AbstractTrainer:
                 if reuse_first_fold:
                     # Perform fallback black-box refit logic that doesn't retrain.
                     model_full = model.convert_to_refit_full_via_copy()
+                    # FIXME: validation time not correct for infer 1 batch time, needed to hack _is_refit=True to fix
                     logger.log(20, f"Fitting model: {model_full.name} | Skipping fit via cloning parent ...")
-                    self._add_model(model_full, stack_name=REFIT_FULL_NAME, level=level)
+                    self._add_model(model_full, stack_name=REFIT_FULL_NAME, level=level, _is_refit=True)
                     self.save_model(model_full)
                     models_trained = [model_full.name]
                 else:
@@ -1261,6 +1262,10 @@ class AbstractTrainer:
                     model_full._user_params_aux["max_memory_usage_ratio"] = model.params_aux["max_memory_usage_ratio"] * 1.15
                     # TODO: Do it for all models in the level at once to avoid repeated processing of data?
                     base_model_names = self.get_base_model_names(model_name)
+                    # FIXME: Logs for inference speed (1 row) are incorrect because
+                    #  parents are non-refit models in this sequence and later correct after logging.
+                    #  Avoiding fix at present to minimize hacks in the code.
+                    #  Return to this later when Trainer controls all stacking logic to map correct parent.
                     models_trained = self.stack_new_level_core(
                         X=X,
                         y=y,
@@ -1831,7 +1836,7 @@ class AbstractTrainer:
                 del model
         return model_names_trained
 
-    def _add_model(self, model: AbstractModel, stack_name: str = "core", level: int = 1, y_pred_proba_val=None) -> bool:
+    def _add_model(self, model: AbstractModel, stack_name: str = "core", level: int = 1, y_pred_proba_val=None, _is_refit=False) -> bool:
         """
         Registers the fit model in the Trainer object. Stores information such as model performance, save path, model type, and more.
         To use a model in Trainer, self._add_model must be called.
@@ -1908,7 +1913,7 @@ class AbstractTrainer:
                         f"Model '{model.name}' depends on model '{base_model_name}', but '{base_model_name}' is not in a lower stack level. ('{model.name}' level: {level}, '{base_model_name}' level: {self.model_graph.nodes[base_model_name]['level']})"
                     )
                 self.model_graph.add_edge(base_model_name, model.name)
-        self._log_model_stats(model)
+        self._log_model_stats(model, _is_refit=_is_refit)
         if self.low_memory:
             del model
         return True
@@ -1938,7 +1943,7 @@ class AbstractTrainer:
             raise AssertionError(f'"{model}" is not a key in self.model_graph, cannot add attributes: {attributes}')
         self.model_graph.nodes[model].update(attributes)
 
-    def _log_model_stats(self, model):
+    def _log_model_stats(self, model, _is_refit=False):
         """Logs model fit time, val score, predict time, and predict_1_time"""
         model = self.load_model(model)
         if model.val_score is not None:
@@ -1957,13 +1962,28 @@ class AbstractTrainer:
             fit_metadata = model.get_fit_metadata()
             predict_1_batch_size = fit_metadata.get("predict_1_batch_size", None)
             assert predict_1_batch_size is not None, "predict_1_batch_size cannot be None if predict_1_time is not None"
-            predict_1_time = model.predict_1_time
+
+            if _is_refit:
+                predict_1_time = self.get_model_attribute(model=model.name, attribute="predict_1_child_time")
+                predict_1_time_full = self.get_model_attribute_full(model=model.name, attribute="predict_1_child_time")
+            else:
+                predict_1_time = model.predict_1_time
+                predict_1_time_full = self.get_model_attribute_full(model=model.name, attribute="predict_1_time")
+
             predict_1_time_log, time_unit = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time)
             logger.log(20, f"\t{round(predict_1_time_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size | MARGINAL)")
 
-            predict_1_time_full = self.get_model_attribute_full(model=model.name, attribute="predict_1_time")
             predict_1_time_full_log, time_unit = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time_full)
             logger.log(20, f"\t{round(predict_1_time_full_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size)")
+
+            if not _is_refit:
+                predict_1_time_child = self.get_model_attribute(model=model.name, attribute="predict_1_child_time")
+                predict_1_time_child_log, time_unit = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time_child)
+                logger.log(20, f"\t{round(predict_1_time_child_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size | REFIT | MARGINAL)")
+
+                predict_1_time_full_child = self.get_model_attribute_full(model=model.name, attribute="predict_1_child_time")
+                predict_1_time_full_child_log, time_unit = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time_full_child)
+                logger.log(20, f"\t{round(predict_1_time_full_child_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size | REFIT)")
 
     # TODO: Split this to avoid confusion, HPO should go elsewhere?
     def _train_single_full(
