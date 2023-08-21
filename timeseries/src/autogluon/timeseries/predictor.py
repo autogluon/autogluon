@@ -300,6 +300,15 @@ class TimeSeriesPredictor:
             f"Median time series length is {median_length} (min={min_length}, max={max_length}). "
         )
 
+    def _recommend_num_val_windows(self, train_data: TimeSeriesDataFrame, max_num_val_windows: int = 3) -> int:
+        """Automatically recommend num_val_windows based on the length of training time series.
+
+        Chooses num_val_windows such that TS with median length is long enough to perform num_val_windows validations.
+        """
+        median_length = train_data.num_timesteps_per_item().median()
+        num_val_windows_for_median_ts = int((median_length - 1) // self.prediction_length - 1)
+        return min(max_num_val_windows, max(1, num_val_windows_for_median_ts))
+
     def _filter_short_series(
         self,
         train_data: TimeSeriesDataFrame,
@@ -333,15 +342,6 @@ class TimeSeriesPredictor:
             filtered_train_data = train_data
 
         return filtered_train_data
-
-    def _recommend_num_val_windows(self, train_data: TimeSeriesDataFrame, max_num_val_windows: int = 3) -> int:
-        """Automatically recommend num_val_windows based on the length of training time series.
-
-        Chooses num_val_windows such that TS with median length is long enough to perform num_val_windows validations.
-        """
-        median_length = train_data.num_timesteps_per_item().median()
-        num_val_windows_for_median_ts = int((median_length - 1) // self.prediction_length - 1)
-        return min(max_num_val_windows, max(1, num_val_windows_for_median_ts))
 
     @apply_presets(TIMESERIES_PRESETS_CONFIGS)
     def fit(
