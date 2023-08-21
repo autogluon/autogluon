@@ -364,8 +364,10 @@ class TimeSeriesPredictor:
         Parameters
         ----------
         train_data : Union[TimeSeriesDataFrame, pd.DataFrame, str]
-            Training data in the :class:`~autogluon.timeseries.TimeSeriesDataFrame` format. For best performance, all
-            time series should have length ``> 2 * prediction_length``.
+            Training data in the :class:`~autogluon.timeseries.TimeSeriesDataFrame` format.
+
+            Time series with length ``<= (num_val_windows + 1) * prediction_length`` will be ignored during training.
+            See :attr:`num_val_windows` for details.
 
             If ``known_covariates_names`` were specified when creating the predictor, ``train_data`` must include the
             columns listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
@@ -392,7 +394,7 @@ class TimeSeriesPredictor:
             time series are used for computing the validation score.
 
             If ``tuning_data`` is provided, multi-window backtesting on training data will be disabled, the
-            ``num_val_windows`` argument will be ignored, and ``refit_full`` will be set to ``False``.
+            :attr:`num_val_windows` will be set to ``0``, and :attr:`refit_full` will be set to ``False``.
 
             Leaving this argument empty and letting AutoGluon automatically generate the validation set from
             ``train_data`` is a good default.
@@ -516,10 +518,12 @@ class TimeSeriesPredictor:
                     presets="high_quality",
                     excluded_model_types=["DeepAR"],
                 )
-        num_val_windows : int, default = 1
+        num_val_windows : int or None, default = 1
             Number of backtests done on ``train_data`` for each trained model to estimate the validation performance.
             A separate copy of each model is trained for each validation window.
             When ``num_val_windows = k``, training time is increased roughly by a factor of ``k``.
+            If ``num_val_windows=None``, the predictor will attempt to set this parameter automatically based on the
+            length of time series in ``train_data``.
         refit_full : bool, default = False
             If True, after training is complete, AutoGluon will attempt to re-train all models using all of training
             data (including the data initially reserved for validation). This argument has no effect if ``tuning_data``
@@ -585,6 +589,9 @@ class TimeSeriesPredictor:
                     "\tSetting num_val_windows = 0 (disabling backtesting) because tuning_data is provided."
                 )
                 num_val_windows = 0
+
+        if num_val_windows == 0 and tuning_data is None:
+            raise ValueError("Please set num_val_windows >= 1 or provide custom tuning_data")
 
         train_data = self._filter_short_series(train_data, num_val_windows=num_val_windows)
 
