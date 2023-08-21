@@ -65,6 +65,7 @@ DEFAULT_MODEL_PRIORITY = dict(
     Average=100,
     SeasonalAverage=100,
     Theta=90,
+    NPTS=80,
     AutoETS=80,
     ETS=80,
     RecursiveTabular=70,
