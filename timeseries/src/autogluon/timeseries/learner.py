@@ -1,4 +1,5 @@
 import logging
+import reprlib
 import time
 from typing import Any, Dict, List, Optional, Type, Union
 
@@ -149,7 +150,7 @@ class TimeSeriesLearner(AbstractLearner):
         missing_item_ids = data.item_ids.difference(known_covariates.item_ids)
         if len(missing_item_ids) > 0:
             raise ValueError(
-                f"known_covariates are missing information for the following item_ids: {missing_item_ids.to_list()}."
+                f"known_covariates are missing information for the following item_ids: {reprlib.repr(missing_item_ids.to_list())}."
             )
 
         forecast_index = get_forecast_horizon_index_ts_dataframe(data, prediction_length=self.prediction_length)

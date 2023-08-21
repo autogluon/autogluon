@@ -1,4 +1,5 @@
 import logging
+import reprlib
 from dataclasses import dataclass, field
 from typing import List, Optional
 
@@ -134,7 +135,7 @@ class TimeSeriesFeatureGenerator:
         missing_columns = pd.Index(required_column_names).difference(data.columns)
         if len(missing_columns) > 0:
             raise ValueError(
-                f"{len(missing_columns)} columns are missing from {data_frame_name}: {missing_columns.to_list()}"
+                f"{len(missing_columns)} columns are missing from {data_frame_name}: {reprlib.repr(missing_columns.to_list())}"
             )
         data = data[required_column_names]
         try:
