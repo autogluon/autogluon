@@ -257,7 +257,7 @@ class TimeSeriesPredictor:
                 df = df.convert_frequency(freq=self.freq)
 
         # TODO: Add support for all pandas frequencies
-        offset = pd.tseries.frequencies.to_offset(df.freq)
+        offset = pd.tseries.frequencies.to_offset(self.freq)
         norm_freq_str = offset.name.split("-")[0]
         if norm_freq_str not in SUPPORTED_FREQUENCIES:
             logger.warning(
@@ -320,15 +320,15 @@ class TimeSeriesPredictor:
                 f"(at least {min_train_length + 1}) will be used for training."
             )
             filtered_train_data = train_data.query("item_id not in @train_items_to_drop")
-            logger.info(
-                f"\tAfter removing short series, train_data has {self._get_dataset_stats(filtered_train_data)}"
-            )
             if len(filtered_train_data) == 0:
                 raise ValueError(
                     f"At least some time series in train_data must have length > (num_val_windows + 1) * prediction_length "
                     f"(at least {min_train_length + 1}), otherwise training is impossible. Please reduce prediction_length, "
                     f"reduce num_val_windows, or provide longer time series as train_data."
                 )
+            logger.info(
+                f"\tAfter removing short series, train_data has {self._get_dataset_stats(filtered_train_data)}"
+            )
         else:
             filtered_train_data = train_data
 

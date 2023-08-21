@@ -13,7 +13,7 @@ from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 from autogluon.timeseries.models import DeepARModel, SimpleFeedForwardModel
 from autogluon.timeseries.predictor import TimeSeriesPredictor
 
-from .common import DUMMY_TS_DATAFRAME
+from .common import DUMMY_TS_DATAFRAME, get_data_frame_with_variable_lengths
 
 TEST_HYPERPARAMETER_SETTINGS = [
     {"SimpleFeedForward": {"epochs": 1, "num_batches_per_epoch": 1}},
@@ -731,3 +731,95 @@ def test_given_regular_time_series_when_predictor_loaded_from_disk_then_inferred
     loaded_predictor = TimeSeriesPredictor.load(temp_model_path)
     assert loaded_predictor.freq is not None
     assert loaded_predictor.freq == DUMMY_TS_DATAFRAME.freq
+
+
+@pytest.mark.parametrize("prediction_length", [1, 7])
+@pytest.mark.parametrize("num_val_windows", [1, 3])
+def test_given_short_and_long_series_in_train_data_when_fit_called_then_trainer_receives_only_long_series(
+    temp_model_path, prediction_length, num_val_windows
+):
+    item_id_to_length = {
+        "long_series_1": (num_val_windows + 2) * prediction_length + 1,
+        "long_series_2": (num_val_windows + 1) * prediction_length + 1,
+        "short_series_1": (num_val_windows + 1) * prediction_length,
+        "short_series_2": num_val_windows * prediction_length + 1,
+        "short_series_3": 2,
+    }
+    data = get_data_frame_with_variable_lengths(item_id_to_length, freq="H")
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length, freq="H")
+    with mock.patch("autogluon.timeseries.learner.TimeSeriesLearner.fit") as learner_fit:
+        predictor.fit(data, num_val_windows=num_val_windows)
+        learner_fit_kwargs = learner_fit.call_args[1]
+        item_ids_received_by_learner = learner_fit_kwargs["train_data"].item_ids
+        assert (item_ids_received_by_learner == ["long_series_1", "long_series_2"]).all()
+
+
+@pytest.mark.parametrize("prediction_length", [1, 7])
+def test_given_short_and_long_series_in_train_data_and_tuning_data_when_fit_called_then_trainer_receives_only_long_series(
+    temp_model_path, prediction_length
+):
+    item_id_to_length = {
+        "long_series_1": prediction_length + 1,
+        "short_series_1": prediction_length,
+        "short_series_2": 1,
+    }
+    data = get_data_frame_with_variable_lengths(item_id_to_length, freq="H")
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length, freq="H")
+    with mock.patch("autogluon.timeseries.learner.TimeSeriesLearner.fit") as learner_fit:
+        predictor.fit(data, tuning_data=DUMMY_TS_DATAFRAME)
+        learner_fit_kwargs = learner_fit.call_args[1]
+        item_ids_received_by_learner = learner_fit_kwargs["train_data"].item_ids
+        assert (item_ids_received_by_learner == ["long_series_1"]).all()
+
+
+@pytest.mark.parametrize("num_val_windows", [1, 3, None])
+def test_given_tuning_data_when_fit_called_then_num_val_windows_is_set_to_zero(temp_model_path, num_val_windows):
+    predictor = TimeSeriesPredictor(path=temp_model_path)
+    with mock.patch("autogluon.timeseries.learner.TimeSeriesLearner.fit") as learner_fit:
+        predictor.fit(DUMMY_TS_DATAFRAME, tuning_data=DUMMY_TS_DATAFRAME, num_val_windows=num_val_windows)
+        learner_fit_kwargs = learner_fit.call_args[1]
+        assert learner_fit_kwargs["num_val_windows"] == 0
+
+
+@pytest.mark.parametrize("prediction_length", [1, 5, 7])
+def test_when_num_val_windows_is_recommended_then_increasing_num_val_windows_raises_error(
+    temp_model_path, prediction_length
+):
+    df = DUMMY_TS_DATAFRAME.copy()
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length)
+    recommended_num_val_windows = predictor._recommend_num_val_windows(df, max_num_val_windows=100)
+    # assert that recommended_num_val_windows is the highest value for num_val_windows that doesn't raise an exception
+    assert predictor._filter_short_series(df, num_val_windows=recommended_num_val_windows).num_items == df.num_items
+    with pytest.raises(ValueError, match="At least some time series in train\_data must have length"):
+        predictor._filter_short_series(df, num_val_windows=recommended_num_val_windows + 1).num_items < df.num_items
+
+
+@pytest.mark.parametrize("prediction_length", [1, 7])
+@pytest.mark.parametrize("num_val_windows", [1, 3])
+def test_given_only_short_series_in_train_data_when_fit_called_then_exception_is_raised(
+    temp_model_path, prediction_length, num_val_windows
+):
+    item_id_to_length = {
+        "short_series_1": (num_val_windows + 1) * prediction_length,
+        "short_series_2": num_val_windows * prediction_length + 1,
+        "short_series_3": 2,
+    }
+    data = get_data_frame_with_variable_lengths(item_id_to_length, freq="H")
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length, freq="H")
+    with pytest.raises(ValueError, match="At least some time series in train\_data must have length"):
+        predictor.fit(data, num_val_windows=num_val_windows)
+
+
+@pytest.mark.parametrize("prediction_length", [1, 7])
+def test_given_only_short_series_when_num_val_windows_is_recommended_then_exception_is_raised(
+    temp_model_path, prediction_length
+):
+    item_id_to_length = {
+        "short_series_1": 2 * prediction_length,
+        "short_series_2": prediction_length + 1,
+        "short_series_3": 2,
+    }
+    data = get_data_frame_with_variable_lengths(item_id_to_length, freq="H")
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length, freq="H")
+    with pytest.raises(ValueError, match="At least some time series in train\_data must have length"):
+        predictor.fit(data, num_val_windows=None)
