@@ -137,7 +137,6 @@ def test_advanced_functionality():
     savedir_predictor_original = savedir + "predictor/"
     predictor: TabularPredictor = TabularPredictor(label=label, path=savedir_predictor_original).fit(train_data)
     leaderboard = predictor.leaderboard(data=test_data)
-    predictor.plot_ensemble_model()
     extra_metrics = ["accuracy", "roc_auc", "log_loss"]
     test_data_no_label = test_data.drop(columns=[label])
     with pytest.raises(ValueError):
@@ -247,7 +246,6 @@ def test_advanced_functionality():
 
     assert predictor.get_model_full_dict() == dict()
     predictor.refit_full()
-    predictor.plot_ensemble_model()
     assert len(predictor.get_model_full_dict()) == num_models
     assert len(predictor.get_model_names()) == num_models * 2
     for model in predictor.get_model_names():
@@ -694,7 +692,7 @@ def test_pseudolabeling():
                     assert False, error_msg + "unlabeled test data, best quality" + error_suffix
 
 
-@pytest.mark.slow
+@pytest.mark.platform
 def test_tabularHPObagstack():
     ############ Benchmark options you can set: ########################
     perf_threshold = 1.1  # How much worse can performance on each dataset be vs previous performance without warning
@@ -734,7 +732,7 @@ def test_tabularHPObagstack():
     ###################################################################
     run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold, seed_val=seed_val, fit_args=fit_args)
 
-
+@pytest.mark.platform
 def test_tabularHPO():
     ############ Benchmark options you can set: ########################
     perf_threshold = 1.1  # How much worse can performance on each dataset be vs previous performance without warning
@@ -1143,7 +1141,6 @@ def test_tabular_log_to_file():
     predictor = TabularPredictor(label="class", log_to_file=True, log_file_path=log_file).fit(train_data=train_data, hyperparameters={"DUMMY": {}})
     log = TabularPredictor.load_log(log_file_path=log_file)
     assert "TabularPredictor saved." in log[-1]
-    os.remove(log_file)
 
     with pytest.raises(AssertionError):
         TabularPredictor.load_log()
