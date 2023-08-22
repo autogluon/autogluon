@@ -129,7 +129,6 @@ from .utils import (
     evaluate_coco,
     extract_from_output,
     filter_hyperparameters,
-    get_available_devices,
     get_config,
     get_detection_classes,
     get_dir_ckpt_paths,
@@ -1289,7 +1288,7 @@ class MultiModalPredictor(ExportMixin):
                 validate_data=val_df,
                 val_use_training_mode=val_use_training_mode,
             )
-
+        print(f"cuda initialized  at line 1292: {torch.cuda.is_initialized()}")
         optimization_kwargs = dict(
             optim_type=config.optimization.optim_type,
             lr_choice=config.optimization.lr_choice,
@@ -1370,6 +1369,7 @@ class MultiModalPredictor(ExportMixin):
 
         logger.debug(f"validation_metric_name: {task.validation_metric_name}")
         logger.debug(f"minmax_mode: {minmax_mode}")
+        print(f"cuda initialized  at line 1373: {torch.cuda.is_initialized()}")
 
         checkpoint_callback = AutoMMModelCheckpoint(
             dirpath=save_path,
@@ -1418,12 +1418,13 @@ class MultiModalPredictor(ExportMixin):
             name="",
             version="",
         )
-
+        print(f"cuda initialized  at line 1422: {torch.cuda.is_initialized()}")
         num_gpus = compute_num_gpus(config_num_gpus=config.env.num_gpus, strategy=config.env.strategy)
-        logger.info(get_gpu_message(detected_num_gpus=ResourceManager.get_gpu_count_torch(), used_num_gpus=num_gpus))
+        logger.info(get_gpu_message(detected_num_gpus=ResourceManager.get_gpu_count_torch(), used_num_gpus=num_gpus, strategy=config.env.strategy))
 
         precision = infer_precision(num_gpus=num_gpus, precision=config.env.precision)
-
+        print(f"cuda initialized  at line 1428: {torch.cuda.is_initialized()}")
+        # exit()
         if num_gpus == 0:  # CPU only training
             grad_steps = max(
                 config.env.batch_size // (config.env.per_gpu_batch_size * config.env.num_nodes),
@@ -1464,16 +1465,14 @@ class MultiModalPredictor(ExportMixin):
         self._config = config
         # save artifacts for the current running, except for model checkpoint, which will be saved in trainer
         self.save(save_path, standalone=standalone)
+        print(f"cuda initialized  at line 1470: {torch.cuda.is_initialized()}")
 
         blacklist_msgs = ["already configured with model summary"]
         log_filter = LogFilter(blacklist_msgs)
         with apply_log_filter(log_filter):
             trainer = pl.Trainer(
                 accelerator="gpu" if num_gpus > 0 else "auto",
-                devices=get_available_devices(
-                    num_gpus=num_gpus,
-                    auto_select_gpus=config.env.auto_select_gpus,
-                ),
+                devices=num_gpus if num_gpus > 0 else "auto",
                 num_nodes=config.env.num_nodes,
                 precision=precision,
                 strategy=strategy,
@@ -1498,7 +1497,8 @@ class MultiModalPredictor(ExportMixin):
                 else 1,
                 plugins=[custom_checkpoint_plugin],
             )
-
+        print(f"cuda initialized  at line 1501: {torch.cuda.is_initialized()}")
+        # exit()
         with warnings.catch_warnings():
             warnings.filterwarnings(
                 "ignore",
@@ -1777,7 +1777,7 @@ class MultiModalPredictor(ExportMixin):
         with apply_log_filter(log_filter):
             evaluator = pl.Trainer(
                 accelerator="gpu" if num_gpus > 0 else "auto",
-                devices=get_available_devices(num_gpus=num_gpus, auto_select_gpus=self._config.env.auto_select_gpus),
+                devices=num_gpus if num_gpus > 0 else "auto",
                 num_nodes=self._config.env.num_nodes,
                 precision=precision,
                 strategy=strategy,
