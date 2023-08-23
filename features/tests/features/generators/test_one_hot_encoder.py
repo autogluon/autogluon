@@ -14,7 +14,7 @@ def test_one_hot_encoder_feature_generator(generator_helper, data_helper):
         ("int", ()): ["int"],
     }
     expected_feature_metadata_full = {
-        ("int", ("bool", "sparse")): ['_ohe_0', '_ohe_1', '_ohe_2', '_ohe_3', '_ohe_4', '_ohe_5', '_ohe_6', '_ohe_7', '_ohe_8', '_ohe_9', '_ohe_10']
+        ("int", ("bool", "sparse")): ["_ohe_0", "_ohe_1", "_ohe_2", "_ohe_3", "_ohe_4", "_ohe_5", "_ohe_6", "_ohe_7", "_ohe_8", "_ohe_9", "_ohe_10"]
     }
 
     expected_output_data_int_0_val = [0, 1, 0, 0, 0, 0, 0, 1, 0]
