@@ -1319,8 +1319,23 @@ class AbstractModel:
         return template
 
     def convert_to_refit_full_template(self):
-        """After calling this function, returned model should be able to be fit without X_val, y_val using the iterations trained by the original model."""
+        """
+        After calling this function, returned model should be able to be fit without X_val, y_val using the iterations trained by the original model.
+
+        Increase max_memory_usage_ratio by 25% to reduce the chance that the refit model will trigger NotEnoughMemoryError and skip training.
+        This can happen without the 25% increase since the refit model generally will use more training data and thus require more memory.
+        """
         params = copy.deepcopy(self.get_params())
+
+        if "hyperparameters" not in params:
+            params["hyperparameters"] = dict()
+
+        if AG_ARGS_FIT not in params["hyperparameters"]:
+            params["hyperparameters"][AG_ARGS_FIT] = dict()
+
+        # Increase memory limit by 25% to avoid memory restrictions during fit
+        params["hyperparameters"][AG_ARGS_FIT]["max_memory_usage_ratio"] = params["hyperparameters"][AG_ARGS_FIT].get("max_memory_usage_ratio", 1.0) * 1.25
+
         params["hyperparameters"].update(self.params_trained)
         params["name"] = params["name"] + REFIT_FULL_SUFFIX
         template = self.__class__(**params)
