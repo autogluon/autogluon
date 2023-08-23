@@ -43,3 +43,12 @@ profile = "black"
 skip = '.git,*.pdf,*.svg,*.ipynb,*.csv,kaggle_feedback_prize'
 #
 ignore-words-list = 'mape,ans,2st,fo,nd,te,fpr,coo,rouge'
+
+
+[tool.ruff]
+ignore = [
+    "E501",  # Line too long
+    "E731",  # Do not assign a `lambda` expression, use a `def`
+    "E722",  # Do not use bare `except`
+]
+extend-exclude = ["__init__.py"]
