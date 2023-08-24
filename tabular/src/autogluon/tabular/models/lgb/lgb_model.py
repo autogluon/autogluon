@@ -77,7 +77,7 @@ class LGBModel(AbstractModel):
         """
         num_classes = self.num_classes if self.num_classes else 1  # self.num_classes could be None after initialization if it's a regression problem
         data_mem_usage = get_approximate_df_mem_usage(X).sum()
-        data_mem_usage_bytes = data_mem_usage * 6 + data_mem_usage / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
+        data_mem_usage_bytes = data_mem_usage * 5 + data_mem_usage / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
 
         params = self._get_model_params()
         max_bins = params.get('max_bins', 255)
