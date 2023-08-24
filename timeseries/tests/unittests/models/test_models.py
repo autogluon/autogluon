@@ -1,6 +1,5 @@
 """Unit tests and utils common to all models"""
 import itertools
-import os
 import shutil
 import tempfile
 from unittest import mock

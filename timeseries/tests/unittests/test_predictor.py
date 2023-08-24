@@ -355,7 +355,7 @@ def test_given_mixed_searchspace_and_hyperparameter_tune_kwargs_when_predictor_f
 @pytest.mark.parametrize("target_column", ["target", "CUSTOM_TARGET"])
 def test_when_target_included_in_known_covariates_then_exception_is_raised(temp_model_path, target_column):
     with pytest.raises(ValueError, match="cannot be one of the known covariates"):
-        predictor = TimeSeriesPredictor(
+        TimeSeriesPredictor(
             path=temp_model_path, target=target_column, known_covariates_names=["Y", target_column, "X"]
         )
 
@@ -520,12 +520,12 @@ def test_given_data_is_not_sorted_then_preprocessed_data_is_sorted(temp_model_pa
 
 def test_when_both_argument_aliases_are_passed_to_init_then_exception_is_raised(temp_model_path):
     with pytest.raises(ValueError, match="Please specify at most one of these arguments"):
-        predictor = TimeSeriesPredictor(path=temp_model_path, target="custom_target", label="custom_target")
+        TimeSeriesPredictor(path=temp_model_path, target="custom_target", label="custom_target")
 
 
 def test_when_invalid_argument_passed_to_init_then_exception_is_raised(temp_model_path):
     with pytest.raises(TypeError, match="unexpected keyword argument 'invalid_argument'"):
-        predictor = TimeSeriesPredictor(path=temp_model_path, invalid_argument=23)
+        TimeSeriesPredictor(path=temp_model_path, invalid_argument=23)
 
 
 def test_when_invalid_argument_passed_to_fit_then_exception_is_raised(temp_model_path):

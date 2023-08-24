@@ -244,7 +244,7 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
             if strategy == "items":
                 item_ids = data.item_ids
                 num_items_to_keep = math.ceil(len(item_ids) * max_num_rows / len(data))
-                items_to_keep = np.random.choice(item_ids, num_items_to_keep, replace=False)
+                items_to_keep = np.random.choice(item_ids, num_items_to_keep, replace=False)  # noqa: F841
                 logger.debug(
                     f"\tRandomly selected {num_items_to_keep} ({num_items_to_keep / len(item_ids):.1%}) time series "
                     "to limit peak memory usage"

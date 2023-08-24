@@ -6,6 +6,7 @@ function setup_build_env {
     python3 -m pip install isort>=5.10
     python3 -m pip install bandit
     python3 -m pip install packaging
+    python3 -m pip install ruff
 }
 
 function setup_build_contrib_env {
@@ -49,7 +50,7 @@ function install_multimodal_no_groundingdino {
     # groundingdino has issue when installing on Windows
     # https://github.com/IDEA-Research/GroundingDINO/issues/57
     source $(dirname "$0")/setup_mmcv.sh
-    
+
     # launch different process for each test to make sure memory is released
     python3 -m pip install --upgrade pytest-xdist
     install_local_packages "multimodal/$1"
@@ -60,7 +61,7 @@ function install_multimodal_no_groundingdino {
 function install_multimodal {
     source $(dirname "$0")/setup_mmcv.sh
     source $(dirname "$0")/setup_groundingdino.sh
-    
+
     # launch different process for each test to make sure memory is released
     python3 -m pip install --upgrade pytest-xdist
     install_local_packages "multimodal/$1"

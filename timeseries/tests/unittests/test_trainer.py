@@ -1,6 +1,5 @@
 """Unit tests for trainers"""
 import copy
-import os
 import shutil
 import tempfile
 from collections import defaultdict
