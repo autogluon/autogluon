@@ -79,8 +79,8 @@ class CatBoostModel(AbstractModel):
         data_mem_usage_bytes = data_mem_usage * 5 + data_mem_usage / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
 
         params = self._get_model_params()
-        border_count = params.get('border_count', 254)
-        depth = params.get('depth', 6)
+        border_count = params.get("border_count", 254)
+        depth = params.get("depth", 6)
         # Formula based on manual testing, aligns with LightGBM histogram sizes
         histogram_mem_usage_bytes = 20 * math.pow(2, depth) * len(X.columns) * border_count
 

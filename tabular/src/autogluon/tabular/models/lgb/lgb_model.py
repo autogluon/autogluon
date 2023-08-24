@@ -80,11 +80,11 @@ class LGBModel(AbstractModel):
         data_mem_usage_bytes = data_mem_usage * 5 + data_mem_usage / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
 
         params = self._get_model_params()
-        max_bins = params.get('max_bins', 255)
-        num_leaves = params.get('num_leaves', 31)
+        max_bins = params.get("max_bins", 255)
+        num_leaves = params.get("num_leaves", 31)
         # Memory usage of histogram based on https://github.com/microsoft/LightGBM/issues/562#issuecomment-304524592
         histogram_mem_usage_bytes = 20 * max_bins * len(X.columns) * num_leaves
-        histogram_mem_usage_bytes_max = params.get('histogram_pool_size', None)
+        histogram_mem_usage_bytes_max = params.get("histogram_pool_size", None)
         if histogram_mem_usage_bytes_max is not None:
             histogram_mem_usage_bytes_max *= 1e6  # Convert megabytes to bytes, `histogram_pool_size` is in MB.
             if histogram_mem_usage_bytes > histogram_mem_usage_bytes_max:
