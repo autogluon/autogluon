@@ -9,7 +9,6 @@ from joblib import Parallel, delayed
 from scipy.stats import norm
 
 from autogluon.core.utils.exceptions import TimeLimitExceeded
-from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
@@ -34,6 +33,9 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         Argument that can be passed to the underlying local model.
     default_n_jobs : Union[int, float]
         Default number of CPU cores used to train models. If float, this fraction of CPU cores will be used.
+    default_max_ts_length : Optional[int]
+        If not None, only the last ``max_ts_length`` time steps of each time series will be used to train the model.
+        This significantly speeds up fitting and usually leads to no change in accuracy.
     init_time_in_seconds : int
         Time that it takes to initialize the model in seconds (e.g., because of JIT compilation by Numba).
         If time_limit is below this number, model won't be trained.
@@ -41,6 +43,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
 
     allowed_local_model_args: List[str] = []
     default_n_jobs: Union[int, float] = AG_DEFAULT_N_JOBS
+    default_max_ts_length: Optional[int] = 2500
     init_time_in_seconds: int = 0
 
     def __init__(
@@ -65,7 +68,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
             raise ValueError(f"n_jobs must be a float between 0 and 1 or an integer (received n_jobs = {n_jobs})")
         # Default values, potentially overridden inside _fit()
         self.use_fallback_model = hyperparameters.pop("use_fallback_model", True)
-        self.max_ts_length = hyperparameters.pop("max_ts_length", 2500)
+        self.max_ts_length = hyperparameters.pop("max_ts_length", self.default_max_ts_length)
 
         super().__init__(
             path=path,
@@ -164,7 +167,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
                 local_model_args=self._local_model_args.copy(),
             )
             model_failed = False
-        except:
+        except Exception:
             if self.use_fallback_model:
                 result = seasonal_naive_forecast(
                     target=time_series.values.ravel(),

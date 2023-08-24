@@ -22,7 +22,7 @@ class AutoTimeSeriesTrainer(AbstractTimeSeriesTrainer):
             freq=kwargs.get("freq"),
             hyperparameters=hyperparameters,
             hyperparameter_tune=hyperparameter_tune,
-            quantiles=quantile_levels,
+            quantile_levels=quantile_levels,
             all_assigned_names=self._get_banned_model_names(),
             target=self.target,
             metadata=self.metadata,

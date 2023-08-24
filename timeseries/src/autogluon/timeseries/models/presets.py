@@ -4,7 +4,6 @@ import re
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Type, Union
 
-import autogluon.timeseries as agts
 from autogluon.common import space
 from autogluon.core import constants
 
@@ -12,14 +11,17 @@ from . import (
     ARIMAModel,
     AutoARIMAModel,
     AutoETSModel,
+    AverageModel,
     DeepARModel,
     DirectTabularModel,
     DLinearModel,
     DynamicOptimizedThetaModel,
     ETSModel,
     NaiveModel,
+    NPTSModel,
     PatchTSTModel,
     RecursiveTabularModel,
+    SeasonalAverageModel,
     SeasonalNaiveModel,
     SimpleFeedForwardModel,
     TemporalFusionTransformerModel,
@@ -42,11 +44,14 @@ MODEL_TYPES = dict(
     TemporalFusionTransformer=TemporalFusionTransformerModel,
     RecursiveTabular=RecursiveTabularModel,
     DirectTabular=DirectTabularModel,
+    Average=AverageModel,
+    SeasonalAverage=SeasonalAverageModel,
     Naive=NaiveModel,
     SeasonalNaive=SeasonalNaiveModel,
     AutoETS=AutoETSModel,
     AutoARIMA=AutoARIMAModel,
     DynamicOptimizedTheta=DynamicOptimizedThetaModel,
+    NPTS=NPTSModel,
     Theta=ThetaModel,
     ARIMA=ARIMAModel,
     ETS=ETSModel,
@@ -304,9 +309,9 @@ def verify_contains_at_least_one_searchspace(hyperparameters: Dict[str, List[Mod
                 return
 
     raise ValueError(
-        f"Hyperparameter tuning specified, but no model contains a hyperparameter search space. "
-        f"Please disable hyperparameter tuning with `hyperparameter_tune_kwargs=None` or provide a search space "
-        f"for at least one model."
+        "Hyperparameter tuning specified, but no model contains a hyperparameter search space. "
+        "Please disable hyperparameter tuning with `hyperparameter_tune_kwargs=None` or provide a search space "
+        "for at least one model."
     )
 
 

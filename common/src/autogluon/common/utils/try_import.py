@@ -36,7 +36,7 @@ def try_import_ray() -> ModuleType:
         Windows=RAY_MAX_VERSION,
         Linux=RAY_MAX_VERSION,
     )
-    ray_min_version = "2.5.1"
+    ray_min_version = "2.6.3"
     current_os = platform.system()
     ray_max_version = ray_max_version_os_map.get(current_os, RAY_MAX_VERSION)
     try:

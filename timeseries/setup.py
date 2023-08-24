@@ -4,9 +4,7 @@ import importlib.util
 ###########################
 # This code block is a HACK (!), but is necessary to avoid code duplication. Do NOT alter these lines.
 import os
-import warnings
 
-from packaging.version import parse as vparse
 from setuptools import setup
 
 filepath = os.path.abspath(os.path.dirname(__file__))
@@ -45,7 +43,7 @@ install_requires = [
 extras_require = {
     "tests": [
         "pytest",
-        "flake8>=4.0,<5",
+        "ruff>=0.0.285",
         "flaky>=3.7,<4",
         "pytest-timeout>=2.1,<3",
         "isort>=5.10",

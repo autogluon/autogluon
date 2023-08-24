@@ -16,8 +16,6 @@ warnings.simplefilter("ignore", ModelWarning)
 warnings.simplefilter("ignore", ConvergenceWarning)
 warnings.simplefilter("ignore", ValueWarning)
 
-from .abstract_local_model import AbstractLocalModel
-
 
 def get_quantiles_from_statsmodels(coverage_fn: Callable, quantile_levels: List[float]) -> List[pd.Series]:
     """Obtain quantile forecasts using a fitted Statsmodels model.

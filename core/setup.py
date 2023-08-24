@@ -47,16 +47,11 @@ install_requires = (
 
 extras_require = {
     "ray": [
-        "ray[default]>=2.3,<2.7",
-        # https://github.com/grpc/grpc/issues/31885
-        # version range set to align with ray's updated version range:
-        # https://github.com/ray-project/ray/blob/master/python/setup.py#L259-L261
-        # TODO: remove the pin once issue resolved
-        "grpcio>=1.42.0,<=1.50.0",
+        "ray[default]>=2.6.3,<2.7",
         "pydantic>=1.10.4,<2.0",  # https://github.com/ray-project/ray/issues/36990
     ],
     "raytune": [
-        "ray[tune]>=2.3,<2.7",
+        "ray[tune]>=2.6.3,<2.7",
         # TODO: consider alternatives as hyperopt is not actively maintained.
         "hyperopt>=0.2.7,<0.2.8",  # This is needed for the bayes search to work.
         # 'GPy>=1.10.0,<1.11.0'  # TODO: Enable this once PBT/PB2 are supported by ray lightning

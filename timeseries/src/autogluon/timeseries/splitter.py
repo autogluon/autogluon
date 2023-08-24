@@ -3,7 +3,7 @@ from typing import Tuple, Union
 
 import pandas as pd
 
-from .dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
+from .dataset.ts_dataframe import TimeSeriesDataFrame
 
 logger = logging.getLogger(__name__)
 
@@ -169,7 +169,7 @@ class MultiWindowSplitter(AbstractTimeSeriesSplitter):
             long_enough = num_timesteps_per_item > 2 * prediction_length
             # Convert boolean indicator into item_id index
             can_be_split = item_index[long_enough]
-            cannot_be_split = item_index[~long_enough]
+            cannot_be_split = item_index[~long_enough]  # noqa: F841
 
             train_dataframes.append(ts_dataframe.query("item_id in @cannot_be_split"))
             if static_features_available:

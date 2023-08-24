@@ -30,7 +30,7 @@ Note that some of the models' hyperparameters have names and default values that
 
 
 
-## Default models
+## Overview
 
 ```{eval-rst}
 .. automodule:: autogluon.timeseries.models
@@ -46,30 +46,33 @@ Note that some of the models' hyperparameters have names and default values that
 
    NaiveModel
    SeasonalNaiveModel
+   AverageModel
+   SeasonalAverageModel
    ARIMAModel
    ETSModel
    AutoARIMAModel
    AutoETSModel
    ThetaModel
-   DynamicOptimizedThetaModel
-   DirectTabularModel
-   RecursiveTabularModel
+   NPTSModel
    DeepARModel
    DLinearModel
    PatchTSTModel
    SimpleFeedForwardModel
    TemporalFusionTransformerModel
+   DirectTabularModel
+   RecursiveTabularModel
 
 ```
 
-### {hidden}`NaiveModel`
+## Baseline models
+
+Baseline models are simple approaches that use minimal historical data to make predictions. They serve as benchmarks for evaluating more complex methods.
 
 ```{eval-rst}
 .. autoclass:: NaiveModel
    :members: init
 ```
 
-### {hidden}`SeasonalNaiveModel`
 
 ```{eval-rst}
 .. autoclass:: SeasonalNaiveModel
@@ -77,7 +80,22 @@ Note that some of the models' hyperparameters have names and default values that
 
 ```
 
-### {hidden}`ARIMAModel`
+
+```{eval-rst}
+.. autoclass:: AverageModel
+   :members: init
+```
+
+
+```{eval-rst}
+.. autoclass:: SeasonalAverageModel
+   :members: init
+
+```
+
+## Statistical models
+
+Statistical models capture simple patterns in the data like trends and seasonality.
 
 ```{eval-rst}
 .. autoclass:: ARIMAModel
@@ -85,7 +103,6 @@ Note that some of the models' hyperparameters have names and default values that
 
 ```
 
-### {hidden}`ETSModel`
 
 ```{eval-rst}
 .. autoclass:: ETSModel
@@ -93,21 +110,18 @@ Note that some of the models' hyperparameters have names and default values that
 
 ```
 
-### {hidden}`AutoARIMAModel`
 
 ```{eval-rst}
 .. autoclass:: AutoARIMAModel
    :members: init
 ```
 
-### {hidden}`AutoETSModel`
 
 ```{eval-rst}
 .. autoclass:: AutoETSModel
    :members: init
 ```
 
-### {hidden}`ThetaModel`
 
 ```{eval-rst}
 .. autoclass:: ThetaModel
@@ -115,30 +129,15 @@ Note that some of the models' hyperparameters have names and default values that
 ```
 
 
-### {hidden}`DynamicOptimizedThetaModel`
-
 ```{eval-rst}
-.. autoclass:: DynamicOptimizedThetaModel
-   :members: init
-```
-
-### {hidden}`DirectTabularModel`
-
-```{eval-rst}
-.. autoclass:: DirectTabularModel
+.. autoclass:: NPTSModel
    :members: init
 
 ```
 
-### {hidden}`RecursiveTabularModel`
+## Deep learning models
 
-```{eval-rst}
-.. autoclass:: RecursiveTabularModel
-   :members: init
-
-```
-
-### {hidden}`DeepARModel`
+Deep learning models use neural networks to capture complex patterns in the data.
 
 ```{eval-rst}
 .. autoclass:: DeepARModel
@@ -146,7 +145,6 @@ Note that some of the models' hyperparameters have names and default values that
 
 ```
 
-### {hidden}`DLinearModel`
 
 ```{eval-rst}
 .. autoclass:: DLinearModel
@@ -154,7 +152,6 @@ Note that some of the models' hyperparameters have names and default values that
 
 ```
 
-### {hidden}`PatchTSTModel`
 
 ```{eval-rst}
 .. autoclass:: PatchTSTModel
@@ -162,7 +159,6 @@ Note that some of the models' hyperparameters have names and default values that
 
 ```
 
-### {hidden}`SimpleFeedForwardModel`
 
 ```{eval-rst}
 .. autoclass:: SimpleFeedForwardModel
@@ -170,12 +166,29 @@ Note that some of the models' hyperparameters have names and default values that
 
 ```
 
-### {hidden}`TemporalFusionTransformerModel`
 
 ```{eval-rst}
 .. autoclass:: TemporalFusionTransformerModel
    :members: init
 
+
+```
+
+## Tabular models
+
+Tabular models convert time series forecasting into a tabular regression problem.
+
+
+```{eval-rst}
+.. autoclass:: DirectTabularModel
+   :members: init
+
+```
+
+
+```{eval-rst}
+.. autoclass:: RecursiveTabularModel
+   :members: init
 
 ```
 
