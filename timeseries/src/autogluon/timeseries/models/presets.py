@@ -309,9 +309,9 @@ def verify_contains_at_least_one_searchspace(hyperparameters: Dict[str, List[Mod
                 return
 
     raise ValueError(
-        f"Hyperparameter tuning specified, but no model contains a hyperparameter search space. "
-        f"Please disable hyperparameter tuning with `hyperparameter_tune_kwargs=None` or provide a search space "
-        f"for at least one model."
+        "Hyperparameter tuning specified, but no model contains a hyperparameter search space. "
+        "Please disable hyperparameter tuning with `hyperparameter_tune_kwargs=None` or provide a search space "
+        "for at least one model."
     )
 
 

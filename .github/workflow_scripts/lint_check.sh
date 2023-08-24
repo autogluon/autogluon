@@ -22,3 +22,4 @@ function lint_check_all {
 
 bandit -r multimodal/src -ll
 lint_check_all
+ruff check timeseries/

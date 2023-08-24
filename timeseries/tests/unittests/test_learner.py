@@ -1,12 +1,10 @@
 """Unit tests for learners"""
-import os
 import shutil
 import tempfile
 from collections import defaultdict
 from unittest import mock
 
 import numpy as np
-import pandas as pd
 import pytest
 
 from autogluon.common import space
