@@ -141,6 +141,7 @@ class OneHotEncoderFeatureGenerator(AbstractFeatureGenerator):
 
         self._ohe.fit(X_out)
         self._ohe_columns = self._ohe.get_feature_names_out()
+        self._ohe_columns = ["_ohe_" + str(i) for i in range(len(self._ohe_columns))]
         X_out = self._transform(X)
 
         features_out = list(X_out.columns)
