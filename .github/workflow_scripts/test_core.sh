@@ -10,9 +10,13 @@ setup_build_env
 install_local_packages "common/[tests]" "core/[all,tests]"
 
 cd core/
-if [ -n "$ADDITIONAL_TEST_ARGS" ]
+if [ "$OSTYPE" == "msys" ]
 then
-    python3 -m pytest --junitxml=results.xml --runslow "$ADDITIONAL_TEST_ARGS" tests
-else
+    # to skip certain tests on Windows platform
     python3 -m pytest --junitxml=results.xml --runslow tests
+elif [ -n "$ADDITIONAL_TEST_ARGS" ]
+then
+    python3 -m pytest --junitxml=results.xml --runslow --runplatform "$ADDITIONAL_TEST_ARGS" tests
+else
+    python3 -m pytest --junitxml=results.xml --runslow --runplatform tests
 fi
