@@ -2865,7 +2865,7 @@ class MultiModalPredictor(ExportMixin):
 
     def update_strategy_by_env(self):
         """
-        Set strategy to ddp_for or ddp_notebook if an iterative env is detected.
+        Set strategy to ddp_fork or ddp_notebook if an iterative env is detected.
         """
         assert self._config is not None
         if is_interactive():
