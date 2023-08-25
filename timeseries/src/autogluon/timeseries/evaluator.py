@@ -52,13 +52,6 @@ def symmetric_mape_per_item(*, y_true: pd.Series, y_pred: pd.Series) -> pd.Serie
     return (2 * (y_true - y_pred).abs() / (y_true.abs() + y_pred.abs())).groupby(level=ITEMID, sort=False).mean()
 
 
-def wape_per_item(*, y_true: pd.Series, y_pred: pd.Series) -> pd.Series:
-    """Compute Weighted Average Percentage Error for each item (time series)."""
-    abs_error = (y_true - y_pred).abs().groupby(level=ITEMID, sort=False).sum()
-    actuals = (y_true).abs().groupby(level=ITEMID, sort=False).sum()
-    return abs_error / actuals
-
-
 class TimeSeriesEvaluator:
     """Contains functions for computing forecast accuracy metrics.
 
