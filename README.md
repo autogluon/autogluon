@@ -47,7 +47,7 @@ leaderboard = predictor.leaderboard(test_data)
 See the [AutoGluon Website](https://auto.gluon.ai/stable/index.html) for documentation and instructions on:
 - [Installing AutoGluon](https://auto.gluon.ai/stable/index.html#installation)
 - [Learning with tabular data](https://auto.gluon.ai/stable/tutorials/tabular/tabular-quick-start.html)
-  - [Tips to maximize accuracy](https://auto.gluon.ai/stable/tutorials/tabular/tabular-essentials.html#maximizing-predictive-performance) (if **benchmarking**, make sure to run `fit()` with argument `presets='best_quality'`).  
+  - [Tips to maximize accuracy](https://auto.gluon.ai/stable/tutorials/tabular/tabular-essentials.html#maximizing-predictive-performance) (if **benchmarking**, make sure to run `fit()` with argument `presets='best_quality'`).
 
 - [Learning with multimodal data (image, text, etc.)](https://auto.gluon.ai/stable/tutorials/multimodal/multimodal_prediction/multimodal-quick-start.html)
 - [Learning with time series data](https://auto.gluon.ai/stable/tutorials/timeseries/forecasting-quick-start.html)
@@ -121,6 +121,16 @@ BibTeX entry:
   author={Shi, Xingjian and Mueller, Jonas and Erickson, Nick and Li, Mu and Smola, Alex},
   booktitle={8th ICML Workshop on Automated Machine Learning (AutoML)},
   year={2021}
+}
+```
+
+If you use AutoGluon's time series forecasting functionality in a scientific publication, please cite the following paper:
+```bibtex
+@inproceedings{agtimeseries,
+  title={{AutoGluon-TimeSeries}: {AutoML} for Probabilistic Time Series Forecasting},
+  author={Shchur, Oleksandr and Turkmen, Caner and Erickson, Nick and Shen, Huibin and Shirkov, Alexander and Hu, Tony and Wang, Yuyang},
+  booktitle={International Conference on Automated Machine Learning},
+  year={2023}
 }
 ```
 
