@@ -22,7 +22,7 @@ def in_sample_seasonal_naive_error(*, y_past: pd.Series, seasonal_period: int = 
     return seasonal_diffs.groupby(level=ITEMID, sort=False).mean().fillna(1.0)
 
 
-def abs_error_per_item(*, y_true: pd.Series, y_pred: pd.Series) -> pd.Series:
+def abs_error_sum_per_item(*, y_true: pd.Series, y_pred: pd.Series) -> pd.Series:
     """Compute Absolute Error for each item (time series)."""
     return (y_true - y_pred).abs().groupby(level=ITEMID, sort=False).sum()
 
@@ -180,7 +180,7 @@ class TimeSeriesEvaluator:
 
     def _wape(self, y_true: pd.Series, predictions: TimeSeriesDataFrame) -> float:
         y_pred = self._get_median_forecast(predictions)
-        abs_error_sum = abs_error_per_item(y_true=y_true, y_pred=y_pred).sum()
+        abs_error_sum = abs_error_sum_per_item(y_true=y_true, y_pred=y_pred).sum()
         abs_target_sum = abs_target_sum_per_item(y_true=y_true).sum()
         return abs_error_sum / abs_target_sum
 
