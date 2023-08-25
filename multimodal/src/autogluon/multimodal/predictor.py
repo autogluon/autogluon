@@ -1780,7 +1780,7 @@ class MultiModalPredictor(ExportMixin):
             blacklist_msgs.append("LOCAL_RANK")
             blacklist_msgs.append("Trainer(barebones=True)")
         log_filter = LogFilter(blacklist_msgs)
-        
+
         with apply_log_filter(log_filter):
             evaluator = pl.Trainer(
                 accelerator="gpu" if num_gpus > 0 else "auto",
