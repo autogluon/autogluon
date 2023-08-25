@@ -55,16 +55,6 @@ def compute_num_gpus(config_num_gpus: Union[int, float, List], strategy: str):
                 UserWarning,
             )
 
-    if is_interactive() and num_gpus > 1 and strategy.startswith(DDP) and 'notebook' not in strategy:
-        warnings.warn(
-            "Interactive environment is detected. Currently, MultiModalPredictor does not support multi-gpu "
-            "training under an interactive environment due to the limitation of ddp / ddp_spawn strategies "
-            "in PT Lightning. Thus, we switch to single gpu training. For multi-gpu training, you need to execute "
-            "MultiModalPredictor in a script.",
-            UserWarning,
-        )
-        num_gpus = 1
-
     return num_gpus
 
 

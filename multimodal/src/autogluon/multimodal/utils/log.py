@@ -20,7 +20,7 @@ def make_exp_dir(
     """
     Creates the exp dir of format e.g.,: root_path/2022_01_01/job_name_12_00_00/
     This function is to better organize the training runs. It is recommended to call this
-    function and pass the returned "exp_dir" to "AutoMMPredictor.fit(save_path=exp_dir)".
+    function and pass the returned "exp_dir" to "MultiModalPredictor.fit(save_path=exp_dir)".
 
     Parameters
     ----------
@@ -204,7 +204,9 @@ def get_gpu_message(detected_num_gpus: int, used_num_gpus: int, strategy: str):
         for i in range(detected_num_gpus):
             free_memory, total_memory = torch.cuda.mem_get_info(i)
             gpu_message += f"   - GPU {i} name: {torch.cuda.get_device_name(i)}\n"
-            gpu_message += f"   - GPU {i} memory: {free_memory * 1e-9:.2f}GB/{total_memory * 1e-9:.2f}GB (Free/Total)\n"
+            gpu_message += (
+                f"   - GPU {i} memory: {free_memory * 1e-9:.2f}GB/{total_memory * 1e-9:.2f}GB (Free/Total)\n"
+            )
     if torch.cuda.is_available():
         gpu_message += f"CUDA version is {torch.version.cuda}.\n"
 

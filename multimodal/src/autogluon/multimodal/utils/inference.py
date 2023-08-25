@@ -456,6 +456,7 @@ def predict(
     signature: Optional[str] = None,
     realtime: Optional[bool] = None,
     is_matching: Optional[bool] = False,
+    barebones: Optional[bool] = False,
 ) -> List[Dict]:
     """
     Perform inference for predictor or matcher.
@@ -477,8 +478,8 @@ def predict(
         Whether use realtime infernece.
     is_matching
         Whether is matching.
-    seed
-        random seed.
+    barebones
+        Whether to run in “barebones mode”, where all lightning's features that may impact raw speed are disabled.
 
     Returns
     -------
@@ -528,6 +529,12 @@ def predict(
     if predictor._problem_type == OBJECT_DETECTION:
         realtime = False
 
+    # TODO: support realtime inference for notebook with multi-gpus
+    if any([s in predictor._config.env.strategy for s in ["fork", "notebook"]]) and realtime:
+        realtime = False
+        num_gpus = 1
+        barebones = True
+
     if realtime:
         if is_matching:
             outputs = realtime_predict(
@@ -576,6 +583,7 @@ def predict(
                 precision=precision,
                 batch_size=batch_size,
                 strategy=strategy,
+                barebones=barebones,
             )
 
     return outputs
