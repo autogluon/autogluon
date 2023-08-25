@@ -530,7 +530,11 @@ def predict(
         realtime = False
 
     # TODO: support realtime inference for notebook with multi-gpus
-    if any([s in predictor._config.env.strategy for s in ["fork", "notebook"]]) and realtime:
+    if (
+        predictor._config.env.strategy
+        and any([s in predictor._config.env.strategy for s in ["fork", "notebook"]])
+        and realtime
+    ):
         realtime = False
         num_gpus = 1
         barebones = True
