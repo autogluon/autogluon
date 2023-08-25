@@ -1,8 +1,8 @@
-import pytest
 import unittest
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from autogluon.core.constants import BINARY, MULTICLASS, MULTICLASS_UPPER_LIMIT, REGRESSION
 from autogluon.core.utils import infer_problem_type
