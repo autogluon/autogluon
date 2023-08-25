@@ -1291,6 +1291,7 @@ class MultiModalPredictor(ExportMixin):
                 validate_data=val_df,
                 val_use_training_mode=val_use_training_mode,
             )
+
         optimization_kwargs = dict(
             optim_type=config.optimization.optim_type,
             lr_choice=config.optimization.lr_choice,
@@ -1419,6 +1420,7 @@ class MultiModalPredictor(ExportMixin):
             name="",
             version="",
         )
+
         num_gpus = compute_num_gpus(config_num_gpus=config.env.num_gpus, strategy=config.env.strategy)
         logger.info(
             get_gpu_message(
@@ -1429,6 +1431,7 @@ class MultiModalPredictor(ExportMixin):
         )
 
         precision = infer_precision(num_gpus=num_gpus, precision=config.env.precision)
+
         if num_gpus == 0:  # CPU only training
             grad_steps = max(
                 config.env.batch_size // (config.env.per_gpu_batch_size * config.env.num_nodes),
@@ -1500,6 +1503,7 @@ class MultiModalPredictor(ExportMixin):
                 else 1,
                 plugins=[custom_checkpoint_plugin],
             )
+
         with warnings.catch_warnings():
             warnings.filterwarnings(
                 "ignore",
@@ -1776,6 +1780,7 @@ class MultiModalPredictor(ExportMixin):
             blacklist_msgs.append("LOCAL_RANK")
             blacklist_msgs.append("Trainer(barebones=True)")
         log_filter = LogFilter(blacklist_msgs)
+        
         with apply_log_filter(log_filter):
             evaluator = pl.Trainer(
                 accelerator="gpu" if num_gpus > 0 else "auto",
