@@ -23,7 +23,7 @@ def in_sample_seasonal_naive_error(*, y_past: pd.Series, seasonal_period: int = 
 
 
 def abs_error_sum_per_item(*, y_true: pd.Series, y_pred: pd.Series) -> pd.Series:
-    """Compute Absolute Error for each item (time series)."""
+    """Compute Absolute Error Sum for each item (time series)."""
     return (y_true - y_pred).abs().groupby(level=ITEMID, sort=False).sum()
 
 
@@ -84,7 +84,7 @@ class TimeSeriesEvaluator:
          by the total absolute values of the time series. See https://docs.aws.amazon.com/forecast/latest/dg/metrics.html#metrics-wQL
         * ``MSE``: mean squared error
         * ``RMSE``: root mean squared error
-        * ``WAPE``: root mean squared error. See https://docs.aws.amazon.com/forecast/latest/dg/metrics.html#metrics-WAPE
+        * ``WAPE``: weighted absolute percentage error. See https://docs.aws.amazon.com/forecast/latest/dg/metrics.html#metrics-WAPE
 
     prediction_length : int
         Length of the forecast horizon
