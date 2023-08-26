@@ -37,6 +37,7 @@ from .environment import (
     compute_num_gpus,
     get_precision_context,
     infer_precision,
+    is_interactive_strategy,
     move_to_device,
 )
 from .matcher import compute_matching_probability
@@ -530,11 +531,7 @@ def predict(
         realtime = False
 
     # TODO: support realtime inference for notebook with multi-gpus
-    if (
-        predictor._config.env.strategy
-        and any([s in predictor._config.env.strategy for s in ["fork", "notebook"]])
-        and realtime
-    ):
+    if is_interactive_strategy(strategy) and realtime:
         realtime = False
         num_gpus = 1
         barebones = True

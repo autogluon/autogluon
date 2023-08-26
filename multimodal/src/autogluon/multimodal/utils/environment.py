@@ -16,12 +16,19 @@ from ..constants import DDP, OBJECT_DETECTION, OCR
 logger = logging.getLogger(__name__)
 
 
-def is_interactive():
+def is_interactive_env():
     """
     Return whether the current process is running under the interactive mode.
     Check also https://stackoverflow.com/a/64523765
     """
     return hasattr(sys, "ps1")
+
+
+def is_interactive_strategy(strategy: str):
+    if strategy:
+        return strategy.startswith(("ddp_fork", "ddp_notebook"))
+    else:
+        return False
 
 
 def compute_num_gpus(config_num_gpus: Union[int, float, List], strategy: str):

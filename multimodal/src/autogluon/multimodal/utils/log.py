@@ -8,6 +8,7 @@ import pytz
 import torch
 
 from .. import version as ag_version
+from .environment import is_interactive_strategy
 
 logger = logging.getLogger(__name__)
 
@@ -200,7 +201,7 @@ def get_gpu_message(detected_num_gpus: int, used_num_gpus: int, strategy: str):
     A string with the GPU info.
     """
     gpu_message = f"{detected_num_gpus} GPUs are detected, and {used_num_gpus} GPUs will be used.\n"
-    if strategy and not any(s in strategy for s in ["fork", "notebook"]):
+    if not is_interactive_strategy(strategy):
         for i in range(detected_num_gpus):
             free_memory, total_memory = torch.cuda.mem_get_info(i)
             gpu_message += f"   - GPU {i} name: {torch.cuda.get_device_name(i)}\n"

@@ -146,7 +146,8 @@ from .utils import (
     infer_precision,
     infer_scarcity_mode_by_data_size,
     init_df_preprocessor,
-    is_interactive,
+    is_interactive_env,
+    is_interactive_strategy,
     is_lazy_weight_tensor,
     list_timm_models,
     load_text_tokenizers,
@@ -2868,8 +2869,7 @@ class MultiModalPredictor(ExportMixin):
         Set strategy to ddp_fork or ddp_notebook if an iterative env is detected.
         """
         assert self._config is not None
-        if is_interactive():
-            if not self._config.env.strategy.startswith(("ddp_fork", "ddp_notebook")):
-                strs = list(self._config.env.strategy.partition("_find_unused_parameters"))
-                strs[0] = "ddp_fork"
-                self._config.env.strategy = "".join(strs)
+        if is_interactive_env() and not is_interactive_strategy(self._config.env.strategy):
+            strs = list(self._config.env.strategy.partition("_find_unused_parameters"))
+            strs[0] = "ddp_fork"
+            self._config.env.strategy = "".join(strs)
