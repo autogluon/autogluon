@@ -16,12 +16,19 @@ from ..constants import DDP, OBJECT_DETECTION, OCR
 logger = logging.getLogger(__name__)
 
 
-def is_interactive():
+def is_interactive_env():
     """
     Return whether the current process is running under the interactive mode.
     Check also https://stackoverflow.com/a/64523765
     """
     return hasattr(sys, "ps1")
+
+
+def is_interactive_strategy(strategy: str):
+    if strategy:
+        return strategy.startswith(("ddp_fork", "ddp_notebook"))
+    else:
+        return False
 
 
 def compute_num_gpus(config_num_gpus: Union[int, float, List], strategy: str):
@@ -54,16 +61,6 @@ def compute_num_gpus(config_num_gpus: Union[int, float, List], strategy: str):
                 f"smaller than the GPU number {config_num_gpus} in the config.",
                 UserWarning,
             )
-
-    if is_interactive() and num_gpus > 1 and strategy.startswith(DDP):
-        warnings.warn(
-            "Interactive environment is detected. Currently, MultiModalPredictor does not support multi-gpu "
-            "training under an interactive environment due to the limitation of ddp / ddp_spawn strategies "
-            "in PT Lightning. Thus, we switch to single gpu training. For multi-gpu training, you need to execute "
-            "MultiModalPredictor in a script.",
-            UserWarning,
-        )
-        num_gpus = 1
 
     return num_gpus
 
