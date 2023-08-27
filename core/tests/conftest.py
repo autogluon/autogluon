@@ -24,5 +24,6 @@ def pytest_collection_modifyitems(config, items):
         # --runplatform given in cli: do not skip platform tests
         custom_markers.pop("platform", None)
     for item in items:
-        if "slow" in item.keywords:
-            item.add_marker(skip_slow)
+        for marker in custom_markers:
+            if marker in item.keywords:
+                item.add_marker(custom_markers[marker])
