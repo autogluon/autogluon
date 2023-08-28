@@ -54,9 +54,7 @@ def try_import_ray() -> ModuleType:
     except ImportError:
         raise ImportError(
             "ray is required to train folds in parallel / HPO. "
-            f"A quick tip is to install via `pip install ray=={ray_min_version}`, "
-            "or use sequential fold fitting by passing `sequential_local` to `ag_args_ensemble` when calling TabularPredictor fit()"
-            "For example: `predictor.fit(..., ag_args_ensemble={'fold_fitting_strategy': 'sequential_local'})`"
+            f"A quick tip is to install via `pip install ray=={ray_min_version}`"
         )
 
 
