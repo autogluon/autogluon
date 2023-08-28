@@ -11,7 +11,7 @@ from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTS
 
 from .common import DUMMY_TS_DATAFRAME
 
-GLUONTS_PARITY_METRICS = ["mean_wQuantileLoss", "MAPE", "sMAPE", "MSE", "RMSE", "MASE", "WAPE"]
+GLUONTS_PARITY_METRICS = ["mean_wQuantileLoss", "MAPE", "sMAPE", "MSE", "RMSE", "MASE", "WAPE", "NRMSE"]
 AG_TO_GLUONTS_METRIC = {"WAPE": "ND"}
 
 

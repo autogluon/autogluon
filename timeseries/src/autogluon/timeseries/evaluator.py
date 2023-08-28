@@ -74,6 +74,7 @@ class TimeSeriesEvaluator:
          by the total absolute values of the time series. See https://docs.aws.amazon.com/forecast/latest/dg/metrics.html#metrics-wQL
         * ``MSE``: mean squared error
         * ``RMSE``: root mean squared error
+        * ``NRMSE``: normalized root mean squared error (normalization by mean target value)
         * ``WAPE``: weighted absolute percentage error. See https://docs.aws.amazon.com/forecast/latest/dg/metrics.html#metrics-WAPE
 
     prediction_length : int
@@ -97,7 +98,7 @@ class TimeSeriesEvaluator:
         :meth:``~autogluon.timeseries.TimeSeriesEvaluator.check_get_evaluation_metric``.
     """
 
-    AVAILABLE_METRICS = ["MASE", "MAPE", "sMAPE", "mean_wQuantileLoss", "MSE", "RMSE", "WAPE"]
+    AVAILABLE_METRICS = ["MASE", "MAPE", "sMAPE", "mean_wQuantileLoss", "MSE", "RMSE", "NRMSE", "WAPE"]
     METRIC_COEFFICIENTS = {
         "MASE": -1,
         "MAPE": -1,
@@ -105,6 +106,7 @@ class TimeSeriesEvaluator:
         "mean_wQuantileLoss": -1,
         "MSE": -1,
         "RMSE": -1,
+        "NRMSE": -1,
         "WAPE": -1,
     }
     DEFAULT_METRIC = "mean_wQuantileLoss"
@@ -143,6 +145,9 @@ class TimeSeriesEvaluator:
 
     def _rmse(self, y_true: pd.Series, predictions: TimeSeriesDataFrame) -> float:
         return np.sqrt(self._mse(y_true=y_true, predictions=predictions))
+
+    def _nrmse(self, y_true: pd.Series, predictions: TimeSeriesDataFrame) -> float:
+        return self._rmse(y_true=y_true, predictions=predictions) / y_true.mean()
 
     def _mase(self, y_true: pd.Series, predictions: TimeSeriesDataFrame) -> float:
         y_pred = self._get_median_forecast(predictions)
