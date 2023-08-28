@@ -137,6 +137,8 @@ def test_advanced_functionality():
     savedir_predictor_original = savedir + "predictor/"
     predictor: TabularPredictor = TabularPredictor(label=label, path=savedir_predictor_original).fit(train_data)
     leaderboard = predictor.leaderboard(data=test_data)
+    if os.name != "nt":
+        predictor.plot_ensemble_model()
     extra_metrics = ["accuracy", "roc_auc", "log_loss"]
     test_data_no_label = test_data.drop(columns=[label])
     with pytest.raises(ValueError):
@@ -246,6 +248,8 @@ def test_advanced_functionality():
 
     assert predictor.get_model_full_dict() == dict()
     predictor.refit_full()
+    if os.name != "nt":
+        predictor.plot_ensemble_model()
     assert len(predictor.get_model_full_dict()) == num_models
     assert len(predictor.get_model_names()) == num_models * 2
     for model in predictor.get_model_names():
@@ -692,7 +696,7 @@ def test_pseudolabeling():
                     assert False, error_msg + "unlabeled test data, best quality" + error_suffix
 
 
-@pytest.mark.platform
+@pytest.mark.slow
 def test_tabularHPObagstack():
     ############ Benchmark options you can set: ########################
     perf_threshold = 1.1  # How much worse can performance on each dataset be vs previous performance without warning
@@ -1141,6 +1145,8 @@ def test_tabular_log_to_file():
     predictor = TabularPredictor(label="class", log_to_file=True, log_file_path=log_file).fit(train_data=train_data, hyperparameters={"DUMMY": {}})
     log = TabularPredictor.load_log(log_file_path=log_file)
     assert "TabularPredictor saved." in log[-1]
+    if os.name != "nt":
+        os.remove(log_file)
 
     with pytest.raises(AssertionError):
         TabularPredictor.load_log()
