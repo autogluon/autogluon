@@ -940,7 +940,9 @@ class AbstractModel:
                                allowed_gap: float = 0.3, scale_gap: bool = True, fit_single_proba: np.ndarray= None):
         """
         Adjust the predictions to avoid stack info leakage.
+        FIXME: likely we want to increase the gap for multi-class as definition is a bit different...
         """
+
         # Technically, we would need to preprocess X here. But as we are only interested in
         # the stack features, we ignore this for now.
         if fit_single_proba is not None:
@@ -951,14 +953,23 @@ class AbstractModel:
 
         def _get_masks(labels, gap):
             if self.problem_type == MULTICLASS:
-                pass # FIXME
+                # FIXME: need to check that len(unique(y_val_fold)) == proba.shape[1], does ag guarantee this?
+                from sklearn.preprocessing import LabelBinarizer  # fixme, move up or keep lazy?
+                lb = LabelBinarizer().fit(labels)
+                lb.classes_ = list(range(y_pred_proba.shape[-1]))
+                transformed_labels = lb.transform(labels)
+
+                loss = 1 - (transformed_labels * y_pred_proba).sum(axis=1)
+                reasonable_loss = 1 - (transformed_labels * reasonable_proba).sum(axis=1)
             elif self.problem_type in [BINARY, REGRESSION]:
+                # FIXME: assumption that labels are 0 and 1 for binary
                 loss = abs(labels - y_pred_proba)
                 reasonable_loss = abs(labels - reasonable_proba)
             else:
-                # TODO: catch this earlier
+                # TODO: catch this earlier during init
                 raise ValueError(f"Unknown problem type for leak protection: {self.problem_type}")
 
+            # FIXME: Might need to add esp here too or handle 0 loss cases differently
             rel_loss_diff = (reasonable_loss - loss) / np.max([reasonable_loss, loss], axis=0)
 
             if scale_gap:
@@ -978,17 +989,20 @@ class AbstractModel:
             win_cheat_cases, lose_cheat_cases = _get_masks(y_val_fold, allowed_gap)
         else:
             if self.problem_type == MULTICLASS:
-                pass # FIXME
+                # FIXME: assumption that order of proba vectors respects order of classes and labels are 0...N.
+                pseudo_label = reasonable_proba.argmax(axis=1)
             elif self.problem_type == BINARY:
-                pseudo_label = (reasonable_proba >= 0.5).astype(int)  # FIXME
+                # FIXME: assumption that the optimal threshold is 0.5
+                pseudo_label = (reasonable_proba >= 0.5).astype(int)
             else:
                 # FIXME: this idea wont work well for regression due to no difference here and the impact on loss
-                #   -> will always flip unless gap is >= 100%
+                #   -> will always flip unless gap is >= 100% due to impact scaler
+                #   -> will only work for validation data and in extreme abs loss difference cases... mhm
                 pseudo_label = reasonable_proba
 
             win_cheat_cases, lose_cheat_cases = _get_masks(pseudo_label, allowed_gap)
 
-        # -- Flip based on learned smaller/greater mapping
+        # -- Flip based on masks
         # Flip to make model worse
         y_pred_proba[win_cheat_cases] = reasonable_proba[win_cheat_cases]
         # Flip to make model better
