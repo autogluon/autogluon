@@ -180,8 +180,8 @@ class TimeSeriesEvaluator:
 
     def _wape(self, y_true: pd.Series, predictions: TimeSeriesDataFrame) -> float:
         y_pred = self._get_median_forecast(predictions)
-        abs_error_sum = abs_error_sum_per_item(y_true=y_true, y_pred=y_pred).sum()
-        abs_target_sum = abs_target_sum_per_item(y_true=y_true).sum()
+        abs_error_sum = (mae_per_item(y_true=y_true, y_pred=y_pred) * self.prediction_length).sum()
+        abs_target_sum = y_true.abs().sum()
         return abs_error_sum / abs_target_sum
 
     def _get_median_forecast(self, predictions: TimeSeriesDataFrame) -> pd.Series:
