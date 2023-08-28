@@ -195,11 +195,14 @@ class XGBoostModel(AbstractModel):
         # Formula based on manual testing, aligns with LightGBM histogram sizes
         #  This approximation is less accurate than it is for LightGBM and CatBoost.
         #  Note that max_depth didn't appear to reduce memory usage below 6, and it was unclear if it increased memory usage above 6.
-        if max_depth < 10:
+        if max_depth < 7:
             depth_modifier = math.pow(2, 6)
+        elif max_depth < 9:
+            depth_modifier = math.pow(2, max_depth)
         else:
-            depth_modifier = math.pow(2, max_depth - 3)
+            depth_modifier = math.pow(2, max_depth - 1)
         histogram_mem_usage_bytes = 20 * depth_modifier * len(X.columns) * max_bin
+        histogram_mem_usage_bytes *= 1.2  # Add a 20% buffer
 
         approx_mem_size_req = data_mem_usage_bytes + histogram_mem_usage_bytes
         return approx_mem_size_req

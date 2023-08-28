@@ -83,6 +83,7 @@ class CatBoostModel(AbstractModel):
         depth = params.get("depth", 6)
         # Formula based on manual testing, aligns with LightGBM histogram sizes
         histogram_mem_usage_bytes = 20 * math.pow(2, depth) * len(X.columns) * border_count
+        histogram_mem_usage_bytes *= 1.2  # Add a 20% buffer
 
         approx_mem_size_req = data_mem_usage_bytes + histogram_mem_usage_bytes
         return approx_mem_size_req

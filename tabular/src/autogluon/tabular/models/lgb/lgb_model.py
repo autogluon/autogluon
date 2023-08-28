@@ -89,6 +89,7 @@ class LGBModel(AbstractModel):
             histogram_mem_usage_bytes_max *= 1e6  # Convert megabytes to bytes, `histogram_pool_size` is in MB.
             if histogram_mem_usage_bytes > histogram_mem_usage_bytes_max:
                 histogram_mem_usage_bytes = histogram_mem_usage_bytes_max
+        histogram_mem_usage_bytes *= 1.2  # Add a 20% buffer
 
         approx_mem_size_req = data_mem_usage_bytes + histogram_mem_usage_bytes
         return approx_mem_size_req
