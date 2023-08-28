@@ -53,7 +53,7 @@ def try_import_ray() -> ModuleType:
         return ray
     except ImportError:
         raise ImportError(
-            "ray is required to train folds in parallel / HPO. "
+            "ray is required to train folds in parallel for TabularPredictor or HPO for MultiModalPredictor. "
             f"A quick tip is to install via `pip install ray=={ray_min_version}`"
         )
 
