@@ -9,7 +9,6 @@ from joblib import Parallel, delayed
 from scipy.stats import norm
 
 from autogluon.core.utils.exceptions import TimeLimitExceeded
-from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
@@ -168,7 +167,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
                 local_model_args=self._local_model_args.copy(),
             )
             model_failed = False
-        except:
+        except Exception:
             if self.use_fallback_model:
                 result = seasonal_naive_forecast(
                     target=time_series.values.ravel(),

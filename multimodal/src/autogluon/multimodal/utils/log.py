@@ -8,6 +8,7 @@ import pytz
 import torch
 
 from .. import version as ag_version
+from .environment import is_interactive_strategy
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +21,7 @@ def make_exp_dir(
     """
     Creates the exp dir of format e.g.,: root_path/2022_01_01/job_name_12_00_00/
     This function is to better organize the training runs. It is recommended to call this
-    function and pass the returned "exp_dir" to "AutoMMPredictor.fit(save_path=exp_dir)".
+    function and pass the returned "exp_dir" to "MultiModalPredictor.fit(save_path=exp_dir)".
 
     Parameters
     ----------
@@ -184,7 +185,7 @@ or post issues on GitHub: https://github.com/autogluon/autogluon
 """
 
 
-def get_gpu_message(detected_num_gpus: int, used_num_gpus: int):
+def get_gpu_message(detected_num_gpus: int, used_num_gpus: int, strategy: str):
     """
     Get the GPU related info (GPU name, total memory, free memory, and CUDA version) for logging.
 
@@ -200,10 +201,13 @@ def get_gpu_message(detected_num_gpus: int, used_num_gpus: int):
     A string with the GPU info.
     """
     gpu_message = f"{detected_num_gpus} GPUs are detected, and {used_num_gpus} GPUs will be used.\n"
-    for i in range(detected_num_gpus):
-        free_memory, total_memory = torch.cuda.mem_get_info(i)
-        gpu_message += f"   - GPU {i} name: {torch.cuda.get_device_name(i)}\n"
-        gpu_message += f"   - GPU {i} memory: {free_memory * 1e-9:.2f}GB/{total_memory * 1e-9:.2f}GB (Free/Total)\n"
+    if not is_interactive_strategy(strategy):
+        for i in range(detected_num_gpus):
+            free_memory, total_memory = torch.cuda.mem_get_info(i)
+            gpu_message += f"   - GPU {i} name: {torch.cuda.get_device_name(i)}\n"
+            gpu_message += (
+                f"   - GPU {i} memory: {free_memory * 1e-9:.2f}GB/{total_memory * 1e-9:.2f}GB (Free/Total)\n"
+            )
     if torch.cuda.is_available():
         gpu_message += f"CUDA version is {torch.version.cuda}.\n"
 

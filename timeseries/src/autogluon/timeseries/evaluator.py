@@ -74,6 +74,7 @@ class TimeSeriesEvaluator:
          by the total absolute values of the time series. See https://docs.aws.amazon.com/forecast/latest/dg/metrics.html#metrics-wQL
         * ``MSE``: mean squared error
         * ``RMSE``: root mean squared error
+        * ``WAPE``: weighted absolute percentage error. See https://docs.aws.amazon.com/forecast/latest/dg/metrics.html#metrics-WAPE
 
     prediction_length : int
         Length of the forecast horizon
@@ -96,8 +97,16 @@ class TimeSeriesEvaluator:
         :meth:``~autogluon.timeseries.TimeSeriesEvaluator.check_get_evaluation_metric``.
     """
 
-    AVAILABLE_METRICS = ["MASE", "MAPE", "sMAPE", "mean_wQuantileLoss", "MSE", "RMSE"]
-    METRIC_COEFFICIENTS = {"MASE": -1, "MAPE": -1, "sMAPE": -1, "mean_wQuantileLoss": -1, "MSE": -1, "RMSE": -1}
+    AVAILABLE_METRICS = ["MASE", "MAPE", "sMAPE", "mean_wQuantileLoss", "MSE", "RMSE", "WAPE"]
+    METRIC_COEFFICIENTS = {
+        "MASE": -1,
+        "MAPE": -1,
+        "sMAPE": -1,
+        "mean_wQuantileLoss": -1,
+        "MSE": -1,
+        "RMSE": -1,
+        "WAPE": -1,
+    }
     DEFAULT_METRIC = "mean_wQuantileLoss"
 
     def __init__(
@@ -158,6 +167,12 @@ class TimeSeriesEvaluator:
             np.abs((values_true - values_pred) * ((values_true <= values_pred) - quantile_levels)).sum(axis=0)
             / np.abs(values_true).sum()
         )
+
+    def _wape(self, y_true: pd.Series, predictions: TimeSeriesDataFrame) -> float:
+        y_pred = self._get_median_forecast(predictions)
+        abs_error_sum = (mae_per_item(y_true=y_true, y_pred=y_pred) * self.prediction_length).sum()
+        abs_target_sum = y_true.abs().sum()
+        return abs_error_sum / abs_target_sum
 
     def _get_median_forecast(self, predictions: TimeSeriesDataFrame) -> pd.Series:
         # TODO: Median forecast doesn't actually minimize the MAPE / sMAPE losses

@@ -12,7 +12,6 @@ import pandas as pd
 from tqdm import tqdm
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
-from autogluon.common.utils.path_converter import PathConverter
 from autogluon.common.utils.utils import hash_pandas_df
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils.exceptions import TimeLimitExceeded
@@ -382,7 +381,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
     def get_model_names(self, level: Optional[int] = None, **kwargs) -> List[str]:
         """Get model names that are registered in the model graph"""
         if level is not None:
-            return list(node for node, l in self._get_model_levels().items() if l == level)
+            return list(node for node, l in self._get_model_levels().items() if l == level)  # noqa: E741
         return list(self.model_graph.nodes)
 
     def _train_single(
@@ -946,7 +945,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                         model_pred_dict=model_pred_dict,
                     )
                     pred_time_dict_marginal[model_name] = time.time() - predict_start_time
-                except Exception as e:
+                except Exception:
                     failed_models.append(model_name)
                     logger.error(f"Model {model_name} failed to predict with the following exception:")
                     logger.error(traceback.format_exc())
@@ -1000,7 +999,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                     return model_pred_dict, pred_time_dict
                 else:
                     logger.warning(f"Found corrupted cached predictions in {self._cached_predictions_path}")
-        logger.debug(f"Found no cached predictions")
+        logger.debug("Found no cached predictions")
         return {}, {}
 
     def _save_cached_pred_dicts(
@@ -1008,7 +1007,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
     ) -> None:
         # TODO: Save separate file for each dataset if _cached_predictions file grows large?
         if self._cached_predictions_path.exists():
-            logger.debug(f"Extending existing cached predictions")
+            logger.debug("Extending existing cached predictions")
             cached_predictions = load_pkl.load(str(self._cached_predictions_path))
         else:
             cached_predictions = {}

@@ -117,6 +117,7 @@ def test_empty_search_space():
             )
 
 
+@pytest.mark.platform
 @pytest.mark.parametrize("searcher", list(SEARCHER_PRESETS.keys()))
 @pytest.mark.parametrize("scheduler", list(SCHEDULER_PRESETS.keys()))
 def test_run(searcher, scheduler):

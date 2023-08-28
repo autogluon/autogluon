@@ -741,7 +741,7 @@ def test_when_dataset_constructed_from_dataframe_then_timestamp_column_is_conver
 def test_when_path_is_given_to_constructor_then_tsdf_is_constructed_correctly():
     df = SAMPLE_TS_DATAFRAME.reset_index()
     with TemporaryDirectory() as temp_dir:
-        temp_file = str(Path(temp_dir) / f"temp.csv")
+        temp_file = str(Path(temp_dir) / "temp.csv")
         df.to_csv(temp_file)
 
         ts_df = TimeSeriesDataFrame(temp_file)

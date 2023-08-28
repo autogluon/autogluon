@@ -70,6 +70,7 @@ class TimeSeriesPredictor:
         - ``"MASE"``: mean absolute scaled error
         - ``"MSE"``: mean squared error
         - ``"RMSE"``: root mean squared error
+        - ``"WAPE"``: weighted absolute percentage error
 
         For more information about these metrics, see https://docs.aws.amazon.com/forecast/latest/dg/metrics.html.
     eval_metric_seasonal_period : int, optional

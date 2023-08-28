@@ -38,7 +38,8 @@ from .environment import (
     get_available_devices,
     get_precision_context,
     infer_precision,
-    is_interactive,
+    is_interactive_env,
+    is_interactive_strategy,
     move_to_device,
 )
 from .export import ExportMixin

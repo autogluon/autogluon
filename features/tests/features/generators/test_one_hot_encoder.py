@@ -14,7 +14,7 @@ def test_one_hot_encoder_feature_generator(generator_helper, data_helper):
         ("int", ()): ["int"],
     }
     expected_feature_metadata_full = {
-        ("int", ("bool", "sparse")): ["int_-8", "int_0", "int_2", "int_3", "int_5", "int_12", "cat_a", "cat_b", "cat_c", "cat_d", "cat_nan"]
+        ("int", ("bool", "sparse")): ["_ohe_0", "_ohe_1", "_ohe_2", "_ohe_3", "_ohe_4", "_ohe_5", "_ohe_6", "_ohe_7", "_ohe_8", "_ohe_9", "_ohe_10"]
     }
 
     expected_output_data_int_0_val = [0, 1, 0, 0, 0, 0, 0, 1, 0]
@@ -29,8 +29,8 @@ def test_one_hot_encoder_feature_generator(generator_helper, data_helper):
 
     # Therefore
     assert len(output_data.columns) == 11
-    assert output_data["int_0"].dtype.subtype == np.uint8
-    assert list(output_data["int_0"].values) == expected_output_data_int_0_val
+    assert output_data["_ohe_1"].dtype.subtype == np.uint8
+    assert list(output_data["_ohe_1"].values) == expected_output_data_int_0_val
 
 
 def test_one_hot_encoder_feature_generator_advanced(generator_helper, data_helper):
@@ -44,7 +44,7 @@ def test_one_hot_encoder_feature_generator_advanced(generator_helper, data_helpe
         ("int", ()): ["int"],
     }
     # TODO: improve readability of names when max_levels is specified
-    expected_feature_metadata_full = {("int", ("bool",)): ["x0_0", "x0_13", "x0_2", "x0_3", "x1_13", "x1_a", "x1_b", "x1_d"]}
+    expected_feature_metadata_full = {("int", ("bool",)): ["_ohe_0", "_ohe_1", "_ohe_2", "_ohe_3", "_ohe_4", "_ohe_5", "_ohe_6", "_ohe_7"]}
 
     expected_output_data_int_0_val = [0, 1, 0, 0, 0, 0, 0, 1, 0]
 
@@ -58,5 +58,5 @@ def test_one_hot_encoder_feature_generator_advanced(generator_helper, data_helpe
 
     # Therefore
     assert len(output_data.columns) == 8
-    assert output_data["x0_0"].dtype == np.uint16
-    assert list(output_data["x0_0"].values) == expected_output_data_int_0_val
+    assert output_data["_ohe_0"].dtype == np.uint16
+    assert list(output_data["_ohe_0"].values) == expected_output_data_int_0_val
