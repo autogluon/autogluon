@@ -376,7 +376,7 @@ class BaggedEnsembleModel(AbstractModel):
         model_base.name = f"{model_base.name}S1F1"
         model_base.set_contexts(path_context=os.path.join(self.path, model_base.name))
         time_start_fit = time.time()
-        model_base.fit(X=X, y=y, time_limit=time_limit, **kwargs)
+        model_base.fit(X=X, y=y, time_limit=time_limit, fit_single=True, **kwargs)
         model_base.fit_time = time.time() - time_start_fit
         model_base.predict_time = None
         if not skip_oof:
@@ -414,6 +414,18 @@ class BaggedEnsembleModel(AbstractModel):
                 time_start_predict = time.time()
                 if model_base._get_tags().get("valid_oof", False):
                     self._oof_pred_proba = model_base.get_oof_pred_proba(X=X, y=y)
+
+                    if model_base._leak_protection_for_fit_single:
+                        # Special case for leakage protection when the base model is not using cross-validation
+                        model_base._reasonable_ensemble._load_oof()
+                        self._oof_pred_proba = model_base._apply_leak_protection(
+                            X=X, y_pred_proba=self._oof_pred_proba, y_val_fold=y,
+                            fit_single_proba=model_base._reasonable_ensemble.get_oof_pred_proba()
+                        )
+                        # Reduce memory footprint
+                        model_base._reasonable_ensemble._oof_pred_proba = None
+                        model_base._reasonable_ensemble._oof_pred_model_repeats = None
+
                 else:
                     logger.warning(
                         "\tWARNING: `use_child_oof` was specified but child model does not have a dedicated `get_oof_pred_proba` method. This model may have heavily overfit validation scores."

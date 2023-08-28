@@ -266,7 +266,7 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
                 expected_remaining_time_required = expected_time_required * (folds_left - 1) / folds_to_fit
                 if expected_remaining_time_required > time_left:
                     raise TimeLimitExceeded
-        pred_proba = fold_model.predict_proba(X_val_fold)
+        pred_proba = fold_model.predict_proba(X_val_fold, y_val_fold=y_val_fold)
         fold_model.predict_time = time.time() - time_train_end_fold
         fold_model.val_score = fold_model.score_with_y_pred_proba(y=y_val_fold, y_pred_proba=pred_proba)
         fold_model.reduce_memory_size(remove_fit=True, remove_info=False, requires_save=True)
@@ -412,7 +412,7 @@ def _ray_fit(
 
 
 def _ray_predict_oof(fold_model, X_val_fold, y_val_fold, time_train_end_fold, num_cpus=-1, save_bag_folds=True):
-    pred_proba = fold_model.predict_proba(X_val_fold, num_cpus=num_cpus)
+    pred_proba = fold_model.predict_proba(X_val_fold, y_val_fold=y_val_fold, num_cpus=num_cpus)
     time_pred_end_fold = time.time()
     fold_model.predict_time = time_pred_end_fold - time_train_end_fold
     fold_model.val_score = fold_model.score_with_y_pred_proba(y=y_val_fold, y_pred_proba=pred_proba)

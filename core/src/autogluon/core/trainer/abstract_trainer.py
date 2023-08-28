@@ -394,6 +394,7 @@ class AbstractTrainer:
                 name_suffix=name_suffix,
                 infer_limit=infer_limit,
                 infer_limit_batch_size=infer_limit_batch_size,
+                last_level=level == level_end
             )
             model_names_fit += base_model_names + aux_models
         if self.model_best is None and len(model_names_fit) != 0:
@@ -509,6 +510,7 @@ class AbstractTrainer:
         name_suffix: str = None,
         infer_limit=None,
         infer_limit_batch_size=None,
+        last_level: bool = False
     ) -> (List[str], List[str]):
         """
         Similar to calling self.stack_new_level_core, except auxiliary models will also be trained via a call to self.stack_new_level_aux, with the models trained from self.stack_new_level_core used as base models.
@@ -542,7 +544,16 @@ class AbstractTrainer:
             aux_models = self.stack_new_level_aux(
                 X=X, y=y, base_model_names=core_models, level=level + 1, infer_limit=infer_limit, infer_limit_batch_size=infer_limit_batch_size, **aux_kwargs
             )
+            # Compute Bagged Weighted Ensemble needed for info leak protection
+            if (core_kwargs.get("ag_args_fit", None) is not None) and core_kwargs["ag_args_fit"].get("stack_info_leak_protection", False) \
+                    and (not last_level):
+                aux_models += self.stack_new_level_aux(
+                    X=X, y=y, base_model_names=core_models, level=level + 1, infer_limit=infer_limit,
+                    infer_limit_batch_size=infer_limit_batch_size, fit_one_model=False, **aux_kwargs
+                )
+                core_kwargs["ag_args_fit"]["reasonable_ensemble"] = self.load_model(aux_models[-1])
         else:
+            # TODO: do we need to add stack info leakage protection here too?
             aux_models = self.stack_new_level_aux(
                 X=X_val,
                 y=y_val,
@@ -691,6 +702,7 @@ class AbstractTrainer:
         infer_limit_batch_size=None,
         use_val_cache=True,
         fit_weighted_ensemble=True,
+        fit_one_model=True,
     ) -> List[str]:
         """
         Trains auxiliary models (currently a single weighted ensemble) using the provided base models.
@@ -715,15 +727,24 @@ class AbstractTrainer:
             X, w = extract_column(X, self.sample_weight)  # TODO: consider redesign with w as separate arg instead of bundled inside X
             if w is not None:
                 X_stack_preds[self.sample_weight] = w.values / w.mean()
+
+        if fit_one_model:
+            k_fold, n_repeats = 1, 1
+            name_bag_suffix = ""
+        else:
+            k_fold, n_repeats = self.k_fold, self.n_repeats
+            name_bag_suffix = "_BAG"
+
         return self.generate_weighted_ensemble(
             X=X_stack_preds,
             y=y,
             level=level,
             base_model_names=base_model_names,
-            k_fold=1,
-            n_repeats=1,
+            k_fold=k_fold,
+            n_repeats=n_repeats,
             ag_args_fit=ag_args_fit,
             stack_name=stack_name,
+            name_bag_suffix=name_bag_suffix,
             time_limit=time_limit,
             name_suffix=name_suffix,
             get_models_func=get_models_func,
@@ -1628,6 +1649,7 @@ class AbstractTrainer:
         ag_args_fit=None,
         time_limit=None,
         name_suffix: str = None,
+        name_bag_suffix: str = "",
         save_bag_folds=None,
         check_if_best=True,
         child_hyperparameters=None,
@@ -1667,7 +1689,7 @@ class AbstractTrainer:
                 hyperparameters=hyperparameters,
                 random_state=level + self.random_state,
             ),
-            ag_args={"name_bag_suffix": ""},
+            ag_args={"name_bag_suffix": name_bag_suffix},
             ag_args_fit=ag_args_fit,
             ag_args_ensemble={"save_bag_folds": save_bag_folds},
             name_suffix=name_suffix,
