@@ -394,7 +394,7 @@ class AbstractTrainer:
                 name_suffix=name_suffix,
                 infer_limit=infer_limit,
                 infer_limit_batch_size=infer_limit_batch_size,
-                last_level=level == level_end
+                last_level=level == level_end,
             )
             model_names_fit += base_model_names + aux_models
         if self.model_best is None and len(model_names_fit) != 0:
@@ -510,7 +510,7 @@ class AbstractTrainer:
         name_suffix: str = None,
         infer_limit=None,
         infer_limit_batch_size=None,
-        last_level: bool = False
+        last_level: bool = False,
     ) -> (List[str], List[str]):
         """
         Similar to calling self.stack_new_level_core, except auxiliary models will also be trained via a call to self.stack_new_level_aux, with the models trained from self.stack_new_level_core used as base models.
@@ -545,11 +545,16 @@ class AbstractTrainer:
                 X=X, y=y, base_model_names=core_models, level=level + 1, infer_limit=infer_limit, infer_limit_batch_size=infer_limit_batch_size, **aux_kwargs
             )
             # Compute Bagged Weighted Ensemble needed for info leak protection
-            if (core_kwargs.get("ag_args_fit", None) is not None) and core_kwargs["ag_args_fit"].get("stack_info_leak_protection", False) \
-                    and (not last_level):
+            if (core_kwargs.get("ag_args_fit", None) is not None) and core_kwargs["ag_args_fit"].get("stack_info_leak_protection", False) and (not last_level):
                 aux_models += self.stack_new_level_aux(
-                    X=X, y=y, base_model_names=core_models, level=level + 1, infer_limit=infer_limit,
-                    infer_limit_batch_size=infer_limit_batch_size, fit_one_model=False, **aux_kwargs
+                    X=X,
+                    y=y,
+                    base_model_names=core_models,
+                    level=level + 1,
+                    infer_limit=infer_limit,
+                    infer_limit_batch_size=infer_limit_batch_size,
+                    fit_one_model=False,
+                    **aux_kwargs,
                 )
                 core_kwargs["ag_args_fit"]["reasonable_ensemble"] = self.load_model(aux_models[-1])
         else:

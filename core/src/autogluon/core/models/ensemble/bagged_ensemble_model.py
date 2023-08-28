@@ -419,8 +419,7 @@ class BaggedEnsembleModel(AbstractModel):
                         # Special case for leakage protection when the base model is not using cross-validation
                         model_base._reasonable_ensemble._load_oof()
                         self._oof_pred_proba = model_base._apply_leak_protection(
-                            X=X, y_pred_proba=self._oof_pred_proba, y_val_fold=y,
-                            fit_single_proba=model_base._reasonable_ensemble.get_oof_pred_proba()
+                            X=X, y_pred_proba=self._oof_pred_proba, y_val_fold=y, fit_single_proba=model_base._reasonable_ensemble.get_oof_pred_proba()
                         )
                         # Reduce memory footprint
                         model_base._reasonable_ensemble._oof_pred_proba = None

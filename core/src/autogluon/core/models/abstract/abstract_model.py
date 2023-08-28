@@ -24,16 +24,7 @@ from autogluon.common.utils.try_import import try_import_ray
 from autogluon.common.utils.utils import setup_outputdir
 
 from ... import metrics
-from ...constants import (
-    AG_ARG_PREFIX,
-    AG_ARGS_FIT,
-    BINARY,
-    OBJECTIVES_TO_NORMALIZE,
-    QUANTILE,
-    REFIT_FULL_SUFFIX,
-    REGRESSION,
-    MULTICLASS
-)
+from ...constants import AG_ARG_PREFIX, AG_ARGS_FIT, BINARY, OBJECTIVES_TO_NORMALIZE, QUANTILE, REFIT_FULL_SUFFIX, REGRESSION, MULTICLASS
 from ...data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
 from ...hpo.constants import CUSTOM_BACKEND, RAY_BACKEND
 from ...hpo.exceptions import EmptySearchSpace
@@ -936,8 +927,15 @@ class AbstractModel:
         y_pred += self.conformalize
         return y_pred
 
-    def _apply_leak_protection(self, X: pd.DataFrame | np.ndarray, y_pred_proba: np.ndarray, y_val_fold: np.ndarray | None,
-                               allowed_gap: float = 0.3, scale_gap: bool = True, fit_single_proba: np.ndarray= None):
+    def _apply_leak_protection(
+        self,
+        X: pd.DataFrame | np.ndarray,
+        y_pred_proba: np.ndarray,
+        y_val_fold: np.ndarray | None,
+        allowed_gap: float = 0.3,
+        scale_gap: bool = True,
+        fit_single_proba: np.ndarray = None,
+    ):
         """
         Adjust the predictions to avoid stack info leakage.
         FIXME: likely we want to increase the gap for multi-class as definition is a bit different...
@@ -955,6 +953,7 @@ class AbstractModel:
             if self.problem_type == MULTICLASS:
                 # FIXME: need to check that len(unique(y_val_fold)) == proba.shape[1], does ag guarantee this?
                 from sklearn.preprocessing import LabelBinarizer  # fixme, move up or keep lazy?
+
                 lb = LabelBinarizer().fit(labels)
                 lb.classes_ = list(range(y_pred_proba.shape[-1]))
                 transformed_labels = lb.transform(labels)
@@ -995,7 +994,7 @@ class AbstractModel:
                 # FIXME: assumption that the optimal threshold is 0.5
                 pseudo_label = (reasonable_proba >= 0.5).astype(int)
             else:
-                # FIXME: this idea wont work well for regression due to no difference here and the impact on loss
+                # FIXME: this idea won't work well for regression due to no difference here and the impact on loss
                 #   -> will always flip unless gap is >= 100% due to impact scaler
                 #   -> will only work for validation data and in extreme abs loss difference cases... mhm
                 pseudo_label = reasonable_proba
@@ -1035,9 +1034,7 @@ class AbstractModel:
         y_pred_proba = y_pred_proba.astype(np.float32)
 
         if self._model_needs_protection:
-            y_pred_proba = self._apply_leak_protection(
-                X=X, y_pred_proba=y_pred_proba, y_val_fold=kwargs.get('y_val_fold', None)
-            )
+            y_pred_proba = self._apply_leak_protection(X=X, y_pred_proba=y_pred_proba, y_val_fold=kwargs.get("y_val_fold", None))
 
         if self.params_aux.get("temperature_scalar", None) is not None:
             y_pred_proba = self._apply_temperature_scaling(y_pred_proba)
