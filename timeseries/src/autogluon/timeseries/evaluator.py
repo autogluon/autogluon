@@ -27,11 +27,6 @@ def abs_error_sum_per_item(*, y_true: pd.Series, y_pred: pd.Series) -> pd.Series
     return (y_true - y_pred).abs().groupby(level=ITEMID, sort=False).sum()
 
 
-def abs_target_sum_per_item(*, y_true: pd.Series) -> pd.Series:
-    """Compute Absolute Target Sum for each item (time series)."""
-    return (y_true).abs().groupby(level=ITEMID, sort=False).sum()
-
-
 def mse_per_item(*, y_true: pd.Series, y_pred: pd.Series) -> pd.Series:
     """Compute Mean Squared Error for each item (time series)."""
     return (y_true - y_pred).pow(2.0).groupby(level=ITEMID, sort=False).mean()
