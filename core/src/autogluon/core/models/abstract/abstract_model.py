@@ -24,7 +24,16 @@ from autogluon.common.utils.try_import import try_import_ray
 from autogluon.common.utils.utils import setup_outputdir
 
 from ... import metrics
-from ...constants import AG_ARG_PREFIX, AG_ARGS_FIT, BINARY, OBJECTIVES_TO_NORMALIZE, QUANTILE, REFIT_FULL_SUFFIX, REGRESSION, MULTICLASS
+from ...constants import (
+    AG_ARG_PREFIX,
+    AG_ARGS_FIT,
+    BINARY,
+    MULTICLASS,
+    OBJECTIVES_TO_NORMALIZE,
+    QUANTILE,
+    REFIT_FULL_SUFFIX,
+    REGRESSION,
+)
 from ...data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
 from ...hpo.constants import CUSTOM_BACKEND, RAY_BACKEND
 from ...hpo.exceptions import EmptySearchSpace
