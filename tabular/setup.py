@@ -72,10 +72,10 @@ extras_require = {
         "skl2onnx>=1.15.0,<1.16.0",
         # For macOS, there isn't a onnxruntime-gpu package installed with skl2onnx.
         # Therefore, we install onnxruntime explicitly here just for macOS.
-        "onnxruntime>=1.13.0,<1.14.0",
+        "onnxruntime>=1.15.0,<1.16.0",
     ]
     if sys.platform == "darwin"
-    else ["skl2onnx>=1.15.0,<1.16.0", "onnxruntime-gpu>=1.13.0,<1.14.0"],
+    else ["skl2onnx>=1.15.0,<1.16.0", "onnxruntime-gpu>=1.15.0,<1.16.0"],
 }
 
 # TODO: v1.0: Rename `all` to `core`, make `all` contain everything.
