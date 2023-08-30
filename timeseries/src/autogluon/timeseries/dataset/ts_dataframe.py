@@ -210,7 +210,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 raise ValueError(f"{i}'th time-series in data must be a dict, got{type(ts)}")
             if not ("target" in ts and "start" in ts):
                 raise ValueError(f"{i}'th time-series in data must have 'target' and 'start', got{ts.keys()}")
-            if not isinstance(ts["start"], (pd.Timestamp, pd.Period)) or ts["start"].freq is None:
+            if not isinstance(ts["start"], pd.Period) or ts["start"].freqstr is None:
                 raise ValueError(
                     f"{i}'th time-series must have timestamp as 'start' with freq specified, got {ts['start']}"
                 )
@@ -297,9 +297,9 @@ class TimeSeriesDataFrame(pd.DataFrame):
             Example::
 
                 iterable_dataset = [
-                    {"target": [0, 1, 2], "start": pd.Timestamp("01-01-2019", freq='D')},
-                    {"target": [3, 4, 5], "start": pd.Timestamp("01-01-2019", freq='D')},
-                    {"target": [6, 7, 8], "start": pd.Timestamp("01-01-2019", freq='D')}
+                    {"target": [0, 1, 2], "start": pd.Timestamp("01-01-2019")},
+                    {"target": [3, 4, 5], "start": pd.Timestamp("01-01-2019")},
+                    {"target": [6, 7, 8], "start": pd.Timestamp("01-01-2019")}
                 ]
         num_cpus : int, default = -1
             Number of CPU cores used to process the iterable dataset in parallel. Set to -1 to use all cores.
