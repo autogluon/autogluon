@@ -20,11 +20,11 @@ from autogluon.timeseries.dataset.ts_dataframe import (
 
 from .common import get_data_frame_with_variable_lengths
 
-START_TIMESTAMP = pd.Timestamp("01-01-2019", freq="D")  # type: ignore
-END_TIMESTAMP = pd.Timestamp("01-02-2019", freq="D")  # type: ignore
+START_TIMESTAMP = pd.Timestamp("01-01-2019")  # type: ignore
+END_TIMESTAMP = pd.Timestamp("01-02-2019")  # type: ignore
 ITEM_IDS = (0, 1, 2)
 TARGETS = np.arange(9)
-DATETIME_INDEX = tuple(pd.date_range(START_TIMESTAMP, periods=3))
+DATETIME_INDEX = tuple(pd.date_range(START_TIMESTAMP, periods=3, freq="D"))
 EMPTY_ITEM_IDS = np.array([], dtype=np.int64)
 EMPTY_DATETIME_INDEX = np.array([], dtype=np.dtype("datetime64[ns]"))  # type: ignore
 EMPTY_TARGETS = np.array([], dtype=np.int64)
@@ -138,7 +138,7 @@ def test_from_data_frame():
         (
             pd.Timestamp("01-03-2019"),  # type: ignore
             ITEM_IDS,
-            tuple(pd.date_range(START_TIMESTAMP, periods=2)),
+            tuple(pd.date_range(START_TIMESTAMP, periods=2, freq="D")),
             [0, 1, 3, 4, 6, 7],
             ITEM_IDS,
             tuple(pd.date_range(pd.Timestamp("01-03-2019"), periods=1)),  # type: ignore
@@ -187,14 +187,14 @@ def test_split_by_time(
             START_TIMESTAMP,
             END_TIMESTAMP,
             ITEM_IDS,
-            tuple(pd.date_range(START_TIMESTAMP, periods=1)),
+            tuple(pd.date_range(START_TIMESTAMP, periods=1, freq="D")),
             [0, 3, 6],
         ),
         (
             pd.Timestamp("12-31-2018"),  # type: ignore
             END_TIMESTAMP,
             ITEM_IDS,
-            tuple(pd.date_range(START_TIMESTAMP, periods=1)),
+            tuple(pd.date_range(START_TIMESTAMP, periods=1, freq="D")),
             [0, 3, 6],
         ),
         (
