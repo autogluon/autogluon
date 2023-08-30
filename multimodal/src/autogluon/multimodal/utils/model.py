@@ -518,7 +518,7 @@ def modify_duplicate_model_names(
     Parameters
     ----------
     predictor
-        An AutoMMPredictor object.
+        A MultiModalPredictor object.
     postfix
         The postfix used to change the duplicate names.
     blacklist

@@ -11,7 +11,8 @@ from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTS
 
 from .common import DUMMY_TS_DATAFRAME
 
-GLUONTS_PARITY_METRICS = ["mean_wQuantileLoss", "MAPE", "sMAPE", "MSE", "RMSE", "MASE"]
+GLUONTS_PARITY_METRICS = ["mean_wQuantileLoss", "MAPE", "sMAPE", "MSE", "RMSE", "MASE", "WAPE"]
+AG_TO_GLUONTS_METRIC = {"WAPE": "ND"}
 
 
 pytestmark = pytest.mark.filterwarnings("ignore")
@@ -76,7 +77,8 @@ def test_when_given_learned_model_when_evaluator_called_then_output_equal_to_glu
         fcst_iterator=fcast_list,
     )
 
-    assert np.isclose(gts_results[metric_name], ag_value, atol=1e-5)
+    gts_metric_name = AG_TO_GLUONTS_METRIC.get(metric_name, metric_name)
+    assert np.isclose(gts_results[gts_metric_name], ag_value, atol=1e-5)
 
 
 @pytest.mark.parametrize("metric_name", GLUONTS_PARITY_METRICS)
@@ -109,7 +111,8 @@ def test_when_given_all_zero_data_when_evaluator_called_then_output_equal_to_glu
     gts_evaluator = GluonTSEvaluator()
     gts_results, _ = gts_evaluator(ts_iterator=ts_list, fcst_iterator=fcast_list)
 
-    assert np.isclose(gts_results[metric_name], ag_value, atol=1e-5, equal_nan=True)
+    gts_metric_name = AG_TO_GLUONTS_METRIC.get(metric_name, metric_name)
+    assert np.isclose(gts_results[gts_metric_name], ag_value, atol=1e-5, equal_nan=True)
 
 
 @pytest.mark.parametrize("metric_name", GLUONTS_PARITY_METRICS)
@@ -148,7 +151,8 @@ def test_when_given_zero_forecasts_when_evaluator_called_then_output_equal_to_gl
     gts_evaluator = GluonTSEvaluator(seasonality=seasonal_period)
     gts_results, _ = gts_evaluator(ts_iterator=ts_list, fcst_iterator=zero_forecast_list)
 
-    assert np.isclose(gts_results[metric_name], ag_value, atol=1e-5)
+    gts_metric_name = AG_TO_GLUONTS_METRIC.get(metric_name, metric_name)
+    assert np.isclose(gts_results[gts_metric_name], ag_value, atol=1e-5)
 
 
 def test_available_metrics_have_coefficients():

@@ -13,6 +13,9 @@ on:
       pr-sha:
         description: 'The pr-sha of which the slash command was dispatched'
         required: true
+      branch_or_pr_number:
+        description: 'dummy parameter to allow benchmark workflow to run'
+        required: false
 
 jobs:
   setup:

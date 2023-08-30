@@ -28,6 +28,7 @@ from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
 from autogluon.common.utils.resource_utils import ResourceManager
+from autogluon.common.utils.try_import import try_import_ray
 from autogluon.core.utils import default_holdout_frac, generate_train_test_split_combined
 from autogluon.core.utils.loaders import load_pd
 from autogluon.multimodal.utils.log import get_fit_complete_message, get_fit_start_message
@@ -129,7 +130,6 @@ from .utils import (
     evaluate_coco,
     extract_from_output,
     filter_hyperparameters,
-    get_available_devices,
     get_config,
     get_detection_classes,
     get_dir_ckpt_paths,
@@ -147,6 +147,8 @@ from .utils import (
     infer_precision,
     infer_scarcity_mode_by_data_size,
     init_df_preprocessor,
+    is_interactive_env,
+    is_interactive_strategy,
     is_lazy_weight_tensor,
     list_timm_models,
     load_text_tokenizers,
@@ -819,6 +821,7 @@ class MultiModalPredictor(ExportMixin):
 
         hpo_mode = True if hyperparameter_tune_kwargs else False
         if hpo_mode:
+            try_import_ray()
             hyperparameters = filter_hyperparameters(
                 hyperparameters=hyperparameters,
                 column_types=column_types,
@@ -937,6 +940,7 @@ class MultiModalPredictor(ExportMixin):
                 model=self._model,
                 advanced_hyperparameters=advanced_hyperparameters,
             )
+        self.update_strategy_by_env()
 
     def _ensure_inference_ready(self):
         if not self._fit_called:
@@ -1203,6 +1207,7 @@ class MultiModalPredictor(ExportMixin):
         self._data_processors = data_processors
         self._model = model
         self._model_postprocess_fn = model_postprocess_fn
+        self.update_strategy_by_env()
 
         if max_time == timedelta(seconds=0):
             self._top_k_average(
@@ -1420,7 +1425,13 @@ class MultiModalPredictor(ExportMixin):
         )
 
         num_gpus = compute_num_gpus(config_num_gpus=config.env.num_gpus, strategy=config.env.strategy)
-        logger.info(get_gpu_message(detected_num_gpus=ResourceManager.get_gpu_count_torch(), used_num_gpus=num_gpus))
+        logger.info(
+            get_gpu_message(
+                detected_num_gpus=ResourceManager.get_gpu_count_torch(),
+                used_num_gpus=num_gpus,
+                strategy=config.env.strategy,
+            )
+        )
 
         precision = infer_precision(num_gpus=num_gpus, precision=config.env.precision)
 
@@ -1470,13 +1481,10 @@ class MultiModalPredictor(ExportMixin):
         with apply_log_filter(log_filter):
             trainer = pl.Trainer(
                 accelerator="gpu" if num_gpus > 0 else "auto",
-                devices=get_available_devices(
-                    num_gpus=num_gpus,
-                    auto_select_gpus=config.env.auto_select_gpus,
-                ),
+                devices=num_gpus if num_gpus > 0 else "auto",
                 num_nodes=config.env.num_nodes,
                 precision=precision,
-                strategy=strategy,
+                strategy=strategy if strategy else "auto",
                 benchmark=False,
                 deterministic=config.env.deterministic,
                 max_epochs=config.optimization.max_epochs,
@@ -1693,6 +1701,7 @@ class MultiModalPredictor(ExportMixin):
         precision: Union[int, str],
         batch_size: int,
         strategy: str,
+        barebones: Optional[bool] = False,
     ) -> List[Dict]:
         if self._config.env.strategy == DEEPSPEED_OFFLOADING and DEEPSPEED_MODULE not in sys.modules:
             # Need to initialize DeepSpeed and optimizer as currently required in Pytorch-Lighting integration of deepspeed.
@@ -1772,21 +1781,23 @@ class MultiModalPredictor(ExportMixin):
             blacklist_msgs.append("HPU available")
             blacklist_msgs.append("select gpus")
             blacklist_msgs.append("LOCAL_RANK")
+            blacklist_msgs.append("Trainer(barebones=True)")
         log_filter = LogFilter(blacklist_msgs)
 
         with apply_log_filter(log_filter):
             evaluator = pl.Trainer(
                 accelerator="gpu" if num_gpus > 0 else "auto",
-                devices=get_available_devices(num_gpus=num_gpus, auto_select_gpus=self._config.env.auto_select_gpus),
+                devices=num_gpus if num_gpus > 0 else "auto",
                 num_nodes=self._config.env.num_nodes,
                 precision=precision,
                 strategy=strategy,
                 benchmark=False,
-                enable_progress_bar=self._enable_progress_bar,
+                enable_progress_bar=False if barebones else self._enable_progress_bar,
                 deterministic=self._config.env.deterministic,
                 max_epochs=-1,  # Add max_epochs to disable warning
                 logger=False,
                 callbacks=callbacks,
+                barebones=barebones,
             )
 
             with warnings.catch_warnings():
@@ -2750,6 +2761,7 @@ class MultiModalPredictor(ExportMixin):
             loss_func=loss_func,
         )
         predictor._model_postprocess_fn = model_postprocess_fn
+        predictor.update_strategy_by_env()
 
         return predictor
 
@@ -2854,12 +2866,12 @@ class MultiModalPredictor(ExportMixin):
         else:
             raise ValueError(f"list_supported_models() is not available for problem type: {self._problem_type}")
 
-
-class AutoMMPredictor(MultiModalPredictor):
-    def __init__(self, **kwargs):
-        warnings.warn(
-            "AutoMMPredictor has been renamed as 'MultiModalPredictor'. "
-            "Consider to use MultiModalPredictor instead. Using AutoMMPredictor will "
-            "raise an exception starting in v0.7."
-        )
-        super(AutoMMPredictor, self).__init__(**kwargs)
+    def update_strategy_by_env(self):
+        """
+        Set strategy to ddp_fork or ddp_notebook if an iterative env is detected.
+        """
+        assert self._config is not None
+        if is_interactive_env() and not is_interactive_strategy(self._config.env.strategy):
+            strs = list(self._config.env.strategy.partition("_find_unused_parameters"))
+            strs[0] = "ddp_fork"
+            self._config.env.strategy = "".join(strs)
