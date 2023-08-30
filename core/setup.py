@@ -38,7 +38,7 @@ install_requires = (
         "numpy",
         "scipy",
         "scikit-learn",
-        "pandas",
+        "pandas>=1.4.1,<1.6",  # TODO: upgrade to 2.0 when webassembly supports
         "tqdm",
         "matplotlib",
         f"{ag.PACKAGE_NAME}.common=={version}",
