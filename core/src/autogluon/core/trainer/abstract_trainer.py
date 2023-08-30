@@ -541,8 +541,14 @@ class AbstractTrainer:
         )
 
         if X_val is None:
+            if last_level and (core_kwargs.get("ag_args_fit", None) is not None) and core_kwargs["ag_args_fit"].get("full_last_weighted_ensemble", False):
+                tmp_base_model_names = core_models + base_model_names
+            else:
+                tmp_base_model_names = core_models
             aux_models = self.stack_new_level_aux(
-                X=X, y=y, base_model_names=core_models, level=level + 1, infer_limit=infer_limit, infer_limit_batch_size=infer_limit_batch_size, **aux_kwargs
+                X=X, y=y,
+                base_model_names=tmp_base_model_names,
+                level=level + 1, infer_limit=infer_limit, infer_limit_batch_size=infer_limit_batch_size, **aux_kwargs
             )
             # Compute Bagged Weighted Ensemble needed for info leak protection
             if (core_kwargs.get("ag_args_fit", None) is not None) and core_kwargs["ag_args_fit"].get("stack_info_leak_protection", False) and (not last_level):
@@ -558,7 +564,7 @@ class AbstractTrainer:
                 )
                 core_kwargs["ag_args_fit"]["reasonable_ensemble"] = self.load_model(aux_models[-1])
         else:
-            # TODO: do we need to add stack info leakage protection here too?
+            # TODO: do we need to add stack info leakage protection here too? (not now)
             aux_models = self.stack_new_level_aux(
                 X=X_val,
                 y=y_val,
