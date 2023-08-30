@@ -1375,7 +1375,7 @@ class TabularPredictor:
             test_pseudo_idxes = pd.Series(data=False, index=y_pred_proba.index)
             test_pseudo_idxes[test_pseudo_idxes_true.index] = True
 
-            y_pseudo_og = pd.concat([y_pred_proba_og, y_pred.loc[test_pseudo_idxes_true.index]], verify_integrity=True)
+            y_pseudo_og = pd.concat([y_pseudo_og, y_pred.loc[test_pseudo_idxes_true.index]], verify_integrity=True)
 
             pseudo_data = unlabeled_data.loc[y_pseudo_og.index]
             pseudo_data[self.label] = y_pseudo_og
