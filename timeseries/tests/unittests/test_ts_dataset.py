@@ -220,7 +220,6 @@ def test_slice_by_time(start_timestamp, end_timestamp, item_ids, datetimes, targ
     new_tsdf = SAMPLE_TS_DATAFRAME.slice_by_time(start_timestamp, end_timestamp)
 
 
-
 @pytest.mark.parametrize(
     "timestamps, expected_freq",
     [
