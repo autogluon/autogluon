@@ -218,6 +218,8 @@ def test_slice_by_time(start_timestamp, end_timestamp, item_ids, datetimes, targ
     start_timestamp = start_timestamp.to_timestamp() if isinstance(start_timestamp, pd.Period) else start_timestamp
     end_timestamp = end_timestamp.to_timestamp() if isinstance(end_timestamp, pd.Period) else end_timestamp
     new_tsdf = SAMPLE_TS_DATAFRAME.slice_by_time(start_timestamp, end_timestamp)
+    ts_df = _build_ts_dataframe(item_ids, datetimes, targets)
+    pd.testing.assert_frame_equal(new_tsdf, ts_df)
 
 
 @pytest.mark.parametrize(
