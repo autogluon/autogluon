@@ -173,7 +173,7 @@ class DataHelper:
 
     @staticmethod
     def generate_datetime_feature() -> Series:
-        return pd.to_datetime(DataHelper.generate_datetime_as_object_feature(), errors="coerce")
+        return pd.to_datetime(DataHelper.generate_datetime_as_object_feature(), errors="coerce", format="mixed")
 
     @staticmethod
     def generate_bool_feature_int(name="int_bool") -> DataFrame:

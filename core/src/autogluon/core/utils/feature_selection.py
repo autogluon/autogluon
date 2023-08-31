@@ -58,7 +58,7 @@ def merge_importance_dfs(df_old: pd.DataFrame, df_new: pd.DataFrame, using_prev_
     # for features with info on only df_old, return corresponding df_old rows
     evaluated_old_only_rows = evaluated_old_rows.loc[evaluated_old_only]
     # for features with info on only df_new or whose df_old feature importance came from the previous model, return corresponding df_new rows
-    evaluated_new_only_rows = evaluated_new_rows.loc[set(evaluated_new_only + evaluated_new_first_time)]
+    evaluated_new_only_rows = evaluated_new_rows.loc[list(set(evaluated_new_only + evaluated_new_first_time))]
     # for features with info on both df_new and whose df_old feature importance came from the current model, return combined statistics
     evaluated_both_rows = pd.DataFrame()
     evaluated_both_rows_new = evaluated_new_rows.loc[evaluated_both].sort_index()
