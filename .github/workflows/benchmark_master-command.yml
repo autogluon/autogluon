@@ -1,8 +1,8 @@
 name: benchmark_master
 
 on:
-  schedule:
-    - cron: '*/5 * * * *'
+  push:
+  pull_request_target:
 
 env:
   AG_MODULE: tabular
