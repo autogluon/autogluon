@@ -45,7 +45,6 @@ permissions:
 jobs:
 
   generate_bench_configs:
-    needs: setup
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
