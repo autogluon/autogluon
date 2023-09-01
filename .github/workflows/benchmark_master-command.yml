@@ -1,0 +1,114 @@
+name: benchmark_master
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+
+env:
+  AG_MODULE: tabular
+    # description: 'Which module to run the benchmark on'
+    # required: true
+    # default: tabular
+    # options:
+    #   - tabular
+  AG_PRESET: medium
+    # description: 'Preset to run for tabular'
+    # required: true
+    # options:
+    #   - best
+    #   - high
+    #   - good
+    #   - medium
+  AG_BENCHMARK: test
+    # description: 'Benchmark to run'
+    # required: true
+    # options:
+    #   - full
+    #   - test
+  AG_TIME_LIMIT: 1h
+    # description: 'Time limit for the benchmark to run'
+    # required: true
+    # options:
+    #   - 1h
+    #   - 4h
+    #   - 8h
+    #   - 16h
+    #   - 24h
+  AG_BRANCH_NAME: master
+    # description: 'Branch or PR number to run the benchmark on'
+    # required: true
+  
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+
+  generate_bench_configs:
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Setup Env Vars
+        uses: ./.github/actions/setup-env-vars
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmarkConfig
+          role-duration-seconds: 3600
+          aws-region: us-east-1
+      - name: Generate bench configs (For Push)
+        if: ${{ github.event_name == 'push' }}
+        run: |
+          /bin/bash CI/bench/generate_amlb_user_dir.sh ${{ env.GIT_REPO }} ${{ env.BRANCH }} ${{ env.SHORT_SHA }}
+      - name: Generate bench configs (For Pull Request)
+        if: ${{ github.event_name == 'pull_request_target' }}
+        run: |
+          /bin/bash CI/bench/generate_amlb_user_dir.sh ${{ env.GIT_REPO }} ${{ env.BRANCH }} ${{ env.SHORT_SHA }} ${{ env.PR_NUMBER }}
+
+  benchmark:
+    needs: generate_bench_configs
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Free Disk Space (Ubuntu)
+        # uses: jlumbroso/free-disk-space@v1.2.0
+        uses: hirnidrin/free-disk-space@main  # revert back once fix in https://github.com/jlumbroso/free-disk-space/pull/11
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+      - name: Checkout repository for PR
+        uses: actions/checkout@v2
+      - name: Setup Python
+        uses: actions/setup-python@v1
+        with:
+          python-version: '3.9'
+      - name: Setup npm
+        uses: actions/setup-node@v3
+        with:
+          node-version: 'latest'
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
+          role-duration-seconds: 14400
+          aws-region: us-east-1
+      - name: Run benchmark
+        shell: bash -l {0}
+        run: |
+          nvm install 20
+          npm install -g aws-cdk
+          /bin/bash ./.github/workflow_scripts/run_benchmark.sh ${{ env.AG_MODULE }} ${{ env.AG_PRESET }} ${{ env.AG_BENCHMARK }} ${{ env.AG_TIME_LIMIT }} ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
+      - name: Upload website.txt
+        uses: actions/upload-artifact@v3
+        with:
+          name: dashboard-website
+          path: ./website.txt
