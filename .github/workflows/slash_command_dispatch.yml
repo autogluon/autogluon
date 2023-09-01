@@ -35,6 +35,7 @@ jobs:
           token: ${{ secrets.PAT }}
           commands: |
             benchmark
+            benchmark_master
             platform_tests
           dispatch-type: workflow
           static-args: |
