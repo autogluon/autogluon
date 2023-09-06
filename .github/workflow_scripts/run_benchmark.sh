@@ -14,6 +14,9 @@ source $(dirname "$0")/env_setup.sh
 setup_benchmark_env
 
 /bin/bash CI/bench/generate_bench_config.sh $MODULE $PRESET $BENCHMARK $TIME_LIMIT $BRANCH_OR_PR_NUMBER
+#copy the generated config file to test
+echo "Printing the cloud config file"
+cat $MODULE"_cloud_configs.yaml"
 agbench run $MODULE"_cloud_configs.yaml" --wait
 
 python CI/bench/evaluate.py --config_path ./ag_bench_runs/tabular/ --time_limit $TIME_LIMIT
