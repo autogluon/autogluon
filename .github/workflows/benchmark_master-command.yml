@@ -5,15 +5,10 @@ on:
 
 env:
   AG_MODULE: tabular
-    description: 'Which module to run the benchmark on'
   AG_PRESET: medium
-    description: 'Preset to run for tabular'
   AG_BENCHMARK: test
-    description: 'Benchmark to run'
   AG_TIME_LIMIT: 1h
-    description: 'Time limit for the benchmark to run'
   AG_BRANCH_NAME: master
-    description: 'Branch or PR number to run the benchmark on'
   
 permissions:
   id-token: write
