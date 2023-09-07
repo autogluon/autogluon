@@ -22,12 +22,12 @@ def get_seasonal_diffs(*, y_past: pd.Series, seasonal_period: int = 1) -> pd.Ser
 
 def in_sample_seasonal_naive_error(*, y_past: pd.Series, seasonal_period: int = 1) -> pd.Series:
     """Compute seasonal naive forecast error (predict value from seasonal_period steps ago) for each time series."""
-    seasonal_diffs = get_seasonal_diffs(y_past, seasonal_period=seasonal_period)
+    seasonal_diffs = get_seasonal_diffs(y_past=y_past, seasonal_period=seasonal_period)
     return seasonal_diffs.groupby(level=ITEMID, sort=False).mean().fillna(1.0)
 
 
 def in_sample_random_walk_error(*, y_past: pd.Series) -> pd.Series:
-    onestep_diffs = get_seasonal_diffs(y_past, seasonal_period=1)
+    onestep_diffs = get_seasonal_diffs(y_past=y_past, seasonal_period=1)
     return onestep_diffs.dropna().pow(2.0).groupby(level=ITEMID, sort=False).mean()
 
 
@@ -140,6 +140,7 @@ class TimeSeriesEvaluator:
 
         self.metric_method = self.__getattribute__("_" + self.eval_metric.lower())
         self._past_naive_error: Optional[pd.Series] = None
+        self._random_walk_error: Optional[pd.Series] = None
 
     @property
     def coefficient(self) -> int:
@@ -191,8 +192,7 @@ class TimeSeriesEvaluator:
 
     def _rmsse(self, y_true: pd.Series, predictions: TimeSeriesDataFrame) -> float:
         y_pred = self._get_median_forecast(predictions)
-        rmsse = rmsse_per_item(y_true, y_pred, self._random_walk_error)
-        return rmsse.mean()
+        return self._safemean(rmsse_per_item(y_true=y_true, y_pred=y_pred, random_walk_error=self._random_walk_error))
 
     def _get_median_forecast(self, predictions: TimeSeriesDataFrame) -> pd.Series:
         # TODO: Median forecast doesn't actually minimize the MAPE / sMAPE losses
