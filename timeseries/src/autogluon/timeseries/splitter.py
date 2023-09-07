@@ -1,5 +1,5 @@
 import logging
-from typing import Tuple, Union
+from typing import Iterator, List, Optional, Tuple, Union
 
 import pandas as pd
 
@@ -227,3 +227,21 @@ class LastWindowSplitter(MultiWindowSplitter):
             f"Will use the last prediction_length = {prediction_length} time steps of each time series as a hold-out "
             "validation set."
         )
+
+
+class Splitter:
+    def __init__(self, prediction_length: int, num_windows: int, step_size: Optional[int] = None):
+        self.prediction_length = prediction_length
+        self.num_windows = num_windows
+        if step_size is None:
+            step_size = prediction_length
+        self.step_size = step_size
+
+    def split(self, data: TimeSeriesDataFrame) -> Iterator[Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]]:
+        ts_lengths = data.num_timesteps_per_item()
+        required_length = self.prediction_length + (self.num_windows - 1) * self.step_size + 1
+        short_series = ts_lengths.index[ts_lengths < required_length]
+        if len(short_series) > 0:
+            raise ValueError(
+                f"Following time series are too short for given cross validation settings: {short_series.to_list()}"
+            )

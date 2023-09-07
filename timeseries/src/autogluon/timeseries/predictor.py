@@ -521,10 +521,16 @@ class TimeSeriesPredictor:
                 )
         num_val_windows : int or None, default = 1
             Number of backtests done on ``train_data`` for each trained model to estimate the validation performance.
-            A separate copy of each model is trained for each validation window.
-            When ``num_val_windows = k``, training time is increased roughly by a factor of ``k``.
             If ``num_val_windows=None``, the predictor will attempt to set this parameter automatically based on the
             length of time series in ``train_data`` (at most to 5).
+
+            Increasing this parameter increases the training time roughly by a factor of ``num_val_windows // refit_every_n_windows``.
+            See :attr:`refit_every_n_windows` and :attr:`val_step_size`: for details.
+        refit_every_n_windows: int, default = 1
+            When performing cross validation, each models will be retrained every ``refit_every_n_windows`` validation
+            windows.
+        val_step_size : int, optional
+            For each . Defaults to ``prediction_length`` provided when creating the predictor.
         refit_full : bool, default = False
             If True, after training is complete, AutoGluon will attempt to re-train all models using all of training
             data (including the data initially reserved for validation). This argument has no effect if ``tuning_data``
@@ -540,6 +546,7 @@ class TimeSeriesPredictor:
             documentation for :class:`~autogluon.timeseries.TimeSeriesPredictor` for more details.
 
         """
+        # TODO: Improve docstrings for num_val_windows, val_step_size and refit_every_n_windows
         time_start = time.time()
         if self._learner.is_fit:
             raise AssertionError("Predictor is already fit! To fit additional models create a new `Predictor`.")
