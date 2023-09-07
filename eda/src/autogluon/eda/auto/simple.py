@@ -1664,7 +1664,7 @@ def detect_anomalies(
     ):
         anomaly_scores = _state.anomaly_detection.scores[ds]
         anomaly_idx = anomaly_scores[anomaly_scores >= anomaly_score_threshold].sort_values(ascending=False).index
-        _state.anomaly_detection.anomalies[ds] = df.iloc[anomaly_idx].join(anomaly_scores)
+        _state.anomaly_detection.anomalies[ds] = df.loc[anomaly_idx].join(anomaly_scores)
 
         if (show_top_n_anomalies is not None) and (show_top_n_anomalies > 0) and (len(anomaly_idx) > 0):
             analyze(

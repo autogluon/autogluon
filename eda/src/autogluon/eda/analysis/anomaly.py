@@ -346,5 +346,5 @@ class AnomalyDetectorAnalysis(AbstractAnalysis):
         return dict(
             train_data=args.train_data,
             model=detector,
-            rows=args[dataset].iloc[dataset_row_ids],
+            rows=args[dataset].loc[dataset_row_ids],
         )
