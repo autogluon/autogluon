@@ -26,6 +26,11 @@ def in_sample_seasonal_naive_error(*, y_past: pd.Series, seasonal_period: int = 
     return seasonal_diffs.groupby(level=ITEMID, sort=False).mean().fillna(1.0)
 
 
+def in_sample_random_walk_error(*, y_past: pd.Series) -> pd.Series:
+    onestep_diffs = get_seasonal_diffs(y_past, seasonal_period=1)
+    return onestep_diffs.dropna().pow(2.0).groupby(level=ITEMID, sort=False).mean()
+
+
 def mse_per_item(*, y_true: pd.Series, y_pred: pd.Series) -> pd.Series:
     """Compute Mean Squared Error for each item (time series)."""
     return (y_true - y_pred).pow(2.0).groupby(level=ITEMID, sort=False).mean()
@@ -222,6 +227,9 @@ class TimeSeriesEvaluator:
         self._past_naive_error = in_sample_seasonal_naive_error(
             y_past=data_past[self.target_column], seasonal_period=seasonal_period
         )
+
+        if self.eval_metric == "RMSSE":
+            self._random_walk_error = in_sample_random_walk_error(y_past=data_past[self.target_column])
 
     def score_with_saved_past_metrics(
         self, data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame
