@@ -192,7 +192,7 @@ def test_given_unavailable_input_and_no_raise_check_get_eval_metric_output_defau
     )
 
 
-@pytest.mark.parametrize("eval_metric", ["MASE", "sMAPE"])
+@pytest.mark.parametrize("eval_metric", ["MASE", "RMSSE"])
 def test_given_historic_data_not_cached_when_scoring_then_exception_is_raised(eval_metric):
     prediction_length = 3
     evaluator = TimeSeriesEvaluator(eval_metric=eval_metric, prediction_length=prediction_length)

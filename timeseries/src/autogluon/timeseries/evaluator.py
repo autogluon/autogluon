@@ -254,7 +254,11 @@ class TimeSeriesEvaluator:
         it doesn't require splitting the test data into past/future portions each time (e.g., when fitting ensembles).
         """
         assert (predictions.num_timesteps_per_item() == self.prediction_length).all()
-        assert self._past_naive_error is not None, "Call save_past_metrics before score_with_saved_past_metrics"
+        if self.eval_metric == "MASE":
+            assert self._past_naive_error is not None, "Call save_past_metrics before score_with_saved_past_metrics"
+        if self.eval_metric == "RMSSE":
+            assert self._random_walk_error is not None, "Call save_past_metrics before score_with_saved_past_metrics"
+
         assert data_future.index.equals(predictions.index), "Prediction and data indices do not match."
 
         with evaluator_warning_filter(), warnings.catch_warnings():
