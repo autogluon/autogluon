@@ -89,6 +89,7 @@ class TimeSeriesEvaluator:
         * ``MSE``: mean squared error
         * ``RMSE``: root mean squared error
         * ``WAPE``: weighted absolute percentage error. See https://docs.aws.amazon.com/forecast/latest/dg/metrics.html#metrics-WAPE
+        * ``RMSSE``: Root Mean Squared Scaled Error . See https://mofc.unic.ac.cy/m5-competition/
 
     prediction_length : int
         Length of the forecast horizon
