@@ -1,5 +1,6 @@
 import math
 import time
+from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
@@ -10,8 +11,6 @@ from autogluon.core.models import AbstractModel
 from autogluon.core.models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
 from autogluon.core.models.ensemble.fold_fitting_strategy import ParallelLocalFoldFittingStrategy
 from autogluon.core.searcher import LocalRandomSearcher
-
-from unittest.mock import patch
 
 
 class DummyBigModel(AbstractModel):
