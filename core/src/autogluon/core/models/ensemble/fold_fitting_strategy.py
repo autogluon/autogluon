@@ -493,7 +493,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
             num_folds_parallel = int(math.pow(2, math.floor((math.log10(max_folds_to_train_with_mem) / math.log10(2)))))
             logger.log(
                 30,
-                f"\tMemory not enough to fit {user_specified_num_folds_parallel} folds of {self.model_base.__class__.__name__} in parallel. Will train {num_folds_parallel} folds in parallel instead. "
+                f"\tMemory not enough to fit {user_specified_num_folds_parallel} folds of {self.model_base.__class__.__name__} in parallel. Will train {num_folds_parallel} folds in parallel instead. ",
             )
         return num_folds_parallel
 

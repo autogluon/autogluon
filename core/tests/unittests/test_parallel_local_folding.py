@@ -15,7 +15,6 @@ from unittest.mock import patch
 
 
 class DummyBigModel(AbstractModel):
-
     def _estimate_memory_usage(self, **kwargs):
         return ResourceManager.get_available_virtual_mem() / 2.5
 
@@ -54,7 +53,7 @@ def _construct_dummy_fold_strategy(num_jobs, model_base_cls=AbstractModel, time_
         num_jobs=num_jobs,
         num_folds_parallel=num_folds_parallel,
         time_limit_fold_ratio=1,
-        max_memory_usage_ratio=1
+        max_memory_usage_ratio=1,
     )
     return ParallelLocalFoldFittingStrategy(**args)
 
