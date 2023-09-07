@@ -46,6 +46,11 @@ def mape_per_item(*, y_true: pd.Series, y_pred: pd.Series) -> pd.Series:
     return ((y_true - y_pred) / y_true).abs().groupby(level=ITEMID, sort=False).mean()
 
 
+def rmsse_per_item(*, y_true: pd.Series, y_pred: pd.Series, random_walk_error: pd.Series) -> pd.Series:
+    mse = mse_per_item(y_true=y_true, y_pred=y_pred)
+    return np.sqrt(mse / random_walk_error)
+
+
 def symmetric_mape_per_item(*, y_true: pd.Series, y_pred: pd.Series) -> pd.Series:
     """Compute symmetric Mean Absolute Percentage Error for each item (time series)."""
     return (2 * (y_true - y_pred).abs() / (y_true.abs() + y_pred.abs())).groupby(level=ITEMID, sort=False).mean()
@@ -106,7 +111,7 @@ class TimeSeriesEvaluator:
         :meth:``~autogluon.timeseries.TimeSeriesEvaluator.check_get_evaluation_metric``.
     """
 
-    AVAILABLE_METRICS = ["MASE", "MAPE", "sMAPE", "mean_wQuantileLoss", "MSE", "RMSE", "WAPE"]
+    AVAILABLE_METRICS = ["MASE", "MAPE", "sMAPE", "mean_wQuantileLoss", "MSE", "RMSE", "WAPE", "RMSSE"]
     METRIC_COEFFICIENTS = {
         "MASE": -1,
         "MAPE": -1,
@@ -115,6 +120,7 @@ class TimeSeriesEvaluator:
         "MSE": -1,
         "RMSE": -1,
         "WAPE": -1,
+        "RMSSE": -1,
     }
     DEFAULT_METRIC = "mean_wQuantileLoss"
 
@@ -182,6 +188,11 @@ class TimeSeriesEvaluator:
         abs_error_sum = (mae_per_item(y_true=y_true, y_pred=y_pred) * self.prediction_length).sum()
         abs_target_sum = y_true.abs().sum()
         return abs_error_sum / abs_target_sum
+
+    def _rmsse(self, y_true: pd.Series, predictions: TimeSeriesDataFrame) -> float:
+        y_pred = self._get_median_forecast(predictions)
+        rmsse = rmsse_per_item(y_true, y_pred, self._random_walk_error)
+        return rmsse.mean()
 
     def _get_median_forecast(self, predictions: TimeSeriesDataFrame) -> pd.Series:
         # TODO: Median forecast doesn't actually minimize the MAPE / sMAPE losses
