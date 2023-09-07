@@ -665,14 +665,18 @@ class BaggedEnsembleModel(AbstractModel):
             fold_fitting_strategy_args["model_sync_path"] = DistributedContext.get_model_sync_path()
         fold_fitting_strategy: FoldFittingStrategy = fold_fitting_strategy_cls(**fold_fitting_strategy_args)
 
-        if type(fold_fitting_strategy) == ParallelLocalFoldFittingStrategy and not fold_fitting_strategy.is_mem_sufficient():
-            fold_fitting_strategy_args["num_folds_parallel"] = 1
-            fold_fitting_strategy: FoldFittingStrategy = fold_fitting_strategy_cls(**fold_fitting_strategy_args)
-            logger.log(
-                30,
-                f"\tMemory not enough to fit {model_base.__class__.__name__} folds in parallel. Will do sequential fitting instead. "
-                f"\tConsider decreasing folds trained in parallel by passing num_folds_parallel to ag_args_ensemble when calling predictor.fit",
-            )
+        if type(fold_fitting_strategy) == ParallelLocalFoldFittingStrategy:
+            folds_can_be_fit_in_parallel = fold_fitting_strategy.folds_can_be_fit_in_parallel()
+            if folds_can_be_fit_in_parallel < num_folds_parallel:
+                # If memory is not sufficient to train num_folds_parallel, reduce to max power of 2 folds that's smaller than folds_can_be_fit_in_parallel.
+                new_num_folds_parallel = int(math.pow(2, math.floor((math.log10(num_folds_parallel) / math.log10(2)))))
+                fold_fitting_strategy_args["num_folds_parallel"] = new_num_folds_parallel
+                fold_fitting_strategy: FoldFittingStrategy = fold_fitting_strategy_cls(**fold_fitting_strategy_args)
+                logger.log(
+                    30,
+                    f"\tMemory not enough to fit {num_folds_parallel} folds of {model_base.__class__.__name__} in parallel. Will train {new_num_folds_parallel} folds in parallel instead. "
+                    f"\tConsider decreasing folds trained in parallel by passing num_folds_parallel to ag_args_ensemble when calling predictor.fit",
+                )
 
         logger.log(
             20,

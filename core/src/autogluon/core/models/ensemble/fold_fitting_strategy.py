@@ -479,14 +479,14 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         )
 
     @disable_if_lite_mode(ret=True)
-    def is_mem_sufficient(self):
+    def folds_can_be_fit_in_parallel(self) -> int:
         """Check if the memory is sufficient to do parallel training"""
         model_mem_est = self._initialized_model_base.estimate_memory_usage(X=self.X)
         total_model_mem_est = self.num_parallel_jobs * model_mem_est
         data_mem_est = self._estimate_data_memory_usage()
         total_data_mem_est = self.num_parallel_jobs * data_mem_est
         mem_available = ResourceManager.get_available_virtual_mem()
-        return (mem_available * self.max_memory_usage_ratio) > (total_model_mem_est + total_data_mem_est)
+        return int((mem_available * self.max_memory_usage_ratio) / (total_model_mem_est + total_data_mem_est))
 
     def _estimate_data_memory_usage(self):
         X_mem = get_approximate_df_mem_usage(self.X).sum()
