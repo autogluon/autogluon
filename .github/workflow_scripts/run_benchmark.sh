@@ -19,6 +19,12 @@ echo "Printing the cloud config file"
 cat $MODULE"_cloud_configs.yaml"
 agbench run $MODULE"_cloud_configs.yaml" --wait
 
+#if it is a PR fetch the cleaned file from master location here 
+if [ $BRANCH_OR_PR_NUMBER != "master" ]
+then
+    aws s3 cp --recursive s3://autogluon-ci-benchmark/cleaned/master/latest/ ./results
+fi
+
 python CI/bench/evaluate.py --config_path ./ag_bench_runs/tabular/ --time_limit $TIME_LIMIT --branch_name $BRANCH_OR_PR_NUMBER
 aws s3 cp --recursive ./results s3://autogluon-ci-benchmark/cleaned/$BRANCH_OR_PR_NUMBER/$SHA/
 aws s3 rm --recursive s3://autogluon-ci-benchmark/cleaned/$BRANCH_OR_PR_NUMBER/latest/

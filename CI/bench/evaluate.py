@@ -59,7 +59,7 @@ subprocess.run(
 # if it is a PR then perform the evaluation as well 
 if branch_name != "master":
 
-    print("\nThis is master branch so we do not evaluate")
+    print("\nThis is PR so we evaluate")
 
     paths = []
     frameworks = []
@@ -86,4 +86,4 @@ if branch_name != "master":
 
 else:
 
-    print("\nEvaluation not performed!")
+    print("\nEvaluation is not performed as branch is master!")
