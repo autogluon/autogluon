@@ -11,11 +11,13 @@ parser.add_argument(
     "--config_path", help="path to generated config path to fetch benchmark name", type=str, required=True
 )
 parser.add_argument("--time_limit", help="time limit of the benchmark run", type=str, required=True)
+parser.add_argument("--branch_name", help="if it happens to be master then just push the cleaned result, do not evaluate", type=str, required=True)
 
 args = parser.parse_args()
 
 config_path = args.config_path
 time_limit = args.time_limit
+branch_name = args.branch_name
 
 for root, dirs, files in os.walk(config_path):
     for file in files:
@@ -54,25 +56,34 @@ subprocess.run(
     ]
 )
 
-paths = []
-frameworks = []
-for file in os.listdir("./results"):
-    if file.endswith(".csv"):
-        file = os.path.join("./results", file)
-        df = pd.read_csv(file)
-        paths.append(os.path.basename(file))
-        frameworks += list(df["framework"].unique())
+# if it is a PR then perform the evaluation as well 
+if branch_name != "master":
 
-subprocess.run(
-    [
-        "agbench",
-        "evaluate-amlb-results",
-        "--frameworks-run",
-        f"{','.join(frameworks)}",
-        "--results-dir-input",
-        "./results",
-        "--paths",
-        f"{','.join(paths)}",
-        "--no-clean-data",
-    ]
-)
+    print("\nThis is master branch so we do not evaluate")
+
+    paths = []
+    frameworks = []
+    for file in os.listdir("./results"):
+        if file.endswith(".csv"):
+            file = os.path.join("./results", file)
+            df = pd.read_csv(file)
+            paths.append(os.path.basename(file))
+            frameworks += list(df["framework"].unique())
+
+    subprocess.run(
+        [
+            "agbench",
+            "evaluate-amlb-results",
+            "--frameworks-run",
+            f"{','.join(frameworks)}",
+            "--results-dir-input",
+            "./results",
+            "--paths",
+            f"{','.join(paths)}",
+            "--no-clean-data",
+        ]
+    )
+
+else:
+
+    print("\nEvaluation not performed!")
