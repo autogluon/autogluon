@@ -16,9 +16,13 @@ from autogluon.timeseries.utils.warning_filters import evaluator_warning_filter
 logger = logging.getLogger(__name__)
 
 
+def get_seasonal_diffs(*, y_past: pd.Series, seasonal_period: int = 1) -> pd.Series:
+    return y_past.groupby(level=ITEMID, sort=False).diff(seasonal_period).abs()
+
+
 def in_sample_seasonal_naive_error(*, y_past: pd.Series, seasonal_period: int = 1) -> pd.Series:
     """Compute seasonal naive forecast error (predict value from seasonal_period steps ago) for each time series."""
-    seasonal_diffs = y_past.groupby(level=ITEMID, sort=False).diff(seasonal_period).abs()
+    seasonal_diffs = get_seasonal_diffs(y_past, seasonal_period=seasonal_period)
     return seasonal_diffs.groupby(level=ITEMID, sort=False).mean().fillna(1.0)
 
 
