@@ -46,9 +46,9 @@ def mape_per_item(*, y_true: pd.Series, y_pred: pd.Series) -> pd.Series:
     return ((y_true - y_pred) / y_true).abs().groupby(level=ITEMID, sort=False).mean()
 
 
-def rmsse_per_item(*, y_true: pd.Series, y_pred: pd.Series, random_walk_error: pd.Series) -> pd.Series:
+def rmsse_per_item(*, y_true: pd.Series, y_pred: pd.Series, past_squared_seasonal_error: pd.Series) -> pd.Series:
     mse = mse_per_item(y_true=y_true, y_pred=y_pred)
-    return np.sqrt(mse / random_walk_error)
+    return np.sqrt(mse / past_squared_seasonal_error)
 
 
 def symmetric_mape_per_item(*, y_true: pd.Series, y_pred: pd.Series) -> pd.Series:
@@ -140,8 +140,8 @@ class TimeSeriesEvaluator:
         self.seasonal_period = eval_metric_seasonal_period
 
         self.metric_method = self.__getattribute__("_" + self.eval_metric.lower())
-        self._past_naive_error: Optional[pd.Series] = None
-        self._random_walk_error: Optional[pd.Series] = None
+        self._past_abs_seasonal_error: Optional[pd.Series] = None
+        self._past_squared_seasonal_error: Optional[pd.Series] = None
 
     @property
     def coefficient(self) -> int:
@@ -164,7 +164,7 @@ class TimeSeriesEvaluator:
     def _mase(self, y_true: pd.Series, predictions: TimeSeriesDataFrame) -> float:
         y_pred = self._get_median_forecast(predictions)
         mae = mae_per_item(y_true=y_true, y_pred=y_pred)
-        return self._safemean(mae / self._past_naive_error)
+        return self._safemean(mae / self._past_abs_seasonal_error)
 
     def _mape(self, y_true: pd.Series, predictions: TimeSeriesDataFrame) -> float:
         y_pred = self._get_median_forecast(predictions)
@@ -193,7 +193,9 @@ class TimeSeriesEvaluator:
 
     def _rmsse(self, y_true: pd.Series, predictions: TimeSeriesDataFrame) -> float:
         y_pred = predictions["mean"]
-        return self._safemean(rmsse_per_item(y_true=y_true, y_pred=y_pred, random_walk_error=self._random_walk_error))
+        return self._safemean(
+            rmsse_per_item(y_true=y_true, y_pred=y_pred, past_squared_seasonal_error=self._past_squared_seasonal_error)
+        )
 
     def _get_median_forecast(self, predictions: TimeSeriesDataFrame) -> pd.Series:
         # TODO: Median forecast doesn't actually minimize the MAPE / sMAPE losses
@@ -236,12 +238,12 @@ class TimeSeriesEvaluator:
 
     def save_past_metrics(self, data_past: TimeSeriesDataFrame):
         seasonal_period = get_seasonality(data_past.freq) if self.seasonal_period is None else self.seasonal_period
-        self._past_naive_error = in_sample_abs_seasonal_error(
+        self._past_abs_seasonal_error = in_sample_abs_seasonal_error(
             y_past=data_past[self.target_column], seasonal_period=seasonal_period
         )
 
         if self.eval_metric == "RMSSE":
-            self._random_walk_error = in_sample_squared_seasonal_error(
+            self._past_squared_seasonal_error = in_sample_squared_seasonal_error(
                 y_past=data_past[self.target_column], seasonal_period=seasonal_period
             )
 
@@ -255,9 +257,13 @@ class TimeSeriesEvaluator:
         """
         assert (predictions.num_timesteps_per_item() == self.prediction_length).all()
         if self.eval_metric == "MASE":
-            assert self._past_naive_error is not None, "Call save_past_metrics before score_with_saved_past_metrics"
+            assert (
+                self._past_abs_seasonal_error is not None
+            ), "Call save_past_metrics before score_with_saved_past_metrics"
         if self.eval_metric == "RMSSE":
-            assert self._random_walk_error is not None, "Call save_past_metrics before score_with_saved_past_metrics"
+            assert (
+                self._past_squared_seasonal_error is not None
+            ), "Call save_past_metrics before score_with_saved_past_metrics"
 
         assert data_future.index.equals(predictions.index), "Prediction and data indices do not match."
 
