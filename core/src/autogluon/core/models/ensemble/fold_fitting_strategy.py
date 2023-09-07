@@ -474,19 +474,28 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         self._pseudo_sequential: bool = num_folds_parallel == 1
         # max_calls to guarantee release of gpu resource
         self._ray_fit = self.ray.remote(max_calls=1)(_ray_fit)
+        num_folds_parallel = self.folds_to_fit_in_parallel_with_mem(user_specified_num_folds_parallel=num_folds_parallel)
         self.resources, self.batches, self.num_parallel_jobs = self._get_resource_suggestions(
             num_jobs=num_jobs, user_specified_num_folds_parallel=num_folds_parallel, user_resources_per_job=self.user_resources_per_job
         )
 
-    @disable_if_lite_mode(ret=True)
-    def folds_can_be_fit_in_parallel(self) -> int:
+    @disable_if_lite_mode(ret=1)
+    def folds_to_fit_in_parallel_with_mem(self, user_specified_num_folds_parallel: int) -> int:
         """Check if the memory is sufficient to do parallel training"""
         model_mem_est = self._initialized_model_base.estimate_memory_usage(X=self.X)
-        total_model_mem_est = self.num_parallel_jobs * model_mem_est
         data_mem_est = self._estimate_data_memory_usage()
-        total_data_mem_est = self.num_parallel_jobs * data_mem_est
         mem_available = ResourceManager.get_available_virtual_mem()
-        return int((mem_available * self.max_memory_usage_ratio) / (total_model_mem_est + total_data_mem_est))
+        max_folds_to_train_with_mem = int((mem_available * self.max_memory_usage_ratio) / (model_mem_est + data_mem_est))
+        # TODO: train at least 1 fold
+        num_folds_parallel = user_specified_num_folds_parallel
+        if max_folds_to_train_with_mem < user_specified_num_folds_parallel:
+            # If memory is not sufficient to train num_folds_parallel, reduce to max power of 2 folds that's smaller than folds_can_be_fit_in_parallel.
+            num_folds_parallel = int(math.pow(2, math.floor((math.log10(max_folds_to_train_with_mem) / math.log10(2)))))
+            logger.log(
+                30,
+                f"\tMemory not enough to fit {user_specified_num_folds_parallel} folds of {self.model_base.__class__.__name__} in parallel. Will train {num_folds_parallel} folds in parallel instead. "
+            )
+        return num_folds_parallel
 
     def _estimate_data_memory_usage(self):
         X_mem = get_approximate_df_mem_usage(self.X).sum()
