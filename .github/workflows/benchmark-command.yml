@@ -1,3 +1,167 @@
+# name: Benchmark
+# on:
+#   workflow_dispatch:
+#     inputs:
+#       repository:
+#         description: 'The repository from which the slash command was dispatched'
+#         required: true
+#       comment-id:
+#         description: 'The comment-id of the slash command'
+#         required: true
+#       pr-sha:
+#         description: 'The pr-sha of which the slash command was dispatched'
+#         required: true
+#       module:
+#         description: 'Which module to run the benchmark on'
+#         required: true
+#         options:
+#           - tabular
+#       preset:
+#         description: 'Preset to run for tabular'
+#         required: true
+#         options:
+#           - best
+#           - high
+#           - good
+#           - medium
+#       benchmark:
+#         description: 'Benchmark to run'
+#         required: true
+#         options:
+#           - full
+#           - test
+#       time_limit:
+#         description: 'Time limit for the benchmark to run'
+#         required: true
+#         options:
+#           - 1h
+#           - 4h
+#           - 8h
+#           - 16h
+#           - 24h
+#       branch_or_pr_number:
+#         description: 'Branch or PR number to run the benchmark on'
+#         required: true
+      
+# permissions:
+#   id-token: write
+#   contents: read
+
+# jobs:
+#   setup:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Create URL to the run output
+#         if: (github.event_name == 'workflow_dispatch')
+#         id: vars
+#         run: echo ::set-output name=run-url::https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+
+#       - name: Create comment
+#         if: (github.event_name == 'workflow_dispatch')
+#         uses: peter-evans/create-or-update-comment@v1
+#         with:
+#           token: ${{ secrets.PAT }}
+#           repository: ${{ github.event.inputs.repository }}
+#           comment-id: ${{ github.event.inputs.comment-id }}
+#           body: |
+#             [Benchmark Output][1]
+
+#             [1]: ${{ steps.vars.outputs.run-url }}
+  
+#   generate_amlb_user_dir:
+#     needs: setup
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout repository
+#         uses: actions/checkout@v2
+#       - name: Setup Env Vars
+#         uses: ./.github/actions/setup-env-vars
+#       - name: Configure AWS Credentials
+#         uses: aws-actions/configure-aws-credentials@v1
+#         with:
+#           role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmarkConfig
+#           role-duration-seconds: 3600
+#           aws-region: us-east-1
+#       - name: Generate AMLB User Dir (For Pull Request)
+#         run: |
+#           /bin/bash CI/bench/generate_amlb_user_dir.sh ${{ env.GIT_REPO }} ${{ env.BRANCH }} ${{ env.SHORT_SHA }} ${{ env.PR_NUMBER }}
+
+#   benchmark:
+#     needs: generate_amlb_user_dir
+#     runs-on: ubuntu-latest
+#     defaults:
+#       run:
+#         shell: bash
+#     steps:
+#       - name: Free Disk Space (Ubuntu)
+#         # uses: jlumbroso/free-disk-space@v1.2.0
+#         uses: hirnidrin/free-disk-space@main  # revert back once fix in https://github.com/jlumbroso/free-disk-space/pull/11
+#         with:
+#           tool-cache: false
+#           android: true
+#           dotnet: true
+#           haskell: true
+#           large-packages: true
+#           docker-images: true
+#           swap-storage: true
+#       - name: Checkout repository for PR
+#         if: (github.event_name == 'workflow_dispatch')
+#         uses: actions/checkout@v2
+#         with:
+#           ref: ${{ github.event.inputs.pr-sha }}
+#       - name: Checkout repository for nightly test
+#         if: (github.event_name == 'schedule')
+#         uses: actions/checkout@v2
+#       - name: Setup Python
+#         uses: actions/setup-python@v1
+#         with:
+#           python-version: '3.9'
+#       - name: Setup npm
+#         uses: actions/setup-node@v3
+#         with:
+#           node-version: 'latest'
+#       - name: Configure AWS Credentials
+#         uses: aws-actions/configure-aws-credentials@v1
+#         with:
+#           role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
+#           role-duration-seconds: 14400
+#           aws-region: us-east-1
+#       - name: Run benchmark
+#         shell: bash -l {0}
+#         run: |
+#           nvm install 20
+#           npm install -g aws-cdk
+#           /bin/bash ./.github/workflow_scripts/run_benchmark.sh ${{ github.event.inputs.module }} ${{ github.event.inputs.preset }} ${{ github.event.inputs.benchmark }} ${{ github.event.inputs.time_limit }} ${{ github.event.inputs.branch_or_pr_number }} ${{ github.event.inputs.pr-sha }}
+#       - name: Upload website.txt
+#         uses: actions/upload-artifact@v3
+#         with:
+#           name: dashboard-website
+#           path: ./website.txt
+  
+#   dashboard: 
+#     needs: benchmark
+#     runs-on: ubuntu-latest
+#     defaults:
+#       run:
+#         shell: bash
+#     steps:
+#       - name: Download website.txt
+#         uses: actions/download-artifact@v3
+#         with:
+#           name: dashboard-website
+#       - name: get dashboard website
+#         id: website
+#         run: |
+#           body="$(cat website.txt)"
+#           echo ::set-output name=body::$body
+#       - name: Comment Dashboard Website Link on PR
+#         uses: peter-evans/create-or-update-comment@v2.0.0
+#         with:
+#           token: ${{ secrets.PAT }}
+#           repository: ${{ github.event.inputs.repository }}
+#           comment-id: ${{ github.event.inputs.comment-id }}
+#           body: ${{ steps.website.outputs.body }}
+
 name: Benchmark
 on:
   workflow_dispatch:
@@ -65,10 +229,9 @@ jobs:
           comment-id: ${{ github.event.inputs.comment-id }}
           body: |
             [Benchmark Output][1]
-
             [1]: ${{ steps.vars.outputs.run-url }}
   
-  generate_amlb_user_dir:
+  generate_bench_configs:
     needs: setup
     runs-on: ubuntu-latest
     steps:
@@ -82,12 +245,16 @@ jobs:
           role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmarkConfig
           role-duration-seconds: 3600
           aws-region: us-east-1
-      - name: Generate AMLB User Dir (For Pull Request)
+      - name: Generate bench configs (For Push)
+        if: ${{ github.event_name == 'push' }}
+        run: |
+          /bin/bash CI/bench/generate_amlb_user_dir.sh ${{ env.GIT_REPO }} ${{ env.BRANCH }} ${{ env.SHORT_SHA }}
+      - name: Generate bench configs (For Pull Request)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
           /bin/bash CI/bench/generate_amlb_user_dir.sh ${{ env.GIT_REPO }} ${{ env.BRANCH }} ${{ env.SHORT_SHA }} ${{ env.PR_NUMBER }}
-
   benchmark:
-    needs: generate_amlb_user_dir
+    needs: generate_bench_configs
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -137,28 +304,29 @@ jobs:
         with:
           name: dashboard-website
           path: ./website.txt
+
   
-  dashboard: 
-    needs: benchmark
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - name: Download website.txt
-        uses: actions/download-artifact@v3
-        with:
-          name: dashboard-website
-      - name: get dashboard website
-        id: website
-        run: |
-          body="$(cat website.txt)"
-          echo ::set-output name=body::$body
-      - name: Comment Dashboard Website Link on PR
-        uses: peter-evans/create-or-update-comment@v2.0.0
-        with:
-          token: ${{ secrets.PAT }}
-          repository: ${{ github.event.inputs.repository }}
-          comment-id: ${{ github.event.inputs.comment-id }}
-          body: ${{ steps.website.outputs.body }}
+  # dashboard: 
+  #   needs: benchmark
+  #   runs-on: ubuntu-latest
+  #   defaults:
+  #     run:
+  #       shell: bash
+  #   steps:
+  #     - name: Download website.txt
+  #       uses: actions/download-artifact@v3
+  #       with:
+  #         name: dashboard-website
+  #     - name: get dashboard website
+  #       id: website
+  #       run: |
+  #         body="$(cat website.txt)"
+  #         echo ::set-output name=body::$body
+  #     - name: Comment Dashboard Website Link on PR
+  #       uses: peter-evans/create-or-update-comment@v2.0.0
+  #       with:
+  #         token: ${{ secrets.PAT }}
+  #         repository: ${{ github.event.inputs.repository }}
+  #         comment-id: ${{ github.event.inputs.comment-id }}
+  #         body: ${{ steps.website.outputs.body }}
       
