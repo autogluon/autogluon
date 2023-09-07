@@ -210,10 +210,8 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 raise ValueError(f"{i}'th time-series in data must be a dict, got{type(ts)}")
             if not ("target" in ts and "start" in ts):
                 raise ValueError(f"{i}'th time-series in data must have 'target' and 'start', got{ts.keys()}")
-            if not isinstance(ts["start"], pd.Period) or ts["start"].freqstr is None:
-                raise ValueError(
-                    f"{i}'th time-series must have timestamp as 'start' with freq specified, got {ts['start']}"
-                )
+            if not isinstance(ts["start"], pd.Period):
+                raise ValueError(f"{i}'th time-series must have a pandas Period as 'start', got {ts['start']}")
 
     @classmethod
     def _validate_data_frame(cls, df: pd.DataFrame):
