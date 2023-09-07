@@ -210,7 +210,6 @@ def test_split_by_time(
     ],
 )
 def test_slice_by_time(start_timestamp, end_timestamp, item_ids, datetimes, targets):
-    # Check if the objects are pd.Period and convert them to pd.Timestamp if they are
     new_tsdf = SAMPLE_TS_DATAFRAME.slice_by_time(start_timestamp, end_timestamp)
     ts_df = _build_ts_dataframe(item_ids, datetimes, targets)
     pd.testing.assert_frame_equal(new_tsdf, ts_df)
