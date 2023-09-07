@@ -192,7 +192,7 @@ class TimeSeriesEvaluator:
         return abs_error_sum / abs_target_sum
 
     def _rmsse(self, y_true: pd.Series, predictions: TimeSeriesDataFrame) -> float:
-        y_pred = self._get_median_forecast(predictions)
+        y_pred = predictions["mean"]
         return self._safemean(rmsse_per_item(y_true=y_true, y_pred=y_pred, random_walk_error=self._random_walk_error))
 
     def _get_median_forecast(self, predictions: TimeSeriesDataFrame) -> pd.Series:
