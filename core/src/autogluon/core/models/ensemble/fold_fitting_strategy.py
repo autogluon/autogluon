@@ -485,8 +485,8 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         model_mem_est = self._initialized_model_base.estimate_memory_usage(X=self.X)
         data_mem_est = self._estimate_data_memory_usage()
         mem_available = ResourceManager.get_available_virtual_mem()
-        max_folds_to_train_with_mem = int((mem_available * self.max_memory_usage_ratio) / (model_mem_est + data_mem_est))
-        # TODO: train at least 1 fold
+        # Train 1 fold at least as the estimation might be off
+        max_folds_to_train_with_mem = min(1, int((mem_available * self.max_memory_usage_ratio) / (model_mem_est + data_mem_est)))
         num_folds_parallel = user_specified_num_folds_parallel
         if max_folds_to_train_with_mem < user_specified_num_folds_parallel:
             # If memory is not sufficient to train num_folds_parallel, reduce to max power of 2 folds that's smaller than folds_can_be_fit_in_parallel.
