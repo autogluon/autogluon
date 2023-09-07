@@ -6,7 +6,7 @@ from gluonts.evaluation import make_evaluation_predictions
 from gluonts.model.forecast import SampleForecast
 
 from autogluon.timeseries import TimeSeriesPredictor
-from autogluon.timeseries.evaluator import TimeSeriesEvaluator, in_sample_seasonal_naive_error
+from autogluon.timeseries.evaluator import TimeSeriesEvaluator, in_sample_abs_seasonal_error
 from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
 
 from .common import DUMMY_TS_DATAFRAME
@@ -204,7 +204,7 @@ def test_given_historic_data_not_cached_when_scoring_then_exception_is_raised(ev
 
 def test_when_eval_metric_seasonal_period_is_longer_than_ts_then_scale_is_set_to_1():
     seasonal_period = max(DUMMY_TS_DATAFRAME.num_timesteps_per_item())
-    naive_error_per_item = in_sample_seasonal_naive_error(
+    naive_error_per_item = in_sample_abs_seasonal_error(
         y_past=DUMMY_TS_DATAFRAME["target"], seasonal_period=seasonal_period
     )
     assert (naive_error_per_item == 1.0).all()
