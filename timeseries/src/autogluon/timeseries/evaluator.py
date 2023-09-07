@@ -26,8 +26,8 @@ def in_sample_abs_seasonal_error(*, y_past: pd.Series, seasonal_period: int = 1)
     return seasonal_diffs.groupby(level=ITEMID, sort=False).mean().fillna(1.0)
 
 
-def in_sample_squared_seasonal_error(*, y_past: pd.Series) -> pd.Series:
-    onestep_diffs = get_seasonal_diffs(y_past=y_past, seasonal_period=1)
+def in_sample_squared_seasonal_error(*, y_past: pd.Series, seasonal_period: int = 1) -> pd.Series:
+    onestep_diffs = get_seasonal_diffs(y_past=y_past, seasonal_period=seasonal_period)
     return onestep_diffs.dropna().pow(2.0).groupby(level=ITEMID, sort=False).mean()
 
 
@@ -241,7 +241,9 @@ class TimeSeriesEvaluator:
         )
 
         if self.eval_metric == "RMSSE":
-            self._random_walk_error = in_sample_squared_seasonal_error(y_past=data_past[self.target_column])
+            self._random_walk_error = in_sample_squared_seasonal_error(
+                y_past=data_past[self.target_column], seasonal_period=seasonal_period
+            )
 
     def score_with_saved_past_metrics(
         self, data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame
