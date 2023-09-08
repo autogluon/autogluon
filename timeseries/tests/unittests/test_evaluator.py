@@ -232,5 +232,4 @@ def test_RMSSE(prediction_length, eval_metric_seasonal_period, expected_result):
         eval_metric_seasonal_period=eval_metric_seasonal_period,
     )
     ag_value = ag_evaluator(data, predictions)
-    print(f"ag_value:{ag_value}")
     assert ag_value == expected_result
