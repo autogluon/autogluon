@@ -1024,6 +1024,10 @@ class TabularPredictor:
         calibrate_decision_threshold=False,
         infer_limit=None,
     ):
+        if not self.get_model_names():
+            logger.log(30, "Warning: No models found, skipping post_fit logic...")
+            return
+
         if refit_full is True:
             if keep_only_best is True:
                 if set_best_to_refit_full is True:

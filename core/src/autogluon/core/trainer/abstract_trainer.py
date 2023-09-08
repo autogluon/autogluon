@@ -2446,9 +2446,8 @@ class AbstractTrainer:
             **kwargs,
         )
         if len(self.get_model_names()) == 0:
-            # FIXME: Add toggle
+            # TODO v1.0: Add toggle to raise exception if no models trained
             logger.log(30, "Warning: AutoGluon did not successfully train any models")
-            # raise ValueError("AutoGluon did not successfully train any models")
         return model_names_fit
 
     def _predict_model(self, X, model, model_pred_proba_dict=None, cascade=False):
@@ -2780,8 +2779,19 @@ class AbstractTrainer:
         """Gets all model names which would cause model files to be overwritten if a new model was trained with the name"""
         return self.get_model_names() + list(self._extra_banned_names)
 
-    # TODO: Docstring
     def _flatten_model_info(self, model_info: dict) -> dict:
+        """
+        Flattens the model_info nested dictionary into a shallow dictionary to convert to a pandas DataFrame row.
+
+        Parameters
+        ----------
+        model_info: dict
+            A nested dictionary of model metadata information
+
+        Returns
+        -------
+        A flattened dictionary of model info.
+        """
         model_info_keys = [
             "num_features",
             "model_type",
@@ -2997,8 +3007,6 @@ class AbstractTrainer:
                 "child_hyperparameters",
                 "child_hyperparameters_fit",
             ]
-            # FIXME: Combine with others
-            # model_info_extra =
             model_info_out = {k: v for k, v in model_info.items() if k in valid_keys}
             model_info_inner_out = {k: v for k, v in model_info_inner.items() if k in valid_keys_inner}
 
