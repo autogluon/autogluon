@@ -134,7 +134,7 @@ def test_from_data_frame():
         (
             pd.Timestamp("01-03-2019"),  # type: ignore
             ITEM_IDS,
-            tuple(pd.date_range(START_TIMESTAMP.to_timestamp(how="start"), periods=2)),
+            tuple(pd.date_range(START_TIMESTAMP, periods=2)),
             [0, 1, 3, 4, 6, 7],
             ITEM_IDS,
             tuple(pd.date_range(pd.Timestamp("01-03-2019"), periods=1)),  # type: ignore
@@ -183,14 +183,14 @@ def test_split_by_time(
             START_TIMESTAMP,
             END_TIMESTAMP,
             ITEM_IDS,
-            tuple(pd.date_range(START_TIMESTAMP.to_timestamp(how="start"), periods=1)),
+            tuple(pd.date_range(START_TIMESTAMP, periods=1)),
             [0, 3, 6],
         ),
         (
             pd.Timestamp("12-31-2018"),  # type: ignore
             END_TIMESTAMP,
             ITEM_IDS,
-            tuple(pd.date_range(START_TIMESTAMP.to_timestamp(how="start"), periods=1)),
+            tuple(pd.date_range(START_TIMESTAMP, periods=1)),
             [0, 3, 6],
         ),
         (
@@ -210,9 +210,6 @@ def test_split_by_time(
     ],
 )
 def test_slice_by_time(start_timestamp, end_timestamp, item_ids, datetimes, targets):
-    # Check if the objects are pd.Period and convert them to pd.Timestamp if they are
-    start_timestamp = start_timestamp.to_timestamp() if isinstance(start_timestamp, pd.Period) else start_timestamp
-    end_timestamp = end_timestamp.to_timestamp() if isinstance(end_timestamp, pd.Period) else end_timestamp
     new_tsdf = SAMPLE_TS_DATAFRAME.slice_by_time(start_timestamp, end_timestamp)
     ts_df = _build_ts_dataframe(item_ids, datetimes, targets)
     pd.testing.assert_frame_equal(new_tsdf, ts_df)
@@ -614,7 +611,8 @@ def test_when_static_features_index_has_wrong_name_then_its_renamed_to_item_id()
 
 def test_when_dataset_sliced_by_time_then_static_features_are_correct():
     df = SAMPLE_TS_DATAFRAME_STATIC
-    dfv = df.slice_by_time(START_TIMESTAMP.to_timestamp(), (START_TIMESTAMP + 1).to_timestamp())
+    dfv = df.slice_by_time(START_TIMESTAMP, START_TIMESTAMP + datetime.timedelta(days=1))
+
     assert isinstance(dfv, TimeSeriesDataFrame)
     assert len(dfv) == 1 * len(dfv.item_ids)
 
@@ -622,7 +620,7 @@ def test_when_dataset_sliced_by_time_then_static_features_are_correct():
 
 
 def test_when_dataset_split_by_time_then_static_features_are_correct():
-    left, right = SAMPLE_TS_DATAFRAME_STATIC.split_by_time(START_TIMESTAMP.to_timestamp() + datetime.timedelta(days=1))
+    left, right = SAMPLE_TS_DATAFRAME_STATIC.split_by_time(START_TIMESTAMP + datetime.timedelta(days=1))
 
     assert len(left) == 1 * len(SAMPLE_TS_DATAFRAME_STATIC.item_ids)
     assert len(right) == 2 * len(SAMPLE_TS_DATAFRAME_STATIC.item_ids)
