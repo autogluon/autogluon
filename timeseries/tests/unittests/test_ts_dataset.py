@@ -891,3 +891,11 @@ def test_when_aggregation_method_is_changed_then_aggregated_result_is_correct(ag
     )
     aggregated = ts_df.convert_frequency(freq="W", agg_numeric=agg_method)
     assert np.all(aggregated.values.ravel() == np.array(values_after_aggregation))
+
+
+@pytest.mark.parametrize("dtype", ["datetime64[ns]", "datetime64[us]", "datetime64[ms]", "datetime64[s]"])
+def test_when_timestamps_have_datetime64_type_then_tsdf_can_be_constructed(dtype):
+    df = SAMPLE_DATAFRAME.copy()
+    df[TIMESTAMP] = df[TIMESTAMP].astype(dtype)
+    assert df[TIMESTAMP].dtype == dtype
+    TimeSeriesDataFrame.from_data_frame(df)
