@@ -466,7 +466,7 @@ def test_when_dataframe_copy_called_on_instance_then_output_correct(input_df):
     copied_df = input_df.copy()
 
     assert isinstance(copied_df, TimeSeriesDataFrame)
-    assert copied_df._data is not input_df._data
+    assert copied_df._mgr is not input_df._mgr
 
 
 @pytest.mark.parametrize("input_df", [SAMPLE_TS_DATAFRAME, SAMPLE_TS_DATAFRAME_EMPTY])
@@ -474,7 +474,7 @@ def test_when_dataframe_stdlib_copy_called_then_output_correct(input_df):
     copied_df = copy.deepcopy(input_df)
 
     assert isinstance(copied_df, TimeSeriesDataFrame)
-    assert copied_df._data is not input_df._data
+    assert copied_df._mgr is not input_df._mgr
 
 
 @pytest.mark.parametrize("input_df", [SAMPLE_TS_DATAFRAME, SAMPLE_TS_DATAFRAME_EMPTY])
@@ -482,7 +482,7 @@ def test_when_dataframe_class_copy_called_then_output_correct(input_df):
     copied_df = TimeSeriesDataFrame.copy(input_df, deep=True)
 
     assert isinstance(copied_df, TimeSeriesDataFrame)
-    assert copied_df._data is not input_df._data
+    assert copied_df._mgr is not input_df._mgr
 
 
 @pytest.mark.parametrize("input_df", [SAMPLE_TS_DATAFRAME, SAMPLE_TS_DATAFRAME_EMPTY])
@@ -496,7 +496,7 @@ def test_when_dataframe_class_rename_called_then_output_correct(input_df, inplac
     assert "mytarget" in renamed_df.columns
     assert "target" not in renamed_df.columns
     if inplace:
-        assert renamed_df._data is input_df._data
+        assert renamed_df._mgr is input_df._mgr
 
 
 @pytest.mark.parametrize("input_df", [SAMPLE_TS_DATAFRAME, SAMPLE_TS_DATAFRAME_EMPTY])
@@ -510,7 +510,7 @@ def test_when_dataframe_instance_rename_called_then_output_correct(input_df, inp
     assert "mytarget" in renamed_df.columns
     assert "target" not in renamed_df.columns
     if inplace:
-        assert renamed_df._data is input_df._data
+        assert renamed_df._mgr is input_df._mgr
 
 
 @pytest.mark.parametrize("input_df", [SAMPLE_TS_DATAFRAME, SAMPLE_TS_DATAFRAME_EMPTY])
@@ -555,7 +555,7 @@ def test_when_dataframe_stdlib_copy_called_then_static_features_are_correct():
     copied_df = copy.deepcopy(input_df)
 
     assert input_df.static_features.equals(copied_df.static_features)
-    assert copied_df._data is not input_df._data
+    assert copied_df._mgr is not input_df._mgr
 
 
 @pytest.mark.parametrize("inplace", [True, False])
@@ -569,7 +569,7 @@ def test_when_dataframe_class_rename_called_then_static_features_are_correct(inp
     assert "mytarget" in renamed_df.columns
     assert "target" not in renamed_df.columns
     if inplace:
-        assert renamed_df._data is input_df._data
+        assert renamed_df._mgr is input_df._mgr
     assert renamed_df.static_features.equals(input_df.static_features)
 
 
@@ -586,7 +586,7 @@ def test_when_dataframe_instance_rename_called_then_static_features_are_correct(
     assert "mytarget" in renamed_df.columns
     assert "target" not in renamed_df.columns
     if inplace:
-        assert renamed_df._data is input_df._data
+        assert renamed_df._mgr is input_df._mgr
     assert renamed_df.static_features.equals(input_df.static_features)
 
 

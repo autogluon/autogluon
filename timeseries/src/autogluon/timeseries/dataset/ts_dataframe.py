@@ -748,13 +748,13 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
         grouped_df = pd.DataFrame(self).groupby(level=ITEMID, sort=False, group_keys=False)
         if method == "auto":
-            filled_df = grouped_df.fillna(method="ffill")
+            filled_df = grouped_df.ffill()
             # Fill missing values at the start of each time series with bfill
-            filled_df = filled_df.groupby(level=ITEMID, sort=False, group_keys=False).fillna(method="bfill")
+            filled_df = filled_df.groupby(level=ITEMID, sort=False, group_keys=False).bfill()
         elif method in ["ffill", "pad"]:
-            filled_df = grouped_df.fillna(method="ffill")
+            filled_df = grouped_df.ffill()
         elif method in ["bfill", "backfill"]:
-            filled_df = grouped_df.fillna(method="bfill")
+            filled_df = grouped_df.bfill()
         elif method == "constant":
             filled_df = self.fillna(value=value)
         elif method == "interpolate":
