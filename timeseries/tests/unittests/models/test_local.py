@@ -17,7 +17,6 @@ from autogluon.timeseries.models.local import (
     SeasonalAverageModel,
     SeasonalNaiveModel,
     ThetaModel,
-    ThetaStatsmodelsModel,
 )
 
 from ..common import (
@@ -39,7 +38,6 @@ TESTABLE_MODELS = [
     NPTSModel,
     SeasonalAverageModel,
     SeasonalNaiveModel,
-    ThetaStatsmodelsModel,
 ]
 
 
@@ -89,13 +87,7 @@ def test_when_local_model_predicts_then_time_index_is_correct(model_class, predi
 
 
 def get_seasonal_period_from_fitted_local_model(model):
-    if model.name == "ARIMA":
-        return model._local_model_args["seasonal_order"][-1]
-    elif model.name == "ETS":
-        return model._local_model_args["seasonal_periods"]
-    elif model.name == "ThetaStatsmodels":
-        return model._local_model_args["period"]
-    elif model.name in ["AutoETS", "AutoARIMA", "DynamicOptimizedTheta", "Theta"]:
+    if model.name in ["ARIMA", "AutoETS", "AutoARIMA", "DynamicOptimizedTheta", "ETS", "Theta"]:
         return model._local_model_args["season_length"]
     else:
         return model._local_model_args["seasonal_period"]

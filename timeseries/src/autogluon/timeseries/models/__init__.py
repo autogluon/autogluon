@@ -12,7 +12,6 @@ from .local import (
     SeasonalAverageModel,
     SeasonalNaiveModel,
     ThetaModel,
-    ThetaStatsmodelsModel,
 )
 
 __all__ = [
@@ -29,11 +28,10 @@ __all__ = [
     "NaiveModel",
     "NPTSModel",
     "SeasonalNaiveModel",
+    "ARIMAModel",
     "AutoETSModel",
     "AutoARIMAModel",
     "DynamicOptimizedThetaModel",
-    "ThetaModel",
-    "ARIMAModel",
     "ETSModel",
-    "ThetaStatsmodelsModel",
+    "ThetaModel",
 ]
