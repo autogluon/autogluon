@@ -238,9 +238,10 @@ class TimeSeriesEvaluator:
 
     def save_past_metrics(self, data_past: TimeSeriesDataFrame):
         seasonal_period = get_seasonality(data_past.freq) if self.seasonal_period is None else self.seasonal_period
-        self._past_abs_seasonal_error = in_sample_abs_seasonal_error(
-            y_past=data_past[self.target_column], seasonal_period=seasonal_period
-        )
+        if self.eval_metric == "MASE":
+            self._past_abs_seasonal_error = in_sample_abs_seasonal_error(
+                y_past=data_past[self.target_column], seasonal_period=seasonal_period
+            )
 
         if self.eval_metric == "RMSSE":
             self._past_squared_seasonal_error = in_sample_squared_seasonal_error(
