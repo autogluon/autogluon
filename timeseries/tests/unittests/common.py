@@ -34,7 +34,14 @@ def get_data_frame_with_item_index(
     freq: str = "H",
     start_date: str = "2022-01-01",
     columns: List[str] = ["target"],
+    data_generation: str = "random",
 ):
+    assert data_generation in ["random", "sequential"]
+    if data_generation == "random":
+        data = [random.random() for _ in range(len(item_list) * data_length)]
+    elif data_generation == "sequential":
+        data = [e for e in range(len(item_list) * data_length)]
+
     return TimeSeriesDataFrame(
         pd.DataFrame(
             index=pd.MultiIndex.from_product(
@@ -48,7 +55,7 @@ def get_data_frame_with_item_index(
                 ],
                 names=(ITEMID, TIMESTAMP),
             ),
-            data=[random.random() for _ in range(len(item_list) * data_length)],
+            data=data,
             columns=columns,
         )
     )
