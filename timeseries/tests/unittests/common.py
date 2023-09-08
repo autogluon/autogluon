@@ -32,6 +32,8 @@ def get_data_frame_with_item_index(
     item_list: List[Union[str, int]],
     data_length: int = 20,
     freq: str = "H",
+    start_date: str = "2022-01-01",
+    columns: List[str] = ["target"],
 ):
     return TimeSeriesDataFrame(
         pd.DataFrame(
@@ -39,7 +41,7 @@ def get_data_frame_with_item_index(
                 [
                     item_list,
                     pd.date_range(
-                        pd.Timestamp("2022-01-01"),  # noqa
+                        pd.Timestamp(start_date),  # noqa
                         freq=freq,
                         periods=data_length,
                     ),
@@ -47,7 +49,7 @@ def get_data_frame_with_item_index(
                 names=(ITEMID, TIMESTAMP),
             ),
             data=[random.random() for _ in range(len(item_list) * data_length)],
-            columns=["target"],
+            columns=columns,
         )
     )
 
