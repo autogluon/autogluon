@@ -97,7 +97,9 @@ class TimeSeriesDataFrame(pd.DataFrame):
     index: pd.MultiIndex
     _metadata = ["_static_features", "_cached_freq"]
 
-    def __init__(self, data: Union[pd.DataFrame, str, Iterable], static_features: Optional[pd.DataFrame] = None, *args, **kwargs):
+    def __init__(
+        self, data: Union[pd.DataFrame, str, Iterable], static_features: Optional[pd.DataFrame] = None, *args, **kwargs
+    ):
         if isinstance(data, pd.DataFrame):
             if isinstance(data.index, pd.MultiIndex):
                 self._validate_multi_index_data_frame(data)
