@@ -100,8 +100,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
     def __init__(self, data: Any, static_features: Optional[pd.DataFrame] = None, *args, **kwargs):
         if isinstance(data, (BlockManager, ArrayManager)):
-            # necessary for copy constructor to work. see _constructor
-            # and pandas.DataFrame
+            # necessary for copy constructor to work. see _constructor and pandas.DataFrame
             pass
         elif isinstance(data, pd.DataFrame):
             if isinstance(data.index, pd.MultiIndex):
@@ -128,6 +127,11 @@ class TimeSeriesDataFrame(pd.DataFrame):
     @property
     def _constructor(self) -> Type[TimeSeriesDataFrame]:
         return TimeSeriesDataFrame
+
+    def _constructor_from_mgr(self, mgr, axes):
+        # Use the default constructor when constructing from _mgr. Otherwise pandas enters an infinite recursion by
+        # repeatedly calling TimeSeriesDataFrame constructor
+        return self._from_mgr(mgr, axes=axes)
 
     @property
     def item_ids(self) -> pd.Index:
