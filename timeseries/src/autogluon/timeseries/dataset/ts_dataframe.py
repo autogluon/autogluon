@@ -131,7 +131,10 @@ class TimeSeriesDataFrame(pd.DataFrame):
     def _constructor_from_mgr(self, mgr, axes):
         # Use the default constructor when constructing from _mgr. Otherwise pandas enters an infinite recursion by
         # repeatedly calling TimeSeriesDataFrame constructor
-        return self._from_mgr(mgr, axes=axes)
+        df = self._from_mgr(mgr, axes=axes)
+        df._static_features = self._static_features
+        df._cached_freq = self._cached_freq
+        return df
 
     @property
     def item_ids(self) -> pd.Index:
