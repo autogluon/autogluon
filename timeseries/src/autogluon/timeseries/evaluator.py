@@ -27,8 +27,8 @@ def in_sample_abs_seasonal_error(*, y_past: pd.Series, seasonal_period: int = 1)
 
 
 def in_sample_squared_seasonal_error(*, y_past: pd.Series, seasonal_period: int = 1) -> pd.Series:
-    onestep_diffs = get_seasonal_diffs(y_past=y_past, seasonal_period=seasonal_period)
-    return onestep_diffs.dropna().pow(2.0).groupby(level=ITEMID, sort=False).mean()
+    seasonal_diffs = get_seasonal_diffs(y_past=y_past, seasonal_period=seasonal_period)
+    return seasonal_diffs.dropna().pow(2.0).groupby(level=ITEMID, sort=False).mean()
 
 
 def mse_per_item(*, y_true: pd.Series, y_pred: pd.Series) -> pd.Series:
