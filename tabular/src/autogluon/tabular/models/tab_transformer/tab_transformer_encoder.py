@@ -594,7 +594,7 @@ def make_date(df: DataFrame, date_field: str):
     if isinstance(field_dtype, pd.core.dtypes.dtypes.DatetimeTZDtype):
         field_dtype = np.datetime64
     if not np.issubdtype(field_dtype, np.datetime64):
-        df[date_field] = pd.to_datetime(df[date_field], infer_datetime_format=True)
+        df[date_field] = pd.to_datetime(df[date_field], infer_datetime_format=True, format="mixed")
 
 
 def add_datepart(df: DataFrame, field_name: str, prefix: str = None, drop: bool = True, time: bool = False):
