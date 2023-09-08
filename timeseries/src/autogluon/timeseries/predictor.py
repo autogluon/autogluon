@@ -5,11 +5,10 @@ import time
 from typing import Any, Dict, List, Optional, Type, Union
 
 import pandas as pd
-import pytorch_lightning as pl
 
 from autogluon.common.utils.deprecated_utils import Deprecated_args
 from autogluon.common.utils.log_utils import set_logger_verbosity
-from autogluon.common.utils.utils import check_saved_predictor_version, setup_outputdir
+from autogluon.common.utils.utils import check_saved_predictor_version, seed_everything, setup_outputdir
 from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
@@ -584,7 +583,7 @@ class TimeSeriesPredictor:
         logger.info("=====================================================")
 
         if random_seed is not None:
-            pl.seed_everything(random_seed)
+            seed_everything(random_seed)
 
         time_left = None if time_limit is None else time_limit - (time.time() - time_start)
         self._learner.fit(
@@ -682,7 +681,7 @@ class TimeSeriesPredictor:
                 2020-03-05     8.3
         """
         if random_seed is not None:
-            pl.seed_everything(random_seed)
+            seed_everything(random_seed)
         # Don't use data.item_ids in case data is not a TimeSeriesDataFrame
         original_item_id_order = data.reset_index()[ITEMID].unique()
         data = self._check_and_prepare_data_frame(data)
