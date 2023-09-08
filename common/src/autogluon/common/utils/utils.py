@@ -184,6 +184,7 @@ def seed_everything(seed: int) -> None:
     np.random.seed(seed)
     try:
         import torch
+
         torch.manual_seed(seed)
     except ImportError:
         pass
