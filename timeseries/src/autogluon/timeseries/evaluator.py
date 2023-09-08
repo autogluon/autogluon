@@ -48,7 +48,7 @@ def mape_per_item(*, y_true: pd.Series, y_pred: pd.Series) -> pd.Series:
 
 def rmsse_per_item(*, y_true: pd.Series, y_pred: pd.Series, past_squared_seasonal_error: pd.Series) -> pd.Series:
     mse = mse_per_item(y_true=y_true, y_pred=y_pred)
-    return np.sqrt(mse / past_squared_seasonal_error)
+    return mse / past_squared_seasonal_error
 
 
 def symmetric_mape_per_item(*, y_true: pd.Series, y_pred: pd.Series) -> pd.Series:
@@ -193,8 +193,10 @@ class TimeSeriesEvaluator:
 
     def _rmsse(self, y_true: pd.Series, predictions: TimeSeriesDataFrame) -> float:
         y_pred = predictions["mean"]
-        return self._safemean(
-            rmsse_per_item(y_true=y_true, y_pred=y_pred, past_squared_seasonal_error=self._past_squared_seasonal_error)
+        return np.sqrt(
+            rmsse_per_item(
+                y_true=y_true, y_pred=y_pred, past_squared_seasonal_error=self._past_squared_seasonal_error
+            ).mean()
         )
 
     def _get_median_forecast(self, predictions: TimeSeriesDataFrame) -> pd.Series:
