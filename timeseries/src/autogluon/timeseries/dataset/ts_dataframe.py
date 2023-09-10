@@ -100,8 +100,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
     def __init__(self, data: Any, static_features: Optional[pd.DataFrame] = None, *args, **kwargs):
         if isinstance(data, (BlockManager, ArrayManager)):
-            # necessary for copy constructor to work. see _constructor
-            # and pandas.DataFrame
+            # necessary for copy constructor to work in pandas <= 2.0.x. In >= 2.1.x this is replaced by _constructor_from_mgr
             pass
         elif isinstance(data, pd.DataFrame):
             if isinstance(data.index, pd.MultiIndex):
@@ -128,6 +127,14 @@ class TimeSeriesDataFrame(pd.DataFrame):
     @property
     def _constructor(self) -> Type[TimeSeriesDataFrame]:
         return TimeSeriesDataFrame
+
+    def _constructor_from_mgr(self, mgr, axes):
+        # Use the default constructor when constructing from _mgr. Otherwise pandas enters an infinite recursion by
+        # repeatedly calling TimeSeriesDataFrame constructor
+        df = self._from_mgr(mgr, axes=axes)
+        df._static_features = self._static_features
+        df._cached_freq = self._cached_freq
+        return df
 
     @property
     def item_ids(self) -> pd.Index:
@@ -210,10 +217,8 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 raise ValueError(f"{i}'th time-series in data must be a dict, got{type(ts)}")
             if not ("target" in ts and "start" in ts):
                 raise ValueError(f"{i}'th time-series in data must have 'target' and 'start', got{ts.keys()}")
-            if not isinstance(ts["start"], (pd.Timestamp, pd.Period)) or ts["start"].freq is None:
-                raise ValueError(
-                    f"{i}'th time-series must have timestamp as 'start' with freq specified, got {ts['start']}"
-                )
+            if not isinstance(ts["start"], pd.Period):
+                raise ValueError(f"{i}'th time-series must have a pandas Period as 'start', got {ts['start']}")
 
     @classmethod
     def _validate_data_frame(cls, df: pd.DataFrame):
@@ -227,11 +232,10 @@ class TimeSeriesDataFrame(pd.DataFrame):
             raise ValueError(f"`{ITEMID}` column can not have nan")
         if df[TIMESTAMP].isnull().any():
             raise ValueError(f"`{TIMESTAMP}` column can not have nan")
-        if not df[TIMESTAMP].dtype == "datetime64[ns]":
-            raise ValueError(f"for {TIMESTAMP}, the only pandas dtype allowed is `datetime64[ns]`.")
+        if not pd.api.types.is_datetime64_dtype(df[TIMESTAMP]):
+            raise ValueError(f"for {TIMESTAMP}, the only pandas dtype allowed is `datetime64`.")
         item_id_column = df[ITEMID]
-        # workaround for pd.api.types.is_string_dtype issue https://github.com/pandas-dev/pandas/issues/15585
-        item_id_is_string = (item_id_column == item_id_column.astype(str)).all()
+        item_id_is_string = pd.api.types.is_string_dtype(item_id_column)
         item_id_is_int = pd.api.types.is_integer_dtype(item_id_column)
         if not (item_id_is_string or item_id_is_int):
             raise ValueError(f"all entries in column `{ITEMID}` must be of integer or string dtype")
@@ -250,13 +254,12 @@ class TimeSeriesDataFrame(pd.DataFrame):
             raise ValueError(f"data must be a pd.DataFrame, got {type(data)}")
         if not isinstance(data.index, pd.MultiIndex):
             raise ValueError(f"data must have pd.MultiIndex, got {type(data.index)}")
-        if not data.index.dtypes.array[1] == "datetime64[ns]":
-            raise ValueError(f"for {TIMESTAMP}, the only pandas dtype allowed is `datetime64[ns]`.")
+        if not pd.api.types.is_datetime64_dtype(data.index.dtypes[TIMESTAMP]):
+            raise ValueError(f"for {TIMESTAMP}, the only pandas dtype allowed is `datetime64`.")
         if not data.index.names == (f"{ITEMID}", f"{TIMESTAMP}"):
             raise ValueError(f"data must have index names as ('{ITEMID}', '{TIMESTAMP}'), got {data.index.names}")
         item_id_index = data.index.get_level_values(level=ITEMID)
-        # workaround for pd.api.types.is_string_dtype issue https://github.com/pandas-dev/pandas/issues/15585
-        item_id_is_string = (item_id_index == item_id_index.astype(str)).all()
+        item_id_is_string = pd.api.types.is_string_dtype(item_id_index)
         item_id_is_int = pd.api.types.is_integer_dtype(item_id_index)
         if not (item_id_is_string or item_id_is_int):
             raise ValueError(f"all entries in index `{ITEMID}` must be of integer or string dtype")
@@ -293,13 +296,13 @@ class TimeSeriesDataFrame(pd.DataFrame):
         ----------
         iterable_dataset: Iterable
             An iterator over dictionaries, each with a ``target`` field specifying the value of the
-            (univariate) time series, and a ``start`` field that features a pandas Timestamp with features.
+            (univariate) time series, and a ``start`` field with the starting time as a pandas Period .
             Example::
 
                 iterable_dataset = [
-                    {"target": [0, 1, 2], "start": pd.Timestamp("01-01-2019", freq='D')},
-                    {"target": [3, 4, 5], "start": pd.Timestamp("01-01-2019", freq='D')},
-                    {"target": [6, 7, 8], "start": pd.Timestamp("01-01-2019", freq='D')}
+                    {"target": [0, 1, 2], "start": pd.Period("01-01-2019", freq='D')},
+                    {"target": [3, 4, 5], "start": pd.Period("01-01-2019", freq='D')},
+                    {"target": [6, 7, 8], "start": pd.Period("01-01-2019", freq='D')}
                 ]
         num_cpus : int, default = -1
             Number of CPU cores used to process the iterable dataset in parallel. Set to -1 to use all cores.
@@ -746,13 +749,13 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
         grouped_df = pd.DataFrame(self).groupby(level=ITEMID, sort=False, group_keys=False)
         if method == "auto":
-            filled_df = grouped_df.fillna(method="ffill")
+            filled_df = grouped_df.ffill()
             # Fill missing values at the start of each time series with bfill
-            filled_df = filled_df.groupby(level=ITEMID, sort=False, group_keys=False).fillna(method="bfill")
+            filled_df = filled_df.groupby(level=ITEMID, sort=False, group_keys=False).bfill()
         elif method in ["ffill", "pad"]:
-            filled_df = grouped_df.fillna(method="ffill")
+            filled_df = grouped_df.ffill()
         elif method in ["bfill", "backfill"]:
-            filled_df = grouped_df.fillna(method="bfill")
+            filled_df = grouped_df.bfill()
         elif method == "constant":
             filled_df = self.fillna(value=value)
         elif method == "interpolate":

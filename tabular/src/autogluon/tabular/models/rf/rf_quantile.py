@@ -209,7 +209,7 @@ class BaseTreeQuantileRegressor(BaseDecisionTree):
         return self
 
 
-class DecisionTreeQuantileRegressor(DecisionTreeRegressor, BaseTreeQuantileRegressor):
+class DecisionTreeQuantileRegressor(BaseTreeQuantileRegressor, DecisionTreeRegressor):
     """A decision tree regressor that provides quantile estimates.
 
     Parameters

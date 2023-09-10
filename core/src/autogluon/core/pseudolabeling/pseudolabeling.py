@@ -26,11 +26,14 @@ def sample_bins_uniformly(y_pred_proba: pd.DataFrame, df_indexes):
     Returns:
     pd.Series of indices that were selected by sample
     """
-    pred_idxmax = y_pred_proba[df_indexes].idxmax(axis=1)
-    class_value_counts = pred_idxmax.value_counts()
-    min_count = class_value_counts.min()
-    class_keys = list(class_value_counts.keys())
     test_pseudo_indices = pd.Series(data=False, index=y_pred_proba.index)
+    if y_pred_proba[df_indexes].empty:
+        return test_pseudo_indices
+    else:
+        pred_idxmax = y_pred_proba[df_indexes].idxmax(axis=1)
+        class_value_counts = pred_idxmax.value_counts()
+        min_count = class_value_counts.min()
+        class_keys = list(class_value_counts.keys())
 
     if len(class_keys) < 1:
         return test_pseudo_indices
