@@ -84,7 +84,7 @@ jobs:
           aws-region: us-east-1
       - name: Generate AMLB User Dir (For Pull Request)
         run: |
-          /bin/bash CI/bench/generate_amlb_user_dir.sh ${{ env.GIT_REPO }} ${{ env.BRANCH }} ${{ env.SHORT_SHA }} ${{ env.PR_NUMBER }}
+          /bin/bash CI/bench/generate_amlb_user_dir.sh ${{ github.repository }} ${{ github.ref }} ${{ github.sha }} ${{ github.event.pull_request.number }}
 
   benchmark:
     needs: generate_amlb_user_dir
