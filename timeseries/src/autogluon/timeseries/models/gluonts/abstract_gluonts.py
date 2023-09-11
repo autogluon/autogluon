@@ -343,7 +343,8 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         time_limit: int = None,
         **kwargs,
     ) -> None:
-        import pytorch_lightning  # necessary to initialize the loggers
+        # necessary to initialize the loggers
+        import pytorch_lightning  # noqa
 
         verbosity = kwargs.get("verbosity", 2)
         for logger_name in logging.root.manager.loggerDict:
