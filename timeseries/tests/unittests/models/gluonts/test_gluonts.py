@@ -81,7 +81,7 @@ def test_when_models_saved_then_gluonts_predictors_can_be_loaded(model_class, te
 
     loaded_model = model.__class__.load(path=model.path)
 
-    assert model.gluonts_estimator_class is loaded_model.gluonts_estimator_class
+    assert model._get_estimator_class() is loaded_model._get_estimator_class()
     assert loaded_model.gts_predictor.to(model.gts_predictor.device) == model.gts_predictor
 
 
