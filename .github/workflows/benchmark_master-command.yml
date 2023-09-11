@@ -31,11 +31,11 @@ jobs:
       - name: Generate AMLB User Dir (For Push)
         if: ${{ github.event_name == 'push' }}
         run: |
-          /bin/bash CI/bench/generate_amlb_user_dir.sh ${{ env.GIT_REPO }} ${{ env.BRANCH }} ${{ env.SHORT_SHA }}
+          /bin/bash CI/bench/generate_amlb_user_dir.sh ${{ github.repository }} ${{ github.ref }} ${{ github.sha }}
       - name: Generate AMLB User Dir (For Pull Request)
         if: ${{ github.event_name == 'pull_request_target' }}
         run: |
-          /bin/bash CI/bench/generate_amlb_user_dir.sh ${{ env.GIT_REPO }} ${{ env.BRANCH }} ${{ env.SHORT_SHA }} ${{ env.PR_NUMBER }}
+          /bin/bash CI/bench/generate_amlb_user_dir.sh ${{ github.repository }} ${{ github.ref }} ${{ github.sha }} ${{ github.event.pull_request.number }}
 
   benchmark:
     needs: generate_amlb_user_dir
