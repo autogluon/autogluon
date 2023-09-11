@@ -701,7 +701,11 @@ def run_model(model: nn.Module, batch: dict, trt_model: Optional[nn.Module] = No
         TFewModel,
         OnnxModule,
     )
-    pure_model = model.module if isinstance(model, nn.DataParallel) else model
+    pure_model = model
+    if isinstance(model, torch._dynamo.eval_frame.OptimizedModule):
+        pure_model = model._orig_mod
+    if isinstance(model, nn.DataParallel):
+        pure_model = model.module
     if isinstance(pure_model, OnnxModule):
         for k in batch:
             # HACK input data types in ONNX
