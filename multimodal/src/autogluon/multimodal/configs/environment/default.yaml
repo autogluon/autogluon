@@ -17,4 +17,5 @@ env:
   compile:
     turn_on: False
     mode: "default"
-    dynamic: None
+    dynamic: True
+    backend: "inductor"

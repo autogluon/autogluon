@@ -1161,7 +1161,8 @@ class MultiModalPredictor(ExportMixin):
             model = torch.compile(
                 model,
                 mode=OmegaConf.select(config, "env.compile.mode", default="default"),
-                dynamic=OmegaConf.select(config, "env.compile.dynamic", default=None),
+                dynamic=OmegaConf.select(config, "env.compile.dynamic", default=True),
+                backend=OmegaConf.select(config, "env.compile.backend", default="inductor"),
             )
 
         norm_param_names = get_norm_layer_param_names(model)
