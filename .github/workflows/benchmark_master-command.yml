@@ -1,4 +1,4 @@
-name: benchmark_master
+name: Benchmark Master (Only Generate AMLB User Dir & Run Benchmark)
 on:
   push:
   pull_request_target:
