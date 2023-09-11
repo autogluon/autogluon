@@ -4,6 +4,7 @@ import warnings
 from typing import Dict, List, Optional, Tuple
 
 import torch
+import torch._dynamo
 from torch import nn
 from torch.nn.modules.loss import _Loss
 from transformers import AutoConfig, AutoModel, AutoTokenizer, BertTokenizer, CLIPTokenizer, ElectraTokenizer
