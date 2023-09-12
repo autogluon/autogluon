@@ -305,3 +305,6 @@ MULTI_IMAGE_MIX_DATASET = "multi_image_mix_dataset"
 
 # strategies
 DDP = "ddp"
+
+# torch constants
+TORCH_COMPILE_MIN_VERSION = "2.2.0.dev20230908"
