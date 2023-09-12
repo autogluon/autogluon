@@ -19,7 +19,7 @@ echo "Printing the cloud config file"
 cat $MODULE"_cloud_configs.yaml"
 agbench run $MODULE"_cloud_configs.yaml" --wait
 
-#if it is a PR fetch the cleaned file from master location here 
+# If PR fetch the cleaned file from master location here 
 if [ $BRANCH_OR_PR_NUMBER != "master" ]
 then
     #capture the name of the file, remane it and store it in ./results
