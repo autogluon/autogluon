@@ -5,6 +5,8 @@ BRANCH=$(basename $2)
 SHORT_SHA=$3
 PR_NUMBER=$4
 
+echo "github.ref -> Branch is: $BRANCH"
+
 # generate tabular configs
 python $(dirname "$0")/tabular/generate_framework.py --repository https://github.com/$REPOSITORY.git --branch $BRANCH
 if [ -n "$PR_NUMBER" ]
