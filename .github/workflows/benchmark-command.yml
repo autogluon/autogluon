@@ -84,7 +84,7 @@ jobs:
           aws-region: us-east-1
       - name: Generate AMLB User Dir (For Pull Request)
         run: |
-          /bin/bash CI/bench/generate_amlb_user_dir.sh ${{ github.repository }} ${{ github.ref }} ${{ github.sha }} ${{ github.event.pull_request.number }}
+          /bin/bash CI/bench/generate_amlb_user_dir.sh ${{ github.repository }} ${{ github.ref }} ${{ github.sha }}
 
   benchmark:
     needs: generate_amlb_user_dir
@@ -132,11 +132,6 @@ jobs:
           nvm install 20
           npm install -g aws-cdk
           /bin/bash ./.github/workflow_scripts/run_benchmark.sh ${{ github.event.inputs.module }} ${{ github.event.inputs.preset }} ${{ github.event.inputs.benchmark }} ${{ github.event.inputs.time_limit }} ${{ github.event.pull_request.number }} ${{ github.sha }}
-      - name: Upload website.txt
-        uses: actions/upload-artifact@v3
-        with:
-          name: dashboard-website
-          path: ./website.txt
   
   dashboard: 
     needs: benchmark
@@ -161,4 +156,3 @@ jobs:
           repository: ${{ github.event.inputs.repository }}
           comment-id: ${{ github.event.inputs.comment-id }}
           body: ${{ steps.website.outputs.body }}
-
