@@ -1,4 +1,4 @@
-name: Benchmark
+name: Benchmark (Generate AMLB User Dir + Benchmark + Evaluate)
 on:
   workflow_dispatch:
     inputs:

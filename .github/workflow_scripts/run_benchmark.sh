@@ -19,7 +19,7 @@ echo "Printing the cloud config file"
 cat $MODULE"_cloud_configs.yaml"
 agbench run $MODULE"_cloud_configs.yaml" --wait
 
-# If PR fetch the cleaned file from master location here 
+# If PR, fetch the cleaned file from master location here 
 if [ $BRANCH_OR_PR_NUMBER != "master" ]
 then
     #capture the name of the file, remane it and store it in ./results
@@ -29,6 +29,8 @@ then
     mv "./results/$master_cleaned_file" "./results/$new_master_cleaned_file"
 fi
 
+echo "Printing AG Bench Runs"
+ls ./ag_bench_runs/tabular/
 python CI/bench/evaluate.py --config_path ./ag_bench_runs/tabular/ --time_limit $TIME_LIMIT --branch_name $BRANCH_OR_PR_NUMBER
 
 for file in ./results/*; do
