@@ -100,10 +100,10 @@ def infer_precision(
             warnings.warn(
                 "bf16 is not supported by the GPU device / cuda version. "
                 "Consider using GPU devices with versions after Amphere or upgrading cuda to be >=11.0. "
-                "MultiModalPredictor is switching precision from bf16 to 32.",
+                "MultiModalPredictor is switching precision from bf16 AMP to fp16 AMP.",
                 UserWarning,
             )
-            precision = 32
+            precision = 16
 
     if as_torch:
         precision_mapping = {
