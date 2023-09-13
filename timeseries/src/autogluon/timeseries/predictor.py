@@ -300,7 +300,7 @@ class TimeSeriesPredictor:
             f"Median time series length is {median_length} (min={min_length}, max={max_length}). "
         )
 
-    def _recommend_num_val_windows(self, train_data: TimeSeriesDataFrame, max_num_val_windows: int = 3) -> int:
+    def _recommend_num_val_windows(self, train_data: TimeSeriesDataFrame, max_num_val_windows: int = 5) -> int:
         """Automatically recommend num_val_windows based on the length of training time series.
 
         Chooses num_val_windows such that TS with median length is long enough to perform num_val_windows validations.
@@ -523,7 +523,7 @@ class TimeSeriesPredictor:
             A separate copy of each model is trained for each validation window.
             When ``num_val_windows = k``, training time is increased roughly by a factor of ``k``.
             If ``num_val_windows=None``, the predictor will attempt to set this parameter automatically based on the
-            length of time series in ``train_data``.
+            length of time series in ``train_data`` (at most to 5).
         refit_full : bool, default = False
             If True, after training is complete, AutoGluon will attempt to re-train all models using all of training
             data (including the data initially reserved for validation). This argument has no effect if ``tuning_data``
