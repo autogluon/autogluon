@@ -692,6 +692,8 @@ def apply_layerwise_lr_decay(
     decay_param_names = get_weight_decay_param_names(model)
 
     for name, param in model.named_parameters():
+        if name.startswith("_orig_mod."):
+            name = "".join(name.split("_orig_mod."))
         layer_id = model.name_to_id[name]
         if layer_id == 0:  # Set top layer (e.g. head, fusion_mlp, adapter) as being trainable.
             param.requires_grad = True

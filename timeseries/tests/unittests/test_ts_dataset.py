@@ -20,11 +20,11 @@ from autogluon.timeseries.dataset.ts_dataframe import (
 
 from .common import get_data_frame_with_variable_lengths
 
-START_TIMESTAMP = pd.Timestamp("01-01-2019", freq="D")  # type: ignore
-END_TIMESTAMP = pd.Timestamp("01-02-2019", freq="D")  # type: ignore
+START_TIMESTAMP = pd.Timestamp("01-01-2019")  # type: ignore
+END_TIMESTAMP = pd.Timestamp("01-02-2019")  # type: ignore
 ITEM_IDS = (0, 1, 2)
 TARGETS = np.arange(9)
-DATETIME_INDEX = tuple(pd.date_range(START_TIMESTAMP, periods=3))
+DATETIME_INDEX = tuple(pd.date_range(START_TIMESTAMP, periods=3, freq="D"))
 EMPTY_ITEM_IDS = np.array([], dtype=np.int64)
 EMPTY_DATETIME_INDEX = np.array([], dtype=np.dtype("datetime64[ns]"))  # type: ignore
 EMPTY_TARGETS = np.array([], dtype=np.int64)
@@ -56,9 +56,9 @@ SAMPLE_DATAFRAME = pd.DataFrame(SAMPLE_TS_DATAFRAME).reset_index()
 
 
 SAMPLE_ITERABLE = [
-    {"target": [0, 1, 2], "start": pd.Timestamp("01-01-2019", freq="D")},  # type: ignore
-    {"target": [3, 4, 5], "start": pd.Timestamp("01-01-2019", freq="D")},  # type: ignore
-    {"target": [6, 7, 8], "start": pd.Timestamp("01-01-2019", freq="D")},  # type: ignore
+    {"target": [0, 1, 2], "start": pd.Period("01-01-2019", freq="D")},  # type: ignore
+    {"target": [3, 4, 5], "start": pd.Period("01-01-2019", freq="D")},  # type: ignore
+    {"target": [6, 7, 8], "start": pd.Period("01-01-2019", freq="D")},  # type: ignore
 ]
 
 
@@ -70,10 +70,6 @@ def test_from_iterable():
         TimeSeriesDataFrame([])
 
     sample_iter = [{"target": [0, 1, 2]}]
-    with pytest.raises(ValueError):
-        TimeSeriesDataFrame(sample_iter)
-
-    sample_iter = [{"target": [0, 1, 2], "start": pd.Timestamp("01-01-2019")}]  # type: ignore
     with pytest.raises(ValueError):
         TimeSeriesDataFrame(sample_iter)
 
@@ -111,7 +107,7 @@ def test_from_gluonts_list_dataset():
     prediction_length = 24
     freq = "D"
     custom_dataset = np.random.normal(size=(number_of_ts, ts_length))
-    start = pd.Timestamp("01-01-2019", freq=freq)  # type: ignore
+    start = pd.Period("01-01-2019", freq=freq)  # type: ignore
 
     gluonts_list_dataset = ListDataset(
         [{"target": x, "start": start} for x in custom_dataset[:, :-prediction_length]],
@@ -267,7 +263,7 @@ def test_when_dataset_constructed_from_iterable_with_freq_then_freq_is_inferred(
 @pytest.mark.parametrize("start_time, freq", FREQ_TEST_CASES)
 def test_when_dataset_constructed_via_constructor_with_freq_then_freq_is_inferred(start_time, freq):
     item_list = ListDataset(
-        [{"target": [1, 2, 3], "start": pd.Timestamp(start_time, freq=freq)} for _ in range(3)],  # type: ignore
+        [{"target": [1, 2, 3], "start": pd.Period(start_time, freq=freq)} for _ in range(3)],  # type: ignore
         freq=freq,
     )
 
@@ -281,7 +277,7 @@ def test_when_dataset_constructed_via_constructor_with_freq_and_persisted_then_c
     start_time, freq
 ):
     item_list = ListDataset(
-        [{"target": [1, 2, 3], "start": pd.Timestamp(start_time, freq=freq)} for _ in range(3)],  # type: ignore
+        [{"target": [1, 2, 3], "start": pd.Period(start_time, freq=freq)} for _ in range(3)],  # type: ignore
         freq=freq,
     )
 
@@ -350,9 +346,9 @@ def test_when_dataset_constructed_with_irregular_timestamps_then_freq_call_cache
 
 
 SAMPLE_ITERABLE_2 = [
-    {"target": [0, 1, 2, 3], "start": pd.Timestamp("2019-01-01", freq="D")},  # type: ignore
-    {"target": [3, 4, 5, 4], "start": pd.Timestamp("2019-01-02", freq="D")},  # type: ignore
-    {"target": [6, 7, 8, 5], "start": pd.Timestamp("2019-01-03", freq="D")},  # type: ignore
+    {"target": [0, 1, 2, 3], "start": pd.Period("2019-01-01", freq="D")},  # type: ignore
+    {"target": [3, 4, 5, 4], "start": pd.Period("2019-01-02", freq="D")},  # type: ignore
+    {"target": [6, 7, 8, 5], "start": pd.Period("2019-01-03", freq="D")},  # type: ignore
 ]
 
 
@@ -470,7 +466,7 @@ def test_when_dataframe_copy_called_on_instance_then_output_correct(input_df):
     copied_df = input_df.copy()
 
     assert isinstance(copied_df, TimeSeriesDataFrame)
-    assert copied_df._data is not input_df._data
+    assert copied_df._mgr is not input_df._mgr
 
 
 @pytest.mark.parametrize("input_df", [SAMPLE_TS_DATAFRAME, SAMPLE_TS_DATAFRAME_EMPTY])
@@ -478,7 +474,7 @@ def test_when_dataframe_stdlib_copy_called_then_output_correct(input_df):
     copied_df = copy.deepcopy(input_df)
 
     assert isinstance(copied_df, TimeSeriesDataFrame)
-    assert copied_df._data is not input_df._data
+    assert copied_df._mgr is not input_df._mgr
 
 
 @pytest.mark.parametrize("input_df", [SAMPLE_TS_DATAFRAME, SAMPLE_TS_DATAFRAME_EMPTY])
@@ -486,7 +482,7 @@ def test_when_dataframe_class_copy_called_then_output_correct(input_df):
     copied_df = TimeSeriesDataFrame.copy(input_df, deep=True)
 
     assert isinstance(copied_df, TimeSeriesDataFrame)
-    assert copied_df._data is not input_df._data
+    assert copied_df._mgr is not input_df._mgr
 
 
 @pytest.mark.parametrize("input_df", [SAMPLE_TS_DATAFRAME, SAMPLE_TS_DATAFRAME_EMPTY])
@@ -500,7 +496,7 @@ def test_when_dataframe_class_rename_called_then_output_correct(input_df, inplac
     assert "mytarget" in renamed_df.columns
     assert "target" not in renamed_df.columns
     if inplace:
-        assert renamed_df._data is input_df._data
+        assert renamed_df._mgr is input_df._mgr
 
 
 @pytest.mark.parametrize("input_df", [SAMPLE_TS_DATAFRAME, SAMPLE_TS_DATAFRAME_EMPTY])
@@ -514,7 +510,7 @@ def test_when_dataframe_instance_rename_called_then_output_correct(input_df, inp
     assert "mytarget" in renamed_df.columns
     assert "target" not in renamed_df.columns
     if inplace:
-        assert renamed_df._data is input_df._data
+        assert renamed_df._mgr is input_df._mgr
 
 
 @pytest.mark.parametrize("input_df", [SAMPLE_TS_DATAFRAME, SAMPLE_TS_DATAFRAME_EMPTY])
@@ -559,7 +555,7 @@ def test_when_dataframe_stdlib_copy_called_then_static_features_are_correct():
     copied_df = copy.deepcopy(input_df)
 
     assert input_df.static_features.equals(copied_df.static_features)
-    assert copied_df._data is not input_df._data
+    assert copied_df._mgr is not input_df._mgr
 
 
 @pytest.mark.parametrize("inplace", [True, False])
@@ -573,7 +569,7 @@ def test_when_dataframe_class_rename_called_then_static_features_are_correct(inp
     assert "mytarget" in renamed_df.columns
     assert "target" not in renamed_df.columns
     if inplace:
-        assert renamed_df._data is input_df._data
+        assert renamed_df._mgr is input_df._mgr
     assert renamed_df.static_features.equals(input_df.static_features)
 
 
@@ -590,7 +586,7 @@ def test_when_dataframe_instance_rename_called_then_static_features_are_correct(
     assert "mytarget" in renamed_df.columns
     assert "target" not in renamed_df.columns
     if inplace:
-        assert renamed_df._data is input_df._data
+        assert renamed_df._mgr is input_df._mgr
     assert renamed_df.static_features.equals(input_df.static_features)
 
 
@@ -895,3 +891,11 @@ def test_when_aggregation_method_is_changed_then_aggregated_result_is_correct(ag
     )
     aggregated = ts_df.convert_frequency(freq="W", agg_numeric=agg_method)
     assert np.all(aggregated.values.ravel() == np.array(values_after_aggregation))
+
+
+@pytest.mark.parametrize("dtype", ["datetime64[ns]", "datetime64[us]", "datetime64[ms]", "datetime64[s]"])
+def test_when_timestamps_have_datetime64_type_then_tsdf_can_be_constructed(dtype):
+    df = SAMPLE_DATAFRAME.copy()
+    df[TIMESTAMP] = df[TIMESTAMP].astype(dtype)
+    assert df[TIMESTAMP].dtype == dtype
+    TimeSeriesDataFrame.from_data_frame(df)

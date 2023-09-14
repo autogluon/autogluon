@@ -32,22 +32,31 @@ def get_data_frame_with_item_index(
     item_list: List[Union[str, int]],
     data_length: int = 20,
     freq: str = "H",
+    start_date: str = "2022-01-01",
+    columns: List[str] = ["target"],
+    data_generation: str = "random",
 ):
+    assert data_generation in ["random", "sequential"]
+    if data_generation == "random":
+        data = [random.random() for _ in range(len(item_list) * data_length)]
+    elif data_generation == "sequential":
+        data = [e for e in range(len(item_list) * data_length)]
+
     return TimeSeriesDataFrame(
         pd.DataFrame(
             index=pd.MultiIndex.from_product(
                 [
                     item_list,
                     pd.date_range(
-                        pd.Timestamp("2022-01-01"),  # noqa
+                        pd.Timestamp(start_date),  # noqa
                         freq=freq,
                         periods=data_length,
                     ),
                 ],
                 names=(ITEMID, TIMESTAMP),
             ),
-            data=[random.random() for _ in range(len(item_list) * data_length)],
-            columns=["target"],
+            data=data,
+            columns=columns,
         )
     )
 

@@ -79,6 +79,7 @@ from .constants import (
     SCORE,
     TEXT,
     TEXT_NER,
+    TORCH_COMPILE_MIN_VERSION,
     UNIFORM_SOUP,
     XYWH,
     Y_PRED,
@@ -1150,6 +1151,19 @@ class MultiModalPredictor(ExportMixin):
             )
         else:  # continuing training
             model = self._model
+
+        if OmegaConf.select(config, "env.compile.turn_on", default=False):
+            assert version.parse(torch.__version__) >= version.parse(TORCH_COMPILE_MIN_VERSION), (
+                f"torch.compile requires torch version >= {TORCH_COMPILE_MIN_VERSION}, "
+                f"but torch version {torch.__version__} is detected."
+            )
+            logger.debug("Using torch.compile() in compiling the model.")
+            model = torch.compile(
+                model,
+                mode=OmegaConf.select(config, "env.compile.mode", default="default"),
+                dynamic=OmegaConf.select(config, "env.compile.dynamic", default=True),
+                backend=OmegaConf.select(config, "env.compile.backend", default="inductor"),
+            )
 
         norm_param_names = get_norm_layer_param_names(model)
 

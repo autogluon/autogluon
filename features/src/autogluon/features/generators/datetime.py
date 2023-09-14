@@ -46,12 +46,12 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
         #   NaN, empty string, datetime without timezone, and datetime with timezone, all as an object type, all being present in the same column.
         #   I don't know why, but in this specific situation (and not otherwise), NaN will be filled by .fillna, but empty string will be converted to NaT
         #   and refuses to be filled by .fillna, requiring a dedicated replace call. (NaT is filled by .fillna in every other situation...)
-        series = pd.to_datetime(X[feature].copy(), utc=True, errors="coerce")
+        series = pd.to_datetime(X[feature].copy(), utc=True, errors="coerce", format="mixed")
         broken_idx = series[(series == "NaT") | series.isna() | series.isnull()].index
         bad_rows = series.iloc[broken_idx]
         if is_fit:
             good_rows = series[~series.isin(bad_rows)].astype(np.int64)
-            self._fillna_map[feature] = pd.to_datetime(int(good_rows.mean()), utc=True)
+            self._fillna_map[feature] = pd.to_datetime(int(good_rows.mean()), utc=True, format="mixed")
         series[broken_idx] = self._fillna_map[feature]
         return series
 

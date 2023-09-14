@@ -379,7 +379,7 @@ class DirectTabularModel(AbstractTimeSeriesModel):
             data_future[self.target] = np.nan
         else:
             future_index = get_forecast_horizon_index_ts_dataframe(data, self.prediction_length)
-            data_future = pd.DataFrame(columns=[self.target], index=future_index)
+            data_future = pd.DataFrame(columns=[self.target], index=future_index, dtype="float64")
         data_extended = pd.concat([data, data_future])
         data_extended.static_features = data.static_features
 
