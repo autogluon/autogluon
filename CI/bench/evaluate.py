@@ -56,11 +56,8 @@ subprocess.run(
     ]
 )
 
-# if it is a PR then perform the evaluation as well 
+# If it is a PR then perform the evaluation as w.r.t cleaned master bench reaults
 if branch_name != "master":
-
-    print("\nThis is PR so we evaluate")
-
     paths = []
     frameworks = []
     for file in os.listdir("./results"):
@@ -83,7 +80,3 @@ if branch_name != "master":
             "--no-clean-data",
         ]
     )
-
-else:
-
-    print("\nEvaluation is not performed as branch is master!")

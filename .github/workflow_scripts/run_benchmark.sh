@@ -14,27 +14,21 @@ source $(dirname "$0")/env_setup.sh
 setup_benchmark_env
 
 /bin/bash CI/bench/generate_bench_config.sh $MODULE $PRESET $BENCHMARK $TIME_LIMIT $BRANCH_OR_PR_NUMBER
-#copy the generated config file to test
-echo "Printing the cloud config file"
-cat $MODULE"_cloud_configs.yaml"
 agbench run $MODULE"_cloud_configs.yaml" --wait
 
-# If PR, fetch the cleaned file from master location here 
+# If it is a PR, fetch the cleaned file of master-evaluation
 if [ $BRANCH_OR_PR_NUMBER != "master" ]
 then
-    #capture the name of the file, remane it and store it in ./results
+    # Capture the name of the file, rename it and store it in ./results
     master_cleaned_file=$(aws s3 ls s3://autogluon-ci-benchmark/cleaned/master/latest/ | awk '{print $NF}')
     new_master_cleaned_file="master_${master_cleaned_file}"
     aws s3 cp --recursive s3://autogluon-ci-benchmark/cleaned/master/latest/ ./results
     mv "./results/$master_cleaned_file" "./results/$new_master_cleaned_file"
 fi
 
-echo "Printing AG Bench Runs"
-ls ./ag_bench_runs/tabular/
 python CI/bench/evaluate.py --config_path ./ag_bench_runs/tabular/ --time_limit $TIME_LIMIT --branch_name $BRANCH_OR_PR_NUMBER
 
 for file in ./results/*; do
-    echo "File Name: $file"
     # Check if the file does not start with "master"
     if [[ "$(basename "$file")" != "master"* ]]
     then
@@ -48,14 +42,11 @@ for file in ./results/*; do
     fi
 done
 
-#run dashboard if the branch is not master
+# Run dashboard if the branch is not master
 if [ $BRANCH_OR_PR_NUMBER != "master" ]
 then
     cwd=`pwd`
-    echo "Printing paths and folder structure"
-    ls ./results
     ls data/results/output/openml/ag_eval/pairwise/* | grep .csv > $cwd/agg_csv.txt
-    echo "Printing the agg_csv file"
     cat agg_csv.txt
     filename=`head -1 $cwd/agg_csv.txt`
     prefix=$BRANCH_OR_PR_NUMBER/$SHA
