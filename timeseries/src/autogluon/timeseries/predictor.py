@@ -4,8 +4,8 @@ import pprint
 import time
 from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
-import pandas as pd
 import lightning.pytorch as pl
+import pandas as pd
 
 from autogluon.common.utils.deprecated_utils import Deprecated_args
 from autogluon.common.utils.log_utils import set_logger_verbosity
