@@ -1,7 +1,7 @@
 name: Benchmark Master (Only Generate AMLB User Dir & Run Benchmark)
 on:
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '0 0 * * 0'
 
 env:
   AG_MODULE: tabular
