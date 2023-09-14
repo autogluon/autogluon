@@ -1,3 +1,4 @@
+# Workflow to trigger benchmarking, cleaning, aggregation of the PR and evaluating w.r.t master branch, results on dashboard
 name: Benchmark (Generate AMLB User Dir + Benchmark + Evaluate)
 on:
   workflow_dispatch:
