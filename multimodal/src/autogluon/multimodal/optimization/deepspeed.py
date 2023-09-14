@@ -17,8 +17,8 @@
 import logging
 from typing import Any, Dict, Generator, List, Mapping, Optional, Tuple, Union, cast
 
+import lightning.pytorch as pl
 import torch
-from lightning.pytorch import LightningModule, accelerators
 from lightning.pytorch.accelerators.cuda import CUDAAccelerator
 from lightning.pytorch.overrides.base import _LightningModuleWrapperBase, _LightningPrecisionModuleWrapperBase
 from lightning.pytorch.plugins.environments.cluster_environment import ClusterEnvironment
@@ -46,7 +46,7 @@ class CustomDeepSpeedStrategy(DeepSpeedStrategy):
 
     def __init__(
         self,
-        accelerator: Optional["accelerators.accelerator.Accelerator"] = None,
+        accelerator: Optional["pl.accelerators.accelerator.Accelerator"] = None,
         zero_optimization: bool = True,
         stage: int = 2,
         remote_device: str = "cpu",
@@ -296,7 +296,7 @@ class CustomDeepSpeedStrategy(DeepSpeedStrategy):
     def init_deepspeed(self) -> None:
         assert self.lightning_module is not None
         # deepspeed handles gradient clipping internally
-        if is_overridden("configure_gradient_clipping", self.lightning_module, LightningModule):
+        if is_overridden("configure_gradient_clipping", self.lightning_module, pl.LightningModule):
             rank_zero_warn(
                 "Since DeepSpeed handles gradient clipping internally, the default"
                 " `LightningModule.configure_gradient_clipping` implementation will not actually clip gradients."
@@ -320,7 +320,7 @@ class CustomDeepSpeedStrategy(DeepSpeedStrategy):
                 "DeepSpeed currently does not support different `accumulate_grad_batches` at different epochs."
             )
 
-        assert isinstance(self.model, (LightningModule, _LightningPrecisionModuleWrapperBase))
+        assert isinstance(self.model, (pl.LightningModule, _LightningPrecisionModuleWrapperBase))
         model = _LightningModuleWrapperBase(pl_module=self.model)
 
         self._initialize_deepspeed_train(model)

@@ -6,8 +6,8 @@ import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
+import lightning.pytorch as pl
 import torch
-from lightning.pytorch import LightningModule, Trainer
 from lightning.pytorch.callbacks import BasePredictionWriter
 
 from ..constants import WEIGHT
@@ -63,8 +63,8 @@ class DDPPredictionWriter(BasePredictionWriter):
 
     def write_on_epoch_end(
         self,
-        trainer: Trainer,
-        pl_module: LightningModule,
+        trainer: pl.Trainer,
+        pl_module: pl.LightningModule,
         predictions: Sequence[Any],
         batch_indices: Sequence[Any],
     ):

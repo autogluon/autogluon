@@ -1,10 +1,10 @@
 import logging
 from typing import Callable, List, Optional, Union
 
+import lightning.pytorch as pl
 import torch
 import torch.nn.functional as F
 import torchmetrics
-from lightning.pytorch import LightningModule
 from lightning.pytorch.utilities import grad_norm
 from omegaconf import DictConfig
 from torch import nn
@@ -18,7 +18,7 @@ from .utils import apply_layerwise_lr_decay, apply_single_lr, apply_two_stages_l
 logger = logging.getLogger(__name__)
 
 
-class DistillerLitModule(LightningModule):
+class DistillerLitModule(pl.LightningModule):
     """
     Knowledge distillation loops for training and evaluation. This module is independent of
     the model definition. This class inherits from the Pytorch Lightning's LightningModule:

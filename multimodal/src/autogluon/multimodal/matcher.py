@@ -11,13 +11,11 @@ import warnings
 from datetime import timedelta
 from typing import Callable, Dict, List, Optional, Union
 
+import lightning.pytorch as pl
 import numpy as np
 import pandas as pd
 import torch
 import yaml
-from lightning.pytorch import Trainer, callbacks
-from lightning.pytorch import loggers as lightning_loggers
-from lightning.pytorch import seed_everything
 from omegaconf import DictConfig, OmegaConf
 from torch import nn
 
@@ -425,7 +423,7 @@ class MultiModalMatcher:
         fit_called = self._fit_called  # used in current function
         self._fit_called = True
 
-        seed_everything(seed, workers=True)
+        pl.seed_everything(seed, workers=True)
 
         self._save_path = setup_save_path(
             resume=self._resume,
@@ -878,15 +876,15 @@ class MultiModalMatcher:
             mode=minmax_mode,
             save_last=True,
         )
-        early_stopping_callback = callbacks.EarlyStopping(
+        early_stopping_callback = pl.callbacks.EarlyStopping(
             monitor=task.validation_metric_name,
             patience=config.optimization.patience,
             mode=minmax_mode,
             stopping_threshold=get_stopping_threshold(validation_metric_name),
         )
-        lr_callback = callbacks.LearningRateMonitor(logging_interval="step")
-        model_summary = callbacks.ModelSummary(max_depth=1)
-        callbacks_obj = [
+        lr_callback = pl.callbacks.LearningRateMonitor(logging_interval="step")
+        model_summary = pl.callbacks.ModelSummary(max_depth=1)
+        callbacks = [
             checkpoint_callback,
             early_stopping_callback,
             lr_callback,
@@ -894,20 +892,20 @@ class MultiModalMatcher:
         ]
 
         if hpo_mode:
-            from ray.tune.integration.pytorch_lightning import TuneReportCheckpointCallback
+            from .utils.hpo import _TuneReportCheckpointCallback
 
-            tune_report_callback = TuneReportCheckpointCallback(
+            tune_report_callback = _TuneReportCheckpointCallback(
                 {f"{task.validation_metric_name}": f"{task.validation_metric_name}"},
                 filename=RAY_TUNE_CHECKPOINT,
             )
-            callbacks_obj = [
+            callbacks = [
                 tune_report_callback,
                 early_stopping_callback,
                 lr_callback,
                 model_summary,
             ]
 
-        tb_logger = lightning_loggers.TensorBoardLogger(
+        tb_logger = pl.loggers.TensorBoardLogger(
             save_dir=save_path,
             name="",
             version="",
@@ -948,7 +946,7 @@ class MultiModalMatcher:
         blacklist_msgs = ["already configured with model summary"]
         log_filter = LogFilter(blacklist_msgs)
         with apply_log_filter(log_filter):
-            trainer = Trainer(
+            trainer = pl.Trainer(
                 accelerator="gpu" if num_gpus > 0 else "auto",
                 devices=get_available_devices(
                     num_gpus=num_gpus,
@@ -962,7 +960,7 @@ class MultiModalMatcher:
                 max_epochs=config.optimization.max_epochs,
                 max_steps=config.optimization.max_steps,
                 max_time=max_time,
-                callbacks=callbacks_obj,
+                callbacks=callbacks,
                 logger=tb_logger,
                 gradient_clip_val=OmegaConf.select(config, "optimization.gradient_clip_val", default=1),
                 gradient_clip_algorithm=OmegaConf.select(
@@ -1290,7 +1288,7 @@ class MultiModalMatcher:
             blacklist_msgs.append("LOCAL_RANK")
         log_filter = LogFilter(blacklist_msgs)
         with apply_log_filter(log_filter):
-            evaluator = Trainer(
+            evaluator = pl.Trainer(
                 accelerator="gpu" if num_gpus > 0 else "auto",
                 devices=get_available_devices(num_gpus=num_gpus, auto_select_gpus=self._config.env.auto_select_gpus),
                 num_nodes=self._config.env.num_nodes,

@@ -1,9 +1,9 @@
 import logging
 from typing import Callable, Dict, List, Optional, Union
 
+import lightning.pytorch as pl
 import torch
 import torchmetrics
-from lightning.pytorch import LightningModule
 from lightning.pytorch.utilities import grad_norm
 from omegaconf import DictConfig
 from torch import nn
@@ -27,7 +27,7 @@ from .utils import (
 logger = logging.getLogger(__name__)
 
 
-class MatcherLitModule(LightningModule):
+class MatcherLitModule(pl.LightningModule):
     """
     Control the loops for training, evaluation, and prediction. This module is independent of
     the model definition. This class inherits from the Pytorch Lightning's LightningModule:

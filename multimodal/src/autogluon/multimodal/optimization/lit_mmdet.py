@@ -1,8 +1,8 @@
 import logging
 from typing import Callable, Optional, Union
 
+import lightning.pytorch as pl
 import torchmetrics
-from lightning.pytorch import LightningModule
 from lightning.pytorch.utilities import grad_norm
 from torch.nn.modules.loss import _Loss
 from torchmetrics.aggregation import BaseAggregator
@@ -27,7 +27,7 @@ except ImportError as e:
 logger = logging.getLogger(__name__)
 
 
-class MMDetLitModule(LightningModule):
+class MMDetLitModule(pl.LightningModule):
     def __init__(
         self,
         model,

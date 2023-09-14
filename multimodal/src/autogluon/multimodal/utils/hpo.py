@@ -2,15 +2,26 @@ import logging
 import os
 import shutil
 
+import lightning.pytorch as pl
 import yaml
 
 from autogluon.common.utils.context import set_torch_num_threads
 
-from ..constants import AUTOMM, BEST_K_MODELS_FILE, RAY_TUNE_CHECKPOINT
+from ..constants import BEST_K_MODELS_FILE, RAY_TUNE_CHECKPOINT
 from .matcher import create_siamese_model
 from .model import create_fusion_model
 
+try:
+    from ray.tune.integration.pytorch_lightning import TuneReportCheckpointCallback
+except:
+    TuneReportCheckpointCallback = None
+
 logger = logging.getLogger(__name__)
+
+
+class _TuneReportCheckpointCallback(TuneReportCheckpointCallback, pl.Callback):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
 
 def hpo_trial(sampled_hyperparameters, predictor, checkpoint_dir=None, **_fit_args):

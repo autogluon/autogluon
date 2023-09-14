@@ -4,8 +4,8 @@ import re
 import shutil
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+import lightning.pytorch as pl
 import torch
-from lightning.pytorch import LightningModule, Trainer, callbacks, plugins
 from lightning.pytorch.strategies import DeepSpeedStrategy
 from lightning.pytorch.utilities.rank_zero import rank_zero_warn
 
@@ -66,7 +66,7 @@ def average_checkpoints(
     return avg_state_dict
 
 
-class AutoMMModelCheckpointIO(plugins.CheckpointIO):
+class AutoMMModelCheckpointIO(pl.plugins.CheckpointIO):
     """
     Class that customizes how checkpoints are saved. Saves either the entire model or only parameters that have been explicitly updated during training. The latter reduces memory footprint substantially when training very large models with parameter-efficient finetuning methods.
     Class is based on plugins.TorchCheckpointIO.
@@ -129,7 +129,7 @@ class AutoMMModelCheckpointIO(plugins.CheckpointIO):
         except AttributeError as err:
             # todo (sean): is this try catch necessary still?
             # https://github.com/Lightning-AI/lightning/pull/431
-            key = LightningModule.CHECKPOINT_HYPER_PARAMS_KEY
+            key = pl.LightningModule.CHECKPOINT_HYPER_PARAMS_KEY
             checkpoint.pop(key, None)
             rank_zero_warn(f"Warning, `{key}` dropped from checkpoint. An attribute is not picklable: {err}")
             _atomic_save(checkpoint, path)
@@ -167,7 +167,7 @@ class AutoMMModelCheckpointIO(plugins.CheckpointIO):
             logger.debug(f"Removed checkpoint: {path}")
 
 
-class AutoMMModelCheckpoint(callbacks.ModelCheckpoint):
+class AutoMMModelCheckpoint(pl.callbacks.ModelCheckpoint):
     """
     Class that inherits callbacks.ModelCheckpoint. The purpose is to resolve the potential issues in lightning.
 
@@ -192,7 +192,7 @@ class AutoMMModelCheckpoint(callbacks.ModelCheckpoint):
     def _update_best_and_save(
         self,
         current: torch.Tensor,
-        trainer: "Trainer",
+        trainer: "pl.Trainer",
         monitor_candidates: Dict[str, torch.Tensor],
     ) -> None:
 
