@@ -2,7 +2,7 @@ import logging
 import os
 import pprint
 import time
-from typing import Any, Dict, List, Optional, Type, Union
+from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import pandas as pd
 import pytorch_lightning as pl
@@ -236,6 +236,7 @@ class TimeSeriesPredictor:
             Preprocessed data in TimeSeriesDataFrame format.
         """
         df = self._to_data_frame(data, name=name)
+        df = df.astype({self.target: float})
         # MultiIndex.is_monotonic_increasing checks if index is sorted by ["item_id", "timestamp"]
         if not df.index.is_monotonic_increasing:
             df = df.sort_index()
@@ -251,14 +252,14 @@ class TimeSeriesPredictor:
                 )
             else:
                 self.freq = df.freq
-                logger.info(f"Inferred data frequency: {df.freq}")
+                logger.info(f"Inferred time series frequency: {df.freq}")
         else:
             if df.freq != self.freq:
                 logger.warning(f"{name} with frequency '{df.freq}' has been resampled to frequency '{self.freq}'.")
                 df = df.convert_frequency(freq=self.freq)
 
         # TODO: Add support for all pandas frequencies
-        offset = pd.tseries.frequencies.to_offset(df.freq)
+        offset = pd.tseries.frequencies.to_offset(self.freq)
         norm_freq_str = offset.name.split("-")[0]
         if norm_freq_str not in SUPPORTED_FREQUENCIES:
             logger.warning(
@@ -279,12 +280,6 @@ class TimeSeriesPredictor:
             df = df.fill_missing_values()
             if df.isna().values.any():
                 raise ValueError(f"Some time series in {name} consist completely of NaN values. Please remove them.")
-
-        # Ensure that time series are long enough
-        if (df.num_timesteps_per_item() <= 2).any():
-            # FIXME: Gracefully handle short time series: Ignore time series with length <= 2 in train_data,
-            # FIXME: otherwise generate naive forecast for short time series
-            raise ValueError(f"Detected time series with length <= 2 in {name}. Please remove them from the dataset.")
         return df
 
     def _check_data_for_evaluation(self, data: TimeSeriesDataFrame, name: str = "data"):
@@ -296,47 +291,59 @@ class TimeSeriesPredictor:
                 f"all time series have length > prediction_length (at least {self.prediction_length + 1})"
             )
 
-    def _validate_num_val_windows(
+    @staticmethod
+    def _get_dataset_stats(data: TimeSeriesDataFrame) -> str:
+        ts_lengths = data.num_timesteps_per_item()
+        median_length = int(ts_lengths.median())
+        min_length = ts_lengths.min()
+        max_length = ts_lengths.max()
+        return (
+            f"{len(data)} rows, {data.num_items} time series. "
+            f"Median time series length is {median_length} (min={min_length}, max={max_length}). "
+        )
+
+    def _recommend_num_val_windows(self, train_data: TimeSeriesDataFrame, max_num_val_windows: int = 5) -> int:
+        """Automatically recommend num_val_windows based on the length of training time series.
+
+        Chooses num_val_windows such that TS with median length is long enough to perform num_val_windows validations.
+        """
+        median_length = train_data.num_timesteps_per_item().median()
+        num_val_windows_for_median_ts = int((median_length - 1) // self.prediction_length - 1)
+        return min(max_num_val_windows, max(1, num_val_windows_for_median_ts))
+
+    def _filter_short_series(
         self,
         train_data: TimeSeriesDataFrame,
-        tuning_data: Optional[TimeSeriesDataFrame],
         num_val_windows: int,
-    ) -> int:
-        """Check if given num_val_windows is suitable for given data and validate length of training time series.
+    ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
+        """Remove time series from train_data that are too short for chosen prediction_length and num_val_windows.
 
-        Returns
-        -------
-        num_val_windows : int
-            Number of cross validation windows adjusted based on the length of training time series.
+        This method ensures that for each validation window, train series have length at least prediction_length + 1.
+
+        If all time series in train_data have length <= (num_val_windows + 1) * prediction_length, an error is raised.
         """
-        shortest_ts_length = train_data.num_timesteps_per_item().min()
-        if tuning_data is None:
-            recommended_ts_length = 2 * self.prediction_length + 1
-            recommended_ts_length_str = "2 * prediction_length + 1"
+        min_train_length = (num_val_windows + 1) * self.prediction_length
+        train_lengths = train_data.num_timesteps_per_item()
+        train_items_to_drop = train_lengths.index[train_lengths <= min_train_length]
+        if len(train_items_to_drop) > 0:
+            logger.info(
+                f"\tRemoving {len(train_items_to_drop)} short time series from train_data. Only series with length > (num_val_windows + 1) * prediction_length "
+                f"(at least {min_train_length + 1}) will be used for training."
+            )
+            filtered_train_data = train_data.query("item_id not in @train_items_to_drop")
+            if len(filtered_train_data) == 0:
+                raise ValueError(
+                    f"At least some time series in train_data must have length > (num_val_windows + 1) * prediction_length "
+                    f"(at least {min_train_length + 1}), otherwise training is impossible. Please reduce prediction_length, "
+                    f"reduce num_val_windows, or provide longer time series as train_data."
+                )
+            logger.info(
+                f"\tAfter removing short series, train_data has {self._get_dataset_stats(filtered_train_data)}"
+            )
         else:
-            recommended_ts_length = self.prediction_length + 1
-            recommended_ts_length_str = "prediction_length + 1"
+            filtered_train_data = train_data
 
-        if shortest_ts_length < recommended_ts_length:
-            logger.warning(
-                f"\nIt is recommended that all time series in train_data have length >= {recommended_ts_length_str} "
-                f"(at least {recommended_ts_length}). "
-                "Otherwise the predictor may not work as expected. "
-                "\nPlease reduce prediction_length or provide longer time series as train_data. "
-            )
-
-        # Ensure that after splitting off the last prediction_length timesteps all time series have length >= 1
-        max_possible_num_val_windows = int((shortest_ts_length - 1) / self.prediction_length)
-        if num_val_windows > max_possible_num_val_windows:
-            logger.warning(
-                f"\nTime series in train_data are too short for the given num_val_windows = {num_val_windows}. "
-                f"Setting num_val_windows = {max_possible_num_val_windows}"
-            )
-            num_val_windows = max_possible_num_val_windows
-        if num_val_windows == 0 and tuning_data is None:
-            raise ValueError("Training is impossible because num_val_windows = 0 and no tuning_data is provided")
-
-        return num_val_windows
+        return filtered_train_data
 
     @apply_presets(TIMESERIES_PRESETS_CONFIGS)
     def fit(
@@ -359,8 +366,10 @@ class TimeSeriesPredictor:
         Parameters
         ----------
         train_data : Union[TimeSeriesDataFrame, pd.DataFrame, str]
-            Training data in the :class:`~autogluon.timeseries.TimeSeriesDataFrame` format. For best performance, all
-            time series should have length ``> 2 * prediction_length``.
+            Training data in the :class:`~autogluon.timeseries.TimeSeriesDataFrame` format.
+
+            Time series with length ``<= (num_val_windows + 1) * prediction_length`` will be ignored during training.
+            See :attr:`num_val_windows` for details.
 
             If ``known_covariates_names`` were specified when creating the predictor, ``train_data`` must include the
             columns listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
@@ -387,7 +396,7 @@ class TimeSeriesPredictor:
             time series are used for computing the validation score.
 
             If ``tuning_data`` is provided, multi-window backtesting on training data will be disabled, the
-            ``num_val_windows`` argument will be ignored, and ``refit_full`` will be set to ``False``.
+            :attr:`num_val_windows` will be set to ``0``, and :attr:`refit_full` will be set to ``False``.
 
             Leaving this argument empty and letting AutoGluon automatically generate the validation set from
             ``train_data`` is a good default.
@@ -511,10 +520,12 @@ class TimeSeriesPredictor:
                     presets="high_quality",
                     excluded_model_types=["DeepAR"],
                 )
-        num_val_windows : int, default = 1
+        num_val_windows : int or None, default = 1
             Number of backtests done on ``train_data`` for each trained model to estimate the validation performance.
             A separate copy of each model is trained for each validation window.
             When ``num_val_windows = k``, training time is increased roughly by a factor of ``k``.
+            If ``num_val_windows=None``, the predictor will attempt to set this parameter automatically based on the
+            length of time series in ``train_data`` (at most to 5).
         refit_full : bool, default = False
             If True, after training is complete, AutoGluon will attempt to re-train all models using all of training
             data (including the data initially reserved for validation). This argument has no effect if ``tuning_data``
@@ -565,24 +576,28 @@ class TimeSeriesPredictor:
         logger.info(f"{pprint.pformat(fit_args)}\n")
 
         train_data = self._check_and_prepare_data_frame(train_data, name="train_data")
-        logger.info(
-            f"Provided training data set with {len(train_data)} rows, {train_data.num_items} items (item = single time series). "
-            f"Average time series length is {len(train_data) / train_data.num_items:.1f}. "
-        )
+        logger.info(f"Provided train_data has {self._get_dataset_stats(train_data)}")
+
+        if num_val_windows is None:
+            num_val_windows = self._recommend_num_val_windows(train_data)
 
         if tuning_data is not None:
             tuning_data = self._check_and_prepare_data_frame(tuning_data, name="tuning_data")
             self._check_data_for_evaluation(tuning_data, name="tuning_data")
-            logger.info(
-                f"Provided tuning data set with {len(tuning_data)} rows, {tuning_data.num_items} items. "
-                f"Average time series length is {len(tuning_data) / tuning_data.num_items:.1f}."
-            )
+            logger.info(f"Provided tuning_data has {self._get_dataset_stats(train_data)}")
+            # TODO: Use num_val_windows to perform multi-window backtests on tuning_data
             if num_val_windows > 0:
-                logger.warning("Multi-window backtesting is disabled (setting num_val_windows = 0)")
+                logger.warning(
+                    "\tSetting num_val_windows = 0 (disabling backtesting) because tuning_data is provided."
+                )
                 num_val_windows = 0
-        num_val_windows = self._validate_num_val_windows(train_data, tuning_data, num_val_windows)
 
-        logger.info("=====================================================")
+        if num_val_windows == 0 and tuning_data is None:
+            raise ValueError("Please set num_val_windows >= 1 or provide custom tuning_data")
+
+        train_data = self._filter_short_series(train_data, num_val_windows=num_val_windows)
+
+        logger.info("=====================================================\n")
 
         if random_seed is not None:
             pl.seed_everything(random_seed)
