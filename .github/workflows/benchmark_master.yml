@@ -1,5 +1,5 @@
 # Workflow to trigger/schedule benchmarking, cleaning, aggregating on master branch only and storing results in S3
-name: Benchmark Master (Only Generate AMLB User Dir & Run Benchmark)
+name: Benchmark Master Branch
 on:
   push:
     branches: ["master"]
