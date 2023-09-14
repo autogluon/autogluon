@@ -1,10 +1,10 @@
 from typing import Dict, List, Optional, Union
 
 import pandas as pd
-from pytorch_lightning import LightningDataModule
+from lightning.pytorch import LightningDataModule
 from torch.utils.data import DataLoader, Dataset
 
-from ..constants import DEFAULT_DATASET, PREDICT, TEST, TRAIN, VALIDATE
+from ..constants import PREDICT, TEST, TRAIN, VALIDATE
 from .dataset import BaseDataset
 from .preprocess_dataframe import MultiModalFeaturePreprocessor
 from .utils import get_collate_fn

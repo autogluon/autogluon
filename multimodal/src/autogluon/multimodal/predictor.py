@@ -17,13 +17,17 @@ from typing import Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
-import pytorch_lightning as pl
 import torch
 import transformers
 import yaml
+from lightning.pytorch import Trainer
+from lightning.pytorch import __version__ as lightning_version
+from lightning.pytorch import callbacks
+from lightning.pytorch import loggers as lightning_loggers
+from lightning.pytorch import seed_everything
+from lightning.pytorch.strategies import DeepSpeedStrategy
 from omegaconf import OmegaConf
 from packaging import version
-from pytorch_lightning.strategies import DeepSpeedStrategy
 from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
@@ -1101,7 +1105,7 @@ class MultiModalPredictor(ExportMixin):
         clean_ckpts: bool = True,
         **hpo_kwargs,
     ):
-        pl.seed_everything(seed, workers=True)
+        seed_everything(seed, workers=True)
         # TODO(?) We should have a separate "_pre_training_event()" for logging messages.
         logger.info(get_fit_start_message(save_path, validation_metric_name))
         config = get_config(
@@ -1398,15 +1402,15 @@ class MultiModalPredictor(ExportMixin):
             mode=minmax_mode,
             save_last=True,
         )
-        early_stopping_callback = pl.callbacks.EarlyStopping(
+        early_stopping_callback = callbacks.EarlyStopping(
             monitor=task.validation_metric_name,
             patience=config.optimization.patience,
             mode=minmax_mode,
             stopping_threshold=get_stopping_threshold(validation_metric_name),
         )
-        lr_callback = pl.callbacks.LearningRateMonitor(logging_interval="step")
-        model_summary = pl.callbacks.ModelSummary(max_depth=1)
-        callbacks = [
+        lr_callback = callbacks.LearningRateMonitor(logging_interval="step")
+        model_summary = callbacks.ModelSummary(max_depth=1)
+        callbacks_obj = [
             checkpoint_callback,
             early_stopping_callback,
             lr_callback,
@@ -1420,7 +1424,7 @@ class MultiModalPredictor(ExportMixin):
                 {f"{task.validation_metric_name}": f"{task.validation_metric_name}"},
                 filename=RAY_TUNE_CHECKPOINT,
             )
-            callbacks = [
+            callbacks_obj = [
                 tune_report_callback,
                 early_stopping_callback,
                 lr_callback,
@@ -1432,7 +1436,7 @@ class MultiModalPredictor(ExportMixin):
             model_name_to_id=model.name_to_id,
         )
 
-        tb_logger = pl.loggers.TensorBoardLogger(
+        tb_logger = lightning_loggers.TensorBoardLogger(
             save_dir=save_path,
             name="",
             version="",
@@ -1463,9 +1467,9 @@ class MultiModalPredictor(ExportMixin):
         if not hpo_mode:
             if num_gpus <= 1:
                 if config.env.strategy == DEEPSPEED_OFFLOADING:  # Offloading currently only tested for single GPU
-                    assert version.parse(pl.__version__) >= version.parse(
+                    assert version.parse(lightning_version) >= version.parse(
                         DEEPSPEED_MIN_PL_VERSION
-                    ), f"For DeepSpeed Offloading to work reliably you need at least pytorch-lightning version {DEEPSPEED_MIN_PL_VERSION}, however, found {pl.__version__}. Please update your pytorch-lightning version."
+                    ), f"For DeepSpeed Offloading to work reliably you need at least lightning version {DEEPSPEED_MIN_PL_VERSION}, however, found {lightning_version}. Please update your lightning version."
                     from .optimization.deepspeed import CustomDeepSpeedStrategy
 
                     strategy = CustomDeepSpeedStrategy(
@@ -1493,7 +1497,7 @@ class MultiModalPredictor(ExportMixin):
         blacklist_msgs = ["already configured with model summary"]
         log_filter = LogFilter(blacklist_msgs)
         with apply_log_filter(log_filter):
-            trainer = pl.Trainer(
+            trainer = Trainer(
                 accelerator="gpu" if num_gpus > 0 else "auto",
                 devices=num_gpus if num_gpus > 0 else "auto",
                 num_nodes=config.env.num_nodes,
@@ -1504,7 +1508,7 @@ class MultiModalPredictor(ExportMixin):
                 max_epochs=config.optimization.max_epochs,
                 max_steps=config.optimization.max_steps,
                 max_time=max_time,
-                callbacks=callbacks,
+                callbacks=callbacks_obj,
                 logger=tb_logger,
                 gradient_clip_val=OmegaConf.select(config, "optimization.gradient_clip_val", default=1),
                 gradient_clip_algorithm=OmegaConf.select(
@@ -1799,7 +1803,7 @@ class MultiModalPredictor(ExportMixin):
         log_filter = LogFilter(blacklist_msgs)
 
         with apply_log_filter(log_filter):
-            evaluator = pl.Trainer(
+            evaluator = Trainer(
                 accelerator="gpu" if num_gpus > 0 else "auto",
                 devices=num_gpus if num_gpus > 0 else "auto",
                 num_nodes=self._config.env.num_nodes,
@@ -2466,7 +2470,7 @@ class MultiModalPredictor(ExportMixin):
     ):
         if state_dict is None:
             if os.path.isdir(path + "-dir"):  # deepspeed save checkpoints into a directory
-                from pytorch_lightning.utilities.deepspeed import convert_zero_checkpoint_to_fp32_state_dict
+                from lightning.pytorch.utilities.deepspeed import convert_zero_checkpoint_to_fp32_state_dict
 
                 convert_zero_checkpoint_to_fp32_state_dict(path + "-dir", path)
                 shutil.rmtree(path + "-dir")

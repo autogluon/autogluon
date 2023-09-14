@@ -1,16 +1,16 @@
 import logging
 from typing import Callable, Dict, List, Optional, Union
 
-import pytorch_lightning as pl
 import torch
 import torchmetrics
+from lightning.pytorch import LightningModule
+from lightning.pytorch.utilities import grad_norm
 from omegaconf import DictConfig
-from pytorch_lightning.utilities import grad_norm
 from torch import nn
 from torch.nn.modules.loss import _Loss
 from torchmetrics.aggregation import BaseAggregator
 
-from ..constants import AUTOMM, FEATURES, LOGIT_SCALE, PROBABILITY, QUERY, RESPONSE
+from ..constants import FEATURES, LOGIT_SCALE, PROBABILITY, QUERY, RESPONSE
 from ..models.utils import run_model
 from ..utils.matcher import compute_matching_probability
 from .losses import MultiNegativesSoftmaxLoss
@@ -27,7 +27,7 @@ from .utils import (
 logger = logging.getLogger(__name__)
 
 
-class MatcherLitModule(pl.LightningModule):
+class MatcherLitModule(LightningModule):
     """
     Control the loops for training, evaluation, and prediction. This module is independent of
     the model definition. This class inherits from the Pytorch Lightning's LightningModule:
@@ -258,7 +258,7 @@ class MatcherLitModule(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         """
-        Per training step. This function is registered by pl.LightningModule.
+        Per training step. This function is registered by LightningModule.
         Refer to https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html#training-loop
 
         Parameters
@@ -281,7 +281,7 @@ class MatcherLitModule(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         """
-        Per validation step. This function is registered by pl.LightningModule.
+        Per validation step. This function is registered by LightningModule.
         Refer to https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html#validation
 
         Parameters
@@ -318,7 +318,7 @@ class MatcherLitModule(pl.LightningModule):
 
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
         """
-        Per prediction step. This function is registered by pl.LightningModule.
+        Per prediction step. This function is registered by LightningModule.
         Refer to https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html#prediction-loop
 
         Parameters
@@ -359,7 +359,7 @@ class MatcherLitModule(pl.LightningModule):
 
     def configure_optimizers(self):
         """
-        Configure optimizer. This function is registered by pl.LightningModule.
+        Configure optimizer. This function is registered by LightningModule.
         Refer to https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html#configure-optimizers
         Returns
         -------

@@ -1,24 +1,24 @@
 import logging
 from typing import Callable, List, Optional, Union
 
-import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
 import torchmetrics
+from lightning.pytorch import LightningModule
+from lightning.pytorch.utilities import grad_norm
 from omegaconf import DictConfig
-from pytorch_lightning.utilities import grad_norm
 from torch import nn
 from torch.nn.modules.loss import _Loss
 from torchmetrics.aggregation import BaseAggregator
 
-from ..constants import AUTOMM, FEATURES, LOGITS, WEIGHT
+from ..constants import FEATURES, LOGITS, WEIGHT
 from ..models.utils import run_model
 from .utils import apply_layerwise_lr_decay, apply_single_lr, apply_two_stages_lr, get_lr_scheduler, get_optimizer
 
 logger = logging.getLogger(__name__)
 
 
-class DistillerLitModule(pl.LightningModule):
+class DistillerLitModule(LightningModule):
     """
     Knowledge distillation loops for training and evaluation. This module is independent of
     the model definition. This class inherits from the Pytorch Lightning's LightningModule:
@@ -363,7 +363,7 @@ class DistillerLitModule(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         """
-        Per training step. This function is registered by pl.LightningModule.
+        Per training step. This function is registered by LightningModule.
         Refer to https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html#training-loop
 
         Parameters
@@ -386,7 +386,7 @@ class DistillerLitModule(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         """
-        Per validation step. This function is registered by pl.LightningModule.
+        Per validation step. This function is registered by LightningModule.
         Refer to https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html#validation
 
         Parameters
@@ -418,7 +418,7 @@ class DistillerLitModule(pl.LightningModule):
 
     def configure_optimizers(self):
         """
-        Configure optimizer. This function is registered by pl.LightningModule.
+        Configure optimizer. This function is registered by LightningModule.
         Refer to https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html#configure-optimizers
         Returns
         -------

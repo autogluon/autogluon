@@ -4,12 +4,11 @@ import re
 import shutil
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-import pytorch_lightning as pl
 import torch
-from pytorch_lightning.strategies import DeepSpeedStrategy
-from pytorch_lightning.utilities.rank_zero import rank_zero_warn
+from lightning.pytorch import LightningModule, Trainer, callbacks, plugins
+from lightning.pytorch.strategies import DeepSpeedStrategy
+from lightning.pytorch.utilities.rank_zero import rank_zero_warn
 
-from ..constants import AUTOMM, DEEPSPEED_STRATEGY
 from .cloud_io import _atomic_save
 from .cloud_io import _load as pl_load
 from .cloud_io import get_filesystem
@@ -38,7 +37,7 @@ def average_checkpoints(
         avg_counts = {}
         for per_path in checkpoint_paths:
             if os.path.isdir(per_path + "-dir"):  # deepspeed save checkpoints into a directory
-                from pytorch_lightning.utilities.deepspeed import convert_zero_checkpoint_to_fp32_state_dict
+                from lightning.pytorch.utilities.deepspeed import convert_zero_checkpoint_to_fp32_state_dict
 
                 convert_zero_checkpoint_to_fp32_state_dict(per_path + "-dir", per_path)
                 shutil.rmtree(per_path + "-dir")
@@ -67,10 +66,10 @@ def average_checkpoints(
     return avg_state_dict
 
 
-class AutoMMModelCheckpointIO(pl.plugins.CheckpointIO):
+class AutoMMModelCheckpointIO(plugins.CheckpointIO):
     """
     Class that customizes how checkpoints are saved. Saves either the entire model or only parameters that have been explicitly updated during training. The latter reduces memory footprint substantially when training very large models with parameter-efficient finetuning methods.
-    Class is based on pl.plugins.TorchCheckpointIO.
+    Class is based on plugins.TorchCheckpointIO.
 
     """
 
@@ -130,7 +129,7 @@ class AutoMMModelCheckpointIO(pl.plugins.CheckpointIO):
         except AttributeError as err:
             # todo (sean): is this try catch necessary still?
             # https://github.com/Lightning-AI/lightning/pull/431
-            key = pl.LightningModule.CHECKPOINT_HYPER_PARAMS_KEY
+            key = LightningModule.CHECKPOINT_HYPER_PARAMS_KEY
             checkpoint.pop(key, None)
             rank_zero_warn(f"Warning, `{key}` dropped from checkpoint. An attribute is not picklable: {err}")
             _atomic_save(checkpoint, path)
@@ -168,9 +167,9 @@ class AutoMMModelCheckpointIO(pl.plugins.CheckpointIO):
             logger.debug(f"Removed checkpoint: {path}")
 
 
-class AutoMMModelCheckpoint(pl.callbacks.ModelCheckpoint):
+class AutoMMModelCheckpoint(callbacks.ModelCheckpoint):
     """
-    Class that inherits pl.callbacks.ModelCheckpoint. The purpose is to resolve the potential issues in lightning.
+    Class that inherits callbacks.ModelCheckpoint. The purpose is to resolve the potential issues in lightning.
 
     - Issue1:
 
@@ -193,7 +192,7 @@ class AutoMMModelCheckpoint(pl.callbacks.ModelCheckpoint):
     def _update_best_and_save(
         self,
         current: torch.Tensor,
-        trainer: "pl.Trainer",
+        trainer: "Trainer",
         monitor_candidates: Dict[str, torch.Tensor],
     ) -> None:
 

@@ -1,4 +1,4 @@
-# Slightly adapted file of pytorch_lightning.strategies.deepspeed to not init deepspeed using pytorch-lightning's deepspeed inference workaround as this has higher memory requirements and can result in OOM during inference. Instead fallback to initialization using `deepspeed.initialize`.
+# Slightly adapted file of lightning.pytorch.strategies.deepspeed to not init deepspeed using pytorch-lightning's deepspeed inference workaround as this has higher memory requirements and can result in OOM during inference. Instead fallback to initialization using `deepspeed.initialize`.
 # TODO: Support deepspeed_inference, custom kernels, and quantization for fast inference.
 
 # Copyright The PyTorch Lightning team.
@@ -17,18 +17,18 @@
 import logging
 from typing import Any, Dict, Generator, List, Mapping, Optional, Tuple, Union, cast
 
-import pytorch_lightning as pl
 import torch
-from pytorch_lightning.accelerators.cuda import CUDAAccelerator
-from pytorch_lightning.overrides.base import _LightningModuleWrapperBase, _LightningPrecisionModuleWrapperBase
-from pytorch_lightning.plugins.environments.cluster_environment import ClusterEnvironment
-from pytorch_lightning.plugins.precision import PrecisionPlugin
-from pytorch_lightning.strategies import DeepSpeedStrategy
-from pytorch_lightning.utilities import GradClipAlgorithmType
-from pytorch_lightning.utilities.exceptions import MisconfigurationException
-from pytorch_lightning.utilities.model_helpers import is_overridden
-from pytorch_lightning.utilities.rank_zero import rank_zero_warn
-from pytorch_lightning.utilities.types import _PATH
+from lightning.pytorch import LightningModule, accelerators
+from lightning.pytorch.accelerators.cuda import CUDAAccelerator
+from lightning.pytorch.overrides.base import _LightningModuleWrapperBase, _LightningPrecisionModuleWrapperBase
+from lightning.pytorch.plugins.environments.cluster_environment import ClusterEnvironment
+from lightning.pytorch.plugins.precision import PrecisionPlugin
+from lightning.pytorch.strategies import DeepSpeedStrategy
+from lightning.pytorch.utilities import GradClipAlgorithmType
+from lightning.pytorch.utilities.exceptions import MisconfigurationException
+from lightning.pytorch.utilities.model_helpers import is_overridden
+from lightning.pytorch.utilities.rank_zero import rank_zero_warn
+from lightning.pytorch.utilities.types import _PATH
 
 
 class CustomDeepSpeedStrategy(DeepSpeedStrategy):
@@ -46,7 +46,7 @@ class CustomDeepSpeedStrategy(DeepSpeedStrategy):
 
     def __init__(
         self,
-        accelerator: Optional["pl.accelerators.accelerator.Accelerator"] = None,
+        accelerator: Optional["accelerators.accelerator.Accelerator"] = None,
         zero_optimization: bool = True,
         stage: int = 2,
         remote_device: str = "cpu",
@@ -296,7 +296,7 @@ class CustomDeepSpeedStrategy(DeepSpeedStrategy):
     def init_deepspeed(self) -> None:
         assert self.lightning_module is not None
         # deepspeed handles gradient clipping internally
-        if is_overridden("configure_gradient_clipping", self.lightning_module, pl.LightningModule):
+        if is_overridden("configure_gradient_clipping", self.lightning_module, LightningModule):
             rank_zero_warn(
                 "Since DeepSpeed handles gradient clipping internally, the default"
                 " `LightningModule.configure_gradient_clipping` implementation will not actually clip gradients."
@@ -320,7 +320,7 @@ class CustomDeepSpeedStrategy(DeepSpeedStrategy):
                 "DeepSpeed currently does not support different `accumulate_grad_batches` at different epochs."
             )
 
-        assert isinstance(self.model, (pl.LightningModule, _LightningPrecisionModuleWrapperBase))
+        assert isinstance(self.model, (LightningModule, _LightningPrecisionModuleWrapperBase))
         model = _LightningModuleWrapperBase(pl_module=self.model)
 
         self._initialize_deepspeed_train(model)

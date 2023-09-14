@@ -29,7 +29,7 @@ from autogluon.timeseries.utils.warning_filters import disable_root_logger, torc
 
 logger = logging.getLogger(__name__)
 gts_logger = logging.getLogger(gluonts.__name__)
-pl_loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict if "pytorch_lightning" in name]
+pl_loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict if "lightning.pytorch" in name]
 
 
 GLUONTS_SUPPORTED_OFFSETS = ["Y", "Q", "M", "W", "D", "B", "H", "T", "min", "S"]
@@ -371,7 +371,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
     def _get_callbacks(self, time_limit: int, *args, **kwargs) -> List[Callable]:
         """Retrieve a list of callback objects for the GluonTS trainer"""
-        from pytorch_lightning.callbacks import Timer
+        from lightning.pytorch.callbacks import Timer
 
         return [Timer(timedelta(seconds=time_limit))] if time_limit is not None else []
 
