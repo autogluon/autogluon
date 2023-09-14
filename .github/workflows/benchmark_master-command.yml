@@ -1,5 +1,7 @@
 name: Benchmark Master (Only Generate AMLB User Dir & Run Benchmark)
 on:
+  push:
+    branches: ["master"]
   schedule:
     - cron: '0 0 * * 0'
 
