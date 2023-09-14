@@ -16,8 +16,8 @@ logger = logging.getLogger(__name__)
 class NerLitModule(LitModule):
     """
     Control the loops for training, evaluation, and prediction of Named Entity Recognition. This module is independent of
-    the model definition. This class inherits from the Pytorch Lightning's LightningModule:
-    https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html
+    the model definition. This class inherits from Lightning's LightningModule:
+    https://lightning.ai/docs/pytorch/stable/common/lightning_module.html
     """
 
     def __init__(
@@ -158,7 +158,7 @@ class NerLitModule(LitModule):
     def validation_step(self, batch, batch_idx):
         """
         Per validation step. This function is registered by LightningModule.
-        Refer to https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html#validation
+        Refer to https://lightning.ai/docs/pytorch/stable/common/lightning_module.html#validation
 
         Parameters
         ----------

@@ -16,7 +16,7 @@ class BaseDataModule(LightningDataModule):
     validation, testing, and prediction. We organize the multimodal data using pd.DataFrame.
     For some modalities, e.g, image, that cost much memory, we only store their disk path to do lazy loading.
     This class inherits from the Pytorch Lightning's LightningDataModule:
-    https://pytorch-lightning.readthedocs.io/en/latest/extensions/datamodules.html
+    https://lightning.ai/docs/pytorch/stable/data/datamodule.html
     """
 
     def __init__(
@@ -111,7 +111,7 @@ class BaseDataModule(LightningDataModule):
         """
         Set up datasets for different stages: "fit" (training and validation), "test", and "predict".
         This method is registered by Pytorch Lightning's LightningDataModule.
-        Refer to: https://pytorch-lightning.readthedocs.io/en/latest/extensions/datamodules.html#setup
+        Refer to: https://lightning.ai/docs/pytorch/stable/data/datamodule.html#setup
 
         Parameters
         ----------
@@ -137,7 +137,7 @@ class BaseDataModule(LightningDataModule):
         """
         Create the dataloader for training.
         This method is registered by Pytorch Lightning's LightningDataModule.
-        Refer to: https://pytorch-lightning.readthedocs.io/en/latest/extensions/datamodules.html#train-dataloader
+        Refer to: https://lightning.ai/docs/pytorch/stable/data/datamodule.html#train-dataloader
 
         Returns
         -------
@@ -162,7 +162,7 @@ class BaseDataModule(LightningDataModule):
         """
         Create the dataloader for validation.
         This method is registered by Pytorch Lightning's LightningDataModule.
-        Refer to: https://pytorch-lightning.readthedocs.io/en/latest/extensions/datamodules.html#val-dataloader
+        Refer to: https://lightning.ai/docs/pytorch/stable/data/datamodule.html#val-dataloader
 
         Returns
         -------
@@ -186,7 +186,7 @@ class BaseDataModule(LightningDataModule):
         """
         Create the dataloader for test.
         This method is registered by Pytorch Lightning's LightningDataModule.
-        Refer to: https://pytorch-lightning.readthedocs.io/en/latest/extensions/datamodules.html#test-dataloader
+        Refer to: https://lightning.ai/docs/pytorch/stable/data/datamodule.html#test-dataloader
 
         Returns
         -------
@@ -210,7 +210,7 @@ class BaseDataModule(LightningDataModule):
         """
         Create the dataloader for prediction.
         This method is registered by Pytorch Lightning's LightningDataModule.
-        Refer to: https://pytorch-lightning.readthedocs.io/en/latest/extensions/datamodules.html#predict-dataloader
+        Refer to: https://lightning.ai/docs/pytorch/stable/data/datamodule.html#predict-dataloader
 
         Returns
         -------

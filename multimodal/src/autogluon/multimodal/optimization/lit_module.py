@@ -23,7 +23,7 @@ class LitModule(LightningModule):
     """
     Control the loops for training, evaluation, and prediction. This module is independent of
     the model definition. This class inherits from the Pytorch Lightning's LightningModule:
-    https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html
+    https://lightning.ai/docs/pytorch/stable/common/lightning_module.html
     """
 
     def __init__(
@@ -224,7 +224,7 @@ class LitModule(LightningModule):
     def training_step(self, batch, batch_idx):
         """
         Per training step. This function is registered by LightningModule.
-        Refer to https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html#training-loop
+        Refer to https://lightning.ai/docs/pytorch/stable/common/lightning_module.html#training-loop
 
         Parameters
         ----------
@@ -259,7 +259,7 @@ class LitModule(LightningModule):
     def validation_step(self, batch, batch_idx):
         """
         Per validation step. This function is registered by LightningModule.
-        Refer to https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html#validation
+        Refer to https://lightning.ai/docs/pytorch/stable/common/lightning_module.html#validation-loop
 
         Parameters
         ----------
@@ -293,7 +293,7 @@ class LitModule(LightningModule):
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
         """
         Per prediction step. This function is registered by LightningModule.
-        Refer to https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html#prediction-loop
+        Refer to https://lightning.ai/docs/pytorch/stable/common/lightning_module.html#prediction-loop
 
         Parameters
         ----------
@@ -319,7 +319,7 @@ class LitModule(LightningModule):
     def configure_optimizers(self):
         """
         Configure optimizer. This function is registered by LightningModule.
-        Refer to https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html#configure-optimizers
+        Refer to https://lightning.ai/docs/pytorch/stable/common/lightning_module.html#configure-optimizers
         Returns
         -------
         [optimizer]

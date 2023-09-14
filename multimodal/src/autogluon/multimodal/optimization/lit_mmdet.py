@@ -180,7 +180,7 @@ class MMDetLitModule(LightningModule):
     def configure_optimizers(self):
         """
         Configure optimizer. This function is registered by LightningModule.
-        Refer to https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html#configure-optimizers
+        Refer to https://lightning.ai/docs/pytorch/stable/common/lightning_module.html#configure-optimizers
         Returns
         -------
         [optimizer]

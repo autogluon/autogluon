@@ -173,7 +173,7 @@ class AutoMMModelCheckpoint(callbacks.ModelCheckpoint):
 
     - Issue1:
 
-    It solves the issue described in https://github.com/PyTorchLightning/pytorch-lightning/issues/5582.
+    It solves the issue described in https://github.com/Lightning-AI/lightning/issues/5582.
     For ddp_spawn, the checkpoint_callback.best_k_models will be empty.
     Here, we resolve it by storing the best_models to "SAVE_DIR/best_k_models.yaml".
 
