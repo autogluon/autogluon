@@ -33,9 +33,9 @@ jobs:
         uses: peter-evans/slash-command-dispatch@v2.3.0
         with:
           token: ${{ secrets.PAT }}
+          permission: write
           commands: |
             benchmark
-            benchmark_master
             platform_tests
           dispatch-type: workflow
           static-args: |
