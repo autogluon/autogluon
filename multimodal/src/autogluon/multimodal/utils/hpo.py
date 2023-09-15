@@ -11,17 +11,22 @@ from ..constants import BEST_K_MODELS_FILE, RAY_TUNE_CHECKPOINT
 from .matcher import create_siamese_model
 from .model import create_fusion_model
 
-try:
-    from ray.tune.integration.pytorch_lightning import TuneReportCheckpointCallback
-except:
-    TuneReportCheckpointCallback = None
-
 logger = logging.getLogger(__name__)
 
 
-class _TuneReportCheckpointCallback(TuneReportCheckpointCallback, pl.Callback):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+def get_ray_tune_ckpt_callback():
+    """
+    This is a workaround for the issue caused by the mixed use of old and new lightning's import style.
+    https://github.com/optuna/optuna/issues/4689
+    We can remove this function after ray adopts the new lightning import style.
+    """
+    from ray.tune.integration.pytorch_lightning import TuneReportCheckpointCallback
+
+    class _TuneReportCheckpointCallback(TuneReportCheckpointCallback, pl.Callback):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+
+    return _TuneReportCheckpointCallback
 
 
 def hpo_trial(sampled_hyperparameters, predictor, checkpoint_dir=None, **_fit_args):

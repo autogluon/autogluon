@@ -1414,9 +1414,10 @@ class MultiModalPredictor(ExportMixin):
         ]
 
         if hpo_mode:
-            from .utils.hpo import _TuneReportCheckpointCallback
+            from .utils.hpo import get_ray_tune_ckpt_callback
 
-            tune_report_callback = _TuneReportCheckpointCallback(
+            TuneReportCheckpointCallback = get_ray_tune_ckpt_callback()
+            tune_report_callback = TuneReportCheckpointCallback(
                 {f"{task.validation_metric_name}": f"{task.validation_metric_name}"},
                 filename=RAY_TUNE_CHECKPOINT,
             )
