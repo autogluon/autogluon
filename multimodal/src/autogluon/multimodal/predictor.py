@@ -174,6 +174,8 @@ from .utils import (
     upgrade_config,
 )
 
+pl_logger = logging.getLogger("lightning")
+pl_logger.propagate = False  # https://github.com/Lightning-AI/lightning/issues/4621
 logger = logging.getLogger(__name__)
 
 

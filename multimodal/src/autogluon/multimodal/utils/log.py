@@ -132,11 +132,13 @@ def apply_log_filter(log_filter):
     """
     try:
         add_log_filter(logging.getLogger(), log_filter)
+        add_log_filter(logging.getLogger("lightning"), log_filter)
         add_log_filter(logging.getLogger("lightning.pytorch"), log_filter)
         yield
 
     finally:
         remove_log_filter(logging.getLogger(), log_filter)
+        remove_log_filter(logging.getLogger("lightning"), log_filter)
         remove_log_filter(logging.getLogger("lightning.pytorch"), log_filter)
 
 
