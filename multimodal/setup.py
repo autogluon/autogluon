@@ -28,7 +28,7 @@ install_requires = [
     "tqdm",  # version range defined in `core/_setup_utils.py`
     "boto3",  # version range defined in `core/_setup_utils.py`
     "torch",  # version range defined in `core/_setup_utils.py`
-    "pytorch-lightning",  # version range defined in `core/_setup_utils.py`
+    "lightning",  # version range defined in `core/_setup_utils.py`
     "requests>=2.21,<3",
     "jsonschema>=4.14,<4.18",
     "seqeval>=1.2.2,<1.3.0",
