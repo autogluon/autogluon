@@ -6,7 +6,7 @@ import warnings
 from typing import Dict, List, Optional, Tuple, Union
 
 import torch
-from pytorch_lightning.accelerators import find_usable_cuda_devices
+from lightning.pytorch.accelerators import find_usable_cuda_devices
 from torch import nn
 
 from autogluon.common.utils.resource_utils import ResourceManager

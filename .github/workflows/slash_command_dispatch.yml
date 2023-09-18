@@ -33,6 +33,7 @@ jobs:
         uses: peter-evans/slash-command-dispatch@v2.3.0
         with:
           token: ${{ secrets.PAT }}
+          permission: write
           commands: |
             benchmark
             platform_tests

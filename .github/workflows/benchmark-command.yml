@@ -1,4 +1,5 @@
-name: Benchmark
+# Workflow to trigger benchmarking, cleaning, aggregation of the PR and evaluating w.r.t master branch, results on dashboard
+name: Benchmark Pull Request
 on:
   workflow_dispatch:
     inputs:
@@ -67,9 +68,31 @@ jobs:
             [Benchmark Output][1]
 
             [1]: ${{ steps.vars.outputs.run-url }}
+  
+  generate_amlb_user_dir:
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Setup Env Vars
+        uses: ./.github/actions/setup-env-vars
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmarkConfig
+          role-duration-seconds: 3600
+          aws-region: us-east-1
+      - name: Extract branch name
+        shell: bash
+        run: echo "branch=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> $GITHUB_OUTPUT
+        id: extract_branch
+      - name: Generate AMLB User Dir
+        run: |
+          /bin/bash CI/bench/generate_amlb_user_dir.sh ${{ github.repository }} ${{ steps.extract_branch.outputs.branch }} ${{ github.sha }}
 
   benchmark:
-    needs: setup
+    needs: generate_amlb_user_dir
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -108,12 +131,16 @@ jobs:
           role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
           role-duration-seconds: 14400
           aws-region: us-east-1
+      - name: Extract branch name
+        shell: bash
+        run: echo "branch=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> $GITHUB_OUTPUT
+        id: extract_branch
       - name: Run benchmark
         shell: bash -l {0}
         run: |
           nvm install 20
           npm install -g aws-cdk
-          /bin/bash ./.github/workflow_scripts/run_benchmark.sh ${{ github.event.inputs.module }} ${{ github.event.inputs.preset }} ${{ github.event.inputs.benchmark }} ${{ github.event.inputs.time_limit }} ${{ github.event.inputs.branch_or_pr_number }} ${{ github.event.inputs.pr-sha }}
+          /bin/bash ./.github/workflow_scripts/run_benchmark.sh ${{ github.event.inputs.module }} ${{ github.event.inputs.preset }} ${{ github.event.inputs.benchmark }} ${{ github.event.inputs.time_limit }} ${{ steps.extract_branch.outputs.branch }} ${{ github.sha }}
       - name: Upload website.txt
         uses: actions/upload-artifact@v3
         with:
@@ -143,4 +170,4 @@ jobs:
           repository: ${{ github.event.inputs.repository }}
           comment-id: ${{ github.event.inputs.comment-id }}
           body: ${{ steps.website.outputs.body }}
-      
+

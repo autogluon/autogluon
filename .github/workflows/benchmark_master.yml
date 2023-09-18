@@ -1,0 +1,77 @@
+# Workflow to trigger/schedule benchmarking, cleaning, aggregating on master branch only and storing results in S3
+name: Benchmark Master Branch
+on:
+  push:
+    branches: ["master"]
+  schedule:
+    - cron: '00 09 * * SUN' #  UTC 9:00(2:00 PST Time) every Sunday
+
+env:
+  AG_MODULE: tabular
+  AG_PRESET: medium
+  AG_BENCHMARK: test
+  AG_TIME_LIMIT: 1h
+  AG_BRANCH_NAME: master
+  
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  generate_amlb_user_dir:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Setup Env Vars
+        uses: ./.github/actions/setup-env-vars
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmarkConfig
+          role-duration-seconds: 3600
+          aws-region: us-east-1
+      - name: Generate AMLB User Dir
+        run: |
+          /bin/bash CI/bench/generate_amlb_user_dir.sh ${{ github.repository }} ${{ github.ref }} ${{ github.sha }}
+      
+  benchmark:
+    needs: generate_amlb_user_dir
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Free Disk Space (Ubuntu)
+        # uses: jlumbroso/free-disk-space@v1.2.0
+        uses: hirnidrin/free-disk-space@main  # revert back once fix in https://github.com/jlumbroso/free-disk-space/pull/11
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+      - name: Checkout repository for PR
+        uses: actions/checkout@v2
+      - name: Setup Python
+        uses: actions/setup-python@v1
+        with:
+          python-version: '3.9'
+      - name: Setup npm
+        uses: actions/setup-node@v3
+        with:
+          node-version: 'latest'
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
+          role-duration-seconds: 14400
+          aws-region: us-east-1
+      - name: Run benchmark
+        shell: bash -l {0}
+        run: |
+          nvm install 20
+          npm install -g aws-cdk
+          /bin/bash ./.github/workflow_scripts/run_benchmark.sh ${{ env.AG_MODULE }} ${{ env.AG_PRESET }} ${{ env.AG_BENCHMARK }} ${{ env.AG_TIME_LIMIT }} ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}

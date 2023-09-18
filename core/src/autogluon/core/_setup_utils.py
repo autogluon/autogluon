@@ -26,8 +26,8 @@ DEPENDENT_PACKAGES = {
     "networkx": ">=3.0,<4",  # Major version cap
     "tqdm": ">=4.38,<5",  # Major version cap
     "Pillow": ">=9.3,<9.6",  # "<{N+2}" upper cap
-    "torch": ">=1.13,<2.1",  # "<{N+1}" upper cap
-    "pytorch-lightning": ">=2.0.0,<2.1",  # "<{N+1}" upper cap
+    "torch": ">=2.0,<2.1",  # "<{N+1}" upper cap
+    "lightning": ">=2.0.0,<2.1",  # "<{N+1}" upper cap
 }
 if LITE_MODE:
     DEPENDENT_PACKAGES = {package: version for package, version in DEPENDENT_PACKAGES.items() if package not in ["psutil", "Pillow", "timm"]}

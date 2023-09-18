@@ -11,9 +11,9 @@ import warnings
 from datetime import timedelta
 from typing import Callable, Dict, List, Optional, Union
 
+import lightning.pytorch as pl
 import numpy as np
 import pandas as pd
-import pytorch_lightning as pl
 import torch
 import yaml
 from omegaconf import DictConfig, OmegaConf
@@ -892,8 +892,9 @@ class MultiModalMatcher:
         ]
 
         if hpo_mode:
-            from ray.tune.integration.pytorch_lightning import TuneReportCheckpointCallback
+            from .utils.hpo import get_ray_tune_ckpt_callback
 
+            TuneReportCheckpointCallback = get_ray_tune_ckpt_callback()
             tune_report_callback = TuneReportCheckpointCallback(
                 {f"{task.validation_metric_name}": f"{task.validation_metric_name}"},
                 filename=RAY_TUNE_CHECKPOINT,

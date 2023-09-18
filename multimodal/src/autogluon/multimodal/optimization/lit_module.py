@@ -1,17 +1,17 @@
 import logging
 from typing import Callable, Dict, List, Optional, Union
 
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 import torch
 import torch.nn.functional as F
 import torchmetrics
-from pytorch_lightning.strategies import DeepSpeedStrategy
-from pytorch_lightning.utilities import grad_norm
+from lightning.pytorch.strategies import DeepSpeedStrategy
+from lightning.pytorch.utilities import grad_norm
 from torch import nn
 from torch.nn.modules.loss import _Loss
 from torchmetrics.aggregation import BaseAggregator
 
-from ..constants import AUTOMM, LM_TARGET, LOGITS, T_FEW, TEMPLATE_LOGITS, WEIGHT
+from ..constants import LM_TARGET, LOGITS, T_FEW, TEMPLATE_LOGITS, WEIGHT
 from ..data.mixup import MixupModule, multimodel_mixup
 from ..models.utils import run_model
 from .utils import apply_layerwise_lr_decay, apply_single_lr, apply_two_stages_lr, get_lr_scheduler, get_optimizer
@@ -23,7 +23,7 @@ class LitModule(pl.LightningModule):
     """
     Control the loops for training, evaluation, and prediction. This module is independent of
     the model definition. This class inherits from the Pytorch Lightning's LightningModule:
-    https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html
+    https://lightning.ai/docs/pytorch/stable/common/lightning_module.html
     """
 
     def __init__(
@@ -223,8 +223,8 @@ class LitModule(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         """
-        Per training step. This function is registered by pl.LightningModule.
-        Refer to https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html#training-loop
+        Per training step. This function is registered by LightningModule.
+        Refer to https://lightning.ai/docs/pytorch/stable/common/lightning_module.html#training-loop
 
         Parameters
         ----------
@@ -258,8 +258,8 @@ class LitModule(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         """
-        Per validation step. This function is registered by pl.LightningModule.
-        Refer to https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html#validation
+        Per validation step. This function is registered by LightningModule.
+        Refer to https://lightning.ai/docs/pytorch/stable/common/lightning_module.html#validation-loop
 
         Parameters
         ----------
@@ -292,8 +292,8 @@ class LitModule(pl.LightningModule):
 
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
         """
-        Per prediction step. This function is registered by pl.LightningModule.
-        Refer to https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html#prediction-loop
+        Per prediction step. This function is registered by LightningModule.
+        Refer to https://lightning.ai/docs/pytorch/stable/common/lightning_module.html#prediction-loop
 
         Parameters
         ----------
@@ -318,8 +318,8 @@ class LitModule(pl.LightningModule):
 
     def configure_optimizers(self):
         """
-        Configure optimizer. This function is registered by pl.LightningModule.
-        Refer to https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html#configure-optimizers
+        Configure optimizer. This function is registered by LightningModule.
+        Refer to https://lightning.ai/docs/pytorch/stable/common/lightning_module.html#configure-optimizers
         Returns
         -------
         [optimizer]

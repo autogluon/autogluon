@@ -122,7 +122,7 @@ def remove_log_filter(target_logger, log_filter):
 def apply_log_filter(log_filter):
     """
     User contextmanager to control the scope of applying one log filter.
-    Currently, it is to filter some pytorch lightning's log messages.
+    Currently, it is to filter some lightning's log messages.
     But we can easily extend it to cover more loggers.
 
     Parameters
@@ -132,12 +132,14 @@ def apply_log_filter(log_filter):
     """
     try:
         add_log_filter(logging.getLogger(), log_filter)
-        add_log_filter(logging.getLogger("pytorch_lightning"), log_filter)
+        add_log_filter(logging.getLogger("lightning"), log_filter)
+        add_log_filter(logging.getLogger("lightning.pytorch"), log_filter)
         yield
 
     finally:
         remove_log_filter(logging.getLogger(), log_filter)
-        remove_log_filter(logging.getLogger("pytorch_lightning"), log_filter)
+        remove_log_filter(logging.getLogger("lightning"), log_filter)
+        remove_log_filter(logging.getLogger("lightning.pytorch"), log_filter)
 
 
 def get_fit_start_message(save_path, validation_metric_name):
