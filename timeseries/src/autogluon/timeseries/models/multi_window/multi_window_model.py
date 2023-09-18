@@ -2,12 +2,10 @@ import copy
 import inspect
 import logging
 import os
-import reprlib
 import time
-from typing import Dict, Iterator, Optional, Tuple, Type, Union
+from typing import Dict, Optional, Type, Union
 
 import numpy as np
-import pandas as pd
 
 import autogluon.core as ag
 from autogluon.common.utils.log_utils import set_logger_verbosity
@@ -33,7 +31,6 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         kwargs used to initialize model_base if model_base is a class.
     """
 
-    _most_recent_model_folder: str = "W0"
 
     def __init__(
         self,
@@ -58,6 +55,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         self.info_per_val_window = []
 
         self.most_recent_model: AbstractTimeSeriesModel = None
+        self.most_recent_model_folder: Optional[str] = None
         super().__init__(**kwargs)
 
     def _fit(
@@ -121,6 +119,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
 
         # Only the model trained on most recent data is saved & used for prediction
         self.most_recent_model = model
+        self.most_recent_model_folder = f"W{window_index}"
         self.predict_time = self.most_recent_model.predict_time
         self.fit_time = time.time() - global_fit_start_time - self.predict_time
         self._oof_predictions = oof_predictions_per_window
@@ -191,7 +190,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         cls, path: str, reset_paths: bool = True, load_oof: bool = False, verbose: bool = True
     ) -> AbstractTimeSeriesModel:
         model = super().load(path=path, reset_paths=reset_paths, load_oof=load_oof, verbose=verbose)
-        most_recent_model_path = os.path.join(model.path, cls._most_recent_model_folder)
+        most_recent_model_path = os.path.join(model.path, model.most_recent_model_folder)
         model.most_recent_model = model.model_base_type.load(
             most_recent_model_path,
             reset_paths=reset_paths,
