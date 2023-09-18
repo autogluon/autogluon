@@ -26,7 +26,6 @@ from . import (
     SimpleFeedForwardModel,
     TemporalFusionTransformerModel,
     ThetaModel,
-    ThetaStatsmodelsModel,
 )
 from .abstract import AbstractTimeSeriesModel
 from .multi_window.multi_window_model import MultiWindowBacktestingModel
@@ -55,7 +54,6 @@ MODEL_TYPES = dict(
     Theta=ThetaModel,
     ARIMA=ARIMAModel,
     ETS=ETSModel,
-    ThetaStatsmodels=ThetaStatsmodelsModel,
 )
 
 DEFAULT_MODEL_NAMES = {v: k for k, v in MODEL_TYPES.items()}
@@ -76,7 +74,6 @@ DEFAULT_MODEL_PRIORITY = dict(
     AutoARIMA=30,
     # Models below are not included in any presets
     ARIMA=30,
-    ThetaStatsmodels=90,
     SimpleFeedForward=30,
     DynamicOptimizedTheta=30,
 )
