@@ -163,6 +163,7 @@ class TimeSeriesPredictor:
                 logger.info(f"Frequency '{self.freq}' stored as '{std_freq}'")
             self.freq = std_freq
         if eval_metric == "mean_wQuantileLoss":
+            # We don't use warnings.warn since DeprecationWarning may be silenced by the Python warning filters
             logger.warning(
                 "DeprecationWarning: Evaluation metric 'mean_wQuantileLoss' has been renamed to 'WQL'. "
                 "Support for the old name will be removed in v1.1.",
