@@ -44,7 +44,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         Metric by which predictions will be ultimately evaluated on test data.
         This only impacts `model.score()`, as eval_metric is not used during training.
         Available metrics can be found in `autogluon.timeseries.utils.metric_utils.AVAILABLE_METRICS`, and
-        detailed documentation can be found in `gluonts.evaluation.Evaluator`. By default, `mean_wQuantileLoss`
+        detailed documentation can be found in `gluonts.evaluation.Evaluator`. By default, `WQL`
         will be used.
     eval_metric_seasonal_period : int, optional
         Seasonal period used to compute the mean absolute scaled error (MASE) evaluation metric. This parameter is only

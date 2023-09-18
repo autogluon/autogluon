@@ -58,7 +58,7 @@ def generate_train_and_test_data(
 @pytest.mark.parametrize("use_known_covariates", [True, False])
 @pytest.mark.parametrize("use_static_features_continuous", [True, False])
 @pytest.mark.parametrize("use_static_features_categorical", [True, False])
-@pytest.mark.parametrize("eval_metric", ["mean_wQuantileLoss", "MASE"])
+@pytest.mark.parametrize("eval_metric", ["WQL", "MASE"])
 def test_predictor_smoke_test(
     use_known_covariates,
     use_past_covariates,
