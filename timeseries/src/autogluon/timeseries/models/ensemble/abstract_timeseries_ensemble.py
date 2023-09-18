@@ -18,8 +18,8 @@ class AbstractTimeSeriesEnsembleModel(AbstractTimeSeriesModel):
 
     def fit_ensemble(
         self,
-        predictions: Dict[str, TimeSeriesDataFrame],
-        data: TimeSeriesDataFrame,
+        predictions_per_window: Dict[str, List[TimeSeriesDataFrame]],
+        data_per_window: List[TimeSeriesDataFrame],
         time_limit: Optional[int] = None,
         **kwargs,
     ):
@@ -27,11 +27,13 @@ class AbstractTimeSeriesEnsembleModel(AbstractTimeSeriesModel):
 
         Parameters
         ----------
-        predictions : Dict[str, TimeSeriesDataFrame]
-            Dictionary that maps the names of component models to their respective predictions as TimeSeriesDataFrames.
-        data : TimeSeriesDataFrame
-            Observed ground truth data used to train the ensemble. This includes both the forecast horizon (for which
-            the predictions are given in ``predictions``), as well as the "history".
+        predictions_per_window : Dict[str, List[TimeSeriesDataFrame]]
+            Dictionary that maps the names of component models to their respective predictions for each validation
+            window.
+        data_per_window : List[TimeSeriesDataFrame]
+            Observed ground truth data used to train the ensemble for each validation window. Each entry in the list
+            includes both the forecast horizon (for which the predictions are given in ``predictions``), as well as the
+            "history".
         time_limit : Optional[int]
             Maximum allowed time for training in seconds.
         """
@@ -40,17 +42,23 @@ class AbstractTimeSeriesEnsembleModel(AbstractTimeSeriesModel):
                 f"\tWarning: Model has no time left to train, skipping model... (Time Left = {round(time_limit, 1)}s)"
             )
             raise TimeLimitExceeded
+        if isinstance(data_per_window, TimeSeriesDataFrame):
+            raise ValueError("When fitting ensemble, `data` should contain ground truth for each validation window")
+        num_val_windows = len(data_per_window)
+        for model, preds in predictions_per_window.items():
+            if len(preds) != num_val_windows:
+                raise ValueError(f"For model {model} predictions are unavailable for some validation windows")
         self._fit_ensemble(
-            predictions=predictions,
-            data=data,
+            predictions_per_window=predictions_per_window,
+            data_per_window=data_per_window,
             time_limit=time_limit,
         )
         return self
 
     def _fit_ensemble(
         self,
-        predictions: Dict[str, TimeSeriesDataFrame],
-        data: TimeSeriesDataFrame,
+        predictions_per_window: Dict[str, List[TimeSeriesDataFrame]],
+        data_per_window: List[TimeSeriesDataFrame],
         time_limit: Optional[int] = None,
         **kwargs,
     ):

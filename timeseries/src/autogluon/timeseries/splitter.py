@@ -1,4 +1,5 @@
 import logging
+import reprlib
 from typing import Iterator, List, Optional, Tuple, Union
 
 import pandas as pd
@@ -229,19 +230,45 @@ class LastWindowSplitter(MultiWindowSplitter):
         )
 
 
-class Splitter:
-    def __init__(self, prediction_length: int, num_windows: int, step_size: Optional[int] = None):
+class AbstractWindowSplitter:
+    def __init__(self, prediction_length: int, num_windows: int):
         self.prediction_length = prediction_length
         self.num_windows = num_windows
+
+    @property
+    def required_ts_length(self) -> int:
+        raise NotImplementedError
+
+    def split(self, data: TimeSeriesDataFrame) -> Iterator[Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]]:
+        ts_lengths = data.num_timesteps_per_item()
+        short_series = ts_lengths.index[ts_lengths < self.required_ts_length]
+        if len(short_series) > 0:
+            raise ValueError(
+                f"Following time series are too short for chosen cross validation settings: {reprlib.repr(short_series.to_list())}"
+            )
+        yield from self._split(data)
+
+    def _split(self, data: TimeSeriesDataFrame) -> Iterator[Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]]:
+        raise NotImplementedError
+
+
+class ExpandingWindowSplitter(AbstractWindowSplitter):
+    def __init__(self, prediction_length: int, num_windows: int, step_size: Optional[int] = None):
+        super().__init__(prediction_length=prediction_length, num_windows=num_windows)
         if step_size is None:
             step_size = prediction_length
         self.step_size = step_size
 
-    def split(self, data: TimeSeriesDataFrame) -> Iterator[Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]]:
-        ts_lengths = data.num_timesteps_per_item()
-        required_length = self.prediction_length + (self.num_windows - 1) * self.step_size + 1
-        short_series = ts_lengths.index[ts_lengths < required_length]
-        if len(short_series) > 0:
-            raise ValueError(
-                f"Following time series are too short for given cross validation settings: {short_series.to_list()}"
-            )
+    @property
+    def required_ts_length(self) -> int:
+        return self.prediction_length + (self.num_windows - 1) * self.step_size + 1
+
+    def _split(self, data: TimeSeriesDataFrame) -> Iterator[Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]]:
+        for window_idx in range(1, self.num_windows + 1):
+            val_end = -(self.num_windows - window_idx) * self.step_size
+            train_end = val_end - self.prediction_length
+            if val_end == 0:
+                val_end = None
+            train = data.slice_by_timestep(None, train_end)
+            val = data.slice_by_timestep(None, val_end)
+            yield train, val

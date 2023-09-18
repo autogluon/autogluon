@@ -106,7 +106,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         self.freq: str = freq
         self.prediction_length: int = prediction_length
         self.quantile_levels = kwargs.get("quantile_levels", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
-        self._oof_predictions: Optional[TimeSeriesDataFrame] = None
+        self._oof_predictions: Optional[List[TimeSeriesDataFrame]] = None
 
     def __repr__(self) -> str:
         return self.name
@@ -135,7 +135,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         return model
 
     @classmethod
-    def load_oof_predictions(cls, path: str, verbose: bool = True) -> TimeSeriesDataFrame:
+    def load_oof_predictions(cls, path: str, verbose: bool = True) -> List[TimeSeriesDataFrame]:
         """Load the cached OOF predictions from disk."""
         return load_pkl.load(path=os.path.join(path, "utils", cls._oof_filename), verbose=verbose)
 
@@ -368,11 +368,12 @@ class AbstractTimeSeriesModel(AbstractModel):
             prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates_real
         )
         predict_start_time = time.time()
-        self._oof_predictions = self.predict(past_data, known_covariates=known_covariates)
+        oof_predictions = self.predict(past_data, known_covariates=known_covariates)
+        self._oof_predictions = [oof_predictions]
         if store_predict_time:
             self.predict_time = time.time() - predict_start_time
         if store_val_score:
-            self.val_score = self._score_with_predictions(val_data, self._oof_predictions)
+            self.val_score = self._score_with_predictions(val_data, oof_predictions)
 
     def _get_hpo_train_fn_kwargs(self, **train_fn_kwargs) -> dict:
         """Update kwargs passed to model_trial depending on the model configuration.
@@ -409,7 +410,8 @@ class AbstractTimeSeriesModel(AbstractModel):
         save_pkl.save(path=val_path, object=val_data)
 
         fit_kwargs = dict(
-            num_val_windows=kwargs.get("num_val_windows", 1),
+            val_splitter=kwargs.get("val_splitter"),
+            refit_every_n_windows=kwargs.get("refit_every_n_windows", 1),
         )
         train_fn_kwargs = self._get_hpo_train_fn_kwargs(
             model_cls=self.__class__,

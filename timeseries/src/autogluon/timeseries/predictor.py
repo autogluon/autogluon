@@ -314,14 +314,15 @@ class TimeSeriesPredictor:
         self,
         train_data: TimeSeriesDataFrame,
         num_val_windows: int,
+        val_step_size: int,
     ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
         """Remove time series from train_data that are too short for chosen prediction_length and num_val_windows.
 
         This method ensures that for each validation window, train series have length at least prediction_length + 1.
 
-        If all time series in train_data have length <= (num_val_windows + 1) * prediction_length, an error is raised.
+        If all time series in train_data have length <= prediction_length + num_val_windows * val_step_size, an error is raised.
         """
-        min_train_length = (num_val_windows + 1) * self.prediction_length
+        min_train_length = self.prediction_length + num_val_windows * val_step_size
         train_lengths = train_data.num_timesteps_per_item()
         train_items_to_drop = train_lengths.index[train_lengths <= min_train_length]
         if len(train_items_to_drop) > 0:
@@ -355,6 +356,8 @@ class TimeSeriesPredictor:
         hyperparameter_tune_kwargs: Optional[Union[str, Dict]] = None,
         excluded_model_types: Optional[List[str]] = None,
         num_val_windows: int = 1,
+        refit_every_n_windows: int = 1,
+        val_step_size: Optional[int] = None,
         refit_full: bool = False,
         enable_ensemble: bool = True,
         random_seed: Optional[int] = None,
@@ -602,7 +605,12 @@ class TimeSeriesPredictor:
         if num_val_windows == 0 and tuning_data is None:
             raise ValueError("Please set num_val_windows >= 1 or provide custom tuning_data")
 
-        train_data = self._filter_short_series(train_data, num_val_windows=num_val_windows)
+        if val_step_size is None:
+            val_step_size = self.prediction_length
+
+        train_data = self._filter_short_series(
+            train_data, num_val_windows=num_val_windows, val_step_size=val_step_size
+        )
 
         logger.info("=====================================================\n")
 
