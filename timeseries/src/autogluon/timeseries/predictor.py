@@ -527,10 +527,11 @@ class TimeSeriesPredictor:
             Increasing this parameter increases the training time roughly by a factor of ``num_val_windows // refit_every_n_windows``.
             See :attr:`refit_every_n_windows` and :attr:`val_step_size`: for details.
         refit_every_n_windows: int, default = 1
-            When performing cross validation, each models will be retrained every ``refit_every_n_windows`` validation
+            When performing cross validation, each model will be retrained every ``refit_every_n_windows`` validation
             windows.
         val_step_size : int, optional
-            For each . Defaults to ``prediction_length`` provided when creating the predictor.
+            Step size between consecutive validation windows. Defaults to ``prediction_length`` provided when creating
+            the predictor.
         refit_full : bool, default = False
             If True, after training is complete, AutoGluon will attempt to re-train all models using all of training
             data (including the data initially reserved for validation). This argument has no effect if ``tuning_data``
@@ -780,6 +781,11 @@ class TimeSeriesPredictor:
         Returns
         -------
         predictor : TimeSeriesPredictor
+
+        Examples
+        --------
+        >>> predictor = TimeSeriesPredictor.load(path_to_predictor)
+
         """
         if not path:
             raise ValueError("`path` cannot be None or empty in load().")

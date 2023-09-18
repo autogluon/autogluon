@@ -2,8 +2,9 @@ import copy
 import inspect
 import logging
 import os
+import reprlib
 import time
-from typing import Dict, Optional, Type, Union
+from typing import Dict, Iterator, Optional, Tuple, Type, Union
 
 import numpy as np
 import pandas as pd
@@ -14,6 +15,32 @@ from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 
 logger = logging.getLogger(__name__)
+
+
+class TimeSeriesSplitter:
+    def __init__(self, prediction_length: int, num_windows: int, step_size: Optional[int] = None):
+        self.prediction_length = prediction_length
+        self.num_windows = num_windows
+        if step_size is None:
+            step_size = prediction_length
+        self.step_size = step_size
+
+    def split(self, data: TimeSeriesDataFrame) -> Iterator[Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]]:
+        ts_lengths = data.num_timesteps_per_item()
+        required_length = self.prediction_length + (self.num_windows - 1) * self.step_size + 1
+        short_series = ts_lengths.index[ts_lengths < required_length]
+        if len(short_series) > 0:
+            raise ValueError(
+                f"Following time series are too short for chosen cross validation settings: {reprlib.repr(short_series.to_list())}"
+            )
+        for window_idx in range(1, self.num_windows + 1):
+            val_end = -(self.num_windows - window_idx) * self.step_size
+            train_end = val_end - self.prediction_length
+            if val_end == 0:
+                val_end = None
+            train = data.slice_by_timestep(None, train_end)
+            val = data.slice_by_timestep(None, val_end)
+            yield train, val
 
 
 class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
@@ -66,6 +93,8 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         val_data: Optional[TimeSeriesDataFrame] = None,
         time_limit: Optional[int] = None,
         num_val_windows: int = 1,
+        val_step_size: Optional[int] = None,
+        refit_every_n_windows: int = 1,
         **kwargs,
     ):
         # TODO: use incremental training for GluonTS models?
@@ -80,29 +109,27 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
 
         trained_models = []
         global_fit_start_time = time.time()
-        for window_index in range(num_val_windows):
-            if window_index == 0:
-                end_index = None
-            else:
-                end_index = -self.prediction_length * window_index
-            train_fold, val_fold = train_data.train_test_split(
-                prediction_length=self.prediction_length,
-                end_index=end_index,
-                suffix=f"_W{window_index}",
-            )
-
+        splitter = TimeSeriesSplitter(
+            prediction_length=self.prediction_length,
+            num_windows=num_val_windows,
+            step_size=val_step_size,
+        )
+        for window_index, (train_fold, val_fold) in enumerate(splitter.split(train_data)):
             logger.debug(f"\tWindow {window_index}")
             model = self.get_child_model(window_index)
-            model_fit_start_time = time.time()
-            model.fit(
-                train_data=train_fold,
-                val_data=val_fold,
-                time_limit=None if time_limit is None else time_limit - (model_fit_start_time - global_fit_start_time),
-                **kwargs,
-            )
-            model.fit_time = time.time() - model_fit_start_time
-            model.score_and_cache_oof(val_fold, store_val_score=True, store_predict_time=True)
-            trained_models.append(model)
+            if window_index % refit_every_n_windows == 0:
+                model_fit_start_time = time.time()
+                model.fit(
+                    train_data=train_fold,
+                    val_data=val_fold,
+                    time_limit=None
+                    if time_limit is None
+                    else time_limit - (model_fit_start_time - global_fit_start_time),
+                    **kwargs,
+                )
+                model.fit_time = time.time() - model_fit_start_time
+                model.score_and_cache_oof(val_fold, store_val_score=True, store_predict_time=True)
+                trained_models.append(model)
 
             logger.debug(f"\t\t{model.val_score:<7.4f}".ljust(15) + f"= Validation score ({model.eval_metric})")
             logger.debug(f"\t\t{model.fit_time:<7.3f} s".ljust(15) + "= Training runtime")
