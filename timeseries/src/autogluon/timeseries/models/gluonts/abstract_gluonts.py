@@ -9,14 +9,12 @@ import gluonts
 import gluonts.core.settings
 import numpy as np
 import pandas as pd
-import torch
 from gluonts.core.component import from_hyperparameters
 from gluonts.dataset.common import Dataset as GluonTSDataset
 from gluonts.dataset.field_names import FieldName
+from gluonts.model.estimator import Estimator as GluonTSEstimator
 from gluonts.model.forecast import Forecast, QuantileForecast, SampleForecast
-from gluonts.torch.model.estimator import PyTorchLightningEstimator as GluonTSPyTorchLightningEstimator
-from gluonts.torch.model.forecast import DistributionForecast
-from gluonts.torch.model.predictor import PyTorchPredictor as GluonTSPyTorchPredictor
+from gluonts.model.predictor import Predictor as GluonTSPredictor
 from pandas.tseries.frequencies import to_offset
 
 from autogluon.common.loaders import load_pkl
@@ -27,9 +25,11 @@ from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 from autogluon.timeseries.utils.warning_filters import disable_root_logger, torch_warning_filter
 
+# NOTE: We avoid imports for torch and pytorch_lightning at the top level and hide them inside class methods.
+# This is done to skip these imports during multiprocessing (which may cause bugs)
+
 logger = logging.getLogger(__name__)
 gts_logger = logging.getLogger(gluonts.__name__)
-pl_loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict if "pytorch_lightning" in name]
 
 
 GLUONTS_SUPPORTED_OFFSETS = ["Y", "Q", "M", "W", "D", "B", "H", "T", "min", "S"]
@@ -133,7 +133,6 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         possible values.
     """
 
-    gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator]
     gluonts_model_path = "gluon_ts"
     # datatype of floating point and integers passed internally to GluonTS
     float_dtype: Type = np.float32
@@ -162,7 +161,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             hyperparameters=hyperparameters,
             **kwargs,
         )
-        self.gts_predictor: Optional[GluonTSPyTorchPredictor] = None
+        self.gts_predictor: Optional[GluonTSPredictor] = None
         self.callbacks = []
         self.num_feat_static_cat = 0
         self.num_feat_static_real = 0
@@ -189,11 +188,13 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
     @classmethod
     def load(cls, path: str, reset_paths: bool = True, verbose: bool = True) -> "AbstractGluonTSModel":
+        from gluonts.torch.model.predictor import PyTorchPredictor
+
         with torch_warning_filter():
             model = load_pkl.load(path=os.path.join(path, cls.model_file_name), verbose=verbose)
             if reset_paths:
                 model.set_contexts(path)
-            model.gts_predictor = GluonTSPyTorchPredictor.deserialize(Path(path) / cls.gluonts_model_path)
+            model.gts_predictor = PyTorchPredictor.deserialize(Path(path) / cls.gluonts_model_path)
         return model
 
     def _deferred_init_params_aux(self, **kwargs) -> None:
@@ -255,11 +256,15 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         init_kwargs.setdefault("max_epochs", init_kwargs.get("epochs"))
         return init_kwargs
 
-    def _get_estimator(self) -> GluonTSPyTorchLightningEstimator:
+    def _get_estimator_class(self) -> Type[GluonTSEstimator]:
+        raise NotImplementedError
+
+    def _get_estimator(self) -> GluonTSEstimator:
         """Return the GluonTS Estimator object for the model"""
         # As GluonTSPyTorchLightningEstimator objects do not implement `from_hyperparameters` convenience
         # constructors, we re-implement the logic here.
         # we translate the "epochs" parameter to "max_epochs" for consistency in the AbstractGluonTSModel interface
+        import torch
 
         init_args = self._get_estimator_init_args()
 
@@ -278,7 +283,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             trainer_kwargs["devices"] = 1
 
         return from_hyperparameters(
-            self.gluonts_estimator_class,
+            self._get_estimator_class(),
             trainer_kwargs=trainer_kwargs,
             **init_args,
         )
@@ -338,9 +343,14 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         time_limit: int = None,
         **kwargs,
     ) -> None:
+        # necessary to initialize the loggers
+        import pytorch_lightning  # noqa
+
         verbosity = kwargs.get("verbosity", 2)
-        for pl_logger in pl_loggers:
-            pl_logger.setLevel(logging.ERROR if verbosity <= 3 else logging.INFO)
+        for logger_name in logging.root.manager.loggerDict:
+            if "pytorch_lightning" in logger_name:
+                pl_logger = logging.getLogger(logger_name)
+                pl_logger.setLevel(logging.ERROR if verbosity <= 3 else logging.INFO)
         set_logger_verbosity(verbosity, logger=logger)
         gts_logger.setLevel(logging.ERROR if verbosity <= 3 else logging.INFO)
 
@@ -432,9 +442,9 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         return QuantileForecast(**forecast_init_args)
 
     @staticmethod
-    def _distribution_to_quantile_forecast(
-        forecast: DistributionForecast, quantile_levels: List[float]
-    ) -> QuantileForecast:
+    def _distribution_to_quantile_forecast(forecast: Forecast, quantile_levels: List[float]) -> QuantileForecast:
+        import torch
+
         # Compute all quantiles in parallel instead of a for-loop
         quantiles = torch.tensor(quantile_levels, device=forecast.distribution.mean.device).reshape(-1, 1)
         quantile_predictions = forecast.distribution.icdf(quantiles).cpu().detach().numpy()
@@ -455,6 +465,8 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         quantile_levels: List[float],
         forecast_index: pd.MultiIndex,
     ) -> TimeSeriesDataFrame:
+        from gluonts.torch.model.forecast import DistributionForecast
+
         # TODO: Concatenate all forecasts into a single tensor/object before converting?
         # Especially for DistributionForecast this could result in massive speedups
         if isinstance(forecasts[0], SampleForecast):
