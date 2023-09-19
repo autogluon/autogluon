@@ -79,8 +79,8 @@ def test_predictor_smoke_test(
         "TemporalFusionTransformer": DUMMY_MODEL_HPARAMS,
         "Theta": {},
         # Override default hyperparameters for faster training
-        "AutoARIMA": {"max_p": 2},
-        "AutoETS": {"model": "AAA"},
+        "AutoARIMA": {"max_p": 2, "use_fallback_model": False},
+        "AutoETS": {"model": "AAA", "use_fallback_model": False},
     }
 
     train_data, test_data = generate_train_and_test_data(
