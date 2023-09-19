@@ -1,9 +1,9 @@
 import logging
 from typing import Callable, Optional, Union
 
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 import torchmetrics
-from pytorch_lightning.utilities import grad_norm
+from lightning.pytorch.utilities import grad_norm
 from torch.nn.modules.loss import _Loss
 from torchmetrics.aggregation import BaseAggregator
 
@@ -179,8 +179,8 @@ class MMDetLitModule(pl.LightningModule):
 
     def configure_optimizers(self):
         """
-        Configure optimizer. This function is registered by pl.LightningModule.
-        Refer to https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html#configure-optimizers
+        Configure optimizer. This function is registered by LightningModule.
+        Refer to https://lightning.ai/docs/pytorch/stable/common/lightning_module.html#configure-optimizers
         Returns
         -------
         [optimizer]

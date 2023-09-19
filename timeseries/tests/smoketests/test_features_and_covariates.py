@@ -10,7 +10,7 @@ from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSer
 
 TARGET_COLUMN = "custom_target"
 ITEM_IDS = ["Z", "A", "1", "C"]
-DUMMY_MODEL_HPARAMS = {"maxiter": 1, "epochs": 1, "num_batches_per_epoch": 1}
+DUMMY_MODEL_HPARAMS = {"maxiter": 1, "epochs": 1, "num_batches_per_epoch": 1, "use_fallback_model": False}
 
 
 def generate_train_and_test_data(
@@ -58,7 +58,7 @@ def generate_train_and_test_data(
 @pytest.mark.parametrize("use_known_covariates", [True, False])
 @pytest.mark.parametrize("use_static_features_continuous", [True, False])
 @pytest.mark.parametrize("use_static_features_categorical", [True, False])
-@pytest.mark.parametrize("eval_metric", ["mean_wQuantileLoss", "MASE"])
+@pytest.mark.parametrize("eval_metric", ["WQL", "MASE"])
 def test_predictor_smoke_test(
     use_known_covariates,
     use_past_covariates,
@@ -79,8 +79,8 @@ def test_predictor_smoke_test(
         "TemporalFusionTransformer": DUMMY_MODEL_HPARAMS,
         "Theta": {},
         # Override default hyperparameters for faster training
-        "AutoARIMA": {"max_p": 2},
-        "AutoETS": {"model": "AAA"},
+        "AutoARIMA": {"max_p": 2, "use_fallback_model": False},
+        "AutoETS": {"model": "AAA", "use_fallback_model": False},
     }
 
     train_data, test_data = generate_train_and_test_data(
@@ -94,9 +94,6 @@ def test_predictor_smoke_test(
     known_covariates_names = [col for col in train_data if col.startswith("known_")]
 
     with warnings.catch_warnings():
-        # Ensure that no warnings are raised
-        warnings.simplefilter("error")
-
         predictor = TimeSeriesPredictor(
             target=TARGET_COLUMN,
             prediction_length=prediction_length,

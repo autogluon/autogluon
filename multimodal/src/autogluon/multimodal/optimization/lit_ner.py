@@ -1,18 +1,14 @@
 import logging
 from typing import Callable, Dict, List, Optional, Union
 
-import pytorch_lightning as pl
 import torch
-import torch.nn.functional as F
 import torchmetrics
 from torch import nn
 from torch.nn.modules.loss import _Loss
-from torchmetrics.aggregation import BaseAggregator
 
-from ..constants import AUTOMM, FUSION_NER, LM_TARGET, LOGITS, NER_TEXT, T_FEW, TEMPLATE_LOGITS, WEIGHT
-from ..data.mixup import MixupModule, multimodel_mixup
+from ..constants import FUSION_NER, LOGITS, NER_TEXT, WEIGHT
+from ..data.mixup import MixupModule
 from .lit_module import LitModule
-from .utils import apply_layerwise_lr_decay, apply_single_lr, apply_two_stages_lr, get_lr_scheduler, get_optimizer
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +16,8 @@ logger = logging.getLogger(__name__)
 class NerLitModule(LitModule):
     """
     Control the loops for training, evaluation, and prediction of Named Entity Recognition. This module is independent of
-    the model definition. This class inherits from the Pytorch Lightning's LightningModule:
-    https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html
+    the model definition. This class inherits from Lightning's LightningModule:
+    https://lightning.ai/docs/pytorch/stable/common/lightning_module.html
     """
 
     def __init__(
@@ -161,8 +157,8 @@ class NerLitModule(LitModule):
 
     def validation_step(self, batch, batch_idx):
         """
-        Per validation step. This function is registered by pl.LightningModule.
-        Refer to https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html#validation
+        Per validation step. This function is registered by LightningModule.
+        Refer to https://lightning.ai/docs/pytorch/stable/common/lightning_module.html#validation
 
         Parameters
         ----------

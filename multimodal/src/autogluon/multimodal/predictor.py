@@ -15,15 +15,15 @@ import warnings
 from datetime import timedelta
 from typing import Dict, List, Optional, Union
 
+import lightning.pytorch as pl
 import numpy as np
 import pandas as pd
-import pytorch_lightning as pl
 import torch
 import transformers
 import yaml
+from lightning.pytorch.strategies import DeepSpeedStrategy
 from omegaconf import OmegaConf
 from packaging import version
-from pytorch_lightning.strategies import DeepSpeedStrategy
 from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
@@ -174,6 +174,8 @@ from .utils import (
     upgrade_config,
 )
 
+pl_logger = logging.getLogger("lightning")
+pl_logger.propagate = False  # https://github.com/Lightning-AI/lightning/issues/4621
 logger = logging.getLogger(__name__)
 
 
@@ -1414,8 +1416,9 @@ class MultiModalPredictor(ExportMixin):
         ]
 
         if hpo_mode:
-            from ray.tune.integration.pytorch_lightning import TuneReportCheckpointCallback
+            from .utils.hpo import get_ray_tune_ckpt_callback
 
+            TuneReportCheckpointCallback = get_ray_tune_ckpt_callback()
             tune_report_callback = TuneReportCheckpointCallback(
                 {f"{task.validation_metric_name}": f"{task.validation_metric_name}"},
                 filename=RAY_TUNE_CHECKPOINT,
@@ -1465,7 +1468,7 @@ class MultiModalPredictor(ExportMixin):
                 if config.env.strategy == DEEPSPEED_OFFLOADING:  # Offloading currently only tested for single GPU
                     assert version.parse(pl.__version__) >= version.parse(
                         DEEPSPEED_MIN_PL_VERSION
-                    ), f"For DeepSpeed Offloading to work reliably you need at least pytorch-lightning version {DEEPSPEED_MIN_PL_VERSION}, however, found {pl.__version__}. Please update your pytorch-lightning version."
+                    ), f"For DeepSpeed Offloading to work reliably you need at least lightning version {DEEPSPEED_MIN_PL_VERSION}, however, found {pl.__version__}. Please update your lightning version."
                     from .optimization.deepspeed import CustomDeepSpeedStrategy
 
                     strategy = CustomDeepSpeedStrategy(
@@ -1718,8 +1721,8 @@ class MultiModalPredictor(ExportMixin):
         barebones: Optional[bool] = False,
     ) -> List[Dict]:
         if self._config.env.strategy == DEEPSPEED_OFFLOADING and DEEPSPEED_MODULE not in sys.modules:
-            # Need to initialize DeepSpeed and optimizer as currently required in Pytorch-Lighting integration of deepspeed.
-            # TODO: Using optimiation_kwargs for inference is confusing and bad design. Remove as soon as fixed in pytorch-lighting.
+            # Need to initialize DeepSpeed and optimizer as currently required in lightning's integration of deepspeed.
+            # TODO: Using optimiation_kwargs for inference is confusing and bad design. Remove as soon as fixed in lightning.
             from .optimization.deepspeed import CustomDeepSpeedStrategy
 
             strategy = CustomDeepSpeedStrategy(
@@ -2466,7 +2469,7 @@ class MultiModalPredictor(ExportMixin):
     ):
         if state_dict is None:
             if os.path.isdir(path + "-dir"):  # deepspeed save checkpoints into a directory
-                from pytorch_lightning.utilities.deepspeed import convert_zero_checkpoint_to_fp32_state_dict
+                from lightning.pytorch.utilities.deepspeed import convert_zero_checkpoint_to_fp32_state_dict
 
                 convert_zero_checkpoint_to_fp32_state_dict(path + "-dir", path)
                 shutil.rmtree(path + "-dir")

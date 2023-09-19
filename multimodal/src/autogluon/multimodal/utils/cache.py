@@ -6,9 +6,9 @@ import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 import torch
-from pytorch_lightning.callbacks import BasePredictionWriter
+from lightning.pytorch.callbacks import BasePredictionWriter
 
 from ..constants import WEIGHT
 
@@ -25,7 +25,7 @@ class DDPPredictionWriter(BasePredictionWriter):
         write_interval
             When to write. Could be "batch" or "epoch".
             See Lightning's source code at
-            https://pytorch-lightning.readthedocs.io/en/stable/_modules/pytorch_lightning/callbacks/prediction_writer.html#BasePredictionWriter
+            https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.callbacks.BasePredictionWriter.html
         sleep_time
             If other process does not finish writing, sleep for a few seconds and recheck.
         """

@@ -5,11 +5,10 @@ import time
 from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import pandas as pd
-import pytorch_lightning as pl
 
 from autogluon.common.utils.deprecated_utils import Deprecated_args
 from autogluon.common.utils.log_utils import set_logger_verbosity
-from autogluon.common.utils.utils import check_saved_predictor_version, setup_outputdir
+from autogluon.common.utils.utils import check_saved_predictor_version, seed_everything, setup_outputdir
 from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
@@ -59,12 +58,12 @@ class TimeSeriesPredictor:
 
         If ``freq`` is provided when creating the predictor, all data passed to the predictor will be automatically
         resampled at this frequency.
-    eval_metric : str, default = "mean_wQuantileLoss"
+    eval_metric : str, default = "WQL"
         Metric by which predictions will be ultimately evaluated on future test data. AutoGluon tunes hyperparameters
         in order to improve this metric on validation data, and ranks models (on validation data) according to this
         metric. Available options:
 
-        - ``"mean_wQuantileLoss"``: mean weighted quantile loss, defined as average of quantile losses for the specified ``quantile_levels`` scaled by the total value of the time series
+        - ``"WQL"``: mean weighted quantile loss, defined as average of quantile losses for the specified ``quantile_levels`` scaled by the total value of the time series
         - ``"MAPE"``: mean absolute percentage error
         - ``"sMAPE"``: "symmetric" mean absolute percentage error
         - ``"MASE"``: mean absolute scaled error
@@ -162,6 +161,13 @@ class TimeSeriesPredictor:
             if std_freq != str(self.freq):
                 logger.info(f"Frequency '{self.freq}' stored as '{std_freq}'")
             self.freq = std_freq
+        if eval_metric == "mean_wQuantileLoss":
+            # We don't use warnings.warn since DeprecationWarning may be silenced by the Python warning filters
+            logger.warning(
+                "DeprecationWarning: Evaluation metric 'mean_wQuantileLoss' has been renamed to 'WQL'. "
+                "Support for the old name will be removed in v1.1.",
+            )
+            eval_metric = "WQL"
         self.eval_metric = eval_metric
         self.eval_metric_seasonal_period = eval_metric_seasonal_period
         if quantile_levels is None:
@@ -600,7 +606,7 @@ class TimeSeriesPredictor:
         logger.info("=====================================================\n")
 
         if random_seed is not None:
-            pl.seed_everything(random_seed)
+            seed_everything(random_seed)
 
         time_left = None if time_limit is None else time_limit - (time.time() - time_start)
         self._learner.fit(
@@ -698,7 +704,7 @@ class TimeSeriesPredictor:
                 2020-03-05     8.3
         """
         if random_seed is not None:
-            pl.seed_everything(random_seed)
+            seed_everything(random_seed)
         # Don't use data.item_ids in case data is not a TimeSeriesDataFrame
         original_item_id_order = data.reset_index()[ITEMID].unique()
         data = self._check_and_prepare_data_frame(data)

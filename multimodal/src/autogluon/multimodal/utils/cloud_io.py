@@ -16,7 +16,7 @@
 Copied from
 https://github.com/Lightning-AI/lightning/blob/master/src/lightning/fabric/utilities/cloud_io.py
 to address warnings:
-LightningDeprecationWarning: pytorch_lightning.utilities.cloud_io.atomic_save has been 
+LightningDeprecationWarning: lightning.pytorch.utilities.cloud_io.atomic_save has been 
 deprecated in v1.8.0 and will be removed in v1.10.0. This function is internal but you 
 can copy over its implementation.
 """
