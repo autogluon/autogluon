@@ -16,6 +16,7 @@ from autogluon.timeseries import __version__ as current_ag_version
 from autogluon.timeseries.configs import TIMESERIES_PRESETS_CONFIGS
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
 from autogluon.timeseries.learner import AbstractLearner, TimeSeriesLearner
+from autogluon.timeseries.splitter import ExpandingWindowSplitter
 from autogluon.timeseries.trainer import AbstractTimeSeriesTrainer
 
 logger = logging.getLogger(__name__)
@@ -154,6 +155,8 @@ class TimeSeriesPredictor:
         self.known_covariates_names = known_covariates_names
 
         self.prediction_length = prediction_length
+        # For each validation fold, all time series in training set must have length >= _min_train_length
+        self._min_train_length = max(self.prediction_length + 1, 5)
         self.freq = freq
         if self.freq is not None:
             # Standardize frequency string (e.g., "min" -> "T", "Y" -> "A-DEC")
@@ -301,13 +304,23 @@ class TimeSeriesPredictor:
             f"Median time series length is {median_length} (min={min_length}, max={max_length}). "
         )
 
-    def _recommend_num_val_windows(self, train_data: TimeSeriesDataFrame, max_num_val_windows: int = 5) -> int:
+    def _recommend_num_val_windows(
+        self,
+        train_data: TimeSeriesDataFrame,
+        val_step_size: int,
+        max_num_val_windows: int = 5,
+    ) -> int:
         """Automatically recommend num_val_windows based on the length of training time series.
 
         Chooses num_val_windows such that TS with median length is long enough to perform num_val_windows validations.
+
+        In other words, find largest `num_val_windows` that satisfies
+        median_length >= min_train_length + prediction_length + (num_val_windows - 1) * val_step_size
         """
         median_length = train_data.num_timesteps_per_item().median()
-        num_val_windows_for_median_ts = int((median_length - 1) // self.prediction_length - 1)
+        num_val_windows_for_median_ts = int(
+            (median_length - self._min_train_length - self.prediction_length) // val_step_size + 1
+        )
         return min(max_num_val_windows, max(1, num_val_windows_for_median_ts))
 
     def _filter_short_series(
@@ -315,17 +328,15 @@ class TimeSeriesPredictor:
         train_data: TimeSeriesDataFrame,
         num_val_windows: int,
         val_step_size: int,
-        min_train_length: int = 5,
     ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
         """Remove time series from train_data that are too short for chosen prediction_length and validation settings.
 
-        This method ensures that for each validation window, train series have length at least max(prediction_length + 1, 5).
+        This method ensures that for each validation fold, all train series have length >= max(prediction_length + 1, 5).
 
         In other words, this method removes from train_data all time series with length less than
-        max(prediction_length + 1, 5) + prediction_length + (num_val_windows - 1) * val_step_size
+        min_train_length + prediction_length + (num_val_windows - 1) * val_step_size
         """
-        min_train_length = max(self.prediction_length + 1, min_train_length)
-        min_length = min_train_length + self.prediction_length + (num_val_windows - 1) * val_step_size
+        min_length = self._min_train_length + self.prediction_length + (num_val_windows - 1) * val_step_size
 
         train_lengths = train_data.num_timesteps_per_item()
         train_items_to_drop = train_lengths.index[train_lengths < min_length]
@@ -533,12 +544,12 @@ class TimeSeriesPredictor:
             Increasing this parameter increases the training time roughly by a factor of ``num_val_windows // refit_every_n_windows``.
             See :attr:`refit_every_n_windows` and :attr:`val_step_size`: for details.
 
-            For example, for ``prediction_length=3``, ``num_val_windows=2`` and ``val_step_size=1`` the folds are::
+            For example, for ``prediction_length=2``, ``num_val_windows=3`` and ``val_step_size=1`` the folds are::
 
-                |-----------------------|
-                | x x x x x x y y y - - |
-                | x x x x x x x y y y - |
-                | x x x x x x x x y y y |
+                |-------------------|
+                | x x x x x y y - - |
+                | x x x x x x y y - |
+                | x x x x x x x y y |
 
             where ``x`` are the train time steps and ``y`` are the validation time steps.
 
@@ -627,6 +638,10 @@ class TimeSeriesPredictor:
             train_data, num_val_windows=num_val_windows, val_step_size=val_step_size
         )
 
+        val_splitter = ExpandingWindowSplitter(
+            prediction_length=self.prediction_length, num_windows=num_val_windows, step_size=val_step_size
+        )
+
         logger.info("=====================================================\n")
 
         if random_seed is not None:
@@ -641,8 +656,7 @@ class TimeSeriesPredictor:
             excluded_model_types=excluded_model_types,
             time_limit=time_left,
             verbosity=verbosity,
-            num_val_windows=num_val_windows,
-            val_step_size=val_step_size,
+            val_splitter=val_splitter,
             refit_every_n_windows=refit_every_n_windows,
             enable_ensemble=enable_ensemble,
         )

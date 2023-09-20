@@ -138,7 +138,8 @@ def test_when_models_saved_then_they_can_be_loaded(model_class, trained_models, 
     assert dict_equal_primitive(model.params, loaded_model.params)
     assert dict_equal_primitive(model.params_aux, loaded_model.params_aux)
     assert model.metadata == loaded_model.metadata
-    assert model.get_oof_predictions().equals(loaded_model.get_oof_predictions())
+    for orig_oof_pred, loaded_oof_pred in zip(model.get_oof_predictions(), loaded_model.get_oof_predictions()):
+        assert orig_oof_pred.equals(loaded_oof_pred)
 
 
 @flaky

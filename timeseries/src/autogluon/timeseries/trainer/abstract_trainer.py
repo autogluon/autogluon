@@ -22,7 +22,7 @@ from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesEvaluator
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.ensemble import AbstractTimeSeriesEnsembleModel, TimeSeriesGreedyEnsemble
 from autogluon.timeseries.models.presets import contains_searchspace
-from autogluon.timeseries.splitter import ExpandingWindowSplitter
+from autogluon.timeseries.splitter import AbstractWindowSplitter, ExpandingWindowSplitter
 from autogluon.timeseries.utils.features import CovariateMetadata
 from autogluon.timeseries.utils.warning_filters import disable_tqdm
 
@@ -258,8 +258,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         save_data: bool = True,
         enable_ensemble: bool = True,
         verbosity: int = 2,
-        num_val_windows: int = 1,
-        val_step_size: Optional[int] = None,
+        val_splitter: Optional[AbstractWindowSplitter] = None,
         refit_every_n_windows: Optional[int] = 1,
         cache_predictions: bool = True,
         **kwargs,
@@ -283,9 +282,10 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         self.eval_metric = TimeSeriesEvaluator.check_get_evaluation_metric(eval_metric)
         self.eval_metric_seasonal_period = eval_metric_seasonal_period
-        self.val_splitter = ExpandingWindowSplitter(
-            prediction_length=prediction_length, num_windows=num_val_windows, step_size=val_step_size
-        )
+        if val_splitter is None:
+            val_splitter = ExpandingWindowSplitter(prediction_length=self.prediction_length)
+        assert isinstance(val_splitter, AbstractWindowSplitter), "val_splitter must be of type AbstractWindowSplitter"
+        self.val_splitter = val_splitter
         self.refit_every_n_windows = refit_every_n_windows
         self.cache_predictions = cache_predictions
         self.hpo_results = {}
@@ -555,17 +555,17 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 self.save_val_data(val_data)
             self.is_data_saved = True
 
-        if self.val_splitter.num_windows > 0:
-            assert val_data is None, "val_data shouldn't be provided if num_val_windows > 0"
+        if self.val_splitter.num_val_windows > 0:
+            assert val_data is None, "val_data shouldn't be provided if val_splitter.num_val_windows > 0"
         else:
-            assert val_data is not None, "val_data should be provided if num_val_windows > 0"
+            assert val_data is not None, "val_data should be provided if val_splitter.num_val_windows > 0"
 
         if models is None:
             models = self.construct_model_templates(
                 hyperparameters=hyperparameters,
                 hyperparameter_tune=hyperparameter_tune_kwargs is not None,  # TODO: remove hyperparameter_tune
                 freq=train_data.freq,
-                multi_window=self.val_splitter.num_windows > 0,
+                multi_window=self.val_splitter.num_val_windows > 0,
                 excluded_model_types=excluded_model_types,
             )
 
