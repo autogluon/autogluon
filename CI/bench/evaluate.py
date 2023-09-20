@@ -89,7 +89,7 @@ if branch_name != "master":
             "./results",
             *paths,
             f"--results-dir-output",
-            f"./results/evaluate",
+            f"./evaluate",
             "--no-clean-data",
         ]
     )
@@ -103,9 +103,9 @@ if branch_name != "master":
     # Write this print in a file > $cwd/final_eval.txt
     # Do the artifact upload and download
     # For now read one metric from the CSV
-    for file in os.listdir("./results/evaluate/pairwise/"):
+    for file in os.listdir("./evaluate/pairwise/"):
         if file.endswith(".csv"):
-            file_path = os.path.join("./results/evaluate/pairwise/", file)
+            file_path = os.path.join("./evaluate/pairwise/", file)
             df = pd.read_csv(file_path)
             unique_framework = {}
             for index, row in df.iterrows():
@@ -117,10 +117,11 @@ if branch_name != "master":
         if "master" in key:
             master_win_rate = unique_framework[key]
 
-    pr_comment = ""
+    pr_comment = "Benchmark Test Result - Pass"
     for key in unique_framework:
         if ("master" not in key) and (master_win_rate >= unique_framework[key]):
-            pr_comment = "Benchmark Test Result - Negative"
+            pr_comment = ""
+            pr_comment = "Benchmark Test Result - Fail"
 
     with open("final_eval.txt", "w") as file:
         file.write(pr_comment)
