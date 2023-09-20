@@ -45,6 +45,8 @@ done
 # Run dashboard if the branch is not master
 if [ $BRANCH_OR_PR_NUMBER != "master" ]
 then
+    echo "Name of all files"
+    ls
     cwd=`pwd`
     ls data/results/output/openml/ag_eval/pairwise/* | grep .csv > $cwd/agg_csv.txt
     cat agg_csv.txt

@@ -56,7 +56,7 @@ subprocess.run(
     ]
 )
 
-# If it is a PR then perform the evaluation w.r.t cleaned master bench reaults
+# If it is a PR then perform the evaluation w.r.t cleaned master bench results
 if branch_name != "master":
     paths = []
     frameworks = []
@@ -88,6 +88,39 @@ if branch_name != "master":
             "--results-dir-input",
             "./results",
             *paths,
+            f"--results-dir-output",
+            f"./results/evaluate",
             "--no-clean-data",
         ]
     )
+    
+    # High level implementation -
+    # Write the print logic below
+    # You already have 2 CSVs post evaluation {file_all, file_aggregated} - check where they are stored, mostly in ./results
+    # If not then find the path
+    # Let's read file_aggregate for now, in that read Win Rate for every framework 
+    # If Win Rate of Master greater than Win Rate of PR then print it (it will eventually show up in GitHub)
+    # Write this print in a file > $cwd/final_eval.txt
+    # Do the artifact upload and download
+    # For now read one metric from the CSV
+    for file in os.listdir("data/results/output/openml/ag_eval/pairwise/"):
+        print("\nFile is: ", file)
+        if file.endswith(".csv"):
+            df = pd.read_csv(file)
+            unique_framework = {}
+            for index, row in df.iterrows():
+                if row['framework'] not in unique_framework:
+                    unique_framework[row['framework']] = row['winrate']
+
+    master_win_rate = None
+    for key in unique_framework:
+        if "master" in key:
+            master_win_rate = unique_framework[key]
+
+    pr_comment = None
+    for key in unique_framework:
+        if ("master" not in key) and (master_win_rate >= unique_framework[key]):
+            pr_comment = "Benchmark Test Result - Negative"
+
+    with open("final_eval.txt", "w") as file:
+        file.write(pr_comment)
