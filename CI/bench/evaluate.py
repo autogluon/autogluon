@@ -112,12 +112,12 @@ if branch_name != "master":
                 if row['framework'] not in unique_framework:
                     unique_framework[row['framework']] = row['winrate']
 
-    master_win_rate = None
+    master_win_rate = 0
     for key in unique_framework:
         if "master" in key:
             master_win_rate = unique_framework[key]
 
-    pr_comment = None
+    pr_comment = ""
     for key in unique_framework:
         if ("master" not in key) and (master_win_rate >= unique_framework[key]):
             pr_comment = "Benchmark Test Result - Negative"
