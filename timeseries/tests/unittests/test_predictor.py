@@ -691,7 +691,7 @@ def test_given_irregular_time_series_and_no_tuning_when_predictor_called_with_fr
     assert "SimpleFeedForward" in predictor.get_model_names()
 
 
-@pytest.mark.parametrize("predictor_freq", ["H", "3H", "20T"])
+@pytest.mark.parametrize("predictor_freq", ["H", "2H", "20T"])
 def test_given_regular_time_series_when_predictor_called_with_freq_then_predictions_have_predictor_freq(
     temp_model_path, predictor_freq
 ):
