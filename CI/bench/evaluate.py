@@ -104,9 +104,9 @@ if branch_name != "master":
     # Do the artifact upload and download
     # For now read one metric from the CSV
     for file in os.listdir("./results/evaluate/pairwise/"):
-        print("\nFile is: ", file)
         if file.endswith(".csv"):
-            df = pd.read_csv(file)
+            file_path = os.path.join("./results/evaluate/pairwise/", file)
+            df = pd.read_csv(file_path)
             unique_framework = {}
             for index, row in df.iterrows():
                 if row['framework'] not in unique_framework:
