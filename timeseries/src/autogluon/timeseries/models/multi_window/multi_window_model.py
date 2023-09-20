@@ -11,6 +11,7 @@ import autogluon.core as ag
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
+from autogluon.timeseries.models.local.abstract_local_model import AbstractLocalModel
 from autogluon.timeseries.splitter import AbstractWindowSplitter, ExpandingWindowSplitter
 
 logger = logging.getLogger(__name__)
@@ -76,7 +77,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         if val_splitter is None:
             val_splitter = ExpandingWindowSplitter(prediction_length=self.prediction_length)
         if not isinstance(val_splitter, AbstractWindowSplitter) or val_splitter.num_val_windows <= 0:
-            raise ValueError("MultiWindowBacktestingModel.fit expects an AbstractWindowSplitter with num_windows > 0")
+            raise ValueError(f"{self.name}.fit expects an AbstractWindowSplitter with num_val_windows > 0")
         if refit_every_n_windows is None:
             refit_every_n_windows = val_splitter.num_val_windows + 1  # only fit model for the first window
 
@@ -87,7 +88,8 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
             logger.debug(f"\tWindow {window_index}")
             # refit_this_window is always True for the 0th window
             refit_this_window = window_index % refit_every_n_windows == 0
-            if refit_this_window:
+            # For local models we call `fit` for every window to ensure that the time_limit is respected
+            if refit_this_window or issubclass(self.model_base_type, AbstractLocalModel):
                 model = self.get_child_model(window_index)
                 model_fit_start_time = time.time()
                 model.fit(

@@ -555,11 +555,6 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 self.save_val_data(val_data)
             self.is_data_saved = True
 
-        if self.val_splitter.num_val_windows > 0:
-            assert val_data is None, "val_data shouldn't be provided if val_splitter.num_val_windows > 0"
-        else:
-            assert val_data is not None, "val_data should be provided if val_splitter.num_val_windows > 0"
-
         if models is None:
             models = self.construct_model_templates(
                 hyperparameters=hyperparameters,

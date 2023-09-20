@@ -614,8 +614,11 @@ class TimeSeriesPredictor:
         train_data = self._check_and_prepare_data_frame(train_data, name="train_data")
         logger.info(f"Provided train_data has {self._get_dataset_stats(train_data)}")
 
+        if val_step_size is None:
+            val_step_size = self.prediction_length
+
         if num_val_windows is None:
-            num_val_windows = self._recommend_num_val_windows(train_data)
+            num_val_windows = self._recommend_num_val_windows(train_data, val_step_size=val_step_size)
 
         if tuning_data is not None:
             tuning_data = self._check_and_prepare_data_frame(tuning_data, name="tuning_data")
@@ -631,15 +634,12 @@ class TimeSeriesPredictor:
         if num_val_windows == 0 and tuning_data is None:
             raise ValueError("Please set num_val_windows >= 1 or provide custom tuning_data")
 
-        if val_step_size is None:
-            val_step_size = self.prediction_length
-
         train_data = self._filter_short_series(
             train_data, num_val_windows=num_val_windows, val_step_size=val_step_size
         )
 
         val_splitter = ExpandingWindowSplitter(
-            prediction_length=self.prediction_length, num_windows=num_val_windows, step_size=val_step_size
+            prediction_length=self.prediction_length, num_val_windows=num_val_windows, val_step_size=val_step_size
         )
 
         logger.info("=====================================================\n")
