@@ -62,8 +62,8 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
             data_past = data.slice_by_timestep(None, -self.metric.prediction_length)
             data_future = data.slice_by_timestep(-self.metric.prediction_length, None)
             evaluator.save_past_metrics(data_past)
-            self.data_future_per_window.append(data_future)
             self.evaluator_per_window.append(evaluator)
+            self.data_future_per_window.append(data_future)
 
         super()._fit(
             predictions=stacked_predictions,

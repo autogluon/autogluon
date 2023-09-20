@@ -406,6 +406,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             time_limit=time_limit,
             verbosity=self.verbosity,
             val_splitter=self.val_splitter,
+            refit_every_n_windows=self.refit_every_n_windows,
         )
         return model
 
@@ -432,6 +433,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 time_limit=time_limit,
                 default_num_trials=default_num_trials,
                 val_splitter=self.val_splitter,
+                refit_every_n_windows=self.refit_every_n_windows,
             )
         total_tuning_time = time.time() - tuning_start_time
 
@@ -701,6 +703,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             target=self.target,
             prediction_length=self.prediction_length,
             path=self.path,
+            freq=data_per_window[0].freq,
             quantile_levels=self.quantile_levels,
             metadata=self.metadata,
         )

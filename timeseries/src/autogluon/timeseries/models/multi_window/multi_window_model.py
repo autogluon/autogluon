@@ -11,7 +11,7 @@ import autogluon.core as ag
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
-from autogluon.timeseries.splitter import AbstractWindowSplitter
+from autogluon.timeseries.splitter import AbstractWindowSplitter, ExpandingWindowSplitter
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,6 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
     model_base_kwargs : Optional[Dict[str, any]], default = None
         kwargs used to initialize model_base if model_base is a class.
     """
-
 
     def __init__(
         self,
@@ -74,17 +73,19 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
 
         if val_data is not None:
             raise ValueError(f"val_data should not be passed to {self.name}.fit()")
+        if val_splitter is None:
+            val_splitter = ExpandingWindowSplitter(prediction_length=self.prediction_length)
         if not isinstance(val_splitter, AbstractWindowSplitter) or val_splitter.num_windows <= 0:
             raise ValueError("MultiWindowBacktestingModel.fit expects an AbstractWindowSplitter with num_windows > 0")
         if refit_every_n_windows is None:
             refit_every_n_windows = val_splitter.num_windows + 1  # only fit model for the first window
 
-        val_score_per_window = []
         oof_predictions_per_window = []
         global_fit_start_time = time.time()
 
         for window_index, (train_fold, val_fold) in enumerate(val_splitter.split(train_data)):
             logger.debug(f"\tWindow {window_index}")
+            # refit_this_window is always True for the 0th window
             refit_this_window = window_index % refit_every_n_windows == 0
             if refit_this_window:
                 model = self.get_child_model(window_index)
@@ -101,7 +102,6 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
             model.score_and_cache_oof(val_fold, store_val_score=True, store_predict_time=True)
 
             oof_predictions_per_window.append(model.get_oof_predictions()[0])
-            val_score_per_window.append(model.val_score)
 
             logger.debug(f"\t\t{model.val_score:<7.4f}".ljust(15) + f"= Validation score ({model.eval_metric})")
             logger.debug(f"\t\t{model.fit_time:<7.3f} s".ljust(15) + "= Training runtime")
@@ -123,7 +123,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         self.predict_time = self.most_recent_model.predict_time
         self.fit_time = time.time() - global_fit_start_time - self.predict_time
         self._oof_predictions = oof_predictions_per_window
-        self.val_score = np.mean(val_score_per_window)
+        self.val_score = np.mean([info["val_score"] for info in self.info_per_val_window])
 
     def get_info(self) -> dict:
         info = super().get_info()

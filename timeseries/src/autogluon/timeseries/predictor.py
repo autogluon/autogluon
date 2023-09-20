@@ -315,27 +315,30 @@ class TimeSeriesPredictor:
         train_data: TimeSeriesDataFrame,
         num_val_windows: int,
         val_step_size: int,
+        min_train_length: int = 5,
     ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
-        """Remove time series from train_data that are too short for chosen prediction_length and num_val_windows.
+        """Remove time series from train_data that are too short for chosen prediction_length and validation settings.
 
-        This method ensures that for each validation window, train series have length at least prediction_length + 1.
+        This method ensures that for each validation window, train series have length at least max(prediction_length + 1, 5).
 
-        If all time series in train_data have length <= prediction_length + num_val_windows * val_step_size, an error is raised.
+        In other words, this method removes from train_data all time series with length less than
+        max(prediction_length + 1, 5) + prediction_length + (num_val_windows - 1) * val_step_size
         """
-        min_train_length = self.prediction_length + num_val_windows * val_step_size
+        min_train_length = max(self.prediction_length + 1, min_train_length)
+        min_length = min_train_length + self.prediction_length + (num_val_windows - 1) * val_step_size
+
         train_lengths = train_data.num_timesteps_per_item()
-        train_items_to_drop = train_lengths.index[train_lengths <= min_train_length]
+        train_items_to_drop = train_lengths.index[train_lengths < min_length]
         if len(train_items_to_drop) > 0:
             logger.info(
-                f"\tRemoving {len(train_items_to_drop)} short time series from train_data. Only series with length > (num_val_windows + 1) * prediction_length "
-                f"(at least {min_train_length + 1}) will be used for training."
+                f"\tRemoving {len(train_items_to_drop)} short time series from train_data. Only series with length "
+                f">= {min_length} will be used for training."
             )
             filtered_train_data = train_data.query("item_id not in @train_items_to_drop")
             if len(filtered_train_data) == 0:
                 raise ValueError(
-                    f"At least some time series in train_data must have length > (num_val_windows + 1) * prediction_length "
-                    f"(at least {min_train_length + 1}), otherwise training is impossible. Please reduce prediction_length, "
-                    f"reduce num_val_windows, or provide longer time series as train_data."
+                    f"At least some time series in train_data must have length >= {min_length}. Please provide longer "
+                    f"time series as train_data or reduce prediction_length, num_val_windows, or val_step_size."
                 )
             logger.info(
                 f"\tAfter removing short series, train_data has {self._get_dataset_stats(filtered_train_data)}"
@@ -356,8 +359,8 @@ class TimeSeriesPredictor:
         hyperparameter_tune_kwargs: Optional[Union[str, Dict]] = None,
         excluded_model_types: Optional[List[str]] = None,
         num_val_windows: int = 1,
-        refit_every_n_windows: int = 1,
         val_step_size: Optional[int] = None,
+        refit_every_n_windows: int = 1,
         refit_full: bool = False,
         enable_ensemble: bool = True,
         random_seed: Optional[int] = None,
@@ -529,12 +532,25 @@ class TimeSeriesPredictor:
 
             Increasing this parameter increases the training time roughly by a factor of ``num_val_windows // refit_every_n_windows``.
             See :attr:`refit_every_n_windows` and :attr:`val_step_size`: for details.
-        refit_every_n_windows: int, default = 1
+
+            For example, for ``prediction_length=3``, ``num_val_windows=2`` and ``val_step_size=1`` the folds are::
+
+                |-----------------------|
+                | x x x x x x y y y - - |
+                | x x x x x x x y y y - |
+                | x x x x x x x x y y y |
+
+            where ``x`` are the train time steps and ``y`` are the validation time steps.
+
+            This argument has no effect if ``tuning_data`` is provided.
+        val_step_size : int or None, default = None
+            Step size between consecutive validation windows. If set to ``None``, defaults to ``prediction_length``
+            provided when creating the predictor.
+
+            This argument has no effect if ``tuning_data`` is provided.
+        refit_every_n_windows: int or None, default = 1
             When performing cross validation, each model will be retrained every ``refit_every_n_windows`` validation
-            windows.
-        val_step_size : int, optional
-            Step size between consecutive validation windows. Defaults to ``prediction_length`` provided when creating
-            the predictor.
+            windows. If set to ``None``, model will only be fit once for the first validation window.
         refit_full : bool, default = False
             If True, after training is complete, AutoGluon will attempt to re-train all models using all of training
             data (including the data initially reserved for validation). This argument has no effect if ``tuning_data``
@@ -550,7 +566,6 @@ class TimeSeriesPredictor:
             documentation for :class:`~autogluon.timeseries.TimeSeriesPredictor` for more details.
 
         """
-        # TODO: Improve docstrings for num_val_windows, val_step_size and refit_every_n_windows
         time_start = time.time()
         if self._learner.is_fit:
             raise AssertionError("Predictor is already fit! To fit additional models create a new `Predictor`.")
@@ -627,6 +642,8 @@ class TimeSeriesPredictor:
             time_limit=time_left,
             verbosity=verbosity,
             num_val_windows=num_val_windows,
+            val_step_size=val_step_size,
+            refit_every_n_windows=refit_every_n_windows,
             enable_ensemble=enable_ensemble,
         )
         if refit_full:

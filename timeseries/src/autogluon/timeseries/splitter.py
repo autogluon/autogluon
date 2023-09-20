@@ -1,8 +1,9 @@
 import logging
-import reprlib
-from typing import Iterator, List, Optional, Tuple, Union
+from typing import Iterator, Optional, Tuple, Union
 
 import pandas as pd
+
+from autogluon.common.utils.deprecated_utils import Deprecated
 
 from .dataset.ts_dataframe import TimeSeriesDataFrame
 
@@ -69,6 +70,7 @@ class AbstractTimeSeriesSplitter:
         return result
 
 
+@Deprecated(min_version_to_warn="1.0", min_version_to_error="1.1", new="ExpandingWindowSplitter")
 class MultiWindowSplitter(AbstractTimeSeriesSplitter):
     """Reserve multiple windows at the end of each time series as the validation set.
 
@@ -217,6 +219,7 @@ class MultiWindowSplitter(AbstractTimeSeriesSplitter):
         return train_data, val_data
 
 
+@Deprecated(min_version_to_warn="1.0", min_version_to_error="1.1", new="ExpandingWindowSplitter")
 class LastWindowSplitter(MultiWindowSplitter):
     """Reserves the last prediction_length steps of each time series for validation."""
 
@@ -231,39 +234,19 @@ class LastWindowSplitter(MultiWindowSplitter):
 
 
 class AbstractWindowSplitter:
-    def __init__(self, prediction_length: int, num_windows: int):
+    def __init__(self, prediction_length: int, num_windows: int = 1):
         self.prediction_length = prediction_length
         self.num_windows = num_windows
 
-    @property
-    def required_ts_length(self) -> int:
-        raise NotImplementedError
-
-    def split(self, data: TimeSeriesDataFrame) -> Iterator[Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]]:
-        ts_lengths = data.num_timesteps_per_item()
-        short_series = ts_lengths.index[ts_lengths < self.required_ts_length]
-        if len(short_series) > 0:
-            raise ValueError(
-                f"Following time series are too short for chosen cross validation settings: {reprlib.repr(short_series.to_list())}"
-            )
-        yield from self._split(data)
-
-    def _split(self, data: TimeSeriesDataFrame) -> Iterator[Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]]:
-        raise NotImplementedError
-
 
 class ExpandingWindowSplitter(AbstractWindowSplitter):
-    def __init__(self, prediction_length: int, num_windows: int, step_size: Optional[int] = None):
+    def __init__(self, prediction_length: int, num_windows: int = 1, step_size: Optional[int] = None):
         super().__init__(prediction_length=prediction_length, num_windows=num_windows)
         if step_size is None:
             step_size = prediction_length
         self.step_size = step_size
 
-    @property
-    def required_ts_length(self) -> int:
-        return self.prediction_length + (self.num_windows - 1) * self.step_size + 1
-
-    def _split(self, data: TimeSeriesDataFrame) -> Iterator[Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]]:
+    def split(self, data: TimeSeriesDataFrame) -> Iterator[Tuple[TimeSeriesDataFrame, TimeSeriesDataFrame]]:
         for window_idx in range(1, self.num_windows + 1):
             val_end = -(self.num_windows - window_idx) * self.step_size
             train_end = val_end - self.prediction_length

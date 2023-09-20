@@ -75,6 +75,8 @@ class TimeSeriesLearner(AbstractLearner):
         hyperparameter_tune_kwargs: Optional[Union[str, dict]] = None,
         time_limit: Optional[int] = None,
         num_val_windows: int = 1,
+        val_step_size: Optional[int] = None,
+        refit_every_n_windows: Optional[int] = 1,
         **kwargs,
     ) -> None:
         self._time_limit = time_limit
@@ -109,6 +111,8 @@ class TimeSeriesLearner(AbstractLearner):
                 enable_ensemble=kwargs.get("enable_ensemble", True),
                 metadata=self.feature_generator.covariate_metadata,
                 num_val_windows=num_val_windows,
+                val_step_size=val_step_size,
+                refit_every_n_windows=refit_every_n_windows,
                 cache_predictions=self.cache_predictions,
             )
         )
