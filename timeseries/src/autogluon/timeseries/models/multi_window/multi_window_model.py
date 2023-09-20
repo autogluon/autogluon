@@ -75,10 +75,10 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
             raise ValueError(f"val_data should not be passed to {self.name}.fit()")
         if val_splitter is None:
             val_splitter = ExpandingWindowSplitter(prediction_length=self.prediction_length)
-        if not isinstance(val_splitter, AbstractWindowSplitter) or val_splitter.num_windows <= 0:
+        if not isinstance(val_splitter, AbstractWindowSplitter) or val_splitter.num_val_windows <= 0:
             raise ValueError("MultiWindowBacktestingModel.fit expects an AbstractWindowSplitter with num_windows > 0")
         if refit_every_n_windows is None:
-            refit_every_n_windows = val_splitter.num_windows + 1  # only fit model for the first window
+            refit_every_n_windows = val_splitter.num_val_windows + 1  # only fit model for the first window
 
         oof_predictions_per_window = []
         global_fit_start_time = time.time()
