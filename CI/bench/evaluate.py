@@ -103,7 +103,7 @@ if branch_name != "master":
     # Write this print in a file > $cwd/final_eval.txt
     # Do the artifact upload and download
     # For now read one metric from the CSV
-    for file in os.listdir("data/results/output/openml/ag_eval/pairwise/"):
+    for file in os.listdir("./results/evaluate/pairwise/"):
         print("\nFile is: ", file)
         if file.endswith(".csv"):
             df = pd.read_csv(file)
