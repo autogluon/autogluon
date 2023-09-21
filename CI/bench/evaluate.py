@@ -93,33 +93,47 @@ if branch_name != "master":
             "--no-clean-data",
         ]
     )
+
+    unique_framework = {}
+    # Renaming the frameworks for dasboard formatting
+    for file in os.listdir("./evaluate"):
+        if file.endswith(".csv"):
+            file_path = os.path.join("./evaluate", file)
+            df = pd.read_csv(file_path)
+            for index, row in df.iterrows():
+                if (row['framework'].split('_')[-1] not in unique_framework) and ("AutoGluon" in row['framework']):
+                    unique_framework[row['framework']] = index
     
-    # High level implementation -
-    # Write the print logic below
-    # You already have 2 CSVs post evaluation {file_all, file_aggregated} - check where they are stored, mostly in ./results
-    # If not then find the path
-    # Let's read file_aggregate for now, in that read Win Rate for every framework 
-    # If Win Rate of Master greater than Win Rate of PR then print it (it will eventually show up in GitHub)
-    # Write this print in a file > $cwd/final_eval.txt
-    # Do the artifact upload and download
-    # For now read one metric from the CSV
+    if len(unique_framework) > 1:
+        sorted_items = sorted(unique_framework.items()) 
+        earliest_timestamp = sorted_items[0][0]
+
+        unique_framework = {earliest_timestamp: 'AutoGluon_master'}
+        for i, (key, value) in enumerate(sorted_items[1:], start=1):
+            unique_framework[key] = f'AutoGluon_PR_{i}'
+
+        df['framework'] = df['framework'].apply(lambda x: unique_framework.get(x.split('_')[-1], x))
+
+    print("Unique Framework is: ", unique_framework)
+    df.to_csv(file_path, index=False)
+    
     for file in os.listdir("./evaluate/pairwise/"):
         if file.endswith(".csv"):
             file_path = os.path.join("./evaluate/pairwise/", file)
             df = pd.read_csv(file_path)
-            unique_framework = {}
-            for index, row in df.iterrows():
-                if row['framework'] not in unique_framework:
-                    unique_framework[row['framework']] = row['winrate']
+            df['framework'] = df['framework'].apply(lambda x: unique_framework.get(x.split('_')[-1], x))
 
+    df.to_csv(file_path, index=False)
+
+    # Compare aggregated results with Master branch and return comment
     master_win_rate = 0
-    for key in unique_framework:
-        if "master" in key:
-            master_win_rate = unique_framework[key]
+    for _, row in df.iterrows():
+        if "master" in row['framework']:
+            master_win_rate = row['winrate']
 
     pr_comment = "\nBenchmark Test Result - Pass\n"
-    for key in unique_framework:
-        if ("master" not in key) and (master_win_rate >= unique_framework[key]):
+    for _, row in df.iterrows():
+        if ("master" not in row['framework']) and (master_win_rate >= row['winrate']):
             pr_comment = ""
             pr_comment = "\nBenchmark Test Result - Fail\n"
 
