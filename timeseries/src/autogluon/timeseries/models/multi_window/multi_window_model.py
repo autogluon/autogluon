@@ -6,12 +6,13 @@ import time
 from typing import Dict, Optional, Type, Union
 
 import numpy as np
-import pandas as pd
 
 import autogluon.core as ag
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
+from autogluon.timeseries.models.local.abstract_local_model import AbstractLocalModel
+from autogluon.timeseries.splitter import AbstractWindowSplitter, ExpandingWindowSplitter
 
 logger = logging.getLogger(__name__)
 
@@ -29,11 +30,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         which will be used to initialize the model via model_base(**model_base_kwargs).
     model_base_kwargs : Optional[Dict[str, any]], default = None
         kwargs used to initialize model_base if model_base is a class.
-    num_val_windows : int, default = 1
-        Number of windows to use for backtesting, starting from the end of the training data.
     """
-
-    _most_recent_model_folder: str = "W0"
 
     def __init__(
         self,
@@ -58,6 +55,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         self.info_per_val_window = []
 
         self.most_recent_model: AbstractTimeSeriesModel = None
+        self.most_recent_model_folder: Optional[str] = None
         super().__init__(**kwargs)
 
     def _fit(
@@ -65,7 +63,8 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         train_data: TimeSeriesDataFrame,
         val_data: Optional[TimeSeriesDataFrame] = None,
         time_limit: Optional[int] = None,
-        num_val_windows: int = 1,
+        val_splitter: AbstractWindowSplitter = None,
+        refit_every_n_windows: Optional[int] = 1,
         **kwargs,
     ):
         # TODO: use incremental training for GluonTS models?
@@ -75,34 +74,36 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
 
         if val_data is not None:
             raise ValueError(f"val_data should not be passed to {self.name}.fit()")
-        if num_val_windows == 0:
-            raise ValueError("MultiWindowBacktestingModel can only be trained with num_val_windows > 0")
+        if val_splitter is None:
+            val_splitter = ExpandingWindowSplitter(prediction_length=self.prediction_length)
+        if not isinstance(val_splitter, AbstractWindowSplitter) or val_splitter.num_val_windows <= 0:
+            raise ValueError(f"{self.name}.fit expects an AbstractWindowSplitter with num_val_windows > 0")
+        if refit_every_n_windows is None:
+            refit_every_n_windows = val_splitter.num_val_windows + 1  # only fit model for the first window
 
-        trained_models = []
+        oof_predictions_per_window = []
         global_fit_start_time = time.time()
-        for window_index in range(num_val_windows):
-            if window_index == 0:
-                end_index = None
-            else:
-                end_index = -self.prediction_length * window_index
-            train_fold, val_fold = train_data.train_test_split(
-                prediction_length=self.prediction_length,
-                end_index=end_index,
-                suffix=f"_W{window_index}",
-            )
 
+        for window_index, (train_fold, val_fold) in enumerate(val_splitter.split(train_data)):
             logger.debug(f"\tWindow {window_index}")
-            model = self.get_child_model(window_index)
-            model_fit_start_time = time.time()
-            model.fit(
-                train_data=train_fold,
-                val_data=val_fold,
-                time_limit=None if time_limit is None else time_limit - (model_fit_start_time - global_fit_start_time),
-                **kwargs,
-            )
-            model.fit_time = time.time() - model_fit_start_time
+            # refit_this_window is always True for the 0th window
+            refit_this_window = window_index % refit_every_n_windows == 0
+            # For local models we call `fit` for every window to ensure that the time_limit is respected
+            if refit_this_window or issubclass(self.model_base_type, AbstractLocalModel):
+                model = self.get_child_model(window_index)
+                model_fit_start_time = time.time()
+                model.fit(
+                    train_data=train_fold,
+                    val_data=val_fold,
+                    time_limit=None
+                    if time_limit is None
+                    else time_limit - (model_fit_start_time - global_fit_start_time),
+                    **kwargs,
+                )
+                model.fit_time = time.time() - model_fit_start_time
             model.score_and_cache_oof(val_fold, store_val_score=True, store_predict_time=True)
-            trained_models.append(model)
+
+            oof_predictions_per_window.append(model.get_oof_predictions()[0])
 
             logger.debug(f"\t\t{model.val_score:<7.4f}".ljust(15) + f"= Validation score ({model.eval_metric})")
             logger.debug(f"\t\t{model.fit_time:<7.3f} s".ljust(15) + "= Training runtime")
@@ -111,18 +112,20 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
             self.info_per_val_window.append(
                 {
                     "window_index": window_index,
-                    "fit_time": model.fit_time,
+                    "refit_this_window": refit_this_window,
+                    "fit_time": model.fit_time if refit_this_window else float("nan"),
                     "val_score": model.val_score,
                     "predict_time": model.predict_time,
                 }
             )
 
         # Only the model trained on most recent data is saved & used for prediction
-        self.most_recent_model = trained_models[0]
+        self.most_recent_model = model
+        self.most_recent_model_folder = f"W{window_index}"
         self.predict_time = self.most_recent_model.predict_time
         self.fit_time = time.time() - global_fit_start_time - self.predict_time
-        self._oof_predictions = pd.concat([model.get_oof_predictions() for model in trained_models])
-        self.val_score = np.mean([model.val_score for model in trained_models])
+        self._oof_predictions = oof_predictions_per_window
+        self.val_score = np.mean([info["val_score"] for info in self.info_per_val_window])
 
     def get_info(self) -> dict:
         info = super().get_info()
@@ -189,7 +192,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         cls, path: str, reset_paths: bool = True, load_oof: bool = False, verbose: bool = True
     ) -> AbstractTimeSeriesModel:
         model = super().load(path=path, reset_paths=reset_paths, load_oof=load_oof, verbose=verbose)
-        most_recent_model_path = os.path.join(model.path, cls._most_recent_model_folder)
+        most_recent_model_path = os.path.join(model.path, model.most_recent_model_folder)
         model.most_recent_model = model.model_base_type.load(
             most_recent_model_path,
             reset_paths=reset_paths,

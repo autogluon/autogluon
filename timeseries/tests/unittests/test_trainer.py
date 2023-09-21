@@ -349,12 +349,13 @@ def test_when_trainer_fit_and_deleted_then_oof_predictions_can_be_loaded(temp_mo
 
     loaded_trainer = AutoTimeSeriesTrainer.load(path=temp_model_path)
 
-    oof_data = loaded_trainer._get_ensemble_oof_data(DUMMY_TS_DATAFRAME)
+    oof_data = loaded_trainer._get_ensemble_oof_data(DUMMY_TS_DATAFRAME, val_data=None)
     for m in model_names:
         if "WeightedEnsemble" not in m:
             oof_predictions = loaded_trainer._get_model_oof_predictions(m)
-            assert isinstance(oof_predictions, TimeSeriesDataFrame)
-            loaded_trainer._score_with_predictions(oof_data, oof_predictions)
+            for window_idx, oof_pred in enumerate(oof_predictions):
+                assert isinstance(oof_pred, TimeSeriesDataFrame)
+                loaded_trainer._score_with_predictions(oof_data[window_idx], oof_pred)
 
 
 def test_when_known_covariates_present_then_all_ensemble_base_models_can_predict(temp_model_path):
