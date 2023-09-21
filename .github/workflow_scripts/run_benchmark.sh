@@ -52,7 +52,7 @@ then
     cat agg_csv.txt
     filename=`head -1 $cwd/agg_csv.txt`
     echo "Printing CSVs"
-    cat ./evaluate/pairwise/$filename
+    cat $filename
     echo "Printing all dataset CSV"
     cat ./evaluate/results_ranked_by_dataset_all.csv
     prefix=$BRANCH_OR_PR_NUMBER/$SHA
