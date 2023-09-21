@@ -117,11 +117,11 @@ if branch_name != "master":
         if "master" in key:
             master_win_rate = unique_framework[key]
 
-    pr_comment = "Benchmark Test Result - Pass"
+    pr_comment = "\nBenchmark Test Result - Pass\n"
     for key in unique_framework:
         if ("master" not in key) and (master_win_rate >= unique_framework[key]):
             pr_comment = ""
-            pr_comment = "Benchmark Test Result - Fail"
+            pr_comment = "\nBenchmark Test Result - Fail"
 
     with open("final_eval.txt", "w") as file:
         file.write(pr_comment)

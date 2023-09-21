@@ -159,22 +159,6 @@ jobs:
       run:
         shell: bash
     steps:
-      - name: Download website.txt
-        uses: actions/download-artifact@v3
-        with:
-          name: dashboard-website
-      - name: get dashboard website
-        id: website
-        run: |
-          body="$(cat website.txt)"
-          echo ::set-output name=body::$body
-      - name: Comment Dashboard Website Link on PR
-        uses: peter-evans/create-or-update-comment@v2.0.0
-        with:
-          token: ${{ secrets.PAT }}
-          repository: ${{ github.event.inputs.repository }}
-          comment-id: ${{ github.event.inputs.comment-id }}
-          body: ${{ steps.website.outputs.body }}
       - name: Download final_eval.txt
         uses: actions/download-artifact@v3
         with:
@@ -191,4 +175,19 @@ jobs:
           repository: ${{ github.event.inputs.repository }}
           comment-id: ${{ github.event.inputs.comment-id }}
           body: ${{ steps.eval_result.outputs.body }}
-
+      - name: Download website.txt
+        uses: actions/download-artifact@v3
+        with:
+          name: dashboard-website
+      - name: get dashboard website
+        id: website
+        run: |
+          body="$(cat website.txt)"
+          echo ::set-output name=body::$body
+      - name: Comment Dashboard Website Link on PR
+        uses: peter-evans/create-or-update-comment@v2.0.0
+        with:
+          token: ${{ secrets.PAT }}
+          repository: ${{ github.event.inputs.repository }}
+          comment-id: ${{ github.event.inputs.comment-id }}
+          body: ${{ steps.website.outputs.body }}
