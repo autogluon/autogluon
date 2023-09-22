@@ -113,7 +113,9 @@ if branch_name != "master":
         for i, (key, value) in enumerate(sorted_items[1:], start=1):
             unique_framework[key] = f'AutoGluon_PR_{i}'
 
-        df['framework'] = df['framework'].apply(lambda x: unique_framework.get(x.split('_')[-1], x))
+    # df['framework'] = df['framework'].apply(lambda x: unique_framework.get(x.split('_')[-1], x))
+    for _, row in df.iterrows():
+        row['framework'] = unique_framework[row['framework']]
 
     print("\nUnique Framework is: ", unique_framework)
     print("\nThe Dataframe is: ", df.head())
@@ -127,7 +129,9 @@ if branch_name != "master":
             print("Reading file: ",file_path)
             df = pd.read_csv(file_path)
 
-    df['framework'] = df['framework'].apply(lambda x: unique_framework.get(x.split('_')[-1], x))
+    # df['framework'] = df['framework'].apply(lambda x: unique_framework.get(x.split('_')[-1], x))
+    for _, row in df.iterrows():
+        row['framework'] = unique_framework[row['framework']]
 
     print("\nThe Dataframe 2 is: ", df.head())
     print("\nFramework Column: ", df['framework'])
