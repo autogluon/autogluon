@@ -99,6 +99,7 @@ if branch_name != "master":
     for file in os.listdir("./evaluate"):
         if file.endswith("dataset_all.csv"):
             file_path = os.path.join("./evaluate", file)
+            print("Reading file: ",file_path)
             df = pd.read_csv(file_path)
             for index, row in df.iterrows():
                 if (row['framework'].split('_')[-1] not in unique_framework) and ("AutoGluon" in row['framework']):
@@ -114,17 +115,23 @@ if branch_name != "master":
 
         df['framework'] = df['framework'].apply(lambda x: unique_framework.get(x.split('_')[-1], x))
 
-    print("Unique Framework is: ", unique_framework)
-    print("The Dataframe is: ", df)
+    print("\nUnique Framework is: ", unique_framework)
+    print("\nThe Dataframe is: ", df.head())
+    print("\nFramework Column: ", df['framework'])
+
     df.to_csv(file_path, index=False)
     
     for file in os.listdir("./evaluate/pairwise/"):
         if file.endswith(".csv"):
             file_path = os.path.join("./evaluate/pairwise/", file)
+            print("Reading file: ",file_path)
             df = pd.read_csv(file_path)
-            df['framework'] = df['framework'].apply(lambda x: unique_framework.get(x.split('_')[-1], x))
 
-    print("The Dataframe 2 is: ", df)
+    df['framework'] = df['framework'].apply(lambda x: unique_framework.get(x.split('_')[-1], x))
+
+    print("\nThe Dataframe 2 is: ", df.head())
+    print("\nFramework Column: ", df['framework'])
+
     df.to_csv(file_path, index=False)
 
     # Compare aggregated results with Master branch and return comment
