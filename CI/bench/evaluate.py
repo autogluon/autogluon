@@ -95,9 +95,9 @@ if branch_name != "master":
     )
 
     unique_framework = {}
-    # Renaming the frameworks for dasboard formatting
+    # Renaming the frameworks for dashboard formatting
     for file in os.listdir("./evaluate"):
-        if file.endswith(".csv"):
+        if file.endswith("dataset_all.csv"):
             file_path = os.path.join("./evaluate", file)
             df = pd.read_csv(file_path)
             for index, row in df.iterrows():
@@ -115,6 +115,7 @@ if branch_name != "master":
         df['framework'] = df['framework'].apply(lambda x: unique_framework.get(x.split('_')[-1], x))
 
     print("Unique Framework is: ", unique_framework)
+    print("The Dataframe is: ", df)
     df.to_csv(file_path, index=False)
     
     for file in os.listdir("./evaluate/pairwise/"):
@@ -123,6 +124,7 @@ if branch_name != "master":
             df = pd.read_csv(file_path)
             df['framework'] = df['framework'].apply(lambda x: unique_framework.get(x.split('_')[-1], x))
 
+    print("The Dataframe 2 is: ", df)
     df.to_csv(file_path, index=False)
 
     # Compare aggregated results with Master branch and return comment
