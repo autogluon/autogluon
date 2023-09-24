@@ -61,7 +61,7 @@ subprocess.run(
 )
 
 # If it is a PR then perform the evaluation w.r.t cleaned master bench results
-if branch_name == "master":
+if branch_name != "master":
     paths = []
     frameworks = []
     for file in os.listdir("./results"):
