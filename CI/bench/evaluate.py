@@ -37,7 +37,7 @@ subprocess.run(
     [
         "agbench",
         "aggregate-amlb-results",
-        "prateek-ag",
+        "autogluon-ci-benchmark",
         "tabular",
         benchmark_name,
         "--constraint",
@@ -51,7 +51,7 @@ subprocess.run(
         "clean-amlb-results",
         benchmark_name,
         f"--results-dir-input",
-        f"s3://prateek-ag/aggregated/tabular/{benchmark_name}/",
+        f"s3://autogluon-ci-benchmark/aggregated/tabular/{benchmark_name}/",
         "--benchmark-name-in-input-path",
         "--constraints",
         time_limit,
