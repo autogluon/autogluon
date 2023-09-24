@@ -19,6 +19,10 @@ config_path = args.config_path
 time_limit = args.time_limit
 branch_name = args.branch_name
 
+# config_path = '/home/ec2-user/ag_bench_runs/tabular'
+# time_limit = 'test'
+# branch_name = 'master'
+
 for root, dirs, files in os.walk(config_path):
     for file in files:
         if file == "tabular_cloud_configs.yaml":
@@ -33,7 +37,7 @@ subprocess.run(
     [
         "agbench",
         "aggregate-amlb-results",
-        "autogluon-ci-benchmark",
+        "prateek-ag",
         "tabular",
         benchmark_name,
         "--constraint",
@@ -47,7 +51,7 @@ subprocess.run(
         "clean-amlb-results",
         benchmark_name,
         f"--results-dir-input",
-        f"s3://autogluon-ci-benchmark/aggregated/tabular/{benchmark_name}/",
+        f"s3://prateek-ag/aggregated/tabular/{benchmark_name}/",
         "--benchmark-name-in-input-path",
         "--constraints",
         time_limit,
@@ -57,7 +61,7 @@ subprocess.run(
 )
 
 # If it is a PR then perform the evaluation w.r.t cleaned master bench results
-if branch_name != "master":
+if branch_name == "master":
     paths = []
     frameworks = []
     for file in os.listdir("./results"):
@@ -113,9 +117,7 @@ if branch_name != "master":
         for i, (key, value) in enumerate(sorted_items[1:], start=1):
             unique_framework[key] = f'AutoGluon_PR_{i}'
 
-    # df['framework'] = df['framework'].apply(lambda x: unique_framework.get(x.split('_')[-1], x))
-    for _, row in df.iterrows():
-        row['framework'] = unique_framework[row['framework']]
+    df['framework'] = df['framework'].map(unique_framework)
 
     print("\nUnique Framework is: ", unique_framework)
     print("\nThe Dataframe is: ", df.head())
@@ -129,9 +131,7 @@ if branch_name != "master":
             print("Reading file: ",file_path)
             df = pd.read_csv(file_path)
 
-    # df['framework'] = df['framework'].apply(lambda x: unique_framework.get(x.split('_')[-1], x))
-    for _, row in df.iterrows():
-        row['framework'] = unique_framework[row['framework']]
+    df['framework'] = df['framework'].map(unique_framework)
 
     print("\nThe Dataframe 2 is: ", df.head())
     print("\nFramework Column: ", df['framework'])
