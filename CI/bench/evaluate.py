@@ -19,10 +19,6 @@ config_path = args.config_path
 time_limit = args.time_limit
 branch_name = args.branch_name
 
-# config_path = '/home/ec2-user/ag_bench_runs/tabular'
-# time_limit = 'test'
-# branch_name = 'master'
-
 for root, dirs, files in os.walk(config_path):
     for file in files:
         if file == "tabular_cloud_configs.yaml":
@@ -103,27 +99,24 @@ if branch_name != "master":
     for file in os.listdir("./evaluate"):
         if file.endswith("dataset_all.csv"):
             file_path = os.path.join("./evaluate", file)
-            print("Reading file: ",file_path)
             df = pd.read_csv(file_path)
             for index, row in df.iterrows():
                 if (row['framework'].split('_')[-1] not in unique_framework) and ("AutoGluon" in row['framework']):
-                    unique_framework[row['framework']] = index
+                    unique_framework[row['framework']] = row['framework'].split('_')[-1]
     
     if len(unique_framework) > 1:
-        sorted_items = sorted(unique_framework.items()) 
-        earliest_timestamp = sorted_items[0][0]
-
-        unique_framework = {earliest_timestamp: 'AutoGluon_master'}
-        for i, (key, value) in enumerate(sorted_items[1:], start=1):
-            unique_framework[key] = f'AutoGluon_PR_{i}'
+        unique_framework = dict(sorted(unique_framework.items(), key=lambda item: item[1]))
+        print("\nList is: ", unique_framework)
+        earliest_timestamp = next(iter(unique_framework))
+        print("\nEarliest Timestamp: ", earliest_timestamp)
+        unique_framework[earliest_timestamp] = 'AutoGluon_master'
+        for index, (key, value) in enumerate(unique_framework.items()):
+            if index > 0:
+                unique_framework[key] = f'AutoGluon_PR_{index}'
 
     df['framework'] = df['framework'].map(unique_framework)
-
-    print("\nUnique Framework is: ", unique_framework)
-    print("\nThe Dataframe is: ", df.head())
-    print("\nFramework Column: ", df['framework'])
-
     df.to_csv(file_path, index=False)
+    print("\nFinal Dataframe 1: ", df)
     
     for file in os.listdir("./evaluate/pairwise/"):
         if file.endswith(".csv"):
@@ -132,11 +125,8 @@ if branch_name != "master":
             df = pd.read_csv(file_path)
 
     df['framework'] = df['framework'].map(unique_framework)
-
-    print("\nThe Dataframe 2 is: ", df.head())
-    print("\nFramework Column: ", df['framework'])
-
     df.to_csv(file_path, index=False)
+    print("\nFinal Dataframe 2: ", df)
 
     # Compare aggregated results with Master branch and return comment
     master_win_rate = 0
