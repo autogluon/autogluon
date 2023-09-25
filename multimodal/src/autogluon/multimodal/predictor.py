@@ -363,9 +363,6 @@ class MultiModalPredictor(ExportMixin):
 
         check_if_packages_installed(problem_type=problem_type)
 
-        # if eval_metric is not None and not isinstance(eval_metric, str):
-        #     eval_metric = eval_metric.name
-
         if isinstance(eval_metric, str):
             eval_metric_name = eval_metric
             eval_metric_func = autogluon.core.metrics.get_metric(eval_metric)
