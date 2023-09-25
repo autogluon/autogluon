@@ -106,9 +106,7 @@ if branch_name != "master":
     
     if len(unique_framework) > 1:
         unique_framework = dict(sorted(unique_framework.items(), key=lambda item: item[1]))
-        print("\nList is: ", unique_framework)
         earliest_timestamp = next(iter(unique_framework))
-        print("\nEarliest Timestamp: ", earliest_timestamp)
         unique_framework[earliest_timestamp] = 'AutoGluon_master'
         for index, (key, value) in enumerate(unique_framework.items()):
             if index > 0:
@@ -120,7 +118,6 @@ if branch_name != "master":
     for file in os.listdir("./evaluate/pairwise/"):
         if file.endswith(".csv"):
             file_path = os.path.join("./evaluate/pairwise/", file)
-            print("Reading file: ",file_path)
             df = pd.read_csv(file_path)
 
     df['framework'] = df['framework'].map(unique_framework)
