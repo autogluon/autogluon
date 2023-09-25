@@ -51,10 +51,6 @@ then
     ls ./evaluate/pairwise/* | grep .csv > $cwd/agg_csv.txt
     cat agg_csv.txt
     filename=`head -1 $cwd/agg_csv.txt`
-    echo "Printing CSVs"
-    cat $filename
-    echo "Printing all dataset CSV"
-    cat ./evaluate/results_ranked_by_dataset_all.csv
     prefix=$BRANCH_OR_PR_NUMBER/$SHA
     agdash --per_dataset_csv  './evaluate/results_ranked_by_dataset_all.csv' --agg_dataset_csv $filename --s3_prefix benchmark-dashboard/$prefix --s3_bucket autogluon-staging --s3_region us-west-2 > $cwd/out.txt
     tail -1 $cwd/out.txt > $cwd/website.txt
