@@ -31,6 +31,8 @@ from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_ray
 from autogluon.core.utils import default_holdout_frac, generate_train_test_split_combined
 from autogluon.core.utils.loaders import load_pd
+import autogluon.core.metrics
+from autogluon.core.metrics import Scorer
 from autogluon.multimodal.utils.log import get_fit_complete_message, get_fit_start_message
 
 from . import version as ag_version
@@ -199,7 +201,7 @@ class MultiModalPredictor(ExportMixin):
         match_label: Optional[Union[int, str]] = None,
         pipeline: Optional[str] = None,
         presets: Optional[str] = None,
-        eval_metric: Optional[str] = None,
+        eval_metric: Optional[Union[str, Scorer]] = None,
         hyperparameters: Optional[dict] = None,
         path: Optional[str] = None,
         verbosity: Optional[int] = 2,
@@ -361,10 +363,19 @@ class MultiModalPredictor(ExportMixin):
 
         check_if_packages_installed(problem_type=problem_type)
 
-        if eval_metric is not None and not isinstance(eval_metric, str):
-            eval_metric = eval_metric.name
+        # if eval_metric is not None and not isinstance(eval_metric, str):
+        #     eval_metric = eval_metric.name
 
-        if eval_metric is not None and eval_metric.lower() in [
+        if isinstance(eval_metric, str):
+            eval_metric_name = eval_metric
+            eval_metric_func = autogluon.core.metrics.get_metric(eval_metric)
+        elif isinstance(eval_metric, Scorer):
+            eval_metric_func = eval_metric
+            eval_metric_name = eval_metric_func.name
+        else:
+            raise ValueError(f"Evaluation metric type {type(eval_metric)} is not supported.")
+
+        if eval_metric is not None and eval_metric_name.lower() in [
             "rmse",
             "r2",
             "pearsonr",
@@ -373,7 +384,7 @@ class MultiModalPredictor(ExportMixin):
             if problem_type is None:
                 logger.debug(
                     f"Infer problem type to be a regression problem "
-                    f"since the evaluation metric is set as {eval_metric}."
+                    f"since the evaluation metric is set as {eval_metric_name}."
                 )
                 problem_type = REGRESSION
             else:
@@ -401,7 +412,8 @@ class MultiModalPredictor(ExportMixin):
         self._label_column = label
         self._problem_type = problem_type
         self._presets = presets.lower() if presets else None
-        self._eval_metric_name = eval_metric.lower() if eval_metric else None
+        self._eval_metric_name = eval_metric_name.lower() if eval_metric else None
+        self._eval_metric_func = eval_metric_func if eval_metric else None
         self._validation_metric_name = validation_metric.lower() if validation_metric else None
         self._output_shape = num_classes
         self._classes = classes
@@ -803,7 +815,7 @@ class MultiModalPredictor(ExportMixin):
             time_limit = timedelta(seconds=time_limit)
 
         # set attributes for saving and prediction
-        self._eval_metric_name = eval_metric_name  # In case eval_metric isn't provided in __init__().
+        self._eval_metric_name = eval_metric_name if self._eval_metric_name is None else self._eval_metric_name  # In case eval_metric isn't provided in __init__().
         self._validation_metric_name = validation_metric_name
         self._column_types = column_types
 
@@ -2058,8 +2070,8 @@ class MultiModalPredictor(ExportMixin):
 
         if metrics is None:
             metrics_is_none = True
-            metrics = [self._eval_metric_name]
-        if isinstance(metrics, str):
+            metrics = [self._eval_metric_func]
+        if isinstance(metrics, str) or isinstance(metrics, Scorer):
             metrics = [metrics]
 
         results = {}
@@ -2083,9 +2095,10 @@ class MultiModalPredictor(ExportMixin):
             for per_metric in metrics:
                 score = compute_score(
                     metric_data=metric_data,
-                    metric_name=per_metric.lower(),
+                    metric_name=per_metric,
                 )
-                results[per_metric] = score
+                per_metric_name = per_metric if isinstance(per_metric, str) else per_metric.name
+                results[per_metric_name] = score
 
         if return_pred:
             return results, self._as_pandas(data=data, to_be_converted=y_pred_inv)

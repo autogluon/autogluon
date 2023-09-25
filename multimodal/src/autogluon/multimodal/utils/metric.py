@@ -8,7 +8,7 @@ import evaluate
 import numpy as np
 from sklearn.metrics import f1_score
 
-from autogluon.core.metrics import get_metric
+from autogluon.core.metrics import get_metric, Scorer
 
 from ..constants import (
     ACCURACY,
@@ -198,7 +198,7 @@ def compute_score(
     -------
     Computed score.
     """
-    if metric_name in [OVERALL_ACCURACY, OVERALL_F1]:
+    if isinstance(metric_name, str) and metric_name in [OVERALL_ACCURACY, OVERALL_F1]:
         metric = evaluate.load("seqeval")
         warnings.filterwarnings("ignore")
         for p in metric_data[Y_TRUE]:
@@ -215,7 +215,7 @@ def compute_score(
     elif metric.name in [F1]:  # only for binary classification
         return f1_score(metric_data[Y_TRUE], metric_data[Y_PRED], pos_label=pos_label)
     else:
-        return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED])
+        return metric_name._sign * metric_name(metric_data[Y_TRUE], metric_data[Y_PRED], y_prob=metric_data[Y_PRED_PROB])
 
 
 class RankingMetrics:
