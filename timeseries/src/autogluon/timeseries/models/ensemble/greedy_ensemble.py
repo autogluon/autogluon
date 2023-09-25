@@ -38,31 +38,53 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
 
     def _fit(
         self,
-        predictions: List[TimeSeriesDataFrame],
-        labels: TimeSeriesDataFrame,
+        predictions: List[List[TimeSeriesDataFrame]],  # first dim: model, second dim: val window index
+        labels: List[TimeSeriesDataFrame],
         time_limit: Optional[int] = None,
         sample_weight=None,
     ):
-        self.dummy_pred = copy.deepcopy(predictions[0])
-        # This should never happen; sanity check to make sure that all predictions have the same index
-        assert all(self.dummy_pred.index.equals(pred.index) for pred in predictions)
-        # Split the observed time series once to avoid repeated computations inside the evaluator
-        data_past = labels.slice_by_timestep(None, -self.metric.prediction_length)
-        data_future = labels.slice_by_timestep(-self.metric.prediction_length, None)
-        self.metric.save_past_metrics(data_past)
+        # Stack predictions for each model into a 3d tensor of shape [num_val_windows, num_rows, num_cols]
+        stacked_predictions = [np.stack(preds) for preds in predictions]
+
+        self.dummy_pred_per_window = []
+        self.evaluator_per_window = []
+        self.data_future_per_window = []
+
+        for window_idx, data in enumerate(labels):
+            dummy_pred = copy.deepcopy(predictions[0][window_idx])
+            # This should never happen; sanity check to make sure that all predictions have the same index
+            assert all(dummy_pred.index.equals(pred[window_idx].index) for pred in predictions)
+
+            self.dummy_pred_per_window.append(dummy_pred)
+
+            evaluator = copy.deepcopy(self.metric)
+            # Split the observed time series once to avoid repeated computations inside the evaluator
+            data_past = data.slice_by_timestep(None, -self.metric.prediction_length)
+            data_future = data.slice_by_timestep(-self.metric.prediction_length, None)
+            evaluator.save_past_metrics(data_past)
+            self.evaluator_per_window.append(evaluator)
+            self.data_future_per_window.append(data_future)
+
         super()._fit(
-            predictions=[d.values for d in predictions],
+            predictions=stacked_predictions,
             labels=data_future,
             time_limit=time_limit,
         )
-        self.dummy_pred = None
+        self.dummy_pred_per_window = None
+        self.evaluator_per_window = None
+        self.data_future_per_window = None
 
-    def _calculate_regret(self, y_true, y_pred_proba, metric, dummy_pred=None, sample_weight=None):  # noqa
-        dummy_pred = copy.deepcopy(self.dummy_pred if dummy_pred is None else dummy_pred)
-        dummy_pred[list(dummy_pred.columns)] = y_pred_proba
-        score = metric.score_with_saved_past_metrics(y_true, dummy_pred) * metric.coefficient
+    def _calculate_regret(self, y_true, y_pred_proba, metric=None, sample_weight=None):  # noqa
+        # Compute average score across all validation windows
+        total_score = 0.0
+        for window_idx, data_future in enumerate(self.data_future_per_window):
+            dummy_pred = self.dummy_pred_per_window[window_idx]
+            dummy_pred[list(dummy_pred.columns)] = y_pred_proba[window_idx]
+            evaluator = self.evaluator_per_window[window_idx]
+            total_score += evaluator.score_with_saved_past_metrics(data_future, dummy_pred) * metric.coefficient
+        avg_score = total_score / len(self.data_future_per_window)
         # score: higher is better, regret: lower is better, so we flip the sign
-        return -score
+        return -avg_score
 
 
 class TimeSeriesGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
@@ -75,8 +97,8 @@ class TimeSeriesGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
 
     def _fit_ensemble(
         self,
-        predictions: Dict[str, TimeSeriesDataFrame],
-        data: TimeSeriesDataFrame,
+        predictions_per_window: Dict[str, List[TimeSeriesDataFrame]],
+        data_per_window: List[TimeSeriesDataFrame],
         time_limit: Optional[int] = None,
         **kwargs,
     ):
@@ -88,12 +110,12 @@ class TimeSeriesGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
         )
         ensemble_selection = TimeSeriesEnsembleSelection(ensemble_size=self.ensemble_size, metric=evaluator)
         ensemble_selection.fit(
-            predictions=list(predictions.values()),
-            labels=data,
+            predictions=list(predictions_per_window.values()),
+            labels=data_per_window,
             time_limit=time_limit,
         )
         self.model_to_weight = {}
-        for model_name, weight in zip(predictions.keys(), ensemble_selection.weights_):
+        for model_name, weight in zip(predictions_per_window.keys(), ensemble_selection.weights_):
             if weight != 0:
                 self.model_to_weight[model_name] = weight
 

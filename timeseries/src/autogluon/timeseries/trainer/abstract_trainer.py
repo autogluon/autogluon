@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import networkx as nx
+import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
@@ -21,6 +22,7 @@ from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesEvaluator
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.ensemble import AbstractTimeSeriesEnsembleModel, TimeSeriesGreedyEnsemble
 from autogluon.timeseries.models.presets import contains_searchspace
+from autogluon.timeseries.splitter import AbstractWindowSplitter, ExpandingWindowSplitter
 from autogluon.timeseries.utils.features import CovariateMetadata
 from autogluon.timeseries.utils.warning_filters import disable_tqdm
 
@@ -256,7 +258,8 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         save_data: bool = True,
         enable_ensemble: bool = True,
         verbosity: int = 2,
-        num_val_windows: int = 1,
+        val_splitter: Optional[AbstractWindowSplitter] = None,
+        refit_every_n_windows: Optional[int] = 1,
         cache_predictions: bool = True,
         **kwargs,
     ):
@@ -279,7 +282,11 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         self.eval_metric = TimeSeriesEvaluator.check_get_evaluation_metric(eval_metric)
         self.eval_metric_seasonal_period = eval_metric_seasonal_period
-        self.num_val_windows = num_val_windows
+        if val_splitter is None:
+            val_splitter = ExpandingWindowSplitter(prediction_length=self.prediction_length)
+        assert isinstance(val_splitter, AbstractWindowSplitter), "val_splitter must be of type AbstractWindowSplitter"
+        self.val_splitter = val_splitter
+        self.refit_every_n_windows = refit_every_n_windows
         self.cache_predictions = cache_predictions
         self.hpo_results = {}
 
@@ -317,7 +324,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         self.models = models
 
-    def _get_model_oof_predictions(self, model_name: str) -> TimeSeriesDataFrame:
+    def _get_model_oof_predictions(self, model_name: str) -> List[TimeSeriesDataFrame]:
         model_path = os.path.join(self.path, self.get_model_attribute(model=model_name, attribute="path"))
         model_type = self.get_model_attribute(model=model_name, attribute="type")
         return model_type.load_oof_predictions(path=model_path)
@@ -398,7 +405,8 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             val_data=val_data,
             time_limit=time_limit,
             verbosity=self.verbosity,
-            num_val_windows=self.num_val_windows,
+            val_splitter=self.val_splitter,
+            refit_every_n_windows=self.refit_every_n_windows,
         )
         return model
 
@@ -424,7 +432,8 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
                 time_limit=time_limit,
                 default_num_trials=default_num_trials,
-                num_val_windows=self.num_val_windows,
+                val_splitter=self.val_splitter,
+                refit_every_n_windows=self.refit_every_n_windows,
             )
         total_tuning_time = time.time() - tuning_start_time
 
@@ -546,17 +555,12 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 self.save_val_data(val_data)
             self.is_data_saved = True
 
-        if self.num_val_windows > 0:
-            assert val_data is None, "val_data shouldn't be provided if num_val_windows > 0"
-        else:
-            assert val_data is not None, "val_data should be provided if num_val_windows > 0"
-
         if models is None:
             models = self.construct_model_templates(
                 hyperparameters=hyperparameters,
                 hyperparameter_tune=hyperparameter_tune_kwargs is not None,  # TODO: remove hyperparameter_tune
                 freq=train_data.freq,
-                multi_window=self.num_val_windows > 0,
+                multi_window=self.val_splitter.num_val_windows > 0,
                 excluded_model_types=excluded_model_types,
             )
 
@@ -635,11 +639,9 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 )
             else:
                 try:
-                    if val_data is None:
-                        val_data = self._get_ensemble_oof_data(train_data)
                     model_names_trained.append(
                         self.fit_ensemble(
-                            val_data=val_data,
+                            data_per_window=self._get_ensemble_oof_data(train_data=train_data, val_data=val_data),
                             model_names=models_available_for_ensemble,
                             time_limit=time_left_for_ensemble,
                         )
@@ -662,21 +664,13 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         return model_names_trained
 
-    def _get_ensemble_oof_data(self, train_data: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
-        """Stack validation data for all windows into a single dataframe"""
-        split_per_window = []
-        for window_index in range(self.num_val_windows):
-            if window_index == 0:
-                end_index = None
-            else:
-                end_index = -self.prediction_length * window_index
-            _, val_fold = train_data.train_test_split(
-                self.prediction_length,
-                end_index=end_index,
-                suffix=f"_W{window_index}",
-            )
-            split_per_window.append(val_fold)
-        return pd.concat(split_per_window)
+    def _get_ensemble_oof_data(
+        self, train_data: TimeSeriesDataFrame, val_data: Optional[TimeSeriesDataFrame]
+    ) -> List[TimeSeriesDataFrame]:
+        if val_data is None:
+            return [val_fold for _, val_fold in self.val_splitter.split(train_data)]
+        else:
+            return [val_data]
 
     def _get_ensemble_model_name(self) -> str:
         """Ensure we don't have name collisions in the ensemble model name"""
@@ -688,11 +682,11 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         return ensemble_name
 
     def fit_ensemble(
-        self, val_data: TimeSeriesDataFrame, model_names: List[str], time_limit: Optional[float] = None
+        self, data_per_window: List[TimeSeriesDataFrame], model_names: List[str], time_limit: Optional[float] = None
     ) -> str:
         logger.info("Fitting simple weighted ensemble.")
 
-        model_preds = {}
+        model_preds: Dict[str, List[TimeSeriesDataFrame]] = {}
         for model_name in model_names:
             model_preds[model_name] = self._get_model_oof_predictions(model_name=model_name)
 
@@ -704,21 +698,23 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             target=self.target,
             prediction_length=self.prediction_length,
             path=self.path,
-            freq=val_data.freq,
+            freq=data_per_window[0].freq,
             quantile_levels=self.quantile_levels,
             metadata=self.metadata,
         )
-        ensemble.fit_ensemble(predictions=model_preds, data=val_data, time_limit=time_limit)
-        time_end = time.time()
-        ensemble.fit_time = time_end - time_start
+        ensemble.fit_ensemble(model_preds, data_per_window=data_per_window, time_limit=time_limit)
+        ensemble.fit_time = time.time() - time_start
 
         predict_time = 0
         for m in ensemble.model_names:
             predict_time += self.get_model_attribute(model=m, attribute="predict_time")
         ensemble.predict_time = predict_time
 
-        predictions = ensemble.predict({n: model_preds[n] for n in ensemble.model_names})
-        ensemble.val_score = self._score_with_predictions(val_data, predictions)
+        score_per_fold = []
+        for window_idx, data in enumerate(data_per_window):
+            predictions = ensemble.predict({n: model_preds[n][window_idx] for n in ensemble.model_names})
+            score_per_fold.append(self._score_with_predictions(data, predictions))
+        ensemble.val_score = np.mean(score_per_fold)
 
         self._log_scores_and_times(
             val_score=ensemble.val_score,
