@@ -116,7 +116,6 @@ if branch_name != "master":
 
     df['framework'] = df['framework'].map(unique_framework)
     df.to_csv(file_path, index=False)
-    print("\nFinal Dataframe 1: ", df)
     
     for file in os.listdir("./evaluate/pairwise/"):
         if file.endswith(".csv"):
@@ -126,7 +125,6 @@ if branch_name != "master":
 
     df['framework'] = df['framework'].map(unique_framework)
     df.to_csv(file_path, index=False)
-    print("\nFinal Dataframe 2: ", df)
 
     # Compare aggregated results with Master branch and return comment
     master_win_rate = 0
