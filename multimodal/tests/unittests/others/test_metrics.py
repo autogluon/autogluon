@@ -146,7 +146,7 @@ def test_custom_metric():
         )
     scores_by_name = predictor_by_name.evaluate(
             data=dataset.test_df,
-            metrics=None, #[test_metric_name, coverage_scorer],
+            metrics=None,
         )
     scores_by_scorer_eval = predictor_by_name.evaluate(
             data=dataset.test_df,
