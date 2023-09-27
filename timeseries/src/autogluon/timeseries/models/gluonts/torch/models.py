@@ -4,14 +4,12 @@ Module including wrappers for PyTorch implementations of models in GluonTS
 import logging
 from typing import Any, Dict, Type
 
-from gluonts.torch.model.d_linear import DLinearEstimator
-from gluonts.torch.model.deepar import DeepAREstimator
-from gluonts.torch.model.estimator import PyTorchLightningEstimator as GluonTSPyTorchLightningEstimator
-from gluonts.torch.model.patch_tst import PatchTSTEstimator
-from gluonts.torch.model.simple_feedforward import SimpleFeedForwardEstimator
-from gluonts.torch.model.tft import TemporalFusionTransformerEstimator
+from gluonts.model.estimator import Estimator as GluonTSEstimator
 
 from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
+
+# NOTE: We avoid imports for torch and pytorch_lightning at the top level and hide them inside class methods.
+# This is done to skip these imports during multiprocessing (which may cause bugs)
 
 # FIXME: introduces cpflows dependency. We exclude this model until a future release.
 # from gluonts.torch.model.mqf2 import MQF2MultiHorizonEstimator
@@ -71,9 +69,13 @@ class DeepARModel(AbstractGluonTSModel):
         Learning rate used during training
     """
 
-    gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator] = DeepAREstimator
     default_num_samples: int = 250
     supports_known_covariates = True
+
+    def _get_estimator_class(self) -> Type[GluonTSEstimator]:
+        from gluonts.torch.model.deepar import DeepAREstimator
+
+        return DeepAREstimator
 
     def _get_estimator_init_args(self) -> Dict[str, Any]:
         init_kwargs = super()._get_estimator_init_args()
@@ -113,7 +115,10 @@ class SimpleFeedForwardModel(AbstractGluonTSModel):
         Learning rate used during training
     """
 
-    gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator] = SimpleFeedForwardEstimator
+    def _get_estimator_class(self) -> Type[GluonTSEstimator]:
+        from gluonts.torch.model.simple_feedforward import SimpleFeedForwardEstimator
+
+        return SimpleFeedForwardEstimator
 
 
 class TemporalFusionTransformerModel(AbstractGluonTSModel):
@@ -161,13 +166,17 @@ class TemporalFusionTransformerModel(AbstractGluonTSModel):
         Learning rate used during training
     """
 
-    gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator] = TemporalFusionTransformerEstimator
     supports_known_covariates = True
     supports_past_covariates = True
 
     @property
     def default_context_length(self) -> int:
         return max(64, 2 * self.prediction_length)
+
+    def _get_estimator_class(self) -> Type[GluonTSEstimator]:
+        from gluonts.torch.model.tft import TemporalFusionTransformerEstimator
+
+        return TemporalFusionTransformerEstimator
 
     def _get_estimator_init_args(self) -> Dict[str, Any]:
         init_kwargs = super()._get_estimator_init_args()
@@ -216,11 +225,14 @@ class DLinearModel(AbstractGluonTSModel):
         Weight decay regularization parameter.
     """
 
-    gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator] = DLinearEstimator
-
     @property
     def default_context_length(self) -> int:
         return 96
+
+    def _get_estimator_class(self) -> Type[GluonTSEstimator]:
+        from gluonts.torch.model.d_linear import DLinearEstimator
+
+        return DLinearEstimator
 
 
 class PatchTSTModel(AbstractGluonTSModel):
@@ -265,11 +277,14 @@ class PatchTSTModel(AbstractGluonTSModel):
         Weight decay regularization parameter.
     """
 
-    gluonts_estimator_class: Type[GluonTSPyTorchLightningEstimator] = PatchTSTEstimator
-
     @property
     def default_context_length(self) -> int:
         return 96
+
+    def _get_estimator_class(self) -> Type[GluonTSEstimator]:
+        from gluonts.torch.model.patch_tst import PatchTSTEstimator
+
+        return PatchTSTEstimator
 
     def _get_estimator_init_args(self) -> Dict[str, Any]:
         init_kwargs = super()._get_estimator_init_args()

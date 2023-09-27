@@ -7,6 +7,7 @@ from hashlib import md5
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+import numpy as np
 import pandas as pd
 
 from ..version import __version__
@@ -176,3 +177,14 @@ def hash_pandas_df(df: Optional[pd.DataFrame]) -> str:
     else:
         hashable_object = "0".encode("utf-8")
     return md5(hashable_object).hexdigest()
+
+
+def seed_everything(seed: int) -> None:
+    """Set random seeds for numpy and PyTorch."""
+    np.random.seed(seed)
+    try:
+        import torch
+
+        torch.manual_seed(seed)
+    except ImportError:
+        pass

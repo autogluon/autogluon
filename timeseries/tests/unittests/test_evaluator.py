@@ -11,8 +11,8 @@ from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTS
 
 from .common import DUMMY_TS_DATAFRAME, get_data_frame_with_item_index
 
-GLUONTS_PARITY_METRICS = ["mean_wQuantileLoss", "MAPE", "sMAPE", "MSE", "RMSE", "MASE", "WAPE"]
-AG_TO_GLUONTS_METRIC = {"WAPE": "ND"}
+GLUONTS_PARITY_METRICS = ["WQL", "MAPE", "sMAPE", "MSE", "RMSE", "MASE", "WAPE"]
+AG_TO_GLUONTS_METRIC = {"WAPE": "ND", "WQL": "mean_wQuantileLoss"}
 
 
 pytestmark = pytest.mark.filterwarnings("ignore")

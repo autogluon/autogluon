@@ -6,6 +6,7 @@ import pytest
 
 from autogluon.timeseries.models import DeepARModel, ETSModel
 from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
+from autogluon.timeseries.splitter import ExpandingWindowSplitter
 
 from ..common import DUMMY_TS_DATAFRAME, dict_equal_primitive
 
@@ -34,11 +35,13 @@ def test_when_model_base_kwargs_passed_to_mw_model_then_kwargs_passed_to_base_mo
 def test_when_mw_model_trained_then_oof_predictions_and_stats_are_saved(
     temp_model_path, prediction_length, num_val_windows
 ):
+    val_splitter = ExpandingWindowSplitter(prediction_length=prediction_length, num_val_windows=num_val_windows)
     mw_model = get_multi_window_deepar(path=temp_model_path, prediction_length=prediction_length)
-    mw_model.fit(train_data=DUMMY_TS_DATAFRAME, num_val_windows=num_val_windows)
+    mw_model.fit(train_data=DUMMY_TS_DATAFRAME, val_splitter=val_splitter)
 
-    expected_num_oof_rows = prediction_length * DUMMY_TS_DATAFRAME.num_items * num_val_windows
-    assert len(mw_model.get_oof_predictions()) == expected_num_oof_rows
+    assert len(mw_model.get_oof_predictions()) == num_val_windows
+    for oof_pred in mw_model.get_oof_predictions():
+        assert len(oof_pred) == prediction_length * DUMMY_TS_DATAFRAME.num_items
     assert mw_model.val_score is not None
     assert mw_model.predict_time is not None
 

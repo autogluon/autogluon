@@ -56,7 +56,7 @@ subprocess.run(
     ]
 )
 
-# If it is a PR then perform the evaluation w.r.t cleaned master bench reaults
+# If it is a PR then perform the evaluation w.r.t cleaned master bench results
 if branch_name != "master":
     paths = []
     frameworks = []
@@ -88,6 +88,52 @@ if branch_name != "master":
             "--results-dir-input",
             "./results",
             *paths,
+            f"--results-dir-output",
+            f"./evaluate",
             "--no-clean-data",
         ]
     )
+
+    unique_framework = {}
+    # Renaming the frameworks for dashboard formatting
+    for file in os.listdir("./evaluate"):
+        if file.endswith("dataset_all.csv"):
+            file_path = os.path.join("./evaluate", file)
+            df = pd.read_csv(file_path)
+            for index, row in df.iterrows():
+                if (row['framework'].split('_')[-1] not in unique_framework) and ("AutoGluon" in row['framework']):
+                    unique_framework[row['framework']] = row['framework'].split('_')[-1]
+    
+    if len(unique_framework) > 1:
+        unique_framework = dict(sorted(unique_framework.items(), key=lambda item: item[1]))
+        earliest_timestamp = next(iter(unique_framework))
+        unique_framework[earliest_timestamp] = 'AutoGluon_master'
+        for index, (key, value) in enumerate(unique_framework.items()):
+            if index > 0:
+                unique_framework[key] = f'AutoGluon_PR_{index}'
+
+    df['framework'] = df['framework'].map(unique_framework)
+    df.to_csv(file_path, index=False)
+    
+    for file in os.listdir("./evaluate/pairwise/"):
+        if file.endswith(".csv"):
+            file_path = os.path.join("./evaluate/pairwise/", file)
+            df = pd.read_csv(file_path)
+
+    df['framework'] = df['framework'].map(unique_framework)
+    df.to_csv(file_path, index=False)
+
+    # Compare aggregated results with Master branch and return comment
+    master_win_rate = 0
+    for _, row in df.iterrows():
+        if "master" in row['framework']:
+            master_win_rate = row['winrate']
+
+    pr_comment = "\nBenchmark Test Result - Pass\n"
+    for _, row in df.iterrows():
+        if ("master" not in row['framework']) and (master_win_rate >= row['winrate']):
+            pr_comment = ""
+            pr_comment = "\nBenchmark Test Result - Fail\n"
+
+    with open("final_eval.txt", "w") as file:
+        file.write(pr_comment)

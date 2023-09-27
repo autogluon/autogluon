@@ -146,6 +146,11 @@ jobs:
         with:
           name: dashboard-website
           path: ./website.txt
+      - name: Upload final_eval.txt
+        uses: actions/upload-artifact@v3
+        with:
+          name: evaluation-results
+          path: ./final_eval.txt       
   
   dashboard: 
     needs: benchmark
@@ -154,6 +159,22 @@ jobs:
       run:
         shell: bash
     steps:
+      - name: Download final_eval.txt
+        uses: actions/download-artifact@v3
+        with:
+          name: evaluation-results
+      - name: get evaluation results
+        id: eval_result
+        run: |
+          body="$(cat final_eval.txt)"
+          echo ::set-output name=body::$body
+      - name: Comment Evaluation Result of PR with Master
+        uses: peter-evans/create-or-update-comment@v2.0.0
+        with:
+          token: ${{ secrets.PAT }}
+          repository: ${{ github.event.inputs.repository }}
+          comment-id: ${{ github.event.inputs.comment-id }}
+          body: ${{ steps.eval_result.outputs.body }}
       - name: Download website.txt
         uses: actions/download-artifact@v3
         with:
@@ -170,4 +191,3 @@ jobs:
           repository: ${{ github.event.inputs.repository }}
           comment-id: ${{ github.event.inputs.comment-id }}
           body: ${{ steps.website.outputs.body }}
-

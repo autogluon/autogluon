@@ -6,7 +6,7 @@ and does not require you to manually deal with cumbersome issues like model sele
 
 Under the hood, AutoGluon combines various state of the art forecasting algorithms.
 These include established statical methods like ETS and ARIMA from
-[`StatsForecast`](https://github.com/Nixtla/statsforecast) and [`statsmodels`](https://statsmodels.org/) libraries,
+[`StatsForecast`](https://github.com/Nixtla/statsforecast),
 efficient tree-based forecasters like LightGBM based on [AutoGluon-Tabular](https://auto.gluon.ai/stable/tutorials/tabular/index.html),
 and flexible deep learning models like DeepAR and Temporal Fusion Transformer from [GluonTS](https://ts.gluon.ai/).
 

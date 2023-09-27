@@ -102,7 +102,7 @@ def test_when_score_and_cache_oof_called_then_oof_predictions_are_saved(
     if isinstance(model, MultiWindowBacktestingModel):
         pytest.skip()
 
-    oof_predictions = model.get_oof_predictions()
+    oof_predictions = model.get_oof_predictions()[0]
     assert isinstance(oof_predictions, TimeSeriesDataFrame)
     oof_score = model._score_with_predictions(DUMMY_TS_DATAFRAME, oof_predictions)
     assert isinstance(oof_score, float)
@@ -138,7 +138,8 @@ def test_when_models_saved_then_they_can_be_loaded(model_class, trained_models, 
     assert dict_equal_primitive(model.params, loaded_model.params)
     assert dict_equal_primitive(model.params_aux, loaded_model.params_aux)
     assert model.metadata == loaded_model.metadata
-    assert model.get_oof_predictions().equals(loaded_model.get_oof_predictions())
+    for orig_oof_pred, loaded_oof_pred in zip(model.get_oof_predictions(), loaded_model.get_oof_predictions()):
+        assert orig_oof_pred.equals(loaded_oof_pred)
 
 
 @flaky

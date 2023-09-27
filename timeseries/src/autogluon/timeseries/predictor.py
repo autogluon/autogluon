@@ -5,11 +5,10 @@ import time
 from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import pandas as pd
-import pytorch_lightning as pl
 
 from autogluon.common.utils.deprecated_utils import Deprecated_args
 from autogluon.common.utils.log_utils import set_logger_verbosity
-from autogluon.common.utils.utils import check_saved_predictor_version, setup_outputdir
+from autogluon.common.utils.utils import check_saved_predictor_version, seed_everything, setup_outputdir
 from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
@@ -17,6 +16,7 @@ from autogluon.timeseries import __version__ as current_ag_version
 from autogluon.timeseries.configs import TIMESERIES_PRESETS_CONFIGS
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
 from autogluon.timeseries.learner import AbstractLearner, TimeSeriesLearner
+from autogluon.timeseries.splitter import ExpandingWindowSplitter
 from autogluon.timeseries.trainer import AbstractTimeSeriesTrainer
 
 logger = logging.getLogger(__name__)
@@ -59,12 +59,12 @@ class TimeSeriesPredictor:
 
         If ``freq`` is provided when creating the predictor, all data passed to the predictor will be automatically
         resampled at this frequency.
-    eval_metric : str, default = "mean_wQuantileLoss"
+    eval_metric : str, default = "WQL"
         Metric by which predictions will be ultimately evaluated on future test data. AutoGluon tunes hyperparameters
         in order to improve this metric on validation data, and ranks models (on validation data) according to this
         metric. Available options:
 
-        - ``"mean_wQuantileLoss"``: mean weighted quantile loss, defined as average of quantile losses for the specified ``quantile_levels`` scaled by the total value of the time series
+        - ``"WQL"``: mean weighted quantile loss, defined as average of quantile losses for the specified ``quantile_levels`` scaled by the total value of the time series
         - ``"MAPE"``: mean absolute percentage error
         - ``"sMAPE"``: "symmetric" mean absolute percentage error
         - ``"MASE"``: mean absolute scaled error
@@ -155,6 +155,8 @@ class TimeSeriesPredictor:
         self.known_covariates_names = known_covariates_names
 
         self.prediction_length = prediction_length
+        # For each validation fold, all time series in training set must have length >= _min_train_length
+        self._min_train_length = max(self.prediction_length + 1, 5)
         self.freq = freq
         if self.freq is not None:
             # Standardize frequency string (e.g., "min" -> "T", "Y" -> "A-DEC")
@@ -162,6 +164,13 @@ class TimeSeriesPredictor:
             if std_freq != str(self.freq):
                 logger.info(f"Frequency '{self.freq}' stored as '{std_freq}'")
             self.freq = std_freq
+        if eval_metric == "mean_wQuantileLoss":
+            # We don't use warnings.warn since DeprecationWarning may be silenced by the Python warning filters
+            logger.warning(
+                "DeprecationWarning: Evaluation metric 'mean_wQuantileLoss' has been renamed to 'WQL'. "
+                "Support for the old name will be removed in v1.1.",
+            )
+            eval_metric = "WQL"
         self.eval_metric = eval_metric
         self.eval_metric_seasonal_period = eval_metric_seasonal_period
         if quantile_levels is None:
@@ -302,40 +311,52 @@ class TimeSeriesPredictor:
             f"Median time series length is {median_length} (min={min_length}, max={max_length}). "
         )
 
-    def _recommend_num_val_windows(self, train_data: TimeSeriesDataFrame, max_num_val_windows: int = 5) -> int:
+    def _recommend_num_val_windows(
+        self,
+        train_data: TimeSeriesDataFrame,
+        val_step_size: int,
+        max_num_val_windows: int = 5,
+    ) -> int:
         """Automatically recommend num_val_windows based on the length of training time series.
 
         Chooses num_val_windows such that TS with median length is long enough to perform num_val_windows validations.
+
+        In other words, find largest `num_val_windows` that satisfies
+        median_length >= min_train_length + prediction_length + (num_val_windows - 1) * val_step_size
         """
         median_length = train_data.num_timesteps_per_item().median()
-        num_val_windows_for_median_ts = int((median_length - 1) // self.prediction_length - 1)
+        num_val_windows_for_median_ts = int(
+            (median_length - self._min_train_length - self.prediction_length) // val_step_size + 1
+        )
         return min(max_num_val_windows, max(1, num_val_windows_for_median_ts))
 
     def _filter_short_series(
         self,
         train_data: TimeSeriesDataFrame,
         num_val_windows: int,
+        val_step_size: int,
     ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
-        """Remove time series from train_data that are too short for chosen prediction_length and num_val_windows.
+        """Remove time series from train_data that are too short for chosen prediction_length and validation settings.
 
-        This method ensures that for each validation window, train series have length at least prediction_length + 1.
+        This method ensures that for each validation fold, all train series have length >= max(prediction_length + 1, 5).
 
-        If all time series in train_data have length <= (num_val_windows + 1) * prediction_length, an error is raised.
+        In other words, this method removes from train_data all time series with length less than
+        min_train_length + prediction_length + (num_val_windows - 1) * val_step_size
         """
-        min_train_length = (num_val_windows + 1) * self.prediction_length
+        min_length = self._min_train_length + self.prediction_length + (num_val_windows - 1) * val_step_size
+
         train_lengths = train_data.num_timesteps_per_item()
-        train_items_to_drop = train_lengths.index[train_lengths <= min_train_length]
+        train_items_to_drop = train_lengths.index[train_lengths < min_length]
         if len(train_items_to_drop) > 0:
             logger.info(
-                f"\tRemoving {len(train_items_to_drop)} short time series from train_data. Only series with length > (num_val_windows + 1) * prediction_length "
-                f"(at least {min_train_length + 1}) will be used for training."
+                f"\tRemoving {len(train_items_to_drop)} short time series from train_data. Only series with length "
+                f">= {min_length} will be used for training."
             )
             filtered_train_data = train_data.query("item_id not in @train_items_to_drop")
             if len(filtered_train_data) == 0:
                 raise ValueError(
-                    f"At least some time series in train_data must have length > (num_val_windows + 1) * prediction_length "
-                    f"(at least {min_train_length + 1}), otherwise training is impossible. Please reduce prediction_length, "
-                    f"reduce num_val_windows, or provide longer time series as train_data."
+                    f"At least some time series in train_data must have length >= {min_length}. Please provide longer "
+                    f"time series as train_data or reduce prediction_length, num_val_windows, or val_step_size."
                 )
             logger.info(
                 f"\tAfter removing short series, train_data has {self._get_dataset_stats(filtered_train_data)}"
@@ -356,6 +377,8 @@ class TimeSeriesPredictor:
         hyperparameter_tune_kwargs: Optional[Union[str, Dict]] = None,
         excluded_model_types: Optional[List[str]] = None,
         num_val_windows: int = 1,
+        val_step_size: Optional[int] = None,
+        refit_every_n_windows: int = 1,
         refit_full: bool = False,
         enable_ensemble: bool = True,
         random_seed: Optional[int] = None,
@@ -522,10 +545,30 @@ class TimeSeriesPredictor:
                 )
         num_val_windows : int or None, default = 1
             Number of backtests done on ``train_data`` for each trained model to estimate the validation performance.
-            A separate copy of each model is trained for each validation window.
-            When ``num_val_windows = k``, training time is increased roughly by a factor of ``k``.
             If ``num_val_windows=None``, the predictor will attempt to set this parameter automatically based on the
             length of time series in ``train_data`` (at most to 5).
+
+            Increasing this parameter increases the training time roughly by a factor of ``num_val_windows // refit_every_n_windows``.
+            See :attr:`refit_every_n_windows` and :attr:`val_step_size`: for details.
+
+            For example, for ``prediction_length=2``, ``num_val_windows=3`` and ``val_step_size=1`` the folds are::
+
+                |-------------------|
+                | x x x x x y y - - |
+                | x x x x x x y y - |
+                | x x x x x x x y y |
+
+            where ``x`` are the train time steps and ``y`` are the validation time steps.
+
+            This argument has no effect if ``tuning_data`` is provided.
+        val_step_size : int or None, default = None
+            Step size between consecutive validation windows. If set to ``None``, defaults to ``prediction_length``
+            provided when creating the predictor.
+
+            This argument has no effect if ``tuning_data`` is provided.
+        refit_every_n_windows: int or None, default = 1
+            When performing cross validation, each model will be retrained every ``refit_every_n_windows`` validation
+            windows. If set to ``None``, model will only be fit once for the first validation window.
         refit_full : bool, default = False
             If True, after training is complete, AutoGluon will attempt to re-train all models using all of training
             data (including the data initially reserved for validation). This argument has no effect if ``tuning_data``
@@ -578,8 +621,11 @@ class TimeSeriesPredictor:
         train_data = self._check_and_prepare_data_frame(train_data, name="train_data")
         logger.info(f"Provided train_data has {self._get_dataset_stats(train_data)}")
 
+        if val_step_size is None:
+            val_step_size = self.prediction_length
+
         if num_val_windows is None:
-            num_val_windows = self._recommend_num_val_windows(train_data)
+            num_val_windows = self._recommend_num_val_windows(train_data, val_step_size=val_step_size)
 
         if tuning_data is not None:
             tuning_data = self._check_and_prepare_data_frame(tuning_data, name="tuning_data")
@@ -595,12 +641,18 @@ class TimeSeriesPredictor:
         if num_val_windows == 0 and tuning_data is None:
             raise ValueError("Please set num_val_windows >= 1 or provide custom tuning_data")
 
-        train_data = self._filter_short_series(train_data, num_val_windows=num_val_windows)
+        train_data = self._filter_short_series(
+            train_data, num_val_windows=num_val_windows, val_step_size=val_step_size
+        )
+
+        val_splitter = ExpandingWindowSplitter(
+            prediction_length=self.prediction_length, num_val_windows=num_val_windows, val_step_size=val_step_size
+        )
 
         logger.info("=====================================================\n")
 
         if random_seed is not None:
-            pl.seed_everything(random_seed)
+            seed_everything(random_seed)
 
         time_left = None if time_limit is None else time_limit - (time.time() - time_start)
         self._learner.fit(
@@ -611,7 +663,8 @@ class TimeSeriesPredictor:
             excluded_model_types=excluded_model_types,
             time_limit=time_left,
             verbosity=verbosity,
-            num_val_windows=num_val_windows,
+            val_splitter=val_splitter,
+            refit_every_n_windows=refit_every_n_windows,
             enable_ensemble=enable_ensemble,
         )
         if refit_full:
@@ -698,7 +751,7 @@ class TimeSeriesPredictor:
                 2020-03-05     8.3
         """
         if random_seed is not None:
-            pl.seed_everything(random_seed)
+            seed_everything(random_seed)
         # Don't use data.item_ids in case data is not a TimeSeriesDataFrame
         original_item_id_order = data.reset_index()[ITEMID].unique()
         data = self._check_and_prepare_data_frame(data)
@@ -774,6 +827,11 @@ class TimeSeriesPredictor:
         Returns
         -------
         predictor : TimeSeriesPredictor
+
+        Examples
+        --------
+        >>> predictor = TimeSeriesPredictor.load(path_to_predictor)
+
         """
         if not path:
             raise ValueError("`path` cannot be None or empty in load().")

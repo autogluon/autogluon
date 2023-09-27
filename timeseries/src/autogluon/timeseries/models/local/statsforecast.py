@@ -138,6 +138,74 @@ class AutoARIMAModel(AbstractStatsForecastModel):
         return AutoARIMA
 
 
+class ARIMAModel(AbstractStatsForecastModel):
+    """Autoregressive Integrated Moving Average (ARIMA) model with fixed parameters.
+
+    Based on `statsforecast.models.ARIMA <https://nixtla.github.io/statsforecast/models.html#arima>`_.
+
+
+    Other Parameters
+    ----------------
+    order: Tuple[int, int, int], default = (1, 1, 1)
+        The (p, d, q) order of the model for the number of AR parameters, differences, and MA parameters to use.
+    seasonal_order: Tuple[int, int, int], default = (0, 0, 0)
+        The (P, D, Q) parameters of the seasonal ARIMA model. Setting to (0, 0, 0) disables seasonality.
+    include_mean : bool, default = True
+        Should the ARIMA model include a mean term?
+    include_drift : bool, default = False
+        Should the ARIMA model include a linear drift term?
+    include_constant : bool, optional
+        If True, then includ_mean is set to be True for undifferenced series and include_drift is set to be True for
+        differenced series.
+    blambda : float, optional
+        Box-Cox transformation parameter.
+    biasadj : bool, default = False
+        Use adjusted back-transformed mean Box-Cox.
+    method : {"CSS-ML", "CSS", "ML"}, default = "CSS-ML"
+        Fitting method: CSS (conditional sum of squares), ML (maximum likelihood), CSS-ML (initialize with CSS, then
+        optimize with ML).
+    fixed : Dict[str, float], optional
+        Dictionary containing fixed coefficients for the ARIMA model.
+    seasonal_period : int or None, default = None
+        Number of time steps in a complete seasonal cycle for seasonal models. For example, 7 for daily data with a
+        weekly cycle or 12 for monthly data with an annual cycle.
+        When set to None, seasonal_period will be inferred from the frequency of the training data. Can also be
+        specified manually by providing an integer > 1.
+        If seasonal_period (inferred or provided) is equal to 1, seasonality will be disabled.
+    n_jobs : int or float, default = 0.5
+        Number of CPU cores used to fit the models in parallel.
+        When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
+        When set to a positive integer, that many cores are used.
+        When set to -1, all CPU cores are used.
+    max_ts_length : int, default = 2500
+        If not None, only the last ``max_ts_length`` time steps of each time series will be used to train the model.
+        This significantly speeds up fitting and usually leads to no change in accuracy.
+    """
+
+    allowed_local_model_args = [
+        "order",
+        "seasonal_order",
+        "include_mean",
+        "include_drift",
+        "include_constant",
+        "blambda",
+        "biasadj",
+        "method",
+        "fixed",
+        "seasonal_period",
+    ]
+
+    def _update_local_model_args(self, local_model_args: dict) -> dict:
+        local_model_args = super()._update_local_model_args(local_model_args)
+        local_model_args.setdefault("order", (1, 1, 1))
+        return local_model_args
+
+    def _get_model_type(self):
+        from statsforecast.models import ARIMA
+
+        return ARIMA
+
+
 class AutoETSModel(AbstractStatsForecastModel):
     """Automatically tuned exponential smoothing with trend and seasonality.
 
@@ -176,6 +244,53 @@ class AutoETSModel(AbstractStatsForecastModel):
         from statsforecast.models import AutoETS
 
         return AutoETS
+
+    def _predict_with_local_model(
+        self,
+        time_series: pd.Series,
+        local_model_args: dict,
+    ) -> pd.DataFrame:
+        # Disable seasonality if time series too short for chosen season_length, otherwise model will crash
+        if len(time_series) < 2 * local_model_args["season_length"]:
+            # changing last character to "N" disables seasonality, e.g., model="AAA" -> model="AAN"
+            local_model_args["model"] = local_model_args["model"][:-1] + "N"
+        return super()._predict_with_local_model(time_series=time_series, local_model_args=local_model_args)
+
+
+class ETSModel(AutoETSModel):
+    """Exponential smoothing with trend and seasonality.
+
+    The E (error), T (trend) and S (seasonal) components are fixed and provided by the user.
+
+    This is an alias for `statsforecast.models.AutoETS <https://nixtla.github.io/statsforecast/models.html#autoets>`_.
+
+    Other Parameters
+    ----------------
+    model : str, default = "AAA"
+        Model string describing the configuration of the E (error), T (trend) and S (seasonal) model components.
+        Each component can be one of "M" (multiplicative), "A" (additive), "N" (omitted). For example when model="ANN"
+        (additive error, no trend, and no seasonality), ETS will explore only a simple exponential smoothing.
+    seasonal_period : int or None, default = None
+        Number of time steps in a complete seasonal cycle for seasonal models. For example, 7 for daily data with a
+        weekly cycle or 12 for monthly data with an annual cycle.
+        When set to None, seasonal_period will be inferred from the frequency of the training data. Can also be
+        specified manually by providing an integer > 1.
+        If seasonal_period (inferred or provided) is equal to 1, seasonality will be disabled.
+    n_jobs : int or float, default = 0.5
+        Number of CPU cores used to fit the models in parallel.
+        When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
+        When set to a positive integer, that many cores are used.
+        When set to -1, all CPU cores are used.
+    max_ts_length : int, default = 2500
+        If not None, only the last ``max_ts_length`` time steps of each time series will be used to train the model.
+        This significantly speeds up fitting and usually leads to no change in accuracy.
+    """
+
+    def _update_local_model_args(self, local_model_args: dict) -> dict:
+        local_model_args = super()._update_local_model_args(local_model_args)
+        local_model_args.setdefault("model", "AAA")
+        local_model_args.setdefault("damped", False)
+        return local_model_args
 
 
 class DynamicOptimizedThetaModel(AbstractStatsForecastModel):

@@ -90,7 +90,7 @@ class RecursiveTabularModel(AbstractTimeSeriesModel):
         "MASE": "mean_absolute_error",
         "MAPE": "mean_absolute_percentage_error",
         "sMAPE": "mean_absolute_percentage_error",
-        "mean_wQuantileLoss": "mean_absolute_error",
+        "WQL": "mean_absolute_error",
         "MSE": "mean_squared_error",
         "RMSE": "root_mean_squared_error",
     }
