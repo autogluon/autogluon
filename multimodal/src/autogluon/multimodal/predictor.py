@@ -26,13 +26,13 @@ from omegaconf import OmegaConf
 from packaging import version
 from torch import nn
 
+import autogluon.core.metrics
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_ray
+from autogluon.core.metrics import Scorer
 from autogluon.core.utils import default_holdout_frac, generate_train_test_split_combined
 from autogluon.core.utils.loaders import load_pd
-import autogluon.core.metrics
-from autogluon.core.metrics import Scorer
 from autogluon.multimodal.utils.log import get_fit_complete_message, get_fit_start_message
 
 from . import version as ag_version
@@ -812,7 +812,9 @@ class MultiModalPredictor(ExportMixin):
             time_limit = timedelta(seconds=time_limit)
 
         # set attributes for saving and prediction
-        self._eval_metric_name = eval_metric_name if self._eval_metric_name is None else self._eval_metric_name  # In case eval_metric isn't provided in __init__().
+        self._eval_metric_name = (
+            eval_metric_name if self._eval_metric_name is None else self._eval_metric_name
+        )  # In case eval_metric isn't provided in __init__().
         self._validation_metric_name = validation_metric_name
         self._column_types = column_types
 
