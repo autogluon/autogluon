@@ -41,7 +41,7 @@ def test_load_old_checkpoint_text_only():
         dataset.train_df,
         presets="multilingual",
         time_limit=10,
-        hyperparameters={"optimization.top_k_average_method": "uniform_soup", "env.num_gpus": 1},
+        hyperparameters={"optimization.top_k_average_method": "uniform_soup", "env.num_gpus": -1},
     )
 
 

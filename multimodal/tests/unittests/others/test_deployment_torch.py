@@ -127,7 +127,7 @@ def test_mmdet_object_detection_save_and_load():
     predictor = MultiModalPredictor(
         hyperparameters={
             "model.mmdet_image.checkpoint_name": "yolov3_mobilenetv2_8xb24-320-300e_coco",
-            "env.num_gpus": 1,
+            "env.num_gpus": -1,
         },
         problem_type="object_detection",
     )
@@ -140,7 +140,7 @@ def test_mmdet_object_detection_save_and_load():
     new_predictor = MultiModalPredictor(
         hyperparameters={
             "model.mmdet_image.checkpoint_name": detection_model_save_subdir,
-            "env.num_gpus": 1,
+            "env.num_gpus": -1,
         },
         problem_type="object_detection",
     )

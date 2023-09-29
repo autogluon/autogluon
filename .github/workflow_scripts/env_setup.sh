@@ -60,14 +60,14 @@ function install_multimodal_no_groundingdino {
 
 function install_multimodal {
     source $(dirname "$0")/setup_mmcv.sh
-    source $(dirname "$0")/setup_groundingdino.sh
+    # source $(dirname "$0")/setup_groundingdino.sh
 
     # launch different process for each test to make sure memory is released
     python3 -m pip install --upgrade pytest-xdist
     install_local_packages "multimodal/$1"
     setup_mmcv
     # python3 -m pip install --upgrade "mmocr<1.0"  # not compatible with mmcv 2.0
-    setup_groundingdino
+    # setup_groundingdino
 }
 
 function install_all {

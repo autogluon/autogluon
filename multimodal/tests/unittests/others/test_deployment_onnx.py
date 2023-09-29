@@ -94,7 +94,7 @@ def test_onnx_export_hf_text(checkpoint_name):
     "checkpoint_name,num_gpus",
     [
         ("swin_tiny_patch4_window7_224", -1),
-        ("resnet18", 0),
+        ("resnet18", -1),
     ],
 )
 def test_onnx_export_timm_image(checkpoint_name, num_gpus):
