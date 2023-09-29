@@ -1,20 +1,20 @@
-import random
 import os
+import random
 import shutil
 import tempfile
 
 import pytest
 import torch
-import tempfile
 from sklearn.metrics import f1_score, log_loss
 from torchmetrics import MeanMetric, RetrievalHitRate
 
+import autogluon.core.metrics as ag_metrics
+from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.constants import MULTICLASS, Y_PRED, Y_TRUE
 from autogluon.multimodal.optimization.utils import compute_hit_rate, get_loss_func, get_metric
 from autogluon.multimodal.utils import compute_score
+
 from ..utils.unittest_datasets import HatefulMeMesDataset
-from autogluon.multimodal import MultiModalPredictor
-import autogluon.core.metrics as ag_metrics
 
 
 @pytest.mark.parametrize(
@@ -145,15 +145,15 @@ def test_custom_metric():
             save_path=save_path,
         )
     scores_by_name = predictor_by_name.evaluate(
-            data=dataset.test_df,
-            metrics=None,
-        )
+        data=dataset.test_df,
+        metrics=None,
+    )
     scores_by_scorer_eval = predictor_by_name.evaluate(
-            data=dataset.test_df,
-            metrics=[metric_scorer],
-        )
+        data=dataset.test_df,
+        metrics=[metric_scorer],
+    )
     scores_by_scorer_init = predictor_by_scorer.evaluate(
-            data=dataset.test_df,
-            metrics=None,
-        )
+        data=dataset.test_df,
+        metrics=None,
+    )
     assert scores_by_name[metric_name] == scores_by_scorer_eval[metric_name] == scores_by_scorer_init[metric_name]
