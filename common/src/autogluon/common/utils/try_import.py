@@ -30,13 +30,13 @@ def try_import_mxboard():
 
 
 def try_import_ray() -> ModuleType:
-    RAY_MAX_VERSION = "2.7.0"  # sync with core/setup.py
+    RAY_MAX_VERSION = "2.8.0"  # sync with core/setup.py
     ray_max_version_os_map = dict(
         Darwin=RAY_MAX_VERSION,
         Windows=RAY_MAX_VERSION,
         Linux=RAY_MAX_VERSION,
     )
-    ray_min_version = "2.6.3"
+    ray_min_version = "2.7.0"
     current_os = platform.system()
     ray_max_version = ray_max_version_os_map.get(current_os, RAY_MAX_VERSION)
     try:
@@ -124,7 +124,7 @@ def try_import_torch():
         raise ImportError(
             "Unable to import dependency torch\n"
             "A quick tip is to install via `pip install torch`.\n"
-            "The minimum torch version is currently 1.13."  # sync with core/_setup_utils.py
+            "The minimum torch version is currently 2.0."  # sync with core/_setup_utils.py
         )
 
 
