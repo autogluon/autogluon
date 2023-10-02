@@ -10,6 +10,11 @@ function test_multimodal {
     install_local_packages "common/[tests]" "core/[all,tests]" "features/"
     install_multimodal "[tests]"
 
+    echo "Additional Test Args: $ADDITIONAL_TEST_ARGS"
+
+    # Get GPU USAGE COUNT HERE AND IF > 1 then use Multi-GPU CI
+    # On 4 GPU machines enable 1 and get count to try first
+
     cd multimodal/
     if [ -n "$ADDITIONAL_TEST_ARGS" ]
     then
