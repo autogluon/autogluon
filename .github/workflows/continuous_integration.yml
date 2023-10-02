@@ -244,7 +244,7 @@ jobs:
         with:
           job-type: CI-MULTI-GPU
           job-name: AutoGluon-Multimodal-Others-2-GPU
-          command: chmod +x ./.github/workflow_scripts/test_multimodal_others_2.sh && ./.github/workflow_scripts/test_multimodal_others_2.sh
+          command: chmod +x ./.github/workflow_scripts/test_multimodal_others.sh && ./.github/workflow_scripts/test_multimodal_others.sh
   # test_timeseries:
   #   needs: lint_check
   #   runs-on: ubuntu-latest
