@@ -28,6 +28,7 @@ def download_sample_dataset():
     return data_dir
 
 
+@pytest.mark.mgpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -64,6 +65,7 @@ def test_mmdet_object_detection_fit_then_evaluate_coco(checkpoint_name):
     predictor.evaluate(test_path)
 
 
+@pytest.mark.mgpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
