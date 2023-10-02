@@ -164,13 +164,16 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
 
         grouped_df = df.groupby(MLF_ITEMID, sort=False)
         num_items = len(grouped_df)
-        rows_per_item = int(len(df) / num_items)
-        train_rows_per_item = max_num_samples // num_items
-        # Use last `prediction_length` rows as validation set (but no more than half of the rows)
-        val_rows_per_item = min(self.prediction_length, rows_per_item // 2)
-
-        train_df = grouped_df.nth(slice(-(train_rows_per_item + val_rows_per_item), -val_rows_per_item))
+        # Use last `prediction_length` rows as validation set (but no more than 50% of the rows)
+        val_rows_per_item = min(self.prediction_length, math.ceil(0.5 * len(df) / num_items))
+        train_df = grouped_df.nth(slice(None, -val_rows_per_item))
         val_df = grouped_df.tail(val_rows_per_item)
+
+        if max_num_samples is not None:
+            if len(train_df) > max_num_samples:
+                train_df = train_df.sample(n=max_num_samples)
+            if len(val_df) > max_num_samples:
+                val_df = val_df.sample(n=max_num_samples)
         return train_df.drop([MLF_ITEMID, MLF_TIMESTAMP], axis=1), val_df.drop([MLF_ITEMID, MLF_TIMESTAMP], axis=1)
 
     def _to_mlforecast_df(
