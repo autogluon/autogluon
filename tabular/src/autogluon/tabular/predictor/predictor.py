@@ -4524,6 +4524,53 @@ class TabularPredictor:
         predictor_clone.save_space()
         return predictor_clone if return_clone else predictor_clone.path
 
+    # TODO: Cleanup, unit test, add docs
+    def get_simulation_artifact(self, test_data: pd.DataFrame) -> dict:
+        """
+        Computes and returns the necessary information to perform zeroshot HPO simulation.
+
+        Parameters
+        ----------
+        test_data: pd.DataFrame
+            The test data.
+
+        Returns
+        -------
+        simulation_dict: dict
+            The dictionary of information requires for zeroshot HPO simulation.
+            TODO: Describe keys
+
+        """
+        models = self.get_model_names(can_infer=True)
+
+        if self.can_predict_proba:
+            pred_proba_dict_val = self.predict_proba_multi(inverse_transform=False, as_multiclass=False, models=models)
+            pred_proba_dict_test = self.predict_proba_multi(test_data, inverse_transform=False, as_multiclass=False, models=models)
+        else:
+            pred_proba_dict_val = self.predict_multi(inverse_transform=False, models=models)
+            pred_proba_dict_test = self.predict_multi(test_data, inverse_transform=False, models=models)
+
+        val_data_source = 'val' if self._trainer.has_val else 'train'
+        _, y_val = self.load_data_internal(data=val_data_source, return_X=False, return_y=True)
+        y_test = test_data[self.label]
+        y_test = self.transform_labels(y_test, inverse=False)
+
+        simulation_dict = dict(
+            pred_proba_dict_val=pred_proba_dict_val,
+            pred_proba_dict_test=pred_proba_dict_test,
+            y_val=y_val,
+            y_test=y_test,
+            eval_metric=self.eval_metric.name,
+            problem_type=self.problem_type,
+            ordered_class_labels=self._learner.label_cleaner.ordered_class_labels,
+            ordered_class_labels_transformed=self._learner.label_cleaner.ordered_class_labels_transformed,
+            problem_type_transform=self._learner.label_cleaner.problem_type_transform,
+            num_classes=self._learner.label_cleaner.num_classes,
+            label=self.label,
+        )
+
+        return simulation_dict
+
     @staticmethod
     def _check_if_hyperparameters_handle_text(hyperparameters: dict) -> bool:
         """Check if hyperparameters contain a model that supports raw text features as input"""
