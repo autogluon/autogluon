@@ -170,7 +170,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             df = grouped_df.tail(self.prediction_length + math.ceil(max_num_samples / num_items))
             grouped_df = df.groupby(MLF_ITEMID, sort=False)
 
-        # Use last `prediction_length` rows as validation set (but no more than 50% of the rows)
+        # Use up to `prediction_length` last rows as validation set (but no more than 50% of the rows)
         val_rows_per_item = min(self.prediction_length, math.ceil(0.5 * len(df) / num_items))
         train_df = grouped_df.nth(slice(None, -val_rows_per_item))
         val_df = grouped_df.tail(val_rows_per_item)
