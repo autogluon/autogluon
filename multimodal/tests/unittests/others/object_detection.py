@@ -399,6 +399,7 @@ def test_mmdet_object_detection_fit_with_freeze_backbone(checkpoint_name):
     )
 
 
+@pytest.mark.mgpu
 def test_detector_hyperparameters_consistency():
     data_dir = download_sample_dataset()
 
