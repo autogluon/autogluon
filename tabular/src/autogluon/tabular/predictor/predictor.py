@@ -366,6 +366,14 @@ class TabularPredictor:
             raise ValueError(f"Unknown feature_stage: '{feature_stage}'. Must be one of {['original', 'transformed']}")
 
     @property
+    def has_val(self) -> bool:
+        """
+        Return True if holdout validation data was used during fit, else return False.
+        """
+        self._assert_is_fit("has_val")
+        return self._trainer.has_val
+
+    @property
     def feature_metadata(self):
         return self._trainer.feature_metadata
 
@@ -2335,7 +2343,7 @@ class TabularPredictor:
         data : str or DataFrame, default = None
             The data to predict on.
             If None:
-                If self.trainer.has_val, the validation data is used.
+                If self.has_val, the validation data is used.
                 Else, the out-of-fold prediction probabilities are used.
         models : List[str], default = None
             The list of models to get predictions for.
@@ -2403,7 +2411,7 @@ class TabularPredictor:
         data : DataFrame, default = None
             The data to predict on.
             If None:
-                If self.trainer.has_val, the validation data is used.
+                If self.has_val, the validation data is used.
                 Else, the out-of-fold prediction probabilities are used.
         models : List[str], default = None
             The list of models to get predictions for.
@@ -4527,7 +4535,7 @@ class TabularPredictor:
     # TODO: Cleanup, unit test, add docs
     def get_simulation_artifact(self, test_data: pd.DataFrame) -> dict:
         """
-        Computes and returns the necessary information to perform zeroshot HPO simulation.
+        [Advanced] Computes and returns the necessary information to perform zeroshot HPO simulation.
 
         Parameters
         ----------
