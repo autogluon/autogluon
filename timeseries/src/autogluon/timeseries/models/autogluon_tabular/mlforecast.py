@@ -144,6 +144,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
     def _generate_train_val_dfs(
         self, data: TimeSeriesDataFrame, max_num_items: Optional[int], max_num_samples: Optional[int]
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        # Exclude items that are too short for chosen differences - otherwise exception will be raised
         if self._min_train_length is not None:
             ts_lengths = data.num_timesteps_per_item()
             items_to_exclude = ts_lengths.index[ts_lengths < self._min_train_length]
@@ -164,16 +165,16 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
 
         grouped_df = df.groupby(MLF_ITEMID, sort=False)
         num_items = len(grouped_df)
+
+        if max_num_samples is not None and len(df) > max_num_samples:
+            df = grouped_df.tail(self.prediction_length + math.ceil(max_num_samples / num_items))
+            grouped_df = df.groupby(MLF_ITEMID, sort=False)
+
         # Use last `prediction_length` rows as validation set (but no more than 50% of the rows)
         val_rows_per_item = min(self.prediction_length, math.ceil(0.5 * len(df) / num_items))
         train_df = grouped_df.nth(slice(None, -val_rows_per_item))
         val_df = grouped_df.tail(val_rows_per_item)
 
-        if max_num_samples is not None:
-            if len(train_df) > max_num_samples:
-                train_df = train_df.sample(n=max_num_samples)
-            if len(val_df) > max_num_samples:
-                val_df = val_df.sample(n=max_num_samples)
         return train_df.drop([MLF_ITEMID, MLF_TIMESTAMP], axis=1), val_df.drop([MLF_ITEMID, MLF_TIMESTAMP], axis=1)
 
     def _to_mlforecast_df(
