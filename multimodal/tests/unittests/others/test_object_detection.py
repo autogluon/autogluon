@@ -93,6 +93,7 @@ def test_mmdet_object_detection_inference_list_str_dict(checkpoint_name):
     assert len(pred) == 10  # test data size is 10
 
 
+@pytest.mark.mgpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -135,6 +136,7 @@ def test_mmdet_object_detection_inference_xywh_output(checkpoint_name):
     assert abs(y2 - y1 + 1 - h) < 1e-4
 
 
+@pytest.mark.mgpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -160,6 +162,7 @@ def test_mmdet_object_detection_inference_df(checkpoint_name):
     pred = predictor.predict(test_df.iloc[:100])
 
 
+@pytest.mark.mgpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -182,6 +185,7 @@ def test_mmdet_object_detection_inference_coco(checkpoint_name):
     pred = predictor.predict(test_path)
 
 
+@pytest.mark.mgpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -217,6 +221,7 @@ def test_mmdet_object_detection_save_and_load(checkpoint_name):
     assert abs(pred["bboxes"][0][0]["score"] - new_pred["bboxes"][0][0]["score"]) < 1e-4
 
 
+@pytest.mark.mgpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -251,6 +256,7 @@ def test_mmdet_object_detection_fit_then_inference_dict(checkpoint_name):
     pred = predictor.predict({"image": [mmdet_image_name] * 10})  # test batch inference
 
 
+@pytest.mark.mgpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -287,6 +293,7 @@ def test_mmdet_object_detection_fit_then_inference_df(checkpoint_name):
     pred = predictor.predict(df)  # test batch inference
 
 
+@pytest.mark.mgpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -321,6 +328,7 @@ def test_mmdet_object_detection_fit_then_inference_coco(checkpoint_name):
     pred = predictor.predict(test_path)  # test batch inference
 
 
+@pytest.mark.mgpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -357,6 +365,7 @@ def test_mmdet_object_detection_fit_eval_predict_df(checkpoint_name):
     results = predictor.evaluate(data=test_df)
 
 
+@pytest.mark.mgpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
