@@ -365,12 +365,13 @@ class MultiModalPredictor(ExportMixin):
 
         if isinstance(eval_metric, str):
             eval_metric_name = eval_metric
-            eval_metric_func = autogluon.core.metrics.get_metric(eval_metric)
+            eval_metric_func = None
         elif isinstance(eval_metric, Scorer):
             eval_metric_func = eval_metric
             eval_metric_name = eval_metric_func.name
         else:
-            raise ValueError(f"Evaluation metric type {type(eval_metric)} is not supported.")
+            eval_metric_name = None
+            eval_metric_func = None
 
         if eval_metric is not None and eval_metric_name.lower() in [
             "rmse",
@@ -2069,7 +2070,10 @@ class MultiModalPredictor(ExportMixin):
 
         if metrics is None:
             metrics_is_none = True
-            metrics = [self._eval_metric_func]
+            if self._eval_metric_func:
+                metrics = [self._eval_metric_func]
+            else:
+                metrics = [self._eval_metric_name]
         if isinstance(metrics, str) or isinstance(metrics, Scorer):
             metrics = [metrics]
 
