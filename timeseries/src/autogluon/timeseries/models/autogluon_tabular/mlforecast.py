@@ -2,8 +2,7 @@ import logging
 import math
 import os
 import time
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
-from autogluon.timeseries.dataset import TimeSeriesDataFrame
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -13,9 +12,9 @@ import autogluon.core as ag
 from autogluon.tabular import TabularPredictor
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
-from autogluon.timeseries.utils.warning_filters import warning_filter
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 from autogluon.timeseries.utils.seasonality import get_seasonality
+from autogluon.timeseries.utils.warning_filters import warning_filter
 
 logger = logging.getLogger(__name__)
 
@@ -93,8 +92,9 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
 
     def _get_mlforecast_init_args(self, model_params: dict) -> dict:
         from gluonts.time_feature import get_lags_for_frequency, time_features_from_frequency_str
-        from .utils import MeanAbsScaler, StandardScaler
         from mlforecast.target_transforms import Differences
+
+        from .utils import MeanAbsScaler, StandardScaler
 
         lags = model_params.get("lags")
         if lags is None:
@@ -142,7 +142,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         return df
 
     def _generate_train_val_dfs(
-        self, data: TimeSeriesDataFrame, max_num_items: Optional[int], max_num_samples: Optional[int]
+        self, data: TimeSeriesDataFrame, max_num_items: Optional[int] = None, max_num_samples: Optional[int] = None
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
         # Exclude items that are too short for chosen differences - otherwise exception will be raised
         if self._min_train_length is not None:
@@ -247,11 +247,11 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         with warning_filter():
             self._mlf.fit_models(X=train_df.drop(MLF_TARGET, axis=1), y=train_df[MLF_TARGET])
 
-        self._save_residuals(val_df)
+        self._avg_residuals_std = self._compute_residuals_std(val_df)
 
-    def _save_residuals(self, val_df: pd.DataFrame):
+    def _compute_residuals_std(self, val_df: pd.DataFrame) -> float:
         residuals = val_df[MLF_TARGET] - self._mlf.models_["mean"].predict(val_df)
-        self._avg_residuals_std = np.sqrt(residuals.pow(2.0).mean())
+        return np.sqrt(residuals.pow(2.0).mean())
 
     def _get_scale_per_item(self, item_ids: pd.Index) -> pd.Series:
         """Extract the '_scale' values from the scaler object, if available."""
@@ -270,7 +270,23 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
 
 
 class DirectTabularModel(AbstractMLForecastModel):
-    """
+    """Predict all future time series values simultaneously using TabularPredictor from AutoGluon-Tabular.
+
+    A single TabularPredictor is used to forecast all future time series values using the following features:
+
+    - lag features (observed time series values) based on ``freq`` of the data
+    - time features (e.g., day of the week) based on the timestamp of the measurement
+    - known covariates (if available)
+    - static features of each item (if available)
+
+    Features not known during the forecast horizon (e.g., future target values) are replaced by NaNs.
+
+    If ``eval_metric=="WQL"``, the TabularPredictor will be trained with ``"quantile"`` problem type.
+    Otherwise, TabularPredictor will be trained with ``"regression"`` problem type, and dummy quantiles will be
+    obtained by assuming that the residuals follow zero-mean normal distribution.
+
+    Based on the `mlforecast <https://github.com/Nixtla/mlforecast>`_ library.
+
 
     Other Parameters
     ----------------
@@ -294,8 +310,8 @@ class DirectTabularModel(AbstractMLForecastModel):
     max_num_items: int or None, default = 10_000
         If not None, the model will randomly select this many time series for training and validation.
     max_num_samples : int or None, default = 1_000_000
-        If not None, training and validation datasets passed to TabularPredictor will contain at most this many rows
-        (starting from the end of each time series).
+        If not None, training dataset passed to TabularPredictor will contain at most this many rows (starting from the
+        end of each time series).
     """
 
     TIMESERIES_METRIC_TO_TABULAR_METRIC = {
@@ -326,15 +342,15 @@ class DirectTabularModel(AbstractMLForecastModel):
         num_hidden = np.random.randint(0, self.prediction_length, size=len(df))
         lag_cols = [f"lag{lag}" for lag in self._target_lags]
         mask = num_hidden[:, None] < self._target_lags[None]  # shape [len(num_hidden), len(_target_lags)]
-        df[lag_cols] = df[lag_cols].where(mask, other=np.nan)
+        # use df.loc[:, lag_cols] instead of df[lag_cols] to avoid SettingWithCopyWarning
+        df.loc[:, lag_cols] = df[lag_cols].where(mask, other=np.nan)
         return df
 
-    def _save_residuals(self, val_df: pd.DataFrame):
-        # Quantile model does not require residuals to produce prediction intervals
+    def _compute_residuals_std(self, val_df: pd.DataFrame) -> float:
         if self.is_quantile_model:
-            self._avg_residuals_std = 1.0
+            return 1.0  # Quantile model does not require residuals to produce prediction intervals
         else:
-            super()._save_residuals(val_df=val_df)
+            return super()._compute_residuals_std(val_df=val_df)
 
     def predict(
         self,
@@ -390,7 +406,20 @@ class DirectTabularModel(AbstractMLForecastModel):
 
 
 class RecursiveTabularModel(AbstractMLForecastModel):
-    """
+    """Predict future time series values one by one using TabularPredictor from AutoGluon-Tabular.
+
+    A single TabularPredictor is used to forecast the future time series values using the following features:
+
+    - lag features (observed time series values) based on ``freq`` of the data
+    - time features (e.g., day of the week) based on the timestamp of the measurement
+    - known covariates (if available)
+    - static features of each item (if available)
+
+    TabularPredictor will always be trained with ``"regression"`` problem type, and dummy quantiles will be
+    obtained by assuming that the residuals follow zero-mean normal distribution.
+
+    Based on the `mlforecast <https://github.com/Nixtla/mlforecast>`_ library.
+
 
     Other Parameters
     ----------------
@@ -413,8 +442,8 @@ class RecursiveTabularModel(AbstractMLForecastModel):
     max_num_items: int or None, default = 10_000
         If not None, the model will randomly select this many time series for training and validation.
     max_num_samples : int or None, default = 1_000_000
-        If not None, training and validation datasets passed to TabularPredictor will contain at most this many rows
-        (starting from the end of each time series).
+        If not None, training dataset passed to TabularPredictor will contain at most this many rows (starting from the
+        end of each time series).
     """
 
     TIMESERIES_METRIC_TO_TABULAR_METRIC = {
@@ -442,7 +471,7 @@ class RecursiveTabularModel(AbstractMLForecastModel):
     ) -> TimeSeriesDataFrame:
         from scipy.stats import norm
 
-        new_data = self._to_mlforecast_df(data, data.static_features)
+        new_df = self._to_mlforecast_df(data, data.static_features)
         if known_covariates is not None:
             dynamic_dfs = [self._to_mlforecast_df(known_covariates, data.static_features, include_target=False)]
         else:
@@ -450,7 +479,7 @@ class RecursiveTabularModel(AbstractMLForecastModel):
         with warning_filter():
             raw_predictions = self._mlf.predict(
                 h=self.prediction_length,
-                new_data=new_data,
+                new_df=new_df,
                 dynamic_dfs=dynamic_dfs,
             )
         predictions = raw_predictions.rename(columns={MLF_ITEMID: ITEMID, MLF_TIMESTAMP: TIMESTAMP})

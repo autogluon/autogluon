@@ -2,7 +2,6 @@
 See also, https://ts.gluon.ai/api/gluonts/gluonts.evaluation.html
 """
 import logging
-import warnings
 from typing import Optional
 
 import numpy as np

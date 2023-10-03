@@ -4,7 +4,7 @@ from mlforecast.target_transforms import BaseTargetTransform
 
 
 class StandardScaler(BaseTargetTransform):
-    """Standardizes the series by dividing by their standard deviation."""
+    """Standardizes the series by subtracting mean and diving by standard deviation."""
 
     min_scale: float = 1e-2
 
@@ -30,7 +30,7 @@ class StandardScaler(BaseTargetTransform):
 
 
 class MeanAbsScaler(BaseTargetTransform):
-    """Standardizes the series by dividing by their standard deviation."""
+    """Scales time series by diving by their mean absolute value."""
 
     min_scale: float = 1e-2
 
@@ -48,24 +48,4 @@ class MeanAbsScaler(BaseTargetTransform):
         for col in df.columns.drop([self.id_col, self.time_col, "_scale"]):
             df[col] = df[col] * df["_scale"]
         df = df.drop(columns=["_scale"])
-        return df
-
-
-class Detrend(BaseTargetTransform):
-    def fit_transform(self, df: pd.DataFrame) -> pd.DataFrame:
-        self.length_per_ts
-        return df
-
-    def inverse_transform(self, df: pd.DataFrame) -> pd.DataFrame:
-        prediction_length = 20
-        return df
-
-
-class Deseasonalize(BaseTargetTransform):
-    def fit_transform(self, df: pd.DataFrame) -> pd.DataFrame:
-        self.length_per_ts
-        return df
-
-    def inverse_transform(self, df: pd.DataFrame) -> pd.DataFrame:
-        prediction_length = 20
         return df
