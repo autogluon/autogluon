@@ -8,6 +8,7 @@ from statsmodels.tools.sm_exceptions import ConvergenceWarning, ValueWarning
 
 __all__ = ["warning_filter", "disable_root_logger", "disable_tqdm"]
 
+
 @contextlib.contextmanager
 def warning_filter():
     with warnings.catch_warnings():
