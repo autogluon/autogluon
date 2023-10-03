@@ -6,11 +6,12 @@ function test_multimodal {
 
     setup_build_env
     setup_hf_model_mirror "$SUB_FOLDER"
-    export CUDA_VISIBLE_DEVICES=0,1,2,3
+    export CUDA_VISIBLE_DEVICES=0
     install_local_packages "common/[tests]" "core/[all,tests]" "features/"
     install_multimodal "[tests]"
 
     echo "Additional Test Args: $ADDITIONAL_TEST_ARGS"
+    nvidia-smi
 
     # Get GPU USAGE COUNT HERE AND IF > 1 then use Multi-GPU CI
     # On 4 GPU machines enable 1 and get count to try first
