@@ -91,6 +91,8 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         return model_params
 
     def _get_mlforecast_init_args(self, model_params: dict) -> dict:
+        # TODO: Support lag generation for all pandas frequencies
+        # TODO: Support date_feature generation for all pandas frequencies
         from gluonts.time_feature import get_lags_for_frequency, time_features_from_frequency_str
         from mlforecast.target_transforms import Differences
 
@@ -187,7 +189,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
 
         Each row contains unique_id, ds, y, and (optionally) known covariates & static features.
         """
-        # past_covariates & lags for known_covariates are not supported
+        # TODO: Add support for past_covariates
         selected_columns = self.metadata.known_covariates_real.copy()
         column_name_mapping = {ITEMID: MLF_ITEMID, TIMESTAMP: MLF_TIMESTAMP}
         if include_target:
