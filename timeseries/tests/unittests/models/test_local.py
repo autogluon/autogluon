@@ -133,7 +133,7 @@ def test_when_seasonal_period_is_set_to_none_then_inferred_period_is_used(
         ("M", 100, 24),
     ],
 )
-def test_when_seasonal_period_is_provided_then_inferred_period_is_overriden(
+def test_when_seasonal_period_is_provided_then_inferred_period_is_overridden(
     model_class,
     temp_model_path,
     freqstr,
