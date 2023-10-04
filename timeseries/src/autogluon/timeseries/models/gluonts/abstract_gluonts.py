@@ -280,6 +280,8 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         if torch.cuda.is_available():
             trainer_kwargs["accelerator"] = "gpu"
             trainer_kwargs["devices"] = 1
+        else:
+            trainer_kwargs["accelerator"] = "cpu"
 
         return from_hyperparameters(
             self._get_estimator_class(),
