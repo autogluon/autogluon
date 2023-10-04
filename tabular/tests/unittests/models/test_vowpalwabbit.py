@@ -1,5 +1,6 @@
-import pytest
 import sys
+
+import pytest
 
 from autogluon.tabular.models.vowpalwabbit.vowpalwabbit_model import VowpalWabbitModel
 
