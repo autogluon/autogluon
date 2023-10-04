@@ -1,10 +1,10 @@
 import os
 import shutil
-import tensorrt
 
 import numpy as np
 import numpy.testing
 import pytest
+import tensorrt
 import torch
 from datasets import load_dataset
 from packaging import version
