@@ -194,8 +194,10 @@ def test_onnx_export_timm_image(checkpoint_name, num_gpus):
         ),
     ],
 )
-
-@pytest.mark.skipif(version.parse(tensorrt.__version__) >= version.parse("8.5.4"), reason="tensorrt above 8.5.4 cause segfault, but is required to support py311")
+@pytest.mark.skipif(
+    version.parse(tensorrt.__version__) >= version.parse("8.5.4"),
+    reason="tensorrt above 8.5.4 cause segfault, but is required to support py311",
+)
 def test_onnx_optimize_for_inference(dataset_name, model_names, text_backbone, image_backbone):
     dataset = ALL_DATASETS[dataset_name]
     hyperparameters = {
