@@ -35,7 +35,6 @@ DUMMY_HYPERPARAMETERS = {
     "use_fallback_model": False,
 }
 TESTABLE_PREDICTION_LENGTHS = [1, 5]
-MODELS_WITHOUT_HPO = ["DirectTabular"]
 
 
 @pytest.fixture(scope="module")
@@ -150,8 +149,6 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct
             "maxiter": 1,
         },
     )
-    if model.name in MODELS_WITHOUT_HPO:
-        pytest.skip(f"{model.name} doesn't support HPO")
     if isinstance(model, MultiWindowBacktestingModel):
         val_data = None
     else:

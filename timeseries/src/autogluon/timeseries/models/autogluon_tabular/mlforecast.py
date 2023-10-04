@@ -72,7 +72,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         from mlforecast import MLForecast
         from mlforecast.target_transforms import BaseTargetTransform
 
-        self._min_train_length: Optional[int] = None
+        self._required_ts_length: Optional[int] = None
         self._target_lags: Optional[List[int]] = None
         self._date_features: Optional[List[str]] = None
         self._mlf: Optional[MLForecast] = None
@@ -90,7 +90,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         model_params.setdefault("tabular_fit_kwargs", {})
         return model_params
 
-    def _get_mlforecast_init_args(self, model_params: dict) -> dict:
+    def _get_mlforecast_init_args(self, train_data: TimeSeriesDataFrame, model_params: dict) -> dict:
         # TODO: Support lag generation for all pandas frequencies
         # TODO: Support date_feature generation for all pandas frequencies
         from gluonts.time_feature import get_lags_for_frequency, time_features_from_frequency_str
@@ -110,9 +110,21 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
 
         target_transforms = []
         differences = model_params.get("differences")
+
+        ts_lengths = train_data.num_timesteps_per_item()
+        required_ts_length = sum(differences) + 1
+        all_train_ts_are_long_enough = ts_lengths.min() >= required_ts_length
+        some_ts_available_for_validation = ts_lengths.max() >= required_ts_length + self.prediction_length
+        if not (all_train_ts_are_long_enough and some_ts_available_for_validation):
+            logger.warning(
+                f"\tTime series in the dataset are too short for chosen differences {differences}. "
+                f"Setting differences to [1]."
+            )
+            differences = [1]
+
         if len(differences) > 0:
             target_transforms.append(Differences(differences))
-            self._min_train_length = sum(differences)
+            self._required_ts_length = sum(differences)
 
         scaler_name = model_params.get("scaler")
         if scaler_name is None:
@@ -147,9 +159,9 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         self, data: TimeSeriesDataFrame, max_num_items: Optional[int] = None, max_num_samples: Optional[int] = None
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
         # Exclude items that are too short for chosen differences - otherwise exception will be raised
-        if self._min_train_length is not None:
+        if self._required_ts_length is not None:
             ts_lengths = data.num_timesteps_per_item()
-            items_to_exclude = ts_lengths.index[ts_lengths < self._min_train_length]
+            items_to_exclude = ts_lengths.index[ts_lengths < self._required_ts_length]
             if len(items_to_exclude) > 0:
                 logger.debug(f"Removing {len(items_to_exclude)} items that are too short for chosen differences")
                 data = data.query("item_id not in @items_to_exclude")
@@ -216,13 +228,15 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
     ) -> None:
         from mlforecast import MLForecast
 
+        self._check_fit_params()
         fit_start_time = time.time()
         # TabularEstimator is passed to MLForecast later to include tuning_data
         model_params = self._get_model_params()
 
-        mlforecast_init_args = self._get_mlforecast_init_args(model_params)
+        mlforecast_init_args = self._get_mlforecast_init_args(train_data, model_params)
         self._mlf = MLForecast(models={}, freq=self.freq, **mlforecast_init_args)
 
+        # We generate train/val splits from train_data and ignore val_data to avoid overfitting
         train_df, val_df = self._generate_train_val_dfs(
             train_data,
             max_num_items=model_params["max_num_items"],
@@ -327,6 +341,14 @@ class DirectTabularModel(AbstractMLForecastModel):
         "RMSSE": "root_mean_squared_error",
     }
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if 0.5 not in self.quantile_levels:
+            self.must_drop_median = True
+            self.quantile_levels = sorted(set([0.5] + self.quantile_levels))
+        else:
+            self.must_drop_median = False
+
     @property
     def is_quantile_model(self) -> bool:
         return self.eval_metric == "WQL"
@@ -385,6 +407,8 @@ class DirectTabularModel(AbstractMLForecastModel):
         predictions = predictions.rename(columns={MLF_ITEMID: ITEMID, MLF_TIMESTAMP: TIMESTAMP}).set_index(
             [ITEMID, TIMESTAMP]
         )
+        if self.must_drop_median:
+            predictions = predictions.drop("0.5", axis=1)
         return TimeSeriesDataFrame(predictions)
 
     def _postprocess_predictions(self, predictions: np.ndarray) -> pd.DataFrame:
@@ -486,6 +510,7 @@ class RecursiveTabularModel(AbstractMLForecastModel):
             )
         predictions = raw_predictions.rename(columns={MLF_ITEMID: ITEMID, MLF_TIMESTAMP: TIMESTAMP})
 
+        # Add quantile levels assuming that residuals follow normal distribution
         scale_per_item = self._get_scale_per_item(predictions[ITEMID].unique())
         num_items = int(len(predictions) / self.prediction_length)
         sqrt_h = np.sqrt(np.arange(1, self.prediction_length + 1))
@@ -495,7 +520,7 @@ class RecursiveTabularModel(AbstractMLForecastModel):
         std_per_timestep = self._avg_residuals_std * scale_per_item * normal_scale_per_timestep
         for q in self.quantile_levels:
             predictions[str(q)] = predictions["mean"] + norm.ppf(q) * std_per_timestep.to_numpy()
-        return TimeSeriesDataFrame(predictions)
+        return TimeSeriesDataFrame(predictions).reindex(data.item_ids, level=ITEMID)
 
     def _get_extra_tabular_init_kwargs(self) -> dict:
         return {"problem_type": ag.constants.REGRESSION}
