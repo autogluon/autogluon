@@ -1,5 +1,6 @@
 import os
 
+import pytest
 import timm
 import transformers
 
