@@ -6,7 +6,8 @@ function test_multimodal {
 
     setup_build_env
     setup_hf_model_mirror "$SUB_FOLDER"
-    export CUDA_VISIBLE_DEVICES=0
+    # export CUDA_VISIBLE_DEVICES=0,1,2,3
+    unset CUDA_VISIBLE_DEVICES
     install_local_packages "common/[tests]" "core/[all,tests]" "features/"
     install_multimodal "[tests]"
 
@@ -19,8 +20,8 @@ function test_multimodal {
     cd multimodal/
     if [ -n "$ADDITIONAL_TEST_ARGS" ]
     then
-        python3 -m pytest -vv --junitxml=results.xml --runslow "$ADDITIONAL_TEST_ARGS" tests/unittests/"$SUB_FOLDER"/ --durations=0
+        python3 -m pytest -vv --junitxml=results.xml --runslow "$ADDITIONAL_TEST_ARGS" tests/unittests/"$SUB_FOLDER"/ --durations=0 -x
     else
-        python3 -m pytest -vv --junitxml=results.xml --runslow tests/unittests/"$SUB_FOLDER"/ --durations=0
+        python3 -m pytest -vv --junitxml=results.xml --runslow tests/unittests/"$SUB_FOLDER"/ --durations=0 -x
     fi   
 }
