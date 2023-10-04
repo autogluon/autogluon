@@ -1,11 +1,13 @@
 import os
 import shutil
+import tensorrt
 
 import numpy as np
 import numpy.testing
 import pytest
 import torch
 from datasets import load_dataset
+from packaging import version
 from scipy.stats import pearsonr, spearmanr
 from sklearn.metrics.pairwise import paired_cosine_distances
 from torch import FloatTensor
@@ -192,6 +194,8 @@ def test_onnx_export_timm_image(checkpoint_name, num_gpus):
         ),
     ],
 )
+
+@pytest.mark.skipif(version.parse(tensorrt.__version__) >= version.parse("8.5.4"), reason="tensorrt above 8.5.4 cause segfault, but is required to support py311")
 def test_onnx_optimize_for_inference(dataset_name, model_names, text_backbone, image_backbone):
     dataset = ALL_DATASETS[dataset_name]
     hyperparameters = {
