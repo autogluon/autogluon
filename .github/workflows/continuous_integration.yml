@@ -325,65 +325,65 @@ jobs:
           job-type: CI-CPU
           job-name: AutoGluon-Install
           command: chmod +x ./.github/workflow_scripts/test_install.sh && ./.github/workflow_scripts/test_install.sh
-  build_tabular_prediction_tutorial:
-    needs: [test_common, test_core, test_features, test_tabular, test_multimodal_predictor, test_multimodal_others, test_multimodal_others_2, test_timeseries, test_tabular_lite, test_install]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Setup Env Vars
-        uses: ./.github/actions/setup-env-vars
-      - name: Build Tabular Prediction Tutorial on AWS Batch
-        uses: ./.github/actions/submit-job
-        with:
-          job-type: CI-GPU
-          job-name: AutoGluon-BuildTabularPrediction
-          command: chmod +x ./.github/workflow_scripts/build_tabular_prediction_tutorial.sh && ./.github/workflow_scripts/build_tabular_prediction_tutorial.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
-  build_multimodal_tutorial:
-    strategy:
-      matrix:
-        SUB_DOC: ["advanced_topics", "image_prediction", "matching", "object_detection", "text_prediction", "document", "multimodal_prediction"]
-    needs: [test_common, test_core, test_features, test_tabular, test_multimodal_predictor, test_multimodal_others, test_multimodal_others_2, test_timeseries, test_install]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Setup Env Vars
-        uses: ./.github/actions/setup-env-vars
-      - name: Build Multimodal Tutorial on AWS Batch
-        uses: ./.github/actions/submit-job
-        with:
-          job-type: CI-GPU
-          job-name: AutoGluon-BuildMultimodal
-          command: chmod +x ./.github/workflow_scripts/build_multimodal_tutorial.sh && ./.github/workflow_scripts/build_multimodal_tutorial.sh '${{ matrix.SUB_DOC }}' '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
-  build_cloud_fit_deploy_tutorial:
-    needs: [test_common, test_core, test_features, test_tabular, test_multimodal_predictor, test_multimodal_others, test_multimodal_others_2, test_timeseries, test_install]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Setup Env Vars
-        uses: ./.github/actions/setup-env-vars
-      - name: Build Cloud Fit Deploy Tutorial on AWS Batch
-        uses: ./.github/actions/submit-job
-        with:
-          job-type: CI-CPU
-          job-name: AutoGluon-BuildCloudFitDeploy
-          command: chmod +x ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh && ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
-  build_timeseries_tutorial:
-    needs: [test_common, test_core, test_features, test_tabular, test_multimodal_predictor, test_multimodal_others, test_multimodal_others_2, test_timeseries, test_install]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Setup Env Vars
-        uses: ./.github/actions/setup-env-vars
-      - name: Build Timeseries Tutorial on AWS Batch
-        uses: ./.github/actions/submit-job
-        with:
-          job-type: CI-GPU
-          job-name: AutoGluon-BuildTimeseries
-          command: chmod +x ./.github/workflow_scripts/build_timeseries_tutorial.sh && ./.github/workflow_scripts/build_timeseries_tutorial.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
+  # build_tabular_prediction_tutorial:
+  #   needs: [test_common, test_core, test_features, test_tabular, test_multimodal_predictor, test_multimodal_others, test_multimodal_others_2, test_timeseries, test_tabular_lite, test_install]
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v2
+  #     - name: Setup Env Vars
+  #       uses: ./.github/actions/setup-env-vars
+  #     - name: Build Tabular Prediction Tutorial on AWS Batch
+  #       uses: ./.github/actions/submit-job
+  #       with:
+  #         job-type: CI-GPU
+  #         job-name: AutoGluon-BuildTabularPrediction
+  #         command: chmod +x ./.github/workflow_scripts/build_tabular_prediction_tutorial.sh && ./.github/workflow_scripts/build_tabular_prediction_tutorial.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
+  # build_multimodal_tutorial:
+  #   strategy:
+  #     matrix:
+  #       SUB_DOC: ["advanced_topics", "image_prediction", "matching", "object_detection", "text_prediction", "document", "multimodal_prediction"]
+  #   needs: [test_common, test_core, test_features, test_tabular, test_multimodal_predictor, test_multimodal_others, test_multimodal_others_2, test_timeseries, test_install]
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v2
+  #     - name: Setup Env Vars
+  #       uses: ./.github/actions/setup-env-vars
+  #     - name: Build Multimodal Tutorial on AWS Batch
+  #       uses: ./.github/actions/submit-job
+  #       with:
+  #         job-type: CI-GPU
+  #         job-name: AutoGluon-BuildMultimodal
+  #         command: chmod +x ./.github/workflow_scripts/build_multimodal_tutorial.sh && ./.github/workflow_scripts/build_multimodal_tutorial.sh '${{ matrix.SUB_DOC }}' '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
+  # build_cloud_fit_deploy_tutorial:
+  #   needs: [test_common, test_core, test_features, test_tabular, test_multimodal_predictor, test_multimodal_others, test_multimodal_others_2, test_timeseries, test_install]
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v2
+  #     - name: Setup Env Vars
+  #       uses: ./.github/actions/setup-env-vars
+  #     - name: Build Cloud Fit Deploy Tutorial on AWS Batch
+  #       uses: ./.github/actions/submit-job
+  #       with:
+  #         job-type: CI-CPU
+  #         job-name: AutoGluon-BuildCloudFitDeploy
+  #         command: chmod +x ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh && ./.github/workflow_scripts/build_cloud_fit_deploy_tutorial.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
+  # build_timeseries_tutorial:
+  #   needs: [test_common, test_core, test_features, test_tabular, test_multimodal_predictor, test_multimodal_others, test_multimodal_others_2, test_timeseries, test_install]
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v2
+  #     - name: Setup Env Vars
+  #       uses: ./.github/actions/setup-env-vars
+  #     - name: Build Timeseries Tutorial on AWS Batch
+  #       uses: ./.github/actions/submit-job
+  #       with:
+  #         job-type: CI-GPU
+  #         job-name: AutoGluon-BuildTimeseries
+  #         command: chmod +x ./.github/workflow_scripts/build_timeseries_tutorial.sh && ./.github/workflow_scripts/build_timeseries_tutorial.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
   # build_eda_tutorial:
   #   needs: [test_common, test_core, test_features, test_tabular, test_eda, test_multimodal_predictor, test_multimodal_others, test_multimodal_others_2, test_timeseries, test_install]
   #   runs-on: ubuntu-latest
@@ -398,51 +398,51 @@ jobs:
   #         job-type: CI-GPU
   #         job-name: AutoGluon-BuildEda
   #         command: chmod +x ./.github/workflow_scripts/build_eda_tutorial.sh && ./.github/workflow_scripts/build_eda_tutorial.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
-  build_all_docs:
-    needs: [build_tabular_prediction_tutorial, build_multimodal_tutorial, build_cloud_fit_deploy_tutorial, build_timeseries_tutorial]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Setup Env Vars
-        uses: ./.github/actions/setup-env-vars
-      - name: Build All Docs on AWS Batch
-        uses: ./.github/actions/submit-job
-        with:
-          job-type: CI-GPU
-          job-name: AutoGluon-BuildAllDocs
-          command: chmod +x ./.github/workflow_scripts/build_all_docs.sh && ./.github/workflow_scripts/build_all_docs.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
-  copy-docs:
-    needs: build_all_docs
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Setup Env Vars
-        uses: ./.github/actions/setup-env-vars
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCiCopyDocs
-          role-duration-seconds: 3600
-          aws-region: us-east-1
-      - name: Copy Docs to Bucket(For push)
-        if: ${{ github.event_name == 'push' }}
-        run: |
-          chmod +x ./.github/workflow_scripts/copy_docs.sh
-          ./.github/workflow_scripts/copy_docs.sh '${{ github.ref }}' '${{ github.repository }}' '${{ env.SHORT_SHA }}'
-      - name: Copy Docs to Bucket(For pull request)
-        if: ${{ github.event_name == 'pull_request_target' }}
-        env:
-          branch: ${{ github.event.pull_request.head.ref }}
-        run: |
-          chmod +x ./.github/workflow_scripts/copy_docs.sh
-          ./.github/workflow_scripts/copy_docs.sh "$branch" '${{ github.event.pull_request.head.repo.full_name }}' '${{ env.SHORT_SHA }}' PR-'${{ github.event.number }}'
-      - name: Comment on PR
-        if: ${{ github.event_name == 'pull_request_target' }}
-        uses: peter-evans/create-or-update-comment@v2.0.0
-        with:
-          issue-number: ${{ github.event.number }}
-          body: |
-            Job PR-${{ github.event.number }}-${{ env.SHORT_SHA }} is done.
-            Docs are uploaded to http://autogluon-staging.s3-website-us-west-2.amazonaws.com/PR-${{ github.event.number }}/${{ env.SHORT_SHA }}/index.html
+  # build_all_docs:
+  #   needs: [build_tabular_prediction_tutorial, build_multimodal_tutorial, build_cloud_fit_deploy_tutorial, build_timeseries_tutorial]
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v2
+  #     - name: Setup Env Vars
+  #       uses: ./.github/actions/setup-env-vars
+  #     - name: Build All Docs on AWS Batch
+  #       uses: ./.github/actions/submit-job
+  #       with:
+  #         job-type: CI-GPU
+  #         job-name: AutoGluon-BuildAllDocs
+  #         command: chmod +x ./.github/workflow_scripts/build_all_docs.sh && ./.github/workflow_scripts/build_all_docs.sh '${{ env.BRANCH }}' '${{ env.GIT_REPO }}' '${{ env.SHORT_SHA }}' '${{ env.PR_NUMBER }}'
+  # copy-docs:
+  #   needs: build_all_docs
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v2
+  #     - name: Setup Env Vars
+  #       uses: ./.github/actions/setup-env-vars
+  #     - name: Configure AWS Credentials
+  #       uses: aws-actions/configure-aws-credentials@v1
+  #       with:
+  #         role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCiCopyDocs
+  #         role-duration-seconds: 3600
+  #         aws-region: us-east-1
+  #     - name: Copy Docs to Bucket(For push)
+  #       if: ${{ github.event_name == 'push' }}
+  #       run: |
+  #         chmod +x ./.github/workflow_scripts/copy_docs.sh
+  #         ./.github/workflow_scripts/copy_docs.sh '${{ github.ref }}' '${{ github.repository }}' '${{ env.SHORT_SHA }}'
+  #     - name: Copy Docs to Bucket(For pull request)
+  #       if: ${{ github.event_name == 'pull_request_target' }}
+  #       env:
+  #         branch: ${{ github.event.pull_request.head.ref }}
+  #       run: |
+  #         chmod +x ./.github/workflow_scripts/copy_docs.sh
+  #         ./.github/workflow_scripts/copy_docs.sh "$branch" '${{ github.event.pull_request.head.repo.full_name }}' '${{ env.SHORT_SHA }}' PR-'${{ github.event.number }}'
+  #     - name: Comment on PR
+  #       if: ${{ github.event_name == 'pull_request_target' }}
+  #       uses: peter-evans/create-or-update-comment@v2.0.0
+  #       with:
+  #         issue-number: ${{ github.event.number }}
+  #         body: |
+  #           Job PR-${{ github.event.number }}-${{ env.SHORT_SHA }} is done.
+  #           Docs are uploaded to http://autogluon-staging.s3-website-us-west-2.amazonaws.com/PR-${{ github.event.number }}/${{ env.SHORT_SHA }}/index.html
