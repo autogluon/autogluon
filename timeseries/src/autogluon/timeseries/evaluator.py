@@ -9,7 +9,7 @@ import pandas as pd
 
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID
-from autogluon.timeseries.utils.seasonality import get_seasonality
+from autogluon.timeseries.utils.datetime import get_seasonality
 from autogluon.timeseries.utils.warning_filters import warning_filter
 
 logger = logging.getLogger(__name__)

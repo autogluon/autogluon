@@ -12,7 +12,7 @@ from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
-from autogluon.timeseries.utils.seasonality import get_seasonality
+from autogluon.timeseries.utils.datetime import get_seasonality
 from autogluon.timeseries.utils.warning_filters import warning_filter
 
 logger = logging.getLogger(__name__)

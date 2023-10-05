@@ -131,3 +131,41 @@ def dict_equal_primitive(this, that):
             equal_fields.append(dict_equal_primitive(dict(enumerate(v)), dict(enumerate(that[k]))))
 
     return all(equal_fields)
+
+
+ALL_PANDAS_FREQUENCIES = [
+    "B",
+    "C",
+    "D",
+    "W",
+    "M",
+    "SM",
+    "BM",
+    "CBM",
+    "MS",
+    "SMS",
+    "BMS",
+    "CBMS",
+    "Q",
+    "BQ",
+    "QS",
+    "BQS",
+    "A",
+    "Y",
+    "BA",
+    "BY",
+    "AS",
+    "YS",
+    "BAS",
+    "BYS",
+    "BH",
+    "H",
+    "T",
+    "min",
+    "S",
+    "L",
+    "ms",
+    "U",
+    "us",
+    "N",
+]
