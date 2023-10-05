@@ -9,6 +9,7 @@ from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.utils import from_coco_or_voc
 
 
+@pytest.mark.mgpu
 def download_sample_images():
     url = "https://raw.githubusercontent.com/open-mmlab/mmdetection/master/demo/demo.jpg"
     image = Image.open(requests.get(url, stream=True).raw)
@@ -18,6 +19,7 @@ def download_sample_images():
     return mmdet_image_name
 
 
+@pytest.mark.mgpu
 def download_sample_dataset():
     zip_file = "https://automl-mm-bench.s3.amazonaws.com/object_detection_dataset/tiny_motorbike_coco.zip"
     download_dir = "./tiny_motorbike_coco"
