@@ -151,7 +151,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         """Apply a mask that mimics the situation at prediction time when target/covariates are unknown during the
         forecast horizon.
 
-        This method is overriden by DirectTabularModel.
+        This method is overridden by DirectTabularModel.
         """
         return df
 
