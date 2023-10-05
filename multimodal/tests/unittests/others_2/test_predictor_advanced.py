@@ -14,7 +14,7 @@ from autogluon.multimodal.utils.misc import shopee_dataset
 from ..utils.unittest_datasets import AmazonReviewSentimentCrossLingualDataset, PetFinderDataset
 
 
-@pytest.mark.mgpu
+@pytest.mark.sgpu
 @pytest.mark.parametrize(
     "backbone,efficient_finetuning,pooling_mode,precision,expected_ratio,standalone",
     [

@@ -116,7 +116,7 @@ def test_fusion_model_dump():
     assert os.path.exists(timm_image_dir) and (len(os.listdir(timm_image_dir)) == 2) == True
 
 
-@pytest.mark.mgpu
+@pytest.mark.sgpu
 def test_mmdet_object_detection_save_and_load():
     zip_file = "https://automl-mm-bench.s3.amazonaws.com/object_detection_dataset/tiny_motorbike_coco.zip"
     download_dir = "./tiny_motorbike_coco"

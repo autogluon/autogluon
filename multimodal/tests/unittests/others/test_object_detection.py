@@ -9,7 +9,7 @@ from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.utils import from_coco_or_voc
 
 
-@pytest.mark.mgpu
+@pytest.mark.sgpu
 def download_sample_images():
     url = "https://raw.githubusercontent.com/open-mmlab/mmdetection/master/demo/demo.jpg"
     image = Image.open(requests.get(url, stream=True).raw)
@@ -19,7 +19,7 @@ def download_sample_images():
     return mmdet_image_name
 
 
-@pytest.mark.mgpu
+@pytest.mark.sgpu
 def download_sample_dataset():
     zip_file = "https://automl-mm-bench.s3.amazonaws.com/object_detection_dataset/tiny_motorbike_coco.zip"
     download_dir = "./tiny_motorbike_coco"
@@ -30,7 +30,7 @@ def download_sample_dataset():
     return data_dir
 
 
-@pytest.mark.mgpu
+@pytest.mark.sgpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -67,7 +67,7 @@ def test_mmdet_object_detection_fit_then_evaluate_coco(checkpoint_name):
     predictor.evaluate(test_path)
 
 
-@pytest.mark.mgpu
+@pytest.mark.sgpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -95,7 +95,7 @@ def test_mmdet_object_detection_inference_list_str_dict(checkpoint_name):
     assert len(pred) == 10  # test data size is 10
 
 
-@pytest.mark.mgpu
+@pytest.mark.sgpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -138,7 +138,7 @@ def test_mmdet_object_detection_inference_xywh_output(checkpoint_name):
     assert abs(y2 - y1 + 1 - h) < 1e-4
 
 
-@pytest.mark.mgpu
+@pytest.mark.sgpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -164,7 +164,7 @@ def test_mmdet_object_detection_inference_df(checkpoint_name):
     pred = predictor.predict(test_df.iloc[:100])
 
 
-@pytest.mark.mgpu
+@pytest.mark.sgpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -187,7 +187,7 @@ def test_mmdet_object_detection_inference_coco(checkpoint_name):
     pred = predictor.predict(test_path)
 
 
-@pytest.mark.mgpu
+@pytest.mark.sgpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -223,7 +223,7 @@ def test_mmdet_object_detection_save_and_load(checkpoint_name):
     assert abs(pred["bboxes"][0][0]["score"] - new_pred["bboxes"][0][0]["score"]) < 1e-4
 
 
-@pytest.mark.mgpu
+@pytest.mark.sgpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -258,7 +258,7 @@ def test_mmdet_object_detection_fit_then_inference_dict(checkpoint_name):
     pred = predictor.predict({"image": [mmdet_image_name] * 10})  # test batch inference
 
 
-@pytest.mark.mgpu
+@pytest.mark.sgpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -295,7 +295,7 @@ def test_mmdet_object_detection_fit_then_inference_df(checkpoint_name):
     pred = predictor.predict(df)  # test batch inference
 
 
-@pytest.mark.mgpu
+@pytest.mark.sgpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -330,7 +330,7 @@ def test_mmdet_object_detection_fit_then_inference_coco(checkpoint_name):
     pred = predictor.predict(test_path)  # test batch inference
 
 
-@pytest.mark.mgpu
+@pytest.mark.sgpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -367,7 +367,7 @@ def test_mmdet_object_detection_fit_eval_predict_df(checkpoint_name):
     results = predictor.evaluate(data=test_df)
 
 
-@pytest.mark.mgpu
+@pytest.mark.sgpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -401,7 +401,7 @@ def test_mmdet_object_detection_fit_with_freeze_backbone(checkpoint_name):
     )
 
 
-@pytest.mark.mgpu
+@pytest.mark.sgpu
 def test_detector_hyperparameters_consistency():
     data_dir = download_sample_dataset()
 
