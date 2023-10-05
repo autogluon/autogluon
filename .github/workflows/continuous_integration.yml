@@ -246,45 +246,45 @@ jobs:
           job-name: AutoGluon-Multimodal-Others-GPU
           command: chmod +x ./.github/workflow_scripts/test_multimodal_others.sh && ./.github/workflow_scripts/test_multimodal_others.sh
   test_multimodal_others_2:
-  needs: lint_check
-  runs-on: ubuntu-latest
-  steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
-    - name: Check if changes beside docs
-      uses: dorny/paths-filter@v2
-      id: changes
-      with:
-        filters: |
-          other_than_docs:
-            - '!(docs/**)**'
-    - name: Test Multimodal Others 2 on AWS Batch
-      if: steps.changes.outputs.other_than_docs == 'true'
-      uses: ./.github/actions/submit-job
-      with:
-        job-type: CI-MULTI-GPU
-        job-name: AutoGluon-Multimodal-Others-2-GPU
-        command: chmod +x ./.github/workflow_scripts/test_multimodal_others_2.sh && ./.github/workflow_scripts/test_multimodal_others_2.sh
+    needs: lint_check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Check if changes beside docs
+        uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            other_than_docs:
+              - '!(docs/**)**'
+      - name: Test Multimodal Others 2 on AWS Batch
+        if: steps.changes.outputs.other_than_docs == 'true'
+        uses: ./.github/actions/submit-job
+        with:
+          job-type: CI-MULTI-GPU
+          job-name: AutoGluon-Multimodal-Others-2-GPU
+          command: chmod +x ./.github/workflow_scripts/test_multimodal_others_2.sh && ./.github/workflow_scripts/test_multimodal_others_2.sh
   test_multimodal_predictor:
-  needs: lint_check
-  runs-on: ubuntu-latest
-  steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
-    - name: Check if changes beside docs
-      uses: dorny/paths-filter@v2
-      id: changes
-      with:
-        filters: |
-          other_than_docs:
-            - '!(docs/**)**'
-    - name: Test Multimodal Predictor on AWS Batch
-      if: steps.changes.outputs.other_than_docs == 'true'
-      uses: ./.github/actions/submit-job
-      with:
-        job-type: CI-MULTI-GPU
-        job-name: AutoGluon-Multimodal-Predictor-GPU
-        command: chmod +x ./.github/workflow_scripts/test_multimodal_predictor.sh && ./.github/workflow_scripts/test_multimodal_predictor.sh
+    needs: lint_check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Check if changes beside docs
+        uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            other_than_docs:
+              - '!(docs/**)**'
+      - name: Test Multimodal Predictor on AWS Batch
+        if: steps.changes.outputs.other_than_docs == 'true'
+        uses: ./.github/actions/submit-job
+        with:
+          job-type: CI-MULTI-GPU
+          job-name: AutoGluon-Multimodal-Predictor-GPU
+          command: chmod +x ./.github/workflow_scripts/test_multimodal_predictor.sh && ./.github/workflow_scripts/test_multimodal_predictor.sh
   # test_timeseries:
   #   needs: lint_check
   #   runs-on: ubuntu-latest
