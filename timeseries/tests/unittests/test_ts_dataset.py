@@ -25,7 +25,7 @@ END_TIMESTAMP = pd.Timestamp("01-02-2019")  # type: ignore
 ITEM_IDS = (0, 1, 2)
 TARGETS = np.arange(9, dtype=np.float64)
 DATETIME_INDEX = tuple(pd.date_range(START_TIMESTAMP, periods=3, freq="D"))
-EMPTY_ITEM_IDS = np.array([], dtype=np.int32)
+EMPTY_ITEM_IDS = np.array([], dtype=int)
 EMPTY_DATETIME_INDEX = np.array([], dtype=np.dtype("datetime64[ns]"))  # type: ignore
 EMPTY_TARGETS = np.array([], dtype=np.float64)
 
@@ -56,9 +56,9 @@ SAMPLE_DATAFRAME = pd.DataFrame(SAMPLE_TS_DATAFRAME).reset_index()
 
 
 SAMPLE_ITERABLE = [
-    {"target": [0, 1, 2], "start": pd.Period("01-01-2019", freq="D")},  # type: ignore
-    {"target": [3, 4, 5], "start": pd.Period("01-01-2019", freq="D")},  # type: ignore
-    {"target": [6, 7, 8], "start": pd.Period("01-01-2019", freq="D")},  # type: ignore
+    {"target": [0.0, 1.0, 2.0], "start": pd.Period("01-01-2019", freq="D")},  # type: ignore
+    {"target": [3.0, 4.0, 5.0], "start": pd.Period("01-01-2019", freq="D")},  # type: ignore
+    {"target": [6.0, 7.0, 8.0], "start": pd.Period("01-01-2019", freq="D")},  # type: ignore
 ]
 
 
