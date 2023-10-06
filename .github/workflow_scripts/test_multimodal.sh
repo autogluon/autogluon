@@ -6,22 +6,16 @@ function test_multimodal {
 
     setup_build_env
     setup_hf_model_mirror "$SUB_FOLDER"
-    # export CUDA_VISIBLE_DEVICES=0,1,2,3
+    # Use all available GPUs
     unset CUDA_VISIBLE_DEVICES
     install_local_packages "common/[tests]" "core/[all,tests]" "features/"
     install_multimodal "[tests]"
 
-    echo "Additional Test Args: $ADDITIONAL_TEST_ARGS"
-    nvidia-smi
-
-    # Get GPU USAGE COUNT HERE AND IF > 1 then use Multi-GPU CI
-    # On 4 GPU machines enable 1 and get count to try first
-
     cd multimodal/
     if [ -n "$ADDITIONAL_TEST_ARGS" ]
     then
-        python3 -m pytest -vv --junitxml=results.xml --runslow "$ADDITIONAL_TEST_ARGS" tests/unittests/"$SUB_FOLDER"/ --durations=0 -x -s
+        python3 -m pytest -vv --junitxml=results.xml --runslow "$ADDITIONAL_TEST_ARGS" tests/unittests/"$SUB_FOLDER"/
     else
-        python3 -m pytest -vv --junitxml=results.xml --runslow tests/unittests/"$SUB_FOLDER"/ --durations=0 -x -s
+        python3 -m pytest -vv --junitxml=results.xml --runslow tests/unittests/"$SUB_FOLDER"/
     fi   
 }

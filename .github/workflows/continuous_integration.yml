@@ -2,9 +2,6 @@ name: Continuous Integration
 
 on:
   push:
-    branches:
-      - main
-      - automm-ci
   pull_request_target:
 
 permissions:
