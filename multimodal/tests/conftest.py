@@ -13,8 +13,8 @@ def pytest_configure(config):
 
 def pytest_collection_modifyitems(config, items):
     skip_slow = pytest.mark.skip(reason="need --runslow option to run")
-    skip_mgpu = pytest.mark.skip(reason="need --runsgpu option to run")
-    custom_markers = dict(slow=skip_slow, mgpu=skip_mgpu)
+    skip_sgpu = pytest.mark.skip(reason="need --runsgpu option to run")
+    custom_markers = dict(slow=skip_slow, sgpu=skip_sgpu)
     if config.getoption("--runslow"):
         # --runslow given in cli: do not skip slow tests
         custom_markers.pop("slow", None)
