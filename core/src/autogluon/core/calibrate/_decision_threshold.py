@@ -61,7 +61,7 @@ def calibrate_decision_threshold(
         problem_type=problem_type,
         decision_threshold=0.5,
     )
-    # TODO: Avoid calling like this, re-use logic that works with weights + extra args
+    # TODO: Avoid calling like this, reuse logic that works with weights + extra args
     score_val_baseline = metric(y, y_pred_val, **metric_kwargs)
 
     if verbose:
@@ -73,7 +73,7 @@ def calibrate_decision_threshold(
             problem_type=problem_type,
             decision_threshold=decision_threshold,
         )
-        # TODO: Avoid calling like this, re-use logic that works with weights + extra args
+        # TODO: Avoid calling like this, reuse logic that works with weights + extra args
         score_val = metric(y, y_pred_val, **metric_kwargs)
 
         if best_score_val is None or score_val > best_score_val:

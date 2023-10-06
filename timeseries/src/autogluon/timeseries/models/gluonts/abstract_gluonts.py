@@ -19,11 +19,10 @@ from pandas.tseries.frequencies import to_offset
 
 from autogluon.common.loaders import load_pkl
 from autogluon.common.utils.log_utils import set_logger_verbosity
-from autogluon.core.utils import warning_filter
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
-from autogluon.timeseries.utils.warning_filters import disable_root_logger, torch_warning_filter
+from autogluon.timeseries.utils.warning_filters import disable_root_logger, warning_filter
 
 # NOTE: We avoid imports for torch and pytorch_lightning at the top level and hide them inside class methods.
 # This is done to skip these imports during multiprocessing (which may cause bugs)
@@ -190,7 +189,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
     def load(cls, path: str, reset_paths: bool = True, verbose: bool = True) -> "AbstractGluonTSModel":
         from gluonts.torch.model.predictor import PyTorchPredictor
 
-        with torch_warning_filter():
+        with warning_filter():
             model = load_pkl.load(path=os.path.join(path, cls.model_file_name), verbose=verbose)
             if reset_paths:
                 model.set_contexts(path)
@@ -281,6 +280,8 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         if torch.cuda.is_available():
             trainer_kwargs["accelerator"] = "gpu"
             trainer_kwargs["devices"] = 1
+        else:
+            trainer_kwargs["accelerator"] = "cpu"
 
         return from_hyperparameters(
             self._get_estimator_class(),

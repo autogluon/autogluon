@@ -218,7 +218,7 @@ Models not included in this table currently do not support any additional featur
      - ✓
      - ✓
      - ✓
-     - ✓
+     -
    * - :class:`~autogluon.timeseries.models.RecursiveTabularModel`
      - ✓
      - ✓

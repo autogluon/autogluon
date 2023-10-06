@@ -49,7 +49,7 @@ jobs:
       matrix:
         os: [macos-latest, windows-latest, ubuntu-latest]
         python: ["3.8", "3.9", "3.10"]
-    steps:  
+    steps:
       - name: Checkout repository for PR
         if: (github.event_name == 'workflow_dispatch')
         uses: actions/checkout@v2
@@ -207,6 +207,48 @@ jobs:
         run: |
           conda install --channel conda-forge pygraphviz
           chmod +x ./.github/workflow_scripts/test_tabular.sh && ./.github/workflow_scripts/test_tabular.sh "-m not gpu" "true"
+
+  timeseries:
+    needs: setup
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+        python: ["3.8", "3.9", "3.10"]
+    steps:
+      - name: Checkout repository for PR
+        if: (github.event_name == 'workflow_dispatch')
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.inputs.pr-sha }}
+      - name: Checkout repository for nightly test
+        if: (github.event_name == 'schedule')
+        uses: actions/checkout@v2
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v2.0.0
+        with:
+          activate-environment: autogluon_py3
+          environment-file: .github/workflows_env/unittest_env.yml
+          auto-update-conda: true
+          python-version: ${{ matrix.python }}
+      - name: Setup OMP
+        if: matrix.os == 'macos-latest'
+        shell: bash -l {0}
+        run: |
+          wget https://raw.githubusercontent.com/Homebrew/homebrew-core/fb8323f2b170bd4ae97e1bac9bf3e2983af3fdb0/Formula/libomp.rb
+          brew unlink libomp
+          brew install libomp.rb
+          rm libomp.rb
+      - name: unit-test
+        shell: bash -l {0}
+        run: |
+          conda install --channel conda-forge pygraphviz
+          chmod +x ./.github/workflow_scripts/test_timeseries.sh && ./.github/workflow_scripts/test_timeseries.sh "-m not gpu" "true"
 
   install:
     needs: setup

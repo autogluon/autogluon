@@ -5,26 +5,26 @@ import pandas as pd
 from sklearn.datasets import make_classification, make_regression
 from sklearn.model_selection import train_test_split
 
-"""Format of a test:  
+"""Format of a test:
     {   # Default regression model on a small dataset
         'name':             # some unique name
-        'type':             # either 'regression' or 'classification'.  We make a dataset using 
+        'type':             # either 'regression' or 'classification'.  We make a dataset using
                             # scikit-learn.make_{regression,classification}
-        'n_samples':        # number of rows in the training dataset.  With TEST_SIZE default of 0.5, 
+        'n_samples':        # number of rows in the training dataset.  With TEST_SIZE default of 0.5,
                             # we make an additional n_samples for testing.
         'n_features': 2,    # number of columns.
         'n_categorical': 0, # number of categorical (discrete not continuous) columns.
         ''dataset_hash' :   # Hash of synthetic dataset to ensure the dataset itself didn't change.
-        'params' : [ { 'predict' : {}, 'fit' : {} },   # If an array, we call TabularPredictor multiple times with 
+        'params' : [ { 'predict' : {}, 'fit' : {} },   # If an array, we call TabularPredictor multiple times with
                                                        # different parameters.
-                     { 'predict' : {}, 'fit' : {} },   # Pass the additional parameters to predict(), fit() or both 
+                     { 'predict' : {}, 'fit' : {} },   # Pass the additional parameters to predict(), fit() or both
                                                        # in the dicts.
                                                        # If a scalar, we only call TabularPredictor once.
                    ],
-        'expected_score_range' : {                     # A list of models we expect to run, and a valid score range we 
+        'expected_score_range' : {                     # A list of models we expect to run, and a valid score range we
                                                        # expect from each model.
-                  'CatBoost': (-7.86, 0.01),           # The first value is the lower bound, the 2nd value is a delta 
-                  'ExtraTreesMSE': (-7.88, 0.01),      # to compute the upper bound, e.g. ( -8.12, 0.01 ) means we 
+                  'CatBoost': (-7.86, 0.01),           # The first value is the lower bound, the 2nd value is a delta
+                  'ExtraTreesMSE': (-7.88, 0.01),      # to compute the upper bound, e.g. ( -8.12, 0.01 ) means we
                                                        # expect the score to be from -8.12 to -8.11 inclusive.
                   'CatBoost_BAG_L1': (np.nan, np.nan), # If np.nan, we expect this model to return np.nan as the score.
         },
@@ -42,7 +42,7 @@ tests = [
         "n_categorical": 0,
         "dataset_hash": "5850a1c21a",
         "params": [
-            {"predict": {}, "fit": {}},  # All of the followiing params should return same results because they're defaults
+            {"predict": {}, "fit": {}},  # All of the following params should return same results because they're defaults
             {"predict": {}, "fit": {"presets": "medium_quality_faster_train"}},
             {"predict": {}, "fit": {"presets": "ignore_text"}},
             {"predict": {}, "fit": {"hyperparameters": "default"}},
@@ -250,7 +250,7 @@ tests = [
         "n_categorical": 0,
         "dataset_hash": "be1f16df80",
         "params": [
-            {"predict": {}, "fit": {}},  # All of the followiing params should return same results
+            {"predict": {}, "fit": {}},  # All of the following params should return same results
             {"predict": {}, "fit": {"presets": "medium_quality_faster_train"}},
             {"predict": {}, "fit": {"presets": "ignore_text"}},
             {"predict": {}, "fit": {"hyperparameters": "default"}},
@@ -283,7 +283,7 @@ tests = [
         "n_categorical": 0,
         "dataset_hash": "79e634aac3",
         "params": [
-            {"predict": {}, "fit": {}},  # All of the followiing params should return same results
+            {"predict": {}, "fit": {}},  # All of the following params should return same results
             {"predict": {"eval_metric": "accuracy"}, "fit": {}},
         ],
         "expected_score_range": {
