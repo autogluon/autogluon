@@ -20,8 +20,8 @@ function test_multimodal {
     cd multimodal/
     if [ -n "$ADDITIONAL_TEST_ARGS" ]
     then
-        python3 -m pytest -vv --junitxml=results.xml --runslow "$ADDITIONAL_TEST_ARGS" tests/unittests/"$SUB_FOLDER"/ --durations=0 -x
+        python3 -m pytest -vv --junitxml=results.xml --runslow "$ADDITIONAL_TEST_ARGS" tests/unittests/"$SUB_FOLDER"/ --durations=0 -x -s
     else
-        python3 -m pytest -vv --junitxml=results.xml --runslow tests/unittests/"$SUB_FOLDER"/ --durations=0 -x
+        python3 -m pytest -vv --junitxml=results.xml --runslow tests/unittests/"$SUB_FOLDER"/ --durations=0 -x -s
     fi   
 }

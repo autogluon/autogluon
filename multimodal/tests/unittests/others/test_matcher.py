@@ -97,7 +97,7 @@ def evaluate_matcher_ranking(matcher, test_df, query_column, response_column, me
         )
 
 
-@pytest.mark.sgpu
+# @pytest.mark.sgpu
 @pytest.mark.parametrize(
     "dataset_name,query,response,problem_type,text_backbone,image_backbone, is_ranking, symmetric",
     [
