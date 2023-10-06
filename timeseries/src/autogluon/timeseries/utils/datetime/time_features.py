@@ -23,7 +23,12 @@ def month_of_year(index: pd.DatetimeIndex) -> np.ndarray:
 
 
 def week_of_year(index: pd.DatetimeIndex) -> np.ndarray:
-    return _normalize(index.isocalendar().week - 1, num=53)
+    try:
+        week = index.isocalendar().week
+    except AttributeError:
+        week = index.week
+
+    return _normalize(week - 1, num=53)
 
 
 def day_of_month(index: pd.DatetimeIndex) -> np.ndarray:
