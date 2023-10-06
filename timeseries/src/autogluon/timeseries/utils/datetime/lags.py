@@ -1,3 +1,6 @@
+"""
+Generate lag indices based on frequency string. Adapted from gluonts.time_feature.lag.
+"""
 from typing import Optional, List
 
 import numpy as np
@@ -54,6 +57,10 @@ def _make_lags_for_month(multiple, num_cycles=3):
     return [_make_lags(k * 12 // multiple, 1) for k in range(1, num_cycles + 1)]
 
 
+def _make_lags_for_quarter(multiple, num_cycles=3):
+    return [_make_lags(k * 4 // multiple, 1) for k in range(1, num_cycles + 1)]
+
+
 def _make_lags_for_semi_month(multiple, num_cycles=3):
     # We use previous ``num_cycles`` years to generate lags
     return [_make_lags(k * 24 // multiple, 1) for k in range(1, num_cycles + 1)]
@@ -92,8 +99,7 @@ def get_lags_for_frequency(
     if offset_name == "A":
         lags = []
     elif offset_name == "Q":
-        assert offset.n == 1, "Only multiple 1 is supported for quarterly. Use x month instead."
-        lags = _make_lags_for_month(offset.n * 3.0)
+        lags = _make_lags_for_quarter(offset.n)
     elif offset_name == "M":
         lags = _make_lags_for_month(offset.n)
     elif offset_name == "SM":
@@ -110,6 +116,13 @@ def get_lags_for_frequency(
             + _make_lags_for_day(offset.n / 24)
             + _make_lags_for_week(offset.n / (24 * 7))
         )
+    # business hour
+    elif offset_name == "BH":
+        lags = (
+            _make_lags_for_business_hour(offset.n)
+            + _make_lags_for_day(offset.n / 9)
+            + _make_lags_for_week(offset.n / (9 * 7))
+        )
     # minutes
     elif offset_name == "T":
         lags = (
@@ -125,8 +138,26 @@ def get_lags_for_frequency(
             + _make_lags_for_minute(offset.n / 60)
             + _make_lags_for_hour(offset.n / (60 * 60))
         )
+    elif offset_name == "L":
+        lags = (
+            _make_lags_for_second(offset.n / 1e3)
+            + _make_lags_for_minute(offset.n / (60 * 1e3))
+            + _make_lags_for_hour(offset.n / (60 * 60 * 1e3))
+        )
+    elif offset_name == "U":
+        lags = (
+            _make_lags_for_second(offset.n / 1e6)
+            + _make_lags_for_minute(offset.n / (60 * 1e6))
+            + _make_lags_for_hour(offset.n / (60 * 60 * 1e6))
+        )
+    elif offset_name == "N":
+        lags = (
+            _make_lags_for_second(offset.n / 1e9)
+            + _make_lags_for_minute(offset.n / (60 * 1e9))
+            + _make_lags_for_hour(offset.n / (60 * 60 * 1e9))
+        )
     else:
-        raise Exception("invalid frequency")
+        raise Exception(f"invalid frequency {freq}")
 
     # flatten lags list and filter
     lags = [int(lag) for sub_list in lags for lag in sub_list if 7 < lag <= lag_ub]

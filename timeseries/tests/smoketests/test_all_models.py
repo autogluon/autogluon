@@ -128,21 +128,19 @@ def assert_leaderboard_contains_all_models(leaderboard: pd.DataFrame, include_en
 
 #     assert predictions.index.equals(future_test_data.index)
 
-from autogluon.timeseries.utils.datetime.seasonality import DEFAULT_SEASONALITIES
+from autogluon.timeseries.utils.datetime.base import ALL_PANDAS_FREQUENCIES
 
-ALL_PANDAS_FREQUENCIES = [
-    "2BQ",
-    "2Q",
-]
+ALL_PANDAS_FREQUENCIES = {"BH", "BQ"}
 
 
 @pytest.mark.parametrize("freq", ALL_PANDAS_FREQUENCIES)
 def test_all_models_handle_all_pandas_frequencies(freq):
+    freq_str = f"3{freq}"
     prediction_length = 5
 
     train_data, test_data = generate_train_and_test_data(
         prediction_length=prediction_length,
-        freq=freq,
+        freq=freq_str,
         use_known_covariates=True,
         use_past_covariates=True,
     )

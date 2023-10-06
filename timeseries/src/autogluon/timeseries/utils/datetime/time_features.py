@@ -1,3 +1,6 @@
+"""
+Generate time features based on frequency string. Adapted from gluonts.time_feature.time_feature.
+"""
 from typing import List, Callable
 
 import numpy as np

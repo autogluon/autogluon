@@ -5,14 +5,9 @@ import pytest
 
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
-from autogluon.timeseries.utils.datetime import (
-    norm_freq_str,
-    get_lags_for_frequency,
-    get_time_features_for_frequency,
-)
+from autogluon.timeseries.utils.datetime import get_lags_for_frequency, get_time_features_for_frequency
+from autogluon.timeseries.utils.datetime.base import norm_freq_str, ALL_PANDAS_FREQUENCIES
 from autogluon.timeseries.utils.datetime.seasonality import DEFAULT_SEASONALITIES
-
-from .common import ALL_PANDAS_FREQUENCIES
 
 
 @pytest.mark.parametrize("freq", ["H", "min", "S", "D", "W", "M", "Q", "Y", "3H", "17S"])
