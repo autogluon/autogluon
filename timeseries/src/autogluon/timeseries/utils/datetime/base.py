@@ -1,6 +1,5 @@
 import pandas as pd
 
-
 TO_MAJOR_FREQ = {
     "min": "T",
     "ms": "L",
