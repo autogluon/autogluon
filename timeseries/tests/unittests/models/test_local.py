@@ -6,7 +6,6 @@ import pytest
 
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.models.local import (
-    ARIMAModel,
     AutoARIMAModel,
     AutoETSModel,
     AverageModel,
@@ -31,7 +30,6 @@ TESTABLE_MODELS = [
     AutoETSModel,
     AverageModel,
     DynamicOptimizedThetaModel,
-    ARIMAModel,
     ETSModel,
     ThetaModel,
     NaiveModel,
