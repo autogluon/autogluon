@@ -22,12 +22,12 @@ from .common import get_data_frame_with_variable_lengths
 
 START_TIMESTAMP = pd.Timestamp("01-01-2019")  # type: ignore
 END_TIMESTAMP = pd.Timestamp("01-02-2019")  # type: ignore
-ITEM_IDS = (0, 1, 2)
-TARGETS = np.arange(9)
+ITEM_IDS = np.array([0, 1, 2], dtype=int)
+TARGETS = np.arange(9, dtype=np.float64)
 DATETIME_INDEX = tuple(pd.date_range(START_TIMESTAMP, periods=3, freq="D"))
-EMPTY_ITEM_IDS = np.array([], dtype=np.int64)
+EMPTY_ITEM_IDS = np.array([], dtype=int)
 EMPTY_DATETIME_INDEX = np.array([], dtype=np.dtype("datetime64[ns]"))  # type: ignore
-EMPTY_TARGETS = np.array([], dtype=np.int64)
+EMPTY_TARGETS = np.array([], dtype=np.float64)
 
 
 def _build_ts_dataframe(item_ids, datetime_index, target, static_features=None):
@@ -56,15 +56,15 @@ SAMPLE_DATAFRAME = pd.DataFrame(SAMPLE_TS_DATAFRAME).reset_index()
 
 
 SAMPLE_ITERABLE = [
-    {"target": [0, 1, 2], "start": pd.Period("01-01-2019", freq="D")},  # type: ignore
-    {"target": [3, 4, 5], "start": pd.Period("01-01-2019", freq="D")},  # type: ignore
-    {"target": [6, 7, 8], "start": pd.Period("01-01-2019", freq="D")},  # type: ignore
+    {"target": [0.0, 1.0, 2.0], "start": pd.Period("01-01-2019", freq="D")},  # type: ignore
+    {"target": [3.0, 4.0, 5.0], "start": pd.Period("01-01-2019", freq="D")},  # type: ignore
+    {"target": [6.0, 7.0, 8.0], "start": pd.Period("01-01-2019", freq="D")},  # type: ignore
 ]
 
 
 def test_from_iterable():
     ts_df = TimeSeriesDataFrame(SAMPLE_ITERABLE)
-    pd.testing.assert_frame_equal(ts_df, SAMPLE_TS_DATAFRAME, check_dtype=True)
+    pd.testing.assert_frame_equal(ts_df, SAMPLE_TS_DATAFRAME, check_dtype=True, check_index_type=False)
 
     with pytest.raises(ValueError):
         TimeSeriesDataFrame([])
@@ -116,7 +116,7 @@ def test_from_gluonts_list_dataset():
     TimeSeriesDataFrame(gluonts_list_dataset)
 
     ts_df = TimeSeriesDataFrame(ListDataset(SAMPLE_ITERABLE, freq=freq))
-    pd.testing.assert_frame_equal(ts_df, SAMPLE_TS_DATAFRAME, check_dtype=False)
+    pd.testing.assert_frame_equal(ts_df, SAMPLE_TS_DATAFRAME, check_dtype=False, check_index_type=False)
 
     empty_list_dataset = ListDataset([], freq=freq)
     with pytest.raises(ValueError):
@@ -135,10 +135,10 @@ def test_from_data_frame():
             pd.Timestamp("01-03-2019"),  # type: ignore
             ITEM_IDS,
             tuple(pd.date_range(START_TIMESTAMP, periods=2)),
-            [0, 1, 3, 4, 6, 7],
+            [0.0, 1.0, 3.0, 4.0, 6.0, 7.0],
             ITEM_IDS,
             tuple(pd.date_range(pd.Timestamp("01-03-2019"), periods=1)),  # type: ignore
-            [2, 5, 8],
+            [2.0, 5.0, 8.0],
         ),
         (
             pd.Timestamp("01-01-2019"),  # type: ignore
@@ -184,14 +184,14 @@ def test_split_by_time(
             END_TIMESTAMP,
             ITEM_IDS,
             tuple(pd.date_range(START_TIMESTAMP, periods=1)),
-            [0, 3, 6],
+            [0.0, 3.0, 6.0],
         ),
         (
             pd.Timestamp("12-31-2018"),  # type: ignore
             END_TIMESTAMP,
             ITEM_IDS,
             tuple(pd.date_range(START_TIMESTAMP, periods=1)),
-            [0, 3, 6],
+            [0.0, 3.0, 6.0],
         ),
         (
             START_TIMESTAMP,

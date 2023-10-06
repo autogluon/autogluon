@@ -371,7 +371,7 @@ def test_when_known_covariates_present_then_all_ensemble_base_models_can_predict
     trainer.fit(df_train, hyperparameters={"ETS": {"maxiter": 1}, "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1}})
 
     # Manually add ensemble to ensure that both models have non-zero weight
-    ensemble = TimeSeriesGreedyEnsemble(name="WeightedEnsemble")
+    ensemble = TimeSeriesGreedyEnsemble(name="WeightedEnsemble", path=trainer.path)
     ensemble.model_to_weight = {"DeepAR": 0.5, "ETS": 0.5}
     trainer._add_model(model=ensemble, base_models=["DeepAR", "ETS"])
     trainer.save_model(model=ensemble)
