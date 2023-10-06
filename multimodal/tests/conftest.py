@@ -19,7 +19,7 @@ def pytest_collection_modifyitems(config, items):
         # --runslow given in cli: do not skip slow tests
         custom_markers.pop("slow", None)
     if config.getoption("--runsgpu", None):
-        # --runslow given in cli: do not skip multi-gpu tests
+        # --runslow given in cli: do not skip single-gpu tests
         custom_markers.pop("sgpu", None)
     for item in items:
         for marker in custom_markers:
