@@ -252,7 +252,7 @@ hidden:
 ---
 
 Cheat Sheets <cheatsheet.rst>
-Versions <https://auto.gluon.ai/dev/versions.html>
+Versions <https://auto.gluon.ai/stable/versions.html>
 Tabular FAQ <tutorials/tabular/tabular-faq.md>
 Multimodal FAQ <tutorials/multimodal/multimodal-faq.md>
 Time Series FAQ <tutorials/timeseries/forecasting-faq.md>
