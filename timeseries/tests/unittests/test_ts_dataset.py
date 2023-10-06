@@ -22,7 +22,7 @@ from .common import get_data_frame_with_variable_lengths
 
 START_TIMESTAMP = pd.Timestamp("01-01-2019")  # type: ignore
 END_TIMESTAMP = pd.Timestamp("01-02-2019")  # type: ignore
-ITEM_IDS = (0, 1, 2)
+ITEM_IDS = np.array([0, 1, 2], dtype=int)
 TARGETS = np.arange(9, dtype=np.float64)
 DATETIME_INDEX = tuple(pd.date_range(START_TIMESTAMP, periods=3, freq="D"))
 EMPTY_ITEM_IDS = np.array([], dtype=int)
