@@ -1,10 +1,11 @@
 """
 Generate time features based on frequency string. Adapted from gluonts.time_feature.time_feature.
 """
-from typing import List, Callable
+from typing import Callable, List
 
 import numpy as np
 import pandas as pd
+
 from .base import norm_freq_str
 
 
@@ -26,7 +27,7 @@ def week_of_year(index: pd.DatetimeIndex) -> np.ndarray:
 
 
 def day_of_month(index: pd.DatetimeIndex) -> np.ndarray:
-    return _normalize(index.day, num=31)
+    return _normalize(index.day - 1, num=31)
 
 
 def day_of_year(index: pd.DatetimeIndex) -> np.ndarray:

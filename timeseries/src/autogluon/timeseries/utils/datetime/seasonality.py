@@ -4,7 +4,6 @@ import pandas as pd
 
 from .base import norm_freq_str
 
-
 DEFAULT_SEASONALITIES = {
     "A": 1,
     "Q": 4,

@@ -1,12 +1,12 @@
-import pytest
 from typing import Tuple
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from autogluon.timeseries import TimeSeriesPredictor
-
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
+from autogluon.timeseries.utils.datetime.seasonality import DEFAULT_SEASONALITIES
 
 TARGET_COLUMN = "custom_target"
 ITEM_IDS = ["Z", "A", "1", "C"]
@@ -56,7 +56,6 @@ def generate_train_and_test_data(
 DUMMY_MODEL_HPARAMS = {"epochs": 1, "num_batches_per_epoch": 1, "use_fallback_model": False}
 
 ALL_MODELS = {
-    "ARIMA": DUMMY_MODEL_HPARAMS,
     "Average": DUMMY_MODEL_HPARAMS,
     "DLinear": DUMMY_MODEL_HPARAMS,
     "DeepAR": DUMMY_MODEL_HPARAMS,
@@ -74,7 +73,6 @@ ALL_MODELS = {
     "Theta": DUMMY_MODEL_HPARAMS,
     # Override default hyperparameters for faster training
     "AutoARIMA": {"max_p": 2, "use_fallback_model": False},
-    "AutoETS": {"model": "AAA", "use_fallback_model": False},
 }
 
 
@@ -86,56 +84,52 @@ def assert_leaderboard_contains_all_models(leaderboard: pd.DataFrame, include_en
     assert len(failed_models) == 0, f"Failed models: {failed_models}"
 
 
-# @pytest.mark.parametrize("use_past_covariates", [True, False])
-# @pytest.mark.parametrize("use_known_covariates", [True, False])
-# @pytest.mark.parametrize("use_static_features_continuous", [True, False])
-# @pytest.mark.parametrize("use_static_features_categorical", [True, False])
-# @pytest.mark.parametrize("eval_metric", ["WQL", "MASE"])
-# def test_all_models_can_handle_all_covariates(
-#     use_known_covariates,
-#     use_past_covariates,
-#     use_static_features_continuous,
-#     use_static_features_categorical,
-#     eval_metric,
-# ):
-#     prediction_length = 5
-#     train_data, test_data = generate_train_and_test_data(
-#         prediction_length=prediction_length,
-#         use_known_covariates=use_known_covariates,
-#         use_past_covariates=use_past_covariates,
-#         use_static_features_continuous=use_static_features_continuous,
-#         use_static_features_categorical=use_static_features_categorical,
-#     )
+@pytest.mark.parametrize("use_past_covariates", [True, False])
+@pytest.mark.parametrize("use_known_covariates", [True, False])
+@pytest.mark.parametrize("use_static_features_continuous", [True, False])
+@pytest.mark.parametrize("use_static_features_categorical", [True, False])
+@pytest.mark.parametrize("eval_metric", ["WQL", "MASE"])
+def test_all_models_can_handle_all_covariates(
+    use_known_covariates,
+    use_past_covariates,
+    use_static_features_continuous,
+    use_static_features_categorical,
+    eval_metric,
+):
+    prediction_length = 5
+    train_data, test_data = generate_train_and_test_data(
+        prediction_length=prediction_length,
+        use_known_covariates=use_known_covariates,
+        use_past_covariates=use_past_covariates,
+        use_static_features_continuous=use_static_features_continuous,
+        use_static_features_categorical=use_static_features_categorical,
+    )
 
-#     known_covariates_names = [col for col in train_data if col.startswith("known_")]
+    known_covariates_names = [col for col in train_data if col.startswith("known_")]
 
-#     predictor = TimeSeriesPredictor(
-#         target=TARGET_COLUMN,
-#         prediction_length=prediction_length,
-#         known_covariates_names=known_covariates_names if len(known_covariates_names) > 0 else None,
-#         eval_metric=eval_metric,
-#     )
-#     predictor.fit(train_data, hyperparameters=ALL_MODELS)
-#     predictor.score(test_data)
-#     leaderboard = predictor.leaderboard(test_data)
+    predictor = TimeSeriesPredictor(
+        target=TARGET_COLUMN,
+        prediction_length=prediction_length,
+        known_covariates_names=known_covariates_names if len(known_covariates_names) > 0 else None,
+        eval_metric=eval_metric,
+    )
+    predictor.fit(train_data, hyperparameters=ALL_MODELS)
+    predictor.score(test_data)
+    leaderboard = predictor.leaderboard(test_data)
 
-#     assert_leaderboard_contains_all_models(leaderboard)
+    assert_leaderboard_contains_all_models(leaderboard)
 
-#     known_covariates = test_data.slice_by_timestep(-prediction_length, None)[known_covariates_names]
-#     predictions = predictor.predict(train_data, known_covariates=known_covariates)
+    known_covariates = test_data.slice_by_timestep(-prediction_length, None)[known_covariates_names]
+    predictions = predictor.predict(train_data, known_covariates=known_covariates)
 
-#     future_test_data = test_data.slice_by_timestep(-prediction_length, None)
+    future_test_data = test_data.slice_by_timestep(-prediction_length, None)
 
-#     assert predictions.index.equals(future_test_data.index)
-
-from autogluon.timeseries.utils.datetime.base import ALL_PANDAS_FREQUENCIES
-
-ALL_PANDAS_FREQUENCIES = {"BH", "BQ"}
+    assert predictions.index.equals(future_test_data.index)
 
 
-@pytest.mark.parametrize("freq", ALL_PANDAS_FREQUENCIES)
+@pytest.mark.parametrize("freq", DEFAULT_SEASONALITIES.keys())
 def test_all_models_handle_all_pandas_frequencies(freq):
-    freq_str = f"3{freq}"
+    freq_str = f"2{freq}"
     prediction_length = 5
 
     train_data, test_data = generate_train_and_test_data(

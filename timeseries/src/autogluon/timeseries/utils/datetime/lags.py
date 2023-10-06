@@ -1,7 +1,7 @@
 """
 Generate lag indices based on frequency string. Adapted from gluonts.time_feature.lag.
 """
-from typing import Optional, List
+from typing import List, Optional
 
 import numpy as np
 import pandas as pd

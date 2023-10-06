@@ -1,43 +1,5 @@
 import pandas as pd
 
-# List of all supported pandas frequencies, based on https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases
-ALL_PANDAS_FREQUENCIES = {
-    "B",
-    "C",
-    "D",
-    "W",
-    "M",
-    "SM",
-    "BM",
-    "CBM",
-    "MS",
-    "SMS",
-    "BMS",
-    "CBMS",
-    "Q",
-    "BQ",
-    "QS",
-    "BQS",
-    "A",
-    "Y",
-    "BA",
-    "BY",
-    "AS",
-    "YS",
-    "BAS",
-    "BYS",
-    "BH",
-    "H",
-    "T",
-    "min",
-    "S",
-    "L",
-    "ms",
-    "U",
-    "us",
-    "N",
-}
-
 
 TO_MAJOR_FREQ = {
     "min": "T",
