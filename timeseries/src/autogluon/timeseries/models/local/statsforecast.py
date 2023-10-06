@@ -245,6 +245,11 @@ class AutoETSModel(AbstractStatsForecastModel):
 
         return AutoETS
 
+    def _update_local_model_args(self, local_model_args: dict) -> dict:
+        local_model_args = super()._update_local_model_args(local_model_args)
+        local_model_args.setdefault("model", "ZZZ")
+        return local_model_args
+
     def _predict_with_local_model(
         self,
         time_series: pd.Series,
