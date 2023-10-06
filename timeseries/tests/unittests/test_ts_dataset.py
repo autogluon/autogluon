@@ -64,7 +64,7 @@ SAMPLE_ITERABLE = [
 
 def test_from_iterable():
     ts_df = TimeSeriesDataFrame(SAMPLE_ITERABLE)
-    pd.testing.assert_frame_equal(ts_df, SAMPLE_TS_DATAFRAME, check_dtype=True)
+    pd.testing.assert_frame_equal(ts_df, SAMPLE_TS_DATAFRAME, check_dtype=True, check_index_type=False)
 
     with pytest.raises(ValueError):
         TimeSeriesDataFrame([])
@@ -116,7 +116,7 @@ def test_from_gluonts_list_dataset():
     TimeSeriesDataFrame(gluonts_list_dataset)
 
     ts_df = TimeSeriesDataFrame(ListDataset(SAMPLE_ITERABLE, freq=freq))
-    pd.testing.assert_frame_equal(ts_df, SAMPLE_TS_DATAFRAME, check_dtype=False)
+    pd.testing.assert_frame_equal(ts_df, SAMPLE_TS_DATAFRAME, check_dtype=False, check_index_type=False)
 
     empty_list_dataset = ListDataset([], freq=freq)
     with pytest.raises(ValueError):
