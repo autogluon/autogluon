@@ -278,15 +278,21 @@ class TabularPredictor:
         self._stacked_overfitting_occurred: bool | None = None
 
     @property
-    def class_labels(self):
+    def classes_(self) -> list:
+        """Returns the class labels"""
         return self._learner.class_labels
 
     @property
-    def class_labels_internal(self):
+    def class_labels(self) -> list:
+        """Alias to self.classes_"""
+        return self.classes_
+
+    @property
+    def class_labels_internal(self) -> list:
         return self._learner.label_cleaner.ordered_class_labels_transformed
 
     @property
-    def class_labels_internal_map(self):
+    def class_labels_internal_map(self) -> dict:
         return self._learner.label_cleaner.inv_map
 
     @property
@@ -4558,7 +4564,7 @@ class TabularPredictor:
             pred_proba_dict_val = self.predict_multi(inverse_transform=False, models=models)
             pred_proba_dict_test = self.predict_multi(test_data, inverse_transform=False, models=models)
 
-        val_data_source = 'val' if self._trainer.has_val else 'train'
+        val_data_source = 'val' if self.has_val else 'train'
         _, y_val = self.load_data_internal(data=val_data_source, return_X=False, return_y=True)
         y_test = test_data[self.label]
         y_test = self.transform_labels(y_test, inverse=False)
