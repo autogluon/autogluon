@@ -124,6 +124,27 @@ class SimpleGluonTSDataset(GluonTSDataset):
             yield time_series
 
 
+class GTSDataset(GluonTSDataset):
+    def __init__(self, iterator, length, freq):
+        self.iterator = iterator
+        self.length = length
+        self.freq = freq
+
+    def __len__(self):
+        return self.length  # noqa
+
+    def __iter__(self) -> Iterator[Dict[str, Any]]:
+        def to_gts_item(item_id, ds, y):
+            return {
+                FieldName.ITEM_ID: item_id,
+                FieldName.START: pd.Period(ds, freq=self.freq),
+                FieldName.TARGET: y,
+            }
+
+        for item_id, ds, y in self.iterator:
+            yield to_gts_item(item_id, ds, y)
+
+
 class AbstractGluonTSModel(AbstractTimeSeriesModel):
     """Abstract class wrapping GluonTS estimators for use in autogluon.timeseries.
 
@@ -309,6 +330,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         self, time_series_df: Optional[TimeSeriesDataFrame], known_covariates: Optional[TimeSeriesDataFrame] = None
     ) -> Optional[GluonTSDataset]:
         if time_series_df is not None:
+            start = time.time()
             if self.num_feat_static_cat > 0:
                 feat_static_cat = time_series_df.static_features[self.metadata.static_features_cat]
             else:
@@ -340,25 +362,26 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             else:
                 past_feat_dynamic_real = None
 
-            # from joblib import delayed, Parallel
+            # result = list(GTSDataset(time_series_df[self.target], self.freq))
+            # from statsforecast.core import GroupedArray, _grouped_array_from_df
 
-            def to_gts_item(item_id, ts):
-                return {
-                    FieldName.ITEM_ID: item_id,
-                    FieldName.TARGET: ts.to_numpy(),
-                    FieldName.START: pd.Period(ts.index.levels[1][0], freq=self.freq),
-                }
+            # ga = _grouped_array_from_df()
+            def fast_groupby(df):
+                item_ids = df.index.get_level_values("item_id")
+                timestamps = df.index.get_level_values("timestamp")
+                indices_sizes = item_ids.value_counts(sort=False)
+                sizes = indices_sizes.values
+                cum_sizes = sizes.cumsum()
+                indptr = np.append(0, cum_sizes).astype(np.int32)
+                data = df.values
+                for j in range(len(indptr) - 1):
+                    start = indptr[j]
+                    yield item_ids[start], timestamps[start], data[start : indptr[j + 1]]
 
-            # gluonts_dataset = Parallel(n_jobs=16, return_as="generator")(
-            #     delayed(to_gts_item)(item_id, ts)
-            #     for item_id, ts in time_series_df[self.target].groupby(level="item_id", sort=False)
-            # )
-            gluonts_dataset = [
-                to_gts_item(item_id, ts)
-                for item_id, ts in time_series_df[self.target].groupby(level="item_id", sort=False)
-            ]
-            print("finished data gen")
-            return gluonts_dataset
+            gts = GTSDataset(
+                iterator=fast_groupby(time_series_df[self.target]), length=time_series_df.num_items, freq=self.freq
+            )
+            return gts
 
             return SimpleGluonTSDataset(
                 target_df=time_series_df,
