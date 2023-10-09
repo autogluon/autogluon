@@ -433,6 +433,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                 validation_data=self._to_gluonts_dataset(val_data),
                 cache_data=True,
             )
+            self.gts_predictor.batch_size = 500
 
         lightning_logs_dir = Path(self.path) / "lightning_logs"
         if lightning_logs_dir.exists() and lightning_logs_dir.is_dir():
