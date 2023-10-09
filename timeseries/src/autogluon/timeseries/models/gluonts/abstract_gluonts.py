@@ -1,7 +1,9 @@
 import logging
 import os
 import shutil
+import time
 from datetime import timedelta
+from itertools import zip_longest
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterator, List, Optional, Type
 
@@ -21,6 +23,7 @@ from autogluon.common.loaders import load_pkl
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
+from autogluon.timeseries.utils.datetime import norm_freq_str
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 from autogluon.timeseries.utils.warning_filters import disable_root_logger, warning_filter
 
@@ -73,37 +76,50 @@ class SimpleGluonTSDataset(GluonTSDataset):
         pd_offset = to_offset(self.freq_)
 
         # normalize freq str to handle peculiarities such as W-SUN
-        offset_base_alias = pd_offset.name.split("-")[0]
+        offset_base_alias = norm_freq_str(pd_offset)
 
         return "A" if offset_base_alias is None or offset_base_alias not in GLUONTS_SUPPORTED_OFFSETS else self.freq_
+
+    def data_iterator(self):
+        def iterate_dataframe(df: pd.DataFrame) -> Iterator[np.ndarray]:
+            if df is None:
+                return []
+            else:
+                for _, value in df.groupby(level="item_id", sort=False):
+                    yield value
+
+        iterators = [
+            iterate_dataframe(df)
+            for df in [
+                self.feat_static_cat,
+                self.feat_static_real,
+                self.feat_dynamic_real,
+                self.past_feat_dynamic_real,
+            ]
+        ]
+        return zip_longest(self.target_series.groupby(level=ITEMID, sort=False), *iterators)
 
     def __len__(self):
         return len(self.item_ids)  # noqa
 
     def __iter__(self) -> Iterator[Dict[str, Any]]:
-        for item_id in self.item_ids:  # noqa
-            ts = self.target_series.loc[item_id]
+        data_iter = self.data_iterator()
+        for (item_id, ts), feat_static_cat, feat_static_real, feat_dynamic_real, past_feat_dynamic_real in data_iter:
             time_series = {
                 FieldName.ITEM_ID: item_id,
                 FieldName.TARGET: ts.to_numpy(dtype=self.float_dtype).ravel(),
-                FieldName.START: pd.Period(ts.index[0], freq=self.freq),
+                FieldName.START: pd.Period(ts.index.levels[1][0], freq=self.freq),
             }
-            if self.feat_static_cat is not None:
-                time_series[FieldName.FEAT_STATIC_CAT] = self.feat_static_cat.loc[item_id].to_numpy(
-                    dtype=self.int_dtype
-                )
-            if self.feat_static_real is not None:
-                time_series[FieldName.FEAT_STATIC_REAL] = self.feat_static_real.loc[item_id].to_numpy(
+            if feat_static_cat is not None:
+                time_series[FieldName.FEAT_STATIC_CAT] = feat_static_cat.to_numpy(dtype=self.int_dtype)
+            if feat_static_real is not None:
+                time_series[FieldName.FEAT_STATIC_REAL] = feat_static_real.to_numpy(dtype=self.float_dtype)
+            if feat_dynamic_real is not None:
+                time_series[FieldName.FEAT_DYNAMIC_REAL] = feat_dynamic_real.to_numpy(dtype=self.float_dtype).T
+            if past_feat_dynamic_real is not None:
+                time_series[FieldName.PAST_FEAT_DYNAMIC_REAL] = past_feat_dynamic_real.to_numpy(
                     dtype=self.float_dtype
-                )
-            if self.feat_dynamic_real is not None:
-                time_series[FieldName.FEAT_DYNAMIC_REAL] = (
-                    self.feat_dynamic_real.loc[item_id].to_numpy(dtype=self.float_dtype).T
-                )
-            if self.past_feat_dynamic_real is not None:
-                time_series[FieldName.PAST_FEAT_DYNAMIC_REAL] = (
-                    self.past_feat_dynamic_real.loc[item_id].to_numpy(dtype=self.float_dtype).T
-                )
+                ).T
 
             yield time_series
 
@@ -324,6 +340,26 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             else:
                 past_feat_dynamic_real = None
 
+            # from joblib import delayed, Parallel
+
+            def to_gts_item(item_id, ts):
+                return {
+                    FieldName.ITEM_ID: item_id,
+                    FieldName.TARGET: ts.to_numpy(),
+                    FieldName.START: pd.Period(ts.index.levels[1][0], freq=self.freq),
+                }
+
+            # gluonts_dataset = Parallel(n_jobs=16, return_as="generator")(
+            #     delayed(to_gts_item)(item_id, ts)
+            #     for item_id, ts in time_series_df[self.target].groupby(level="item_id", sort=False)
+            # )
+            gluonts_dataset = [
+                to_gts_item(item_id, ts)
+                for item_id, ts in time_series_df[self.target].groupby(level="item_id", sort=False)
+            ]
+            print("finished data gen")
+            return gluonts_dataset
+
             return SimpleGluonTSDataset(
                 target_df=time_series_df,
                 target_column=self.target,
@@ -406,13 +442,18 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             if not all(0 < q < 1 for q in quantiles):
                 raise ValueError("Invalid quantile value specified. Quantiles must be between 0 and 1 (exclusive).")
 
+            print("Starting GluonTS forecast")
+            start = time.time()
             predicted_targets = self._predict_gluonts_forecasts(data, known_covariates=known_covariates, **kwargs)
+            print(f"Finished GluonTS forecast, time = {time.time() - start:.1f}s")
 
+            start = time.time()
             df = self._gluonts_forecasts_to_data_frame(
                 predicted_targets,
                 quantile_levels=quantile_levels or self.quantile_levels,
                 forecast_index=get_forecast_horizon_index_ts_dataframe(data, self.prediction_length),
             )
+            print(f"Finished Df conversion, time = {time.time() - start:.1f}s")
 
         return df
 
