@@ -223,7 +223,10 @@ class LinearModel(AbstractModel):
                 model = model.fit(**fit_args)
             total_iter += model.max_iter
             if model.n_iter_ is not None:
-                total_iter_used += model.n_iter_[0]
+                if isinstance(model.n_iter_, int):
+                    total_iter_used += model.n_iter_
+                else:
+                    total_iter_used += model.n_iter_[0]
             else:
                 total_iter_used += model.max_iter
             if early_stop:
@@ -261,8 +264,9 @@ class LinearModel(AbstractModel):
         # continuous = numeric features to rescale
         # skewed = features to which we will apply power (ie. log / box-cox) transform before normalization
         types_of_features = defaultdict(list)
+        skew_threshold = self.params["proc.skew_threshold"]
         for feature in features:
-            if np.abs(df[feature].skew()) > self.params["proc.skew_threshold"]:
+            if skew_threshold is not None and (np.abs(df[feature].skew()) > self.params["proc.skew_threshold"]):
                 types_of_features["skewed"].append(feature)
             else:
                 types_of_features["continuous"].append(feature)
