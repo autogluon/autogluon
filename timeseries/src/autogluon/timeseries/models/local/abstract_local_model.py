@@ -11,9 +11,9 @@ from scipy.stats import norm
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
+from autogluon.timeseries.utils.datetime import get_seasonality
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
-from autogluon.timeseries.utils.seasonality import get_seasonality
-from autogluon.timeseries.utils.warning_filters import statsmodels_joblib_warning_filter, statsmodels_warning_filter
+from autogluon.timeseries.utils.warning_filters import warning_filter
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +58,8 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
     ):
         if hyperparameters is None:
             hyperparameters = {}
+        else:
+            hyperparameters = hyperparameters.copy()
         # TODO: Replace with 'num_cpus' argument passed to fit (after predictor API is changed)
         n_jobs = hyperparameters.pop("n_jobs", self.default_n_jobs)
         if isinstance(n_jobs, float) and 0 < n_jobs <= 1:
@@ -133,7 +135,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         executor = Parallel(self.n_jobs, timeout=timeout)
 
         try:
-            with statsmodels_joblib_warning_filter(), statsmodels_warning_filter():
+            with warning_filter():
                 predictions_with_flags = executor(
                     delayed(self._predict_wrapper)(ts, end_time=end_time) for ts in all_series
                 )
