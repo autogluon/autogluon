@@ -4564,7 +4564,7 @@ class TabularPredictor:
             pred_proba_dict_val = self.predict_multi(inverse_transform=False, models=models)
             pred_proba_dict_test = self.predict_multi(test_data, inverse_transform=False, models=models)
 
-        val_data_source = 'val' if self.has_val else 'train'
+        val_data_source = "val" if self.has_val else "train"
         _, y_val = self.load_data_internal(data=val_data_source, return_X=False, return_y=True)
         y_test = test_data[self.label]
         y_test = self.transform_labels(y_test, inverse=False)
