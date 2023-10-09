@@ -21,7 +21,7 @@ from pandas.tseries.frequencies import to_offset
 
 from autogluon.common.loaders import load_pkl
 from autogluon.common.utils.log_utils import set_logger_verbosity
-from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
+from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.datetime import norm_freq_str
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
@@ -38,10 +38,6 @@ GLUONTS_SUPPORTED_OFFSETS = ["Y", "Q", "M", "W", "D", "B", "H", "T", "min", "S"]
 
 
 class SimpleGluonTSDataset(GluonTSDataset):
-    """A simple GluonTS dataset that wraps a TimeSeriesDataFrame and implements the
-    GluonTS Dataset protocol via lazy iterations.
-    """
-
     def __init__(
         self,
         target_df: TimeSeriesDataFrame,
@@ -50,99 +46,75 @@ class SimpleGluonTSDataset(GluonTSDataset):
         feat_static_real: Optional[pd.DataFrame] = None,
         feat_dynamic_real: Optional[pd.DataFrame] = None,
         past_feat_dynamic_real: Optional[pd.DataFrame] = None,
-        float_dtype: Type = np.float64,
-        int_dtype: Type = np.int64,
+        includes_future: bool = False,
+        prediction_length: int = None,
     ):
         assert target_df is not None
         assert target_df.freq, "Initializing GluonTS data sets without freq is not allowed"
         # Convert TimeSeriesDataFrame to pd.Series for faster processing
-        self.target_series = target_df[target_column]
-        self.item_ids = target_df.item_ids
-        self.freq_ = target_df.freq
-        self.feat_static_cat = feat_static_cat
-        self.feat_static_real = feat_static_real
-        self.feat_dynamic_real = feat_dynamic_real
-        self.past_feat_dynamic_real = past_feat_dynamic_real
+        self.target_array = self._to_array(target_df[target_column], dtype=np.float32)
+        self.feat_static_cat = self._to_array(feat_static_cat, dtype=np.int64)
+        self.feat_static_real = self._to_array(feat_static_real, dtype=np.float32)
+        self.feat_dynamic_real = self._to_array(feat_dynamic_real, dtype=np.float32)
+        self.past_feat_dynamic_real = self._to_array(past_feat_dynamic_real, dtype=np.float32)
+        self.freq = self._to_gluonts_freq(target_df.freq)
 
-        self.int_dtype = int_dtype
-        self.float_dtype = float_dtype
+        # Necessary to compute indptr for known_covariates at prediction time
+        self.includes_future = includes_future
+        self.prediction_length = prediction_length
 
-    @property
-    def freq(self):
+        self.item_ids = target_df.index.get_level_values(ITEMID)
+        self.timestamps = target_df.index.get_level_values(TIMESTAMP)
+        indices_sizes = self.item_ids.value_counts(sort=False)
+        cum_sizes = indices_sizes.values.cumsum()
+        self.indptr = np.append(0, cum_sizes).astype(np.int32)
+
+    @staticmethod
+    def _to_array(df: Optional[pd.DataFrame], dtype: np.dtype) -> Optional[np.ndarray]:
+        if df is None:
+            return None
+        else:
+            return df.to_numpy(dtype=dtype)
+
+    @staticmethod
+    def _to_gluonts_freq(freq: str) -> str:
         # FIXME: GluonTS expects a frequency string, but only supports a limited number of such strings
         # for feature generation. If the frequency string doesn't match or is not provided, it raises an exception.
         # Here we bypass this by issuing a default "yearly" frequency, tricking it into not producing
         # any lags or features.
-        pd_offset = to_offset(self.freq_)
+        pd_offset = to_offset(freq)
 
         # normalize freq str to handle peculiarities such as W-SUN
         offset_base_alias = norm_freq_str(pd_offset)
-
-        return "A" if offset_base_alias is None or offset_base_alias not in GLUONTS_SUPPORTED_OFFSETS else self.freq_
-
-    def data_iterator(self):
-        def iterate_dataframe(df: pd.DataFrame) -> Iterator[np.ndarray]:
-            if df is None:
-                return []
-            else:
-                for _, value in df.groupby(level="item_id", sort=False):
-                    yield value
-
-        iterators = [
-            iterate_dataframe(df)
-            for df in [
-                self.feat_static_cat,
-                self.feat_static_real,
-                self.feat_dynamic_real,
-                self.past_feat_dynamic_real,
-            ]
-        ]
-        return zip_longest(self.target_series.groupby(level=ITEMID, sort=False), *iterators)
+        if freq not in GLUONTS_SUPPORTED_OFFSETS or offset_base_alias is None:
+            return "A"
+        else:
+            return freq
 
     def __len__(self):
-        return len(self.item_ids)  # noqa
+        return len(self.indptr) - 1  # noqa
 
     def __iter__(self) -> Iterator[Dict[str, Any]]:
-        data_iter = self.data_iterator()
-        for (item_id, ts), feat_static_cat, feat_static_real, feat_dynamic_real, past_feat_dynamic_real in data_iter:
-            time_series = {
-                FieldName.ITEM_ID: item_id,
-                FieldName.TARGET: ts.to_numpy(dtype=self.float_dtype).ravel(),
-                FieldName.START: pd.Period(ts.index.levels[1][0], freq=self.freq),
+        for j in range(len(self.indptr) - 1):
+            start_idx = self.indptr[j]
+            end_idx = self.indptr[j + 1]
+            ts = {
+                FieldName.ITEM_ID: self.item_ids[j],
+                FieldName.START: pd.Period(self.timestamps[j], freq=self.freq),
+                FieldName.TARGET: self.target_array[start_idx:end_idx],
             }
-            if feat_static_cat is not None:
-                time_series[FieldName.FEAT_STATIC_CAT] = feat_static_cat.to_numpy(dtype=self.int_dtype)
-            if feat_static_real is not None:
-                time_series[FieldName.FEAT_STATIC_REAL] = feat_static_real.to_numpy(dtype=self.float_dtype)
-            if feat_dynamic_real is not None:
-                time_series[FieldName.FEAT_DYNAMIC_REAL] = feat_dynamic_real.to_numpy(dtype=self.float_dtype).T
-            if past_feat_dynamic_real is not None:
-                time_series[FieldName.PAST_FEAT_DYNAMIC_REAL] = past_feat_dynamic_real.to_numpy(
-                    dtype=self.float_dtype
-                ).T
-
-            yield time_series
-
-
-class GTSDataset(GluonTSDataset):
-    def __init__(self, iterator, length, freq):
-        self.iterator = iterator
-        self.length = length
-        self.freq = freq
-
-    def __len__(self):
-        return self.length  # noqa
-
-    def __iter__(self) -> Iterator[Dict[str, Any]]:
-        def to_gts_item(item_id, ds, y):
-            return {
-                FieldName.ITEM_ID: item_id,
-                FieldName.START: pd.Period(ds, freq=self.freq),
-                FieldName.TARGET: y,
-            }
-
-        for item_id, ds, y in self.iterator:
-            yield to_gts_item(item_id, ds, y)
+            if self.feat_static_cat is not None:
+                ts[FieldName.FEAT_STATIC_CAT] = self.feat_static_cat[j]
+            if self.feat_static_real is not None:
+                ts[FieldName.FEAT_STATIC_REAL] = self.feat_static_real[j]
+            if self.past_feat_dynamic_real is not None:
+                ts[FieldName.PAST_FEAT_DYNAMIC_REAL] = self.past_feat_dynamic_real[start_idx:end_idx].T
+            if self.feat_dynamic_real is not None:
+                if self.includes_future:
+                    start = start + j * self.prediction_length
+                    end = end + (j + 1) * self.prediction_length
+                ts[FieldName.FEAT_DYNAMIC_REAL] = self.feat_dynamic_real[start_idx:end_idx].T
+            yield ts
 
 
 class AbstractGluonTSModel(AbstractTimeSeriesModel):
@@ -365,24 +337,6 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             # result = list(GTSDataset(time_series_df[self.target], self.freq))
             # from statsforecast.core import GroupedArray, _grouped_array_from_df
 
-            # ga = _grouped_array_from_df()
-            def fast_groupby(df):
-                item_ids = df.index.get_level_values("item_id")
-                timestamps = df.index.get_level_values("timestamp")
-                indices_sizes = item_ids.value_counts(sort=False)
-                sizes = indices_sizes.values
-                cum_sizes = sizes.cumsum()
-                indptr = np.append(0, cum_sizes).astype(np.int32)
-                data = df.values
-                for j in range(len(indptr) - 1):
-                    start = indptr[j]
-                    yield item_ids[start], timestamps[start], data[start : indptr[j + 1]]
-
-            gts = GTSDataset(
-                iterator=fast_groupby(time_series_df[self.target]), length=time_series_df.num_items, freq=self.freq
-            )
-            return gts
-
             return SimpleGluonTSDataset(
                 target_df=time_series_df,
                 target_column=self.target,
@@ -390,8 +344,8 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                 feat_static_real=feat_static_real,
                 feat_dynamic_real=feat_dynamic_real,
                 past_feat_dynamic_real=past_feat_dynamic_real,
-                float_dtype=self.float_dtype,
-                int_dtype=self.int_dtype,
+                includes_future=known_covariates is not None,
+                prediction_length=self.prediction_length,
             )
         else:
             return None
