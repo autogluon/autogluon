@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 import inspect
 import logging
@@ -877,10 +879,12 @@ class BaggedEnsembleModel(AbstractModel):
     def convert_to_template_child(self):
         return self._get_model_base().convert_to_template()
 
-    def _get_compressed_params(self, model_params_list=None):
+    def _get_compressed_params(self, model_params_list=None) -> dict:
         if model_params_list is None:
             model_params_list = [self.load_child(child).get_trained_params() for child in self.models]
 
+        if len(model_params_list) == 0:
+            return dict()
         model_params_compressed = dict()
         for param in model_params_list[0].keys():
             model_param_vals = [model_params[param] for model_params in model_params_list]
@@ -1112,10 +1116,10 @@ class BaggedEnsembleModel(AbstractModel):
 
         return info
 
-    def get_memory_size(self):
+    def get_memory_size(self, allow_exception: bool = False) -> int | None:
         models = self.models
         self.models = None
-        memory_size = super().get_memory_size()
+        memory_size = super().get_memory_size(allow_exception=allow_exception)
         self.models = models
         return memory_size
 

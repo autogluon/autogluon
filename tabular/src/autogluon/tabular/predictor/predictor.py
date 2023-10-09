@@ -1024,6 +1024,10 @@ class TabularPredictor:
         calibrate_decision_threshold=False,
         infer_limit=None,
     ):
+        if not self.get_model_names():
+            logger.log(30, "Warning: No models found, skipping post_fit logic...")
+            return
+
         if refit_full is True:
             if keep_only_best is True:
                 if set_best_to_refit_full is True:
@@ -1926,6 +1930,52 @@ class TabularPredictor:
             silent=silent,
         )
 
+    def get_model_failures(self, verbose: bool = False) -> pd.DataFrame:
+        """
+        [Advanced] Get the model failures that occurred during the fitting of this model, in the form of a pandas DataFrame.
+
+        This is useful for in-depth debugging of model failures and identifying bugs.
+
+        For more information on model failures, refer to `predictor.info()['model_info_failures']`
+
+        Parameters
+        ----------
+        verbose: bool, default = False
+            If True, the output DataFrame is printed to stdout.
+
+        Returns
+        -------
+        model_failures_df: pd.DataFrame
+            A DataFrame of model failures. Each row corresponds to a model failure, and columns correspond to meta information about that model.
+
+            Included Columns:
+                "model": The name of the model that failed
+                "exc_type": The class name of the exception raised
+                "total_time": The total time in seconds taken by the model prior to the exception (lost time due to the failure)
+                "model_type": The class name of the model
+                "child_model_type": The child class name of the model
+                "is_initialized"
+                "is_fit"
+                "is_valid"
+                "can_infer"
+                "num_features"
+                "num_models"
+                "memory_size"
+                "hyperparameters"
+                "hyperparameters_fit"
+                "child_hyperparameters"
+                "child_hyperparameters_fit"
+                "exc_str": The string message contained in the raised exception
+                "exc_traceback": The full traceback message of the exception as a string
+                "exc_order": The order of the model failure (starting from 1)
+        """
+        self._assert_is_fit("get_model_failures")
+        model_failures_df = self._trainer.get_model_failures()
+        if verbose:
+            with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):
+                print(model_failures_df)
+        return model_failures_df
+
     def predict_proba_multi(
         self,
         data=None,
@@ -2722,7 +2772,7 @@ class TabularPredictor:
         Dictionary of `predictor` metadata.
         """
         self._assert_is_fit("info")
-        return self._learner.get_info(include_model_info=True)
+        return self._learner.get_info(include_model_info=True, include_model_failures=True)
 
     # TODO: Add data argument
     # TODO: Add option to disable OOF generation of newly fitted models

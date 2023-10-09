@@ -223,7 +223,7 @@ class VowpalWabbitModel(AbstractModel):
         y_pred_proba = np.array([self.model.predict(row) for row in X])
         return self._convert_proba_to_unified_form(y_pred_proba)
 
-    def get_memory_size(self) -> int:
+    def _get_memory_size(self) -> int:
         # TODO: Can be improved further to make it more accurate
         # Returning 5MB as the value
         return int(5e6)
