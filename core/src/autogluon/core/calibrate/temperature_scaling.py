@@ -2,6 +2,9 @@ import numpy as np
 
 from autogluon.common.utils.try_import import try_import_torch
 
+from ..constants import BINARY
+from ..data.label_cleaner import LabelCleanerMulticlassToBinary
+
 
 def tune_temperature_scaling(y_val_probs: np.ndarray, y_val: np.ndarray, init_val: float = 1, max_iter: int = 1000, lr: float = 0.01):
     """
@@ -60,3 +63,24 @@ def tune_temperature_scaling(y_val_probs: np.ndarray, y_val: np.ndarray, init_va
         return None
 
     return temperature_scale
+
+
+def custom_softmax(logits: np.ndarray) -> np.ndarray:
+    x_max = np.amax(logits, axis=1, keepdims=True)
+    exp_x_shifted = np.exp(logits - x_max)
+    y_pred_proba = exp_x_shifted / np.sum(exp_x_shifted, axis=1, keepdims=True)
+    return y_pred_proba
+
+
+def apply_temperature_scaling(y_pred_proba: np.ndarray, temperature_scalar: float, problem_type: str) -> np.ndarray:
+    # TODO: This is expensive to convert at inference time, try to avoid in future
+    if problem_type == BINARY:
+        y_pred_proba = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_pred_proba)
+
+    logits = np.log(y_pred_proba)
+    y_pred_proba = custom_softmax(logits=logits / temperature_scalar)
+
+    if problem_type == BINARY:
+        y_pred_proba = y_pred_proba[:, 1]
+
+    return y_pred_proba

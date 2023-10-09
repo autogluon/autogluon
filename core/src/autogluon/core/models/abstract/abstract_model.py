@@ -11,7 +11,6 @@ from typing import Any, Dict, Optional, Union
 
 import numpy as np
 import pandas as pd
-import scipy
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.utils.distribute_utils import DistributedContext
@@ -24,6 +23,7 @@ from autogluon.common.utils.try_import import try_import_ray
 from autogluon.common.utils.utils import setup_outputdir
 
 from ... import metrics
+from ...calibrate.temperature_scaling import apply_temperature_scaling
 from ...constants import (
     AG_ARG_PREFIX,
     AG_ARGS_FIT,
@@ -33,7 +33,7 @@ from ...constants import (
     REFIT_FULL_SUFFIX,
     REGRESSION,
 )
-from ...data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
+from ...data.label_cleaner import LabelCleaner
 from ...hpo.constants import CUSTOM_BACKEND, RAY_BACKEND
 from ...hpo.exceptions import EmptySearchSpace
 from ...hpo.executors import HpoExecutor, HpoExecutorFactory
@@ -895,19 +895,12 @@ class AbstractModel:
         X = self.preprocess(X)
         self.model = self.model.fit(X, y)
 
-    def _apply_temperature_scaling(self, y_pred_proba):
-        # TODO: This is expensive to convert at inference time, try to avoid in future
-        if self.problem_type == BINARY:
-            y_pred_proba = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_pred_proba)
-
-        logits = np.log(y_pred_proba)
-        y_pred_proba = scipy.special.softmax(logits / self.params_aux.get("temperature_scalar"), axis=1)
-        y_pred_proba = y_pred_proba / y_pred_proba.sum(axis=1, keepdims=True)
-
-        if self.problem_type == BINARY:
-            y_pred_proba = y_pred_proba[:, 1]
-
-        return y_pred_proba
+    def _apply_temperature_scaling(self, y_pred_proba: np.ndarray) -> np.ndarray:
+        return apply_temperature_scaling(
+            y_pred_proba=y_pred_proba,
+            temperature_scalar=self.params_aux.get("temperature_scalar"),
+            problem_type=self.problem_type,
+        )
 
     def _apply_conformalization(self, y_pred):
         """
