@@ -602,6 +602,7 @@ class BaggedEnsembleModel(AbstractModel):
         else:
             self._oof_pred_proba += oof_pred_proba
             self._oof_pred_model_repeats += oof_pred_model_repeats
+        self._oof_pred_proba = self._oof_pred_proba.astype(np.float32)  # save memory
 
         self._cv_splitters += [cv_splitter for _ in range(n_repeats_started)]
         self._k_per_n_repeat += [k_fold for _ in range(n_repeats_finished)]
@@ -1144,13 +1145,13 @@ class BaggedEnsembleModel(AbstractModel):
 
     def _construct_empty_oof(self, X, y):
         if self.problem_type == MULTICLASS:
-            oof_pred_proba = np.zeros(shape=(len(X), len(y.unique())), dtype=np.float32)
+            oof_pred_proba = np.zeros(shape=(len(X), len(y.unique())), dtype=np.float64)
         elif self.problem_type == SOFTCLASS:
-            oof_pred_proba = np.zeros(shape=y.shape, dtype=np.float32)
+            oof_pred_proba = np.zeros(shape=y.shape, dtype=np.float64)
         elif self.problem_type == QUANTILE:
-            oof_pred_proba = np.zeros(shape=(len(X), len(self.quantile_levels)), dtype=np.float32)
+            oof_pred_proba = np.zeros(shape=(len(X), len(self.quantile_levels)), dtype=np.float64)
         else:
-            oof_pred_proba = np.zeros(shape=len(X), dtype=np.float32)
+            oof_pred_proba = np.zeros(shape=len(X), dtype=np.float64)
         oof_pred_model_repeats = np.zeros(shape=len(X), dtype=np.uint8)
         return oof_pred_proba, oof_pred_model_repeats
 
