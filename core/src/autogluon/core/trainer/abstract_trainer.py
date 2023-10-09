@@ -173,7 +173,6 @@ class AbstractTrainer:
 
         self._extra_banned_names = set()  # Names which are banned but are not used by a trained model.
 
-        self._models_failed_to_train = []  # List of models which failed to train
         self._models_failed_to_train_errors = dict()  # Dict of model name -> model failure metadata
 
         # self._exceptions_list = []  # TODO: Keep exceptions list for debugging during benchmarking.
@@ -1825,7 +1824,6 @@ class AbstractTrainer:
             total_time = crash_time - fit_start_time
             tb = traceback.format_exc()
             model_info = self.get_model_info(model=model)
-            self._models_failed_to_train.append(model.name)
             self._models_failed_to_train_errors[model.name] = dict(
                 exc_type=err.__class__.__name__,
                 exc_str=str(err),
@@ -2992,7 +2990,6 @@ class AbstractTrainer:
                 "total_time",
             ]
             valid_keys_inner = [
-                # "name",
                 "model_type",
                 "hyperparameters",
                 "hyperparameters_fit",
@@ -3026,12 +3023,10 @@ class AbstractTrainer:
             "total_time",
             "model_type",
             "child_model_type",
-            # "stack_level",
             "is_initialized",
             "is_fit",
             "is_valid",
             "can_infer",
-            # "fit_order",
             "num_features",
             "num_models",
             "memory_size",
