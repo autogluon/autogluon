@@ -335,7 +335,7 @@ class DirectTabularModel(AbstractMLForecastModel):
 
     TIMESERIES_METRIC_TO_TABULAR_METRIC = {
         "MAPE": "mean_absolute_percentage_error",
-        "sMAPE": "mean_absolute_percentage_error",
+        "sMAPE": "symmetric_mean_absolute_percentage_error",
         "WQL": "pinball_loss",
         "MASE": "mean_absolute_error",
         "WAPE": "mean_absolute_error",
@@ -477,7 +477,7 @@ class RecursiveTabularModel(AbstractMLForecastModel):
 
     TIMESERIES_METRIC_TO_TABULAR_METRIC = {
         "MAPE": "mean_absolute_percentage_error",
-        "sMAPE": "mean_absolute_percentage_error",
+        "sMAPE": "symmetric_mean_absolute_percentage_error",
         "WQL": "mean_absolute_error",
         "MASE": "mean_absolute_error",
         "WAPE": "mean_absolute_error",
