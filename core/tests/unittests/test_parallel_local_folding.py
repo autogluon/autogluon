@@ -15,7 +15,7 @@ from autogluon.core.searcher import LocalRandomSearcher
 
 class DummyBigModel(AbstractModel):
     def _estimate_memory_usage(self, **kwargs):
-        return ResourceManager.get_available_virtual_mem() / 2.5
+        return 1e+9
 
 
 def _prepare_data():
@@ -99,6 +99,15 @@ def test_resource_allocation_and_time_limit():
 
 @patch("autogluon.common.utils.resource_utils.ResourceManager.get_available_virtual_mem")
 def test_dynamic_resource_allocation(mock_get_mem):
-    mock_get_mem.return_value = 1073741824
-    fold_fitting_strategy = _construct_dummy_fold_strategy(model_base_cls=DummyBigModel, num_jobs=100, num_folds_parallel=8)
-    assert fold_fitting_strategy.num_parallel_jobs == 2
+    mock_get_mem.return_value = 2.5 * 1e+9
+    fold_fitting_strategy = _construct_dummy_fold_strategy(model_base_cls=DummyBigModel, num_jobs=8, num_folds_parallel=8)
+    assert fold_fitting_strategy.num_parallel_jobs == 2 and fold_fitting_strategy.batches == 4
+    mock_get_mem.return_value = 7.5 * 1e+9
+    fold_fitting_strategy = _construct_dummy_fold_strategy(model_base_cls=DummyBigModel, num_jobs=8, num_folds_parallel=8)
+    # If memory is not sufficient to train num_folds_parallel, reduce to max power of 2 folds that's smaller than folds_can_be_fit_in_parallel.
+    # Here memory can only train 7 folds, therefore we train 4 folds instead in two batches
+    assert fold_fitting_strategy.num_parallel_jobs == 4 and fold_fitting_strategy.batches == 2
+    mock_get_mem.return_value = 6 * 1e+9
+    fold_fitting_strategy = _construct_dummy_fold_strategy(model_base_cls=DummyBigModel, num_jobs=10, num_folds_parallel=10)
+    # Here memory can only train 10 folds, therefore we train 4 folds instead in three batches, the last batch would train 2 folds in parallel
+    assert fold_fitting_strategy.num_parallel_jobs == 4 and fold_fitting_strategy.batches == 3
