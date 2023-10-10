@@ -1,7 +1,6 @@
 import logging
 import os
 import shutil
-import time
 from datetime import timedelta
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterator, List, Optional, Type
@@ -112,8 +111,8 @@ class SimpleGluonTSDataset(GluonTSDataset):
                 ts[FieldName.PAST_FEAT_DYNAMIC_REAL] = self.past_feat_dynamic_real[start_idx:end_idx].T
             if self.feat_dynamic_real is not None:
                 if self.includes_future:
-                    start = start + j * self.prediction_length
-                    end = end + (j + 1) * self.prediction_length
+                    start_idx = start_idx + j * self.prediction_length
+                    end_idx = end_idx + (j + 1) * self.prediction_length
                 ts[FieldName.FEAT_DYNAMIC_REAL] = self.feat_dynamic_real[start_idx:end_idx].T
             yield ts
 
@@ -526,5 +525,5 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
         forecast_df.index = forecast_index
         if self.must_drop_median:
-            predictions = predictions.drop("0.5", axis=1)
+            forecast_df = forecast_df.drop("0.5", axis=1)
         return TimeSeriesDataFrame(forecast_df)
