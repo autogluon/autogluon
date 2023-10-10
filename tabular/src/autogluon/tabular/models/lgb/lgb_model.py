@@ -64,10 +64,34 @@ class LGBModel(AbstractModel):
             stopping_metric_name = stopping_metric
         return stopping_metric, stopping_metric_name
 
-    def _estimate_memory_usage(self, X, **kwargs):
+    def _estimate_memory_usage(self, X: DataFrame, **kwargs) -> float:
+        """
+        Returns the expected peak memory usage in bytes of the LightGBM model during fit.
+
+        The memory usage of LightGBM is primarily made up of two sources:
+
+        1. The size of the data
+        2. The size of the histogram cache
+            Scales roughly by 5100*num_features*num_leaves bytes
+            For 10000 features and 128 num_leaves, the histogram would be 6.5 GB.
+        """
         num_classes = self.num_classes if self.num_classes else 1  # self.num_classes could be None after initialization if it's a regression problem
         data_mem_usage = get_approximate_df_mem_usage(X).sum()
-        approx_mem_size_req = data_mem_usage * 7 + data_mem_usage / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
+        data_mem_usage_bytes = data_mem_usage * 5 + data_mem_usage / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
+
+        params = self._get_model_params()
+        max_bins = params.get("max_bins", 255)
+        num_leaves = params.get("num_leaves", 31)
+        # Memory usage of histogram based on https://github.com/microsoft/LightGBM/issues/562#issuecomment-304524592
+        histogram_mem_usage_bytes = 20 * max_bins * len(X.columns) * num_leaves
+        histogram_mem_usage_bytes_max = params.get("histogram_pool_size", None)
+        if histogram_mem_usage_bytes_max is not None:
+            histogram_mem_usage_bytes_max *= 1e6  # Convert megabytes to bytes, `histogram_pool_size` is in MB.
+            if histogram_mem_usage_bytes > histogram_mem_usage_bytes_max:
+                histogram_mem_usage_bytes = histogram_mem_usage_bytes_max
+        histogram_mem_usage_bytes *= 1.2  # Add a 20% buffer
+
+        approx_mem_size_req = data_mem_usage_bytes + histogram_mem_usage_bytes
         return approx_mem_size_req
 
     def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, num_gpus=0, num_cpus=0, sample_weight=None, sample_weight_val=None, verbosity=2, **kwargs):

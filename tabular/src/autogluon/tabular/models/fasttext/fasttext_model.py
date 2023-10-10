@@ -166,7 +166,7 @@ class FastTextModel(AbstractModel):
         model._load_model = None
         return model
 
-    def get_memory_size(self) -> int:
+    def _get_memory_size(self) -> int:
         return self._model_size_estimate
 
     def _more_tags(self):

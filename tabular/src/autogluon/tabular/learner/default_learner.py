@@ -432,10 +432,10 @@ class DefaultLearner(AbstractTabularLearner):
 
         return new_threshold, holdout_frac, num_bag_folds
 
-    def get_info(self, include_model_info=False, **kwargs):
+    def get_info(self, include_model_info=False, include_model_failures=False, **kwargs):
         learner_info = super().get_info(**kwargs)
         trainer = self.load_trainer()
-        trainer_info = trainer.get_info(include_model_info=include_model_info)
+        trainer_info = trainer.get_info(include_model_info=include_model_info, include_model_failures=include_model_failures)
         learner_info.update(
             {
                 "time_fit_preprocessing": self._time_fit_preprocessing,

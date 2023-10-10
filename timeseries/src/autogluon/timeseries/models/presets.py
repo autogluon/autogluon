@@ -8,7 +8,6 @@ from autogluon.common import space
 from autogluon.core import constants
 
 from . import (
-    ARIMAModel,
     AutoARIMAModel,
     AutoETSModel,
     AverageModel,
@@ -29,6 +28,9 @@ from . import (
 )
 from .abstract import AbstractTimeSeriesModel
 from .multi_window.multi_window_model import MultiWindowBacktestingModel
+
+# TODO: Enable ARIMAModel after upgrading to StatsForecast >=1.5.0 - currently ARIMA model is broken
+
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +54,6 @@ MODEL_TYPES = dict(
     DynamicOptimizedTheta=DynamicOptimizedThetaModel,
     NPTS=NPTSModel,
     Theta=ThetaModel,
-    ARIMA=ARIMAModel,
     ETS=ETSModel,
 )
 

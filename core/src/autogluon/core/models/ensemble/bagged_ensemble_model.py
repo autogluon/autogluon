@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 import inspect
 import logging
@@ -84,7 +86,7 @@ class BaggedEnsembleModel(AbstractModel):
         self._bagged_mode = None
         # _child_oof currently is only set to True for KNN models, that are capable of LOO prediction generation to avoid needing bagging.
         # TODO: Consider moving `_child_oof` logic to a separate class / refactor OOF logic.
-        # FIXME: Avoid unnecessary refit during refit_full on `_child_oof=True` models, just re-use the original model.
+        # FIXME: Avoid unnecessary refit during refit_full on `_child_oof=True` models, just reuse the original model.
         self._child_oof = False  # Whether the OOF preds were taken from a single child model (Assumes child can produce OOF preds without bagging).
         self._cv_splitters = []  # Keeps track of the CV splitter used for each bagged repeat.
         self._params_aux_child = None  # aux params of child model
@@ -142,11 +144,11 @@ class BaggedEnsembleModel(AbstractModel):
         return self._oof_pred_proba_func(self._oof_pred_proba, self._oof_pred_model_repeats)
 
     @staticmethod
-    def _oof_pred_proba_func(oof_pred_proba, oof_pred_model_repeats):
+    def _oof_pred_proba_func(oof_pred_proba, oof_pred_model_repeats, return_type=np.float32):
         oof_pred_model_repeats_without_0 = np.where(oof_pred_model_repeats == 0, 1, oof_pred_model_repeats)
         if oof_pred_proba.ndim == 2:
             oof_pred_model_repeats_without_0 = oof_pred_model_repeats_without_0[:, None]
-        return oof_pred_proba / oof_pred_model_repeats_without_0
+        return (oof_pred_proba / oof_pred_model_repeats_without_0).astype(return_type)
 
     def _init_misc(self, **kwargs):
         child = self._get_model_base().convert_to_template()
@@ -877,10 +879,12 @@ class BaggedEnsembleModel(AbstractModel):
     def convert_to_template_child(self):
         return self._get_model_base().convert_to_template()
 
-    def _get_compressed_params(self, model_params_list=None):
+    def _get_compressed_params(self, model_params_list=None) -> dict:
         if model_params_list is None:
             model_params_list = [self.load_child(child).get_trained_params() for child in self.models]
 
+        if len(model_params_list) == 0:
+            return dict()
         model_params_compressed = dict()
         for param in model_params_list[0].keys():
             model_param_vals = [model_params[param] for model_params in model_params_list]
@@ -1112,10 +1116,10 @@ class BaggedEnsembleModel(AbstractModel):
 
         return info
 
-    def get_memory_size(self):
+    def get_memory_size(self, allow_exception: bool = False) -> int | None:
         models = self.models
         self.models = None
-        memory_size = super().get_memory_size()
+        memory_size = super().get_memory_size(allow_exception=allow_exception)
         self.models = models
         return memory_size
 
@@ -1144,13 +1148,13 @@ class BaggedEnsembleModel(AbstractModel):
 
     def _construct_empty_oof(self, X, y):
         if self.problem_type == MULTICLASS:
-            oof_pred_proba = np.zeros(shape=(len(X), len(y.unique())), dtype=np.float32)
+            oof_pred_proba = np.zeros(shape=(len(X), len(y.unique())), dtype=np.float64)
         elif self.problem_type == SOFTCLASS:
-            oof_pred_proba = np.zeros(shape=y.shape, dtype=np.float32)
+            oof_pred_proba = np.zeros(shape=y.shape, dtype=np.float64)
         elif self.problem_type == QUANTILE:
-            oof_pred_proba = np.zeros(shape=(len(X), len(self.quantile_levels)), dtype=np.float32)
+            oof_pred_proba = np.zeros(shape=(len(X), len(self.quantile_levels)), dtype=np.float64)
         else:
-            oof_pred_proba = np.zeros(shape=len(X), dtype=np.float32)
+            oof_pred_proba = np.zeros(shape=len(X), dtype=np.float64)
         oof_pred_model_repeats = np.zeros(shape=len(X), dtype=np.uint8)
         return oof_pred_proba, oof_pred_model_repeats
 

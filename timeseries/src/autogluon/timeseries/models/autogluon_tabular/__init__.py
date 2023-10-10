@@ -1,5 +1,4 @@
-from .direct_tabular import DirectTabularModel
-from .mlforecast import RecursiveTabularModel
+from .mlforecast import DirectTabularModel, RecursiveTabularModel
 
 __all__ = [
     "DirectTabularModel",
