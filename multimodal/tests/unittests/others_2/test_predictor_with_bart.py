@@ -4,11 +4,11 @@ import warnings
 
 import numpy.testing as npt
 import pytest
+from datasets import load_dataset
 from torch import Tensor
 
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.constants import IA3_LORA
-from datasets import load_dataset
 
 
 @pytest.mark.parametrize("checkpoint_name", ["facebook/bart-base"])

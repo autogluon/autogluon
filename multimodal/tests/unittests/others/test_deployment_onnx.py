@@ -5,6 +5,7 @@ import numpy as np
 import numpy.testing
 import pytest
 import torch
+from datasets import load_dataset
 from scipy.stats import pearsonr, spearmanr
 from sklearn.metrics.pairwise import paired_cosine_distances
 from torch import FloatTensor
@@ -14,7 +15,6 @@ from autogluon.multimodal.constants import REGRESSION
 from autogluon.multimodal.utils import logits_to_prob
 from autogluon.multimodal.utils.misc import shopee_dataset
 from autogluon.multimodal.utils.onnx import OnnxModule
-from datasets import load_dataset
 
 from ..utils.unittest_datasets import AEDataset, PetFinderDataset
 
