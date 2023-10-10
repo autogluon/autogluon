@@ -481,8 +481,8 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
     def _stack_distribution_forecasts(self, forecasts: List[Forecast], item_ids: pd.Index) -> pd.DataFrame:
         import torch
-        from torch.distributions import Distribution
         from gluonts.torch.distributions import AffineTransformed
+        from torch.distributions import Distribution
 
         # Sort forecasts in the same order as in the dataset
         item_id_to_forecast = {str(f.item_id): f for f in forecasts}
