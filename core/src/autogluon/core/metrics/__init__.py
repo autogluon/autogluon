@@ -413,6 +413,15 @@ mean_absolute_percentage_error = make_scorer(
 mean_absolute_percentage_error.add_alias("mape")
 
 
+def smape_func(y_true, y_pred) -> float:
+    epsilon = np.finfo(np.float64).eps
+    return np.average(np.abs(y_pred - y_true) / np.maximum(np.abs(y_true) + np.abs(y_pred), epsilon))
+
+
+symmetric_mean_absolute_percentage_error = make_scorer("symmetric_mean_absolute_percentage_error", smape_func, optimum=0.0, greater_is_better=False)
+symmetric_mean_absolute_percentage_error.add_alias("smape")
+
+
 def local_spearmanr(y_true, y_pred):
     return float(scipy.stats.spearmanr(y_true, y_pred)[0])
 
@@ -512,6 +521,7 @@ for scorer in [
     mean_absolute_error,
     median_absolute_error,
     mean_absolute_percentage_error,
+    symmetric_mean_absolute_percentage_error,
     spearmanr,
     pearsonr,
 ]:
