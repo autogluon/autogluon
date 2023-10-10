@@ -88,10 +88,10 @@ class SimpleGluonTSDataset(GluonTSDataset):
 
         # normalize freq str to handle peculiarities such as W-SUN
         offset_base_alias = norm_freq_str(pd_offset)
-        if freq not in GLUONTS_SUPPORTED_OFFSETS or offset_base_alias is None:
+        if offset_base_alias not in GLUONTS_SUPPORTED_OFFSETS:
             return "A"
         else:
-            return freq
+            return f"{pd_offset.n}{offset_base_alias}"
 
     def __len__(self):
         return len(self.indptr) - 1  # noqa
