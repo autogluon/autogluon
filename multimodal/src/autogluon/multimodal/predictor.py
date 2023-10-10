@@ -26,7 +26,6 @@ from omegaconf import OmegaConf
 from packaging import version
 from torch import nn
 
-import autogluon.core.metrics
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_ray
@@ -2098,7 +2097,7 @@ class MultiModalPredictor(ExportMixin):
             for per_metric in metrics:
                 score = compute_score(
                     metric_data=metric_data,
-                    metric_name=per_metric,
+                    metric=per_metric.lower() if isinstance(per_metric, str) else per_metric,
                 )
                 per_metric_name = per_metric if isinstance(per_metric, str) else per_metric.name
                 results[per_metric_name] = score

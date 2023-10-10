@@ -4,10 +4,10 @@ import warnings
 
 import numpy.testing as npt
 import pytest
-from datasets import load_dataset
 from torch import Tensor
 
 from autogluon.multimodal import MultiModalPredictor
+from datasets import load_dataset
 
 
 @pytest.mark.parametrize("eval_metric", ["spearmanr", "pearsonr"])
