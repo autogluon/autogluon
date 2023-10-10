@@ -456,22 +456,6 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
         return list(self.gts_predictor.predict(**predictor_kwargs))
 
-    @staticmethod
-    def _sample_to_quantile_forecast(forecast: SampleForecast, quantile_levels: List[float]) -> QuantileForecast:
-        forecast_arrays = [forecast.mean]
-
-        quantile_keys = [str(q) for q in quantile_levels]
-        for q in quantile_keys:
-            forecast_arrays.append(forecast.quantile(q))
-
-        forecast_init_args = dict(
-            forecast_arrays=np.array(forecast_arrays),
-            start_date=forecast.start_date,
-            forecast_keys=["mean"] + quantile_keys,
-            item_id=str(forecast.item_id),
-        )
-        return QuantileForecast(**forecast_init_args)
-
     def _stack_quantile_forecasts(self, forecasts: List[QuantileForecast], item_ids: pd.Index) -> pd.DataFrame:
         # GluonTS always saves item_id as a string
         item_id_to_forecast = {str(f.item_id): f for f in forecasts}
@@ -499,16 +483,48 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
     def _stack_distribution_forecasts(self, forecasts: List[Forecast], item_ids: pd.Index) -> pd.DataFrame:
         import torch
+        from torch.distributions import Distribution
+        from gluonts.torch.distributions import AffineTransformed
 
-        # TODO: Concatenate all forecasts into a single tensor/object before converting?
+        # Sort forecasts in the same order as in the dataset
         item_id_to_forecast = {str(f.item_id): f for f in forecasts}
-        array_per_item = []
-        for item_id in item_ids:
-            forecast = item_id_to_forecast[str(item_id)]
-            quantiles = torch.tensor(self.quantile_levels, device=forecast.distribution.mean.device).reshape(-1, 1)
-            quantile_predictions = forecast.distribution.icdf(quantiles).cpu().detach().numpy()
-            array_per_item.append(np.vstack([forecast.mean, quantile_predictions]).T)
-        forecast_array = np.concatenate(array_per_item, axis=0)
+        forecasts = [item_id_to_forecast[str(item_id)] for item_id in item_ids]
+
+        def stack_distributions(distributions: List[Distribution]) -> Distribution:
+            """Stack multiple torch.Distribution objects into a single distribution"""
+            params_per_dist = []
+            for dist in distributions:
+                params = {name: getattr(dist, name) for name in dist.arg_constraints.keys()}
+                params_per_dist.append(params)
+            # Make sure that all distributions have same keys
+            assert len(set(tuple(p.keys()) for p in params_per_dist)) == 1
+
+            stacked_params = {}
+            for key in dist.arg_constraints.keys():
+                stacked_params[key] = torch.cat([p[key] for p in params_per_dist])
+            return dist.__class__(**stacked_params)
+
+        if not isinstance(forecasts[0].distribution, AffineTransformed):
+            raise AssertionError("Expected forecast.distribution to be an instance of AffineTransformed")
+
+        # We stack all forecast distribution into a single Distribution object.
+        # This dramatically speeds up the quantiles calculation.
+        stacked_base_dist = stack_distributions([f.distribution.base_dist for f in forecasts])
+
+        stacked_loc = torch.cat([f.distribution.loc for f in forecasts])
+        if stacked_loc.shape != stacked_base_dist.batch_shape:
+            stacked_loc = stacked_loc.repeat_interleave(self.prediction_length)
+
+        stacked_scale = torch.cat([f.distribution.scale for f in forecasts])
+        if stacked_scale.shape != stacked_base_dist.batch_shape:
+            stacked_scale = stacked_scale.repeat_interleave(self.prediction_length)
+
+        stacked_dist = AffineTransformed(stacked_base_dist, loc=stacked_loc, scale=stacked_scale)
+
+        mean_prediction = stacked_dist.mean.cpu().detach().numpy()
+        quantiles = torch.tensor(self.quantile_levels, device=stacked_dist.mean.device).reshape(-1, 1)
+        quantile_predictions = stacked_dist.icdf(quantiles).cpu().detach().numpy()
+        forecast_array = np.vstack([mean_prediction, quantile_predictions]).T
         return pd.DataFrame(forecast_array, columns=["mean"] + [str(q) for q in self.quantile_levels])
 
     def _gluonts_forecasts_to_data_frame(
