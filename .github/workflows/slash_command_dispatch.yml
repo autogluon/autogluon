@@ -28,6 +28,20 @@ jobs:
           script: |
             const { owner, repo, number } = context.issue;
             return number
+      - name: Get Forked Repository and Branch
+        id: pr_info
+        run: |
+          # Use the GitHub API to fetch information about the pull request
+          pr_info=$(curl -s -H "Authorization: token ${{ secrets.PAT }}" \
+                      "https://api.github.com/repos/${{ github.repository }}/pulls/${{ steps.pr_number.outputs.result }}")
+
+          # Extract the forked repository and branch from the pull request info
+          forked_repo=$(echo "$pr_info" | jq -r '.head.repo.full_name')
+          forked_branch=$(echo "$pr_info" | jq -r '.head.ref')
+          echo "Forked Repository: $forked_repo"
+          echo "Forked Branch: $forked_branch"
+          echo "FORK_NAME=$forked_repo" >> $GITHUB_OUTPUT
+          echo "FORK_BRANCH=$forked_branch" >> $GITHUB_OUTPUT
       - name: Slash Command Dispatch
         id: scd
         uses: peter-evans/slash-command-dispatch@v2.3.0
@@ -43,6 +57,8 @@ jobs:
             comment-id=${{ github.event.comment.id }}
             pr-sha=${{ steps.sha.outputs.result }}
             branch_or_pr_number=PR-${{ steps.pr_number.outputs.result }}
+            fork_name=${{ steps.pr_info.outputs.FORK_NAME }}
+            fork_branch=${{ steps.pr_info.outputs.FORK_BRANCH }}
       - name: Edit comment with error message
         if: steps.scd.outputs.error-message
         uses: peter-evans/create-or-update-comment@v1
