@@ -48,7 +48,6 @@ Note that some of the models' hyperparameters have names and default values that
    SeasonalNaiveModel
    AverageModel
    SeasonalAverageModel
-   ARIMAModel
    ETSModel
    AutoARIMAModel
    AutoETSModel
@@ -96,12 +95,6 @@ Baseline models are simple approaches that use minimal historical data to make p
 ## Statistical models
 
 Statistical models capture simple patterns in the data like trends and seasonality.
-
-```{eval-rst}
-.. autoclass:: ARIMAModel
-   :members: init
-
-```
 
 
 ```{eval-rst}
@@ -218,7 +211,7 @@ Models not included in this table currently do not support any additional featur
      - ✓
      - ✓
      - ✓
-     - ✓
+     -
    * - :class:`~autogluon.timeseries.models.RecursiveTabularModel`
      - ✓
      - ✓

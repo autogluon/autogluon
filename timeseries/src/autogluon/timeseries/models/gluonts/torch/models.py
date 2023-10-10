@@ -7,6 +7,7 @@ from typing import Any, Dict, Type
 from gluonts.model.estimator import Estimator as GluonTSEstimator
 
 from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
+from autogluon.timeseries.utils.datetime import get_lags_for_frequency, get_time_features_for_frequency
 
 # NOTE: We avoid imports for torch and pytorch_lightning at the top level and hide them inside class methods.
 # This is done to skip these imports during multiprocessing (which may cause bugs)
@@ -83,6 +84,8 @@ class DeepARModel(AbstractGluonTSModel):
         init_kwargs["num_feat_static_real"] = self.num_feat_static_real
         init_kwargs["cardinality"] = self.feat_static_cat_cardinality
         init_kwargs["num_feat_dynamic_real"] = self.num_feat_dynamic_real
+        init_kwargs["lags_seq"] = get_lags_for_frequency(self.freq)
+        init_kwargs["time_features"] = get_time_features_for_frequency(self.freq)
         return init_kwargs
 
 
@@ -188,6 +191,7 @@ class TemporalFusionTransformerModel(AbstractGluonTSModel):
             init_kwargs["static_dims"] = [self.num_feat_static_real]
         if len(self.feat_static_cat_cardinality):
             init_kwargs["static_cardinalities"] = self.feat_static_cat_cardinality
+        init_kwargs["time_features"] = get_time_features_for_frequency(self.freq)
         return init_kwargs
 
 

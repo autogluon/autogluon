@@ -17,19 +17,14 @@ from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
 
 from ..common import DUMMY_TS_DATAFRAME, dict_equal_primitive, get_data_frame_with_item_index
-from .gluonts.test_gluonts import TESTABLE_MODELS as GLUONTS_TESTABLE_MODELS
-from .test_direct_tabular import TESTABLE_MODELS as TABULAR_TESTABLE_MODELS
+from .test_gluonts import TESTABLE_MODELS as GLUONTS_TESTABLE_MODELS
 from .test_local import TESTABLE_MODELS as LOCAL_TESTABLE_MODELS
 from .test_mlforecast import TESTABLE_MODELS as MLFORECAST_TESTABLE_MODELS
 from .test_multi_window_model import get_multi_window_deepar
 
 AVAILABLE_METRICS = TimeSeriesEvaluator.AVAILABLE_METRICS
 TESTABLE_MODELS = (
-    GLUONTS_TESTABLE_MODELS
-    + TABULAR_TESTABLE_MODELS
-    + LOCAL_TESTABLE_MODELS
-    + MLFORECAST_TESTABLE_MODELS
-    + [get_multi_window_deepar]
+    GLUONTS_TESTABLE_MODELS + LOCAL_TESTABLE_MODELS + MLFORECAST_TESTABLE_MODELS + [get_multi_window_deepar]
 )
 
 DUMMY_HYPERPARAMETERS = {
@@ -40,7 +35,6 @@ DUMMY_HYPERPARAMETERS = {
     "use_fallback_model": False,
 }
 TESTABLE_PREDICTION_LENGTHS = [1, 5]
-MODELS_WITHOUT_HPO = ["DirectTabular"]
 
 
 @pytest.fixture(scope="module")
@@ -155,8 +149,6 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct
             "maxiter": 1,
         },
     )
-    if model.name in MODELS_WITHOUT_HPO:
-        pytest.skip(f"{model.name} doesn't support HPO")
     if isinstance(model, MultiWindowBacktestingModel):
         val_data = None
     else:

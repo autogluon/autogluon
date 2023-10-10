@@ -13,7 +13,7 @@ from autogluon.timeseries.models.gluonts import (
 )
 from autogluon.timeseries.utils.features import TimeSeriesFeatureGenerator
 
-from ...common import DATAFRAME_WITH_COVARIATES, DATAFRAME_WITH_STATIC, DUMMY_TS_DATAFRAME
+from ..common import DATAFRAME_WITH_COVARIATES, DATAFRAME_WITH_STATIC, DUMMY_TS_DATAFRAME
 
 MODELS_WITH_STATIC_FEATURES = [DeepARModel, TemporalFusionTransformerModel]
 MODELS_WITH_KNOWN_COVARIATES = [DeepARModel, TemporalFusionTransformerModel]

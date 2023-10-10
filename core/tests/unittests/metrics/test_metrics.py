@@ -72,7 +72,9 @@ EXPECTED_REGRESSION_METRICS = {
     "r2",
     "rmse",
     "root_mean_squared_error",
+    "smape",
     "spearmanr",
+    "symmetric_mean_absolute_percentage_error",
 }
 
 EXPECTED_QUANTILE_METRICS = {

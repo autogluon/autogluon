@@ -388,7 +388,7 @@ def run_tabular_benchmark_toy(fit_args):
     savedir = directory + "AutogluonOutput/"
     shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
     predictor = TabularPredictor(label=dataset["label"], path=savedir).fit(train_data, **fit_args)
-    assert len(predictor._trainer._models_failed_to_train) == 0
+    assert len(predictor._trainer._models_failed_to_train_errors.keys()) == 0
     print(predictor.feature_metadata)
     print(predictor.feature_metadata.type_map_raw)
     print(predictor.feature_metadata.type_group_map_special)
@@ -485,7 +485,7 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
                     # .sample instead of .head to increase diversity and test cases where data index is not monotonically increasing.
                     train_data = train_data.sample(n=subsample_size, random_state=seed_val)  # subsample for fast_benchmark
             predictor = TabularPredictor(label=label, path=savedir).fit(train_data, **fit_args)
-            assert len(predictor._trainer._models_failed_to_train) == 0
+            assert len(predictor._trainer._models_failed_to_train_errors.keys()) == 0
             results = predictor.fit_summary(verbosity=4)
             original_features = list(train_data)
             original_features.remove(label)
@@ -926,7 +926,7 @@ def test_quantile():
     directory = directory_prefix + dataset["name"] + "/"
     savedir = directory + "AutogluonOutput/"
     shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
-    fit_args = {"time_limit": 20}
+    fit_args = {"time_limit": 40}
     predictor = TabularPredictor(label=dataset["label"], path=savedir, problem_type=dataset["problem_type"], quantile_levels=quantile_levels).fit(
         train_data, **fit_args
     )
