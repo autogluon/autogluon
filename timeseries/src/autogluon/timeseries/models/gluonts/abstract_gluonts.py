@@ -381,8 +381,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         init_args = self._get_estimator_init_args()
         callbacks = self._get_callbacks(
             time_limit=time_limit,
-            early_stopping_patience=init_args["early_stopping_patience"],
-            val_data_available=val_data is not None,
+            early_stopping_patience=None if val_data is None else init_args["early_stopping_patience"],
         )
         self._deferred_init_params_aux(dataset=train_data, callbacks=callbacks)
 
@@ -406,7 +405,6 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         self,
         time_limit: int,
         early_stopping_patience: Optional[int] = None,
-        val_data_available: bool = False,
     ) -> List[Callable]:
         """Retrieve a list of callback objects for the GluonTS trainer"""
         from pytorch_lightning.callbacks import EarlyStopping, Timer
@@ -414,7 +412,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         callbacks = []
         if time_limit is not None:
             callbacks.append(Timer(timedelta(seconds=time_limit)))
-        if early_stopping_patience is not None and val_data_available:
+        if early_stopping_patience is not None:
             callbacks.append(EarlyStopping(monitor="val_loss", patience=early_stopping_patience))
         return callbacks
 
