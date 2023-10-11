@@ -100,8 +100,9 @@ class SimpleGluonTSDataset(GluonTSDataset):
         for j in range(len(self.indptr) - 1):
             start_idx = self.indptr[j]
             end_idx = self.indptr[j + 1]
+            # GluonTS expects item_id to be a string
             ts = {
-                FieldName.ITEM_ID: self.item_ids[j],
+                FieldName.ITEM_ID: str(self.item_ids[j]),
                 FieldName.START: pd.Period(self.timestamps[j], freq=self.freq),
                 FieldName.TARGET: self.target_array[start_idx:end_idx],
             }
@@ -295,7 +296,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         else:
             default_trainer_kwargs["accelerator"] = "cpu"
 
-        default_trainer_kwargs.update(init_args.get("trainer_kwargs", {}))
+        default_trainer_kwargs.update(init_args.pop("trainer_kwargs", {}))
         logger.debug(f"\tTraining on device '{default_trainer_kwargs['accelerator']}'")
 
         return from_hyperparameters(
