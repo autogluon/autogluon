@@ -2080,7 +2080,7 @@ class MultiModalPredictor(ExportMixin):
         if self._problem_type == NER:
             score = compute_score(
                 metric_data=metric_data,
-                metric_name=self._eval_metric_name.lower(),
+                metric=self._eval_metric_name.lower(),
             )
             score = {k.lower(): v for k, v in score.items()}
             if metrics_is_none:
