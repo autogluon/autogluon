@@ -133,7 +133,7 @@ def test_custom_metric():
             shutil.rmtree(save_path)
         predictor_by_name.fit(
             train_data=dataset.train_df,
-            time_limit=10,
+            time_limit=0,
             save_path=save_path,
         )
     with tempfile.TemporaryDirectory() as save_path:
@@ -141,7 +141,7 @@ def test_custom_metric():
             shutil.rmtree(save_path)
         predictor_by_scorer.fit(
             train_data=dataset.train_df,
-            time_limit=10,
+            time_limit=0,
             save_path=save_path,
         )
     scores_by_name = predictor_by_name.evaluate(
