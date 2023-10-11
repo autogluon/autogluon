@@ -296,19 +296,19 @@ def test_given_enable_ensemble_false_when_predictor_called_then_ensemble_is_not_
 
 def test_given_model_fails_when_predictor_predicts_then_exception_is_raised(temp_model_path):
     predictor = TimeSeriesPredictor(path=temp_model_path)
-    predictor.fit(train_data=DUMMY_TS_DATAFRAME, hyperparameters={"ARIMA": {"maxiter": 1}})
-    with mock.patch("autogluon.timeseries.models.local.statsforecast.ARIMAModel.predict") as arima_predict:
+    predictor.fit(train_data=DUMMY_TS_DATAFRAME, hyperparameters={"ETS": {}})
+    with mock.patch("autogluon.timeseries.models.local.statsforecast.ETSModel.predict") as arima_predict:
         arima_predict.side_effect = RuntimeError("Numerical error")
-        with pytest.raises(RuntimeError, match="Following models failed to predict: \\['ARIMA'\\]"):
+        with pytest.raises(RuntimeError, match="Following models failed to predict: \\['ETS'\\]"):
             predictor.predict(DUMMY_TS_DATAFRAME)
 
 
 def test_given_model_fails_when_predictor_scores_then_exception_is_raised(temp_model_path):
     predictor = TimeSeriesPredictor(path=temp_model_path)
-    predictor.fit(train_data=DUMMY_TS_DATAFRAME, hyperparameters={"ARIMA": {"maxiter": 1}})
-    with mock.patch("autogluon.timeseries.models.local.statsforecast.ARIMAModel.predict") as arima_predict:
+    predictor.fit(train_data=DUMMY_TS_DATAFRAME, hyperparameters={"ETS": {}})
+    with mock.patch("autogluon.timeseries.models.local.statsforecast.ETSModel.predict") as arima_predict:
         arima_predict.side_effect = RuntimeError("Numerical error")
-        with pytest.raises(RuntimeError, match="Following models failed to predict: \\['ARIMA'\\]"):
+        with pytest.raises(RuntimeError, match="Following models failed to predict: \\['ETS'\\]"):
             predictor.score(DUMMY_TS_DATAFRAME)
 
 

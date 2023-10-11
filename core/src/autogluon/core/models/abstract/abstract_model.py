@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 import gc
 import inspect
@@ -11,7 +13,6 @@ from typing import Any, Dict, Optional, Union
 
 import numpy as np
 import pandas as pd
-import scipy
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.utils.distribute_utils import DistributedContext
@@ -24,6 +25,7 @@ from autogluon.common.utils.try_import import try_import_ray
 from autogluon.common.utils.utils import setup_outputdir
 
 from ... import metrics
+from ...calibrate.temperature_scaling import apply_temperature_scaling
 from ...constants import (
     AG_ARG_PREFIX,
     AG_ARGS_FIT,
@@ -33,7 +35,7 @@ from ...constants import (
     REFIT_FULL_SUFFIX,
     REGRESSION,
 )
-from ...data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
+from ...data.label_cleaner import LabelCleaner
 from ...hpo.constants import CUSTOM_BACKEND, RAY_BACKEND
 from ...hpo.exceptions import EmptySearchSpace
 from ...hpo.executors import HpoExecutor, HpoExecutorFactory
@@ -120,6 +122,7 @@ class AbstractModel:
         self.path = self.create_contexts(os.path.join(self.path_root, self.path_suffix))  # TODO: Make this path a function for consistency.
 
         self.num_classes = None
+        self.quantile_levels = None
         self.model = None
         self.problem_type = problem_type
 
@@ -130,6 +133,7 @@ class AbstractModel:
             self.eval_metric = metrics.get_metric(eval_metric, self.problem_type, "eval_metric")  # Note: we require higher values = better performance
         else:
             self.eval_metric = None
+        self.stopping_metric = None
         self.normalize_pred_probas = None
 
         self.features = None  # External features, do not use internally
@@ -149,6 +153,7 @@ class AbstractModel:
         self.params = {}
         self.params_aux = {}
         self.params_trained = dict()
+        self.nondefault_params = []
         self._is_initialized = False
         self._is_fit_metadata_registered = False
         self._fit_metadata = dict()
@@ -895,19 +900,12 @@ class AbstractModel:
         X = self.preprocess(X)
         self.model = self.model.fit(X, y)
 
-    def _apply_temperature_scaling(self, y_pred_proba):
-        # TODO: This is expensive to convert at inference time, try to avoid in future
-        if self.problem_type == BINARY:
-            y_pred_proba = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_pred_proba)
-
-        logits = np.log(y_pred_proba)
-        y_pred_proba = scipy.special.softmax(logits / self.params_aux.get("temperature_scalar"), axis=1)
-        y_pred_proba = y_pred_proba / y_pred_proba.sum(axis=1, keepdims=True)
-
-        if self.problem_type == BINARY:
-            y_pred_proba = y_pred_proba[:, 1]
-
-        return y_pred_proba
+    def _apply_temperature_scaling(self, y_pred_proba: np.ndarray) -> np.ndarray:
+        return apply_temperature_scaling(
+            y_pred_proba=y_pred_proba,
+            temperature_scalar=self.params_aux.get("temperature_scalar"),
+            problem_type=self.problem_type,
+        )
 
     def _apply_conformalization(self, y_pred):
         """
@@ -1314,8 +1312,23 @@ class AbstractModel:
         return template
 
     def convert_to_refit_full_template(self):
-        """After calling this function, returned model should be able to be fit without X_val, y_val using the iterations trained by the original model."""
+        """
+        After calling this function, returned model should be able to be fit without X_val, y_val using the iterations trained by the original model.
+
+        Increase max_memory_usage_ratio by 25% to reduce the chance that the refit model will trigger NotEnoughMemoryError and skip training.
+        This can happen without the 25% increase since the refit model generally will use more training data and thus require more memory.
+        """
         params = copy.deepcopy(self.get_params())
+
+        if "hyperparameters" not in params:
+            params["hyperparameters"] = dict()
+
+        if AG_ARGS_FIT not in params["hyperparameters"]:
+            params["hyperparameters"][AG_ARGS_FIT] = dict()
+
+        # Increase memory limit by 25% to avoid memory restrictions during fit
+        params["hyperparameters"][AG_ARGS_FIT]["max_memory_usage_ratio"] = params["hyperparameters"][AG_ARGS_FIT].get("max_memory_usage_ratio", 1.0) * 1.25
+
         params["hyperparameters"].update(self.params_trained)
         params["name"] = params["name"] + REFIT_FULL_SUFFIX
         template = self.__class__(**params)
@@ -1510,11 +1523,37 @@ class AbstractModel:
         model_disk_size = sum(f.stat().st_size for f in model_path.glob("**/*") if f.is_file())
         return model_disk_size
 
-    # TODO: This results in a doubling of memory usage of the model to calculate its size.
-    #  If the model takes ~40%+ of memory, this may result in an OOM error.
-    #  This is generally not an issue because the model already needed to do this when being saved to disk, so the error would have been triggered earlier.
-    #  Consider using Pympler package for memory efficiency: https://pympler.readthedocs.io/en/latest/asizeof.html#asizeof
-    def get_memory_size(self) -> int:
+    def get_memory_size(self, allow_exception: bool = False) -> int | None:
+        """
+        Pickled the model object (self) and returns the size in bytes.
+        Will raise an exception if `self` cannot be pickled.
+
+        Note: This will temporarily double the memory usage of the model, as both the original and the pickled version will exist in memory.
+        This can lead to an out-of-memory error if the model is larger than the remaining available memory.
+
+        Parameters
+        ----------
+        allow_exception: bool, default = False
+            If True and an exception occurs during the memory size calculation, will return None instead of raising the exception.
+            For example, if a model failed during fit and had a messy internal state, and then `get_memory_size` was called,
+            it may still contain a non-serializable object. By setting `allow_exception=True`, we avoid crashing in this scenario.
+            For example: "AttributeError: Can't pickle local object 'func_generator.<locals>.custom_metric'"
+
+        Returns
+        -------
+        memory_size: int | None
+            The memory size in bytes of the pickled model object.
+            None if an exception occurred and `allow_exception=True`.
+        """
+        if allow_exception:
+            try:
+                return self._get_memory_size()
+            except:
+                return None
+        else:
+            return self._get_memory_size()
+
+    def _get_memory_size(self) -> int:
         gc.collect()  # Try to avoid OOM error
         return sys.getsizeof(pickle.dumps(self, protocol=4))
 
@@ -1696,7 +1735,7 @@ class AbstractModel:
             "model_type": type(self).__name__,
             "problem_type": self.problem_type,
             "eval_metric": self.eval_metric.name,
-            "stopping_metric": self.stopping_metric.name,
+            "stopping_metric": self.stopping_metric.name if self.stopping_metric is not None else None,
             "fit_time": self.fit_time,
             "num_classes": self.num_classes,
             "quantile_levels": self.quantile_levels,
@@ -1710,8 +1749,12 @@ class AbstractModel:
             "features": self.features,
             "feature_metadata": self.feature_metadata,
             # 'disk_size': self.get_disk_size(),
-            "memory_size": self.get_memory_size(),  # Memory usage of model in bytes
+            "memory_size": self.get_memory_size(allow_exception=True),  # Memory usage of model in bytes
             "compile_time": self.compile_time if hasattr(self, "compile_time") else None,
+            "is_initialized": self.is_initialized(),
+            "is_fit": self.is_fit(),
+            "is_valid": self.is_valid(),
+            "can_infer": self.can_infer(),
         }
         return info
 

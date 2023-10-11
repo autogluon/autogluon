@@ -251,7 +251,7 @@ class MultiModalPredictorModel(AbstractModel):
         model._load_model = None
         return model
 
-    def get_memory_size(self) -> int:
+    def _get_memory_size(self) -> int:
         """Return the memory size by calculating the total number of parameters.
 
         Returns
