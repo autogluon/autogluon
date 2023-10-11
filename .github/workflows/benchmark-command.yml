@@ -43,6 +43,12 @@ on:
       branch_or_pr_number:
         description: 'Branch or PR number to run the benchmark on'
         required: true
+      fork_name:
+        description: 'Get the forked PR repository name'
+        required: true
+      fork_branch:
+        description: 'Get the forked PR repository branch name'
+        required: true
       
 permissions:
   id-token: write
@@ -83,13 +89,9 @@ jobs:
           role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmarkConfig
           role-duration-seconds: 3600
           aws-region: us-east-1
-      - name: Extract branch name
-        shell: bash
-        run: echo "branch=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> $GITHUB_OUTPUT
-        id: extract_branch
       - name: Generate AMLB User Dir
         run: |
-          /bin/bash CI/bench/generate_amlb_user_dir.sh ${{ github.repository }} ${{ steps.extract_branch.outputs.branch }} ${{ github.sha }}
+          /bin/bash CI/bench/generate_amlb_user_dir.sh ${{ github.event.inputs.fork_name }} ${{ github.event.inputs.fork_branch }} ${{ github.sha }}
 
   benchmark:
     needs: generate_amlb_user_dir
@@ -131,16 +133,12 @@ jobs:
           role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
           role-duration-seconds: 14400
           aws-region: us-east-1
-      - name: Extract branch name
-        shell: bash
-        run: echo "branch=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> $GITHUB_OUTPUT
-        id: extract_branch
       - name: Run benchmark
         shell: bash -l {0}
         run: |
           nvm install 20
           npm install -g aws-cdk
-          /bin/bash ./.github/workflow_scripts/run_benchmark.sh ${{ github.event.inputs.module }} ${{ github.event.inputs.preset }} ${{ github.event.inputs.benchmark }} ${{ github.event.inputs.time_limit }} ${{ steps.extract_branch.outputs.branch }} ${{ github.sha }}
+          /bin/bash ./.github/workflow_scripts/run_benchmark.sh ${{ github.event.inputs.module }} ${{ github.event.inputs.preset }} ${{ github.event.inputs.benchmark }} ${{ github.event.inputs.time_limit }} ${{ github.event.inputs.fork_branch }} ${{ github.sha }}
       - name: Upload website.txt
         uses: actions/upload-artifact@v3
         with:
