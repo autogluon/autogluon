@@ -3,7 +3,7 @@ import pytest
 
 def pytest_addoption(parser):
     parser.addoption("--runslow", action="store_true", default=False, help="run slow tests")
-    parser.addoption("--runonegpu", action="store_true", default=False, help="run single-gpu tests")
+    parser.addoption("--run_single_gpu", action="store_true", default=False, help="run single-gpu tests")
 
 
 def pytest_configure(config):
@@ -13,12 +13,12 @@ def pytest_configure(config):
 
 def pytest_collection_modifyitems(config, items):
     skip_slow = pytest.mark.skip(reason="need --runslow option to run")
-    skip_sgpu = pytest.mark.skip(reason="need --runonegpu option to run")
+    skip_sgpu = pytest.mark.skip(reason="need --run_single_gpu option to run")
     custom_markers = dict(slow=skip_slow, single_gpu=skip_sgpu)
     if config.getoption("--runslow"):
         # --runslow given in cli: do not skip slow tests
         custom_markers.pop("slow", None)
-    if config.getoption("--runonegpu", None):
+    if config.getoption("--run_single_gpu", None):
         # --runslow given in cli: do not skip single-gpu tests
         custom_markers.pop("single_gpu", None)
     for item in items:

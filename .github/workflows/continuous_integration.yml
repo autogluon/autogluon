@@ -181,7 +181,7 @@ jobs:
         with:
           job-type: CI-GPU
           job-name: AutoGluon-Multimodal-Predictor
-          command: chmod +x ./.github/workflow_scripts/test_multimodal_predictor.sh && ./.github/workflow_scripts/test_multimodal_predictor.sh --runonegpu
+          command: chmod +x ./.github/workflow_scripts/test_multimodal_predictor.sh && ./.github/workflow_scripts/test_multimodal_predictor.sh --run_single_gpu
   test_multimodal_others:
     needs: lint_check
     runs-on: ubuntu-latest
@@ -201,7 +201,7 @@ jobs:
         with:
           job-type: CI-GPU
           job-name: AutoGluon-Multimodal-Others
-          command: chmod +x ./.github/workflow_scripts/test_multimodal_others.sh && ./.github/workflow_scripts/test_multimodal_others.sh --runonegpu
+          command: chmod +x ./.github/workflow_scripts/test_multimodal_others.sh && ./.github/workflow_scripts/test_multimodal_others.sh --run_single_gpu
   test_multimodal_others_2:
     needs: lint_check
     runs-on: ubuntu-latest
@@ -221,7 +221,7 @@ jobs:
         with:
           job-type: CI-GPU
           job-name: AutoGluon-Multimodal-Others-2
-          command: chmod +x ./.github/workflow_scripts/test_multimodal_others_2.sh && ./.github/workflow_scripts/test_multimodal_others_2.sh --runonegpu
+          command: chmod +x ./.github/workflow_scripts/test_multimodal_others_2.sh && ./.github/workflow_scripts/test_multimodal_others_2.sh --run_single_gpu
   test_multimodal_others_multi_gpu:
     needs: lint_check
     runs-on: ubuntu-latest

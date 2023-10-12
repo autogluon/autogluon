@@ -41,7 +41,7 @@ def verify_predict_single_column(test_data, predictor):
     return preds
 
 
-@pytest.mark.sgpu
+@pytest.mark.single_gpu
 def test_fewshot_fit_predict():
     download_dir = "./ag_automm_tutorial_imgcls"
     train_data, test_data = shopee_dataset(download_dir)
