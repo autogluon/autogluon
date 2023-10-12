@@ -1,13 +1,20 @@
+import os
 import random
+import shutil
+import tempfile
 
 import pytest
 import torch
 from sklearn.metrics import f1_score, log_loss
 from torchmetrics import MeanMetric, RetrievalHitRate
 
+import autogluon.core.metrics as ag_metrics
+from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.constants import MULTICLASS, Y_PRED, Y_TRUE
 from autogluon.multimodal.optimization.utils import compute_hit_rate, get_loss_func, get_metric
 from autogluon.multimodal.utils import compute_score
+
+from ..utils.unittest_datasets import HatefulMeMesDataset
 
 
 @pytest.mark.parametrize(
@@ -105,3 +112,48 @@ def test_symmetric_hit_rate():
             hit_rate_impl = compute_hit_rate(features_a, features_b, logit_scale=1.0, top_ks=top_ks)
             hit_rate_ref = ref_symmetric_hit_rate(features_a, features_b, logit_scale=1.0, top_ks=top_ks)
             assert pytest.approx(hit_rate_impl.item()) == hit_rate_ref.item()
+
+
+def test_custom_metric():
+    dataset = HatefulMeMesDataset()
+    metric_name = dataset.metric
+    metric_scorer = ag_metrics.get_metric(metric_name)
+    predictor_by_name = MultiModalPredictor(
+        label=dataset.label_columns[0],
+        problem_type=dataset.problem_type,
+        eval_metric=metric_name,
+    )
+    predictor_by_scorer = MultiModalPredictor(
+        label=dataset.label_columns[0],
+        problem_type=dataset.problem_type,
+        eval_metric=metric_scorer,
+    )
+    with tempfile.TemporaryDirectory() as save_path:
+        if os.path.isdir(save_path):
+            shutil.rmtree(save_path)
+        predictor_by_name.fit(
+            train_data=dataset.train_df,
+            time_limit=0,
+            save_path=save_path,
+        )
+    with tempfile.TemporaryDirectory() as save_path:
+        if os.path.isdir(save_path):
+            shutil.rmtree(save_path)
+        predictor_by_scorer.fit(
+            train_data=dataset.train_df,
+            time_limit=0,
+            save_path=save_path,
+        )
+    scores_by_name = predictor_by_name.evaluate(
+        data=dataset.test_df,
+        metrics=None,
+    )
+    scores_by_scorer_eval = predictor_by_name.evaluate(
+        data=dataset.test_df,
+        metrics=[metric_scorer],
+    )
+    scores_by_scorer_init = predictor_by_scorer.evaluate(
+        data=dataset.test_df,
+        metrics=None,
+    )
+    assert scores_by_name[metric_name] == scores_by_scorer_eval[metric_name] == scores_by_scorer_init[metric_name]
