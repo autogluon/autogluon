@@ -1,5 +1,6 @@
 import logging
 import platform
+import sys
 from types import ModuleType
 
 from ..version import __version__
@@ -30,7 +31,7 @@ def try_import_mxboard():
 
 
 def try_import_ray() -> ModuleType:
-    RAY_MAX_VERSION = "2.7.0"
+    RAY_MAX_VERSION = "2.7.0"  # sync with core/setup.py
     ray_max_version_os_map = dict(
         Darwin=RAY_MAX_VERSION,
         Windows=RAY_MAX_VERSION,
@@ -62,7 +63,12 @@ def try_import_catboost():
     try:
         import catboost
     except ImportError as e:
-        raise ImportError("`import catboost` failed. " f"A quick tip is to install via `pip install autogluon.tabular[catboost]=={__version__}`.")
+        error_msg = "`import catboost` failed. "
+        if sys.version_info >= (3, 11) and sys.platform == "darwin":
+            error_msg += f"Detected your env as {sys.platform}. Please either downgrade your python version to below 3.11 or move to another platform. Then install via ``pip install autogluon.tabular[catboost]=={__version__}``"
+        else:
+            error_msg += f"A quick tip is to install via `pip install autogluon.tabular[catboost]=={__version__}`."
+        raise ImportError()
     except ValueError as e:
         raise ImportError(
             "Import catboost failed. Numpy version may be outdated, "
@@ -122,7 +128,9 @@ def try_import_torch():
         import torch
     except ImportError as e:
         raise ImportError(
-            "Unable to import dependency torch\n" "A quick tip is to install via `pip install torch`.\n" "The minimum torch version is currently 1.6."
+            "Unable to import dependency torch\n"
+            "A quick tip is to install via `pip install torch`.\n"
+            "The minimum torch version is currently 2.0."  # sync with core/_setup_utils.py
         )
 
 

@@ -37,9 +37,9 @@ install_requires = [
     "transformers[sentencepiece]>=4.31.0,<4.32.0",
     "timm>=0.9.5,<0.10.0",
     "torchvision>=0.14.0,<0.16.0",  # torch 1.13 requires torchvision 0.14. Increase it to 0.15 when dropping the support of torch 1.13.
-    "scikit-image>=0.19.1,<0.20.0",
+    "scikit-image>=0.19.1,<0.21.0",
     "text-unidecode>=1.3,<1.4",
-    "torchmetrics>=1.0.0,<1.1.0",
+    "torchmetrics>=1.0.0,<1.2.0",
     "nptyping>=1.4.4,<2.5.0",
     "omegaconf>=2.1.1,<2.3.0",
     f"autogluon.core[raytune]=={version}",
@@ -64,7 +64,7 @@ tests_require = [
     "onnx>=1.13.0,<1.14.0",
     "onnxruntime>=1.15.0,<1.16.0;platform_system=='Darwin'",
     "onnxruntime-gpu>=1.15.0,<1.16.0;platform_system!='Darwin'",
-    "tensorrt>=8.5.3.1,<8.5.4;platform_system=='Linux'",
+    "tensorrt>=8.5.3.1,<8.5.4;platform_system=='Linux' and python_version<'3.11'",  # tensorrt > 8.5.4 cause segfault
 ]
 
 extras_require = {

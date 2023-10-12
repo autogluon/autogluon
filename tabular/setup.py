@@ -38,8 +38,9 @@ extras_require = {
     "catboost": [
         # CatBoost wheel build is not working correctly on darwin for CatBoost 1.2, so use old version in this case.
         # https://github.com/autogluon/autogluon/pull/3190#issuecomment-1540599280
-        'catboost>=1.1,<1.2 ; sys_platform == "darwin"',
-        "catboost>=1.1,<1.3",
+        # Catboost 1.2 doesn't have wheel for python 3.11
+        "catboost>=1.1,<1.2 ; sys_platform == 'darwin' and python_version < '3.11'",
+        "catboost>=1.1,<1.3; sys_platform != 'darwin'",
     ],
     # FIXME: Debug why xgboost 1.6 has 4x+ slower inference on multiclass datasets compared to 1.4
     #  It is possibly only present on MacOS, haven't tested linux.
@@ -66,7 +67,8 @@ extras_require = {
     ],
     "vowpalwabbit": [
         # FIXME: 9.5+ causes VW to save an empty model which always predicts 0. Confirmed on MacOS (Intel CPU). Unknown how to fix.
-        "vowpalwabbit>=9,<9.9",
+        # No vowpalwabbit wheel for python 3.11 or above yet
+        "vowpalwabbit>=9,<9.9; python_version < '3.11'",
     ],
     "skl2onnx": [
         "skl2onnx>=1.15.0,<1.16.0",

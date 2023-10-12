@@ -43,7 +43,7 @@ In the following, we decomposed the functionalities of AutoMM and prepared step-
   How to use MultiModalPredictor to build models on datasets with languages other than English.
 :::
 
-:::{grid-item-card} Named Entity Recognition with AutoMM - Quick Start
+:::{grid-item-card} AutoMM for Named Entity Recognition - Quick Start
   :link: text_prediction/ner.html
 
   How to use MultiModalPredictor for entity extraction.
@@ -150,18 +150,18 @@ In the following, we decomposed the functionalities of AutoMM and prepared step-
 :::
 
 :::{grid-item-card} Image-to-Text Matching with AutoMM - Quick Start
-  :link: matching/image2text_matching.html
+  :link: matching/image_text_matching.html
 
   How to use AutoMM for image to text matching.
 :::
 
 :::{grid-item-card} Zero Shot Image-to-Text Matching with AutoMM
-  :link: matching/image2text_matching.html
+  :link: matching/zero_shot_img_txt_matching.html
 
   How to use AutoMM for zero shot image to text matching.
 :::
 
-:::{grid-item-card} Semantic Textual Search with AutoGluon Multimodal Matching
+:::{grid-item-card} Text Semantic Search with AutoMM
   :link: matching/text_semantic_search.html
 
   How to use semantic embeddings to improve search ranking performance.
@@ -178,13 +178,13 @@ In the following, we decomposed the functionalities of AutoMM and prepared step-
   :link: multimodal_prediction/multimodal_text_tabular.html
 
   How MultiModalPredictor can be applied to multimodal data tables with a mix of text, numerical, and
-  categorical columns. Here, we train a model to predict the price of books.
+  categorical columns.
 :::
 
 :::{grid-item-card} AutoMM for Image + Text + Tabular - Quick Start
   :link: multimodal_prediction/beginner_multimodal.html
 
-  How to use MultiModalPredictor to train a model that predicts the adoption speed of pets.
+  How to use MultiModalPredictor to train a model on image, text, numerical, and categorical data.
 :::
 
 :::{grid-item-card} AutoMM for Entity Extraction with Text and Image - Quick Start
@@ -207,7 +207,7 @@ In the following, we decomposed the functionalities of AutoMM and prepared step-
   In the tutorial, we will use combine IA^3, BitFit, and gradient checkpointing to finetune FLAN-T5-XL.
 :::
 
-:::{grid-item-card} HPO in AutoMM
+:::{grid-item-card} Hyperparameter Optimization in AutoMM
   :link: advanced_topics/hyperparameter_optimization.html
 
   How to do hyperparameter optimization in AutoMM.
@@ -219,7 +219,7 @@ In the following, we decomposed the functionalities of AutoMM and prepared step-
   How to do knowledge distillation in AutoMM.
 :::
 
-:::{grid-item-card} Customize AutoMM
+:::{grid-item-card} Continuous Training with AutoMM
   :link: advanced_topics/continuous_training.html
 
   How to continue training in AutoMM.
@@ -237,16 +237,22 @@ In the following, we decomposed the functionalities of AutoMM and prepared step-
   How to use AutoMM presets.
 :::
 
-:::{grid-item-card} Few Shot Learning with FusionSVM
+:::{grid-item-card} Few Shot Learning with FewShotSVMPredictor
   :link: advanced_topics/few_shot_learning.html
 
   How to use SVM combined with feature extraction for few shot learning.
 :::
 
-:::{grid-item-card} Focal Loss
+:::{grid-item-card} How to use FocalLoss
   :link: advanced_topics/focal_loss.html
 
   How to use focal loss in AutoMM.
+:::
+
+:::{grid-item-card} Faster Prediction with TensorRT
+  :link: advanced_topics/tensorrt.html
+
+  How to use TensorRT in accelerating AutoMM model inference.
 :::
 
 ::::

@@ -1454,7 +1454,7 @@ class MultiModalMatcher:
         for per_metric in metrics:
             score = compute_score(
                 metric_data=metric_data,
-                metric_name=per_metric.lower(),
+                metric=per_metric.lower(),
             )
             results[per_metric] = score
 

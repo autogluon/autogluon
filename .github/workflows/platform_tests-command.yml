@@ -48,8 +48,8 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-latest, windows-latest, ubuntu-latest]
-        python: ["3.8", "3.9", "3.10"]
-    steps:
+        python: ["3.8", "3.9", "3.10", "3.11"]
+    steps:  
       - name: Checkout repository for PR
         if: (github.event_name == 'workflow_dispatch')
         uses: actions/checkout@v2
@@ -80,7 +80,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-latest, windows-latest, ubuntu-latest]
-        python: ["3.8", "3.9", "3.10"]
+        python: ["3.8", "3.9", "3.10", "3.11"]
     steps:
       - name: Checkout repository for PR
         if: (github.event_name == 'workflow_dispatch')
@@ -112,7 +112,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-latest, windows-latest, ubuntu-latest]
-        python: ["3.8", "3.9", "3.10"]
+        python: ["3.8", "3.9", "3.10", "3.11"]
     steps:
       - name: Checkout repository for PR
         if: (github.event_name == 'workflow_dispatch')
@@ -144,7 +144,7 @@ jobs:
   #     fail-fast: false
   #     matrix:
   #       os: [macos-latest, windows-latest, ubuntu-latest]
-  #       python: ["3.8", "3.9", "3.10"]
+  #       python: ["3.8", "3.9", "3.10", "3.11"]
   #   steps:
   #     - name: Checkout repository for PR
   #       if: (github.event_name == 'workflow_dispatch')
@@ -177,7 +177,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-latest, windows-latest, ubuntu-latest]
-        python: ["3.8", "3.9", "3.10"]
+        python: ["3.8", "3.9", "3.10", "3.11"]
     steps:
       - name: Checkout repository for PR
         if: (github.event_name == 'workflow_dispatch')
@@ -260,7 +260,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-latest, windows-latest, ubuntu-latest]
-        python: ["3.8", "3.9", "3.10"]
+        python: ["3.8", "3.9", "3.10", "3.11"]
     steps:
       - name: Checkout repository for PR
         if: (github.event_name == 'workflow_dispatch')
