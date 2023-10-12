@@ -1,9 +1,62 @@
 import os
 from pathlib import Path
 
+import pytest
+
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.metrics import METRICS
 from autogluon.core.models.dummy.dummy_model import DummyModel
+
+
+def test_no_models(fit_helper, dataset_loader_helper):
+    """Tests that logic works properly when no models are trained"""
+    fit_args = dict(
+        hyperparameters={},
+    )
+
+    dataset_name = "adult"
+    directory_prefix = "./datasets/"
+    train_data, test_data, dataset_info = dataset_loader_helper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
+
+    predictor = fit_helper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
+
+    assert not predictor.get_model_names()
+    with pytest.raises(AssertionError):
+        predictor.predict(test_data)
+    assert len(predictor.leaderboard()) == 0
+    assert len(predictor.leaderboard(test_data)) == 0
+    assert len(predictor.get_model_failures()) == 0
+
+
+def test_no_models_raise(fit_helper, dataset_loader_helper):
+    """Tests that logic works properly when no models are trained, and tests get_model_failures"""
+
+    expected_exc_str = "Test Error Message"
+
+    # Force DummyModel to raise an exception when fit.
+    fit_args = dict(
+        hyperparameters={DummyModel: {"raise": ValueError, "raise_msg": expected_exc_str}},
+    )
+
+    dataset_name = "adult"
+    directory_prefix = "./datasets/"
+    train_data, test_data, dataset_info = dataset_loader_helper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
+
+    predictor = fit_helper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
+
+    assert not predictor.get_model_names()
+    with pytest.raises(AssertionError):
+        predictor.predict(test_data)
+    assert len(predictor.leaderboard()) == 0
+    assert len(predictor.leaderboard(test_data)) == 0
+
+    model_failures = predictor.get_model_failures()
+    assert len(model_failures) == 1
+    model_failures_dict = model_failures.iloc[0].to_dict()
+    assert model_failures_dict["model"] == "DummyModel"
+    assert model_failures_dict["model_type"] == "DummyModel"
+    assert model_failures_dict["exc_type"] == "ValueError"
+    assert model_failures_dict["exc_str"] == expected_exc_str
 
 
 def test_dummy_binary(fit_helper):

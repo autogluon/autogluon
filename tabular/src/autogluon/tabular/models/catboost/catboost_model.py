@@ -1,8 +1,10 @@
 import logging
+import math
 import os
 import time
 
 import numpy as np
+import pandas as pd
 
 from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
@@ -61,10 +63,29 @@ class CatBoostModel(AbstractModel):
                     X[category] = X[category].cat.add_categories("__NaN__").fillna("__NaN__")
         return X
 
-    def _estimate_memory_usage(self, X, **kwargs):
+    def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> float:
+        """
+        Returns the expected peak memory usage in bytes of the CatBoost model during fit.
+
+        The memory usage of CatBoost is primarily made up of two sources:
+
+        1. The size of the data
+        2. The size of the histogram cache
+            Scales roughly by 5080*num_features*2^depth bytes
+            For 10000 features and 6 depth, the histogram would be 3.2 GB.
+        """
         num_classes = self.num_classes if self.num_classes else 1  # self.num_classes could be None after initialization if it's a regression problem
         data_mem_usage = get_approximate_df_mem_usage(X).sum()
-        approx_mem_size_req = data_mem_usage * 7 + data_mem_usage / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
+        data_mem_usage_bytes = data_mem_usage * 5 + data_mem_usage / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
+
+        params = self._get_model_params()
+        border_count = params.get("border_count", 254)
+        depth = params.get("depth", 6)
+        # Formula based on manual testing, aligns with LightGBM histogram sizes
+        histogram_mem_usage_bytes = 20 * math.pow(2, depth) * len(X.columns) * border_count
+        histogram_mem_usage_bytes *= 1.2  # Add a 20% buffer
+
+        approx_mem_size_req = data_mem_usage_bytes + histogram_mem_usage_bytes
         return approx_mem_size_req
 
     # TODO: Use Pool in preprocess, optimize bagging to do Pool.split() to avoid re-computing pool for each fold! Requires stateful + y

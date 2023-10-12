@@ -12,8 +12,12 @@ import autogluon.core as ag
 from autogluon.tabular import TabularPredictor
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
+from autogluon.timeseries.utils.datetime import (
+    get_lags_for_frequency,
+    get_seasonality,
+    get_time_features_for_frequency,
+)
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
-from autogluon.timeseries.utils.seasonality import get_seasonality
 from autogluon.timeseries.utils.warning_filters import warning_filter
 
 logger = logging.getLogger(__name__)
@@ -93,7 +97,6 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
     def _get_mlforecast_init_args(self, train_data: TimeSeriesDataFrame, model_params: dict) -> dict:
         # TODO: Support lag generation for all pandas frequencies
         # TODO: Support date_feature generation for all pandas frequencies
-        from gluonts.time_feature import get_lags_for_frequency, time_features_from_frequency_str
         from mlforecast.target_transforms import Differences
 
         from .utils import MeanAbsScaler, StandardScaler
@@ -105,7 +108,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
 
         date_features = model_params.get("date_features")
         if date_features is None:
-            date_features = time_features_from_frequency_str(self.freq)
+            date_features = get_time_features_for_frequency(self.freq)
         self._date_features = date_features
 
         target_transforms = []
@@ -332,7 +335,7 @@ class DirectTabularModel(AbstractMLForecastModel):
 
     TIMESERIES_METRIC_TO_TABULAR_METRIC = {
         "MAPE": "mean_absolute_percentage_error",
-        "sMAPE": "mean_absolute_percentage_error",
+        "sMAPE": "symmetric_mean_absolute_percentage_error",
         "WQL": "pinball_loss",
         "MASE": "mean_absolute_error",
         "WAPE": "mean_absolute_error",
@@ -474,7 +477,7 @@ class RecursiveTabularModel(AbstractMLForecastModel):
 
     TIMESERIES_METRIC_TO_TABULAR_METRIC = {
         "MAPE": "mean_absolute_percentage_error",
-        "sMAPE": "mean_absolute_percentage_error",
+        "sMAPE": "symmetric_mean_absolute_percentage_error",
         "WQL": "mean_absolute_error",
         "MASE": "mean_absolute_error",
         "WAPE": "mean_absolute_error",

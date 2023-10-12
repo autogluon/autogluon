@@ -29,6 +29,10 @@ class DummyModel(AbstractModel):
     def _fit(self, X, y, **kwargs):
         X = self.preprocess(X)
         model_cls = self._get_model_type()
+        model_params = self._get_model_params()
+        if "raise" in model_params:
+            raise_msg = model_params.get("raise_msg", "")
+            raise model_params["raise"](raise_msg)
         if model_cls == DummyQuantileRegressor:
             self.model = model_cls(quantile_levels=self.quantile_levels)
         else:

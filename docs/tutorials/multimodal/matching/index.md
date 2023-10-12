@@ -16,18 +16,18 @@
 :::
 
 :::{grid-item-card} Image-to-Text Matching with AutoMM - Quick Start
-  :link: image2text_matching.html
+  :link: image_text_matching.html
 
   How to use AutoMM for image to text matching.
 :::
 
 :::{grid-item-card} Zero Shot Image-to-Text Matching with AutoMM
-  :link: image2text_matching.html
+  :link: zero_shot_img_txt_matching.html
 
   How to use AutoMM for zero shot image to text matching.
 :::
 
-:::{grid-item-card} Semantic Textual Search with AutoGluon Multimodal Matching
+:::{grid-item-card} Text Semantic Search with AutoMM
   :link: text_semantic_search.html
 
   How to use semantic embeddings to improve search ranking performance.

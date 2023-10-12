@@ -8,7 +8,7 @@ import evaluate
 import numpy as np
 from sklearn.metrics import f1_score
 
-from autogluon.core.metrics import get_metric
+from autogluon.core.metrics import Scorer, get_metric
 
 from ..constants import (
     ACCURACY,
@@ -178,7 +178,7 @@ def get_stopping_threshold(metric_name: str):
 
 def compute_score(
     metric_data: dict,
-    metric_name: str,
+    metric: Union[str, Scorer],
     pos_label: Optional[int] = 1,
 ) -> float:
     """
@@ -189,8 +189,8 @@ def compute_score(
     metric_data
         A dictionary with the groundtruth (Y_TRUE) and predicted values (Y_PRED, Y_PRED_PROB).
         The predicted class probabilities are required to compute the roc_auc score.
-    metric_name
-        The name of metric to compute.
+    metric
+        The name of metric or the function of metric to compute.
     pos_label
         The encoded label (0 or 1) of binary classification's positive class.
 
@@ -198,7 +198,7 @@ def compute_score(
     -------
     Computed score.
     """
-    if metric_name in [OVERALL_ACCURACY, OVERALL_F1]:
+    if isinstance(metric, str) and metric in [OVERALL_ACCURACY, OVERALL_F1]:
         metric = evaluate.load("seqeval")
         warnings.filterwarnings("ignore")
         for p in metric_data[Y_TRUE]:
@@ -209,13 +209,16 @@ def compute_score(
                 print(p)
         return metric.compute(references=metric_data[Y_TRUE], predictions=metric_data[Y_PRED])
 
-    metric = get_metric(metric_name)
+    metric = get_metric(metric)
     if metric.name in [ROC_AUC, AVERAGE_PRECISION]:
         return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED_PROB][:, pos_label])
     elif metric.name in [F1]:  # only for binary classification
         return f1_score(metric_data[Y_TRUE], metric_data[Y_PRED], pos_label=pos_label)
     else:
-        return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED])
+        try:
+            return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED], y_prob=metric_data[Y_PRED_PROB])
+        except:
+            return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED])
 
 
 class RankingMetrics:

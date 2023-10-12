@@ -61,7 +61,7 @@ def test_when_covariates_and_features_present_then_train_and_val_dfs_have_correc
 def test_when_covariates_and_features_present_then_model_can_predict(temp_model_path, model_type, data):
     data = data.copy()
     model = model_type(path=temp_model_path, freq=data.freq)
-    model.fit(train_data=data, time_limit=2)
+    model.fit(train_data=data, time_limit=10)
     predictions = model.predict(data)
     assert isinstance(predictions, TimeSeriesDataFrame)
     assert len(predictions) == data.num_items * model.prediction_length

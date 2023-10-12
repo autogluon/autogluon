@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 import pandas as pd
 
@@ -26,5 +28,8 @@ def get_forecast_horizon_index_ts_dataframe(
 
     offset = pd.tseries.frequencies.to_offset(ts_dataframe.freq)
     last_ts = pd.DatetimeIndex(last[TIMESTAMP])
-    timestamps = np.dstack([last_ts + step * offset for step in range(1, prediction_length + 1)]).ravel()
+    # Non-vectorized offsets like BusinessDay may produce a PerformanceWarning - we filter them
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=pd.errors.PerformanceWarning)
+        timestamps = np.dstack([last_ts + step * offset for step in range(1, prediction_length + 1)]).ravel()
     return pd.MultiIndex.from_arrays([item_ids, timestamps], names=[ITEMID, TIMESTAMP])

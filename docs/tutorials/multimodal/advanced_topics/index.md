@@ -6,11 +6,11 @@
 :::{grid-item-card} Single GPU Billion-scale Model Training via Parameter-Efficient Finetuning
   :link: efficient_finetuning_basic.html
 
-  How to take advantage of larger foundation models with the help of parameter-efficient finetuning.
+  How to take advantage of large foundation models with the help of parameter-efficient finetuning.
   In the tutorial, we will use combine IA^3, BitFit, and gradient checkpointing to finetune FLAN-T5-XL.
 :::
 
-:::{grid-item-card} HPO in AutoMM
+:::{grid-item-card} Hyperparameter Optimization in AutoMM
   :link: hyperparameter_optimization.html
 
   How to do hyperparameter optimization in AutoMM.
@@ -34,13 +34,13 @@
   How to use AutoMM presets.
 :::
 
-:::{grid-item-card} Few Shot Learning with FusionSVM
+:::{grid-item-card} Few Shot Learning with FewShotSVMPredictor
   :link: few_shot_learning.html
 
   How to use SVM combined with feature extraction for few shot learning.
 :::
 
-:::{grid-item-card} Focal Loss
+:::{grid-item-card} How to use FocalLoss
   :link: focal_loss.html
 
   How to use focal loss in AutoMM.
@@ -53,7 +53,7 @@
 :::
 
 :::{grid-item-card} Continuous Training with AutoMM
-  :link: tensorrt.html
+  :link: continuous_training.html
 
   Different use cases for continuous training with AutoMM.
 :::

@@ -21,6 +21,7 @@
 """
 import os
 import shutil
+import sys
 import tempfile
 import warnings
 from random import seed
@@ -34,6 +35,7 @@ from autogluon.common import space
 from autogluon.core.constants import BINARY, MULTICLASS, PROBLEM_TYPES_CLASSIFICATION, QUANTILE, REGRESSION
 from autogluon.core.utils import download, unzip
 from autogluon.tabular import TabularDataset, TabularPredictor
+from autogluon.tabular.configs.hyperparameter_configs import get_hyperparameter_config
 
 PARALLEL_LOCAL_BAGGING = "parallel_local"
 SEQUENTIAL_LOCAL_BAGGING = "sequential_local"
@@ -47,7 +49,7 @@ def test_tabular():
     subsample_size = None
     hyperparameter_tune_kwargs = None
     verbosity = 2  # how much output to print
-    hyperparameters = None
+    hyperparameters = get_hyperparameter_config("default")
     time_limit = None
     fast_benchmark = True  # False
     # If True, run a faster benchmark (subsample training sets, less epochs, etc),
@@ -58,6 +60,10 @@ def test_tabular():
     if fast_benchmark:
         subsample_size = 100
         time_limit = 60
+
+    # Catboost > 1.2 is required for python 3.11 but cannot be correctly installed on macos
+    if sys.version_info >= (3, 11) and sys.platform == "darwin":
+        hyperparameters.pop("CAT")
 
     fit_args = {"verbosity": verbosity}
     if hyperparameter_tune_kwargs is not None:
@@ -388,7 +394,7 @@ def run_tabular_benchmark_toy(fit_args):
     savedir = directory + "AutogluonOutput/"
     shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
     predictor = TabularPredictor(label=dataset["label"], path=savedir).fit(train_data, **fit_args)
-    assert len(predictor._trainer._models_failed_to_train) == 0
+    assert len(predictor._trainer._models_failed_to_train_errors.keys()) == 0
     print(predictor.feature_metadata)
     print(predictor.feature_metadata.type_map_raw)
     print(predictor.feature_metadata.type_group_map_special)
@@ -485,7 +491,7 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
                     # .sample instead of .head to increase diversity and test cases where data index is not monotonically increasing.
                     train_data = train_data.sample(n=subsample_size, random_state=seed_val)  # subsample for fast_benchmark
             predictor = TabularPredictor(label=label, path=savedir).fit(train_data, **fit_args)
-            assert len(predictor._trainer._models_failed_to_train) == 0
+            assert len(predictor._trainer._models_failed_to_train_errors.keys()) == 0
             results = predictor.fit_summary(verbosity=4)
             original_features = list(train_data)
             original_features.remove(label)
@@ -926,7 +932,7 @@ def test_quantile():
     directory = directory_prefix + dataset["name"] + "/"
     savedir = directory + "AutogluonOutput/"
     shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
-    fit_args = {"time_limit": 20}
+    fit_args = {"time_limit": 40}
     predictor = TabularPredictor(label=dataset["label"], path=savedir, problem_type=dataset["problem_type"], quantile_levels=quantile_levels).fit(
         train_data, **fit_args
     )

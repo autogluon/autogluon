@@ -247,12 +247,14 @@ tutorials/cloud_fit_deploy/index
 ```{toctree}
 ---
 caption: Resources
-maxdepth: 1
+maxdepth: 2
 hidden:
 ---
 
 Cheat Sheets <cheatsheet.rst>
-Versions <versions.rst>
+Versions <https://auto.gluon.ai/stable/versions.html>
+What's New <whats_new/index>
+GitHub <https://github.com/autogluon/autogluon>
 Tabular FAQ <tutorials/tabular/tabular-faq.md>
 Multimodal FAQ <tutorials/multimodal/multimodal-faq.md>
 Time Series FAQ <tutorials/timeseries/forecasting-faq.md>
