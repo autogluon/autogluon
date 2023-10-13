@@ -27,6 +27,7 @@ install_requires = [
     "pandas",  # version range defined in `core/_setup_utils.py`
     "torch",  # version range defined in `core/_setup_utils.py`
     "lightning",  # version range defined in `core/_setup_utils.py`
+    "pytorch_lightning",  # version range defined in `core/_setup_utils.py`
     "statsmodels>=0.13.0,<0.15",
     "gluonts>=0.13.1,<0.14",
     "networkx",  # version range defined in `core/_setup_utils.py`
