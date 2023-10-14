@@ -9,7 +9,7 @@ import platform
 import time
 from collections import Counter
 from statistics import mean
-from typing import Dict, Type, Union
+from typing import Dict, List, Type, Union
 
 import numpy as np
 import pandas as pd
@@ -666,11 +666,48 @@ class BaggedEnsembleModel(AbstractModel):
     # TODO: Augment to generate OOF after shuffling each column in X (Batching), this is the fastest way.
     # TODO: Reduce logging clutter during OOF importance calculation (Currently logs separately for each child)
     # Generates OOF predictions from pre-trained bagged models, assuming X and y are in the same row order as used in .fit(X, y)
-    def compute_feature_importance(self, X, y, features=None, silent=False, time_limit=None, is_oof=False, **kwargs) -> pd.DataFrame:
+    def compute_feature_importance(
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
+        features: List[str] = None,
+        silent: bool = False,
+        time_limit: float = None,
+        is_oof: bool = False,
+        from_children: bool = False,
+        **kwargs,
+    ) -> pd.DataFrame:
+        """
+
+        Parameters
+        ----------
+        X: pd.DataFrame
+            The data to use for calculating feature importance.
+        y: pd.Series
+            The ground truth to use for calculating feature importance.
+        features: List[str], default = None,
+            The list of features to compute feature importances for.
+            If None, all features are computed.
+        silent: bool, default = False
+            If True, silences logs.
+        time_limit: float, default = None
+            If specified, will early stop shuffle set repeats when time limit would be exceeded.
+            If is_oof or from_children is True, the individual child models are processed one by one and early stopped if time limit would be exceeded.
+        is_oof: bool, default = False
+            If True, calculates feature importance for each child model on the out-of-fold indices, treating X as the original training data.
+        from_children: bool, default = False
+            If True, calculates feature importance for each child model without averaging child predictions.
+            If False, calculates feature importance for the bagged ensemble via averaging of the child predictions.
+        kwargs
+
+        Returns
+        -------
+        A pandas DataFrame of feature importances.
+        """
         if features is None:
             # FIXME: use FULL features (children can have different features)
             features = self.load_child(model=self.models[0]).features
-        if not is_oof:
+        if not is_oof and not from_children:
             return super().compute_feature_importance(X, y, features=features, time_limit=time_limit, silent=silent, **kwargs)
         fi_fold_list = []
         model_index = 0
