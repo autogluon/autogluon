@@ -24,7 +24,7 @@ job_type_info = {
         'job_queue': 'CI-CPU'
     },
     'CI-MULTI-GPU': {
-        'job_definition': 'autogluon-ci-multi-gpu:5',
+        'job_definition': 'autogluon-ci-multi-gpu:6',
         'job_queue': 'CI-MULTI-GPU'
     },
     'CI-CPU-PUSH': {
@@ -40,7 +40,7 @@ job_type_info = {
         'job_queue': 'CI-CPU'
     },
     'CI-MULTI-GPU-PUSH': {
-        'job_definition': 'autogluon-ci-multi-gpu-push:1',
+        'job_definition': 'autogluon-ci-multi-gpu-push:2',
         'job_queue': 'CI-MULTI-GPU'
     },
 }
