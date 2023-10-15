@@ -64,10 +64,16 @@ class DeepARModel(AbstractGluonTSModel):
         Number of epochs the model will be trained for
     batch_size : int, default = 64
         Size of batches used during training
+    predict_batch_size : int, default = 500
+        Size of batches used during prediction.
     num_batches_per_epoch : int, default = 50
         Number of batches processed every epoch
     learning_rate : float, default = 1e-3,
         Learning rate used during training
+    trainer_kwargs : dict, optional
+        Optional keyword arguments passed to ``lightning.Trainer``.
+    early_stopping_patience : int or None, default = 20
+        Early stop training if the validation loss doesn't improve for this many epochs.
     """
 
     default_num_samples: int = 250
@@ -84,8 +90,8 @@ class DeepARModel(AbstractGluonTSModel):
         init_kwargs["num_feat_static_real"] = self.num_feat_static_real
         init_kwargs["cardinality"] = self.feat_static_cat_cardinality
         init_kwargs["num_feat_dynamic_real"] = self.num_feat_dynamic_real
-        init_kwargs["lags_seq"] = get_lags_for_frequency(self.freq)
-        init_kwargs["time_features"] = get_time_features_for_frequency(self.freq)
+        init_kwargs.setdefault("lags_seq", get_lags_for_frequency(self.freq))
+        init_kwargs.setdefault("time_features", get_time_features_for_frequency(self.freq))
         return init_kwargs
 
 
@@ -112,10 +118,16 @@ class SimpleFeedForwardModel(AbstractGluonTSModel):
         Number of epochs the model will be trained for
     batch_size : int, default = 64
         Size of batches used during training
+    predict_batch_size : int, default = 500
+        Size of batches used during prediction.
     num_batches_per_epoch : int, default = 50
         Number of batches processed every epoch
     learning_rate : float, default = 1e-3,
         Learning rate used during training
+    trainer_kwargs : dict, optional
+        Optional keyword arguments passed to ``lightning.Trainer``.
+    early_stopping_patience : int or None, default = 20
+        Early stop training if the validation loss doesn't improve for this many epochs.
     """
 
     def _get_estimator_class(self) -> Type[GluonTSEstimator]:
@@ -163,10 +175,16 @@ class TemporalFusionTransformerModel(AbstractGluonTSModel):
         Number of epochs the model will be trained for
     batch_size : int, default = 64
         Size of batches used during training
+    predict_batch_size : int, default = 500
+        Size of batches used during prediction.
     num_batches_per_epoch : int, default = 50
         Number of batches processed every epoch
     learning_rate : float, default = 1e-3,
         Learning rate used during training
+    trainer_kwargs : dict, optional
+        Optional keyword arguments passed to ``lightning.Trainer``.
+    early_stopping_patience : int or None, default = 20
+        Early stop training if the validation loss doesn't improve for this many epochs.
     """
 
     supports_known_covariates = True
@@ -191,7 +209,7 @@ class TemporalFusionTransformerModel(AbstractGluonTSModel):
             init_kwargs["static_dims"] = [self.num_feat_static_real]
         if len(self.feat_static_cat_cardinality):
             init_kwargs["static_cardinalities"] = self.feat_static_cat_cardinality
-        init_kwargs["time_features"] = get_time_features_for_frequency(self.freq)
+        init_kwargs.setdefault("time_features", get_time_features_for_frequency(self.freq))
         return init_kwargs
 
 
@@ -221,10 +239,16 @@ class DLinearModel(AbstractGluonTSModel):
         Number of epochs the model will be trained for
     batch_size : int, default = 64
         Size of batches used during training
+    predict_batch_size : int, default = 500
+        Size of batches used during prediction.
     num_batches_per_epoch : int, default = 50
         Number of batches processed every epoch
     learning_rate : float, default = 1e-3,
         Learning rate used during training
+    trainer_kwargs : dict, optional
+        Optional keyword arguments passed to ``lightning.Trainer``.
+    early_stopping_patience : int or None, default = 20
+        Early stop training if the validation loss doesn't improve for this many epochs.
     weight_decay : float, default = 1e-8
         Weight decay regularization parameter.
     """

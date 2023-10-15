@@ -36,7 +36,9 @@ def test_when_mw_model_trained_then_oof_predictions_and_stats_are_saved(
     temp_model_path, prediction_length, num_val_windows
 ):
     val_splitter = ExpandingWindowSplitter(prediction_length=prediction_length, num_val_windows=num_val_windows)
-    mw_model = get_multi_window_deepar(path=temp_model_path, prediction_length=prediction_length)
+    mw_model = get_multi_window_deepar(
+        path=temp_model_path, prediction_length=prediction_length, freq=DUMMY_TS_DATAFRAME.freq
+    )
     mw_model.fit(train_data=DUMMY_TS_DATAFRAME, val_splitter=val_splitter)
 
     assert len(mw_model.get_oof_predictions()) == num_val_windows
@@ -54,7 +56,7 @@ def test_when_val_data_passed_to_mw_model_fit_then_exception_is_raised(temp_mode
 
 def test_when_saved_model_moved_then_model_can_be_loaded_with_updated_path():
     original_path = tempfile.mkdtemp() + os.sep
-    model = get_multi_window_deepar(path=original_path)
+    model = get_multi_window_deepar(path=original_path, freq=DUMMY_TS_DATAFRAME.freq)
     model.fit(train_data=DUMMY_TS_DATAFRAME)
     model.save()
     new_path = tempfile.mkdtemp() + os.sep

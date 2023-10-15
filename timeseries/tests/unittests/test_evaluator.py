@@ -2,8 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from gluonts.evaluation import Evaluator as GluonTSEvaluator
-from gluonts.evaluation import make_evaluation_predictions
-from gluonts.model.forecast import SampleForecast
+from gluonts.model.forecast import QuantileForecast
 
 from autogluon.timeseries import TimeSeriesPredictor
 from autogluon.timeseries.evaluator import TimeSeriesEvaluator, in_sample_abs_seasonal_error
@@ -47,36 +46,45 @@ def deepar_trained_zero_data() -> AbstractGluonTSModel:
     return pred._trainer.load_model("DeepAR")
 
 
+def to_gluonts_forecast(forecast_df, freq):
+    forecast_list = []
+    for item_id, fcast in forecast_df.groupby(level="item_id", sort=False):
+        start_date = fcast.index[0][1].to_period(freq=freq)
+        qf = QuantileForecast(
+            forecast_arrays=fcast.values.T,
+            start_date=start_date,
+            forecast_keys=fcast.columns,
+            item_id=item_id,
+        )
+        forecast_list.append(qf)
+    return forecast_list
+
+
+def to_gluonts_test_set(data):
+    ts_list = []
+    for item_id, ts in data.groupby(level="item_id", sort=False):
+        ts = ts.loc[item_id]["target"]
+        ts.index = ts.index.to_period(freq=data.freq)
+        ts_list.append(ts)
+    return ts_list
+
+
 @pytest.mark.parametrize("metric_name", GLUONTS_PARITY_METRICS)
 def test_when_given_learned_model_when_evaluator_called_then_output_equal_to_gluonts(metric_name, deepar_trained):
     model = deepar_trained
+    data_train, data_test = DUMMY_TS_DATAFRAME.train_test_split(model.prediction_length)
 
-    forecast_iter, ts_iter = make_evaluation_predictions(
-        dataset=model._to_gluonts_dataset(DUMMY_TS_DATAFRAME),
-        predictor=model.gts_predictor,
-        num_samples=100,
-    )
-    fcast_list, ts_list = list(forecast_iter), list(ts_iter)
-    prediction_length = 2
+    forecast_df = model.predict(data_train)
     seasonal_period = 3
-    forecast_index = DUMMY_TS_DATAFRAME.slice_by_timestep(-prediction_length, None).index
-    forecast_df = model._gluonts_forecasts_to_data_frame(
-        fcast_list,
-        quantile_levels=model.quantile_levels,
-        forecast_index=forecast_index,
-    )
-
     ag_evaluator = TimeSeriesEvaluator(
-        eval_metric=metric_name, prediction_length=prediction_length, eval_metric_seasonal_period=seasonal_period
+        eval_metric=metric_name, prediction_length=model.prediction_length, eval_metric_seasonal_period=seasonal_period
     )
     ag_value = ag_evaluator(DUMMY_TS_DATAFRAME, forecast_df)
 
+    forecast_list = to_gluonts_forecast(forecast_df, freq=data_train.freq)
+    ts_list = to_gluonts_test_set(data_test)
     gts_evaluator = GluonTSEvaluator(seasonality=seasonal_period)
-    gts_results, _ = gts_evaluator(
-        ts_iterator=ts_list,
-        fcst_iterator=fcast_list,
-    )
-
+    gts_results, _ = gts_evaluator(ts_iterator=ts_list, fcst_iterator=forecast_list)
     gts_metric_name = AG_TO_GLUONTS_METRIC.get(metric_name, metric_name)
     assert np.isclose(gts_results[gts_metric_name], ag_value, atol=1e-5)
 
@@ -90,26 +98,19 @@ def test_when_given_all_zero_data_when_evaluator_called_then_output_equal_to_glu
 
     model = deepar_trained_zero_data
     data = DUMMY_TS_DATAFRAME.copy() * 0
+    data_train, data_test = data.train_test_split(model.prediction_length)
 
-    forecast_iter, ts_iter = make_evaluation_predictions(
-        dataset=model._to_gluonts_dataset(data),
-        predictor=model.gts_predictor,
-        num_samples=100,
+    forecast_df = model.predict(data_train)
+    seasonal_period = 3
+    ag_evaluator = TimeSeriesEvaluator(
+        eval_metric=metric_name, prediction_length=model.prediction_length, eval_metric_seasonal_period=seasonal_period
     )
-    fcast_list, ts_list = list(forecast_iter), list(ts_iter)
-    prediction_length = 2
-    forecast_index = DUMMY_TS_DATAFRAME.slice_by_timestep(-prediction_length, None).index
-    forecast_df = model._gluonts_forecasts_to_data_frame(
-        fcast_list,
-        quantile_levels=model.quantile_levels,
-        forecast_index=forecast_index,
-    )
-
-    ag_evaluator = TimeSeriesEvaluator(eval_metric=metric_name, prediction_length=prediction_length)
     ag_value = ag_evaluator(data, forecast_df)
 
-    gts_evaluator = GluonTSEvaluator()
-    gts_results, _ = gts_evaluator(ts_iterator=ts_list, fcst_iterator=fcast_list)
+    forecast_list = to_gluonts_forecast(forecast_df, freq=data_train.freq)
+    ts_list = to_gluonts_test_set(data_test)
+    gts_evaluator = GluonTSEvaluator(seasonality=seasonal_period)
+    gts_results, _ = gts_evaluator(ts_iterator=ts_list, fcst_iterator=forecast_list)
 
     gts_metric_name = AG_TO_GLUONTS_METRIC.get(metric_name, metric_name)
     assert np.isclose(gts_results[gts_metric_name], ag_value, atol=1e-5, equal_nan=True)
@@ -118,39 +119,19 @@ def test_when_given_all_zero_data_when_evaluator_called_then_output_equal_to_glu
 @pytest.mark.parametrize("metric_name", GLUONTS_PARITY_METRICS)
 def test_when_given_zero_forecasts_when_evaluator_called_then_output_equal_to_gluonts(metric_name, deepar_trained):
     model = deepar_trained
-    forecast_iter, ts_iter = make_evaluation_predictions(
-        dataset=model._to_gluonts_dataset(DUMMY_TS_DATAFRAME),
-        predictor=model.gts_predictor,
-        num_samples=100,
-    )
-    fcast_list, ts_list = list(forecast_iter), list(ts_iter)
+    data_train, data_test = DUMMY_TS_DATAFRAME.train_test_split(model.prediction_length)
 
-    zero_forecast_list = []
-    for s in fcast_list:
-        zero_forecast_list.append(
-            SampleForecast(
-                samples=np.zeros_like(s.samples),  # noqa
-                start_date=pd.Period(s.start_date, freq=s.freq),
-                item_id=s.item_id,
-            )
-        )
-    prediction_length = 2
+    forecast_df = model.predict(data_train) * 0
     seasonal_period = 3
-    forecast_index = DUMMY_TS_DATAFRAME.slice_by_timestep(-prediction_length, None).index
-    forecast_df = model._gluonts_forecasts_to_data_frame(
-        zero_forecast_list,
-        quantile_levels=model.quantile_levels,
-        forecast_index=forecast_index,
-    )
-
     ag_evaluator = TimeSeriesEvaluator(
-        eval_metric=metric_name, prediction_length=prediction_length, eval_metric_seasonal_period=seasonal_period
+        eval_metric=metric_name, prediction_length=model.prediction_length, eval_metric_seasonal_period=seasonal_period
     )
     ag_value = ag_evaluator(DUMMY_TS_DATAFRAME, forecast_df)
 
+    forecast_list = to_gluonts_forecast(forecast_df, freq=data_train.freq)
+    ts_list = to_gluonts_test_set(data_test)
     gts_evaluator = GluonTSEvaluator(seasonality=seasonal_period)
-    gts_results, _ = gts_evaluator(ts_iterator=ts_list, fcst_iterator=zero_forecast_list)
-
+    gts_results, _ = gts_evaluator(ts_iterator=ts_list, fcst_iterator=forecast_list)
     gts_metric_name = AG_TO_GLUONTS_METRIC.get(metric_name, metric_name)
     assert np.isclose(gts_results[gts_metric_name], ag_value, atol=1e-5)
 

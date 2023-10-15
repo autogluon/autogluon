@@ -1659,9 +1659,15 @@ class AbstractModel:
             return  # Model is smaller than the min threshold to check available mem
 
         available_mem = ResourceManager.get_available_virtual_mem()
-        ratio = approx_mem_size_req / available_mem
-        min_error_memory_ratio = ratio / mem_error_threshold
-        min_warning_memory_ratio = ratio / mem_warning_threshold
+
+        # The expected memory usage percentage of the model during fit
+        expected_memory_usage_ratio = approx_mem_size_req / available_mem
+
+        # The minimum `max_memory_usage_ratio` values required to avoid an error/warning
+        min_error_memory_ratio = expected_memory_usage_ratio / mem_error_threshold
+        min_warning_memory_ratio = expected_memory_usage_ratio / mem_warning_threshold
+
+        # The max allowed `expected_memory_usage_ratio` values to avoid an error/warning
         max_memory_usage_error_ratio = mem_error_threshold * max_memory_usage_ratio
         max_memory_usage_warning_ratio = mem_warning_threshold * max_memory_usage_ratio
 
@@ -1670,10 +1676,10 @@ class AbstractModel:
 
         log_user_guideline = (
             f"Estimated to require {approx_mem_size_req / 1e9:.3f} GB "
-            f"out of {available_mem / 1e9:.3f} GB available memory ({min_error_memory_ratio*100:.3f}%)... "
+            f"out of {available_mem / 1e9:.3f} GB available memory ({expected_memory_usage_ratio*100:.3f}%)... "
             f"({max_memory_usage_error_ratio*100:.3f}% of avail memory is the max safe size)"
         )
-        if min_error_memory_ratio > max_memory_usage_error_ratio:
+        if expected_memory_usage_ratio > max_memory_usage_error_ratio:
             log_user_guideline += (
                 f'\n\tTo force training the model, specify the model hyperparameter "ag.max_memory_usage_ratio" to a larger value '
                 f"(currently {max_memory_usage_ratio}, set to >={min_error_memory_ratio + 0.05:.2f} to avoid the error)"
@@ -1686,7 +1692,7 @@ class AbstractModel:
                 )
             logger.warning(f"\tWarning: Not enough memory to safely train model. {log_user_guideline}")
             raise NotEnoughMemoryError
-        elif min_warning_memory_ratio > max_memory_usage_warning_ratio:
+        elif expected_memory_usage_ratio > max_memory_usage_warning_ratio:
             log_user_guideline += (
                 f'\n\tTo avoid this warning, specify the model hyperparameter "ag.max_memory_usage_ratio" to a larger value '
                 f"(currently {max_memory_usage_ratio}, set to >={min_warning_memory_ratio + 0.05:.2f} to avoid the warning)"

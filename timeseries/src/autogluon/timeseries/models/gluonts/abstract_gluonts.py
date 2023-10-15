@@ -19,8 +19,9 @@ from pandas.tseries.frequencies import to_offset
 
 from autogluon.common.loaders import load_pkl
 from autogluon.common.utils.log_utils import set_logger_verbosity
-from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
+from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
+from autogluon.timeseries.utils.datetime import norm_freq_str
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 from autogluon.timeseries.utils.warning_filters import disable_root_logger, warning_filter
 
@@ -35,9 +36,7 @@ GLUONTS_SUPPORTED_OFFSETS = ["Y", "Q", "M", "W", "D", "B", "H", "T", "min", "S"]
 
 
 class SimpleGluonTSDataset(GluonTSDataset):
-    """A simple GluonTS dataset that wraps a TimeSeriesDataFrame and implements the
-    GluonTS Dataset protocol via lazy iterations.
-    """
+    """Wrapper for TimeSeriesDataFrame that is compatible with the GluonTS Dataset API."""
 
     def __init__(
         self,
@@ -47,65 +46,78 @@ class SimpleGluonTSDataset(GluonTSDataset):
         feat_static_real: Optional[pd.DataFrame] = None,
         feat_dynamic_real: Optional[pd.DataFrame] = None,
         past_feat_dynamic_real: Optional[pd.DataFrame] = None,
-        float_dtype: Type = np.float64,
-        int_dtype: Type = np.int64,
+        includes_future: bool = False,
+        prediction_length: int = None,
     ):
         assert target_df is not None
         assert target_df.freq, "Initializing GluonTS data sets without freq is not allowed"
         # Convert TimeSeriesDataFrame to pd.Series for faster processing
-        self.target_series = target_df[target_column]
-        self.item_ids = target_df.item_ids
-        self.freq_ = target_df.freq
-        self.feat_static_cat = feat_static_cat
-        self.feat_static_real = feat_static_real
-        self.feat_dynamic_real = feat_dynamic_real
-        self.past_feat_dynamic_real = past_feat_dynamic_real
+        self.target_array = self._to_array(target_df[target_column], dtype=np.float32)
+        self.feat_static_cat = self._to_array(feat_static_cat, dtype=np.int64)
+        self.feat_static_real = self._to_array(feat_static_real, dtype=np.float32)
+        self.feat_dynamic_real = self._to_array(feat_dynamic_real, dtype=np.float32)
+        self.past_feat_dynamic_real = self._to_array(past_feat_dynamic_real, dtype=np.float32)
+        self.freq = self._to_gluonts_freq(target_df.freq)
 
-        self.int_dtype = int_dtype
-        self.float_dtype = float_dtype
+        # Necessary to compute indptr for known_covariates at prediction time
+        self.includes_future = includes_future
+        self.prediction_length = prediction_length
 
-    @property
-    def freq(self):
+        # Replace inefficient groupby ITEMID with indptr that stores start:end of each time series
+        item_id_index = target_df.index.get_level_values(ITEMID)
+        indices_sizes = item_id_index.value_counts(sort=False)
+        self.item_ids = indices_sizes.index  # shape [num_items]
+        cum_sizes = indices_sizes.values.cumsum()
+        self.indptr = np.append(0, cum_sizes).astype(np.int32)
+        self.timestamps = target_df.index.get_level_values(TIMESTAMP)  # shape [len(target_df)]
+
+    @staticmethod
+    def _to_array(df: Optional[pd.DataFrame], dtype: np.dtype) -> Optional[np.ndarray]:
+        if df is None:
+            return None
+        else:
+            return df.to_numpy(dtype=dtype)
+
+    @staticmethod
+    def _to_gluonts_freq(freq: str) -> str:
         # FIXME: GluonTS expects a frequency string, but only supports a limited number of such strings
         # for feature generation. If the frequency string doesn't match or is not provided, it raises an exception.
         # Here we bypass this by issuing a default "yearly" frequency, tricking it into not producing
         # any lags or features.
-        pd_offset = to_offset(self.freq_)
+        pd_offset = to_offset(freq)
 
         # normalize freq str to handle peculiarities such as W-SUN
-        offset_base_alias = pd_offset.name.split("-")[0]
-
-        return "A" if offset_base_alias is None or offset_base_alias not in GLUONTS_SUPPORTED_OFFSETS else self.freq_
+        offset_base_alias = norm_freq_str(pd_offset)
+        if offset_base_alias not in GLUONTS_SUPPORTED_OFFSETS:
+            return "A"
+        else:
+            return f"{pd_offset.n}{offset_base_alias}"
 
     def __len__(self):
-        return len(self.item_ids)  # noqa
+        return len(self.indptr) - 1  # noqa
 
     def __iter__(self) -> Iterator[Dict[str, Any]]:
-        for item_id in self.item_ids:  # noqa
-            ts = self.target_series.loc[item_id]
-            time_series = {
-                FieldName.ITEM_ID: item_id,
-                FieldName.TARGET: ts.to_numpy(dtype=self.float_dtype).ravel(),
-                FieldName.START: pd.Period(ts.index[0], freq=self.freq),
+        for j in range(len(self.indptr) - 1):
+            start_idx = self.indptr[j]
+            end_idx = self.indptr[j + 1]
+            # GluonTS expects item_id to be a string
+            ts = {
+                FieldName.ITEM_ID: str(self.item_ids[j]),
+                FieldName.START: pd.Period(self.timestamps[j], freq=self.freq),
+                FieldName.TARGET: self.target_array[start_idx:end_idx],
             }
             if self.feat_static_cat is not None:
-                time_series[FieldName.FEAT_STATIC_CAT] = self.feat_static_cat.loc[item_id].to_numpy(
-                    dtype=self.int_dtype
-                )
+                ts[FieldName.FEAT_STATIC_CAT] = self.feat_static_cat[j]
             if self.feat_static_real is not None:
-                time_series[FieldName.FEAT_STATIC_REAL] = self.feat_static_real.loc[item_id].to_numpy(
-                    dtype=self.float_dtype
-                )
-            if self.feat_dynamic_real is not None:
-                time_series[FieldName.FEAT_DYNAMIC_REAL] = (
-                    self.feat_dynamic_real.loc[item_id].to_numpy(dtype=self.float_dtype).T
-                )
+                ts[FieldName.FEAT_STATIC_REAL] = self.feat_static_real[j]
             if self.past_feat_dynamic_real is not None:
-                time_series[FieldName.PAST_FEAT_DYNAMIC_REAL] = (
-                    self.past_feat_dynamic_real.loc[item_id].to_numpy(dtype=self.float_dtype).T
-                )
-
-            yield time_series
+                ts[FieldName.PAST_FEAT_DYNAMIC_REAL] = self.past_feat_dynamic_real[start_idx:end_idx].T
+            if self.feat_dynamic_real is not None:
+                if self.includes_future:
+                    start_idx = start_idx + j * self.prediction_length
+                    end_idx = end_idx + (j + 1) * self.prediction_length
+                ts[FieldName.FEAT_DYNAMIC_REAL] = self.feat_dynamic_real[start_idx:end_idx].T
+            yield ts
 
 
 class AbstractGluonTSModel(AbstractTimeSeriesModel):
@@ -133,9 +145,6 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
     """
 
     gluonts_model_path = "gluon_ts"
-    # datatype of floating point and integers passed internally to GluonTS
-    float_dtype: Type = np.float32
-    int_dtype: Type = np.int64
     # default number of samples for prediction
     default_num_samples: int = 1000
     supports_known_covariates: bool = False
@@ -167,6 +176,12 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         self.num_feat_dynamic_real = 0
         self.num_past_feat_dynamic_real = 0
         self.feat_static_cat_cardinality: List[int] = []
+
+        if 0.5 not in self.quantile_levels:
+            self.must_drop_median = True
+            self.quantile_levels = sorted(set([0.5] + self.quantile_levels))
+        else:
+            self.must_drop_median = False
 
     def save(self, path: str = None, verbose: bool = True) -> str:
         # we flush callbacks instance variable if it has been set. it can keep weak references which breaks training
@@ -233,10 +248,12 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
     def _get_model_params(self) -> dict:
         """Gets params that are passed to the inner model."""
-        args = super()._get_model_params().copy()
-        args.setdefault("batch_size", 64)
-        args.setdefault("context_length", self.default_context_length)
-        args.update(
+        init_args = super()._get_model_params().copy()
+        init_args.setdefault("batch_size", 64)
+        init_args.setdefault("context_length", self.default_context_length)
+        init_args.setdefault("predict_batch_size", 500)
+        init_args.setdefault("early_stopping_patience", 20)
+        init_args.update(
             dict(
                 freq=self.freq,
                 prediction_length=self.prediction_length,
@@ -244,16 +261,15 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                 callbacks=self.callbacks,
             )
         )
-        return args
+        # Support MXNet kwarg names for backwards compatibility
+        init_args.setdefault("lr", init_args.get("learning_rate", 1e-3))
+        init_args.setdefault("max_epochs", init_args.get("epochs"))
+        return init_args
 
     def _get_estimator_init_args(self) -> Dict[str, Any]:
         """Get GluonTS specific constructor arguments for estimator objects, an alias to `self._get_model_params`
         for better readability."""
-        init_kwargs = self._get_model_params()
-        # Map MXNet kwarg names to PyTorch Lightning kwarg names
-        init_kwargs.setdefault("lr", init_kwargs.get("learning_rate", 1e-3))
-        init_kwargs.setdefault("max_epochs", init_kwargs.get("epochs"))
-        return init_kwargs
+        return self._get_model_params()
 
     def _get_estimator_class(self) -> Type[GluonTSEstimator]:
         raise NotImplementedError
@@ -267,25 +283,25 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
         init_args = self._get_estimator_init_args()
 
-        trainer_kwargs = {}
-        epochs = init_args.get("max_epochs")
-        callbacks = init_args.get("callbacks", [])
-
-        # TODO: Provide trainer_kwargs outside the function (e.g., to specify # of GPUs)?
-        if epochs is not None:
-            trainer_kwargs.update({"max_epochs": epochs})
-        trainer_kwargs.update({"callbacks": callbacks, "enable_progress_bar": False})
-        trainer_kwargs["default_root_dir"] = self.path
+        default_trainer_kwargs = {
+            "max_epochs": init_args["max_epochs"],
+            "callbacks": init_args["callbacks"],
+            "enable_progress_bar": False,
+            "default_root_dir": self.path,
+        }
 
         if torch.cuda.is_available():
-            trainer_kwargs["accelerator"] = "gpu"
-            trainer_kwargs["devices"] = 1
+            default_trainer_kwargs["accelerator"] = "gpu"
+            default_trainer_kwargs["devices"] = 1
         else:
-            trainer_kwargs["accelerator"] = "cpu"
+            default_trainer_kwargs["accelerator"] = "cpu"
+
+        default_trainer_kwargs.update(init_args.pop("trainer_kwargs", {}))
+        logger.debug(f"\tTraining on device '{default_trainer_kwargs['accelerator']}'")
 
         return from_hyperparameters(
             self._get_estimator_class(),
-            trainer_kwargs=trainer_kwargs,
+            trainer_kwargs=default_trainer_kwargs,
             **init_args,
         )
 
@@ -331,8 +347,8 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                 feat_static_real=feat_static_real,
                 feat_dynamic_real=feat_dynamic_real,
                 past_feat_dynamic_real=past_feat_dynamic_real,
-                float_dtype=self.float_dtype,
-                int_dtype=self.int_dtype,
+                includes_future=known_covariates is not None,
+                prediction_length=self.prediction_length,
             )
         else:
             return None
@@ -363,9 +379,12 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
         self._check_fit_params()
         # update auxiliary parameters
-        self._deferred_init_params_aux(
-            dataset=train_data, callbacks=self._get_callbacks(time_limit=time_limit), **kwargs
+        init_args = self._get_estimator_init_args()
+        callbacks = self._get_callbacks(
+            time_limit=time_limit,
+            early_stopping_patience=None if val_data is None else init_args["early_stopping_patience"],
         )
+        self._deferred_init_params_aux(dataset=train_data, callbacks=callbacks)
 
         estimator = self._get_estimator()
         with warning_filter(), disable_root_logger(), gluonts.core.settings.let(gluonts.env.env, use_tqdm=False):
@@ -374,17 +393,29 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                 validation_data=self._to_gluonts_dataset(val_data),
                 cache_data=True,
             )
+            # Increase batch size during prediction to speed up inference
+            if init_args["predict_batch_size"] is not None:
+                self.gts_predictor.batch_size = init_args["predict_batch_size"]
 
         lightning_logs_dir = Path(self.path) / "lightning_logs"
         if lightning_logs_dir.exists() and lightning_logs_dir.is_dir():
             logger.debug(f"Removing lightning_logs directory {lightning_logs_dir}")
             shutil.rmtree(lightning_logs_dir)
 
-    def _get_callbacks(self, time_limit: int, *args, **kwargs) -> List[Callable]:
+    def _get_callbacks(
+        self,
+        time_limit: int,
+        early_stopping_patience: Optional[int] = None,
+    ) -> List[Callable]:
         """Retrieve a list of callback objects for the GluonTS trainer"""
-        from pytorch_lightning.callbacks import Timer
+        from pytorch_lightning.callbacks import EarlyStopping, Timer
 
-        return [Timer(timedelta(seconds=time_limit))] if time_limit is not None else []
+        callbacks = []
+        if time_limit is not None:
+            callbacks.append(Timer(timedelta(seconds=time_limit)))
+        if early_stopping_patience is not None:
+            callbacks.append(EarlyStopping(monitor="val_loss", patience=early_stopping_patience))
+        return callbacks
 
     def predict(
         self,
@@ -407,10 +438,8 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                 raise ValueError("Invalid quantile value specified. Quantiles must be between 0 and 1 (exclusive).")
 
             predicted_targets = self._predict_gluonts_forecasts(data, known_covariates=known_covariates, **kwargs)
-
             df = self._gluonts_forecasts_to_data_frame(
                 predicted_targets,
-                quantile_levels=quantile_levels or self.quantile_levels,
                 forecast_index=get_forecast_horizon_index_ts_dataframe(data, self.prediction_length),
             )
 
@@ -426,72 +455,95 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
         return list(self.gts_predictor.predict(**predictor_kwargs))
 
-    @staticmethod
-    def _sample_to_quantile_forecast(forecast: SampleForecast, quantile_levels: List[float]) -> QuantileForecast:
-        forecast_arrays = [forecast.mean]
+    def _stack_quantile_forecasts(self, forecasts: List[QuantileForecast], item_ids: pd.Index) -> pd.DataFrame:
+        # GluonTS always saves item_id as a string
+        item_id_to_forecast = {str(f.item_id): f for f in forecasts}
+        result_dfs = []
+        for item_id in item_ids:
+            forecast = item_id_to_forecast[str(item_id)]
+            result_dfs.append(pd.DataFrame(forecast.forecast_array.T, columns=forecast.forecast_keys))
+        forecast_df = pd.concat(result_dfs)
+        if "mean" not in forecast_df.columns:
+            forecast_df["mean"] = forecast_df["0.5"]
+        columns_order = ["mean"] + [str(q) for q in self.quantile_levels]
+        return forecast_df[columns_order]
 
-        quantile_keys = [str(q) for q in quantile_levels]
-        for q in quantile_keys:
-            forecast_arrays.append(forecast.quantile(q))
+    def _stack_sample_forecasts(self, forecasts: List[SampleForecast], item_ids: pd.Index) -> pd.DataFrame:
+        item_id_to_forecast = {str(f.item_id): f for f in forecasts}
+        samples_per_item = []
+        for item_id in item_ids:
+            forecast = item_id_to_forecast[str(item_id)]
+            samples_per_item.append(forecast.samples.T)
+        samples = np.concatenate(samples_per_item, axis=0)
+        quantiles = np.quantile(samples, self.quantile_levels, axis=1).T
+        mean = samples.mean(axis=1, keepdims=True)
+        forecast_array = np.concatenate([mean, quantiles], axis=1)
+        return pd.DataFrame(forecast_array, columns=["mean"] + [str(q) for q in self.quantile_levels])
 
-        forecast_init_args = dict(
-            forecast_arrays=np.array(forecast_arrays),
-            start_date=forecast.start_date,
-            forecast_keys=["mean"] + quantile_keys,
-            item_id=str(forecast.item_id),
-        )
-        return QuantileForecast(**forecast_init_args)
-
-    @staticmethod
-    def _distribution_to_quantile_forecast(forecast: Forecast, quantile_levels: List[float]) -> QuantileForecast:
+    def _stack_distribution_forecasts(self, forecasts: List[Forecast], item_ids: pd.Index) -> pd.DataFrame:
         import torch
+        from gluonts.torch.distributions import AffineTransformed
+        from torch.distributions import Distribution
 
-        # Compute all quantiles in parallel instead of a for-loop
-        quantiles = torch.tensor(quantile_levels, device=forecast.distribution.mean.device).reshape(-1, 1)
-        quantile_predictions = forecast.distribution.icdf(quantiles).cpu().detach().numpy()
-        forecast_arrays = np.vstack([forecast.mean, quantile_predictions])
-        forecast_keys = ["mean"] + [str(q) for q in quantile_levels]
+        # Sort forecasts in the same order as in the dataset
+        item_id_to_forecast = {str(f.item_id): f for f in forecasts}
+        forecasts = [item_id_to_forecast[str(item_id)] for item_id in item_ids]
 
-        forecast_init_args = dict(
-            forecast_arrays=forecast_arrays,
-            start_date=forecast.start_date,
-            forecast_keys=forecast_keys,
-            item_id=str(forecast.item_id),
-        )
-        return QuantileForecast(**forecast_init_args)
+        def stack_distributions(distributions: List[Distribution]) -> Distribution:
+            """Stack multiple torch.Distribution objects into a single distribution"""
+            params_per_dist = []
+            for dist in distributions:
+                params = {name: getattr(dist, name) for name in dist.arg_constraints.keys()}
+                params_per_dist.append(params)
+            # Make sure that all distributions have same keys
+            assert len(set(tuple(p.keys()) for p in params_per_dist)) == 1
+
+            stacked_params = {}
+            for key in dist.arg_constraints.keys():
+                stacked_params[key] = torch.cat([p[key] for p in params_per_dist])
+            return dist.__class__(**stacked_params)
+
+        if not isinstance(forecasts[0].distribution, AffineTransformed):
+            raise AssertionError("Expected forecast.distribution to be an instance of AffineTransformed")
+
+        # We stack all forecast distribution into a single Distribution object.
+        # This dramatically speeds up the quantiles calculation.
+        stacked_base_dist = stack_distributions([f.distribution.base_dist for f in forecasts])
+
+        stacked_loc = torch.cat([f.distribution.loc for f in forecasts])
+        if stacked_loc.shape != stacked_base_dist.batch_shape:
+            stacked_loc = stacked_loc.repeat_interleave(self.prediction_length)
+
+        stacked_scale = torch.cat([f.distribution.scale for f in forecasts])
+        if stacked_scale.shape != stacked_base_dist.batch_shape:
+            stacked_scale = stacked_scale.repeat_interleave(self.prediction_length)
+
+        stacked_dist = AffineTransformed(stacked_base_dist, loc=stacked_loc, scale=stacked_scale)
+
+        mean_prediction = stacked_dist.mean.cpu().detach().numpy()
+        quantiles = torch.tensor(self.quantile_levels, device=stacked_dist.mean.device).reshape(-1, 1)
+        quantile_predictions = stacked_dist.icdf(quantiles).cpu().detach().numpy()
+        forecast_array = np.vstack([mean_prediction, quantile_predictions]).T
+        return pd.DataFrame(forecast_array, columns=["mean"] + [str(q) for q in self.quantile_levels])
 
     def _gluonts_forecasts_to_data_frame(
         self,
         forecasts: List[Forecast],
-        quantile_levels: List[float],
         forecast_index: pd.MultiIndex,
     ) -> TimeSeriesDataFrame:
         from gluonts.torch.model.forecast import DistributionForecast
 
-        # TODO: Concatenate all forecasts into a single tensor/object before converting?
-        # Especially for DistributionForecast this could result in massive speedups
+        item_ids = forecast_index.unique(level=ITEMID)
         if isinstance(forecasts[0], SampleForecast):
-            forecasts = [self._sample_to_quantile_forecast(f, quantile_levels) for f in forecasts]
+            forecast_df = self._stack_sample_forecasts(forecasts, item_ids)
+        elif isinstance(forecasts[0], QuantileForecast):
+            forecast_df = self._stack_quantile_forecasts(forecasts, item_ids)
         elif isinstance(forecasts[0], DistributionForecast):
-            forecasts = [self._distribution_to_quantile_forecast(f, quantile_levels) for f in forecasts]
+            forecast_df = self._stack_distribution_forecasts(forecasts, item_ids)
         else:
-            assert isinstance(forecasts[0], QuantileForecast), f"Unrecognized forecast type {type(forecasts[0])}"
+            raise ValueError(f"Unrecognized forecast type {type(forecasts[0])}")
 
-        # sanity check to ensure all quantiles are accounted for
-        assert all(str(q) in forecasts[0].forecast_keys for q in quantile_levels), (
-            "Some forecast quantiles are missing from GluonTS forecast outputs. Was"
-            " the model trained to forecast all quantiles?"
-        )
-        item_id_to_forecast = {str(f.item_id): f for f in forecasts}
-        result_dfs = []
-        for item_id in forecast_index.unique(level=ITEMID):
-            # GluonTS always saves item_id as a string
-            forecast = item_id_to_forecast[str(item_id)]
-            item_forecast_dict = {"mean": forecast.mean}
-            for quantile in quantile_levels:
-                item_forecast_dict[str(quantile)] = forecast.quantile(str(quantile))
-            result_dfs.append(pd.DataFrame(item_forecast_dict))
-
-        result = pd.concat(result_dfs)
-        result.index = forecast_index
-        return TimeSeriesDataFrame(result)
+        forecast_df.index = forecast_index
+        if self.must_drop_median:
+            forecast_df = forecast_df.drop("0.5", axis=1)
+        return TimeSeriesDataFrame(forecast_df)
