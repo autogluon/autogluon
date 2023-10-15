@@ -14,6 +14,7 @@ from autogluon.multimodal.utils.misc import shopee_dataset
 from ..utils.unittest_datasets import AmazonReviewSentimentCrossLingualDataset, PetFinderDataset
 
 
+@pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "backbone,efficient_finetuning,pooling_mode,precision,expected_ratio,standalone",
     [
@@ -49,7 +50,7 @@ def test_predictor_gradient_checkpointing(
             "env.per_gpu_batch_size": 2,
             "env.num_workers": 0,
             "env.num_workers_evaluation": 0,
-            "env.num_gpus": 1,
+            "env.num_gpus": -1,
         },
         time_limit=30,
     )

@@ -93,6 +93,7 @@ def verify_no_redundant_model_configs(predictor):
     assert sorted(predictor._config.model.names) == sorted(model_names)
 
 
+@pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "dataset_name,model_names,text_backbone,image_backbone,top_k_average_method,efficient_finetune,loss_function",
     [
