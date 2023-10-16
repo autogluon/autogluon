@@ -1137,7 +1137,9 @@ class AbstractTrainer:
     def get_inputs_to_stacker(
         self,
         X: pd.DataFrame,
-        base_models: List[str],
+        *,
+        model: str = None,
+        base_models: List[str] = None,
         model_pred_proba_dict: Optional[dict] = None,
         fit: bool = False,
         use_orig_features: bool = True,
@@ -1150,9 +1152,13 @@ class AbstractTrainer:
         ----------
         X : pd.DataFrame
             Input data to augment.
-        base_models : List[str]
+        model : str, default = None
+            The model to derive `base_models` from.
+            Cannot be specified alongside `base_models`.
+        base_models : List[str], default = None
             The list of base models to augment X with.
             Base models will add their prediction probabilities as extra features to X.
+            Cannot be specified alongside `model`.
         model_pred_proba_dict : dict, optional
             A dict of predict_probas that could have been computed by a prior call to `get_model_pred_proba_dict` to avoid redundant computations.
             Models already present in model_pred_proba_dict will not be predicted on.
@@ -1171,6 +1177,11 @@ class AbstractTrainer:
         -------
         X : DataFrame, an updated DataFrame with the additional stack features from `base_models`.
         """
+        if model is not None and base_models is not None:
+            raise AssertionError("Only one of `model`, `base_models` is allowed to be set.")
+
+        if model is not None and base_models is None:
+            base_models = self.get_base_model_names(model)
         if not base_models:
             return X
         if fit:
