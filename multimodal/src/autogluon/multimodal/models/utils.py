@@ -705,7 +705,7 @@ def run_model(model: nn.Module, batch: dict, trt_model: Optional[nn.Module] = No
     pure_model = model
     if isinstance(model, torch._dynamo.eval_frame.OptimizedModule):
         pure_model = model._orig_mod
-    if isinstance(model, nn.DataParallel):
+    if isinstance(model, nn.parallel.DistributedDataParallel):
         pure_model = model.module
     if isinstance(pure_model, OnnxModule):
         for k in batch:
