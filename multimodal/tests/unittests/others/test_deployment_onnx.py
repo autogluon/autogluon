@@ -30,6 +30,7 @@ except ImportError:
     tensorrt = None
 
 
+@pytest.mark.single_gpu
 def evaluate(predictor, df, onnx_session=None):
     labels = df["score"].to_numpy()
 
@@ -47,6 +48,7 @@ def evaluate(predictor, df, onnx_session=None):
     return eval_pearson_cosine, eval_spearman_cosine
 
 
+@pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     ["sentence-transformers/msmarco-MiniLM-L-12-v3", "sentence-transformers/all-MiniLM-L6-v2"],
@@ -96,11 +98,12 @@ def test_onnx_export_hf_text(checkpoint_name):
     assert pytest.approx(onnx_spearman, 1e-2) == ag_spearman
 
 
+@pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "checkpoint_name,num_gpus",
     [
         ("swin_tiny_patch4_window7_224", -1),
-        ("resnet18", 0),
+        ("resnet18", -1),
     ],
 )
 def test_onnx_export_timm_image(checkpoint_name, num_gpus):
@@ -181,6 +184,7 @@ def test_onnx_export_timm_image(checkpoint_name, num_gpus):
     np.testing.assert_allclose(load_proba, onnx_proba, rtol=1e-2, atol=1e-2)
 
 
+@pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "dataset_name,model_names,text_backbone,image_backbone",
     [

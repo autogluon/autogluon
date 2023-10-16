@@ -1,5 +1,6 @@
 import os
 
+import pytest
 import timm
 import transformers
 
@@ -115,6 +116,7 @@ def test_fusion_model_dump():
     assert os.path.exists(timm_image_dir) and (len(os.listdir(timm_image_dir)) == 2) == True
 
 
+@pytest.mark.single_gpu
 def test_mmdet_object_detection_save_and_load():
     zip_file = "https://automl-mm-bench.s3.amazonaws.com/object_detection_dataset/tiny_motorbike_coco.zip"
     download_dir = "./tiny_motorbike_coco"
@@ -127,7 +129,7 @@ def test_mmdet_object_detection_save_and_load():
     predictor = MultiModalPredictor(
         hyperparameters={
             "model.mmdet_image.checkpoint_name": "yolov3_mobilenetv2_8xb24-320-300e_coco",
-            "env.num_gpus": 1,
+            "env.num_gpus": -1,
         },
         problem_type="object_detection",
     )
@@ -140,7 +142,7 @@ def test_mmdet_object_detection_save_and_load():
     new_predictor = MultiModalPredictor(
         hyperparameters={
             "model.mmdet_image.checkpoint_name": detection_model_save_subdir,
-            "env.num_gpus": 1,
+            "env.num_gpus": -1,
         },
         problem_type="object_detection",
     )

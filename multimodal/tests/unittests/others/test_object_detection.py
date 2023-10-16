@@ -28,6 +28,7 @@ def download_sample_dataset():
     return data_dir
 
 
+@pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -44,7 +45,7 @@ def test_mmdet_object_detection_fit_then_evaluate_coco(checkpoint_name):
     predictor = MultiModalPredictor(
         hyperparameters={
             "model.mmdet_image.checkpoint_name": checkpoint_name,
-            "env.num_gpus": 1,
+            "env.num_gpus": -1,
         },
         problem_type="object_detection",
         sample_data_path=train_path,
@@ -64,6 +65,7 @@ def test_mmdet_object_detection_fit_then_evaluate_coco(checkpoint_name):
     predictor.evaluate(test_path)
 
 
+@pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -76,7 +78,7 @@ def test_mmdet_object_detection_inference_list_str_dict(checkpoint_name):
     predictor = MultiModalPredictor(
         hyperparameters={
             "model.mmdet_image.checkpoint_name": checkpoint_name,
-            "env.num_gpus": 1,  # currently mmdet only support single gpu inference
+            "env.num_gpus": -1,  # currently mmdet only support single gpu inference
         },
         problem_type="object_detection",
     )
@@ -91,6 +93,7 @@ def test_mmdet_object_detection_inference_list_str_dict(checkpoint_name):
     assert len(pred) == 10  # test data size is 10
 
 
+@pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -104,7 +107,7 @@ def test_mmdet_object_detection_inference_xywh_output(checkpoint_name):
         hyperparameters={
             "model.mmdet_image.checkpoint_name": checkpoint_name,
             "model.mmdet_image.output_bbox_format": "xywh",
-            "env.num_gpus": 1,  # currently mmdet only support single gpu inference
+            "env.num_gpus": -1,  # currently mmdet only support single gpu inference
         },
         problem_type="object_detection",
     )
@@ -114,7 +117,7 @@ def test_mmdet_object_detection_inference_xywh_output(checkpoint_name):
     xyxy_predictor = MultiModalPredictor(
         hyperparameters={
             "model.mmdet_image.checkpoint_name": checkpoint_name,
-            "env.num_gpus": 1,  # currently mmdet only support single gpu inference
+            "env.num_gpus": -1,  # currently mmdet only support single gpu inference
         },
         problem_type="object_detection",
     )
@@ -133,6 +136,7 @@ def test_mmdet_object_detection_inference_xywh_output(checkpoint_name):
     assert abs(y2 - y1 + 1 - h) < 1e-4
 
 
+@pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -148,7 +152,7 @@ def test_mmdet_object_detection_inference_df(checkpoint_name):
     predictor = MultiModalPredictor(
         hyperparameters={
             "model.mmdet_image.checkpoint_name": checkpoint_name,
-            "env.num_gpus": 1,
+            "env.num_gpus": -1,
         },
         problem_type="object_detection",
     )
@@ -158,6 +162,7 @@ def test_mmdet_object_detection_inference_df(checkpoint_name):
     pred = predictor.predict(test_df.iloc[:100])
 
 
+@pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -172,7 +177,7 @@ def test_mmdet_object_detection_inference_coco(checkpoint_name):
     predictor = MultiModalPredictor(
         hyperparameters={
             "model.mmdet_image.checkpoint_name": checkpoint_name,
-            "env.num_gpus": 1,
+            "env.num_gpus": -1,
         },
         problem_type="object_detection",
     )
@@ -180,6 +185,7 @@ def test_mmdet_object_detection_inference_coco(checkpoint_name):
     pred = predictor.predict(test_path)
 
 
+@pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -194,7 +200,7 @@ def test_mmdet_object_detection_save_and_load(checkpoint_name):
     predictor = MultiModalPredictor(
         hyperparameters={
             "model.mmdet_image.checkpoint_name": checkpoint_name,
-            "env.num_gpus": 1,
+            "env.num_gpus": -1,
         },
         problem_type="object_detection",
     )
@@ -206,7 +212,7 @@ def test_mmdet_object_detection_save_and_load(checkpoint_name):
     new_predictor = MultiModalPredictor(
         hyperparameters={
             "model.mmdet_image.checkpoint_name": model_save_subdir,
-            "env.num_gpus": 1,
+            "env.num_gpus": -1,
         },
         problem_type="object_detection",
     )
@@ -215,6 +221,7 @@ def test_mmdet_object_detection_save_and_load(checkpoint_name):
     assert abs(pred["bboxes"][0][0]["score"] - new_pred["bboxes"][0][0]["score"]) < 1e-4
 
 
+@pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -231,7 +238,7 @@ def test_mmdet_object_detection_fit_then_inference_dict(checkpoint_name):
     predictor = MultiModalPredictor(
         hyperparameters={
             "model.mmdet_image.checkpoint_name": checkpoint_name,
-            "env.num_gpus": 1,
+            "env.num_gpus": -1,
         },
         problem_type="object_detection",
         sample_data_path=train_path,
@@ -249,6 +256,7 @@ def test_mmdet_object_detection_fit_then_inference_dict(checkpoint_name):
     pred = predictor.predict({"image": [mmdet_image_name] * 10})  # test batch inference
 
 
+@pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -265,7 +273,7 @@ def test_mmdet_object_detection_fit_then_inference_df(checkpoint_name):
     predictor = MultiModalPredictor(
         hyperparameters={
             "model.mmdet_image.checkpoint_name": checkpoint_name,
-            "env.num_gpus": 1,
+            "env.num_gpus": -1,
         },
         problem_type="object_detection",
         sample_data_path=train_path,
@@ -285,6 +293,7 @@ def test_mmdet_object_detection_fit_then_inference_df(checkpoint_name):
     pred = predictor.predict(df)  # test batch inference
 
 
+@pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -300,7 +309,7 @@ def test_mmdet_object_detection_fit_then_inference_coco(checkpoint_name):
     predictor = MultiModalPredictor(
         hyperparameters={
             "model.mmdet_image.checkpoint_name": checkpoint_name,
-            "env.num_gpus": 1,
+            "env.num_gpus": -1,
         },
         problem_type="object_detection",
         sample_data_path=train_path,
@@ -319,6 +328,7 @@ def test_mmdet_object_detection_fit_then_inference_coco(checkpoint_name):
     pred = predictor.predict(test_path)  # test batch inference
 
 
+@pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -335,7 +345,7 @@ def test_mmdet_object_detection_fit_eval_predict_df(checkpoint_name):
     predictor = MultiModalPredictor(
         hyperparameters={
             "model.mmdet_image.checkpoint_name": checkpoint_name,
-            "env.num_gpus": 1,
+            "env.num_gpus": -1,
         },
         problem_type="object_detection",
         sample_data_path=train_df,
@@ -355,6 +365,7 @@ def test_mmdet_object_detection_fit_eval_predict_df(checkpoint_name):
     results = predictor.evaluate(data=test_df)
 
 
+@pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -372,7 +383,7 @@ def test_mmdet_object_detection_fit_with_freeze_backbone(checkpoint_name):
         hyperparameters={
             "model.mmdet_image.checkpoint_name": checkpoint_name,
             "model.mmdet_image.frozen_layers": ["backbone"],
-            "env.num_gpus": 1,
+            "env.num_gpus": -1,
         },
         problem_type="object_detection",
         sample_data_path=train_df,
@@ -388,6 +399,7 @@ def test_mmdet_object_detection_fit_with_freeze_backbone(checkpoint_name):
     )
 
 
+@pytest.mark.single_gpu
 def test_detector_hyperparameters_consistency():
     data_dir = download_sample_dataset()
 
@@ -396,7 +408,7 @@ def test_detector_hyperparameters_consistency():
 
     hyperparameters = {
         "model.mmdet_image.checkpoint_name": "yolov3_mobilenetv2_8xb24-320-300e_coco",
-        "env.num_gpus": 1,
+        "env.num_gpus": -1,
     }
 
     # pass hyperparameters to init()

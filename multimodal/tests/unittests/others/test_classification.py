@@ -41,7 +41,7 @@ def test_focal_loss_multiclass(checkpoint_name):
     predictor.fit(
         hyperparameters={
             "model.mmdet_image.checkpoint_name": checkpoint_name,
-            "env.num_gpus": 1,
+            "env.num_gpus": -1,
             "optimization.loss_function": "focal_loss",
             "optimization.focal_loss.alpha": [1, 0.25, 0.35, 0.16],  # shopee dataset has 4 classes.
             "optimization.focal_loss.gamma": 2.5,
