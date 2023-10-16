@@ -757,7 +757,7 @@ def from_coco(
         logger.info(f"Using default root folder: {root}. Specify `root=...` if you feel it is wrong...")
     else:
         raise ValueError("Unable to parse root: {}".format(root))
-    
+
     # support prediction using data with no annotations
     # note that data with annotation can be used for prediction without any changes
     try:
