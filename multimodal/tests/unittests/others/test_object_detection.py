@@ -1,3 +1,4 @@
+import json
 import os
 
 import pytest
@@ -148,6 +149,16 @@ def test_mmdet_object_detection_inference_df(checkpoint_name):
     data_dir = download_sample_dataset()
 
     test_path = os.path.join(data_dir, "Annotations", "test_cocoformat.json")
+
+    test_path_without_annotations = os.path.join(data_dir, "Annotations", "test_cocoformat_nolabel.json")
+
+    with open(test_path, "r") as f:
+        test_data = json.load(f)
+    test_data.pop("annotations")
+    test_data["images"] = test_data["images"][:100]
+    with open(test_path_without_annotations, "w+") as f_wo_ann:
+        json.dump(test_data, f_wo_ann)
+
     # Init predictor
     predictor = MultiModalPredictor(
         hyperparameters={
@@ -160,6 +171,9 @@ def test_mmdet_object_detection_inference_df(checkpoint_name):
     test_df = from_coco_or_voc(test_path)
 
     pred = predictor.predict(test_df.iloc[:100])
+
+    # also test prediction on data without annotations
+    pred = predictor.predict(test_path_without_annotations)
 
 
 @pytest.mark.single_gpu
