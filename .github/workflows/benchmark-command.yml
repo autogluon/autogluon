@@ -97,7 +97,7 @@ jobs:
           echo "Fork Branch: $fork_branch"
       - name: Generate AMLB User Dir
         run: |
-          /bin/bash CI/bench/generate_amlb_user_dir.sh ${{ fork_name }} ${{ fork_branch }} ${{ github.sha }} ${{ github.event.inputs.folds }}
+          /bin/bash CI/bench/generate_amlb_user_dir.sh "${{ fork_name }}" "${{ fork_branch }}" ${{ github.sha }} ${{ github.event.inputs.folds }}
 
   benchmark:
     needs: generate_amlb_user_dir
