@@ -8,7 +8,7 @@ parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFo
 
 parser.add_argument("--repository", help="git repository to run autogluon on", type=str, required=True)
 parser.add_argument("--branch", help="git branch to run autogluon on", type=str, required=True)
-parser.add_argument("--folds_to_run", help="git branch to run autogluon on", type=int, required=True)
+parser.add_argument("--folds_to_run", help="number of folds to run", type=int, required=True)
 
 args = parser.parse_args()
 
