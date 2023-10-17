@@ -90,14 +90,14 @@ jobs:
           role-duration-seconds: 3600
           aws-region: us-east-1
       - name: Extract Fork Info
-        id: parse-fork-info
+        id: parse_fork_info
         run: |
           IFS="|" read -r fork_name fork_branch <<< "${{ github.event.inputs.fork_info }}"
-          echo "Fork Name: $fork_name"
-          echo "Fork Branch: $fork_branch"
+          echo "FORK_NAME=$fork_name" >> $GITHUB_OUTPUT
+          echo "FORK_BRANCH=$fork_branch" >> $GITHUB_OUTPUT
       - name: Generate AMLB User Dir
         run: |
-          /bin/bash CI/bench/generate_amlb_user_dir.sh "${{ fork_name }}" "${{ fork_branch }}" ${{ github.sha }} ${{ github.event.inputs.folds }}
+          /bin/bash CI/bench/generate_amlb_user_dir.sh ${{ steps.parse_fork_info.outputs.FORK_NAME }} ${{ steps.parse_fork_info.outputs.FORK_BRANCH }} ${{ github.sha }} ${{ github.event.inputs.folds }}
 
   benchmark:
     needs: generate_amlb_user_dir
