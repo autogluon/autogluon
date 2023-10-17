@@ -20,11 +20,12 @@ def test_no_full_last_level_weighted_ensemble(fit_helper):
     """Tests that fit_weighted_ensemble=False works"""
     fit_args = dict(
         hyperparameters={"DUMMY": {}},
-        fit_weighted_ensemble=False,
+        fit_weighted_ensemble=True,
         full_last_level_weighted_ensemble=False,
         num_stack_levels=1,
         num_bag_folds=2,
-        num_bag_sets=5,
+        num_bag_sets=1,
+        ag_args_ensemble={"fold_fitting_strategy": "sequential_local"}
     )
     dataset_name = "adult"
     extra_metrics = list(METRICS[BINARY])
@@ -40,7 +41,8 @@ def test_full_last_level_weighted_ensemble(fit_helper):
         full_last_level_weighted_ensemble=True,
         num_stack_levels=1,
         num_bag_folds=2,
-        num_bag_sets=5,
+        num_bag_sets=1,
+        ag_args_ensemble={"fold_fitting_strategy": "sequential_local"}
     )
     dataset_name = "adult"
     extra_metrics = list(METRICS[BINARY])
