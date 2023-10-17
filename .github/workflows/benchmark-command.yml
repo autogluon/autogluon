@@ -91,101 +91,102 @@ jobs:
           aws-region: us-east-1
       - name: Generate AMLB User Dir
         run: |
-          /bin/bash CI/bench/generate_amlb_user_dir.sh ${{ github.event.inputs.fork_info[0] }} ${{ github.event.inputs.fork_info[1] }} ${{ github.sha }} ${{ github.event.inputs.folds }}
+          echo "GitHub Input Payload:"
+          echo "${{ toJson(github) }}"
 
-  benchmark:
-    needs: generate_amlb_user_dir
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - name: Free Disk Space (Ubuntu)
-        # uses: jlumbroso/free-disk-space@v1.2.0
-        uses: hirnidrin/free-disk-space@main  # revert back once fix in https://github.com/jlumbroso/free-disk-space/pull/11
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
-      - name: Checkout repository for PR
-        if: (github.event_name == 'workflow_dispatch')
-        uses: actions/checkout@v2
-        with:
-          ref: ${{ github.event.inputs.pr-sha }}
-      - name: Checkout repository for nightly test
-        if: (github.event_name == 'schedule')
-        uses: actions/checkout@v2
-      - name: Setup Python
-        uses: actions/setup-python@v1
-        with:
-          python-version: '3.9'
-      - name: Setup npm
-        uses: actions/setup-node@v3
-        with:
-          node-version: 'latest'
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
-          role-duration-seconds: 14400
-          aws-region: us-east-1
-      - name: Run benchmark
-        shell: bash -l {0}
-        run: |
-          nvm install 20
-          npm install -g aws-cdk
-          /bin/bash ./.github/workflow_scripts/run_benchmark.sh ${{ github.event.inputs.module }} ${{ github.event.inputs.preset }} ${{ github.event.inputs.benchmark }} ${{ github.event.inputs.time_limit }} ${{ github.event.inputs.fork_info[1] }} ${{ github.sha }}
-      - name: Upload website.txt
-        uses: actions/upload-artifact@v3
-        with:
-          name: dashboard-website
-          path: ./website.txt
-      - name: Upload final_eval.txt
-        uses: actions/upload-artifact@v3
-        with:
-          name: evaluation-results
-          path: ./final_eval.txt       
+  # benchmark:
+  #   needs: generate_amlb_user_dir
+  #   runs-on: ubuntu-latest
+  #   defaults:
+  #     run:
+  #       shell: bash
+  #   steps:
+  #     - name: Free Disk Space (Ubuntu)
+  #       # uses: jlumbroso/free-disk-space@v1.2.0
+  #       uses: hirnidrin/free-disk-space@main  # revert back once fix in https://github.com/jlumbroso/free-disk-space/pull/11
+  #       with:
+  #         tool-cache: false
+  #         android: true
+  #         dotnet: true
+  #         haskell: true
+  #         large-packages: true
+  #         docker-images: true
+  #         swap-storage: true
+  #     - name: Checkout repository for PR
+  #       if: (github.event_name == 'workflow_dispatch')
+  #       uses: actions/checkout@v2
+  #       with:
+  #         ref: ${{ github.event.inputs.pr-sha }}
+  #     - name: Checkout repository for nightly test
+  #       if: (github.event_name == 'schedule')
+  #       uses: actions/checkout@v2
+  #     - name: Setup Python
+  #       uses: actions/setup-python@v1
+  #       with:
+  #         python-version: '3.9'
+  #     - name: Setup npm
+  #       uses: actions/setup-node@v3
+  #       with:
+  #         node-version: 'latest'
+  #     - name: Configure AWS Credentials
+  #       uses: aws-actions/configure-aws-credentials@v1
+  #       with:
+  #         role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
+  #         role-duration-seconds: 14400
+  #         aws-region: us-east-1
+  #     - name: Run benchmark
+  #       shell: bash -l {0}
+  #       run: |
+  #         nvm install 20
+  #         npm install -g aws-cdk
+  #         /bin/bash ./.github/workflow_scripts/run_benchmark.sh ${{ github.event.inputs.module }} ${{ github.event.inputs.preset }} ${{ github.event.inputs.benchmark }} ${{ github.event.inputs.time_limit }} ${{ github.event.inputs.fork_info[1] }} ${{ github.sha }}
+  #     - name: Upload website.txt
+  #       uses: actions/upload-artifact@v3
+  #       with:
+  #         name: dashboard-website
+  #         path: ./website.txt
+  #     - name: Upload final_eval.txt
+  #       uses: actions/upload-artifact@v3
+  #       with:
+  #         name: evaluation-results
+  #         path: ./final_eval.txt       
   
-  dashboard: 
-    needs: benchmark
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - name: Download final_eval.txt
-        uses: actions/download-artifact@v3
-        with:
-          name: evaluation-results
-      - name: get evaluation results
-        id: eval_result
-        run: |
-          body="$(cat final_eval.txt)"
-          echo ::set-output name=body::$body
-      - name: Comment Evaluation Result of PR with Master
-        uses: peter-evans/create-or-update-comment@v2.0.0
-        with:
-          token: ${{ secrets.PAT }}
-          repository: ${{ github.event.inputs.repository }}
-          comment-id: ${{ github.event.inputs.comment-id }}
-          body: ${{ steps.eval_result.outputs.body }}
-      - name: Download website.txt
-        uses: actions/download-artifact@v3
-        with:
-          name: dashboard-website
-      - name: get dashboard website
-        id: website
-        run: |
-          body="$(cat website.txt)"
-          echo ::set-output name=body::$body
-      - name: Comment Dashboard Website Link on PR
-        uses: peter-evans/create-or-update-comment@v2.0.0
-        with:
-          token: ${{ secrets.PAT }}
-          repository: ${{ github.event.inputs.repository }}
-          comment-id: ${{ github.event.inputs.comment-id }}
-          body: ${{ steps.website.outputs.body }}
+  # dashboard: 
+  #   needs: benchmark
+  #   runs-on: ubuntu-latest
+  #   defaults:
+  #     run:
+  #       shell: bash
+  #   steps:
+  #     - name: Download final_eval.txt
+  #       uses: actions/download-artifact@v3
+  #       with:
+  #         name: evaluation-results
+  #     - name: get evaluation results
+  #       id: eval_result
+  #       run: |
+  #         body="$(cat final_eval.txt)"
+  #         echo ::set-output name=body::$body
+  #     - name: Comment Evaluation Result of PR with Master
+  #       uses: peter-evans/create-or-update-comment@v2.0.0
+  #       with:
+  #         token: ${{ secrets.PAT }}
+  #         repository: ${{ github.event.inputs.repository }}
+  #         comment-id: ${{ github.event.inputs.comment-id }}
+  #         body: ${{ steps.eval_result.outputs.body }}
+  #     - name: Download website.txt
+  #       uses: actions/download-artifact@v3
+  #       with:
+  #         name: dashboard-website
+  #     - name: get dashboard website
+  #       id: website
+  #       run: |
+  #         body="$(cat website.txt)"
+  #         echo ::set-output name=body::$body
+  #     - name: Comment Dashboard Website Link on PR
+  #       uses: peter-evans/create-or-update-comment@v2.0.0
+  #       with:
+  #         token: ${{ secrets.PAT }}
+  #         repository: ${{ github.event.inputs.repository }}
+  #         comment-id: ${{ github.event.inputs.comment-id }}
+  #         body: ${{ steps.website.outputs.body }}
