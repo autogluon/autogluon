@@ -8,16 +8,29 @@ parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFo
 
 parser.add_argument("--repository", help="git repository to run autogluon on", type=str, required=True)
 parser.add_argument("--branch", help="git branch to run autogluon on", type=str, required=True)
+parser.add_argument("--folds_to_run", help="git branch to run autogluon on", type=int, required=True)
 
 args = parser.parse_args()
 
 
 repository = args.repository
 branch = args.branch
+folds_to_run = args.folds_to_run
 framework_template_file = os.path.join(os.path.dirname(__file__), "amlb_user_dir", "frameworks_template.yaml")
 framework_benchmark_file = os.path.join(os.path.dirname(framework_template_file), "frameworks_benchmark.yaml")
+constraints_file = os.path.join(os.path.dirname(__file__), "amlb_user_dir", "constraints.yaml")
 
 frameworks = {}
+constraints = {}
+with open(constraints_file, "r") as f:
+    constraints = yaml.safe_load(f)
+
+for constraint in constraints.values():
+    constraint["folds"] = folds_to_run
+
+with open(constraints_file, "w") as f:
+    yaml.safe_dump(constraints, f)
+
 with open(framework_template_file, "r") as f:
     frameworks = yaml.safe_load(f)
 

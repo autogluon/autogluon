@@ -3,7 +3,7 @@
 1h:
   folds: 10
   max_runtime_seconds: 3600
-  cores: 4
+  cores: 8
   min_vol_size_mb: 100000
 
 4h:

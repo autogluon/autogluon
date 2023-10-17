@@ -40,6 +40,9 @@ on:
           - 8h
           - 16h
           - 24h
+      folds:
+        description: 'Number of folds to run'
+        required: false
       branch_or_pr_number:
         description: 'Branch or PR number to run the benchmark on'
         required: true
@@ -91,7 +94,7 @@ jobs:
           aws-region: us-east-1
       - name: Generate AMLB User Dir
         run: |
-          /bin/bash CI/bench/generate_amlb_user_dir.sh ${{ github.event.inputs.fork_name }} ${{ github.event.inputs.fork_branch }} ${{ github.sha }}
+          /bin/bash CI/bench/generate_amlb_user_dir.sh ${{ github.event.inputs.fork_name }} ${{ github.event.inputs.fork_branch }} ${{ github.sha }} ${{ github.event.inputs.folds }}
 
   benchmark:
     needs: generate_amlb_user_dir
