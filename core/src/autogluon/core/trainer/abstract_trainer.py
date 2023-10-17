@@ -707,7 +707,7 @@ class AbstractTrainer:
 
         if full_weighted_ensemble:
             # Fit weighted ensemble on all previously fitted core models
-            base_model_names = self.get_model_names(stack_name='core')
+            base_model_names = self.get_model_names(stack_name="core")
 
         base_model_names = self._filter_base_models_via_infer_limit(base_model_names=base_model_names, infer_limit=infer_limit, infer_limit_modifier=0.95)
         if len(base_model_names) == 0:
