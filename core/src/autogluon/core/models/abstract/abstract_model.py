@@ -958,6 +958,27 @@ class AbstractModel:
         return y_pred_proba
 
     def predict_from_proba(self, y_pred_proba: np.ndarray) -> np.ndarray:
+        """
+        Convert prediction probabilities to predictions.
+
+        Parameters
+        ----------
+        y_pred_proba : np.ndarray
+            The prediction probabilities to be converted to predictions.
+
+        Returns
+        -------
+        y_pred : np.ndarray
+            The predictions obtained from `y_pred_proba`.
+
+        Examples
+        --------
+        >>> y_pred = predictor.predict(X)
+        >>> y_pred_proba = predictor.predict_proba(X)
+        >>>
+        >>> # Identical to y_pred
+        >>> y_pred_from_proba = predictor.predict_from_proba(y_pred_proba)
+        """
         return get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
 
     def _predict_proba(self, X, **kwargs) -> np.ndarray:
