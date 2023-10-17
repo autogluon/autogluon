@@ -89,10 +89,15 @@ jobs:
           role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmarkConfig
           role-duration-seconds: 3600
           aws-region: us-east-1
+      - name: Extract Fork Info
+        id: parse-fork-info
+        run: |
+          IFS="|" read -r fork_name fork_branch <<< "${{ github.event.inputs.fork_info }}"
+          echo "Fork Name: $fork_name"
+          echo "Fork Branch: $fork_branch"
       - name: Generate AMLB User Dir
         run: |
-          echo "GitHub Input Payload:"
-          echo "${{ toJson(github) }}"
+          /bin/bash CI/bench/generate_amlb_user_dir.sh ${{ github.event.inputs.fork_name }} ${{ github.event.inputs.fork_branch }} ${{ github.sha }}
 
   # benchmark:
   #   needs: generate_amlb_user_dir
