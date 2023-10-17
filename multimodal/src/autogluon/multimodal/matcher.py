@@ -58,6 +58,7 @@ from .data.preprocess_dataframe import MultiModalFeaturePreprocessor
 from .optimization.lit_matcher import MatcherLitModule
 from .optimization.utils import get_matcher_loss_func, get_matcher_miner_func, get_metric
 from .presets import matcher_presets
+from .problem_types import PROBLEM_TYPES_REG
 from .utils import (
     AutoMMModelCheckpoint,
     CustomUnpickler,
@@ -100,6 +101,7 @@ from .utils import (
     split_train_tuning_data,
     update_hyperparameters,
     upgrade_config,
+    is_lazy_weight_tensor,
 )
 
 logger = logging.getLogger(__name__)
@@ -264,8 +266,29 @@ class MultiModalMatcher:
             return self._problem_type
 
     @property
+    def problem_property(self):
+        return PROBLEM_TYPES_REG.get(self._pipeline)
+
+    @property
     def column_types(self):
         return self._column_types
+
+    @property
+    def total_parameters(self) -> int:
+        return sum(p.numel() if not is_lazy_weight_tensor(p) else 0 for p in self._query_model.parameters())
+
+    @property
+    def trainable_parameters(self) -> int:
+        return sum(
+            p.numel() if not is_lazy_weight_tensor(p) else 0 for p in self._query_model.parameters() if p.requires_grad
+        )
+
+    @property
+    def model_size(self) -> float:
+        model_size = sum(
+            p.numel() * p.element_size() if not is_lazy_weight_tensor(p) else 0 for p in self._query_model.parameters()
+        )
+        return model_size * 1e-6  # convert to megabytes
 
     # This func is required by the abstract trainer of TabularPredictor.
     def set_verbosity(self, verbosity: int):
@@ -2074,3 +2097,46 @@ class MultiModalMatcher:
     def set_num_gpus(self, num_gpus):
         assert isinstance(num_gpus, int)
         self._config.env.num_gpus = num_gpus
+
+    def get_num_gpus(self):
+        try:
+            return self._config.env.num_gpus
+        except:
+            return None
+
+    def fit_summary(self, verbosity=0, show_plot=False):
+        """
+        Output summary of information about models produced during `fit()`.
+
+        Parameters
+        ----------
+        verbosity : int, default = 2
+            Verbosity levels range from 0 to 4 and control how much information is printed.
+            verbosity = 0 for no output printing.
+            TODO: Higher levels correspond to more detailed print statements
+        show_plot : bool, default = False
+            If True, shows the model summary plot in browser when verbosity > 1.
+
+        Returns
+        -------
+        Dict containing various detailed information.
+        We do not recommend directly printing this dict as it may be very large.
+        """
+        if self._total_train_time is None:
+            logging.info("There is no `best_score` or `total_train_time`. Have you called `predictor.fit()`?")
+        else:
+            logging.info(
+                f"Here's the model summary:"
+                f""
+                f"The model achieved score '{self._best_score}' on the validation metric"
+                f" '{self._validation_metric_name}'. "
+                f"The total training time is {timedelta(seconds=self._total_train_time)}"
+            )
+        results = {
+            f"val_{self._validation_metric_name}": self._best_score,
+            "training_time": self._total_train_time,
+        }
+        return results
+
+    def list_supported_models(self, pretrained=True):
+        raise ValueError(f"list_supported_models() is not available for problem type: {self._pipeline}")
