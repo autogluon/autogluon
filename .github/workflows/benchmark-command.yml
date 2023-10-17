@@ -46,11 +46,8 @@ on:
       branch_or_pr_number:
         description: 'Branch or PR number to run the benchmark on'
         required: true
-      fork_name:
-        description: 'Get the forked PR repository name'
-        required: true
-      fork_branch:
-        description: 'Get the forked PR repository branch name'
+      fork_info:
+        description: 'Get the forked PR repository name and branch'
         required: true
       
 permissions:
@@ -94,7 +91,7 @@ jobs:
           aws-region: us-east-1
       - name: Generate AMLB User Dir
         run: |
-          /bin/bash CI/bench/generate_amlb_user_dir.sh ${{ github.event.inputs.fork_name }} ${{ github.event.inputs.fork_branch }} ${{ github.sha }} ${{ github.event.inputs.folds }}
+          /bin/bash CI/bench/generate_amlb_user_dir.sh ${{ github.event.inputs.fork_info[0] }} ${{ github.event.inputs.fork_info[1] }} ${{ github.sha }} ${{ github.event.inputs.folds }}
 
   benchmark:
     needs: generate_amlb_user_dir
@@ -141,7 +138,7 @@ jobs:
         run: |
           nvm install 20
           npm install -g aws-cdk
-          /bin/bash ./.github/workflow_scripts/run_benchmark.sh ${{ github.event.inputs.module }} ${{ github.event.inputs.preset }} ${{ github.event.inputs.benchmark }} ${{ github.event.inputs.time_limit }} ${{ github.event.inputs.fork_branch }} ${{ github.sha }}
+          /bin/bash ./.github/workflow_scripts/run_benchmark.sh ${{ github.event.inputs.module }} ${{ github.event.inputs.preset }} ${{ github.event.inputs.benchmark }} ${{ github.event.inputs.time_limit }} ${{ github.event.inputs.fork_info[1] }} ${{ github.sha }}
       - name: Upload website.txt
         uses: actions/upload-artifact@v3
         with:
