@@ -543,7 +543,7 @@ class AbstractTrainer:
             **core_kwargs,
         )
 
-        if last_level and (core_kwargs.get("ag_args_fit", None) is not None) and core_kwargs["ag_args_fit"].get("full_last_weighted_ensemble", False):
+        if last_level and core_kwargs.get("ag_args_fit", dict()).get("full_last_weighted_ensemble", True):
             aux_level_base_model_names = self.get_model_names(stack_name='core')  # get all fitted core models
         else:
             aux_level_base_model_names = core_models
