@@ -17,24 +17,20 @@ import lightning.pytorch as pl
 import numpy as np
 import pandas as pd
 import torch
-import transformers
 import yaml
 from lightning.pytorch.strategies import DeepSpeedStrategy
 from omegaconf import OmegaConf
 from packaging import version
 from torch import nn
 
-from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_ray
 from autogluon.core.metrics import Scorer
 from autogluon.core.utils import default_holdout_frac, generate_train_test_split_combined
 from autogluon.core.utils.loaders import load_pd
-from autogluon.multimodal.utils.log import get_fit_complete_message, get_fit_start_message
 
-from . import version as ag_version
-from .constants import (
-    AUTOMM_TUTORIAL_MODE,
+from .. import version as ag_version
+from ..constants import (
     BBOX,
     BEST,
     BEST_K_MODELS_FILE,
@@ -44,7 +40,6 @@ from .constants import (
     DEEPSPEED_MIN_PL_VERSION,
     DEEPSPEED_MODULE,
     DEEPSPEED_OFFLOADING,
-    DEPRECATED_ZERO_SHOT,
     DOCUMENT,
     FEATURE_EXTRACTION,
     FEATURES,
@@ -86,30 +81,30 @@ from .constants import (
     Y_TRUE,
     ZERO_SHOT_IMAGE_CLASSIFICATION,
 )
-from .data.datamodule import BaseDataModule
-from .data.dataset_mmlab import MultiImageMixDataset
-from .data.infer_types import (
+from ..data import (
+    BaseDataModule,
+    MultiImageMixDataset,
     infer_column_types,
     infer_output_shape,
     infer_problem_type,
     infer_rois_column_type,
     is_image_column,
+    MultiModalFeaturePreprocessor,
 )
-from .data.preprocess_dataframe import MultiModalFeaturePreprocessor
-from .matcher import MultiModalMatcher
-from .models.utils import get_model_postprocess_fn
-from .optimization.lit_distiller import DistillerLitModule
-from .optimization.lit_mmdet import MMDetLitModule
-from .optimization.lit_module import LitModule
-from .optimization.lit_ner import NerLitModule
-from .optimization.losses import RKDLoss
-from .optimization.utils import (
+
+from ..models import get_model_postprocess_fn
+from ..optimization import (
+    DistillerLitModule,
+    MMDetLitModule,
+    LitModule,
+    NerLitModule,
+    RKDLoss,
     get_loss_func,
     get_metric,
     get_norm_layer_param_names,
     get_trainable_params_efficient_finetune,
 )
-from .problem_types import PROBLEM_TYPES_REG
+from ..problem_types import PROBLEM_TYPES_REG
 from ..utils import (
     AutoMMModelCheckpoint,
     AutoMMModelCheckpointIO,
@@ -120,7 +115,6 @@ from ..utils import (
     apply_log_filter,
     assign_feature_column_names,
     average_checkpoints,
-    check_if_packages_installed,
     compute_num_gpus,
     compute_score,
     convert_pred_to_xywh,
@@ -131,7 +125,6 @@ from ..utils import (
     extract_from_output,
     filter_hyperparameters,
     get_config,
-    get_detection_classes,
     get_dir_ckpt_paths,
     get_fit_complete_message,
     get_fit_start_message,
@@ -171,6 +164,7 @@ from ..utils import (
     update_hyperparameters,
     update_tabular_config_by_resources,
     upgrade_config,
+    infer_problem_type_by_eval_metric,
 )
 
 pl_logger = logging.getLogger("lightning")
@@ -181,15 +175,10 @@ logger = logging.getLogger(__name__)
 class BaseLearner(ExportMixin):
     """
     """
-
     def __init__(
         self,
         label: Optional[str] = None,
         problem_type: Optional[str] = None,
-        query: Optional[Union[str, List[str]]] = None,
-        response: Optional[Union[str, List[str]]] = None,
-        match_label: Optional[Union[int, str]] = None,
-        pipeline: Optional[str] = None,
         presets: Optional[str] = None,
         eval_metric: Optional[Union[str, Scorer]] = None,
         hyperparameters: Optional[dict] = None,
@@ -245,19 +234,6 @@ class BaseLearner(ExportMixin):
             - 'few_shot_text_classification' (experimental)
             - 'ocr_text_detection' (experimental)
             - 'ocr_text_recognition' (experimental)
-
-        query
-            Column names of query data (used for matching).
-        response
-            Column names of response data (used for matching). If no label column is provided,
-            query and response columns form positive pairs.
-        match_label
-            The label class that indicates the <query, response> pair is counted as "match".
-            This is used when the problem_type is one of the matching problem types, and when the labels are binary.
-            For example, the label column can contain ["duplicate", "not duplicate"]. And match_label can be "duplicate".
-            If match_label is not provided, every sample is assumed to have a unique label.
-        pipeline
-            Pipeline has been deprecated and merged in problem_type.
         presets
             Presets regarding model quality, e.g., best_quality, high_quality, and medium_quality.
         eval_metric
@@ -311,44 +287,21 @@ class BaseLearner(ExportMixin):
             This is used for automatically inference num_classes, classes, or label.
 
         """
+        self._eval_metric_name = None
+        self._eval_metric_func = None
         if isinstance(eval_metric, str):
-            eval_metric_name = eval_metric
-            eval_metric_func = None
+            self._eval_metric_name = eval_metric.lower()
         elif isinstance(eval_metric, Scorer):
-            eval_metric_func = eval_metric
-            eval_metric_name = eval_metric_func.name
-        else:
-            eval_metric_name = None
-            eval_metric_func = None
+            self._eval_metric_name = eval_metric.name
+            self._eval_metric_func = eval_metric
 
-        if eval_metric is not None and eval_metric_name.lower() in [
-            "rmse",
-            "r2",
-            "pearsonr",
-            "spearmanr",
-        ]:
-            if problem_type is None:
-                logger.debug(
-                    f"Infer problem type to be a regression problem "
-                    f"since the evaluation metric is set as {eval_metric_name}."
-                )
-                problem_type = REGRESSION
-            else:
-                problem_prop = PROBLEM_TYPES_REG.get(problem_type)
-                if NUMERICAL not in problem_prop.supported_label_type:
-                    raise ValueError(
-                        f"The provided evaluation metric will require the problem "
-                        f"to support label type = {NUMERICAL}. However, "
-                        f"the provided problem type = {problem_type} only "
-                        f"supports label type = {problem_prop.supported_label_type}."
-                    )
-
+        self._problem_type = infer_problem_type_by_eval_metric(
+            eval_metric_name=self._eval_metric_name,
+            problem_type=problem_type,
+        )
 
         self._label_column = label
-        self._problem_type = problem_type
         self._presets = presets.lower() if presets else None
-        self._eval_metric_name = eval_metric_name.lower() if eval_metric else None
-        self._eval_metric_func = eval_metric_func if eval_metric else None
         self._validation_metric_name = validation_metric.lower() if validation_metric else None
         self._output_shape = num_classes
         self._classes = classes
@@ -367,59 +320,23 @@ class BaseLearner(ExportMixin):
         self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
         self._sample_data_path = sample_data_path
         self._fit_called = False  # While using ddp, after fit called, we can only use single gpu.
-        self._matcher = None
         self._save_path = path
         self._hyperparameters = hyperparameters
-
         # Summary statistics used in fit summary. TODO: wrap it in a class.
         self._total_train_time = None
         self._best_score = None
 
-
     @property
     def path(self):
-        if self._matcher:
-            return self._matcher.path
-        else:
-            return self._save_path
+        return self._save_path
 
     @property
     def label(self):
-        if self._matcher:
-            return self._matcher.label
-        else:
-            return self._label_column
-
-    @property
-    def query(self):
-        if self._matcher:
-            return self._matcher.query
-        else:
-            warnings.warn("Matcher is not used. No query columns are available.", UserWarning)
-            return None
-
-    @property
-    def response(self):
-        if self._matcher:
-            return self._matcher.response
-        else:
-            warnings.warn("Matcher is not used. No response columns are available.", UserWarning)
-            return None
-
-    @property
-    def match_label(self):
-        if self._matcher:
-            return self._matcher.match_label
-        else:
-            warnings.warn("Matcher is not used. No match_label is available.", UserWarning)
-            return None
+        return self._label_column
 
     @property
     def problem_type(self):
-        if self._matcher:
-            return self._matcher._pipeline
-        else:
-            return self._problem_type
+        return self._problem_type
 
     @property
     def problem_property(self):
@@ -430,10 +347,7 @@ class BaseLearner(ExportMixin):
 
     @property
     def column_types(self):
-        if self._matcher:
-            return self._matcher.column_types
-        else:
-            return self._column_types
+        return self._column_types
 
     @property
     def total_parameters(self) -> int:
@@ -637,15 +551,15 @@ class BaseLearner(ExportMixin):
             fit_called=fit_called,
         )
 
-        if tuning_data is None:
-            train_data, tuning_data = self._split_train_tuning(
-                data=train_data, holdout_frac=holdout_frac, random_state=seed
-            )
-
         if self._label_column:
             self._problem_type = infer_problem_type(
                 y_train_data=train_data[self._label_column],
                 provided_problem_type=self._problem_type,
+            )
+
+        if tuning_data is None:
+            train_data, tuning_data = self._split_train_tuning(
+                data=train_data, holdout_frac=holdout_frac, random_state=seed
             )
 
         column_types = infer_column_types(

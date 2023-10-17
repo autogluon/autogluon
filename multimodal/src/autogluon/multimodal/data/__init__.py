@@ -13,3 +13,11 @@ from .process_ner import NerProcessor
 from .process_numerical import NumericalProcessor
 from .process_ovd import OVDProcessor
 from .process_text import TextProcessor
+from .dataset_mmlab import MultiImageMixDataset
+from .infer_types import (
+    infer_column_types,
+    infer_output_shape,
+    infer_problem_type,
+    infer_rois_column_type,
+    is_image_column,
+)

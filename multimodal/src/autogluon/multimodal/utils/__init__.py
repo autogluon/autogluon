@@ -55,7 +55,7 @@ from .log import (
     make_exp_dir,
 )
 from .matcher import compute_semantic_similarity, convert_data_for_ranking, create_siamese_model, semantic_search
-from .metric import compute_ranking_score, compute_score, get_minmax_mode, get_stopping_threshold, infer_metrics
+from .metric import compute_ranking_score, compute_score, get_minmax_mode, get_stopping_threshold, infer_metrics, infer_problem_type_by_eval_metric
 from .misc import logits_to_prob, merge_bio_format, shopee_dataset, tensor_to_ndarray, visualize_ner
 from .mmcv import CollateMMDet, CollateMMOcr
 from .model import (

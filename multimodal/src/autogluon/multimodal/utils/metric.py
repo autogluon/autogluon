@@ -10,9 +10,9 @@ from sklearn.metrics import f1_score
 
 from autogluon.core.metrics import Scorer, get_metric
 
+from ..problem_types import PROBLEM_TYPES_REG
 from ..constants import (
     ACCURACY,
-    AUTOMM,
     AVERAGE_PRECISION,
     BINARY,
     DIRECT_LOSS,
@@ -38,6 +38,7 @@ from ..constants import (
     Y_PRED,
     Y_PRED_PROB,
     Y_TRUE,
+    NUMERICAL,
 )
 
 logger = logging.getLogger(__name__)
@@ -440,3 +441,29 @@ def compute_ranking_score(
                 metric_results[f"{PRECISION}@{k}"] = round(scores[f"{PRECISION}@{k}"], 5)
 
     return metric_results
+
+
+def infer_problem_type_by_eval_metric(eval_metric_name: str, problem_type: str):
+    if eval_metric_name is not None and eval_metric_name.lower() in [
+        "rmse",
+        "r2",
+        "pearsonr",
+        "spearmanr",
+    ]:
+        if problem_type is None:
+            logger.debug(
+                f"Infer problem type to be a regression problem "
+                f"since the evaluation metric is set as {eval_metric_name}."
+            )
+            problem_type = REGRESSION
+        else:
+            problem_prop = PROBLEM_TYPES_REG.get(problem_type)
+            if NUMERICAL not in problem_prop.supported_label_type:
+                raise ValueError(
+                    f"The provided evaluation metric will require the problem "
+                    f"to support label type = {NUMERICAL}. However, "
+                    f"the provided problem type = {problem_type} only "
+                    f"supports label type = {problem_prop.supported_label_type}."
+                )
+
+    return problem_type

@@ -223,11 +223,10 @@ class MultiModalPredictor:
             self.set_verbosity(verbosity)
 
         self._verbosity = verbosity
-        self._learner = None
-        self._matcher = None
+        self._is_matcher = False
 
         if self.problem_property and self.problem_property.is_matching:
-            self._matcher = MultiModalMatcher(
+            self._learner = MultiModalMatcher(
                 query=query,
                 response=response,
                 label=label,
@@ -243,6 +242,7 @@ class MultiModalPredictor:
                 pretrained=pretrained,
                 validation_metric=validation_metric,
             )
+            self._is_matcher = True
             return
         elif problem_type == OBJECT_DETECTION:
             self._learner = ObjectDetectionLearner(
@@ -291,62 +291,35 @@ class MultiModalPredictor:
 
     @property
     def path(self):
-        if self._matcher:
-            return self._matcher.path
-        else:
-            return self._learner.path
+        return self._learner.path
 
     @property
     def label(self):
-        if self._matcher:
-            return self._matcher.label
-        else:
-            return self._learner.label
+        return self._learner.label
 
     @property
     def query(self):
-        if self._matcher:
-            return self._matcher.query
-        else:
-            warnings.warn("Matcher is not used. No query columns are available.", UserWarning)
-            return None
+        return self._learner.query
 
     @property
     def response(self):
-        if self._matcher:
-            return self._matcher.response
-        else:
-            warnings.warn("Matcher is not used. No response columns are available.", UserWarning)
-            return None
+        return self._learner.response
 
     @property
     def match_label(self):
-        if self._matcher:
-            return self._matcher.match_label
-        else:
-            warnings.warn("Matcher is not used. No match_label is available.", UserWarning)
-            return None
+        return self._learner.match_label
 
     @property
     def problem_type(self):
-        if self._matcher:
-            return self._matcher._pipeline
-        else:
-            return self._learner.problem_type
+        return self._learner.problem_type
 
     @property
     def problem_property(self):
-        if self._matcher:
-            return self._matcher.problem_property
-        else:
-            return self._learner.problem_property
+        return self._learner.problem_property
 
     @property
     def column_types(self):
-        if self._matcher:
-            return self._matcher.column_types
-        else:
-            return self._learner.column_types
+        return self._learner.column_types
 
     @property
     def verbosity(self):
@@ -354,31 +327,21 @@ class MultiModalPredictor:
 
     @property
     def total_parameters(self) -> int:
-        if self._matcher:
-            return self._matcher.total_parameters
-        else:
-            return self._learner.total_parameters
+        return self._learner.total_parameters
 
     @property
     def trainable_parameters(self) -> int:
-        if self._matcher:
-            return self._matcher.trainable_parameters
-        else:
-            return self._learner.trainable_parameters
+        return self._learner.trainable_parameters
 
     @property
     def model_size(self) -> float:
-        if self._matcher:
-            return self._matcher.model_size
-        else:
-            return self._learner.model_size
+        return self._learner.model_size
 
     @property
     def classes(self):
         """
         Return the classes of object detection.
         """
-        assert self._learner is not None
         return self._learner.classes
 
     @property
@@ -394,7 +357,6 @@ class MultiModalPredictor:
         -------
         List that contain the class names. It will be None if it's not a classification problem.
         """
-        assert self._learner is not None
         return self._learner.class_labels
 
     @property
@@ -413,7 +375,6 @@ class MultiModalPredictor:
         -------
         The positive class name in binary classification or None if the problem is not binary classification.
         """
-        assert self._learner is not None
         return self._learner.positive_class
 
     # This func is required by the abstract trainer of TabularPredictor.
@@ -437,16 +398,10 @@ class MultiModalPredictor:
         transformers.logging.set_verbosity(verbosity2loglevel(verbosity))
 
     def set_num_gpus(self, num_gpus):
-        if self._matcher:
-            self._matcher.set_num_gpus(num_gpus)
-        else:
-            self._learner.set_num_gpus(num_gpus)
+        self._learner.set_num_gpus(num_gpus)
 
     def get_num_gpus(self):
-        if self._matcher:
-            self._matcher.get_num_gpus()
-        else:
-            self._learner.get_num_gpus()
+        self._learner.get_num_gpus()
 
     def fit(
         self,
@@ -578,8 +533,8 @@ class MultiModalPredictor:
         -------
         An "MultiModalPredictor" object (itself).
         """
-        if self._matcher:
-            self._matcher.fit(
+        if self._is_matcher:
+            self._learner.fit(
                 train_data=train_data,
                 tuning_data=tuning_data,
                 id_mappings=id_mappings,
@@ -599,7 +554,6 @@ class MultiModalPredictor:
                 config=config,
                 tuning_data=tuning_data,
                 max_num_tuning_data=max_num_tuning_data,
-                id_mappings=id_mappings,
                 time_limit=time_limit,
                 save_path=save_path,
                 hyperparameters=hyperparameters,
@@ -670,8 +624,8 @@ class MultiModalPredictor:
         A dictionary with the metric names and their corresponding scores.
         Optionally return a dataframe of prediction results.
         """
-        if self._matcher:
-            return self._matcher.evaluate(
+        if self._is_matcher:
+            return self._learner.evaluate(
                 data=data,
                 query_data=query_data,
                 response_data=response_data,
@@ -729,8 +683,8 @@ class MultiModalPredictor:
         -------
         Array of predictions, one corresponding to each row in given dataset.
         """
-        if self._matcher:
-            return self._matcher.predict(
+        if self._is_matcher:
+            return self._learner.predict(
                 data=data,
                 id_mappings=id_mappings,
                 as_pandas=as_pandas,
@@ -785,8 +739,8 @@ class MultiModalPredictor:
         Otherwise, the output will have shape (#samples,)
         """
 
-        if self._matcher:
-            return self._matcher.predict_proba(
+        if self._is_matcher:
+            return self._learner.predict_proba(
                 data=data,
                 id_mappings=id_mappings,
                 as_pandas=as_pandas,
@@ -843,8 +797,8 @@ class MultiModalPredictor:
         It will have shape (#samples, D) where the embedding dimension D is determined
         by the neural network's architecture.
         """
-        if self._matcher:
-            return self._matcher.extract_embedding(
+        if self._is_matcher:
+            return self._learner.extract_embedding(
                 data=data,
                 signature=signature,
                 id_mappings=id_mappings,
@@ -875,10 +829,7 @@ class MultiModalPredictor:
             and reset the associate model.model_name.checkpoint_name start with `local://` in config.yaml.
             When standalone = False, the saved artifact may require an online environment to process in load().
         """
-        if self._matcher:
-            self._matcher.save(path=path, standalone=standalone)
-        else:
-            self._learner.save(path=path, standalone=standalone)
+        self._learner.save(path=path, standalone=standalone)
 
     @classmethod
     def load(
@@ -917,14 +868,8 @@ class MultiModalPredictor:
         with open(os.path.join(dir_path, "assets.json"), "r") as fp:
             assets = json.load(fp)
         if "class_name" in assets and assets["class_name"] == "MultiModalMatcher":
-            predictor._matcher = MultiModalMatcher.load(
-                path=path,
-                resume=resume,
-                verbosity=verbosity,
-            )
-            return predictor
-
-        if assets["problem_type"] == OBJECT_DETECTION:
+            learner_class = MultiModalMatcher
+        elif assets["problem_type"] == OBJECT_DETECTION:
             learner_class = ObjectDetectionLearner
         elif assets["problem_type"] == NER:
             learner_class = NERLearner
@@ -945,7 +890,6 @@ class MultiModalPredictor:
         save_path : str
            Path to directory where models and configs should be saved.
         """
-        assert self._learner is not None
         return self._learner.dump_model(save_path=save_path)
 
     def export_onnx(
@@ -986,7 +930,6 @@ class MultiModalPredictor:
             A string that indicates location of the exported onnx model, if `path` argument is provided.
             Otherwise, would return the onnx model as bytes.
         """
-        assert self._learner is not None
         return self._learner.export_onnx(
             data=data,
             path=path,
@@ -1045,10 +988,7 @@ class MultiModalPredictor:
         Dict containing various detailed information.
         We do not recommend directly printing this dict as it may be very large.
         """
-        if self._matcher:
-            return self._matcher.fit_summary(verbosity=verbosity, show_plot=show_plot)
-        else:
-            return self._learner.fit_summary(verbosity=verbosity, show_plot=show_plot)
+        return self._learner.fit_summary(verbosity=verbosity, show_plot=show_plot)
 
     def list_supported_models(self, pretrained=True):
         """
@@ -1065,7 +1005,4 @@ class MultiModalPredictor:
         -------
         a list of model names
         """
-        if self._matcher:
-            return self._matcher.list_supported_models(pretrained=pretrained)
-        else:
-            return self._learner.list_supported_models(pretrained=pretrained)
+        return self._learner.list_supported_models(pretrained=pretrained)

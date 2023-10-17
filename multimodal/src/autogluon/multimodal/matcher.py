@@ -104,6 +104,8 @@ from .utils import (
     is_lazy_weight_tensor,
 )
 
+pl_logger = logging.getLogger("lightning")
+pl_logger.propagate = False  # https://github.com/Lightning-AI/lightning/issues/4621
 logger = logging.getLogger(__name__)
 
 
