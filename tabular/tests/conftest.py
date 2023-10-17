@@ -3,16 +3,19 @@ import os
 import shutil
 import uuid
 from contextlib import contextmanager
-from typing import List
+from typing import List, Tuple
 
+import numpy as np
+import pandas as pd
 import pytest
 
 from autogluon.common.utils.path_converter import PathConverter
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.data.label_cleaner import LabelCleaner
+from autogluon.core.models import AbstractModel, BaggedEnsembleModel
 from autogluon.core.utils import download, generate_train_test_split, infer_problem_type, unzip
-from autogluon.features.generators import AutoMLPipelineFeatureGenerator
+from autogluon.features.generators import AbstractFeatureGenerator, AutoMLPipelineFeatureGenerator
 from autogluon.tabular import TabularDataset, TabularPredictor
 
 
@@ -228,7 +231,9 @@ class FitHelper:
 # Helper functions for training models outside of predictors
 class ModelFitHelper:
     @staticmethod
-    def fit_and_validate_dataset(dataset_name, model, fit_args, sample_size=1000):
+    def fit_and_validate_dataset(
+        dataset_name: str, model: AbstractModel, fit_args: dict, sample_size: int = 1000, check_predict_children: bool = False
+    ) -> AbstractModel:
         directory_prefix = "./datasets/"
         train_data, test_data, dataset_info = DatasetLoaderHelper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
         label = dataset_info["label"]
@@ -242,12 +247,33 @@ class ModelFitHelper:
         X_test = feature_generator.transform(X_test)
 
         model.predict(X_test)
-        model.predict_proba(X_test)
+        y_pred_proba = model.predict_proba(X_test)
         model.get_info()
+
+        if check_predict_children:
+            assert isinstance(model, BaggedEnsembleModel)
+            y_pred_children = model.predict_children(X_test)
+            assert len(y_pred_children) == model.n_children
+            if model.can_predict_proba:
+                y_pred_proba_children = model.predict_proba_children(X_test)
+                assert len(y_pred_proba_children) == model.n_children
+                y_pred_proba_from_children = np.mean(y_pred_proba_children, axis=0)
+                assert np.isclose(y_pred_proba_from_children, y_pred_proba).all()
+
+                for y_pred_proba_child, y_pred_child in zip(y_pred_proba_children, y_pred_children):
+                    y_pred_child_from_proba = model.predict_from_proba(y_pred_proba=y_pred_proba_child)
+                    assert np.isclose(y_pred_child_from_proba, y_pred_child).all()
+
         return model
 
     @staticmethod
-    def fit_dataset(train_data, model, label, fit_args, sample_size=None):
+    def fit_dataset(
+        train_data: pd.DataFrame,
+        model: AbstractModel,
+        label: str,
+        fit_args: dict,
+        sample_size: int = None,
+    ) -> Tuple[AbstractModel, LabelCleaner, AbstractFeatureGenerator]:
         if sample_size is not None and sample_size < len(train_data):
             train_data = train_data.sample(n=sample_size, random_state=0)
         X = train_data.drop(columns=[label])
