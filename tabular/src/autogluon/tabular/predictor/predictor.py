@@ -388,7 +388,7 @@ class TabularPredictor:
         infer_limit=None,
         infer_limit_batch_size=None,
         fit_weighted_ensemble: bool = True,
-        full_last_level_weighted_ensemble: bool = True,
+        fit_full_last_level_weighted_ensemble: bool = True,
         calibrate_decision_threshold=False,
         num_cpus="auto",
         num_gpus="auto",
@@ -637,9 +637,8 @@ class TabularPredictor:
             If True, a WeightedEnsembleModel will be fit in each stack layer.
             A weighted ensemble will often be stronger than an individual model while being very fast to train.
             It is recommended to keep this value set to True to maximize predictive quality.
-        full_last_level_weighted_ensemble : bool, default = True
-            If True, the WeightedEnsembleModel of the final stack level will be fit with all models from all previous layers.
-            If False, the WeightedEnsembleModel will only be fit with the last layer's models.
+        fit_full_last_level_weighted_ensemble : bool, default = True
+            If True, an additional WeightedEnsembleModel will be fit at the last stacking level with all models from all previous layers.
             It is recommended to keep this value set to True to maximize predictive quality.
         calibrate_decision_threshold : bool, default = False
             [Experimental] This may be removed / changed without warning in a future release.
@@ -987,7 +986,7 @@ class TabularPredictor:
         aux_kwargs = {}
         if fit_weighted_ensemble is False:
             aux_kwargs["fit_weighted_ensemble"] = False
-        aux_kwargs["full_last_level_weighted_ensemble"] = full_last_level_weighted_ensemble
+        aux_kwargs["fit_full_last_level_weighted_ensemble"] = fit_full_last_level_weighted_ensemble
         self.save(silent=True)  # Save predictor to disk to enable prediction and training after interrupt
         self._learner.fit(
             X=train_data,
@@ -1096,7 +1095,7 @@ class TabularPredictor:
         time_limit=None,
         base_model_names=None,
         fit_weighted_ensemble=True,
-        full_last_level_weighted_ensemble=True,
+        fit_full_last_level_weighted_ensemble=True,
         num_cpus="auto",
         num_gpus="auto",
         **kwargs
@@ -1124,9 +1123,8 @@ class TabularPredictor:
             If True, a WeightedEnsembleModel will be fit in each stack layer.
             A weighted ensemble will often be stronger than an individual model while being very fast to train.
             It is recommended to keep this value set to True to maximize predictive quality.
-        full_last_level_weighted_ensemble : bool, default = True
-            If True, the WeightedEnsembleModel of the final stack level will be fit with all models from all previous layers.
-            If False, the WeightedEnsembleModel will only be fit with the last layer's models.
+        fit_full_last_level_weighted_ensemble : bool, default = True
+            If True, an additional WeightedEnsembleModel will be fit at the last stacking level with all models from all previous layers.
             It is recommended to keep this value set to True to maximize predictive quality.
         num_cpus: int, default = "auto"
             The total amount of cpus you want AutoGluon predictor to use.
@@ -1201,7 +1199,7 @@ class TabularPredictor:
         aux_kwargs = {}
         if fit_weighted_ensemble is False:
             aux_kwargs = {"fit_weighted_ensemble": False}
-        aux_kwargs["full_last_level_weighted_ensemble"] = full_last_level_weighted_ensemble
+        aux_kwargs["fit_full_last_level_weighted_ensemble"] = fit_full_last_level_weighted_ensemble
 
         if isinstance(hyperparameters, str):
             hyperparameters = get_hyperparameter_config(hyperparameters)
