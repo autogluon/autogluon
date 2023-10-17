@@ -14,8 +14,8 @@ source $(dirname "$0")/env_setup.sh
 setup_benchmark_env
 
 /bin/bash CI/bench/generate_bench_config.sh $MODULE $PRESET $BENCHMARK $TIME_LIMIT $BRANCH_OR_PR_NUMBER
-echo "Printing Constraints"
-cat $(dirname "$0")/tabular/amlb_user_dir/constraints.yaml
+# echo "Printing Constraints"
+# cat $(dirname "$0")/tabular/amlb_user_dir/constraints.yaml
 echo "Printing Cloud Configs"
 cat $MODULE"_cloud_configs.yaml"
 agbench run $MODULE"_cloud_configs.yaml" --wait
