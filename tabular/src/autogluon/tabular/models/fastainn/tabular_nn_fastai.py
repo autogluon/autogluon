@@ -237,11 +237,16 @@ class NNFastAiTabularModel(AbstractModel):
             y_min, y_max = infer_y_range(y, y_range_extend=0.05)
             clip_func = partial(np.clip, a_min=y_min, a_max=y_max)
 
-            self.y_scaler = sklearn.pipeline.Pipeline(steps=[
+            steps = [
                 # needs both func and inverse func, as the FastAI model calls inverse_transform.
                 ("clipper", sklearn.preprocessing.FunctionTransformer(func=clip_func, inverse_func=clip_func)),
-                ("scaler", self.y_scaler),
-            ])
+            ]
+
+            # Support the case where no scaler is defined.
+            if self.y_scaler is not None:
+                steps.append(("scaler", self.y_scaler))
+
+            self.y_scaler = sklearn.pipeline.Pipeline(steps=steps)
 
         if num_gpus is not None:
             # TODO: Control CPU vs GPU usage during inference
