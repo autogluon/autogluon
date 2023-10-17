@@ -380,7 +380,7 @@ class BaggedEnsembleModel(AbstractModel):
         """
         if children_idx is None:
             children_idx = list(range(self.n_children))
-        children = [m for i, m in enumerate(self.models) if i in children_idx]
+        children = [self.models[index] for index in children_idx]
         model = self.load_child(children[0])
         if preprocess_nonadaptive:
             X = self.preprocess(X, model=model, **kwargs)
@@ -424,7 +424,7 @@ class BaggedEnsembleModel(AbstractModel):
         """
         if children_idx is None:
             children_idx = list(range(self.n_children))
-        children = [m for i, m in enumerate(self.models) if i in children_idx]
+        children = [self.models[index] for index in children_idx]
         model = self.load_child(children[0])
         if preprocess_nonadaptive:
             X = self.preprocess(X, model=model, **kwargs)
