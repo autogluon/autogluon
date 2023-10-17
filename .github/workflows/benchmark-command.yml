@@ -47,7 +47,7 @@ on:
         description: 'Branch or PR number to run the benchmark on'
         required: true
       fork_info:
-        description: 'Get the forked PR repository name and branch'
+        description: 'Get the forked PR repository name and branch - list'
         required: true
       
 permissions:
