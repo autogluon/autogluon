@@ -322,6 +322,8 @@ class BaseLearner(ExportMixin):
         self._fit_called = False  # While using ddp, after fit called, we can only use single gpu.
         self._save_path = path
         self._hyperparameters = hyperparameters
+        self._train_data = None
+        self._tuning_data = None
         # Summary statistics used in fit summary. TODO: wrap it in a class.
         self._total_train_time = None
         self._best_score = None
@@ -366,6 +368,72 @@ class BaseLearner(ExportMixin):
         )
         return model_size * 1e-6  # convert to megabytes
 
+    def ensure_fitting_ready(self):
+        if self._problem_type and not self.problem_property.support_fit:
+            raise RuntimeError(
+                f"The problem_type='{self._problem_type}' does not support `predictor.fit()`. "
+                f"You may try to use `predictor.predict()` or `predictor.evaluate()`."
+            )
+
+    def infer_problem_type(self, train_data: pd.DataFrame):
+        if self._label_column:
+            self._problem_type = infer_problem_type(
+                y_train_data=train_data[self._label_column],
+                provided_problem_type=self._problem_type,
+            )
+
+    def setup_save_path(self, save_path: str, fit_called: bool):
+        self._save_path = setup_save_path(
+            resume=self._resume,
+            old_save_path=self._save_path,
+            proposed_save_path=save_path,
+            raise_if_exist=True,
+            warn_if_exist=False,
+            fit_called=fit_called,
+        )
+
+    def infer_column_types(self, column_types: Dict):
+        self._column_types = infer_column_types(
+            data=self._train_data,
+            valid_data=self._tuning_data,
+            label_columns=self._label_column,
+            provided_column_types=column_types,
+            problem_type=self._problem_type,  # used to update the corresponding column type
+        )
+        logger.debug(f"column_types: {column_types}")
+        logger.debug(f"image columns: {[k for k, v in column_types.items() if v == 'image_path']}")
+
+    def infer_output_shape(self):
+        self._output_shape = infer_output_shape(
+            label_column=self._label_column,
+            data=self._train_data,
+            problem_type=self._problem_type,
+        )
+
+    def prepare_for_train_tuning_data(self, train_data: Union[str, pd.DataFrame], tuning_data: Union[str, pd.DataFrame], holdout_frac: float, max_num_tuning_data: int, seed: int):
+        if isinstance(train_data, str):
+            train_data = load_pd.load(train_data)
+        if isinstance(tuning_data, str):
+            tuning_data = load_pd.load(tuning_data)
+
+        if tuning_data is None:
+            self._train_data, tuning_data = self.split_train_tuning(
+                data=train_data, holdout_frac=holdout_frac, random_state=seed,
+            )
+
+        self._train_data = train_data
+        self._tuning_data = tuning_data
+
+    def detect_data_scarcity_mode(self):
+        # Determine data scarcity mode, i.e. a few-shot scenario
+        scarcity_mode = infer_scarcity_mode_by_data_size(
+            df_train=self._train_data, scarcity_threshold=50
+        )  # Add as separate hyperparameter somewhere?
+        if scarcity_mode == FEW_SHOT and (not presets or FEW_SHOT not in presets):  # TODO: check for data  type
+            logger.info(
+                f"Detected data scarcity. Consider running using the preset '{FEW_SHOT_TEXT_CLASSIFICATION}' for better performance."
+            )
+
     def fit(
         self,
         train_data: Union[pd.DataFrame, str],
@@ -373,164 +441,33 @@ class BaseLearner(ExportMixin):
         config: Optional[dict] = None,
         tuning_data: Optional[Union[pd.DataFrame, str]] = None,
         max_num_tuning_data: Optional[int] = None,
-        id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         time_limit: Optional[int] = None,
         save_path: Optional[str] = None,
         hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
         column_types: Optional[dict] = None,
         holdout_frac: Optional[float] = None,
-        teacher_predictor: Union[str, MultiModalPredictor] = None,
+        teacher_learner: Union[str, BaseLearner] = None,
         seed: Optional[int] = 0,
         standalone: Optional[bool] = True,
         hyperparameter_tune_kwargs: Optional[dict] = None,
         clean_ckpts: Optional[bool] = True,
     ):
-        """
-        Fit MultiModalPredictor predict label column of a dataframe based on the other columns,
-        which may contain image path, text, numeric, or categorical features.
+        self.ensure_fitting_ready()
 
-        Parameters
-        ----------
-        train_data
-            A dataframe containing training data.
-        presets
-            Presets regarding model quality, e.g., best_quality, high_quality, and medium_quality.
-        config
-            A dictionary with four keys "model", "data", "optimization", and "environment".
-            Each key's value can be a string, yaml file path, or OmegaConf's DictConfig.
-            Strings should be the file names (DO NOT include the postfix ".yaml") in
-            automm/configs/model, automm/configs/data, automm/configs/optimization, and automm/configs/environment.
-            For example, you can configure a late-fusion model for the image, text, and tabular data as follows:
-            config = {
-                        "model": "fusion_mlp_image_text_tabular",
-                        "data": "default",
-                        "optimization": "adamw",
-                        "environment": "default",
-                    }
-            or
-            config = {
-                        "model": "/path/to/model/config.yaml",
-                        "data": "/path/to/data/config.yaml",
-                        "optimization": "/path/to/optimization/config.yaml",
-                        "environment": "/path/to/environment/config.yaml",
-                    }
-            or
-            config = {
-                        "model": OmegaConf.load("/path/to/model/config.yaml"),
-                        "data": OmegaConf.load("/path/to/data/config.yaml"),
-                        "optimization": OmegaConf.load("/path/to/optimization/config.yaml"),
-                        "environment": OmegaConf.load("/path/to/environment/config.yaml"),
-                    }
-        tuning_data
-            A dataframe containing validation data, which should have the same columns as the train_data.
-            If `tuning_data = None`, `fit()` will automatically
-            hold out some random validation examples from `train_data`.
-        id_mappings
-             Id-to-content mappings. The contents can be text, image, etc.
-             This is used when the dataframe contains the query/response identifiers instead of their contents.
-        time_limit
-            How long `fit()` should run for (wall clock time in seconds).
-            If not specified, `fit()` will run until the model has completed training.
-        save_path
-            Path to directory where models and intermediate outputs should be saved.
-        hyperparameters
-            This is to override some default configurations.
-            For example, changing the text and image backbones can be done by formatting:
-
-            a string
-            hyperparameters = "model.hf_text.checkpoint_name=google/electra-small-discriminator model.timm_image.checkpoint_name=swin_small_patch4_window7_224"
-
-            or a list of strings
-            hyperparameters = ["model.hf_text.checkpoint_name=google/electra-small-discriminator", "model.timm_image.checkpoint_name=swin_small_patch4_window7_224"]
-
-            or a dictionary
-            hyperparameters = {
-                            "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
-                            "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
-                        }
-        column_types
-            A dictionary that maps column names to their data types.
-            For example: `column_types = {"item_name": "text", "image": "image_path",
-            "product_description": "text", "height": "numerical"}`
-            may be used for a table with columns: "item_name", "brand", "product_description", and "height".
-            If None, column_types will be automatically inferred from the data.
-            The current supported types are:
-                - "image_path": each row in this column is one image path.
-                - "text": each row in this column contains text (sentence, paragraph, etc.).
-                - "numerical": each row in this column contains a number.
-                - "categorical": each row in this column belongs to one of K categories.
-        holdout_frac
-            Fraction of train_data to holdout as tuning_data for optimizing hyper-parameters or
-            early stopping (ignored unless `tuning_data = None`).
-            Default value (if None) is selected based on the number of rows in the training data
-            and whether hyper-parameter-tuning is utilized.
-        teacher_predictor
-            The pre-trained teacher predictor or its saved path. If provided, `fit()` can distill its
-            knowledge to a student predictor, i.e., the current predictor.
-        seed
-            The random seed to use for this training run.
-            Defaults to 0
-        standalone
-            Whether to save the enire model for offline deployment or only trained parameters of parameter-efficient fine-tuning strategy.
-        hyperparameter_tune_kwargs
-                Hyperparameter tuning strategy and kwargs (for example, how many HPO trials to run).
-                If None, then hyperparameter tuning will not be performed.
-                    num_trials: int
-                        How many HPO trials to run. Either `num_trials` or `time_limit` to `fit` needs to be specified.
-                    scheduler: Union[str, ray.tune.schedulers.TrialScheduler]
-                        If str is passed, AutoGluon will create the scheduler for you with some default parameters.
-                        If ray.tune.schedulers.TrialScheduler object is passed, you are responsible for initializing the object.
-                    scheduler_init_args: Optional[dict] = None
-                        If provided str to `scheduler`, you can optionally provide custom init_args to the scheduler
-                    searcher: Union[str, ray.tune.search.SearchAlgorithm, ray.tune.search.Searcher]
-                        If str is passed, AutoGluon will create the searcher for you with some default parameters.
-                        If ray.tune.schedulers.TrialScheduler object is passed, you are responsible for initializing the object.
-                        You don't need to worry about `metric` and `mode` of the searcher object. AutoGluon will figure it out by itself.
-                    scheduler_init_args: Optional[dict] = None
-                        If provided str to `searcher`, you can optionally provide custom init_args to the searcher
-                        You don't need to worry about `metric` and `mode`. AutoGluon will figure it out by itself.
-        clean_ckpts
-            Whether to clean the checkpoints of each validation step after training.
-
-        Returns
-        -------
-        An "MultiModalPredictor" object (itself).
-        """
         fit_called = self._fit_called  # used in current function
         self._fit_called = True
 
-        if self._problem_type and not self.problem_property.support_fit:
-            raise RuntimeError(
-                f"The problem_type='{self._problem_type}' does not support `predictor.fit()`. "
-                f"You may try to use `predictor.predict()` or `predictor.evaluate()`."
-            )
-
         training_start = time.time()
-        if self._matcher:
-            self._matcher.fit(
-                train_data=train_data,
-                tuning_data=tuning_data,
-                id_mappings=id_mappings,
-                time_limit=time_limit,
-                presets=presets,
-                hyperparameters=hyperparameters,
-                column_types=column_types,
-                holdout_frac=holdout_frac,
-                save_path=save_path,
-                hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-                seed=seed,
-            )
-            return self
 
-        if self._problem_type == OBJECT_DETECTION:
-            train_data, tuning_data = setup_detection_train_tuning_data(
-                self, max_num_tuning_data, seed, train_data, tuning_data
-            )
-
-        if isinstance(train_data, str):
-            train_data = load_pd.load(train_data)
-        if isinstance(tuning_data, str):
-            tuning_data = load_pd.load(tuning_data)
+        self.setup_save_path(save_path=save_path, fit_called=fit_called)
+        self.infer_problem_type(train_data=train_data)
+        self.prepare_for_train_tuning_data(
+            train_data=train_data,
+            tuning_data=tuning_data,
+            holdout_frac=holdout_frac,
+            max_num_tuning_data=max_num_tuning_data,
+            seed=seed,
+        )
 
         if self._presets is not None:
             # FIXME: Silently ignoring user input, there should be a warning
@@ -542,51 +479,8 @@ class BaseLearner(ExportMixin):
             # FIXME: Silently ignoring user input, there should be a warning
             config = self._config
 
-        self._save_path = setup_save_path(
-            resume=self._resume,
-            old_save_path=self._save_path,
-            proposed_save_path=save_path,
-            raise_if_exist=True,
-            warn_if_exist=False,
-            fit_called=fit_called,
-        )
-
-        if self._label_column:
-            self._problem_type = infer_problem_type(
-                y_train_data=train_data[self._label_column],
-                provided_problem_type=self._problem_type,
-            )
-
-        if tuning_data is None:
-            train_data, tuning_data = self._split_train_tuning(
-                data=train_data, holdout_frac=holdout_frac, random_state=seed
-            )
-
-        column_types = infer_column_types(
-            data=train_data,
-            valid_data=tuning_data,
-            label_columns=self._label_column,
-            provided_column_types=column_types,
-            problem_type=self._problem_type,  # used to update the corresponding column type
-        )
-
-        output_shape = infer_output_shape(
-            label_column=self._label_column,
-            data=train_data,
-            problem_type=self._problem_type,
-        )
-
-        # Determine data scarcity mode, i.e. a few-shot scenario
-        scarcity_mode = infer_scarcity_mode_by_data_size(
-            df_train=train_data, scarcity_threshold=50
-        )  # Add as separate hyperparameter somewhere?
-        if scarcity_mode == FEW_SHOT and (not presets or FEW_SHOT not in presets):  # TODO: check for data  type
-            logger.info(
-                f"Detected data scarcity. Consider running using the preset '{FEW_SHOT_TEXT_CLASSIFICATION}' for better performance."
-            )
-
-        logger.debug(f"column_types: {column_types}")
-        logger.debug(f"image columns: {[k for k, v in column_types.items() if v == 'image_path']}")
+        self.infer_column_types(column_types=column_types)
+        self.infer_output_shape()
 
         if self._column_types is not None and self._column_types != column_types:
             warnings.warn(
@@ -695,7 +589,7 @@ class BaseLearner(ExportMixin):
 
         return self
 
-    def _split_train_tuning(
+    def split_train_tuning(
         self, data: pd.DataFrame, holdout_frac: float = None, random_state: int = 0
     ) -> (pd.DataFrame, pd.DataFrame):
         """
@@ -741,7 +635,7 @@ class BaseLearner(ExportMixin):
         )
         return train_data, tuning_data
 
-    def _init_pretrained(self):
+    def init_pretrained(self):
         # split out the hyperparameters whose values are complex objects
         hyperparameters, advanced_hyperparameters = split_hyperparameters(self._hyperparameters)
 
@@ -764,7 +658,7 @@ class BaseLearner(ExportMixin):
             )
         self.update_strategy_by_env()
 
-    def _ensure_inference_ready(self):
+    def ensure_inference_ready(self):
         if not self._fit_called:
             if not self._problem_type or not self.problem_property.support_zero_shot:
                 raise RuntimeError(
@@ -774,131 +668,6 @@ class BaseLearner(ExportMixin):
                 )
             else:
                 self._init_pretrained()
-
-    def _setup_distillation(
-        self,
-        teacher_predictor: Union[str, MultiModalPredictor],
-    ):
-        """
-        Prepare for distillation. It verifies whether the student and teacher predictors have consistent
-        configurations. If teacher and student have duplicate model names, it modifies teacher's model names.
-
-        Parameters
-        ----------
-        teacher_predictor
-            The teacher predictor in knowledge distillation.
-
-        Returns
-        -------
-        teacher_model
-            The teacher predictor's model.
-        critics
-            The critics used in computing mutual information loss.
-        baseline_funcs
-            The baseline functions used in computing mutual information loss.
-        soft_label_loss_func
-            The loss function using teacher's logits as labels.
-        output_feature_adaptor
-            The adaptor used to adapt student output feature to the shape of teacher's.
-        output_feature_loss_func
-            The loss function using minimize distance between output_feature of teacher and student.
-        rkd_loss_func
-            The loss function using rkd distance and angle loss between output_feature of teacher and student.
-        df_preprocessor
-            The teacher predictor's dataframe preprocessor.
-        data_processors
-            The teacher predictor's data processors.
-        """
-        logger.debug("setting up distillation...")
-        if isinstance(teacher_predictor, str):
-            teacher_predictor = MultiModalPredictor.load(teacher_predictor)
-
-        # verify that student and teacher configs are consistent.
-        assert self._problem_type == teacher_predictor.problem_type
-        assert self._label_column == teacher_predictor._label_column
-        assert self._output_shape == teacher_predictor._output_shape
-
-        # if teacher and student have duplicate model names, change teacher's model names
-        # we don't change student's model names to avoid changing the names back when saving the model.
-        teacher_predictor = modify_duplicate_model_names(
-            predictor=teacher_predictor,
-            postfix="teacher",
-            blacklist=self._config.model.names,
-        )
-
-        critics, baseline_funcs = None, None
-        if not self._config.distiller.soft_label_loss_type:
-            # automatically infer loss func based on problem type if not specified
-            if self._problem_type == REGRESSION:
-                soft_label_loss_func = nn.MSELoss()
-            else:
-                assert self._output_shape > 1
-                soft_label_loss_func = nn.CrossEntropyLoss()
-        elif self._config.distiller.soft_label_loss_type == "mse":
-            soft_label_loss_func = nn.MSELoss()
-        elif self._config.distiller.soft_label_loss_type == "cross_entropy":
-            soft_label_loss_func = nn.CrossEntropyLoss()
-        else:
-            raise ValueError(f"Unknown soft_label_loss_type: {self._config.distiller.soft_label_loss_type}")
-
-        if not self._config.distiller.softmax_regression_loss_type:
-            # automatically infer loss func based on problem type if not specified
-            if self._problem_type == REGRESSION:
-                softmax_regression_loss_func = nn.MSELoss()
-            else:
-                assert self._output_shape > 1
-                softmax_regression_loss_func = nn.CrossEntropyLoss()
-        elif self._config.distiller.softmax_regression_loss_type == "mse":
-            softmax_regression_loss_func = nn.MSELoss()
-        elif self._config.distiller.softmax_regression_loss_type == "cross_entropy":
-            softmax_regression_loss_func = nn.CrossEntropyLoss()
-        else:
-            raise ValueError(f"Unknown soft_label_loss_type: {self._config.distiller.softmax_regression_loss_type}")
-
-        output_feature_loss_type = OmegaConf.select(self._config, "distiller.output_feature_loss_type", default="mse")
-        if output_feature_loss_type == "cosine":
-            output_feature_loss_func = nn.CosineEmbeddingLoss()
-        elif output_feature_loss_type == "mse":
-            output_feature_loss_func = nn.MSELoss()
-        else:
-            raise ValueError(f"Unknown output_feature_loss_type: {output_feature_loss_type}")
-
-        # Adapt student's output_feature feature to teacher's
-        # Refer to FitNet: https://arxiv.org/abs/1412.6550
-        teacher_model_dim = teacher_predictor._model.out_features
-        student_model_dim = self._model.out_features
-        output_feature_adaptor = (
-            nn.Linear(student_model_dim, teacher_model_dim)
-            if teacher_model_dim != student_model_dim
-            else nn.Identity()
-        )
-
-        rkd_distance_loss_weight = OmegaConf.select(self._config, "distiller.rkd_distance_loss_weight", default=0.0)
-        rkd_angle_loss_weight = OmegaConf.select(self._config, "distiller.rkd_angle_loss_weight", default=0.0)
-        rkd_loss_func = RKDLoss(rkd_distance_loss_weight, rkd_angle_loss_weight)
-
-        # turn on returning column information in data processors
-        turn_on_off_feature_column_info(
-            data_processors=self._data_processors,
-            flag=True,
-        )
-        turn_on_off_feature_column_info(
-            data_processors=teacher_predictor._data_processors,
-            flag=True,
-        )
-
-        return (
-            teacher_predictor._model,
-            critics,
-            baseline_funcs,
-            soft_label_loss_func,
-            softmax_regression_loss_func,
-            output_feature_adaptor,
-            output_feature_loss_func,
-            rkd_loss_func,
-            teacher_predictor._df_preprocessor,
-            teacher_predictor._data_processors,
-        )
 
     def _fit(
         self,
@@ -916,7 +685,7 @@ class BaseLearner(ExportMixin):
         config: Optional[dict] = None,
         hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
         advanced_hyperparameters: Optional[Dict] = None,
-        teacher_predictor: Union[str, MultiModalPredictor] = None,
+        teacher_predictor: Union[str, BaseLearner] = None,
         hpo_mode: bool = False,
         standalone: bool = True,
         clean_ckpts: bool = True,
@@ -1793,21 +1562,6 @@ class BaseLearner(ExportMixin):
         A dictionary with the metric names and their corresponding scores.
         Optionally return a dataframe of prediction results.
         """
-        if self._matcher:
-            return self._matcher.evaluate(
-                data=data,
-                query_data=query_data,
-                response_data=response_data,
-                id_mappings=id_mappings,
-                chunk_size=chunk_size,
-                similarity_type=similarity_type,
-                cutoffs=cutoffs,
-                label=label,
-                metrics=metrics,
-                return_pred=return_pred,
-                realtime=realtime,
-            )
-
         self._ensure_inference_ready()
         if self._problem_type == OBJECT_DETECTION:
             if realtime:
@@ -1977,14 +1731,6 @@ class BaseLearner(ExportMixin):
         -------
         Array of predictions, one corresponding to each row in given dataset.
         """
-        if self._matcher:
-            return self._matcher.predict(
-                data=data,
-                id_mappings=id_mappings,
-                as_pandas=as_pandas,
-                realtime=realtime,
-            )
-
         self._ensure_inference_ready()
         if self._problem_type == OBJECT_DETECTION:
             data = object_detection_data_to_df(data)
@@ -2128,16 +1874,6 @@ class BaseLearner(ExportMixin):
         When as_multiclass is True, the output will always have shape (#samples, #classes).
         Otherwise, the output will have shape (#samples,)
         """
-
-        if self._matcher:
-            return self._matcher.predict_proba(
-                data=data,
-                id_mappings=id_mappings,
-                as_pandas=as_pandas,
-                as_multiclass=as_multiclass,
-                realtime=realtime,
-            )
-
         self._ensure_inference_ready()
         assert self._problem_type not in [
             REGRESSION,
@@ -2217,16 +1953,6 @@ class BaseLearner(ExportMixin):
         It will have shape (#samples, D) where the embedding dimension D is determined
         by the neural network's architecture.
         """
-        if self._matcher:
-            return self._matcher.extract_embedding(
-                data=data,
-                signature=signature,
-                id_mappings=id_mappings,
-                as_tensor=as_tensor,
-                as_pandas=as_pandas,
-                realtime=realtime,
-            )
-
         self._ensure_inference_ready()
         turn_on_off_feature_column_info(
             data_processors=self._data_processors,
@@ -2328,10 +2054,6 @@ class BaseLearner(ExportMixin):
             and reset the associate model.model_name.checkpoint_name start with `local://` in config.yaml.
             When standalone = False, the saved artifact may require an online environment to process in load().
         """
-        if self._matcher:
-            self._matcher.save(path=path, standalone=standalone)
-            return
-
         config = copy.deepcopy(self._config)
         if standalone and (
             not OmegaConf.select(config, "optimization.efficient_finetune")
@@ -2403,7 +2125,7 @@ class BaseLearner(ExportMixin):
 
     @staticmethod
     def _load_metadata(
-        predictor: MultiModalPredictor,
+        predictor: BaseLearner,
         path: str,
         resume: Optional[bool] = False,
         verbosity: Optional[int] = 3,
@@ -2621,7 +2343,7 @@ class BaseLearner(ExportMixin):
 
         It is useful for computing metrics such as F1 which require a positive and negative class.
         You may refer to https://en.wikipedia.org/wiki/F-score for more details.
-        In binary classification, :class:`MultiModalPredictor.predict_proba(as_multiclass=False)`
+        In binary classification, :class:`BaseLearner.predict_proba(as_multiclass=False)`
         returns the estimated probability that each row belongs to the positive class.
         Will print a warning and return None if called when `predictor.problem_type != 'binary'`.
 

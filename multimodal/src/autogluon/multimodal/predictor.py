@@ -23,7 +23,7 @@ from .constants import (
 from .matcher import MultiModalMatcher
 from .learners import BaseLearner, ObjectDetectionLearner, NERLearner
 from .problem_types import PROBLEM_TYPES_REG
-from .utils import get_dir_ckpt_paths
+from .utils import get_dir_ckpt_paths, handle_deprecated_args
 
 pl_logger = logging.getLogger("lightning")
 pl_logger.propagate = False  # https://github.com/Lightning-AI/lightning/issues/4621
@@ -171,48 +171,23 @@ class MultiModalPredictor:
             This is used for automatically inference num_classes, classes, or label.
 
         """
-        # Handle the deprecated `init_scratch` argument
-        if init_scratch:
-            warnings.warn("init_scratch is deprecated. Try pretrained=False instead.", UserWarning)
-            pretrained = False
-
-        # Handle the deprecated `pipeline` argument
-        if pipeline is not None:
-            pipeline = pipeline.lower()
+        problem_type, pretrained = handle_deprecated_args(
+            init_scratch=init_scratch,
+            pipeline=pipeline,
+            problem_type=problem_type,
+            pretrained=pretrained,
+        )
+        assert problem_type in PROBLEM_TYPES_REG, (
+            f"problem_type='{problem_type}' is not supported yet. You may pick a problem type from"
+            f" {PROBLEM_TYPES_REG.list_keys()}."
+        )
+        problem_property = PROBLEM_TYPES_REG.get(problem_type)
+        if problem_property.experimental:
             warnings.warn(
-                f"pipeline argument has been deprecated and moved to problem_type. "
-                f"Use problem_type='{pipeline}' instead.",
-                DeprecationWarning,
+                f"problem_type='{problem_type}' is currently experimental.",
+                UserWarning,
             )
-            if problem_type is not None:
-                assert pipeline == problem_type, (
-                    f"Mismatched pipeline and problem_type. "
-                    f"Received pipeline={pipeline}, problem_type={problem_type}. "
-                    f"Consider using only the problem_type argument."
-                )
-            problem_type = pipeline
-
-        # Sanity check of problem_type
-        if problem_type is not None:
-            problem_type = problem_type.lower()
-            if problem_type == DEPRECATED_ZERO_SHOT:
-                warnings.warn(
-                    f'problem_type="{DEPRECATED_ZERO_SHOT}" is deprecated. For inference with CLIP model, '
-                    f'use problem_type="{ZERO_SHOT_IMAGE_CLASSIFICATION}" instead.',
-                    DeprecationWarning,
-                )
-                problem_type = ZERO_SHOT_IMAGE_CLASSIFICATION
-            assert problem_type in PROBLEM_TYPES_REG, (
-                f"problem_type='{problem_type}' is not supported yet. You may pick a problem type from"
-                f" {PROBLEM_TYPES_REG.list_keys()}."
-            )
-            problem_prop = PROBLEM_TYPES_REG.get(problem_type)
-            if problem_prop.experimental:
-                warnings.warn(
-                    f"problem_type='{problem_type}' is currently experimental.",
-                    UserWarning,
-                )
-            problem_type = problem_prop.name
+        problem_type = problem_property.name
 
         if os.environ.get(AUTOMM_TUTORIAL_MODE):
             enable_progress_bar = False
@@ -225,7 +200,7 @@ class MultiModalPredictor:
         self._verbosity = verbosity
         self._is_matcher = False
 
-        if self.problem_property and self.problem_property.is_matching:
+        if problem_property.is_matching:
             self._learner = MultiModalMatcher(
                 query=query,
                 response=response,
@@ -243,7 +218,6 @@ class MultiModalPredictor:
                 validation_metric=validation_metric,
             )
             self._is_matcher = True
-            return
         elif problem_type == OBJECT_DETECTION:
             self._learner = ObjectDetectionLearner(
                 label=label,
@@ -559,7 +533,7 @@ class MultiModalPredictor:
                 hyperparameters=hyperparameters,
                 column_types=column_types,
                 holdout_frac=holdout_frac,
-                teacher_predictor=teacher_predictor,
+                teacher_learner=teacher_predictor._learner,
                 seed=seed,
                 standalone=standalone,
                 hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,

@@ -84,24 +84,30 @@ class ObjectDetectionLearner(BaseLearner):
         """
         return self._model.model.CLASSES
 
-    def _setup_train_tuning_data(
+    def prepare_for_train_tuning_data(
         self,
         train_data: Union[pd.DataFrame, str],
         tuning_data: Optional[Union[pd.DataFrame, str]],
         holdout_frac: Optional[float],
-        seed: Optional[int],
         max_num_tuning_data: Optional[int],
-        **kwargs,
+        seed: Optional[int],
     ):
+        #TODO: remove self from calling setup_detection_train_tuning_data()
         train_data, tuning_data = setup_detection_train_tuning_data(
-            self, max_num_tuning_data, seed, train_data, tuning_data
+            predictor=self,
+            train_data=train_data,
+            tuning_data=tuning_data,
+            max_num_tuning_data=max_num_tuning_data,
+            seed=seed,
         )
+
         if tuning_data is None:
             train_data, tuning_data = self._split_train_tuning(
                 data=train_data, holdout_frac=holdout_frac, random_state=seed
             )
 
-        return train_data, tuning_data
+        self._train_data = train_data
+        self._tuning_data = tuning_data
 
     def _infer_output_shape(self, **kwargs):
         assert self._output_shape is not None, f"self._output_shape should have been set in __init__"
