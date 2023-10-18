@@ -361,11 +361,11 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         **kwargs,
     ) -> None:
         # necessary to initialize the loggers
-        import pytorch_lightning  # noqa
+        import lightning.pytorch  # noqa
 
         verbosity = kwargs.get("verbosity", 2)
         for logger_name in logging.root.manager.loggerDict:
-            if "pytorch_lightning" in logger_name:
+            if "lightning" in logger_name:
                 pl_logger = logging.getLogger(logger_name)
                 pl_logger.setLevel(logging.ERROR if verbosity <= 3 else logging.INFO)
         set_logger_verbosity(verbosity, logger=logger)
@@ -408,7 +408,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         early_stopping_patience: Optional[int] = None,
     ) -> List[Callable]:
         """Retrieve a list of callback objects for the GluonTS trainer"""
-        from pytorch_lightning.callbacks import EarlyStopping, Timer
+        from lightning.pytorch.callbacks import EarlyStopping, Timer
 
         callbacks = []
         if time_limit is not None:

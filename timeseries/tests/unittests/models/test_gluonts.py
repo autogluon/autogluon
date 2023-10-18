@@ -254,7 +254,7 @@ def test_given_custom_predict_batch_size_then_predictor_uses_correct_batch_size(
 
 
 def catch_trainer_kwargs(model):
-    with mock.patch("pytorch_lightning.Trainer") as mock_trainer:
+    with mock.patch("lightning.pytorch.Trainer") as mock_trainer:
         try:
             model.fit(train_data=DUMMY_TS_DATAFRAME, val_data=DUMMY_TS_DATAFRAME)
         except IsADirectoryError:
@@ -264,7 +264,7 @@ def catch_trainer_kwargs(model):
 
 
 def test_when_custom_callbacks_passed_via_trainer_kwargs_then_trainer_receives_them():
-    from pytorch_lightning.callbacks import RichModelSummary
+    from lightning.pytorch.callbacks import RichModelSummary
 
     callback = RichModelSummary()
     model = DLinearModel(hyperparameters={"trainer_kwargs": {"callbacks": [callback]}, **DUMMY_HYPERPARAMETERS})
@@ -273,7 +273,7 @@ def test_when_custom_callbacks_passed_via_trainer_kwargs_then_trainer_receives_t
 
 
 def test_when_early_stopping_patience_provided_then_early_stopping_callback_created():
-    from pytorch_lightning.callbacks import EarlyStopping
+    from lightning.pytorch.callbacks import EarlyStopping
 
     patience = 7
     model = SimpleFeedForwardModel(hyperparameters={"early_stopping_patience": patience, **DUMMY_HYPERPARAMETERS})
@@ -284,7 +284,7 @@ def test_when_early_stopping_patience_provided_then_early_stopping_callback_crea
 
 
 def test_when_early_stopping_patience_is_none_then_early_stopping_callback_not_created():
-    from pytorch_lightning.callbacks import EarlyStopping
+    from lightning.pytorch.callbacks import EarlyStopping
 
     model = SimpleFeedForwardModel(hyperparameters={"early_stopping_patience": None, **DUMMY_HYPERPARAMETERS})
     received_trainer_kwargs = catch_trainer_kwargs(model)
