@@ -1,2 +1,12 @@
+---
+# Locally stored instead of fetched from openml to avoid server errors
+# Small datasets to test benchmarking - extracted from autogluon-bench/data/metadata/task_metadata.csv
+
 - name: arcene
   openml_task_id: 190412
+
+# - name: tecator
+#   openml_task_id: 359934
+
+# - name: boston
+#   openml_task_id: 359950
