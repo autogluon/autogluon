@@ -7,7 +7,11 @@ from typing import Any, Dict, Type
 from gluonts.model.estimator import Estimator as GluonTSEstimator
 
 from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
-from autogluon.timeseries.utils.datetime import get_lags_for_frequency, get_time_features_for_frequency
+from autogluon.timeseries.utils.datetime import (
+    get_lags_for_frequency,
+    get_time_features_for_frequency,
+    get_seasonality,
+)
 
 # NOTE: We avoid imports for torch and pytorch_lightning at the top level and hide them inside class methods.
 # This is done to skip these imports during multiprocessing (which may cause bugs)
@@ -317,4 +321,64 @@ class PatchTSTModel(AbstractGluonTSModel):
     def _get_estimator_init_args(self) -> Dict[str, Any]:
         init_kwargs = super()._get_estimator_init_args()
         init_kwargs.setdefault("patch_len", 16)
+        return init_kwargs
+
+
+class WaveNetModel(AbstractGluonTSModel):
+    """WaveNet estimator that uses the architecture proposed in [Oord2016] with quantized targets.
+
+    The model is trained using the cross-entropy loss.
+
+    Based on `gluonts.torch.model.wavenet.WaveNetEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.torch.model.wavenet.html>`_.
+    See GluonTS documentation for additional hyperparameters.
+
+    References
+    ----------
+    .. [Oord2016] Oord, Aaron van den, et al.
+        "Wavenet: A generative model for raw audio"
+        arXiv preprint arXiv:1609.03499. 2016.
+
+    Other Parameters
+    ----------------
+    context_length : int, default = 96
+        Number of time units that condition the predictions
+    hidden_dimension: int, default = 20
+        Size of hidden layers in the feedforward network
+    distr_output : gluonts.torch.distributions.DistributionOutput, default = StudentTOutput()
+        Distribution to fit.
+    scaling : {"mean", "std", None}, default = "mean"
+        Scaling applied to the inputs. One of ``"mean"`` (mean absolute scaling), ``"std"`` (standardization), ``None`` (no scaling).
+    epochs : int, default = 100
+        Number of epochs the model will be trained for
+    batch_size : int, default = 64
+        Size of batches used during training
+    predict_batch_size : int, default = 500
+        Size of batches used during prediction.
+    num_batches_per_epoch : int, default = 50
+        Number of batches processed every epoch
+    learning_rate : float, default = 1e-3,
+        Learning rate used during training
+    trainer_kwargs : dict, optional
+        Optional keyword arguments passed to ``lightning.Trainer``.
+    early_stopping_patience : int or None, default = 20
+        Early stop training if the validation loss doesn't improve for this many epochs.
+    weight_decay : float, default = 1e-8
+        Weight decay regularization parameter.
+    """
+
+    def _get_estimator_class(self) -> Type[GluonTSEstimator]:
+        from gluonts.torch.model.wavenet import WaveNetEstimator
+
+        return WaveNetEstimator
+
+    def _get_estimator_init_args(self) -> Dict[str, Any]:
+        init_kwargs = super()._get_estimator_init_args()
+        init_kwargs["num_feat_static_cat"] = self.num_feat_static_cat
+        init_kwargs["num_feat_static_real"] = self.num_feat_static_real
+        init_kwargs["cardinality"] = (
+            [1] if len(self.feat_static_cat_cardinality) == 0 else self.feat_static_cat_cardinality
+        )
+        init_kwargs["num_feat_dynamic_real"] = self.num_feat_dynamic_real
+        init_kwargs.setdefault("seasonality", get_seasonality(self.freq))
+        init_kwargs.setdefault("time_features", get_time_features_for_frequency(self.freq))
         return init_kwargs

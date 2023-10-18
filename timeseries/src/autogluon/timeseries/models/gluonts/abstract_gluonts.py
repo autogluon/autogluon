@@ -403,6 +403,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
     ) -> List[Callable]:
         """Retrieve a list of callback objects for the GluonTS trainer"""
         from pytorch_lightning.callbacks import EarlyStopping, Timer
+        return []
 
         callbacks = []
         if time_limit is not None:

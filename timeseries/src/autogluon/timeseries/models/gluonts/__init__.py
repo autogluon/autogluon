@@ -1,4 +1,4 @@
-from .torch import DeepARModel, DLinearModel, PatchTSTModel, SimpleFeedForwardModel, TemporalFusionTransformerModel
+from .torch.models import DeepARModel, DLinearModel, PatchTSTModel, SimpleFeedForwardModel, TemporalFusionTransformerModel, WaveNetModel
 
 __all__ = [
     "DeepARModel",
@@ -6,4 +6,5 @@ __all__ = [
     "PatchTSTModel",
     "SimpleFeedForwardModel",
     "TemporalFusionTransformerModel",
+    "WaveNetModel",
 ]
