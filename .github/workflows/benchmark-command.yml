@@ -47,7 +47,7 @@ on:
         description: 'Branch or PR number to run the benchmark on'
         required: true
       fork_info:
-        description: 'Get the forked PR repository name and branch - list'
+        description: 'Get the forked PR repository name and branch'
         required: true
       
 permissions:
@@ -139,6 +139,12 @@ jobs:
           role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
           role-duration-seconds: 14400
           aws-region: us-east-1
+      - name: Extract Fork Info
+        id: parse_fork_info
+        run: |
+          IFS="|" read -r fork_name fork_branch <<< "${{ github.event.inputs.fork_info }}"
+          echo "FORK_NAME=$fork_name" >> $GITHUB_OUTPUT
+          echo "FORK_BRANCH=$fork_branch" >> $GITHUB_OUTPUT
       - name: Run benchmark
         shell: bash -l {0}
         run: |
