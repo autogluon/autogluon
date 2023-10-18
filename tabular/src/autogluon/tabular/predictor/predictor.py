@@ -1106,7 +1106,7 @@ class TabularPredictor:
         full_weighted_ensemble_additionally=False,
         num_cpus="auto",
         num_gpus="auto",
-        **kwargs
+        **kwargs,
     ):
         """
         Fits additional models after the original :meth:`TabularPredictor.fit` call.
