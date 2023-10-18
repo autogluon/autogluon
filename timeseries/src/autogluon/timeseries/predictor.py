@@ -60,9 +60,14 @@ class TimeSeriesPredictor:
     eval_metric : str, default = "WQL"
         Metric by which predictions will be ultimately evaluated on future test data. AutoGluon tunes hyperparameters
         in order to improve this metric on validation data, and ranks models (on validation data) according to this
-        metric. Available options:
+        metric.
 
-        - ``"WQL"``: mean weighted quantile loss, defined as average of quantile losses for the specified ``quantile_levels`` scaled by the total value of the time series
+        Probabilistic forecast metrics (evaluated on quantile forecasts for the specified ``quantile_levels``):
+
+        - ``"WQL"``: mean weighted quantile loss, defined as average of quantile losses, scaled by the total value of the time series
+
+        Point forecast metrics (these are always evaluated on the ``"mean"`` column of the predictions):
+
         - ``"MAPE"``: mean absolute percentage error
         - ``"sMAPE"``: "symmetric" mean absolute percentage error
         - ``"MASE"``: mean absolute scaled error
