@@ -1457,7 +1457,7 @@ class AbstractModel:
                     Hyperparameter config of the model trial.
         hpo_info: Any
             Advanced output with scheduler specific logic, primarily for debugging.
-            In case of Ray Tune backend, this will be an Analysis object: https://docs.ray.io/en/latest/tune/api_docs/analysis.html
+            In case of Ray Tune backend, this will be an Analysis object: https://docs.ray.io/en/latest/tune/api/doc/ray.tune.ExperimentAnalysis.html
         """
         # if hpo_executor is not None, ensemble has already created the hpo_executor
         if hpo_executor is None:
