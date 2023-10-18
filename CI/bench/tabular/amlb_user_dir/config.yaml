@@ -1,16 +1,16 @@
 frameworks:              # configuration namespace for the frameworks definitions.
   definition_file:       # list of yaml files describing the frameworks base definitions.
-    - '{root}/resources/frameworks.yaml'
     - '{user}/frameworks.yaml'
+    - '{root}/resources/frameworks.yaml'
   allow_duplicates: true     # if true, the last definition is used.
   tags: ['stable', 'latest', 'benchmark']  # the list of supported tags when looking up frameworks:
                               # for example frmwk:latest will look for framework frmwk in a frameworks_latest.yaml file if present.
 
 benchmarks:                     # configuration namespace for the benchmarks definitions.
   definition_dir:               # list of directories containing the benchmarks yaml definitions.
-    - '{root}/resources/benchmarks'
     - '{user}/benchmarks'
+    - '{root}/resources/benchmarks'
   constraints_file:             # list of yaml files describing the benchmarks runtime constraints.
-    - '{root}/resources/constraints.yaml'
     - '{user}/constraints.yaml'
+    - '{root}/resources/constraints.yaml'
   overhead_time_seconds: 72000   # amount of additional time allowed for the job to complete before sending an interruption signal
