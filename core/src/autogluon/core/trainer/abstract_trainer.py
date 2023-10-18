@@ -373,7 +373,8 @@ class AbstractTrainer:
         for level in range(level_start, level_end + 1):
             core_kwargs_level = core_kwargs.copy()
             aux_kwargs_level = aux_kwargs.copy()
-            additional_full_weighted_ensemble = aux_kwargs_level.pop("fit_full_last_level_weighted_ensemble", True) and (level == level_end)
+            full_weighted_ensemble = aux_kwargs_level.pop("fit_full_last_level_weighted_ensemble", True) and (level == level_end) and (level > 1)
+            additional_full_weighted_ensemble = aux_kwargs_level.pop("full_weighted_ensemble_additionally", False) and full_weighted_ensemble
             if time_limit is not None:
                 time_train_level_start = time.time()
                 levels_left = level_end - level + 1
@@ -397,6 +398,7 @@ class AbstractTrainer:
                 name_suffix=name_suffix,
                 infer_limit=infer_limit,
                 infer_limit_batch_size=infer_limit_batch_size,
+                full_weighted_ensemble=full_weighted_ensemble,
                 additional_full_weighted_ensemble=additional_full_weighted_ensemble,
             )
             model_names_fit += base_model_names + aux_models
@@ -513,6 +515,7 @@ class AbstractTrainer:
         name_suffix: str = None,
         infer_limit=None,
         infer_limit_batch_size=None,
+        full_weighted_ensemble: bool = False,
         additional_full_weighted_ensemble: bool = False,
     ) -> (List[str], List[str]):
         """
@@ -543,13 +546,16 @@ class AbstractTrainer:
             **core_kwargs,
         )
 
-        aux_models = self._stack_new_level_aux(X_val, y_val, X, y, core_models, level, infer_limit, infer_limit_batch_size, **aux_kwargs)
+        aux_models = []
+        if full_weighted_ensemble:
+            full_aux_kwargs = aux_kwargs.copy()
+            if additional_full_weighted_ensemble:
+                full_aux_kwargs["name_extra"] = "_FULL"
+            all_base_model_names = self.get_model_names(stack_name="core")  # Fit weighted ensemble on all previously fitted core models
+            aux_models += self._stack_new_level_aux(X_val, y_val, X, y, all_base_model_names, level, infer_limit, infer_limit_batch_size, **full_aux_kwargs)
 
-        if additional_full_weighted_ensemble:
-            # Fit weighted ensemble on all previously fitted core models
-            all_base_model_names = self.get_model_names(stack_name="core")
-            aux_models += self._stack_new_level_aux(X_val, y_val, X, y, all_base_model_names, level, infer_limit, infer_limit_batch_size, name_extra="_FULL",
-                                                   **aux_kwargs)
+        if (not full_weighted_ensemble) or additional_full_weighted_ensemble:
+            aux_models += self._stack_new_level_aux(X_val, y_val, X, y, core_models, level, infer_limit, infer_limit_batch_size, **aux_kwargs)
 
         return core_models, aux_models
 
