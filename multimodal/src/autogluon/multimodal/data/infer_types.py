@@ -28,6 +28,8 @@ from ..constants import (
     NUMERICAL,
     OBJECT_DETECTION,
     OPEN_VOCABULARY_OBJECT_DETECTION,
+    REAL_WORLD_SEM_SEG,
+    REAL_WORLD_SEM_SEG_IMG,
     REGRESSION,
     ROIS,
     TEXT,
@@ -546,6 +548,8 @@ def infer_column_types(
             # Check if it is document image or not.
             if is_document_image_column(data[col_name], col_name=col_name):
                 column_types[col_name] = DOCUMENT_IMAGE
+            elif problem_type == REAL_WORLD_SEM_SEG:
+                column_types[col_name] = REAL_WORLD_SEM_SEG_IMG
             else:
                 column_types[col_name] = IMAGE_PATH
         elif is_document_pdf_column(data[col_name], col_name=col_name):
@@ -600,7 +604,13 @@ def infer_label_column_type_by_problem_type(
     problem_type: Optional[str],
     data: Optional[pd.DataFrame] = None,
     valid_data: Optional[pd.DataFrame] = None,
-    allowable_label_types: Optional[List[str]] = (CATEGORICAL, NUMERICAL, NER_ANNOTATION, ROIS),
+    allowable_label_types: Optional[List[str]] = (
+        CATEGORICAL,
+        NUMERICAL,
+        NER_ANNOTATION,
+        ROIS,
+        REAL_WORLD_SEM_SEG_IMG,
+    ),
     fallback_label_type: Optional[str] = CATEGORICAL,
 ):
     """
@@ -749,7 +759,7 @@ def infer_output_shape(
             return 1
         else:
             return class_num
-    elif problem_type in [NER, OBJECT_DETECTION, OPEN_VOCABULARY_OBJECT_DETECTION]:
+    elif problem_type in [NER, OBJECT_DETECTION, OPEN_VOCABULARY_OBJECT_DETECTION, REAL_WORLD_SEM_SEG]:
         return None
     else:
         raise ValueError(
@@ -757,7 +767,8 @@ def infer_output_shape(
             f"for training. The supported problem types are"
             f" '{BINARY}', '{MULTICLASS}', '{REGRESSION}',"
             f" '{CLASSIFICATION}', '{NER}',"
-            f" '{OBJECT_DETECTION}', '{OPEN_VOCABULARY_OBJECT_DETECTION}'"
+            f" '{OBJECT_DETECTION}', '{OPEN_VOCABULARY_OBJECT_DETECTION}',"
+            f" '{REAL_WORLD_SEM_SEG}"
         )
 
 

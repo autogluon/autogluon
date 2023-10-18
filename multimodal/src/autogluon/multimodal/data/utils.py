@@ -37,8 +37,10 @@ try:
     from torchvision.transforms import InterpolationMode
 
     BICUBIC = InterpolationMode.BICUBIC
+    NEAREST = InterpolationMode.NEAREST
 except ImportError:
     BICUBIC = PIL.Image.BICUBIC
+    NEAREST = PIL.Image.NEAREST
 
 from .randaug import RandAugment
 from .trivial_augmenter import TrivialAugment
@@ -520,6 +522,8 @@ def get_image_transform_funcs(transform_types: Union[List[str], ListConfig, List
 
         if trans_mode == "resize_to_square":
             image_transforms.append(transforms.Resize((size, size), interpolation=BICUBIC))
+        elif trans_mode == "resize_gt_to_square":
+            image_transforms.append(transforms.Resize((size, size), interpolation=NEAREST))
         elif trans_mode == "resize_shorter_side":
             image_transforms.append(transforms.Resize(size, interpolation=BICUBIC))
         elif trans_mode == "center_crop":
@@ -583,7 +587,7 @@ def construct_image_processor(
     image_transforms = get_image_transform_funcs(transform_types=image_transforms, size=size)
     if not any([isinstance(trans, transforms.ToTensor) for trans in image_transforms]):
         image_transforms.append(transforms.ToTensor())
-    if not any([isinstance(trans, transforms.Normalize) for trans in image_transforms]):
+    if not any([isinstance(trans, transforms.Normalize) for trans in image_transforms]) and normalization != None:
         image_transforms.append(normalization)
     return transforms.Compose(image_transforms)
 

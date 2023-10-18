@@ -20,6 +20,7 @@ from .constants import (
     NUMERICAL,
     OBJECT_DETECTION,
     OPEN_VOCABULARY_OBJECT_DETECTION,
+    REAL_WORLD_SEM_SEG,
     REGRESSION,
     ROIS,
     TEXT,
@@ -127,6 +128,19 @@ PROBLEM_TYPES_REG.register(
         support_fit=False,  # TODO: future work
         supported_modality_type={IMAGE, TEXT},
         supported_label_type={ROIS},
+        force_exist_modality={IMAGE},
+    ),
+)
+
+# Real-World Semantic Segmentation: image --> image
+PROBLEM_TYPES_REG.register(
+    REAL_WORLD_SEM_SEG,
+    ProblemTypeProperty(
+        name=REAL_WORLD_SEM_SEG,
+        support_zero_shot=True,
+        support_fit=True,
+        supported_modality_type={IMAGE},
+        supported_label_type={IMAGE},
         force_exist_modality={IMAGE},
     ),
 )

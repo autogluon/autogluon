@@ -21,6 +21,7 @@ from ..constants import (
     PROBABILITY,
     PROMPT,
     QUERY,
+    REAL_WORLD_SEM_SEG,
     RESPONSE,
     SCORE,
     TEXT,

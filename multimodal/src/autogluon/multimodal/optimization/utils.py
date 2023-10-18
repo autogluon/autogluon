@@ -21,6 +21,9 @@ from ..constants import (
     AUTOMM,
     AVERAGE_PRECISION,
     BINARY,
+    BINARY_ACC,
+    BINARY_DICE,
+    BINARY_IOU,
     BIT_FIT,
     COLUMN_FEATURES,
     CONTRASTIVE_LOSS,
@@ -57,6 +60,7 @@ from ..constants import (
     PEFT_STRATEGIES,
     QUADRATIC_KAPPA,
     R2,
+    REAL_WORLD_SEM_SEG,
     RECALL,
     REGRESSION,
     RMSE,
@@ -64,7 +68,7 @@ from ..constants import (
     ROOT_MEAN_SQUARED_ERROR,
     SPEARMANR,
 )
-from .losses import FocalLoss, MultiNegativesSoftmaxLoss, SoftTargetCrossEntropy
+from .losses import FocalLoss, IoULoss, MultiNegativesSoftmaxLoss, SoftTargetCrossEntropy
 from .lr_scheduler import (
     get_cosine_schedule_with_warmup,
     get_linear_schedule_with_warmup,
@@ -123,6 +127,11 @@ def get_loss_func(
         loss_func = nn.CrossEntropyLoss(ignore_index=0)
     elif problem_type in [OBJECT_DETECTION, OPEN_VOCABULARY_OBJECT_DETECTION]:
         return None
+    elif problem_type == REAL_WORLD_SEM_SEG:
+        if "iou_loss" in loss_func_name.lower():
+            loss_func = IoULoss()
+        else:
+            loss_func = nn.BCEWithLogitsLoss()
     elif problem_type is None:
         return None
     else:
@@ -280,6 +289,12 @@ def get_metric(
             return CustomHitRate(), None
         else:  # TODO: support recall for general classification tasks.
             raise ValueError("Recall is not supported yet.")
+    elif metric_name == BINARY_IOU:
+        return torchmetrics.JaccardIndex(task="binary"), None
+    elif metric_name == BINARY_DICE:
+        return torchmetrics.Dice(multiclass=False), None
+    elif metric_name == BINARY_ACC:
+        return torchmetrics.Accuracy(task="binary"), None
     else:
         raise ValueError(f"Unknown metric {metric_name}")
 
@@ -467,6 +482,8 @@ def apply_single_lr(
     lr: float,
     weight_decay: float,
     return_params: Optional[bool] = True,
+    efficient_finetune: Optional[str] = None,
+    trainable_param_names: Optional[List] = None,
 ):
     """
     Set to use a single learning rate for all parameters. Layer normalization parameters and other
@@ -491,14 +508,41 @@ def apply_single_lr(
     The grouped parameters or their names.
     """
     decay_param_names = get_weight_decay_param_names(model)
+    decay_grad_param_names = []
+    no_decay_grad_param_names = []
+
+    for name, param in model.named_parameters():
+        if (
+            efficient_finetune is not None
+            and efficient_finetune != "None"
+            and trainable_param_names
+            and not any([re.match(trainable_param_name, name) for trainable_param_name in trainable_param_names])
+        ):
+            param.requires_grad = False
+
+        if not param.requires_grad:
+            continue  # frozen weights
+
+        if name in decay_param_names:
+            if return_params:
+                decay_grad_param_names.append(param)
+            else:
+                decay_grad_param_names.append(name)
+
+        else:
+            if return_params:
+                no_decay_grad_param_names.append(param)
+            else:
+                no_decay_grad_param_names.append(name)
+
     optimizer_grouped_parameters = [
         {
-            "params": [p if return_params else n for n, p in model.named_parameters() if n in decay_param_names],
+            "params": decay_grad_param_names,
             "weight_decay": weight_decay,
             "lr": lr,
         },
         {
-            "params": [p if return_params else n for n, p in model.named_parameters() if n not in decay_param_names],
+            "params": no_decay_grad_param_names,
             "weight_decay": 0.0,
             "lr": lr,
         },
@@ -584,8 +628,7 @@ def apply_two_stages_lr(
 
 
 def get_trainable_params_efficient_finetune(
-    norm_param_names: List[str],
-    efficient_finetune: Optional[str] = None,
+    norm_param_names: List[str], efficient_finetune: Optional[str] = None, extra_params: Optional[List] = None
 ):
     """
      Get the list of trainable parameters according to the provided efficient finetuning method.
@@ -623,6 +666,8 @@ def get_trainable_params_efficient_finetune(
             f" is not supported. We only support"
             f" {', '.join(PEFT_STRATEGIES)}."
         )
+
+    trainable_param_names.extend(extra_params)
 
     return trainable_param_names
 

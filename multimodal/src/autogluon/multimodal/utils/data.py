@@ -28,7 +28,9 @@ from ..constants import (
     NUMERICAL,
     OVD,
     REGRESSION,
+    REAL_WORLD_SEM_SEG_IMG,
     ROIS,
+    SAM,
     TEXT,
     TEXT_NER,
 )
@@ -45,6 +47,7 @@ from ..data import (
     NerProcessor,
     NumericalProcessor,
     OVDProcessor,
+    RealWorldSemSegImageProcessor,
     TextProcessor,
 )
 from ..data.infer_types import is_image_column
@@ -199,6 +202,10 @@ def create_data_processor(
             text_max_len=model_config.max_text_len,
             missing_value_strategy=config.data.document.missing_value_strategy,
         )
+    elif data_type == REAL_WORLD_SEM_SEG_IMG:
+        data_processor = RealWorldSemSegImageProcessor(
+            model=model, model_config=model_config, norm_type=model_config.image_norm, size=model_config.image_size
+        )
     else:
         raise ValueError(f"unknown data type: {data_type}")
 
@@ -243,6 +250,7 @@ def create_fusion_data_processors(
         TEXT_NER: [],
         DOCUMENT: [],
         OVD: [],
+        REAL_WORLD_SEM_SEG_IMG: [],
     }
 
     model_dict = {model.prefix: model}
@@ -294,6 +302,17 @@ def create_fusion_data_processors(
             )
             if data_types is not None and IMAGE in data_types:
                 data_types.remove(IMAGE)
+        elif per_name == SAM:
+            data_processors[REAL_WORLD_SEM_SEG_IMG].append(
+                create_data_processor(
+                    data_type=REAL_WORLD_SEM_SEG_IMG,
+                    config=config,
+                    model=per_model,
+                )
+            )
+            if data_types is not None and IMAGE in data_types:
+                data_types.remove(IMAGE)
+            requires_label = False
 
         if requires_label:
             # each model has its own label processor

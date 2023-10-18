@@ -27,6 +27,7 @@ from ..constants import (
     NULL,
     NUMERICAL,
     OVD,
+    REAL_WORLD_SEM_SEG_IMG,
     ROIS,
     TEXT,
     TEXT_NER,
@@ -94,7 +95,10 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         for col_name, col_type in self._column_types.items():
             if col_name == self._label_column:
                 continue
-            if col_type.startswith((TEXT, IMAGE, ROIS, TEXT_NER, DOCUMENT)) or col_type == NULL:
+            if (
+                col_type.startswith((TEXT, IMAGE, ROIS, TEXT_NER, DOCUMENT, REAL_WORLD_SEM_SEG_IMG))
+                or col_type == NULL
+            ):
                 continue
             elif col_type == CATEGORICAL:
                 generator = CategoryFeatureGenerator(
@@ -138,6 +142,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         self._rois_feature_names = []
         self._ner_feature_names = []
         self._document_feature_names = []
+        self._real_world_sem_seg_feature_names = []
 
     @property
     def label_column(self):
@@ -196,6 +201,10 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                 return self.text_feature_names[:1]
             else:
                 return []
+
+    @property
+    def real_world_sem_seg_feature_names(self):
+        return self._real_world_sem_seg_feature_names
 
     @property
     def required_feature_names(self):
@@ -274,6 +283,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             return [self._label_column]  # as a list to be consistent with others
         elif self.label_type == NER_ANNOTATION:
             return self.ner_feature_names + [self._label_column]
+        elif modality == REAL_WORLD_SEM_SEG_IMG:
+            return self._real_world_sem_seg_feature_names
         else:
             raise ValueError(f"Unknown modality: {modality}.")
 
@@ -345,6 +356,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                 self._document_feature_names.append(col_name)
             elif col_type == ROIS:
                 self._rois_feature_names.append(col_name)
+            elif col_type == REAL_WORLD_SEM_SEG_IMG:
+                self._real_world_sem_seg_feature_names.append(col_name)
             else:
                 raise NotImplementedError(
                     f"Type of the column is not supported currently. Received {col_name}={col_type}."
@@ -368,7 +381,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         elif self.label_type == NUMERICAL:
             y = pd.to_numeric(y).to_numpy()
             self._label_scaler.fit(np.expand_dims(y, axis=-1))
-        elif self.label_type == ROIS:
+        elif self.label_type == ROIS or self.label_type == REAL_WORLD_SEM_SEG_IMG:
             pass  # Do nothing. TODO: Shall we call fit here?
         elif self.label_type == NER_ANNOTATION:
             # If there are ner annotations and text columns but no NER feature columns,
@@ -490,6 +503,49 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             ret_type[col_name] = self._column_types[col_name]
 
         return ret_data, ret_type
+
+    def transform_real_world_sem_seg_img(
+        self,
+        df: pd.DataFrame,
+    ) -> Tuple[Dict[str, List[List[str]]], Dict[str, str]]:
+        """
+        Preprocess real-world semantic segmenation data.
+        For image data we preprocess them by collecting their paths together. If one sample has multiple images
+        in an image column, assume that their image paths are separated by ";".
+        For rois data we simply convert them from a column of pandas dataframe to a list.
+        This function needs to be called preceding the rois processor in "process_rois.py".
+
+        Parameters
+        ----------
+        df
+            The multimodal pd.DataFrame.
+
+        Returns
+        -------
+        image_features
+            All the image data stored in a dictionary.
+        image_types
+            The column types of these image data, e.g., image_path or image_identifier.
+        """
+        assert (
+            self._fit_called or self._fit_x_called
+        ), "You will need to first call preprocessor.fit_x() before calling preprocessor.transform_real_world_sem_seg_img."
+
+        image_features = {}
+        image_types = {}
+        for col_name in self._real_world_sem_seg_feature_names:
+            col_value = df[col_name]
+            col_type = self._column_types[col_name]
+
+            if col_type in [REAL_WORLD_SEM_SEG_IMG]:
+                processed_data = col_value.apply(lambda ele: str(ele).split(";")).tolist()
+            else:
+                raise ValueError(f"Unknown image type {col_type} for column {col_name}")
+
+            image_features[col_name] = processed_data
+            image_types[col_name] = self._column_types[col_name]
+
+        return image_features, image_types
 
     def transform_ovd(
         self,

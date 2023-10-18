@@ -34,6 +34,7 @@ OCR_TEXT_RECOGNITION = f"{OCR}_text_recognition"
 IMAGE_SIMILARITY = "image_similarity"
 TEXT_SIMILARITY = "text_similarity"
 IMAGE_TEXT_SIMILARITY = "image_text_similarity"
+REAL_WORLD_SEM_SEG = "real_world_sem_seg"
 
 # Input keys
 IMAGE = "image"
@@ -49,6 +50,7 @@ ATTENTION_MASK = "attention_mask"
 TOKEN_TYPE_IDS = "token_type_ids"
 PIXEL_VALUES = "pixel_values"
 INPUT_IDS = "input_ids"
+REAL_WORLD_SEM_SEG_IMG = "real_world_sem_seg_img"
 
 # Output keys
 LOGITS = "logits"
@@ -123,6 +125,10 @@ NDCG = "ndcg"
 PRECISION = "precision"
 RECALL = "recall"
 MRR = "mrr"
+SM = "sm"
+BINARY_IOU = "binary_iou"
+BINARY_DICE = "binary_dice"
+BINARY_ACC = "binary_acc"
 RETRIEVAL_METRICS = [NDCG, PRECISION, RECALL, MRR]
 METRIC_MODE_MAP = {
     ACC: MAX,
@@ -143,6 +149,9 @@ METRIC_MODE_MAP = {
     NER_TOKEN_F1: MAX,
     OVERALL_F1: MAX,
     RECALL: MAX,
+    SM: MAX,
+    BINARY_IOU: MAX,
+    BINARY_DICE: MAX,
 }
 VALID_METRICS = METRIC_MODE_MAP.keys()
 
@@ -159,7 +168,7 @@ MMDET = "mmdet"
 MMOCR = "mmocr"
 
 # Modality keys. may need to update here if new modality keys are added in above.
-ALL_MODALITIES = [IMAGE, TEXT, CATEGORICAL, NUMERICAL, TEXT_NER, DOCUMENT]
+ALL_MODALITIES = [IMAGE, TEXT, CATEGORICAL, NUMERICAL, TEXT_NER, DOCUMENT, REAL_WORLD_SEM_SEG_IMG]
 
 # Keys to compute metrics
 Y_PRED = "y_pred"
@@ -245,6 +254,7 @@ NER_TEXT = "ner_text"
 DOCUMENT_TRANSFORMER = "document_transformer"
 HF_MODELS = (HF_TEXT, T_FEW, CLIP, NER_TEXT, DOCUMENT_TRANSFORMER)
 MMLAB_MODELS = (MMDET_IMAGE, MMOCR_TEXT_DET, MMOCR_TEXT_RECOG)
+SAM = "sam"
 
 # matcher loss type
 CONTRASTIVE_LOSS = "contrastive_loss"

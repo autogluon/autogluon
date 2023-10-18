@@ -30,6 +30,8 @@ from ..constants import (
     NUMERICAL,
     NUMERICAL_MLP,
     OVD,
+    REAL_WORLD_SEM_SEG_IMG,
+    SAM,
     T_FEW,
     TEXT,
     TEXT_NER,
@@ -52,6 +54,7 @@ from ..models import (
     MultimodalFusionTransformer,
     NumericalMLP,
     OVDModel,
+    SAMForRealWorldSemSeg,
     TFewModel,
     TimmAutoModelForImagePrediction,
 )
@@ -104,6 +107,8 @@ def select_model(
         data_status[TEXT_NER] = True
     if len(df_preprocessor.document_feature_names) > 0:
         data_status[DOCUMENT] = True
+    if len(df_preprocessor.real_world_sem_seg_feature_names) > 0:
+        data_status[REAL_WORLD_SEM_SEG_IMG] = True
 
     names = config.model.names
     if isinstance(names, str):
@@ -367,6 +372,14 @@ def create_model(
             additive_attention=OmegaConf.select(model_config, "additive_attention", default=False),
             share_qv_weights=OmegaConf.select(model_config, "share_qv_weights", default=False),
             pooling_mode=OmegaConf.select(model_config, "pooling_mode", default="cls"),
+        )
+    elif model_name.lower().startswith(SAM):
+        model = SAMForRealWorldSemSeg(
+            prefix=model_name,
+            checkpoint_name=model_config.checkpoint_name,
+            pretrained=pretrained,
+            frozen_layers=OmegaConf.select(model_config, "frozen_layers", default=None),
+            config=model_config,
         )
     else:
         raise ValueError(f"unknown model name: {model_name}")

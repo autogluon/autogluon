@@ -482,6 +482,9 @@ recall = make_scorer("recall", sklearn.metrics.recall_score)
 # Register other metrics
 quadratic_kappa = make_scorer("quadratic_kappa", classification_metrics.quadratic_kappa, needs_proba=False)
 
+binary_iou = make_scorer("binary_iou", sklearn.metrics.jaccard_score, needs_proba=False)
+binary_dice = make_scorer("binary_dice", scipy.spatial.distance.dice, needs_proba=False)
+
 
 def customized_log_loss(y_true, y_pred, eps=1e-15):
     """
@@ -556,6 +559,8 @@ for scorer in [
 for scorer in [
     roc_auc,
     average_precision,
+    binary_iou,
+    binary_dice,
 ]:
     _add_scorer_to_metric_dict(metric_dict=BINARY_METRICS, scorer=scorer)
 

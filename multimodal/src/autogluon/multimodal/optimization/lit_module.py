@@ -214,6 +214,8 @@ class LitModule(pl.LightningModule):
             metric.update(preds=prob[:, 1], target=label)  # only for binary classification
         elif isinstance(metric, BaseAggregator):
             metric.update(custom_metric_func(logits, label))
+        elif isinstance(metric, torchmetrics.classification.BinaryJaccardIndex):
+            metric.update(logits.float(), label)
         else:
             metric.update(logits.squeeze(dim=1).float(), label)
 
@@ -358,6 +360,8 @@ class LitModule(pl.LightningModule):
         else:
             logger.debug("applying single learning rate...")
             grouped_parameters = apply_single_lr(
+                efficient_finetune=self.hparams.efficient_finetune,
+                trainable_param_names=self.trainable_param_names,
                 **kwargs,
             )
 

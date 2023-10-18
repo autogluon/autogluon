@@ -14,6 +14,7 @@ from ..constants import (
     ACCURACY,
     AVERAGE_PRECISION,
     BINARY,
+    BINARY_DICE,
     DIRECT_LOSS,
     F1,
     MAP,
@@ -215,6 +216,8 @@ def compute_score(
         return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED_PROB][:, pos_label])
     elif metric.name in [F1]:  # only for binary classification
         return f1_score(metric_data[Y_TRUE], metric_data[Y_PRED], pos_label=pos_label)
+    elif metric.name == BINARY_DICE:
+        return 1 - metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED])
     else:
         try:
             return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED], y_prob=metric_data[Y_PRED_PROB])
