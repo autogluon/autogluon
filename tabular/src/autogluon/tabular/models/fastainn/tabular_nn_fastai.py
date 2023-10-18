@@ -4,6 +4,7 @@ import copy
 import logging
 import time
 from builtins import classmethod
+from functools import partial
 from pathlib import Path
 from typing import Dict, Union
 
@@ -32,6 +33,7 @@ from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.files import make_temp_directory
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
+from autogluon.tabular.models.tabular_nn.utils.nn_architecture_utils import infer_y_range
 
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
@@ -59,11 +61,16 @@ class NNFastAiTabularModel(AbstractModel):
     """Class for fastai v1 neural network models that operate on tabular data.
 
     Hyperparameters:
-        y_scaler: on a regression problems, the model can give unreasonable predictions on unseen data.
-        This attribute allows to pass a scaler for y values to address this problem. Please note that intermediate
+        'y_scaler': on regression problems, the model can give unreasonable predictions on unseen data.
+        To address this problem, AutoGluon scales y values by default for regression problems.
+        This attribute allows to pass a custom scaler for y values. Please note that intermediate
         iteration metrics will be affected by this transform and as a result intermediate iteration scores will be
         different from the final ones (these will be correct).
         https://scikit-learn.org/stable/modules/classes.html#module-sklearn.preprocessing
+
+        'clipping': on regression problems, extreme outliers of y can hurt performance of the model during training and
+        on unseen data. To address this problem, AutoGluon clips input y values and output predictions by default to a
+        range inferred from the training data. Setting this attribute to False disables clipping.
 
         'layers': list of hidden layers sizes; None - use model's heuristics; default is None
 
@@ -97,6 +104,7 @@ class NNFastAiTabularModel(AbstractModel):
         self._cont_normalization = None
         self._load_model = None  # Whether to load inner model when loading.
         self._num_cpus_infer = None
+        self.clipping = None
 
     def _preprocess_train(self, X, y, X_val, y_val):
         from fastai.data.block import CategoryBlock, RegressionBlock
@@ -222,6 +230,23 @@ class NNFastAiTabularModel(AbstractModel):
                 self.y_scaler = sklearn.preprocessing.MinMaxScaler()
         else:
             self.y_scaler = copy.deepcopy(self.y_scaler)
+
+        self.clipping = params.pop("clipping", True)
+        if self.clipping and (self.problem_type == REGRESSION):
+            # use code and concepts from TorchNN to infer y range. 0.05 follows default from TorchNN.
+            y_min, y_max = infer_y_range(y, y_range_extend=0.05)
+            clip_func = partial(np.clip, a_min=y_min, a_max=y_max)
+
+            steps = [
+                # needs both func and inverse func, as the FastAI model calls inverse_transform.
+                ("clipper", sklearn.preprocessing.FunctionTransformer(func=clip_func, inverse_func=clip_func)),
+            ]
+
+            # Support the case where no scaler is defined.
+            if self.y_scaler is not None:
+                steps.append(("scaler", self.y_scaler))
+
+            self.y_scaler = sklearn.pipeline.Pipeline(steps=steps)
 
         if num_gpus is not None:
             # TODO: Control CPU vs GPU usage during inference
