@@ -2,14 +2,14 @@
 name: Benchmark Master Branch
 on:
   push:
-    branches: ["master"]
+    branches: ["master", "fold_fix"]
   schedule:
     - cron: '00 09 * * SUN' #  UTC 9:00(2:00 PST Time) every Sunday
 
 env:
   AG_MODULE: tabular
   AG_PRESET: medium
-  AG_BENCHMARK: test
+  AG_BENCHMARK: small
   AG_TIME_LIMIT: 1h
   AG_BRANCH_NAME: master
   
