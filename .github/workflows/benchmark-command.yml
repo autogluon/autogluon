@@ -42,7 +42,7 @@ on:
           - 24h
       folds:
         description: 'Number of folds to run'
-        required: false
+        required: true
       branch_or_pr_number:
         description: 'Branch or PR number to run the benchmark on'
         required: true
