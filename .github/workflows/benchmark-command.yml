@@ -104,7 +104,7 @@ jobs:
         shell: bash
     steps:
       - name: Free Disk Space (Ubuntu)
-        # uses: jlumbroso/free-disk-space@v1.2.0
+        # uses: jlumbroso/free-disk-space@v1.2.0 - test
         uses: hirnidrin/free-disk-space@main  # revert back once fix in https://github.com/jlumbroso/free-disk-space/pull/11
         with:
           tool-cache: false
