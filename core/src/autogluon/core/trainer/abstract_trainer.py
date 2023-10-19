@@ -373,6 +373,8 @@ class AbstractTrainer:
         for level in range(level_start, level_end + 1):
             core_kwargs_level = core_kwargs.copy()
             aux_kwargs_level = aux_kwargs.copy()
+            full_weighted_ensemble = aux_kwargs_level.pop("fit_full_last_level_weighted_ensemble", True) and (level == level_end) and (level > 1)
+            additional_full_weighted_ensemble = aux_kwargs_level.pop("full_weighted_ensemble_additionally", False) and full_weighted_ensemble
             if time_limit is not None:
                 time_train_level_start = time.time()
                 levels_left = level_end - level + 1
@@ -396,6 +398,8 @@ class AbstractTrainer:
                 name_suffix=name_suffix,
                 infer_limit=infer_limit,
                 infer_limit_batch_size=infer_limit_batch_size,
+                full_weighted_ensemble=full_weighted_ensemble,
+                additional_full_weighted_ensemble=additional_full_weighted_ensemble,
             )
             model_names_fit += base_model_names + aux_models
         if self.model_best is None and len(model_names_fit) != 0:
@@ -511,6 +515,8 @@ class AbstractTrainer:
         name_suffix: str = None,
         infer_limit=None,
         infer_limit_batch_size=None,
+        full_weighted_ensemble: bool = False,
+        additional_full_weighted_ensemble: bool = False,
     ) -> (List[str], List[str]):
         """
         Similar to calling self.stack_new_level_core, except auxiliary models will also be trained via a call to self.stack_new_level_aux, with the models trained from self.stack_new_level_core used as base models.
@@ -540,21 +546,17 @@ class AbstractTrainer:
             **core_kwargs,
         )
 
-        if X_val is None:
-            aux_models = self.stack_new_level_aux(
-                X=X, y=y, base_model_names=core_models, level=level + 1, infer_limit=infer_limit, infer_limit_batch_size=infer_limit_batch_size, **aux_kwargs
-            )
-        else:
-            aux_models = self.stack_new_level_aux(
-                X=X_val,
-                y=y_val,
-                fit=False,
-                base_model_names=core_models,
-                level=level + 1,
-                infer_limit=infer_limit,
-                infer_limit_batch_size=infer_limit_batch_size,
-                **aux_kwargs,
-            )
+        aux_models = []
+        if full_weighted_ensemble:
+            full_aux_kwargs = aux_kwargs.copy()
+            if additional_full_weighted_ensemble:
+                full_aux_kwargs["name_extra"] = "_ALL"
+            all_base_model_names = self.get_model_names(stack_name="core")  # Fit weighted ensemble on all previously fitted core models
+            aux_models += self._stack_new_level_aux(X_val, y_val, X, y, all_base_model_names, level, infer_limit, infer_limit_batch_size, **full_aux_kwargs)
+
+        if (not full_weighted_ensemble) or additional_full_weighted_ensemble:
+            aux_models += self._stack_new_level_aux(X_val, y_val, X, y, core_models, level, infer_limit, infer_limit_batch_size, **aux_kwargs)
+
         return core_models, aux_models
 
     def stack_new_level_core(
@@ -674,6 +676,24 @@ class AbstractTrainer:
             **kwargs,
         )
 
+    def _stack_new_level_aux(self, X_val, y_val, X, y, core_models, level, infer_limit, infer_limit_batch_size, **kwargs):
+        if X_val is None:
+            aux_models = self.stack_new_level_aux(
+                X=X, y=y, base_model_names=core_models, level=level + 1, infer_limit=infer_limit, infer_limit_batch_size=infer_limit_batch_size, **kwargs
+            )
+        else:
+            aux_models = self.stack_new_level_aux(
+                X=X_val,
+                y=y_val,
+                fit=False,
+                base_model_names=core_models,
+                level=level + 1,
+                infer_limit=infer_limit,
+                infer_limit_batch_size=infer_limit_batch_size,
+                **kwargs,
+            )
+        return aux_models
+
     # TODO: Consider making level be auto-determined based off of max(base_model_levels)+1
     # TODO: Remove name_suffix, hacked in
     # TODO: X can be optional because it isn't needed if fit=True
@@ -692,7 +712,8 @@ class AbstractTrainer:
         infer_limit=None,
         infer_limit_batch_size=None,
         use_val_cache=True,
-        fit_weighted_ensemble=True,
+        fit_weighted_ensemble: bool = True,
+        name_extra: str | None = None,
     ) -> List[str]:
         """
         Trains auxiliary models (currently a single weighted ensemble) using the provided base models.
@@ -702,7 +723,9 @@ class AbstractTrainer:
         if fit_weighted_ensemble is False:
             # Skip fitting of aux models
             return []
+
         base_model_names = self._filter_base_models_via_infer_limit(base_model_names=base_model_names, infer_limit=infer_limit, infer_limit_modifier=0.95)
+
         if len(base_model_names) == 0:
             logger.log(20, f"No base models to train on, skipping auxiliary stack level {level}...")
             return []
@@ -717,6 +740,9 @@ class AbstractTrainer:
             X, w = extract_column(X, self.sample_weight)  # TODO: consider redesign with w as separate arg instead of bundled inside X
             if w is not None:
                 X_stack_preds[self.sample_weight] = w.values / w.mean()
+        child_hyperparameters = None
+        if name_extra is not None:
+            child_hyperparameters = {"ag_args": {"name_suffix": name_extra}}
         return self.generate_weighted_ensemble(
             X=X_stack_preds,
             y=y,
@@ -730,6 +756,7 @@ class AbstractTrainer:
             name_suffix=name_suffix,
             get_models_func=get_models_func,
             check_if_best=check_if_best,
+            child_hyperparameters=child_hyperparameters,
         )
 
     def predict(self, X, model=None):
