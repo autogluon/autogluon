@@ -4,11 +4,12 @@ from typing import Callable, Dict, List, Optional, Tuple, Union
 
 import pandas as pd
 import torch
+import torch.distributed as dist
+import torch.multiprocessing as mp
 from omegaconf import OmegaConf
 from scipy.special import softmax
 from torch import nn
-import torch.distributed as dist
-import torch.multiprocessing as mp
+
 from ..constants import (
     BBOX,
     COLUMN_FEATURES,
@@ -179,11 +180,13 @@ def infer_batch(
     batch_size = len(batch[next(iter(batch))])
     if 1 < num_gpus <= batch_size:
         logger.info(f"Using {num_gpus} GPUs with DDP.")
-        os.environ['MASTER_ADDR'] = 'localhost'
-        os.environ['MASTER_PORT'] = '12355'
+        os.environ["MASTER_ADDR"] = "localhost"
+        os.environ["MASTER_PORT"] = "12355"
         batches = split_batch(batch, num_gpus)
         with mp.Pool(processes=num_gpus) as pool:
-            iterable = [(rank, num_gpus, batches[rank], model, precision, model_postprocess_fn) for rank in range(num_gpus)]
+            iterable = [
+                (rank, num_gpus, batches[rank], model, precision, model_postprocess_fn) for rank in range(num_gpus)
+            ]
             results = pool.starmap(infer_batch_ddp, iterable)
 
         output = {}
@@ -232,7 +235,7 @@ def infer_batch_ddp(rank, world_size, batch, model, precision, model_postprocess
     model_postprocess_fn
         The post-processing function for the model output.
     """
-    device = torch.device(f'cuda:{rank}')
+    device = torch.device(f"cuda:{rank}")
     torch.cuda.set_device(device)
     dist.init_process_group(backend="nccl", rank=rank, world_size=world_size)
     # print(f"Using {world_size} GPUs with rank={rank}.")
@@ -251,6 +254,7 @@ def infer_batch_ddp(rank, world_size, batch, model, precision, model_postprocess
     # print(f"Got output from rank={rank} with value={output[model.module.prefix]}")
     dist.destroy_process_group()
     return output[model.module.prefix]
+
 
 def split_batch(batch: Dict, num_parts: int) -> List[Dict]:
     """
@@ -277,6 +281,7 @@ def split_batch(batch: Dict, num_parts: int) -> List[Dict]:
         split_batch = {k: v[start:end] for k, v in batch.items()}
         split_batches.append(split_batch)
     return split_batches
+
 
 def infer_matcher_batch(
     batch: Dict,
