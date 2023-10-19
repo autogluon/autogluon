@@ -8,7 +8,7 @@ that automatically selects, fuses, and tunes foundation models from popular pack
 You can not only use `AutoMM` to solve standard NLP/Vision tasks
 such as sentiment classification, intent detection, paraphrase detection, image classification, but also use it for multimodal problems that involve image,
 text, tabular features, object bounding boxes, named entities, etc. Moreover, `AutoMM` can be used as a basic model in the multi-layer
-stack-ensemble of [AutoGluon Tabular](https://auto.gluon.ai/stable/tutorials/tabular_prediction/index.html), and is powering up the FT-Transformer in `TabularPredictor`.
+stack-ensemble of [AutoGluon Tabular](https://auto.gluon.ai/stable/tutorials/tabular/index.html), and is powering up the FT-Transformer in `TabularPredictor`.
 
 Here are some example use-cases of AutoMM:
 
