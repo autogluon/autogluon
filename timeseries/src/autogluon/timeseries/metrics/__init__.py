@@ -1,6 +1,6 @@
 import json
 from typing import Union, Type
-from .abstract import TimeSeriesMetric
+from .abstract import TimeSeriesScorer
 from .point import MAE, MAPE, MASE, sMAPE, MSE, RMSE, RMSSE, WAPE
 from .quantile import WQL
 
@@ -33,11 +33,11 @@ AVAILABLE_METRICS = {
 
 
 def check_get_evaluation_metric(
-    eval_metric: Union[str, TimeSeriesMetric, Type[TimeSeriesMetric], None] = None,
-) -> TimeSeriesMetric:
-    if isinstance(metric, Type[TimeSeriesMetric]):
+    eval_metric: Union[str, TimeSeriesScorer, Type[TimeSeriesScorer], None] = None,
+) -> TimeSeriesScorer:
+    if isinstance(metric, Type[TimeSeriesScorer]):
         metric = metric()
-    elif isinstance(metric, TimeSeriesMetric):
+    elif isinstance(metric, TimeSeriesScorer):
         metric = metric
     elif isinstance(metric, str):
         if metric.upper() not in AVAILABLE_METRICS:
@@ -50,6 +50,6 @@ def check_get_evaluation_metric(
         metric = AVAILABLE_METRICS[DEFAULT_METRIC]()
     else:
         raise ValueError(
-            f"eval_metric must be of type str, TimeSeriesMetric or None "
+            f"eval_metric must be of type str, TimeSeriesScorer or None "
             f"(received eval_metric = {eval_metric} of type {type(eval_metric)})"
         )

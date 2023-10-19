@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import List, Optional
 
 import numpy as np
 import pandas as pd
@@ -40,6 +40,12 @@ class TimeSeriesScorer:
     def name(self) -> str:
         return f"{self.__class__.__name__}"
 
+    def __repr__(self) -> str:
+        return self.name
+
+    def __str__(self) -> str:
+        return self.name
+
     @property
     def name_with_sign(self) -> str:
         if self.greater_is_better:
@@ -55,6 +61,7 @@ class TimeSeriesScorer:
         prediction_length: int = 1,
         target: str = "target",
         seasonal_period: Optional[int] = None,
+        quantile_levels: Optional[List[float]] = None,
         **kwargs,
     ) -> float:
         seasonal_period = get_seasonality(data.freq) if seasonal_period is None else seasonal_period
@@ -65,12 +72,18 @@ class TimeSeriesScorer:
         assert (predictions.num_timesteps_per_item() == prediction_length).all()
         assert data_future.index.equals(predictions.index), "Prediction and data indices do not match."
 
-        self.save_past_metrics(data_past=data_past, target=target, seasonal_period=seasonal_period, **kwargs)
+        self.save_past_metrics(
+            data_past=data_past,
+            target=target,
+            seasonal_period=seasonal_period,
+            **kwargs,
+        )
         with warning_filter():
             metric_value = self.compute_metric(
                 data_future=data_future,
                 predictions=predictions,
                 target=target,
+                quantile_levels=quantile_levels,
                 **kwargs,
             )
         self.clear_past_metrics()
@@ -83,6 +96,7 @@ class TimeSeriesScorer:
         data_future: TimeSeriesDataFrame,
         predictions: TimeSeriesDataFrame,
         target: str = "target",
+        quantile_levels: Optional[List[float]] = None,
         **kwargs,
     ) -> float:
         """Internal method that computes the metric for given forecast & actual data.

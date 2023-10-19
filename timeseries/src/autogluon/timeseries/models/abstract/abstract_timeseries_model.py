@@ -12,6 +12,7 @@ from autogluon.core.hpo.executors import HpoExecutor
 from autogluon.core.models import AbstractModel
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.evaluator import TimeSeriesEvaluator
+from autogluon.timeseries.metrics import check_get_evaluation_metric
 from autogluon.timeseries.utils.features import CovariateMetadata
 
 from .model_trial import model_trial, skip_hpo
@@ -316,14 +317,15 @@ class AbstractTimeSeriesModel(AbstractModel):
         metric: Optional[str] = None,
     ) -> float:
         """Compute the score measuring how well the predictions align with the data."""
-        eval_metric = self.eval_metric if metric is None else metric
-        evaluator = TimeSeriesEvaluator(
-            eval_metric=eval_metric,
-            eval_metric_seasonal_period=self.eval_metric_seasonal_period,
+        eval_metric = self.eval_metric if metric is None else check_get_evaluation_metric(metric)
+        return eval_metric.score(
+            data=data,
+            predictions=predictions,
             prediction_length=self.prediction_length,
-            target_column=self.target,
+            target=self.target,
+            seasonal_period=self.eval_metric_seasonal_period,
+            quantile_levels=self.quantile_levels,
         )
-        return evaluator(data, predictions) * evaluator.coefficient
 
     def score(self, data: TimeSeriesDataFrame, metric: Optional[str] = None) -> float:
         """Return the evaluation scores for given metric and dataset. The last
