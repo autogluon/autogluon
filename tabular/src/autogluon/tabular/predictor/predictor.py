@@ -106,7 +106,7 @@ class TabularPredictor:
         For metric source code, see `autogluon.core.metrics`.
 
         You can also pass your own evaluation function here as long as it follows formatting of the functions defined in folder `autogluon.core.metrics`.
-        For detailed instructions on creating and using a custom metric, refer to https://auto.gluon.ai/stable/tutorials/tabular_prediction/tabular-custom-metric.html
+        For detailed instructions on creating and using a custom metric, refer to https://auto.gluon.ai/stable/tutorials/tabular/advanced/tabular-custom-metric.html
     path : Union[str, pathlib.Path], default = None
         Path to directory where models and intermediate outputs should be saved.
         If unspecified, a time-stamped folder called "AutogluonModels/ag-[TIMESTAMP]" will be created in the working directory to store all models.
@@ -503,7 +503,7 @@ class TabularPredictor:
                 Some model types have preset hyperparameter configs keyed under strings as shorthand for a complex model hyperparameter configuration known to work well:
                     'GBM': ['GBMLarge']
             Advanced functionality: Bring your own model / Custom model support
-                AutoGluon fully supports custom models. For a detailed tutorial on creating and using custom models with AutoGluon, refer to https://auto.gluon.ai/stable/tutorials/tabular_prediction/tabular-custom-model.html
+                AutoGluon fully supports custom models. For a detailed tutorial on creating and using custom models with AutoGluon, refer to https://auto.gluon.ai/stable/tutorials/tabular/advanced/tabular-custom-model.html
             Advanced functionality: Custom stack levels
                 By default, AutoGluon re-uses the same models and model hyperparameters at each level during stack ensembling.
                 To customize this behaviour, create a hyperparameters dictionary separately for each stack level, and then add them as values to a new dictionary, with keys equal to the stack level.
@@ -548,7 +548,7 @@ class TabularPredictor:
                 XGB: `autogluon.tabular.models.xgboost.hyperparameters.parameters`
                      See also the XGBoost docs: https://xgboost.readthedocs.io/en/latest/parameter.html
                 FASTAI: `autogluon.tabular.models.fastainn.hyperparameters.parameters`
-                     See also the FastAI docs: https://docs.fast.ai/tabular.models.html
+                     See also the FastAI docs: https://docs.fast.ai/tabular.learner.html
                 RF: See sklearn documentation: https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestClassifier.html
                     Note: Hyperparameter tuning is disabled for this model.
                 XT: See sklearn documentation: https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.ExtraTreesClassifier.html
@@ -3440,7 +3440,7 @@ class TabularPredictor:
         $ sudo apt-get install graphviz graphviz-dev
         $ pip install pygraphviz
 
-        For other platforms, refer to https://graphviz.org/ for Graphviz install, and https://pygraphviz.github.io/documentation.html for PyGraphviz.
+        For other platforms, refer to https://graphviz.org/ for Graphviz install, and https://pygraphviz.github.io/ for PyGraphviz.
 
         Parameters
         ----------
