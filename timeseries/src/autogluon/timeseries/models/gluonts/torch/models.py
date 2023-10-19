@@ -80,7 +80,6 @@ class DeepARModel(AbstractGluonTSModel):
         Early stop training if the validation loss doesn't improve for this many epochs.
     """
 
-    default_num_samples: int = 250
     supports_known_covariates = True
 
     def _get_estimator_class(self) -> Type[GluonTSEstimator]:
@@ -380,7 +379,6 @@ class WaveNetModel(AbstractGluonTSModel):
         Weight decay regularization parameter.
     """
 
-    default_num_samples: int = 250
     supports_known_covariates = True
 
     def _get_estimator_class(self) -> Type[GluonTSEstimator]:
