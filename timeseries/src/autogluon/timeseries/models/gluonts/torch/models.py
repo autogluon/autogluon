@@ -13,7 +13,7 @@ from autogluon.timeseries.utils.datetime import (
     get_seasonality,
 )
 
-# NOTE: We avoid imports for torch and pytorch_lightning at the top level and hide them inside class methods.
+# NOTE: We avoid imports for torch and lightning.pytorch at the top level and hide them inside class methods.
 # This is done to skip these imports during multiprocessing (which may cause bugs)
 
 # FIXME: introduces cpflows dependency. We exclude this model until a future release.
@@ -64,7 +64,7 @@ class DeepARModel(AbstractGluonTSModel):
         Distribution to use to evaluate observations and sample predictions
     scaling: bool, default = True
         Whether to automatically scale the target values
-    epochs : int, default = 100
+    max_epochs : int, default = 100
         Number of epochs the model will be trained for
     batch_size : int, default = 64
         Size of batches used during training
@@ -72,7 +72,7 @@ class DeepARModel(AbstractGluonTSModel):
         Size of batches used during prediction.
     num_batches_per_epoch : int, default = 50
         Number of batches processed every epoch
-    learning_rate : float, default = 1e-3,
+    lr : float, default = 1e-3,
         Learning rate used during training
     trainer_kwargs : dict, optional
         Optional keyword arguments passed to ``lightning.Trainer``.
@@ -118,7 +118,7 @@ class SimpleFeedForwardModel(AbstractGluonTSModel):
         Whether to use batch normalization
     mean_scaling : bool, default = True
         Scale the network input by the data mean and the network output by its inverse
-    epochs : int, default = 100
+    max_epochs : int, default = 100
         Number of epochs the model will be trained for
     batch_size : int, default = 64
         Size of batches used during training
@@ -126,7 +126,7 @@ class SimpleFeedForwardModel(AbstractGluonTSModel):
         Size of batches used during prediction.
     num_batches_per_epoch : int, default = 50
         Number of batches processed every epoch
-    learning_rate : float, default = 1e-3,
+    lr : float, default = 1e-3,
         Learning rate used during training
     trainer_kwargs : dict, optional
         Optional keyword arguments passed to ``lightning.Trainer``.
@@ -175,7 +175,7 @@ class TemporalFusionTransformerModel(AbstractGluonTSModel):
         Number of attention heads in self-attention layer in the decoder.
     dropout_rate : float, default = 0.1
         Dropout regularization parameter
-    epochs : int, default = 100
+    max_epochs : int, default = 100
         Number of epochs the model will be trained for
     batch_size : int, default = 64
         Size of batches used during training
@@ -183,7 +183,7 @@ class TemporalFusionTransformerModel(AbstractGluonTSModel):
         Size of batches used during prediction.
     num_batches_per_epoch : int, default = 50
         Number of batches processed every epoch
-    learning_rate : float, default = 1e-3,
+    lr : float, default = 1e-3,
         Learning rate used during training
     trainer_kwargs : dict, optional
         Optional keyword arguments passed to ``lightning.Trainer``.
@@ -239,7 +239,7 @@ class DLinearModel(AbstractGluonTSModel):
         Distribution to fit.
     scaling : {"mean", "std", None}, default = "mean"
         Scaling applied to the inputs. One of ``"mean"`` (mean absolute scaling), ``"std"`` (standardization), ``None`` (no scaling).
-    epochs : int, default = 100
+    max_epochs : int, default = 100
         Number of epochs the model will be trained for
     batch_size : int, default = 64
         Size of batches used during training
@@ -247,7 +247,7 @@ class DLinearModel(AbstractGluonTSModel):
         Size of batches used during prediction.
     num_batches_per_epoch : int, default = 50
         Number of batches processed every epoch
-    learning_rate : float, default = 1e-3,
+    lr : float, default = 1e-3,
         Learning rate used during training
     trainer_kwargs : dict, optional
         Optional keyword arguments passed to ``lightning.Trainer``.
@@ -297,13 +297,13 @@ class PatchTSTModel(AbstractGluonTSModel):
         Distribution to fit.
     scaling : {"mean", "std", None}, default = "mean"
         Scaling applied to the inputs. One of ``"mean"`` (mean absolute scaling), ``"std"`` (standardization), ``None`` (no scaling).
-    epochs : int, default = 100
+    max_epochs : int, default = 100
         Number of epochs the model will be trained for
     batch_size : int, default = 64
         Size of batches used during training
     num_batches_per_epoch : int, default = 50
         Number of batches processed every epoch
-    learning_rate : float, default = 1e-3,
+    lr : float, default = 1e-3,
         Learning rate used during training
     weight_decay : float, default = 1e-8
         Weight decay regularization parameter.
@@ -327,7 +327,8 @@ class PatchTSTModel(AbstractGluonTSModel):
 class WaveNetModel(AbstractGluonTSModel):
     """WaveNet estimator that uses the architecture proposed in [Oord2016] with quantized targets.
 
-    The model is trained using the cross-entropy loss.
+    The model is based on a CNN architecture with dilated convolutions. Time series values are quantized into buckets
+    and the model is trained using the cross-entropy loss.
 
     Based on `gluonts.torch.model.wavenet.WaveNetEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.torch.model.wavenet.html>`_.
     See GluonTS documentation for additional hyperparameters.
@@ -340,15 +341,28 @@ class WaveNetModel(AbstractGluonTSModel):
 
     Other Parameters
     ----------------
-    context_length : int, default = 96
-        Number of time units that condition the predictions
-    hidden_dimension: int, default = 20
-        Size of hidden layers in the feedforward network
-    distr_output : gluonts.torch.distributions.DistributionOutput, default = StudentTOutput()
-        Distribution to fit.
-    scaling : {"mean", "std", None}, default = "mean"
-        Scaling applied to the inputs. One of ``"mean"`` (mean absolute scaling), ``"std"`` (standardization), ``None`` (no scaling).
-    epochs : int, default = 100
+    num_bins : int, default = 1024
+        Number of bins used for quantization of the time series.
+    num_residual_channels : int, default = 24
+        Number of residual channels in WaveNet architecture.
+    num_skip_channels : int, default = 32
+        Number of skip channels in WaveNet architecture, by default 32
+    dilation_depth : int or None, default = None
+        Number of dilation layers in WaveNet architecture. If set to None (default), dilation_depth is set such that 
+        the receptive length is at least as long as the ``seasonality`` and at least ``2 * prediction_length``.
+    num_stacks : int, default = 1
+        Number of dilation stacks in WaveNet architecture.
+    temperature : float, default = 1.0
+        Temperature used for sampling from softmax distribution.
+    seasonality : int, optional
+        The seasonality of the time series. By default is set based on the ``freq`` of the data.
+    embedding_dimension : int, default = 5
+        The dimension of the embeddings for categorical features.
+    use_log_scale_feature : bool, default = True
+        If True, logarithm of the scale of the past data will be used as an additional static feature.
+    negative_data : bool, default = True
+        Flag indicating whether the time series take negative values.
+    max_epochs : int, default = 100
         Number of epochs the model will be trained for
     batch_size : int, default = 64
         Size of batches used during training
@@ -356,7 +370,7 @@ class WaveNetModel(AbstractGluonTSModel):
         Size of batches used during prediction.
     num_batches_per_epoch : int, default = 50
         Number of batches processed every epoch
-    learning_rate : float, default = 1e-3,
+    lr : float, default = 1e-3,
         Learning rate used during training
     trainer_kwargs : dict, optional
         Optional keyword arguments passed to ``lightning.Trainer``.
@@ -365,6 +379,9 @@ class WaveNetModel(AbstractGluonTSModel):
     weight_decay : float, default = 1e-8
         Weight decay regularization parameter.
     """
+
+    default_num_samples: int = 250
+    supports_known_covariates = True
 
     def _get_estimator_class(self) -> Type[GluonTSEstimator]:
         from gluonts.torch.model.wavenet import WaveNetEstimator
@@ -379,6 +396,7 @@ class WaveNetModel(AbstractGluonTSModel):
             [1] if len(self.feat_static_cat_cardinality) == 0 else self.feat_static_cat_cardinality
         )
         init_kwargs["num_feat_dynamic_real"] = self.num_feat_dynamic_real
+        init_kwargs.setdefault("negative_data", self.negative_data)
         init_kwargs.setdefault("seasonality", get_seasonality(self.freq))
         init_kwargs.setdefault("time_features", get_time_features_for_frequency(self.freq))
         return init_kwargs
