@@ -55,7 +55,6 @@ Be sure to select the *Source* option from the installation preferences.
 
 - All code should adhere to the [PEP8 style](https://www.python.org/dev/peps/pep-0008/).
 
-
 - After you have edited the code, ensure your changes pass the unit tests via:
 ```
 cd common/
