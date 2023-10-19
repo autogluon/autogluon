@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import Callable, Dict, List, Optional, Tuple, Union
 
 import pandas as pd
@@ -6,7 +7,8 @@ import torch
 from omegaconf import OmegaConf
 from scipy.special import softmax
 from torch import nn
-
+import torch.distributed as dist
+import torch.multiprocessing as mp
 from ..constants import (
     BBOX,
     COLUMN_FEATURES,
@@ -176,7 +178,30 @@ def infer_batch(
     device = torch.device(device_type)
     batch_size = len(batch[next(iter(batch))])
     if 1 < num_gpus <= batch_size:
-        model = nn.parallel.DistributedDataParallel(model)
+        logger.info(f"Using {num_gpus} GPUs with DDP.")
+        os.environ['MASTER_ADDR'] = 'localhost'
+        os.environ['MASTER_PORT'] = '12355'
+        batches = split_batch(batch, num_gpus)
+        with mp.Pool(processes=num_gpus) as pool:
+            iterable = [(rank, num_gpus, batches[rank], model, precision, model_postprocess_fn) for rank in range(num_gpus)]
+            results = pool.starmap(infer_batch_ddp, iterable)
+
+        output = {}
+        for key in results[0].keys():
+            # Check value type
+            if isinstance(results[0][key], torch.Tensor):
+                if results[0][key].ndim > 0:
+                    # If tensor with dimensions, concatenate
+                    output[key] = torch.cat([result[key] for result in results], dim=0)
+                else:
+                    # If scalar tensor, sum
+                    output[key] = sum(result[key] for result in results)
+            else:
+                # If scalar or other type, sum or apply appropriate operation
+                output[key] = sum(result[key] for result in results)
+
+        return output
+    model = nn.DataParallel(model)
     model.to(device).eval()
     batch = move_to_device(batch, device=device)
     precision_context = get_precision_context(precision=precision, device_type=device_type)
@@ -185,13 +210,78 @@ def infer_batch(
         if model_postprocess_fn:
             output = model_postprocess_fn(output)
 
-    if isinstance(model, nn.parallel.DistributedDataParallel):
+    if isinstance(model, nn.DataParallel):
         model = model.module
     else:
         model = model
     output = move_to_device(output, device=torch.device("cpu"))
     return output[model.prefix]
 
+
+def infer_batch_ddp(rank, world_size, batch, model, precision, model_postprocess_fn):
+    """
+    Perform inference for a batch using DistributedDataParallel (DDP) in a separate process inside a group.
+
+    Parameters
+    ----------
+    rank
+        The rank of the current process in the group.
+    world_size
+        The total number of processes in the group.
+    batch
+        The batch data.
+    model
+        A Pytorch model.
+    precision
+        The desired precision used in inference.
+    model_postprocess_fn
+        The post-processing function for the model output.
+    """
+    device = torch.device(f'cuda:{rank}')
+    torch.cuda.set_device(device)
+    dist.init_process_group(backend="nccl", rank=rank, world_size=world_size)
+    # print(f"Using {world_size} GPUs with rank={rank}.")
+    model = model.to(device)
+    model = nn.parallel.DistributedDataParallel(model, device_ids=[rank], output_device=rank)
+    model.eval()
+    batch = move_to_device(batch, device=device)
+    precision_context = get_precision_context(precision=precision, device_type="cuda")
+    output = None
+    with precision_context, torch.no_grad():
+        output = run_model(model, batch)
+        if model_postprocess_fn:
+            output = model_postprocess_fn(output)
+
+    output = move_to_device(output, device=torch.device("cpu"))
+    # print(f"Got output from rank={rank} with value={output[model.module.prefix]}")
+    dist.destroy_process_group()
+    return output[model.module.prefix]
+
+def split_batch(batch: Dict, num_parts: int) -> List[Dict]:
+    """
+    Split a batch into equal parts.
+
+    Parameters
+    ----------
+    batch
+        The input batch.
+    num_parts
+        The number of parts to split the batch into.
+
+    Returns
+    -------
+    A list of split batches.
+    """
+    split_batches = []
+    keys = list(batch.keys())
+    batch_size = len(batch[keys[0]])
+    size_per_part = batch_size // num_parts
+    for i in range(num_parts):
+        start = i * size_per_part
+        end = start + size_per_part if i < num_parts - 1 else batch_size
+        split_batch = {k: v[start:end] for k, v in batch.items()}
+        split_batches.append(split_batch)
+    return split_batches
 
 def infer_matcher_batch(
     batch: Dict,
