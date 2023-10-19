@@ -646,7 +646,6 @@ def update_hyperparameters(
     presets,
     provided_hyperparameters,
     provided_hyperparameter_tune_kwargs,
-    teacher_predictor: Optional[str] = None,
 ):
     """
     Update preset hyperparameters hyperparameter_tune_kwargs by the provided.
@@ -663,8 +662,6 @@ def update_hyperparameters(
         The hyperparameters provided by users.
     provided_hyperparameter_tune_kwargs
         The hyperparameter_tune_kwargs provided by users.
-    teacher_predictor
-        The path of a saved teacher predictor, used for distillation HPO.
 
     Returns
     -------
@@ -687,10 +684,6 @@ def update_hyperparameters(
         assert isinstance(
             hyperparameters, dict
         ), "Please provide hyperparameters as a dictionary if you want to do HPO"
-        if teacher_predictor is not None:
-            assert isinstance(
-                teacher_predictor, str
-            ), "HPO with distillation only supports passing a path to the predictor"
 
     return hyperparameters, hyperparameter_tune_kwargs
 

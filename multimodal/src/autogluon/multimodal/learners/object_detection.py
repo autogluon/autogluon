@@ -92,7 +92,7 @@ class ObjectDetectionLearner(BaseLearner):
         max_num_tuning_data: Optional[int],
         seed: Optional[int],
     ):
-        #TODO: remove self from calling setup_detection_train_tuning_data()
+        # TODO: remove self from calling setup_detection_train_tuning_data()
         train_data, tuning_data = setup_detection_train_tuning_data(
             predictor=self,
             train_data=train_data,
@@ -109,10 +109,9 @@ class ObjectDetectionLearner(BaseLearner):
         self._train_data = train_data
         self._tuning_data = tuning_data
 
-    def _infer_output_shape(self, **kwargs):
-        assert self._output_shape is not None, f"self._output_shape should have been set in __init__"
-
-        return self._output_shape
+    def infer_output_shape(self, **kwargs):
+        # TODO: support inferring output during fit()?
+        assert self._output_shape is not None, f"output_shape should have been set in the learner initialization."
 
     def _get_data_module(
         self, train_df, val_df, df_preprocessor, data_processors, val_use_training_mode

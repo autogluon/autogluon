@@ -26,7 +26,6 @@ from torch import nn
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_ray
 from autogluon.core.metrics import Scorer
-from autogluon.core.utils import default_holdout_frac, generate_train_test_split_combined
 from autogluon.core.utils.loaders import load_pd
 
 from .. import version as ag_version
@@ -155,7 +154,7 @@ from ..utils import (
     save_result_df,
     save_text_tokenizers,
     select_model,
-    setup_detection_train_tuning_data,
+    split_train_tuning_data,
     setup_save_path,
     split_hyperparameters,
     tensor_to_ndarray,
@@ -303,6 +302,7 @@ class BaseLearner(ExportMixin):
         self._label_column = label
         self._presets = presets.lower() if presets else None
         self._validation_metric_name = validation_metric.lower() if validation_metric else None
+        self._minmax_mode = None
         self._output_shape = num_classes
         self._classes = classes
         self._ckpt_path = None
@@ -322,8 +322,13 @@ class BaseLearner(ExportMixin):
         self._fit_called = False  # While using ddp, after fit called, we can only use single gpu.
         self._save_path = path
         self._hyperparameters = hyperparameters
+        self._advanced_hyperparameters = None
+        self._hyperparameter_tune_kwargs = None
         self._train_data = None
         self._tuning_data = None
+        self._is_hpo = False
+        self._teacher_learner = None
+        self._fit_args = None
         # Summary statistics used in fit summary. TODO: wrap it in a class.
         self._total_train_time = None
         self._best_score = None
@@ -376,23 +381,27 @@ class BaseLearner(ExportMixin):
             )
 
     def infer_problem_type(self, train_data: pd.DataFrame):
+        if self._fit_called:
+            return
         if self._label_column:
             self._problem_type = infer_problem_type(
                 y_train_data=train_data[self._label_column],
                 provided_problem_type=self._problem_type,
             )
 
-    def setup_save_path(self, save_path: str, fit_called: bool):
+    def setup_save_path(self, save_path: str):
         self._save_path = setup_save_path(
             resume=self._resume,
             old_save_path=self._save_path,
             proposed_save_path=save_path,
             raise_if_exist=True,
             warn_if_exist=False,
-            fit_called=fit_called,
+            fit_called=self._fit_called,
         )
 
     def infer_column_types(self, column_types: Dict):
+        if self._fit_called:
+            return
         self._column_types = infer_column_types(
             data=self._train_data,
             valid_data=self._tuning_data,
@@ -404,6 +413,8 @@ class BaseLearner(ExportMixin):
         logger.debug(f"image columns: {[k for k, v in column_types.items() if v == 'image_path']}")
 
     def infer_output_shape(self):
+        if self._fit_called:
+            return
         self._output_shape = infer_output_shape(
             label_column=self._label_column,
             data=self._train_data,
@@ -417,8 +428,12 @@ class BaseLearner(ExportMixin):
             tuning_data = load_pd.load(tuning_data)
 
         if tuning_data is None:
-            self._train_data, tuning_data = self.split_train_tuning(
-                data=train_data, holdout_frac=holdout_frac, random_state=seed,
+            train_data, tuning_data = split_train_tuning_data(
+                data=train_data,
+                holdout_frac=holdout_frac,
+                problem_type=self._problem_type,
+                label_column=self._label_column,
+                random_state=seed,
             )
 
         self._train_data = train_data
@@ -429,37 +444,131 @@ class BaseLearner(ExportMixin):
         scarcity_mode = infer_scarcity_mode_by_data_size(
             df_train=self._train_data, scarcity_threshold=50
         )  # Add as separate hyperparameter somewhere?
-        if scarcity_mode == FEW_SHOT and (not presets or FEW_SHOT not in presets):  # TODO: check for data  type
+        if scarcity_mode == FEW_SHOT and (not self._presets or FEW_SHOT not in self._presets):  # TODO: check for data type
             logger.info(
                 f"Detected data scarcity. Consider running using the preset '{FEW_SHOT_TEXT_CLASSIFICATION}' for better performance."
             )
+
+    def update_attributes(self, presets: str, config: Dict, teacher_learner: Union[str, BaseLearner]):
+        if presets:
+            if self._fit_called:
+                warnings.warn("Ignoring the provided `presets` as fit() was called before.", UserWarning)
+            else:
+                self._presets = presets
+
+        if config:
+            if self._fit_called:
+                warnings.warn("Ignoring the provided `config` as fit() was called before.", UserWarning)
+            else:
+                self._config = config
+
+        if teacher_learner:
+            self._teacher_learner = teacher_learner
+
+    def infer_validation_metric(self):
+        if self._fit_called:
+            return
+
+        self._validation_metric_name, self._eval_metric_name = infer_metrics(
+            problem_type=self._problem_type,
+            eval_metric_name=self._eval_metric_name,
+            validation_metric_name=self._validation_metric_name,
+        )
+        self._minmax_mode = get_minmax_mode(self._validation_metric_name)
+
+    def update_hyperparameters(self, hyperparameters: Dict, hyperparameter_tune_kwargs: Dict):
+        if self._hyperparameters and hyperparameters:
+            self._hyperparameters.update(hyperparameters)
+        elif hyperparameters:
+            self._hyperparameters = hyperparameters
+
+        if self._hyperparameter_tune_kwargs and hyperparameter_tune_kwargs:
+            self._hyperparameter_tune_kwargs.update(hyperparameter_tune_kwargs)
+        elif hyperparameter_tune_kwargs:
+            self._hyperparameter_tune_kwargs = hyperparameter_tune_kwargs
+
+        self._hyperparameters, self._hyperparameter_tune_kwargs = update_hyperparameters(
+            problem_type=self._problem_type,
+            presets=self._presets,
+            provided_hyperparameters=self._hyperparameters,
+            provided_hyperparameter_tune_kwargs=self._hyperparameter_tune_kwargs,
+        )
+        # split out the hyperparameters whose values are complex objects
+        self._hyperparameters, self._advanced_hyperparameters = split_hyperparameters(self._hyperparameters)
+        self._is_hpo = True if self._hyperparameter_tune_kwargs else False
+        if self._is_hpo:
+            try_import_ray()
+            self._hyperparameters = filter_hyperparameters(
+                hyperparameters=self._hyperparameters,
+                column_types=self._column_types,
+                config=self._config,
+                fit_called=self._fit_called,
+            )
+
+    def fit_sanity_check(self):
+        assert not self._resume or not self._is_hpo, "You can not resume training with HPO."
+        if self._is_hpo and self._teacher_learner is not None:
+            assert isinstance(
+                self._teacher_learner, str
+            ), "HPO with distillation only supports passing a path to the predictor."
+
+    def prepare_for_fit_args(self, time_limit: int, seed: int, standalone: bool, clean_ckpts: bool):
+        if time_limit is not None:
+            time_limit = timedelta(seconds=time_limit)
+        self._fit_args = dict(
+            train_df=self._train_data,
+            val_df=self._tuning_data,
+            validation_metric_name=self._validation_metric_name,
+            minmax_mode=self._minmax_mode,
+            max_time=time_limit,
+            save_path=self._save_path,
+            ckpt_path=None if self._is_hpo else self._ckpt_path,
+            resume=False if self._is_hpo else self._resume,
+            enable_progress_bar=False if self._is_hpo else self._enable_progress_bar,
+            seed=seed,
+            presets=self._presets,
+            config=self._config,
+            hyperparameters=self._hyperparameters,
+            advanced_hyperparameters=self._advanced_hyperparameters,
+            teacher_learner=self._teacher_learner,
+            standalone=standalone,
+            is_hpo=self._is_hpo,  # skip average checkpoint if in hpo mode
+            clean_ckpts=clean_ckpts,
+        )
+
+    def execute_fit(self):
+        if self._is_hpo:
+            self._fit_args["predictor"] = self
+            hyperparameter_tune(
+                hyperparameter_tune_kwargs=self._hyperparameter_tune_kwargs,
+                resources=dict(num_gpus=ResourceManager.get_gpu_count_torch()),  # TODO: allow customizing GPUs
+                **self._fit_args,
+            )
+        else:
+            self.fit_single_run(**self._fit_args)
 
     def fit(
         self,
         train_data: Union[pd.DataFrame, str],
         presets: Optional[str] = None,
-        config: Optional[dict] = None,
+        config: Optional[Dict] = None,
         tuning_data: Optional[Union[pd.DataFrame, str]] = None,
         max_num_tuning_data: Optional[int] = None,
         time_limit: Optional[int] = None,
         save_path: Optional[str] = None,
         hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
-        column_types: Optional[dict] = None,
+        column_types: Optional[Dict] = None,
         holdout_frac: Optional[float] = None,
         teacher_learner: Union[str, BaseLearner] = None,
         seed: Optional[int] = 0,
         standalone: Optional[bool] = True,
-        hyperparameter_tune_kwargs: Optional[dict] = None,
+        hyperparameter_tune_kwargs: Optional[Dict] = None,
         clean_ckpts: Optional[bool] = True,
     ):
         self.ensure_fitting_ready()
-
-        fit_called = self._fit_called  # used in current function
-        self._fit_called = True
-
         training_start = time.time()
-
-        self.setup_save_path(save_path=save_path, fit_called=fit_called)
+        self.update_attributes(presets=presets, config=config, teacher_learner=teacher_learner)
+        self.setup_save_path(save_path=save_path)
         self.infer_problem_type(train_data=train_data)
         self.prepare_for_train_tuning_data(
             train_data=train_data,
@@ -468,172 +577,28 @@ class BaseLearner(ExportMixin):
             max_num_tuning_data=max_num_tuning_data,
             seed=seed,
         )
-
-        if self._presets is not None:
-            # FIXME: Silently ignoring user input, there should be a warning
-            presets = self._presets
-        else:
-            self._presets = presets
-
-        if self._config is not None:  # continuous training
-            # FIXME: Silently ignoring user input, there should be a warning
-            config = self._config
-
         self.infer_column_types(column_types=column_types)
         self.infer_output_shape()
-
-        if self._column_types is not None and self._column_types != column_types:
-            warnings.warn(
-                f"Inferred column types {column_types} are inconsistent with "
-                f"the previous {self._column_types}. "
-                f"New columns will not be used in the current training."
-            )
-            # use previous column types to avoid inconsistency with previous numerical mlp and categorical mlp
-            column_types = self._column_types
-
-        if self._problem_type != OBJECT_DETECTION:
-            if self._output_shape is not None and output_shape is not None:
-                assert self._output_shape == output_shape, (
-                    f"Inferred output shape {output_shape} is different from " f"the previous {self._output_shape}"
-                )
-            else:
-                self._output_shape = output_shape
-
-        if self._validation_metric_name is None or self._eval_metric_name is None:
-            validation_metric_name, eval_metric_name = infer_metrics(
-                problem_type=self._problem_type,
-                eval_metric_name=self._eval_metric_name,
-                validation_metric_name=self._validation_metric_name,
-            )
-        else:
-            validation_metric_name = self._validation_metric_name
-            eval_metric_name = self._eval_metric_name
-        minmax_mode = get_minmax_mode(validation_metric_name)
-
-        if time_limit is not None:
-            time_limit = timedelta(seconds=time_limit)
-
-        # set attributes for saving and prediction
-        self._eval_metric_name = (
-            eval_metric_name if self._eval_metric_name is None else self._eval_metric_name
-        )  # In case eval_metric isn't provided in __init__().
-        self._validation_metric_name = validation_metric_name
-        self._column_types = column_types
-
-        if self._hyperparameters and hyperparameters:
-            self._hyperparameters.update(hyperparameters)
-        elif hyperparameters:
-            self._hyperparameters = hyperparameters
-
-        hyperparameters, hyperparameter_tune_kwargs = update_hyperparameters(
-            problem_type=self._problem_type,
-            presets=presets,
-            provided_hyperparameters=self._hyperparameters,
-            provided_hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-            teacher_predictor=teacher_predictor,
-        )
-        # split out the hyperparameters whose values are complex objects
-        hyperparameters, advanced_hyperparameters = split_hyperparameters(hyperparameters)
-
-        hpo_mode = True if hyperparameter_tune_kwargs else False
-        if hpo_mode:
-            try_import_ray()
-            hyperparameters = filter_hyperparameters(
-                hyperparameters=hyperparameters,
-                column_types=column_types,
-                config=config,
-                fit_called=fit_called,
-            )
-
-        _fit_args = dict(
-            train_df=train_data,
-            val_df=tuning_data,
-            validation_metric_name=validation_metric_name,
-            minmax_mode=minmax_mode,
-            max_time=time_limit,
-            save_path=self._save_path,
-            ckpt_path=None if hpo_mode else self._ckpt_path,
-            resume=False if hpo_mode else self._resume,
-            enable_progress_bar=False if hpo_mode else self._enable_progress_bar,
-            seed=seed,
-            presets=presets,
-            config=config,
+        self.infer_validation_metric()
+        self.update_hyperparameters(
             hyperparameters=hyperparameters,
-            advanced_hyperparameters=advanced_hyperparameters,
-            teacher_predictor=teacher_predictor,
+            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+        )
+        self.fit_sanity_check()
+        self.prepare_for_fit_args(
+            time_limit=time_limit,
+            seed=seed,
             standalone=standalone,
-            hpo_mode=hpo_mode,  # skip average checkpoint if in hpo mode
             clean_ckpts=clean_ckpts,
         )
-
-        if hpo_mode:
-            # TODO: allow custom gpu
-            assert self._resume is False, "You can not resume training with HPO"
-            resources = dict(num_gpus=ResourceManager.get_gpu_count_torch())
-            if _fit_args["max_time"] is not None:
-                _fit_args["max_time"] *= 0.95  # give some buffer time to ray lightning trainer
-            _fit_args["predictor"] = self
-            predictor = hyperparameter_tune(
-                hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-                resources=resources,
-                **_fit_args,
-            )
-            return predictor
-
-        self._fit(**_fit_args)
+        self.execute_fit()
+        self._fit_called = True
         training_end = time.time()
         self._total_train_time = training_end - training_start
-
         # TODO(?) We should have a separate "_post_training_event()" for logging messages.
         logger.info(get_fit_complete_message(self._save_path))
 
         return self
-
-    def split_train_tuning(
-        self, data: pd.DataFrame, holdout_frac: float = None, random_state: int = 0
-    ) -> (pd.DataFrame, pd.DataFrame):
-        """
-        Splits `data` into `train_data` and `tuning_data`.
-        If the problem_type is one of ['binary', 'multiclass']:
-            The split will be done with stratification on the label column.
-            Will guarantee at least 1 sample of every class in `data` will be present in `train_data`.
-                If only 1 sample of a class exists, it will always be put in `train_data` and not `tuning_data`.
-
-        Parameters
-        ----------
-        data : pd.DataFrame
-            The data to be split
-        holdout_frac : float, default = None
-            The ratio of data to use as validation.
-            If 0.2, 20% of the data will be used for validation, and 80% for training.
-            If None, the ratio is automatically determined,
-            ranging from 0.2 for small row count to 0.01 for large row count.
-        random_state : int, default = 0
-            The random state to use when splitting the data, to make the splitting process deterministic.
-            If None, a random value is used.
-
-        Returns
-        -------
-        Tuple of (train_data, tuning_data) of the split `data`
-        """
-        if holdout_frac is None:
-            holdout_frac = default_holdout_frac(num_train_rows=len(data), hyperparameter_tune=False)
-
-        # TODO: Hack since the recognized problem types are only binary, multiclass, and regression
-        #  Problem types used for purpose of stratification, so regression = no stratification
-        if self._problem_type in [BINARY, MULTICLASS]:
-            problem_type_for_split = self._problem_type
-        else:
-            problem_type_for_split = REGRESSION
-
-        train_data, tuning_data = generate_train_test_split_combined(
-            data=data,
-            label=self.label,
-            test_size=holdout_frac,
-            problem_type=problem_type_for_split,
-            random_state=random_state,
-        )
-        return train_data, tuning_data
 
     def init_pretrained(self):
         # split out the hyperparameters whose values are complex objects
@@ -667,9 +632,9 @@ class BaseLearner(ExportMixin):
                     f"running `predictor.predict()`, `predictor.evaluate()` or `predictor.extract_embedding()`."
                 )
             else:
-                self._init_pretrained()
+                self.init_pretrained()
 
-    def _fit(
+    def fit_single_run(
         self,
         train_df: pd.DataFrame,
         val_df: pd.DataFrame,
@@ -685,8 +650,8 @@ class BaseLearner(ExportMixin):
         config: Optional[dict] = None,
         hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
         advanced_hyperparameters: Optional[Dict] = None,
-        teacher_predictor: Union[str, BaseLearner] = None,
-        hpo_mode: bool = False,
+        teacher_learner: Union[str, BaseLearner] = None,
+        is_hpo: bool = False,
         standalone: bool = True,
         clean_ckpts: bool = True,
         **hpo_kwargs,
@@ -1003,7 +968,7 @@ class BaseLearner(ExportMixin):
             model_summary,
         ]
 
-        if hpo_mode:
+        if is_hpo:
             from .utils.hpo import get_ray_tune_ckpt_callback
 
             TuneReportCheckpointCallback = get_ray_tune_ckpt_callback()
@@ -1051,7 +1016,7 @@ class BaseLearner(ExportMixin):
                 1,
             )
 
-        if not hpo_mode:
+        if not is_hpo:
             if num_gpus <= 1:
                 if config.env.strategy == DEEPSPEED_OFFLOADING:  # Offloading currently only tested for single GPU
                     assert version.parse(pl.__version__) >= version.parse(
@@ -1129,7 +1094,7 @@ class BaseLearner(ExportMixin):
         if trainer.global_rank == 0:
             # We do not perform averaging checkpoint in the case of hpo for each trial
             # We only average the checkpoint of the best trial at the end in the master process.
-            if not hpo_mode:
+            if not is_hpo:
                 self._top_k_average(
                     model=model,
                     save_path=save_path,

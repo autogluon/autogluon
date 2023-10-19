@@ -464,14 +464,14 @@ class MultiModalMatcher:
         if isinstance(tuning_data, str):
             tuning_data = load_pd.load(tuning_data)
 
-        train_data, tuning_data = split_train_tuning_data(
-            train_data=train_data,
-            tuning_data=tuning_data,
-            holdout_frac=holdout_frac,
-            is_classification=self._problem_type in [BINARY, MULTICLASS, CLASSIFICATION],
-            label_column=self._label_column,
-            seed=seed,
-        )
+        if tuning_data is None:
+            train_data, tuning_data = split_train_tuning_data(
+                data=train_data,
+                holdout_frac=holdout_frac,
+                problem_type=self._problem_type,
+                label_column=self._label_column,
+                random_state=seed,
+            )
 
         if self._label_column:
             self._problem_type = infer_problem_type(

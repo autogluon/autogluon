@@ -184,6 +184,8 @@ def hyperparameter_tune(hyperparameter_tune_kwargs, resources, is_matching=False
     mode = _fit_args.get("minmax_mode")
     save_path = _fit_args.get("save_path")
     time_budget_s = _fit_args.get("max_time")
+    if time_budget_s is not None:
+        time_budget_s *= 0.95  # give some buffer time to ray
     is_distill = False
     if _fit_args.get("teacher_predictor", None) is not None:
         is_distill = True
