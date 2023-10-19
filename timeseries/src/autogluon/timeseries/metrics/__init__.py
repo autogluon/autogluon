@@ -1,7 +1,8 @@
 import json
-from typing import Union, Type
+from typing import Type, Union
+
 from .abstract import TimeSeriesScorer
-from .point import MAE, MAPE, MASE, sMAPE, MSE, RMSE, RMSSE, WAPE
+from .point import MAE, MAPE, MASE, MSE, RMSE, RMSSE, WAPE, sMAPE
 from .quantile import WQL
 
 __all__ = [

@@ -451,17 +451,12 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         logger.info(f"\tTrained {len(model_names_trained)} models while tuning {model.name}.")
 
         if len(model_names_trained) > 0:
-            if TimeSeriesEvaluator.METRIC_COEFFICIENTS[self.eval_metric] == -1:
-                sign_str = "-"
-            else:
-                sign_str = ""
-
             trained_model_results = [hpo_models[model_name] for model_name in model_names_trained]
             best_model_result = max(trained_model_results, key=lambda x: x["val_score"])
 
             logger.info(
                 f"\t{best_model_result['val_score']:<7.4f}".ljust(15)
-                + f"= Validation score ({sign_str}{self.eval_metric})"
+                + f"= Validation score ({self.eval_metric.name_with_sign})"
             )
             logger.info(f"\t{total_tuning_time:<7.2f} s".ljust(15) + "= Total tuning time")
             logger.debug(f"\tBest hyperparameter configuration: {best_model_result['hyperparameters']}")
