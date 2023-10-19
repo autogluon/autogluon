@@ -550,7 +550,7 @@ class AbstractTrainer:
         if full_weighted_ensemble:
             full_aux_kwargs = aux_kwargs.copy()
             if additional_full_weighted_ensemble:
-                full_aux_kwargs["name_extra"] = "_FULL"
+                full_aux_kwargs["name_extra"] = "_ALL"
             all_base_model_names = self.get_model_names(stack_name="core")  # Fit weighted ensemble on all previously fitted core models
             aux_models += self._stack_new_level_aux(X_val, y_val, X, y, all_base_model_names, level, infer_limit, infer_limit_batch_size, **full_aux_kwargs)
 
