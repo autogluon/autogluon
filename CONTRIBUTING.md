@@ -49,11 +49,12 @@ Be sure to select the *Source* option from the installation preferences.
 
 - We recommend developing on Linux as this is the only OS where all features are currently 100% functional. Avoid introducing changes that will only work on a particular OS, as we're currently working to support MacOSX and Windows. Changes to existing code that improve cross-platform compatibility are most welcome!
 
-- Use Python 3.8, 3.9 or 3.10 for development, as these are the only versions where AutoGluon is fully functional.
+- Use Python 3.8, 3.9, 3.10, or 3.11 for development, as these are the only versions where AutoGluon is fully functional.
 
 - Please try to avoid introducing additional dependencies on 3rd party packages. We are currently working to reduce the number of external dependencies of our package. For now, we recommend [lazy-import](https://github.com/autogluon/autogluon/blob/master/common/src/autogluon/common/utils/try_import.py) of external package if you are adding functionality that you believe will only be used by small fraction users.
 
 - All code should adhere to the [PEP8 style](https://www.python.org/dev/peps/pep-0008/).
+
 
 - After you have edited the code, ensure your changes pass the unit tests via:
 ```
@@ -81,6 +82,8 @@ Or remove the ::test_mytest suffix to run all tests in the file:
 ```
 python3 -m pytest path_to_file
 ```
+
+- If using PyCharm, we highly recommend `pip install pytest-pycharm` to [improve ease of debugging inside of unit tests](https://stackoverflow.com/questions/14086067/debugging-pytest-post-mortem-exceptions-in-pycharm-pydev).
 
 - To otherwise test your code changes, we recommend running AutoGluon on multiple datasets and verifying the code runs correctly and the resulting accuracy of the trained models is not harmed by your change.  One easy way to test is to simply modify the scripts in [`examples/`](https://github.com/autogluon/autogluon/tree/master/examples), or the [tutorial notebooks](https://github.com/autogluon/autogluon/tree/master/docs/tutorials), which already provide datasets.
 
