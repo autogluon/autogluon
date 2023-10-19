@@ -743,15 +743,15 @@ class MultiModalPredictor(ExportMixin):
             fit_called=fit_called,
         )
 
-        if tuning_data is None:
-            train_data, tuning_data = self._split_train_tuning(
-                data=train_data, holdout_frac=holdout_frac, random_state=seed
-            )
-
         if self._label_column:
             self._problem_type = infer_problem_type(
                 y_train_data=train_data[self._label_column],
                 provided_problem_type=self._problem_type,
+            )
+
+        if tuning_data is None:
+            train_data, tuning_data = self._split_train_tuning(
+                data=train_data, holdout_frac=holdout_frac, random_state=seed
             )
 
         column_types = infer_column_types(

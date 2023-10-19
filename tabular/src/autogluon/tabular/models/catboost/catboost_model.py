@@ -28,7 +28,7 @@ class CatBoostModel(AbstractModel):
     """
     CatBoost model: https://catboost.ai/
 
-    Hyperparameter options: https://catboost.ai/docs/concepts/python-reference_parameters-list.html
+    Hyperparameter options: https://catboost.ai/en/docs/references/training-parameters
     """
 
     def __init__(self, **kwargs):
