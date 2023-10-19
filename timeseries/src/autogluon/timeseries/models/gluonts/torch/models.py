@@ -9,8 +9,8 @@ from gluonts.model.estimator import Estimator as GluonTSEstimator
 from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
 from autogluon.timeseries.utils.datetime import (
     get_lags_for_frequency,
-    get_time_features_for_frequency,
     get_seasonality,
+    get_time_features_for_frequency,
 )
 
 # NOTE: We avoid imports for torch and lightning.pytorch at the top level and hide them inside class methods.
@@ -348,7 +348,7 @@ class WaveNetModel(AbstractGluonTSModel):
     num_skip_channels : int, default = 32
         Number of skip channels in WaveNet architecture, by default 32
     dilation_depth : int or None, default = None
-        Number of dilation layers in WaveNet architecture. If set to None (default), dilation_depth is set such that 
+        Number of dilation layers in WaveNet architecture. If set to None (default), dilation_depth is set such that
         the receptive length is at least as long as the ``seasonality`` and at least ``2 * prediction_length``.
     num_stacks : int, default = 1
         Number of dilation stacks in WaveNet architecture.
