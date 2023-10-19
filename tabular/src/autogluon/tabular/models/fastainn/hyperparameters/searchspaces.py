@@ -17,7 +17,7 @@ def get_default_searchspace(problem_type, num_classes=None):
 
 def get_searchspace_binary():
     spaces = {
-        # See docs: https://docs.fast.ai/tabular.models.html
+        # See docs: https://docs.fast.ai/tabular.learner.html
         "layers": space.Categorical(
             None, [200, 100], [200], [500], [1000], [500, 200], [50, 25], [1000, 500], [200, 100, 50], [500, 200, 100], [1000, 500, 200]
         ),
