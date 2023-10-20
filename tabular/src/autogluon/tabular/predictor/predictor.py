@@ -1089,7 +1089,17 @@ class TabularPredictor:
             )
             time_limit = int(org_time_limit * first_fit_frac)
             ds_fit_context = self._learner.org_path_context + "/ds_first_fit"
-            stacked_overfitting = self._sub_fit_memory_save_wrapper(inner_train_data, outer_val_data, time_limit, ds_fit_context, ag_fit_kwargs, ag_post_fix_kwargs)
+            logger.info(f"Starting sub-fit for dynamic stacking. Context path is: {ds_fit_context}. Sub-fit time limit is: {time_limit} seconds.")
+
+
+            avoid_memory_leak = False
+            if avoid_memory_leak:
+                # TODO: Unsure how stable this is on Mac/Windows. Toggle using _sub_fit_memory_save_wrapper depending on OS? Linux yes, mac/windows no
+                # FIXME: this seems to get stuck when calling AutoGluon twice, likely due to ray?
+                stacked_overfitting = self._sub_fit_memory_save_wrapper(inner_train_data, outer_val_data, time_limit, ds_fit_context, ag_fit_kwargs, ag_post_fix_kwargs)
+            else:
+                stacked_overfitting = self._sub_fit(inner_train_data, outer_val_data, time_limit, ds_fit_context, ag_fit_kwargs, ag_post_fix_kwargs)
+
             del inner_train_data, outer_val_data  # To avoid memory leak from these copies of the dataset, we could wrap the call of this function in a subprocess.
         else:
             raise NotImplementedError("TODO")
@@ -1105,12 +1115,11 @@ class TabularPredictor:
 
         return num_stack_levels, time_limit_fit_full
 
-    def _sub_fit_memory_save_wrapper(self, inner_train_data, outer_val_data, time_limit, ds_fit_context, ag_fit_kwargs, ag_post_fix_kwargs):
-        logger.info(f"Starting sub-fit for dynamic stacking. Context path is: {ds_fit_context}. Sub-fit time limit is: {time_limit} seconds.")
+    def _sub_fit_memory_save_wrapper(self, *args):
         try:
             # First fit in subprocess for memory safety!
             with ProcessPoolExecutor() as executor:  # TODO: convert to ray and use put?
-                sub_fit_future = executor.submit(self._sub_fit, inner_train_data, outer_val_data, time_limit, ds_fit_context, ag_fit_kwargs, ag_post_fix_kwargs)
+                sub_fit_future = executor.submit(self._sub_fit, *args)
                 stacked_overfitting = sub_fit_future.result()
         except Exception as e:
             logger.info("Sub-fit of dynamic stacking crashed!")
@@ -1145,6 +1154,13 @@ class TabularPredictor:
         shutil.rmtree(ds_fit_context)  # FIXME: other way? / make this optional?
         del self._learner
         self._learner = org_learner
+
+        try:
+            import ray
+            if ray.is_initialized():
+                ray.shutdown()
+        except:
+            pass
 
         return stacked_overfitting
 
