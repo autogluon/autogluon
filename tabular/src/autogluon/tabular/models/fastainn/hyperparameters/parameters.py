@@ -18,7 +18,7 @@ def get_param_baseline(problem_type, num_classes=None):
 def get_param_multiclass_baseline():
     # TODO: explore/add other hyperparameters like weight decay, use of batch-norm, activation-function choice, etc.
     params = {
-        # See docs: https://docs.fast.ai/tabular.models.html
+        # See docs: https://docs.fast.ai/tabular.learner.html
         "layers": None,  # layers configuration; None - use model's heuristics
         "emb_drop": 0.1,  # embedding layers dropout
         "ps": 0.1,  # linear layers dropout

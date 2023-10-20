@@ -431,13 +431,15 @@ class AbstractTabularLearner(AbstractLearner):
         else:
             dataset_preprocessed = self.transform_features(dataset)
             fit = False
-        if base_models is not None:
-            dataset_preprocessed = trainer.get_inputs_to_stacker(X=dataset_preprocessed, base_models=base_models, fit=fit, use_orig_features=use_orig_features)
-        elif model is not None:
-            base_models = list(trainer.model_graph.predecessors(model))
-            dataset_preprocessed = trainer.get_inputs_to_stacker(X=dataset_preprocessed, base_models=base_models, fit=fit, use_orig_features=use_orig_features)
-            # Note: Below doesn't quite work here because weighted_ensemble has unique input format returned that isn't a DataFrame.
-            # dataset_preprocessed = trainer.get_inputs_to_model(model=model_to_get_inputs_for, X=dataset_preprocessed, fit=fit)
+        dataset_preprocessed = trainer.get_inputs_to_stacker(
+            X=dataset_preprocessed,
+            model=model,
+            base_models=base_models,
+            fit=fit,
+            use_orig_features=use_orig_features,
+        )
+        # Note: Below doesn't quite work here because weighted_ensemble has unique input format returned that isn't a DataFrame.
+        # dataset_preprocessed = trainer.get_inputs_to_model(model=model_to_get_inputs_for, X=dataset_preprocessed, fit=fit)
 
         return dataset_preprocessed
 
