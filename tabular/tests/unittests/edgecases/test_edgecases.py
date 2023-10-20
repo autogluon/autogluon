@@ -189,7 +189,7 @@ def test_use_bag_holdout_calibrate(fit_helper):
 
 
 def test_num_folds_parallel(fit_helper, capsys):
-    """Tests that num_folds works"""
+    """Tests that num_folds_parallel equal to 1 works"""
     fit_args = dict(hyperparameters={"DUMMY": {}}, fit_weighted_ensemble=False, num_bag_folds=2, num_bag_sets=1, ag_args_ensemble=dict(num_folds_parallel=1))
     dataset_name = "adult"
 
