@@ -476,6 +476,8 @@ class BaseLearner(ExportMixin):
             validation_metric_name=self._validation_metric_name,
         )
         self._minmax_mode = get_minmax_mode(self._validation_metric_name)
+        logger.debug(f"validation_metric_name: {self._validation_metric_name}")
+        logger.debug(f"minmax_mode: {self._minmax_mode}")
 
     def update_hyperparameters(self, hyperparameters: Dict, hyperparameter_tune_kwargs: Dict):
         if self._hyperparameters and hyperparameters:
@@ -628,7 +630,7 @@ class BaseLearner(ExportMixin):
                 model=self._model,
                 advanced_hyperparameters=advanced_hyperparameters,
             )
-        self.update_strategy_by_env()
+        self._config = self.update_strategy_by_env(config=self._config)
 
     def ensure_inference_ready(self):
         if not self._fit_called:
@@ -733,10 +735,104 @@ class BaseLearner(ExportMixin):
         )
         return validation_metric, custom_metric_func
 
+    def get_mixup_func_per_run(self, config):
+        mixup_active, mixup_func = get_mixup(
+            model_config=OmegaConf.select(config, "model"),
+            mixup_config=OmegaConf.select(config, "data.mixup"),
+            num_classes=self._output_shape,
+        )
+        if mixup_active and (config.env.per_gpu_batch_size == 1 or config.env.per_gpu_batch_size % 2 == 1):
+            warnings.warn(
+                "The mixup is done on the batch."
+                "The per_gpu_batch_size should be >1 and even for reasonable operation",
+                UserWarning,
+            )
+        return mixup_active, mixup_func
+
+    def get_loss_func_per_run(self, config, mixup_active):
+        loss_func = get_loss_func(
+            problem_type=self._problem_type,
+            mixup_active=mixup_active,
+            loss_func_name=OmegaConf.select(config, "optimization.loss_function"),
+            config=config.optimization,
+        )
+        return loss_func
+
+    def get_model_postprocess_fn_per_run(self, loss_func):
+        model_postprocess_fn = get_model_postprocess_fn(
+            problem_type=self._problem_type,
+            loss_func=loss_func,
+        )
+        return model_postprocess_fn
+
+    def get_datamodule_per_run(self, df_preprocessor, data_processors, config):
+        datamodule = BaseDataModule(
+            df_preprocessor=df_preprocessor,
+            data_processors=data_processors,
+            per_gpu_batch_size=config.env.per_gpu_batch_size,
+            num_workers=config.env.num_workers,
+            train_data=self._train_data,
+            validate_data=self._tuning_data,
+        )
+        return datamodule
+
+    def get_optimization_kwargs_per_run(self, config, validation_metric, custom_metric_func):
+        return dict(
+            optim_type=config.optimization.optim_type,
+            lr_choice=config.optimization.lr_choice,
+            lr_schedule=config.optimization.lr_schedule,
+            lr=config.optimization.learning_rate,
+            lr_decay=config.optimization.lr_decay,
+            end_lr=config.optimization.end_lr,
+            lr_mult=config.optimization.lr_mult,
+            weight_decay=config.optimization.weight_decay,
+            warmup_steps=config.optimization.warmup_steps,
+            track_grad_norm=OmegaConf.select(config, "optimization.track_grad_norm", default=-1),
+            validation_metric=validation_metric,
+            validation_metric_name=self._validation_metric_name,
+            custom_metric_func=custom_metric_func,
+        )
+
+    def build_task_per_run(self, model, loss_func, config, mixup_func, model_postprocess_fn, peft_param_names, optimization_kwargs):
+        return LitModule(
+            model=model,
+            loss_func=loss_func,
+            efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
+            mixup_func=mixup_func,
+            mixup_off_epoch=OmegaConf.select(config, "data.mixup.turn_off_epoch"),
+            model_postprocess_fn=model_postprocess_fn,
+            trainable_param_names=peft_param_names,
+            skip_final_val=OmegaConf.select(config, "optimization.skip_final_val", default=False),
+            **optimization_kwargs,
+        )
+
+    def get_callbacks_per_run(self, save_path, config, task, ):
+        checkpoint_callback = AutoMMModelCheckpoint(
+            dirpath=save_path,
+            save_top_k=config.optimization.top_k,
+            verbose=True,
+            monitor=task.validation_metric_name,
+            mode=self._minmax_mode,
+            save_last=True,
+        )
+        early_stopping_callback = pl.callbacks.EarlyStopping(
+            monitor=task.validation_metric_name,
+            patience=config.optimization.patience,
+            mode=self._minmax_mode,
+            stopping_threshold=get_stopping_threshold(self._validation_metric_name),
+        )
+        lr_callback = pl.callbacks.LearningRateMonitor(logging_interval="step")
+        model_summary = pl.callbacks.ModelSummary(max_depth=1)
+        callbacks = [
+            checkpoint_callback,
+            early_stopping_callback,
+            lr_callback,
+            model_summary,
+        ]
+        return callbacks
+
     def fit_per_run(
         self,
-        validation_metric_name: str,
-        minmax_mode: str,
         max_time: timedelta,
         save_path: str,
         ckpt_path: str,
@@ -755,7 +851,7 @@ class BaseLearner(ExportMixin):
     ):
         pl.seed_everything(seed, workers=True)
         # TODO(?) We should have a separate "_pre_training_event()" for logging messages.
-        logger.info(get_fit_start_message(save_path, validation_metric_name))
+        logger.info(get_fit_start_message(save_path, self._validation_metric_name))
         config = self.get_config_per_run(config=config, hyperparameters=hyperparameters)
         df_preprocessor = self.get_df_preprocessor_per_run(
             df_preprocessor=df_preprocessor,
@@ -772,227 +868,40 @@ class BaseLearner(ExportMixin):
             advanced_hyperparameters=advanced_hyperparameters,
         )
         validation_metric, custom_metric_func = self.get_validation_metric_per_run()
-
-
-        mixup_active, mixup_fn = get_mixup(
-            model_config=OmegaConf.select(config, "model"),
-            mixup_config=OmegaConf.select(config, "data.mixup"),
-            num_classes=self._output_shape,
-        )
-        if mixup_active and (config.env.per_gpu_batch_size == 1 or config.env.per_gpu_batch_size % 2 == 1):
-            warnings.warn(
-                "The mixup is done on the batch."
-                "The per_gpu_batch_size should be >1 and even for reasonable operation",
-                UserWarning,
-            )
-        loss_func = get_loss_func(
-            problem_type=self._problem_type,
-            mixup_active=mixup_active,
-            loss_func_name=OmegaConf.select(config, "optimization.loss_function"),
-            config=config.optimization,
-        )
-
-        model_postprocess_fn = get_model_postprocess_fn(
-            problem_type=self._problem_type,
-            loss_func=loss_func,
-        )
-
-        self._config = config
-        self._df_preprocessor = df_preprocessor
-        self._data_processors = data_processors
-        self._model = model
-        self._model_postprocess_fn = model_postprocess_fn
-        self.update_strategy_by_env()
+        mixup_active, mixup_func = self.get_mixup_func_per_run(config=config)
+        loss_func = self.get_loss_func_per_run(config=config, mixup_active=mixup_active)
+        model_postprocess_fn = self.get_model_postprocess_fn_per_run(loss_func=loss_func)
+        config = self.update_strategy_by_env(config=config)
 
         if max_time == timedelta(seconds=0):
             self._top_k_average(
                 model=model,
                 save_path=save_path,
-                minmax_mode=minmax_mode,
                 is_distill=False,
                 top_k_average_method=config.optimization.top_k_average_method,
-                val_df=val_df,
-                validation_metric_name=validation_metric_name,
-                strict_loading=not trainable_param_names,
+                tuning_data=self._tuning_data,
+                strict_loading=not peft_param_names,
                 standalone=standalone,
                 clean_ckpts=clean_ckpts,
             )
 
             return self
 
-        # need to assign the above attributes before setting up distillation
-        if teacher_predictor is not None:
-            (
-                teacher_model,
-                critics,
-                baseline_funcs,
-                soft_label_loss_func,
-                softmax_regression_loss_func,
-                output_feature_adaptor,
-                output_feature_loss_func,
-                rkd_loss_func,
-                teacher_df_preprocessor,
-                teacher_data_processors,
-            ) = self._setup_distillation(
-                teacher_predictor=teacher_predictor,
-            )
-        else:
-            (
-                teacher_model,
-                critics,
-                baseline_funcs,
-                soft_label_loss_func,
-                softmax_regression_loss_func,
-                output_feature_adaptor,
-                output_feature_loss_func,
-                rkd_loss_func,
-                teacher_df_preprocessor,
-                teacher_data_processors,
-            ) = (None, None, None, None, None, None, None, None, None, None)
-
-        if teacher_df_preprocessor is not None:
-            df_preprocessor = [df_preprocessor, teacher_df_preprocessor]
-        if teacher_data_processors is not None:
-            data_processors = [data_processors, teacher_data_processors]
-
-        val_use_training_mode = (self._problem_type == OBJECT_DETECTION) and (validation_metric_name != MAP)
-        train_dataset = None
-        if (
-            self._problem_type == OBJECT_DETECTION
-            and self._model.config is not None
-            and MULTI_IMAGE_MIX_DATASET in self._model.config
-        ):
-            train_dataset = MultiImageMixDataset(
-                data=train_df,
-                preprocessor=[df_preprocessor],
-                processors=[data_processors],
-                model_config=self._model.config,
-                id_mappings=None,
-                is_training=True,
-            )
-            train_dm = BaseDataModule(
-                df_preprocessor=df_preprocessor,
-                data_processors=data_processors,
-                per_gpu_batch_size=config.env.per_gpu_batch_size,
-                num_workers=config.env.num_workers,
-                train_dataset=train_dataset,
-                validate_data=val_df,
-                val_use_training_mode=val_use_training_mode,
-            )
-        else:
-            train_dm = BaseDataModule(
-                df_preprocessor=df_preprocessor,
-                data_processors=data_processors,
-                per_gpu_batch_size=config.env.per_gpu_batch_size,
-                num_workers=config.env.num_workers,
-                train_data=train_df,
-                validate_data=val_df,
-                val_use_training_mode=val_use_training_mode,
-            )
-
-        optimization_kwargs = dict(
-            optim_type=config.optimization.optim_type,
-            lr_choice=config.optimization.lr_choice,
-            lr_schedule=config.optimization.lr_schedule,
-            lr=config.optimization.learning_rate,
-            lr_decay=config.optimization.lr_decay,
-            end_lr=config.optimization.end_lr,
-            lr_mult=config.optimization.lr_mult,
-            weight_decay=config.optimization.weight_decay,
-            warmup_steps=config.optimization.warmup_steps,
-            track_grad_norm=OmegaConf.select(config, "optimization.track_grad_norm", default=-1),
-        )
-        metrics_kwargs = dict(
+        optimization_kwargs = self.get_optimization_kwargs_per_run(
+            config=config,
             validation_metric=validation_metric,
-            validation_metric_name=validation_metric_name,
             custom_metric_func=custom_metric_func,
         )
-        is_distill = teacher_model is not None
-        if is_distill:
-            output_feature_loss_weight = OmegaConf.select(
-                self._config, "distiller.output_feature_loss_weight", default=0.0
-            )
-            softmax_regression_weight = OmegaConf.select(
-                self._config, "distiller.softmax_regression_weight", default=0.0
-            )
-            use_raw_features = OmegaConf.select(self._config, "distiller.use_raw_features", default=False)
-            task = DistillerLitModule(
-                student_model=model,
-                teacher_model=teacher_model,
-                matches=config.distiller.matches,
-                critics=critics,
-                baseline_funcs=baseline_funcs,
-                hard_label_weight=config.distiller.hard_label_weight,
-                soft_label_weight=config.distiller.soft_label_weight,
-                softmax_regression_weight=softmax_regression_weight,
-                temperature=config.distiller.temperature,
-                output_feature_loss_weight=output_feature_loss_weight,
-                hard_label_loss_func=loss_func,
-                soft_label_loss_func=soft_label_loss_func,
-                softmax_regression_loss_func=softmax_regression_loss_func,
-                output_feature_adaptor=output_feature_adaptor,
-                output_feature_loss_func=output_feature_loss_func,
-                rkd_loss_func=rkd_loss_func,
-                **metrics_kwargs,
-                **optimization_kwargs,
-            )
-        elif self._problem_type == NER:
-            task = NerLitModule(
-                model=model,
-                loss_func=loss_func,
-                efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
-                mixup_fn=mixup_fn,
-                mixup_off_epoch=OmegaConf.select(config, "data.mixup.turn_off_epoch"),
-                model_postprocess_fn=model_postprocess_fn,
-                trainable_param_names=trainable_param_names,
-                **metrics_kwargs,
-                **optimization_kwargs,
-            )
-        elif self._problem_type == OBJECT_DETECTION:
-            task = MMDetLitModule(
-                model=model,
-                **metrics_kwargs,
-                **optimization_kwargs,
-            )
-        else:
-            task = LitModule(
-                model=model,
-                loss_func=loss_func,
-                efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
-                mixup_fn=mixup_fn,
-                mixup_off_epoch=OmegaConf.select(config, "data.mixup.turn_off_epoch"),
-                model_postprocess_fn=model_postprocess_fn,
-                trainable_param_names=trainable_param_names,
-                skip_final_val=OmegaConf.select(config, "optimization.skip_final_val", default=False),
-                **metrics_kwargs,
-                **optimization_kwargs,
-            )
-
-        logger.debug(f"validation_metric_name: {task.validation_metric_name}")
-        logger.debug(f"minmax_mode: {minmax_mode}")
-
-        checkpoint_callback = AutoMMModelCheckpoint(
-            dirpath=save_path,
-            save_top_k=config.optimization.top_k,
-            verbose=True,
-            monitor=task.validation_metric_name,
-            mode=minmax_mode,
-            save_last=True,
+        task = self.build_task_per_run(
+            model=model,
+            loss_func=loss_func,
+            config=config,
+            mixup_func=mixup_func,
+            model_postprocess_fn=model_postprocess_fn,
+            peft_param_names=peft_param_names,
+            optimization_kwargs=optimization_kwargs,
         )
-        early_stopping_callback = pl.callbacks.EarlyStopping(
-            monitor=task.validation_metric_name,
-            patience=config.optimization.patience,
-            mode=minmax_mode,
-            stopping_threshold=get_stopping_threshold(validation_metric_name),
-        )
-        lr_callback = pl.callbacks.LearningRateMonitor(logging_interval="step")
-        model_summary = pl.callbacks.ModelSummary(max_depth=1)
-        callbacks = [
-            checkpoint_callback,
-            early_stopping_callback,
-            lr_callback,
-            model_summary,
-        ]
+        callbacks = self.get_callbacks_per_run(save_path=save_path, config=config, task=task)
 
         if is_hpo:
             from .utils.hpo import get_ray_tune_ckpt_callback
@@ -1138,6 +1047,8 @@ class BaseLearner(ExportMixin):
             self._best_score = trainer.callback_metrics[f"val_{self._validation_metric_name}"].item()
         else:
             sys.exit(f"Training finished, exit the process with global_rank={trainer.global_rank}...")
+
+        return config, df_preprocessor, data_processors, model, model_postprocess_fn
 
     def _top_k_average(
         self,
@@ -2303,7 +2214,7 @@ class BaseLearner(ExportMixin):
             loss_func=loss_func,
         )
         predictor._model_postprocess_fn = model_postprocess_fn
-        predictor.update_strategy_by_env()
+        predictor._config = predictor.update_strategy_by_env(predictor._config)
 
         return predictor
 
@@ -2408,12 +2319,14 @@ class BaseLearner(ExportMixin):
         else:
             raise ValueError(f"list_supported_models() is not available for problem type: {self._problem_type}")
 
-    def update_strategy_by_env(self):
+    def update_strategy_by_env(self, config):
         """
         Set strategy to ddp_fork or ddp_notebook if an iterative env is detected.
         """
-        assert self._config is not None
-        if is_interactive_env() and not is_interactive_strategy(self._config.env.strategy):
-            strs = list(self._config.env.strategy.partition("_find_unused_parameters"))
+        assert config is not None
+        if is_interactive_env() and not is_interactive_strategy(config.env.strategy):
+            strs = list(config.env.strategy.partition("_find_unused_parameters"))
             strs[0] = "ddp_fork"
-            self._config.env.strategy = "".join(strs)
+            config.env.strategy = "".join(strs)
+
+        return config

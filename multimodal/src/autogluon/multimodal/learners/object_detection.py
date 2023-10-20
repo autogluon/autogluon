@@ -84,6 +84,9 @@ class ObjectDetectionLearner(BaseLearner):
         """
         return self._model.model.CLASSES
 
+    def fit_per_run(self):
+        val_use_training_mode = (self._problem_type == OBJECT_DETECTION) and (validation_metric_name != MAP)
+
     def prepare_for_train_tuning_data(
         self,
         train_data: Union[pd.DataFrame, str],
@@ -113,12 +116,10 @@ class ObjectDetectionLearner(BaseLearner):
         # TODO: support inferring output during fit()?
         assert self._output_shape is not None, f"output_shape should have been set in the learner initialization."
 
-    def _get_data_module(
-        self, train_df, val_df, df_preprocessor, data_processors, val_use_training_mode
-    ) -> pl.LightningDataModule:
+    def get_datamodule_per_run(self, df_preprocessor, data_processors, config):
         if self._model.config is not None and MULTI_IMAGE_MIX_DATASET in self._model.config:
             train_dataset = MultiImageMixDataset(
-                data=train_df,
+                data=self._train_data,
                 preprocessor=[df_preprocessor],
                 processors=[data_processors],
                 model_config=self._model.config,
@@ -131,7 +132,7 @@ class ObjectDetectionLearner(BaseLearner):
                 per_gpu_batch_size=self._config.env.per_gpu_batch_size,
                 num_workers=self._config.env.num_workers,
                 train_dataset=train_dataset,
-                validate_data=val_df,
+                validate_data=self._tuning_data,
                 val_use_training_mode=val_use_training_mode,
             )
         else:
@@ -140,31 +141,22 @@ class ObjectDetectionLearner(BaseLearner):
                 data_processors=data_processors,
                 per_gpu_batch_size=self._config.env.per_gpu_batch_size,
                 num_workers=self._config.env.num_workers,
-                train_data=train_df,
-                validate_data=val_df,
+                train_data=self._train_data,
+                validate_data=self._tuning_data,
                 val_use_training_mode=val_use_training_mode,
             )
 
         return train_dm
 
-    def _get_lightning_module(
+    def build_task_per_run(
         self,
+        model,
         optimization_kwargs: Optional[dict] = None,
-        metrics_kwargs: Optional[dict] = None,
-        test_time: bool = False,
-        **kwargs,
     ):
-        if test_time:
-            task = MMDetLitModule(
-                model=self._model,
-                **optimization_kwargs,
-            )
-        else:
-            task = MMDetLitModule(
-                model=self._model,
-                **metrics_kwargs,
-                **optimization_kwargs,
-            )
+        task = MMDetLitModule(
+            model=model,
+            **optimization_kwargs,
+        )
         return task
 
     def evaluate(

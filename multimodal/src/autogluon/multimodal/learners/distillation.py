@@ -201,3 +201,51 @@ class DistillationLearner(BaseLearner):
             teacher_predictor._df_preprocessor,
             teacher_predictor._data_processors,
         )
+
+    def build_task_per_run(self, model, teacher_model, critics, baseline_funcs, loss_func, config, mixup_func, model_postprocess_fn, peft_param_names, optimization_kwargs):
+        output_feature_loss_weight = OmegaConf.select(
+            self._config, "distiller.output_feature_loss_weight", default=0.0
+        )
+        softmax_regression_weight = OmegaConf.select(
+            self._config, "distiller.softmax_regression_weight", default=0.0
+        )
+        use_raw_features = OmegaConf.select(self._config, "distiller.use_raw_features", default=False)
+        task = DistillerLitModule(
+            student_model=model,
+            teacher_model=teacher_model,
+            matches=config.distiller.matches,
+            critics=critics,
+            baseline_funcs=baseline_funcs,
+            hard_label_weight=config.distiller.hard_label_weight,
+            soft_label_weight=config.distiller.soft_label_weight,
+            softmax_regression_weight=softmax_regression_weight,
+            temperature=config.distiller.temperature,
+            output_feature_loss_weight=output_feature_loss_weight,
+            hard_label_loss_func=loss_func,
+            soft_label_loss_func=soft_label_loss_func,
+            softmax_regression_loss_func=softmax_regression_loss_func,
+            output_feature_adaptor=output_feature_adaptor,
+            output_feature_loss_func=output_feature_loss_func,
+            rkd_loss_func=rkd_loss_func,
+            **optimization_kwargs,
+        )
+        return task
+
+    def fit_per_run(self):
+        (
+            teacher_model,
+            critics,
+            baseline_funcs,
+            soft_label_loss_func,
+            softmax_regression_loss_func,
+            output_feature_adaptor,
+            output_feature_loss_func,
+            rkd_loss_func,
+            teacher_df_preprocessor,
+            teacher_data_processors,
+        ) = self._setup_distillation(
+            teacher_predictor=teacher_learner,
+        )
+        df_preprocessor = [df_preprocessor, teacher_df_preprocessor]
+        data_processors = [data_processors, teacher_data_processors]
+

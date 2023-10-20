@@ -45,36 +45,20 @@ class NERLearner(BaseLearner):
             pretrained=pretrained,
         )
 
-    def _get_lightning_module(
+    def build_task_per_run(
         self,
-        trainable_param_names: List[str],
-        mixup_fn: Optional[Mixup] = None,
+        peft_param_names: List[str],
         loss_func: Optional[nn.Module] = None,
         optimization_kwargs: Optional[dict] = None,
-        metrics_kwargs: Optional[dict] = None,
-        test_time: bool = False,
-        **kwargs,
     ):
-        if test_time:
-            task = NerLitModule(
-                model=self._model,
-                model_postprocess_fn=self._model_postprocess_fn,
-                efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
-                trainable_param_names=trainable_param_names,
-                **optimization_kwargs,
-            )
-        else:
-            task = NerLitModule(
-                model=self._model,
-                loss_func=loss_func,
-                efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
-                mixup_fn=mixup_fn,
-                mixup_off_epoch=OmegaConf.select(self._config, "data.mixup.turn_off_epoch"),
-                model_postprocess_fn=self._model_postprocess_fn,
-                trainable_param_names=trainable_param_names,
-                **metrics_kwargs,
-                **optimization_kwargs,
-            )
+        task = NerLitModule(
+            model=self._model,
+            loss_func=loss_func,
+            efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
+            model_postprocess_fn=self._model_postprocess_fn,
+            trainable_param_names=peft_param_names,
+            **optimization_kwargs,
+        )
         return task
 
     def get_output_shape_per_run(self, df_preprocessor):
