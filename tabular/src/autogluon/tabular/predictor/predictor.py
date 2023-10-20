@@ -9,8 +9,8 @@ import pprint
 import shutil
 import time
 import warnings
-from typing import List, Optional, Tuple, Union
 from concurrent.futures import ProcessPoolExecutor
+from typing import List, Optional, Tuple, Union
 
 import networkx as nx
 import numpy as np
@@ -43,6 +43,7 @@ from autogluon.core.metrics import Scorer
 from autogluon.core.problem_type import problem_type_info
 from autogluon.core.pseudolabeling.pseudolabeling import filter_ensemble_pseudo, filter_pseudo
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
+from autogluon.core.stacked_overfitting.utils import check_stacked_overfitting_from_leaderboard
 from autogluon.core.trainer import AbstractTrainer
 from autogluon.core.utils import (
     get_pred_from_proba_df,
@@ -54,7 +55,6 @@ from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
 from autogluon.core.utils.utils import default_holdout_frac
-from autogluon.core.stacked_overfitting.utils import check_stacked_overfitting_from_leaderboard
 
 from ..configs.feature_generator_presets import get_default_feature_generator
 from ..configs.hyperparameter_configs import get_hyperparameter_config
