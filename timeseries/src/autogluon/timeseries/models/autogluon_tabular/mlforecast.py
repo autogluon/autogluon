@@ -251,7 +251,6 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
                 "path": os.path.join(self.path, "tabular_predictor"),
                 "verbosity": verbosity - 2,
                 "label": MLF_TARGET,
-                "eval_metric": self.TIMESERIES_METRIC_TO_TABULAR_METRIC[self.eval_metric],
                 **self._get_extra_tabular_init_kwargs(),
             },
             predictor_fit_kwargs={
@@ -333,17 +332,6 @@ class DirectTabularModel(AbstractMLForecastModel):
         end of each time series).
     """
 
-    TIMESERIES_METRIC_TO_TABULAR_METRIC = {
-        "MAPE": "mean_absolute_percentage_error",
-        "sMAPE": "symmetric_mean_absolute_percentage_error",
-        "WQL": "pinball_loss",
-        "MASE": "mean_absolute_error",
-        "WAPE": "mean_absolute_error",
-        "MSE": "mean_squared_error",
-        "RMSE": "root_mean_squared_error",
-        "RMSSE": "root_mean_squared_error",
-    }
-
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         if 0.5 not in self.quantile_levels:
@@ -354,7 +342,7 @@ class DirectTabularModel(AbstractMLForecastModel):
 
     @property
     def is_quantile_model(self) -> bool:
-        return self.eval_metric == "WQL"
+        return self.eval_metric.is_quantile_metric
 
     def _get_model_params(self) -> dict:
         model_params = super()._get_model_params()
@@ -429,9 +417,19 @@ class DirectTabularModel(AbstractMLForecastModel):
 
     def _get_extra_tabular_init_kwargs(self) -> dict:
         if self.is_quantile_model:
-            return {"problem_type": ag.constants.QUANTILE, "quantile_levels": self.quantile_levels}
+            return {
+                "problem_type": ag.constants.QUANTILE,
+                "quantile_levels": self.quantile_levels,
+                "eval_metric": "pinball_loss",
+            }
         else:
-            return {"problem_type": ag.constants.REGRESSION}
+            tabular_metric = self.eval_metric.equivalent_tabular_regression_metric
+            if tabular_metric is None:
+                tabular_metric = "mean_absolute_error"
+            return {
+                "problem_type": ag.constants.REGRESSION,
+                "eval_metric": tabular_metric,
+            }
 
 
 class RecursiveTabularModel(AbstractMLForecastModel):
@@ -475,17 +473,6 @@ class RecursiveTabularModel(AbstractMLForecastModel):
         end of each time series).
     """
 
-    TIMESERIES_METRIC_TO_TABULAR_METRIC = {
-        "MAPE": "mean_absolute_percentage_error",
-        "sMAPE": "symmetric_mean_absolute_percentage_error",
-        "WQL": "mean_absolute_error",
-        "MASE": "mean_absolute_error",
-        "WAPE": "mean_absolute_error",
-        "MSE": "mean_squared_error",
-        "RMSE": "root_mean_squared_error",
-        "RMSSE": "root_mean_squared_error",
-    }
-
     def _get_model_params(self) -> dict:
         model_params = super()._get_model_params()
         model_params.setdefault("scaler", "standard")
@@ -526,4 +513,10 @@ class RecursiveTabularModel(AbstractMLForecastModel):
         return TimeSeriesDataFrame(predictions).reindex(data.item_ids, level=ITEMID)
 
     def _get_extra_tabular_init_kwargs(self) -> dict:
-        return {"problem_type": ag.constants.REGRESSION}
+        tabular_metric = self.eval_metric.equivalent_tabular_regression_metric
+        if tabular_metric is None:
+            tabular_metric = "mean_absolute_error"
+        return {
+            "problem_type": ag.constants.REGRESSION,
+            "eval_metric": tabular_metric,
+        }

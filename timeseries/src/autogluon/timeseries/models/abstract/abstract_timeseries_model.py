@@ -11,8 +11,7 @@ from autogluon.core.hpo.exceptions import EmptySearchSpace
 from autogluon.core.hpo.executors import HpoExecutor
 from autogluon.core.models import AbstractModel
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
-from autogluon.timeseries.evaluator import TimeSeriesEvaluator
-from autogluon.timeseries.metrics import check_get_evaluation_metric
+from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
 from autogluon.timeseries.utils.features import CovariateMetadata
 
 from .model_trial import model_trial, skip_hpo
@@ -41,16 +40,13 @@ class AbstractTimeSeriesModel(AbstractModel):
     metadata: CovariateMetadata
         A mapping of different covariate types known to autogluon.timeseries to column names
         in the data set.
-    eval_metric : str, default
-        Metric by which predictions will be ultimately evaluated on test data.
-        This only impacts `model.score()`, as eval_metric is not used during training.
-        Available metrics can be found in `autogluon.timeseries.utils.metric_utils.AVAILABLE_METRICS`, and
-        detailed documentation can be found in `gluonts.evaluation.Evaluator`. By default, `WQL`
-        will be used.
+    eval_metric : Union[str, TimeSeriesScorer], default = "WQL"
+        Metric by which predictions will be ultimately evaluated on future test data. AutoGluon tunes hyperparameters
+        in order to improve this metric on validation data, and ranks models (on validation data) according to this
+        metric.
     eval_metric_seasonal_period : int, optional
-        Seasonal period used to compute the mean absolute scaled error (MASE) evaluation metric. This parameter is only
-        used if ``eval_metric="MASE"`. See https://en.wikipedia.org/wiki/Mean_absolute_scaled_error for more details.
-        Defaults to ``None``, in which case the seasonal period is computed based on the data frequency.
+        Seasonal period used to compute some evaluation metrics such as mean absolute scaled error (MASE). Defaults to
+        ``None``, in which case the seasonal period is computed based on the data frequency.
     hyperparameters : dict, default = None
         Hyperparameters that will be used by the model (can be search spaces instead of fixed values).
         If None, model defaults are used. This is identical to passing an empty dictionary.
@@ -83,7 +79,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         path: Optional[str] = None,
         name: Optional[str] = None,
         metadata: Optional[CovariateMetadata] = None,
-        eval_metric: Optional[str] = None,
+        eval_metric: Union[str, TimeSeriesScorer, None] = None,
         eval_metric_seasonal_period: Optional[int] = None,
         hyperparameters: Dict[str, Union[int, float, str, space.Space]] = None,
         **kwargs,
@@ -96,7 +92,7 @@ class AbstractTimeSeriesModel(AbstractModel):
             eval_metric=None,
             hyperparameters=hyperparameters,
         )
-        self.eval_metric: str = TimeSeriesEvaluator.check_get_evaluation_metric(eval_metric)
+        self.eval_metric: TimeSeriesScorer = check_get_evaluation_metric(eval_metric)
         self.eval_metric_seasonal_period = eval_metric_seasonal_period
         self.stopping_metric = None
         self.problem_type = "timeseries"

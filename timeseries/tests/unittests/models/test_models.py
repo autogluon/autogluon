@@ -10,8 +10,9 @@ import pytest
 from flaky import flaky
 
 from autogluon.common import space
-from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesEvaluator
+from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
+from autogluon.timeseries.metrics import AVAILABLE_METRICS
 from autogluon.timeseries.models import DeepARModel, ETSModel
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
@@ -22,7 +23,6 @@ from .test_local import TESTABLE_MODELS as LOCAL_TESTABLE_MODELS
 from .test_mlforecast import TESTABLE_MODELS as MLFORECAST_TESTABLE_MODELS
 from .test_multi_window_model import get_multi_window_deepar
 
-AVAILABLE_METRICS = TimeSeriesEvaluator.AVAILABLE_METRICS
 TESTABLE_MODELS = (
     GLUONTS_TESTABLE_MODELS + LOCAL_TESTABLE_MODELS + MLFORECAST_TESTABLE_MODELS + [get_multi_window_deepar]
 )

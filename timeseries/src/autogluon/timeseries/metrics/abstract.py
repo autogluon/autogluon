@@ -26,11 +26,19 @@ class TimeSeriesScorer:
     optimized_by_median : bool, default = False
         Whether given point forecast metric is optimized by the median (if True) or expected value (if False). If True,
         all models in AutoGluon-TimeSeries will attempt to paste median forecast into the "mean" column.
+    is_quantile_metric : bool, default = False
+        Whether the given metric uses the quantile predictions. Some models will modify the training procedure if they
+        are trained to optimize a quantile metric.
+    equivalent_tabular_regression_metric : str
+        Name of an equivalent metric used by AutoGluon-Tabular with ``problem_type="regression"``. Used by models that
+        train a TabularPredictor under the hood. This attribute should only be specified by point forecast metrics.
     """
 
     greater_is_better: bool = False
     optimum: float = 0.0
     optimized_by_median: bool = False
+    is_quantile_metric: bool = False
+    equivalent_tabular_regression_metric: str
 
     @property
     def sign(self) -> int:
@@ -113,6 +121,8 @@ class TimeSeriesScorer:
             columns corresponding to each of the quantile levels.
         target : str, default = "target"
             Name of the column in ``data_future`` that contains the target time series.
+        quantile_levels : List[float], optional
+            List of increasing decimals that specifies the quantiles present in ``predictions`` data frame.
 
         Returns
         -------

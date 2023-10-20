@@ -16,6 +16,7 @@ from autogluon.timeseries import __version__ as current_ag_version
 from autogluon.timeseries.configs import TIMESERIES_PRESETS_CONFIGS
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
 from autogluon.timeseries.learner import AbstractLearner, TimeSeriesLearner
+from autogluon.timeseries.metrics import TimeSeriesScorer
 from autogluon.timeseries.splitter import ExpandingWindowSplitter
 from autogluon.timeseries.trainer import AbstractTimeSeriesTrainer
 
@@ -57,7 +58,7 @@ class TimeSeriesPredictor:
 
         If ``freq`` is provided when creating the predictor, all data passed to the predictor will be automatically
         resampled at this frequency.
-    eval_metric : str, default = "WQL"
+    eval_metric : Union[str, TimeSeriesScorer], default = "WQL"
         Metric by which predictions will be ultimately evaluated on future test data. AutoGluon tunes hyperparameters
         in order to improve this metric on validation data, and ranks models (on validation data) according to this
         metric.
@@ -78,9 +79,8 @@ class TimeSeriesPredictor:
 
         For more information about these metrics, see https://docs.aws.amazon.com/forecast/latest/dg/metrics.html.
     eval_metric_seasonal_period : int, optional
-        Seasonal period used to compute the mean absolute scaled error (MASE) evaluation metric. This parameter is only
-        used if ``eval_metric="MASE"``. See https://en.wikipedia.org/wiki/Mean_absolute_scaled_error for more details.
-        Defaults to ``None``, in which case the seasonal period is computed based on the data frequency.
+        Seasonal period used to compute some evaluation metrics such as mean absolute scaled error (MASE). Defaults to
+        ``None``, in which case the seasonal period is computed based on the data frequency.
     known_covariates_names: List[str], optional
         Names of the covariates that are known in advance for all time steps in the forecast horizon. These are also
         known as dynamic features, exogenous variables, additional regressors or related time series. Examples of such
@@ -125,7 +125,7 @@ class TimeSeriesPredictor:
         known_covariates_names: Optional[List[str]] = None,
         prediction_length: int = 1,
         freq: str = None,
-        eval_metric: Optional[str] = None,
+        eval_metric: Union[str, TimeSeriesScorer, None] = None,
         eval_metric_seasonal_period: Optional[int] = None,
         path: Optional[str] = None,
         verbosity: int = 2,
@@ -167,7 +167,7 @@ class TimeSeriesPredictor:
             if std_freq != str(self.freq):
                 logger.info(f"Frequency '{self.freq}' stored as '{std_freq}'")
             self.freq = std_freq
-        if eval_metric == "mean_wQuantileLoss":
+        if isinstance(eval_metric, str) and eval_metric == "mean_wQuantileLoss":
             # We don't use warnings.warn since DeprecationWarning may be silenced by the Python warning filters
             logger.warning(
                 "DeprecationWarning: Evaluation metric 'mean_wQuantileLoss' has been renamed to 'WQL'. "

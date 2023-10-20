@@ -7,7 +7,7 @@ import pandas as pd
 
 from autogluon.core.learner import AbstractLearner
 from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
-from autogluon.timeseries.evaluator import TimeSeriesEvaluator
+from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.splitter import AbstractWindowSplitter
 from autogluon.timeseries.trainer import AbstractTimeSeriesTrainer, AutoTimeSeriesTrainer
@@ -28,14 +28,14 @@ class TimeSeriesLearner(AbstractLearner):
         target: str = "target",
         known_covariates_names: Optional[List[str]] = None,
         trainer_type: Type[AbstractTimeSeriesTrainer] = AutoTimeSeriesTrainer,
-        eval_metric: Optional[str] = None,
+        eval_metric: Union[str, TimeSeriesScorer, None] = None,
         eval_metric_seasonal_period: Optional[int] = None,
         prediction_length: int = 1,
         cache_predictions: bool = True,
         **kwargs,
     ):
         super().__init__(path_context=path_context)
-        self.eval_metric: str = TimeSeriesEvaluator.check_get_evaluation_metric(eval_metric)
+        self.eval_metric: TimeSeriesScorer = check_get_evaluation_metric(eval_metric)
         self.eval_metric_seasonal_period = eval_metric_seasonal_period
         self.trainer_type = trainer_type
         self.target = target
@@ -89,7 +89,7 @@ class TimeSeriesLearner(AbstractLearner):
         logger.info(f"AutoGluon will save models to {self.path}")
 
         logger.info(f"AutoGluon will gauge predictive performance using evaluation metric: '{self.eval_metric}'")
-        if TimeSeriesEvaluator.METRIC_COEFFICIENTS[self.eval_metric] == -1:
+        if not self.eval_metric.greater_is_better:
             logger.info(
                 "\tThis metric's sign has been flipped to adhere to being 'higher is better'. "
                 "The reported score can be multiplied by -1 to get the metric value.",

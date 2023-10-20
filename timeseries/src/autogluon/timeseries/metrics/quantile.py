@@ -11,6 +11,8 @@ from .abstract import TimeSeriesScorer
 class QuantileForecastScorer(TimeSeriesScorer):
     """Base class for all quantile forecast metrics."""
 
+    is_quantile_metric = True
+
     def compute_metric(
         self,
         data_future: TimeSeriesDataFrame,
@@ -27,6 +29,11 @@ class QuantileForecastScorer(TimeSeriesScorer):
 
 
 class WQL(QuantileForecastScorer):
+    """Weighted quantile loss.
+
+    Also known as weighted pinball loss.
+    """
+
     def _compute_quantile_metric(self, y_true: pd.Series, q_pred: pd.DataFrame, quantile_levels: List[float]) -> float:
         values_true = y_true.values[:, None]  # shape [N, 1]
         values_pred = q_pred.values  # shape [N, len(quantile_levels)]
