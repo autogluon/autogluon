@@ -390,9 +390,7 @@ class WaveNetModel(AbstractGluonTSModel):
         init_kwargs = super()._get_estimator_init_args()
         init_kwargs["num_feat_static_cat"] = self.num_feat_static_cat
         init_kwargs["num_feat_static_real"] = self.num_feat_static_real
-        init_kwargs["cardinality"] = (
-            [1] if len(self.feat_static_cat_cardinality) == 0 else self.feat_static_cat_cardinality
-        )
+        init_kwargs["cardinality"] = [1] if self.num_feat_static_cat == 0 else self.feat_static_cat_cardinality
         init_kwargs["num_feat_dynamic_real"] = self.num_feat_dynamic_real
         init_kwargs.setdefault("negative_data", self.negative_data)
         init_kwargs.setdefault("seasonality", get_seasonality(self.freq))
