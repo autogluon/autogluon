@@ -335,7 +335,7 @@ def get_available_devices(num_gpus: int, auto_select_gpus: bool):
 
 def _get_mmlab_installation_guide(package_name):
     if package_name == "mmdet":
-        err_msg = 'Please install MMDetection by: pip install "mmdet>=3.0.0".'
+        err_msg = 'Please install MMDetection by: pip install "mmdet==3.0.0".'
     elif package_name == "mmcv":
         err_msg = "Please install MMCV by: mim install mmcv"
     elif package_name == "mmengine":
