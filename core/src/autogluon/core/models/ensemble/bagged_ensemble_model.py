@@ -666,8 +666,8 @@ class BaggedEnsembleModel(AbstractModel):
         fold_fitting_strategy: FoldFittingStrategy = fold_fitting_strategy_cls(**fold_fitting_strategy_args)
 
         if type(fold_fitting_strategy) == ParallelLocalFoldFittingStrategy and not fold_fitting_strategy.is_mem_sufficient():
-            # If memory is not sufficient, fall back to sequential fold strategy
-            fold_fitting_strategy: FoldFittingStrategy = SequentialLocalFoldFittingStrategy(**fold_fitting_strategy_args)
+            fold_fitting_strategy_args["num_folds_parallel"] = 1
+            fold_fitting_strategy: FoldFittingStrategy = fold_fitting_strategy_cls(**fold_fitting_strategy_args)
             logger.log(
                 30,
                 f"\tMemory not enough to fit {model_base.__class__.__name__} folds in parallel. Will do sequential fitting instead. "
