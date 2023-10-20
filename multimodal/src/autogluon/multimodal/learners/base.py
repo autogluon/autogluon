@@ -79,6 +79,7 @@ from ..constants import (
     Y_PRED_PROB,
     Y_TRUE,
     ZERO_SHOT_IMAGE_CLASSIFICATION,
+    DISTILLER,
 )
 from ..data import (
     BaseDataModule,
@@ -516,8 +517,6 @@ class BaseLearner(ExportMixin):
         if time_limit is not None:
             time_limit = timedelta(seconds=time_limit)
         self._fit_args = dict(
-            train_df=self._train_data,
-            val_df=self._tuning_data,
             validation_metric_name=self._validation_metric_name,
             minmax_mode=self._minmax_mode,
             max_time=time_limit,
@@ -528,13 +527,21 @@ class BaseLearner(ExportMixin):
             seed=seed,
             presets=self._presets,
             config=self._config,
-            hyperparameters=self._hyperparameters,
+            hyperparameters=self._hyperparameters,  # In HPO mode, this would be overwritten by sampled hyperparameters.
             advanced_hyperparameters=self._advanced_hyperparameters,
             teacher_learner=self._teacher_learner,
             standalone=standalone,
             is_hpo=self._is_hpo,  # skip average checkpoint if in hpo mode
             clean_ckpts=clean_ckpts,
         )
+        if self._fit_called:  # continuous training
+            continuous_train_args = dict(
+                config=self._config,
+                df_preprocessor=self._df_preprocessor,
+                data_processors=self._data_processors,
+                model=self._model,
+            )
+            self._fit_args.update(continuous_train_args)
 
     def execute_fit(self):
         if self._is_hpo:
@@ -545,7 +552,7 @@ class BaseLearner(ExportMixin):
                 **self._fit_args,
             )
         else:
-            self.fit_single_run(**self._fit_args)
+            self.fit_per_run(**self._fit_args)
 
     def fit(
         self,
@@ -634,55 +641,32 @@ class BaseLearner(ExportMixin):
             else:
                 self.init_pretrained()
 
-    def fit_single_run(
-        self,
-        train_df: pd.DataFrame,
-        val_df: pd.DataFrame,
-        validation_metric_name: str,
-        minmax_mode: str,
-        max_time: timedelta,
-        save_path: str,
-        ckpt_path: str,
-        resume: bool,
-        enable_progress_bar: bool,
-        seed: int,
-        presets: Optional[str] = None,
-        config: Optional[dict] = None,
-        hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
-        advanced_hyperparameters: Optional[Dict] = None,
-        teacher_learner: Union[str, BaseLearner] = None,
-        is_hpo: bool = False,
-        standalone: bool = True,
-        clean_ckpts: bool = True,
-        **hpo_kwargs,
-    ):
-        pl.seed_everything(seed, workers=True)
-        # TODO(?) We should have a separate "_pre_training_event()" for logging messages.
-        logger.info(get_fit_start_message(save_path, validation_metric_name))
+    def get_config_per_run(self, config, hyperparameters):
         config = get_config(
             problem_type=self._problem_type,
-            presets=presets,
+            presets=self._presets,
             config=config,
-            overrides=hyperparameters,
-            extra=["distiller"] if teacher_predictor is not None else None,
+            overrides=hyperparameters,  # don't use self._hyperparameters due to HPO.
+            extra=[DISTILLER] if self._teacher_learner is not None else None,
         )
-
         config = update_config_by_rules(
             problem_type=self._problem_type,
             config=config,
         )
+        return config
 
-        if self._df_preprocessor is None:
+    def get_df_preprocessor_per_run(self, df_preprocessor, config):
+        if df_preprocessor is None:
             df_preprocessor = init_df_preprocessor(
                 config=config,
                 column_types=self._column_types,
                 label_column=self._label_column,
-                train_df_x=train_df.drop(columns=self._label_column),
-                train_df_y=train_df[self._label_column],
+                train_df_x=self._train_data.drop(columns=self._label_column),
+                train_df_y=self._train_data[self._label_column],
             )
-        else:  # continuing training
-            df_preprocessor = self._df_preprocessor
+        return df_preprocessor
 
+    def update_config_by_data_per_run(self, config, df_preprocessor):
         # Avoid passing tabular data with many columns to MultiHeadAttention.
         # If models have additive_attention="auto", we enable it automatically for large tables.
         config = update_tabular_config_by_resources(
@@ -691,12 +675,10 @@ class BaseLearner(ExportMixin):
             num_categorical_columns=len(df_preprocessor.categorical_num_categories),
         )
         config = select_model(config=config, df_preprocessor=df_preprocessor)
+        return config
 
-        # Update output_shape with label_generator.
-        if self._problem_type == NER:
-            self._output_shape = len(df_preprocessor.label_generator.unique_entity_groups)
-
-        if self._model is None:
+    def get_model_per_run(self, model, config, df_preprocessor):
+        if model is None:
             model = create_fusion_model(
                 config=config,
                 num_classes=self._output_shape,
@@ -704,9 +686,9 @@ class BaseLearner(ExportMixin):
                 num_numerical_columns=len(df_preprocessor.numerical_feature_names),
                 num_categories=df_preprocessor.categorical_num_categories,
             )
-        else:  # continuing training
-            model = self._model
+        return model
 
+    def compile_model_per_run(self, config, model):
         if OmegaConf.select(config, "env.compile.turn_on", default=False):
             assert version.parse(torch.__version__) >= version.parse(TORCH_COMPILE_MIN_VERSION), (
                 f"torch.compile requires torch version >= {TORCH_COMPILE_MIN_VERSION}, "
@@ -719,34 +701,78 @@ class BaseLearner(ExportMixin):
                 dynamic=OmegaConf.select(config, "env.compile.dynamic", default=True),
                 backend=OmegaConf.select(config, "env.compile.backend", default="inductor"),
             )
+        return model
 
-        norm_param_names = get_norm_layer_param_names(model)
+    def get_peft_param_names_per_run(self, model, config):
+        peft_param_names = None
+        peft = OmegaConf.select(config, "optimization.efficient_finetune")
+        if peft:
+            norm_param_names = get_norm_layer_param_names(model)
+            peft_param_names = get_trainable_params_efficient_finetune(
+                norm_param_names,
+                efficient_finetune=peft,
+            )
+        return peft_param_names
 
-        trainable_param_names = get_trainable_params_efficient_finetune(
-            norm_param_names,
-            efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
-        )
-
-        if self._data_processors is None:
+    def get_data_processors_per_run(self, data_processors, config, model, advanced_hyperparameters):
+        if data_processors is None:
             data_processors = create_fusion_data_processors(
                 config=config,
                 model=model,
                 advanced_hyperparameters=advanced_hyperparameters,
             )
-        else:  # continuing training
-            data_processors = self._data_processors
-
         data_processors_count = {k: len(v) for k, v in data_processors.items()}
         logger.debug(f"data_processors_count: {data_processors_count}")
+        return data_processors
 
-        if validation_metric_name is not None:
-            validation_metric, custom_metric_func = get_metric(
-                metric_name=validation_metric_name,
-                num_classes=self._output_shape,
-                problem_type=self._problem_type,
-            )
-        else:
-            validation_metric, custom_metric_func = (None, None)
+    def get_validation_metric_per_run(self):
+        validation_metric, custom_metric_func = get_metric(
+            metric_name=self._validation_metric_name,
+            num_classes=self._output_shape,
+            problem_type=self._problem_type,
+        )
+        return validation_metric, custom_metric_func
+
+    def fit_per_run(
+        self,
+        validation_metric_name: str,
+        minmax_mode: str,
+        max_time: timedelta,
+        save_path: str,
+        ckpt_path: str,
+        resume: bool,
+        enable_progress_bar: bool,
+        seed: int,
+        hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
+        advanced_hyperparameters: Optional[Dict] = None,
+        config: Optional[Dict] = None,
+        df_preprocessor: Optional[MultiModalFeaturePreprocessor] = None,
+        data_processors: Optional[Dict] = None,
+        model: Optional[nn.Module] = None,
+        is_hpo: bool = False,
+        standalone: bool = True,
+        clean_ckpts: bool = True,
+    ):
+        pl.seed_everything(seed, workers=True)
+        # TODO(?) We should have a separate "_pre_training_event()" for logging messages.
+        logger.info(get_fit_start_message(save_path, validation_metric_name))
+        config = self.get_config_per_run(config=config, hyperparameters=hyperparameters)
+        df_preprocessor = self.get_df_preprocessor_per_run(
+            df_preprocessor=df_preprocessor,
+            config=config,
+        )
+        config = self.update_config_by_data_per_run(config=config, df_preprocessor=df_preprocessor)
+        model = self.get_model_per_run(model=model, config=config, df_preprocessor=df_preprocessor)
+        model = self.compile_model_per_run(config=config, model=model)
+        peft_param_names = self.get_peft_param_names_per_run(model=model, config=config)
+        data_processors = self.get_data_processors_per_run(
+            data_processors=data_processors,
+            config=config,
+            model=model,
+            advanced_hyperparameters=advanced_hyperparameters,
+        )
+        validation_metric, custom_metric_func = self.get_validation_metric_per_run()
+
 
         mixup_active, mixup_fn = get_mixup(
             model_config=OmegaConf.select(config, "model"),

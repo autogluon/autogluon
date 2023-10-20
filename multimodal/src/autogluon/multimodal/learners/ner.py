@@ -77,6 +77,42 @@ class NERLearner(BaseLearner):
             )
         return task
 
+    def get_output_shape_per_run(self, df_preprocessor):
+        # ner needs to update output_shape with label_generator.
+        return len(df_preprocessor.label_generator.unique_entity_groups)
+
+    def fit_per_run(
+            self,
+            validation_metric_name: str,
+            minmax_mode: str,
+            max_time: timedelta,
+            save_path: str,
+            ckpt_path: str,
+            resume: bool,
+            enable_progress_bar: bool,
+            seed: int,
+            hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
+            advanced_hyperparameters: Optional[Dict] = None,
+            config: Optional[Dict] = None,
+            df_preprocessor: Optional[MultiModalFeaturePreprocessor] = None,
+            data_processors: Optional[Dict] = None,
+            model: Optional[nn.Module] = None,
+            is_hpo: bool = False,
+            standalone: bool = True,
+            clean_ckpts: bool = True,
+    ):
+        pl.seed_everything(seed, workers=True)
+        # TODO(?) We should have a separate "_pre_training_event()" for logging messages.
+        logger.info(get_fit_start_message(save_path, validation_metric_name))
+        config = self.get_config_per_run(config=config, hyperparameters=hyperparameters)
+        df_preprocessor = self.get_df_preprocessor_per_run(
+            df_preprocessor=df_preprocessor,
+            config=config,
+        )
+        config = self.update_config_by_data_per_run(config=config, df_preprocessor=df_preprocessor)
+        output_shape = self.get_output_shape_per_run(df_preprocessor=df_preprocessor)
+        model = self.get_model_per_run(model=model, config=config, df_preprocessor=df_preprocessor)
+
     def _get_model(self):
         """
         Setup and update config (DictConfig) for the model, and get the model (nn.Module)
