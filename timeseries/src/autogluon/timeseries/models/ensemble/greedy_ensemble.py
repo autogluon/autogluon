@@ -8,8 +8,8 @@ import autogluon.core as ag
 from autogluon.core.models.greedy_ensemble.ensemble_selection import EnsembleSelection
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer
-from autogluon.timeseries.utils.datetime import get_seasonality
 from autogluon.timeseries.models.ensemble import AbstractTimeSeriesEnsembleModel
+from autogluon.timeseries.utils.datetime import get_seasonality
 
 logger = logging.getLogger(__name__)
 
