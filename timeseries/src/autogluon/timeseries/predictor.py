@@ -65,7 +65,7 @@ class TimeSeriesPredictor:
 
         Probabilistic forecast metrics (evaluated on quantile forecasts for the specified ``quantile_levels``):
 
-        - ``"WQL"``: mean weighted quantile loss, defined as average of quantile losses, scaled by the total value of the time series
+        - ``"WQL"``: mean weighted quantile loss, defined as average of quantile losses, divided by the sum of absolute time series values in the forecast horizon.
 
         Point forecast metrics (these are always evaluated on the ``"mean"`` column of the predictions):
 
@@ -167,6 +167,7 @@ class TimeSeriesPredictor:
             if std_freq != str(self.freq):
                 logger.info(f"Frequency '{self.freq}' stored as '{std_freq}'")
             self.freq = std_freq
+        # TODO: Change to DeprecationWarning, make sure it's displayed correctly https://github.com/autogluon/autogluon/issues/3465
         if isinstance(eval_metric, str) and eval_metric == "mean_wQuantileLoss":
             # We don't use warnings.warn since DeprecationWarning may be silenced by the Python warning filters
             logger.warning(

@@ -17,9 +17,6 @@ class TimeSeriesScorer:
 
     Attributes
     ----------
-    greater_is_better : bool, default = False
-        Whether internal method :meth:`~autogluon.timeseries.metrics.TimeSeriesScorer.compute_metric` is
-        a loss function (default), meaning low is good, or a score function, meaning high is good.
     optimum : float, default = 0.0
         The best score achievable by the score function, i.e. maximum in case of scorer function and minimum in case of
         loss function.
@@ -34,7 +31,7 @@ class TimeSeriesScorer:
         train a TabularPredictor under the hood. This attribute should only be specified by point forecast metrics.
     """
 
-    greater_is_better: bool = False
+    _greater_is_better: bool = False  # does `compute_metric` method return metric in greater-is-better format?
     optimum: float = 0.0
     optimized_by_median: bool = False
     is_quantile_metric: bool = False
@@ -42,7 +39,7 @@ class TimeSeriesScorer:
 
     @property
     def sign(self) -> int:
-        return 1 if self.greater_is_better else -1
+        return 1 if self._greater_is_better else -1
 
     @property
     def name(self) -> str:
@@ -56,7 +53,7 @@ class TimeSeriesScorer:
 
     @property
     def name_with_sign(self) -> str:
-        if self.greater_is_better:
+        if self._greater_is_better:
             prefix = ""
         else:
             prefix = "-"
@@ -80,21 +77,23 @@ class TimeSeriesScorer:
         assert (predictions.num_timesteps_per_item() == prediction_length).all()
         assert data_future.index.equals(predictions.index), "Prediction and data indices do not match."
 
-        self.save_past_metrics(
-            data_past=data_past,
-            target=target,
-            seasonal_period=seasonal_period,
-            **kwargs,
-        )
-        with warning_filter():
-            metric_value = self.compute_metric(
-                data_future=data_future,
-                predictions=predictions,
-                target=target,
-                quantile_levels=quantile_levels,
-                **kwargs,
-            )
-        self.clear_past_metrics()
+        try:
+            with warning_filter():
+                self.save_past_metrics(
+                    data_past=data_past,
+                    target=target,
+                    seasonal_period=seasonal_period,
+                    **kwargs,
+                )
+                metric_value = self.compute_metric(
+                    data_future=data_future,
+                    predictions=predictions,
+                    target=target,
+                    quantile_levels=quantile_levels,
+                    **kwargs,
+                )
+        finally:
+            self.clear_past_metrics()
         return metric_value * self.sign
 
     score = __call__

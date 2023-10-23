@@ -41,9 +41,9 @@ class AbstractTimeSeriesModel(AbstractModel):
         A mapping of different covariate types known to autogluon.timeseries to column names
         in the data set.
     eval_metric : Union[str, TimeSeriesScorer], default = "WQL"
-        Metric by which predictions will be ultimately evaluated on future test data. AutoGluon tunes hyperparameters
-        in order to improve this metric on validation data, and ranks models (on validation data) according to this
-        metric.
+        Metric by which predictions will be ultimately evaluated on future test data. This only impacts
+        ``model.score()``, as eval_metric is not used during training. Available metrics can be found in
+        ``autogluon.timeseries.metrics``.
     eval_metric_seasonal_period : int, optional
         Seasonal period used to compute some evaluation metrics such as mean absolute scaled error (MASE). Defaults to
         ``None``, in which case the seasonal period is computed based on the data frequency.
