@@ -186,3 +186,20 @@ def test_use_bag_holdout_calibrate(fit_helper):
         expected_model_count=2,
         refit_full=False,
     )
+
+
+def test_num_folds_parallel(fit_helper, capsys):
+    """Tests that num_folds_parallel equal to 1 works"""
+    fit_args = dict(hyperparameters={"DUMMY": {}}, fit_weighted_ensemble=False, num_bag_folds=2, num_bag_sets=1, ag_args_ensemble=dict(num_folds_parallel=1))
+    dataset_name = "adult"
+
+    predictor = fit_helper.fit_and_validate_dataset(
+        dataset_name=dataset_name,
+        fit_args=fit_args,
+        expected_model_count=1,
+        refit_full=False,
+        delete_directory=False,
+    )
+    leaderboard = predictor.leaderboard(extra_info=True)
+    assert leaderboard.iloc[0]["num_models"] == 2
+    shutil.rmtree(predictor.path, ignore_errors=True)
