@@ -145,5 +145,5 @@ class RMSSE(PointForecastScorer):
         if self._past_squared_seasonal_error is None:
             raise AssertionError("Call `save_past_metrics` before `compute_metric`")
 
-        rmse_per_item = (y_true - y_pred).pow(2.0).groupby(level=ITEMID, sort=False).mean()
-        return self._safemean(rmse_per_item / self._past_squared_seasonal_error)
+        mse_per_item = (y_true - y_pred).pow(2.0).groupby(level=ITEMID, sort=False).mean()
+        return np.sqrt(self._safemean(mse_per_item / self._past_squared_seasonal_error))

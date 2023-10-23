@@ -18,14 +18,16 @@ class QuantileForecastScorer(TimeSeriesScorer):
         data_future: TimeSeriesDataFrame,
         predictions: TimeSeriesDataFrame,
         target: str = "target",
-        quantile_levels: Optional[List[float]] = None,
         **kwargs,
     ) -> float:
-        assert quantile_levels is not None, f"{self.name} expects `quantile_levels` to be provided"
+        quantile_columns = [col for col in predictions.columns if col != "mean"]
+        quantile_levels = np.array(quantile_columns, dtype=float)
         y_true = data_future[target]
-        q_pred = predictions[[str(q) for q in quantile_levels]]
-        quantile_levels = np.array(quantile_levels, dtype=float)
+        q_pred = predictions[quantile_columns]
         return self._compute_quantile_metric(y_true=y_true, q_pred=q_pred, quantile_levels=quantile_levels)
+
+    def _compute_quantile_metric(self, y_true: pd.Series, q_pred: pd.DataFrame, quantile_levels: np.ndarray) -> float:
+        raise NotImplementedError
 
 
 class WQL(QuantileForecastScorer):
@@ -34,7 +36,7 @@ class WQL(QuantileForecastScorer):
     Also known as weighted pinball loss.
     """
 
-    def _compute_quantile_metric(self, y_true: pd.Series, q_pred: pd.DataFrame, quantile_levels: List[float]) -> float:
+    def _compute_quantile_metric(self, y_true: pd.Series, q_pred: pd.DataFrame, quantile_levels: np.ndarray) -> float:
         values_true = y_true.values[:, None]  # shape [N, 1]
         values_pred = q_pred.values  # shape [N, len(quantile_levels)]
 

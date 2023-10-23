@@ -26,7 +26,6 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
         random_state: np.random.RandomState = None,
         prediction_length: int = 1,
         target: str = "target",
-        quantile_levels: List[float] = None,
         eval_metric_seasonal_period: Optional[int] = None,
         **kwargs,
     ):
@@ -42,7 +41,6 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
         )
         self.prediction_length = prediction_length
         self.target = target
-        self.quantile_levels = quantile_levels
         self.eval_metric_seasonal_period = eval_metric_seasonal_period
 
     def _fit(
@@ -91,7 +89,7 @@ class TimeSeriesEnsembleSelection(EnsembleSelection):
             dummy_pred[list(dummy_pred.columns)] = y_pred_proba[window_idx]
             # We use scorer.compute_metric instead of scorer.score to avoid repeated calls to scorer.save_past_metrics
             metric_value = self.scorer_per_window[window_idx].compute_metric(
-                data_future, dummy_pred, target=self.target, quantile_levels=self.quantile_levels
+                data_future, dummy_pred, target=self.target
             )
             total_score += metric.sign * metric_value
         avg_score = total_score / len(self.data_future_per_window)
@@ -122,7 +120,6 @@ class TimeSeriesGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
             prediction_length=self.prediction_length,
             target=self.target,
             eval_metric_seasonal_period=self.eval_metric_seasonal_period,
-            quantile_levels=self.quantile_levels,
         )
         ensemble_selection.fit(
             predictions=list(predictions_per_window.values()),

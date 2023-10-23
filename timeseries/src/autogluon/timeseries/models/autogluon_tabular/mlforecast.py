@@ -278,14 +278,6 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         else:
             return pd.Series(1.0, index=item_ids)
 
-    def predict(
-        self,
-        data: TimeSeriesDataFrame,
-        known_covariates: Optional[TimeSeriesDataFrame] = None,
-        **kwargs,
-    ) -> TimeSeriesDataFrame:
-        raise NotImplementedError
-
 
 class DirectTabularModel(AbstractMLForecastModel):
     """Predict all future time series values simultaneously using TabularPredictor from AutoGluon-Tabular.
@@ -332,14 +324,6 @@ class DirectTabularModel(AbstractMLForecastModel):
         end of each time series).
     """
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        if 0.5 not in self.quantile_levels:
-            self.must_drop_median = True
-            self.quantile_levels = sorted(set([0.5] + self.quantile_levels))
-        else:
-            self.must_drop_median = False
-
     @property
     def is_quantile_model(self) -> bool:
         return self.eval_metric.is_quantile_metric
@@ -367,7 +351,7 @@ class DirectTabularModel(AbstractMLForecastModel):
         else:
             return super()._compute_residuals_std(val_df=val_df)
 
-    def predict(
+    def _predict(
         self,
         data: TimeSeriesDataFrame,
         known_covariates: Optional[TimeSeriesDataFrame] = None,
@@ -398,8 +382,6 @@ class DirectTabularModel(AbstractMLForecastModel):
         predictions = predictions.rename(columns={MLF_ITEMID: ITEMID, MLF_TIMESTAMP: TIMESTAMP}).set_index(
             [ITEMID, TIMESTAMP]
         )
-        if self.must_drop_median:
-            predictions = predictions.drop("0.5", axis=1)
         return TimeSeriesDataFrame(predictions)
 
     def _postprocess_predictions(self, predictions: np.ndarray) -> pd.DataFrame:
@@ -423,9 +405,7 @@ class DirectTabularModel(AbstractMLForecastModel):
                 "eval_metric": "pinball_loss",
             }
         else:
-            tabular_metric = self.eval_metric.equivalent_tabular_regression_metric
-            if tabular_metric is None:
-                tabular_metric = "mean_absolute_error"
+            tabular_metric = getattr(self.eval_metric, "equivalent_tabular_regression_metric", "mean_absolute_error")
             return {
                 "problem_type": ag.constants.REGRESSION,
                 "eval_metric": tabular_metric,
@@ -479,7 +459,7 @@ class RecursiveTabularModel(AbstractMLForecastModel):
         model_params.setdefault("differences", [get_seasonality(self.freq)])
         return model_params
 
-    def predict(
+    def _predict(
         self,
         data: TimeSeriesDataFrame,
         known_covariates: Optional[TimeSeriesDataFrame] = None,
@@ -513,9 +493,7 @@ class RecursiveTabularModel(AbstractMLForecastModel):
         return TimeSeriesDataFrame(predictions).reindex(data.item_ids, level=ITEMID)
 
     def _get_extra_tabular_init_kwargs(self) -> dict:
-        tabular_metric = self.eval_metric.equivalent_tabular_regression_metric
-        if tabular_metric is None:
-            tabular_metric = "mean_absolute_error"
+        tabular_metric = getattr(self.eval_metric, "equivalent_tabular_regression_metric", "mean_absolute_error")
         return {
             "problem_type": ag.constants.REGRESSION,
             "eval_metric": tabular_metric,

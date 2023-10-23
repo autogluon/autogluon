@@ -177,12 +177,6 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         self.num_past_feat_dynamic_real = 0
         self.feat_static_cat_cardinality: List[int] = []
 
-        if 0.5 not in self.quantile_levels:
-            self.must_drop_median = True
-            self.quantile_levels = sorted(set([0.5] + self.quantile_levels))
-        else:
-            self.must_drop_median = False
-
     def save(self, path: str = None, verbose: bool = True) -> str:
         # we flush callbacks instance variable if it has been set. it can keep weak references which breaks training
         self.callbacks = []
@@ -417,32 +411,21 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             callbacks.append(EarlyStopping(monitor="val_loss", patience=early_stopping_patience))
         return callbacks
 
-    def predict(
+    def _predict(
         self,
         data: TimeSeriesDataFrame,
         known_covariates: Optional[TimeSeriesDataFrame] = None,
-        quantile_levels: List[float] = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
         if self.gts_predictor is None:
             raise ValueError("Please fit the model before predicting.")
 
-        logger.debug(f"Predicting with time series model {self.name}")
-        logger.debug(
-            f"\tProvided data for prediction with {len(data)} rows, {data.num_items} items. "
-            f"Average time series length is {len(data) / data.num_items}."
-        )
         with warning_filter(), gluonts.core.settings.let(gluonts.env.env, use_tqdm=False):
-            quantiles = quantile_levels or self.quantile_levels
-            if not all(0 < q < 1 for q in quantiles):
-                raise ValueError("Invalid quantile value specified. Quantiles must be between 0 and 1 (exclusive).")
-
             predicted_targets = self._predict_gluonts_forecasts(data, known_covariates=known_covariates, **kwargs)
             df = self._gluonts_forecasts_to_data_frame(
                 predicted_targets,
                 forecast_index=get_forecast_horizon_index_ts_dataframe(data, self.prediction_length),
             )
-
         return df
 
     def _predict_gluonts_forecasts(
@@ -544,6 +527,4 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             raise ValueError(f"Unrecognized forecast type {type(forecasts[0])}")
 
         forecast_df.index = forecast_index
-        if self.must_drop_median:
-            forecast_df = forecast_df.drop("0.5", axis=1)
         return TimeSeriesDataFrame(forecast_df)

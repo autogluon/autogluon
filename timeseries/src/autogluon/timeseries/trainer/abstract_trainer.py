@@ -827,7 +827,6 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             prediction_length=self.prediction_length,
             target=self.target,
             seasonal_period=self.eval_metric_seasonal_period,
-            quantile_levels=self.quantile_levels,
         )
 
     def score(

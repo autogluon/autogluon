@@ -17,7 +17,7 @@ __all__ = [
     "WQL",
 ]
 
-DEFAULT_METRIC = "WQL"
+DEFAULT_METRIC_NAME = "WQL"
 
 AVAILABLE_METRICS = {
     "MASE": MASE,
@@ -47,9 +47,9 @@ def check_get_evaluation_metric(
                 f"Time series metric {eval_metric} not supported. Available metrics are:\n"
                 f"{json.dumps(list(AVAILABLE_METRICS.keys()), indent=2)}"
             )
-        eval_metric = AVAILABLE_METRICS[eval_metric]()
+        eval_metric = AVAILABLE_METRICS[eval_metric.upper()]()
     elif eval_metric is None:
-        eval_metric = AVAILABLE_METRICS[DEFAULT_METRIC]()
+        eval_metric = AVAILABLE_METRICS[DEFAULT_METRIC_NAME]()
     else:
         raise ValueError(
             f"eval_metric must be of type str, TimeSeriesScorer or None "

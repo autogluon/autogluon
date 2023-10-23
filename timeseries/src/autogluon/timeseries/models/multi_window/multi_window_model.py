@@ -105,7 +105,9 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
 
             oof_predictions_per_window.append(model.get_oof_predictions()[0])
 
-            logger.debug(f"\t\t{model.val_score:<7.4f}".ljust(15) + f"= Validation score ({model.eval_metric})")
+            logger.debug(
+                f"\t\t{model.val_score:<7.4f}".ljust(15) + f"= Validation score ({model.eval_metric.name_with_sign})"
+            )
             logger.debug(f"\t\t{model.fit_time:<7.3f} s".ljust(15) + "= Training runtime")
             logger.debug(f"\t\t{model.predict_time:<7.3f} s".ljust(15) + "= Training runtime")
 
@@ -137,7 +139,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         model.rename(self.name + os.sep + f"W{window_index}")
         return model
 
-    def predict(
+    def _predict(
         self,
         data: TimeSeriesDataFrame,
         known_covariates: Optional[TimeSeriesDataFrame] = None,

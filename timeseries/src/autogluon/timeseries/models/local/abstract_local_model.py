@@ -119,7 +119,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
     def _update_local_model_args(self, local_model_args: Dict[str, Any]) -> Dict[str, Any]:
         return local_model_args
 
-    def predict(self, data: TimeSeriesDataFrame, **kwargs) -> TimeSeriesDataFrame:
+    def _predict(self, data: TimeSeriesDataFrame, **kwargs) -> TimeSeriesDataFrame:
         if self.max_ts_length is not None:
             logger.debug(f"Shortening all time series to at most {self.max_ts_length}")
             data = data.groupby(level=ITEMID, sort=False).tail(self.max_ts_length)

@@ -56,7 +56,7 @@ class TimeSeriesScorer:
 
     @property
     def name_with_sign(self) -> str:
-        if self._greater_is_better:
+        if self.greater_is_better_internal:
             prefix = ""
         else:
             prefix = "-"
@@ -69,7 +69,6 @@ class TimeSeriesScorer:
         prediction_length: int = 1,
         target: str = "target",
         seasonal_period: Optional[int] = None,
-        quantile_levels: Optional[List[float]] = None,
         **kwargs,
     ) -> float:
         seasonal_period = get_seasonality(data.freq) if seasonal_period is None else seasonal_period
@@ -92,7 +91,6 @@ class TimeSeriesScorer:
                     data_future=data_future,
                     predictions=predictions,
                     target=target,
-                    quantile_levels=quantile_levels,
                     **kwargs,
                 )
         finally:
@@ -106,7 +104,6 @@ class TimeSeriesScorer:
         data_future: TimeSeriesDataFrame,
         predictions: TimeSeriesDataFrame,
         target: str = "target",
-        quantile_levels: Optional[List[float]] = None,
         **kwargs,
     ) -> float:
         """Internal method that computes the metric for given forecast & actual data.
@@ -123,8 +120,6 @@ class TimeSeriesScorer:
             columns corresponding to each of the quantile levels.
         target : str, default = "target"
             Name of the column in ``data_future`` that contains the target time series.
-        quantile_levels : List[float], optional
-            List of increasing decimals that specifies the quantiles present in ``predictions`` data frame.
 
         Returns
         -------
