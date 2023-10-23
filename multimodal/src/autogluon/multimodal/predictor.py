@@ -1510,7 +1510,7 @@ class MultiModalPredictor(ExportMixin):
         with apply_log_filter(log_filter):
             trainer = pl.Trainer(
                 accelerator="gpu" if num_gpus > 0 else "auto",
-                devices=get_available_devices(num_gpus,config.env.auto_select_gpus),
+                devices=get_available_devices(num_gpus, config.env.auto_select_gpus),
                 num_nodes=config.env.num_nodes,
                 precision=precision,
                 strategy=strategy if strategy else "auto",
