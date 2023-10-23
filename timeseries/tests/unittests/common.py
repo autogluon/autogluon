@@ -7,8 +7,8 @@ import pandas as pd
 from gluonts.dataset.common import ListDataset
 
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
-from autogluon.timeseries.metrics import TimeSeriesScorer
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
+from autogluon.timeseries.metrics import TimeSeriesScorer
 
 # TODO: add larger unit test data sets to S3
 

@@ -12,12 +12,12 @@ from flaky import flaky
 from autogluon.common import space
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
-from autogluon.timeseries.metrics import AVAILABLE_METRICS, TimeSeriesScorer
+from autogluon.timeseries.metrics import AVAILABLE_METRICS
 from autogluon.timeseries.models import DeepARModel, ETSModel
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
 
-from ..common import DUMMY_TS_DATAFRAME, dict_equal_primitive, get_data_frame_with_item_index, CustomMetric
+from ..common import DUMMY_TS_DATAFRAME, CustomMetric, dict_equal_primitive, get_data_frame_with_item_index
 from .test_gluonts import TESTABLE_MODELS as GLUONTS_TESTABLE_MODELS
 from .test_local import TESTABLE_MODELS as LOCAL_TESTABLE_MODELS
 from .test_mlforecast import TESTABLE_MODELS as MLFORECAST_TESTABLE_MODELS
