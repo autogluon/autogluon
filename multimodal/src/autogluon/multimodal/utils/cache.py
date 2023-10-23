@@ -99,8 +99,8 @@ class DDPPredictionWriter(BasePredictionWriter):
         while (not os.path.exists(sample_indices_file)) or (not os.path.exists(predictions_file)):
             logger.info(f"waiting for rank #{global_rank} to finish saving predictions...")
             time.sleep(self.sleep_time)
-        sample_indices = torch.load(sample_indices_file)
-        predictions = torch.load(predictions_file)
+        sample_indices = torch.load(sample_indices_file, map_location=torch.device("cpu"))
+        predictions = torch.load(predictions_file, map_location=torch.device("cpu"))
 
         return sample_indices, predictions
 
