@@ -47,8 +47,8 @@ on:
         description: 'Branch or PR number to run the benchmark on'
         required: true
       fork_info:
-        description: 'Get the forked PR repository name and branch'
-        required: true
+        description: 'Get the forked PR repository name and branch, e.g. username/autogluon|test_branch'
+        required: false
       
 permissions:
   id-token: write
