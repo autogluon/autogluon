@@ -231,6 +231,26 @@ class DistillationLearner(BaseLearner):
         )
         return task
 
+    def post_fit_per_run(self):
+        if trainer.global_rank == 0:
+            # We do not perform averaging checkpoint in the case of hpo for each trial
+            # We only average the checkpoint of the best trial at the end in the master process.
+            if not is_hpo:
+                self._top_k_average(
+                    model=model,
+                    save_path=save_path,
+                    is_distill=True,
+                    top_k_average_method=config.optimization.top_k_average_method,
+                    strategy=strategy,
+                    strict_loading=not peft_param_names,
+                    # Not strict loading if using parameter-efficient finetuning
+                    standalone=standalone,
+                    clean_ckpts=clean_ckpts,
+                )
+            self._best_score = trainer.callback_metrics[f"val_{self._validation_metric_name}"].item()
+        else:
+            sys.exit(f"Training finished, exit the process with global_rank={trainer.global_rank}...")
+
     def fit_per_run(self):
         (
             teacher_model,

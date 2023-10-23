@@ -11,7 +11,7 @@ import sys
 import time
 import warnings
 from datetime import timedelta
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, Callable
 
 import lightning.pytorch as pl
 import numpy as np
@@ -19,7 +19,7 @@ import pandas as pd
 import torch
 import yaml
 from lightning.pytorch.strategies import DeepSpeedStrategy
-from omegaconf import OmegaConf
+from omegaconf import OmegaConf, DictConfig
 from packaging import version
 from torch import nn
 
@@ -450,21 +450,35 @@ class BaseLearner(ExportMixin):
                 f"Detected data scarcity. Consider running using the preset '{FEW_SHOT_TEXT_CLASSIFICATION}' for better performance."
             )
 
-    def update_attributes(self, presets: str, config: Dict, teacher_learner: Union[str, BaseLearner]):
+    def update_attributes(
+        self, presets: Optional[str] = None,
+        config: Optional[Dict] = None,
+        teacher_learner: Optional[Union[str, BaseLearner]] = None,
+        df_preprocessor: Optional[MultiModalFeaturePreprocessor] = None,
+        data_processors: Optional[Dict] = None,
+        model: Optional[nn.Module] = None,
+        model_postprocess_fn: Optional[Callable] = None,
+    ):
         if presets:
             if self._fit_called:
                 warnings.warn("Ignoring the provided `presets` as fit() was called before.", UserWarning)
             else:
                 self._presets = presets
-
         if config:
             if self._fit_called:
                 warnings.warn("Ignoring the provided `config` as fit() was called before.", UserWarning)
             else:
                 self._config = config
-
         if teacher_learner:
             self._teacher_learner = teacher_learner
+        if df_preprocessor:
+            self._df_preprocessor = df_preprocessor
+        if data_processors:
+            self._data_processors = data_processors
+        if model:
+            self._model = model
+        if model_postprocess_fn:
+            self._model_postprocess_fn = model_postprocess_fn
 
     def infer_validation_metric(self):
         if self._fit_called:
@@ -533,7 +547,6 @@ class BaseLearner(ExportMixin):
             advanced_hyperparameters=self._advanced_hyperparameters,
             teacher_learner=self._teacher_learner,
             standalone=standalone,
-            is_hpo=self._is_hpo,  # skip average checkpoint if in hpo mode
             clean_ckpts=clean_ckpts,
         )
         if self._fit_called:  # continuous training
@@ -554,7 +567,14 @@ class BaseLearner(ExportMixin):
                 **self._fit_args,
             )
         else:
-            self.fit_per_run(**self._fit_args)
+            config, df_preprocessor, data_processors, model, model_postprocess_fn = self.fit_per_run(**self._fit_args)
+            self.update_attributes(
+                config=config,
+                df_preprocessor=df_preprocessor,
+                data_processors=data_processors,
+                model=model,
+                model_postprocess_fn=model_postprocess_fn,
+            )
 
     def fit(
         self,
@@ -806,7 +826,7 @@ class BaseLearner(ExportMixin):
             **optimization_kwargs,
         )
 
-    def get_callbacks_per_run(self, save_path, config, task, ):
+    def get_callbacks_per_run(self, save_path, config, task):
         checkpoint_callback = AutoMMModelCheckpoint(
             dirpath=save_path,
             save_top_k=config.optimization.top_k,
@@ -829,7 +849,157 @@ class BaseLearner(ExportMixin):
             lr_callback,
             model_summary,
         ]
+        if self._is_hpo:
+            from ..utils.hpo import get_ray_tune_ckpt_callback
+
+            TuneReportCheckpointCallback = get_ray_tune_ckpt_callback()
+            tune_report_callback = TuneReportCheckpointCallback(
+                {f"{task.validation_metric_name}": f"{task.validation_metric_name}"},
+                filename=RAY_TUNE_CHECKPOINT,
+            )
+            callbacks = [
+                tune_report_callback,
+                early_stopping_callback,
+                lr_callback,
+                model_summary,
+            ]
+
         return callbacks
+
+    def get_plugins_per_run(self, model, peft_param_names):
+        custom_checkpoint_plugin = AutoMMModelCheckpointIO(
+            trainable_param_names=peft_param_names,
+            model_name_to_id=model.name_to_id,
+        )
+        return [custom_checkpoint_plugin]
+
+    def get_tb_logger(self, save_path):
+        return pl.loggers.TensorBoardLogger(
+            save_dir=save_path,
+            name="",
+            version="",
+        )
+
+    def log_gpu_info(self, num_gpus, config):
+        logger.info(
+            get_gpu_message(
+                detected_num_gpus=ResourceManager.get_gpu_count_torch(),
+                used_num_gpus=num_gpus,
+                strategy=config.env.strategy,
+            )
+        )
+
+    def get_grad_steps(self, num_gpus, config):
+        if num_gpus == 0:  # CPU only training
+            grad_steps = max(
+                config.env.batch_size // (config.env.per_gpu_batch_size * config.env.num_nodes),
+                1,
+            )
+        else:
+            grad_steps = max(
+                config.env.batch_size // (config.env.per_gpu_batch_size * num_gpus * config.env.num_nodes),
+                1,
+            )
+        return grad_steps
+
+    def get_strategy_per_run(self, num_gpus, config):
+        if config.env.strategy == DEEPSPEED_OFFLOADING and num_gpus == 1:  # Offloading currently only tested for single GPU
+            assert version.parse(pl.__version__) >= version.parse(
+                DEEPSPEED_MIN_PL_VERSION
+            ), f"For DeepSpeed Offloading to work reliably you need at least lightning version {DEEPSPEED_MIN_PL_VERSION}, however, found {pl.__version__}. Please update your lightning version."
+            from ..optimization.deepspeed import CustomDeepSpeedStrategy
+
+            strategy = CustomDeepSpeedStrategy(
+                stage=3,
+                offload_optimizer=True,
+                offload_parameters=False,
+                allgather_bucket_size=config.env.deepspeed_allgather_size,
+                reduce_bucket_size=config.env.deepspeed_allreduce_size,
+            )
+        elif num_gpus <= 1:
+            strategy = "auto"
+        else:
+            strategy = config.env.strategy
+        return strategy
+
+    def update_strategy_and_num_gpus_for_hpo(self, strategy, num_gpus):
+        if self._is_hpo:
+            strategy = "auto"
+            num_gpus = min(num_gpus, 1)  # Currently only support one trial using one gpu.
+        return strategy, num_gpus
+
+    def post_update_config_per_run(self, config, num_gpus, precision, strategy):
+        config.env.num_gpus = num_gpus
+        config.env.precision = precision
+        config.env.strategy = strategy if not config.env.strategy == DEEPSPEED_OFFLOADING else DEEPSPEED_OFFLOADING
+        return config
+
+    def init_trainer_per_run(self, num_gpus, config, precision, strategy, max_time, callbacks, tb_logger, grad_steps, plugins, enable_progress_bar):
+        blacklist_msgs = ["already configured with model summary"]
+        log_filter = LogFilter(blacklist_msgs)
+        with apply_log_filter(log_filter):
+            trainer = pl.Trainer(
+                accelerator="gpu" if num_gpus > 0 else "auto",
+                devices=num_gpus if num_gpus > 0 else "auto",
+                num_nodes=config.env.num_nodes,
+                precision=precision,
+                strategy=strategy if strategy else "auto",
+                benchmark=False,
+                deterministic=config.env.deterministic,
+                max_epochs=config.optimization.max_epochs,
+                max_steps=config.optimization.max_steps,
+                max_time=max_time,
+                callbacks=callbacks,
+                logger=tb_logger,
+                gradient_clip_val=OmegaConf.select(config, "optimization.gradient_clip_val", default=1),
+                gradient_clip_algorithm=OmegaConf.select(
+                    config, "optimization.gradient_clip_algorithm", default="norm"
+                ),
+                accumulate_grad_batches=grad_steps,
+                log_every_n_steps=OmegaConf.select(config, "optimization.log_every_n_steps", default=10),
+                enable_progress_bar=enable_progress_bar,
+                fast_dev_run=config.env.fast_dev_run,
+                val_check_interval=config.optimization.val_check_interval,
+                check_val_every_n_epoch=config.optimization.check_val_every_n_epoch
+                if hasattr(config.optimization, "check_val_every_n_epoch")
+                else 1,
+                plugins=plugins,
+            )
+        return trainer
+
+    def fit_trainer_per_run(self, trainer, task, datamodule, ckpt_path, resume):
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                ".*does not have many workers which may be a bottleneck. "
+                "Consider increasing the value of the `num_workers` argument` "
+                ".* in the `DataLoader` init to improve performance.*",
+            )
+            warnings.filterwarnings("ignore", "Checkpoint directory .* exists and is not empty.")
+            trainer.fit(
+                task,
+                datamodule=datamodule,
+                ckpt_path=ckpt_path if resume else None,  # this is to resume training that was broken accidentally
+            )
+
+    def on_fit_end_per_run(self, trainer, model, save_path, config, strategy, peft_param_names, standalone, clean_ckpts):
+        if trainer.global_rank == 0:
+            # We do not perform averaging checkpoint in the case of hpo for each trial
+            # We only average the checkpoint of the best trial at the end in the master process.
+            if not self._is_hpo:
+                self._top_k_average(
+                    model=model,
+                    save_path=save_path,
+                    top_k_average_method=config.optimization.top_k_average_method,
+                    strategy=strategy,
+                    strict_loading=not peft_param_names,
+                    # Not strict loading if using parameter-efficient finetuning
+                    standalone=standalone,
+                    clean_ckpts=clean_ckpts,
+                )
+            self._best_score = trainer.callback_metrics[f"val_{self._validation_metric_name}"].item()
+        else:
+            sys.exit(f"Training finished, exit the process with global_rank={trainer.global_rank}...")
 
     def fit_per_run(
         self,
@@ -845,7 +1015,6 @@ class BaseLearner(ExportMixin):
         df_preprocessor: Optional[MultiModalFeaturePreprocessor] = None,
         data_processors: Optional[Dict] = None,
         model: Optional[nn.Module] = None,
-        is_hpo: bool = False,
         standalone: bool = True,
         clean_ckpts: bool = True,
     ):
@@ -877,9 +1046,7 @@ class BaseLearner(ExportMixin):
             self._top_k_average(
                 model=model,
                 save_path=save_path,
-                is_distill=False,
                 top_k_average_method=config.optimization.top_k_average_method,
-                tuning_data=self._tuning_data,
                 strict_loading=not peft_param_names,
                 standalone=standalone,
                 clean_ckpts=clean_ckpts,
@@ -887,6 +1054,11 @@ class BaseLearner(ExportMixin):
 
             return self
 
+        datamodule = self.get_datamodule_per_run(
+            df_preprocessor=df_preprocessor,
+            data_processors=data_processors,
+            config=config,
+        )
         optimization_kwargs = self.get_optimization_kwargs_per_run(
             config=config,
             validation_metric=validation_metric,
@@ -902,151 +1074,58 @@ class BaseLearner(ExportMixin):
             optimization_kwargs=optimization_kwargs,
         )
         callbacks = self.get_callbacks_per_run(save_path=save_path, config=config, task=task)
-
-        if is_hpo:
-            from .utils.hpo import get_ray_tune_ckpt_callback
-
-            TuneReportCheckpointCallback = get_ray_tune_ckpt_callback()
-            tune_report_callback = TuneReportCheckpointCallback(
-                {f"{task.validation_metric_name}": f"{task.validation_metric_name}"},
-                filename=RAY_TUNE_CHECKPOINT,
-            )
-            callbacks = [
-                tune_report_callback,
-                early_stopping_callback,
-                lr_callback,
-                model_summary,
-            ]
-
-        custom_checkpoint_plugin = AutoMMModelCheckpointIO(
-            trainable_param_names=trainable_param_names,
-            model_name_to_id=model.name_to_id,
-        )
-
-        tb_logger = pl.loggers.TensorBoardLogger(
-            save_dir=save_path,
-            name="",
-            version="",
-        )
-
+        plugins = self.get_plugins_per_run(model=model, peft_param_names=peft_param_names)
+        tb_logger = self.get_tb_logger(save_path=save_path)
         num_gpus = compute_num_gpus(config_num_gpus=config.env.num_gpus, strategy=config.env.strategy)
-        logger.info(
-            get_gpu_message(
-                detected_num_gpus=ResourceManager.get_gpu_count_torch(),
-                used_num_gpus=num_gpus,
-                strategy=config.env.strategy,
-            )
+        self.log_gpu_info(num_gpus=num_gpus, config=config)
+        precision = infer_precision(num_gpus=num_gpus, precision=config.env.precision)
+        grad_steps = self.get_grad_steps(num_gpus=num_gpus, config=config)
+        strategy = self.get_strategy_per_run(num_gpus=num_gpus, config=config)
+        strategy, num_gpus = self.update_strategy_and_num_gpus_for_hpo(strategy=strategy, num_gpus=num_gpus)
+        config = self.post_update_config_per_run(
+            config=config,
+            num_gpus=num_gpus,
+            precision=precision,
+            strategy=strategy,
+        )
+        # save artifacts for the current running, except for model checkpoint, which will be saved in trainer
+        self.save(
+            path=save_path,
+            standalone=standalone,
+            config=config,
+            df_preprocessor=df_preprocessor,
+            data_processors=data_processors,
+        )
+        trainer = self.init_trainer_per_run(
+            num_gpus=num_gpus,
+            config=config,
+            precision=precision,
+            strategy=strategy,
+            max_time=max_time,
+            callbacks=callbacks,
+            tb_logger=tb_logger,
+            grad_steps=grad_steps,
+            plugins=plugins,
+            enable_progress_bar=enable_progress_bar,
         )
 
-        precision = infer_precision(num_gpus=num_gpus, precision=config.env.precision)
-
-        if num_gpus == 0:  # CPU only training
-            grad_steps = max(
-                config.env.batch_size // (config.env.per_gpu_batch_size * config.env.num_nodes),
-                1,
-            )
-        else:
-            grad_steps = max(
-                config.env.batch_size // (config.env.per_gpu_batch_size * num_gpus * config.env.num_nodes),
-                1,
-            )
-
-        if not is_hpo:
-            if num_gpus <= 1:
-                if config.env.strategy == DEEPSPEED_OFFLOADING:  # Offloading currently only tested for single GPU
-                    assert version.parse(pl.__version__) >= version.parse(
-                        DEEPSPEED_MIN_PL_VERSION
-                    ), f"For DeepSpeed Offloading to work reliably you need at least lightning version {DEEPSPEED_MIN_PL_VERSION}, however, found {pl.__version__}. Please update your lightning version."
-                    from .optimization.deepspeed import CustomDeepSpeedStrategy
-
-                    strategy = CustomDeepSpeedStrategy(
-                        stage=3,
-                        offload_optimizer=True,
-                        offload_parameters=False,
-                        allgather_bucket_size=config.env.deepspeed_allgather_size,
-                        reduce_bucket_size=config.env.deepspeed_allreduce_size,
-                    )
-                else:
-                    strategy = "auto"
-            else:
-                strategy = config.env.strategy
-        else:
-            strategy = "auto"
-            num_gpus = min(num_gpus, 1)
-
-        config.env.num_gpus = num_gpus
-        config.env.precision = precision
-        config.env.strategy = strategy if not config.env.strategy == DEEPSPEED_OFFLOADING else DEEPSPEED_OFFLOADING
-        self._config = config
-        # save artifacts for the current running, except for model checkpoint, which will be saved in trainer
-        self.save(save_path, standalone=standalone)
-
-        blacklist_msgs = ["already configured with model summary"]
-        log_filter = LogFilter(blacklist_msgs)
-        with apply_log_filter(log_filter):
-            trainer = pl.Trainer(
-                accelerator="gpu" if num_gpus > 0 else "auto",
-                devices=num_gpus if num_gpus > 0 else "auto",
-                num_nodes=config.env.num_nodes,
-                precision=precision,
-                strategy=strategy if strategy else "auto",
-                benchmark=False,
-                deterministic=config.env.deterministic,
-                max_epochs=config.optimization.max_epochs,
-                max_steps=config.optimization.max_steps,
-                max_time=max_time,
-                callbacks=callbacks,
-                logger=tb_logger,
-                gradient_clip_val=OmegaConf.select(config, "optimization.gradient_clip_val", default=1),
-                gradient_clip_algorithm=OmegaConf.select(
-                    config, "optimization.gradient_clip_algorithm", default="norm"
-                ),
-                accumulate_grad_batches=grad_steps,
-                log_every_n_steps=OmegaConf.select(config, "optimization.log_every_n_steps", default=10),
-                enable_progress_bar=enable_progress_bar,
-                fast_dev_run=config.env.fast_dev_run,
-                val_check_interval=config.optimization.val_check_interval,
-                check_val_every_n_epoch=config.optimization.check_val_every_n_epoch
-                if hasattr(config.optimization, "check_val_every_n_epoch")
-                else 1,
-                plugins=[custom_checkpoint_plugin],
-            )
-
-        with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore",
-                ".*does not have many workers which may be a bottleneck. "
-                "Consider increasing the value of the `num_workers` argument` "
-                ".* in the `DataLoader` init to improve performance.*",
-            )
-            warnings.filterwarnings("ignore", "Checkpoint directory .* exists and is not empty.")
-            trainer.fit(
-                task,
-                datamodule=train_dm,
-                ckpt_path=ckpt_path if resume else None,  # this is to resume training that was broken accidentally
-            )
-
-        if trainer.global_rank == 0:
-            # We do not perform averaging checkpoint in the case of hpo for each trial
-            # We only average the checkpoint of the best trial at the end in the master process.
-            if not is_hpo:
-                self._top_k_average(
-                    model=model,
-                    save_path=save_path,
-                    minmax_mode=minmax_mode,
-                    is_distill=is_distill,
-                    top_k_average_method=config.optimization.top_k_average_method,
-                    val_df=val_df,
-                    validation_metric_name=validation_metric_name,
-                    strategy=strategy,
-                    strict_loading=not trainable_param_names,
-                    # Not strict loading if using parameter-efficient finetuning
-                    standalone=standalone,
-                    clean_ckpts=clean_ckpts,
-                )
-            self._best_score = trainer.callback_metrics[f"val_{self._validation_metric_name}"].item()
-        else:
-            sys.exit(f"Training finished, exit the process with global_rank={trainer.global_rank}...")
+        self.fit_trainer_per_run(
+            trainer=trainer,
+            task=task,
+            datamodule=datamodule,
+            ckpt_path=ckpt_path,
+            resume=resume,
+        )
+        self.on_fit_end_per_run(
+            trainer=trainer,
+            model=model,
+            save_path=save_path,
+            config=config,
+            strategy=strategy,
+            peft_param_names=peft_param_names,
+            standalone=standalone,
+            clean_ckpts=clean_ckpts,
+        )
 
         return config, df_preprocessor, data_processors, model, model_postprocess_fn
 
@@ -1054,11 +1133,8 @@ class BaseLearner(ExportMixin):
         self,
         model,
         save_path,
-        minmax_mode,
-        is_distill,
         top_k_average_method,
-        val_df,
-        validation_metric_name,
+        is_distill=False,
         strategy=None,
         last_ckpt_path=None,
         strict_loading=True,
@@ -1942,7 +2018,14 @@ class BaseLearner(ExportMixin):
         }
         return state_dict_processed
 
-    def save(self, path: str, standalone: Optional[bool] = True):
+    def save(
+        self,
+        path: str,
+        standalone: Optional[bool] = True,
+        config: Optional[DictConfig] = None,
+        df_preprocessor: Optional[MultiModalFeaturePreprocessor] = None,
+        data_processors: Optional[Dict] = None,
+    ):
         """
         Save this predictor to file in directory specified by `path`.
 
@@ -1956,22 +2039,24 @@ class BaseLearner(ExportMixin):
             and reset the associate model.model_name.checkpoint_name start with `local://` in config.yaml.
             When standalone = False, the saved artifact may require an online environment to process in load().
         """
-        config = copy.deepcopy(self._config)
+        config = config if config else self._config
+        config = copy.deepcopy(config)
         if standalone and (
             not OmegaConf.select(config, "optimization.efficient_finetune")
             or OmegaConf.select(config, "optimization.efficient_finetune") == "None"
         ):
             config = save_pretrained_model_configs(model=self._model, config=config, path=path)
-
         os.makedirs(path, exist_ok=True)
         OmegaConf.save(config=config, f=os.path.join(path, "config.yaml"))
 
+        df_preprocessor = df_preprocessor if df_preprocessor else self._df_preprocessor
         with open(os.path.join(path, "df_preprocessor.pkl"), "wb") as fp:
-            pickle.dump(self._df_preprocessor, fp)
+            pickle.dump(df_preprocessor, fp)
+
+        data_processors = data_processors if data_processors else self._data_processors
+        data_processors = copy.deepcopy(data_processors)
 
         # Save text tokenizers before saving data processors
-        data_processors = copy.deepcopy(self._data_processors)
-
         for modality in [TEXT, TEXT_NER, NER, DOCUMENT]:
             if modality in data_processors:
                 data_processors[modality] = save_text_tokenizers(
@@ -2000,7 +2085,7 @@ class BaseLearner(ExportMixin):
                     "validation_metric_name": self._validation_metric_name,
                     "output_shape": self._output_shape,
                     "classes": self._classes,
-                    "save_path": self._save_path,
+                    "save_path": path,
                     "pretrained": self._pretrained,
                     "pretrained_path": self._pretrained_path,
                     "fit_called": self._fit_called,
