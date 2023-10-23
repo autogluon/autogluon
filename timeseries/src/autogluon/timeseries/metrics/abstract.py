@@ -17,6 +17,9 @@ class TimeSeriesScorer:
 
     Attributes
     ----------
+    greater_is_better_internal : bool, default = False
+        Whether internal method :meth:`~autogluon.timeseries.metrics.TimeSeriesScorer.compute_metric` is
+        a loss function (default), meaning low is good, or a score function, meaning high is good.
     optimum : float, default = 0.0
         The best score achievable by the score function, i.e. maximum in case of scorer function and minimum in case of
         loss function.
@@ -31,7 +34,7 @@ class TimeSeriesScorer:
         train a TabularPredictor under the hood. This attribute should only be specified by point forecast metrics.
     """
 
-    _greater_is_better: bool = False  # does `compute_metric` method return metric in greater-is-better format?
+    greater_is_better_internal: bool = False
     optimum: float = 0.0
     optimized_by_median: bool = False
     is_quantile_metric: bool = False
@@ -39,7 +42,7 @@ class TimeSeriesScorer:
 
     @property
     def sign(self) -> int:
-        return 1 if self._greater_is_better else -1
+        return 1 if self.greater_is_better_internal else -1
 
     @property
     def name(self) -> str:
@@ -126,8 +129,8 @@ class TimeSeriesScorer:
         Returns
         -------
         score : float
-            Value of the metric for given forecast and data. If self.greater_is_better is True, returns score in
-            greater-is-better format, otherwise in lower-is-better format.
+            Value of the metric for given forecast and data. If self.greater_is_better_internal is True, returns score
+            in greater-is-better format, otherwise in lower-is-better format.
 
         """
         raise NotImplementedError

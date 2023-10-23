@@ -89,7 +89,7 @@ class TimeSeriesLearner(AbstractLearner):
         logger.info(f"AutoGluon will save models to {self.path}")
 
         logger.info(f"AutoGluon will gauge predictive performance using evaluation metric: '{self.eval_metric}'")
-        if not self.eval_metric.greater_is_better:
+        if not self.eval_metric.greater_is_better_internal:
             logger.info(
                 "\tThis metric's sign has been flipped to adhere to being 'higher is better'. "
                 "The reported score can be multiplied by -1 to get the metric value.",
