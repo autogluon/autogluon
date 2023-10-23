@@ -42,13 +42,13 @@ on:
           - 24h
       folds:
         description: 'Number of folds to run'
-        required: true
+        required: false
       branch_or_pr_number:
         description: 'Branch or PR number to run the benchmark on'
         required: true
       fork_info:
         description: 'Get the forked PR repository name and branch, e.g. username/autogluon|test_branch'
-        required: false
+        required: true
       
 permissions:
   id-token: write
