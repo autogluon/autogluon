@@ -833,7 +833,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         self,
         data: TimeSeriesDataFrame,
         model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
-        metric: Optional[str] = None,
+        metric: Union[str, TimeSeriesScorer, None] = None,
         use_cache: bool = True,
     ) -> float:
         past_data, known_covariates = data.get_model_inputs_for_scoring(

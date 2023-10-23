@@ -185,7 +185,7 @@ class TimeSeriesLearner(AbstractLearner):
         self,
         data: TimeSeriesDataFrame,
         model: AbstractTimeSeriesModel = None,
-        metric: Optional[str] = None,
+        metric: Union[str, TimeSeriesScorer, None] = None,
         use_cache: bool = True,
     ) -> float:
         data = self.feature_generator.transform(data)
