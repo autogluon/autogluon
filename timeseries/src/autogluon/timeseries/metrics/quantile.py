@@ -9,7 +9,7 @@ from .abstract import TimeSeriesScorer
 class QuantileForecastScorer(TimeSeriesScorer):
     """Base class for all quantile forecast metrics."""
 
-    is_quantile_metric = True
+    needs_quantile = True
 
     def compute_metric(
         self,

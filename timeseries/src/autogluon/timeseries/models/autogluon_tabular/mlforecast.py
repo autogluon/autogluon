@@ -326,7 +326,7 @@ class DirectTabularModel(AbstractMLForecastModel):
 
     @property
     def is_quantile_model(self) -> bool:
-        return self.eval_metric.is_quantile_metric
+        return self.eval_metric.needs_quantile
 
     def _get_model_params(self) -> dict:
         model_params = super()._get_model_params()
