@@ -6,6 +6,7 @@ from collections import defaultdict
 from unittest import mock
 
 import numpy as np
+import pandas as pd
 import pytest
 
 import autogluon.core as ag
@@ -536,15 +537,15 @@ def test_given_cache_predictions_is_true_when_predicting_multiple_times_then_cac
 ):
     trainer = AutoTimeSeriesTrainer(path=temp_model_path)
     trainer.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
-    mock_return_value = "mock_return_value"
+    mock_predictions = pd.DataFrame(columns=["mock_prediction"])
     with mock.patch("autogluon.timeseries.models.local.naive.NaiveModel.predict") as naive_predict:
-        naive_predict.return_value = mock_return_value
+        naive_predict.return_value = mock_predictions
         trainer.predict(DUMMY_TS_DATAFRAME, model="Naive")
 
     with mock.patch("autogluon.timeseries.models.local.naive.NaiveModel.predict") as naive_predict:
         predictions = trainer.predict(DUMMY_TS_DATAFRAME, model="Naive")
         naive_predict.assert_not_called()
-        assert predictions == mock_return_value
+        assert predictions.equals(mock_predictions)
 
 
 def test_given_cache_predictions_is_false_when_calling_get_model_pred_dict_then_predictions_are_not_cached(

@@ -15,4 +15,4 @@ def _in_sample_abs_seasonal_error(*, y_past: pd.Series, seasonal_period: int = 1
 
 def _in_sample_squared_seasonal_error(*, y_past: pd.Series, seasonal_period: int = 1) -> pd.Series:
     seasonal_diffs = _get_seasonal_diffs(y_past=y_past, seasonal_period=seasonal_period)
-    return seasonal_diffs.dropna().pow(2.0).groupby(level=ITEMID, sort=False).mean()
+    return seasonal_diffs.pow(2.0).groupby(level=ITEMID, sort=False).mean().fillna(1.0)

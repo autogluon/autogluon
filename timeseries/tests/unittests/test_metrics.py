@@ -6,7 +6,7 @@ from gluonts.model.forecast import QuantileForecast
 
 from autogluon.timeseries import TimeSeriesPredictor
 from autogluon.timeseries.metrics import AVAILABLE_METRICS, DEFAULT_METRIC_NAME, check_get_evaluation_metric
-from autogluon.timeseries.metrics.utils import _in_sample_abs_seasonal_error
+from autogluon.timeseries.metrics.utils import _in_sample_abs_seasonal_error, _in_sample_squared_seasonal_error
 from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
 
 from .common import DUMMY_TS_DATAFRAME, get_data_frame_with_item_index
@@ -146,9 +146,17 @@ def test_given_historic_data_not_cached_when_scoring_then_exception_is_raised(ev
         evaluator.compute_metric(data_future=data_future, predictions=predictions)
 
 
-def test_when_eval_metric_seasonal_period_is_longer_than_ts_then_scale_is_set_to_1():
+def test_when_eval_metric_seasonal_period_is_longer_than_ts_then_abs_seasonal_error_is_set_to_1():
     seasonal_period = max(DUMMY_TS_DATAFRAME.num_timesteps_per_item())
     naive_error_per_item = _in_sample_abs_seasonal_error(
+        y_past=DUMMY_TS_DATAFRAME["target"], seasonal_period=seasonal_period
+    )
+    assert (naive_error_per_item == 1.0).all()
+
+
+def test_when_eval_metric_seasonal_period_is_longer_than_ts_then_squared_seasonal_error_is_set_to_1():
+    seasonal_period = max(DUMMY_TS_DATAFRAME.num_timesteps_per_item())
+    naive_error_per_item = _in_sample_squared_seasonal_error(
         y_past=DUMMY_TS_DATAFRAME["target"], seasonal_period=seasonal_period
     )
     assert (naive_error_per_item == 1.0).all()
@@ -175,3 +183,40 @@ def test_RMSSE(prediction_length, seasonal_period, expected_result):
         data, predictions, prediction_length=prediction_length, seasonal_period=seasonal_period
     )
     assert ag_value == expected_result
+
+
+@pytest.mark.parametrize("metric_name", AVAILABLE_METRICS)
+def test_given_metric_is_optimized_by_median_when_model_predicts_then_median_is_pasted_to_mean_forecast(metric_name):
+    eval_metric = check_get_evaluation_metric(metric_name)
+    pred = TimeSeriesPredictor(prediction_length=5, eval_metric=eval_metric)
+    pred.fit(DUMMY_TS_DATAFRAME, hyperparameters={"DeepAR": {"epochs": 1, "num_batches_per_epoch": 1}})
+    predictions = pred.predict(DUMMY_TS_DATAFRAME)
+    if eval_metric.optimized_by_median:
+        assert (predictions["mean"] == predictions["0.5"]).all()
+    else:
+        assert (predictions["mean"] != predictions["0.5"]).any()
+
+
+@pytest.mark.parametrize("metric_name", AVAILABLE_METRICS)
+def test_when_perfect_predictions_passed_to_metric_then_score_equals_optimum(metric_name):
+    prediction_length = 5
+    eval_metric = check_get_evaluation_metric(metric_name)
+    data = DUMMY_TS_DATAFRAME.copy()
+    predictions = data.slice_by_timestep(-prediction_length, None).rename(columns={"target": "mean"})
+    for q in ["0.1", "0.4", "0.9"]:
+        predictions[q] = predictions["mean"]
+    score = eval_metric.score(data, predictions, prediction_length=prediction_length)
+    assert score == eval_metric.optimum
+
+
+@pytest.mark.parametrize("metric_name", AVAILABLE_METRICS)
+def test_when_better_predictions_passed_to_metric_then_score_improves(metric_name):
+    prediction_length = 5
+    eval_metric = check_get_evaluation_metric(metric_name)
+    data = DUMMY_TS_DATAFRAME.copy()
+    predictions = data.slice_by_timestep(-prediction_length, None).rename(columns={"target": "mean"})
+    for q in ["0.1", "0.4", "0.9"]:
+        predictions[q] = predictions["mean"]
+    good_score = eval_metric.score(data, predictions + 1, prediction_length=prediction_length)
+    bad_score = eval_metric.score(data, predictions + 50, prediction_length=prediction_length)
+    assert good_score > bad_score
