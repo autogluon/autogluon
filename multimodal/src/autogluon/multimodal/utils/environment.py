@@ -11,7 +11,7 @@ from torch import nn
 
 from autogluon.common.utils.resource_utils import ResourceManager
 
-from ..constants import DDP, OBJECT_DETECTION, OCR
+from ..constants import DDP_STRATEGIES, OBJECT_DETECTION, OCR
 
 logger = logging.getLogger(__name__)
 
@@ -347,3 +347,15 @@ def _get_mmlab_installation_guide(package_name):
         raise ValueError("Available package_name are: mmdet, mmcv, mmengine.")
 
     return err_msg
+
+
+def run_ddp_only_once(num_gpus, strategy):
+    if strategy in DDP_STRATEGIES:
+        global FIRST_TIME_DDP
+        if "FIRST_TIME_DDP" in globals():
+            # not the first time running DDP, set number of devices to 1 (use single GPU)
+            return 1
+        else:
+            if num_gpus > 1:
+                FIRST_TIME_DDP = False  # now we run DDP for the first time
+    return num_gpus

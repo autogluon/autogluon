@@ -160,6 +160,7 @@ from .utils import (
     modify_duplicate_model_names,
     object_detection_data_to_df,
     predict,
+    run_ddp_only_once,
     save_ovd_result_df,
     save_pretrained_model_configs,
     save_result_df,
@@ -1505,6 +1506,8 @@ class MultiModalPredictor(ExportMixin):
         # save artifacts for the current running, except for model checkpoint, which will be saved in trainer
         self.save(save_path, standalone=standalone)
 
+        num_gpus = run_ddp_only_once(num_gpus, strategy)
+
         blacklist_msgs = ["already configured with model summary"]
         log_filter = LogFilter(blacklist_msgs)
         with apply_log_filter(log_filter):
@@ -1800,6 +1803,8 @@ class MultiModalPredictor(ExportMixin):
                 trainable_param_names=trainable_param_names,
                 **optimization_kwargs,
             )
+
+        num_gpus = run_ddp_only_once(num_gpus, strategy)
 
         blacklist_msgs = []
         if self._verbosity <= 3:  # turn off logging in prediction

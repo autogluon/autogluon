@@ -92,6 +92,7 @@ from .utils import (
     init_df_preprocessor,
     load_text_tokenizers,
     predict,
+    run_ddp_only_once,
     save_pretrained_model_configs,
     save_text_tokenizers,
     select_model,
@@ -944,6 +945,8 @@ class MultiModalMatcher:
         # save artifacts for the current running, except for model checkpoint, which will be saved in trainer
         self.save(save_path)
 
+        num_gpus = run_ddp_only_once(num_gpus, strategy)
+
         blacklist_msgs = ["already configured with model summary"]
         log_filter = LogFilter(blacklist_msgs)
         with apply_log_filter(log_filter):
@@ -1277,6 +1280,8 @@ class MultiModalMatcher:
             signature=signature,
             match_label=match_label,
         )
+
+        num_gpus = run_ddp_only_once(num_gpus, strategy)
 
         blacklist_msgs = []
         if self._verbosity <= 3:  # turn off logging in prediction
