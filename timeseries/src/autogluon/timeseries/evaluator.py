@@ -1,9 +1,8 @@
 from typing import Optional
 
 from autogluon.common.utils.deprecated_utils import Deprecated
-
 from autogluon.timeseries import TimeSeriesDataFrame
-from autogluon.timeseries.metrics import check_get_evaluation_metric, AVAILABLE_METRICS
+from autogluon.timeseries.metrics import AVAILABLE_METRICS, check_get_evaluation_metric
 
 
 @Deprecated(

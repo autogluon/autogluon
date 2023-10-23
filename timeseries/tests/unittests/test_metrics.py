@@ -5,7 +5,7 @@ from gluonts.evaluation import Evaluator as GluonTSEvaluator
 from gluonts.model.forecast import QuantileForecast
 
 from autogluon.timeseries import TimeSeriesPredictor
-from autogluon.timeseries.metrics import check_get_evaluation_metric, AVAILABLE_METRICS, DEFAULT_METRIC_NAME
+from autogluon.timeseries.metrics import AVAILABLE_METRICS, DEFAULT_METRIC_NAME, check_get_evaluation_metric
 from autogluon.timeseries.metrics.utils import _in_sample_abs_seasonal_error
 from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
 
