@@ -251,3 +251,26 @@ model:
     data_types:
     additive_attention: False # Whether to use lightweight additive attention, can be True, False or "auto"
     share_qv_weights: False # Whether to share weight for query and value, can be True, False or "auto"
+  ft_transformer_refactor:
+    data_types:
+      - "categorical"
+      - "numerical"
+    embedding_arch:
+      - 'linear'
+      - 'relu'
+    d_token: 192
+    adapter_output_feature: 192
+    hidden_size: 192
+    n_blocks: 3
+    attention_n_heads: 8
+    attention_dropout: 0.2
+    residual_dropout: 0.0
+    ffn_dropout: 0.1
+    ffn_d_hidden: 192
+    ffn_activation: "geglu"
+    head_activation: "relu"
+    normalization: "layer_norm"
+    merge: "concat"
+    select_model_strict: False
+    additive_attention: False # Whether to use lightweight additive attention, can be True, False or "auto"
+    share_qv_weights: False # Whether to share weight for query and value, can be True, False or "auto"

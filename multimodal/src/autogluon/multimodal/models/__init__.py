@@ -19,3 +19,4 @@ from .numerical_transformer import NumericalTransformer
 from .ovd import OVDModel
 from .t_few import TFewModel
 from .timm_image import TimmAutoModelForImagePrediction
+from .ft_transformer_refactor import FT_Transformer_refactor

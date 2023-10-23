@@ -20,6 +20,7 @@ from ..constants import (
     FUSION_MLP,
     FUSION_NER,
     FUSION_TRANSFORMER,
+    FT_TRANSFORMER,
     HF_TEXT,
     IMAGE,
     MMDET_IMAGE,
@@ -56,6 +57,7 @@ from ..models import (
     OVDModel,
     TFewModel,
     TimmAutoModelForImagePrediction,
+    FT_Transformer_refactor,
 )
 from ..models.utils import inject_adaptation_to_linear_layer
 
@@ -114,6 +116,7 @@ def select_model(
     fusion_model_name = []
     for model_name in names:
         model_config = getattr(config.model, model_name)
+        strict = getattr(model_config, "select_model_strict", True)
         if not model_config.data_types:
             fusion_model_name.append(model_name)
             continue
@@ -391,6 +394,30 @@ def create_model(
             head_activation=model_config.head_activation,
             adapt_in_features=model_config.adapt_in_features,
             loss_weight=model_config.weight if hasattr(model_config, "weight") else None,
+            additive_attention=OmegaConf.select(model_config, "additive_attention", default=False),
+            share_qv_weights=OmegaConf.select(model_config, "share_qv_weights", default=False),
+        )
+    elif model_name.lower().startswith(FT_TRANSFORMER):
+        model = FT_Transformer_refactor(
+            prefix=model_name,
+            num_numerical_columns=num_numerical_columns,
+            num_categories=num_categories,
+            embedding_arch=model_config.embedding_arch,
+            d_token=model_config.d_token,
+            adapter_output_feature=model_config.adapter_output_feature,
+            hidden_features=model_config.hidden_size,
+            num_classes=num_classes,
+            n_blocks=model_config.n_blocks,
+            attention_n_heads=model_config.attention_n_heads,
+            attention_dropout=model_config.attention_dropout,
+            attention_normalization=model_config.normalization,
+            ffn_d_hidden=model_config.ffn_d_hidden,
+            ffn_dropout=model_config.ffn_dropout,
+            ffn_normalization=model_config.normalization,
+            ffn_activation=model_config.ffn_activation,
+            residual_dropout=model_config.residual_dropout,
+            head_normalization=model_config.normalization,
+            head_activation=model_config.head_activation,
             additive_attention=OmegaConf.select(model_config, "additive_attention", default=False),
             share_qv_weights=OmegaConf.select(model_config, "share_qv_weights", default=False),
         )

@@ -37,6 +37,8 @@ automm_hyperparameters = {
     "data.categorical.convert_to_text": False,
     "model.names": ["categorical_transformer", "numerical_transformer", "fusion_transformer"],
     "model.numerical_transformer.embedding_arch": ["linear"],
+    # "model.names": ["ft_transformer_refactor"],
+    # "model.ft_transformer_refactor.embedding_arch": ["linear"],
     "env.batch_size": 128,
     "env.per_gpu_batch_size": 128,
     "env.eval_batch_size_ratio": 1,
@@ -100,11 +102,13 @@ def main(args):
         )
 
         ### model training
+        # ignored_columns = {"numerical_0": "null", "numerical_1": "null", "numerical_2": "null", "numerical_3": "null", "numerical_4": "null", "numerical_5": "null"}
         predictor.fit(
             train_data=train_data.data,
             tuning_data=val_data.data,
             seed=args.seed,
             hyperparameters=automm_hyperparameters,
+            # column_types=ignored_columns,
         )
 
         ### model inference
