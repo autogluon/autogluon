@@ -8,18 +8,13 @@ parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFo
 
 parser.add_argument("--repository", help="git repository to run autogluon on", type=str, required=True)
 parser.add_argument("--branch", help="git branch to run autogluon on", type=str, required=True)
-parser.add_argument("--folds_to_run", help="number of folds to run", type=int, required=False)
+parser.add_argument("--folds_to_run", help="number of folds to run, has to be greater than 0", type=int, required=False)
 
 args = parser.parse_args()
-folds_to_run = 0
-
-if args.folds_to_run is None:
-    folds_to_run = -1
-else:
-    folds_to_run = args.folds_to_run
 
 repository = args.repository
 branch = args.branch
+folds_to_run = args.folds_to_run
 framework_template_file = os.path.join(os.path.dirname(__file__), "amlb_user_dir", "frameworks_template.yaml")
 framework_benchmark_file = os.path.join(os.path.dirname(framework_template_file), "frameworks_benchmark.yaml")
 constraints_file = os.path.join(os.path.dirname(__file__), "amlb_user_dir", "constraints.yaml")
