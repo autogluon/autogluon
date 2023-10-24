@@ -458,6 +458,7 @@ class FT_Transformer_refactor(nn.Module):
         head_normalization: Optional[str] = "layer_norm",
         additive_attention: Optional[bool] = False,
         share_qv_weights: Optional[bool] = False,
+        pooling_mode: Optional[str] = "cls",
     ) -> None:
         """
         Parameters
@@ -512,6 +513,8 @@ class FT_Transformer_refactor(nn.Module):
             If 'true' the transformer will use additive attention with linear complexity to sequence length.
         share_qv_weights
             if 'true', then value and query transformation parameters are shared in additive attention.
+        pooling_mode
+            The pooling mode for the Transformer. Can be "cls", or "mean"
 
         References
         ----------
@@ -531,6 +534,7 @@ class FT_Transformer_refactor(nn.Module):
 
         self.prefix = prefix
         self.out_features = adapter_output_feature
+        self.pooling_mode = pooling_mode
 
         self.categorical_feature_tokenizer = None
         self.numerical_feature_tokenizer = None
@@ -645,6 +649,13 @@ class FT_Transformer_refactor(nn.Module):
         features = self.transformer(multimodal_features)
         logits = self.head(features)
 
+        if self.pooling_mode == "cls":
+            features = features[:, -1, :]
+        elif self.pooling_mode == "mean":
+            features = features.mean(dim=1)
+        else:
+            raise NotImplementedError(f"Pooling mode={self.pooling_mode} is not supported.")
+        
         output = {
             self.prefix: {
                 LOGITS: logits,

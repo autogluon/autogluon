@@ -274,3 +274,4 @@ model:
     select_model_strict: False
     additive_attention: False # Whether to use lightweight additive attention, can be True, False or "auto"
     share_qv_weights: False # Whether to share weight for query and value, can be True, False or "auto"
+    pooling_mode: "cls"

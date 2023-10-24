@@ -420,6 +420,7 @@ def create_model(
             head_activation=model_config.head_activation,
             additive_attention=OmegaConf.select(model_config, "additive_attention", default=False),
             share_qv_weights=OmegaConf.select(model_config, "share_qv_weights", default=False),
+            pooling_mode=OmegaConf.select(model_config, "pooling_mode", default="cls"),
         )
     else:
         raise ValueError(f"unknown model name: {model_name}")
@@ -501,10 +502,6 @@ def create_fusion_model(
         # must have one fusion model if there are multiple independent models
         return fusion_model(models=single_models)
     elif len(single_models) == 1:
-        if isinstance(single_models[0], NumericalTransformer) or isinstance(single_models[0], CategoricalTransformer):
-            # TODO: Support using categorical_transformer or numerical_transformer alone without a fusion model.
-            return fusion_model(models=single_models)
-        else:
             return single_models[0]
     else:
         raise ValueError(f"No available models for {names}")
