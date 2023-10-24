@@ -187,7 +187,7 @@ def test_given_hyperparameter_spaces_to_init_when_fit_called_then_error_is_raise
 @pytest.mark.parametrize(
     "quantile_levels",
     [
-        [0.1, 0.44, 0.9],
+        [0.1, 0.44, 0.72],
         [0.1, 0.5, 0.9],
     ],
 )
@@ -207,8 +207,9 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_has_
     assert isinstance(predictions, TimeSeriesDataFrame)
 
     predicted_item_index = predictions.item_ids
+    expected_columns = ["mean"] + [str(q) for q in quantile_levels]
     assert all(predicted_item_index == DUMMY_TS_DATAFRAME.item_ids)  # noqa
-    assert predictions.columns.equals(["mean"] + [str(q) for q in quantile_levels])
+    assert (predictions.columns == expected_columns).all()
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
@@ -355,6 +356,22 @@ def test_when_get_info_is_called_then_all_keys_are_present(model_class, predicti
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+def test_when_median_not_in_quantile_levels_then_median_is_present_in_raw_predictions(model_class):
+    model = model_class(
+        prediction_length=3,
+        quantile_levels=[0.1, 0.15],
+        freq=DUMMY_TS_DATAFRAME.freq,
+        hyperparameters=DUMMY_HYPERPARAMETERS,
+    )
+    if isinstance(model, MultiWindowBacktestingModel):
+        # Median is present in the predictions of the base model, but not in the MultiWindowBacktestingModel wrapper
+        pytest.skip()
+
+    raw_predictions = model._predict(DUMMY_TS_DATAFRAME)
+    assert "0.5" in raw_predictions.columns
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 def test_when_median_not_in_quantile_levels_then_median_is_dropped_at_prediction_time(model_class):
     model = model_class(
         prediction_length=3,
@@ -364,9 +381,7 @@ def test_when_median_not_in_quantile_levels_then_median_is_dropped_at_prediction
     )
     assert model.must_drop_median
     model.fit(train_data=DUMMY_TS_DATAFRAME)
-    raw_predictions = model._predict(DUMMY_TS_DATAFRAME)
     final_predictions = model.predict(DUMMY_TS_DATAFRAME)
-    assert "0.5" in raw_predictions.columns
     assert "0.5" not in final_predictions.columns
 
 
