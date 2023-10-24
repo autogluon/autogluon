@@ -400,18 +400,31 @@ class BaseLearner(ExportMixin):
             fit_called=self._fit_called,
         )
 
-    def infer_column_types(self, column_types: Dict):
-        if self._fit_called:
+    def infer_column_types(self, column_types: Optional[Dict] = None, data: Optional[pd.DataFrame]=None, is_train=True):
+        if is_train and self._fit_called:
             return
-        self._column_types = infer_column_types(
-            data=self._train_data,
-            valid_data=self._tuning_data,
-            label_columns=self._label_column,
-            provided_column_types=column_types,
-            problem_type=self._problem_type,  # used to update the corresponding column type
-        )
-        logger.debug(f"column_types: {column_types}")
-        logger.debug(f"image columns: {[k for k, v in column_types.items() if v == 'image_path']}")
+        elif is_train:
+            self._column_types = infer_column_types(
+                data=self._train_data,
+                valid_data=self._tuning_data,
+                label_columns=self._label_column,
+                provided_column_types=column_types,
+                problem_type=self._problem_type,  # used to update the corresponding column type
+            )
+            logger.debug(f"column_types: {column_types}")
+            logger.debug(f"image columns: {[k for k, v in column_types.items() if v == 'image_path']}")
+        elif column_types is None:
+            allowable_dtypes, fallback_dtype = infer_dtypes_by_model_names(model_config=self._config.model)
+            return infer_column_types(
+                data=data,
+                label_columns=self._label_column,
+                problem_type=self._problem_type,
+                allowable_column_types=allowable_dtypes,
+                fallback_column_type=fallback_dtype,
+            )
+        else:
+            return column_types
+
 
     def infer_output_shape(self):
         if self._fit_called:
@@ -677,15 +690,24 @@ class BaseLearner(ExportMixin):
         )
         return config
 
-    def get_df_preprocessor_per_run(self, df_preprocessor, config):
+    def get_df_preprocessor_per_run(self, df_preprocessor, data=None, config=None, column_types=None, is_train=True):
         if df_preprocessor is None:
-            df_preprocessor = init_df_preprocessor(
-                config=config,
-                column_types=self._column_types,
-                label_column=self._label_column,
-                train_df_x=self._train_data.drop(columns=self._label_column),
-                train_df_y=self._train_data[self._label_column],
-            )
+            if is_train:
+                df_preprocessor = init_df_preprocessor(
+                    config=config,
+                    column_types=self._column_types,
+                    label_column=self._label_column,
+                    train_df_x=self._train_data.drop(columns=self._label_column),
+                    train_df_y=self._train_data[self._label_column],
+                )
+            else:
+                df_preprocessor = init_df_preprocessor(
+                    config=self._config,
+                    column_types=column_types,
+                    label_column=self._label_column,
+                    train_df_x=data.drop(columns=self._label_column),
+                    train_df_y=data[self._label_column] if self._label_column else None,
+                )
         return df_preprocessor
 
     def update_config_by_data_per_run(self, config, df_preprocessor):
@@ -736,15 +758,22 @@ class BaseLearner(ExportMixin):
             )
         return peft_param_names
 
-    def get_data_processors_per_run(self, data_processors, config, model, advanced_hyperparameters):
-        if data_processors is None:
+    def get_data_processors_per_run(self, data_processors, config=None, model=None, advanced_hyperparameters=None, requires_label=None, is_train=True):
+        if is_train and data_processors is None:
             data_processors = create_fusion_data_processors(
                 config=config,
                 model=model,
                 advanced_hyperparameters=advanced_hyperparameters,
             )
-        data_processors_count = {k: len(v) for k, v in data_processors.items()}
-        logger.debug(f"data_processors_count: {data_processors_count}")
+            data_processors_count = {k: len(v) for k, v in data_processors.items()}
+            logger.debug(f"data_processors_count: {data_processors_count}")
+        else:
+            # For each inference call, decouple the used data processors from the predictor's attribute
+            data_processors = copy.copy(data_processors)
+            # For prediction data with no labels provided.
+            if not requires_label:
+                data_processors.pop(LABEL, None)
+
         return data_processors
 
     def get_validation_metric_per_run(self):
@@ -785,15 +814,24 @@ class BaseLearner(ExportMixin):
         )
         return model_postprocess_fn
 
-    def get_datamodule_per_run(self, df_preprocessor, data_processors, config):
-        datamodule = BaseDataModule(
-            df_preprocessor=df_preprocessor,
-            data_processors=data_processors,
-            per_gpu_batch_size=config.env.per_gpu_batch_size,
-            num_workers=config.env.num_workers,
-            train_data=self._train_data,
-            validate_data=self._tuning_data,
-        )
+    def get_datamodule_per_run(self, df_preprocessor, data_processors, per_gpu_batch_size, num_workers, predict_data=None, is_train=True):
+        if is_train:
+            datamodule = BaseDataModule(
+                df_preprocessor=df_preprocessor,
+                data_processors=data_processors,
+                per_gpu_batch_size=per_gpu_batch_size,
+                num_workers=num_workers,
+                train_data=self._train_data,
+                validate_data=self._tuning_data,
+            )
+        else:
+            datamodule = BaseDataModule(
+                df_preprocessor=df_preprocessor,
+                data_processors=data_processors,
+                per_gpu_batch_size=per_gpu_batch_size,
+                num_workers=self._config.env.num_workers_evaluation,
+                predict_data=predict_data,
+            )
         return datamodule
 
     def get_optimization_kwargs_per_run(self, config, validation_metric, custom_metric_func):
@@ -813,20 +851,36 @@ class BaseLearner(ExportMixin):
             custom_metric_func=custom_metric_func,
         )
 
-    def build_task_per_run(self, model, loss_func, config, mixup_func, model_postprocess_fn, peft_param_names, optimization_kwargs):
-        return LitModule(
-            model=model,
-            loss_func=loss_func,
-            efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
-            mixup_func=mixup_func,
-            mixup_off_epoch=OmegaConf.select(config, "data.mixup.turn_off_epoch"),
-            model_postprocess_fn=model_postprocess_fn,
-            trainable_param_names=peft_param_names,
-            skip_final_val=OmegaConf.select(config, "optimization.skip_final_val", default=False),
-            **optimization_kwargs,
-        )
+    def build_task_per_run(self, model=None, loss_func=None, config=None, mixup_func=None, model_postprocess_fn=None, peft_param_names=None, optimization_kwargs=None, is_train=True):
+        if is_train:
+            return LitModule(
+                model=model,
+                loss_func=loss_func,
+                efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
+                mixup_fn=mixup_func,
+                mixup_off_epoch=OmegaConf.select(config, "data.mixup.turn_off_epoch"),
+                model_postprocess_fn=model_postprocess_fn,
+                trainable_param_names=peft_param_names,
+                skip_final_val=OmegaConf.select(config, "optimization.skip_final_val", default=False),
+                **optimization_kwargs,
+            )
+        else:
+            return LitModule(
+                model=self._model,
+                model_postprocess_fn=self._model_postprocess_fn,
+                efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
+                trainable_param_names=peft_param_names,
+                **optimization_kwargs,
+            )
 
-    def get_callbacks_per_run(self, save_path, config, task):
+    def get_callbacks_per_run(self, save_path=None, config=None, task=None, pred_writer=None, is_train=True):
+        if not is_train:
+            if pred_writer is not None:
+                callbacks = [pred_writer]
+            else:
+                callbacks = []
+            return callbacks
+
         checkpoint_callback = AutoMMModelCheckpoint(
             dirpath=save_path,
             save_top_k=config.optimization.top_k,
@@ -903,7 +957,7 @@ class BaseLearner(ExportMixin):
         return grad_steps
 
     def get_strategy_per_run(self, num_gpus, config):
-        if config.env.strategy == DEEPSPEED_OFFLOADING and num_gpus == 1:  # Offloading currently only tested for single GPU
+        if config.env.strategy == DEEPSPEED_OFFLOADING and num_gpus == 1 and DEEPSPEED_MODULE not in sys.modules:  # Offloading currently only tested for single GPU
             assert version.parse(pl.__version__) >= version.parse(
                 DEEPSPEED_MIN_PL_VERSION
             ), f"For DeepSpeed Offloading to work reliably you need at least lightning version {DEEPSPEED_MIN_PL_VERSION}, however, found {pl.__version__}. Please update your lightning version."
@@ -934,40 +988,70 @@ class BaseLearner(ExportMixin):
         config.env.strategy = strategy if not config.env.strategy == DEEPSPEED_OFFLOADING else DEEPSPEED_OFFLOADING
         return config
 
-    def init_trainer_per_run(self, num_gpus, config, precision, strategy, max_time, callbacks, tb_logger, grad_steps, plugins, enable_progress_bar):
-        blacklist_msgs = ["already configured with model summary"]
-        log_filter = LogFilter(blacklist_msgs)
-        with apply_log_filter(log_filter):
-            trainer = pl.Trainer(
-                accelerator="gpu" if num_gpus > 0 else "auto",
-                devices=num_gpus if num_gpus > 0 else "auto",
-                num_nodes=config.env.num_nodes,
-                precision=precision,
-                strategy=strategy if strategy else "auto",
-                benchmark=False,
-                deterministic=config.env.deterministic,
-                max_epochs=config.optimization.max_epochs,
-                max_steps=config.optimization.max_steps,
-                max_time=max_time,
-                callbacks=callbacks,
-                logger=tb_logger,
-                gradient_clip_val=OmegaConf.select(config, "optimization.gradient_clip_val", default=1),
-                gradient_clip_algorithm=OmegaConf.select(
-                    config, "optimization.gradient_clip_algorithm", default="norm"
-                ),
-                accumulate_grad_batches=grad_steps,
-                log_every_n_steps=OmegaConf.select(config, "optimization.log_every_n_steps", default=10),
-                enable_progress_bar=enable_progress_bar,
-                fast_dev_run=config.env.fast_dev_run,
-                val_check_interval=config.optimization.val_check_interval,
-                check_val_every_n_epoch=config.optimization.check_val_every_n_epoch
-                if hasattr(config.optimization, "check_val_every_n_epoch")
-                else 1,
-                plugins=plugins,
-            )
+    def init_trainer_per_run(self, num_gpus, precision, strategy, callbacks, max_time=None, config=None, tb_logger=None, grad_steps=None, plugins=None, enable_progress_bar=None, barebones=False, is_train=True):
+        if is_train:
+            blacklist_msgs = ["already configured with model summary"]
+            log_filter = LogFilter(blacklist_msgs)
+            with apply_log_filter(log_filter):
+                trainer = pl.Trainer(
+                    accelerator="gpu" if num_gpus > 0 else "auto",
+                    devices=num_gpus if num_gpus > 0 else "auto",
+                    num_nodes=config.env.num_nodes,
+                    precision=precision,
+                    strategy=strategy if strategy else "auto",
+                    benchmark=False,
+                    deterministic=config.env.deterministic,
+                    max_epochs=config.optimization.max_epochs,
+                    max_steps=config.optimization.max_steps,
+                    max_time=max_time,
+                    callbacks=callbacks,
+                    logger=tb_logger,
+                    gradient_clip_val=OmegaConf.select(config, "optimization.gradient_clip_val", default=1),
+                    gradient_clip_algorithm=OmegaConf.select(
+                        config, "optimization.gradient_clip_algorithm", default="norm"
+                    ),
+                    accumulate_grad_batches=grad_steps,
+                    log_every_n_steps=OmegaConf.select(config, "optimization.log_every_n_steps", default=10),
+                    enable_progress_bar=enable_progress_bar,
+                    fast_dev_run=config.env.fast_dev_run,
+                    val_check_interval=config.optimization.val_check_interval,
+                    check_val_every_n_epoch=config.optimization.check_val_every_n_epoch
+                    if hasattr(config.optimization, "check_val_every_n_epoch")
+                    else 1,
+                    plugins=plugins,
+                )
+        else:
+            blacklist_msgs = []
+            if self._verbosity <= 3:  # turn off logging in prediction
+                blacklist_msgs.append("Automatic Mixed Precision")
+                blacklist_msgs.append("GPU available")
+                blacklist_msgs.append("TPU available")
+                blacklist_msgs.append("IPU available")
+                blacklist_msgs.append("HPU available")
+                blacklist_msgs.append("select gpus")
+                blacklist_msgs.append("LOCAL_RANK")
+                blacklist_msgs.append("Trainer(barebones=True)")
+            log_filter = LogFilter(blacklist_msgs)
+
+            with apply_log_filter(log_filter):
+                trainer = pl.Trainer(
+                    accelerator="gpu" if num_gpus > 0 else "auto",
+                    devices=num_gpus if num_gpus > 0 else "auto",
+                    num_nodes=self._config.env.num_nodes,
+                    precision=precision,
+                    strategy=strategy,
+                    benchmark=False,
+                    enable_progress_bar=False if barebones else self._enable_progress_bar,
+                    deterministic=self._config.env.deterministic,
+                    max_epochs=-1,  # Add max_epochs to disable warning
+                    logger=False,
+                    callbacks=callbacks,
+                    barebones=barebones,
+                )
+
         return trainer
 
-    def fit_trainer_per_run(self, trainer, task, datamodule, ckpt_path, resume):
+    def run_trainer(self, trainer, task, datamodule, ckpt_path=None, resume=None, pred_writer=None, is_train=True):
         with warnings.catch_warnings():
             warnings.filterwarnings(
                 "ignore",
@@ -976,19 +1060,28 @@ class BaseLearner(ExportMixin):
                 ".* in the `DataLoader` init to improve performance.*",
             )
             warnings.filterwarnings("ignore", "Checkpoint directory .* exists and is not empty.")
-            trainer.fit(
-                task,
-                datamodule=datamodule,
-                ckpt_path=ckpt_path if resume else None,  # this is to resume training that was broken accidentally
-            )
+            if is_train:
+                trainer.fit(
+                    task,
+                    datamodule=datamodule,
+                    ckpt_path=ckpt_path if resume else None,  # this is to resume training that was broken accidentally
+                )
+            else:
+                outputs = trainer.predict(
+                    task,
+                    datamodule=datamodule,
+                    return_predictions=pred_writer is None,
+                )
+                return outputs
 
-    def on_fit_end_per_run(self, trainer, model, save_path, config, strategy, peft_param_names, standalone, clean_ckpts):
+    def on_fit_per_run_end(self, trainer, model, save_path, config, strategy, peft_param_names, standalone, clean_ckpts):
         if trainer.global_rank == 0:
             # We do not perform averaging checkpoint in the case of hpo for each trial
             # We only average the checkpoint of the best trial at the end in the master process.
             if not self._is_hpo:
-                self._top_k_average(
+                self.top_k_average(
                     model=model,
+                    validation_metric_name=self._validation_metric_name,
                     save_path=save_path,
                     top_k_average_method=config.optimization.top_k_average_method,
                     strategy=strategy,
@@ -1043,8 +1136,9 @@ class BaseLearner(ExportMixin):
         config = self.update_strategy_by_env(config=config)
 
         if max_time == timedelta(seconds=0):
-            self._top_k_average(
+            self.top_k_average(
                 model=model,
+                validation_metric_name=self._validation_metric_name,
                 save_path=save_path,
                 top_k_average_method=config.optimization.top_k_average_method,
                 strict_loading=not peft_param_names,
@@ -1057,7 +1151,8 @@ class BaseLearner(ExportMixin):
         datamodule = self.get_datamodule_per_run(
             df_preprocessor=df_preprocessor,
             data_processors=data_processors,
-            config=config,
+            per_gpu_batch_size=config.env.per_gpu_batch_size,
+            num_workers=config.env.num_workers,
         )
         optimization_kwargs = self.get_optimization_kwargs_per_run(
             config=config,
@@ -1109,14 +1204,14 @@ class BaseLearner(ExportMixin):
             enable_progress_bar=enable_progress_bar,
         )
 
-        self.fit_trainer_per_run(
+        self.run_trainer(
             trainer=trainer,
             task=task,
             datamodule=datamodule,
             ckpt_path=ckpt_path,
             resume=resume,
         )
-        self.on_fit_end_per_run(
+        self.on_fit_per_run_end(
             trainer=trainer,
             model=model,
             save_path=save_path,
@@ -1127,11 +1222,13 @@ class BaseLearner(ExportMixin):
             clean_ckpts=clean_ckpts,
         )
 
-        return config, df_preprocessor, data_processors, model, model_postprocess_fn
+        return config, df_preprocessor, data_processors, self._model, model_postprocess_fn
 
-    def _top_k_average(
+    ## TODO: top_k_average should avoid modifying self._model inplace.
+    def top_k_average(
         self,
         model,
+        validation_metric_name,  # FIXME: we need to change validation_metric to evaluation_metric for model choosing
         save_path,
         top_k_average_method,
         is_distill=False,
@@ -1141,16 +1238,10 @@ class BaseLearner(ExportMixin):
         standalone=True,
         clean_ckpts=True,
     ):
-        # FIXME: we need to change validation_metric to evaluation_metric for model choosing
-        # since we called self.evaluate. Below is a temporal fix for NER.
-        if self._problem_type is not None and self._problem_type == NER:
-            validation_metric_name = OVERALL_F1  # seqeval only support overall_f1
-
         best_k_models_yaml_path = os.path.join(save_path, BEST_K_MODELS_FILE)
         if os.path.exists(best_k_models_yaml_path):
             with open(best_k_models_yaml_path, "r") as f:
                 best_k_models = yaml.safe_load(f)
-
         else:
             # In some cases, the training ends up too early (e.g., due to time_limit) so that there is
             # no saved best_k model checkpoints. In that scenario, we won't perform any model averaging.
@@ -1173,14 +1264,14 @@ class BaseLearner(ExportMixin):
                     for v in sorted(
                         list(best_k_models.items()),
                         key=lambda ele: ele[1],
-                        reverse=(minmax_mode == MAX),
+                        reverse=(self._minmax_mode == MAX),
                     )
                 ]
                 if top_k_average_method == GREEDY_SOUP:
                     # Select the ingredients based on the methods proposed in paper
                     #  "Model soups: averaging weights of multiple fine-tuned models improves accuracy without
                     #  increasing inference time", https://arxiv.org/pdf/2203.05482.pdf
-                    monitor_op = {MIN: operator.le, MAX: operator.ge}[minmax_mode]
+                    monitor_op = {MIN: operator.le, MAX: operator.ge}[self._minmax_mode]
                     ingredients = [top_k_model_paths[0]]
                     if len(top_k_model_paths) > 1:
                         logger.info(
@@ -1193,7 +1284,7 @@ class BaseLearner(ExportMixin):
                             prefix=prefix,
                             strict=strict_loading,
                         )
-                        best_score = self.evaluate(val_df, metrics=[validation_metric_name])[validation_metric_name]
+                        best_score = self.evaluate(self._tuning_data, metrics=[validation_metric_name])[validation_metric_name]
                         for i in range(1, len(top_k_model_paths)):
                             cand_avg_state_dict = average_checkpoints(
                                 checkpoint_paths=ingredients + [top_k_model_paths[i]],
@@ -1204,7 +1295,7 @@ class BaseLearner(ExportMixin):
                                 prefix=prefix,
                                 strict=strict_loading,
                             )
-                            cand_score = self.evaluate(val_df, metrics=[validation_metric_name])[
+                            cand_score = self.evaluate(self._tuning_data, metrics=[validation_metric_name])[
                                 validation_metric_name
                             ]
                             if monitor_op(cand_score, best_score):
@@ -1275,21 +1366,11 @@ class BaseLearner(ExportMixin):
             if os.path.isfile(last_ckpt_path):
                 os.remove(last_ckpt_path)
 
-    def _default_predict(
-        self,
-        data: pd.DataFrame,
-        df_preprocessor: MultiModalFeaturePreprocessor,
-        data_processors: Dict,
-        num_gpus: int,
-        precision: Union[int, str],
-        batch_size: int,
-        strategy: str,
-        barebones: Optional[bool] = False,
-    ) -> List[Dict]:
+    def prepare_for_deepspeed_offloading(self, strategy):
+        # TODO: Using optimiation_kwargs for inference is confusing and bad design. Remove as soon as fixed in lightning.
         if self._config.env.strategy == DEEPSPEED_OFFLOADING and DEEPSPEED_MODULE not in sys.modules:
             # Need to initialize DeepSpeed and optimizer as currently required in lightning's integration of deepspeed.
-            # TODO: Using optimiation_kwargs for inference is confusing and bad design. Remove as soon as fixed in lightning.
-            from .optimization.deepspeed import CustomDeepSpeedStrategy
+            from ..optimization.deepspeed import CustomDeepSpeedStrategy
 
             strategy = CustomDeepSpeedStrategy(
                 stage=3,
@@ -1299,7 +1380,7 @@ class BaseLearner(ExportMixin):
                 reduce_bucket_size=self._config.env.deepspeed_allreduce_size,
             )
             norm_param_names = get_norm_layer_param_names(self._model)
-            trainable_param_names = get_trainable_params_efficient_finetune(
+            peft_param_names = get_trainable_params_efficient_finetune(
                 norm_param_names,
                 efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
             )
@@ -1317,119 +1398,90 @@ class BaseLearner(ExportMixin):
             )
         else:
             optimization_kwargs = {}
-            trainable_param_names = []
+            peft_param_names = []
 
-        predict_dm = BaseDataModule(
+        return strategy, optimization_kwargs, peft_param_names
+
+    def get_pred_writer(self, strategy):
+        pred_writer = None
+        if isinstance(strategy, str) and DDP in strategy:
+            pred_writer = DDPPredictionWriter(output_dir=self._save_path, write_interval="epoch")
+        return pred_writer
+
+    def collect_predictions(self, outputs, trainer, pred_writer, num_gpus):
+        if pred_writer is not None:
+            if trainer.global_rank == 0:
+                outputs = pred_writer.collect_all_gpu_results(num_gpus=num_gpus)
+
+        return outputs
+
+    def clean_trainer_processes(self, trainer):
+        if trainer.global_rank != 0:
+            sys.exit(f"Prediction finished, exit the process with global_rank={trainer.global_rank}...")
+
+    def _default_predict(
+        self,
+        data: pd.DataFrame,
+        df_preprocessor: MultiModalFeaturePreprocessor,
+        data_processors: Dict,
+        num_gpus: int,
+        precision: Union[int, str],
+        batch_size: int,
+        strategy: str,
+        barebones: Optional[bool] = False,
+    ) -> List[Dict]:
+        strategy, optimization_kwargs, peft_param_names = self.prepare_for_deepspeed_offloading(strategy=strategy)
+        datamodule = self.get_datamodule_per_run(
             df_preprocessor=df_preprocessor,
             data_processors=data_processors,
             per_gpu_batch_size=batch_size,
             num_workers=self._config.env.num_workers_evaluation,
             predict_data=data,
         )
-
-        callbacks = []
-        pred_writer = None
-        if isinstance(strategy, str) and DDP in strategy:
-            pred_writer = DDPPredictionWriter(output_dir=self._save_path, write_interval="epoch")
-            callbacks = [pred_writer]
-
-        if self._problem_type == NER:
-            task = NerLitModule(
-                model=self._model,
-                model_postprocess_fn=self._model_postprocess_fn,
-                efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
-                trainable_param_names=trainable_param_names,
-                **optimization_kwargs,
-            )
-        elif self._problem_type == OBJECT_DETECTION:
-            task = MMDetLitModule(
-                model=self._model,
-                **optimization_kwargs,
-            )
-        else:
-            task = LitModule(
-                model=self._model,
-                model_postprocess_fn=self._model_postprocess_fn,
-                efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
-                trainable_param_names=trainable_param_names,
-                **optimization_kwargs,
-            )
-
-        blacklist_msgs = []
-        if self._verbosity <= 3:  # turn off logging in prediction
-            blacklist_msgs.append("Automatic Mixed Precision")
-            blacklist_msgs.append("GPU available")
-            blacklist_msgs.append("TPU available")
-            blacklist_msgs.append("IPU available")
-            blacklist_msgs.append("HPU available")
-            blacklist_msgs.append("select gpus")
-            blacklist_msgs.append("LOCAL_RANK")
-            blacklist_msgs.append("Trainer(barebones=True)")
-        log_filter = LogFilter(blacklist_msgs)
-
-        with apply_log_filter(log_filter):
-            evaluator = pl.Trainer(
-                accelerator="gpu" if num_gpus > 0 else "auto",
-                devices=num_gpus if num_gpus > 0 else "auto",
-                num_nodes=self._config.env.num_nodes,
-                precision=precision,
-                strategy=strategy,
-                benchmark=False,
-                enable_progress_bar=False if barebones else self._enable_progress_bar,
-                deterministic=self._config.env.deterministic,
-                max_epochs=-1,  # Add max_epochs to disable warning
-                logger=False,
-                callbacks=callbacks,
-                barebones=barebones,
-            )
-
-            with warnings.catch_warnings():
-                warnings.filterwarnings(
-                    "ignore",
-                    ".*does not have many workers which may be a bottleneck. "
-                    "Consider increasing the value of the `num_workers` argument` "
-                    ".* in the `DataLoader` init to improve performance.*",
-                )
-
-                outputs = evaluator.predict(
-                    task,
-                    datamodule=predict_dm,
-                    return_predictions=pred_writer is None,
-                )
-
-                if pred_writer is not None:
-                    if evaluator.global_rank == 0:
-                        outputs = pred_writer.collect_all_gpu_results(num_gpus=num_gpus)
-                    else:
-                        sys.exit(f"Prediction finished, exit the process with global_rank={evaluator.global_rank}...")
-                elif (
-                    self._problem_type == OBJECT_DETECTION
-                ):  # TODO: remove this by adjusting the return of mmdet_image or lit_mmdet.
-                    outputs = [output for batch_outputs in outputs for output in batch_outputs]
+        pred_writer = self.get_pred_writer(strategy=strategy)
+        callbacks = self.get_callbacks_per_run(pred_writer=pred_writer, is_train=False)
+        # TODO: remove optimization_kwargs from inference
+        task = self.build_task_per_run(optimization_kwargs=optimization_kwargs, is_train=False)
+        trainer = self.init_trainer_per_run(
+            num_gpus=num_gpus,
+            precision=precision,
+            strategy=strategy,
+            callbacks=callbacks,
+            barebones=barebones,
+            is_train=False,
+        )
+        outputs = self.run_trainer(
+            trainer=trainer,
+            task=task,
+            datamodule=datamodule,
+            pred_writer=pred_writer,
+        )
+        outputs = self.collect_predictions(outputs=outputs, trainer=trainer, pred_writer=pred_writer, num_gpus=num_gpus)
+        self.clean_trainer_processes(trainer=trainer)
 
         return outputs
 
-    def _on_predict_start(
-        self,
-        data: Union[pd.DataFrame, dict, list],
-        requires_label: bool,
-    ):
-        if self._column_types is None:
-            data = data_to_df(data=data)
-            allowable_dtypes, fallback_dtype = infer_dtypes_by_model_names(model_config=self._config.model)
-            column_types = infer_column_types(
-                data=data,
-                label_columns=self._label_column,
-                problem_type=self._problem_type,
-                allowable_column_types=allowable_dtypes,
-                fallback_column_type=fallback_dtype,
-            )
-            if self._problem_type == OBJECT_DETECTION:
-                column_types = infer_rois_column_type(
-                    column_types=column_types,
-                    data=data,
-                )
-        else:  # called .fit() or .load()
+    def update_image_column_types(self, data):
+        column_types = self._column_types
+        column_types_copy = copy.deepcopy(column_types)
+        for col_name, col_type in column_types.items():
+            if col_type in [IMAGE_BYTEARRAY, IMAGE_PATH]:
+                if is_image_column(data=data[col_name], col_name=col_name, image_type=IMAGE_PATH):
+                    image_type = IMAGE_PATH
+                elif is_image_column(
+                        data=data[col_name],
+                        col_name=col_name,
+                        image_type=IMAGE_BYTEARRAY,
+                ):
+                    image_type = IMAGE_BYTEARRAY
+                else:
+                    image_type = col_type
+                if col_type != image_type:
+                    column_types_copy[col_name] = image_type
+        return column_types_copy
+
+    def data_to_df(self, data):
+        if self._fit_called:
             column_names = list(self._column_types.keys())
             # remove label column since it's not required in inference.
             column_names.remove(self._label_column)
@@ -1438,39 +1490,22 @@ class BaseLearner(ExportMixin):
                 required_columns=self._df_preprocessor.required_feature_names,
                 all_columns=column_names,
             )
-            column_types = self._column_types
-            column_types_copy = copy.deepcopy(column_types)
-            for col_name, col_type in column_types.items():
-                if col_type in [IMAGE_BYTEARRAY, IMAGE_PATH]:
-                    if is_image_column(data=data[col_name], col_name=col_name, image_type=IMAGE_PATH):
-                        image_type = IMAGE_PATH
-                    elif is_image_column(
-                        data=data[col_name],
-                        col_name=col_name,
-                        image_type=IMAGE_BYTEARRAY,
-                    ):
-                        image_type = IMAGE_BYTEARRAY
-                    else:
-                        image_type = col_type
-                    if col_type != image_type:
-                        column_types_copy[col_name] = image_type
-            self._df_preprocessor._column_types = column_types_copy
+        else:
+            data = data_to_df(data=data)
 
-        if self._df_preprocessor is None:
-            df_preprocessor = init_df_preprocessor(
-                config=self._config,
-                column_types=column_types,
-                label_column=self._label_column,
-                train_df_x=data,  # TODO: drop label like in line 884?
-                train_df_y=data[self._label_column] if self._label_column else None,
-            )
-        else:  # called .fit() or .load()
-            df_preprocessor = self._df_preprocessor
+        return data
 
-        data_processors = copy.copy(self._data_processors)
-        # For prediction data with no labels provided.
-        if not requires_label:
-            data_processors.pop(LABEL, None)
+    def _on_predict_start(
+        self,
+        data: Union[pd.DataFrame, dict, list],
+        requires_label: bool,
+    ):
+        data = self.data_to_df(data=data)
+        column_types = self.infer_column_types(column_types=self._column_types, data=data, is_train=False)
+        df_preprocessor = self.get_df_preprocessor_per_run(df_preprocessor=self._df_preprocessor, data=data, column_types=column_types, is_train=False)
+        if self._fit_called:
+            df_preprocessor._column_types = self.update_image_column_types(data=data)
+        data_processors = self.get_data_processors_per_run(data_processors=self._data_processors, requires_label=requires_label, is_train=False)
 
         return data, df_preprocessor, data_processors
 

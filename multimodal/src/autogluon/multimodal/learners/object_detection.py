@@ -150,14 +150,43 @@ class ObjectDetectionLearner(BaseLearner):
 
     def build_task_per_run(
         self,
-        model,
+        model: Optional[nn.Module] = None,
         optimization_kwargs: Optional[dict] = None,
+        is_train=True,
     ):
-        task = MMDetLitModule(
-            model=model,
-            **optimization_kwargs,
+        if is_train:
+            return MMDetLitModule(
+                model=model,
+                **optimization_kwargs,
+            )
+        else:
+            return MMDetLitModule(model=self._model)
+
+    def on_predict_end(self, pred_writer, outputs):
+        if pred_writer is None:
+            # TODO: remove this by adjusting the return of mmdet_image or lit_mmdet.
+            outputs = [output for batch_outputs in outputs for output in batch_outputs]
+        return outputs
+
+    def _on_predict_start(
+            self,
+            data: Union[pd.DataFrame, dict, list],
+            requires_label: bool,
+    ):
+        data = self.data_to_df(data=data)
+        column_types = self.infer_column_types(column_types=self._column_types, data=data, is_train=False)
+        column_types = infer_rois_column_type(
+            column_types=column_types,
+            data=data,
         )
-        return task
+        df_preprocessor = self.get_df_preprocessor_per_run(df_preprocessor=self._df_preprocessor, data=data,
+                                                           column_types=column_types, is_train=False)
+        if self._fit_called:
+            df_preprocessor._column_types = self.update_image_column_types(data=data)
+        data_processors = self.get_data_processors_per_run(data_processors=self._data_processors,
+                                                           requires_label=requires_label, is_train=False)
+
+        return data, df_preprocessor, data_processors
 
     def evaluate(
         self,

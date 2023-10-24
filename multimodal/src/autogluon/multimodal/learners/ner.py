@@ -47,23 +47,51 @@ class NERLearner(BaseLearner):
 
     def build_task_per_run(
         self,
+        model,
+        config,
         peft_param_names: List[str],
         loss_func: Optional[nn.Module] = None,
         optimization_kwargs: Optional[dict] = None,
+        is_train=True,
     ):
-        task = NerLitModule(
-            model=self._model,
-            loss_func=loss_func,
-            efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
-            model_postprocess_fn=self._model_postprocess_fn,
-            trainable_param_names=peft_param_names,
-            **optimization_kwargs,
-        )
-        return task
+        if is_train:
+            return NerLitModule(
+                model=model,
+                loss_func=loss_func,
+                efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
+                model_postprocess_fn=self._model_postprocess_fn,
+                trainable_param_names=peft_param_names,
+                **optimization_kwargs,
+            )
+        else:
+            return NerLitModule(
+                model=self._model,
+                model_postprocess_fn=self._model_postprocess_fn,
+            )
 
     def get_output_shape_per_run(self, df_preprocessor):
         # ner needs to update output_shape with label_generator.
         return len(df_preprocessor.label_generator.unique_entity_groups)
+
+    def on_fit_per_run_end(self, trainer, model, save_path, config, strategy, peft_param_names, standalone, clean_ckpts):
+        if trainer.global_rank == 0:
+            # We do not perform averaging checkpoint in the case of hpo for each trial
+            # We only average the checkpoint of the best trial at the end in the master process.
+            if not self._is_hpo:
+                self._top_k_average(
+                    model=model,
+                    validation_metric_name=OVERALL_F1,  # since we called self.evaluate. Below is a temporal fix for NER. seqeval only support overall_f1
+                    save_path=save_path,
+                    top_k_average_method=config.optimization.top_k_average_method,
+                    strategy=strategy,
+                    strict_loading=not peft_param_names,
+                    # Not strict loading if using parameter-efficient finetuning
+                    standalone=standalone,
+                    clean_ckpts=clean_ckpts,
+                )
+            self._best_score = trainer.callback_metrics[f"val_{self._validation_metric_name}"].item()
+        else:
+            sys.exit(f"Training finished, exit the process with global_rank={trainer.global_rank}...")
 
     def fit_per_run(
             self,
