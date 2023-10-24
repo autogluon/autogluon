@@ -13,7 +13,7 @@ from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 from autogluon.timeseries.models import DeepARModel, SimpleFeedForwardModel
 from autogluon.timeseries.predictor import TimeSeriesPredictor
 
-from .common import DUMMY_TS_DATAFRAME, get_data_frame_with_variable_lengths
+from .common import DUMMY_TS_DATAFRAME, CustomMetric, get_data_frame_with_variable_lengths
 
 TEST_HYPERPARAMETER_SETTINGS = [
     {"SimpleFeedForward": {"epochs": 1, "num_batches_per_epoch": 1}},
@@ -876,3 +876,17 @@ def test_given_refit_every_n_windows_when_fit_then_model_is_fit_correct_number_o
     for window_info in models_info["Naive"]["info_per_val_window"]:
         actual_num_refits += window_info["refit_this_window"]
     assert actual_num_refits == expected_num_refits
+
+
+def test_given_custom_metric_when_creating_predictor_then_predictor_can_score(temp_model_path):
+    predictor = TimeSeriesPredictor(path=temp_model_path, eval_metric=CustomMetric())
+    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
+    score = predictor.score(DUMMY_TS_DATAFRAME)
+    assert isinstance(score, float)
+
+
+def test_when_custom_metric_passed_to_score_then_predictor_can_score(temp_model_path):
+    predictor = TimeSeriesPredictor(path=temp_model_path, eval_metric="MASE")
+    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
+    score = predictor.score(DUMMY_TS_DATAFRAME, metric=CustomMetric())
+    assert isinstance(score, float)

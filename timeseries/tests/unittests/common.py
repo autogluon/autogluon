@@ -8,6 +8,7 @@ from gluonts.dataset.common import ListDataset
 
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
+from autogluon.timeseries.metrics import TimeSeriesScorer
 
 # TODO: add larger unit test data sets to S3
 
@@ -169,3 +170,16 @@ def dict_equal_primitive(this, that):
             equal_fields.append(dict_equal_primitive(dict(enumerate(v)), dict(enumerate(that[k]))))
 
     return all(equal_fields)
+
+
+class CustomMetric(TimeSeriesScorer):
+    def save_past_metrics(self, data_past: TimeSeriesDataFrame, target: str = "target", **kwargs) -> None:
+        self._past_target_mean = 1.0 + data_past[target].abs().mean()
+
+    def compute_metric(
+        self, data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, target: str = "target", **kwargs
+    ) -> float:
+        return ((data_future[target] - predictions["mean"]) / self._past_target_mean).mean()
+
+    def clear_past_metrics(self) -> None:
+        del self._past_target_mean
