@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -38,7 +38,7 @@ class TimeSeriesScorer:
     optimum: float = 0.0
     optimized_by_median: bool = False
     needs_quantile: bool = False
-    equivalent_tabular_regression_metric: str
+    equivalent_tabular_regression_metric: Optional[str] = None
 
     @property
     def sign(self) -> int:
@@ -158,5 +158,44 @@ class TimeSeriesScorer:
         return self.optimum - self.score(*args, **kwargs)
 
     @staticmethod
-    def _safemean(data: pd.Series) -> float:
-        return np.nanmean(data.replace([np.inf, -np.inf], np.nan).values)
+    def _safemean(series: pd.Series) -> float:
+        """Compute mean of an pd.Series, ignoring inf, -inf and nan values."""
+        return np.nanmean(series.replace([np.inf, -np.inf], np.nan).values)
+
+    @staticmethod
+    def _get_point_forecast_score_inputs(
+        data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, target: str = "target"
+    ) -> Tuple[pd.Series, pd.Series]:
+        """Get inputs necessary to compute point forecast metrics.
+
+        Returns
+        -------
+        y_true : pd.Series, shape [num_items * prediction_length]
+            Target time series values during the forecast horizon.
+        y_pred : pd.Series, shape [num_items * prediction_length]
+            Predicted time series values during the forecast horizon.
+        """
+        y_true = data_future[target]
+        y_pred = predictions["mean"]
+        return y_true, y_pred
+
+    @staticmethod
+    def _get_quantile_forecast_score_inputs(
+        data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, target: str = "target"
+    ) -> Tuple[pd.Series, pd.DataFrame, np.ndarray]:
+        """Get inputs necessary to compute quantile forecast metrics.
+
+        Returns
+        -------
+        y_true : pd.Series, shape [num_items * prediction_length]
+            Target time series values during the forecast horizon.
+        q_pred : pd.DataFrame, shape [num_items * prediction_length, num_quantiles]
+            Quantile forecast for each predicted quantile level. Column order corresponds to ``quantile_levels``.
+        quantile_levels : np.ndarray, shape [num_quantiles]
+            Quantile levels for which the forecasts are generated (as floats).
+        """
+        quantile_columns = [col for col in predictions.columns if col != "mean"]
+        y_true = data_future[target]
+        q_pred = predictions[quantile_columns]
+        quantile_levels = np.array(quantile_columns, dtype=float)
+        return y_true, q_pred, quantile_levels

@@ -405,7 +405,9 @@ class DirectTabularModel(AbstractMLForecastModel):
                 "eval_metric": "pinball_loss",
             }
         else:
-            tabular_metric = getattr(self.eval_metric, "equivalent_tabular_regression_metric", "mean_absolute_error")
+            tabular_metric = self.eval_metric.equivalent_tabular_regression_metric
+            if tabular_metric is None:
+                tabular_metric = "mean_absolute_error"
             return {
                 "problem_type": ag.constants.REGRESSION,
                 "eval_metric": tabular_metric,
@@ -493,7 +495,9 @@ class RecursiveTabularModel(AbstractMLForecastModel):
         return TimeSeriesDataFrame(predictions).reindex(data.item_ids, level=ITEMID)
 
     def _get_extra_tabular_init_kwargs(self) -> dict:
-        tabular_metric = getattr(self.eval_metric, "equivalent_tabular_regression_metric", "mean_absolute_error")
+        tabular_metric = self.eval_metric.equivalent_tabular_regression_metric
+        if tabular_metric is None:
+            tabular_metric = "mean_absolute_error"
         return {
             "problem_type": ag.constants.REGRESSION,
             "eval_metric": tabular_metric,

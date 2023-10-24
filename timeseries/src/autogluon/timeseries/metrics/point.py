@@ -13,82 +13,81 @@ from .utils import _in_sample_abs_seasonal_error, _in_sample_squared_seasonal_er
 logger = logging.getLogger(__name__)
 
 
-class PointForecastScorer(TimeSeriesScorer):
-    """Base class for all point forecast metrics.
-
-    Point forecast metrics are always evaluated on the "mean" column of the predictions.
-    """
-
-    def compute_metric(
-        self,
-        data_future: TimeSeriesDataFrame,
-        predictions: TimeSeriesDataFrame,
-        target: str = "target",
-        **kwargs,
-    ) -> float:
-        return self._compute_point_metric(y_true=data_future[target], y_pred=predictions["mean"], **kwargs)
-
-    def _compute_point_metric(self, y_true: pd.Series, y_pred: pd.Series, **kwargs) -> float:
-        raise NotImplementedError
-
-
-class RMSE(PointForecastScorer):
+class RMSE(TimeSeriesScorer):
     """Root mean squared error."""
 
     equivalent_tabular_regression_metric = "root_mean_squared_error"
 
-    def _compute_point_metric(self, y_true: pd.Series, y_pred: pd.Series, **kwargs) -> float:
+    def compute_metric(
+        self, data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, target: str = "target", **kwargs
+    ) -> float:
+        y_true, y_pred = self._get_point_forecast_score_inputs(data_future, predictions, target=target)
         return np.sqrt(self._safemean((y_true - y_pred) ** 2))
 
 
-class MSE(PointForecastScorer):
+class MSE(TimeSeriesScorer):
     """Mean squared error."""
 
     equivalent_tabular_regression_metric = "mean_squared_error"
 
-    def _compute_point_metric(self, y_true: pd.Series, y_pred: pd.Series, **kwargs) -> float:
+    def compute_metric(
+        self, data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, target: str = "target", **kwargs
+    ) -> float:
+        y_true, y_pred = self._get_point_forecast_score_inputs(data_future, predictions, target=target)
         return self._safemean((y_true - y_pred) ** 2)
 
 
-class MAE(PointForecastScorer):
+class MAE(TimeSeriesScorer):
     """Mean absolute error."""
 
     optimized_by_median = True
     equivalent_tabular_regression_metric = "mean_absolute_error"
 
-    def _compute_point_metric(self, y_true: pd.Series, y_pred: pd.Series, **kwargs) -> float:
+    def compute_metric(
+        self, data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, target: str = "target", **kwargs
+    ) -> float:
+        y_true, y_pred = self._get_point_forecast_score_inputs(data_future, predictions, target=target)
         return self._safemean((y_true - y_pred).abs())
 
 
-class WAPE(PointForecastScorer):
+class WAPE(TimeSeriesScorer):
     """Weighted absolute percentage error."""
 
     optimized_by_median = True
     equivalent_tabular_regression_metric = "mean_absolute_error"
 
-    def _compute_point_metric(self, y_true: pd.Series, y_pred: pd.Series, **kwargs) -> float:
+    def compute_metric(
+        self, data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, target: str = "target", **kwargs
+    ) -> float:
+        y_true, y_pred = self._get_point_forecast_score_inputs(data_future, predictions, target=target)
         return (y_true - y_pred).abs().sum() / y_true.abs().sum()
 
 
-class sMAPE(PointForecastScorer):
+class sMAPE(TimeSeriesScorer):
     "Symmetric mean absolute percentage error."
     optimized_by_median = True
     equivalent_tabular_regression_metric = "symmetric_mean_absolute_percentage_error"
 
-    def _compute_point_metric(self, y_true: pd.Series, y_pred: pd.Series, **kwargs) -> float:
+    def compute_metric(
+        self, data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, target: str = "target", **kwargs
+    ) -> float:
+        y_true, y_pred = self._get_point_forecast_score_inputs(data_future, predictions, target=target)
         return self._safemean(2 * ((y_true - y_pred).abs() / (y_true.abs() + y_pred.abs())))
 
 
-class MAPE(PointForecastScorer):
+class MAPE(TimeSeriesScorer):
     "Mean Absolute Percentage Error."
     optimized_by_median = True
     equivalent_tabular_regression_metric = "mean_absolute_percentage_error"
 
-    def _compute_point_metric(self, y_true: pd.Series, y_pred: pd.Series, **kwargs) -> float:
+    def compute_metric(
+        self, data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, target: str = "target", **kwargs
+    ) -> float:
+        y_true, y_pred = self._get_point_forecast_score_inputs(data_future, predictions, target=target)
         return self._safemean((y_true - y_pred).abs() / y_true.abs())
 
 
-class MASE(PointForecastScorer):
+class MASE(TimeSeriesScorer):
     """Mean absolute scaled error."""
 
     optimized_by_median = True
@@ -111,7 +110,10 @@ class MASE(PointForecastScorer):
     def clear_past_metrics(self) -> None:
         self._past_abs_seasonal_error = None
 
-    def _compute_point_metric(self, y_true: pd.Series, y_pred: pd.Series, **kwargs) -> float:
+    def compute_metric(
+        self, data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, target: str = "target", **kwargs
+    ) -> float:
+        y_true, y_pred = self._get_point_forecast_score_inputs(data_future, predictions, target=target)
         if self._past_abs_seasonal_error is None:
             raise AssertionError("Call `save_past_metrics` before `compute_metric`")
 
@@ -119,7 +121,7 @@ class MASE(PointForecastScorer):
         return self._safemean(mae_per_item / self._past_abs_seasonal_error)
 
 
-class RMSSE(PointForecastScorer):
+class RMSSE(TimeSeriesScorer):
     """Root mean squared scaled error."""
 
     equivalent_tabular_regression_metric = "root_mean_squared_error"
@@ -141,7 +143,10 @@ class RMSSE(PointForecastScorer):
     def clear_past_metrics(self) -> None:
         self._past_squared_seasonal_error = None
 
-    def _compute_point_metric(self, y_true: pd.Series, y_pred: pd.Series, **kwargs) -> float:
+    def compute_metric(
+        self, data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, target: str = "target", **kwargs
+    ) -> float:
+        y_true, y_pred = self._get_point_forecast_score_inputs(data_future, predictions, target=target)
         if self._past_squared_seasonal_error is None:
             raise AssertionError("Call `save_past_metrics` before `compute_metric`")
 

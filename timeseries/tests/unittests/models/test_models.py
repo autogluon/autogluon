@@ -366,6 +366,7 @@ def test_when_median_not_in_quantile_levels_then_median_is_present_in_raw_predic
     if isinstance(model, MultiWindowBacktestingModel):
         # Median is present in the predictions of the base model, but not in the MultiWindowBacktestingModel wrapper
         pytest.skip()
+    model.fit(train_data=DUMMY_TS_DATAFRAME)
 
     raw_predictions = model._predict(DUMMY_TS_DATAFRAME)
     assert "0.5" in raw_predictions.columns
