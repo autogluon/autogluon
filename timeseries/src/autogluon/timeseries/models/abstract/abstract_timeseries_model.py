@@ -294,6 +294,7 @@ class AbstractTimeSeriesModel(AbstractModel):
             of input items.
         """
         predictions = self._predict(data=data, known_covariates=known_covariates, **kwargs)
+        # "0.5" might be missing from the quantiles if self is a wrapper (MultiWindowBacktestingModel or ensemble)
         if "0.5" in predictions.columns:
             if self.eval_metric.optimized_by_median:
                 predictions["mean"] = predictions["0.5"]
