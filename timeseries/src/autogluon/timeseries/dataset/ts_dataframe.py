@@ -392,12 +392,13 @@ class TimeSeriesDataFrame(pd.DataFrame):
         df: pd.DataFrame,
         id_column: Optional[str] = None,
         timestamp_column: Optional[str] = None,
+        static_features_df: Optional[pd.DataFrame] = None,
     ) -> TimeSeriesDataFrame:
         """Construct a ``TimeSeriesDataFrame`` from a pandas DataFrame.
 
         Parameters
         ----------
-        df: pd.DataFrame
+        df : pd.DataFrame
             A pd.DataFrame with 'item_id' and 'timestamp' as columns. For example:
 
             .. code-block::
@@ -412,19 +413,45 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 6        2 2019-01-01       6
                 7        2 2019-01-02       7
                 8        2 2019-01-03       8
-        id_column: str
+        id_column : str
             Name of the 'item_id' column if column name is different
-        timestamp_column: str
+        timestamp_column : str
             Name of the 'timestamp' column if column name is different
+        static_features_df : pd.DataFrame, optional
+            A pd.DataFrame with 'item_id' column that contains the static features for each time series. For example:
+
+            .. code-block::
+
+                   item_id feat_1   feat_2
+                0        0 foo         0.5
+                1        1 foo         2.2
+                2        2 bar         0.1
 
         Returns
         -------
         ts_df: TimeSeriesDataFrame
             A data frame in TimeSeriesDataFrame format.
         """
-        return cls(
-            cls._construct_pandas_frame_from_data_frame(df, id_column=id_column, timestamp_column=timestamp_column)
-        )
+        df = cls._construct_pandas_frame_from_data_frame(df, id_column=id_column, timestamp_column=timestamp_column)
+        static_features_df = cls._construct_static_features_from_data_frame(static_features_df, id_column=id_column)
+        return cls(df, static_features=static_features_df)
+
+    @classmethod
+    def _construct_static_features_from_data_frame(
+        cls, static_features_df: Optional[pd.DataFrame], id_column: Optional[str] = None
+    ) -> Optional[pd.DataFrame]:
+        if static_features_df is not None:
+            df = static_features_df.copy()
+            if id_column is not None:
+                assert id_column in df.columns, f"Column '{id_column}' not found in static_features!"
+                if id_column != ITEMID and ITEMID in df.columns:
+                    logger.warning(f"Renaming existing column '{ITEMID}' -> '__{ITEMID}' to avoid name collisions.")
+                    df.rename(columns={ITEMID: "__" + ITEMID}, inplace=True)
+                df.rename(columns={id_column: ITEMID}, inplace=True)
+            assert ITEMID in df.columns, f"Column '{ITEMID} not found in static_features!"
+            return df.set_index(ITEMID)
+        else:
+            return None
 
     def copy(self: TimeSeriesDataFrame, deep: bool = True) -> pd.DataFrame:  # noqa
         obj = super().copy(deep=deep)
