@@ -174,7 +174,8 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             data = data.query("item_id in @items_to_keep")
 
         mlforecast_df = self._to_mlforecast_df(data, data.static_features)
-        df = self._mlf.preprocess(mlforecast_df, dropna=False)
+        # Unless we set static_features=[], MLForecast interprets all known covariates as static features
+        df = self._mlf.preprocess(mlforecast_df, dropna=False, static_features=[])
         # df.query results in 2x memory saving compared to df.dropna(subset="y")
         df = df.query("y.notnull()")
 
@@ -366,7 +367,7 @@ class DirectTabularModel(AbstractMLForecastModel):
         data_future[self.target] = float("inf")
         data_extended = pd.concat([data, data_future])
         mlforecast_df = self._to_mlforecast_df(data_extended, data.static_features)
-        df = self._mlf.preprocess(mlforecast_df, dropna=False)
+        df = self._mlf.preprocess(mlforecast_df, dropna=False, static_features=[])
         df = df.groupby(MLF_ITEMID, sort=False).tail(self.prediction_length)
         df = df.replace(float("inf"), float("nan"))
 
@@ -376,7 +377,7 @@ class DirectTabularModel(AbstractMLForecastModel):
 
         if hasattr(self._mlf.ts, "target_transforms"):
             # Ensure that transforms are fitted only on past data
-            self._mlf.preprocess(self._to_mlforecast_df(data, None))
+            self._mlf.preprocess(self._to_mlforecast_df(data, None), static_features=[])
             for tfm in self._mlf.ts.target_transforms[::-1]:
                 predictions = tfm.inverse_transform(predictions)
         predictions = predictions.rename(columns={MLF_ITEMID: ITEMID, MLF_TIMESTAMP: TIMESTAMP}).set_index(
