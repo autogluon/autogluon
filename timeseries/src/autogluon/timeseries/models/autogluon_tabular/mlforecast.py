@@ -471,14 +471,14 @@ class RecursiveTabularModel(AbstractMLForecastModel):
 
         new_df = self._to_mlforecast_df(data, data.static_features)
         if known_covariates is not None:
-            dynamic_dfs = [self._to_mlforecast_df(known_covariates, data.static_features, include_target=False)]
+            X_df = self._to_mlforecast_df(known_covariates, data.static_features, include_target=False)
         else:
-            dynamic_dfs = None
+            X_df = None
         with warning_filter():
             raw_predictions = self._mlf.predict(
                 h=self.prediction_length,
                 new_df=new_df,
-                dynamic_dfs=dynamic_dfs,
+                X_df=X_df,
             )
         predictions = raw_predictions.rename(columns={MLF_ITEMID: ITEMID, MLF_TIMESTAMP: TIMESTAMP})
 

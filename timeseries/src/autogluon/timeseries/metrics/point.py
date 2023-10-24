@@ -64,7 +64,8 @@ class WAPE(TimeSeriesScorer):
 
 
 class sMAPE(TimeSeriesScorer):
-    "Symmetric mean absolute percentage error."
+    """Symmetric mean absolute percentage error."""
+
     optimized_by_median = True
     equivalent_tabular_regression_metric = "symmetric_mean_absolute_percentage_error"
 
@@ -76,7 +77,8 @@ class sMAPE(TimeSeriesScorer):
 
 
 class MAPE(TimeSeriesScorer):
-    "Mean Absolute Percentage Error."
+    """Mean Absolute Percentage Error."""
+
     optimized_by_median = True
     equivalent_tabular_regression_metric = "mean_absolute_percentage_error"
 
