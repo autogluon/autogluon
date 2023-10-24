@@ -7,11 +7,7 @@ PR_NUMBER=$4
 FOLDS=$5
 
 # generate tabular configs
-if [ -z "$FOLDS" ]; then
-    python $(dirname "$0")/tabular/generate_framework.py --repository https://github.com/$REPOSITORY.git --branch $BRANCH --folds_to_run ""
-else
-    python $(dirname "$0")/tabular/generate_framework.py --repository https://github.com/$REPOSITORY.git --branch $BRANCH --folds_to_run $FOLDS
-fi
+python $(dirname "$0")/tabular/generate_framework.py --repository https://github.com/$REPOSITORY.git --branch $BRANCH --folds_to_run $FOLDS
 
 if [ -n "$PR_NUMBER" ]
 then
