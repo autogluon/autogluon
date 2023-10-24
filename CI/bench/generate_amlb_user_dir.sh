@@ -8,7 +8,7 @@ FOLDS=$5
 
 # generate tabular configs
 if [ -z "$FOLDS" ]; then
-    python $(dirname "$0")/tabular/generate_framework.py --repository https://github.com/$REPOSITORY.git --branch $BRANCH --folds_to_run False
+    python $(dirname "$0")/tabular/generate_framework.py --repository https://github.com/$REPOSITORY.git --branch $BRANCH --folds_to_run ""
 else
     python $(dirname "$0")/tabular/generate_framework.py --repository https://github.com/$REPOSITORY.git --branch $BRANCH --folds_to_run $FOLDS
 fi
