@@ -91,8 +91,10 @@ jobs:
           aws-region: us-east-1
       - name: Extract Fork Info
         id: parse_fork_info
+        env:
+          FORK_INFO: ${{ github.event.inputs.fork_info }}
         run: |
-          IFS="|" read -r fork_name fork_branch <<< "${{ github.event.inputs.fork_info }}"
+          IFS="|" read -r fork_name fork_branch <<< "$FORK_INFO"
           echo "FORK_NAME=$fork_name" >> $GITHUB_OUTPUT
           echo "FORK_BRANCH=$fork_branch" >> $GITHUB_OUTPUT
       - name: Generate AMLB User Dir
@@ -141,8 +143,10 @@ jobs:
           aws-region: us-east-1
       - name: Extract Fork Info
         id: parse_fork_info
+        env:
+          FORK_INFO: ${{ github.event.inputs.fork_info }}
         run: |
-          IFS="|" read -r fork_name fork_branch <<< "${{ github.event.inputs.fork_info }}"
+          IFS="|" read -r fork_name fork_branch <<< "$FORK_INFO"
           echo "FORK_NAME=$fork_name" >> $GITHUB_OUTPUT
           echo "FORK_BRANCH=$fork_branch" >> $GITHUB_OUTPUT
       - name: Run benchmark
