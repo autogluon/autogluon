@@ -1848,7 +1848,8 @@ class MultiModalPredictor(ExportMixin):
                         outputs = pred_writer.collect_all_gpu_results(num_gpus=num_gpus)
                     else:
                         sys.exit(f"Prediction finished, exit the process with global_rank={evaluator.global_rank}...")
-                elif (
+
+                if (
                     self._problem_type == OBJECT_DETECTION
                 ):  # TODO: remove this by adjusting the return of mmdet_image or lit_mmdet.
                     outputs = [output for batch_outputs in outputs for output in batch_outputs]
