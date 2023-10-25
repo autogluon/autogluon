@@ -761,8 +761,9 @@ class TabularPredictor:
                 detect stacked overfitting. The sub-fits stop and stacking will be disabled if any sub-fit shows stacked overfitting.
                 Allowed keys and values are:
                     `detection_time_frac` : float in (0,1)
-                        Determines how much of the original training time is used for detecting stacked overfitting. If no time limit is given, AutoGluon
-                        will use 4-repeated 8-fold cross-validation to detect stacked overfitting.
+                        Determines how much of the original training time is used for detecting stacked overfitting.
+                        If no time limit is given to AutoGluon, this parameter is ignored and AutoGluon uses holdout validation to detect stacked overfitting
+                        whereby AutoGluon is fit without a time limit in the sub-fit.
                     `use_holdout` : bool
                         Whether to use holdout validation or not.
                     `holdout_frac` : float in (0,1)
@@ -1115,7 +1116,7 @@ class TabularPredictor:
             logger.info(f"Sub-fit time limit is: {org_time_limit} seconds.")
             time_limit = int(org_time_limit * detection_time_frac)
         else:
-            logger.info(f"No time limit provided, use 4-repeated 8-fold cross-validation to detect stacked overfitting.")
+            logger.info(f"No time limit provided.")
             time_limit = None
 
         # -- Avoid copying data
@@ -1144,11 +1145,13 @@ class TabularPredictor:
 
         # -- Determine rest time and new num_stack_levels
         time_spend_sub_fits = int(time.time() - time_start)
-        time_limit_fit_full = org_time_limit - time_spend_sub_fits
-        logger.info(
-            f"Spend {time_spend_sub_fits} seconds for the sub-fit(s) during dynamic stacking. "
-            f"Time left for full fit of AutoGluon: {time_limit_fit_full} seconds. Starting full fit now."
-        )
+        logger.info(f"Spend {time_spend_sub_fits} seconds for the sub-fit(s) during dynamic stacking.")
+        if org_time_limit is None:
+            time_limit_fit_full = None
+        else:
+            time_limit_fit_full = org_time_limit - time_spend_sub_fits
+            logger.info(f"Time left for full fit of AutoGluon: {time_limit_fit_full} seconds.")
+
         num_stack_levels = 0 if stacked_overfitting else org_num_stack_levels
         self._stacked_overfitting_occurred = stacked_overfitting
 
@@ -1158,6 +1161,7 @@ class TabularPredictor:
         ag_fit_kwargs["X_val"] = X_val
         ag_fit_kwargs["X_unlabeled"] = X_unlabeled
 
+        logger.info(f"Starting full fit now with num_stack_levels {num_stack_levels}.")
         return num_stack_levels, time_limit_fit_full
 
     def _sub_fit_memory_save_wrapper(self, train_data, time_limit, ds_fit_kwargs, ag_fit_kwargs, ag_post_fix_kwargs):
