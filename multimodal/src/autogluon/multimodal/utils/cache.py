@@ -36,7 +36,9 @@ class DDPPredictionWriter(BasePredictionWriter):
         super().__init__(write_interval)
         if output_dir is None:  # TODO: give the predictor a default save_path before calling DDPPredictionWriter
             output_dir = "temp_cache_for_ddp_prediction"
-            logging.warning(f"Current predictor's save_path is None, using a default cache folder which may cause an error in prediction I/O. Try init the predictor with a save_path.")
+            logging.warning(
+                f"Current predictor's save_path is None, using a default cache folder which may cause an error in prediction I/O. Try init the predictor with a save_path."
+            )
         assert isinstance(
             output_dir, (str, Path)
         ), f"Only str and pathlib.Path types are supported for path, but got {output_dir} of type {type(output_dir)}."
@@ -46,7 +48,9 @@ class DDPPredictionWriter(BasePredictionWriter):
         try:
             os.makedirs(self.output_dir, exist_ok=False)
         except FileExistsError:  # assume the string is unique
-            logger.warning(f"{self.output_dir} already exists. This could be caused by DDP subprocess. Just make sure the previous cache is removed in {self.output_dir}.")
+            logger.warning(
+                f"{self.output_dir} already exists. This could be caused by DDP subprocess. Just make sure the previous cache is removed in {self.output_dir}."
+            )
 
     def get_predictions_cache_dir(self, global_rank: int):
         """

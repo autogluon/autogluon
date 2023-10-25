@@ -88,12 +88,12 @@ def test_mmdet_object_detection_inference_list_str_dict(checkpoint_name):
 
     # TODO: FIX DDP multi runs!
 
-    #pred = predictor.predict(mmdet_image_name)  # test batch inference
-    #assert len(pred) == 1  # test data size is 1
+    # pred = predictor.predict(mmdet_image_name)  # test batch inference
+    # assert len(pred) == 1  # test data size is 1
 
-    #pred = predictor.predict({"image": [mmdet_image_name] * 4})  # test batch inference
-    #assert len(pred) == 4  # test data size is 10
-    #print(pred)
+    # pred = predictor.predict({"image": [mmdet_image_name] * 4})  # test batch inference
+    # assert len(pred) == 4  # test data size is 10
+    # print(pred)
 
 
 # TODO: FIX DDP multi runs!
