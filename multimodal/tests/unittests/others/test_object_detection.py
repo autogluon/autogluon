@@ -28,6 +28,7 @@ def download_sample_dataset():
 
     return data_dir
 
+
 # TODO: Pytest does not support DDP
 @pytest.mark.single_gpu
 @pytest.mark.parametrize(
