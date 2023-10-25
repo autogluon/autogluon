@@ -765,8 +765,6 @@ def from_coco(
     except KeyError:  # KeyError: 'annotations', there is no annotation entry
         num_annotations = 0
 
-    # synsets
-    classes = [c["name"] for c in coco.loadCats(coco.getCatIds())]
     # load entries
     d = {"image": [], "rois": []}
     image_ids = sorted(coco.getImgIds())
