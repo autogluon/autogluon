@@ -136,7 +136,7 @@ def test_given_unavailable_input_and_raise_check_get_eval_metric_raises():
         check_get_evaluation_metric("some_nonsense_eval_metric")
 
 
-@pytest.mark.parametrize("eval_metric", ["MASE", "RMSSE"])
+@pytest.mark.parametrize("eval_metric", ["MASE", "RMSSE", "SQL"])
 def test_given_historic_data_not_cached_when_scoring_then_exception_is_raised(eval_metric):
     prediction_length = 3
     evaluator = check_get_evaluation_metric(eval_metric)
