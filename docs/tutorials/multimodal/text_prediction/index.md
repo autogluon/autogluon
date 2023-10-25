@@ -15,13 +15,13 @@
   How to use MultiModalPredictor to build models on datasets with languages other than English.
 :::
 
-:::{grid-item-card} Named Entity Recognition with AutoMM - Quick Start
+:::{grid-item-card} AutoMM for Named Entity Recognition - Quick Start
   :link: ner.html
 
   How to use MultiModalPredictor for entity extraction.
 :::
 
-:::{grid-item-card} Named Entity Recognition in Chinese with AutoMM - Quick Start
+:::{grid-item-card} AutoMM for Named Entity Recognition in Chinese - Quick Start
   :link: chinese_ner.html
 
   How to use MultiModalPredictor for entity extraction in Chinese text.

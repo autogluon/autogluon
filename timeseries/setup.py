@@ -27,12 +27,14 @@ install_requires = [
     "pandas",  # version range defined in `core/_setup_utils.py`
     "torch",  # version range defined in `core/_setup_utils.py`
     "lightning",  # version range defined in `core/_setup_utils.py`
+    "pytorch_lightning",  # version range defined in `core/_setup_utils.py`
     "statsmodels>=0.13.0,<0.15",
     "gluonts>=0.13.1,<0.14",
     "networkx",  # version range defined in `core/_setup_utils.py`
     # TODO: update statsforecast to v1.5.0 - resolve antlr4-python3-runtime dependency clash with multimodal
     "statsforecast>=1.4.0,<1.5",
-    "mlforecast>=0.9.3,<0.9.4",
+    "mlforecast>=0.10.0,<0.10.1",
+    "utilsforecast>=0.0.10,<0.0.11",
     "tqdm",  # version range defined in `core/_setup_utils.py`
     "ujson>=5,<6",  # needed to silence GluonTS warning
     f"autogluon.core[raytune]=={version}",

@@ -110,7 +110,7 @@ def test_clip_zero_shot():
     [
         ("swin_tiny_patch4_window7_224", -1),
         ("vit_tiny_patch16_224", -1),
-        ("resnet18", 0),
+        ("resnet18", -1),
         ("legacy_seresnet18", -1),
     ],
 )

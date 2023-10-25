@@ -6,6 +6,7 @@ import numpy.testing
 import pytest
 import torch
 from datasets import load_dataset
+from packaging import version
 from scipy.stats import pearsonr, spearmanr
 from sklearn.metrics.pairwise import paired_cosine_distances
 from torch import FloatTensor
@@ -23,7 +24,13 @@ ALL_DATASETS = {
     "ae": AEDataset(),
 }
 
+try:
+    import tensorrt
+except ImportError:
+    tensorrt = None
 
+
+@pytest.mark.single_gpu
 def evaluate(predictor, df, onnx_session=None):
     labels = df["score"].to_numpy()
 
@@ -41,6 +48,7 @@ def evaluate(predictor, df, onnx_session=None):
     return eval_pearson_cosine, eval_spearman_cosine
 
 
+@pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     ["sentence-transformers/msmarco-MiniLM-L-12-v3", "sentence-transformers/all-MiniLM-L6-v2"],
@@ -90,11 +98,12 @@ def test_onnx_export_hf_text(checkpoint_name):
     assert pytest.approx(onnx_spearman, 1e-2) == ag_spearman
 
 
+@pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "checkpoint_name,num_gpus",
     [
         ("swin_tiny_patch4_window7_224", -1),
-        ("resnet18", 0),
+        ("resnet18", -1),
     ],
 )
 def test_onnx_export_timm_image(checkpoint_name, num_gpus):
@@ -175,6 +184,7 @@ def test_onnx_export_timm_image(checkpoint_name, num_gpus):
     np.testing.assert_allclose(load_proba, onnx_proba, rtol=1e-2, atol=1e-2)
 
 
+@pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "dataset_name,model_names,text_backbone,image_backbone",
     [
@@ -191,6 +201,10 @@ def test_onnx_export_timm_image(checkpoint_name, num_gpus):
             None,
         ),
     ],
+)
+@pytest.mark.skipif(
+    tensorrt is None or version.parse(tensorrt.__version__) >= version.parse("8.5.4"),
+    reason="tensorrt above 8.5.4 cause segfault, but is required to support py311",
 )
 def test_onnx_optimize_for_inference(dataset_name, model_names, text_backbone, image_backbone):
     dataset = ALL_DATASETS[dataset_name]

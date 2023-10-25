@@ -16,6 +16,79 @@ def test_no_weighted_ensemble(fit_helper):
     fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, expected_model_count=1)
 
 
+def test_no_full_last_level_weighted_ensemble(fit_helper):
+    """Tests that fit_weighted_ensemble=False works"""
+    fit_args = dict(
+        hyperparameters={"DUMMY": {}},
+        fit_weighted_ensemble=True,
+        fit_full_last_level_weighted_ensemble=False,
+        num_stack_levels=1,
+        num_bag_folds=2,
+        num_bag_sets=1,
+        ag_args_ensemble={"fold_fitting_strategy": "sequential_local"},
+    )
+    dataset_name = "adult"
+    extra_metrics = list(METRICS[BINARY])
+
+    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, expected_model_count=4)
+
+
+def test_no_full_last_level_weighted_ensemble_additionally(fit_helper):
+    """Tests that fit_weighted_ensemble=False works"""
+    fit_args = dict(
+        hyperparameters={"DUMMY": {}},
+        fit_weighted_ensemble=True,
+        fit_full_last_level_weighted_ensemble=False,
+        full_weighted_ensemble_additionally=False,
+        num_stack_levels=1,
+        num_bag_folds=2,
+        num_bag_sets=1,
+        ag_args_ensemble={"fold_fitting_strategy": "sequential_local"},
+    )
+    dataset_name = "adult"
+    extra_metrics = list(METRICS[BINARY])
+
+    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, expected_model_count=4)
+
+
+def test_full_last_level_weighted_ensemble_additionally(fit_helper):
+    """Tests that fit_weighted_ensemble=False works"""
+    fit_args = dict(
+        hyperparameters={"DUMMY": {}},
+        fit_weighted_ensemble=True,
+        fit_full_last_level_weighted_ensemble=True,
+        full_weighted_ensemble_additionally=True,
+        num_stack_levels=1,
+        num_bag_folds=2,
+        num_bag_sets=1,
+        ag_args_ensemble={"fold_fitting_strategy": "sequential_local"},
+    )
+    dataset_name = "adult"
+    extra_metrics = list(METRICS[BINARY])
+
+    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, expected_model_count=5)
+
+    fit_args["num_stack_levels"] = 0
+    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, expected_model_count=2)
+
+
+def test_full_last_level_weighted_ensemble(fit_helper):
+    """Tests that fit_weighted_ensemble=False works"""
+    fit_args = dict(
+        hyperparameters={"DUMMY": {}},
+        fit_weighted_ensemble=True,
+        fit_full_last_level_weighted_ensemble=True,
+        num_stack_levels=1,
+        num_bag_folds=2,
+        num_bag_sets=1,
+        ag_args_ensemble={"fold_fitting_strategy": "sequential_local"},
+    )
+    dataset_name = "adult"
+    extra_metrics = list(METRICS[BINARY])
+
+    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, expected_model_count=4)
+
+
 def test_max_sets(fit_helper):
     """Tests that max_sets works"""
     fit_args = dict(
@@ -113,3 +186,20 @@ def test_use_bag_holdout_calibrate(fit_helper):
         expected_model_count=2,
         refit_full=False,
     )
+
+
+def test_num_folds_parallel(fit_helper, capsys):
+    """Tests that num_folds_parallel equal to 1 works"""
+    fit_args = dict(hyperparameters={"DUMMY": {}}, fit_weighted_ensemble=False, num_bag_folds=2, num_bag_sets=1, ag_args_ensemble=dict(num_folds_parallel=1))
+    dataset_name = "adult"
+
+    predictor = fit_helper.fit_and_validate_dataset(
+        dataset_name=dataset_name,
+        fit_args=fit_args,
+        expected_model_count=1,
+        refit_full=False,
+        delete_directory=False,
+    )
+    leaderboard = predictor.leaderboard(extra_info=True)
+    assert leaderboard.iloc[0]["num_models"] == 2
+    shutil.rmtree(predictor.path, ignore_errors=True)

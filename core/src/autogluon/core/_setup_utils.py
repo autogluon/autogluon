@@ -11,7 +11,7 @@ LITE_MODE = "lite" in PACKAGE_NAME
 
 AUTOGLUON_ROOT_PATH = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", ".."))
 
-PYTHON_REQUIRES = ">=3.8, <3.11"
+PYTHON_REQUIRES = ">=3.8, <3.12"
 
 
 # Only put packages here that would otherwise appear multiple times across different module's setup.py files.
@@ -26,8 +26,9 @@ DEPENDENT_PACKAGES = {
     "networkx": ">=3.0,<4",  # Major version cap
     "tqdm": ">=4.38,<5",  # Major version cap
     "Pillow": ">=9.3,<9.6",  # "<{N+2}" upper cap
-    "torch": ">=2.0,<2.1",  # "<{N+1}" upper cap
+    "torch": ">=2.0,<2.1",  # "<{N+1}" upper cap, sync with common/src/autogluon/common/utils/try_import.py
     "lightning": ">=2.0.0,<2.1",  # "<{N+1}" upper cap
+    "pytorch_lightning": ">=2.0.0,<2.1",  # "<{N+1}" upper cap
 }
 if LITE_MODE:
     DEPENDENT_PACKAGES = {package: version for package, version in DEPENDENT_PACKAGES.items() if package not in ["psutil", "Pillow", "timm"]}
@@ -137,6 +138,7 @@ def default_setup_args(*, version, submodule):
             "Programming Language :: Python :: 3.8",
             "Programming Language :: Python :: 3.9",
             "Programming Language :: Python :: 3.10",
+            "Programming Language :: Python :: 3.11",
             "Topic :: Software Development",
             "Topic :: Scientific/Engineering :: Artificial Intelligence",
             "Topic :: Scientific/Engineering :: Information Analysis",
