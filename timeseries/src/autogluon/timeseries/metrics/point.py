@@ -99,11 +99,7 @@ class MASE(TimeSeriesScorer):
         self._past_abs_seasonal_error: Optional[pd.Series] = None
 
     def save_past_metrics(
-        self,
-        data_past: TimeSeriesDataFrame,
-        target: str = "target",
-        seasonal_period: int = 1,
-        **kwargs,
+        self, data_past: TimeSeriesDataFrame, target: str = "target", seasonal_period: int = 1, **kwargs
     ) -> None:
         self._past_abs_seasonal_error = _in_sample_abs_seasonal_error(
             y_past=data_past[target], seasonal_period=seasonal_period
@@ -132,11 +128,7 @@ class RMSSE(TimeSeriesScorer):
         self._past_squared_seasonal_error: Optional[pd.Series] = None
 
     def save_past_metrics(
-        self,
-        data_past: TimeSeriesDataFrame,
-        target: str = "target",
-        seasonal_period: int = 1,
-        **kwargs,
+        self, data_past: TimeSeriesDataFrame, target: str = "target", seasonal_period: int = 1, **kwargs
     ) -> None:
         self._past_squared_seasonal_error = _in_sample_squared_seasonal_error(
             y_past=data_past[target], seasonal_period=seasonal_period
