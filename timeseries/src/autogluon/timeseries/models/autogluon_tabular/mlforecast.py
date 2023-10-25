@@ -174,7 +174,8 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             data = data.query("item_id in @items_to_keep")
 
         mlforecast_df = self._to_mlforecast_df(data, data.static_features)
-        df = self._mlf.preprocess(mlforecast_df, dropna=False)
+        # Unless we set static_features=[], MLForecast interprets all known covariates as static features
+        df = self._mlf.preprocess(mlforecast_df, dropna=False, static_features=[])
         # df.query results in 2x memory saving compared to df.dropna(subset="y")
         df = df.query("y.notnull()")
 
@@ -366,7 +367,7 @@ class DirectTabularModel(AbstractMLForecastModel):
         data_future[self.target] = float("inf")
         data_extended = pd.concat([data, data_future])
         mlforecast_df = self._to_mlforecast_df(data_extended, data.static_features)
-        df = self._mlf.preprocess(mlforecast_df, dropna=False)
+        df = self._mlf.preprocess(mlforecast_df, dropna=False, static_features=[])
         df = df.groupby(MLF_ITEMID, sort=False).tail(self.prediction_length)
         df = df.replace(float("inf"), float("nan"))
 
@@ -376,7 +377,7 @@ class DirectTabularModel(AbstractMLForecastModel):
 
         if hasattr(self._mlf.ts, "target_transforms"):
             # Ensure that transforms are fitted only on past data
-            self._mlf.preprocess(self._to_mlforecast_df(data, None))
+            self._mlf.preprocess(self._to_mlforecast_df(data, None), static_features=[])
             for tfm in self._mlf.ts.target_transforms[::-1]:
                 predictions = tfm.inverse_transform(predictions)
         predictions = predictions.rename(columns={MLF_ITEMID: ITEMID, MLF_TIMESTAMP: TIMESTAMP}).set_index(
@@ -405,12 +406,9 @@ class DirectTabularModel(AbstractMLForecastModel):
                 "eval_metric": "pinball_loss",
             }
         else:
-            tabular_metric = self.eval_metric.equivalent_tabular_regression_metric
-            if tabular_metric is None:
-                tabular_metric = "mean_absolute_error"
             return {
                 "problem_type": ag.constants.REGRESSION,
-                "eval_metric": tabular_metric,
+                "eval_metric": self.eval_metric.equivalent_tabular_regression_metric or "mean_absolute_error",
             }
 
 
@@ -470,15 +468,18 @@ class RecursiveTabularModel(AbstractMLForecastModel):
         from scipy.stats import norm
 
         new_df = self._to_mlforecast_df(data, data.static_features)
-        if known_covariates is not None:
-            dynamic_dfs = [self._to_mlforecast_df(known_covariates, data.static_features, include_target=False)]
-        else:
-            dynamic_dfs = None
+        if known_covariates is None:
+            future_index = get_forecast_horizon_index_ts_dataframe(data, self.prediction_length)
+            known_covariates = pd.DataFrame(columns=[self.target], index=future_index, dtype="float32")
+        X_df = self._to_mlforecast_df(known_covariates, data.static_features, include_target=False)
+        # If both covariates & static features are missing, set X_df = None to avoid exception from MLForecast
+        if len(X_df.columns.difference([MLF_ITEMID, MLF_TIMESTAMP])) == 0:
+            X_df = None
         with warning_filter():
             raw_predictions = self._mlf.predict(
                 h=self.prediction_length,
                 new_df=new_df,
-                dynamic_dfs=dynamic_dfs,
+                X_df=X_df,
             )
         predictions = raw_predictions.rename(columns={MLF_ITEMID: ITEMID, MLF_TIMESTAMP: TIMESTAMP})
 
@@ -495,10 +496,7 @@ class RecursiveTabularModel(AbstractMLForecastModel):
         return TimeSeriesDataFrame(predictions).reindex(data.item_ids, level=ITEMID)
 
     def _get_extra_tabular_init_kwargs(self) -> dict:
-        tabular_metric = self.eval_metric.equivalent_tabular_regression_metric
-        if tabular_metric is None:
-            tabular_metric = "mean_absolute_error"
         return {
             "problem_type": ag.constants.REGRESSION,
-            "eval_metric": tabular_metric,
+            "eval_metric": self.eval_metric.equivalent_tabular_regression_metric or "mean_absolute_error",
         }
