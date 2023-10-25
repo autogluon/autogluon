@@ -18,7 +18,8 @@ from autogluon.core.models import AbstractModel
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_json, save_pkl
-from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesEvaluator
+from autogluon.timeseries import TimeSeriesDataFrame
+from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.ensemble import AbstractTimeSeriesEnsembleModel, TimeSeriesGreedyEnsemble
 from autogluon.timeseries.models.presets import contains_searchspace
@@ -253,7 +254,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         self,
         path: str,
         prediction_length: Optional[int] = 1,
-        eval_metric: Optional[str] = None,
+        eval_metric: Union[str, TimeSeriesScorer, None] = None,
         eval_metric_seasonal_period: Optional[int] = None,
         save_data: bool = True,
         enable_ensemble: bool = True,
@@ -280,7 +281,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         # self.refit_single_full() and self.refit_full().
         self.model_full_dict = {}
 
-        self.eval_metric = TimeSeriesEvaluator.check_get_evaluation_metric(eval_metric)
+        self.eval_metric: TimeSeriesScorer = check_get_evaluation_metric(eval_metric)
         self.eval_metric_seasonal_period = eval_metric_seasonal_period
         if val_splitter is None:
             val_splitter = ExpandingWindowSplitter(prediction_length=self.prediction_length)
@@ -451,17 +452,12 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         logger.info(f"\tTrained {len(model_names_trained)} models while tuning {model.name}.")
 
         if len(model_names_trained) > 0:
-            if TimeSeriesEvaluator.METRIC_COEFFICIENTS[self.eval_metric] == -1:
-                sign_str = "-"
-            else:
-                sign_str = ""
-
             trained_model_results = [hpo_models[model_name] for model_name in model_names_trained]
             best_model_result = max(trained_model_results, key=lambda x: x["val_score"])
 
             logger.info(
                 f"\t{best_model_result['val_score']:<7.4f}".ljust(15)
-                + f"= Validation score ({sign_str}{self.eval_metric})"
+                + f"= Validation score ({self.eval_metric.name_with_sign})"
             )
             logger.info(f"\t{total_tuning_time:<7.2f} s".ljust(15) + "= Total tuning time")
             logger.debug(f"\tBest hyperparameter configuration: {best_model_result['hyperparameters']}")
@@ -520,11 +516,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         predict_time: Optional[float] = None,
     ):
         if val_score is not None:
-            if TimeSeriesEvaluator.METRIC_COEFFICIENTS[self.eval_metric] == -1:
-                sign_str = "-"
-            else:
-                sign_str = ""
-            logger.info(f"\t{val_score:<7.4f}".ljust(15) + f"= Validation score ({sign_str}{self.eval_metric})")
+            logger.info(f"\t{val_score:<7.4f}".ljust(15) + f"= Validation score ({self.eval_metric.name_with_sign})")
         if fit_time is not None:
             logger.info(f"\t{fit_time:<7.2f} s".ljust(15) + "= Training runtime")
         if predict_time is not None:
@@ -825,23 +817,23 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         self,
         data: TimeSeriesDataFrame,
         predictions: TimeSeriesDataFrame,
-        metric: Optional[str] = None,
+        metric: Union[str, TimeSeriesScorer, None] = None,
     ) -> float:
         """Compute the score measuring how well the predictions align with the data."""
-        eval_metric = self.eval_metric if metric is None else metric
-        evaluator = TimeSeriesEvaluator(
-            eval_metric=eval_metric,
-            eval_metric_seasonal_period=self.eval_metric_seasonal_period,
+        eval_metric = self.eval_metric if metric is None else check_get_evaluation_metric(metric)
+        return eval_metric.score(
+            data=data,
+            predictions=predictions,
             prediction_length=self.prediction_length,
-            target_column=self.target,
+            target=self.target,
+            seasonal_period=self.eval_metric_seasonal_period,
         )
-        return evaluator(data, predictions) * evaluator.coefficient
 
     def score(
         self,
         data: TimeSeriesDataFrame,
         model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
-        metric: Optional[str] = None,
+        metric: Union[str, TimeSeriesScorer, None] = None,
         use_cache: bool = True,
     ) -> float:
         past_data, known_covariates = data.get_model_inputs_for_scoring(
