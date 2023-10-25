@@ -11,11 +11,6 @@ from lightning.pytorch.callbacks import BasePredictionWriter
 
 from ..constants import BBOX, WEIGHT
 
-try:
-    import mmengine
-except ImportError as e:
-    mmengine = None
-
 logger = logging.getLogger(__name__)
 
 
