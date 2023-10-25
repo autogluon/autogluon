@@ -471,9 +471,12 @@ class RecursiveTabularModel(AbstractMLForecastModel):
         from scipy.stats import norm
 
         new_df = self._to_mlforecast_df(data, data.static_features)
-        if known_covariates is not None:
-            X_df = self._to_mlforecast_df(known_covariates, data.static_features, include_target=False)
-        else:
+        if known_covariates is None:
+            future_index = get_forecast_horizon_index_ts_dataframe(data, self.prediction_length)
+            known_covariates = pd.DataFrame(columns=[self.target], index=future_index, dtype="float32")
+        X_df = self._to_mlforecast_df(known_covariates, data.static_features, include_target=False)
+        # If both covariates & static features are missing, set X_df = None to avoid exception from MLForecast
+        if len(X_df.columns.difference([MLF_ITEMID, MLF_TIMESTAMP])) == 0:
             X_df = None
         with warning_filter():
             raw_predictions = self._mlf.predict(
