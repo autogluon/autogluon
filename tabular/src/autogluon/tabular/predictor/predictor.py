@@ -37,6 +37,7 @@ from autogluon.core.constants import (
     PSEUDO_MODEL_SUFFIX,
     QUANTILE,
     REGRESSION,
+    SOFTCLASS,
 )
 from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.dataset import TabularDataset
@@ -55,7 +56,7 @@ from autogluon.core.utils import (
 from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
-from autogluon.core.utils.utils import default_holdout_frac, generate_train_test_split_combined
+from autogluon.core.utils.utils import default_holdout_frac, generate_train_test_split_combined, CVSplitter
 
 from ..configs.feature_generator_presets import get_default_feature_generator
 from ..configs.hyperparameter_configs import get_hyperparameter_config
@@ -762,8 +763,8 @@ class TabularPredictor:
                 Allowed keys and values are:
                     `detection_time_frac` : float in (0,1)
                         Determines how much of the original training time is used for detecting stacked overfitting.
-                        If no time limit is given to AutoGluon, this parameter is ignored and AutoGluon uses holdout validation to detect stacked overfitting
-                        whereby AutoGluon is fit without a time limit in the sub-fit.
+                        If no time limit is given to AutoGluon, this parameter is ignored and AutoGluon is fit without a time limit in the sub-fit.
+                        When using (repeatd) cross-validation, each sub-fit will be fit for `1/n_splits * detection_time_frac * time_limit`.
                     `use_holdout` : bool
                         Whether to use holdout validation or not.
                     `holdout_frac` : float in (0,1)
@@ -1068,6 +1069,12 @@ class TabularPredictor:
                 "and enable or disable stacking as a consequence."
             )
             num_stack_levels, time_limit = self._dynamic_stacking(ag_fit_kwargs, ag_post_fix_kwargs, **ds_args)
+
+            if (time_limit is not None) and (time_limit <= 0):
+                raise ValueError(
+                    f"Not enough time left to train models for the full fit. Consider specifying a larger time_limit. Time remaining: {time_limit}s"
+                )
+
             ag_fit_kwargs["num_stack_levels"] = num_stack_levels
             ag_fit_kwargs["time_limit"] = time_limit
 
@@ -1106,6 +1113,7 @@ class TabularPredictor:
         time_start = time.time()
         org_time_limit = ag_fit_kwargs["time_limit"]
         org_num_stack_levels = ag_fit_kwargs["num_stack_levels"]
+        ds_fit_context = self._learner.org_path_context + "/ds_sub_fit"
         logger.info(
             "Detecting stacked overfitting by sub-fitting AutoGluon on the input data. "
             "That is, copies of AutoGluon will be sub-fit on subset(s) of the data. "
@@ -1113,7 +1121,7 @@ class TabularPredictor:
         )
 
         if org_time_limit is not None:
-            logger.info(f"Sub-fit time limit is: {org_time_limit} seconds.")
+            logger.info(f"Sub-fit(s) time limit is: {org_time_limit} seconds.")
             time_limit = int(org_time_limit * detection_time_frac)
         else:
             logger.info(f"No time limit provided.")
@@ -1127,21 +1135,68 @@ class TabularPredictor:
         inner_ag_fit_kwargs["X_val"] = X_val
         inner_ag_fit_kwargs["X_unlabeled"] = X_unlabeled
 
+        # Verify problem type is set
+        if self.problem_type is None:
+            self._learner.problem_type = self._learner.infer_problem_type(y=X[self.label], silent=True)
+
+        ds_fit_kwargs = dict(
+            clean_up_fits=clean_up_fits,
+            memory_safe_fits=memory_safe_fits,
+        )
+
         # -- Validation Method
         if use_holdout:
-            ds_fit_kwargs = dict(
-                ds_fit_context=self._learner.org_path_context + "/ds_sub_fits",
-                clean_up_fits=clean_up_fits,
-                memory_safe_fits=memory_safe_fits,
-                holdout_frac=holdout_frac,
+            ds_fit_kwargs.update(
+                dict(
+                    holdout_frac=holdout_frac,
+                    ds_fit_context=ds_fit_context + "/sub_fit_ho",
+                )
             )
             logger.info(f"Starting holdout-based sub-fit for dynamic stacking. Context path is: {ds_fit_kwargs['ds_fit_context']}.")
             stacked_overfitting = self._sub_fit_memory_save_wrapper(X, time_limit, ds_fit_kwargs, inner_ag_fit_kwargs, ag_post_fix_kwargs)
         else:
-            # TODO:
-            #   support repeated cross val
-            #   support custom val data
-            raise NotImplementedError("TODO")
+            # TODO: support custom val data
+
+            # Holdout is false, use (repeated) cross-validation
+            is_stratified = self.problem_type in [REGRESSION, QUANTILE, SOFTCLASS]
+            self._learner._validate_groups(X, X_val)  # Validate splits before splitting
+            splits = CVSplitter(n_splits=n_folds, n_repeats=n_repeats, groups=self._learner.groups, stratified=is_stratified, random_state=42).split(
+                X=X.drop(self.label, axis=1), y=X[self.label]
+            )
+            n_splits = len(splits)
+            logger.info(
+                f"Starting (repeated-)cross-validation-based sub-fits for dynamic stacking. Context path is: {ds_fit_context}. "
+                f"Run at most {n_splits} sub-fits based on {n_repeats}-repeated {n_folds}-fold cross-validation."
+            )
+            np.random.RandomState(42).shuffle(splits)  # shuffle splits to mix up order such that if only one of the repeats shows leakage we might stop early.
+            for split_index, (train_indices, val_indices) in enumerate(splits):
+                if time_limit is None:
+                    sub_fit_time = None
+                else:
+                    time_spend_sub_fits_so_far = int(time.time() - time_start)
+                    rest_time = time_limit - time_spend_sub_fits_so_far
+                    sub_fit_time = 1 / (n_splits - split_index) * rest_time  # if we are faster, give more time to rest of the folds.
+                    if sub_fit_time <= 0:
+                        logger.info(f"Stop cross-validation during dynamic stacking early as no more time left. Consider specifying a larger time_limit.")
+                        break
+                ds_fit_kwargs.update(
+                    dict(
+                        train_indices=train_indices,
+                        val_indices=val_indices,
+                        ds_fit_context=ds_fit_context + f"/sub_fit_{split_index}",
+                    )
+                )
+                logger.info(
+                    f"Starting sub-fit {split_index + 1}. Time limit for the sub-fit of this split is: {'unlimited' if sub_fit_time is None else sub_fit_time}."
+                )
+                stacked_overfitting = self._sub_fit_memory_save_wrapper(X, sub_fit_time, ds_fit_kwargs, inner_ag_fit_kwargs, ag_post_fix_kwargs)
+                if stacked_overfitting:
+                    break
+
+            del splits
+
+        if clean_up_fits:
+            shutil.rmtree(ds_fit_context)
 
         # -- Determine rest time and new num_stack_levels
         time_spend_sub_fits = int(time.time() - time_start)
@@ -4133,9 +4188,9 @@ class TabularPredictor:
         for arg_name in ["detection_time_frac", "holdout_frac"]:
             if (arg_name in ds_args) and ((not isinstance(ds_args[arg_name], float)) or (ds_args[arg_name] >= 1) or (ds_args[arg_name] <= 0)):
                 raise ValueError(f"`{arg_name}` in `ds_args` must be float in (0,1).  Got: {type(ds_args[arg_name])}, {ds_args[arg_name]}")
-        if ("n_folds" in ds_args) and ((not isinstance(ds_args["n_folds"], int)) or (ds_args["n_folds"] >= 2)):
+        if ("n_folds" in ds_args) and ((not isinstance(ds_args["n_folds"], int)) or (ds_args["n_folds"] < 2)):
             raise ValueError(f"`n_folds` in `ds_args` must be int in [2, +inf).  Got: {type(ds_args['n_folds'])}, {ds_args['n_folds']}")
-        if ("n_repeats" in ds_args) and ((not isinstance(ds_args["n_repeats"], int)) or (ds_args["n_repeats"] >= 1)):
+        if ("n_repeats" in ds_args) and ((not isinstance(ds_args["n_repeats"], int)) or (ds_args["n_repeats"] < 1)):
             raise ValueError(f"`n_repeats` in `ds_args` must be int in [1, +inf).  Got: {type(ds_args['n_repeats'])}, {ds_args['n_repeats']}")
 
         return kwargs_sanitized
@@ -4493,14 +4548,19 @@ class _TabularPredictorExperimental(TabularPredictor):
 
 def _sub_fit(self, train_data, time_limit, ds_fit_kwargs, ag_fit_kwargs, ag_post_fix_kwargs, val_data=None):
     holdout_frac = ds_fit_kwargs.get("holdout_frac", None)
+    train_indices = ds_fit_kwargs.get("train_indices", None)
     if holdout_frac is not None:
         train_data, val_data = generate_train_test_split_combined(
             train_data,
             label=self.label,
-            problem_type=self._learner.infer_problem_type(y=train_data[self.label], silent=True),
+            problem_type=self.problem_type,
             test_size=holdout_frac,
             random_state=42,
         )
+    elif train_indices is not None:
+        val_indices = ds_fit_kwargs.get("val_indices", None)
+        val_data = train_data.iloc[val_indices]
+        train_data = train_data.iloc[train_indices]
     else:
         raise NotImplementedError("TODO")
 
@@ -4510,28 +4570,32 @@ def _sub_fit(self, train_data, time_limit, ds_fit_kwargs, ag_fit_kwargs, ag_post
     ag_fit_kwargs["X"] = train_data
     ag_fit_kwargs["time_limit"] = time_limit
     ds_fit_context = ds_fit_kwargs.get("ds_fit_context")
-    clean_up_sub_fit = ds_fit_kwargs.get("clean_up_fits")
+    clean_up_fits = ds_fit_kwargs.get("clean_up_fits")
 
     self._learner.set_contexts(ds_fit_context)
     self._fit(ag_fit_kwargs, ag_post_fix_kwargs)
 
-    # Determine stacked overfitting
-    ho_leaderboard = self.leaderboard(val_data, silent=True).reset_index(drop=True).sort_values(by="score_val")
-    stacked_overfitting = check_stacked_overfitting_from_leaderboard(ho_leaderboard)
-    logger.info("Leaderboard on holdout data from dynamic stacking:")
-    with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):
-        logger.info(
-            ho_leaderboard.rename(
-                # Rename to avoid confusion for the user
-                {"score_test": "score_val_holdout", "score_val": "score_val_oof"}
+    if not self.get_model_names():
+        logger.info(f"Unable to determine stacked overfitting. AutoGluon's sub-fit did not successfully train any models!")
+        stacked_overfitting = False
+    else:
+        # Determine stacked overfitting
+        ho_leaderboard = self.leaderboard(val_data, silent=True).reset_index(drop=True).sort_values(by="score_val")
+        stacked_overfitting = check_stacked_overfitting_from_leaderboard(ho_leaderboard)
+        logger.info("Leaderboard on holdout data from dynamic stacking:")
+        with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):
+            logger.info(
+                ho_leaderboard.rename(
+                    # Rename to avoid confusion for the user
+                    {"score_test": "score_val_holdout", "score_val": "score_val_oof"}
+                )
             )
-        )
-    logger.info(f"Stacked overfitting occurred: {stacked_overfitting}.")
 
+    logger.info(f"Stacked overfitting occurred: {stacked_overfitting}.")
     del self._learner
     self._learner = org_learner
 
-    if clean_up_sub_fit:
+    if clean_up_fits:
         shutil.rmtree(ds_fit_context)
     else:
         self._sub_fits.append(ds_fit_context)
