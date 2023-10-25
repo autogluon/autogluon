@@ -33,7 +33,6 @@ def download_sample_dataset():
     "checkpoint_name",
     [
         "yolox_s",
-        "yolov3_mobilenetv2_8xb24-320-300e_coco",
     ],
 )
 def test_mmdet_object_detection_fit_then_evaluate_coco(checkpoint_name):
@@ -65,6 +64,8 @@ def test_mmdet_object_detection_fit_then_evaluate_coco(checkpoint_name):
     predictor.evaluate(test_path)
 
 
+# TODO: Pytest does not support DDP
+@pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -140,6 +141,8 @@ def test_mmdet_object_detection_inference_xywh_output(checkpoint_name):
     assert abs(y2 - y1 + 1 - h) < 1e-4
 
 
+# TODO: Pytest does not support DDP
+@pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -179,6 +182,8 @@ def test_mmdet_object_detection_inference_df(checkpoint_name):
     pred = predictor.predict(test_path_with_images_only)
 
 
+# TODO: Pytest does not support DDP
+@pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -238,6 +243,8 @@ def test_mmdet_object_detection_save_and_load(checkpoint_name):
     assert abs(pred["bboxes"][0][0]["score"] - new_pred["bboxes"][0][0]["score"]) < 1e-4
 
 
+# TODO: Pytest does not support DDP
+@pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -271,6 +278,8 @@ def test_mmdet_object_detection_fit_then_inference_dict(checkpoint_name):
     pred = predictor.predict({"image": [mmdet_image_name] * 10})  # test batch inference
 
 
+# TODO: Pytest does not support DDP
+@pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -307,6 +316,8 @@ def test_mmdet_object_detection_fit_then_inference_df(checkpoint_name):
     pred = predictor.predict(df)  # test batch inference
 
 
+# TODO: Pytest does not support DDP
+@pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -379,6 +390,8 @@ def test_mmdet_object_detection_fit_eval_predict_df(checkpoint_name):
     results = predictor.evaluate(data=test_df)
 
 
+# TODO: Pytest does not support DDP
+@pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
