@@ -13,14 +13,13 @@ from ..constants import (
     AUTOMM,
     CATEGORICAL,
     CATEGORICAL_MLP,
-    CATEGORICAL_TRANSFORMER,
     CLIP,
     DOCUMENT,
     DOCUMENT_TRANSFORMER,
+    FT_TRANSFORMER,
     FUSION_MLP,
     FUSION_NER,
     FUSION_TRANSFORMER,
-    FT_TRANSFORMER,
     HF_TEXT,
     IMAGE,
     MMDET_IMAGE,
@@ -30,7 +29,6 @@ from ..constants import (
     NER_TEXT,
     NUMERICAL,
     NUMERICAL_MLP,
-    NUMERICAL_TRANSFORMER,
     OVD,
     T_FEW,
     TEXT,
@@ -41,9 +39,9 @@ from ..constants import (
 from ..data import MultiModalFeaturePreprocessor
 from ..models import (
     CategoricalMLP,
-    CategoricalTransformer,
     CLIPForImageText,
     DocumentTransformer,
+    FT_Transformer,
     HFAutoModelForNER,
     HFAutoModelForTextPrediction,
     MMDetAutoModelForObjectDetection,
@@ -53,11 +51,9 @@ from ..models import (
     MultimodalFusionNER,
     MultimodalFusionTransformer,
     NumericalMLP,
-    NumericalTransformer,
     OVDModel,
     TFewModel,
     TimmAutoModelForImagePrediction,
-    FT_Transformer_refactor,
 )
 from ..models.utils import inject_adaptation_to_linear_layer
 
@@ -116,7 +112,7 @@ def select_model(
     fusion_model_name = []
     for model_name in names:
         model_config = getattr(config.model, model_name)
-        strict = getattr(model_config, "select_model_strict", True)
+        strict = getattr(model_config, "requires_all_dtypes", True)
         if not model_config.data_types:
             fusion_model_name.append(model_name)
             continue
@@ -248,29 +244,6 @@ def create_model(
             embedding_arch=OmegaConf.select(model_config, "embedding_arch"),
             num_classes=num_classes,
         )
-    elif model_name.lower().startswith(NUMERICAL_TRANSFORMER):
-        model = NumericalTransformer(
-            prefix=model_name,
-            in_features=num_numerical_columns,
-            out_features=model_config.out_features,
-            d_token=model_config.d_token,
-            n_blocks=model_config.num_trans_blocks,
-            attention_n_heads=model_config.num_attn_heads,
-            attention_dropout=model_config.attention_dropout,
-            residual_dropout=model_config.residual_dropout,
-            ffn_dropout=model_config.ffn_dropout,
-            attention_normalization=model_config.normalization,
-            ffn_normalization=model_config.normalization,
-            head_normalization=model_config.normalization,
-            ffn_activation=model_config.ffn_activation,
-            head_activation=model_config.head_activation,
-            cls_token=False,
-            embedding_arch=model_config.embedding_arch,
-            num_classes=num_classes,
-            ffn_d_hidden=OmegaConf.select(model_config, "ffn_d_hidden", default=192),
-            additive_attention=OmegaConf.select(model_config, "additive_attention", default=False),
-            share_qv_weights=OmegaConf.select(model_config, "share_qv_weights", default=False),
-        )
     elif model_name.lower().startswith(CATEGORICAL_MLP):
         model = CategoricalMLP(
             prefix=model_name,
@@ -281,28 +254,6 @@ def create_model(
             dropout_prob=model_config.drop_rate,
             normalization=model_config.normalization,
             num_classes=num_classes,
-        )
-    elif model_name.lower().startswith(CATEGORICAL_TRANSFORMER):
-        model = CategoricalTransformer(
-            prefix=model_name,
-            num_categories=num_categories,
-            out_features=model_config.out_features,
-            d_token=model_config.d_token,
-            n_blocks=model_config.num_trans_blocks,
-            attention_n_heads=model_config.num_attn_heads,
-            attention_dropout=model_config.attention_dropout,
-            residual_dropout=model_config.residual_dropout,
-            ffn_dropout=model_config.ffn_dropout,
-            attention_normalization=model_config.normalization,
-            ffn_normalization=model_config.normalization,
-            head_normalization=model_config.normalization,
-            ffn_activation=model_config.ffn_activation,
-            head_activation=model_config.head_activation,
-            ffn_d_hidden=OmegaConf.select(model_config, "ffn_d_hidden", default=192),
-            num_classes=num_classes,
-            cls_token=False,
-            additive_attention=OmegaConf.select(model_config, "additive_attention", default=False),
-            share_qv_weights=OmegaConf.select(model_config, "share_qv_weights", default=False),
         )
     elif model_name.lower().startswith(DOCUMENT_TRANSFORMER):
         model = DocumentTransformer(
@@ -398,7 +349,7 @@ def create_model(
             share_qv_weights=OmegaConf.select(model_config, "share_qv_weights", default=False),
         )
     elif model_name.lower().startswith(FT_TRANSFORMER):
-        model = FT_Transformer_refactor(
+        model = FT_Transformer(
             prefix=model_name,
             num_numerical_columns=num_numerical_columns,
             num_categories=num_categories,
@@ -502,7 +453,7 @@ def create_fusion_model(
         # must have one fusion model if there are multiple independent models
         return fusion_model(models=single_models)
     elif len(single_models) == 1:
-            return single_models[0]
+        return single_models[0]
     else:
         raise ValueError(f"No available models for {names}")
 
