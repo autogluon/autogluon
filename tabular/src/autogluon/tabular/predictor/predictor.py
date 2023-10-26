@@ -1186,7 +1186,7 @@ class TabularPredictor:
                 else:
                     time_spend_sub_fits_so_far = int(time.time() - time_start)
                     rest_time = time_limit - time_spend_sub_fits_so_far
-                    sub_fit_time = 1 / (n_splits - split_index) * rest_time  # if we are faster, give more time to rest of the folds.
+                    sub_fit_time = int(1 / (n_splits - split_index) * rest_time)  # if we are faster, give more time to rest of the folds.
                     if sub_fit_time <= 0:
                         logger.info(f"Stop cross-validation during dynamic stacking early as no more time left. Consider specifying a larger time_limit.")
                         break
@@ -1215,7 +1215,7 @@ class TabularPredictor:
         if org_time_limit is None:
             time_limit_fit_full = None
         else:
-            time_limit_fit_full = org_time_limit - time_spend_sub_fits
+            time_limit_fit_full = int(org_time_limit - time_spend_sub_fits)
             logger.info(f"Time left for full fit of AutoGluon: {time_limit_fit_full} seconds.")
 
         num_stack_levels = 0 if stacked_overfitting else org_num_stack_levels
