@@ -1,14 +1,13 @@
 import os
 from typing import Dict, List, Optional, Union
 
-import numpy as np
 import pandas as pd
 from torch import nn
 from datetime import timedelta
 import logging
 
-from ..constants import BBOX, MULTI_IMAGE_MIX_DATASET, OBJECT_DETECTION, XYWH, MAP
-from ..data import BaseDataModule, MultiModalFeaturePreprocessor, MultiImageMixDataset
+from ..constants import BBOX, MULTI_IMAGE_MIX_DATASET, OBJECT_DETECTION, XYWH, MAP, OPEN_VOCABULARY_OBJECT_DETECTION, OVD_RET
+from ..data import BaseDataModule, MultiModalFeaturePreprocessor, MultiImageMixDataset, infer_rois_column_type
 from ..optimization import MMDetLitModule
 from ..utils import (
     convert_pred_to_xywh,
@@ -23,12 +22,16 @@ from ..utils import (
     create_fusion_model,
     compute_num_gpus,
     infer_precision,
+    predict,
+    extract_from_output,
+    save_ovd_result_df,
 )
 from .base import BaseLearner
 logger = logging.getLogger(__name__)
 
 
 class ObjectDetectionLearner(BaseLearner):
+
     def __init__(
         self,
         label: Optional[str] = None,
@@ -107,12 +110,6 @@ class ObjectDetectionLearner(BaseLearner):
     def infer_output_shape(self, **kwargs):
         # TODO: support inferring output during fit()?
         assert self._output_shape is not None, f"output_shape should have been set in the learner initialization."
-
-    def on_predict_end(self, pred_writer, outputs):
-        if pred_writer is None:
-            # TODO: remove this by adjusting the return of mmdet_image or lit_mmdet.
-            outputs = [output for batch_outputs in outputs for output in batch_outputs]
-        return outputs
 
     def fit(
         self,
@@ -338,24 +335,84 @@ class ObjectDetectionLearner(BaseLearner):
         )
 
     def _on_predict_start(
-            self,
-            data: Union[pd.DataFrame, dict, list],
-            requires_label: bool,
+        self,
+        data: Union[pd.DataFrame, dict, list],
+        requires_label: bool,
     ):
         data = self.data_to_df(data=data)
-        column_types = self.infer_column_types(column_types=self._column_types, data=data, is_train=False)
+        column_types = self.infer_column_types(
+            column_types=self._column_types,
+            data=data,
+            is_train=False,
+        )
         column_types = infer_rois_column_type(
             column_types=column_types,
             data=data,
         )
-        df_preprocessor = self.get_df_preprocessor_per_run(df_preprocessor=self._df_preprocessor, data=data,
-                                                           column_types=column_types, is_train=False)
+        df_preprocessor = self.get_df_preprocessor_per_run(
+            df_preprocessor=self._df_preprocessor,
+            data=data,
+            column_types=column_types,
+            is_train=False,
+        )
         if self._fit_called:
             df_preprocessor._column_types = self.update_image_column_types(data=data)
-        data_processors = self.get_data_processors_per_run(data_processors=self._data_processors,
-                                                           requires_label=requires_label, is_train=False)
+        data_processors = self.get_data_processors_per_run(
+            data_processors=self._data_processors,
+            requires_label=requires_label,
+            is_train=False,
+        )
 
         return data, df_preprocessor, data_processors
+
+    def _default_predict(
+        self,
+        data: pd.DataFrame,
+        df_preprocessor: MultiModalFeaturePreprocessor,
+        data_processors: Dict,
+        num_gpus: int,
+        precision: Union[int, str],
+        batch_size: int,
+        strategy: str,
+        barebones: Optional[bool] = False,
+    ) -> List[Dict]:
+        datamodule = self.get_datamodule_per_run(
+            df_preprocessor=df_preprocessor,
+            data_processors=data_processors,
+            per_gpu_batch_size=batch_size,
+            num_workers=self._config.env.num_workers_evaluation,
+            predict_data=data,
+        )
+        pred_writer = self.get_pred_writer(strategy=strategy)
+        callbacks = self.get_callbacks_per_run(pred_writer=pred_writer, is_train=False)
+        task = self.build_task_per_run(is_train=False)
+        trainer = self.init_trainer_per_run(
+            num_gpus=num_gpus,
+            precision=precision,
+            strategy=strategy,
+            callbacks=callbacks,
+            barebones=barebones,
+            is_train=False,
+        )
+        outputs = self.run_trainer(
+            trainer=trainer,
+            task=task,
+            datamodule=datamodule,
+            pred_writer=pred_writer,
+        )
+        outputs = self.collect_predictions(
+            outputs=outputs,
+            trainer=trainer,
+            pred_writer=pred_writer,
+            num_gpus=num_gpus,
+        )
+        self.clean_trainer_processes(trainer=trainer)
+
+        # TODO: remove this by adjusting the return format of mmdet_image or lit_mmdet.
+        if pred_writer is None:
+            outputs = [output for batch_outputs in outputs for output in batch_outputs]
+
+        return outputs
 
     def evaluate(
         self,
@@ -367,9 +424,9 @@ class ObjectDetectionLearner(BaseLearner):
     ):
         """
         """
-        self._ensure_inference_ready()
+        self.ensure_inference_ready()
         if self._problem_type == OPEN_VOCABULARY_OBJECT_DETECTION:
-            raise RuntimeError("Open vocabulary object detection doesn't support doing evaluation yet.")
+            raise NotImplementedError("Open vocabulary object detection doesn't support calling `evaluate` yet.")
 
         if realtime:
             return NotImplementedError(
@@ -421,13 +478,13 @@ class ObjectDetectionLearner(BaseLearner):
         -------
         Array of predictions, one corresponding to each row in given dataset.
         """
-        self._ensure_inference_ready()
+        self.ensure_inference_ready()
+        ret_type = BBOX
         if self._problem_type == OBJECT_DETECTION:
             data = object_detection_data_to_df(data)
-        if self._label_column not in data:
-            self._label_column = None
-        ret_type = BBOX
-        if self._problem_type == OPEN_VOCABULARY_OBJECT_DETECTION:
+            if self._label_column not in data:
+                self._label_column = None
+        elif self._problem_type == OPEN_VOCABULARY_OBJECT_DETECTION:
             ret_type = OVD_RET
 
         outputs = predict(
@@ -436,48 +493,29 @@ class ObjectDetectionLearner(BaseLearner):
             requires_label=False,
             realtime=realtime,
         )
-        logits = extract_from_output(outputs=outputs, ret_type=ret_type)
-        if self._df_preprocessor:
-            if ret_type == BBOX:
-                pred = logits
-            else:
-                pred = self._df_preprocessor.transform_prediction(
-                    y_pred=logits,
-                )
-        else:
-            if isinstance(logits, (torch.Tensor, np.ndarray)) and logits.ndim == 2:
-                pred = logits.argmax(axis=1)
-            else:
-                pred = logits
-
+        pred = extract_from_output(outputs=outputs, ret_type=ret_type)
         if self._problem_type == OBJECT_DETECTION:
             if self._model.output_bbox_format == XYWH:
                 pred = convert_pred_to_xywh(pred)
 
-        if save_results:
-            ## Dumping Result for detection only now
-            assert (
-                self._problem_type == OBJECT_DETECTION
-            ), "Aborting: save results only works for object detection now."
-
+        if save_results and self._problem_type == OBJECT_DETECTION:
             self._save_path = setup_save_path(
                 old_save_path=self._save_path,
                 warn_if_exist=False,
             )
-
-            result_path = os.path.join(self._save_path, "result.txt")
-
             save_result_df(
                 pred=pred,
                 data=data,
                 detection_classes=self._model.model.CLASSES,
-                result_path=result_path,
+                result_path=os.path.join(self._save_path, "result.txt"),
             )
 
         if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
             if (
                 self._problem_type == OBJECT_DETECTION
             ):  # TODO: add prediction output in COCO format if as_pandas is False
+                #TODO: calling save_result_df to convert data to dataframe is not a good logic
+                #TODO: consider combining this with the above saving logic or using a different function.
                 pred = save_result_df(
                     pred=pred,
                     data=data,
@@ -502,12 +540,16 @@ class ObjectDetectionLearner(BaseLearner):
         as_multiclass: Optional[bool] = True,
         realtime: Optional[bool] = None,
     ):
-        raise RuntimeError("Object detection doesn't support calling `predict_proba`.")
+        raise NotImplementedError("Object detection doesn't support calling `predict_proba` yet.")
 
     def extract_embedding(
             self,
+            data: Union[pd.DataFrame, dict, list],
+            as_tensor: Optional[bool] = False,
+            as_pandas: Optional[bool] = False,
+            realtime: Optional[bool] = None,
     ):
-        raise RuntimeError("Object detection doesn't support calling `extract_embedding`.")
+        raise NotImplementedError("Object detection doesn't support calling `extract_embedding` yet.")
 
     @staticmethod
     def _load_metadata(
@@ -516,6 +558,6 @@ class ObjectDetectionLearner(BaseLearner):
         resume: Optional[bool] = False,
         verbosity: Optional[int] = 3,
     ):
-        learner = super()._load_metadata(learner=learner, path=path, resume=resume, verbosity=verbosity)
+        learner = BaseLearner._load_metadata(learner=learner, path=path, resume=resume, verbosity=verbosity)
         learner._data_processors = None
         return learner

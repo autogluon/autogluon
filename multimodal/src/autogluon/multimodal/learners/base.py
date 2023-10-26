@@ -347,7 +347,7 @@ class BaseLearner(ExportMixin):
         )
         return model_size * 1e-6  # convert to megabytes
 
-    def ensure_fitting_ready(self):
+    def ensure_fit_ready(self):
         if self._problem_type and not self.problem_property.support_fit:
             raise RuntimeError(
                 f"The problem_type='{self._problem_type}' does not support `learner.fit()`. "
@@ -562,7 +562,7 @@ class BaseLearner(ExportMixin):
             self.update_attributes(**attributes)
 
     def on_fit_start(self):
-        self.ensure_fitting_ready()
+        self.ensure_fit_ready()
         training_start = time.time()
         return training_start
 
@@ -1513,7 +1513,12 @@ class BaseLearner(ExportMixin):
             datamodule=datamodule,
             pred_writer=pred_writer,
         )
-        outputs = self.collect_predictions(outputs=outputs, trainer=trainer, pred_writer=pred_writer, num_gpus=num_gpus)
+        outputs = self.collect_predictions(
+            outputs=outputs,
+            trainer=trainer,
+            pred_writer=pred_writer,
+            num_gpus=num_gpus,
+        )
         self.clean_trainer_processes(trainer=trainer)
 
         return outputs
