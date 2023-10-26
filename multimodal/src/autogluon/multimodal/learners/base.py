@@ -398,7 +398,6 @@ class BaseLearner(ExportMixin):
         else:
             return column_types
 
-
     def infer_output_shape(self):
         if self._fit_called:
             return
@@ -659,7 +658,6 @@ class BaseLearner(ExportMixin):
             presets=self._presets,
             config=config,
             overrides=hyperparameters,  # don't use self._hyperparameters due to HPO.
-            extra=[DISTILLER] if self._teacher_learner is not None else None,
         )
         config = update_config_by_rules(
             problem_type=self._problem_type,
@@ -847,13 +845,15 @@ class BaseLearner(ExportMixin):
             validation_metric=validation_metric,
             validation_metric_name=self._validation_metric_name,
             custom_metric_func=custom_metric_func,
+            efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
+            mixup_off_epoch=OmegaConf.select(config, "data.mixup.turn_off_epoch"),
+            skip_final_val=OmegaConf.select(config, "optimization.skip_final_val", default=False),
         )
 
     def build_task_per_run(
             self,
             model=None,
             loss_func=None,
-            config=None,
             mixup_func=None,
             model_postprocess_fn=None,
             peft_param_names=None,
@@ -864,20 +864,15 @@ class BaseLearner(ExportMixin):
             return LitModule(
                 model=model,
                 loss_func=loss_func,
-                efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
                 mixup_fn=mixup_func,
-                mixup_off_epoch=OmegaConf.select(config, "data.mixup.turn_off_epoch"),
                 model_postprocess_fn=model_postprocess_fn,
                 trainable_param_names=peft_param_names,
-                skip_final_val=OmegaConf.select(config, "optimization.skip_final_val", default=False),
                 **optimization_kwargs,
             )
         else:
             return LitModule(
                 model=self._model,
                 model_postprocess_fn=self._model_postprocess_fn,
-                efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
-                trainable_param_names=peft_param_names,
                 **optimization_kwargs,
             )
 
@@ -1119,15 +1114,15 @@ class BaseLearner(ExportMixin):
         logger.info(get_fit_start_message(save_path, self._validation_metric_name))
 
     def on_fit_per_run_end(
-            self,
-            trainer,
-            model,
-            save_path,
-            config,
-            strategy,
-            standalone,
-            clean_ckpts,
-            peft_param_names=None,
+        self,
+        trainer,
+        model,
+        save_path,
+        config,
+        strategy,
+        standalone,
+        clean_ckpts,
+        peft_param_names=None,
     ):
         if trainer.global_rank == 0:
             # We do not perform averaging checkpoint in the case of hpo for each trial
@@ -1213,7 +1208,6 @@ class BaseLearner(ExportMixin):
         task = self.build_task_per_run(
             model=model,
             loss_func=loss_func,
-            config=config,
             mixup_func=mixup_func,
             model_postprocess_fn=model_postprocess_fn,
             peft_param_names=peft_param_names,
@@ -1436,11 +1430,6 @@ class BaseLearner(ExportMixin):
                 allgather_bucket_size=self._config.env.deepspeed_allgather_size,
                 reduce_bucket_size=self._config.env.deepspeed_allreduce_size,
             )
-            norm_param_names = get_norm_layer_param_names(self._model)
-            peft_param_names = get_trainable_params_efficient_finetune(
-                norm_param_names,
-                efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
-            )
 
             optimization_kwargs = dict(
                 optim_type=self._config.optimization.optim_type,
@@ -1455,9 +1444,8 @@ class BaseLearner(ExportMixin):
             )
         else:
             optimization_kwargs = {}
-            peft_param_names = []
 
-        return strategy, optimization_kwargs, peft_param_names
+        return strategy, optimization_kwargs
 
     def get_pred_writer(self, strategy):
         pred_writer = None
@@ -1487,7 +1475,7 @@ class BaseLearner(ExportMixin):
         strategy: str,
         barebones: Optional[bool] = False,
     ) -> List[Dict]:
-        strategy, optimization_kwargs, peft_param_names = self.prepare_for_deepspeed_offloading(strategy=strategy)
+        strategy, optimization_kwargs = self.prepare_for_deepspeed_offloading(strategy=strategy)
         datamodule = self.get_datamodule_per_run(
             df_preprocessor=df_preprocessor,
             data_processors=data_processors,

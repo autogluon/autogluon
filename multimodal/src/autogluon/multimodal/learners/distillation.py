@@ -45,38 +45,6 @@ class DistillationLearner(BaseLearner):
             pretrained=pretrained,
         )
 
-    def _get_lightning_module(
-        self,
-        trainable_param_names: List[str],
-        mixup_fn: Optional[Mixup] = None,
-        loss_func: Optional[nn.Module] = None,
-        optimization_kwargs: Optional[dict] = None,
-        metrics_kwargs: Optional[dict] = None,
-        test_time: bool = False,
-        **kwargs,
-    ):
-        if test_time:
-            task = NerLitModule(
-                model=self._model,
-                model_postprocess_fn=self._model_postprocess_fn,
-                efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
-                trainable_param_names=trainable_param_names,
-                **optimization_kwargs,
-            )
-        else:
-            task = NerLitModule(
-                model=self._model,
-                loss_func=loss_func,
-                efficient_finetune=OmegaConf.select(self._config, "optimization.efficient_finetune"),
-                mixup_fn=mixup_fn,
-                mixup_off_epoch=OmegaConf.select(self._config, "data.mixup.turn_off_epoch"),
-                model_postprocess_fn=self._model_postprocess_fn,
-                trainable_param_names=trainable_param_names,
-                **metrics_kwargs,
-                **optimization_kwargs,
-            )
-        return task
-
     def _setup_distillation(
             self,
             teacher_learner: Union[str, BaseLearner],
@@ -250,6 +218,21 @@ class DistillationLearner(BaseLearner):
             self._best_score = trainer.callback_metrics[f"val_{self._validation_metric_name}"].item()
         else:
             sys.exit(f"Training finished, exit the process with global_rank={trainer.global_rank}...")
+
+    def get_config_per_run(self, config, hyperparameters):
+        config = get_config(
+            problem_type=self._problem_type,
+            presets=self._presets,
+            config=config,
+            overrides=hyperparameters,  # don't use self._hyperparameters due to HPO.
+            extra=[DISTILLER] if self._teacher_learner is not None else None,
+        )
+        config = update_config_by_rules(
+            problem_type=self._problem_type,
+            config=config,
+        )
+        config = self.update_strategy_by_env(config=config)
+        return config
 
     def fit_per_run(self):
         (

@@ -1,18 +1,21 @@
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Dict
 
 import pandas as pd
-import pytorch_lightning as pl
-from omegaconf import OmegaConf
-from timm.data.mixup import Mixup
+import sys
+import logging
+import warnings
+from datetime import timedelta
 from torch import nn
 
-from autogluon.core.utils.loaders import load_pd
+from autogluon.core.metrics import Scorer
 
-from ..constants import NER
-from ..optimization.lit_ner import NerLitModule
-from ..utils.model import create_fusion_model, select_model
-from ..utils.object_detection import setup_detection_train_tuning_data
-from .base_learner import BaseLearner
+from ..constants import NER, OVERALL_F1, NER_RET, Y_PRED, Y_TRUE
+from ..data import MultiModalFeaturePreprocessor
+from ..optimization import NerLitModule
+from ..utils import predict, extract_from_output, compute_num_gpus, infer_precision, compute_score, merge_bio_format
+from .base import BaseLearner
+
+logger = logging.getLogger(__name__)
 
 
 class NERLearner(BaseLearner):
@@ -30,7 +33,6 @@ class NERLearner(BaseLearner):
         enable_progress_bar: Optional[bool] = None,
         pretrained: Optional[bool] = True,
     ):
-        assert problem_type == NER, f"Expected problem_type={NER}, but problem_type={problem_type}"
         super().__init__(
             label=label,
             problem_type=problem_type,
@@ -45,10 +47,53 @@ class NERLearner(BaseLearner):
             pretrained=pretrained,
         )
 
+    def fit(
+        self,
+        train_data: Union[pd.DataFrame, str],
+        presets: Optional[str] = None,
+        config: Optional[Dict] = None,
+        tuning_data: Optional[Union[pd.DataFrame, str]] = None,
+        time_limit: Optional[int] = None,
+        save_path: Optional[str] = None,
+        hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
+        column_types: Optional[Dict] = None,
+        holdout_frac: Optional[float] = None,
+        teacher_learner: Union[str, BaseLearner] = None,
+        seed: Optional[int] = 0,
+        standalone: Optional[bool] = True,
+        hyperparameter_tune_kwargs: Optional[Dict] = None,
+        clean_ckpts: Optional[bool] = True,
+    ):
+        training_start = self.on_fit_start()
+        self.update_attributes(presets=presets, config=config, teacher_learner=teacher_learner)
+        self.setup_save_path(save_path=save_path)
+        self.prepare_for_train_tuning_data(
+            train_data=train_data,
+            tuning_data=tuning_data,
+            holdout_frac=holdout_frac,
+            seed=seed,
+        )
+        self.infer_column_types(column_types=column_types)
+        self.infer_validation_metric()
+        self.update_hyperparameters(
+            hyperparameters=hyperparameters,
+            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+        )
+        self.fit_sanity_check()
+        self.prepare_for_fit_args(
+            time_limit=time_limit,
+            seed=seed,
+            standalone=standalone,
+            clean_ckpts=clean_ckpts,
+        )
+        self.execute_fit()
+        self.on_fit_end(training_start=training_start)
+
+        return self
+
     def build_task_per_run(
         self,
         model,
-        config,
         peft_param_names: List[str],
         loss_func: Optional[nn.Module] = None,
         optimization_kwargs: Optional[dict] = None,
@@ -58,29 +103,35 @@ class NERLearner(BaseLearner):
             return NerLitModule(
                 model=model,
                 loss_func=loss_func,
-                efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
-                model_postprocess_fn=self._model_postprocess_fn,
                 trainable_param_names=peft_param_names,
                 **optimization_kwargs,
             )
         else:
-            return NerLitModule(
-                model=self._model,
-                model_postprocess_fn=self._model_postprocess_fn,
-            )
+            return NerLitModule(model=self._model)
 
-    def get_output_shape_per_run(self, df_preprocessor):
+    @staticmethod
+    def get_output_shape_per_run(df_preprocessor):
         # ner needs to update output_shape with label_generator.
         return len(df_preprocessor.label_generator.unique_entity_groups)
 
-    def on_fit_per_run_end(self, trainer, model, save_path, config, strategy, peft_param_names, standalone, clean_ckpts):
+    def on_fit_per_run_end(
+        self,
+        trainer,
+        model,
+        save_path,
+        config,
+        strategy,
+        standalone,
+        clean_ckpts,
+        peft_param_names=None,
+    ):
         if trainer.global_rank == 0:
             # We do not perform averaging checkpoint in the case of hpo for each trial
             # We only average the checkpoint of the best trial at the end in the master process.
             if not self._is_hpo:
-                self._top_k_average(
+                self.top_k_average(
                     model=model,
-                    validation_metric_name=OVERALL_F1,  # since we called self.evaluate. Below is a temporal fix for NER. seqeval only support overall_f1
+                    validation_metric_name=OVERALL_F1,  # because we call self.evaluate. Below is a temporal fix for NER. seqeval only support overall_f1
                     save_path=save_path,
                     top_k_average_method=config.optimization.top_k_average_method,
                     strategy=strategy,
@@ -94,36 +145,131 @@ class NERLearner(BaseLearner):
             sys.exit(f"Training finished, exit the process with global_rank={trainer.global_rank}...")
 
     def fit_per_run(
-            self,
-            validation_metric_name: str,
-            minmax_mode: str,
-            max_time: timedelta,
-            save_path: str,
-            ckpt_path: str,
-            resume: bool,
-            enable_progress_bar: bool,
-            seed: int,
-            hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
-            advanced_hyperparameters: Optional[Dict] = None,
-            config: Optional[Dict] = None,
-            df_preprocessor: Optional[MultiModalFeaturePreprocessor] = None,
-            data_processors: Optional[Dict] = None,
-            model: Optional[nn.Module] = None,
-            is_hpo: bool = False,
-            standalone: bool = True,
-            clean_ckpts: bool = True,
+        self,
+        max_time: timedelta,
+        save_path: str,
+        ckpt_path: str,
+        resume: bool,
+        enable_progress_bar: bool,
+        seed: int,
+        hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
+        advanced_hyperparameters: Optional[Dict] = None,
+        config: Optional[Dict] = None,
+        df_preprocessor: Optional[MultiModalFeaturePreprocessor] = None,
+        data_processors: Optional[Dict] = None,
+        model: Optional[nn.Module] = None,
+        standalone: bool = True,
+        clean_ckpts: bool = True,
     ):
-        pl.seed_everything(seed, workers=True)
-        # TODO(?) We should have a separate "_pre_training_event()" for logging messages.
-        logger.info(get_fit_start_message(save_path, validation_metric_name))
+        self.on_fit_per_run_start(seed=seed, save_path=save_path)
         config = self.get_config_per_run(config=config, hyperparameters=hyperparameters)
         df_preprocessor = self.get_df_preprocessor_per_run(
             df_preprocessor=df_preprocessor,
             config=config,
         )
         config = self.update_config_by_data_per_run(config=config, df_preprocessor=df_preprocessor)
-        output_shape = self.get_output_shape_per_run(df_preprocessor=df_preprocessor)
+        self._output_shape = self.get_output_shape_per_run(df_preprocessor=df_preprocessor)
         model = self.get_model_per_run(model=model, config=config, df_preprocessor=df_preprocessor)
+        model = self.compile_model_per_run(config=config, model=model)
+        peft_param_names = self.get_peft_param_names_per_run(model=model, config=config)
+        data_processors = self.get_data_processors_per_run(
+            data_processors=data_processors,
+            config=config,
+            model=model,
+            advanced_hyperparameters=advanced_hyperparameters,
+        )
+        validation_metric, custom_metric_func = self.get_validation_metric_per_run()
+        loss_func = self.get_loss_func_per_run(config=config)
+        if max_time == timedelta(seconds=0):
+            self.top_k_average(
+                model=model,
+                validation_metric_name=self._validation_metric_name,
+                save_path=save_path,
+                top_k_average_method=config.optimization.top_k_average_method,
+                strict_loading=not peft_param_names,
+                standalone=standalone,
+                clean_ckpts=clean_ckpts,
+            )
+
+            return self
+
+        datamodule = self.get_datamodule_per_run(
+            df_preprocessor=df_preprocessor,
+            data_processors=data_processors,
+            per_gpu_batch_size=config.env.per_gpu_batch_size,
+            num_workers=config.env.num_workers,
+        )
+        optimization_kwargs = self.get_optimization_kwargs_per_run(
+            config=config,
+            validation_metric=validation_metric,
+            custom_metric_func=custom_metric_func,
+        )
+        task = self.build_task_per_run(
+            model=model,
+            loss_func=loss_func,
+            peft_param_names=peft_param_names,
+            optimization_kwargs=optimization_kwargs,
+        )
+        callbacks = self.get_callbacks_per_run(save_path=save_path, config=config, task=task)
+        plugins = self.get_plugins_per_run(model=model, peft_param_names=peft_param_names)
+        tb_logger = self.get_tb_logger(save_path=save_path)
+        num_gpus = compute_num_gpus(config_num_gpus=config.env.num_gpus, strategy=config.env.strategy)
+        self.log_gpu_info(num_gpus=num_gpus, config=config)
+        precision = infer_precision(num_gpus=num_gpus, precision=config.env.precision)
+        grad_steps = self.get_grad_steps(num_gpus=num_gpus, config=config)
+        strategy = self.get_strategy_per_run(num_gpus=num_gpus, config=config)
+        strategy, num_gpus = self.update_strategy_and_num_gpus_for_hpo(strategy=strategy, num_gpus=num_gpus)
+        config = self.post_update_config_per_run(
+            config=config,
+            num_gpus=num_gpus,
+            precision=precision,
+            strategy=strategy,
+        )
+        # save artifacts for the current running, except for model checkpoint, which will be saved in trainer
+        self.save(
+            path=save_path,
+            standalone=standalone,
+            config=config,
+            df_preprocessor=df_preprocessor,
+            data_processors=data_processors,
+        )
+        trainer = self.init_trainer_per_run(
+            num_gpus=num_gpus,
+            config=config,
+            precision=precision,
+            strategy=strategy,
+            max_time=max_time,
+            callbacks=callbacks,
+            tb_logger=tb_logger,
+            grad_steps=grad_steps,
+            plugins=plugins,
+            enable_progress_bar=enable_progress_bar,
+        )
+
+        self.run_trainer(
+            trainer=trainer,
+            task=task,
+            datamodule=datamodule,
+            ckpt_path=ckpt_path,
+            resume=resume,
+        )
+        self.on_fit_per_run_end(
+            trainer=trainer,
+            model=model,
+            save_path=save_path,
+            config=config,
+            strategy=strategy,
+            peft_param_names=peft_param_names,
+            standalone=standalone,
+            clean_ckpts=clean_ckpts,
+        )
+
+        return dict(
+            config=config,
+            df_preprocessor=df_preprocessor,
+            data_processors=data_processors,
+            model=self._model,
+        )
 
     def evaluate(
         self,
@@ -135,15 +281,14 @@ class NERLearner(BaseLearner):
     ):
         """
         """
-        self._ensure_inference_ready()
-        ret_type = NER_RET
+        self.ensure_inference_ready()
         outputs = predict(
             predictor=self,
             data=data,
             requires_label=True,
             realtime=realtime,
         )
-        logits = extract_from_output(ret_type=ret_type, outputs=outputs)
+        logits = extract_from_output(ret_type=NER_RET, outputs=outputs)
         metric_data = {}
         y_pred = self._df_preprocessor.transform_prediction(
             y_pred=logits,
@@ -153,7 +298,10 @@ class NERLearner(BaseLearner):
             y_pred=logits,
             inverse_categorical=True,
         )
-        y_true = self._df_preprocessor.transform_label_for_metric(df=data, tokenizer=self._model.tokenizer)
+        y_true = self._df_preprocessor.transform_label_for_metric(
+            df=data,
+            tokenizer=self._model.tokenizer,
+        )
         metric_data.update(
             {
                 Y_PRED: y_pred,
@@ -183,7 +331,7 @@ class NERLearner(BaseLearner):
                 if per_metric.lower() in score:
                     results.update({per_metric: score[per_metric.lower()]})
                 else:
-                    logger.warning(f"Warning: {per_metric} is not a supported evaluation metric!")
+                    warnings.warning(f"Warning: {per_metric} is not a supported evaluation metric!")
             if not results:
                 results = score  # If the results dict is empty, return all scores.
 
@@ -193,11 +341,10 @@ class NERLearner(BaseLearner):
             return results
 
     def predict(
-            self,
-            data: Union[pd.DataFrame, dict, list, str],
-            as_pandas: Optional[bool] = None,
-            realtime: Optional[bool] = None,
-            save_results: Optional[bool] = None,
+        self,
+        data: Union[pd.DataFrame, dict, list, str],
+        as_pandas: Optional[bool] = None,
+        realtime: Optional[bool] = None,
     ):
         """
         Predict values for the label column of new data.
@@ -213,31 +360,25 @@ class NERLearner(BaseLearner):
             Whether to do realtime inference, which is efficient for small data (default None).
             If not specified, we would infer it on based on the data modalities
             and sample number.
-        save_results
-            Whether to save the prediction results (only works for detection now)
 
         Returns
         -------
         Array of predictions, one corresponding to each row in given dataset.
         """
-        self._ensure_inference_ready()
-        ret_type = NER_RET
+        self.ensure_inference_ready()
         outputs = predict(
             predictor=self,
             data=data,
             requires_label=False,
             realtime=realtime,
         )
-        logits = extract_from_output(outputs=outputs, ret_type=ret_type)
+        logits = extract_from_output(outputs=outputs, ret_type=NER_RET)
         if self._df_preprocessor:
             pred = self._df_preprocessor.transform_prediction(
                 y_pred=logits,
             )
         else:
-            if isinstance(logits, (torch.Tensor, np.ndarray)) and logits.ndim == 2:
-                pred = logits.argmax(axis=1)
-            else:
-                pred = logits
+            pred = logits
 
         pred = merge_bio_format(data[self._df_preprocessor.ner_feature_names[0]], pred)
         if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
@@ -260,16 +401,8 @@ class NERLearner(BaseLearner):
         data
             The data to make predictions for. Should contain same column names as training data and
               follow same format (except for the `label` column).
-        candidate_data
-            The candidate data from which to search the query data's matches.
-        id_mappings
-             Id-to-content mappings. The contents can be text, image, etc.
-             This is used when data contain the query/response identifiers instead of their contents.
         as_pandas
             Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
-        as_multiclass
-            Whether to return the probability of all labels or
-            just return the probability of the positive class for binary classification problems.
         realtime
             Whether to do realtime inference, which is efficient for small data (default None).
             If not specified, we would infer it on based on the data modalities
@@ -281,8 +414,7 @@ class NERLearner(BaseLearner):
         When as_multiclass is True, the output will always have shape (#samples, #classes).
         Otherwise, the output will have shape (#samples,)
         """
-        self._ensure_inference_ready()
-
+        self.ensure_inference_ready()
         outputs = predict(
             predictor=self,
             data=data,
@@ -294,13 +426,17 @@ class NERLearner(BaseLearner):
             y_pred=ner_outputs,
             return_proba=True,
         )
-
         if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
             prob = self._as_pandas(data=data, to_be_converted=prob)
 
         return prob
 
     def extract_embedding(
-            self,
+        self,
+        data: Union[pd.DataFrame, dict, list],
+        return_masks: Optional[bool] = False,
+        as_tensor: Optional[bool] = False,
+        as_pandas: Optional[bool] = False,
+        realtime: Optional[bool] = None,
     ):
-        raise RuntimeError("NER doesn't support calling `extract_embedding`.")
+        raise NotImplementedError("NER doesn't support calling `extract_embedding`.")
