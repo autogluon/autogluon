@@ -132,6 +132,7 @@ from .utils import (
     evaluate_coco,
     extract_from_output,
     filter_hyperparameters,
+    get_available_devices,
     get_config,
     get_detection_classes,
     get_dir_ckpt_paths,
@@ -1509,7 +1510,7 @@ class MultiModalPredictor(ExportMixin):
         with apply_log_filter(log_filter):
             trainer = pl.Trainer(
                 accelerator="gpu" if num_gpus > 0 else "auto",
-                devices=num_gpus if num_gpus > 0 else "auto",
+                devices=get_available_devices(num_gpus, config.env.auto_select_gpus),
                 num_nodes=config.env.num_nodes,
                 precision=precision,
                 strategy=strategy if strategy else "auto",
@@ -1847,7 +1848,8 @@ class MultiModalPredictor(ExportMixin):
                         outputs = pred_writer.collect_all_gpu_results(num_gpus=num_gpus)
                     else:
                         sys.exit(f"Prediction finished, exit the process with global_rank={evaluator.global_rank}...")
-                elif (
+
+                if (
                     self._problem_type == OBJECT_DETECTION
                 ):  # TODO: remove this by adjusting the return of mmdet_image or lit_mmdet.
                     outputs = [output for batch_outputs in outputs for output in batch_outputs]
