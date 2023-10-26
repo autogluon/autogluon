@@ -1,0 +1,13 @@
+- name: m4_hourly_2
+  dataset:
+    path: https://autogluon.s3.amazonaws.com/datasets/timeseries/m4_hourly/test.csv
+    type: timeseries
+    freq: H
+    forecast_horizon_in_steps: 48
+    seasonality: 24
+    target: target
+    id_column: item_id
+    timestamp_column: timestamp
+  metric: [mase, smape, mape, rmse, mql, wql, sql]
+  quantile_levels: [0.05, 0.5, 0.95]
+  folds: 2

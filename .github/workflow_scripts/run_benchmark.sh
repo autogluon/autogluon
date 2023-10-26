@@ -20,25 +20,25 @@ agbench run $MODULE"_cloud_configs.yaml" --wait
 if [ $BRANCH_OR_PR_NUMBER != "master" ]
 then
     # Capture the name of the file, rename it and store it in ./results
-    master_cleaned_file=$(aws s3 ls s3://autogluon-ci-benchmark/cleaned/master/latest/ | awk '{print $NF}')
+    master_cleaned_file=$(aws s3 ls s3://autogluon-ci-benchmark/cleaned/$MODULE/master/latest/ | awk '{print $NF}')
     new_master_cleaned_file="master_${master_cleaned_file}"
-    aws s3 cp --recursive s3://autogluon-ci-benchmark/cleaned/master/latest/ ./results
+    aws s3 cp --recursive s3://autogluon-ci-benchmark/cleaned/$MODULE/master/latest/ ./results
     mv "./results/$master_cleaned_file" "./results/$new_master_cleaned_file"
 fi
 
-python CI/bench/evaluate.py --config_path ./ag_bench_runs/tabular/ --time_limit $TIME_LIMIT --branch_name $BRANCH_OR_PR_NUMBER
+python CI/bench/evaluate.py --config_path ./ag_bench_runs/$MODULE/ --module_name $MODULE --time_limit $TIME_LIMIT --branch_name $BRANCH_OR_PR_NUMBER
 
 for file in ./results/*; do
     # Check if the file does not start with "master"
     if [[ "$(basename "$file")" != "master"* ]]
     then
-        aws s3 cp "$file" "s3://autogluon-ci-benchmark/cleaned/$BRANCH_OR_PR_NUMBER/$SHA/$(basename "$file")"
-        aws s3 rm --recursive s3://autogluon-ci-benchmark/cleaned/$BRANCH_OR_PR_NUMBER/latest/
-        aws s3 cp "$file" s3://autogluon-ci-benchmark/cleaned/$BRANCH_OR_PR_NUMBER/latest/$(basename "$file")
+        aws s3 cp "$file" "s3://autogluon-ci-benchmark/cleaned/$MODULE/$BRANCH_OR_PR_NUMBER/$SHA/$(basename "$file")"
+        aws s3 rm --recursive s3://autogluon-ci-benchmark/cleaned/$MODULE/$BRANCH_OR_PR_NUMBER/latest/
+        aws s3 cp "$file" s3://autogluon-ci-benchmark/cleaned/$MODULE/$BRANCH_OR_PR_NUMBER/latest/$(basename "$file")
     else
-        aws s3 cp "$file" "s3://autogluon-ci-benchmark/cleaned/master/$SHA/$(basename "$file")"
-        aws s3 rm --recursive s3://autogluon-ci-benchmark/cleaned/master/latest/
-        aws s3 cp "$file" s3://autogluon-ci-benchmark/cleaned/master/latest/$(basename "$file")
+        aws s3 cp "$file" "s3://autogluon-ci-benchmark/cleaned/$MODULE/master/$SHA/$(basename "$file")"
+        aws s3 rm --recursive s3://autogluon-ci-benchmark/cleaned/$MODULE/master/latest/
+        aws s3 cp "$file" s3://autogluon-ci-benchmark/cleaned/$MODULE/master/latest/$(basename "$file")
     fi
 done
 

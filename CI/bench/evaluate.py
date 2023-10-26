@@ -10,18 +10,20 @@ parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFo
 parser.add_argument(
     "--config_path", help="path to generated config path to fetch benchmark name", type=str, required=True
 )
+parser.add_argument("--module_name", help="module on which we run benchmark", type=str, required=True)
 parser.add_argument("--time_limit", help="time limit of the benchmark run", type=str, required=True)
 parser.add_argument("--branch_name", help="if it happens to be master then just push the cleaned result, do not evaluate", type=str, required=True)
 
 args = parser.parse_args()
 
 config_path = args.config_path
+module_name = args.module_name
 time_limit = args.time_limit
 branch_name = args.branch_name
 
 for root, dirs, files in os.walk(config_path):
     for file in files:
-        if file == "tabular_cloud_configs.yaml":
+        if file == f"{module_name}_cloud_configs.yaml":
             config_file = os.path.join(root, file)
             break
 
@@ -34,7 +36,7 @@ subprocess.run(
         "agbench",
         "aggregate-amlb-results",
         "autogluon-ci-benchmark",
-        "tabular",
+        module_name,
         benchmark_name,
         "--constraint",
         time_limit,
@@ -47,7 +49,7 @@ subprocess.run(
         "clean-amlb-results",
         benchmark_name,
         f"--results-dir-input",
-        f"s3://autogluon-ci-benchmark/aggregated/tabular/{benchmark_name}/",
+        f"s3://autogluon-ci-benchmark/aggregated/{module_name}/{benchmark_name}/",
         "--benchmark-name-in-input-path",
         "--constraints",
         time_limit,

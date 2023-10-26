@@ -1,0 +1,7 @@
+---
+
+test101:
+  folds: 3
+  max_runtime_seconds: 600
+  cores: 4
+  min_vol_size_mb: 100000
