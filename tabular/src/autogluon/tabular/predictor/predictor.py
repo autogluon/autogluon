@@ -275,7 +275,8 @@ class TabularPredictor:
         )
         self._learner_type = type(self._learner)
         self._trainer = None
-        self._sub_fits = []
+        self._sub_fits = []  # type: List[str]
+        self._stacked_overfitting_occurred = None  # type: bool | None
 
     @property
     def class_labels(self):
@@ -1093,15 +1094,6 @@ class TabularPredictor:
         self._post_fit(**ag_post_fix_kwargs)
         self.save()
 
-        try:
-            # Clean up ray from ParallelFoldFittingStrategy
-            ray = try_import_ray()
-            if ray.is_initialized():
-                ray.shutdown()
-        except ImportError:
-            # Ray did not run. Hence, ignore.
-            pass
-
     def _dynamic_stacking(
         self,
         ag_fit_kwargs,
@@ -1231,6 +1223,8 @@ class TabularPredictor:
         return num_stack_levels, time_limit_fit_full
 
     def _sub_fit_memory_save_wrapper(self, train_data, time_limit, ds_fit_kwargs, ag_fit_kwargs, ag_post_fix_kwargs, custom_val_data=None):
+        """Tries to run the sub-fit in a subprocess (managed by ray). Similar to AutoGluon's parallel fold fitting strategies,
+        this code does not shut down ray after usage. Otherwise, we would also kill outer-scope ray usage."""
         memory_safe_fits = ds_fit_kwargs.get("memory_safe_fits", True)
         normal_fit = False
         if memory_safe_fits:
@@ -1275,11 +1269,6 @@ class TabularPredictor:
                 )
                 finished, unfinished = _ds_ray.wait([ref], num_returns=1)
                 stacked_overfitting = _ds_ray.get(finished[0])
-
-                # Clean up
-                if _ds_ray.is_initialized():
-                    _ds_ray.shutdown()
-                del _ds_ray
             else:
                 normal_fit = True
         else:
@@ -1415,6 +1404,7 @@ class TabularPredictor:
             Refer to kwargs documentation in :meth:`TabularPredictor.fit`.
             Note that the following kwargs are not available in `fit_extra` as they cannot be changed from their values set in `fit()`:
                 [`holdout_frac`, `num_bag_folds`, `auto_stack`, `feature_generator`, `unlabeled_data`]
+            Moreover, `dynamic_stacking` is also not available in `fit_extra` as the detection of stacked overfitting is only supported at the first fit time.
             pseudo_data : pd.DataFrame, default = None
                 Data that has been self labeled by Autogluon model and will be incorporated into training during 'fit_extra'
         """
@@ -4613,12 +4603,8 @@ def _sub_fit(self, train_data, time_limit, ds_fit_kwargs, ag_fit_kwargs, ag_post
         stacked_overfitting = check_stacked_overfitting_from_leaderboard(ho_leaderboard)
         logger.info("Leaderboard on holdout data from dynamic stacking:")
         with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):
-            logger.info(
-                ho_leaderboard.rename(
-                    # Rename to avoid confusion for the user
-                    {"score_test": "score_val_holdout", "score_val": "score_val_oof"}
-                )
-            )
+            # Rename to avoid confusion for the user
+            logger.info(ho_leaderboard.rename({"score_test": "holdout_score"}, axis=1))
 
     logger.info(f"Stacked overfitting occurred: {stacked_overfitting}.")
     del self._learner
