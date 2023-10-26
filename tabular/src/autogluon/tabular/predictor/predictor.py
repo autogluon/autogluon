@@ -56,7 +56,7 @@ from autogluon.core.utils import (
 from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
-from autogluon.core.utils.utils import default_holdout_frac, generate_train_test_split_combined, CVSplitter
+from autogluon.core.utils.utils import CVSplitter, default_holdout_frac, generate_train_test_split_combined
 
 from ..configs.feature_generator_presets import get_default_feature_generator
 from ..configs.hyperparameter_configs import get_hyperparameter_config
