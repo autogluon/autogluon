@@ -755,7 +755,7 @@ class TabularPredictor:
                 See the `ag_args_ensemble` argument from "Advanced functionality: Custom AutoGluon model arguments" in the `hyperparameters` argument documentation for valid values.
                 Identical to specifying `ag_args_ensemble` parameter for all models in `hyperparameters`.
                 If a key in `ag_args_ensemble` is already specified for a model in `hyperparameters`, it will not be altered through this argument.
-            ds_args : dict, see bleow for default,
+            ds_args : dict, see bleow for default
                 Keyword arguments for dynamic stacking, only used if `dynamic_stacking=True`. These keyword arguments control the behavior of dynamic stacking
                 and determine how AutoGluon tries to detect stacked overfitting. To detect stacked overfitting, AutoGluon will fit itself (so called sub-fits)
                 on a subset (for holdout) or multiple subsets (for repeated cross-validation) and use the predictions of AutoGluon on the validation data to
