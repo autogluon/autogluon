@@ -56,7 +56,7 @@ subprocess.run(
     ]
 )
 
-# If it is a PR then perform the evaluation w.r.t cleaned master bench results
+# If it is a PR then perform the evaluation w.r.t cleaned master bench results, test
 if branch_name != "master":
     paths = []
     frameworks = []
