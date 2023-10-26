@@ -4202,6 +4202,7 @@ class TabularPredictor:
             raise ValueError(f"`calibrate` must be a value in {valid_calibrate_options}, but is: {calibrate}")
 
         # -- Validate dynamic stacking extra args
+        kwargs_sanitized["ds_args"].update(fit_extra_kwargs_default["ds_args"])
         ds_args = kwargs_sanitized["ds_args"]
         allowed_kes = set(fit_extra_kwargs_default["ds_args"].keys())
         key_missmatch = set(ds_args.keys()) - allowed_kes
