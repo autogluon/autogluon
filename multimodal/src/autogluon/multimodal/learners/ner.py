@@ -125,28 +125,182 @@ class NERLearner(BaseLearner):
         output_shape = self.get_output_shape_per_run(df_preprocessor=df_preprocessor)
         model = self.get_model_per_run(model=model, config=config, df_preprocessor=df_preprocessor)
 
-    def _get_model(self):
+    def evaluate(
+        self,
+        data: Union[pd.DataFrame, dict, list, str],
+        metrics: Optional[Union[str, List[str]]] = None,
+        return_pred: Optional[bool] = False,
+        realtime: Optional[bool] = None,
+        eval_tool: Optional[str] = None,
+    ):
         """
-        Setup and update config (DictConfig) for the model, and get the model (nn.Module)
-        Returns:
-            Tuple[DictConfig, nn.Module]: the updated config (DictConfig) and the model (nn.Module)
         """
-        config = select_model(config=self._config, df_preprocessor=self._df_preprocessor)
+        self._ensure_inference_ready()
+        ret_type = NER_RET
+        outputs = predict(
+            predictor=self,
+            data=data,
+            requires_label=True,
+            realtime=realtime,
+        )
+        logits = extract_from_output(ret_type=ret_type, outputs=outputs)
+        metric_data = {}
+        y_pred = self._df_preprocessor.transform_prediction(
+            y_pred=logits,
+            inverse_categorical=False,
+        )
+        y_pred_inv = self._df_preprocessor.transform_prediction(
+            y_pred=logits,
+            inverse_categorical=True,
+        )
+        y_true = self._df_preprocessor.transform_label_for_metric(df=data, tokenizer=self._model.tokenizer)
+        metric_data.update(
+            {
+                Y_PRED: y_pred,
+                Y_TRUE: y_true,
+            }
+        )
+        metrics_is_none = False
+        if metrics is None:
+            metrics_is_none = True
+            if self._eval_metric_func:
+                metrics = [self._eval_metric_func]
+            else:
+                metrics = [self._eval_metric_name]
+        if isinstance(metrics, str) or isinstance(metrics, Scorer):
+            metrics = [metrics]
 
-        # 4. if NER, update output shape. TODO: This can be refactored into the NER Learner
-        # Update output_shape with label_generator.
-        self._output_shape = len(self._df_preprocessor.label_generator.unique_entity_groups)
+        results = {}
+        score = compute_score(
+            metric_data=metric_data,
+            metric=self._eval_metric_name.lower(),
+        )
+        score = {k.lower(): v for k, v in score.items()}
+        if metrics_is_none:
+            results = score
+        else:
+            for per_metric in metrics:
+                if per_metric.lower() in score:
+                    results.update({per_metric: score[per_metric.lower()]})
+                else:
+                    logger.warning(f"Warning: {per_metric} is not a supported evaluation metric!")
+            if not results:
+                results = score  # If the results dict is empty, return all scores.
 
-        # 5. get model
-        if self._model is None:
-            model = create_fusion_model(
-                config=config,
-                num_classes=self._output_shape,
-                classes=self._classes,
-                num_numerical_columns=len(self._df_preprocessor.numerical_feature_names),
-                num_categories=self._df_preprocessor.categorical_num_categories,
+        if return_pred:
+            return results, self._as_pandas(data=data, to_be_converted=y_pred_inv)
+        else:
+            return results
+
+    def predict(
+            self,
+            data: Union[pd.DataFrame, dict, list, str],
+            as_pandas: Optional[bool] = None,
+            realtime: Optional[bool] = None,
+            save_results: Optional[bool] = None,
+    ):
+        """
+        Predict values for the label column of new data.
+
+        Parameters
+        ----------
+        data
+            The data to make predictions for. Should contain same column names as training data and
+            follow same format (except for the `label` column).
+        as_pandas
+            Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
+        realtime
+            Whether to do realtime inference, which is efficient for small data (default None).
+            If not specified, we would infer it on based on the data modalities
+            and sample number.
+        save_results
+            Whether to save the prediction results (only works for detection now)
+
+        Returns
+        -------
+        Array of predictions, one corresponding to each row in given dataset.
+        """
+        self._ensure_inference_ready()
+        ret_type = NER_RET
+        outputs = predict(
+            predictor=self,
+            data=data,
+            requires_label=False,
+            realtime=realtime,
+        )
+        logits = extract_from_output(outputs=outputs, ret_type=ret_type)
+        if self._df_preprocessor:
+            pred = self._df_preprocessor.transform_prediction(
+                y_pred=logits,
             )
-        else:  # continuing training
-            model = self._model
+        else:
+            if isinstance(logits, (torch.Tensor, np.ndarray)) and logits.ndim == 2:
+                pred = logits.argmax(axis=1)
+            else:
+                pred = logits
 
-        return config, model
+        pred = merge_bio_format(data[self._df_preprocessor.ner_feature_names[0]], pred)
+        if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
+            pred = self._as_pandas(data=data, to_be_converted=pred)
+
+        return pred
+
+    def predict_proba(
+        self,
+        data: Union[pd.DataFrame, dict, list],
+        as_pandas: Optional[bool] = None,
+        realtime: Optional[bool] = None,
+    ):
+        """
+        Predict probabilities class probabilities rather than class labels.
+        This is only for the classification tasks. Calling it for a regression task will throw an exception.
+
+        Parameters
+        ----------
+        data
+            The data to make predictions for. Should contain same column names as training data and
+              follow same format (except for the `label` column).
+        candidate_data
+            The candidate data from which to search the query data's matches.
+        id_mappings
+             Id-to-content mappings. The contents can be text, image, etc.
+             This is used when data contain the query/response identifiers instead of their contents.
+        as_pandas
+            Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
+        as_multiclass
+            Whether to return the probability of all labels or
+            just return the probability of the positive class for binary classification problems.
+        realtime
+            Whether to do realtime inference, which is efficient for small data (default None).
+            If not specified, we would infer it on based on the data modalities
+            and sample number.
+
+        Returns
+        -------
+        Array of predicted class-probabilities, corresponding to each row in the given data.
+        When as_multiclass is True, the output will always have shape (#samples, #classes).
+        Otherwise, the output will have shape (#samples,)
+        """
+        self._ensure_inference_ready()
+
+        outputs = predict(
+            predictor=self,
+            data=data,
+            requires_label=False,
+            realtime=realtime,
+        )
+        ner_outputs = extract_from_output(outputs=outputs, ret_type=NER_RET)
+        prob = self._df_preprocessor.transform_prediction(
+            y_pred=ner_outputs,
+            return_proba=True,
+        )
+
+        if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
+            prob = self._as_pandas(data=data, to_be_converted=prob)
+
+        return prob
+
+    def extract_embedding(
+            self,
+    ):
+        raise RuntimeError("NER doesn't support calling `extract_embedding`.")

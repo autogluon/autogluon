@@ -30,7 +30,6 @@ from autogluon.core.utils.loaders import load_pd
 
 from .. import version as ag_version
 from ..constants import (
-    BBOX,
     BEST,
     BEST_K_MODELS_FILE,
     BINARY,
@@ -50,31 +49,19 @@ from ..constants import (
     LABEL,
     LAST_CHECKPOINT,
     LOGITS,
-    MAP,
     MASKS,
     MAX,
     MIN,
     MODEL_CHECKPOINT,
-    MULTI_IMAGE_MIX_DATASET,
     MULTICLASS,
     NER,
-    NER_RET,
-    NUMERICAL,
-    OBJECT_DETECTION,
-    OCR_TEXT_DETECTION,
-    OCR_TEXT_RECOGNITION,
-    OPEN_VOCABULARY_OBJECT_DETECTION,
-    OVD_RET,
-    OVERALL_F1,
     RAY_TUNE_CHECKPOINT,
     REGRESSION,
     ROIS,
-    SCORE,
     TEXT,
     TEXT_NER,
     TORCH_COMPILE_MIN_VERSION,
     UNIFORM_SOUP,
-    XYWH,
     Y_PRED,
     Y_PRED_PROB,
     Y_TRUE,
@@ -83,22 +70,16 @@ from ..constants import (
 )
 from ..data import (
     BaseDataModule,
-    MultiImageMixDataset,
     infer_column_types,
     infer_output_shape,
     infer_problem_type,
-    infer_rois_column_type,
     is_image_column,
     MultiModalFeaturePreprocessor,
 )
 
 from ..models import get_model_postprocess_fn
 from ..optimization import (
-    DistillerLitModule,
-    MMDetLitModule,
     LitModule,
-    NerLitModule,
-    RKDLoss,
     get_loss_func,
     get_metric,
     get_norm_layer_param_names,
@@ -117,11 +98,9 @@ from ..utils import (
     average_checkpoints,
     compute_num_gpus,
     compute_score,
-    convert_pred_to_xywh,
     create_fusion_data_processors,
     create_fusion_model,
     data_to_df,
-    evaluate_coco,
     extract_from_output,
     filter_hyperparameters,
     get_config,
@@ -146,13 +125,8 @@ from ..utils import (
     list_timm_models,
     load_text_tokenizers,
     logits_to_prob,
-    merge_bio_format,
-    modify_duplicate_model_names,
-    object_detection_data_to_df,
     predict,
-    save_ovd_result_df,
     save_pretrained_model_configs,
-    save_result_df,
     save_text_tokenizers,
     select_model,
     split_train_tuning_data,
@@ -220,7 +194,7 @@ class BaseLearner(ExportMixin):
             - 'ocr_text_recognition': (experimental) Recognize OCR text
 
             For certain problem types, the default behavior is to load a pretrained model based on
-            the presets / hyperparameters and the predictor will support zero-shot inference
+            the presets / hyperparameters and the learner will support zero-shot inference
             (running inference without .fit()). This includes the following
             problem types:
 
@@ -302,7 +276,6 @@ class BaseLearner(ExportMixin):
 
         self._label_column = label
         self._presets = presets.lower() if presets else None
-        self._validation_metric_name = validation_metric.lower() if validation_metric else None
         self._minmax_mode = None
         self._output_shape = num_classes
         self._classes = classes
@@ -377,8 +350,8 @@ class BaseLearner(ExportMixin):
     def ensure_fitting_ready(self):
         if self._problem_type and not self.problem_property.support_fit:
             raise RuntimeError(
-                f"The problem_type='{self._problem_type}' does not support `predictor.fit()`. "
-                f"You may try to use `predictor.predict()` or `predictor.evaluate()`."
+                f"The problem_type='{self._problem_type}' does not support `learner.fit()`. "
+                f"You may try to use `learner.predict()` or `learner.evaluate()`."
             )
 
     def infer_problem_type(self, train_data: pd.DataFrame):
@@ -435,7 +408,13 @@ class BaseLearner(ExportMixin):
             problem_type=self._problem_type,
         )
 
-    def prepare_for_train_tuning_data(self, train_data: Union[str, pd.DataFrame], tuning_data: Union[str, pd.DataFrame], holdout_frac: float, max_num_tuning_data: int, seed: int):
+    def prepare_for_train_tuning_data(
+        self,
+        train_data: Union[pd.DataFrame, str],
+        tuning_data: Optional[Union[pd.DataFrame, str]],
+        holdout_frac: Optional[float],
+        seed: Optional[int],
+    ):
         if isinstance(train_data, str):
             train_data = load_pd.load(train_data)
         if isinstance(tuning_data, str):
@@ -496,7 +475,6 @@ class BaseLearner(ExportMixin):
     def infer_validation_metric(self):
         if self._fit_called:
             return
-
         self._validation_metric_name, self._eval_metric_name = infer_metrics(
             problem_type=self._problem_type,
             eval_metric_name=self._eval_metric_name,
@@ -540,7 +518,7 @@ class BaseLearner(ExportMixin):
         if self._is_hpo and self._teacher_learner is not None:
             assert isinstance(
                 self._teacher_learner, str
-            ), "HPO with distillation only supports passing a path to the predictor."
+            ), "HPO with distillation only supports passing a path to the learner."
 
     def prepare_for_fit_args(self, time_limit: int, seed: int, standalone: bool, clean_ckpts: bool):
         if time_limit is not None:
@@ -573,21 +551,27 @@ class BaseLearner(ExportMixin):
 
     def execute_fit(self):
         if self._is_hpo:
-            self._fit_args["predictor"] = self
+            self._fit_args["learner"] = self
             hyperparameter_tune(
                 hyperparameter_tune_kwargs=self._hyperparameter_tune_kwargs,
                 resources=dict(num_gpus=ResourceManager.get_gpu_count_torch()),  # TODO: allow customizing GPUs
                 **self._fit_args,
             )
         else:
-            config, df_preprocessor, data_processors, model, model_postprocess_fn = self.fit_per_run(**self._fit_args)
-            self.update_attributes(
-                config=config,
-                df_preprocessor=df_preprocessor,
-                data_processors=data_processors,
-                model=model,
-                model_postprocess_fn=model_postprocess_fn,
-            )
+            attributes = self.fit_per_run(**self._fit_args)
+            self.update_attributes(**attributes)
+
+    def on_fit_start(self):
+        self.ensure_fitting_ready()
+        training_start = time.time()
+        return training_start
+
+    def on_fit_end(self, training_start):
+        self._fit_called = True
+        training_end = time.time()
+        self._total_train_time = training_end - training_start
+        # TODO(?) We should have a separate "_post_training_event()" for logging messages.
+        logger.info(get_fit_complete_message(self._save_path))
 
     def fit(
         self,
@@ -595,7 +579,6 @@ class BaseLearner(ExportMixin):
         presets: Optional[str] = None,
         config: Optional[Dict] = None,
         tuning_data: Optional[Union[pd.DataFrame, str]] = None,
-        max_num_tuning_data: Optional[int] = None,
         time_limit: Optional[int] = None,
         save_path: Optional[str] = None,
         hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
@@ -607,8 +590,7 @@ class BaseLearner(ExportMixin):
         hyperparameter_tune_kwargs: Optional[Dict] = None,
         clean_ckpts: Optional[bool] = True,
     ):
-        self.ensure_fitting_ready()
-        training_start = time.time()
+        training_start = self.on_fit_start()
         self.update_attributes(presets=presets, config=config, teacher_learner=teacher_learner)
         self.setup_save_path(save_path=save_path)
         self.infer_problem_type(train_data=train_data)
@@ -616,7 +598,6 @@ class BaseLearner(ExportMixin):
             train_data=train_data,
             tuning_data=tuning_data,
             holdout_frac=holdout_frac,
-            max_num_tuning_data=max_num_tuning_data,
             seed=seed,
         )
         self.infer_column_types(column_types=column_types)
@@ -634,11 +615,7 @@ class BaseLearner(ExportMixin):
             clean_ckpts=clean_ckpts,
         )
         self.execute_fit()
-        self._fit_called = True
-        training_end = time.time()
-        self._total_train_time = training_end - training_start
-        # TODO(?) We should have a separate "_post_training_event()" for logging messages.
-        logger.info(get_fit_complete_message(self._save_path))
+        self.on_fit_end(training_start=training_start)
 
         return self
 
@@ -670,8 +647,8 @@ class BaseLearner(ExportMixin):
             if not self._problem_type or not self.problem_property.support_zero_shot:
                 raise RuntimeError(
                     f"problem_type='{self._problem_type}' does not support running inference directly. "
-                    f"You need to call `predictor.fit()`, or load a predictor first before "
-                    f"running `predictor.predict()`, `predictor.evaluate()` or `predictor.extract_embedding()`."
+                    f"You need to call `learner.fit()`, or load a learner first before "
+                    f"running `learner.predict()`, `learner.evaluate()` or `learner.extract_embedding()`."
                 )
             else:
                 self.init_pretrained()
@@ -688,9 +665,17 @@ class BaseLearner(ExportMixin):
             problem_type=self._problem_type,
             config=config,
         )
+        config = self.update_strategy_by_env(config=config)
         return config
 
-    def get_df_preprocessor_per_run(self, df_preprocessor, data=None, config=None, column_types=None, is_train=True):
+    def get_df_preprocessor_per_run(
+        self,
+        df_preprocessor,
+        data=None,
+        config=None,
+        column_types=None,
+        is_train=True,
+    ):
         if df_preprocessor is None:
             if is_train:
                 df_preprocessor = init_df_preprocessor(
@@ -705,12 +690,13 @@ class BaseLearner(ExportMixin):
                     config=self._config,
                     column_types=column_types,
                     label_column=self._label_column,
-                    train_df_x=data.drop(columns=self._label_column),
+                    train_df_x=data,
                     train_df_y=data[self._label_column] if self._label_column else None,
                 )
         return df_preprocessor
 
-    def update_config_by_data_per_run(self, config, df_preprocessor):
+    @staticmethod
+    def update_config_by_data_per_run(config, df_preprocessor):
         # Avoid passing tabular data with many columns to MultiHeadAttention.
         # If models have additive_attention="auto", we enable it automatically for large tables.
         config = update_tabular_config_by_resources(
@@ -726,13 +712,13 @@ class BaseLearner(ExportMixin):
             model = create_fusion_model(
                 config=config,
                 num_classes=self._output_shape,
-                classes=self._classes,
                 num_numerical_columns=len(df_preprocessor.numerical_feature_names),
                 num_categories=df_preprocessor.categorical_num_categories,
             )
         return model
 
-    def compile_model_per_run(self, config, model):
+    @staticmethod
+    def compile_model_per_run(config, model):
         if OmegaConf.select(config, "env.compile.turn_on", default=False):
             assert version.parse(torch.__version__) >= version.parse(TORCH_COMPILE_MIN_VERSION), (
                 f"torch.compile requires torch version >= {TORCH_COMPILE_MIN_VERSION}, "
@@ -747,7 +733,8 @@ class BaseLearner(ExportMixin):
             )
         return model
 
-    def get_peft_param_names_per_run(self, model, config):
+    @staticmethod
+    def get_peft_param_names_per_run(model, config):
         peft_param_names = None
         peft = OmegaConf.select(config, "optimization.efficient_finetune")
         if peft:
@@ -758,7 +745,15 @@ class BaseLearner(ExportMixin):
             )
         return peft_param_names
 
-    def get_data_processors_per_run(self, data_processors, config=None, model=None, advanced_hyperparameters=None, requires_label=None, is_train=True):
+    @staticmethod
+    def get_data_processors_per_run(
+        data_processors,
+        config=None,
+        model=None,
+        advanced_hyperparameters=None,
+        requires_label=None,
+        is_train=True,
+    ):
         if is_train and data_processors is None:
             data_processors = create_fusion_data_processors(
                 config=config,
@@ -767,8 +762,8 @@ class BaseLearner(ExportMixin):
             )
             data_processors_count = {k: len(v) for k, v in data_processors.items()}
             logger.debug(f"data_processors_count: {data_processors_count}")
-        else:
-            # For each inference call, decouple the used data processors from the predictor's attribute
+        elif not is_train:
+            # For each inference call, decouple the used data processors from the learner's attribute
             data_processors = copy.copy(data_processors)
             # For prediction data with no labels provided.
             if not requires_label:
@@ -798,7 +793,7 @@ class BaseLearner(ExportMixin):
             )
         return mixup_active, mixup_func
 
-    def get_loss_func_per_run(self, config, mixup_active):
+    def get_loss_func_per_run(self, config, mixup_active=None):
         loss_func = get_loss_func(
             problem_type=self._problem_type,
             mixup_active=mixup_active,
@@ -814,24 +809,27 @@ class BaseLearner(ExportMixin):
         )
         return model_postprocess_fn
 
-    def get_datamodule_per_run(self, df_preprocessor, data_processors, per_gpu_batch_size, num_workers, predict_data=None, is_train=True):
+    def get_datamodule_per_run(
+        self,
+        df_preprocessor,
+        data_processors,
+        per_gpu_batch_size,
+        num_workers,
+        predict_data=None,
+        is_train=True,
+    ):
+        datamodule_kwargs = dict(
+            df_preprocessor=df_preprocessor,
+            data_processors=data_processors,
+            per_gpu_batch_size=per_gpu_batch_size,
+            num_workers=num_workers,
+        )
         if is_train:
-            datamodule = BaseDataModule(
-                df_preprocessor=df_preprocessor,
-                data_processors=data_processors,
-                per_gpu_batch_size=per_gpu_batch_size,
-                num_workers=num_workers,
-                train_data=self._train_data,
-                validate_data=self._tuning_data,
-            )
+            datamodule_kwargs.update(dict(train_data=self._train_data, validate_data=self._tuning_data))
         else:
-            datamodule = BaseDataModule(
-                df_preprocessor=df_preprocessor,
-                data_processors=data_processors,
-                per_gpu_batch_size=per_gpu_batch_size,
-                num_workers=self._config.env.num_workers_evaluation,
-                predict_data=predict_data,
-            )
+            datamodule_kwargs.update(dict(predict_data=predict_data))
+
+        datamodule = BaseDataModule(**datamodule_kwargs)
         return datamodule
 
     def get_optimization_kwargs_per_run(self, config, validation_metric, custom_metric_func):
@@ -851,7 +849,17 @@ class BaseLearner(ExportMixin):
             custom_metric_func=custom_metric_func,
         )
 
-    def build_task_per_run(self, model=None, loss_func=None, config=None, mixup_func=None, model_postprocess_fn=None, peft_param_names=None, optimization_kwargs=None, is_train=True):
+    def build_task_per_run(
+            self,
+            model=None,
+            loss_func=None,
+            config=None,
+            mixup_func=None,
+            model_postprocess_fn=None,
+            peft_param_names=None,
+            optimization_kwargs=None,
+            is_train=True,
+    ):
         if is_train:
             return LitModule(
                 model=model,
@@ -920,21 +928,24 @@ class BaseLearner(ExportMixin):
 
         return callbacks
 
-    def get_plugins_per_run(self, model, peft_param_names):
+    @staticmethod
+    def get_plugins_per_run(model, peft_param_names=None):
         custom_checkpoint_plugin = AutoMMModelCheckpointIO(
             trainable_param_names=peft_param_names,
             model_name_to_id=model.name_to_id,
         )
         return [custom_checkpoint_plugin]
 
-    def get_tb_logger(self, save_path):
+    @staticmethod
+    def get_tb_logger(save_path):
         return pl.loggers.TensorBoardLogger(
             save_dir=save_path,
             name="",
             version="",
         )
 
-    def log_gpu_info(self, num_gpus, config):
+    @staticmethod
+    def log_gpu_info(num_gpus, config):
         logger.info(
             get_gpu_message(
                 detected_num_gpus=ResourceManager.get_gpu_count_torch(),
@@ -943,7 +954,8 @@ class BaseLearner(ExportMixin):
             )
         )
 
-    def get_grad_steps(self, num_gpus, config):
+    @staticmethod
+    def get_grad_steps(num_gpus, config):
         if num_gpus == 0:  # CPU only training
             grad_steps = max(
                 config.env.batch_size // (config.env.per_gpu_batch_size * config.env.num_nodes),
@@ -956,7 +968,8 @@ class BaseLearner(ExportMixin):
             )
         return grad_steps
 
-    def get_strategy_per_run(self, num_gpus, config):
+    @staticmethod
+    def get_strategy_per_run(num_gpus, config):
         if config.env.strategy == DEEPSPEED_OFFLOADING and num_gpus == 1 and DEEPSPEED_MODULE not in sys.modules:  # Offloading currently only tested for single GPU
             assert version.parse(pl.__version__) >= version.parse(
                 DEEPSPEED_MIN_PL_VERSION
@@ -982,13 +995,30 @@ class BaseLearner(ExportMixin):
             num_gpus = min(num_gpus, 1)  # Currently only support one trial using one gpu.
         return strategy, num_gpus
 
-    def post_update_config_per_run(self, config, num_gpus, precision, strategy):
+    @staticmethod
+    def post_update_config_per_run(config, num_gpus, precision, strategy):
         config.env.num_gpus = num_gpus
         config.env.precision = precision
+        # for deepspeed offloading, the strategy becomes is a customized strategy object instead of a string,
+        # but config still needs a string.
         config.env.strategy = strategy if not config.env.strategy == DEEPSPEED_OFFLOADING else DEEPSPEED_OFFLOADING
         return config
 
-    def init_trainer_per_run(self, num_gpus, precision, strategy, callbacks, max_time=None, config=None, tb_logger=None, grad_steps=None, plugins=None, enable_progress_bar=None, barebones=False, is_train=True):
+    def init_trainer_per_run(
+        self,
+        num_gpus,
+        precision,
+        strategy,
+        callbacks,
+        max_time=None,
+        config=None,
+        tb_logger=None,
+        grad_steps=None,
+        plugins=None,
+        enable_progress_bar=None,
+        barebones=False,
+        is_train=True,
+    ):
         if is_train:
             blacklist_msgs = ["already configured with model summary"]
             log_filter = LogFilter(blacklist_msgs)
@@ -1051,7 +1081,16 @@ class BaseLearner(ExportMixin):
 
         return trainer
 
-    def run_trainer(self, trainer, task, datamodule, ckpt_path=None, resume=None, pred_writer=None, is_train=True):
+    @staticmethod
+    def run_trainer(
+        trainer,
+        task,
+        datamodule,
+        ckpt_path=None,
+        resume=None,
+        pred_writer=None,
+        is_train=True,
+    ):
         with warnings.catch_warnings():
             warnings.filterwarnings(
                 "ignore",
@@ -1074,7 +1113,22 @@ class BaseLearner(ExportMixin):
                 )
                 return outputs
 
-    def on_fit_per_run_end(self, trainer, model, save_path, config, strategy, peft_param_names, standalone, clean_ckpts):
+    def on_fit_per_run_start(self, seed, save_path):
+        pl.seed_everything(seed, workers=True)
+        # TODO(?) We should have a separate "_pre_training_event()" for logging messages.
+        logger.info(get_fit_start_message(save_path, self._validation_metric_name))
+
+    def on_fit_per_run_end(
+            self,
+            trainer,
+            model,
+            save_path,
+            config,
+            strategy,
+            standalone,
+            clean_ckpts,
+            peft_param_names=None,
+    ):
         if trainer.global_rank == 0:
             # We do not perform averaging checkpoint in the case of hpo for each trial
             # We only average the checkpoint of the best trial at the end in the master process.
@@ -1111,9 +1165,7 @@ class BaseLearner(ExportMixin):
         standalone: bool = True,
         clean_ckpts: bool = True,
     ):
-        pl.seed_everything(seed, workers=True)
-        # TODO(?) We should have a separate "_pre_training_event()" for logging messages.
-        logger.info(get_fit_start_message(save_path, self._validation_metric_name))
+        self.on_fit_per_run_start(seed=seed, save_path=save_path)
         config = self.get_config_per_run(config=config, hyperparameters=hyperparameters)
         df_preprocessor = self.get_df_preprocessor_per_run(
             df_preprocessor=df_preprocessor,
@@ -1133,7 +1185,6 @@ class BaseLearner(ExportMixin):
         mixup_active, mixup_func = self.get_mixup_func_per_run(config=config)
         loss_func = self.get_loss_func_per_run(config=config, mixup_active=mixup_active)
         model_postprocess_fn = self.get_model_postprocess_fn_per_run(loss_func=loss_func)
-        config = self.update_strategy_by_env(config=config)
 
         if max_time == timedelta(seconds=0):
             self.top_k_average(
@@ -1222,7 +1273,13 @@ class BaseLearner(ExportMixin):
             clean_ckpts=clean_ckpts,
         )
 
-        return config, df_preprocessor, data_processors, self._model, model_postprocess_fn
+        return dict(
+            config=config,
+            df_preprocessor=df_preprocessor,
+            data_processors=data_processors,
+            model=self._model,
+            model_postprocess_fn=model_postprocess_fn,
+        )
 
     ## TODO: top_k_average should avoid modifying self._model inplace.
     def top_k_average(
@@ -1522,17 +1579,9 @@ class BaseLearner(ExportMixin):
     def evaluate(
         self,
         data: Union[pd.DataFrame, dict, list, str],
-        query_data: Optional[list] = None,
-        response_data: Optional[list] = None,
-        id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         metrics: Optional[Union[str, List[str]]] = None,
-        chunk_size: Optional[int] = 1024,
-        similarity_type: Optional[str] = "cosine",
-        cutoffs: Optional[List[int]] = [1, 5, 10],
-        label: Optional[str] = None,
         return_pred: Optional[bool] = False,
         realtime: Optional[bool] = None,
-        eval_tool: Optional[str] = None,
     ):
         """
         Evaluate model on a test dataset.
@@ -1542,33 +1591,15 @@ class BaseLearner(ExportMixin):
         data
             A dataframe, containing the same columns as the training data.
             Or a str, that is a path of the annotation file for detection.
-        query_data
-            Query data used for ranking.
-        response_data
-            Response data used for ranking.
-        id_mappings
-             Id-to-content mappings. The contents can be text, image, etc.
-             This is used when data/query_data/response_data contain the query/response identifiers instead of their contents.
         metrics
             A list of metric names to report.
             If None, we only return the score for the stored `_eval_metric_name`.
-        chunk_size
-            Scan the response data by chunk_size each time. Increasing the value increases the speed, but requires more memory.
-        similarity_type
-            Use what function (cosine/dot_prod) to score the similarity (default: cosine).
-        cutoffs
-            A list of cutoff values to evaluate ranking.
-        label
-            The label column name in data. Some tasks, e.g., image<-->text matching, have no label column in training data,
-            but the label column may be still required in evaluation.
         return_pred
             Whether to return the prediction result of each row.
         realtime
             Whether to do realtime inference, which is efficient for small data (default None).
             If not specified, we would infer it on based on the data modalities
             and sample number.
-        eval_tool
-            The eval_tool for object detection. Could be "pycocotools" or "torchmetrics".
 
         Returns
         -------
@@ -1576,36 +1607,7 @@ class BaseLearner(ExportMixin):
         Optionally return a dataframe of prediction results.
         """
         self._ensure_inference_ready()
-        if self._problem_type == OBJECT_DETECTION:
-            if realtime:
-                return NotImplementedError(
-                    f"Current problem type {self._problem_type} does not support realtime predict."
-                )
-            if isinstance(data, str):
-                return evaluate_coco(
-                    predictor=self,
-                    anno_file_or_df=data,
-                    metrics=metrics,
-                    return_pred=return_pred,
-                    eval_tool=eval_tool,
-                )
-            else:
-                data = object_detection_data_to_df(data)
-                return evaluate_coco(
-                    predictor=self,
-                    anno_file_or_df=data,
-                    metrics=metrics,
-                    return_pred=return_pred,
-                    eval_tool="torchmetrics",
-                )
-
-        if self._problem_type == NER:
-            ret_type = NER_RET
-        elif self._problem_type == OPEN_VOCABULARY_OBJECT_DETECTION:
-            ret_type = OVD_RET
-        else:
-            ret_type = LOGITS
-
+        ret_type = LOGITS
         outputs = predict(
             predictor=self,
             data=data,
@@ -1613,7 +1615,6 @@ class BaseLearner(ExportMixin):
             realtime=realtime,
         )
         logits = extract_from_output(ret_type=ret_type, outputs=outputs)
-
         metric_data = {}
         if self._problem_type in [BINARY, MULTICLASS]:
             y_pred_prob = logits_to_prob(logits)
@@ -1627,23 +1628,14 @@ class BaseLearner(ExportMixin):
             y_pred=logits,
             inverse_categorical=True,
         )
-
-        if self._problem_type == NER:
-            y_true = self._df_preprocessor.transform_label_for_metric(df=data, tokenizer=self._model.tokenizer)
-        else:
-            y_true = self._df_preprocessor.transform_label_for_metric(df=data)
-
+        y_true = self._df_preprocessor.transform_label_for_metric(df=data)
         metric_data.update(
             {
                 Y_PRED: y_pred,
                 Y_TRUE: y_true,
             }
         )
-
-        metrics_is_none = False
-
         if metrics is None:
-            metrics_is_none = True
             if self._eval_metric_func:
                 metrics = [self._eval_metric_func]
             else:
@@ -1652,30 +1644,13 @@ class BaseLearner(ExportMixin):
             metrics = [metrics]
 
         results = {}
-        if self._problem_type == NER:
+        for per_metric in metrics:
             score = compute_score(
                 metric_data=metric_data,
-                metric=self._eval_metric_name.lower(),
+                metric=per_metric.lower() if isinstance(per_metric, str) else per_metric,
             )
-            score = {k.lower(): v for k, v in score.items()}
-            if metrics_is_none:
-                results = score
-            else:
-                for per_metric in metrics:
-                    if per_metric.lower() in score:
-                        results.update({per_metric: score[per_metric.lower()]})
-                    else:
-                        logger.warning(f"Warning: {per_metric} is not a supported evaluation metric!")
-                if not results:
-                    results = score  # If the results dict is empty, return all scores.
-        else:
-            for per_metric in metrics:
-                score = compute_score(
-                    metric_data=metric_data,
-                    metric=per_metric.lower() if isinstance(per_metric, str) else per_metric,
-                )
-                per_metric_name = per_metric if isinstance(per_metric, str) else per_metric.name
-                results[per_metric_name] = score
+            per_metric_name = per_metric if isinstance(per_metric, str) else per_metric.name
+            results[per_metric_name] = score
 
         if return_pred:
             return results, self._as_pandas(data=data, to_be_converted=y_pred_inv)
@@ -1713,10 +1688,8 @@ class BaseLearner(ExportMixin):
         self,
         data: Union[pd.DataFrame, dict, list, str],
         candidate_data: Optional[Union[pd.DataFrame, dict, list]] = None,
-        id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         as_pandas: Optional[bool] = None,
         realtime: Optional[bool] = None,
-        save_results: Optional[bool] = None,
     ):
         """
         Predict values for the label column of new data.
@@ -1737,33 +1710,13 @@ class BaseLearner(ExportMixin):
             Whether to do realtime inference, which is efficient for small data (default None).
             If not specified, we would infer it on based on the data modalities
             and sample number.
-        save_results
-            Whether to save the prediction results (only works for detection now)
 
         Returns
         -------
         Array of predictions, one corresponding to each row in given dataset.
         """
         self._ensure_inference_ready()
-        if self._problem_type == OBJECT_DETECTION:
-            data = object_detection_data_to_df(data)
-
-            if self._label_column not in data:
-                self._label_column = None
-
-        if self._problem_type in [OBJECT_DETECTION, OCR_TEXT_DETECTION]:
-            ret_type = BBOX
-        elif self._problem_type == OCR_TEXT_RECOGNITION:
-            ret_type = [TEXT, SCORE]
-        else:
-            ret_type = LOGITS
-
-        if self._problem_type == NER:
-            ret_type = NER_RET
-
-        if self._problem_type == OPEN_VOCABULARY_OBJECT_DETECTION:
-            ret_type = OVD_RET
-
+        ret_type = LOGITS
         if candidate_data:
             pred = self._match_queries_and_candidates(
                 query_data=data,
@@ -1777,74 +1730,20 @@ class BaseLearner(ExportMixin):
                 requires_label=False,
                 realtime=realtime,
             )
-
-            if self._problem_type == OCR_TEXT_RECOGNITION:
-                logits = []
-                for r_type in ret_type:
-                    logits.append(extract_from_output(outputs=outputs, ret_type=r_type))
-            else:
-                logits = extract_from_output(outputs=outputs, ret_type=ret_type)
+            logits = extract_from_output(outputs=outputs, ret_type=ret_type)
 
             if self._df_preprocessor:
-                if ret_type == BBOX:
-                    pred = logits
-                else:
-                    pred = self._df_preprocessor.transform_prediction(
-                        y_pred=logits,
-                    )
+                pred = self._df_preprocessor.transform_prediction(
+                    y_pred=logits,
+                )
             else:
                 if isinstance(logits, (torch.Tensor, np.ndarray)) and logits.ndim == 2:
                     pred = logits.argmax(axis=1)
                 else:
                     pred = logits
 
-            if self._problem_type == NER:
-                pred = merge_bio_format(data[self._df_preprocessor.ner_feature_names[0]], pred)
-
-            if self._problem_type == OBJECT_DETECTION:
-                if self._model.output_bbox_format == XYWH:
-                    pred = convert_pred_to_xywh(pred)
-
-        if save_results:
-            ## Dumping Result for detection only now
-            assert (
-                self._problem_type == OBJECT_DETECTION
-            ), "Aborting: save results only works for object detection now."
-
-            self._save_path = setup_save_path(
-                old_save_path=self._save_path,
-                warn_if_exist=False,
-            )
-
-            result_path = os.path.join(self._save_path, "result.txt")
-
-            save_result_df(
-                pred=pred,
-                data=data,
-                detection_classes=self._model.model.CLASSES,
-                result_path=result_path,
-            )
-
         if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
-            if (
-                self._problem_type == OBJECT_DETECTION
-            ):  # TODO: add prediction output in COCO format if as_pandas is False
-                pred = save_result_df(
-                    pred=pred,
-                    data=data,
-                    detection_classes=self._model.model.CLASSES,
-                    result_path=None,
-                )
-            elif (
-                self._problem_type == OPEN_VOCABULARY_OBJECT_DETECTION
-            ):  # TODO: refactor and merge with OBJECT DETECTION
-                pred = save_ovd_result_df(
-                    pred=pred,
-                    data=data,
-                    result_path=None,
-                )
-            else:
-                pred = self._as_pandas(data=data, to_be_converted=pred)
+            pred = self._as_pandas(data=data, to_be_converted=pred)
 
         return pred
 
@@ -1852,7 +1751,6 @@ class BaseLearner(ExportMixin):
         self,
         data: Union[pd.DataFrame, dict, list],
         candidate_data: Optional[Union[pd.DataFrame, dict, list]] = None,
-        id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         as_pandas: Optional[bool] = None,
         as_multiclass: Optional[bool] = True,
         realtime: Optional[bool] = None,
@@ -1868,9 +1766,6 @@ class BaseLearner(ExportMixin):
               follow same format (except for the `label` column).
         candidate_data
             The candidate data from which to search the query data's matches.
-        id_mappings
-             Id-to-content mappings. The contents can be text, image, etc.
-             This is used when data contain the query/response identifiers instead of their contents.
         as_pandas
             Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
         as_multiclass
@@ -1905,16 +1800,8 @@ class BaseLearner(ExportMixin):
                 requires_label=False,
                 realtime=realtime,
             )
-
-            if self._problem_type == NER:
-                ner_outputs = extract_from_output(outputs=outputs, ret_type=NER_RET)
-                prob = self._df_preprocessor.transform_prediction(
-                    y_pred=ner_outputs,
-                    return_proba=True,
-                )
-            else:
-                logits = extract_from_output(outputs=outputs, ret_type=LOGITS)
-                prob = logits_to_prob(logits)
+            logits = extract_from_output(outputs=outputs, ret_type=LOGITS)
+            prob = logits_to_prob(logits)
 
         if not as_multiclass:
             if self._problem_type == BINARY:
@@ -1928,12 +1815,10 @@ class BaseLearner(ExportMixin):
     def extract_embedding(
         self,
         data: Union[pd.DataFrame, dict, list],
-        id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         return_masks: Optional[bool] = False,
         as_tensor: Optional[bool] = False,
         as_pandas: Optional[bool] = False,
         realtime: Optional[bool] = None,
-        signature: Optional[str] = None,
     ):
         """
         Extract features for each sample, i.e., one row in the provided dataframe `data`.
@@ -1943,9 +1828,6 @@ class BaseLearner(ExportMixin):
         data
             The data to extract embeddings for. Should contain same column names as training dataset and
             follow same format (except for the `label` column).
-        id_mappings
-             Id-to-content mappings. The contents can be text, image, etc.
-             This is used when data contain the query/response identifiers instead of their contents.
         return_masks
             If true, returns a mask dictionary, whose keys are the same as those in the features dictionary.
             If a sample has empty input in feature column `image_0`, the sample will has mask 0 under key `image_0`.
@@ -1957,8 +1839,6 @@ class BaseLearner(ExportMixin):
             Whether to do realtime inference, which is efficient for small data (default None).
             If not specified, we would infer it on based on the data modalities
             and sample number.
-        signature
-            When using matcher, it can be query or response.
 
         Returns
         -------
@@ -2062,12 +1942,12 @@ class BaseLearner(ExportMixin):
         data_processors: Optional[Dict] = None,
     ):
         """
-        Save this predictor to file in directory specified by `path`.
+        Save this learner to file in directory specified by `path`.
 
         Parameters
         ----------
         path
-            The directory to save this predictor.
+            The directory to save this learner.
         standalone
             Whether to save the downloaded model for offline deployment.
             When standalone = True, save the transformers.CLIPModel and transformers.AutoModel to os.path.join(path,model_name),
@@ -2147,7 +2027,7 @@ class BaseLearner(ExportMixin):
 
     @staticmethod
     def _load_metadata(
-        predictor: BaseLearner,
+        learner: BaseLearner,
         path: str,
         resume: Optional[bool] = False,
         verbosity: Optional[int] = 3,
@@ -2203,43 +2083,37 @@ class BaseLearner(ExportMixin):
         except:  # backward compatibility. reconstruct the data processor in case something went wrong.
             data_processors = None
 
-        # backward compatibility. Use ROISProcessor for old mmdet/mmocr models.
-        if assets["problem_type"] == OBJECT_DETECTION or (
-            "pipeline" in assets and assets["pipeline"] == OBJECT_DETECTION
-        ):
-            data_processors = None
-
-        predictor._label_column = assets["label_column"]
-        predictor._problem_type = assets["problem_type"]
+        learner._label_column = assets["label_column"]
+        learner._problem_type = assets["problem_type"]
         if "pipeline" in assets:  # backward compatibility
-            predictor._problem_type = assets["pipeline"]
+            learner._problem_type = assets["pipeline"]
         if "presets" in assets:
-            predictor._presets = assets["presets"]
+            learner._presets = assets["presets"]
         if "best_score" in assets:  # backward compatibility
-            predictor._best_score = assets["best_score"]
+            learner._best_score = assets["best_score"]
         if "total_train_time" in assets:  # backward compatibility
-            predictor._total_train_time = assets["total_train_time"]
-        predictor._eval_metric_name = assets["eval_metric_name"]
-        predictor._verbosity = verbosity
-        predictor._resume = resume
-        predictor._save_path = path  # in case the original exp dir is copied to somewhere else
-        predictor._pretrained_path = path
+            learner._total_train_time = assets["total_train_time"]
+        learner._eval_metric_name = assets["eval_metric_name"]
+        learner._verbosity = verbosity
+        learner._resume = resume
+        learner._save_path = path  # in case the original exp dir is copied to somewhere else
+        learner._pretrained_path = path
         if "pretrained" in assets:
-            predictor._pretrained = assets["pretrained"]
+            learner._pretrained = assets["pretrained"]
         if "fit_called" in assets:
-            predictor._fit_called = assets["fit_called"]
+            learner._fit_called = assets["fit_called"]
         else:
-            predictor._fit_called = True  # backward compatible
-        predictor._config = config
-        predictor._output_shape = assets["output_shape"]
+            learner._fit_called = True  # backward compatible
+        learner._config = config
+        learner._output_shape = assets["output_shape"]
         if "classes" in assets:
-            predictor._classes = assets["classes"]
-        predictor._column_types = assets["column_types"]
-        predictor._validation_metric_name = assets["validation_metric_name"]
-        predictor._df_preprocessor = df_preprocessor
-        predictor._data_processors = data_processors
+            learner._classes = assets["classes"]
+        learner._column_types = assets["column_types"]
+        learner._validation_metric_name = assets["validation_metric_name"]
+        learner._df_preprocessor = df_preprocessor
+        learner._data_processors = data_processors
 
-        return predictor
+        return learner
 
     @classmethod
     def load(
@@ -2249,7 +2123,7 @@ class BaseLearner(ExportMixin):
         verbosity: Optional[int] = 3,
     ):
         """
-        Load a predictor object from a directory specified by `path`. The to-be-loaded predictor
+        Load a learner object from a directory specified by `path`. The to-be-loaded learner
         can be completely or partially trained by .fit(). If a previous training has completed,
         it will load the checkpoint `model.ckpt`. Otherwise if a previous training accidentally
         collapses in the middle, it can load the `last.ckpt` checkpoint by setting `resume=True`.
@@ -2258,7 +2132,7 @@ class BaseLearner(ExportMixin):
         Parameters
         ----------
         path
-            The directory to load the predictor object.
+            The directory to load the learner object.
         resume
             Whether to resume training from `last.ckpt`. This is useful when a training was accidentally
             broken during the middle and we want to resume the training from the last saved checkpoint.
@@ -2268,42 +2142,28 @@ class BaseLearner(ExportMixin):
 
         Returns
         -------
-        The loaded predictor object.
+        The loaded learner object.
         """
         dir_path, ckpt_path = get_dir_ckpt_paths(path=path)
 
         assert os.path.isdir(dir_path), f"'{dir_path}' must be an existing directory."
-        predictor = cls(label="dummy_label")
-
-        with open(os.path.join(dir_path, "assets.json"), "r") as fp:
-            assets = json.load(fp)
-        if "class_name" in assets and assets["class_name"] == "MultiModalMatcher":
-            predictor._matcher = MultiModalMatcher.load(
-                path=path,
-                resume=resume,
-                verbosity=verbosity,
-            )
-            predictor._problem_type = predictor._matcher._pipeline
-            return predictor
-
-        predictor = cls._load_metadata(predictor=predictor, path=dir_path, resume=resume, verbosity=verbosity)
-
-        efficient_finetune = OmegaConf.select(predictor._config, "optimization.efficient_finetune")
-
+        learner = cls(label="dummy_label")
+        learner = cls._load_metadata(learner=learner, path=dir_path, resume=resume, verbosity=verbosity)
+        efficient_finetune = OmegaConf.select(learner._config, "optimization.efficient_finetune")
         model = create_fusion_model(
-            config=predictor._config,
-            num_classes=predictor._output_shape,
-            classes=predictor._classes,
-            num_numerical_columns=len(predictor._df_preprocessor.numerical_feature_names),
-            num_categories=predictor._df_preprocessor.categorical_num_categories,
+            config=learner._config,
+            num_classes=learner._output_shape,
+            classes=learner._classes,
+            num_numerical_columns=len(learner._df_preprocessor.numerical_feature_names),
+            num_categories=learner._df_preprocessor.categorical_num_categories,
             pretrained=False
             if not efficient_finetune or efficient_finetune == "None"
             else True,  # set "pretrain=False" to prevent downloading online models
         )
 
-        if predictor._data_processors is None:
-            predictor._data_processors = create_fusion_data_processors(
-                config=predictor._config,
+        if learner._data_processors is None:
+            learner._data_processors = create_fusion_data_processors(
+                config=learner._config,
                 model=model,
             )
 
@@ -2319,24 +2179,24 @@ class BaseLearner(ExportMixin):
             strict=not efficient_finetune or efficient_finetune == "None",
         )
 
-        predictor._ckpt_path = ckpt_path
-        predictor._model = model
+        learner._ckpt_path = ckpt_path
+        learner._model = model
 
         loss_func = get_loss_func(
-            problem_type=predictor._problem_type,
+            problem_type=learner._problem_type,
             mixup_active=False,
-            loss_func_name=OmegaConf.select(predictor._config, "optimization.loss_function"),
-            config=predictor._config.optimization,
+            loss_func_name=OmegaConf.select(learner._config, "optimization.loss_function"),
+            config=learner._config.optimization,
         )
 
         model_postprocess_fn = get_model_postprocess_fn(
-            problem_type=predictor._problem_type,
+            problem_type=learner._problem_type,
             loss_func=loss_func,
         )
-        predictor._model_postprocess_fn = model_postprocess_fn
-        predictor._config = predictor.update_strategy_by_env(predictor._config)
+        learner._model_postprocess_fn = model_postprocess_fn
+        learner._config = learner.update_strategy_by_env(learner._config)
 
-        return predictor
+        return learner
 
     @property
     def class_labels(self):
@@ -2367,7 +2227,7 @@ class BaseLearner(ExportMixin):
         You may refer to https://en.wikipedia.org/wiki/F-score for more details.
         In binary classification, :class:`BaseLearner.predict_proba(as_multiclass=False)`
         returns the estimated probability that each row belongs to the positive class.
-        Will print a warning and return None if called when `predictor.problem_type != 'binary'`.
+        Will print a warning and return None if called when `learner.problem_type != 'binary'`.
 
         Returns
         -------
@@ -2403,7 +2263,7 @@ class BaseLearner(ExportMixin):
         We do not recommend directly printing this dict as it may be very large.
         """
         if self._total_train_time is None:
-            logging.info("There is no `best_score` or `total_train_time`. Have you called `predictor.fit()`?")
+            logging.info("There is no `best_score` or `total_train_time`. Have you called `learner.fit()`?")
         else:
             logging.info(
                 f"Here's the model summary:"
@@ -2439,7 +2299,8 @@ class BaseLearner(ExportMixin):
         else:
             raise ValueError(f"list_supported_models() is not available for problem type: {self._problem_type}")
 
-    def update_strategy_by_env(self, config):
+    @staticmethod
+    def update_strategy_by_env(config):
         """
         Set strategy to ddp_fork or ddp_notebook if an iterative env is detected.
         """
