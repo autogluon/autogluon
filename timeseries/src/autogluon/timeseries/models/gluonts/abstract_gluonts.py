@@ -25,7 +25,7 @@ from autogluon.timeseries.utils.datetime import norm_freq_str
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 from autogluon.timeseries.utils.warning_filters import disable_root_logger, warning_filter
 
-# NOTE: We avoid imports for torch and pytorch_lightning at the top level and hide them inside class methods.
+# NOTE: We avoid imports for torch and lightning.pytorch at the top level and hide them inside class methods.
 # This is done to skip these imports during multiprocessing (which may cause bugs)
 
 logger = logging.getLogger(__name__)
@@ -146,7 +146,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
     gluonts_model_path = "gluon_ts"
     # default number of samples for prediction
-    default_num_samples: int = 1000
+    default_num_samples: int = 250
     supports_known_covariates: bool = False
     supports_past_covariates: bool = False
 
@@ -176,6 +176,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         self.num_feat_dynamic_real = 0
         self.num_past_feat_dynamic_real = 0
         self.feat_static_cat_cardinality: List[int] = []
+        self.negative_data = True
 
     def save(self, path: str = None, verbose: bool = True) -> str:
         # we flush callbacks instance variable if it has been set. it can keep weak references which breaks training
@@ -232,6 +233,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             disable_past_covariates = model_params.get("disable_past_covariates", False)
             if not disable_past_covariates and self.supports_past_covariates:
                 self.num_past_feat_dynamic_real = len(self.metadata.past_covariates_real)
+            self.negative_data = (ds[self.target] < 0).any()
 
         if "callbacks" in kwargs:
             self.callbacks += kwargs["callbacks"]
@@ -257,7 +259,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         )
         # Support MXNet kwarg names for backwards compatibility
         init_args.setdefault("lr", init_args.get("learning_rate", 1e-3))
-        init_args.setdefault("max_epochs", init_args.get("epochs"))
+        init_args.setdefault("max_epochs", init_args.get("epochs", 100))
         return init_args
 
     def _get_estimator_init_args(self) -> Dict[str, Any]:
@@ -355,11 +357,11 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         **kwargs,
     ) -> None:
         # necessary to initialize the loggers
-        import pytorch_lightning  # noqa
+        import lightning.pytorch  # noqa
 
         verbosity = kwargs.get("verbosity", 2)
         for logger_name in logging.root.manager.loggerDict:
-            if "pytorch_lightning" in logger_name:
+            if "lightning" in logger_name:
                 pl_logger = logging.getLogger(logger_name)
                 pl_logger.setLevel(logging.ERROR if verbosity <= 3 else logging.INFO)
         set_logger_verbosity(verbosity, logger=logger)
@@ -402,7 +404,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         early_stopping_patience: Optional[int] = None,
     ) -> List[Callable]:
         """Retrieve a list of callback objects for the GluonTS trainer"""
-        from pytorch_lightning.callbacks import EarlyStopping, Timer
+        from lightning.pytorch.callbacks import EarlyStopping, Timer
 
         callbacks = []
         if time_limit is not None:

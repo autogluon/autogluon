@@ -324,7 +324,10 @@ def get_available_devices(num_gpus: int, auto_select_gpus: bool):
     """
     if num_gpus > 0:
         if auto_select_gpus:
-            devices = find_usable_cuda_devices(num_gpus)
+            if is_interactive_env():
+                devices = list(range(num_gpus))
+            else:
+                devices = find_usable_cuda_devices(num_gpus)
         else:
             devices = num_gpus
     else:

@@ -79,7 +79,6 @@ class NPTSModel(AbstractLocalModel):
         dummy_freq = "S"
         ts.index = ts.index.to_period(freq=dummy_freq)
         predictor = NPTSPredictor(
-            freq=dummy_freq,
             prediction_length=self.prediction_length,
             use_default_time_features=False,
             **local_model_args,
