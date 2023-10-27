@@ -1234,8 +1234,8 @@ class TabularPredictor:
         if holdout_data is None:
             ag_fit_kwargs["X"] = X
         else:
-            logger.log(20, "Concatenating holdout data from dynamic stacking to the training for the full fit.")
-            ag_fit_kwargs["X"] = pd.concat([X, holdout_data])
+            logger.log(20, "Concatenating holdout data from dynamic stacking to the training data for the full fit (and reset the index).")
+            ag_fit_kwargs["X"] = pd.concat([X, holdout_data], ignore_index=True)
 
         ag_fit_kwargs["X_val"] = X_val
         ag_fit_kwargs["X_unlabeled"] = X_unlabeled
