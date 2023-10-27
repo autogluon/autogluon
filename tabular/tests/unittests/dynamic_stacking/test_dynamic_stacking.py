@@ -70,6 +70,7 @@ def test_dynamic_stacking_hps(fit_helper, dataset_loader_helper, stacked_overfit
         dict(validation_procedure="cv"),  # 2-fold CV
         dict(validation_procedure="cv", n_repeats=2),  # 2-repeated 2-fold CV
         dict(memory_safe_fits=False, clean_up_fits=False),  # fit options False
+        dict(holdout_data=test_data),
         dict(holdout_data=test_data, validation_procedure="cv", expect_raise=ValueError),
     ]:
         expect_raise = ds_args_update.pop("expect_raise", None)
