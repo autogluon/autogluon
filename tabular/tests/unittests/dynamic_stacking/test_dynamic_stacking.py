@@ -6,14 +6,14 @@ from autogluon.core.constants import BINARY
 from autogluon.core.metrics import METRICS
 
 DS_ARGS_TEST_DEFAULTS = dict(
-    use_holdout=True,
+    validation_procedure="holdout",
     detection_time_frac=1 / 4,
     holdout_frac=1 / 9,
     n_folds=2,
     n_repeats=1,
     memory_safe_fits=True,
     clean_up_fits=True,
-    custom_val_data=None,
+    holdout_data=None,
 )
 
 
@@ -66,22 +66,26 @@ def test_dynamic_stacking_hps(fit_helper, dataset_loader_helper, stacked_overfit
     test_data = test_data[allowed_cols]
 
     for ds_args_update in [
-        dict(use_holdout=True, holdout_frac=1 / 5),  # holdout
-        dict(use_holdout=False),  # 2-fold CV
-        dict(use_holdout=False, n_repeats=2),  # 2-repeated 2-fold CV
+        dict(validation_procedure="holdout", holdout_frac=1 / 5),  # holdout
+        dict(validation_procedure="cv"),  # 2-fold CV
+        dict(validation_procedure="cv", n_repeats=2),  # 2-repeated 2-fold CV
         dict(memory_safe_fits=False, clean_up_fits=False),  # fit options False
-        dict(custom_val_data=test_data),
+        dict(holdout_data=test_data, validation_procedure="cv", expect_raise=ValueError),
     ]:
-        print(ds_args_update)
+        expect_raise = ds_args_update.pop("expect_raise", None)
         tmp_ds_args = DS_ARGS_TEST_DEFAULTS.copy()
         if ds_args_update is not None:
             tmp_ds_args.update(ds_args_update)
         tmp_fit_args = fit_args.copy()
         tmp_fit_args["ds_args"] = tmp_ds_args
-        predictor = fit_helper.fit_dataset(train_data=train_data, init_args=dict(label=label), fit_args=tmp_fit_args, sample_size=1000)
-        lb = predictor.leaderboard(test_data, extra_info=True)
-        stacked_overfitting_assert_func(lb, predictor, False, False)
-        shutil.rmtree(predictor.path)
+        if expect_raise is None:
+            predictor = fit_helper.fit_dataset(train_data=train_data, init_args=dict(label=label), fit_args=tmp_fit_args, sample_size=1000)
+            lb = predictor.leaderboard(test_data, extra_info=True)
+            stacked_overfitting_assert_func(lb, predictor, False, False)
+            shutil.rmtree(predictor.path)
+        else:
+            with pytest.raises(expect_raise):
+                predictor = fit_helper.fit_dataset(train_data=train_data, init_args=dict(label=label), fit_args=tmp_fit_args, sample_size=1000)
 
 
 def test_no_dynamic_stacking(fit_helper):
