@@ -29,7 +29,7 @@ install_requires = [
     "lightning",  # version range defined in `core/_setup_utils.py`
     "pytorch_lightning",  # version range defined in `core/_setup_utils.py`
     "statsmodels>=0.13.0,<0.15",
-    "gluonts>=0.13.1,<0.14",
+    "gluonts>=0.14.0,<0.15",
     "networkx",  # version range defined in `core/_setup_utils.py`
     # TODO: update statsforecast to v1.5.0 - resolve antlr4-python3-runtime dependency clash with multimodal
     "statsforecast>=1.4.0,<1.5",

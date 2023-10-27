@@ -71,6 +71,7 @@ ALL_MODELS = {
     "SimpleFeedForward": DUMMY_MODEL_HPARAMS,
     "TemporalFusionTransformer": DUMMY_MODEL_HPARAMS,
     "Theta": DUMMY_MODEL_HPARAMS,
+    "WaveNet": DUMMY_MODEL_HPARAMS,
     # Override default hyperparameters for faster training
     "AutoARIMA": {"max_p": 2, "use_fallback_model": False},
 }

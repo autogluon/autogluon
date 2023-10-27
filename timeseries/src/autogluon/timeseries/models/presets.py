@@ -26,6 +26,7 @@ from . import (
     SimpleFeedForwardModel,
     TemporalFusionTransformerModel,
     ThetaModel,
+    WaveNetModel,
 )
 from .abstract import AbstractTimeSeriesModel
 from .multi_window.multi_window_model import MultiWindowBacktestingModel
@@ -44,6 +45,7 @@ MODEL_TYPES = dict(
     DLinear=DLinearModel,
     PatchTST=PatchTSTModel,
     TemporalFusionTransformer=TemporalFusionTransformerModel,
+    WaveNet=WaveNetModel,
     RecursiveTabular=RecursiveTabularModel,
     DirectTabular=DirectTabularModel,
     Average=AverageModel,
