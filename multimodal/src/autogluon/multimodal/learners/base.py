@@ -80,6 +80,7 @@ from ..data import (
 from ..models import get_model_postprocess_fn
 from ..optimization import (
     LitModule,
+    DistillerLitModule,
     get_loss_func,
     get_metric,
     get_norm_layer_param_names,
@@ -92,6 +93,7 @@ from ..utils import (
     CustomUnpickler,
     DDPPredictionWriter,
     ExportMixin,
+    DistillationMixin,
     LogFilter,
     apply_log_filter,
     assign_feature_column_names,
@@ -146,7 +148,7 @@ pl_logger.propagate = False  # https://github.com/Lightning-AI/lightning/issues/
 logger = logging.getLogger(__name__)
 
 
-class BaseLearner(ExportMixin):
+class BaseLearner(ExportMixin, DistillationMixin):
     """
     """
     def __init__(
@@ -442,7 +444,8 @@ class BaseLearner(ExportMixin):
             )
 
     def update_attributes(
-        self, presets: Optional[str] = None,
+        self,
+        presets: Optional[str] = None,
         config: Optional[Dict] = None,
         teacher_learner: Optional[Union[str, BaseLearner]] = None,
         df_preprocessor: Optional[MultiModalFeaturePreprocessor] = None,
@@ -535,7 +538,6 @@ class BaseLearner(ExportMixin):
             config=self._config,
             hyperparameters=self._hyperparameters,  # In HPO mode, this would be overwritten by sampled hyperparameters.
             advanced_hyperparameters=self._advanced_hyperparameters,
-            teacher_learner=self._teacher_learner,
             standalone=standalone,
             clean_ckpts=clean_ckpts,
         )
@@ -658,6 +660,7 @@ class BaseLearner(ExportMixin):
             presets=self._presets,
             config=config,
             overrides=hyperparameters,  # don't use self._hyperparameters due to HPO.
+            extra=[DISTILLER] if self._teacher_learner is not None else None,
         )
         config = update_config_by_rules(
             problem_type=self._problem_type,
@@ -691,6 +694,8 @@ class BaseLearner(ExportMixin):
                     train_df_x=data,
                     train_df_y=data[self._label_column] if self._label_column else None,
                 )
+        if is_train and self._teacher_learner is not None:
+            df_preprocessor = [df_preprocessor, self._teacher_learner._df_preprocessor]
         return df_preprocessor
 
     @staticmethod
@@ -743,8 +748,8 @@ class BaseLearner(ExportMixin):
             )
         return peft_param_names
 
-    @staticmethod
     def get_data_processors_per_run(
+        self,
         data_processors,
         config=None,
         model=None,
@@ -752,20 +757,24 @@ class BaseLearner(ExportMixin):
         requires_label=None,
         is_train=True,
     ):
-        if is_train and data_processors is None:
-            data_processors = create_fusion_data_processors(
-                config=config,
-                model=model,
-                advanced_hyperparameters=advanced_hyperparameters,
-            )
-            data_processors_count = {k: len(v) for k, v in data_processors.items()}
-            logger.debug(f"data_processors_count: {data_processors_count}")
-        elif not is_train:
+        if is_train:
+            if data_processors is None:
+                data_processors = create_fusion_data_processors(
+                    config=config,
+                    model=model,
+                    advanced_hyperparameters=advanced_hyperparameters,
+                )
+                data_processors_count = {k: len(v) for k, v in data_processors.items()}
+                logger.debug(f"data_processors_count: {data_processors_count}")
+        else:
             # For each inference call, decouple the used data processors from the learner's attribute
             data_processors = copy.copy(data_processors)
             # For prediction data with no labels provided.
             if not requires_label:
                 data_processors.pop(LABEL, None)
+
+        if is_train and self._teacher_learner is not None:
+            data_processors = [data_processors, self._teacher_learner._data_processors]
 
         return data_processors
 
@@ -858,17 +867,26 @@ class BaseLearner(ExportMixin):
             model_postprocess_fn=None,
             peft_param_names=None,
             optimization_kwargs=None,
+            distillation_kwargs = None,
             is_train=True,
     ):
         if is_train:
-            return LitModule(
-                model=model,
-                loss_func=loss_func,
-                mixup_fn=mixup_func,
-                model_postprocess_fn=model_postprocess_fn,
-                trainable_param_names=peft_param_names,
-                **optimization_kwargs,
-            )
+            if self._teacher_learner:
+                return DistillerLitModule(
+                    student_model=model,
+                    teacher_model=self._teacher_learner._model,
+                    **optimization_kwargs,
+                    **distillation_kwargs,
+                )
+            else:
+                return LitModule(
+                    model=model,
+                    loss_func=loss_func,
+                    mixup_fn=mixup_func,
+                    model_postprocess_fn=model_postprocess_fn,
+                    trainable_param_names=peft_param_names,
+                    **optimization_kwargs,
+                )
         else:
             return LitModule(
                 model=self._model,
@@ -1194,6 +1212,12 @@ class BaseLearner(ExportMixin):
 
             return self
 
+        distillation_kwargs = self.setup_distillation(
+            model=model,
+            loss_func=loss_func,
+            config=config,
+            data_processors=data_processors,
+        )
         datamodule = self.get_datamodule_per_run(
             df_preprocessor=df_preprocessor,
             data_processors=data_processors,
@@ -1212,6 +1236,7 @@ class BaseLearner(ExportMixin):
             model_postprocess_fn=model_postprocess_fn,
             peft_param_names=peft_param_names,
             optimization_kwargs=optimization_kwargs,
+            distillation_kwargs=distillation_kwargs,
         )
         callbacks = self.get_callbacks_per_run(save_path=save_path, config=config, task=task)
         plugins = self.get_plugins_per_run(model=model, peft_param_names=peft_param_names)
@@ -1282,7 +1307,6 @@ class BaseLearner(ExportMixin):
         validation_metric_name,  # FIXME: we need to change validation_metric to evaluation_metric for model choosing
         save_path,
         top_k_average_method,
-        is_distill=False,
         strategy=None,
         last_ckpt_path=None,
         strict_loading=True,
@@ -1300,7 +1324,7 @@ class BaseLearner(ExportMixin):
         if last_ckpt_path is None:
             last_ckpt_path = os.path.join(save_path, LAST_CHECKPOINT)
 
-        if is_distill:
+        if self._teacher_learner is not None:
             prefix = "student_model."
         else:
             prefix = "model."
@@ -1381,7 +1405,7 @@ class BaseLearner(ExportMixin):
             strict=strict_loading,
         )
 
-        if is_distill:
+        if self._teacher_learner is not None:
             avg_state_dict = self._replace_model_name_prefix(
                 state_dict=avg_state_dict,
                 old_prefix="student_model",
