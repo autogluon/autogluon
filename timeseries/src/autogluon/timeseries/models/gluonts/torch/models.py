@@ -395,4 +395,6 @@ class WaveNetModel(AbstractGluonTSModel):
         init_kwargs.setdefault("negative_data", self.negative_data)
         init_kwargs.setdefault("seasonality", get_seasonality(self.freq))
         init_kwargs.setdefault("time_features", get_time_features_for_frequency(self.freq))
+        # WaveNet model fails if an unsupported frequency such as "SM" is provided. We provide a dummy freq instead
+        init_kwargs["freq"] = "H"
         return init_kwargs
