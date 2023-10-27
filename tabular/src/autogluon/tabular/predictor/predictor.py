@@ -1113,7 +1113,8 @@ class TabularPredictor:
         clean_up_fits: bool,
         holdout_data: Optional[Union[str, pd.DataFrame, None]] = None,
     ):
-        """Dynamically determines if stacking is used or not by validating the behavior of a sub-fit of AutoGluon that uses stacking on held out data."""
+        """Dynamically determines if stacking is used or not by validating the behavior of a sub-fit of AutoGluon that uses stacking on held out data.
+        See `ds_args` in the docstring of `fit()` for details on the parameters."""
         time_start = time.time()
         time_limit_og = ag_fit_kwargs["time_limit"]
         org_num_stack_levels = ag_fit_kwargs["num_stack_levels"]
