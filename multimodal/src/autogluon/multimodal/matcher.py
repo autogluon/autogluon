@@ -24,13 +24,10 @@ from autogluon.core.utils.loaders import load_pd
 
 from . import version as ag_version
 from .constants import (
-    AUTOMM,
     AUTOMM_TUTORIAL_MODE,
     BEST,
     BEST_K_MODELS_FILE,
     BINARY,
-    CLASSIFICATION,
-    DATA,
     FEATURES,
     GREEDY_SOUP,
     IMAGE_TEXT_SIMILARITY,
@@ -38,7 +35,6 @@ from .constants import (
     LAST_CHECKPOINT,
     MAX,
     MIN,
-    MODEL,
     MODEL_CHECKPOINT,
     MULTICLASS,
     PAIR,
@@ -52,11 +48,8 @@ from .constants import (
     Y_PRED_PROB,
     Y_TRUE,
 )
-from .data.datamodule import BaseDataModule
-from .data.infer_types import infer_column_types, infer_output_shape, infer_problem_type
-from .data.preprocess_dataframe import MultiModalFeaturePreprocessor
-from .optimization.lit_matcher import MatcherLitModule
-from .optimization.utils import get_matcher_loss_func, get_matcher_miner_func, get_metric
+from .data import BaseDataModule, infer_column_types, infer_output_shape, infer_problem_type, MultiModalFeaturePreprocessor
+from .optimization import MatcherLitModule, get_matcher_loss_func, get_matcher_miner_func, get_metric
 from .presets import matcher_presets
 from .problem_types import PROBLEM_TYPES_REG
 from .utils import (
@@ -102,6 +95,9 @@ from .utils import (
     update_hyperparameters,
     upgrade_config,
     is_lazy_weight_tensor,
+    compute_inference_batch_size,
+    RealtimeMixin,
+    is_interactive_strategy,
 )
 
 pl_logger = logging.getLogger("lightning")
@@ -109,7 +105,7 @@ pl_logger.propagate = False  # https://github.com/Lightning-AI/lightning/issues/
 logger = logging.getLogger(__name__)
 
 
-class MultiModalMatcher:
+class MultiModalMatcher(RealtimeMixin):
     """
     MultiModalMatcher is a framework to learn/extract embeddings for multimodal data including image, text, and tabular.
     These embeddings can be used e.g. with cosine-similarity to find items with similar semantic meanings.
@@ -1338,6 +1334,169 @@ class MultiModalMatcher:
                     task,
                     datamodule=predict_dm,
                 )
+
+        return outputs
+
+    def _realtime_predict(
+        self,
+        data: pd.DataFrame,
+        df_preprocessor: Union[MultiModalFeaturePreprocessor, List[MultiModalFeaturePreprocessor]],
+        data_processors: Union[Dict, List[Dict]],
+        num_gpus: int,
+        precision: Union[int, str],
+        query_model: Optional[nn.Module] = None,
+        response_model: Optional[nn.Module] = None,
+        id_mappings: Union[Dict[str, Dict], Dict[str, pd.Series]] = None,
+        signature: Optional[str] = None,
+        match_label: Optional[int] = None,
+    ) -> List[Dict]:
+        """
+        Perform realtime inference.
+
+        Parameters
+        ----------
+        data
+            A dataframe.
+        df_preprocessor
+            Dataframe preprocessors.
+        data_processors
+            Data processors.
+        num_gpus
+            Number of GPUs.
+        precision
+            The precision used in inference.
+        query_model
+            Matcher's query model.
+        response_model
+            Matcher's response model.
+        id_mappings
+            Id-to-content mappings. The contents can be text, image, etc.
+            This is used when the dataframe contains the query/response indexes instead of their contents.
+        signature
+            query or response.
+        match_label
+            0 or 1.
+
+        Returns
+        -------
+        A list of output dicts.
+        """
+
+        batch = self.process_batch(
+            data=data,
+            df_preprocessor=df_preprocessor,
+            data_processors=data_processors,
+            id_mappings=id_mappings,
+        )
+        output = self.predict_matcher_batch(
+            batch=batch,
+            query_model=query_model,
+            response_model=response_model,
+            signature=signature,
+            match_label=match_label,
+            precision=precision,
+            num_gpus=num_gpus,
+        )
+
+        return [output]
+
+    def predict_per_run(
+        self,
+        data: Union[pd.DataFrame, dict, list],
+        requires_label: bool,
+        id_mappings: Union[Dict[str, Dict], Dict[str, pd.Series]] = None,
+        signature: Optional[str] = None,
+        realtime: Optional[bool] = None,
+        barebones: Optional[bool] = False,
+    ) -> List[Dict]:
+        """
+        Perform inference for predictor or matcher.
+
+        Parameters
+        ----------
+        data
+            The data for inference.
+        requires_label
+            Whether uses label during inference.
+        id_mappings
+            Id-to-content mappings. The contents can be text, image, etc.
+            This is used when the dataframe contains the query/response indexes instead of their contents.
+        signature
+            query or response.
+        realtime
+            Whether use realtime inference.
+        barebones
+            Whether to run in “barebones mode”, where all lightning's features that may impact raw speed are disabled.
+
+        Returns
+        -------
+        A list of output dicts.
+        """
+        data, df_preprocessor, data_processors, match_label = self._on_predict_start(
+            data=data,
+            id_mappings=id_mappings,
+            requires_label=requires_label,
+            signature=signature,
+        )
+        strategy = self._config.env.strategy  # default used in inference.
+        num_gpus = compute_num_gpus(
+            config_num_gpus=self._config.env.num_gpus,
+            strategy=strategy
+        )
+        if num_gpus <= 1:
+            # Force set strategy to be None if it's cpu-only or we have only one GPU.
+            strategy = "auto"
+
+        precision = infer_precision(
+            num_gpus=num_gpus,
+            precision=self._config.env.precision,
+            cpu_only_warning=False,
+        )
+
+        if not realtime:
+            batch_size = compute_inference_batch_size(
+                per_gpu_batch_size=self._config.env.per_gpu_batch_size,
+                eval_batch_size_ratio=OmegaConf.select(self._config, "env.eval_batch_size_ratio"),
+                per_gpu_batch_size_evaluation=self._config.env.per_gpu_batch_size_evaluation,
+                # backward compatibility.
+                num_gpus=num_gpus,
+                strategy=strategy,
+            )
+
+        if realtime is None:
+            realtime = self.use_realtime(data=data, data_processors=data_processors, batch_size=batch_size)
+
+        # TODO: support realtime inference for notebook with multi-gpus
+        if is_interactive_strategy(strategy) and realtime:
+            realtime = False
+            num_gpus = 1
+
+        if realtime:
+            outputs = self._realtime_predict(
+                query_model=self._query_model,
+                response_model=self._response_model,
+                data=data,
+                df_preprocessor=df_preprocessor,
+                data_processors=data_processors,
+                num_gpus=num_gpus,
+                precision=precision,
+                id_mappings=id_mappings,
+                signature=signature,
+                match_label=match_label,
+            )
+        else:
+            outputs = self._default_predict(
+                data=data,
+                id_mappings=id_mappings,
+                df_preprocessor=df_preprocessor,
+                data_processors=data_processors,
+                num_gpus=num_gpus,
+                precision=precision,
+                batch_size=batch_size,
+                strategy=strategy,
+                match_label=match_label,
+                signature=signature,
+            )
 
         return outputs
 

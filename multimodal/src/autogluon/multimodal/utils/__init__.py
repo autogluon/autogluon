@@ -44,7 +44,7 @@ from .environment import (
 )
 from .export import ExportMixin
 from .hpo import hyperparameter_tune
-from .inference import extract_from_output, infer_batch, predict, process_batch, use_realtime
+from .inference import extract_from_output, RealtimeMixin
 from .load import CustomUnpickler, get_dir_ckpt_paths, get_load_ckpt_paths, load_text_tokenizers
 from .log import (
     LogFilter,

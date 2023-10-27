@@ -3,10 +3,11 @@ from typing import Dict, List, Optional, Union
 
 import pandas as pd
 from torch import nn
+from omegaconf import OmegaConf
 from datetime import timedelta
 import logging
 
-from ..constants import BBOX, MULTI_IMAGE_MIX_DATASET, OBJECT_DETECTION, XYWH, MAP, OPEN_VOCABULARY_OBJECT_DETECTION, OVD_RET
+from ..constants import BBOX, MULTI_IMAGE_MIX_DATASET, OBJECT_DETECTION, XYWH, MAP, OPEN_VOCABULARY_OBJECT_DETECTION, OVD_RET, DDP
 from ..data import BaseDataModule, MultiModalFeaturePreprocessor, MultiImageMixDataset, infer_rois_column_type
 from ..optimization import MMDetLitModule
 from ..utils import (
@@ -22,9 +23,9 @@ from ..utils import (
     create_fusion_model,
     compute_num_gpus,
     infer_precision,
-    predict,
     extract_from_output,
     save_ovd_result_df,
+    compute_inference_batch_size,
 )
 from .base import BaseLearner
 logger = logging.getLogger(__name__)
@@ -193,6 +194,20 @@ class ObjectDetectionLearner(BaseLearner):
         datamodule = BaseDataModule(**datamodule_kwargs)
         return datamodule
 
+    def get_strategy_per_run(self, num_gpus, config):
+        if num_gpus <= 1:
+            strategy = "auto"
+        else:
+            strategy = DDP
+
+        return strategy
+
+    def update_num_gpus_by_strategy(self, strategy, num_gpus):
+        if strategy == DDP and self._fit_called:
+            num_gpus = 1  # While using DDP, we can only use single gpu after fit is called
+
+        return num_gpus
+
     def build_task_per_run(
         self,
         model: Optional[nn.Module] = None,
@@ -334,11 +349,31 @@ class ObjectDetectionLearner(BaseLearner):
             model=self._model,
         )
 
-    def _on_predict_start(
+    def predict_per_run(
         self,
         data: Union[pd.DataFrame, dict, list],
         requires_label: bool,
-    ):
+        realtime: Optional[bool] = None,
+        barebones: Optional[bool] = False,
+    ) -> List[Dict]:
+        """
+        Perform inference for learner.
+
+        Parameters
+        ----------
+        data
+            The data for inference.
+        requires_label
+            Whether uses label during inference.
+        realtime
+            Whether use realtime inference.
+        barebones
+            Whether to run in “barebones mode”, where all lightning's features that may impact raw speed are disabled.
+
+        Returns
+        -------
+        A list of output dicts.
+        """
         data = self.data_to_df(data=data)
         column_types = self.infer_column_types(
             column_types=self._column_types,
@@ -362,20 +397,31 @@ class ObjectDetectionLearner(BaseLearner):
             requires_label=requires_label,
             is_train=False,
         )
-
-        return data, df_preprocessor, data_processors
-
-    def _default_predict(
-        self,
-        data: pd.DataFrame,
-        df_preprocessor: MultiModalFeaturePreprocessor,
-        data_processors: Dict,
-        num_gpus: int,
-        precision: Union[int, str],
-        batch_size: int,
-        strategy: str,
-        barebones: Optional[bool] = False,
-    ) -> List[Dict]:
+        num_gpus = compute_num_gpus(
+            config_num_gpus=self._config.env.num_gpus,
+            strategy=self._config.env.strategy,
+        )
+        precision = infer_precision(
+            num_gpus=num_gpus,
+            precision=self._config.env.precision,
+            cpu_only_warning=False,
+        )
+        strategy = self.get_strategy_per_run(num_gpus=num_gpus, config=self._config)
+        num_gpus = self.update_num_gpus_by_strategy(strategy=strategy, num_gpus=num_gpus)
+        batch_size = compute_inference_batch_size(
+            per_gpu_batch_size=self._config.env.per_gpu_batch_size,
+            eval_batch_size_ratio=OmegaConf.select(self._config, "env.eval_batch_size_ratio"),
+            per_gpu_batch_size_evaluation=self._config.env.per_gpu_batch_size_evaluation,
+            # backward compatibility.
+            num_gpus=num_gpus,
+            strategy=strategy,
+        )
+        realtime, num_gpus, barebones = self.update_realtime_for_interactive_env(
+            realtime=realtime,
+            num_gpus=num_gpus,
+            barebones=barebones,
+            strategy=strategy,
+        )
         datamodule = self.get_datamodule_per_run(
             df_preprocessor=df_preprocessor,
             data_processors=data_processors,
@@ -424,7 +470,7 @@ class ObjectDetectionLearner(BaseLearner):
     ):
         """
         """
-        self.ensure_inference_ready()
+        self.ensure_predict_ready()
         if self._problem_type == OPEN_VOCABULARY_OBJECT_DETECTION:
             raise NotImplementedError("Open vocabulary object detection doesn't support calling `evaluate` yet.")
 
@@ -478,7 +524,7 @@ class ObjectDetectionLearner(BaseLearner):
         -------
         Array of predictions, one corresponding to each row in given dataset.
         """
-        self.ensure_inference_ready()
+        self.ensure_predict_ready()
         ret_type = BBOX
         if self._problem_type == OBJECT_DETECTION:
             data = object_detection_data_to_df(data)
@@ -487,8 +533,7 @@ class ObjectDetectionLearner(BaseLearner):
         elif self._problem_type == OPEN_VOCABULARY_OBJECT_DETECTION:
             ret_type = OVD_RET
 
-        outputs = predict(
-            predictor=self,
+        outputs = self.predict_per_run(
             data=data,
             requires_label=False,
             realtime=realtime,

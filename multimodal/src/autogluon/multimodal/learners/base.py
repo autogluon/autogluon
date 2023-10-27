@@ -94,6 +94,7 @@ from ..utils import (
     DDPPredictionWriter,
     ExportMixin,
     DistillationMixin,
+    RealtimeMixin,
     LogFilter,
     apply_log_filter,
     assign_feature_column_names,
@@ -127,7 +128,6 @@ from ..utils import (
     list_timm_models,
     load_text_tokenizers,
     logits_to_prob,
-    predict,
     save_pretrained_model_configs,
     save_text_tokenizers,
     select_model,
@@ -141,6 +141,7 @@ from ..utils import (
     update_tabular_config_by_resources,
     upgrade_config,
     infer_problem_type_by_eval_metric,
+    compute_inference_batch_size,
 )
 
 pl_logger = logging.getLogger("lightning")
@@ -148,7 +149,7 @@ pl_logger.propagate = False  # https://github.com/Lightning-AI/lightning/issues/
 logger = logging.getLogger(__name__)
 
 
-class BaseLearner(ExportMixin, DistillationMixin):
+class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
     """
     """
     def __init__(
@@ -643,7 +644,7 @@ class BaseLearner(ExportMixin, DistillationMixin):
             )
         self._config = self.update_strategy_by_env(config=self._config)
 
-    def ensure_inference_ready(self):
+    def ensure_predict_ready(self):
         if not self._fit_called:
             if not self._problem_type or not self.problem_property.support_zero_shot:
                 raise RuntimeError(
@@ -1488,17 +1489,187 @@ class BaseLearner(ExportMixin, DistillationMixin):
         if trainer.global_rank != 0:
             sys.exit(f"Prediction finished, exit the process with global_rank={trainer.global_rank}...")
 
-    def _default_predict(
+    def update_image_column_types(self, data):
+        column_types = self._column_types
+        column_types_copy = copy.deepcopy(column_types)
+        for col_name, col_type in column_types.items():
+            if col_type in [IMAGE_BYTEARRAY, IMAGE_PATH]:
+                if is_image_column(data=data[col_name], col_name=col_name, image_type=IMAGE_PATH):
+                    image_type = IMAGE_PATH
+                elif is_image_column(
+                        data=data[col_name],
+                        col_name=col_name,
+                        image_type=IMAGE_BYTEARRAY,
+                ):
+                    image_type = IMAGE_BYTEARRAY
+                else:
+                    image_type = col_type
+                if col_type != image_type:
+                    column_types_copy[col_name] = image_type
+        return column_types_copy
+
+    def data_to_df(self, data):
+        if self._fit_called:
+            column_names = list(self._column_types.keys())
+            # remove label column since it's not required in inference.
+            column_names.remove(self._label_column)
+            data = data_to_df(
+                data=data,
+                required_columns=self._df_preprocessor.required_feature_names,
+                all_columns=column_names,
+            )
+        else:
+            data = data_to_df(data=data)
+
+        return data
+
+    @staticmethod
+    def update_realtime_for_interactive_env(realtime: bool, num_gpus: int, barebones: bool, strategy: str):
+        # TODO: support realtime inference for notebook with multi-gpus
+        # realtime can initialize CUDA, which can cause failures when calling fit again in the interactive env.
+        if is_interactive_strategy(strategy) and realtime:
+            realtime = False
+            num_gpus = 1
+            barebones = True
+
+        return realtime, num_gpus, barebones
+
+    def realtime_predict(
         self,
         data: pd.DataFrame,
-        df_preprocessor: MultiModalFeaturePreprocessor,
-        data_processors: Dict,
+        df_preprocessor: Union[MultiModalFeaturePreprocessor, List[MultiModalFeaturePreprocessor]],
+        data_processors: Union[Dict, List[Dict]],
         num_gpus: int,
         precision: Union[int, str],
-        batch_size: int,
-        strategy: str,
+        model: Optional[nn.Module] = None,
+        model_postprocess_fn: Optional[Callable] = None,
+    ) -> List[Dict]:
+        """
+        Perform realtime inference.
+
+        Parameters
+        ----------
+        data
+            A dataframe.
+        df_preprocessor
+            Dataframe preprocessors.
+        data_processors
+            Data processors.
+        num_gpus
+            Number of GPUs.
+        precision
+            The precision used in inference.
+        model
+            Predictor's model.
+        model_postprocess_fn
+            A postprocessing function.
+
+        Returns
+        -------
+        A list of output dicts.
+        """
+
+        batch = self.process_batch(
+            data=data,
+            df_preprocessor=df_preprocessor,
+            data_processors=data_processors,
+        )
+        output = self.predict_batch(
+            batch=batch,
+            model=model,
+            precision=precision,
+            num_gpus=num_gpus,
+            model_postprocess_fn=model_postprocess_fn,
+        )
+        return [output]
+
+    def predict_per_run(
+        self,
+        data: Union[pd.DataFrame, dict, list],
+        requires_label: bool,
+        realtime: Optional[bool] = None,
         barebones: Optional[bool] = False,
     ) -> List[Dict]:
+        """
+        Perform inference for learner.
+
+        Parameters
+        ----------
+        data
+            The data for inference.
+        requires_label
+            Whether uses label during inference.
+        realtime
+            Whether use realtime inference.
+        barebones
+            Whether to run in “barebones mode”, where all lightning's features that may impact raw speed are disabled.
+
+        Returns
+        -------
+        A list of output dicts.
+        """
+        data = self.data_to_df(data=data)
+        column_types = self.infer_column_types(
+            column_types=self._column_types,
+            data=data,
+            is_train=False,
+        )
+        df_preprocessor = self.get_df_preprocessor_per_run(
+            df_preprocessor=self._df_preprocessor,
+            data=data,
+            column_types=column_types,
+            is_train=False,
+        )
+        if self._fit_called:
+            df_preprocessor._column_types = self.update_image_column_types(data=data)
+        data_processors = self.get_data_processors_per_run(
+            data_processors=self._data_processors,
+            requires_label=requires_label,
+            is_train=False,
+        )
+        num_gpus = compute_num_gpus(
+            config_num_gpus=self._config.env.num_gpus,
+            strategy=self._config.env.strategy,
+        )
+        precision = infer_precision(
+            num_gpus=num_gpus,
+            precision=self._config.env.precision,
+            cpu_only_warning=False,
+        )
+        strategy = self.get_strategy_per_run(num_gpus=num_gpus, config=self._config)
+        batch_size = compute_inference_batch_size(
+            per_gpu_batch_size=self._config.env.per_gpu_batch_size,
+            eval_batch_size_ratio=OmegaConf.select(self._config, "env.eval_batch_size_ratio"),
+            per_gpu_batch_size_evaluation=self._config.env.per_gpu_batch_size_evaluation,
+            # backward compatibility.
+            num_gpus=num_gpus,
+            strategy=strategy,
+        )
+        realtime = self.use_realtime(
+            realtime=realtime,
+            data=data,
+            data_processors=data_processors,
+            batch_size=batch_size,
+        )
+        realtime, num_gpus, barebones = self.update_realtime_for_interactive_env(
+            realtime=realtime,
+            num_gpus=num_gpus,
+            barebones=barebones,
+            strategy=strategy,
+        )
+
+        if realtime:
+            outputs = self.realtime_predict(
+                model=self._model,
+                data=data,
+                df_preprocessor=df_preprocessor,
+                data_processors=data_processors,
+                num_gpus=num_gpus,
+                precision=precision,
+                model_postprocess_fn=self._model_postprocess_fn,
+            )
+            return outputs
+
         strategy, optimization_kwargs = self.prepare_for_deepspeed_offloading(strategy=strategy)
         datamodule = self.get_datamodule_per_run(
             df_preprocessor=df_preprocessor,
@@ -1534,54 +1705,6 @@ class BaseLearner(ExportMixin, DistillationMixin):
         self.clean_trainer_processes(trainer=trainer)
 
         return outputs
-
-    def update_image_column_types(self, data):
-        column_types = self._column_types
-        column_types_copy = copy.deepcopy(column_types)
-        for col_name, col_type in column_types.items():
-            if col_type in [IMAGE_BYTEARRAY, IMAGE_PATH]:
-                if is_image_column(data=data[col_name], col_name=col_name, image_type=IMAGE_PATH):
-                    image_type = IMAGE_PATH
-                elif is_image_column(
-                        data=data[col_name],
-                        col_name=col_name,
-                        image_type=IMAGE_BYTEARRAY,
-                ):
-                    image_type = IMAGE_BYTEARRAY
-                else:
-                    image_type = col_type
-                if col_type != image_type:
-                    column_types_copy[col_name] = image_type
-        return column_types_copy
-
-    def data_to_df(self, data):
-        if self._fit_called:
-            column_names = list(self._column_types.keys())
-            # remove label column since it's not required in inference.
-            column_names.remove(self._label_column)
-            data = data_to_df(
-                data=data,
-                required_columns=self._df_preprocessor.required_feature_names,
-                all_columns=column_names,
-            )
-        else:
-            data = data_to_df(data=data)
-
-        return data
-
-    def _on_predict_start(
-        self,
-        data: Union[pd.DataFrame, dict, list],
-        requires_label: bool,
-    ):
-        data = self.data_to_df(data=data)
-        column_types = self.infer_column_types(column_types=self._column_types, data=data, is_train=False)
-        df_preprocessor = self.get_df_preprocessor_per_run(df_preprocessor=self._df_preprocessor, data=data, column_types=column_types, is_train=False)
-        if self._fit_called:
-            df_preprocessor._column_types = self.update_image_column_types(data=data)
-        data_processors = self.get_data_processors_per_run(data_processors=self._data_processors, requires_label=requires_label, is_train=False)
-
-        return data, df_preprocessor, data_processors
 
     def set_num_gpus(self, num_gpus):
         assert isinstance(num_gpus, int)
@@ -1623,10 +1746,9 @@ class BaseLearner(ExportMixin, DistillationMixin):
         A dictionary with the metric names and their corresponding scores.
         Optionally return a dataframe of prediction results.
         """
-        self._ensure_inference_ready()
+        self.ensure_predict_ready()
         ret_type = LOGITS
-        outputs = predict(
-            predictor=self,
+        outputs = self.predict_per_run(
             data=data,
             requires_label=True,
             realtime=realtime,
@@ -1718,9 +1840,6 @@ class BaseLearner(ExportMixin, DistillationMixin):
             follow same format (except for the `label` column).
         candidate_data
             The candidate data from which to search the query data's matches.
-        id_mappings
-             Id-to-content mappings. The contents can be text, image, etc.
-             This is used when data contain the query/response identifiers instead of their contents.
         as_pandas
             Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
         realtime
@@ -1732,7 +1851,7 @@ class BaseLearner(ExportMixin, DistillationMixin):
         -------
         Array of predictions, one corresponding to each row in given dataset.
         """
-        self._ensure_inference_ready()
+        self.ensure_predict_ready()
         ret_type = LOGITS
         if candidate_data:
             pred = self._match_queries_and_candidates(
@@ -1741,8 +1860,7 @@ class BaseLearner(ExportMixin, DistillationMixin):
                 return_prob=False,
             )
         else:
-            outputs = predict(
-                predictor=self,
+            outputs = self.predict_per_run(
                 data=data,
                 requires_label=False,
                 realtime=realtime,
@@ -1799,7 +1917,7 @@ class BaseLearner(ExportMixin, DistillationMixin):
         When as_multiclass is True, the output will always have shape (#samples, #classes).
         Otherwise, the output will have shape (#samples,)
         """
-        self._ensure_inference_ready()
+        self.ensure_predict_ready()
         assert self._problem_type not in [
             REGRESSION,
         ], f"Problem {self._problem_type} has no probability output."
@@ -1811,8 +1929,7 @@ class BaseLearner(ExportMixin, DistillationMixin):
                 return_prob=True,
             )
         else:
-            outputs = predict(
-                predictor=self,
+            outputs = self.predict_per_run(
                 data=data,
                 requires_label=False,
                 realtime=realtime,
@@ -1863,13 +1980,12 @@ class BaseLearner(ExportMixin, DistillationMixin):
         It will have shape (#samples, D) where the embedding dimension D is determined
         by the neural network's architecture.
         """
-        self._ensure_inference_ready()
+        self.ensure_predict_ready()
         turn_on_off_feature_column_info(
             data_processors=self._data_processors,
             flag=True,
         )
-        outputs = predict(
-            predictor=self,
+        outputs = self.predict_per_run(
             data=data,
             requires_label=False,
             realtime=realtime,

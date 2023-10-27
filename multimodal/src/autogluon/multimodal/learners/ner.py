@@ -6,13 +6,14 @@ import logging
 import warnings
 from datetime import timedelta
 from torch import nn
+from omegaconf import OmegaConf
 
 from autogluon.core.metrics import Scorer
 
 from ..constants import NER, OVERALL_F1, NER_RET, Y_PRED, Y_TRUE
 from ..data import MultiModalFeaturePreprocessor
 from ..optimization import NerLitModule
-from ..utils import predict, extract_from_output, compute_num_gpus, infer_precision, compute_score, merge_bio_format
+from ..utils import extract_from_output, compute_num_gpus, infer_precision, compute_score, merge_bio_format, compute_inference_batch_size
 from .base import BaseLearner
 
 logger = logging.getLogger(__name__)
@@ -281,9 +282,8 @@ class NERLearner(BaseLearner):
     ):
         """
         """
-        self.ensure_inference_ready()
-        outputs = predict(
-            predictor=self,
+        self.ensure_predict_ready()
+        outputs = self.predict_per_run(
             data=data,
             requires_label=True,
             realtime=realtime,
@@ -365,9 +365,8 @@ class NERLearner(BaseLearner):
         -------
         Array of predictions, one corresponding to each row in given dataset.
         """
-        self.ensure_inference_ready()
-        outputs = predict(
-            predictor=self,
+        self.ensure_predict_ready()
+        outputs = self.predict_per_run(
             data=data,
             requires_label=False,
             realtime=realtime,
@@ -414,9 +413,8 @@ class NERLearner(BaseLearner):
         When as_multiclass is True, the output will always have shape (#samples, #classes).
         Otherwise, the output will have shape (#samples,)
         """
-        self.ensure_inference_ready()
-        outputs = predict(
-            predictor=self,
+        self.ensure_predict_ready()
+        outputs = self.predict_per_run(
             data=data,
             requires_label=False,
             realtime=realtime,
