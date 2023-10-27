@@ -8,9 +8,9 @@ on:
 
 env:
   AG_MODULE: tabular
-  AG_PRESET: medium
-  AG_BENCHMARK: test
-  AG_TIME_LIMIT: 1h
+  AG_PRESET: best
+  AG_BENCHMARK: full
+  AG_TIME_LIMIT: 1h8c
   AG_BRANCH_NAME: master
   
 permissions:
