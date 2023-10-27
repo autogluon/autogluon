@@ -46,20 +46,6 @@ subprocess.run(
     ],
     check=True,
 )
-subprocess.run(
-    [
-        "agbench",
-        "clean-amlb-results",
-        benchmark_name,
-        f"--results-dir-input",
-        f"s3://autogluon-ci-benchmark/aggregated/{module_name}/{benchmark_name}/",
-        "--benchmark-name-in-input-path",
-        "--constraints",
-        time_limit,
-        "--results-dir-output",
-        "./results",
-    ]
-)
 
 if module_name == 'timeseries':
 
@@ -82,6 +68,20 @@ if module_name == 'timeseries':
             df.to_csv(target, index=False)
             bucket.upload_file(target, obj.key)
 
+subprocess.run(
+    [
+        "agbench",
+        "clean-amlb-results",
+        benchmark_name,
+        f"--results-dir-input",
+        f"s3://autogluon-ci-benchmark/aggregated/{module_name}/{benchmark_name}/",
+        "--benchmark-name-in-input-path",
+        "--constraints",
+        time_limit,
+        "--results-dir-output",
+        "./results",
+    ]
+)
 
 # If it is a PR then perform the evaluation w.r.t cleaned master bench results, test
 if branch_name != "master":
