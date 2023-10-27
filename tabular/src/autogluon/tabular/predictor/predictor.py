@@ -4226,7 +4226,7 @@ class TabularPredictor:
             raise ValueError(f"`n_folds` in `ds_args` must be int in [2, +inf).  Got: {type(ds_args['n_folds'])}, {ds_args['n_folds']}")
         if ("n_repeats" in ds_args) and ((not isinstance(ds_args["n_repeats"], int)) or (ds_args["n_repeats"] < 1)):
             raise ValueError(f"`n_repeats` in `ds_args` must be int in [1, +inf).  Got: {type(ds_args['n_repeats'])}, {ds_args['n_repeats']}")
-        if ("holdout_data" in ds_args) and (not isinstance(ds_args["holdout_data"], Union[None, str, pd.DataFrame])):
+        if ("holdout_data" in ds_args) and (not isinstance(ds_args["holdout_data"], (str, pd.DataFrame))) and (ds_args["holdout_data"] is not None):
             raise ValueError(f"`holdout_data` in `ds_args` must be None, str, or pd.DataFrame.  Got: {type(ds_args['holdout_data'])}")
         if (ds_args["validation_procedure"] == "cv") and (ds_args["holdout_data"] is not None):
             raise ValueError(
