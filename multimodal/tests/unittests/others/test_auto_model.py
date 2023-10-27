@@ -4,7 +4,6 @@ import torch
 from autogluon.multimodal.constants import FEATURES, LOGITS
 from autogluon.multimodal.models import (
     HFAutoModelForTextPrediction,
-    NumericalTransformer,
     TimmAutoModelForImagePrediction,
 )
 
@@ -41,39 +40,3 @@ def test_hf_automodel_init(checkpoint_name):
 )
 def test_timm_automodel_init(checkpoint_name):
     model = TimmAutoModelForImagePrediction(prefix="model", checkpoint_name=checkpoint_name, num_classes=5)
-
-
-@pytest.mark.parametrize(
-    "embedding_arch",
-    [
-        ["positional"],
-        ["positional", "linear"],
-        ["linear"],
-        ["linear", "relu", "linear"],
-        ["linear", "layernorm", "relu"],
-        ["autodis"],
-        ["autodis", "linear"],
-    ],
-)
-def test_numerical_transformer_init(embedding_arch):
-
-    in_features = 10
-    d_token = 192
-    num_classes = 5
-
-    model = NumericalTransformer(
-        prefix="model",
-        num_classes=num_classes,
-        in_features=in_features,
-        d_token=d_token,
-        embedding_arch=embedding_arch,
-    )
-
-    y = model.forward(
-        {
-            model.numerical_key: torch.ones(1, in_features),  # synthetic data
-        }
-    )[model.prefix]
-
-    assert y[LOGITS].shape == (1, num_classes)  # check the output shape
-    assert y[FEATURES].shape == (1, in_features, d_token)  # check the output shape

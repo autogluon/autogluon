@@ -35,8 +35,8 @@ TABULAR_DATASETS = {
 
 automm_hyperparameters = {
     "data.categorical.convert_to_text": False,
-    "model.names": ["ft_transformer_refactor"],
-    "model.ft_transformer_refactor.embedding_arch": ["linear"],
+    "model.names": ["ft_transformer"],
+    "model.ft_transformer.embedding_arch": ["linear"],
     "env.batch_size": 128,
     "env.per_gpu_batch_size": 128,
     "env.eval_batch_size_ratio": 1,

@@ -134,13 +134,6 @@ def select_model(
     if len(selected_model_names) > 1:
         assert len(fusion_model_name) == 1
         selected_model_names.extend(fusion_model_name)
-    elif len(fusion_model_name) == 1 and hasattr(config.model, fusion_model_name[0]):
-        # TODO: Support using categorical_transformer or numerical_transformer alone without a fusion model.
-        if selected_model_names[0].lower().startswith((CATEGORICAL_TRANSFORMER, NUMERICAL_TRANSFORMER)):
-            selected_model_names.extend(fusion_model_name)
-        else:
-            # remove the fusion model's config make `config.model.names` and the keys of `config.model` consistent.
-            delattr(config.model, fusion_model_name[0])
 
     config.model.names = selected_model_names
     logger.debug(f"selected models: {selected_model_names}")

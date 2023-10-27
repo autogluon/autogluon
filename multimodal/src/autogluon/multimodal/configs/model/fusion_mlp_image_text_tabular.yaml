@@ -221,7 +221,6 @@ model:
       - "numerical"
     embedding_arch:
       - 'linear'
-      - 'relu'
     d_token: 192
     adapter_output_feature: 192
     hidden_size: 192
