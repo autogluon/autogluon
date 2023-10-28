@@ -112,7 +112,7 @@ def select_model(
     fusion_model_name = []
     for model_name in names:
         model_config = getattr(config.model, model_name)
-        strict = getattr(model_config, "requires_all_dtypes", True)
+        strict = getattr(model_config, "requires_all_dtypes", strict)
         if not model_config.data_types:
             fusion_model_name.append(model_name)
             continue
