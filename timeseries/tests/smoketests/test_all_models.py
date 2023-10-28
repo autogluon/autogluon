@@ -130,12 +130,11 @@ def test_all_models_can_handle_all_covariates(
 
 @pytest.mark.parametrize("freq", DEFAULT_SEASONALITIES.keys())
 def test_all_models_handle_all_pandas_frequencies(freq):
-    freq_str = f"2{freq}"
     prediction_length = 5
 
     train_data, test_data = generate_train_and_test_data(
         prediction_length=prediction_length,
-        freq=freq_str,
+        freq=freq,
         use_known_covariates=True,
         use_past_covariates=True,
     )
