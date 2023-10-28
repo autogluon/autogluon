@@ -53,11 +53,10 @@ from .log import (
     get_fit_start_message,
     get_gpu_message,
     make_exp_dir,
-    handle_deprecated_args,
 )
 from .matcher import compute_semantic_similarity, convert_data_for_ranking, create_siamese_model, semantic_search
 from .metric import compute_ranking_score, compute_score, get_minmax_mode, get_stopping_threshold, infer_metrics, infer_problem_type_by_eval_metric
-from .misc import logits_to_prob, merge_bio_format, shopee_dataset, tensor_to_ndarray, visualize_ner
+from .misc import logits_to_prob, merge_bio_format, shopee_dataset, tensor_to_ndarray, visualize_ner, handle_deprecated_args
 from .mmcv import CollateMMDet, CollateMMOcr
 from .model import (
     create_fusion_model,
@@ -73,7 +72,6 @@ from .object_detection import (
     bbox_xyxy_to_xywh,
     cocoeval,
     convert_pred_to_xywh,
-    evaluate_coco,
     from_coco,
     from_coco_or_voc,
     from_dict,
@@ -84,7 +82,6 @@ from .object_detection import (
     save_result_coco_format,
     save_result_df,
     save_result_voc_format,
-    setup_detection_train_tuning_data,
     visualize_detection,
 )
 from .object_detection_visualizer import Visualizer

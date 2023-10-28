@@ -29,7 +29,7 @@ def get_ray_tune_ckpt_callback():
     return _TuneReportCheckpointCallback
 
 
-def hpo_trial(sampled_hyperparameters, predictor, checkpoint_dir=None, **_fit_args):
+def hpo_trial(sampled_hyperparameters, learner, checkpoint_dir=None, **_fit_args):
     """
     Run one HPO trial.
 
@@ -37,12 +37,12 @@ def hpo_trial(sampled_hyperparameters, predictor, checkpoint_dir=None, **_fit_ar
     ----------
     sampled_hyperparameters
         The sampled hyperparameters for this trial.
-    predictor
-        A predictor object.
+    learner
+        A learner object.
     checkpoint_dir
         The checkpoint directory.
     _fit_args
-        The keyword arguments for predictor._fit().
+        The keyword arguments for learner.fit_per_run().
     """
     from ray import tune
 
@@ -58,19 +58,19 @@ def hpo_trial(sampled_hyperparameters, predictor, checkpoint_dir=None, **_fit_ar
         _fit_args["resume"] = True
         _fit_args["ckpt_path"] = os.path.join(checkpoint_dir, RAY_TUNE_CHECKPOINT)
     with set_torch_num_threads(num_cpus=num_cpus):
-        predictor._fit(**_fit_args)
+        learner.fit_per_run(**_fit_args)
 
 
-def build_final_predictor(
-    predictor, best_trial_path, minmax_mode, is_distill, val_df, save_path, last_ckpt_path, is_matching
+def build_final_learner(
+    learner, best_trial_path, minmax_mode, is_distill, val_df, save_path, last_ckpt_path, is_matching
 ):
     """
-    Build the final predictor after HPO is finished.
+    Build the final learner after HPO is finished.
 
     Parameters
     ----------
-    predictor
-        A predictor object.
+    learner
+        A learner object.
     best_trial_path
         The best trial's saving path.
     minmax_mode
@@ -88,13 +88,13 @@ def build_final_predictor(
 
     Returns
     -------
-    The constructed predictor.
+    The constructed learner.
     """
     if is_matching:
         from ..matcher import MultiModalMatcher
 
-        # reload the predictor metadata
-        matcher = MultiModalMatcher._load_metadata(matcher=predictor, path=best_trial_path)
+        # reload the learner metadata
+        matcher = MultiModalMatcher._load_metadata(matcher=learner, path=best_trial_path)
         # construct the model
         query_model, response_model = create_siamese_model(
             query_config=matcher._query_config,
@@ -118,40 +118,40 @@ def build_final_predictor(
 
         return matcher
     else:
-        from ..predictor import MultiModalPredictor
+        from ..learners import BaseLearner
 
-        # reload the predictor metadata
-        predictor = MultiModalPredictor._load_metadata(predictor=predictor, path=best_trial_path)
+        # reload the learner metadata
+        learner = BaseLearner._load_metadata(learner=learner, path=best_trial_path)
         # construct the model
         model = create_fusion_model(
-            config=predictor._config,
-            num_classes=predictor._output_shape,
-            classes=predictor._classes,
-            num_numerical_columns=len(predictor._df_preprocessor.numerical_feature_names),
-            num_categories=predictor._df_preprocessor.categorical_num_categories,
+            config=learner._config,
+            num_classes=learner._output_shape,
+            classes=learner._classes,
+            num_numerical_columns=len(learner._df_preprocessor.numerical_feature_names),
+            num_categories=learner._df_preprocessor.categorical_num_categories,
             pretrained=False,  # set "pretrain=False" to prevent downloading online models
         )
-        predictor._model = model
+        learner._model = model
         # average checkpoint
-        predictor._top_k_average(
-            model=predictor._model,
+        learner.top_k_average(
+            model=learner._model,
             save_path=best_trial_path,
             last_ckpt_path=last_ckpt_path,
             minmax_mode=minmax_mode,
             is_distill=is_distill,
-            top_k_average_method=predictor._config.optimization.top_k_average_method,
+            top_k_average_method=learner._config.optimization.top_k_average_method,
             val_df=val_df,
-            validation_metric_name=predictor._validation_metric_name,
+            validation_metric_name=learner._validation_metric_name,
         )
 
-        predictor._save_path = save_path
+        learner._save_path = save_path
 
-        return predictor
+        return learner
 
 
 def hyperparameter_tune(hyperparameter_tune_kwargs, resources, is_matching=False, **_fit_args):
     """
-    Tune hyperparameters of predictor.
+    Tune hyperparameters of learner.
 
     Parameters
     ----------
@@ -162,11 +162,11 @@ def hyperparameter_tune(hyperparameter_tune_kwargs, resources, is_matching=False
     is_matching
         Whether is matching.
     _fit_args
-        The keyword arguments for predictor._fit().
+        The keyword arguments for learner.fit_per_run().
 
     Returns
     -------
-    The predictor after tuning hyperparameters.
+    The learner after tuning hyperparameters.
     """
     from ray.air.config import CheckpointConfig
 
@@ -180,14 +180,16 @@ def hyperparameter_tune(hyperparameter_tune_kwargs, resources, is_matching=False
 
     ray_tune_adapter = AutommRayTuneAdapter()
     search_space = _fit_args.get("hyperparameters", dict())
-    metric = "val_" + _fit_args.get("validation_metric_name")
-    mode = _fit_args.get("minmax_mode")
+    # metric = "val_" + _fit_args.get("validation_metric_name")
+    metric = "val_" + _fit_args.get("learner")._validation_metric_name
+    # mode = _fit_args.get("minmax_mode")
+    mode = _fit_args.get("learner")._minmax_mode
     save_path = _fit_args.get("save_path")
     time_budget_s = _fit_args.get("max_time")
     if time_budget_s is not None:
         time_budget_s *= 0.95  # give some buffer time to ray
     is_distill = False
-    if _fit_args.get("teacher_predictor", None) is not None:
+    if _fit_args.get("teacher_learner", None) is not None:
         is_distill = True
     try:
         run_config_kwargs = {
@@ -243,8 +245,8 @@ def hyperparameter_tune(hyperparameter_tune_kwargs, resources, is_matching=False
             yaml.dump(checkpoints_paths_and_scores, yaml_file, default_flow_style=False)
 
         with analysis.get_last_checkpoint(best_trial).as_directory() as last_ckpt_path:
-            predictor = build_final_predictor(
-                predictor=_fit_args.get("predictor"),
+            learner = build_final_learner(
+                learner=_fit_args.get("learner"),
                 best_trial_path=best_trial_path,
                 minmax_mode=mode,
                 is_distill=is_distill,
@@ -255,7 +257,7 @@ def hyperparameter_tune(hyperparameter_tune_kwargs, resources, is_matching=False
             )
 
         cleanup_checkpoints(best_trial_path)
-        # move trial predictor one level up
+        # move trial learner one level up
         contents = os.listdir(best_trial_path)
         for content in contents:
             shutil.move(
@@ -264,4 +266,4 @@ def hyperparameter_tune(hyperparameter_tune_kwargs, resources, is_matching=False
             )
         shutil.rmtree(best_trial_path)
 
-        return predictor
+        return learner

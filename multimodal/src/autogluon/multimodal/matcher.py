@@ -85,7 +85,6 @@ from .utils import (
     infer_precision,
     init_df_preprocessor,
     load_text_tokenizers,
-    predict,
     save_pretrained_model_configs,
     save_text_tokenizers,
     select_model,
@@ -1600,12 +1599,10 @@ class MultiModalMatcher(RealtimeMixin):
         return_pred: Optional[bool] = False,
         realtime: Optional[bool] = None,
     ):
-        outputs = predict(
-            predictor=self,
+        outputs = self.predict_per_run(
             data=data,
             id_mappings=id_mappings,
             requires_label=True,
-            is_matching=True,
             realtime=realtime,
         )
         prob = extract_from_output(ret_type=PROBABILITY, outputs=outputs)
@@ -1777,12 +1774,10 @@ class MultiModalMatcher(RealtimeMixin):
         Array of predictions, one corresponding to each row in given dataset.
         """
         self._ensure_inference_ready()
-        outputs = predict(
-            predictor=self,
+        outputs = self.predict_per_run(
             data=data,
             id_mappings=id_mappings,
             requires_label=False,
-            is_matching=True,
             realtime=realtime,
         )
         prob = extract_from_output(outputs=outputs, ret_type=PROBABILITY)
@@ -1839,12 +1834,10 @@ class MultiModalMatcher(RealtimeMixin):
         Otherwise, the output will have shape (#samples,)
         """
         self._ensure_inference_ready()
-        outputs = predict(
-            predictor=self,
+        outputs = self.predict_per_run(
             data=data,
             id_mappings=id_mappings,
             requires_label=False,
-            is_matching=True,
             realtime=realtime,
         )
         prob = extract_from_output(outputs=outputs, ret_type=PROBABILITY)
@@ -1913,13 +1906,11 @@ class MultiModalMatcher(RealtimeMixin):
             else:
                 signature = QUERY
 
-        outputs = predict(
-            predictor=self,
+        outputs = self.predict_per_run(
             data=data,
             id_mappings=id_mappings,
             signature=signature,
             requires_label=False,
-            is_matching=True,
             realtime=realtime,
         )
         features = extract_from_output(outputs=outputs, ret_type=FEATURES, as_ndarray=as_tensor is False)

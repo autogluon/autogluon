@@ -12,11 +12,9 @@ from ..data import BaseDataModule, MultiModalFeaturePreprocessor, MultiImageMixD
 from ..optimization import MMDetLitModule
 from ..utils import (
     convert_pred_to_xywh,
-    evaluate_coco,
     get_detection_classes,
     object_detection_data_to_df,
     save_result_df,
-    setup_detection_train_tuning_data,
     setup_save_path,
     check_if_packages_installed,
     split_train_tuning_data,
@@ -26,6 +24,8 @@ from ..utils import (
     extract_from_output,
     save_ovd_result_df,
     compute_inference_batch_size,
+    from_coco_or_voc,
+    cocoeval,
 )
 from .base import BaseLearner
 logger = logging.getLogger(__name__)
@@ -72,12 +72,44 @@ class ObjectDetectionLearner(BaseLearner):
                 self._classes = get_detection_classes(self._sample_data_path)
                 self._output_shape = len(self._classes)
 
+        # TODO: merge _detection_anno_train and detection_anno_train?
+        self._detection_anno_train = None
+        self.detection_anno_train = None
+
     @property
     def classes(self):
         """
         Return the classes of object detection.
         """
         return self._model.model.CLASSES
+
+    def setup_detection_train_tuning_data(self, max_num_tuning_data, seed, train_data, tuning_data):
+        if isinstance(train_data, str):
+            self._detection_anno_train = train_data
+            train_data = from_coco_or_voc(train_data, "train")  # TODO: Refactor to use convert_data_to_df
+            if tuning_data is not None:
+                self.detection_anno_train = tuning_data
+                tuning_data = from_coco_or_voc(tuning_data, "val")  # TODO: Refactor to use convert_data_to_df
+                if max_num_tuning_data is not None:
+                    if len(tuning_data) > max_num_tuning_data:
+                        tuning_data = tuning_data.sample(
+                            n=max_num_tuning_data, replace=False, random_state=seed
+                        ).reset_index(drop=True)
+        elif isinstance(train_data, pd.DataFrame):
+            self._detection_anno_train = None
+            # sanity check dataframe columns
+            train_data = object_detection_data_to_df(train_data)
+            if tuning_data is not None:
+                self.detection_anno_train = tuning_data
+                tuning_data = object_detection_data_to_df(tuning_data)
+                if max_num_tuning_data is not None:
+                    if len(tuning_data) > max_num_tuning_data:
+                        tuning_data = tuning_data.sample(
+                            n=max_num_tuning_data, replace=False, random_state=seed
+                        ).reset_index(drop=True)
+        else:
+            raise TypeError(f"Expected train_data to have type str or pd.DataFrame, but got type: {type(train_data)}")
+        return train_data, tuning_data
 
     def prepare_for_train_tuning_data(
         self,
@@ -88,8 +120,7 @@ class ObjectDetectionLearner(BaseLearner):
         seed: Optional[int],
     ):
         # TODO: remove self from calling setup_detection_train_tuning_data()
-        train_data, tuning_data = setup_detection_train_tuning_data(
-            predictor=self,
+        train_data, tuning_data = self.setup_detection_train_tuning_data(
             train_data=train_data,
             tuning_data=tuning_data,
             max_num_tuning_data=max_num_tuning_data,
@@ -460,6 +491,62 @@ class ObjectDetectionLearner(BaseLearner):
 
         return outputs
 
+    def evaluate_coco(
+        self,
+        anno_file_or_df: str,
+        metrics: str,
+        return_pred: Optional[bool] = False,
+        eval_tool: Optional[str] = None,
+    ):
+        """
+        Evaluate object detection model on a test dataset in COCO format.
+
+        Parameters
+        ----------
+        anno_file_or_df
+            The annotation file in COCO format
+        metrics
+            Metrics used for evaluation.
+        return_pred
+            Whether to return the prediction result of each row.
+        eval_tool
+            The eval_tool for object detection. Could be "pycocotools" or "torchmetrics".
+        """
+        if isinstance(anno_file_or_df, str):
+            anno_file = anno_file_or_df
+            data = from_coco_or_voc(anno_file,
+                                    "test")  # TODO: maybe remove default splits hardcoding (only used in VOC)
+            if os.path.isdir(anno_file):
+                eval_tool = "torchmetrics"  # we can only use torchmetrics for VOC format evaluation.
+        else:
+            # during validation, it will call evaluate with df as input
+            anno_file = self._detection_anno_train
+            data = anno_file_or_df
+
+        outputs = self.predict_per_run(
+            data=data,
+            requires_label=True,
+        )  # outputs shape: num_batch, 1(["bbox"]), batch_size, 2(if using mask_rcnn)/na, 80, n, 5
+
+        # Cache prediction results as COCO format # TODO: refactor this
+        self._save_path = setup_save_path(
+            old_save_path=self._save_path,
+            warn_if_exist=False,
+        )
+        cocoeval_cache_path = os.path.join(self._save_path, "object_detection_result_cache.json")
+        eval_results = cocoeval(
+            outputs=outputs,
+            data=data,
+            anno_file=anno_file,
+            cache_path=cocoeval_cache_path,
+            metrics=metrics,
+            tool=eval_tool,
+        )
+        if return_pred:
+            return eval_results, outputs
+        else:
+            return eval_results
+
     def evaluate(
         self,
         data: Union[pd.DataFrame, dict, list, str],
@@ -479,8 +566,7 @@ class ObjectDetectionLearner(BaseLearner):
                 f"Current problem type {self._problem_type} does not support realtime predict."
             )
         if isinstance(data, str):
-            return evaluate_coco(
-                predictor=self,
+            return self.evaluate_coco(
                 anno_file_or_df=data,
                 metrics=metrics,
                 return_pred=return_pred,
@@ -488,8 +574,7 @@ class ObjectDetectionLearner(BaseLearner):
             )
         else:
             data = object_detection_data_to_df(data)
-            return evaluate_coco(
-                predictor=self,
+            return self.evaluate_coco(
                 anno_file_or_df=data,
                 metrics=metrics,
                 return_pred=return_pred,
@@ -588,21 +673,21 @@ class ObjectDetectionLearner(BaseLearner):
         raise NotImplementedError("Object detection doesn't support calling `predict_proba` yet.")
 
     def extract_embedding(
-            self,
-            data: Union[pd.DataFrame, dict, list],
-            as_tensor: Optional[bool] = False,
-            as_pandas: Optional[bool] = False,
-            realtime: Optional[bool] = None,
+        self,
+        data: Union[pd.DataFrame, dict, list],
+        as_tensor: Optional[bool] = False,
+        as_pandas: Optional[bool] = False,
+        realtime: Optional[bool] = None,
     ):
         raise NotImplementedError("Object detection doesn't support calling `extract_embedding` yet.")
 
     @staticmethod
     def _load_metadata(
-        learner: ObjectDetectionLearner,
+        learner,
         path: str,
         resume: Optional[bool] = False,
         verbosity: Optional[int] = 3,
     ):
-        learner = BaseLearner._load_metadata(learner=learner, path=path, resume=resume, verbosity=verbosity)
+        learner = super()._load_metadata(learner=learner, path=path, resume=resume, verbosity=verbosity)
         learner._data_processors = None
         return learner

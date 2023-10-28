@@ -177,17 +177,20 @@ class MultiModalPredictor:
             problem_type=problem_type,
             pretrained=pretrained,
         )
-        assert problem_type in PROBLEM_TYPES_REG, (
-            f"problem_type='{problem_type}' is not supported yet. You may pick a problem type from"
-            f" {PROBLEM_TYPES_REG.list_keys()}."
-        )
-        problem_property = PROBLEM_TYPES_REG.get(problem_type)
-        if problem_property.experimental:
-            warnings.warn(
-                f"problem_type='{problem_type}' is currently experimental.",
-                UserWarning,
+        if problem_type is not None:
+            assert problem_type in PROBLEM_TYPES_REG, (
+                f"problem_type='{problem_type}' is not supported yet. You may pick a problem type from"
+                f" {PROBLEM_TYPES_REG.list_keys()}."
             )
-        problem_type = problem_property.name
+            problem_property = PROBLEM_TYPES_REG.get(problem_type)
+            if problem_property.experimental:
+                warnings.warn(
+                    f"problem_type='{problem_type}' is currently experimental.",
+                    UserWarning,
+                )
+            problem_type = problem_property.name
+        else:
+            problem_property = None
 
         if os.environ.get(AUTOMM_TUTORIAL_MODE):
             enable_progress_bar = False
@@ -200,7 +203,7 @@ class MultiModalPredictor:
         self._verbosity = verbosity
         self._is_matcher = False
 
-        if problem_property.is_matching:
+        if problem_property and problem_property.is_matching:
             self._learner = MultiModalMatcher(
                 query=query,
                 response=response,
@@ -533,7 +536,7 @@ class MultiModalPredictor:
                 hyperparameters=hyperparameters,
                 column_types=column_types,
                 holdout_frac=holdout_frac,
-                teacher_learner=teacher_predictor._learner,
+                teacher_learner=teacher_predictor._learner if teacher_predictor else None,
                 seed=seed,
                 standalone=standalone,
                 hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,

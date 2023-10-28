@@ -5,9 +5,8 @@ from omegaconf import OmegaConf, DictConfig
 from torch import nn
 
 from ..constants import REGRESSION
-from ..optimization import RKDLoss
+from ..optimization.losses import RKDLoss
 from ..utils import modify_duplicate_model_names, turn_on_off_feature_column_info
-from .base import BaseLearner
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +43,7 @@ class DistillationMixin:
             return dict()
         logger.debug("setting up distillation...")
         if isinstance(self._teacher_learner, str):
+            from ..learners.base import BaseLearner
             self._teacher_learner = BaseLearner.load(self._teacher_learner)
 
         # verify that student and teacher configs are consistent.

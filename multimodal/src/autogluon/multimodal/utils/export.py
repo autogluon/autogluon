@@ -14,7 +14,6 @@ from ..models.huggingface_text import HFAutoModelForTextPrediction
 from ..models.mmdet_image import MMDetAutoModelForObjectDetection
 from ..models.timm_image import TimmAutoModelForImagePrediction
 from .environment import compute_num_gpus, get_precision_context, infer_precision, move_to_device
-from .inference import process_batch
 from .onnx import OnnxModule, onnx_get_dynamic_axes
 
 logger = logging.getLogger(__name__)
@@ -250,7 +249,7 @@ class ExportMixin:
             requires_label=requires_label,
         )
 
-        batch = process_batch(
+        batch = self.process_batch(
             data=data,
             df_preprocessor=df_preprocessor,
             data_processors=data_processors,

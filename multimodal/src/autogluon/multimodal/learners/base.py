@@ -78,9 +78,9 @@ from ..data import (
 )
 
 from ..models import get_model_postprocess_fn
-from ..optimization import (
-    LitModule,
-    DistillerLitModule,
+from ..optimization.lit_module import LitModule
+from ..optimization.lit_distiller import DistillerLitModule
+from ..optimization.utils import (
     get_loss_func,
     get_metric,
     get_norm_layer_param_names,
@@ -93,8 +93,8 @@ from ..utils import (
     CustomUnpickler,
     DDPPredictionWriter,
     ExportMixin,
-    DistillationMixin,
     RealtimeMixin,
+    DistillationMixin,
     LogFilter,
     apply_log_filter,
     assign_feature_column_names,
@@ -279,6 +279,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
         self._label_column = label
         self._presets = presets.lower() if presets else None
+        self._validation_metric_name = validation_metric.lower() if validation_metric else None
         self._minmax_mode = None
         self._output_shape = num_classes
         self._classes = classes
@@ -387,8 +388,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                 provided_column_types=column_types,
                 problem_type=self._problem_type,  # used to update the corresponding column type
             )
-            logger.debug(f"column_types: {column_types}")
-            logger.debug(f"image columns: {[k for k, v in column_types.items() if v == 'image_path']}")
+            logger.debug(f"column_types: {self._column_types}")
+            logger.debug(f"image columns: {[k for k, v in self._column_types.items() if v == 'image_path']}")
         elif column_types is None:
             allowable_dtypes, fallback_dtype = infer_dtypes_by_model_names(model_config=self._config.model)
             return infer_column_types(
@@ -523,20 +524,16 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                 self._teacher_learner, str
             ), "HPO with distillation only supports passing a path to the learner."
 
-    def prepare_for_fit_args(self, time_limit: int, seed: int, standalone: bool, clean_ckpts: bool):
+    def prepare_fit_args(self, time_limit: int, seed: int, standalone: bool, clean_ckpts: bool):
         if time_limit is not None:
             time_limit = timedelta(seconds=time_limit)
         self._fit_args = dict(
-            validation_metric_name=self._validation_metric_name,
-            minmax_mode=self._minmax_mode,
             max_time=time_limit,
             save_path=self._save_path,
             ckpt_path=None if self._is_hpo else self._ckpt_path,
             resume=False if self._is_hpo else self._resume,
             enable_progress_bar=False if self._is_hpo else self._enable_progress_bar,
             seed=seed,
-            presets=self._presets,
-            config=self._config,
             hyperparameters=self._hyperparameters,  # In HPO mode, this would be overwritten by sampled hyperparameters.
             advanced_hyperparameters=self._advanced_hyperparameters,
             standalone=standalone,
@@ -591,6 +588,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         standalone: Optional[bool] = True,
         hyperparameter_tune_kwargs: Optional[Dict] = None,
         clean_ckpts: Optional[bool] = True,
+        **kwargs,
     ):
         training_start = self.on_fit_start()
         self.update_attributes(presets=presets, config=config, teacher_learner=teacher_learner)
@@ -610,7 +608,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
         )
         self.fit_sanity_check()
-        self.prepare_for_fit_args(
+        self.prepare_fit_args(
             time_limit=time_limit,
             seed=seed,
             standalone=standalone,
@@ -1211,7 +1209,13 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                 clean_ckpts=clean_ckpts,
             )
 
-            return self
+            return dict(
+                    config=config,
+                    df_preprocessor=df_preprocessor,
+                    data_processors=data_processors,
+                    model=self._model,
+                    model_postprocess_fn=model_postprocess_fn,
+                    )
 
         distillation_kwargs = self.setup_distillation(
             model=model,
@@ -1829,6 +1833,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         candidate_data: Optional[Union[pd.DataFrame, dict, list]] = None,
         as_pandas: Optional[bool] = None,
         realtime: Optional[bool] = None,
+        **kwargs,
     ):
         """
         Predict values for the label column of new data.
@@ -1889,6 +1894,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         as_pandas: Optional[bool] = None,
         as_multiclass: Optional[bool] = True,
         realtime: Optional[bool] = None,
+        **kwargs,
     ):
         """
         Predict probabilities class probabilities rather than class labels.
@@ -1953,6 +1959,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         as_tensor: Optional[bool] = False,
         as_pandas: Optional[bool] = False,
         realtime: Optional[bool] = None,
+        **kwargs,
     ):
         """
         Extract features for each sample, i.e., one row in the provided dataframe `data`.
