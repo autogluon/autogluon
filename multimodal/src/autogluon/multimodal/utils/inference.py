@@ -143,10 +143,8 @@ class RealtimeMixin:
     def predict_batch(
         self,
         batch: Dict,
-        model: nn.Module,
         precision: Union[str, int],
         num_gpus: int,
-        model_postprocess_fn: Callable = None,
     ):
         """
         Perform inference for a batch.
@@ -155,14 +153,10 @@ class RealtimeMixin:
         ----------
         batch
             The batch data.
-        model
-            A Pytorch model.
         precision
             The desired precision used in inference.
         num_gpus
             Number of GPUs.
-        model_postprocess_fn
-            The post-processing function for the model output.
 
         Returns
         -------
@@ -171,6 +165,7 @@ class RealtimeMixin:
         device_type = "cuda" if torch.cuda.is_available() else "cpu"
         device = torch.device(device_type)
         batch_size = len(batch[next(iter(batch))])
+        model = self._model
         if 1 < num_gpus <= batch_size:
             model = nn.DataParallel(model)
         model.to(device).eval()
@@ -178,8 +173,8 @@ class RealtimeMixin:
         precision_context = get_precision_context(precision=precision, device_type=device_type)
         with precision_context, torch.no_grad():
             output = run_model(model, batch)
-            if model_postprocess_fn:
-                output = model_postprocess_fn(output)
+            if self._model_postprocess_fn:
+                output = self._model_postprocess_fn(output)
 
         if isinstance(model, nn.DataParallel):
             model = model.module

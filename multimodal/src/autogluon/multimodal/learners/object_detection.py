@@ -111,7 +111,7 @@ class ObjectDetectionLearner(BaseLearner):
             raise TypeError(f"Expected train_data to have type str or pd.DataFrame, but got type: {type(train_data)}")
         return train_data, tuning_data
 
-    def prepare_for_train_tuning_data(
+    def prepare_train_tuning_data(
         self,
         train_data: Union[pd.DataFrame, str],
         tuning_data: Optional[Union[pd.DataFrame, str]],
@@ -163,7 +163,7 @@ class ObjectDetectionLearner(BaseLearner):
         training_start = self.on_fit_start()
         self.update_attributes(presets=presets, config=config)
         self.setup_save_path(save_path=save_path)
-        self.prepare_for_train_tuning_data(
+        self.prepare_train_tuning_data(
             train_data=train_data,
             tuning_data=tuning_data,
             holdout_frac=holdout_frac,
@@ -177,14 +177,20 @@ class ObjectDetectionLearner(BaseLearner):
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
         )
         self.fit_sanity_check()
-        self.prepare_for_fit_args(
+        self.prepare_fit_args(
             time_limit=time_limit,
             seed=seed,
             standalone=standalone,
             clean_ckpts=clean_ckpts,
         )
-        self.execute_fit()
-        self.on_fit_end(training_start=training_start)
+        fit_returns = self.execute_fit()
+        self.on_fit_end(
+            training_start=training_start,
+            strategy=fit_returns.get("strategy", None),
+            strict_loading=fit_returns.get("strict_loading", True),
+            standalone=standalone,
+            clean_ckpts=clean_ckpts,
+        )
 
         return self
 
@@ -297,7 +303,6 @@ class ObjectDetectionLearner(BaseLearner):
         validation_metric, custom_metric_func = self.get_validation_metric_per_run()
         if max_time == timedelta(seconds=0):
             self.top_k_average(
-                model=model,
                 validation_metric_name=self._validation_metric_name,
                 save_path=save_path,
                 top_k_average_method=config.optimization.top_k_average_method,
@@ -363,21 +368,15 @@ class ObjectDetectionLearner(BaseLearner):
             ckpt_path=ckpt_path,
             resume=resume,
         )
-        self.on_fit_per_run_end(
-            trainer=trainer,
-            model=model,
-            save_path=save_path,
-            config=config,
-            strategy=strategy,
-            standalone=standalone,
-            clean_ckpts=clean_ckpts,
-        )
+        self.on_fit_per_run_end(trainer=trainer)
 
         return dict(
             config=config,
             df_preprocessor=df_preprocessor,
             data_processors=data_processors,
-            model=self._model,
+            model=model,
+            best_score=trainer.callback_metrics[f"val_{self._validation_metric_name}"].item(),
+            strategy=strategy,
         )
 
     def predict_per_run(
@@ -459,6 +458,7 @@ class ObjectDetectionLearner(BaseLearner):
             per_gpu_batch_size=batch_size,
             num_workers=self._config.env.num_workers_evaluation,
             predict_data=data,
+            is_train=False,
         )
         pred_writer = self.get_pred_writer(strategy=strategy)
         callbacks = self.get_callbacks_per_run(pred_writer=pred_writer, is_train=False)
@@ -476,6 +476,7 @@ class ObjectDetectionLearner(BaseLearner):
             task=task,
             datamodule=datamodule,
             pred_writer=pred_writer,
+            is_train=False,
         )
         outputs = self.collect_predictions(
             outputs=outputs,
@@ -483,7 +484,7 @@ class ObjectDetectionLearner(BaseLearner):
             pred_writer=pred_writer,
             num_gpus=num_gpus,
         )
-        self.clean_trainer_processes(trainer=trainer)
+        self.clean_trainer_processes(trainer=trainer, is_train=False)
 
         # TODO: remove this by adjusting the return format of mmdet_image or lit_mmdet.
         if pred_writer is None:

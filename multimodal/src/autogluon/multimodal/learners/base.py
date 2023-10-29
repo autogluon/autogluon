@@ -411,7 +411,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             problem_type=self._problem_type,
         )
 
-    def prepare_for_train_tuning_data(
+    def prepare_train_tuning_data(
         self,
         train_data: Union[pd.DataFrame, str],
         tuning_data: Optional[Union[pd.DataFrame, str]],
@@ -454,6 +454,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         data_processors: Optional[Dict] = None,
         model: Optional[nn.Module] = None,
         model_postprocess_fn: Optional[Callable] = None,
+        best_score: Optional[float] = None,
+        **kwargs,
     ):
         if presets:
             if self._fit_called:
@@ -475,6 +477,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             self._model = model
         if model_postprocess_fn:
             self._model_postprocess_fn = model_postprocess_fn
+        if best_score:
+            self._best_score = best_score
 
     def infer_validation_metric(self):
         if self._fit_called:
@@ -556,17 +560,33 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                 resources=dict(num_gpus=ResourceManager.get_gpu_count_torch()),  # TODO: allow customizing GPUs
                 **self._fit_args,
             )
+            return dict()
         else:
             attributes = self.fit_per_run(**self._fit_args)
             self.update_attributes(**attributes)
+            return attributes
 
     def on_fit_start(self):
         self.ensure_fit_ready()
         training_start = time.time()
         return training_start
 
-    def on_fit_end(self, training_start):
+    def on_fit_end(self, training_start, strategy, strict_loading, standalone, clean_ckpts, validation_metric_name=None):
         self._fit_called = True
+        # We do not perform averaging checkpoint in the case of hpo for each trial
+        # We only average the checkpoint of the best trial at the end in the master process.
+        if not self._is_hpo:
+            self.top_k_average(
+                validation_metric_name=self._validation_metric_name if validation_metric_name is None else validation_metric_name,
+                save_path=self._save_path,
+                top_k_average_method=self._config.optimization.top_k_average_method,
+                strategy=strategy,
+                strict_loading=strict_loading,
+                # Not strict loading if using parameter-efficient finetuning
+                standalone=standalone,
+                clean_ckpts=clean_ckpts,
+            )
+
         training_end = time.time()
         self._total_train_time = training_end - training_start
         # TODO(?) We should have a separate "_post_training_event()" for logging messages.
@@ -594,7 +614,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         self.update_attributes(presets=presets, config=config, teacher_learner=teacher_learner)
         self.setup_save_path(save_path=save_path)
         self.infer_problem_type(train_data=train_data)
-        self.prepare_for_train_tuning_data(
+        self.prepare_train_tuning_data(
             train_data=train_data,
             tuning_data=tuning_data,
             holdout_frac=holdout_frac,
@@ -614,8 +634,14 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             standalone=standalone,
             clean_ckpts=clean_ckpts,
         )
-        self.execute_fit()
-        self.on_fit_end(training_start=training_start)
+        fit_returns = self.execute_fit()
+        self.on_fit_end(
+            training_start=training_start,
+            strategy=fit_returns.get("strategy", None),
+            strict_loading=fit_returns.get("strict_loading", True),
+            standalone=standalone,
+            clean_ckpts=clean_ckpts,
+        )
 
         return self
 
@@ -1133,32 +1159,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
     def on_fit_per_run_end(
         self,
         trainer,
-        model,
-        save_path,
-        config,
-        strategy,
-        standalone,
-        clean_ckpts,
-        peft_param_names=None,
     ):
-        if trainer.global_rank == 0:
-            # We do not perform averaging checkpoint in the case of hpo for each trial
-            # We only average the checkpoint of the best trial at the end in the master process.
-            if not self._is_hpo:
-                self.top_k_average(
-                    model=model,
-                    validation_metric_name=self._validation_metric_name,
-                    save_path=save_path,
-                    top_k_average_method=config.optimization.top_k_average_method,
-                    strategy=strategy,
-                    strict_loading=not peft_param_names,
-                    # Not strict loading if using parameter-efficient finetuning
-                    standalone=standalone,
-                    clean_ckpts=clean_ckpts,
-                )
-            self._best_score = trainer.callback_metrics[f"val_{self._validation_metric_name}"].item()
-        else:
-            sys.exit(f"Training finished, exit the process with global_rank={trainer.global_rank}...")
+        self.clean_trainer_processes(trainer=trainer, is_train=True)
 
     def fit_per_run(
         self,
@@ -1200,7 +1202,6 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
         if max_time == timedelta(seconds=0):
             self.top_k_average(
-                model=model,
                 validation_metric_name=self._validation_metric_name,
                 save_path=save_path,
                 top_k_average_method=config.optimization.top_k_average_method,
@@ -1213,7 +1214,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                     config=config,
                     df_preprocessor=df_preprocessor,
                     data_processors=data_processors,
-                    model=self._model,
+                    model=self._model if self._model else model,
                     model_postprocess_fn=model_postprocess_fn,
                     )
 
@@ -1286,29 +1287,21 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             ckpt_path=ckpt_path,
             resume=resume,
         )
-        self.on_fit_per_run_end(
-            trainer=trainer,
-            model=model,
-            save_path=save_path,
-            config=config,
-            strategy=strategy,
-            peft_param_names=peft_param_names,
-            standalone=standalone,
-            clean_ckpts=clean_ckpts,
-        )
+        self.on_fit_per_run_end(trainer=trainer)
 
         return dict(
             config=config,
             df_preprocessor=df_preprocessor,
             data_processors=data_processors,
-            model=self._model,
+            model=model,
             model_postprocess_fn=model_postprocess_fn,
+            best_score=trainer.callback_metrics[f"val_{self._validation_metric_name}"].item(),
+            strategy=strategy,
+            strict_loading=not peft_param_names,
         )
 
-    ## TODO: top_k_average should avoid modifying self._model inplace.
     def top_k_average(
         self,
-        model,
         validation_metric_name,  # FIXME: we need to change validation_metric to evaluation_metric for model choosing
         save_path,
         top_k_average_method,
@@ -1358,8 +1351,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                             f"Start to fuse {len(top_k_model_paths)} checkpoints via the greedy soup algorithm."
                         )
 
-                        self._model = self._load_state_dict(
-                            model=model,
+                        self._load_state_dict(
                             path=top_k_model_paths[0],
                             prefix=prefix,
                             strict=strict_loading,
@@ -1369,8 +1361,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                             cand_avg_state_dict = average_checkpoints(
                                 checkpoint_paths=ingredients + [top_k_model_paths[i]],
                             )
-                            self._model = self._load_state_dict(
-                                model=self._model,
+                            self._load_state_dict(
                                 state_dict=cand_avg_state_dict,
                                 prefix=prefix,
                                 strict=strict_loading,
@@ -1403,8 +1394,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         avg_state_dict = average_checkpoints(
             checkpoint_paths=ingredients,
         )
-        self._model = self._load_state_dict(
-            model=model,
+        self._load_state_dict(
             state_dict=avg_state_dict,
             prefix=prefix,
             strict=strict_loading,
@@ -1489,9 +1479,13 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
         return outputs
 
-    def clean_trainer_processes(self, trainer):
+    def clean_trainer_processes(self, trainer, is_train=True):
+        if is_train:
+            msg = "Training finished,"
+        else:
+            msg = "Prediction finished,"
         if trainer.global_rank != 0:
-            sys.exit(f"Prediction finished, exit the process with global_rank={trainer.global_rank}...")
+            sys.exit(f"{msg} exit the process with global_rank={trainer.global_rank}...")
 
     def update_image_column_types(self, data):
         column_types = self._column_types
@@ -1545,8 +1539,6 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         data_processors: Union[Dict, List[Dict]],
         num_gpus: int,
         precision: Union[int, str],
-        model: Optional[nn.Module] = None,
-        model_postprocess_fn: Optional[Callable] = None,
     ) -> List[Dict]:
         """
         Perform realtime inference.
@@ -1563,10 +1555,6 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             Number of GPUs.
         precision
             The precision used in inference.
-        model
-            Predictor's model.
-        model_postprocess_fn
-            A postprocessing function.
 
         Returns
         -------
@@ -1580,10 +1568,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         )
         output = self.predict_batch(
             batch=batch,
-            model=model,
             precision=precision,
             num_gpus=num_gpus,
-            model_postprocess_fn=model_postprocess_fn,
         )
         return [output]
 
@@ -1664,13 +1650,11 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
         if realtime:
             outputs = self.realtime_predict(
-                model=self._model,
                 data=data,
                 df_preprocessor=df_preprocessor,
                 data_processors=data_processors,
                 num_gpus=num_gpus,
                 precision=precision,
-                model_postprocess_fn=self._model_postprocess_fn,
             )
             return outputs
 
@@ -1681,6 +1665,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             per_gpu_batch_size=batch_size,
             num_workers=self._config.env.num_workers_evaluation,
             predict_data=data,
+            is_train=False,
         )
         pred_writer = self.get_pred_writer(strategy=strategy)
         callbacks = self.get_callbacks_per_run(pred_writer=pred_writer, is_train=False)
@@ -1699,6 +1684,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             task=task,
             datamodule=datamodule,
             pred_writer=pred_writer,
+            is_train=False,
         )
         outputs = self.collect_predictions(
             outputs=outputs,
@@ -1706,7 +1692,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             pred_writer=pred_writer,
             num_gpus=num_gpus,
         )
-        self.clean_trainer_processes(trainer=trainer)
+        self.clean_trainer_processes(trainer=trainer, is_train=False)
 
         return outputs
 
@@ -2030,9 +2016,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         else:
             return pd.DataFrame(to_be_converted, index=index, columns=self.class_labels)
 
-    @staticmethod
     def _load_state_dict(
-        model: nn.Module,
+        self,
         state_dict: dict = None,
         path: str = None,
         prefix: str = "model.",
@@ -2051,15 +2036,14 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
         # Some buffers like `position_ids` are registered as persistent=False since transformers 4.31.0
         # Refer to https://github.com/huggingface/transformers/pull/24505/files
-        buffer_names = [k for k, v in model.named_buffers()]
-        buffer_names_to_filter = [k for k in buffer_names if k not in model.state_dict().keys()]
+        buffer_names = [k for k, v in self._model.named_buffers()]
+        buffer_names_to_filter = [k for k in buffer_names if k not in self._model.state_dict().keys()]
         state_dict = {k: v for k, v in state_dict.items() if k not in buffer_names_to_filter}
 
-        load_result = model.load_state_dict(state_dict, strict=strict)
+        load_result = self._model.load_state_dict(state_dict, strict=strict)
         assert (
             len(load_result.unexpected_keys) == 0
         ), f"Load model failed, unexpected keys {load_result.unexpected_keys.__str__()}"
-        return model
 
     @staticmethod
     def _replace_model_name_prefix(
@@ -2313,14 +2297,12 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             resume=resume,
         )
 
-        model = cls._load_state_dict(
-            model=model,
+        learner._load_state_dict(
             path=load_path,
             strict=not efficient_finetune or efficient_finetune == "None",
         )
 
         learner._ckpt_path = ckpt_path
-        learner._model = model
 
         loss_func = get_loss_func(
             problem_type=learner._problem_type,

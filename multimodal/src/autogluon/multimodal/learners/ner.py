@@ -68,7 +68,7 @@ class NERLearner(BaseLearner):
         training_start = self.on_fit_start()
         self.update_attributes(presets=presets, config=config, teacher_learner=teacher_learner)
         self.setup_save_path(save_path=save_path)
-        self.prepare_for_train_tuning_data(
+        self.prepare_train_tuning_data(
             train_data=train_data,
             tuning_data=tuning_data,
             holdout_frac=holdout_frac,
@@ -81,14 +81,21 @@ class NERLearner(BaseLearner):
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
         )
         self.fit_sanity_check()
-        self.prepare_for_fit_args(
+        self.prepare_fit_args(
             time_limit=time_limit,
             seed=seed,
             standalone=standalone,
             clean_ckpts=clean_ckpts,
         )
-        self.execute_fit()
-        self.on_fit_end(training_start=training_start)
+        fit_returns = self.execute_fit()
+        self.on_fit_end(
+            training_start=training_start,
+            strategy=fit_returns.get("strategy", None),
+            strict_loading=fit_returns.get("strict_loading", True),
+            standalone=standalone,
+            clean_ckpts=clean_ckpts,
+            validation_metric_name=OVERALL_F1, #TODO: use the evaluation metric in top k averaging.
+        )
 
         return self
 
@@ -114,36 +121,6 @@ class NERLearner(BaseLearner):
     def get_output_shape_per_run(df_preprocessor):
         # ner needs to update output_shape with label_generator.
         return len(df_preprocessor.label_generator.unique_entity_groups)
-
-    def on_fit_per_run_end(
-        self,
-        trainer,
-        model,
-        save_path,
-        config,
-        strategy,
-        standalone,
-        clean_ckpts,
-        peft_param_names=None,
-    ):
-        if trainer.global_rank == 0:
-            # We do not perform averaging checkpoint in the case of hpo for each trial
-            # We only average the checkpoint of the best trial at the end in the master process.
-            if not self._is_hpo:
-                self.top_k_average(
-                    model=model,
-                    validation_metric_name=OVERALL_F1,  # because we call self.evaluate. Below is a temporal fix for NER. seqeval only support overall_f1
-                    save_path=save_path,
-                    top_k_average_method=config.optimization.top_k_average_method,
-                    strategy=strategy,
-                    strict_loading=not peft_param_names,
-                    # Not strict loading if using parameter-efficient finetuning
-                    standalone=standalone,
-                    clean_ckpts=clean_ckpts,
-                )
-            self._best_score = trainer.callback_metrics[f"val_{self._validation_metric_name}"].item()
-        else:
-            sys.exit(f"Training finished, exit the process with global_rank={trainer.global_rank}...")
 
     def fit_per_run(
         self,
@@ -183,7 +160,6 @@ class NERLearner(BaseLearner):
         loss_func = self.get_loss_func_per_run(config=config)
         if max_time == timedelta(seconds=0):
             self.top_k_average(
-                model=model,
                 validation_metric_name=self._validation_metric_name,
                 save_path=save_path,
                 top_k_average_method=config.optimization.top_k_average_method,
@@ -254,22 +230,16 @@ class NERLearner(BaseLearner):
             ckpt_path=ckpt_path,
             resume=resume,
         )
-        self.on_fit_per_run_end(
-            trainer=trainer,
-            model=model,
-            save_path=save_path,
-            config=config,
-            strategy=strategy,
-            peft_param_names=peft_param_names,
-            standalone=standalone,
-            clean_ckpts=clean_ckpts,
-        )
+        self.on_fit_per_run_end(trainer=trainer)
 
         return dict(
             config=config,
             df_preprocessor=df_preprocessor,
             data_processors=data_processors,
-            model=self._model,
+            model=model,
+            best_score=trainer.callback_metrics[f"val_{self._validation_metric_name}"].item(),
+            strategy=strategy,
+            strict_loading=not peft_param_names,
         )
 
     def evaluate(
