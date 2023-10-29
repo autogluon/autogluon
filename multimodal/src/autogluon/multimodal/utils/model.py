@@ -134,6 +134,8 @@ def select_model(
     if len(selected_model_names) > 1:
         assert len(fusion_model_name) == 1
         selected_model_names.extend(fusion_model_name)
+    elif len(fusion_model_name) == 1 and hasattr(config.model, fusion_model_name[0]):
+        delattr(config.model, fusion_model_name[0])
 
     config.model.names = selected_model_names
     logger.debug(f"selected models: {selected_model_names}")
