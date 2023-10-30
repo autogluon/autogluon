@@ -2,6 +2,7 @@ import logging
 import os
 import pprint
 import time
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import pandas as pd
@@ -97,7 +98,7 @@ class TimeSeriesPredictor:
     quantile_levels : List[float], optional
         List of increasing decimals that specifies which quantiles should be estimated when making distributional
         forecasts. Defaults to ``[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]``.
-    path : str, optional
+    path : str or Path, optional
         Path to the directory where models and intermediate outputs will be saved. Defaults to a timestamped folder
         ``AutogluonModels/ag-[TIMESTAMP]`` that will be created in the working directory.
     verbosity : int, default = 2
@@ -128,7 +129,7 @@ class TimeSeriesPredictor:
         freq: str = None,
         eval_metric: Union[str, TimeSeriesScorer, None] = None,
         eval_metric_seasonal_period: Optional[int] = None,
-        path: Optional[str] = None,
+        path: Optional[Union[str, Path]] = None,
         verbosity: int = 2,
         quantile_levels: Optional[List[float]] = None,
         cache_predictions: bool = True,
@@ -800,12 +801,12 @@ class TimeSeriesPredictor:
         return version
 
     @classmethod
-    def load(cls, path: str, require_version_match: bool = True) -> "TimeSeriesPredictor":
+    def load(cls, path: Union[str, Path], require_version_match: bool = True) -> "TimeSeriesPredictor":
         """Load an existing ``TimeSeriesPredictor`` from given ``path``.
 
         Parameters
         ----------
-        path : str
+        path : str or Path
             Path where the predictor was saved via :meth:`~autogluon.timeseries.TimeSeriesPredictor.save`.
         require_version_match : bool, default = True
             If True, will raise an AssertionError if the ``autogluon.timeseries`` version of the loaded predictor does
@@ -824,7 +825,7 @@ class TimeSeriesPredictor:
         """
         if not path:
             raise ValueError("`path` cannot be None or empty in load().")
-        path = setup_outputdir(path, warn_if_exist=False)
+        path: str = setup_outputdir(path, warn_if_exist=False)
 
         try:
             version_saved = cls._load_version_file(path=path)

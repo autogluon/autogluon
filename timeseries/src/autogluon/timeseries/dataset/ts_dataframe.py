@@ -5,6 +5,7 @@ import itertools
 import logging
 import reprlib
 from collections.abc import Iterable
+from pathlib import Path
 from typing import Any, List, Optional, Tuple, Type, Union
 
 import numpy as np
@@ -72,14 +73,35 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 ]
 
     static_features : Optional[pd.DataFrame]
-        An optional data frame describing the metadata attributes of individual items in the item index. These
-        may be categorical or real valued attributes for each item. For example, if TimeSeriesDataFrame contas sales of
-        various products, static features may refer to time-independent features like color or brand. When provided
-        during ``fit``, the ``TimeSeriesPredictor`` expects the same metadata to be available during prediction time.
-        When provided, the index of the ``static_features`` index must match the item index of the ``TimeSeriesDataFrame``.
+        An optional data frame describing the time-independent attributes of each individual time series. These can be
+        real-valued or categorical. For example, if ``TimeSeriesDataFrame`` contains sales of various products, static
+        features may refer to time-independent features like color or brand.
 
-        ``TimeSeriesDataFrame`` will ensure consistency of static features during serialization/deserialization,
-        copy and slice operations although these features should be considered experimental.
+        The index of the ``static_features`` index must contain a single entry for each item present in the respective
+        ``TimeSeriesDataFrame``. For example, the following ``TimeSeriesDataFrame``::
+
+                                target
+            item_id timestamp
+            A       2019-01-01       0
+                    2019-01-02       1
+                    2019-01-03       2
+            B       2019-01-01       3
+                    2019-01-02       4
+                    2019-01-03       5
+
+        is compatible with the following ``static_features``::
+
+                     feat_1 feat_2
+            item_id
+            A           2.0    bar
+            B           5.0    foo
+
+        ``TimeSeriesDataFrame`` will ensure consistency of static features during serialization/deserialization, copy
+        and slice operations.
+
+        If ``static_features`` are provided during ``fit``, the ``TimeSeriesPredictor`` expects the same metadata to be
+        available during prediction time.
+
 
     Attributes
     ----------
@@ -107,7 +129,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 self._validate_multi_index_data_frame(data)
             else:
                 data = self._construct_pandas_frame_from_data_frame(data)
-        elif isinstance(data, str):
+        elif isinstance(data, (str, Path)):
             data = self._load_data_frame_from_file(data)
         elif isinstance(data, Iterable):
             data = self._construct_pandas_frame_from_iterable_dataset(data)
@@ -157,6 +179,8 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 value = value.to_frame()
             if not isinstance(value, pd.DataFrame):
                 raise ValueError(f"static_features must be a pandas DataFrame (received object of type {type(value)})")
+            if isinstance(value.index, pd.MultiIndex):
+                raise ValueError(f"static_features cannot have a MultiIndex")
 
             # Avoid modifying static features inplace
             value = value.copy()
@@ -313,8 +337,8 @@ class TimeSeriesDataFrame(pd.DataFrame):
         return cls(cls._construct_pandas_frame_from_iterable_dataset(iterable_dataset, num_cpus=num_cpus))
 
     @classmethod
-    def _load_data_frame_from_file(cls, path: str) -> pd.DataFrame:
-        df = load_pd.load(path)
+    def _load_data_frame_from_file(cls, path: Union[str, Path]) -> pd.DataFrame:
+        df = load_pd.load(str(path))
         return cls._construct_pandas_frame_from_data_frame(df)
 
     @classmethod
@@ -348,16 +372,16 @@ class TimeSeriesDataFrame(pd.DataFrame):
     @classmethod
     def from_path(
         cls,
-        path: str,
+        path: Union[str, Path],
         id_column: Optional[str] = None,
         timestamp_column: Optional[str] = None,
-        static_features_path: Optional[str] = None,
+        static_features_path: Optional[Union[str, Path]] = None,
     ) -> TimeSeriesDataFrame:
         """Construct a ``TimeSeriesDataFrame`` from a CSV or Parquet file.
 
         Parameters
         ----------
-        path : str
+        path : str or Path
             Path to a local or remote (e.g., S3) file containing the time series data in CSV or Parquet format.
             Example file contents::
 
@@ -376,7 +400,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
             Name of the 'item_id' column if column name is different
         timestamp_column : str, optional
             Name of the 'timestamp' column if column name is different
-        static_features_path : str, optional
+        static_features_path : str or Path, optional
             Path to a local or remote (e.g., S3) file containing static features in CSV or Parquet format.
             Example file contents::
 
@@ -393,8 +417,8 @@ class TimeSeriesDataFrame(pd.DataFrame):
         ts_df: TimeSeriesDataFrame
             A data frame in TimeSeriesDataFrame format.
         """
-        df = load_pd.load(path)
-        static_features_df = load_pd.load(static_features_path) if static_features_path is not None else None
+        df = load_pd.load(str(path))
+        static_features_df = load_pd.load(str(static_features_path)) if static_features_path is not None else None
         return cls.from_data_frame(
             df, id_column=id_column, timestamp_column=timestamp_column, static_features_df=static_features_df
         )
