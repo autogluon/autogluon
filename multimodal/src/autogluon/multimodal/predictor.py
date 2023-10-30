@@ -15,10 +15,8 @@ from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2log
 from autogluon.core.metrics import Scorer
 from .constants import (
     AUTOMM_TUTORIAL_MODE,
-    DEPRECATED_ZERO_SHOT,
     NER,
     OBJECT_DETECTION,
-    ZERO_SHOT_IMAGE_CLASSIFICATION,
 )
 from .matcher import MultiModalMatcher
 from .learners import BaseLearner, ObjectDetectionLearner, NERLearner
@@ -373,7 +371,6 @@ class MultiModalPredictor:
         self._verbosity = verbosity
         set_logger_verbosity(verbosity)
         #TODO: align verbosity2loglevel with https://huggingface.co/docs/transformers/main_classes/logging#transformers.utils.logging.get_verbosity
-        transformers.logging.set_verbosity(verbosity2loglevel(verbosity))
 
     def set_num_gpus(self, num_gpus):
         self._learner.set_num_gpus(num_gpus)
@@ -846,6 +843,7 @@ class MultiModalPredictor:
             assets = json.load(fp)
         if "class_name" in assets and assets["class_name"] == "MultiModalMatcher":
             learner_class = MultiModalMatcher
+            predictor._is_matcher = True
         elif assets["problem_type"] == OBJECT_DETECTION:
             learner_class = ObjectDetectionLearner
         elif assets["problem_type"] == NER:

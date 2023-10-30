@@ -143,6 +143,7 @@ class RealtimeMixin:
     def predict_batch(
         self,
         batch: Dict,
+        model: nn.Module,
         precision: Union[str, int],
         num_gpus: int,
     ):
@@ -153,6 +154,8 @@ class RealtimeMixin:
         ----------
         batch
             The batch data.
+        model
+            A Pytorch model. This is to align with matcher which passes either query or response model.
         precision
             The desired precision used in inference.
         num_gpus
@@ -165,7 +168,6 @@ class RealtimeMixin:
         device_type = "cuda" if torch.cuda.is_available() else "cpu"
         device = torch.device(device_type)
         batch_size = len(batch[next(iter(batch))])
-        model = self._model
         if 1 < num_gpus <= batch_size:
             model = nn.DataParallel(model)
         model.to(device).eval()
@@ -173,7 +175,7 @@ class RealtimeMixin:
         precision_context = get_precision_context(precision=precision, device_type=device_type)
         with precision_context, torch.no_grad():
             output = run_model(model, batch)
-            if self._model_postprocess_fn:
+            if hasattr(self, "_model_postprocess_fn") and self._model_postprocess_fn:
                 output = self._model_postprocess_fn(output)
 
         if isinstance(model, nn.DataParallel):
@@ -251,7 +253,7 @@ class RealtimeMixin:
 
             return {PROBABILITY: probability}
 
-    def use_realtime(self, realtime: bool, data: pd.DataFrame, data_processors: Dict, batch_size: int):
+    def use_realtime(self, realtime: bool, data: pd.DataFrame, data_processors: Union[Dict, List[Dict]], batch_size: int):
         """
         Determine whether to use the realtime inference based on the sample number
         and the data modalities. Loading image data requires more time than text.

@@ -1445,25 +1445,25 @@ class MultiModalMatcher(RealtimeMixin):
         if num_gpus <= 1:
             # Force set strategy to be None if it's cpu-only or we have only one GPU.
             strategy = "auto"
-
         precision = infer_precision(
             num_gpus=num_gpus,
             precision=self._config.env.precision,
             cpu_only_warning=False,
         )
-
-        if not realtime:
-            batch_size = compute_inference_batch_size(
-                per_gpu_batch_size=self._config.env.per_gpu_batch_size,
-                eval_batch_size_ratio=OmegaConf.select(self._config, "env.eval_batch_size_ratio"),
-                per_gpu_batch_size_evaluation=self._config.env.per_gpu_batch_size_evaluation,
-                # backward compatibility.
-                num_gpus=num_gpus,
-                strategy=strategy,
-            )
-
-        if realtime is None:
-            realtime = self.use_realtime(data=data, data_processors=data_processors, batch_size=batch_size)
+        batch_size = compute_inference_batch_size(
+            per_gpu_batch_size=self._config.env.per_gpu_batch_size,
+            eval_batch_size_ratio=OmegaConf.select(self._config, "env.eval_batch_size_ratio"),
+            per_gpu_batch_size_evaluation=self._config.env.per_gpu_batch_size_evaluation,
+            # backward compatibility.
+            num_gpus=num_gpus,
+            strategy=strategy,
+        )
+        realtime = self.use_realtime(
+            realtime=realtime,
+            data=data,
+            data_processors=data_processors,
+            batch_size=batch_size,
+        )
 
         # TODO: support realtime inference for notebook with multi-gpus
         if is_interactive_strategy(strategy) and realtime:

@@ -1584,6 +1584,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         )
         output = self.predict_batch(
             batch=batch,
+            model=self._model,
             precision=precision,
             num_gpus=num_gpus,
         )

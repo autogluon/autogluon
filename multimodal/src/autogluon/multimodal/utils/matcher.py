@@ -10,7 +10,7 @@ from omegaconf import DictConfig
 from torch import nn
 from torch.nn import functional as F
 
-from ..constants import AUTOMM, FUSION, QUERY, RESPONSE
+from ..constants import FUSION, QUERY, RESPONSE
 from .data import data_to_df
 from .model import create_model
 
