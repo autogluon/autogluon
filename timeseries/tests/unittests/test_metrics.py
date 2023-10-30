@@ -3,6 +3,19 @@ import pandas as pd
 import pytest
 from gluonts.evaluation import Evaluator as GluonTSEvaluator
 from gluonts.model.forecast import QuantileForecast
+from gluonts.dataset.split import split
+from gluonts.ev.metrics import (
+    MeanWeightedSumQuantileLoss,
+    Metric,
+    MAPE,
+    SMAPE,
+    MSE,
+    RMSE,
+    MASE,
+    ND,
+    MAE,
+    AverageMeanScaledQuantileLoss,
+)
 
 from autogluon.timeseries import TimeSeriesPredictor
 from autogluon.timeseries.metrics import AVAILABLE_METRICS, DEFAULT_METRIC_NAME, check_get_evaluation_metric
@@ -11,11 +24,23 @@ from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTS
 
 from .common import DUMMY_TS_DATAFRAME, get_data_frame_with_item_index
 
-GLUONTS_PARITY_METRICS = ["WQL", "MAPE", "sMAPE", "MSE", "RMSE", "MASE", "WAPE"]
-AG_TO_GLUONTS_METRIC = {"WAPE": "ND", "WQL": "mean_wQuantileLoss"}
-
-
 pytestmark = pytest.mark.filterwarnings("ignore")
+
+
+def get_ag_to_gluonts_metric_mapping() -> Dict[str, (Metric, str)]:
+    default_quantile_levels = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+    ag_to_gluonts_metric = {
+        "WQL": (MeanWeightedSumQuantileLoss(default_quantile_levels), "mean_weighted_sum_quantile_loss"),
+        "SQL": (AverageMeanScaledQuantileLoss(default_quantile_levels), "average_mean_scaled_quantile_loss"),
+        "WAPE": (ND("mean"), "ND[mean]"),
+    }
+    for point_metric_cls in [MAPE, SMAPE, MSE, RMSE, MASE, MAE]:
+        name = str(point_metric_cls.__name__)
+        ag_to_gluonts_metric[name] = (point_metric_cls("mean"), f"{name}[mean]")
+    return ag_to_gluonts_metric
+
+
+AG_TO_GLUONTS_METRIC_MAPPING = get_ag_to_gluonts_metric_mapping()
 
 
 @pytest.fixture(scope="module")
@@ -61,13 +86,13 @@ def to_gluonts_forecast(forecast_df, freq):
     return forecast_list
 
 
-def to_gluonts_test_set(data):
+def to_gluonts_test_set(data, prediction_length):
     ts_list = []
     for item_id, ts in data.groupby(level="item_id", sort=False):
-        ts = ts.loc[item_id]["target"]
-        ts.index = ts.index.to_period(freq=data.freq)
+        ts = {"target": ts.loc[item_id]["target"], "start": pd.Period(ts.loc[item_id].index[0], freq=data.freq)}
         ts_list.append(ts)
-    return ts_list
+    _, test_template = split(dataset=ts_list, offset=-prediction_length)
+    return test_template.generate_instances(prediction_length, windows=1)
 
 
 def check_gluonts_parity(metric_name, data, model, zero_forecast=False, equal_nan=False):
