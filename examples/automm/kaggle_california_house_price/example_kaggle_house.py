@@ -33,8 +33,7 @@ def get_parser():
 
 def get_automm_hyperparameters(mode, text_backbone, cat_as_text):
     if mode == "ft-transformer":
-        hparams = {"model.names": ["categorical_transformer",
-                                   "numerical_transformer",
+        hparams = {"model.names": ["ft_transformer",
                                    "hf_text",
                                    "fusion_transformer"],
                    "model.hf_text.checkpoint_name": text_backbone,

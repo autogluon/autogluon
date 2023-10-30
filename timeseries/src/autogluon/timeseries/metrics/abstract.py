@@ -196,6 +196,6 @@ class TimeSeriesScorer:
         """
         quantile_columns = [col for col in predictions.columns if col != "mean"]
         y_true = data_future[target]
-        q_pred = predictions[quantile_columns]
+        q_pred = pd.DataFrame(predictions[quantile_columns])
         quantile_levels = np.array(quantile_columns, dtype=float)
         return y_true, q_pred, quantile_levels
