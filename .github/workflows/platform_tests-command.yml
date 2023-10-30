@@ -16,6 +16,9 @@ on:
       branch_or_pr_number:
         description: 'dummy parameter to allow benchmark workflow to run'
         required: false
+      fork_info:
+        description: 'Get info of forked repository and branch'
+        required: false
 
 jobs:
   setup:
