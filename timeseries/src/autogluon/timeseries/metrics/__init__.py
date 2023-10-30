@@ -3,7 +3,7 @@ from typing import Type, Union
 
 from .abstract import TimeSeriesScorer
 from .point import MAE, MAPE, MASE, MSE, RMSE, RMSSE, WAPE, sMAPE
-from .quantile import WQL
+from .quantile import SQL, WQL
 
 __all__ = [
     "MAE",
@@ -13,6 +13,7 @@ __all__ = [
     "MSE",
     "RMSE",
     "RMSSE",
+    "SQL",
     "WAPE",
     "WQL",
 ]
@@ -26,6 +27,7 @@ AVAILABLE_METRICS = {
     "RMSE": RMSE,
     "RMSSE": RMSSE,
     "WAPE": WAPE,
+    "SQL": SQL,
     "WQL": WQL,
     # Exist for compatibility
     "MSE": MSE,
