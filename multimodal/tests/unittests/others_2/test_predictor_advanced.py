@@ -14,6 +14,7 @@ from autogluon.multimodal.utils.misc import shopee_dataset
 from ..utils.unittest_datasets import AmazonReviewSentimentCrossLingualDataset, PetFinderDataset
 
 
+# TODO: remove the unused params to enable ddp unused false
 @pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "backbone,efficient_finetuning,pooling_mode,precision,expected_ratio,standalone",
@@ -52,7 +53,7 @@ def test_predictor_gradient_checkpointing(
             "env.num_workers_evaluation": 0,
             "env.num_gpus": -1,
         },
-        time_limit=30,
+        time_limit=60,  # multigpu need more setup time
     )
     predictions = predictor.predict(test_data, as_pandas=False)
     tunable_ratio = predictor.trainable_parameters / predictor.total_parameters

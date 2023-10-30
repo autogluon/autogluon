@@ -305,6 +305,9 @@ MULTI_IMAGE_MIX_DATASET = "multi_image_mix_dataset"
 
 # strategies
 DDP = "ddp"
+DDP_FIND_UNUSED_PARAMETERS_FALSE = "ddp_find_unused_parameters_false"
+DDP_FIND_UNUSED_PARAMETERS_TRUE = "ddp_find_unused_parameters_true"
+DDP_STRATEGIES = [DDP, DDP_FIND_UNUSED_PARAMETERS_FALSE, DDP_FIND_UNUSED_PARAMETERS_TRUE]
 
 # torch constants
 TORCH_COMPILE_MIN_VERSION = "2.2.0.dev20230908"

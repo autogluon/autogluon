@@ -11,7 +11,7 @@ from torch import nn
 
 from autogluon.common.utils.resource_utils import ResourceManager
 
-from ..constants import DDP, OBJECT_DETECTION, OCR
+from ..constants import DDP_STRATEGIES, OBJECT_DETECTION, OCR
 
 logger = logging.getLogger(__name__)
 
@@ -322,7 +322,9 @@ def get_available_devices(num_gpus: int, auto_select_gpus: bool):
     -------
     The available devices.
     """
-    if num_gpus > 0:
+    if num_gpus == 1:  # for single GPU just return GPU 0, find_usable_cuda_devices can cause error if there is previous DDP run
+        return [0]
+    elif num_gpus > 1:
         if auto_select_gpus:
             if is_interactive_env():
                 devices = list(range(num_gpus))
@@ -347,3 +349,15 @@ def _get_mmlab_installation_guide(package_name):
         raise ValueError("Available package_name are: mmdet, mmcv, mmengine.")
 
     return err_msg
+
+
+def run_ddp_only_once(num_gpus, strategy):
+    if strategy in DDP_STRATEGIES:
+        global FIRST_DDP_RUN  # Use the global variable to make sure it is tracked per process
+        if "FIRST_DDP_RUN" in globals() and not FIRST_DDP_RUN:
+            # not the first time running DDP, set number of devices to 1 (use single GPU)
+            return 1, "auto"
+        else:
+            if num_gpus > 1:
+                FIRST_DDP_RUN = False  # run DDP for the first time, disable the following runs
+    return num_gpus, strategy

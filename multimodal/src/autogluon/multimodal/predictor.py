@@ -160,6 +160,7 @@ from .utils import (
     modify_duplicate_model_names,
     object_detection_data_to_df,
     predict,
+    run_ddp_only_once,
     save_ovd_result_df,
     save_pretrained_model_configs,
     save_result_df,
@@ -1505,6 +1506,9 @@ class MultiModalPredictor(ExportMixin):
         # save artifacts for the current running, except for model checkpoint, which will be saved in trainer
         self.save(save_path, standalone=standalone)
 
+        # After first DDP run, change following DDP runs to single GPU
+        num_gpus, strategy = run_ddp_only_once(num_gpus, strategy)
+
         blacklist_msgs = ["already configured with model summary"]
         log_filter = LogFilter(blacklist_msgs)
         with apply_log_filter(log_filter):
@@ -1801,6 +1805,9 @@ class MultiModalPredictor(ExportMixin):
                 **optimization_kwargs,
             )
 
+        # After first DDP run, change following DDP runs to single GPU
+        num_gpus, strategy = run_ddp_only_once(num_gpus, strategy)
+
         blacklist_msgs = []
         if self._verbosity <= 3:  # turn off logging in prediction
             blacklist_msgs.append("Automatic Mixed Precision")
@@ -1816,7 +1823,7 @@ class MultiModalPredictor(ExportMixin):
         with apply_log_filter(log_filter):
             evaluator = pl.Trainer(
                 accelerator="gpu" if num_gpus > 0 else "auto",
-                devices=num_gpus if num_gpus > 0 else "auto",
+                devices=get_available_devices(num_gpus, self._config.env.auto_select_gpus),
                 num_nodes=self._config.env.num_nodes,
                 precision=precision,
                 strategy=strategy,

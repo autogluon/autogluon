@@ -87,19 +87,15 @@ def test_mmdet_object_detection_inference_list_str_dict(checkpoint_name):
 
     pred = predictor.predict([mmdet_image_name] * 20)  # test batch inference
     assert len(pred) == 20  # test data size is 20
-    print(pred)
 
-    # TODO: FIX DDP multi runs!
+    pred = predictor.predict(mmdet_image_name)  # test batch inference
+    assert len(pred) == 1  # test data size is 1
 
-    # pred = predictor.predict(mmdet_image_name)  # test batch inference
-    # assert len(pred) == 1  # test data size is 1
-
-    # pred = predictor.predict({"image": [mmdet_image_name] * 4})  # test batch inference
-    # assert len(pred) == 4  # test data size is 10
-    # print(pred)
+    pred = predictor.predict({"image": [mmdet_image_name] * 10})  # test batch inference
+    assert len(pred) == 10  # test data size is 10
 
 
-# TODO: FIX DDP multi runs!
+# TODO: Pytest does not support DDP
 @pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "checkpoint_name",
@@ -177,8 +173,7 @@ def test_mmdet_object_detection_inference_df(checkpoint_name):
 
     test_df = from_coco_or_voc(test_path)
 
-    # TODO: FIX DDP multi runs!
-    # pred = predictor.predict(test_df.iloc[:100])
+    pred = predictor.predict(test_df.iloc[:100])
 
     # also test prediction on data without annotations
     pred = predictor.predict(test_path_with_images_only)
@@ -208,7 +203,7 @@ def test_mmdet_object_detection_inference_coco(checkpoint_name):
     pred = predictor.predict(test_path)
 
 
-# TODO: FIX DDP multi runs!
+# TODO: Pytest does not support DDP
 @pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "checkpoint_name",
@@ -354,7 +349,7 @@ def test_mmdet_object_detection_fit_then_inference_coco(checkpoint_name):
     pred = predictor.predict(test_path)  # test batch inference
 
 
-# TODO: FIX DDP multi runs!
+# TODO: ERRORS in evaluate (caused by torchmetrics + lightning DDP barrier)
 @pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "checkpoint_name",
@@ -427,13 +422,12 @@ def test_mmdet_object_detection_fit_with_freeze_backbone(checkpoint_name):
     )
 
 
-# TODO: FIX DDP multi runs!
+# TODO: ERRORS in evaluate (caused by torchmetrics + lightning DDP barrier)
 @pytest.mark.single_gpu
 def test_detector_hyperparameters_consistency():
     data_dir = download_sample_dataset()
 
     train_path = os.path.join(data_dir, "Annotations", "trainval_cocoformat.json")
-    train_df = from_coco_or_voc(train_path)
 
     hyperparameters = {
         "model.mmdet_image.checkpoint_name": "yolov3_mobilenetv2_8xb24-320-300e_coco",
@@ -443,18 +437,18 @@ def test_detector_hyperparameters_consistency():
     # pass hyperparameters to init()
     predictor = MultiModalPredictor(
         problem_type="object_detection",
-        sample_data_path=train_df,
+        sample_data_path=train_path,
         hyperparameters=hyperparameters,
     )
-    predictor.fit(train_df, time_limit=10)
+    predictor.fit(train_path, time_limit=10)
 
     # pass hyperparameters to fit()
     predictor_2 = MultiModalPredictor(
         problem_type="object_detection",
-        sample_data_path=train_df,
+        sample_data_path=train_path,
     )
     predictor_2.fit(
-        train_df,
+        train_path,
         hyperparameters=hyperparameters,
         time_limit=10,
     )

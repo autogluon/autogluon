@@ -901,7 +901,7 @@ def cocoeval_torchmetrics(outputs: List):
     The mAP result.
     """
 
-    map_metric = MeanAveragePrecision(box_format="xyxy", iou_type="bbox", class_metrics=False)
+    map_metric = MeanAveragePrecision(box_format="xyxy", iou_type="bbox", class_metrics=False)  # TODO: consider the compute_on_cpu flag
 
     preds = []
     target = []
