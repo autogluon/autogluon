@@ -1,21 +1,23 @@
+from typing import List, Tuple
+
 import numpy as np
 import pandas as pd
 import pytest
-from gluonts.evaluation import Evaluator as GluonTSEvaluator
-from gluonts.model.forecast import QuantileForecast
 from gluonts.dataset.split import split
 from gluonts.ev.metrics import (
-    MeanWeightedSumQuantileLoss,
-    Metric,
-    MAPE,
-    SMAPE,
-    MSE,
-    RMSE,
-    MASE,
-    ND,
     MAE,
+    MAPE,
+    MASE,
+    MSE,
+    ND,
+    RMSE,
+    SMAPE,
     AverageMeanScaledQuantileLoss,
+    MeanWeightedSumQuantileLoss,
 )
+from gluonts.ev.metrics import Metric as GluonTSMetric
+from gluonts.model.evaluation import evaluate_forecasts
+from gluonts.model.forecast import QuantileForecast
 
 from autogluon.timeseries import TimeSeriesPredictor
 from autogluon.timeseries.metrics import AVAILABLE_METRICS, DEFAULT_METRIC_NAME, check_get_evaluation_metric
@@ -27,20 +29,23 @@ from .common import DUMMY_TS_DATAFRAME, get_data_frame_with_item_index
 pytestmark = pytest.mark.filterwarnings("ignore")
 
 
-def get_ag_to_gluonts_metric_mapping() -> Dict[str, (Metric, str)]:
+def get_ag_and_gts_metrics() -> List[Tuple[str, str, GluonTSMetric]]:
+    # Each entry is a tuple (ag_metric_name, gts_metric_name, gts_metric_object)
     default_quantile_levels = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
-    ag_to_gluonts_metric = {
-        "WQL": (MeanWeightedSumQuantileLoss(default_quantile_levels), "mean_weighted_sum_quantile_loss"),
-        "SQL": (AverageMeanScaledQuantileLoss(default_quantile_levels), "average_mean_scaled_quantile_loss"),
-        "WAPE": (ND("mean"), "ND[mean]"),
-    }
+    # Metric that have different names in AutoGluon and GluonTS
+    ag_and_gts_metrics = [
+        ("WQL", "mean_weighted_sum_quantile_loss", MeanWeightedSumQuantileLoss(default_quantile_levels)),
+        ("SQL", "average_mean_scaled_quantile_loss", AverageMeanScaledQuantileLoss(default_quantile_levels)),
+        ("WAPE", "ND[mean]", ND("mean")),
+    ]
+    # Metric that have same names in AutoGluon and GluonTS
     for point_metric_cls in [MAPE, SMAPE, MSE, RMSE, MASE, MAE]:
         name = str(point_metric_cls.__name__)
-        ag_to_gluonts_metric[name] = (point_metric_cls("mean"), f"{name}[mean]")
-    return ag_to_gluonts_metric
+        ag_and_gts_metrics.append((name, f"{name}[mean]", point_metric_cls("mean")))
+    return ag_and_gts_metrics
 
 
-AG_TO_GLUONTS_METRIC_MAPPING = get_ag_to_gluonts_metric_mapping()
+AG_AND_GTS_METRICS = get_ag_and_gts_metrics()
 
 
 @pytest.fixture(scope="module")
@@ -89,20 +94,22 @@ def to_gluonts_forecast(forecast_df, freq):
 def to_gluonts_test_set(data, prediction_length):
     ts_list = []
     for item_id, ts in data.groupby(level="item_id", sort=False):
-        ts = {"target": ts.loc[item_id]["target"], "start": pd.Period(ts.loc[item_id].index[0], freq=data.freq)}
-        ts_list.append(ts)
+        entry = {"target": ts.loc[item_id]["target"], "start": pd.Period(ts.loc[item_id].index[0], freq=data.freq)}
+        ts_list.append(entry)
     _, test_template = split(dataset=ts_list, offset=-prediction_length)
     return test_template.generate_instances(prediction_length, windows=1)
 
 
-def check_gluonts_parity(metric_name, data, model, zero_forecast=False, equal_nan=False):
+def check_gluonts_parity(
+    ag_metric_name, gts_metric_name, gts_metric, data, model, zero_forecast=False, equal_nan=False
+):
     data_train, data_test = data.train_test_split(model.prediction_length)
     forecast_df = model.predict(data_train)
     forecast_df["mean"] = forecast_df["0.5"]
     if zero_forecast:
         forecast_df = forecast_df * 0
     seasonal_period = 3
-    ag_metric = check_get_evaluation_metric(metric_name)
+    ag_metric = check_get_evaluation_metric(ag_metric_name)
 
     ag_value = ag_metric.sign * ag_metric(
         data_test,
@@ -111,32 +118,58 @@ def check_gluonts_parity(metric_name, data, model, zero_forecast=False, equal_na
         seasonal_period=seasonal_period,
     )
 
-    forecast_list = to_gluonts_forecast(forecast_df, freq=data_train.freq)
-    ts_list = to_gluonts_test_set(data_test)
-    gts_evaluator = GluonTSEvaluator(seasonality=seasonal_period)
-    gts_results, _ = gts_evaluator(ts_iterator=ts_list, fcst_iterator=forecast_list)
-    gts_metric_name = AG_TO_GLUONTS_METRIC.get(metric_name, metric_name)
-    assert np.isclose(gts_results[gts_metric_name], ag_value, atol=1e-5, equal_nan=equal_nan)
+    gts_forecast = to_gluonts_forecast(forecast_df, freq=data_train.freq)
+    gts_test_set = to_gluonts_test_set(data_test, model.prediction_length)
+    gts_value = evaluate_forecasts(
+        gts_forecast, test_data=gts_test_set, seasonality=seasonal_period, metrics=[gts_metric]
+    ).values.item()
+    assert np.isclose(gts_value, ag_value, atol=1e-5, equal_nan=equal_nan)
 
 
-@pytest.mark.parametrize("metric_name", GLUONTS_PARITY_METRICS)
-def test_when_given_learned_model_when_evaluator_called_then_output_equal_to_gluonts(metric_name, deepar_trained):
-    check_gluonts_parity(metric_name, DUMMY_TS_DATAFRAME, deepar_trained)
-
-
-@pytest.mark.parametrize("metric_name", GLUONTS_PARITY_METRICS)
-def test_when_given_all_zero_data_when_evaluator_called_then_output_equal_to_gluonts(
-    metric_name, deepar_trained_zero_data
+@pytest.mark.parametrize("ag_metric_name, gts_metric_name, gts_metric", AG_AND_GTS_METRICS)
+def test_when_metric_evaluated_then_output_equal_to_gluonts(
+    ag_metric_name, gts_metric_name, gts_metric, deepar_trained
 ):
-    if metric_name == "MASE":
-        pytest.skip("MASE is undefined if all data is constant")
+    check_gluonts_parity(
+        ag_metric_name,
+        gts_metric_name,
+        gts_metric,
+        data=DUMMY_TS_DATAFRAME,
+        model=deepar_trained,
+    )
 
-    check_gluonts_parity(metric_name, DUMMY_TS_DATAFRAME.copy() * 0, deepar_trained_zero_data, equal_nan=True)
+
+@pytest.mark.parametrize("ag_metric_name, gts_metric_name, gts_metric", AG_AND_GTS_METRICS)
+def test_given_all_zero_data_when_metric_evaluated_then_output_equal_to_gluonts(
+    ag_metric_name, gts_metric_name, gts_metric, deepar_trained_zero_data
+):
+    if ag_metric_name in ["WQL", "WAPE"]:
+        pytest.skip(
+            "GluonTS produces incorrect values for these metrics on all-zero data https://github.com/awslabs/gluonts/issues/3034"
+        )
+
+    check_gluonts_parity(
+        ag_metric_name,
+        gts_metric_name,
+        gts_metric,
+        data=DUMMY_TS_DATAFRAME.copy() * 0,
+        model=deepar_trained_zero_data,
+        equal_nan=True,
+    )
 
 
-@pytest.mark.parametrize("metric_name", GLUONTS_PARITY_METRICS)
-def test_when_given_zero_forecasts_when_evaluator_called_then_output_equal_to_gluonts(metric_name, deepar_trained):
-    check_gluonts_parity(metric_name, DUMMY_TS_DATAFRAME, deepar_trained, zero_forecast=True)
+@pytest.mark.parametrize("ag_metric_name, gts_metric_name, gts_metric", AG_AND_GTS_METRICS)
+def test_given_zero_forecasts_when_metric_evaluated_then_output_equal_to_gluonts(
+    ag_metric_name, gts_metric_name, gts_metric, deepar_trained
+):
+    check_gluonts_parity(
+        ag_metric_name,
+        gts_metric_name,
+        gts_metric,
+        data=DUMMY_TS_DATAFRAME,
+        model=deepar_trained,
+        zero_forecast=True,
+    )
 
 
 def test_available_metrics_have_coefficients():

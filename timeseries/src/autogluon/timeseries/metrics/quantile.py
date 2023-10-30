@@ -54,6 +54,9 @@ class SQL(TimeSeriesScorer):
     def compute_metric(
         self, data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, target: str = "target", **kwargs
     ) -> float:
+        if self._past_abs_seasonal_error is None:
+            raise AssertionError("Call `save_past_metrics` before `compute_metric`")
+
         y_true, q_pred, quantile_levels = self._get_quantile_forecast_score_inputs(data_future, predictions, target)
         values_true = y_true.values[:, None]  # shape [N, 1]
 
