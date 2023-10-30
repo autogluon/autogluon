@@ -184,7 +184,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
             # Avoid modifying static features inplace
             value = value.copy()
-            if ITEMID in value.columns:
+            if ITEMID in value.columns and value.index.name != ITEMID:
                 value = value.set_index(ITEMID)
             if value.index.name != ITEMID:
                 value.index.rename(ITEMID, inplace=True)

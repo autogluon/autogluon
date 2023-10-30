@@ -718,6 +718,16 @@ def test_given_item_id_is_stored_as_column_and_not_index_in_static_features_then
     assert ts_df.static_features.equals(SAMPLE_TS_DATAFRAME_STATIC.static_features)
 
 
+def test_given_item_id_stored_in_both_index_and_column_when_constructing_tsdf_then_values_in_index_are_used():
+    df = SAMPLE_DATAFRAME.copy()
+    static_df = SAMPLE_STATIC_DATAFRAME.copy()
+    static_df = static_df.set_index(ITEMID)
+    static_df[ITEMID] = ["B", "C", "A"]  # these shouldn't be used; static_df.index should be used instead
+    ts_df = TimeSeriesDataFrame(df)
+    ts_df.static_features = static_df
+    assert (ts_df.static_features[ITEMID] == ["B", "C", "A"]).all()
+
+
 SAMPLE_DATAFRAME_WITH_MIXED_INDEX = pd.DataFrame(
     [
         {ITEMID: 2, TIMESTAMP: pd.Timestamp("2020-01-01"), "target": 2.5},
