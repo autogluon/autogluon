@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import itertools
 import logging
+import reprlib
 from collections.abc import Iterable
 from typing import Any, List, Optional, Tuple, Type, Union
 
@@ -72,7 +73,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
     static_features : Optional[pd.DataFrame]
         An optional data frame describing the metadata attributes of individual items in the item index. These
-        may be categorical or real valued attributes for each item. For example, if the item index refers to sales of
+        may be categorical or real valued attributes for each item. For example, if TimeSeriesDataFrame contas sales of
         various products, static features may refer to time-independent features like color or brand. When provided
         during ``fit``, the ``TimeSeriesPredictor`` expects the same metadata to be available during prediction time.
         When provided, the index of the ``static_features`` index must match the item index of the ``TimeSeriesDataFrame``.
@@ -156,19 +157,21 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 value = value.to_frame()
             if not isinstance(value, pd.DataFrame):
                 raise ValueError(f"static_features must be a pandas DataFrame (received object of type {type(value)})")
+
+            # Avoid modifying static features inplace
+            value = value.copy()
+            if ITEMID in value.columns:
+                value = value.set_index(ITEMID)
+            if value.index.name != ITEMID:
+                value.index.rename(ITEMID, inplace=True)
             missing_item_ids = self.item_ids.difference(value.index)
             if len(missing_item_ids) > 0:
                 raise ValueError(
-                    f"Following item_ids are missing from the index of static_features: {missing_item_ids.to_list()}"
+                    f"Following item_ids are missing from the index of static_features: {reprlib.repr(missing_item_ids.to_list())}"
                 )
             # if provided static features are a strict superset of the item index, we take a subset to ensure consistency
             if len(value.index.difference(self.item_ids)) > 0:
-                value = value.loc[self.item_ids]
-            # Avoid modifying static features inplace
-            value = value.copy()
-            # TODO: If item_id is a column, set this column as index
-            if value.index.name != ITEMID:
-                value.index.rename(ITEMID, inplace=True)
+                value = value.reindex(self.item_ids)
 
         self._static_features = value
 
