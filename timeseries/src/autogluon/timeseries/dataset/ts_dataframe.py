@@ -72,11 +72,10 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
     static_features : Optional[pd.DataFrame]
         An optional data frame describing the metadata attributes of individual items in the item index. These
-        may be categorical or real valued attributes for each item. For example, if the item index refers to
-        time series data of individual households, static features may refer to time-independent demographic
-        features. When provided during ``fit``, the ``TimeSeriesPredictor`` expects the same metadata to be available
-        during prediction time. When provided, the index of the ``static_features`` index must match the item index
-        of the ``TimeSeriesDataFrame``.
+        may be categorical or real valued attributes for each item. For example, if the item index refers to sales of
+        various products, static features may refer to time-independent features like color or brand. When provided
+        during ``fit``, the ``TimeSeriesPredictor`` expects the same metadata to be available during prediction time.
+        When provided, the index of the ``static_features`` index must match the item index of the ``TimeSeriesDataFrame``.
 
         ``TimeSeriesDataFrame`` will ensure consistency of static features during serialization/deserialization,
         copy and slice operations although these features should be considered experimental.
@@ -235,9 +234,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         if not pd.api.types.is_datetime64_dtype(df[TIMESTAMP]):
             raise ValueError(f"for {TIMESTAMP}, the only pandas dtype allowed is `datetime64`.")
         item_id_column = df[ITEMID]
-        item_id_is_string = pd.api.types.is_string_dtype(item_id_column)
-        item_id_is_int = pd.api.types.is_integer_dtype(item_id_column)
-        if not (item_id_is_string or item_id_is_int):
+        if not (pd.api.types.is_integer_dtype(item_id_column) or pd.api.types.is_string_dtype(item_id_column)):
             raise ValueError(f"all entries in column `{ITEMID}` must be of integer or string dtype")
 
     @classmethod
@@ -259,9 +256,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         if not data.index.names == (f"{ITEMID}", f"{TIMESTAMP}"):
             raise ValueError(f"data must have index names as ('{ITEMID}', '{TIMESTAMP}'), got {data.index.names}")
         item_id_index = data.index.get_level_values(level=ITEMID)
-        item_id_is_string = pd.api.types.is_string_dtype(item_id_index)
-        item_id_is_int = pd.api.types.is_integer_dtype(item_id_index)
-        if not (item_id_is_string or item_id_is_int):
+        if not (pd.api.types.is_integer_dtype(item_id_index) or pd.api.types.is_string_dtype(item_id_index)):
             raise ValueError(f"all entries in index `{ITEMID}` must be of integer or string dtype")
 
     @classmethod
@@ -290,7 +285,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         represent a single time series.
 
         This function also offers compatibility with GluonTS data sets, see
-        https://ts.gluon.ai/_modules/gluonts/dataset/common.html#ListDataset.
+        https://ts.gluon.ai/stable/api/gluonts/gluonts.dataset.common.html#gluonts.dataset.common.ListDataset.
 
         Parameters
         ----------
@@ -353,6 +348,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         path: str,
         id_column: Optional[str] = None,
         timestamp_column: Optional[str] = None,
+        static_features_path: Optional[str] = None,
     ) -> TimeSeriesDataFrame:
         """Construct a ``TimeSeriesDataFrame`` from a CSV or Parquet file.
 
@@ -373,10 +369,21 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 2,2019-01-02,7
                 2,2019-01-03,8
 
-        id_column: str
+        id_column : str, optional
             Name of the 'item_id' column if column name is different
-        timestamp_column: str
+        timestamp_column : str, optional
             Name of the 'timestamp' column if column name is different
+        static_features_path : str, optional
+            Path to a local or remote (e.g., S3) file containing static features in CSV or Parquet format.
+            Example file contents::
+
+                item_id,feat_1,feat_2
+                0,foo,0.5
+                1,foo,2.2
+                2,bar,0.1
+
+            See documentation for :class:`~autogluon.timeseries.TimeSeriesDataFrame` for more details about static
+            features.
 
         Returns
         -------
@@ -384,7 +391,10 @@ class TimeSeriesDataFrame(pd.DataFrame):
             A data frame in TimeSeriesDataFrame format.
         """
         df = load_pd.load(path)
-        return cls.from_data_frame(df, id_column=id_column, timestamp_column=timestamp_column)
+        static_features_df = load_pd.load(static_features_path) if static_features_path is not None else None
+        return cls.from_data_frame(
+            df, id_column=id_column, timestamp_column=timestamp_column, static_features_df=static_features_df
+        )
 
     @classmethod
     def from_data_frame(
@@ -399,9 +409,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         Parameters
         ----------
         df : pd.DataFrame
-            A pd.DataFrame with 'item_id' and 'timestamp' as columns. For example:
-
-            .. code-block::
+            A pd.DataFrame with 'item_id' and 'timestamp' as columns. For example::
 
                    item_id  timestamp  target
                 0        0 2019-01-01       0
@@ -413,19 +421,20 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 6        2 2019-01-01       6
                 7        2 2019-01-02       7
                 8        2 2019-01-03       8
-        id_column : str
+        id_column : str, optional
             Name of the 'item_id' column if column name is different
-        timestamp_column : str
+        timestamp_column : str, optional
             Name of the 'timestamp' column if column name is different
         static_features_df : pd.DataFrame, optional
-            A pd.DataFrame with 'item_id' column that contains the static features for each time series. For example:
-
-            .. code-block::
+            A pd.DataFrame with 'item_id' column that contains the static features for each time series. For example::
 
                    item_id feat_1   feat_2
                 0        0 foo         0.5
                 1        1 foo         2.2
                 2        2 bar         0.1
+
+            See documentation for :class:`~autogluon.timeseries.TimeSeriesDataFrame` for more details about static
+            features.
 
         Returns
         -------
