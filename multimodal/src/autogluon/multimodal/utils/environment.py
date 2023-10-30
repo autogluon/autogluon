@@ -322,7 +322,9 @@ def get_available_devices(num_gpus: int, auto_select_gpus: bool):
     -------
     The available devices.
     """
-    if num_gpus == 1:  # for single GPU just return GPU 0, find_usable_cuda_devices can cause error if there is previous DDP run
+    if num_gpus == 1:
+        # for single GPU just return GPU 0,
+        # find_usable_cuda_devices can cause error if there is previous DDP run
         return [0]
     elif num_gpus > 1:
         if auto_select_gpus:
