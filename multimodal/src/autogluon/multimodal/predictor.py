@@ -198,7 +198,7 @@ class MultiModalPredictor:
             transformers.logging.disable_progress_bar()
 
         if verbosity is not None:
-            self.set_verbosity(verbosity)
+            set_logger_verbosity(verbosity)
 
         self._verbosity = verbosity
         self._is_matcher = False
@@ -372,6 +372,7 @@ class MultiModalPredictor:
         """
         self._verbosity = verbosity
         set_logger_verbosity(verbosity)
+        #TODO: align verbosity2loglevel with https://huggingface.co/docs/transformers/main_classes/logging#transformers.utils.logging.get_verbosity
         transformers.logging.set_verbosity(verbosity2loglevel(verbosity))
 
     def set_num_gpus(self, num_gpus):
@@ -619,7 +620,6 @@ class MultiModalPredictor:
             return self._learner.evaluate(
                 data=data,
                 metrics=metrics,
-                label=label,
                 return_pred=return_pred,
                 realtime=realtime,
                 eval_tool=eval_tool,

@@ -1159,8 +1159,24 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
     def on_fit_per_run_end(
         self,
         trainer,
+        config,
+        model,
+        df_preprocessor,
+        data_processors,
+        save_path,
+        standalone,
     ):
         self.clean_trainer_processes(trainer=trainer, is_train=True)
+        self.save(
+            path=save_path,
+            standalone=standalone,
+            config=config,
+            model=model,
+            df_preprocessor=df_preprocessor,
+            data_processors=data_processors,
+            fit_called=True,  # fit is called on one run.
+            save_model=False,  # The final model will be saved in top_k_average
+        )
 
     def fit_per_run(
         self,
@@ -1259,14 +1275,6 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             precision=precision,
             strategy=strategy,
         )
-        # save artifacts for the current running, except for model checkpoint, which will be saved in trainer
-        self.save(
-            path=save_path,
-            standalone=standalone,
-            config=config,
-            df_preprocessor=df_preprocessor,
-            data_processors=data_processors,
-        )
         trainer = self.init_trainer_per_run(
             num_gpus=num_gpus,
             config=config,
@@ -1287,7 +1295,15 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             ckpt_path=ckpt_path,
             resume=resume,
         )
-        self.on_fit_per_run_end(trainer=trainer)
+        self.on_fit_per_run_end(
+            save_path=save_path,
+            standalone=standalone,
+            trainer=trainer,
+            config=config,
+            df_preprocessor=df_preprocessor,
+            data_processors=data_processors,
+            model=model,
+        )
 
         return dict(
             config=config,
@@ -1712,6 +1728,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
         realtime: Optional[bool] = None,
+        **kwargs,
     ):
         """
         Evaluate model on a test dataset.
@@ -2062,8 +2079,11 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         path: str,
         standalone: Optional[bool] = True,
         config: Optional[DictConfig] = None,
+        model: Optional[nn.Module] = None,
         df_preprocessor: Optional[MultiModalFeaturePreprocessor] = None,
         data_processors: Optional[Dict] = None,
+        fit_called: Optional[bool] = None,
+        save_model: Optional[bool] = True,
     ):
         """
         Save this learner to file in directory specified by `path`.
@@ -2080,11 +2100,9 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         """
         config = config if config else self._config
         config = copy.deepcopy(config)
-        if standalone and (
-            not OmegaConf.select(config, "optimization.efficient_finetune")
-            or OmegaConf.select(config, "optimization.efficient_finetune") == "None"
-        ):
-            config = save_pretrained_model_configs(model=self._model, config=config, path=path)
+        model = model if model else self._model
+        if standalone and not OmegaConf.select(config, "optimization.efficient_finetune"):
+            config = save_pretrained_model_configs(model=model, config=config, path=path)
         os.makedirs(path, exist_ok=True)
         OmegaConf.save(config=config, f=os.path.join(path, "config.yaml"))
 
@@ -2122,12 +2140,13 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                     "presets": self._presets,
                     "eval_metric_name": self._eval_metric_name,
                     "validation_metric_name": self._validation_metric_name,
+                    "minmax_mode": self._minmax_mode,
                     "output_shape": self._output_shape,
                     "classes": self._classes,
                     "save_path": path,
                     "pretrained": self._pretrained,
                     "pretrained_path": self._pretrained_path,
-                    "fit_called": self._fit_called,
+                    "fit_called": fit_called if fit_called is not None else self._fit_called,
                     "best_score": self._best_score,
                     "total_train_time": self._total_train_time,
                     "version": ag_version.__version__,
@@ -2136,18 +2155,24 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                 ensure_ascii=True,
             )
 
-        # In case that users save to a path, which is not the original save_path.
-        if os.path.abspath(path) != os.path.abspath(self._save_path):
-            model_path = os.path.join(self._save_path, "model.ckpt")
-            if os.path.isfile(model_path):
-                shutil.copy(model_path, path)
-            else:
-                # FIXME(?) Fix the saving logic
-                RuntimeError(
-                    f"Cannot find the model checkpoint in '{model_path}'. Have you removed the folder that "
-                    f"is created in .fit()? Currently, .save() won't function appropriately if that folder is "
-                    f"removed."
-                )
+        if save_model:
+            checkpoint = {
+                "state_dict": {"model." + name: param for name, param in model.state_dict().items()}
+            }
+            torch.save(checkpoint, os.path.join(os.path.abspath(path), MODEL_CHECKPOINT))
+
+        # # In case that users save to a path, which is not the original save_path.
+        # if os.path.abspath(path) != os.path.abspath(self._save_path):
+        #     model_path = os.path.join(self._save_path, "model.ckpt")
+        #     if os.path.isfile(model_path):
+        #         shutil.copy(model_path, path)
+        #     else:
+        #         # FIXME(?) Fix the saving logic
+        #         RuntimeError(
+        #             f"Cannot find the model checkpoint in '{model_path}'. Have you removed the folder that "
+        #             f"is created in .fit()? Currently, .save() won't function appropriately if that folder is "
+        #             f"removed."
+        #         )
 
     @staticmethod
     def _load_metadata(
@@ -2236,6 +2261,10 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         learner._validation_metric_name = assets["validation_metric_name"]
         learner._df_preprocessor = df_preprocessor
         learner._data_processors = data_processors
+        if "minmax_mode" in assets:
+            learner._minmax_mode = assets["minmax_mode"]
+        else:
+            learner._minmax_mode = get_minmax_mode(learner._validation_metric_name)
 
         return learner
 
@@ -2273,44 +2302,38 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         assert os.path.isdir(dir_path), f"'{dir_path}' must be an existing directory."
         learner = cls(label="dummy_label")
         learner = cls._load_metadata(learner=learner, path=dir_path, resume=resume, verbosity=verbosity)
-        efficient_finetune = OmegaConf.select(learner._config, "optimization.efficient_finetune")
-        model = create_fusion_model(
+        peft = OmegaConf.select(learner._config, "optimization.efficient_finetune")
+        learner._model = create_fusion_model(
             config=learner._config,
             num_classes=learner._output_shape,
             classes=learner._classes,
             num_numerical_columns=len(learner._df_preprocessor.numerical_feature_names),
             num_categories=learner._df_preprocessor.categorical_num_categories,
             pretrained=False
-            if not efficient_finetune or efficient_finetune == "None"
+            if not peft
             else True,  # set "pretrain=False" to prevent downloading online models
         )
-
         if learner._data_processors is None:
             learner._data_processors = create_fusion_data_processors(
                 config=learner._config,
-                model=model,
+                model=learner._model,
             )
-
         load_path, ckpt_path = get_load_ckpt_paths(
             ckpt_path=ckpt_path,
             dir_path=dir_path,
             resume=resume,
         )
-
         learner._load_state_dict(
             path=load_path,
-            strict=not efficient_finetune or efficient_finetune == "None",
+            strict=not peft,
         )
-
         learner._ckpt_path = ckpt_path
-
         loss_func = get_loss_func(
             problem_type=learner._problem_type,
             mixup_active=False,
             loss_func_name=OmegaConf.select(learner._config, "optimization.loss_function"),
             config=learner._config.optimization,
         )
-
         model_postprocess_fn = get_model_postprocess_fn(
             problem_type=learner._problem_type,
             loss_func=loss_func,
