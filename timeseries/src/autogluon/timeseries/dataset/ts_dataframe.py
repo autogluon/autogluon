@@ -180,7 +180,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
             if not isinstance(value, pd.DataFrame):
                 raise ValueError(f"static_features must be a pandas DataFrame (received object of type {type(value)})")
             if isinstance(value.index, pd.MultiIndex):
-                raise ValueError(f"static_features cannot have a MultiIndex")
+                raise ValueError("static_features cannot have a MultiIndex")
 
             # Avoid modifying static features inplace
             value = value.copy()
