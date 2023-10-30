@@ -17,6 +17,7 @@ on:
         required: true
         options:
           - tabular
+          - timeseries
       preset:
         description: 'Preset to run for tabular'
         required: true
@@ -25,12 +26,15 @@ on:
           - high
           - good
           - medium
+          - dev
       benchmark:
         description: 'Benchmark to run'
         required: true
         options:
           - full
           - test
+          - small
+          - timeseries_test
       time_limit:
         description: 'Time limit for the benchmark to run'
         required: true
@@ -40,6 +44,7 @@ on:
           - 8h
           - 16h
           - 24h
+          - test101
       folds:
         description: 'Number of folds to run'
         required: false
@@ -97,9 +102,9 @@ jobs:
           IFS="|" read -r fork_name fork_branch <<< "$FORK_INFO"
           echo "FORK_NAME=$fork_name" >> $GITHUB_OUTPUT
           echo "FORK_BRANCH=$fork_branch" >> $GITHUB_OUTPUT
-      - name: Generate AMLB User Dir
+      - name: Generate AMLB User Dir - {{ github.event.inputs.module }}
         run: |
-          /bin/bash CI/bench/generate_amlb_user_dir.sh ${{ steps.parse_fork_info.outputs.FORK_NAME }} ${{ steps.parse_fork_info.outputs.FORK_BRANCH }} ${{ github.sha }} "" ${{ github.event.inputs.folds }}
+          /bin/bash CI/bench/generate_amlb_user_dir.sh ${{ github.event.inputs.module }} ${{ steps.parse_fork_info.outputs.FORK_NAME }} ${{ steps.parse_fork_info.outputs.FORK_BRANCH }} ${{ github.sha }} "" ${{ github.event.inputs.folds }}
 
   benchmark:
     needs: generate_amlb_user_dir
