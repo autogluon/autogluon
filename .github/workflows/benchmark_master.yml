@@ -7,13 +7,6 @@ on:
     - cron: '00 09 * * SUN' #  UTC 9:00(2:00 PST Time) every Sunday
 
 env:
-<<<<<<< HEAD
-=======
-  AG_MODULE: tabular
-  AG_PRESET: best
-  AG_BENCHMARK: full
-  AG_TIME_LIMIT: 1h8c
->>>>>>> f1d7572ee3539b2195cb1da6563d5a791af1d60f
   AG_BRANCH_NAME: master
   
 permissions:
@@ -121,4 +114,4 @@ jobs:
         run: |
           nvm install 20
           npm install -g aws-cdk
-          /bin/bash ./.github/workflow_scripts/run_benchmark.sh timeseries dev timeseries_test test101 ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
+          /bin/bash ./.github/workflow_scripts/run_benchmark.sh timeseries dev timeseries_small 10m4c ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
