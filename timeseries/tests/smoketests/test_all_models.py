@@ -15,6 +15,7 @@ ITEM_IDS = ["Z", "A", "1", "C"]
 def generate_train_and_test_data(
     prediction_length: int = 1,
     freq: str = "H",
+    start_time: pd.Timestamp = "2020-01-05 15:37"
     use_known_covariates: bool = False,
     use_past_covariates: bool = False,
     use_static_features_continuous: bool = False,
@@ -24,7 +25,7 @@ def generate_train_and_test_data(
     length_per_item = {item_id: np.random.randint(min_length, min_length + 10) for item_id in ITEM_IDS}
     df_per_item = []
     for idx, (item_id, length) in enumerate(length_per_item.items()):
-        start = pd.Timestamp("2020-01-05 15:37") + (idx + 1) * pd.tseries.frequencies.to_offset(freq)
+        start = pd.Timestamp(start_time) + (idx + 1) * pd.tseries.frequencies.to_offset(freq)
         timestamps = pd.date_range(start=start, periods=length, freq=freq)
         index = pd.MultiIndex.from_product([(item_id,), timestamps], names=[ITEMID, TIMESTAMP])
         columns = {TARGET_COLUMN: np.random.normal(size=length)}
@@ -137,6 +138,7 @@ def test_all_models_handle_all_pandas_frequencies(freq):
         freq=freq,
         use_known_covariates=True,
         use_past_covariates=True,
+        start_time="1990-01-01",
     )
     known_covariates_names = [col for col in train_data if col.startswith("known_")]
 
