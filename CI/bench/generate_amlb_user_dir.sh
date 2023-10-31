@@ -7,6 +7,8 @@ SHORT_SHA=$4
 PR_NUMBER=$5
 FOLDS=$6
 
+# Mostly does not require any change for AutoMM side, as we need to change the things in amlb-user-dir
+
 # generate custom amlb configs
 if [ -z "$FOLDS" ]; then
     python $(dirname "$0")/generate_framework.py --module $MODULE --repository https://github.com/$REPOSITORY.git --branch $BRANCH --folds_to_run -1

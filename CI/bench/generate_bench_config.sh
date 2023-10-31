@@ -15,6 +15,7 @@ if [ $MODULE == "tabular" ] || [ $MODULE == "timeseries" ]; then
     INSTANCE_TYPE=m5.2xlarge
     aws s3 cp --recursive s3://autogluon-ci-benchmark/configs/$MODULE/$USER_DIR_S3_PREFIX/latest/ $(dirname "$0")/amlb_user_dir/
 fi
+# Would you require a special kind of machine to benchmark
 
 agbench generate-cloud-config \
 --prefix ag-bench-${INSTANCE_TYPE//./} \
