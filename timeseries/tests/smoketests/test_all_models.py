@@ -3,6 +3,7 @@ from typing import Tuple
 import numpy as np
 import pandas as pd
 import pytest
+from pkg_resources import parse_version
 
 from autogluon.timeseries import TimeSeriesPredictor
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
@@ -15,6 +16,7 @@ ITEM_IDS = ["Z", "A", "1", "C"]
 def generate_train_and_test_data(
     prediction_length: int = 1,
     freq: str = "H",
+    start_time: pd.Timestamp = "2020-01-05 15:37",
     use_known_covariates: bool = False,
     use_past_covariates: bool = False,
     use_static_features_continuous: bool = False,
@@ -24,7 +26,7 @@ def generate_train_and_test_data(
     length_per_item = {item_id: np.random.randint(min_length, min_length + 10) for item_id in ITEM_IDS}
     df_per_item = []
     for idx, (item_id, length) in enumerate(length_per_item.items()):
-        start = pd.Timestamp("2020-01-05 15:37") + (idx + 1) * pd.tseries.frequencies.to_offset(freq)
+        start = pd.Timestamp(start_time) + (idx + 1) * pd.tseries.frequencies.to_offset(freq)
         timestamps = pd.date_range(start=start, periods=length, freq=freq)
         index = pd.MultiIndex.from_product([(item_id,), timestamps], names=[ITEMID, TIMESTAMP])
         columns = {TARGET_COLUMN: np.random.normal(size=length)}
@@ -130,14 +132,17 @@ def test_all_models_can_handle_all_covariates(
 
 @pytest.mark.parametrize("freq", DEFAULT_SEASONALITIES.keys())
 def test_all_models_handle_all_pandas_frequencies(freq):
-    freq_str = f"2{freq}"
+    if parse_version(pd.__version__) < parse_version("2.1") and freq == "SM":
+        pytest.skip("'SM' frequency inference not supported by pandas < 2.1")
+
     prediction_length = 5
 
     train_data, test_data = generate_train_and_test_data(
         prediction_length=prediction_length,
-        freq=freq_str,
+        freq=freq,
         use_known_covariates=True,
         use_past_covariates=True,
+        start_time="1990-01-01",
     )
     known_covariates_names = [col for col in train_data if col.startswith("known_")]
 
