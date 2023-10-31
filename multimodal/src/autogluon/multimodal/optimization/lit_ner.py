@@ -42,6 +42,7 @@ class NerLitModule(LitModule):
         mixup_fn: Optional[MixupModule] = None,
         mixup_off_epoch: Optional[int] = 0,
         model_postprocess_fn: Callable = None,
+        skip_final_val: Optional[bool] = False,
         track_grad_norm: Optional[Union[int, str]] = -1,
     ):
         """
@@ -131,6 +132,7 @@ class NerLitModule(LitModule):
             mixup_fn=mixup_fn,
             mixup_off_epoch=mixup_off_epoch,
             model_postprocess_fn=model_postprocess_fn,
+            skip_final_val=skip_final_val,
             track_grad_norm=track_grad_norm,
         )
 

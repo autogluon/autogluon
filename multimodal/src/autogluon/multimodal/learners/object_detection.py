@@ -159,6 +159,7 @@ class ObjectDetectionLearner(BaseLearner):
         standalone: Optional[bool] = True,
         hyperparameter_tune_kwargs: Optional[Dict] = None,
         clean_ckpts: Optional[bool] = True,
+        **kwargs,
     ):
         training_start = self.on_fit_start()
         self.update_attributes(presets=presets, config=config)
@@ -245,6 +246,23 @@ class ObjectDetectionLearner(BaseLearner):
 
         return num_gpus
 
+    def get_optimization_kwargs_per_run(self, config, validation_metric, custom_metric_func):
+        return dict(
+            optim_type=config.optimization.optim_type,
+            lr_choice=config.optimization.lr_choice,
+            lr_schedule=config.optimization.lr_schedule,
+            lr=config.optimization.learning_rate,
+            lr_decay=config.optimization.lr_decay,
+            end_lr=config.optimization.end_lr,
+            lr_mult=config.optimization.lr_mult,
+            weight_decay=config.optimization.weight_decay,
+            warmup_steps=config.optimization.warmup_steps,
+            track_grad_norm=OmegaConf.select(config, "optimization.track_grad_norm", default=-1),
+            validation_metric=validation_metric,
+            validation_metric_name=self._validation_metric_name,
+            custom_metric_func=custom_metric_func,
+        )
+
     def build_task_per_run(
         self,
         model: Optional[nn.Module] = None,
@@ -303,18 +321,23 @@ class ObjectDetectionLearner(BaseLearner):
         validation_metric, custom_metric_func = self.get_validation_metric_per_run()
         if max_time == timedelta(seconds=0):
             self.top_k_average(
-                validation_metric_name=self._validation_metric_name,
                 save_path=save_path,
                 top_k_average_method=config.optimization.top_k_average_method,
                 standalone=standalone,
                 clean_ckpts=clean_ckpts,
             )
-            return self
+            return dict(
+                config=config,
+                df_preprocessor=df_preprocessor,
+                data_processors=data_processors,
+                model=self._model if self._model else model,
+            )
         datamodule = self.get_datamodule_per_run(
             df_preprocessor=df_preprocessor,
             data_processors=data_processors,
             per_gpu_batch_size=config.env.per_gpu_batch_size,
             num_workers=config.env.num_workers,
+            model_config=model.config,
         )
         optimization_kwargs = self.get_optimization_kwargs_per_run(
             config=config,
@@ -340,14 +363,6 @@ class ObjectDetectionLearner(BaseLearner):
             precision=precision,
             strategy=strategy,
         )
-        # save artifacts for the current running, except for model checkpoint, which will be saved in trainer
-        self.save(
-            path=save_path,
-            standalone=standalone,
-            config=config,
-            df_preprocessor=df_preprocessor,
-            data_processors=data_processors,
-        )
         trainer = self.init_trainer_per_run(
             num_gpus=num_gpus,
             config=config,
@@ -368,7 +383,15 @@ class ObjectDetectionLearner(BaseLearner):
             ckpt_path=ckpt_path,
             resume=resume,
         )
-        self.on_fit_per_run_end(trainer=trainer)
+        self.on_fit_per_run_end(
+            save_path=save_path,
+            standalone=standalone,
+            trainer=trainer,
+            config=config,
+            df_preprocessor=df_preprocessor,
+            data_processors=data_processors,
+            model=model,
+        )
 
         return dict(
             config=config,
@@ -555,6 +578,7 @@ class ObjectDetectionLearner(BaseLearner):
         return_pred: Optional[bool] = False,
         realtime: Optional[bool] = None,
         eval_tool: Optional[str] = None,
+        **kwargs,
     ):
         """
         """
@@ -588,6 +612,7 @@ class ObjectDetectionLearner(BaseLearner):
         as_pandas: Optional[bool] = None,
         realtime: Optional[bool] = None,
         save_results: Optional[bool] = None,
+        **kwargs,
     ):
         """
         Predict values for the label column of new data.
@@ -670,6 +695,7 @@ class ObjectDetectionLearner(BaseLearner):
         as_pandas: Optional[bool] = None,
         as_multiclass: Optional[bool] = True,
         realtime: Optional[bool] = None,
+        **kwargs,
     ):
         raise NotImplementedError("Object detection doesn't support calling `predict_proba` yet.")
 
@@ -679,6 +705,7 @@ class ObjectDetectionLearner(BaseLearner):
         as_tensor: Optional[bool] = False,
         as_pandas: Optional[bool] = False,
         realtime: Optional[bool] = None,
+        **kwargs,
     ):
         raise NotImplementedError("Object detection doesn't support calling `extract_embedding` yet.")
 

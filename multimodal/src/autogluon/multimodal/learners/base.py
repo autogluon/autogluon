@@ -571,13 +571,12 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         training_start = time.time()
         return training_start
 
-    def on_fit_end(self, training_start, strategy, strict_loading, standalone, clean_ckpts, validation_metric_name=None):
+    def on_fit_end(self, training_start, strategy, strict_loading, standalone, clean_ckpts):
         self._fit_called = True
         # We do not perform averaging checkpoint in the case of hpo for each trial
         # We only average the checkpoint of the best trial at the end in the master process.
         if not self._is_hpo:
             self.top_k_average(
-                validation_metric_name=self._validation_metric_name if validation_metric_name is None else validation_metric_name,
                 save_path=self._save_path,
                 top_k_average_method=self._config.optimization.top_k_average_method,
                 strategy=strategy,
@@ -864,7 +863,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         datamodule = BaseDataModule(**datamodule_kwargs)
         return datamodule
 
-    def get_optimization_kwargs_per_run(self, config, validation_metric, custom_metric_func):
+    def get_optimization_kwargs_per_run(self, config, validation_metric, custom_metric_func, loss_func, mixup_func):
         return dict(
             optim_type=config.optimization.optim_type,
             lr_choice=config.optimization.lr_choice,
@@ -879,21 +878,21 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             validation_metric=validation_metric,
             validation_metric_name=self._validation_metric_name,
             custom_metric_func=custom_metric_func,
+            loss_func=loss_func,
+            mixup_fn=mixup_func,
             efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
             mixup_off_epoch=OmegaConf.select(config, "data.mixup.turn_off_epoch"),
             skip_final_val=OmegaConf.select(config, "optimization.skip_final_val", default=False),
         )
 
     def build_task_per_run(
-            self,
-            model=None,
-            loss_func=None,
-            mixup_func=None,
-            model_postprocess_fn=None,
-            peft_param_names=None,
-            optimization_kwargs=None,
-            distillation_kwargs = None,
-            is_train=True,
+        self,
+        model=None,
+        model_postprocess_fn=None,
+        peft_param_names=None,
+        optimization_kwargs=None,
+        distillation_kwargs=None,
+        is_train=True,
     ):
         if is_train:
             if self._teacher_learner:
@@ -906,8 +905,6 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             else:
                 return LitModule(
                     model=model,
-                    loss_func=loss_func,
-                    mixup_fn=mixup_func,
                     model_postprocess_fn=model_postprocess_fn,
                     trainable_param_names=peft_param_names,
                     **optimization_kwargs,
@@ -1218,7 +1215,6 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
         if max_time == timedelta(seconds=0):
             self.top_k_average(
-                validation_metric_name=self._validation_metric_name,
                 save_path=save_path,
                 top_k_average_method=config.optimization.top_k_average_method,
                 strict_loading=not peft_param_names,
@@ -1250,11 +1246,11 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             config=config,
             validation_metric=validation_metric,
             custom_metric_func=custom_metric_func,
+            loss_func=loss_func,
+            mixup_func=mixup_func,
         )
         task = self.build_task_per_run(
             model=model,
-            loss_func=loss_func,
-            mixup_func=mixup_func,
             model_postprocess_fn=model_postprocess_fn,
             peft_param_names=peft_param_names,
             optimization_kwargs=optimization_kwargs,
@@ -1318,7 +1314,6 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
     def top_k_average(
         self,
-        validation_metric_name,  # FIXME: we need to change validation_metric to evaluation_metric for model choosing
         save_path,
         top_k_average_method,
         strategy=None,
@@ -1327,6 +1322,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         standalone=True,
         clean_ckpts=True,
     ):
+        minmax_mode = get_minmax_mode(self._eval_metric_name)
         best_k_models_yaml_path = os.path.join(save_path, BEST_K_MODELS_FILE)
         if os.path.exists(best_k_models_yaml_path):
             with open(best_k_models_yaml_path, "r") as f:
@@ -1353,14 +1349,14 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                     for v in sorted(
                         list(best_k_models.items()),
                         key=lambda ele: ele[1],
-                        reverse=(self._minmax_mode == MAX),
+                        reverse=(minmax_mode == MAX),
                     )
                 ]
                 if top_k_average_method == GREEDY_SOUP:
                     # Select the ingredients based on the methods proposed in paper
                     #  "Model soups: averaging weights of multiple fine-tuned models improves accuracy without
                     #  increasing inference time", https://arxiv.org/pdf/2203.05482.pdf
-                    monitor_op = {MIN: operator.le, MAX: operator.ge}[self._minmax_mode]
+                    monitor_op = {MIN: operator.le, MAX: operator.ge}[minmax_mode]
                     ingredients = [top_k_model_paths[0]]
                     if len(top_k_model_paths) > 1:
                         logger.info(
@@ -1372,7 +1368,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                             prefix=prefix,
                             strict=strict_loading,
                         )
-                        best_score = self.evaluate(self._tuning_data, metrics=[validation_metric_name])[validation_metric_name]
+                        best_score = self.evaluate(self._tuning_data, metrics=[self._eval_metric_name])[self._eval_metric_name]
                         for i in range(1, len(top_k_model_paths)):
                             cand_avg_state_dict = average_checkpoints(
                                 checkpoint_paths=ingredients + [top_k_model_paths[i]],
@@ -1382,8 +1378,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                                 prefix=prefix,
                                 strict=strict_loading,
                             )
-                            cand_score = self.evaluate(self._tuning_data, metrics=[validation_metric_name])[
-                                validation_metric_name
+                            cand_score = self.evaluate(self._tuning_data, metrics=[self._eval_metric_name])[
+                                self._eval_metric_name
                             ]
                             if monitor_op(cand_score, best_score):
                                 # Add new ingredient

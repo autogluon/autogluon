@@ -573,19 +573,16 @@ class MultiModalMatcher(RealtimeMixin):
         if hpo_mode:
             # TODO: allow custom gpu
             assert self._resume is False, "You can not resume training with HPO"
-            resources = dict(num_gpus=torch.cuda.device_count())
-            if _fit_args["max_time"] is not None:
-                _fit_args["max_time"] *= 0.95  # give some buffer time to ray lightning trainer
-            _fit_args["predictor"] = self
+            _fit_args["learner"] = self
             predictor = hyperparameter_tune(
                 hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-                resources=resources,
+                resources=dict(num_gpus=torch.cuda.device_count()),
                 is_matching=True,
                 **_fit_args,
             )
             return predictor
 
-        self._fit(**_fit_args)
+        self.fit_per_run(**_fit_args)
 
         # TODO(?) We should have a separate "_post_training_event()" for logging messages.
         logger.info(get_fit_complete_message(self._save_path))
@@ -692,7 +689,7 @@ class MultiModalMatcher(RealtimeMixin):
 
         return query_processors, response_processors, label_processors
 
-    def _fit(
+    def fit_per_run(
         self,
         train_df: pd.DataFrame,
         val_df: pd.DataFrame,

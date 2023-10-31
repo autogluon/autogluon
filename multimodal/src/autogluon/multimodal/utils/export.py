@@ -244,9 +244,24 @@ class ExportMixin:
         Tensor or numpy array.
         The output processed batch could be used for export/evaluate deployed model.
         """
-        data, df_preprocessor, data_processors = self._on_predict_start(
+        data = self.data_to_df(data=data)
+        column_types = self.infer_column_types(
+            column_types=self._column_types,
             data=data,
+            is_train=False,
+        )
+        df_preprocessor = self.get_df_preprocessor_per_run(
+            df_preprocessor=self._df_preprocessor,
+            data=data,
+            column_types=column_types,
+            is_train=False,
+        )
+        if self._fit_called:
+            df_preprocessor._column_types = self.update_image_column_types(data=data)
+        data_processors = self.get_data_processors_per_run(
+            data_processors=self._data_processors,
             requires_label=requires_label,
+            is_train=False,
         )
 
         batch = self.process_batch(

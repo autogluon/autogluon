@@ -62,14 +62,14 @@ def test_ner(checkpoint_name, searcher, scheduler):
     "checkpoint_name",
     [("google/electra-small-discriminator")],
 )
-def test_multi_ner(checkpoint_name):
+def test_multi_column_ner(checkpoint_name):
     train_data = get_data()
     train_data["add_text"] = train_data.text_snippet
     label_col = "entity_annotations"
     predictor = MultiModalPredictor(problem_type="ner", label=label_col)
     predictor.fit(
         train_data=train_data,
-        time_limit=40,
+        time_limit=10,
         column_types={"text_snippet": "text_ner"},
         hyperparameters={"model.ner_text.checkpoint_name": checkpoint_name},
     )

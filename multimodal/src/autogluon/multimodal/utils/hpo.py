@@ -62,7 +62,7 @@ def hpo_trial(sampled_hyperparameters, learner, checkpoint_dir=None, **_fit_args
 
 
 def build_final_learner(
-    learner, best_trial_path, minmax_mode, is_distill, val_df, save_path, last_ckpt_path, is_matching
+    learner, best_trial_path, minmax_mode, val_df, save_path, last_ckpt_path, is_matching, standalone, clean_ckpts
 ):
     """
     Build the final learner after HPO is finished.
@@ -75,8 +75,6 @@ def build_final_learner(
         The best trial's saving path.
     minmax_mode
         min or max.
-    is_distill
-        Whether is distillation.
     val_df
         Validation dataframe.
     save_path
@@ -134,14 +132,11 @@ def build_final_learner(
         learner._model = model
         # average checkpoint
         learner.top_k_average(
-            model=learner._model,
             save_path=best_trial_path,
             last_ckpt_path=last_ckpt_path,
-            minmax_mode=minmax_mode,
-            is_distill=is_distill,
             top_k_average_method=learner._config.optimization.top_k_average_method,
-            val_df=val_df,
-            validation_metric_name=learner._validation_metric_name,
+            standalone=standalone,
+            clean_ckpts=clean_ckpts,
         )
 
         learner._save_path = save_path
@@ -249,11 +244,12 @@ def hyperparameter_tune(hyperparameter_tune_kwargs, resources, is_matching=False
                 learner=_fit_args.get("learner"),
                 best_trial_path=best_trial_path,
                 minmax_mode=mode,
-                is_distill=is_distill,
-                val_df=_fit_args["val_df"],
+                val_df=_fit_args.get("learner")._tuning_data,
                 save_path=save_path,
                 last_ckpt_path=last_ckpt_path,
                 is_matching=is_matching,
+                standalone=_fit_args.get("standalone"),
+                clean_ckpts=_fit_args.get("clean_ckpts"),
             )
 
         cleanup_checkpoints(best_trial_path)

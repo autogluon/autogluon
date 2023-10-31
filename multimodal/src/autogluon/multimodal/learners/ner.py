@@ -48,6 +48,21 @@ class NERLearner(BaseLearner):
             pretrained=pretrained,
         )
 
+    def on_fit_end(self, training_start, strategy, strict_loading, standalone, clean_ckpts):
+        self._fit_called = True
+        # We do not perform averaging checkpoint in the case of hpo for each trial
+        # We only average the checkpoint of the best trial at the end in the master process.
+        if not self._is_hpo:
+            self.top_k_average(
+                save_path=self._save_path,
+                top_k_average_method=self._config.optimization.top_k_average_method,
+                strategy=strategy,
+                strict_loading=strict_loading,
+                # Not strict loading if using parameter-efficient finetuning
+                standalone=standalone,
+                clean_ckpts=clean_ckpts,
+            )
+
     def fit(
         self,
         train_data: Union[pd.DataFrame, str],
@@ -64,6 +79,7 @@ class NERLearner(BaseLearner):
         standalone: Optional[bool] = True,
         hyperparameter_tune_kwargs: Optional[Dict] = None,
         clean_ckpts: Optional[bool] = True,
+        **kwargs,
     ):
         training_start = self.on_fit_start()
         self.update_attributes(presets=presets, config=config, teacher_learner=teacher_learner)
@@ -94,23 +110,40 @@ class NERLearner(BaseLearner):
             strict_loading=fit_returns.get("strict_loading", True),
             standalone=standalone,
             clean_ckpts=clean_ckpts,
-            validation_metric_name=OVERALL_F1, #TODO: use the evaluation metric in top k averaging.
         )
 
         return self
+
+    def get_optimization_kwargs_per_run(self, config, validation_metric, custom_metric_func, loss_func):
+        return dict(
+            optim_type=config.optimization.optim_type,
+            lr_choice=config.optimization.lr_choice,
+            lr_schedule=config.optimization.lr_schedule,
+            lr=config.optimization.learning_rate,
+            lr_decay=config.optimization.lr_decay,
+            end_lr=config.optimization.end_lr,
+            lr_mult=config.optimization.lr_mult,
+            weight_decay=config.optimization.weight_decay,
+            warmup_steps=config.optimization.warmup_steps,
+            track_grad_norm=OmegaConf.select(config, "optimization.track_grad_norm", default=-1),
+            validation_metric=validation_metric,
+            validation_metric_name=self._validation_metric_name,
+            custom_metric_func=custom_metric_func,
+            loss_func=loss_func,
+            efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
+            skip_final_val=OmegaConf.select(config, "optimization.skip_final_val", default=False),
+        )
 
     def build_task_per_run(
         self,
         model,
         peft_param_names: List[str],
-        loss_func: Optional[nn.Module] = None,
         optimization_kwargs: Optional[dict] = None,
         is_train=True,
     ):
         if is_train:
             return NerLitModule(
                 model=model,
-                loss_func=loss_func,
                 trainable_param_names=peft_param_names,
                 **optimization_kwargs,
             )
@@ -160,7 +193,6 @@ class NERLearner(BaseLearner):
         loss_func = self.get_loss_func_per_run(config=config)
         if max_time == timedelta(seconds=0):
             self.top_k_average(
-                validation_metric_name=self._validation_metric_name,
                 save_path=save_path,
                 top_k_average_method=config.optimization.top_k_average_method,
                 strict_loading=not peft_param_names,
@@ -168,7 +200,12 @@ class NERLearner(BaseLearner):
                 clean_ckpts=clean_ckpts,
             )
 
-            return self
+            return dict(
+                config=config,
+                df_preprocessor=df_preprocessor,
+                data_processors=data_processors,
+                model=self._model if self._model else model,
+            )
 
         datamodule = self.get_datamodule_per_run(
             df_preprocessor=df_preprocessor,
@@ -180,10 +217,10 @@ class NERLearner(BaseLearner):
             config=config,
             validation_metric=validation_metric,
             custom_metric_func=custom_metric_func,
+            loss_func=loss_func,
         )
         task = self.build_task_per_run(
             model=model,
-            loss_func=loss_func,
             peft_param_names=peft_param_names,
             optimization_kwargs=optimization_kwargs,
         )
@@ -201,14 +238,6 @@ class NERLearner(BaseLearner):
             num_gpus=num_gpus,
             precision=precision,
             strategy=strategy,
-        )
-        # save artifacts for the current running, except for model checkpoint, which will be saved in trainer
-        self.save(
-            path=save_path,
-            standalone=standalone,
-            config=config,
-            df_preprocessor=df_preprocessor,
-            data_processors=data_processors,
         )
         trainer = self.init_trainer_per_run(
             num_gpus=num_gpus,
@@ -230,7 +259,15 @@ class NERLearner(BaseLearner):
             ckpt_path=ckpt_path,
             resume=resume,
         )
-        self.on_fit_per_run_end(trainer=trainer)
+        self.on_fit_per_run_end(
+            save_path=save_path,
+            standalone=standalone,
+            trainer=trainer,
+            config=config,
+            df_preprocessor=df_preprocessor,
+            data_processors=data_processors,
+            model=model,
+        )
 
         return dict(
             config=config,
@@ -248,7 +285,7 @@ class NERLearner(BaseLearner):
         metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
         realtime: Optional[bool] = None,
-        eval_tool: Optional[str] = None,
+        **kwargs,
     ):
         """
         """
@@ -301,7 +338,7 @@ class NERLearner(BaseLearner):
                 if per_metric.lower() in score:
                     results.update({per_metric: score[per_metric.lower()]})
                 else:
-                    warnings.warning(f"Warning: {per_metric} is not a supported evaluation metric!")
+                    warnings.warn(f"Warning: {per_metric} is not a supported evaluation metric!")
             if not results:
                 results = score  # If the results dict is empty, return all scores.
 
@@ -315,6 +352,7 @@ class NERLearner(BaseLearner):
         data: Union[pd.DataFrame, dict, list, str],
         as_pandas: Optional[bool] = None,
         realtime: Optional[bool] = None,
+        **kwargs,
     ):
         """
         Predict values for the label column of new data.
@@ -360,6 +398,7 @@ class NERLearner(BaseLearner):
         data: Union[pd.DataFrame, dict, list],
         as_pandas: Optional[bool] = None,
         realtime: Optional[bool] = None,
+        **kwargs,
     ):
         """
         Predict probabilities class probabilities rather than class labels.
@@ -399,12 +438,3 @@ class NERLearner(BaseLearner):
 
         return prob
 
-    def extract_embedding(
-        self,
-        data: Union[pd.DataFrame, dict, list],
-        return_masks: Optional[bool] = False,
-        as_tensor: Optional[bool] = False,
-        as_pandas: Optional[bool] = False,
-        realtime: Optional[bool] = None,
-    ):
-        raise NotImplementedError("NER doesn't support calling `extract_embedding`.")

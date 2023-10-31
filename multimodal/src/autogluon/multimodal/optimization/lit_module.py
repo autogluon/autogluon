@@ -119,7 +119,7 @@ class LitModule(pl.LightningModule):
         """
         super().__init__()
         self.save_hyperparameters(
-            ignore=["model", "validation_metric", "test_metric", "loss_func", "model_postprocess_fn"]
+            ignore=["model", "validation_metric", "test_metric", "loss_func", "model_postprocess_fn", "mixup_fn", "trainable_param_names"]
         )
         self.model = model
         self.validation_metric = validation_metric
