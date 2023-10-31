@@ -11,12 +11,11 @@ from torch import nn
 
 from ..constants import (
     AUTOMM,
-    CATEGORICAL_TRANSFORMER,
     DATA,
+    FT_TRANSFORMER,
     FUSION_TRANSFORMER,
     HF_MODELS,
     MODEL,
-    NUMERICAL_TRANSFORMER,
     REGRESSION,
     VALID_CONFIG_KEYS,
 )
@@ -583,9 +582,8 @@ def update_tabular_config_by_resources(
     The modified config.
     """
     columns_per_model = {
-        NUMERICAL_TRANSFORMER: num_numerical_columns,
-        CATEGORICAL_TRANSFORMER: num_categorical_columns,
         FUSION_TRANSFORMER: num_categorical_columns + num_numerical_columns,
+        FT_TRANSFORMER: num_categorical_columns + num_numerical_columns,
     }
 
     # Threshold is expected to be ~= batch_size * num_tokens, for additive attention.

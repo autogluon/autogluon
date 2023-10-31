@@ -5,7 +5,7 @@ import torch
 from torch import nn
 
 from ...constants import AUTOMM, FEATURES, LABEL, LOGITS, WEIGHT
-from ..ft_transformer import CLSToken, FT_Transformer
+from ..custom_transformer import CLSToken, Custom_Transformer
 from ..utils import init_weights, run_model
 from .base import AbstractMultimodalFusionModel
 
@@ -132,7 +132,7 @@ class MultimodalFusionTransformer(AbstractMultimodalFusionModel):
 
         assert len(self.adapter) == len(self.model)
 
-        self.fusion_transformer = FT_Transformer(
+        self.fusion_transformer = Custom_Transformer(
             d_token=in_features,
             n_blocks=n_blocks,
             attention_n_heads=attention_n_heads,
@@ -158,7 +158,7 @@ class MultimodalFusionTransformer(AbstractMultimodalFusionModel):
             share_qv_weights=share_qv_weights,
         )
 
-        self.head = FT_Transformer.Head(
+        self.head = Custom_Transformer.Head(
             d_in=in_features,
             d_out=num_classes,
             bias=True,

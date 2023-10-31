@@ -31,10 +31,10 @@ on:
         description: 'Benchmark to run'
         required: true
         options:
-          - full
-          - test
-          - small
-          - timeseries_test
+          - tabular_full
+          - tabular_test
+          - tabular_small
+          - timeseries_small
       time_limit:
         description: 'Time limit for the benchmark to run'
         required: true
@@ -44,7 +44,7 @@ on:
           - 8h
           - 16h
           - 24h
-          - test101
+          - 10m4c
       folds:
         description: 'Number of folds to run'
         required: false
