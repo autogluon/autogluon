@@ -164,6 +164,7 @@ def _assert_perfect_score(scorer: Scorer, abs_tol=1e-5):
     assert score == scorer.score(y_true, y_pred)
     error = scorer.error(y_true, y_pred)
     assert error == scorer.convert_score_to_error(score)
+    assert isclose(score, scorer.convert_error_to_score(error), abs_tol=abs_tol)
     assert isclose(error, 0, abs_tol=abs_tol)
     assert isclose(score, scorer.optimum, abs_tol=abs_tol)
 
@@ -179,6 +180,7 @@ def _assert_imperfect_score(scorer: Scorer, abs_tol=1e-5):
     assert score == scorer.score(y_true, y_pred)
     error = scorer.error(y_true, y_pred)
     assert error == scorer.convert_score_to_error(score)
+    assert isclose(score, scorer.convert_error_to_score(error), abs_tol=abs_tol)
     assert error > 0
     assert score < scorer.optimum
     assert not isclose(error, 0, abs_tol=abs_tol)
