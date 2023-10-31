@@ -3,6 +3,7 @@ from typing import Tuple
 import numpy as np
 import pandas as pd
 import pytest
+from pkg_resources import parse_version
 
 from autogluon.timeseries import TimeSeriesPredictor
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
@@ -131,6 +132,9 @@ def test_all_models_can_handle_all_covariates(
 
 @pytest.mark.parametrize("freq", DEFAULT_SEASONALITIES.keys())
 def test_all_models_handle_all_pandas_frequencies(freq):
+    if parse_version(pd.__version__) < parse_version("2.1") and freq == "SM":
+        pytest.skip("'SM' frequency inference not supported by pandas < 2.1")
+
     prediction_length = 5
 
     train_data, test_data = generate_train_and_test_data(
