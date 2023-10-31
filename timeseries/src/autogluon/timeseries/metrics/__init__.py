@@ -1,4 +1,4 @@
-import json
+from pprint import pformat
 from typing import Type, Union
 
 from .abstract import TimeSeriesScorer
@@ -47,7 +47,7 @@ def check_get_evaluation_metric(
         if eval_metric.upper() not in AVAILABLE_METRICS:
             raise ValueError(
                 f"Time series metric {eval_metric} not supported. Available metrics are:\n"
-                f"{json.dumps(list(AVAILABLE_METRICS.keys()), indent=2)}"
+                f"{pformat(sorted(AVAILABLE_METRICS.keys()))}"
             )
         eval_metric = AVAILABLE_METRICS[eval_metric.upper()]()
     elif eval_metric is None:

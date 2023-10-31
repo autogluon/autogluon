@@ -758,11 +758,13 @@ class TimeSeriesPredictor:
         self,
         data: Union[TimeSeriesDataFrame, pd.DataFrame, str],
         model: Optional[str] = None,
-        metric: Union[str, TimeSeriesScorer, None] = None,
+        metrics: Optional[Union[str, TimeSeriesScorer, List[Union[str, TimeSeriesScorer]]]] = None,
         use_cache: bool = True,
-    ):
-        """Evaluate the performance for given dataset, computing the score determined by ``self.eval_metric``
-        on the given data set, and with the same ``prediction_length`` used when training models.
+    ) -> Dict[str, float]:
+        """Evaluate the forecast accuracy for given dataset.
+
+        This method measures the forecast accuracy using the last ``self.prediction_length`` time steps of each time
+        series in ``data`` as a hold-out set.
 
         Parameters
         ----------
@@ -781,23 +783,24 @@ class TimeSeriesPredictor:
         model : str, optional
             Name of the model that you would like to evaluate. By default, the best model during training
             (with highest validation score) will be used.
-        metric : str or TimeSeriesScorer, optional
-            Evaluation metric to compute scores with. Defaults to ``self.eval_metric``
+        metrics : str, TimeSeriesScorer or List[Union[str, TimeSeriesScorer]], optional
+            Metric or a list of metrics to compute scores with. Defaults to ``self.eval_metric``. Supports both
+            metric names as strings and custom metrics based on TimeSeriesScorer.
         use_cache : bool, default = True
             If True, will attempt to use the cached predictions. If False, cached predictions will be ignored.
             This argument is ignored if ``cache_predictions`` was set to False when creating the ``TimeSeriesPredictor``.
 
         Returns
         -------
-        score : float
-            A forecast accuracy score, where higher values indicate better quality. For consistency, error metrics
+        scores_dict : Dict[str, float]
+            Dictionary where keys = metrics, values = performance along each metric. For consistency, error metrics
             will have their signs flipped to obey this convention. For example, negative MAPE values will be reported.
         """
         data = self._check_and_prepare_data_frame(data)
         self._check_data_for_evaluation(data)
-        return self._learner.score(data, model=model, metric=metric, use_cache=use_cache)
+        return self._learner.score(data, model=model, metrics=metrics, use_cache=use_cache)
 
-    def score(self, data: Union[TimeSeriesDataFrame, pd.DataFrame, str], **kwargs):
+    def score(self, data: Union[TimeSeriesDataFrame, pd.DataFrame, str], **kwargs) -> Dict[str, float]:
         """See, :meth:`~autogluon.timeseries.TimeSeriesPredictor.evaluate`."""
         return self.evaluate(data, **kwargs)
 

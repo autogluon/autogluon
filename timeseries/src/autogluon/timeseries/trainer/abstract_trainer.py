@@ -5,7 +5,7 @@ import time
 import traceback
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Dict, List, Optional, Tuple, Type, Union, Iterable
 
 import networkx as nx
 import numpy as np
@@ -817,30 +817,37 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         self,
         data: TimeSeriesDataFrame,
         predictions: TimeSeriesDataFrame,
-        metric: Union[str, TimeSeriesScorer, None] = None,
-    ) -> float:
+        metrics: Optional[Union[str, TimeSeriesScorer, List[Union[str, TimeSeriesScorer]]]] = None,
+    ) -> Dict[str, float]:
         """Compute the score measuring how well the predictions align with the data."""
-        eval_metric = self.eval_metric if metric is None else check_get_evaluation_metric(metric)
-        return eval_metric.score(
-            data=data,
-            predictions=predictions,
-            prediction_length=self.prediction_length,
-            target=self.target,
-            seasonal_period=self.eval_metric_seasonal_period,
-        )
+        if metrics is None:
+            metrics = [self.eval_metric]
+        if not isinstance(metrics, Iterable):
+            metrics = [metrics]
+        scores_dict = {}
+        for metric in metrics:
+            eval_metric = check_get_evaluation_metric(metric)
+            scores_dict[eval_metric.name] = eval_metric.score(
+                data=data,
+                predictions=predictions,
+                prediction_length=self.prediction_length,
+                target=self.target,
+                seasonal_period=self.eval_metric_seasonal_period,
+            )
+        return scores_dict
 
     def score(
         self,
         data: TimeSeriesDataFrame,
         model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
-        metric: Union[str, TimeSeriesScorer, None] = None,
+        metrics: Optional[Union[str, TimeSeriesScorer, List[Union[str, TimeSeriesScorer]]]] = None,
         use_cache: bool = True,
-    ) -> float:
+    ) -> Dict[str, float]:
         past_data, known_covariates = data.get_model_inputs_for_scoring(
             prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates_real
         )
         predictions = self.predict(data=past_data, known_covariates=known_covariates, model=model, use_cache=use_cache)
-        return self._score_with_predictions(data=data, predictions=predictions, metric=metric)
+        return self._score_with_predictions(data=data, predictions=predictions, metrics=metrics)
 
     def _predict_model(
         self,

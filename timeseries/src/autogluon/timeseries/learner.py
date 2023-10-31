@@ -185,11 +185,11 @@ class TimeSeriesLearner(AbstractLearner):
         self,
         data: TimeSeriesDataFrame,
         model: AbstractTimeSeriesModel = None,
-        metric: Union[str, TimeSeriesScorer, None] = None,
+        metrics: Optional[Union[str, TimeSeriesScorer, List[Union[str, TimeSeriesScorer]]]] = None,
         use_cache: bool = True,
     ) -> float:
         data = self.feature_generator.transform(data)
-        return self.load_trainer().score(data=data, model=model, metric=metric, use_cache=use_cache)
+        return self.load_trainer().score(data=data, model=model, metrics=metrics, use_cache=use_cache)
 
     def leaderboard(self, data: Optional[TimeSeriesDataFrame] = None, use_cache: bool = True) -> pd.DataFrame:
         if data is not None:
