@@ -136,8 +136,8 @@ class NERLearner(BaseLearner):
 
     def build_task_per_run(
         self,
-        model,
-        peft_param_names: List[str],
+        model: Optional[nn.Module] = None,
+        peft_param_names: Optional[List[str]] = None,
         optimization_kwargs: Optional[dict] = None,
         is_train=True,
     ):

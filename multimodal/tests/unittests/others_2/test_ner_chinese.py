@@ -3,7 +3,6 @@ import os
 
 import pandas as pd
 
-import autogluon.multimodal
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.utils import download
 
@@ -56,7 +55,7 @@ def read_bio(sample):
             else:
                 new_entity = {"entity_group": label, "start": ptr, "end": new_ptr}
         else:
-            raise NotImplemetedError()
+            raise NotImplementedError
         ptr = new_ptr
         prev_bio_type = bio_type
     if new_entity:

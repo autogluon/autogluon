@@ -26,18 +26,8 @@ class DistillationMixin:
 
         Returns
         -------
-        critics
-            The critics used in computing mutual information loss.
-        baseline_funcs
-            The baseline functions used in computing mutual information loss.
-        soft_label_loss_func
-            The loss function using teacher's logits as labels.
-        output_feature_adaptor
-            The adaptor used to adapt student output feature to the shape of teacher's.
-        output_feature_loss_func
-            The loss function using minimize distance between output_feature of teacher and student.
-        rkd_loss_func
-            The loss function using rkd distance and angle loss between output_feature of teacher and student.
+        distillation_kwargs
+            Distillation related keyword arguments.
         """
         if self._teacher_learner is None:
             return dict()
@@ -109,13 +99,8 @@ class DistillationMixin:
         rkd_distance_loss_weight = OmegaConf.select(config, "distiller.rkd_distance_loss_weight", default=0.0)
         rkd_angle_loss_weight = OmegaConf.select(config, "distiller.rkd_angle_loss_weight", default=0.0)
         rkd_loss_func = RKDLoss(rkd_distance_loss_weight, rkd_angle_loss_weight)
-
-        output_feature_loss_weight = OmegaConf.select(
-            self._config, "distiller.output_feature_loss_weight", default=0.0
-        )
-        softmax_regression_weight = OmegaConf.select(
-            self._config, "distiller.softmax_regression_weight", default=0.0
-        )
+        output_feature_loss_weight = OmegaConf.select(config, "distiller.output_feature_loss_weight", default=0.0)
+        softmax_regression_weight = OmegaConf.select(config, "distiller.softmax_regression_weight", default=0.0)
 
         # turn on returning column information in data processors
         turn_on_off_feature_column_info(

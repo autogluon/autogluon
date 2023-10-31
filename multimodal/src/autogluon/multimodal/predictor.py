@@ -297,6 +297,14 @@ class MultiModalPredictor:
         return self._learner.column_types
 
     @property
+    def eval_metric(self):
+        return self._learner.eval_metric
+
+    @property
+    def validation_metric(self):
+        return self._learner.validation_metric
+
+    @property
     def verbosity(self):
         return self._verbosity
 
@@ -523,6 +531,12 @@ class MultiModalPredictor:
                 seed=seed,
             )
         else:
+            if teacher_predictor is None:
+                teacher_learner = None
+            elif isinstance(teacher_predictor, str):
+                teacher_learner = teacher_predictor
+            else:
+                teacher_learner = teacher_predictor._learner
             self._learner.fit(
                 train_data=train_data,
                 presets=presets,
@@ -534,7 +548,7 @@ class MultiModalPredictor:
                 hyperparameters=hyperparameters,
                 column_types=column_types,
                 holdout_frac=holdout_frac,
-                teacher_learner=teacher_predictor._learner if teacher_predictor else None,
+                teacher_learner=teacher_learner,
                 seed=seed,
                 standalone=standalone,
                 hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,

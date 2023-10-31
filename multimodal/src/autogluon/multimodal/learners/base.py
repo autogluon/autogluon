@@ -335,6 +335,14 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         return self._column_types
 
     @property
+    def eval_metric(self):
+        return self._eval_metric_name
+
+    @property
+    def validation_metric(self):
+        return self._validation_metric_name
+
+    @property
     def total_parameters(self) -> int:
         return sum(p.numel() if not is_lazy_weight_tensor(p) else 0 for p in self._model.parameters())
 
@@ -718,8 +726,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                     train_df_x=data,
                     train_df_y=data[self._label_column] if self._label_column else None,
                 )
-        if is_train and self._teacher_learner is not None:
-            df_preprocessor = [df_preprocessor, self._teacher_learner._df_preprocessor]
+
         return df_preprocessor
 
     @staticmethod
@@ -797,9 +804,6 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             if not requires_label:
                 data_processors.pop(LABEL, None)
 
-        if is_train and self._teacher_learner is not None:
-            data_processors = [data_processors, self._teacher_learner._data_processors]
-
         return data_processors
 
     def get_validation_metric_per_run(self):
@@ -849,6 +853,9 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         predict_data=None,
         is_train=True,
     ):
+        if self._teacher_learner is not None:
+            df_preprocessor = [df_preprocessor, self._teacher_learner._df_preprocessor]
+            data_processors = [data_processors, self._teacher_learner._data_processors]
         datamodule_kwargs = dict(
             df_preprocessor=df_preprocessor,
             data_processors=data_processors,
@@ -895,7 +902,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         is_train=True,
     ):
         if is_train:
-            if self._teacher_learner:
+            if self._teacher_learner is not None:
                 return DistillerLitModule(
                     student_model=model,
                     teacher_model=self._teacher_learner._model,

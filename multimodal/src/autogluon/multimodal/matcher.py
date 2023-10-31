@@ -271,6 +271,14 @@ class MultiModalMatcher(RealtimeMixin):
         return self._column_types
 
     @property
+    def eval_metric(self):
+        return self._eval_metric_name
+
+    @property
+    def validation_metric(self):
+        return self._validation_metric_name
+
+    @property
     def total_parameters(self) -> int:
         return sum(p.numel() if not is_lazy_weight_tensor(p) else 0 for p in self._query_model.parameters())
 

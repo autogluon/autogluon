@@ -430,6 +430,3 @@ def test_detector_hyperparameters_consistency():
         time_limit=10,
     )
     assert predictor._learner._config == predictor_2._learner._config
-
-if __name__ == "__main__":
-    test_mmdet_object_detection_fit_then_evaluate_coco("yolox_s")
