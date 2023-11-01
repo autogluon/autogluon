@@ -7,10 +7,9 @@ SHORT_SHA=$4
 PR_NUMBER=$5
 FOLDS=$6
 
-# Mostly does not require any change for AutoMM side, as we need to change the things in amlb-user-dir
 
 # generate custom amlb configs
-if [ -z "$FOLDS" ]; then
+if [ -z "$FOLDS" ] || [ $MODULE == 'multimodal' ] ; then
     python $(dirname "$0")/generate_framework.py --module $MODULE --repository https://github.com/$REPOSITORY.git --branch $BRANCH --folds_to_run -1
 else
     python $(dirname "$0")/generate_framework.py --module $MODULE --repository https://github.com/$REPOSITORY.git --branch $BRANCH --folds_to_run $FOLDS
@@ -24,6 +23,12 @@ else
 fi
 
 # keep commit sha for future reference
-aws s3 cp --recursive $(dirname "$0")/$MODULE/amlb_user_dir/ s3://autogluon-ci-benchmark/configs/$CONFIG_PATH/$SHORT_SHA/
-aws s3 rm --recursive s3://autogluon-ci-benchmark/configs/$CONFIG_PATH/latest/
-aws s3 cp --recursive $(dirname "$0")/$MODULE/amlb_user_dir/ s3://autogluon-ci-benchmark/configs/$CONFIG_PATH/latest/
+if [ $MODULE == 'multimodal' ]; then
+    aws s3 cp --recursive $(dirname "$0")/$MODULE/custom_user_dir/ s3://autogluon-ci-benchmark/configs/$CONFIG_PATH/$SHORT_SHA/
+    aws s3 rm --recursive s3://autogluon-ci-benchmark/configs/$CONFIG_PATH/latest/
+    aws s3 cp --recursive $(dirname "$0")/$MODULE/custom_user_dir/ s3://autogluon-ci-benchmark/configs/$CONFIG_PATH/latest/
+else 
+    aws s3 cp --recursive $(dirname "$0")/$MODULE/amlb_user_dir/ s3://autogluon-ci-benchmark/configs/$CONFIG_PATH/$SHORT_SHA/
+    aws s3 rm --recursive s3://autogluon-ci-benchmark/configs/$CONFIG_PATH/latest/
+    aws s3 cp --recursive $(dirname "$0")/$MODULE/amlb_user_dir/ s3://autogluon-ci-benchmark/configs/$CONFIG_PATH/latest/
+fi

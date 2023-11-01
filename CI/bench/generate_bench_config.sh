@@ -9,23 +9,37 @@ USER_DIR_S3_PREFIX=$5  # where to find the pre-generated config. This will eithe
 CDK_DEPLOY_ACCOUNT=369469875935
 CDK_DEPLOY_REGION=us-east-1
 METRICS_BUCKET=autogluon-ci-benchmark
-FRAMEWORK=AutoGluon_$PRESET:benchmark
 
 if [ $MODULE == "tabular" ] || [ $MODULE == "timeseries" ]; then
+    FRAMEWORK=AutoGluon_$PRESET:benchmark
     INSTANCE_TYPE=m5.2xlarge
     aws s3 cp --recursive s3://autogluon-ci-benchmark/configs/$MODULE/$USER_DIR_S3_PREFIX/latest/ $(dirname "$0")/amlb_user_dir/
+    agbench generate-cloud-config \
+    --prefix ag-bench-${INSTANCE_TYPE//./} \
+    --module $MODULE \
+    --cdk-deploy-account $CDK_DEPLOY_ACCOUNT \
+    --cdk-deploy-region $CDK_DEPLOY_REGION \
+    --metrics-bucket $METRICS_BUCKET \
+    --instance $INSTANCE_TYPE \
+    --framework $FRAMEWORK \
+    --amlb-benchmark $BENCHMARK \
+    --amlb-constraint $TIME_LIMIT \
+    --amlb-user-dir $(dirname "$0")/amlb_user_dir \
+    --git-uri-branch https://github.com/openml/automlbenchmark.git#stable
+else
+    FRAMEWORK=AutoGluon_$PRESET
+    aws s3 cp --recursive s3://autogluon-ci-benchmark/configs/$MODULE/$USER_DIR_S3_PREFIX/latest/ $(dirname "$0")/custom_user_dir/
+    agbench generate-cloud-config \
+    --prefix ag-bench-${INSTANCE_TYPE//./} \
+    --module $MODULE \
+    --cdk-deploy-account $CDK_DEPLOY_ACCOUNT \
+    --cdk-deploy-region $CDK_DEPLOY_REGION \
+    --metrics-bucket $METRICS_BUCKET \
+    --data-bucket automm-ci-benchmark-data \
+    --framework $FRAMEWORK \
+    --constraint $TIME_LIMIT \
+    --custom-resource-dir $(dirname "$0")/custom_user_dir \
+    --dataset-names prod,airbnb \
+    --custom-dataloader "dataloader_file:$(dirname "$0")/custom_user_dir/dataloaders/text_tabular_dataloader.py;class_name:TextTabularDataLoader;dataset_config_file:$(dirname "$0")/custom_user_dir/dataloaders/text_tabular_datasets.yaml"
 fi
-# Would you require a special kind of machine to benchmark
 
-agbench generate-cloud-config \
---prefix ag-bench-${INSTANCE_TYPE//./} \
---module $MODULE \
---cdk-deploy-account $CDK_DEPLOY_ACCOUNT \
---cdk-deploy-region $CDK_DEPLOY_REGION \
---metrics-bucket $METRICS_BUCKET \
---instance $INSTANCE_TYPE \
---framework $FRAMEWORK \
---amlb-benchmark $BENCHMARK \
---amlb-constraint $TIME_LIMIT \
---amlb-user-dir $(dirname "$0")/amlb_user_dir \
---git-uri-branch https://github.com/openml/automlbenchmark.git#stable
