@@ -35,11 +35,10 @@ else
     --cdk-deploy-account $CDK_DEPLOY_ACCOUNT \
     --cdk-deploy-region $CDK_DEPLOY_REGION \
     --metrics-bucket $METRICS_BUCKET \
-    --data-bucket automm-ci-benchmark-data \
     --framework $FRAMEWORK \
     --constraint $TIME_LIMIT \
     --custom-resource-dir $(dirname "$0")/custom_user_dir \
-    --dataset-names prod,airbnb \
-    --custom-dataloader "dataloader_file:$(dirname "$0")/custom_user_dir/dataloaders/text_tabular_dataloader.py;class_name:TextTabularDataLoader;dataset_config_file:$(dirname "$0")/custom_user_dir/dataloaders/text_tabular_datasets.yaml"
+    --dataset-names bayer,kindle \
+    --custom-dataloader "dataloader_file:$(dirname "$0")/custom_user_dir/dataloaders/vision_dataloader.py;class_name:VisionDataLoader;dataset_config_file:$(dirname "$0")/custom_user_dir/dataloaders/automm_cv_datasets.yaml"
 fi
 
