@@ -64,8 +64,8 @@ class FTTransformerModel(MultiModalPredictorModel):
     def _set_default_params(self):
         default_params = {
             "data.categorical.convert_to_text": False,
-            "model.names": ["categorical_transformer", "numerical_transformer", "fusion_transformer"],
-            "model.numerical_transformer.embedding_arch": ["linear"],
+            "model.names": ["ft_transformer"],
+            "model.ft_transformer.embedding_arch": ["linear"],
             "env.batch_size": 128,
             "env.per_gpu_batch_size": 128,
             "env.num_workers": 0,
