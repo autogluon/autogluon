@@ -6,7 +6,8 @@ from torch import nn
 
 from ..constants import REGRESSION
 from ..optimization.losses import RKDLoss
-from ..utils import modify_duplicate_model_names, turn_on_off_feature_column_info
+from ..utils.data import turn_on_off_feature_column_info
+from ..utils.model import modify_duplicate_model_names
 
 logger = logging.getLogger(__name__)
 
