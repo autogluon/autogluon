@@ -118,7 +118,7 @@ def test_doc_classifier_standalone():
             "model.document_transformer.checkpoint_name": "microsoft/layoutlm-base-uncased",
             "env.num_workers": 0,
         },
-        time_limit=30,
+        time_limit=150,
         save_path=save_path,
     )
 
