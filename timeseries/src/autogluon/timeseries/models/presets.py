@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Type, Union
 
 from autogluon.common import space
 from autogluon.core import constants
+from autogluon.timeseries.metrics import TimeSeriesScorer
 
 from . import (
     AutoARIMAModel,
@@ -25,6 +26,7 @@ from . import (
     SimpleFeedForwardModel,
     TemporalFusionTransformerModel,
     ThetaModel,
+    WaveNetModel,
 )
 from .abstract import AbstractTimeSeriesModel
 from .multi_window.multi_window_model import MultiWindowBacktestingModel
@@ -43,6 +45,7 @@ MODEL_TYPES = dict(
     DLinear=DLinearModel,
     PatchTST=PatchTSTModel,
     TemporalFusionTransformer=TemporalFusionTransformerModel,
+    WaveNet=WaveNetModel,
     RecursiveTabular=RecursiveTabularModel,
     DirectTabular=DirectTabularModel,
     Average=AverageModel,
@@ -150,7 +153,7 @@ def get_preset_models(
     freq: str,
     prediction_length: int,
     path: str,
-    eval_metric: str,
+    eval_metric: TimeSeriesScorer,
     eval_metric_seasonal_period: Optional[int],
     hyperparameters: Union[str, Dict, None],
     hyperparameter_tune: bool,

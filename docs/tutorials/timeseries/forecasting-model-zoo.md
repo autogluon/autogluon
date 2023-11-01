@@ -58,6 +58,7 @@ Note that some of the models' hyperparameters have names and default values that
    PatchTSTModel
    SimpleFeedForwardModel
    TemporalFusionTransformerModel
+   WaveNetModel
    DirectTabularModel
    RecursiveTabularModel
 
@@ -167,6 +168,14 @@ Deep learning models use neural networks to capture complex patterns in the data
 
 ```
 
+
+```{eval-rst}
+.. autoclass:: WaveNetModel
+   :members: init
+
+
+```
+
 ## Tabular models
 
 Tabular models convert time series forecasting into a tabular regression problem.
@@ -227,4 +236,9 @@ Models not included in this table currently do not support any additional featur
      - ✓
      - ✓
      - ✓
+   * - :class:`~autogluon.timeseries.models.WaveNetModel`
+     - ✓
+     - ✓
+     - ✓
+     - 
 ```

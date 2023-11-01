@@ -280,7 +280,7 @@ def get_pred_from_proba_df(y_pred_proba: pd.DataFrame, problem_type: str = BINAR
     return y_pred
 
 
-def get_pred_from_proba(y_pred_proba: np.ndarray, problem_type=BINARY, decision_threshold: float = None):
+def get_pred_from_proba(y_pred_proba: np.ndarray, problem_type: str = BINARY, decision_threshold: float = None) -> np.ndarray:
     if problem_type == BINARY:
         if decision_threshold is None:
             decision_threshold = 0.5

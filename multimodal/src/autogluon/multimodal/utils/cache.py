@@ -2,7 +2,6 @@ import logging
 import os
 import shutil
 import time
-import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
@@ -10,7 +9,7 @@ import lightning.pytorch as pl
 import torch
 from lightning.pytorch.callbacks import BasePredictionWriter
 
-from ..constants import WEIGHT
+from ..constants import BBOX, WEIGHT
 
 logger = logging.getLogger(__name__)
 
@@ -30,17 +29,22 @@ class DDPPredictionWriter(BasePredictionWriter):
             If other process does not finish writing, sleep for a few seconds and recheck.
         """
         super().__init__(write_interval)
+        if output_dir is None:  # TODO: give the predictor a default save_path before calling DDPPredictionWriter
+            output_dir = "temp_cache_for_ddp_prediction"
+            logging.warning(
+                f"Current predictor's save_path is None, using a default cache folder which may cause an error in prediction I/O. Try init the predictor with a save_path."
+            )
         assert isinstance(
             output_dir, (str, Path)
         ), f"Only str and pathlib.Path types are supported for path, but got {output_dir} of type {type(output_dir)}."
         self.sleep_time = sleep_time
         output_dir = os.path.abspath(os.path.expanduser(output_dir))
-        self.output_dir = os.path.join(output_dir, f"predictions_{uuid.uuid4().hex}")
+        self.output_dir = os.path.join(output_dir, "prediction_cache")
         try:
             os.makedirs(self.output_dir, exist_ok=False)
         except FileExistsError:  # assume the string is unique
-            raise Exception(
-                f'Output path {self.output_dir} already exists! Please clean all the outdated folders in {output_dir}."'
+            logger.warning(
+                f"{self.output_dir} already exists. This could be caused by DDP subprocess. Just make sure the previous cache is removed in {self.output_dir}."
             )
 
     def get_predictions_cache_dir(self, global_rank: int):
@@ -128,6 +132,9 @@ class DDPPredictionWriter(BasePredictionWriter):
         x
             A list of batch results. Each batch is one (nested) dictionary.
         """
+        if BBOX in x[0]:  # for detection outputs just sort the batches
+            return x
+
         results = dict()
         if len(x[0]) == 0:  # dict is empty
             return dict()
@@ -158,6 +165,9 @@ class DDPPredictionWriter(BasePredictionWriter):
         indices
             A list of indices.
         """
+        if isinstance(x, list) and BBOX in x[0]:  # for detection outputs just sort the batches
+            return [xi for _, xi in sorted(zip(indices, x), key=lambda ele: ele[0])]
+
         results = dict()
         for k, v in x.items():
             if isinstance(v, dict):

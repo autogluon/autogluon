@@ -252,7 +252,7 @@ def test_when_npts_fit_with_default_seasonal_features_then_predictions_match_glu
         prediction_length=prediction_length,
         hyperparameters={"n_jobs": 1, "use_fallback_model": False},
     )
-    npts_gts = NPTSPredictor(freq=freq, prediction_length=prediction_length)
+    npts_gts = NPTSPredictor(prediction_length=prediction_length)
     npts_ag.fit(train_data=data)
 
     np.random.seed(123)

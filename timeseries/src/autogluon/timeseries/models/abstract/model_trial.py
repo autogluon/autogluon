@@ -80,7 +80,7 @@ def fit_and_save_model(model, fit_kwargs, train_data, val_data, eval_metric, tim
     model.score_and_cache_oof(val_data, store_val_score=True, store_predict_time=True)
 
     logger.debug(f"\tHyperparameter tune run: {model.name}")
-    logger.debug(f"\t\t{model.val_score:<7.4f}".ljust(15) + f"= Validation score ({eval_metric})")
+    logger.debug(f"\t\t{model.val_score:<7.4f}".ljust(15) + f"= Validation score ({eval_metric.name_with_sign})")
     logger.debug(f"\t\t{model.fit_time:<7.3f} s".ljust(15) + "= Training runtime")
     logger.debug(f"\t\t{model.predict_time:<7.3f} s".ljust(15) + "= Training runtime")
     model.save()

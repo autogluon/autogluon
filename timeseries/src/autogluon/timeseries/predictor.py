@@ -16,6 +16,7 @@ from autogluon.timeseries import __version__ as current_ag_version
 from autogluon.timeseries.configs import TIMESERIES_PRESETS_CONFIGS
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
 from autogluon.timeseries.learner import AbstractLearner, TimeSeriesLearner
+from autogluon.timeseries.metrics import TimeSeriesScorer
 from autogluon.timeseries.splitter import ExpandingWindowSplitter
 from autogluon.timeseries.trainer import AbstractTimeSeriesTrainer
 
@@ -57,12 +58,18 @@ class TimeSeriesPredictor:
 
         If ``freq`` is provided when creating the predictor, all data passed to the predictor will be automatically
         resampled at this frequency.
-    eval_metric : str, default = "WQL"
+    eval_metric : Union[str, TimeSeriesScorer], default = "WQL"
         Metric by which predictions will be ultimately evaluated on future test data. AutoGluon tunes hyperparameters
         in order to improve this metric on validation data, and ranks models (on validation data) according to this
-        metric. Available options:
+        metric.
 
-        - ``"WQL"``: mean weighted quantile loss, defined as average of quantile losses for the specified ``quantile_levels`` scaled by the total value of the time series
+        Probabilistic forecast metrics (evaluated on quantile forecasts for the specified ``quantile_levels``):
+
+        - ``"WQL"``: mean weighted quantile loss, defined as average of quantile losses divided by the sum of absolute time series values in the forecast horizon.
+        - ``"SQL"``: scaled quantile loss, defined as average of quantile losses divided by the in-sample seasonal error.
+
+        Point forecast metrics (these are always evaluated on the ``"mean"`` column of the predictions):
+
         - ``"MAPE"``: mean absolute percentage error
         - ``"sMAPE"``: "symmetric" mean absolute percentage error
         - ``"MASE"``: mean absolute scaled error
@@ -73,9 +80,8 @@ class TimeSeriesPredictor:
 
         For more information about these metrics, see https://docs.aws.amazon.com/forecast/latest/dg/metrics.html.
     eval_metric_seasonal_period : int, optional
-        Seasonal period used to compute the mean absolute scaled error (MASE) evaluation metric. This parameter is only
-        used if ``eval_metric="MASE"``. See https://en.wikipedia.org/wiki/Mean_absolute_scaled_error for more details.
-        Defaults to ``None``, in which case the seasonal period is computed based on the data frequency.
+        Seasonal period used to compute some evaluation metrics such as mean absolute scaled error (MASE). Defaults to
+        ``None``, in which case the seasonal period is computed based on the data frequency.
     known_covariates_names: List[str], optional
         Names of the covariates that are known in advance for all time steps in the forecast horizon. These are also
         known as dynamic features, exogenous variables, additional regressors or related time series. Examples of such
@@ -120,7 +126,7 @@ class TimeSeriesPredictor:
         known_covariates_names: Optional[List[str]] = None,
         prediction_length: int = 1,
         freq: str = None,
-        eval_metric: Optional[str] = None,
+        eval_metric: Union[str, TimeSeriesScorer, None] = None,
         eval_metric_seasonal_period: Optional[int] = None,
         path: Optional[str] = None,
         verbosity: int = 2,
@@ -162,7 +168,8 @@ class TimeSeriesPredictor:
             if std_freq != str(self.freq):
                 logger.info(f"Frequency '{self.freq}' stored as '{std_freq}'")
             self.freq = std_freq
-        if eval_metric == "mean_wQuantileLoss":
+        # TODO: Change to DeprecationWarning, make sure it's displayed correctly https://github.com/autogluon/autogluon/issues/3465
+        if isinstance(eval_metric, str) and eval_metric == "mean_wQuantileLoss":
             # We don't use warnings.warn since DeprecationWarning may be silenced by the Python warning filters
             logger.warning(
                 "DeprecationWarning: Evaluation metric 'mean_wQuantileLoss' has been renamed to 'WQL'. "
@@ -747,7 +754,13 @@ class TimeSeriesPredictor:
         predictions = self._learner.predict(data, known_covariates=known_covariates, model=model, use_cache=use_cache)
         return predictions.reindex(original_item_id_order, level=ITEMID)
 
-    def evaluate(self, data: Union[TimeSeriesDataFrame, pd.DataFrame, str], **kwargs):
+    def evaluate(
+        self,
+        data: Union[TimeSeriesDataFrame, pd.DataFrame, str],
+        model: Optional[str] = None,
+        metric: Union[str, TimeSeriesScorer, None] = None,
+        use_cache: bool = True,
+    ):
         """Evaluate the performance for given dataset, computing the score determined by ``self.eval_metric``
         on the given data set, and with the same ``prediction_length`` used when training models.
 
@@ -765,14 +778,11 @@ class TimeSeriesPredictor:
 
             If provided data is an instance of pandas DataFrame, AutoGluon will attempt to automatically convert it
             to a ``TimeSeriesDataFrame``.
-
-        Other Parameters
-        ----------------
         model : str, optional
             Name of the model that you would like to evaluate. By default, the best model during training
             (with highest validation score) will be used.
-        metric : str, optional
-            Name of the evaluation metric to compute scores with. Defaults to ``self.eval_metric``
+        metric : str or TimeSeriesScorer, optional
+            Evaluation metric to compute scores with. Defaults to ``self.eval_metric``
         use_cache : bool, default = True
             If True, will attempt to use the cached predictions. If False, cached predictions will be ignored.
             This argument is ignored if ``cache_predictions`` was set to False when creating the ``TimeSeriesPredictor``.
@@ -785,7 +795,7 @@ class TimeSeriesPredictor:
         """
         data = self._check_and_prepare_data_frame(data)
         self._check_data_for_evaluation(data)
-        return self._learner.score(data, **kwargs)
+        return self._learner.score(data, model=model, metric=metric, use_cache=use_cache)
 
     def score(self, data: Union[TimeSeriesDataFrame, pd.DataFrame, str], **kwargs):
         """See, :meth:`~autogluon.timeseries.TimeSeriesPredictor.evaluate`."""

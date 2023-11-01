@@ -141,6 +141,7 @@ from ..utils import (
     update_hyperparameters,
     update_tabular_config_by_resources,
     upgrade_config,
+    get_available_devices,
 )
 
 pl_logger = logging.getLogger("lightning")
@@ -1079,7 +1080,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             with apply_log_filter(log_filter):
                 trainer = pl.Trainer(
                     accelerator="gpu" if num_gpus > 0 else "auto",
-                    devices=num_gpus if num_gpus > 0 else "auto",
+                    devices=get_available_devices(num_gpus, config.env.auto_select_gpus),
                     num_nodes=config.env.num_nodes,
                     precision=precision,
                     strategy=strategy if strategy else "auto",
@@ -1120,7 +1121,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             with apply_log_filter(log_filter):
                 trainer = pl.Trainer(
                     accelerator="gpu" if num_gpus > 0 else "auto",
-                    devices=num_gpus if num_gpus > 0 else "auto",
+                    devices=get_available_devices(num_gpus, self._config.env.auto_select_gpus),
                     num_nodes=self._config.env.num_nodes,
                     precision=precision,
                     strategy=strategy,

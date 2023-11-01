@@ -4,9 +4,15 @@ REPOSITORY=$1
 BRANCH=$(basename $2)
 SHORT_SHA=$3
 PR_NUMBER=$4
+FOLDS=$5
 
 # generate tabular configs
-python $(dirname "$0")/tabular/generate_framework.py --repository https://github.com/$REPOSITORY.git --branch $BRANCH
+if [ -z "$FOLDS" ]; then
+    python $(dirname "$0")/tabular/generate_framework.py --repository https://github.com/$REPOSITORY.git --branch $BRANCH --folds_to_run -1
+else
+    python $(dirname "$0")/tabular/generate_framework.py --repository https://github.com/$REPOSITORY.git --branch $BRANCH --folds_to_run $FOLDS
+fi
+
 if [ -n "$PR_NUMBER" ]
 then
     CONFIG_PATH=tabular/$PR_NUMBER

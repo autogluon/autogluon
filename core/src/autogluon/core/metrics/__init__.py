@@ -111,6 +111,14 @@ class Scorer(object, metaclass=ABCMeta):
         """
         return self.optimum - score
 
+    def convert_error_to_score(self, error: float) -> float:
+        """
+        Converts error in lower_is_better format to score in higher_is_better format.
+
+        An error of 0 indicates a perfect score.
+        """
+        return self.optimum - error
+
     @property
     def optimum(self) -> float:
         """

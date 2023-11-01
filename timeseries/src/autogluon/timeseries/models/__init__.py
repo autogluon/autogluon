@@ -1,5 +1,12 @@
 from .autogluon_tabular import DirectTabularModel, RecursiveTabularModel
-from .gluonts import DeepARModel, DLinearModel, PatchTSTModel, SimpleFeedForwardModel, TemporalFusionTransformerModel
+from .gluonts import (
+    DeepARModel,
+    DLinearModel,
+    PatchTSTModel,
+    SimpleFeedForwardModel,
+    TemporalFusionTransformerModel,
+    WaveNetModel,
+)
 from .local import (
     ARIMAModel,
     AutoARIMAModel,
@@ -33,4 +40,5 @@ __all__ = [
     "SimpleFeedForwardModel",
     "TemporalFusionTransformerModel",
     "ThetaModel",
+    "WaveNetModel",
 ]

@@ -367,7 +367,7 @@ def object_detection(presets: str = DEFAULT):
         "env.eval_batch_size_ratio": 1,
         "env.precision": 32,
         "env.strategy": "ddp",
-        "env.auto_select_gpus": False,  # Have to turn off for detection!
+        "env.auto_select_gpus": True,  # Turn on for detection to return devices in a list, TODO: fix the extra GPU usage bug
         "env.num_gpus": -1,
         "env.per_gpu_batch_size": 8,  # Works on 8G GPU
         "env.num_workers": 2,
@@ -405,7 +405,7 @@ def object_detection(presets: str = DEFAULT):
     elif presets in [DEFAULT, HIGH_QUALITY]:
         hyperparameters.update(
             {
-                "model.mmdet_image.checkpoint_name": "dino-4scale_r50_8xb2-12e_coco.py",
+                "model.mmdet_image.checkpoint_name": "dino-4scale_r50_8xb2-12e_coco",
                 "model.mmdet_image.frozen_layers": ["backbone", "model.level_embed"],
                 "env.per_gpu_batch_size": 1,  # Works on 16G GPU
                 "optimization.learning_rate": 1e-4,
@@ -418,7 +418,7 @@ def object_detection(presets: str = DEFAULT):
     elif presets == BEST_QUALITY:
         hyperparameters.update(
             {
-                "model.mmdet_image.checkpoint_name": "dino-5scale_swin-l_8xb2-36e_coco.py",
+                "model.mmdet_image.checkpoint_name": "dino-5scale_swin-l_8xb2-36e_coco",
                 "model.mmdet_image.frozen_layers": ["backbone", "model.level_embed"],
                 "env.per_gpu_batch_size": 1,  # Works on 24G GPU
                 "optimization.learning_rate": 1e-4,

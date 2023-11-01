@@ -174,7 +174,8 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             data = data.query("item_id in @items_to_keep")
 
         mlforecast_df = self._to_mlforecast_df(data, data.static_features)
-        df = self._mlf.preprocess(mlforecast_df, dropna=False)
+        # Unless we set static_features=[], MLForecast interprets all known covariates as static features
+        df = self._mlf.preprocess(mlforecast_df, dropna=False, static_features=[])
         # df.query results in 2x memory saving compared to df.dropna(subset="y")
         df = df.query("y.notnull()")
 
@@ -251,7 +252,6 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
                 "path": os.path.join(self.path, "tabular_predictor"),
                 "verbosity": verbosity - 2,
                 "label": MLF_TARGET,
-                "eval_metric": self.TIMESERIES_METRIC_TO_TABULAR_METRIC[self.eval_metric],
                 **self._get_extra_tabular_init_kwargs(),
             },
             predictor_fit_kwargs={
@@ -278,14 +278,6 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             return self._scaler.stats_["_scale"].copy().reindex(item_ids)
         else:
             return pd.Series(1.0, index=item_ids)
-
-    def predict(
-        self,
-        data: TimeSeriesDataFrame,
-        known_covariates: Optional[TimeSeriesDataFrame] = None,
-        **kwargs,
-    ) -> TimeSeriesDataFrame:
-        raise NotImplementedError
 
 
 class DirectTabularModel(AbstractMLForecastModel):
@@ -333,28 +325,9 @@ class DirectTabularModel(AbstractMLForecastModel):
         end of each time series).
     """
 
-    TIMESERIES_METRIC_TO_TABULAR_METRIC = {
-        "MAPE": "mean_absolute_percentage_error",
-        "sMAPE": "symmetric_mean_absolute_percentage_error",
-        "WQL": "pinball_loss",
-        "MASE": "mean_absolute_error",
-        "WAPE": "mean_absolute_error",
-        "MSE": "mean_squared_error",
-        "RMSE": "root_mean_squared_error",
-        "RMSSE": "root_mean_squared_error",
-    }
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        if 0.5 not in self.quantile_levels:
-            self.must_drop_median = True
-            self.quantile_levels = sorted(set([0.5] + self.quantile_levels))
-        else:
-            self.must_drop_median = False
-
     @property
     def is_quantile_model(self) -> bool:
-        return self.eval_metric == "WQL"
+        return self.eval_metric.needs_quantile
 
     def _get_model_params(self) -> dict:
         model_params = super()._get_model_params()
@@ -379,7 +352,7 @@ class DirectTabularModel(AbstractMLForecastModel):
         else:
             return super()._compute_residuals_std(val_df=val_df)
 
-    def predict(
+    def _predict(
         self,
         data: TimeSeriesDataFrame,
         known_covariates: Optional[TimeSeriesDataFrame] = None,
@@ -394,7 +367,7 @@ class DirectTabularModel(AbstractMLForecastModel):
         data_future[self.target] = float("inf")
         data_extended = pd.concat([data, data_future])
         mlforecast_df = self._to_mlforecast_df(data_extended, data.static_features)
-        df = self._mlf.preprocess(mlforecast_df, dropna=False)
+        df = self._mlf.preprocess(mlforecast_df, dropna=False, static_features=[])
         df = df.groupby(MLF_ITEMID, sort=False).tail(self.prediction_length)
         df = df.replace(float("inf"), float("nan"))
 
@@ -404,14 +377,12 @@ class DirectTabularModel(AbstractMLForecastModel):
 
         if hasattr(self._mlf.ts, "target_transforms"):
             # Ensure that transforms are fitted only on past data
-            self._mlf.preprocess(self._to_mlforecast_df(data, None))
+            self._mlf.preprocess(self._to_mlforecast_df(data, None), static_features=[])
             for tfm in self._mlf.ts.target_transforms[::-1]:
                 predictions = tfm.inverse_transform(predictions)
         predictions = predictions.rename(columns={MLF_ITEMID: ITEMID, MLF_TIMESTAMP: TIMESTAMP}).set_index(
             [ITEMID, TIMESTAMP]
         )
-        if self.must_drop_median:
-            predictions = predictions.drop("0.5", axis=1)
         return TimeSeriesDataFrame(predictions)
 
     def _postprocess_predictions(self, predictions: np.ndarray) -> pd.DataFrame:
@@ -429,9 +400,16 @@ class DirectTabularModel(AbstractMLForecastModel):
 
     def _get_extra_tabular_init_kwargs(self) -> dict:
         if self.is_quantile_model:
-            return {"problem_type": ag.constants.QUANTILE, "quantile_levels": self.quantile_levels}
+            return {
+                "problem_type": ag.constants.QUANTILE,
+                "quantile_levels": self.quantile_levels,
+                "eval_metric": "pinball_loss",
+            }
         else:
-            return {"problem_type": ag.constants.REGRESSION}
+            return {
+                "problem_type": ag.constants.REGRESSION,
+                "eval_metric": self.eval_metric.equivalent_tabular_regression_metric or "mean_absolute_error",
+            }
 
 
 class RecursiveTabularModel(AbstractMLForecastModel):
@@ -475,24 +453,13 @@ class RecursiveTabularModel(AbstractMLForecastModel):
         end of each time series).
     """
 
-    TIMESERIES_METRIC_TO_TABULAR_METRIC = {
-        "MAPE": "mean_absolute_percentage_error",
-        "sMAPE": "symmetric_mean_absolute_percentage_error",
-        "WQL": "mean_absolute_error",
-        "MASE": "mean_absolute_error",
-        "WAPE": "mean_absolute_error",
-        "MSE": "mean_squared_error",
-        "RMSE": "root_mean_squared_error",
-        "RMSSE": "root_mean_squared_error",
-    }
-
     def _get_model_params(self) -> dict:
         model_params = super()._get_model_params()
         model_params.setdefault("scaler", "standard")
         model_params.setdefault("differences", [get_seasonality(self.freq)])
         return model_params
 
-    def predict(
+    def _predict(
         self,
         data: TimeSeriesDataFrame,
         known_covariates: Optional[TimeSeriesDataFrame] = None,
@@ -501,15 +468,18 @@ class RecursiveTabularModel(AbstractMLForecastModel):
         from scipy.stats import norm
 
         new_df = self._to_mlforecast_df(data, data.static_features)
-        if known_covariates is not None:
-            dynamic_dfs = [self._to_mlforecast_df(known_covariates, data.static_features, include_target=False)]
-        else:
-            dynamic_dfs = None
+        if known_covariates is None:
+            future_index = get_forecast_horizon_index_ts_dataframe(data, self.prediction_length)
+            known_covariates = pd.DataFrame(columns=[self.target], index=future_index, dtype="float32")
+        X_df = self._to_mlforecast_df(known_covariates, data.static_features, include_target=False)
+        # If both covariates & static features are missing, set X_df = None to avoid exception from MLForecast
+        if len(X_df.columns.difference([MLF_ITEMID, MLF_TIMESTAMP])) == 0:
+            X_df = None
         with warning_filter():
             raw_predictions = self._mlf.predict(
                 h=self.prediction_length,
                 new_df=new_df,
-                dynamic_dfs=dynamic_dfs,
+                X_df=X_df,
             )
         predictions = raw_predictions.rename(columns={MLF_ITEMID: ITEMID, MLF_TIMESTAMP: TIMESTAMP})
 
@@ -526,4 +496,7 @@ class RecursiveTabularModel(AbstractMLForecastModel):
         return TimeSeriesDataFrame(predictions).reindex(data.item_ids, level=ITEMID)
 
     def _get_extra_tabular_init_kwargs(self) -> dict:
-        return {"problem_type": ag.constants.REGRESSION}
+        return {
+            "problem_type": ag.constants.REGRESSION,
+            "eval_metric": self.eval_metric.equivalent_tabular_regression_metric or "mean_absolute_error",
+        }

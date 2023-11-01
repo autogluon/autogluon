@@ -731,7 +731,7 @@ def from_coco(
     -------
     A dataframe with columns "image", "rois", and "image_attr".
     """
-    # construct from COCO format
+    # construct coco object from COCO format
     try_import_pycocotools()
     from pycocotools.coco import COCO
 
@@ -741,6 +741,7 @@ def from_coco(
         anno_file = os.path.expanduser(anno_file)
     coco = COCO(anno_file)
 
+    # get data root
     if isinstance(root, Path):
         root = str(root.expanduser().resolve())
     elif isinstance(root, str):
@@ -752,8 +753,13 @@ def from_coco(
     else:
         raise ValueError("Unable to parse root: {}".format(root))
 
-    # synsets
-    classes = [c["name"] for c in coco.loadCats(coco.getCatIds())]
+    # support prediction using data with no annotations
+    # note that data with annotation can be used for prediction without any changes
+    try:
+        num_annotations = len(coco.getAnnIds())
+    except KeyError:  # KeyError: 'annotations', there is no annotation entry
+        num_annotations = 0
+
     # load entries
     d = {"image": [], "rois": []}
     image_ids = sorted(coco.getImgIds())
@@ -773,6 +779,11 @@ def from_coco(
             use_crowd=use_crowd,
         )
         if not rois:
+            # discard the rows without valid annotation ONLY when data has annotation
+            # add default placeholder to data without annotation for prediction
+            if not num_annotations:
+                d["image"].append(abs_path)
+                d["rois"].append([[-1, -1, -1, -1, 0]])  # TODO: maybe remove this placeholder
             continue
         d["image"].append(abs_path)
         d["rois"].append(rois)

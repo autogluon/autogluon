@@ -47,7 +47,7 @@ def get_approximate_df_mem_usage(df: DataFrame, sample_ratio=0.2):
                 num_categories = len(df[column].cat.categories)
                 num_categories_sample = math.ceil(sample_ratio * num_categories)
                 sample_ratio_cat = num_categories_sample / num_categories
-                memory_usage[column] = (
+                memory_usage[column] = int(
                     df[column].cat.codes.dtype.itemsize * num_rows
                     + df[column].cat.categories[:num_categories_sample].memory_usage(deep=True) / sample_ratio_cat
                 )

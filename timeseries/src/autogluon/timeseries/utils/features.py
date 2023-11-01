@@ -98,9 +98,9 @@ class TimeSeriesFeatureGenerator:
 
             unused = []
             for col_name in data.static_features.columns:
-                if static[col_name].dtype == "category":
+                if col_name in static.columns and static[col_name].dtype == "category":
                     static_features_cat.append(col_name)
-                elif static[col_name].dtype == np.float64:
+                elif col_name in static.columns and static[col_name].dtype == np.float64:
                     static_features_real.append(col_name)
                 else:
                     unused.append(col_name)
@@ -109,7 +109,7 @@ class TimeSeriesFeatureGenerator:
             logger.info(f"\tcategorical:        {static_features_cat}")
             logger.info(f"\tcontinuous (float): {static_features_real}")
             if len(unused) > 0:
-                logger.info(f"\tremoved (neither categorical nor continuous): {unused}")
+                logger.info(f"\tremoved (uninformative columns): {unused}")
             logger.info(
                 "To learn how to fix incorrectly inferred types, please see documentation for TimeSeriesPredictor.fit "
             )
