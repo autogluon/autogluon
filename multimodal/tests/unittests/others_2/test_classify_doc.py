@@ -84,6 +84,7 @@ def test_pdf_doc_classification(checkpoint_name):
         train_data=train_data,
         hyperparameters={
             "model.document_transformer.checkpoint_name": checkpoint_name,
+            "env.per_gpu_batch_size": 2,
             "env.num_workers": 0,
         },
         time_limit=30,
