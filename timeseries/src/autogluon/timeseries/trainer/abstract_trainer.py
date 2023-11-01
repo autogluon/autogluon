@@ -5,7 +5,7 @@ import time
 import traceback
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Type, Union
+from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import networkx as nx
 import numpy as np
@@ -851,7 +851,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates_real
         )
         predictions = self.predict(data=past_data, known_covariates=known_covariates, model=model, use_cache=use_cache)
-        if not isinstance(metrics, Iterable):  # a single metric is provided
+        if not isinstance(metrics, list):  # a single metric is provided
             metrics = [metrics]
         scores_dict = {}
         for metric in metrics:

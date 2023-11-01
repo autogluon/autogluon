@@ -10,6 +10,7 @@ import pytest
 from autogluon.common import space
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
+from autogluon.timeseries.metrics import DEFAULT_METRIC_NAME
 from autogluon.timeseries.models import DeepARModel, SimpleFeedForwardModel
 from autogluon.timeseries.predictor import TimeSeriesPredictor
 
@@ -889,5 +890,26 @@ def test_when_custom_metric_passed_to_score_then_predictor_can_evaluate(temp_mod
     predictor = TimeSeriesPredictor(path=temp_model_path, eval_metric="MASE")
     predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
     eval_metric = CustomMetric()
-    scores = predictor.evaluate(DUMMY_TS_DATAFRAME, metric=eval_metric)
+    scores = predictor.evaluate(DUMMY_TS_DATAFRAME, metrics=eval_metric)
     assert isinstance(scores[eval_metric.name], float)
+
+
+@pytest.mark.parametrize(
+    "fit_metric, metrics_passed_to_eval, expected_keys",
+    [
+        ("MASE", None, ["MASE"]),
+        (None, None, [DEFAULT_METRIC_NAME]),
+        (None, "MASE", ["MASE"]),
+        (CustomMetric(), [None, "WAPE"], [CustomMetric().name, "WAPE"]),
+        (None, ["MAPE", "WAPE"], ["MAPE", "WAPE"]),
+        ("MAPE", ["MASE", CustomMetric(), None], ["MASE", CustomMetric().name, "MAPE"]),
+        (None, ["MASE", CustomMetric(), None], ["MASE", CustomMetric().name, DEFAULT_METRIC_NAME]),
+    ],
+)
+def test_when_evaluate_receives_multiple_metrics_then_score_dict_contains_all_keys(
+    temp_model_path, fit_metric, metrics_passed_to_eval, expected_keys
+):
+    predictor = TimeSeriesPredictor(path=temp_model_path, eval_metric=fit_metric)
+    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
+    scores = predictor.evaluate(DUMMY_TS_DATAFRAME, metrics=metrics_passed_to_eval)
+    assert len(scores) == len(expected_keys) and all(k in scores for k in expected_keys)
