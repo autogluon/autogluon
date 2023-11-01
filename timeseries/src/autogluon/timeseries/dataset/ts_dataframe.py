@@ -113,7 +113,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         constructing a TimeSeriesDataFrame using format 1 (DataFrame without multi-index) or 2 (path to a file).
     num_cpus : int, default = -1
         Number of CPU cores used to process the iterable dataset in parallel. Set to -1 to use all cores. This argument
-        is only used when constructing a TimeSeriesDataFrame using format 3 (iterable dataset).
+        is only used when constructing a TimeSeriesDataFrame using format 4 (iterable dataset).
 
     Attributes
     ----------
