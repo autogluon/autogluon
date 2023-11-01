@@ -59,7 +59,7 @@ class TimeSeriesFeatureGenerator:
     def __init__(self, target: str, known_covariates_names: List[str]):
         self.target = target
         self._is_fit = False
-        self.known_covariates_names = known_covariates_names
+        self.known_covariates_names = list(known_covariates_names)
         self.past_covariates_names = []
         self.static_feature_pipeline = ContinuousAndCategoricalFeatureGenerator()
         self.covariate_metadata: CovariateMetadata = None
