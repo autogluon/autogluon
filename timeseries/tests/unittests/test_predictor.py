@@ -451,7 +451,7 @@ def test_when_some_time_series_contain_only_nans_then_exception_is_raised(temp_m
         predictor._check_and_prepare_data_frame(df)
 
 
-@pytest.mark.parametrize("method", ["score", "leaderboard"])
+@pytest.mark.parametrize("method", ["evaluate", "leaderboard"])
 def test_when_scoring_method_receives_only_future_data_then_exception_is_raised(temp_model_path, method):
     prediction_length = 3
     predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length)
@@ -584,7 +584,7 @@ def test_when_excluded_model_names_provided_then_excluded_models_are_not_trained
     assert leaderboard["model"].values == ["SimpleFeedForward"]
 
 
-@pytest.mark.parametrize("method_name", ["leaderboard", "predict", "score", "evaluate"])
+@pytest.mark.parametrize("method_name", ["leaderboard", "predict", "evaluate"])
 @pytest.mark.parametrize("use_cache", [True, False])
 def test_when_use_cache_is_set_to_false_then_cached_predictions_are_ignored(temp_model_path, use_cache, method_name):
     predictor = TimeSeriesPredictor(path=temp_model_path, cache_predictions=True).fit(
