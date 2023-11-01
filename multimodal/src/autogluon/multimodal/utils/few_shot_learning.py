@@ -14,9 +14,9 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 
-from ..learners import BaseLearner
 from ..constants import BINARY, FEATURE_EXTRACTION, Y_PRED, Y_TRUE
 from ..data.infer_types import infer_problem_type
+from ..learners import BaseLearner
 from ..utils import CustomUnpickler, compute_score, logits_to_prob, setup_save_path
 
 logger = logging.getLogger(__name__)

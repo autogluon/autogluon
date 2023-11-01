@@ -1,19 +1,26 @@
-from typing import List, Optional, Union, Dict
-
-import pandas as pd
-import sys
 import logging
+import sys
 import warnings
 from datetime import timedelta
-from torch import nn
+from typing import Dict, List, Optional, Union
+
+import pandas as pd
 from omegaconf import OmegaConf
+from torch import nn
 
 from autogluon.core.metrics import Scorer
 
-from ..constants import NER, OVERALL_F1, NER_RET, Y_PRED, Y_TRUE
+from ..constants import NER, NER_RET, OVERALL_F1, Y_PRED, Y_TRUE
 from ..data import MultiModalFeaturePreprocessor
 from ..optimization import NerLitModule
-from ..utils import extract_from_output, compute_num_gpus, infer_precision, compute_score, merge_bio_format, compute_inference_batch_size
+from ..utils import (
+    compute_inference_batch_size,
+    compute_num_gpus,
+    compute_score,
+    extract_from_output,
+    infer_precision,
+    merge_bio_format,
+)
 from .base import BaseLearner
 
 logger = logging.getLogger(__name__)
@@ -285,8 +292,7 @@ class NERLearner(BaseLearner):
         realtime: Optional[bool] = None,
         **kwargs,
     ):
-        """
-        """
+        """ """
         self.ensure_predict_ready()
         outputs = self.predict_per_run(
             data=data,
@@ -435,4 +441,3 @@ class NERLearner(BaseLearner):
             prob = self._as_pandas(data=data, to_be_converted=prob)
 
         return prob
-

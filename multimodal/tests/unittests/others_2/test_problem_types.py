@@ -33,4 +33,3 @@ def test_get_problem_type(name):
 def test_problem_type_in_predictor(name):
     predictor = MultiModalPredictor(problem_type=name)
     assert predictor.problem_type == PROBLEM_TYPES_REG.get(name).name
-

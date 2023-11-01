@@ -48,7 +48,13 @@ from .constants import (
     Y_PRED_PROB,
     Y_TRUE,
 )
-from .data import BaseDataModule, infer_column_types, infer_output_shape, infer_problem_type, MultiModalFeaturePreprocessor
+from .data import (
+    BaseDataModule,
+    MultiModalFeaturePreprocessor,
+    infer_column_types,
+    infer_output_shape,
+    infer_problem_type,
+)
 from .optimization import MatcherLitModule, get_matcher_loss_func, get_matcher_miner_func, get_metric
 from .presets import matcher_presets
 from .problem_types import PROBLEM_TYPES_REG
@@ -56,9 +62,11 @@ from .utils import (
     AutoMMModelCheckpoint,
     CustomUnpickler,
     LogFilter,
+    RealtimeMixin,
     apply_log_filter,
     assign_feature_column_names,
     average_checkpoints,
+    compute_inference_batch_size,
     compute_num_gpus,
     compute_ranking_score,
     compute_score,
@@ -84,6 +92,8 @@ from .utils import (
     infer_metrics,
     infer_precision,
     init_df_preprocessor,
+    is_interactive_strategy,
+    is_lazy_weight_tensor,
     load_text_tokenizers,
     save_pretrained_model_configs,
     save_text_tokenizers,
@@ -93,10 +103,6 @@ from .utils import (
     split_train_tuning_data,
     update_hyperparameters,
     upgrade_config,
-    is_lazy_weight_tensor,
-    compute_inference_batch_size,
-    RealtimeMixin,
-    is_interactive_strategy,
 )
 
 pl_logger = logging.getLogger("lightning")
@@ -1077,7 +1083,9 @@ class MultiModalMatcher(RealtimeMixin):
                     if self._pipeline == IMAGE_TEXT_SIMILARITY:
                         best_score = self._evaluate_symmetric_ranking(self._tuning_data)
                     else:
-                        best_score = self.evaluate(self._tuning_data, metrics=[self._validation_metric_name])[self._validation_metric_name]
+                        best_score = self.evaluate(self._tuning_data, metrics=[self._validation_metric_name])[
+                            self._validation_metric_name
+                        ]
                     for i in range(1, len(top_k_model_paths)):
                         cand_avg_state_dict = average_checkpoints(
                             checkpoint_paths=ingredients + [top_k_model_paths[i]],
@@ -1433,10 +1441,7 @@ class MultiModalMatcher(RealtimeMixin):
             signature=signature,
         )
         strategy = self._config.env.strategy  # default used in inference.
-        num_gpus = compute_num_gpus(
-            config_num_gpus=self._config.env.num_gpus,
-            strategy=strategy
-        )
+        num_gpus = compute_num_gpus(config_num_gpus=self._config.env.num_gpus, strategy=strategy)
         if num_gpus <= 1:
             # Force set strategy to be None if it's cpu-only or we have only one GPU.
             strategy = "auto"

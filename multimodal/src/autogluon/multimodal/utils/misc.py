@@ -3,15 +3,14 @@ import json
 import logging
 import os
 import re
+import warnings
 
 import numpy as np
 import pandas as pd
 import torch
 from scipy.special import softmax
-import warnings
 
 from ..constants import DEPRECATED_ZERO_SHOT, ZERO_SHOT_IMAGE_CLASSIFICATION
-
 
 logger = logging.getLogger(__name__)
 

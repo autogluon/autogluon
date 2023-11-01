@@ -11,7 +11,7 @@ import sys
 import time
 import warnings
 from datetime import timedelta
-from typing import Dict, List, Optional, Union, Callable
+from typing import Callable, Dict, List, Optional, Union
 
 import lightning.pytorch as pl
 import numpy as np
@@ -19,7 +19,7 @@ import pandas as pd
 import torch
 import yaml
 from lightning.pytorch.strategies import DeepSpeedStrategy
-from omegaconf import OmegaConf, DictConfig
+from omegaconf import DictConfig, OmegaConf
 from packaging import version
 from torch import nn
 
@@ -38,6 +38,7 @@ from ..constants import (
     DEEPSPEED_MIN_PL_VERSION,
     DEEPSPEED_MODULE,
     DEEPSPEED_OFFLOADING,
+    DISTILLER,
     DOCUMENT,
     FEATURE_EXTRACTION,
     FEATURES,
@@ -66,20 +67,18 @@ from ..constants import (
     Y_PRED_PROB,
     Y_TRUE,
     ZERO_SHOT_IMAGE_CLASSIFICATION,
-    DISTILLER,
 )
 from ..data import (
     BaseDataModule,
+    MultiModalFeaturePreprocessor,
     infer_column_types,
     infer_output_shape,
     infer_problem_type,
     is_image_column,
-    MultiModalFeaturePreprocessor,
 )
-
 from ..models import get_model_postprocess_fn
-from ..optimization.lit_module import LitModule
 from ..optimization.lit_distiller import DistillerLitModule
+from ..optimization.lit_module import LitModule
 from ..optimization.utils import (
     get_loss_func,
     get_metric,
@@ -92,13 +91,14 @@ from ..utils import (
     AutoMMModelCheckpointIO,
     CustomUnpickler,
     DDPPredictionWriter,
-    ExportMixin,
-    RealtimeMixin,
     DistillationMixin,
+    ExportMixin,
     LogFilter,
+    RealtimeMixin,
     apply_log_filter,
     assign_feature_column_names,
     average_checkpoints,
+    compute_inference_batch_size,
     compute_num_gpus,
     compute_score,
     create_fusion_data_processors,
@@ -120,6 +120,7 @@ from ..utils import (
     infer_dtypes_by_model_names,
     infer_metrics,
     infer_precision,
+    infer_problem_type_by_eval_metric,
     infer_scarcity_mode_by_data_size,
     init_df_preprocessor,
     is_interactive_env,
@@ -131,17 +132,15 @@ from ..utils import (
     save_pretrained_model_configs,
     save_text_tokenizers,
     select_model,
-    split_train_tuning_data,
     setup_save_path,
     split_hyperparameters,
+    split_train_tuning_data,
     tensor_to_ndarray,
     turn_on_off_feature_column_info,
     update_config_by_rules,
     update_hyperparameters,
     update_tabular_config_by_resources,
     upgrade_config,
-    infer_problem_type_by_eval_metric,
-    compute_inference_batch_size,
 )
 
 pl_logger = logging.getLogger("lightning")
@@ -150,8 +149,8 @@ logger = logging.getLogger(__name__)
 
 
 class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
-    """
-    """
+    """ """
+
     def __init__(
         self,
         label: Optional[str] = None,
@@ -387,7 +386,9 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             fit_called=self._fit_called,
         )
 
-    def infer_column_types(self, column_types: Optional[Dict] = None, data: Optional[pd.DataFrame]=None, is_train=True):
+    def infer_column_types(
+        self, column_types: Optional[Dict] = None, data: Optional[pd.DataFrame] = None, is_train=True
+    ):
         if is_train and self._fit_called:
             return
         elif is_train:
@@ -450,7 +451,9 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         scarcity_mode = infer_scarcity_mode_by_data_size(
             df_train=self._train_data, scarcity_threshold=50
         )  # Add as separate hyperparameter somewhere?
-        if scarcity_mode == FEW_SHOT and (not self._presets or FEW_SHOT not in self._presets):  # TODO: check for data type
+        if scarcity_mode == FEW_SHOT and (
+            not self._presets or FEW_SHOT not in self._presets
+        ):  # TODO: check for data type
             logger.info(
                 f"Detected data scarcity. Consider running using the preset '{FEW_SHOT_TEXT_CLASSIFICATION}' for better performance."
             )
@@ -1019,7 +1022,9 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
     @staticmethod
     def get_strategy_per_run(num_gpus, config):
-        if config.env.strategy == DEEPSPEED_OFFLOADING and num_gpus == 1 and DEEPSPEED_MODULE not in sys.modules:  # Offloading currently only tested for single GPU
+        if (
+            config.env.strategy == DEEPSPEED_OFFLOADING and num_gpus == 1 and DEEPSPEED_MODULE not in sys.modules
+        ):  # Offloading currently only tested for single GPU
             assert version.parse(pl.__version__) >= version.parse(
                 DEEPSPEED_MIN_PL_VERSION
             ), f"For DeepSpeed Offloading to work reliably you need at least lightning version {DEEPSPEED_MIN_PL_VERSION}, however, found {pl.__version__}. Please update your lightning version."
@@ -1237,12 +1242,12 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             )
 
             return dict(
-                    config=config,
-                    df_preprocessor=df_preprocessor,
-                    data_processors=data_processors,
-                    model=self._model if self._model else model,
-                    model_postprocess_fn=model_postprocess_fn,
-                    )
+                config=config,
+                df_preprocessor=df_preprocessor,
+                data_processors=data_processors,
+                model=self._model if self._model else model,
+                model_postprocess_fn=model_postprocess_fn,
+            )
         # setup distillation in each fit_per_run call to support distillation + HPO
         distillation_kwargs = self.setup_distillation(
             model=model,
@@ -1382,7 +1387,9 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                             prefix=prefix,
                             strict=strict_loading,
                         )
-                        best_score = self.evaluate(self._tuning_data, metrics=[self._eval_metric_name])[self._eval_metric_name]
+                        best_score = self.evaluate(self._tuning_data, metrics=[self._eval_metric_name])[
+                            self._eval_metric_name
+                        ]
                         for i in range(1, len(top_k_model_paths)):
                             cand_avg_state_dict = average_checkpoints(
                                 checkpoint_paths=ingredients + [top_k_model_paths[i]],
@@ -1521,9 +1528,9 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                 if is_image_column(data=data[col_name], col_name=col_name, image_type=IMAGE_PATH):
                     image_type = IMAGE_PATH
                 elif is_image_column(
-                        data=data[col_name],
-                        col_name=col_name,
-                        image_type=IMAGE_BYTEARRAY,
+                    data=data[col_name],
+                    col_name=col_name,
+                    image_type=IMAGE_BYTEARRAY,
                 ):
                     image_type = IMAGE_BYTEARRAY
                 else:
@@ -2167,9 +2174,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             )
 
         if save_model:
-            checkpoint = {
-                "state_dict": {"model." + name: param for name, param in model.state_dict().items()}
-            }
+            checkpoint = {"state_dict": {"model." + name: param for name, param in model.state_dict().items()}}
             torch.save(checkpoint, os.path.join(os.path.abspath(path), MODEL_CHECKPOINT))
 
         # # In case that users save to a path, which is not the original save_path.
@@ -2320,9 +2325,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             classes=learner._classes,
             num_numerical_columns=len(learner._df_preprocessor.numerical_feature_names),
             num_categories=learner._df_preprocessor.categorical_num_categories,
-            pretrained=False
-            if not peft
-            else True,  # set "pretrain=False" to prevent downloading online models
+            pretrained=False if not peft else True,  # set "pretrain=False" to prevent downloading online models
         )
         if learner._data_processors is None:
             learner._data_processors = create_fusion_data_processors(

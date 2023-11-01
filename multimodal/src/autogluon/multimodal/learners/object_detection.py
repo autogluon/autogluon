@@ -1,38 +1,47 @@
+import logging
 import os
+from datetime import timedelta
 from typing import Dict, List, Optional, Union
 
 import pandas as pd
-from torch import nn
 from omegaconf import OmegaConf
-from datetime import timedelta
-import logging
+from torch import nn
 
-from ..constants import BBOX, MULTI_IMAGE_MIX_DATASET, OBJECT_DETECTION, XYWH, MAP, OPEN_VOCABULARY_OBJECT_DETECTION, OVD_RET, DDP
-from ..data import BaseDataModule, MultiModalFeaturePreprocessor, MultiImageMixDataset, infer_rois_column_type
+from ..constants import (
+    BBOX,
+    DDP,
+    MAP,
+    MULTI_IMAGE_MIX_DATASET,
+    OBJECT_DETECTION,
+    OPEN_VOCABULARY_OBJECT_DETECTION,
+    OVD_RET,
+    XYWH,
+)
+from ..data import BaseDataModule, MultiImageMixDataset, MultiModalFeaturePreprocessor, infer_rois_column_type
 from ..optimization import MMDetLitModule
 from ..utils import (
+    check_if_packages_installed,
+    cocoeval,
+    compute_inference_batch_size,
+    compute_num_gpus,
     convert_pred_to_xywh,
+    create_fusion_model,
+    extract_from_output,
+    from_coco_or_voc,
     get_detection_classes,
+    infer_precision,
     object_detection_data_to_df,
+    save_ovd_result_df,
     save_result_df,
     setup_save_path,
-    check_if_packages_installed,
     split_train_tuning_data,
-    create_fusion_model,
-    compute_num_gpus,
-    infer_precision,
-    extract_from_output,
-    save_ovd_result_df,
-    compute_inference_batch_size,
-    from_coco_or_voc,
-    cocoeval,
 )
 from .base import BaseLearner
+
 logger = logging.getLogger(__name__)
 
 
 class ObjectDetectionLearner(BaseLearner):
-
     def __init__(
         self,
         label: Optional[str] = None,
@@ -212,8 +221,14 @@ class ObjectDetectionLearner(BaseLearner):
         )
         if is_train:
             val_use_training_mode = (self._problem_type == OBJECT_DETECTION) and (self._validation_metric_name != MAP)
-            datamodule_kwargs.update(dict(validate_data=self._tuning_data, val_use_training_mode=val_use_training_mode))
-            if self._problem_type == OBJECT_DETECTION and model_config is not None and MULTI_IMAGE_MIX_DATASET in model_config:
+            datamodule_kwargs.update(
+                dict(validate_data=self._tuning_data, val_use_training_mode=val_use_training_mode)
+            )
+            if (
+                self._problem_type == OBJECT_DETECTION
+                and model_config is not None
+                and MULTI_IMAGE_MIX_DATASET in model_config
+            ):
                 train_dataset = MultiImageMixDataset(
                     data=self._train_data,
                     preprocessor=[df_preprocessor],
@@ -537,8 +552,9 @@ class ObjectDetectionLearner(BaseLearner):
         """
         if isinstance(anno_file_or_df, str):
             anno_file = anno_file_or_df
-            data = from_coco_or_voc(anno_file,
-                                    "test")  # TODO: maybe remove default splits hardcoding (only used in VOC)
+            data = from_coco_or_voc(
+                anno_file, "test"
+            )  # TODO: maybe remove default splits hardcoding (only used in VOC)
             if os.path.isdir(anno_file):
                 eval_tool = "torchmetrics"  # we can only use torchmetrics for VOC format evaluation.
         else:
@@ -579,16 +595,13 @@ class ObjectDetectionLearner(BaseLearner):
         eval_tool: Optional[str] = None,
         **kwargs,
     ):
-        """
-        """
+        """ """
         self.ensure_predict_ready()
         if self._problem_type == OPEN_VOCABULARY_OBJECT_DETECTION:
             raise NotImplementedError("Open vocabulary object detection doesn't support calling `evaluate` yet.")
 
         if realtime:
-            return NotImplementedError(
-                f"Current problem type {self._problem_type} does not support realtime predict."
-            )
+            return NotImplementedError(f"Current problem type {self._problem_type} does not support realtime predict.")
         if isinstance(data, str):
             return self.evaluate_coco(
                 anno_file_or_df=data,
@@ -669,8 +682,8 @@ class ObjectDetectionLearner(BaseLearner):
             if (
                 self._problem_type == OBJECT_DETECTION
             ):  # TODO: add prediction output in COCO format if as_pandas is False
-                #TODO: calling save_result_df to convert data to dataframe is not a good logic
-                #TODO: consider combining this with the above saving logic or using a different function.
+                # TODO: calling save_result_df to convert data to dataframe is not a good logic
+                # TODO: consider combining this with the above saving logic or using a different function.
                 pred = save_result_df(
                     pred=pred,
                     data=data,

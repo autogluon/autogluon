@@ -8,8 +8,8 @@ import pandas as pd
 from omegaconf import DictConfig, OmegaConf
 from torch import nn
 
-from autogluon.core.utils.loaders import load_pd
 from autogluon.core.utils import default_holdout_frac, generate_train_test_split_combined
+from autogluon.core.utils.loaders import load_pd
 
 from ..constants import (
     BINARY,
@@ -21,16 +21,16 @@ from ..constants import (
     IMAGE_PATH,
     LABEL,
     MMLAB_MODELS,
+    MULTICLASS,
     NER,
     NER_ANNOTATION,
     NER_TEXT,
     NUMERICAL,
     OVD,
+    REGRESSION,
     ROIS,
     TEXT,
     TEXT_NER,
-    MULTICLASS,
-    REGRESSION,
 )
 from ..data import (
     CategoricalProcessor,

@@ -15,7 +15,6 @@ from autogluon.multimodal.utils.onnx import OnnxModule
 
 from ..utils.unittest_datasets import AEDataset, PetFinderDataset
 
-
 ALL_DATASETS = {
     "petfinder": PetFinderDataset(),
     "ae": AEDataset(),

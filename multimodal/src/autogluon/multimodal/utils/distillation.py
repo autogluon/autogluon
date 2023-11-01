@@ -1,7 +1,7 @@
-from typing import List, Optional, Union, Dict, Callable
-
 import logging
-from omegaconf import OmegaConf, DictConfig
+from typing import Callable, Dict, List, Optional, Union
+
+from omegaconf import DictConfig, OmegaConf
 from torch import nn
 
 from ..constants import REGRESSION
@@ -12,7 +12,6 @@ logger = logging.getLogger(__name__)
 
 
 class DistillationMixin:
-
     def setup_distillation(
         self,
         model: nn.Module,
@@ -34,6 +33,7 @@ class DistillationMixin:
         logger.debug("setting up distillation...")
         if isinstance(self._teacher_learner, str):
             from ..learners.base import BaseLearner
+
             self._teacher_learner = BaseLearner.load(self._teacher_learner)
 
         # verify that student and teacher configs are consistent.

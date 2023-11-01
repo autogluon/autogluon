@@ -636,7 +636,12 @@ def test_modifying_duplicate_model_names():
     )
 
     # verify teacher and student have no duplicate model names
-    assert all([n not in teacher_predictor._learner._config.model.names for n in student_predictor._learner._config.model.names]), (
+    assert all(
+        [
+            n not in teacher_predictor._learner._config.model.names
+            for n in student_predictor._learner._config.model.names
+        ]
+    ), (
         f"teacher model names {teacher_predictor._learner._config.model.names} and"
         f" student model names {student_predictor._learner._config.model.names} have duplicates."
     )

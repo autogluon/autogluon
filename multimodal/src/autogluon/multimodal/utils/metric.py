@@ -10,7 +10,6 @@ from sklearn.metrics import f1_score
 
 from autogluon.core.metrics import Scorer, get_metric
 
-from ..problem_types import PROBLEM_TYPES_REG
 from ..constants import (
     ACCURACY,
     AVERAGE_PRECISION,
@@ -23,6 +22,7 @@ from ..constants import (
     NDCG,
     NER,
     NER_TOKEN_F1,
+    NUMERICAL,
     OBJECT_DETECTION,
     OPEN_VOCABULARY_OBJECT_DETECTION,
     OVERALL_ACCURACY,
@@ -38,8 +38,8 @@ from ..constants import (
     Y_PRED,
     Y_PRED_PROB,
     Y_TRUE,
-    NUMERICAL,
 )
+from ..problem_types import PROBLEM_TYPES_REG
 
 logger = logging.getLogger(__name__)
 

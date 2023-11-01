@@ -61,9 +61,7 @@ def hpo_trial(sampled_hyperparameters, learner, checkpoint_dir=None, **_fit_args
         learner.fit_per_run(**_fit_args)
 
 
-def build_final_learner(
-    learner, best_trial_path, save_path, last_ckpt_path, is_matching, standalone, clean_ckpts
-):
+def build_final_learner(learner, best_trial_path, save_path, last_ckpt_path, is_matching, standalone, clean_ckpts):
     """
     Build the final learner after HPO is finished.
 

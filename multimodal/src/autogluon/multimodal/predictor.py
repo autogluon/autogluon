@@ -13,13 +13,10 @@ import transformers
 
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
 from autogluon.core.metrics import Scorer
-from .constants import (
-    AUTOMM_TUTORIAL_MODE,
-    NER,
-    OBJECT_DETECTION,
-)
+
+from .constants import AUTOMM_TUTORIAL_MODE, NER, OBJECT_DETECTION
+from .learners import BaseLearner, NERLearner, ObjectDetectionLearner
 from .matcher import MultiModalMatcher
-from .learners import BaseLearner, ObjectDetectionLearner, NERLearner
 from .problem_types import PROBLEM_TYPES_REG
 from .utils import get_dir_ckpt_paths, handle_deprecated_args
 
@@ -378,7 +375,7 @@ class MultiModalPredictor:
         """
         self._verbosity = verbosity
         set_logger_verbosity(verbosity)
-        #TODO: align verbosity2loglevel with https://huggingface.co/docs/transformers/main_classes/logging#transformers.utils.logging.get_verbosity
+        # TODO: align verbosity2loglevel with https://huggingface.co/docs/transformers/main_classes/logging#transformers.utils.logging.get_verbosity
 
     def set_num_gpus(self, num_gpus):
         self._learner.set_num_gpus(num_gpus)

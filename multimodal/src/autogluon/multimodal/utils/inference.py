@@ -30,10 +30,7 @@ from ..constants import (
 from ..data.preprocess_dataframe import MultiModalFeaturePreprocessor
 from ..data.utils import apply_data_processor, apply_df_preprocessor, get_collate_fn, get_per_sample_features
 from ..models.utils import run_model
-from .environment import (
-    get_precision_context,
-    move_to_device,
-)
+from .environment import get_precision_context, move_to_device
 from .matcher import compute_matching_probability
 from .misc import tensor_to_ndarray
 
@@ -253,7 +250,9 @@ class RealtimeMixin:
 
             return {PROBABILITY: probability}
 
-    def use_realtime(self, realtime: bool, data: pd.DataFrame, data_processors: Union[Dict, List[Dict]], batch_size: int):
+    def use_realtime(
+        self, realtime: bool, data: pd.DataFrame, data_processors: Union[Dict, List[Dict]], batch_size: int
+    ):
         """
         Determine whether to use the realtime inference based on the sample number
         and the data modalities. Loading image data requires more time than text.

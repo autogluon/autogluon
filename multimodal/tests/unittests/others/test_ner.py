@@ -1,12 +1,13 @@
 import os
 import shutil
 import tempfile
+from unittest import mock
+
+import numpy.testing as npt
 import pandas as pd
 import pytest
-from ray import tune
-from unittest import mock
 import torch
-import numpy.testing as npt
+from ray import tune
 
 from autogluon.multimodal import MultiModalPredictor
 
@@ -133,4 +134,3 @@ def test_ner_standalone():
     offline_predictions = loaded_offline_predictor.predict(test_data, as_pandas=False)
     del loaded_offline_predictor
     npt.assert_equal(online_predictions[0], offline_predictions[0])
-
