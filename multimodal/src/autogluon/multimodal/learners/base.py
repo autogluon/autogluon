@@ -370,6 +370,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         if self._fit_called:
             return
         if self._label_column:
+            if isinstance(train_data, str):
+                train_data = load_pd.load(train_data)
             self._problem_type = infer_problem_type(
                 y_train_data=train_data[self._label_column],
                 provided_problem_type=self._problem_type,
@@ -455,9 +457,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
     def update_attributes(
         self,
-        presets: Optional[str] = None,
         config: Optional[Dict] = None,
-        teacher_learner: Optional[Union[str, BaseLearner]] = None,
         df_preprocessor: Optional[MultiModalFeaturePreprocessor] = None,
         data_processors: Optional[Dict] = None,
         model: Optional[nn.Module] = None,
@@ -465,18 +465,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         best_score: Optional[float] = None,
         **kwargs,
     ):
-        if presets:
-            if self._fit_called:
-                warnings.warn("Ignoring the provided `presets` as fit() was called before.", UserWarning)
-            else:
-                self._presets = presets
         if config:
-            if self._fit_called:
-                warnings.warn("Ignoring the provided `config` as fit() was called before.", UserWarning)
-            else:
-                self._config = config
-        if teacher_learner:
-            self._teacher_learner = teacher_learner
+            self._config = config
         if df_preprocessor:
             self._df_preprocessor = df_preprocessor
         if data_processors:
@@ -571,11 +561,29 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             return dict()
         else:
             attributes = self.fit_per_run(**self._fit_args)
-            self.update_attributes(**attributes)
+            self.update_attributes(**attributes)  # only update attributes for non-HPO mode
             return attributes
 
-    def on_fit_start(self):
+    def on_fit_start(
+        self,
+        presets: Optional[str] = None,
+        config: Optional[Dict] = None,
+        teacher_learner: Optional[Union[str, BaseLearner]] = None,
+    ):
         self.ensure_fit_ready()
+        if presets:
+            if self._fit_called:
+                warnings.warn("Ignoring the provided `presets` as fit() was called before.", UserWarning)
+            else:
+                self._presets = presets
+        if config:
+            if self._fit_called:
+                warnings.warn("Ignoring the provided `config` as fit() was called before.", UserWarning)
+            else:
+                self._config = config
+        if teacher_learner:
+            self._teacher_learner = teacher_learner
+
         training_start = time.time()
         return training_start
 
@@ -617,8 +625,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         clean_ckpts: Optional[bool] = True,
         **kwargs,
     ):
-        training_start = self.on_fit_start()
-        self.update_attributes(presets=presets, config=config, teacher_learner=teacher_learner)
+        training_start = self.on_fit_start(presets=presets, config=config, teacher_learner=teacher_learner)
         self.setup_save_path(save_path=save_path)
         self.infer_problem_type(train_data=train_data)
         self.prepare_train_tuning_data(
@@ -1236,7 +1243,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                     model=self._model if self._model else model,
                     model_postprocess_fn=model_postprocess_fn,
                     )
-
+        # setup distillation in each fit_per_run call to support distillation + HPO
         distillation_kwargs = self.setup_distillation(
             model=model,
             loss_func=loss_func,

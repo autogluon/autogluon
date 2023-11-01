@@ -209,6 +209,7 @@ class MultiModalMatcher(RealtimeMixin):
         self._presets = presets.lower() if presets else None
         self._eval_metric_name = eval_metric.lower() if eval_metric else None
         self._validation_metric_name = validation_metric.lower() if validation_metric else None
+        self._minmax_mode = None
         self._hyperparameters = hyperparameters
         self._output_shape = None
         self._save_path = path
@@ -229,6 +230,8 @@ class MultiModalMatcher(RealtimeMixin):
         self._response_model = None
         self._resume = False
         self._fit_called = False
+        self._train_data = None
+        self._tuning_data = None
         self._verbosity = verbosity
         self._warn_if_exist = warn_if_exist
         self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
@@ -475,6 +478,8 @@ class MultiModalMatcher(RealtimeMixin):
                 label_column=self._label_column,
                 random_state=seed,
             )
+        self._train_data = train_data
+        self._tuning_data = tuning_data
 
         if self._label_column:
             self._problem_type = infer_problem_type(
@@ -519,10 +524,11 @@ class MultiModalMatcher(RealtimeMixin):
                 is_matching=self._pipeline in matcher_presets.list_keys(),
                 eval_metric_name=self._eval_metric_name,
             )
+            minmax_mode = get_minmax_mode(validation_metric_name)
         else:
             validation_metric_name = self._validation_metric_name
             eval_metric_name = self._eval_metric_name
-        minmax_mode = get_minmax_mode(validation_metric_name)
+            minmax_mode = self._minmax_mode
 
         if time_limit is not None:
             time_limit = timedelta(seconds=time_limit)
@@ -535,6 +541,7 @@ class MultiModalMatcher(RealtimeMixin):
         # set attributes for saving and prediction
         self._eval_metric_name = eval_metric_name  # In case eval_metric isn't provided in __init__().
         self._validation_metric_name = validation_metric_name
+        self._minmax_mode = minmax_mode
         self._output_shape = output_shape
         self._column_types = column_types
 
@@ -562,11 +569,7 @@ class MultiModalMatcher(RealtimeMixin):
             )
 
         _fit_args = dict(
-            train_df=train_data,
-            val_df=tuning_data,
             id_mappings=id_mappings,
-            validation_metric_name=validation_metric_name,
-            minmax_mode=minmax_mode,
             max_time=time_limit,
             save_path=self._save_path,
             ckpt_path=None if hpo_mode else self._ckpt_path,
@@ -699,11 +702,7 @@ class MultiModalMatcher(RealtimeMixin):
 
     def fit_per_run(
         self,
-        train_df: pd.DataFrame,
-        val_df: pd.DataFrame,
         id_mappings: Union[Dict[str, Dict], Dict[str, pd.Series]],
-        validation_metric_name: str,
-        minmax_mode: str,
         max_time: timedelta,
         save_path: str,
         ckpt_path: str,
@@ -716,7 +715,7 @@ class MultiModalMatcher(RealtimeMixin):
         **hpo_kwargs,
     ):
         # TODO(?) We should have a separate "_pre_training_event()" for logging messages.
-        logger.info(get_fit_start_message(save_path, validation_metric_name))
+        logger.info(get_fit_start_message(save_path, self._validation_metric_name))
         config = self._config
         config = get_config(
             problem_type=self._pipeline,
@@ -751,7 +750,7 @@ class MultiModalMatcher(RealtimeMixin):
             response_advanced_hyperparameters = None
 
         query_df_preprocessor, response_df_preprocessor, label_df_preprocessor = self._get_matcher_df_preprocessor(
-            data=train_df,
+            data=self._train_data,
             column_types=self._column_types,
             query_config=query_config,
             response_config=response_config,
@@ -790,12 +789,12 @@ class MultiModalMatcher(RealtimeMixin):
             logger.debug(f"label_processors_count: {label_processors_count}")
 
         validation_metric, custom_metric_func = get_metric(
-            metric_name=validation_metric_name,
+            metric_name=self._validation_metric_name,
             num_classes=self._output_shape,
             is_matching=self._pipeline in matcher_presets.list_keys(),
             problem_type=self._problem_type,
         )
-        logger.debug(f"validation_metric_name: {validation_metric_name}")
+        logger.debug(f"validation_metric_name: {self._validation_metric_name}")
         logger.debug(f"validation_metric: {validation_metric}")
         logger.debug(f"custom_metric_func: {custom_metric_func}")
 
@@ -835,10 +834,7 @@ class MultiModalMatcher(RealtimeMixin):
                 query_model=query_model,
                 response_model=response_model,
                 save_path=save_path,
-                minmax_mode=minmax_mode,
                 top_k_average_method=config.optimization.top_k_average_method,
-                val_df=val_df,
-                validation_metric_name=validation_metric_name,
             )
             return self
 
@@ -853,8 +849,8 @@ class MultiModalMatcher(RealtimeMixin):
             data_processors=data_processors,
             per_gpu_batch_size=config.env.per_gpu_batch_size,
             num_workers=config.env.num_workers,
-            train_data=train_df,
-            validate_data=val_df,
+            train_data=self._train_data,
+            validate_data=self._tuning_data,
             id_mappings=id_mappings,
         )
         optimization_kwargs = dict(
@@ -871,7 +867,7 @@ class MultiModalMatcher(RealtimeMixin):
         )
         metrics_kwargs = dict(
             validation_metric=validation_metric,
-            validation_metric_name=validation_metric_name,
+            validation_metric_name=self._validation_metric_name,
             custom_metric_func=custom_metric_func,
         )
 
@@ -891,21 +887,21 @@ class MultiModalMatcher(RealtimeMixin):
         )
 
         logger.debug(f"validation_metric_name: {task.validation_metric_name}")
-        logger.debug(f"minmax_mode: {minmax_mode}")
+        logger.debug(f"minmax_mode: {self._minmax_mode}")
 
         checkpoint_callback = AutoMMModelCheckpoint(
             dirpath=save_path,
             save_top_k=config.optimization.top_k,
             verbose=True,
             monitor=task.validation_metric_name,
-            mode=minmax_mode,
+            mode=self._minmax_mode,
             save_last=True,
         )
         early_stopping_callback = pl.callbacks.EarlyStopping(
             monitor=task.validation_metric_name,
             patience=config.optimization.patience,
-            mode=minmax_mode,
-            stopping_threshold=get_stopping_threshold(validation_metric_name),
+            mode=self._minmax_mode,
+            stopping_threshold=get_stopping_threshold(self._validation_metric_name),
         )
         lr_callback = pl.callbacks.LearningRateMonitor(logging_interval="step")
         model_summary = pl.callbacks.ModelSummary(max_depth=1)
@@ -1026,10 +1022,7 @@ class MultiModalMatcher(RealtimeMixin):
                     query_model=query_model,
                     response_model=response_model,
                     save_path=save_path,
-                    minmax_mode=minmax_mode,
                     top_k_average_method=config.optimization.top_k_average_method,
-                    val_df=val_df,
-                    validation_metric_name=validation_metric_name,
                 )
         else:
             sys.exit(f"Training finished, exit the process with global_rank={trainer.global_rank}...")
@@ -1039,10 +1032,7 @@ class MultiModalMatcher(RealtimeMixin):
         query_model,
         response_model,
         save_path,
-        minmax_mode,
         top_k_average_method,
-        val_df,
-        validation_metric_name,
         last_ckpt_path=None,
     ):
         best_k_models_yaml_path = os.path.join(save_path, BEST_K_MODELS_FILE)
@@ -1066,14 +1056,14 @@ class MultiModalMatcher(RealtimeMixin):
                     for v in sorted(
                         list(best_k_models.items()),
                         key=lambda ele: ele[1],
-                        reverse=(minmax_mode == MAX),
+                        reverse=(self._minmax_mode == MAX),
                     )
                 ]
                 if top_k_average_method == GREEDY_SOUP:
                     # Select the ingredients based on the methods proposed in paper
                     #  "Model soups: averaging weights of multiple fine-tuned models improves accuracy without
                     #  increasing inference time", https://arxiv.org/pdf/2203.05482.pdf
-                    monitor_op = {MIN: operator.le, MAX: operator.ge}[minmax_mode]
+                    monitor_op = {MIN: operator.le, MAX: operator.ge}[self._minmax_mode]
 
                     logger.info(f"Start to fuse {len(top_k_model_paths)} checkpoints via the greedy soup algorithm.")
 
@@ -1085,9 +1075,9 @@ class MultiModalMatcher(RealtimeMixin):
                     )
 
                     if self._pipeline == IMAGE_TEXT_SIMILARITY:
-                        best_score = self._evaluate_symmetric_ranking(val_df)
+                        best_score = self._evaluate_symmetric_ranking(self._tuning_data)
                     else:
-                        best_score = self.evaluate(val_df, metrics=[validation_metric_name])[validation_metric_name]
+                        best_score = self.evaluate(self._tuning_data, metrics=[self._validation_metric_name])[self._validation_metric_name]
                     for i in range(1, len(top_k_model_paths)):
                         cand_avg_state_dict = average_checkpoints(
                             checkpoint_paths=ingredients + [top_k_model_paths[i]],
@@ -1098,10 +1088,10 @@ class MultiModalMatcher(RealtimeMixin):
                             state_dict=cand_avg_state_dict,
                         )
                         if self._pipeline == IMAGE_TEXT_SIMILARITY:
-                            cand_score = self._evaluate_symmetric_ranking(val_df)
+                            cand_score = self._evaluate_symmetric_ranking(self._tuning_data)
                         else:
-                            cand_score = self.evaluate(val_df, metrics=[validation_metric_name])[
-                                validation_metric_name
+                            cand_score = self.evaluate(self._tuning_data, metrics=[self._validation_metric_name])[
+                                self._validation_metric_name
                             ]
                         if monitor_op(cand_score, best_score):
                             # Add new ingredient
@@ -2046,6 +2036,7 @@ class MultiModalMatcher(RealtimeMixin):
                     "presets": self._presets,
                     "eval_metric_name": self._eval_metric_name,
                     "validation_metric_name": self._validation_metric_name,
+                    "minmax_mode": self._minmax_mode,
                     "output_shape": self._output_shape,
                     "save_path": self._save_path,
                     "pretrained": self._pretrained,
@@ -2171,6 +2162,10 @@ class MultiModalMatcher(RealtimeMixin):
         matcher._query_processors = query_processors
         matcher._response_processors = response_processors
         matcher._label_processors = label_processors
+        if "minmax_mode" in assets:
+            matcher._minmax_mode = assets["minmax_mode"]
+        else:
+            matcher._minmax_mode = get_minmax_mode(matcher._validation_metric_name)
 
         return matcher
 

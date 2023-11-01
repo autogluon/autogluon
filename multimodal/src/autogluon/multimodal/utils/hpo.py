@@ -62,7 +62,7 @@ def hpo_trial(sampled_hyperparameters, learner, checkpoint_dir=None, **_fit_args
 
 
 def build_final_learner(
-    learner, best_trial_path, minmax_mode, val_df, save_path, last_ckpt_path, is_matching, standalone, clean_ckpts
+    learner, best_trial_path, save_path, last_ckpt_path, is_matching, standalone, clean_ckpts
 ):
     """
     Build the final learner after HPO is finished.
@@ -73,10 +73,6 @@ def build_final_learner(
         A learner object.
     best_trial_path
         The best trial's saving path.
-    minmax_mode
-        min or max.
-    val_df
-        Validation dataframe.
     save_path
         The saving path.
     last_ckpt_path
@@ -107,10 +103,7 @@ def build_final_learner(
             response_model=response_model,
             save_path=best_trial_path,
             last_ckpt_path=last_ckpt_path,
-            minmax_mode=minmax_mode,
             top_k_average_method=matcher._config.optimization.top_k_average_method,
-            val_df=val_df,
-            validation_metric_name=matcher._validation_metric_name,
         )
         matcher._save_path = save_path
 
@@ -243,8 +236,6 @@ def hyperparameter_tune(hyperparameter_tune_kwargs, resources, is_matching=False
             learner = build_final_learner(
                 learner=_fit_args.get("learner"),
                 best_trial_path=best_trial_path,
-                minmax_mode=mode,
-                val_df=_fit_args.get("learner")._tuning_data,
                 save_path=save_path,
                 last_ckpt_path=last_ckpt_path,
                 is_matching=is_matching,

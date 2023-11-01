@@ -170,7 +170,7 @@ def test_hpo_distillation(searcher, scheduler):
     if os.path.exists(teacher_save_path):
         shutil.rmtree(teacher_save_path)
 
-    teacher_predictor = teacher_predictor.fit(
+    teacher_predictor.fit(
         train_data=dataset.train_df,
         hyperparameters=hyperparameters,
         time_limit=30,
@@ -197,7 +197,7 @@ def test_hpo_distillation(searcher, scheduler):
     if os.path.exists(student_save_path):
         shutil.rmtree(student_save_path)
 
-    predictor = predictor.fit(
+    predictor.fit(
         train_data=dataset.train_df,
         teacher_predictor=teacher_save_path,
         hyperparameters=hyperparameters,

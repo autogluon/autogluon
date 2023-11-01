@@ -424,9 +424,9 @@ def upgrade_config(config, loaded_version):
     if version.parse(loaded_version) <= version.parse("0.6.2"):
         logger.info(f"Start to upgrade the previous configuration trained by AutoMM version={loaded_version}.")
         if OmegaConf.select(config, "model.timm_image") is not None:
-            logger.warn(
+            logger.warning(
                 "Loading a model that has been trained via AutoGluon Multimodal<=0.6.2. "
-                "Try to update the timm image size."
+                "Setting config.model.timm_image.image_size = None."
             )
             config.model.timm_image.image_size = None
     return config

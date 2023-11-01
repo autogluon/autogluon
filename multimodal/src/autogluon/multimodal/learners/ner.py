@@ -74,15 +74,13 @@ class NERLearner(BaseLearner):
         hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
         column_types: Optional[Dict] = None,
         holdout_frac: Optional[float] = None,
-        teacher_learner: Union[str, BaseLearner] = None,
         seed: Optional[int] = 0,
         standalone: Optional[bool] = True,
         hyperparameter_tune_kwargs: Optional[Dict] = None,
         clean_ckpts: Optional[bool] = True,
         **kwargs,
     ):
-        training_start = self.on_fit_start()
-        self.update_attributes(presets=presets, config=config, teacher_learner=teacher_learner)
+        training_start = self.on_fit_start(presets=presets, config=config)
         self.setup_save_path(save_path=save_path)
         self.prepare_train_tuning_data(
             train_data=train_data,

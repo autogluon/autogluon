@@ -14,9 +14,8 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 
-from autogluon.multimodal.predictor import MultiModalPredictor
-
-from ..constants import AUTOMM, BINARY, FEATURE_EXTRACTION, Y_PRED, Y_TRUE
+from ..learners import BaseLearner
+from ..constants import BINARY, FEATURE_EXTRACTION, Y_PRED, Y_TRUE
 from ..data.infer_types import infer_problem_type
 from ..utils import CustomUnpickler, compute_score, logits_to_prob, setup_save_path
 
@@ -61,7 +60,7 @@ class FewShotSVMPredictor:
         problem_type
             The problem type specified by user. Currently the SVM predictor only supports classification types
         """
-        self._automm_predictor = MultiModalPredictor(
+        self.learner = BaseLearner(
             label=None,
             hyperparameters=hyperparameters,
             problem_type=FEATURE_EXTRACTION,
@@ -129,7 +128,7 @@ class FewShotSVMPredictor:
 
         preds = self.clf.predict(features)
         if as_pandas:
-            preds = self._automm_predictor._as_pandas(data=data, to_be_converted=preds)
+            preds = self.learner._as_pandas(data=data, to_be_converted=preds)
         return preds
 
     def predict_proba(
@@ -176,10 +175,10 @@ class FewShotSVMPredictor:
 
         if not as_multiclass:
             if self._problem_type == BINARY:
-                prob = prob[:, 1]
+                prob = probs[:, 1]
 
         if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
-            probs = self._automm_predictor._as_pandas(data=data, to_be_converted=probs)
+            probs = self.learner._as_pandas(data=data, to_be_converted=probs)
         return probs
 
     def extract_embedding(
@@ -212,7 +211,7 @@ class FewShotSVMPredictor:
         """
         if self._label in data.columns:
             data = data.drop(columns=[self._label], axis=1)
-        features = self._automm_predictor.extract_embedding(data, realtime=realtime)
+        features = self.learner.extract_embedding(data, realtime=realtime)
         assert len(features.keys()) == 1, "Currently SVM only supports single column feature input"
         features_key = list(features.keys())[0]
         features = features[features_key]
@@ -244,17 +243,8 @@ class FewShotSVMPredictor:
                 Y_TRUE: labels,
             }
         )
-
-        if self._automm_predictor._df_preprocessor is None:
-            data, df_preprocessor, data_processors = self._automm_predictor._on_predict_start(
-                data=data,
-                requires_label=True,
-            )
-        else:
-            df_preprocessor = self._automm_predictor._df_preprocessor
-
         if metrics is None:
-            metrics = [self._automm_predictor._eval_metric_name]
+            metrics = [self.learner._eval_metric_name]
         if isinstance(metrics, str):
             metrics = [metrics]
 
@@ -271,7 +261,7 @@ class FewShotSVMPredictor:
                 results[per_metric] = score
 
         if return_pred:
-            return results, self._automm_predictor._as_pandas(data=data, to_be_converted=preds)
+            return results, self.learner._as_pandas(data=data, to_be_converted=preds)
         return results
 
     def save_svm(self, path: Optional[str] = None):
@@ -304,7 +294,7 @@ class FewShotSVMPredictor:
     def load_predictor_from_meta_data(self, path: str):
         with open(os.path.join(path, "fewshot_svm_assets.json"), "r") as fp:
             assets = json.load(fp)
-            predictor = MultiModalPredictor(
+            predictor = BaseLearner(
                 label=None,
                 hyperparameters=assets["hyperparameters"],
                 problem_type=FEATURE_EXTRACTION,
@@ -317,7 +307,7 @@ class FewShotSVMPredictor:
     @classmethod
     def load(cls, path: str):
         predictor = cls("dummy_label")
-        predictor._automm_predictor, assets = predictor.load_predictor_from_meta_data(path)
+        predictor.learner, assets = predictor.load_predictor_from_meta_data(path)
         predictor._save_path = assets["path"]
         predictor._label = assets["label"]
         predictor._hyperparameters = assets["hyperparameters"]
