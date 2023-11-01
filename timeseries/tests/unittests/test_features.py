@@ -4,7 +4,7 @@ import pytest
 
 from autogluon.timeseries.utils.features import TimeSeriesFeatureGenerator
 
-from .common import get_data_frame_with_variable_lengths
+from .common import DATAFRAME_WITH_STATIC, get_data_frame_with_variable_lengths
 
 
 @pytest.mark.parametrize("known_covariates_names", [["known_1", "known_2"], []])
@@ -30,3 +30,12 @@ def test_when_covariates_present_in_data_then_they_are_included_in_metadata(
     assert metadata.past_covariates_real == past_covariates_names
     assert metadata.static_features_cat == static_features_cat
     assert metadata.static_features_real == static_features_real
+
+
+def test_given_duplicate_static_features_then_generator_can_fit_transform():
+    feat_generator = TimeSeriesFeatureGenerator(target="target", known_covariates_names=[])
+    data = DATAFRAME_WITH_STATIC.copy()
+    data.static_features["feat5"] = data.static_features["feat1"]
+    feat_generator.fit(data)
+    out = feat_generator.transform(data)
+    assert isinstance(out.static_features, pd.DataFrame)
