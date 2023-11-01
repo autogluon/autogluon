@@ -509,7 +509,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         df: pd.DataFrame,
     ) -> Tuple[Dict[str, List[List[str]]], Dict[str, str]]:
         """
-        Preprocess real-world semantic segmenation data.
+        Preprocess real-world semantic segmentation data.
         For image data we preprocess them by collecting their paths together. If one sample has multiple images
         in an image column, assume that their image paths are separated by ";".
         For rois data we simply convert them from a column of pandas dataframe to a list.
