@@ -30,7 +30,7 @@ else
     FRAMEWORK=AutoGluon_$PRESET
     aws s3 cp --recursive s3://autogluon-ci-benchmark/configs/$MODULE/$USER_DIR_S3_PREFIX/latest/ $(dirname "$0")/custom_user_dir/
     agbench generate-cloud-config \
-    --prefix ag-bench-${INSTANCE_TYPE//./} \
+    --prefix ag-bench \
     --module $MODULE \
     --cdk-deploy-account $CDK_DEPLOY_ACCOUNT \
     --cdk-deploy-region $CDK_DEPLOY_REGION \
