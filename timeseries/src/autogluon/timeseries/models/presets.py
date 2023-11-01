@@ -28,6 +28,13 @@ from . import (
     ThetaModel,
     WaveNetModel,
 )
+from .local import (
+    ADIDAModel,
+    CrostonClassicModel,
+    CrostonOptimizedModel,
+    CrostonSBAModel,
+    IMAPAModel,
+)
 from .abstract import AbstractTimeSeriesModel
 from .multi_window.multi_window_model import MultiWindowBacktestingModel
 
@@ -58,6 +65,11 @@ MODEL_TYPES = dict(
     NPTS=NPTSModel,
     Theta=ThetaModel,
     ETS=ETSModel,
+    ADIDA=ADIDAModel,
+    CrostonClassic=CrostonClassicModel,
+    CrostonOptimized=CrostonOptimizedModel,
+    CrostonSBA=CrostonSBAModel,
+    IMAPA=IMAPAModel,
 )
 
 DEFAULT_MODEL_NAMES = {v: k for k, v in MODEL_TYPES.items()}

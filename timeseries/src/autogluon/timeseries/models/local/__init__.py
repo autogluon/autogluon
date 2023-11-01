@@ -2,7 +2,10 @@ import joblib.externals.loky
 
 from .naive import AverageModel, NaiveModel, SeasonalAverageModel, SeasonalNaiveModel
 from .npts import NPTSModel
-from .statsforecast import ARIMAModel, AutoARIMAModel, AutoETSModel, DynamicOptimizedThetaModel, ETSModel, ThetaModel
+from .statsforecast import (
+    ARIMAModel, AutoARIMAModel, AutoETSModel, DynamicOptimizedThetaModel, ETSModel, ThetaModel,
+    CrostonClassicModel, CrostonOptimizedModel, CrostonSBAModel, ADIDAModel, IMAPAModel
+)
 
 # By default, joblib w/ loky backend kills processes that take >300MB of RAM assuming that this is caused by a memory
 # leak. This leads to problems for some memory-hungry models like AutoARIMA/Theta.

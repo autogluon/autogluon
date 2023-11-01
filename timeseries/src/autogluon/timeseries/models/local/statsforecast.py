@@ -391,3 +391,33 @@ class ThetaModel(AbstractStatsForecastModel):
         from statsforecast.models import Theta
 
         return Theta
+
+
+class ADIDAModel(AbstractStatsForecastModel):
+    def _get_model_type(self):
+        from statsforecast.models import ADIDA
+        return ADIDA
+
+
+class CrostonSBAModel(AbstractStatsForecastModel):
+    def _get_model_type(self):
+        from statsforecast.models import CrostonSBA
+        return CrostonSBA
+
+
+class CrostonOptimizedModel(AbstractStatsForecastModel):
+    def _get_model_type(self):
+        from statsforecast.models import CrostonOptimized
+        return CrostonOptimized
+
+
+class CrostonClassicModel(AbstractStatsForecastModel):
+    def _get_model_type(self):
+        from statsforecast.models import CrostonClassic
+        return CrostonClassic
+
+
+class IMAPAModel(AbstractStatsForecastModel):
+    def _get_model_type(self):
+        from statsforecast.models import IMAPA
+        return IMAPA
