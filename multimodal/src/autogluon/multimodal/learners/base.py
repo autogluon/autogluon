@@ -106,6 +106,7 @@ from ..utils import (
     data_to_df,
     extract_from_output,
     filter_hyperparameters,
+    get_available_devices,
     get_config,
     get_dir_ckpt_paths,
     get_fit_complete_message,
@@ -141,7 +142,6 @@ from ..utils import (
     update_hyperparameters,
     update_tabular_config_by_resources,
     upgrade_config,
-    get_available_devices,
 )
 
 pl_logger = logging.getLogger("lightning")
