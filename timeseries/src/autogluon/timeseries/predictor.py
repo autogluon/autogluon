@@ -16,7 +16,7 @@ from autogluon.timeseries import __version__ as current_ag_version
 from autogluon.timeseries.configs import TIMESERIES_PRESETS_CONFIGS
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
 from autogluon.timeseries.learner import AbstractLearner, TimeSeriesLearner
-from autogluon.timeseries.metrics import TimeSeriesScorer
+from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
 from autogluon.timeseries.splitter import ExpandingWindowSplitter
 from autogluon.timeseries.trainer import AbstractTimeSeriesTrainer
 
@@ -168,15 +168,7 @@ class TimeSeriesPredictor:
             if std_freq != str(self.freq):
                 logger.info(f"Frequency '{self.freq}' stored as '{std_freq}'")
             self.freq = std_freq
-        # TODO: Change to DeprecationWarning, make sure it's displayed correctly https://github.com/autogluon/autogluon/issues/3465
-        if isinstance(eval_metric, str) and eval_metric == "mean_wQuantileLoss":
-            # We don't use warnings.warn since DeprecationWarning may be silenced by the Python warning filters
-            logger.warning(
-                "DeprecationWarning: Evaluation metric 'mean_wQuantileLoss' has been renamed to 'WQL'. "
-                "Support for the old name will be removed in v1.1.",
-            )
-            eval_metric = "WQL"
-        self.eval_metric = eval_metric
+        self.eval_metric = check_get_evaluation_metric(eval_metric)
         self.eval_metric_seasonal_period = eval_metric_seasonal_period
         if quantile_levels is None:
             quantile_levels = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
@@ -795,14 +787,11 @@ class TimeSeriesPredictor:
         scores_dict : Dict[str, float]
             Dictionary where keys = metrics, values = performance along each metric. For consistency, error metrics
             will have their signs flipped to obey this convention. For example, negative MAPE values will be reported.
+            To get the ``eval_metric`` score, do ``output[predictor.eval_metric.name]``.
         """
         data = self._check_and_prepare_data_frame(data)
         self._check_data_for_evaluation(data)
-        return self._learner.score(data, model=model, metrics=metrics, use_cache=use_cache)
-
-    def score(self, data: Union[TimeSeriesDataFrame, pd.DataFrame, str], **kwargs) -> Dict[str, float]:
-        """See, :meth:`~autogluon.timeseries.TimeSeriesPredictor.evaluate`."""
-        return self.evaluate(data, **kwargs)
+        return self._learner.evaluate(data, model=model, metrics=metrics, use_cache=use_cache)
 
     @classmethod
     def _load_version_file(cls, path: str) -> str:

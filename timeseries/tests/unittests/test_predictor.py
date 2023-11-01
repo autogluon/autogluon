@@ -309,7 +309,7 @@ def test_given_model_fails_when_predictor_scores_then_exception_is_raised(temp_m
     with mock.patch("autogluon.timeseries.models.local.statsforecast.ETSModel.predict") as arima_predict:
         arima_predict.side_effect = RuntimeError("Numerical error")
         with pytest.raises(RuntimeError, match="Following models failed to predict: \\['ETS'\\]"):
-            predictor.score(DUMMY_TS_DATAFRAME)
+            predictor.evaluate(DUMMY_TS_DATAFRAME)
 
 
 def test_given_no_searchspace_and_hyperparameter_tune_kwargs_when_predictor_fits_then_exception_is_raised(
@@ -473,7 +473,7 @@ def test_given_data_is_in_dataframe_format_then_predictor_works(temp_model_path)
     predictor = TimeSeriesPredictor(path=temp_model_path)
     predictor.fit(df, hyperparameters={"Naive": {}})
     predictor.leaderboard(df)
-    predictor.score(df)
+    predictor.evaluate(df)
     predictions = predictor.predict(df)
     assert isinstance(predictions, TimeSeriesDataFrame)
 
@@ -485,7 +485,7 @@ def test_given_data_is_in_str_format_then_predictor_works(temp_model_path):
         predictor = TimeSeriesPredictor(path=temp_model_path)
         predictor.fit(df, hyperparameters={"Naive": {}})
         predictor.leaderboard(df)
-        predictor.score(df)
+        predictor.evaluate(df)
         predictions = predictor.predict(df)
         assert isinstance(predictions, TimeSeriesDataFrame)
 
@@ -878,15 +878,16 @@ def test_given_refit_every_n_windows_when_fit_then_model_is_fit_correct_number_o
     assert actual_num_refits == expected_num_refits
 
 
-def test_given_custom_metric_when_creating_predictor_then_predictor_can_score(temp_model_path):
+def test_given_custom_metric_when_creating_predictor_then_predictor_can_evaluate(temp_model_path):
     predictor = TimeSeriesPredictor(path=temp_model_path, eval_metric=CustomMetric())
     predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
-    score = predictor.score(DUMMY_TS_DATAFRAME)
-    assert isinstance(score, float)
+    scores = predictor.evaluate(DUMMY_TS_DATAFRAME)
+    assert isinstance(scores[predictor.eval_metric.name], float)
 
 
-def test_when_custom_metric_passed_to_score_then_predictor_can_score(temp_model_path):
+def test_when_custom_metric_passed_to_score_then_predictor_can_evaluate(temp_model_path):
     predictor = TimeSeriesPredictor(path=temp_model_path, eval_metric="MASE")
     predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
-    score = predictor.score(DUMMY_TS_DATAFRAME, metric=CustomMetric())
-    assert isinstance(score, float)
+    eval_metric = CustomMetric()
+    scores = predictor.evaluate(DUMMY_TS_DATAFRAME, metric=eval_metric)
+    assert isinstance(scores[eval_metric.name], float)

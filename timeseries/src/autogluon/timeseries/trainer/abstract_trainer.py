@@ -817,26 +817,30 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         self,
         data: TimeSeriesDataFrame,
         predictions: TimeSeriesDataFrame,
-        metrics: Optional[Union[str, TimeSeriesScorer, List[Union[str, TimeSeriesScorer]]]] = None,
-    ) -> Dict[str, float]:
+        metric: Union[str, TimeSeriesScorer, None] = None,
+    ) -> float:
         """Compute the score measuring how well the predictions align with the data."""
-        if metrics is None:
-            metrics = [self.eval_metric]
-        if not isinstance(metrics, Iterable):
-            metrics = [metrics]
-        scores_dict = {}
-        for metric in metrics:
-            eval_metric = check_get_evaluation_metric(metric)
-            scores_dict[eval_metric.name] = eval_metric.score(
-                data=data,
-                predictions=predictions,
-                prediction_length=self.prediction_length,
-                target=self.target,
-                seasonal_period=self.eval_metric_seasonal_period,
-            )
-        return scores_dict
+        eval_metric = self.eval_metric if metric is None else check_get_evaluation_metric(metric)
+        return eval_metric.score(
+            data=data,
+            predictions=predictions,
+            prediction_length=self.prediction_length,
+            target=self.target,
+            seasonal_period=self.eval_metric_seasonal_period,
+        )
 
     def score(
+        self,
+        data: TimeSeriesDataFrame,
+        model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
+        metric: Union[str, TimeSeriesScorer, None] = None,
+        use_cache: bool = True,
+    ) -> float:
+        eval_metric = self.eval_metric if metric is None else check_get_evaluation_metric(metric)
+        scores_dict = self.evaluate(data=data, model=model, metrics=[eval_metric], use_cache=use_cache)
+        return scores_dict[eval_metric.name]
+
+    def evaluate(
         self,
         data: TimeSeriesDataFrame,
         model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
@@ -847,7 +851,15 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates_real
         )
         predictions = self.predict(data=past_data, known_covariates=known_covariates, model=model, use_cache=use_cache)
-        return self._score_with_predictions(data=data, predictions=predictions, metrics=metrics)
+        if not isinstance(metrics, Iterable):  # a single metric is provided
+            metrics = [metrics]
+        scores_dict = {}
+        for metric in metrics:
+            eval_metric = self.eval_metric if metric is None else check_get_evaluation_metric(metric)
+            scores_dict[eval_metric.name] = self._score_with_predictions(
+                data=data, predictions=predictions, metric=eval_metric
+            )
+        return scores_dict
 
     def _predict_model(
         self,
