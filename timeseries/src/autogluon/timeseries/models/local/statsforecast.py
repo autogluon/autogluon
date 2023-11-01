@@ -411,12 +411,13 @@ class AbstractStatsForecastIntermittentDemandModel(AbstractStatsForecastModel):
         model_type = self._get_model_type()
         model = model_type(**local_model_args)
 
-        # estimate forecast intervals in-sample by assuming 0-mean Gaussian iid residuals
+        # get residuals for the last window of the time series
         target = time_series.values.ravel()
         calibration_context = target[: -self.prediction_length]
         calibration_forecast = model.forecast(h=self.prediction_length, y=calibration_context)
         residuals = calibration_forecast["mean"] - target[-self.prediction_length :]
 
+        # estimate forecast intervals in-sample by assuming 0-mean Gaussian iid residuals
         stdev_estimate = max(np.sqrt(np.mean(residuals**2)), 1e-5)
         quantile_offsets = {q: sst.norm(0, stdev_estimate).ppf(q) for q in self.quantile_levels}
 
