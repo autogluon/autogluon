@@ -5,7 +5,7 @@ import time
 import traceback
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Type, Union, Iterable
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Type, Union
 
 import networkx as nx
 import numpy as np
