@@ -110,6 +110,9 @@ class EnsembleSelection(AbstractWeightedEnsemble):
             fant_ensemble_prediction = np.zeros(weighted_ensemble_prediction.shape)
             for j, pred in enumerate(predictions):
                 fant_ensemble_prediction[:] = weighted_ensemble_prediction + (1.0 / float(s + 1)) * pred
+                if self.problem_type in ["multiclass", "softclass"]:
+                    # Renormalize
+                    fant_ensemble_prediction[:] = fant_ensemble_prediction / fant_ensemble_prediction.sum(axis=1)[:, np.newaxis]
                 scores[j] = self._calculate_regret(y_true=labels, y_pred_proba=fant_ensemble_prediction, metric=self.metric, sample_weight=sample_weight)
                 if round_scores:
                     scores[j] = scores[j].round(round_decimals)
