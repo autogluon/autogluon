@@ -356,10 +356,12 @@ class IoULoss(nn.Module):
         wiou = 1 - (inter + 1) / (union - inter + 1)
         return (wbce + wiou).mean()
 
+
 class BBCEWithLogitLoss(nn.Module):
-    '''
+    """
     Balanced BCEWithLogitLoss
-    '''
+    """
+
     def __init__(self):
         super(BBCEWithLogitLoss, self).__init__()
 
@@ -368,7 +370,7 @@ class BBCEWithLogitLoss(nn.Module):
             input = input.unsqueeze(1)
         eps = 1e-10
         count_pos = torch.sum(target) + eps
-        count_neg = torch.sum(1. - target)
+        count_neg = torch.sum(1.0 - target)
         ratio = count_neg / count_pos
         w_neg = count_pos / (count_pos + count_neg)
 

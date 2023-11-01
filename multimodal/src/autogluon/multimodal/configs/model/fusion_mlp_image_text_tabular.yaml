@@ -255,7 +255,6 @@ model:
     gt:
       train_transforms:
         - "resize_gt_to_square"
-        # - "random_horizontal_flip"
       val_transforms:
         - "resize_gt_to_square"
     max_img_num_per_col: 1

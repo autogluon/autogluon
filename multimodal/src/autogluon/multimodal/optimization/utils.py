@@ -20,15 +20,11 @@ from ..constants import (
     ACCURACY,
     AUTOMM,
     AVERAGE_PRECISION,
+    BER,
     BINARY,
     BINARY_ACC,
     BINARY_DICE,
     BINARY_IOU,
-    BER,
-    SM,
-    EM,
-    FM,
-    MAE,
     BIT_FIT,
     COLUMN_FEATURES,
     CONTRASTIVE_LOSS,
@@ -37,8 +33,10 @@ from ..constants import (
     CROSS_ENTROPY,
     DETECTION_METRICS,
     DIRECT_LOSS,
+    EM,
     F1,
     FEATURES,
+    FM,
     HIT_RATE,
     IA3,
     IA3_BIAS,
@@ -50,6 +48,7 @@ from ..constants import (
     LORA,
     LORA_BIAS,
     LORA_NORM,
+    MAE,
     MAP,
     MEAN_AVERAGE_PRECISION,
     MULTI_NEGATIVES_SOFTMAX_LOSS,
@@ -71,15 +70,17 @@ from ..constants import (
     RMSE,
     ROC_AUC,
     ROOT_MEAN_SQUARED_ERROR,
+    SM,
     SPEARMANR,
 )
-from .losses import FocalLoss, IoULoss, MultiNegativesSoftmaxLoss, SoftTargetCrossEntropy, BBCEWithLogitLoss
+from . import sod_metric
+from .losses import BBCEWithLogitLoss, FocalLoss, IoULoss, MultiNegativesSoftmaxLoss, SoftTargetCrossEntropy
 from .lr_scheduler import (
     get_cosine_schedule_with_warmup,
     get_linear_schedule_with_warmup,
     get_polynomial_decay_schedule_with_warmup,
 )
-from . import sod_metric
+
 logger = logging.getLogger(__name__)
 
 
@@ -182,6 +183,7 @@ class CustomHitRate(torchmetrics.Metric):
 
         return compute_hit_rate(query_embeddings, response_embeddings, logit_scale)
 
+
 class Balanced_Error_Rate(torchmetrics.Metric):
     """
     Compute the hit rate when doing semantic search between two group of embeddings.
@@ -205,8 +207,11 @@ class Balanced_Error_Rate(torchmetrics.Metric):
 
         labels = (labels * 255) > 125
         logits = (logits * 255) > 125
-        ber = 1 - torchmetrics.Accuracy(task='multiclass', num_classes=2, average='macro', multidim_average='samplewise')(logits, labels)
+        ber = 1 - torchmetrics.Accuracy(
+            task="multiclass", num_classes=2, average="macro", multidim_average="samplewise"
+        )(logits, labels)
         return -torch.mean(ber)
+
 
 class COD(torchmetrics.Metric):
     """
@@ -214,25 +219,21 @@ class COD(torchmetrics.Metric):
     We assume that (a_i, p_i) are a positive pair and (a_i, p_j) for i!=j a negative pair.
     """
 
-    def __init__(
-        self, metric_name: str
-    ):
+    def __init__(self, metric_name: str):
         super().__init__()
         self.add_state("logits", default=[], dist_reduce_fx=None)
         self.add_state("labels", default=[], dist_reduce_fx=None)
         self.metric_name = metric_name
 
-    def update(
-        self, logits, labels
-    ):
+    def update(self, logits, labels):
         self.logits.append(logits)
         self.labels.append(labels)
 
     def compute(self):
-        
+
         logits = torch.cat(self.logits)
         labels = torch.cat(self.labels)
-        
+
         batchsize = labels.shape[0]
 
         metric_FM = sod_metric.Fmeasure()
@@ -244,8 +245,7 @@ class COD(torchmetrics.Metric):
         assert logits.shape == labels.shape
 
         for i in range(batchsize):
-            true, pred = \
-                labels[i, 0].cpu().data.numpy() * 255, logits[i, 0].cpu().data.numpy() * 255
+            true, pred = labels[i, 0].cpu().data.numpy() * 255, logits[i, 0].cpu().data.numpy() * 255
 
             metric_FM.step(pred=pred, gt=true)
             metric_WFM.step(pred=pred, gt=true)
@@ -261,14 +261,15 @@ class COD(torchmetrics.Metric):
             return torch.tensor(metric_WFM.get_results()["wfm"])
         elif self.metric_name == "mae":
             return torch.tensor(metric_MAE.get_results()["mae"])
-    
+
         # fm = metric_FM.get_results()["fm"]
         # wfm = metric_WFM.get_results()["wfm"]
         # sm = metric_SM.get_results()["sm"]
         # em = metric_EM.get_results()["em"]["curve"].mean()
         # mae = metric_MAE.get_results()["mae"]
-        # return 
+        # return
         # return sm, em, wfm, mae
+
 
 def compute_hit_rate(features_a, features_b, logit_scale, top_ks=[1, 5, 10]):
     """

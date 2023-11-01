@@ -5,13 +5,14 @@ import warnings
 from typing import Optional
 
 import torch
+import torch.nn.functional as F
 from omegaconf import DictConfig
 from torch import nn
+from transformers import SamConfig, SamModel
 
 from ..constants import COLUMN, IMAGE, IMAGE_VALID_NUM, LABEL, LOGITS, REAL_WORLD_SEM_SEG
-from .utils import freeze_model_layers, assign_layer_ids
-from transformers import SamModel, SamConfig
-import torch.nn.functional as F
+from .utils import assign_layer_ids, freeze_model_layers
+
 logger = logging.getLogger(__name__)
 
 
@@ -54,13 +55,13 @@ class SAMForRealWorldSemSeg(nn.Module):
 
         self.device = None
         self.name_to_id = {}
-        
+
         self._load_checkpoint(checkpoint_name)
 
         freeze_model_layers(self.model, self.frozen_layers)
 
         self.image_size = self.model.vision_encoder.image_size
-        
+
         # for Binary Semantic Segmentation Tasks.
         self.model.mask_decoder.num_mask_tokens = 1
         mask_token_data = self.model.mask_decoder.mask_tokens.weight.data[0]
@@ -142,7 +143,7 @@ class SAMForRealWorldSemSeg(nn.Module):
             A dictionary with mask predictions.
         """
         rets = self.model(batch[self.image_key], multimask_output=False)
-        pred_masks = rets.pred_masks[:,0,:,:,:]
+        pred_masks = rets.pred_masks[:, 0, :, :, :]
         pred_masks = F.interpolate(pred_masks, batch[self.label_key].size()[-2:], mode="bilinear", align_corners=False)
         if self.training:
             return {self.prefix: {LOGITS: pred_masks}}
@@ -172,7 +173,10 @@ class SAMForRealWorldSemSeg(nn.Module):
             "vision_encoder.patch_embed",
             "vision_encoder.layers",
         )
-        post_encoder_patterns = ("mask_decoder", "vision_encoder.neck", )
+        post_encoder_patterns = (
+            "mask_decoder",
+            "vision_encoder.neck",
+        )
         is_frozen_layer = lambda n: any(bb in n for bb in self.frozen_layers)
         names = [n for n, _ in self.named_parameters() if not is_frozen_layer(n)]
 

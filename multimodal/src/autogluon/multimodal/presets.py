@@ -433,6 +433,7 @@ def object_detection(presets: str = DEFAULT):
 
     return hyperparameters, hyperparameter_tune_kwargs
 
+
 @automm_presets.register()
 def real_world_sem_seg(presets: str = DEFAULT):
     """
@@ -491,6 +492,7 @@ def real_world_sem_seg(presets: str = DEFAULT):
         hyperparameter_tune_kwargs.update(default_hyperparameter_tune_kwargs)
 
     return hyperparameters, hyperparameter_tune_kwargs
+
 
 @automm_presets.register()
 def ocr_text_detection(presets: str = DEFAULT):

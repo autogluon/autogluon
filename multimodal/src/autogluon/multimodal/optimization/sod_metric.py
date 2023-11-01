@@ -4,8 +4,9 @@ import numpy as np
 from scipy.ndimage import convolve
 from scipy.ndimage import distance_transform_edt as bwdist
 
-_EPS = np.spacing(1)    # the different implementation of epsilon (extreme min value) between numpy and matlab
+_EPS = np.spacing(1)  # the different implementation of epsilon (extreme min value) between numpy and matlab
 _TYPE = np.float64
+
 
 def _prepare_data(pred: np.ndarray, gt: np.ndarray) -> tuple:
     """
@@ -303,7 +304,7 @@ class Smeasure(object):
         sigma_xy = np.sum((pred - x) * (gt - y)) / (N - 1)
 
         alpha = 4 * x * y * sigma_xy
-        beta = (x ** 2 + y ** 2) * (sigma_x + sigma_y)
+        beta = (x**2 + y**2) * (sigma_x + sigma_y)
 
         if alpha != 0:
             score = alpha / (beta + _EPS)
@@ -397,9 +398,7 @@ class Emeasure(object):
             results_parts = []
             for i, (part_numel, combination) in enumerate(zip(parts_numel, combinations)):
                 align_matrix_value = (
-                    2
-                    * (combination[0] * combination[1])
-                    / (combination[0] ** 2 + combination[1] ** 2 + _EPS)
+                    2 * (combination[0] * combination[1]) / (combination[0] ** 2 + combination[1] ** 2 + _EPS)
                 )
                 enhanced_matrix_value = (align_matrix_value + 1) ** 2 / 4
                 results_parts.append(enhanced_matrix_value * part_numel)
@@ -440,9 +439,7 @@ class Emeasure(object):
             results_parts = np.empty(shape=(4, 256), dtype=np.float64)
             for i, (part_numel, combination) in enumerate(zip(parts_numel_w_thrs, combinations)):
                 align_matrix_value = (
-                    2
-                    * (combination[0] * combination[1])
-                    / (combination[0] ** 2 + combination[1] ** 2 + _EPS)
+                    2 * (combination[0] * combination[1]) / (combination[0] ** 2 + combination[1] ** 2 + _EPS)
                 )
                 enhanced_matrix_value = (align_matrix_value + 1) ** 2 / 4
                 results_parts[i] = enhanced_matrix_value * part_numel
@@ -451,9 +448,7 @@ class Emeasure(object):
         em = enhanced_matrix_sum / (self.gt_size - 1 + _EPS)
         return em
 
-    def generate_parts_numel_combinations(
-        self, fg_fg_numel, fg_bg_numel, pred_fg_numel, pred_bg_numel
-    ):
+    def generate_parts_numel_combinations(self, fg_fg_numel, fg_bg_numel, pred_fg_numel, pred_bg_numel):
         bg_fg_numel = self.gt_fg_numel - fg_fg_numel
         bg_bg_numel = pred_bg_numel - bg_fg_numel
 

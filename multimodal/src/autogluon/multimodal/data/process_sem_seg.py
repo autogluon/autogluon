@@ -26,6 +26,7 @@ from .collator import PadCollator, StackCollator
 logger = logging.getLogger(__name__)
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
+
 class RealWorldSemSegImageProcessor:
     """
     Prepare image data for the model specified by "prefix". For multiple models requiring image data,
@@ -89,7 +90,7 @@ class RealWorldSemSegImageProcessor:
 
         self.size = model.image_size
         self.mean, self.std = image_mean_std(model.config["image_norm"])
-        
+
         self.normalization = transforms.Normalize(self.mean, self.std)
 
         self.max_img_num_per_col = max_img_num_per_col

@@ -223,7 +223,7 @@ def compute_score(
         bs = len(metric_data[Y_TRUE])
         metric_data[Y_TRUE] = metric_data[Y_TRUE].reshape(bs, -1)
         metric_data[Y_PRED] = metric_data[Y_PRED].reshape(bs, -1)
-        return metric._sign * metric(metric_data[Y_TRUE] > 0., metric_data[Y_PRED] > 0.5)
+        return metric._sign * metric(metric_data[Y_TRUE] > 0.0, metric_data[Y_PRED] > 0.5)
     else:
         try:
             return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED], y_prob=metric_data[Y_PRED_PROB])
