@@ -1,7 +1,10 @@
 import logging
+import traceback
 from typing import Any, Dict, Type
 
+import numpy as np
 import pandas as pd
+import scipy.stats as sst
 
 from .abstract_local_model import AbstractLocalModel
 
@@ -393,31 +396,70 @@ class ThetaModel(AbstractStatsForecastModel):
         return Theta
 
 
-class ADIDAModel(AbstractStatsForecastModel):
+class AbstractStatsForecastIntermittentDemandModel(AbstractStatsForecastModel):
+    allowed_local_model_args = []
+
+    def _update_local_model_args(self, local_model_args: Dict[str, Any]) -> Dict[str, Any]:
+        _ = local_model_args.pop("seasonal_period")
+        return local_model_args
+
+    def _predict_with_local_model(
+        self,
+        time_series: pd.Series,
+        local_model_args: dict,
+    ) -> pd.DataFrame:
+        model_type = self._get_model_type()
+        model = model_type(**local_model_args)
+
+        # estimate forecast intervals in-sample by assuming 0-mean Gaussian iid residuals
+        target = time_series.values.ravel()
+        calibration_context = target[: -self.prediction_length]
+        calibration_forecast = model.forecast(h=self.prediction_length, y=calibration_context)
+        residuals = calibration_forecast["mean"] - target[-self.prediction_length :]
+
+        stdev_estimate = max(np.sqrt(np.mean(residuals**2)), 1e-5)
+        quantile_offsets = {q: sst.norm(0, stdev_estimate).ppf(q) for q in self.quantile_levels}
+
+        # forecast the time series and add the residual distribution to each time step
+        target_minimum = min(0, target.min())
+        forecast = model.forecast(h=self.prediction_length, y=target)
+        predictions = {
+            "mean": forecast["mean"],
+            **{str(q): np.maximum(forecast["mean"] + qo, target_minimum) for q, qo in quantile_offsets.items()},
+        }
+        return pd.DataFrame(predictions)
+
+
+class ADIDAModel(AbstractStatsForecastIntermittentDemandModel):
     def _get_model_type(self):
         from statsforecast.models import ADIDA
+
         return ADIDA
 
 
-class CrostonSBAModel(AbstractStatsForecastModel):
+class CrostonSBAModel(AbstractStatsForecastIntermittentDemandModel):
     def _get_model_type(self):
         from statsforecast.models import CrostonSBA
+
         return CrostonSBA
 
 
-class CrostonOptimizedModel(AbstractStatsForecastModel):
+class CrostonOptimizedModel(AbstractStatsForecastIntermittentDemandModel):
     def _get_model_type(self):
         from statsforecast.models import CrostonOptimized
+
         return CrostonOptimized
 
 
-class CrostonClassicModel(AbstractStatsForecastModel):
+class CrostonClassicModel(AbstractStatsForecastIntermittentDemandModel):
     def _get_model_type(self):
         from statsforecast.models import CrostonClassic
+
         return CrostonClassic
 
 
-class IMAPAModel(AbstractStatsForecastModel):
+class IMAPAModel(AbstractStatsForecastIntermittentDemandModel):
     def _get_model_type(self):
         from statsforecast.models import IMAPA
+
         return IMAPA
