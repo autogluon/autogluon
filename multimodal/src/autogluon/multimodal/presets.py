@@ -452,7 +452,7 @@ def real_world_sem_seg(presets: str = DEFAULT):
     """
     hyperparameters = {
         "model.names": ["sam"],
-        "model.sam.checkpoint_name": "default",
+        "model.sam.checkpoint_name": "facebook/sam-vit-huge",
         "env.batch_size": 1,
         "env.eval_batch_size_ratio": 1,
         "env.strategy": "ddp",
@@ -460,7 +460,7 @@ def real_world_sem_seg(presets: str = DEFAULT):
         "env.num_gpus": -1,
         "env.per_gpu_batch_size": 1,
         "env.num_workers": 4,
-        "env.precision": "16-mixed",
+        "env.precision": "16",
         "optimization.learning_rate": 1e-4,
         "optimization.loss_function": "iou_loss",
         "optimization.lr_decay": 0,
@@ -476,7 +476,7 @@ def real_world_sem_seg(presets: str = DEFAULT):
         "optimization.val_check_interval": 1.0,
         "optimization.check_val_every_n_epoch": 1,
         "optimization.efficient_finetune": "lora",
-        "optimization.lora.module_filter": [".*image_encoder.*attn"],
+        "optimization.lora.module_filter": [".*vision_encoder.*attn"],
         "optimization.lora.filter": ["q", "v"],
         "optimization.extra_trainable_params": [".*mask_decoder"],
         "optimization.lora.r": 3,

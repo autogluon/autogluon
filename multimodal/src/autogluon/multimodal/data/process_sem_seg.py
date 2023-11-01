@@ -26,7 +26,6 @@ from .collator import PadCollator, StackCollator
 logger = logging.getLogger(__name__)
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
-
 class RealWorldSemSegImageProcessor:
     """
     Prepare image data for the model specified by "prefix". For multiple models requiring image data,
@@ -38,7 +37,6 @@ class RealWorldSemSegImageProcessor:
         model: nn.Module,
         model_config: DictConfig,
         norm_type: Optional[str] = None,
-        size: Optional[int] = None,
         max_img_num_per_col: Optional[int] = 1,
         missing_value_strategy: Optional[str] = "zero",
         requires_column_info: bool = False,
@@ -59,8 +57,6 @@ class RealWorldSemSegImageProcessor:
             - clip
                 Normalize image by mean (0.48145466, 0.4578275, 0.40821073) and
                 std (0.26862954, 0.26130258, 0.27577711), used for CLIP.
-        size
-            The provided width / height of a square image.
         max_img_num_per_col
             The maximum number of images one sample can have.
         missing_value_strategy
@@ -90,37 +86,10 @@ class RealWorldSemSegImageProcessor:
         self.prefix = model.prefix
         self.missing_value_strategy = missing_value_strategy
         self.requires_column_info = requires_column_info
-        self.size = None
-        self.mean = None
-        self.std = None
 
-        if model is not None:
-            self.size, self.mean, self.std = self.extract_default(model.config)
-            if size is not None and size != self.size:
-                logger.warn(
-                    f"The model does not support using an image size that is different from the default size. "
-                    f"Provided image size={size}. Default size={self.size}. "
-                    f"Detailed model configuration={model.config}. We have ignored the provided image size."
-                )
-
-        if self.size is None:
-            if size is not None:
-                self.size = size
-                logger.debug(f"using provided image size: {self.size}")
-            else:
-                raise ValueError("image size is missing")
-        else:
-            logger.debug(f"using detected image size: {self.size}")
-
-        if self.mean is None or self.std is None:
-            if norm_type is not None:
-                self.mean, self.std = image_mean_std(norm_type)
-                logger.debug(f"using provided normalization: {norm_type}")
-            else:
-                raise ValueError("image normalization mean and std are missing")
-        else:
-            logger.debug(f"using detected image normalization: {self.mean} and {self.std}")
-
+        self.size = model.image_size
+        self.mean, self.std = image_mean_std(model.config["image_norm"])
+        
         self.normalization = transforms.Normalize(self.mean, self.std)
 
         self.max_img_num_per_col = max_img_num_per_col
@@ -188,31 +157,6 @@ class RealWorldSemSegImageProcessor:
 
         return fn
 
-    def extract_default(self, config=None):
-        """
-        Extract some default hyper-parameters, e.g., image size, mean, and std,
-        from a pre-trained (timm or huggingface) checkpoint.
-
-        Parameters
-        ----------
-        config
-            Config of a pre-trained checkpoint.
-
-        Returns
-        -------
-        image_size
-            Image width/height.
-        mean
-            Image normalization mean.
-        std
-            Image normalizaiton std.
-        """
-
-        image_size = config["image_size"]
-        mean, std = image_mean_std(config["image_norm"])
-
-        return image_size, mean, std
-
     def process_one_sample(
         self,
         image_features: Dict[str, Union[List[str], List[bytearray]]],
@@ -255,7 +199,6 @@ class RealWorldSemSegImageProcessor:
                     "ignore",
                     message=("Palette images with Transparency expressed in bytes should be converted to RGBA images"),
                 )
-                is_zero_img = False
                 try:
                     if feature_modalities.get("image") == IMAGE_BYTEARRAY:
                         image_feature = BytesIO(img_feature)
@@ -267,7 +210,6 @@ class RealWorldSemSegImageProcessor:
                     if self.missing_value_strategy.lower() == "zero":
                         logger.debug(f"Using a zero image due to '{e}'")
                         img = PIL.Image.new(image_mode, (self.size, self.size), color=0)
-                        is_zero_img = True
                     else:
                         raise e
 
@@ -284,18 +226,8 @@ class RealWorldSemSegImageProcessor:
                 img = self.val_processor(img)
                 gt = self.gt_val_processor(gt)
 
-            if is_zero_img:
-                zero_images.append(img)
-            else:
-                images.append(img)
-                gts.append(gt)
-
-        # if self.requires_column_info:
-        #     # only count the valid images since they are put ahead of the zero images in the below returning
-        #     ret[f"{self.image_column_prefix}_{per_col_name}"] = np.array(
-        #         [column_start, len(images)], dtype=np.int64
-        #     )
-        #     column_start = len(images)
+            images.append(img)
+            gts.append(gt)
 
         ret.update(
             {

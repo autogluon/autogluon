@@ -204,7 +204,7 @@ def create_data_processor(
         )
     elif data_type == REAL_WORLD_SEM_SEG_IMG:
         data_processor = RealWorldSemSegImageProcessor(
-            model=model, model_config=model_config, norm_type=model_config.image_norm, size=model_config.image_size
+            model=model, model_config=model_config, norm_type=model_config.image_norm
         )
     else:
         raise ValueError(f"unknown data type: {data_type}")

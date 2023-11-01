@@ -426,3 +426,45 @@ def customized_binary_roc_auc_score(y_true: Union[np.array, pd.Series], y_score:
     fpr = fps / fps[-1]
     tpr = tps / tps[-1]
     return np.trapz(tpr, fpr)
+
+def BER(y_true: np.array, y_score: np.array) -> float:
+    res = []
+    for t, p in zip(y_true, y_score):
+        t = ((t * 255) > 125).reshape(-1)
+        p = ((p * 255) > 125).reshape(-1)
+    
+        res.append(1 - balanced_accuracy(t, p))
+    return np.mean(res)
+
+def COD(y_true: np.array, y_score: np.array, **kwargs) -> float:
+    from multimodal.src.autogluon.multimodal.optimization import sod_metric
+    metric_name = kwargs['metric_name']
+
+    batchsize = y_true.shape[0]
+
+    metric_FM = sod_metric.Fmeasure()
+    metric_WFM = sod_metric.WeightedFmeasure()
+    metric_SM = sod_metric.Smeasure()
+    metric_EM = sod_metric.Emeasure()
+    metric_MAE = sod_metric.MAE()
+
+    assert y_score.shape == y_true.shape
+
+    for i in range(batchsize):
+        true, pred = \
+            y_true[i, 0] * 255, y_score[i, 0] * 255
+
+        metric_FM.step(pred=pred, gt=true)
+        metric_WFM.step(pred=pred, gt=true)
+        metric_SM.step(pred=pred, gt=true)
+        metric_EM.step(pred=pred, gt=true)
+        metric_MAE.step(pred=pred, gt=true)
+
+    if metric_name == "sm":
+        return metric_SM.get_results()["sm"]
+    elif metric_name == "em":
+        return metric_EM.get_results()["em"]["curve"].mean()
+    elif metric_name == "fm":
+        return metric_WFM.get_results()["wfm"]
+    elif metric_name == "mae":
+        return metric_MAE.get_results()["mae"]

@@ -11,7 +11,7 @@ from torch import nn
 
 from autogluon.common.utils.resource_utils import ResourceManager
 
-from ..constants import DDP, OBJECT_DETECTION, OCR, REAL_WORLD_SEM_SEG
+from ..constants import DDP, OBJECT_DETECTION, OCR
 
 logger = logging.getLogger(__name__)
 
@@ -273,14 +273,6 @@ def check_if_packages_installed(problem_type: str = None, package_names: List[st
                     raise ValueError(
                         f'Encountered error while importing mmocr: {e}. Try to install mmocr: pip install "mmocr<1.0".'
                     )
-        elif problem_type == REAL_WORLD_SEM_SEG:
-            try:
-                import segment_anything
-            except ImportError as e:
-                raise ValueError(
-                    f'Encountered error while importing segment anything: {e}. Try to install segment anything: pip install "git+https://github.com/facebookresearch/segment-anything.git".'
-                )
-
     if package_names:
         for package_name in package_names:
             if package_name == "mmcv":

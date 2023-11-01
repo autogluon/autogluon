@@ -14,8 +14,7 @@ except:
 
 from ..constants import BINARY, MULTICLASS, QUANTILE, REGRESSION, SOFTCLASS
 from . import classification_metrics, quantile_metrics
-from .classification_metrics import confusion_matrix
-
+from .classification_metrics import confusion_matrix, BER, COD
 
 class Scorer(object, metaclass=ABCMeta):
     """
@@ -482,9 +481,14 @@ recall = make_scorer("recall", sklearn.metrics.recall_score)
 # Register other metrics
 quadratic_kappa = make_scorer("quadratic_kappa", classification_metrics.quadratic_kappa, needs_proba=False)
 
-binary_iou = make_scorer("binary_iou", sklearn.metrics.jaccard_score, needs_proba=False)
+binary_iou = make_scorer("binary_iou", sklearn.metrics.jaccard_score, average='samples', needs_proba=False)
 binary_dice = make_scorer("binary_dice", scipy.spatial.distance.dice, needs_proba=False)
-
+binary_acc = make_scorer("binary_acc", sklearn.metrics.accuracy_score)
+ber = make_scorer("ber", BER)
+sm = make_scorer("sm", COD, metric_name="sm")
+fm = make_scorer("fm", COD, metric_name="fm")
+em = make_scorer("em", COD, metric_name="em")
+mae = make_scorer("mae", COD, metric_name="mae")
 
 def customized_log_loss(y_true, y_pred, eps=1e-15):
     """
@@ -561,6 +565,11 @@ for scorer in [
     average_precision,
     binary_iou,
     binary_dice,
+    ber,
+    sm,
+    fm,
+    em,
+    mae
 ]:
     _add_scorer_to_metric_dict(metric_dict=BINARY_METRICS, scorer=scorer)
 

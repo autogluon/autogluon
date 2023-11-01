@@ -24,6 +24,11 @@ from ..constants import (
     BINARY_ACC,
     BINARY_DICE,
     BINARY_IOU,
+    BER,
+    SM,
+    EM,
+    FM,
+    MAE,
     BIT_FIT,
     COLUMN_FEATURES,
     CONTRASTIVE_LOSS,
@@ -68,13 +73,13 @@ from ..constants import (
     ROOT_MEAN_SQUARED_ERROR,
     SPEARMANR,
 )
-from .losses import FocalLoss, IoULoss, MultiNegativesSoftmaxLoss, SoftTargetCrossEntropy
+from .losses import FocalLoss, IoULoss, MultiNegativesSoftmaxLoss, SoftTargetCrossEntropy, BBCEWithLogitLoss
 from .lr_scheduler import (
     get_cosine_schedule_with_warmup,
     get_linear_schedule_with_warmup,
     get_polynomial_decay_schedule_with_warmup,
 )
-
+from . import sod_metric
 logger = logging.getLogger(__name__)
 
 
@@ -130,6 +135,8 @@ def get_loss_func(
     elif problem_type == REAL_WORLD_SEM_SEG:
         if "iou_loss" in loss_func_name.lower():
             loss_func = IoULoss()
+        elif "balanced_bce" in loss_func_name.lower():
+            loss_func = BBCEWithLogitLoss()
         else:
             loss_func = nn.BCEWithLogitsLoss()
     elif problem_type is None:
@@ -175,6 +182,93 @@ class CustomHitRate(torchmetrics.Metric):
 
         return compute_hit_rate(query_embeddings, response_embeddings, logit_scale)
 
+class Balanced_Error_Rate(torchmetrics.Metric):
+    """
+    Compute the hit rate when doing semantic search between two group of embeddings.
+    We assume that (a_i, p_i) are a positive pair and (a_i, p_j) for i!=j a negative pair.
+    """
+
+    def __init__(
+        self,
+    ):
+        super().__init__()
+        self.add_state("logits", default=[], dist_reduce_fx=None)
+        self.add_state("labels", default=[], dist_reduce_fx=None)
+
+    def update(self, logits, labels):
+        self.logits.append(logits)
+        self.labels.append(labels)
+
+    def compute(self):
+        logits = torch.cat(self.logits).cpu()
+        labels = torch.cat(self.labels).cpu()
+
+        labels = (labels * 255) > 125
+        logits = (logits * 255) > 125
+        ber = 1 - torchmetrics.Accuracy(task='multiclass', num_classes=2, average='macro', multidim_average='samplewise')(logits, labels)
+        return -torch.mean(ber)
+
+class COD(torchmetrics.Metric):
+    """
+    Compute the hit rate when doing semantic search between two group of embeddings.
+    We assume that (a_i, p_i) are a positive pair and (a_i, p_j) for i!=j a negative pair.
+    """
+
+    def __init__(
+        self, metric_name: str
+    ):
+        super().__init__()
+        self.add_state("logits", default=[], dist_reduce_fx=None)
+        self.add_state("labels", default=[], dist_reduce_fx=None)
+        self.metric_name = metric_name
+
+    def update(
+        self, logits, labels
+    ):
+        self.logits.append(logits)
+        self.labels.append(labels)
+
+    def compute(self):
+        
+        logits = torch.cat(self.logits)
+        labels = torch.cat(self.labels)
+        
+        batchsize = labels.shape[0]
+
+        metric_FM = sod_metric.Fmeasure()
+        metric_WFM = sod_metric.WeightedFmeasure()
+        metric_SM = sod_metric.Smeasure()
+        metric_EM = sod_metric.Emeasure()
+        metric_MAE = sod_metric.MAE()
+
+        assert logits.shape == labels.shape
+
+        for i in range(batchsize):
+            true, pred = \
+                labels[i, 0].cpu().data.numpy() * 255, logits[i, 0].cpu().data.numpy() * 255
+
+            metric_FM.step(pred=pred, gt=true)
+            metric_WFM.step(pred=pred, gt=true)
+            metric_SM.step(pred=pred, gt=true)
+            metric_EM.step(pred=pred, gt=true)
+            metric_MAE.step(pred=pred, gt=true)
+
+        if self.metric_name == "sm":
+            return torch.tensor(metric_SM.get_results()["sm"])
+        elif self.metric_name == "em":
+            return torch.tensor(metric_EM.get_results()["em"]["curve"].mean())
+        elif self.metric_name == "fm":
+            return torch.tensor(metric_WFM.get_results()["wfm"])
+        elif self.metric_name == "mae":
+            return torch.tensor(metric_MAE.get_results()["mae"])
+    
+        # fm = metric_FM.get_results()["fm"]
+        # wfm = metric_WFM.get_results()["wfm"]
+        # sm = metric_SM.get_results()["sm"]
+        # em = metric_EM.get_results()["em"]["curve"].mean()
+        # mae = metric_MAE.get_results()["mae"]
+        # return 
+        # return sm, em, wfm, mae
 
 def compute_hit_rate(features_a, features_b, logit_scale, top_ks=[1, 5, 10]):
     """
@@ -294,7 +388,11 @@ def get_metric(
     elif metric_name == BINARY_DICE:
         return torchmetrics.Dice(multiclass=False), None
     elif metric_name == BINARY_ACC:
-        return torchmetrics.Accuracy(task="binary"), None
+        return torchmetrics.classification.BinaryAccuracy(), None
+    elif metric_name == BER:
+        return Balanced_Error_Rate(), None
+    elif metric_name in [SM, EM, FM, MAE]:
+        return COD(metric_name=metric_name), None
     else:
         raise ValueError(f"Unknown metric {metric_name}")
 

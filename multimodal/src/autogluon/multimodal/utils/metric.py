@@ -15,6 +15,7 @@ from ..constants import (
     AVERAGE_PRECISION,
     BINARY,
     BINARY_DICE,
+    BINARY_IOU,
     DIRECT_LOSS,
     F1,
     MAP,
@@ -218,6 +219,11 @@ def compute_score(
         return f1_score(metric_data[Y_TRUE], metric_data[Y_PRED], pos_label=pos_label)
     elif metric.name == BINARY_DICE:
         return 1 - metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED])
+    elif metric.name == BINARY_IOU:
+        bs = len(metric_data[Y_TRUE])
+        metric_data[Y_TRUE] = metric_data[Y_TRUE].reshape(bs, -1)
+        metric_data[Y_PRED] = metric_data[Y_PRED].reshape(bs, -1)
+        return metric._sign * metric(metric_data[Y_TRUE] > 0., metric_data[Y_PRED] > 0.5)
     else:
         try:
             return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED], y_prob=metric_data[Y_PRED_PROB])

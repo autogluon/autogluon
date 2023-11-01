@@ -9,15 +9,16 @@ from omegaconf import DictConfig
 from torch import nn
 
 from ..constants import COLUMN, IMAGE, IMAGE_VALID_NUM, LABEL, LOGITS, REAL_WORLD_SEM_SEG
-from .utils import freeze_model_layers, lookup_mmdet_config, update_mmdet_config
-
+from .utils import freeze_model_layers, assign_layer_ids
+from transformers import SamModel, SamConfig
+import torch.nn.functional as F
 logger = logging.getLogger(__name__)
 
 
 class SAMForRealWorldSemSeg(nn.Module):
     """
     Support SAM for binary real-world semantic segmentation.
-    Refer to https://github.com/facebookresearch/segment-anything
+    Refer to https://huggingface.co/docs/transformers/main/model_doc/sam
     """
 
     def __init__(
@@ -25,74 +26,55 @@ class SAMForRealWorldSemSeg(nn.Module):
         prefix: str,
         checkpoint_name: str,
         config: DictConfig,
-        classes: Optional[list] = None,
         pretrained: Optional[bool] = True,
         frozen_layers: Optional[list] = None,
     ):
         """
-        Load a pretrained object detector from MMdetection.
+        Load a pretrained Segment Anything Model (SAM).
 
         Parameters
         ----------
         prefix
-            The prefix of the MMdetAutoModelForObjectDetection model.
+            The prefix of the SAMForRealWorldSemSeg model.
         checkpoint_name
-            Name of the mmdet checkpoint.
-        classes
-            All classes in this dataset.
+            Name of the SAM checkpoint.
         pretrained
-            Whether using the pretrained mmdet models. If pretrained=True, download the pretrained model.
+            Whether using the pretrained SAM models. If pretrained=True, download the pretrained model.
+        frozen_layers
+            A list of substrings of frozen layers' names.
         """
-        from ..utils import check_if_packages_installed
-
-        check_if_packages_installed(problem_type=REAL_WORLD_SEM_SEG)
 
         super().__init__()
         self.prefix = prefix
         self.pretrained = pretrained
-        self.checkpoint = None
         self.checkpoint_name = checkpoint_name
         self.config = config
-        self.classes = classes
         self.frozen_layers = frozen_layers
         self.config_file = config
 
         self.device = None
         self.name_to_id = {}
-
-        # TODO: Config only init (without checkpoint)
-
-        self._get_checkpoint_and_config_file(checkpoint_name=checkpoint_name, config_file=None)
-        # self._load_config()
-
-        # self._update_classes(classes)
-        self._load_checkpoint(self.checkpoint_file)
+        
+        self._load_checkpoint(checkpoint_name)
 
         freeze_model_layers(self.model, self.frozen_layers)
 
-        setattr(self.model, "forward", self.bound_forward_method)
-
+        self.image_size = self.model.vision_encoder.image_size
+        
+        # for Binary Semantic Segmentation Tasks.
         self.model.mask_decoder.num_mask_tokens = 1
         mask_token_data = self.model.mask_decoder.mask_tokens.weight.data[0]
-        self.model.mask_decoder.mask_tokens = nn.Embedding(1, self.model.mask_decoder.transformer_dim)
+        self.model.mask_decoder.mask_tokens = nn.Embedding(1, self.model.mask_decoder.hidden_size)
         self.model.mask_decoder.mask_tokens.weight.data[0] = mask_token_data
         hyper_mlps = self.model.mask_decoder.output_hypernetworks_mlps[0]
         self.model.mask_decoder.output_hypernetworks_mlps = nn.ModuleList([hyper_mlps])
 
-    def _reset_classes(self, classes: list):
-        temp_ckpt_file = f"temp_ckpt_{int(time.time()*1000)}.pth"
-        self._save_weights(temp_ckpt_file)
-        self._update_classes(classes)
-        self._load_checkpoint()
-        os.remove(temp_ckpt_file)
-
-    def _update_classes(self, classes: Optional[list] = None):
-        return
-
-    def _load_checkpoint(self, checkpoint_file):
-        from segment_anything import sam_model_registry
-
-        self.model = sam_model_registry[self.checkpoint_name](checkpoint=checkpoint_file)
+    def _load_checkpoint(self, checkpoint_name):
+        if self.pretrained:
+            self.model = SamModel.from_pretrained(checkpoint_name)
+        else:
+            configuration = SamConfig(name_or_path=checkpoint_name)
+            self.model = SamModel(configuration)
 
     def set_data_preprocessor_device(self):
         if not self.device:
@@ -101,7 +83,6 @@ class SAMForRealWorldSemSeg(nn.Module):
             self.data_preprocessor.to(self.device)
 
     def save(self, save_path: str = "./", tokenizers: Optional[dict] = None):
-
         weights_save_path = os.path.join(save_path, "model.pth")
         configs_save_path = os.path.join(save_path, "config.py")
 
@@ -114,70 +95,13 @@ class SAMForRealWorldSemSeg(nn.Module):
         if not save_path:
             save_path = f"./{self.checkpoint_name}_autogluon.pth"
 
-        torch.save({"state_dict": self.model.state_dict(), "meta": {"CLASSES": self.model.CLASSES}}, save_path)
+        torch.save({"state_dict": self.model.state_dict()}, save_path)
 
     def _save_configs(self, save_path=None):
         if not save_path:
             save_path = f"./{self.checkpoint_name}_autogluon.py"
 
         self.config.dump(save_path)
-
-    def _get_checkpoint_and_config_file(self, checkpoint_name: str = None, config_file: str = None):
-        from mim.commands import download as mimdownload
-
-        from ..utils import download, get_pretrain_configs_dir
-
-        logger.debug(f"initializing {checkpoint_name}")
-
-        if not checkpoint_name:
-            checkpoint_name = self.checkpoint_name
-        # if not config_file:
-        #     config_file = self.config_file
-
-        AG_CUSTOM_MODELS = {
-            "default": {
-                "url": "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth",
-                "config_file": "",
-            },
-            "vit_h": {
-                "url": "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth",
-                "config_file": "",
-            },
-        }
-
-        if os.path.isfile(checkpoint_name):
-            checkpoint_file = checkpoint_name
-        elif os.path.isdir(checkpoint_name):
-            checkpoint_file = os.path.join(checkpoint_name, "model.pth")
-            config_file = os.path.join(checkpoint_name, "config.py")
-        else:
-            if checkpoint_name in AG_CUSTOM_MODELS:
-                # TODO: add sha1_hash
-                checkpoint_file = download(
-                    url=AG_CUSTOM_MODELS[checkpoint_name]["url"],
-                )
-                if (
-                    "source" in AG_CUSTOM_MODELS[checkpoint_name]
-                    and AG_CUSTOM_MODELS[checkpoint_name]["source"] == "MegVii"
-                ):
-                    checkpoint_file = self.convert_megvii_yolox(checkpoint_file)
-        if config_file:
-            if not os.path.isfile(config_file):
-                raise ValueError(f"Invalid checkpoint_name ({checkpoint_name}) or config_file ({config_file}): ")
-        else:
-            if checkpoint_name in AG_CUSTOM_MODELS:
-                config_file = AG_CUSTOM_MODELS[checkpoint_name]["config_file"]
-            else:
-                try:
-                    # download config and checkpoint files using openmim
-                    mimdownload(package="mmdet", configs=[checkpoint_name], dest_root=".")
-                    config_file = checkpoint_name + ".py"
-                except Exception as e:
-                    raise ValueError(f"Invalid checkpoint_name ({checkpoint_name}) or config_file ({config_file}): ")
-
-        self.checkpoint_name = checkpoint_name
-        self.checkpoint_file = checkpoint_file
-        self.config_file = config_file
 
     def _load_config(self):
         return
@@ -205,7 +129,6 @@ class SAMForRealWorldSemSeg(nn.Module):
     def forward(
         self,
         batch,
-        # mode,
     ):
         """
         Parameters
@@ -213,43 +136,56 @@ class SAMForRealWorldSemSeg(nn.Module):
         batch
             A dictionary containing the input mini-batch data.
             We need to use the keys with the model prefix to index required data.
-        mode
-            "loss" or "predict". TODO: support "tensor"
-            https://github.com/open-mmlab/mmdetection/blob/main/mmdet/models/detectors/base.py#L58C1
 
         Returns
         -------
-            A dictionary with bounding boxes.
+            A dictionary with mask predictions.
         """
-        rets = self.model(batch[self.image_key])
+        rets = self.model(batch[self.image_key], multimask_output=False)
+        pred_masks = rets.pred_masks[:,0,:,:,:]
+        pred_masks = F.interpolate(pred_masks, batch[self.label_key].size()[-2:], mode="bilinear", align_corners=False)
         if self.training:
-            return {self.prefix: {LOGITS: rets}}
+            return {self.prefix: {LOGITS: pred_masks}}
         else:
-            return {self.prefix: {LOGITS: rets, LABEL: batch[self.label_key]}}
+            return {self.prefix: {LOGITS: pred_masks, LABEL: batch[self.label_key]}}
 
     def _parse_losses(self, losses):
         return self.model._parse_losses(losses)
 
-    def bound_forward_method(self, x):
-        sparse_embeddings, dense_embeddings = self.model.prompt_encoder(points=None, boxes=None, masks=None)
-        if hasattr(self.model.image_encoder, "model"):  # for lora only
-            self.features = self.model.image_encoder.model(x)
-        else:
-            self.features = self.model.image_encoder(x)
-
-        # Predict masks
-        low_res_masks, iou_predictions = self.model.mask_decoder(
-            image_embeddings=self.features,
-            image_pe=self.model.prompt_encoder.get_dense_pe(),
-            sparse_prompt_embeddings=sparse_embeddings,
-            dense_prompt_embeddings=dense_embeddings,
-            multimask_output=False,
-        )
-
-        input_size = x.size()[-2:]
-        masks = self.model.postprocess_masks(low_res_masks, input_size, input_size)
-
-        return masks
-
     def get_layer_ids(self):
-        return {}
+        """
+        Assign an id to each layer. Layer ids will be used in layer-wise lr decay.
+        Basically, id gradually increases when going from the output end to
+        the input end. The layers defined in this class, e.g., head, have id 0.
+
+        In the AutoModel scenario, this function may not always return the correct result.
+        Thus, you can use "print(json.dumps(name_to_id, indent=2))" to manually check whether
+        the layer ids are reasonable.
+
+        Returns
+        -------
+        A dictionary mapping the layer names (keys) to their ids (values).
+        """
+        model_prefix = "model"
+        pre_encoder_patterns = (
+            "vision_encoder.pos_embed",
+            "vision_encoder.patch_embed",
+            "vision_encoder.layers",
+        )
+        post_encoder_patterns = ("mask_decoder", "vision_encoder.neck", )
+        is_frozen_layer = lambda n: any(bb in n for bb in self.frozen_layers)
+        names = [n for n, _ in self.named_parameters() if not is_frozen_layer(n)]
+
+        name_to_id, names = assign_layer_ids(
+            names=names,
+            pre_encoder_patterns=pre_encoder_patterns,
+            post_encoder_patterns=post_encoder_patterns,
+            model_pre=model_prefix,
+        )
+        if len(names) > 0:
+            logger.debug(f"outer layers are treated as head: {names}")
+        for n in names:
+            assert n not in name_to_id
+            name_to_id[n] = 0
+
+        return name_to_id

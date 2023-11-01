@@ -240,18 +240,16 @@ model:
     pooling_mode: "cls"
 
   sam:
-    checkpoint_name: "default"
+    checkpoint_name: "facebook/sam-vit-huge"
     config_file: ""
     image_norm: "imagenet"
     data_types:
-      # - "image"
       - "real_world_sem_seg_img"
     aug:
       - "random_horizontal_flip"
     image:
       train_transforms:
         - "resize_to_square"
-        # - "random_horizontal_flip"
       val_transforms:
         - "resize_to_square"
     gt:
@@ -260,5 +258,5 @@ model:
         # - "random_horizontal_flip"
       val_transforms:
         - "resize_gt_to_square"
-    image_size: 1024
     max_img_num_per_col: 1
+    frozen_layers: ["mask_decoder.iou_prediction_head", "prompt_encoder"]
