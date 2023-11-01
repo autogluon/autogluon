@@ -98,7 +98,7 @@ class TimeSeriesPredictor:
     quantile_levels : List[float], optional
         List of increasing decimals that specifies which quantiles should be estimated when making distributional
         forecasts. Defaults to ``[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]``.
-    path : str or Path, optional
+    path : str or pathlib.Path, optional
         Path to the directory where models and intermediate outputs will be saved. Defaults to a timestamped folder
         ``AutogluonModels/ag-[TIMESTAMP]`` that will be created in the working directory.
     verbosity : int, default = 2
@@ -806,7 +806,7 @@ class TimeSeriesPredictor:
 
         Parameters
         ----------
-        path : str or Path
+        path : str or pathlib.Path
             Path where the predictor was saved via :meth:`~autogluon.timeseries.TimeSeriesPredictor.save`.
         require_version_match : bool, default = True
             If True, will raise an AssertionError if the ``autogluon.timeseries`` version of the loaded predictor does
