@@ -73,9 +73,9 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 ]
 
     static_features : Optional[pd.DataFrame]
-        An optional data frame describing the time-independent attributes of each individual time series. These can be
-        real-valued or categorical. For example, if ``TimeSeriesDataFrame`` contains sales of various products, static
-        features may refer to time-independent features like color or brand.
+        An optional data frame describing the metadata of each individual time series that does not change with time.
+        Can take real-valued or categorical values. For example, if ``TimeSeriesDataFrame`` contains sales of various
+        products, static features may refer to time-independent features like color or brand.
 
         The index of the ``static_features`` index must contain a single entry for each item present in the respective
         ``TimeSeriesDataFrame``. For example, the following ``TimeSeriesDataFrame``::
