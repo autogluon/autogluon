@@ -34,7 +34,7 @@ jobs:
         run: |
           /bin/bash CI/bench/generate_amlb_user_dir.sh ${{ matrix.AG_MODULE }} ${{ github.repository }} ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
 
-  # benchmark-tabular:
+  # benchmark-tabular: test comment
   #   needs: generate_amlb_user_dir
   #   runs-on: ubuntu-latest
   #   defaults:
