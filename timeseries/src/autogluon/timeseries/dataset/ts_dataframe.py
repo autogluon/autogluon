@@ -8,7 +8,6 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any, List, Optional, Tuple, Type, Union
 
-import numpy as np
 import pandas as pd
 from joblib.parallel import Parallel, delayed
 from pandas.core.internals import ArrayManager, BlockManager
@@ -128,7 +127,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
         List of unique time series IDs contained in the data set.
     """
 
-    DUMMY_INDEX_START_TIME = pd.Timestamp("1900-01-01 00:00:00")
     index: pd.MultiIndex
     _metadata = ["_static_features", "_cached_freq"]
 
@@ -687,79 +685,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
         except Exception as err:  # noqa
             raise IOError(f"Could not load pickled data set due to error: {str(err)}")
 
-    @Deprecated(min_version_to_warn="0.9", min_version_to_error="1.0")
-    def get_reindexed_view(self, freq: str = "S") -> TimeSeriesDataFrame:
-        """Returns a new TimeSeriesDataFrame object with the same underlying data and
-        static features as the current data frame, except the time index is replaced by
-        a new "dummy" time series index with the given frequency. This is useful when
-        suggesting AutoGluon-TimeSeries to "ignore" the time information, for example when
-        dealing with irregularly sampled time series or sequences (e.g., financial time
-        series).
-
-        Parameters
-        ----------
-        freq: str
-            Frequency string of the new time series data index.
-
-        Returns
-            TimeSeriesDataFrame: the new view object with replaced index, but the same underlying
-            data. Note that the underlying data is not copied.
-        """
-        df_view = self.iloc[:]  # return a view without copying data
-
-        # build the surrogate index
-        indexes = []
-        for i in self.item_ids:
-            idx = pd.MultiIndex.from_product(
-                [(i,), pd.date_range(self.DUMMY_INDEX_START_TIME, periods=len(self.loc[i]), freq=freq)]
-            )
-            indexes.append(idx)
-
-        new_index = pd.MultiIndex.from_tuples(np.concatenate(indexes), names=[ITEMID, TIMESTAMP])
-        df_view.set_index(new_index, inplace=True)
-        df_view._cached_freq = freq
-
-        return df_view
-
-    @Deprecated(min_version_to_warn="0.9", min_version_to_error="1.0", new="convert_frequency")
-    def to_regular_index(self, freq: str) -> TimeSeriesDataFrame:
-        """Fill the gaps in an irregularly-sampled time series with NaNs.
-
-        Parameters
-        ----------
-        freq: str
-            Frequency string of the new time series data index.
-
-        Examples
-        --------
-        >>> ts_df
-                            target
-        item_id timestamp
-        0       2019-01-01     NaN
-                2019-01-03     1.0
-                2019-01-06     2.0
-                2019-01-07     NaN
-        1       2019-02-04     3.0
-                2019-02-07     4.0
-
-        >>> ts_df.to_regular_index(freq="D")
-                            target
-        item_id timestamp
-        0       2019-01-01     NaN
-                2019-01-02     NaN
-                2019-01-03     1.0
-                2019-01-04     NaN
-                2019-01-05     NaN
-                2019-01-06     2.0
-                2019-01-07     NaN
-        1       2019-02-04     3.0
-                2019-02-05     NaN
-                2019-02-06     NaN
-                2019-02-07     4.0
-
-        """
-        return self.convert_frequency(freq=freq)
-
     def fill_missing_values(self, method: str = "auto", value: float = 0.0) -> TimeSeriesDataFrame:
         """Fill missing values represented by NaN.
 
@@ -812,7 +737,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         if self.freq is None:
             raise ValueError(
                 "Please make sure that all time series have a regular index before calling `fill_missing_values`"
-                "(for example, using the `to_regular_index` method)."
+                "(for example, using the `convert_frequency` method)."
             )
 
         grouped_df = pd.DataFrame(self).groupby(level=ITEMID, sort=False, group_keys=False)
@@ -1020,3 +945,23 @@ class TimeSeriesDataFrame(pd.DataFrame):
         )
         resampled_df.static_features = self.static_features
         return resampled_df
+
+    def __dir__(self) -> List[str]:
+        # This hides method from IPython autocomplete, but not VSCode autocomplete
+        deprecated = ["get_reindexed_view", "to_regular_index"]
+        return [d for d in super().__dir__() if d not in deprecated]
+
+    @Deprecated(
+        min_version_to_warn="1.0",
+        min_version_to_error="1.0",
+        custom_warning_msg=(
+            "`get_reindexed_view` has been deprecated. If your data has irregular timestamps, please "
+            "convert it to a regular frequency with `convert_frequency`."
+        ),
+    )
+    def get_reindexed_view(self, freq: str = "S") -> TimeSeriesDataFrame:
+        raise NotImplementedError
+
+    @Deprecated(min_version_to_warn="1.0", min_version_to_error="1.0", new="convert_frequency")
+    def to_regular_index(self, freq: str) -> TimeSeriesDataFrame:
+        raise NotImplementedError

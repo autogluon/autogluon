@@ -6,7 +6,7 @@ import pytest
 
 from autogluon.timeseries.models import DeepARModel, ETSModel
 from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
-from autogluon.timeseries.splitter import ExpandingWindowSplitter
+from autogluon.timeseries.val_splitter import ExpandingWindowSplitter
 
 from ..common import DUMMY_TS_DATAFRAME, dict_equal_primitive
 

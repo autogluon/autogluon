@@ -8,7 +8,10 @@ from autogluon.timeseries.metrics import AVAILABLE_METRICS, check_get_evaluation
 @Deprecated(
     min_version_to_warn="1.0",
     min_version_to_error="1.1",
-    custom_warning_msg="Please use the metrics defined in autogluon.timeseries.metrics instead.",
+    custom_warning_msg=(
+        "`TimeSeriesEvaluator` has been deprecated. "
+        "Please use the metrics defined in `autogluon.timeseries.metrics` instead."
+    ),
 )
 class TimeSeriesEvaluator:
     """This class has been deprecated in AutoGluon v1.0 and is only provided for backward compatibility!"""

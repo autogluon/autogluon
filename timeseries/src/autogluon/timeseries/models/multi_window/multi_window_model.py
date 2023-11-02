@@ -12,7 +12,7 @@ from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.local.abstract_local_model import AbstractLocalModel
-from autogluon.timeseries.splitter import AbstractWindowSplitter, ExpandingWindowSplitter
+from autogluon.timeseries.val_splitter import AbstractWindowSplitter, ExpandingWindowSplitter
 
 logger = logging.getLogger(__name__)
 
