@@ -10,7 +10,7 @@ __all__ = []
 )
 class AbstractTimeSeriesSplitter:
     def __init__(self, *args, **kwargs):
-        raise
+        raise NotImplementedError
 
 
 @Deprecated(
@@ -20,7 +20,7 @@ class AbstractTimeSeriesSplitter:
 )
 class MultiWindowSplitter(AbstractTimeSeriesSplitter):
     def __init__(self, *args, **kwargs):
-        raise
+        raise NotImplementedError
 
 
 @Deprecated(
@@ -30,4 +30,4 @@ class MultiWindowSplitter(AbstractTimeSeriesSplitter):
 )
 class LastWindowSplitter(MultiWindowSplitter):
     def __init__(self, *args, **kwargs):
-        raise
+        raise NotImplementedError
