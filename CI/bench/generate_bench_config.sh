@@ -35,6 +35,7 @@ else
     --cdk-deploy-account $CDK_DEPLOY_ACCOUNT \
     --cdk-deploy-region $CDK_DEPLOY_REGION \
     --metrics-bucket $METRICS_BUCKET \
+    --data-bucket automl-mm-bench \
     --framework $FRAMEWORK \
     --constraint $TIME_LIMIT \
     --custom-resource-dir $(dirname "$0")/custom_user_dir \
