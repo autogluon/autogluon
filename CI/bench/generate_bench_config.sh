@@ -27,19 +27,32 @@ if [ $MODULE == "tabular" ] || [ $MODULE == "timeseries" ]; then
     --amlb-user-dir $(dirname "$0")/amlb_user_dir \
     --git-uri-branch https://github.com/openml/automlbenchmark.git#stable
 else
+# Put out an IF here based on the BENCHMARK value prepare the dataloader
     FRAMEWORK=AutoGluon_$PRESET
+    DATASET_YAML_PATH=$(dirname "$0")/custom_user_dir/dataloaders/automm_cv_datasets.yaml
     aws s3 cp --recursive s3://autogluon-ci-benchmark/configs/$MODULE/$USER_DIR_S3_PREFIX/latest/ $(dirname "$0")/custom_user_dir/
-    agbench generate-cloud-config \
-    --prefix ag-bench \
-    --module $MODULE \
-    --cdk-deploy-account $CDK_DEPLOY_ACCOUNT \
-    --cdk-deploy-region $CDK_DEPLOY_REGION \
-    --metrics-bucket $METRICS_BUCKET \
-    --data-bucket automl-mm-bench \
-    --framework $FRAMEWORK \
-    --constraint $TIME_LIMIT \
-    --custom-resource-dir $(dirname "$0")/custom_user_dir \
-    --dataset-names bayer,kindle \
-    --custom-dataloader "dataloader_file:$(dirname "$0")/custom_user_dir/dataloaders/vision_dataloader.py;class_name:VisionDataLoader;dataset_config_file:$(dirname "$0")/custom_user_dir/dataloaders/automm_cv_datasets.yaml"
+
+    for dataset_name in $(yq eval '. as $parent | keys | .[]' "$DATASETS_YAML_PATH" | grep -v '^base$')
+    do
+        agbench generate-cloud-config \
+        --prefix ag-bench \
+        --module $MODULE \
+        --cdk-deploy-account $CDK_DEPLOY_ACCOUNT \
+        --cdk-deploy-region $CDK_DEPLOY_REGION \
+        --metrics-bucket $METRICS_BUCKET \
+        --max-machine-num 200 \
+        --data-bucket automl-mm-bench \
+        --framework $FRAMEWORK \
+        --constraint $TIME_LIMIT \
+        --custom-resource-dir $(dirname "$0")/custom_user_dir \
+        --dataset-names "$dataset_name" \
+        --custom-dataloader "dataloader_file:$(dirname "$0")/custom_user_dir/dataloaders/vision_dataloader.py;class_name:VisionDataLoader;dataset_config_file:$(dirname "$0")/custom_user_dir/dataloaders/automm_cv_datasets.yaml"
+    done
 fi
 
+# TO DO: 
+# Add Max Machine Num for all 3 modules
+# Store name of all the datasets
+# Fill in the vision, text-tabular part
+# Run Benchmark will change accordingly
+# Benchmark results for multimodal will be stored in vision/text-tabular etc
