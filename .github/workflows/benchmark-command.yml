@@ -18,6 +18,7 @@ on:
         options:
           - tabular
           - timeseries
+          - multimodal
       preset:
         description: 'Preset to run for tabular'
         required: true
@@ -27,6 +28,7 @@ on:
           - good
           - medium
           - dev
+          - stable
       benchmark:
         description: 'Benchmark to run'
         required: true
@@ -35,6 +37,7 @@ on:
           - test
           - small
           - timeseries_test
+          - none (for AutoMM)
       time_limit:
         description: 'Time limit for the benchmark to run'
         required: true
@@ -45,6 +48,7 @@ on:
           - 16h
           - 24h
           - test101
+          - g4_12x
       folds:
         description: 'Number of folds to run'
         required: false
