@@ -1,4 +1,4 @@
-import json
+from pprint import pformat
 from typing import Type, Union
 
 from .abstract import TimeSeriesScorer
@@ -29,9 +29,13 @@ AVAILABLE_METRICS = {
     "WAPE": WAPE,
     "SQL": SQL,
     "WQL": WQL,
-    # Exist for compatibility
     "MSE": MSE,
     "MAE": MAE,
+}
+
+# For backward compatibility
+DEPRECATED_METRICS = {
+    "mean_wQuantileLoss": "WQL",
 }
 
 
@@ -44,10 +48,11 @@ def check_get_evaluation_metric(
         # e.g., user passed `eval_metric=CustomMetric` instead of `eval_metric=CustomMetric()`
         eval_metric = eval_metric()
     elif isinstance(eval_metric, str):
+        eval_metric = DEPRECATED_METRICS.get(eval_metric, eval_metric)
         if eval_metric.upper() not in AVAILABLE_METRICS:
             raise ValueError(
                 f"Time series metric {eval_metric} not supported. Available metrics are:\n"
-                f"{json.dumps(list(AVAILABLE_METRICS.keys()), indent=2)}"
+                f"{pformat(sorted(AVAILABLE_METRICS.keys()))}"
             )
         eval_metric = AVAILABLE_METRICS[eval_metric.upper()]()
     elif eval_metric is None:
