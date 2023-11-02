@@ -32,7 +32,7 @@ else
     DATASET_YAML_PATH=$(dirname "$0")/custom_user_dir/dataloaders/automm_cv_datasets.yaml
     aws s3 cp --recursive s3://autogluon-ci-benchmark/configs/$MODULE/$USER_DIR_S3_PREFIX/latest/ $(dirname "$0")/custom_user_dir/
 
-    for dataset_name in $(yq eval '. as $parent | keys | .[]' "$DATASETS_YAML_PATH" | grep -v '^base$')
+    for dataset_name in $(yq eval '. as $parent | keys | .[]' "$DATASET_YAML_PATH" | grep -v '^base$')
     do
         agbench generate-cloud-config \
         --prefix ag-bench \
