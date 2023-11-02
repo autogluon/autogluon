@@ -14,7 +14,7 @@ except:
 
 from ..constants import BINARY, MULTICLASS, QUANTILE, REGRESSION, SOFTCLASS
 from . import classification_metrics, quantile_metrics
-from .classification_metrics import confusion_matrix, BER, COD
+from .classification_metrics import BER, COD, confusion_matrix
 
 
 class Scorer(object, metaclass=ABCMeta):
