@@ -422,11 +422,11 @@ class AbstractStatsForecastIntermittentDemandModel(AbstractStatsForecastModel):
         quantile_offsets = {q: sst.norm(0, stdev_estimate).ppf(q) for q in self.quantile_levels}
 
         # forecast the time series and add the residual distribution to each time step
-        target_minimum = min(0, target.min())
+        # target_minimum = min(0, target.min())
         forecast = model.forecast(h=self.prediction_length, y=target)
         predictions = {
             "mean": forecast["mean"],
-            **{str(q): np.maximum(forecast["mean"] + qo, target_minimum) for q, qo in quantile_offsets.items()},
+            **{str(q): forecast["mean"] + qo for q, qo in quantile_offsets.items()},
         }
         return pd.DataFrame(predictions)
 
