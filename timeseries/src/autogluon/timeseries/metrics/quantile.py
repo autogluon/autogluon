@@ -1,3 +1,4 @@
+import logging
 from typing import Optional
 
 import numpy as np
@@ -7,6 +8,8 @@ from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFram
 
 from .abstract import TimeSeriesScorer
 from .utils import _in_sample_abs_seasonal_error
+
+logger = logging.getLogger(__name__)
 
 
 class WQL(TimeSeriesScorer):
@@ -24,9 +27,13 @@ class WQL(TimeSeriesScorer):
         values_true = y_true.values[:, None]  # shape [N, 1]
         values_pred = q_pred.values  # shape [N, len(quantile_levels)]
 
+        abs_target_sum = np.abs(values_true).sum()
+        if abs_target_sum == 0:
+            logger.warning("WQL metric is undefined because all time series equal zero during the forecast horizon!")
+
         return 2 * np.mean(
             np.abs((values_true - values_pred) * ((values_true <= values_pred) - quantile_levels)).sum(axis=0)
-            / np.abs(values_true).sum()
+            / abs_target_sum
         )
 
 

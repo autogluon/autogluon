@@ -60,7 +60,11 @@ class WAPE(TimeSeriesScorer):
         self, data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, target: str = "target", **kwargs
     ) -> float:
         y_true, y_pred = self._get_point_forecast_score_inputs(data_future, predictions, target=target)
-        return (y_true - y_pred).abs().sum() / y_true.abs().sum()
+        abs_target_sum = y_true.abs().sum()
+        if abs_target_sum == 0:
+            logger.warning("WAPE metric is undefined because all time series equal zero during the forecast horizon!")
+
+        return (y_true - y_pred).abs().sum() / abs_target_sum
 
 
 class sMAPE(TimeSeriesScorer):
