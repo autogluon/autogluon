@@ -15,8 +15,7 @@ from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2log
 from autogluon.core.metrics import Scorer
 
 from .constants import AUTOMM_TUTORIAL_MODE, NER, OBJECT_DETECTION
-from .learners import BaseLearner, NERLearner, ObjectDetectionLearner
-from .matcher import MultiModalMatcher
+from .learners import BaseLearner, MultiModalMatcher, NERLearner, ObjectDetectionLearner
 from .problem_types import PROBLEM_TYPES_REG
 from .utils import get_dir_ckpt_paths, handle_deprecated_args
 
@@ -82,8 +81,6 @@ class MultiModalPredictor:
             - 'feature_extraction': Extracting feature (only support inference)
             - 'zero_shot_image_classification': Zero-shot image classification (only support inference)
             - 'few_shot_text_classification': (experimental) Few-shot text classification
-            - 'ocr_text_detection': (experimental) Extract OCR text
-            - 'ocr_text_recognition': (experimental) Recognize OCR text
 
             For certain problem types, the default behavior is to load a pretrained model based on
             the presets / hyperparameters and the predictor will support zero-shot inference
@@ -98,8 +95,6 @@ class MultiModalPredictor:
             - 'feature_extraction'
             - 'zero_shot_image_classification'
             - 'few_shot_text_classification' (experimental)
-            - 'ocr_text_detection' (experimental)
-            - 'ocr_text_recognition' (experimental)
 
         query
             Column names of query data (used for matching).
@@ -196,70 +191,35 @@ class MultiModalPredictor:
             set_logger_verbosity(verbosity)
 
         self._verbosity = verbosity
-        self._is_matcher = False
 
         if problem_property and problem_property.is_matching:
-            self._learner = MultiModalMatcher(
-                query=query,
-                response=response,
-                label=label,
-                match_label=match_label,
-                problem_type=problem_type,
-                presets=presets,
-                hyperparameters=hyperparameters,
-                eval_metric=eval_metric,
-                path=path,
-                verbosity=verbosity,
-                warn_if_exist=warn_if_exist,
-                enable_progress_bar=enable_progress_bar,
-                pretrained=pretrained,
-                validation_metric=validation_metric,
-            )
-            self._is_matcher = True
+            learner_class = MultiModalMatcher
         elif problem_type == OBJECT_DETECTION:
-            self._learner = ObjectDetectionLearner(
-                label=label,
-                problem_type=problem_type,
-                presets=presets,
-                eval_metric=eval_metric,
-                hyperparameters=hyperparameters,
-                path=path,
-                verbosity=verbosity,
-                num_classes=num_classes,
-                classes=classes,
-                warn_if_exist=warn_if_exist,
-                enable_progress_bar=enable_progress_bar,
-                pretrained=pretrained,
-                sample_data_path=sample_data_path,
-            )
+            learner_class = ObjectDetectionLearner
         elif problem_type == NER:
-            self._learner = NERLearner(
-                label=label,
-                problem_type=problem_type,
-                presets=presets,
-                eval_metric=eval_metric,
-                hyperparameters=hyperparameters,
-                path=path,
-                verbosity=verbosity,
-                num_classes=num_classes,
-                warn_if_exist=warn_if_exist,
-                enable_progress_bar=enable_progress_bar,
-                pretrained=pretrained,
-            )
+            learner_class = NERLearner
         else:
-            self._learner = BaseLearner(
-                label=label,
-                problem_type=problem_type,
-                presets=presets,
-                eval_metric=eval_metric,
-                hyperparameters=hyperparameters,
-                path=path,
-                verbosity=verbosity,
-                num_classes=num_classes,
-                warn_if_exist=warn_if_exist,
-                enable_progress_bar=enable_progress_bar,
-                pretrained=pretrained,
-            )
+            learner_class = BaseLearner
+
+        self._learner = learner_class(
+            label=label,
+            problem_type=problem_type,
+            presets=presets,
+            eval_metric=eval_metric,
+            hyperparameters=hyperparameters,
+            path=path,
+            verbosity=verbosity,
+            num_classes=num_classes,
+            classes=classes,
+            warn_if_exist=warn_if_exist,
+            enable_progress_bar=enable_progress_bar,
+            pretrained=pretrained,
+            sample_data_path=sample_data_path,
+            validation_metric=validation_metric,
+            query=query,
+            response=response,
+            match_label=match_label,
+        )
 
     @property
     def path(self):
@@ -442,6 +402,8 @@ class MultiModalPredictor:
             A dataframe containing validation data, which should have the same columns as the train_data.
             If `tuning_data = None`, `fit()` will automatically
             hold out some random validation examples from `train_data`.
+        max_num_tuning_data
+            The maximum number of tuning samples, which is only used in object detection.
         id_mappings
              Id-to-content mappings. The contents can be text, image, etc.
              This is used when the dataframe contains the query/response identifiers instead of their contents.
@@ -513,44 +475,31 @@ class MultiModalPredictor:
         -------
         An "MultiModalPredictor" object (itself).
         """
-        if self._is_matcher:
-            self._learner.fit(
-                train_data=train_data,
-                tuning_data=tuning_data,
-                id_mappings=id_mappings,
-                time_limit=time_limit,
-                presets=presets,
-                hyperparameters=hyperparameters,
-                column_types=column_types,
-                holdout_frac=holdout_frac,
-                save_path=save_path,
-                hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-                seed=seed,
-            )
+
+        if teacher_predictor is None:
+            teacher_learner = None
+        elif isinstance(teacher_predictor, str):
+            teacher_learner = teacher_predictor
         else:
-            if teacher_predictor is None:
-                teacher_learner = None
-            elif isinstance(teacher_predictor, str):
-                teacher_learner = teacher_predictor
-            else:
-                teacher_learner = teacher_predictor._learner
-            self._learner.fit(
-                train_data=train_data,
-                presets=presets,
-                config=config,
-                tuning_data=tuning_data,
-                max_num_tuning_data=max_num_tuning_data,
-                time_limit=time_limit,
-                save_path=save_path,
-                hyperparameters=hyperparameters,
-                column_types=column_types,
-                holdout_frac=holdout_frac,
-                teacher_learner=teacher_learner,
-                seed=seed,
-                standalone=standalone,
-                hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-                clean_ckpts=clean_ckpts,
-            )
+            teacher_learner = teacher_predictor._learner
+        self._learner.fit(
+            train_data=train_data,
+            presets=presets,
+            config=config,
+            tuning_data=tuning_data,
+            max_num_tuning_data=max_num_tuning_data,
+            time_limit=time_limit,
+            save_path=save_path,
+            hyperparameters=hyperparameters,
+            column_types=column_types,
+            holdout_frac=holdout_frac,
+            teacher_learner=teacher_learner,
+            seed=seed,
+            standalone=standalone,
+            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+            clean_ckpts=clean_ckpts,
+            id_mappings=id_mappings,
+        )
 
         return self
 
@@ -610,28 +559,20 @@ class MultiModalPredictor:
         A dictionary with the metric names and their corresponding scores.
         Optionally return a dataframe of prediction results.
         """
-        if self._is_matcher:
-            return self._learner.evaluate(
-                data=data,
-                query_data=query_data,
-                response_data=response_data,
-                id_mappings=id_mappings,
-                chunk_size=chunk_size,
-                similarity_type=similarity_type,
-                cutoffs=cutoffs,
-                label=label,
-                metrics=metrics,
-                return_pred=return_pred,
-                realtime=realtime,
-            )
-        else:
-            return self._learner.evaluate(
-                data=data,
-                metrics=metrics,
-                return_pred=return_pred,
-                realtime=realtime,
-                eval_tool=eval_tool,
-            )
+        return self._learner.evaluate(
+            data=data,
+            metrics=metrics,
+            return_pred=return_pred,
+            realtime=realtime,
+            eval_tool=eval_tool,
+            query_data=query_data,
+            response_data=response_data,
+            id_mappings=id_mappings,
+            chunk_size=chunk_size,
+            similarity_type=similarity_type,
+            cutoffs=cutoffs,
+            label=label,
+        )
 
     def predict(
         self,
@@ -668,21 +609,14 @@ class MultiModalPredictor:
         -------
         Array of predictions, one corresponding to each row in given dataset.
         """
-        if self._is_matcher:
-            return self._learner.predict(
-                data=data,
-                id_mappings=id_mappings,
-                as_pandas=as_pandas,
-                realtime=realtime,
-            )
-        else:
-            return self._learner.predict(
-                data=data,
-                candidate_data=candidate_data,
-                as_pandas=as_pandas,
-                realtime=realtime,
-                save_results=save_results,
-            )
+        return self._learner.predict(
+            data=data,
+            candidate_data=candidate_data,
+            as_pandas=as_pandas,
+            realtime=realtime,
+            save_results=save_results,
+            id_mappings=id_mappings,
+        )
 
     def predict_proba(
         self,
@@ -723,23 +657,14 @@ class MultiModalPredictor:
         When as_multiclass is True, the output will always have shape (#samples, #classes).
         Otherwise, the output will have shape (#samples,)
         """
-
-        if self._is_matcher:
-            return self._learner.predict_proba(
-                data=data,
-                id_mappings=id_mappings,
-                as_pandas=as_pandas,
-                as_multiclass=as_multiclass,
-                realtime=realtime,
-            )
-        else:
-            return self._learner.predict_proba(
-                data=data,
-                candidate_data=candidate_data,
-                as_pandas=as_pandas,
-                as_multiclass=as_multiclass,
-                realtime=realtime,
-            )
+        return self._learner.predict_proba(
+            data=data,
+            candidate_data=candidate_data,
+            as_pandas=as_pandas,
+            as_multiclass=as_multiclass,
+            realtime=realtime,
+            id_mappings=id_mappings,
+        )
 
     def extract_embedding(
         self,
@@ -782,23 +707,15 @@ class MultiModalPredictor:
         It will have shape (#samples, D) where the embedding dimension D is determined
         by the neural network's architecture.
         """
-        if self._is_matcher:
-            return self._learner.extract_embedding(
-                data=data,
-                signature=signature,
-                id_mappings=id_mappings,
-                as_tensor=as_tensor,
-                as_pandas=as_pandas,
-                realtime=realtime,
-            )
-        else:
-            return self._learner.extract_embedding(
-                data=data,
-                return_masks=return_masks,
-                as_tensor=as_tensor,
-                as_pandas=as_pandas,
-                realtime=realtime,
-            )
+        return self._learner.extract_embedding(
+            data=data,
+            return_masks=return_masks,
+            as_tensor=as_tensor,
+            as_pandas=as_pandas,
+            realtime=realtime,
+            signature=signature,
+            id_mappings=id_mappings,
+        )
 
     def save(self, path: str, standalone: Optional[bool] = True):
         """
@@ -854,7 +771,6 @@ class MultiModalPredictor:
             assets = json.load(fp)
         if "class_name" in assets and assets["class_name"] == "MultiModalMatcher":
             learner_class = MultiModalMatcher
-            predictor._is_matcher = True
         elif assets["problem_type"] == OBJECT_DETECTION:
             learner_class = ObjectDetectionLearner
         elif assets["problem_type"] == NER:
@@ -953,7 +869,6 @@ class MultiModalPredictor:
         onnx_module : OnnxModule
             The onnx-based module that can be used to replace predictor._model for model inference.
         """
-        assert self._learner is not None
         return self._learner.optimize_for_inference(providers=providers)
 
     def fit_summary(self, verbosity=0, show_plot=False):

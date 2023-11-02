@@ -168,6 +168,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         pretrained: Optional[bool] = True,
         validation_metric: Optional[str] = None,
         sample_data_path: Optional[str] = None,
+        **kwargs,
     ):
         """
         Parameters
@@ -193,8 +194,6 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             - 'feature_extraction': Extracting feature (only support inference)
             - 'zero_shot_image_classification': Zero-shot image classification (only support inference)
             - 'few_shot_text_classification': (experimental) Few-shot text classification
-            - 'ocr_text_detection': (experimental) Extract OCR text
-            - 'ocr_text_recognition': (experimental) Recognize OCR text
 
             For certain problem types, the default behavior is to load a pretrained model based on
             the presets / hyperparameters and the learner will support zero-shot inference
@@ -209,8 +208,6 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             - 'feature_extraction'
             - 'zero_shot_image_classification'
             - 'few_shot_text_classification' (experimental)
-            - 'ocr_text_detection' (experimental)
-            - 'ocr_text_recognition' (experimental)
         presets
             Presets regarding model quality, e.g., best_quality, high_quality, and medium_quality.
         eval_metric

@@ -22,8 +22,8 @@ from torch import nn
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.core.utils.loaders import load_pd
 
-from . import version as ag_version
-from .constants import (
+from .. import version as ag_version
+from ..constants import (
     AUTOMM_TUTORIAL_MODE,
     BEST,
     BEST_K_MODELS_FILE,
@@ -48,17 +48,17 @@ from .constants import (
     Y_PRED_PROB,
     Y_TRUE,
 )
-from .data import (
+from ..data import (
     BaseDataModule,
     MultiModalFeaturePreprocessor,
     infer_column_types,
     infer_output_shape,
     infer_problem_type,
 )
-from .optimization import MatcherLitModule, get_matcher_loss_func, get_matcher_miner_func, get_metric
-from .presets import matcher_presets
-from .problem_types import PROBLEM_TYPES_REG
-from .utils import (
+from ..optimization import MatcherLitModule, get_matcher_loss_func, get_matcher_miner_func, get_metric
+from ..presets import matcher_presets
+from ..problem_types import PROBLEM_TYPES_REG
+from ..utils import (
     AutoMMModelCheckpoint,
     CustomUnpickler,
     LogFilter,
@@ -133,6 +133,7 @@ class MultiModalMatcher(RealtimeMixin):
         enable_progress_bar: Optional[bool] = None,
         pretrained: Optional[bool] = True,
         validation_metric: Optional[str] = None,
+        **kwargs,
     ):
         """
         Parameters
@@ -391,6 +392,7 @@ class MultiModalMatcher(RealtimeMixin):
         holdout_frac: Optional[float] = None,
         hyperparameter_tune_kwargs: Optional[dict] = None,
         seed: Optional[int] = 123,
+        **kwargs,
     ):
         """
         Fit MultiModalMatcher. Train the model to learn embeddings to simultaneously maximize and minimize
@@ -919,7 +921,7 @@ class MultiModalMatcher(RealtimeMixin):
         ]
 
         if hpo_mode:
-            from .utils.hpo import get_ray_tune_ckpt_callback
+            from ..utils.hpo import get_ray_tune_ckpt_callback
 
             TuneReportCheckpointCallback = get_ray_tune_ckpt_callback()
             tune_report_callback = TuneReportCheckpointCallback(
@@ -1657,6 +1659,7 @@ class MultiModalMatcher(RealtimeMixin):
         cutoffs: Optional[List[int]] = [1, 5, 10],
         label: Optional[str] = None,
         realtime: Optional[bool] = None,
+        **kwargs,
     ):
         """
         Evaluate model on a test dataset.
@@ -1750,6 +1753,7 @@ class MultiModalMatcher(RealtimeMixin):
         id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         as_pandas: Optional[bool] = None,
         realtime: Optional[bool] = None,
+        **kwargs,
     ):
         """
         Predict values for the label column of new data.
@@ -1804,6 +1808,7 @@ class MultiModalMatcher(RealtimeMixin):
         as_pandas: Optional[bool] = None,
         as_multiclass: Optional[bool] = True,
         realtime: Optional[bool] = None,
+        **kwargs,
     ):
         """
         Predict probabilities class probabilities rather than class labels.
@@ -1859,6 +1864,7 @@ class MultiModalMatcher(RealtimeMixin):
         as_tensor: Optional[bool] = False,
         as_pandas: Optional[bool] = False,
         realtime: Optional[bool] = None,
+        **kwargs,
     ):
         """
         Extract features for each sample, i.e., one row in the provided dataframe `data`.

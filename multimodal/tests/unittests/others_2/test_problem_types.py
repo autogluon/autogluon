@@ -20,8 +20,6 @@ from autogluon.multimodal.problem_types import PROBLEM_TYPES_REG
         "feature_extraction",
         "zero_shot_image_classification",
         "few_shot_text_classification",
-        "ocr_text_detection",
-        "ocr_text_recognition",
     ],
 )
 def test_get_problem_type(name):

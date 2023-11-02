@@ -40,6 +40,7 @@ class NERLearner(BaseLearner):
         warn_if_exist: Optional[bool] = True,
         enable_progress_bar: Optional[bool] = None,
         pretrained: Optional[bool] = True,
+        **kwargs,
     ):
         super().__init__(
             label=label,

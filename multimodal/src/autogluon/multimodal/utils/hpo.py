@@ -83,7 +83,7 @@ def build_final_learner(learner, best_trial_path, save_path, last_ckpt_path, is_
     The constructed learner.
     """
     if is_matching:
-        from ..matcher import MultiModalMatcher
+        from ..learners.matching import MultiModalMatcher
 
         # reload the learner metadata
         matcher = MultiModalMatcher._load_metadata(matcher=learner, path=best_trial_path)

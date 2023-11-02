@@ -57,6 +57,7 @@ class ObjectDetectionLearner(BaseLearner):
         enable_progress_bar: Optional[bool] = None,
         pretrained: Optional[bool] = True,
         sample_data_path: Optional[str] = None,
+        **kwargs,
     ):
         super().__init__(
             problem_type=problem_type,
