@@ -55,21 +55,6 @@ class NERLearner(BaseLearner):
             pretrained=pretrained,
         )
 
-    def on_fit_end(self, training_start, strategy, strict_loading, standalone, clean_ckpts):
-        self._fit_called = True
-        # We do not perform averaging checkpoint in the case of hpo for each trial
-        # We only average the checkpoint of the best trial at the end in the master process.
-        if not self._is_hpo:
-            self.top_k_average(
-                save_path=self._save_path,
-                top_k_average_method=self._config.optimization.top_k_average_method,
-                strategy=strategy,
-                strict_loading=strict_loading,
-                # Not strict loading if using parameter-efficient finetuning
-                standalone=standalone,
-                clean_ckpts=clean_ckpts,
-            )
-
     def fit(
         self,
         train_data: Union[pd.DataFrame, str],
@@ -139,7 +124,7 @@ class NERLearner(BaseLearner):
             skip_final_val=OmegaConf.select(config, "optimization.skip_final_val", default=False),
         )
 
-    def build_task_per_run(
+    def get_litmodule_per_run(
         self,
         model: Optional[nn.Module] = None,
         peft_param_names: Optional[List[str]] = None,
@@ -197,19 +182,12 @@ class NERLearner(BaseLearner):
         validation_metric, custom_metric_func = self.get_validation_metric_per_run()
         loss_func = self.get_loss_func_per_run(config=config)
         if max_time == timedelta(seconds=0):
-            self.top_k_average(
-                save_path=save_path,
-                top_k_average_method=config.optimization.top_k_average_method,
-                strict_loading=not peft_param_names,
-                standalone=standalone,
-                clean_ckpts=clean_ckpts,
-            )
-
             return dict(
                 config=config,
                 df_preprocessor=df_preprocessor,
                 data_processors=data_processors,
-                model=self._model if self._model else model,
+                model=model,
+                strict_loading=not peft_param_names,
             )
 
         datamodule = self.get_datamodule_per_run(
@@ -224,12 +202,12 @@ class NERLearner(BaseLearner):
             custom_metric_func=custom_metric_func,
             loss_func=loss_func,
         )
-        task = self.build_task_per_run(
+        litmodule = self.get_litmodule_per_run(
             model=model,
             peft_param_names=peft_param_names,
             optimization_kwargs=optimization_kwargs,
         )
-        callbacks = self.get_callbacks_per_run(save_path=save_path, config=config, task=task)
+        callbacks = self.get_callbacks_per_run(save_path=save_path, config=config, litmodule=litmodule)
         plugins = self.get_plugins_per_run(model=model, peft_param_names=peft_param_names)
         tb_logger = self.get_tb_logger(save_path=save_path)
         num_gpus = compute_num_gpus(config_num_gpus=config.env.num_gpus, strategy=config.env.strategy)
@@ -259,7 +237,7 @@ class NERLearner(BaseLearner):
 
         self.run_trainer(
             trainer=trainer,
-            task=task,
+            litmodule=litmodule,
             datamodule=datamodule,
             ckpt_path=ckpt_path,
             resume=resume,
@@ -406,7 +384,7 @@ class NERLearner(BaseLearner):
     ):
         """
         Predict probabilities class probabilities rather than class labels.
-        This is only for the classification tasks. Calling it for a regression task will throw an exception.
+        This is only for the classification. Calling it for a regression will throw an exception.
 
         Parameters
         ----------

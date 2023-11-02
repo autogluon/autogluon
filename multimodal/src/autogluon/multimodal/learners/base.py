@@ -245,7 +245,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             where `L` ranges from 0 to 50
             (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels)
         num_classes
-            Number of classes. Used in classification task.
+            Number of classes. Used in classification.
             If this is specified and is different from the pretrained model's output,
             the model's head will be changed to have <num_classes> output.
         classes
@@ -297,7 +297,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         self._warn_if_exist = warn_if_exist
         self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
         self._sample_data_path = sample_data_path
-        self._fit_called = False  # While using ddp, after fit called, we can only use single gpu.
+        self._fit_called = False  # Flag whether is continuous training.
         self._save_path = path
         self._hyperparameters = hyperparameters
         self._advanced_hyperparameters = None
@@ -535,7 +535,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             time_limit = timedelta(seconds=time_limit)
         self._fit_args = dict(
             max_time=time_limit,
-            save_path=self._save_path,
+            save_path=self._save_path,  # In HPO mode, this would be overwritten by per trial path.
             ckpt_path=None if self._is_hpo else self._ckpt_path,
             resume=False if self._is_hpo else self._resume,
             enable_progress_bar=False if self._is_hpo else self._enable_progress_bar,
@@ -591,11 +591,12 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         training_start = time.time()
         return training_start
 
-    def on_fit_end(self, training_start, strategy, strict_loading, standalone, clean_ckpts):
+    def on_fit_end(
+        self, training_start: int, strategy: str, strict_loading: bool, standalone: bool, clean_ckpts: bool
+    ):
         self._fit_called = True
-        # We do not perform averaging checkpoint in the case of hpo for each trial
-        # We only average the checkpoint of the best trial at the end in the master process.
         if not self._is_hpo:
+            # top_k_average is called inside hyperparameter_tune() when building the final predictor.
             self.top_k_average(
                 save_path=self._save_path,
                 top_k_average_method=self._config.optimization.top_k_average_method,
@@ -903,7 +904,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             skip_final_val=OmegaConf.select(config, "optimization.skip_final_val", default=False),
         )
 
-    def build_task_per_run(
+    def get_litmodule_per_run(
         self,
         model=None,
         model_postprocess_fn=None,
@@ -934,7 +935,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                 **optimization_kwargs,
             )
 
-    def get_callbacks_per_run(self, save_path=None, config=None, task=None, pred_writer=None, is_train=True):
+    def get_callbacks_per_run(self, save_path=None, config=None, litmodule=None, pred_writer=None, is_train=True):
         if not is_train:
             if pred_writer is not None:
                 callbacks = [pred_writer]
@@ -946,12 +947,12 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             dirpath=save_path,
             save_top_k=config.optimization.top_k,
             verbose=True,
-            monitor=task.validation_metric_name,
+            monitor=litmodule.validation_metric_name,
             mode=self._minmax_mode,
             save_last=True,
         )
         early_stopping_callback = pl.callbacks.EarlyStopping(
-            monitor=task.validation_metric_name,
+            monitor=litmodule.validation_metric_name,
             patience=config.optimization.patience,
             mode=self._minmax_mode,
             stopping_threshold=get_stopping_threshold(self._validation_metric_name),
@@ -969,7 +970,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
             TuneReportCheckpointCallback = get_ray_tune_ckpt_callback()
             tune_report_callback = TuneReportCheckpointCallback(
-                {f"{task.validation_metric_name}": f"{task.validation_metric_name}"},
+                {f"{litmodule.validation_metric_name}": f"{litmodule.validation_metric_name}"},
                 filename=RAY_TUNE_CHECKPOINT,
             )
             callbacks = [
@@ -1114,7 +1115,6 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                 blacklist_msgs.append("IPU available")
                 blacklist_msgs.append("HPU available")
                 blacklist_msgs.append("select gpus")
-                blacklist_msgs.append("LOCAL_RANK")
                 blacklist_msgs.append("Trainer(barebones=True)")
             log_filter = LogFilter(blacklist_msgs)
 
@@ -1136,10 +1136,10 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
         return trainer
 
-    @staticmethod
     def run_trainer(
+        self,
         trainer,
-        task,
+        litmodule,
         datamodule,
         ckpt_path=None,
         resume=None,
@@ -1156,16 +1156,22 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             warnings.filterwarnings("ignore", "Checkpoint directory .* exists and is not empty.")
             if is_train:
                 trainer.fit(
-                    task,
+                    litmodule,
                     datamodule=datamodule,
                     ckpt_path=ckpt_path if resume else None,  # this is to resume training that was broken accidentally
                 )
             else:
-                outputs = trainer.predict(
-                    task,
-                    datamodule=datamodule,
-                    return_predictions=pred_writer is None,
-                )
+                blacklist_msgs = []
+                if self._verbosity <= 3:  # turn off logging in prediction
+                    blacklist_msgs.append("LOCAL_RANK")
+                    blacklist_msgs.append("Trainer(barebones=True)")
+                log_filter = LogFilter(blacklist_msgs)
+                with apply_log_filter(log_filter):
+                    outputs = trainer.predict(
+                        litmodule,
+                        datamodule=datamodule,
+                        return_predictions=pred_writer is None,
+                    )
                 return outputs
 
     def on_fit_per_run_start(self, seed, save_path):
@@ -1234,20 +1240,13 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         model_postprocess_fn = self.get_model_postprocess_fn_per_run(loss_func=loss_func)
 
         if max_time == timedelta(seconds=0):
-            self.top_k_average(
-                save_path=save_path,
-                top_k_average_method=config.optimization.top_k_average_method,
-                strict_loading=not peft_param_names,
-                standalone=standalone,
-                clean_ckpts=clean_ckpts,
-            )
-
             return dict(
                 config=config,
                 df_preprocessor=df_preprocessor,
                 data_processors=data_processors,
-                model=self._model if self._model else model,
+                model=model,
                 model_postprocess_fn=model_postprocess_fn,
+                strict_loading=not peft_param_names,
             )
         # setup distillation in each fit_per_run call to support distillation + HPO
         distillation_kwargs = self.setup_distillation(
@@ -1269,14 +1268,14 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             loss_func=loss_func,
             mixup_func=mixup_func,
         )
-        task = self.build_task_per_run(
+        litmodule = self.get_litmodule_per_run(
             model=model,
             model_postprocess_fn=model_postprocess_fn,
             peft_param_names=peft_param_names,
             optimization_kwargs=optimization_kwargs,
             distillation_kwargs=distillation_kwargs,
         )
-        callbacks = self.get_callbacks_per_run(save_path=save_path, config=config, task=task)
+        callbacks = self.get_callbacks_per_run(save_path=save_path, config=config, litmodule=litmodule)
         plugins = self.get_plugins_per_run(model=model, peft_param_names=peft_param_names)
         tb_logger = self.get_tb_logger(save_path=save_path)
         num_gpus = compute_num_gpus(config_num_gpus=config.env.num_gpus, strategy=config.env.strategy)
@@ -1306,7 +1305,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
         self.run_trainer(
             trainer=trainer,
-            task=task,
+            litmodule=litmodule,
             datamodule=datamodule,
             ckpt_path=ckpt_path,
             resume=resume,
@@ -1470,7 +1469,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             if os.path.isfile(last_ckpt_path):
                 os.remove(last_ckpt_path)
 
-    def prepare_for_deepspeed_offloading(self, strategy):
+    def prepare_deepspeed_offloading(self, strategy):
         # TODO: Using optimiation_kwargs for inference is confusing and bad design. Remove as soon as fixed in lightning.
         if self._config.env.strategy == DEEPSPEED_OFFLOADING and DEEPSPEED_MODULE not in sys.modules:
             # Need to initialize DeepSpeed and optimizer as currently required in lightning's integration of deepspeed.
@@ -1693,7 +1692,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             )
             return outputs
 
-        strategy, optimization_kwargs = self.prepare_for_deepspeed_offloading(strategy=strategy)
+        strategy, optimization_kwargs = self.prepare_deepspeed_offloading(strategy=strategy)
         datamodule = self.get_datamodule_per_run(
             df_preprocessor=df_preprocessor,
             data_processors=data_processors,
@@ -1705,18 +1704,18 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         pred_writer = self.get_pred_writer(strategy=strategy)
         callbacks = self.get_callbacks_per_run(pred_writer=pred_writer, is_train=False)
         # TODO: remove optimization_kwargs from inference
-        task = self.build_task_per_run(optimization_kwargs=optimization_kwargs, is_train=False)
+        litmodule = self.get_litmodule_per_run(optimization_kwargs=optimization_kwargs, is_train=False)
         trainer = self.init_trainer_per_run(
             num_gpus=num_gpus,
             precision=precision,
             strategy=strategy,
             callbacks=callbacks,
-            barebones=barebones,
+            barebones=True,
             is_train=False,
         )
         outputs = self.run_trainer(
             trainer=trainer,
-            task=task,
+            litmodule=litmodule,
             datamodule=datamodule,
             pred_writer=pred_writer,
             is_train=False,
@@ -1920,7 +1919,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
     ):
         """
         Predict probabilities class probabilities rather than class labels.
-        This is only for the classification tasks. Calling it for a regression task will throw an exception.
+        This is only for the classification. Calling it for regression will throw an exception.
 
         Parameters
         ----------

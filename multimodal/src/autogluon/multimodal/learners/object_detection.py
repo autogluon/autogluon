@@ -277,7 +277,7 @@ class ObjectDetectionLearner(BaseLearner):
             custom_metric_func=custom_metric_func,
         )
 
-    def build_task_per_run(
+    def get_litmodule_per_run(
         self,
         model: Optional[nn.Module] = None,
         optimization_kwargs: Optional[dict] = None,
@@ -334,17 +334,11 @@ class ObjectDetectionLearner(BaseLearner):
         )
         validation_metric, custom_metric_func = self.get_validation_metric_per_run()
         if max_time == timedelta(seconds=0):
-            self.top_k_average(
-                save_path=save_path,
-                top_k_average_method=config.optimization.top_k_average_method,
-                standalone=standalone,
-                clean_ckpts=clean_ckpts,
-            )
             return dict(
                 config=config,
                 df_preprocessor=df_preprocessor,
                 data_processors=data_processors,
-                model=self._model if self._model else model,
+                model=model,
             )
         datamodule = self.get_datamodule_per_run(
             df_preprocessor=df_preprocessor,
@@ -358,11 +352,11 @@ class ObjectDetectionLearner(BaseLearner):
             validation_metric=validation_metric,
             custom_metric_func=custom_metric_func,
         )
-        task = self.build_task_per_run(
+        litmodule = self.get_litmodule_per_run(
             model=model,
             optimization_kwargs=optimization_kwargs,
         )
-        callbacks = self.get_callbacks_per_run(save_path=save_path, config=config, task=task)
+        callbacks = self.get_callbacks_per_run(save_path=save_path, config=config, litmodule=litmodule)
         plugins = self.get_plugins_per_run(model=model)
         tb_logger = self.get_tb_logger(save_path=save_path)
         num_gpus = compute_num_gpus(config_num_gpus=config.env.num_gpus, strategy=config.env.strategy)
@@ -392,7 +386,7 @@ class ObjectDetectionLearner(BaseLearner):
 
         self.run_trainer(
             trainer=trainer,
-            task=task,
+            litmodule=litmodule,
             datamodule=datamodule,
             ckpt_path=ckpt_path,
             resume=resume,
@@ -499,7 +493,7 @@ class ObjectDetectionLearner(BaseLearner):
         )
         pred_writer = self.get_pred_writer(strategy=strategy)
         callbacks = self.get_callbacks_per_run(pred_writer=pred_writer, is_train=False)
-        task = self.build_task_per_run(is_train=False)
+        litmodule = self.get_litmodule_per_run(is_train=False)
         trainer = self.init_trainer_per_run(
             num_gpus=num_gpus,
             precision=precision,
@@ -510,7 +504,7 @@ class ObjectDetectionLearner(BaseLearner):
         )
         outputs = self.run_trainer(
             trainer=trainer,
-            task=task,
+            litmodule=litmodule,
             datamodule=datamodule,
             pred_writer=pred_writer,
             is_train=False,
