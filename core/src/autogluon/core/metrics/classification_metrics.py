@@ -427,18 +427,21 @@ def customized_binary_roc_auc_score(y_true: Union[np.array, pd.Series], y_score:
     tpr = tps / tps[-1]
     return np.trapz(tpr, fpr)
 
+
 def BER(y_true: np.array, y_score: np.array) -> float:
     res = []
     for t, p in zip(y_true, y_score):
         t = ((t * 255) > 125).reshape(-1)
         p = ((p * 255) > 125).reshape(-1)
-    
+
         res.append(1 - balanced_accuracy(t, p))
     return np.mean(res)
 
+
 def COD(y_true: np.array, y_score: np.array, **kwargs) -> float:
     from multimodal.src.autogluon.multimodal.optimization import sod_metric
-    metric_name = kwargs['metric_name']
+
+    metric_name = kwargs["metric_name"]
 
     batchsize = y_true.shape[0]
 
@@ -451,8 +454,7 @@ def COD(y_true: np.array, y_score: np.array, **kwargs) -> float:
     assert y_score.shape == y_true.shape
 
     for i in range(batchsize):
-        true, pred = \
-            y_true[i, 0] * 255, y_score[i, 0] * 255
+        true, pred = y_true[i, 0] * 255, y_score[i, 0] * 255
 
         metric_FM.step(pred=pred, gt=true)
         metric_WFM.step(pred=pred, gt=true)
