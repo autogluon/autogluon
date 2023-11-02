@@ -2,6 +2,6 @@ AutoGluon_stable:
   repo: https://github.com/autogluon/autogluon.git
   version: master
   params:  # MultimodalPredictor.fit(params) # can add the actual job time limit here
-    presets: best_quality
+    presets: medium_quality
     hyperparameters:
-      optimization.max_epochs: 10
+      optimization.max_epochs: 3
