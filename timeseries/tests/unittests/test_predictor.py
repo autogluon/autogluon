@@ -1,6 +1,7 @@
 """Unit tests for predictors"""
 import copy
 import tempfile
+from pathlib import Path
 from unittest import mock
 
 import numpy as np
@@ -54,6 +55,18 @@ def test_given_hyperparameters_when_predictor_called_then_model_can_predict(temp
     assert all(predicted_item_index == DUMMY_TS_DATAFRAME.item_ids)  # noqa
     assert all(len(predictions.loc[i]) == 3 for i in predicted_item_index)
     assert not np.any(np.isnan(predictions))
+
+
+def test_when_pathlib_path_provided_to_predictor_then_loaded_predictor_can_predict(temp_model_path):
+    predictor = TimeSeriesPredictor(path=Path(temp_model_path))
+    predictor.fit(
+        train_data=DUMMY_TS_DATAFRAME,
+        hyperparameters={"SimpleFeedForward": {"epochs": 1}},
+    )
+    predictor.save()
+    loaded_predictor = TimeSeriesPredictor.load(predictor.path)
+    predictions = loaded_predictor.predict(DUMMY_TS_DATAFRAME)
+    assert isinstance(predictions, TimeSeriesDataFrame)
 
 
 @pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS + ["fast_training"])  # noqa
