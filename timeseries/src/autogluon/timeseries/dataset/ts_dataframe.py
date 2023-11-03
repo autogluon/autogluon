@@ -153,7 +153,9 @@ class TimeSeriesDataFrame(pd.DataFrame):
                     data, id_column=id_column, timestamp_column=timestamp_column
                 )
         elif isinstance(data, (str, Path)):
-            data = self._load_tsdf_from_path(data, id_column=id_column, timestamp_column=timestamp_column)
+            data = self._construct_tsdf_from_data_frame(
+                load_pd.load(str(data)), id_column=id_column, timestamp_column=timestamp_column
+            )
         elif isinstance(data, Iterable):
             data = self._construct_tsdf_from_iterable_dataset(data, num_cpus=num_cpus)
         else:
@@ -208,16 +210,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
         cls._validate_data_frame(df)
         return df.set_index([ITEMID, TIMESTAMP])
-
-    @classmethod
-    def _load_tsdf_from_path(
-        cls,
-        path: Union[str, Path],
-        id_column: Optional[str] = None,
-        timestamp_column: Optional[str] = None,
-    ) -> pd.DataFrame:
-        df = load_pd.load(str(path))
-        return cls._construct_tsdf_from_data_frame(df, id_column=id_column, timestamp_column=timestamp_column)
 
     @classmethod
     def _construct_tsdf_from_iterable_dataset(cls, iterable_dataset: Iterable, num_cpus: int = -1) -> pd.DataFrame:
