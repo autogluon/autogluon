@@ -20,7 +20,7 @@ on:
           - timeseries
           - multimodal
       preset:
-        description: 'Preset to run for tabular'
+        description: 'Preset to run for tabular/timeseries/multimodal'
         required: true
         options:
           - best
@@ -37,7 +37,8 @@ on:
           - test
           - small
           - timeseries_test
-          - image/text-tabular (for AutoMM)
+          - image
+          - text-tabular
       time_limit:
         description: 'Time limit for the benchmark to run'
         required: true
@@ -148,7 +149,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v1
         with:
           role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
-          role-duration-seconds: 14400
+          role-duration-seconds: 36000
           aws-region: us-east-1
       - name: Extract Fork Info
         id: parse_fork_info

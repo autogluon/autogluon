@@ -66,7 +66,7 @@ jobs:
   #       uses: aws-actions/configure-aws-credentials@v1
   #       with:
   #         role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
-  #         role-duration-seconds: 14400
+  #         role-duration-seconds: 36000
   #         aws-region: us-east-1
   #     - name: Run benchmark - Tabular
   #       shell: bash -l {0}
@@ -107,7 +107,7 @@ jobs:
   #       uses: aws-actions/configure-aws-credentials@v1
   #       with:
   #         role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
-  #         role-duration-seconds: 14400
+  #         role-duration-seconds: 36000
   #         aws-region: us-east-1
   #     - name: Run benchmark - Timeseries
   #       shell: bash -l {0}
@@ -148,7 +148,7 @@ jobs:
   #       uses: aws-actions/configure-aws-credentials@v1
   #       with:
   #         role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
-  #         role-duration-seconds: 14400
+  #         role-duration-seconds: 36000
   #         aws-region: us-east-1
   #     - name: Run benchmark - Multimodal Image
   #       shell: bash -l {0}
@@ -189,7 +189,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v1
         with:
           role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
-          role-duration-seconds: 14400
+          role-duration-seconds: 36000
           aws-region: us-east-1
       - name: Run benchmark - Multimodal Text Tabular
         shell: bash -l {0}
