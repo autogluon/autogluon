@@ -4,4 +4,4 @@ AutoGluon_stable:
   params:  # MultimodalPredictor.fit(params) # can add the actual job time limit here
     presets: medium_quality
     hyperparameters:
-      optimization.max_epochs: 2
+      optimization.max_epochs: 10
