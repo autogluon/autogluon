@@ -168,6 +168,8 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
                 time_series=time_series,
                 local_model_args=self._local_model_args.copy(),
             )
+            if not np.isfinite(result.values).all():
+                raise RuntimeError("Forecast contains NaN or Inf values.")
             model_failed = False
         except Exception:
             if self.use_fallback_model:
@@ -195,7 +197,8 @@ def seasonal_naive_forecast(
 ) -> pd.DataFrame:
     """Generate seasonal naive forecast, predicting the last observed value from the same period."""
     forecast = {}
-    if len(target) > seasonal_period and seasonal_period > 1:
+    # At least seasonal_period + 2 values are required to compute sigma for seasonal naive
+    if len(target) > seasonal_period + 1 and seasonal_period > 1:
         indices = [len(target) - seasonal_period + k % seasonal_period for k in range(prediction_length)]
         forecast["mean"] = target[indices]
         residuals = target[seasonal_period:] - target[:-seasonal_period]

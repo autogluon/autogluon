@@ -20,6 +20,7 @@ from autogluon.common.savers import save_json
 from autogluon.common.utils.file_utils import get_directory_size, get_directory_size_per_file
 from autogluon.common.utils.log_utils import add_log_to_file, set_logger_verbosity
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
+from autogluon.common.utils.try_import import try_import_ray
 from autogluon.common.utils.utils import (
     check_saved_predictor_version,
     compare_autogluon_metadata,
@@ -35,6 +36,7 @@ from autogluon.core.constants import (
     PSEUDO_MODEL_SUFFIX,
     QUANTILE,
     REGRESSION,
+    SOFTCLASS,
 )
 from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.dataset import TabularDataset
@@ -42,6 +44,7 @@ from autogluon.core.metrics import Scorer
 from autogluon.core.problem_type import problem_type_info
 from autogluon.core.pseudolabeling.pseudolabeling import filter_ensemble_pseudo, filter_pseudo
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
+from autogluon.core.stacked_overfitting.utils import check_stacked_overfitting_from_leaderboard
 from autogluon.core.trainer import AbstractTrainer
 from autogluon.core.utils import (
     get_pred_from_proba_df,
@@ -52,7 +55,7 @@ from autogluon.core.utils import (
 from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
-from autogluon.core.utils.utils import default_holdout_frac
+from autogluon.core.utils.utils import CVSplitter, default_holdout_frac, generate_train_test_split_combined
 
 from ..configs.feature_generator_presets import get_default_feature_generator
 from ..configs.hyperparameter_configs import get_hyperparameter_config
@@ -271,6 +274,8 @@ class TabularPredictor:
         )
         self._learner_type = type(self._learner)
         self._trainer = None
+        self._sub_fits: List[str] = []
+        self._stacked_overfitting_occurred: bool | None = None
 
     @property
     def class_labels(self):
@@ -390,6 +395,7 @@ class TabularPredictor:
         fit_weighted_ensemble: bool = True,
         fit_full_last_level_weighted_ensemble: bool = True,
         full_weighted_ensemble_additionally: bool = False,
+        dynamic_stacking: bool = False,
         calibrate_decision_threshold=False,
         num_cpus="auto",
         num_gpus="auto",
@@ -646,6 +652,15 @@ class TabularPredictor:
             If True, AutoGluon will fit two WeightedEnsembleModels after training all stacking levels. Setting this to True, simulates calling
             `fit_weighted_ensemble()` after calling `fit()`. Has no affect if `fit_full_last_level_weighted_ensemble` is False and does not fit an additional
             WeightedEnsembleModel if stacking is disabled.
+        dynamic_stacking: bool, default = False
+            If True and `num_stack_levels` > 0, AutoGluon will dynamically determine whether to use stacking or not by first validating AutoGluon's stacking
+            behavior. This is done to avoid so-called stacked overfitting that can make traditional multi-layer stacking, as used in AutoGluon, fail drastically
+            and produce unreliable validation scores.
+            It is recommended to keep this value set to True when using stacking, as long as it is unknown whether the data is affected by stacked overfitting.
+            If it is known that the data is unaffected by stacked overfitting, then setting this value to False is expected to maximize predictive quality.
+            If enabled, by default, AutoGluon performs dynamic stacking by spending 25% of the provided time limit for detection and all remaining
+            time for fitting AutoGluon. This can be adjusted by specifying `ds_args` with different parameters to `fit()`.
+            See the documentation of `ds_args` for more information.
         calibrate_decision_threshold : bool, default = False
             [Experimental] This may be removed / changed without warning in a future release.
             If True, will automatically calibrate the decision threshold at the end of fit for calls to `.predict` based on the evaluation metric.
@@ -740,11 +755,46 @@ class TabularPredictor:
                 See the `ag_args_ensemble` argument from "Advanced functionality: Custom AutoGluon model arguments" in the `hyperparameters` argument documentation for valid values.
                 Identical to specifying `ag_args_ensemble` parameter for all models in `hyperparameters`.
                 If a key in `ag_args_ensemble` is already specified for a model in `hyperparameters`, it will not be altered through this argument.
+            ds_args : dict, see below for default
+                Keyword arguments for dynamic stacking, only used if `dynamic_stacking=True`. These keyword arguments control the behavior of dynamic stacking
+                and determine how AutoGluon tries to detect stacked overfitting. To detect stacked overfitting, AutoGluon will fit itself (so called sub-fits)
+                on a subset (for holdout) or multiple subsets (for repeated cross-validation) and use the predictions of AutoGluon on the validation data to
+                detect stacked overfitting. The sub-fits stop and stacking will be disabled if any sub-fit shows stacked overfitting.
+                Allowed keys and values are:
+                    `detection_time_frac` : float in (0,1), default = 1/4
+                        Determines how much of the original training time is used for detecting stacked overfitting.
+                        When using (repeated) cross-validation, each sub-fit will be fit for `1/n_splits * detection_time_frac * time_limit`.
+                        If no time limit is given to AutoGluon, this parameter is ignored and AutoGluon is fit without a time limit in the sub-fit.
+                    `validation_procedure`: str, default = 'holdout'
+                        Determines the validation procedure used to detect stacked overfitting. Can be either `cv` or `holdout`.
+                            If `validation_procedure='holdout'` and `holdout_data` is not specified (default), then `holdout_frac` determines the holdout data.
+                            If `validation_procedure='holdout'` and `holdout_data` is specified, then the provided `holdout_data` is used for validation.
+                            If `validation_procedure='cv'`, `n_folds` and `n_repeats` determine the kind cross-validation procedure.
+                    `holdout_frac` : float in (0,1), default = 1/9
+                        Determines how much of the original training data is used for the holdout data during holdout validation.
+                        Ignored if `holdout_data` is not None.
+                    `n_folds` : int in [2, +inf), default = 2
+                        Number of folds to use for cross-validation.
+                    `n_repeats` : int [1, +inf), default = 1
+                        Number of repeats to use for repeated cross-validation. If set to 1, performs 1-repeated cross-validation which is equivalent to
+                        cross-validation without repeats.
+                    `memory_safe_fits` : bool, default = True
+                        If True, AutoGluon runs each sub-fit in a ray-based subprocess to avoid memory leakage that exist due to Python's lackluster
+                        garbage collector.
+                    `clean_up_fits` : bool, default = True
+                        If True, AutoGluon will remove all saved information from sub-fits from disk.
+                        If False, the sub-fits are kept on disk and `self._sub_fits` will store paths to the sub-fits, which can be loaded just like any other
+                        predictor from disk using `TabularPredictor.load()`.
+                    `holdout_data`: str or :class:`TabularDataset` or :class:`pd.DataFrame`, default = None
+                        Another dataset containing validation data reserved for detecting stacked overfitting. This dataset should be in the same format as
+                        `train_data`. If str is passed, `holdout_data` will be loaded using the str value as the file path.
+                        If `holdout_data` is not None, the sub-fit is fit on all of `train_data` and the full fit is fit on all of `train_data` and
+                        `holdout_data` combined.
             included_model_types : list, default = None
                 To only include listed model types for training during `fit()`.
                 Models that are listed in `included_model_types` but not in `hyperparameters` will be ignored.
                 Reference `hyperparameters` documentation for what models correspond to each value.
-                Useful when a only a subset of model needs to be trained and the `hyperparameters` dictionary is difficult or time-consuming.
+                Useful when only a subset of model needs to be trained and the `hyperparameters` dictionary is difficult or time-consuming.
                     Example: To include both 'GBM' and 'FASTAI' models, specify `included_model_types=['GBM', 'FASTAI']`.
             excluded_model_types : list, default = None
                 Banned subset of model types to avoid training during `fit()`, even if present in `hyperparameters`.
@@ -900,6 +950,7 @@ class TabularPredictor:
         included_model_types = kwargs["included_model_types"]
         excluded_model_types = kwargs["excluded_model_types"]
         use_bag_holdout = kwargs["use_bag_holdout"]
+        ds_args: dict = kwargs["ds_args"]
 
         if ag_args is None:
             ag_args = {}
@@ -934,7 +985,7 @@ class TabularPredictor:
         else:
             inferred_problem_type = self._learner.infer_problem_type(y=train_data[self.label], silent=True)
 
-        num_bag_folds, num_bag_sets, num_stack_levels = self._sanitize_stack_args(
+        num_bag_folds, num_bag_sets, num_stack_levels, dynamic_stacking = self._sanitize_stack_args(
             num_bag_folds=num_bag_folds,
             num_bag_sets=num_bag_sets,
             num_stack_levels=num_stack_levels,
@@ -942,6 +993,7 @@ class TabularPredictor:
             auto_stack=auto_stack,
             num_train_rows=len(train_data),
             problem_type=inferred_problem_type,
+            dynamic_stacking=dynamic_stacking,
         )
         if auto_stack:
             logger.log(
@@ -994,8 +1046,8 @@ class TabularPredictor:
             aux_kwargs["fit_weighted_ensemble"] = False
         aux_kwargs["fit_full_last_level_weighted_ensemble"] = fit_full_last_level_weighted_ensemble
         aux_kwargs["full_weighted_ensemble_additionally"] = full_weighted_ensemble_additionally
-        self.save(silent=True)  # Save predictor to disk to enable prediction and training after interrupt
-        self._learner.fit(
+
+        ag_fit_kwargs = dict(
             X=train_data,
             X_val=tuning_data,
             X_unlabeled=unlabeled_data,
@@ -1012,9 +1064,7 @@ class TabularPredictor:
             verbosity=verbosity,
             use_bag_holdout=use_bag_holdout,
         )
-        self._set_post_fit_vars()
-
-        self._post_fit(
+        ag_post_fit_kwargs = dict(
             keep_only_best=kwargs["keep_only_best"],
             refit_full=kwargs["refit_full"],
             set_best_to_refit_full=kwargs["set_best_to_refit_full"],
@@ -1023,8 +1073,255 @@ class TabularPredictor:
             calibrate_decision_threshold=calibrate_decision_threshold,
             infer_limit=infer_limit,
         )
-        self.save()
+        if dynamic_stacking:
+            logger.log(
+                20,
+                f"Dynamic stacking is enabled (dynamic_stacking={dynamic_stacking}). "
+                "AutoGluon will try to determine whether the input data is affected by stacked overfitting and enable or disable stacking as a consequence.",
+            )
+            num_stack_levels, time_limit = self._dynamic_stacking(**ds_args, ag_fit_kwargs=ag_fit_kwargs, ag_post_fit_kwargs=ag_post_fit_kwargs)
+
+            if (time_limit is not None) and (time_limit <= 0):
+                raise ValueError(
+                    f"Not enough time left to train models for the full fit. Consider specifying a larger time_limit. Time remaining: {time_limit}s"
+                )
+
+            ag_fit_kwargs["num_stack_levels"] = num_stack_levels
+            ag_fit_kwargs["time_limit"] = time_limit
+
+        self._fit(ag_fit_kwargs=ag_fit_kwargs, ag_post_fit_kwargs=ag_post_fit_kwargs)
+
         return self
+
+    def _fit(self, ag_fit_kwargs: dict, ag_post_fit_kwargs: dict):
+        self.save(silent=True)  # Save predictor to disk to enable prediction and training after interrupt
+        self._learner.fit(**ag_fit_kwargs)
+        self._set_post_fit_vars()
+        self._post_fit(**ag_post_fit_kwargs)
+        self.save()
+
+    def _dynamic_stacking(
+        self,
+        ag_fit_kwargs: dict,
+        ag_post_fit_kwargs: dict,
+        validation_procedure: bool,
+        detection_time_frac: float,
+        holdout_frac: float,
+        n_folds: int,
+        n_repeats: int,
+        memory_safe_fits: bool,
+        clean_up_fits: bool,
+        holdout_data: Optional[Union[str, pd.DataFrame, None]] = None,
+    ):
+        """Dynamically determines if stacking is used or not by validating the behavior of a sub-fit of AutoGluon that uses stacking on held out data.
+        See `ds_args` in the docstring of `fit()` for details on the parameters."""
+        time_start = time.time()
+        time_limit_og = ag_fit_kwargs["time_limit"]
+        org_num_stack_levels = ag_fit_kwargs["num_stack_levels"]
+        ds_fit_context = self._learner.path_context_og + "/ds_sub_fit"
+        logger.info(
+            "Detecting stacked overfitting by sub-fitting AutoGluon on the input data. "
+            "That is, copies of AutoGluon will be sub-fit on subset(s) of the data. "
+            "Then, the holdout validation data is used to detect stacked overfitting."
+        )
+
+        if time_limit_og is not None:
+            logger.info(f"Sub-fit(s) time limit is: {time_limit_og} seconds.")
+            time_limit = int(time_limit_og * detection_time_frac)
+        else:
+            logger.info(f"No time limit provided.")
+            time_limit = None
+
+        # -- Avoid copying data
+        X = ag_fit_kwargs.pop("X")
+        X_val = ag_fit_kwargs.pop("X_val")
+        X_unlabeled = ag_fit_kwargs.pop("X_unlabeled")
+        inner_ag_fit_kwargs = copy.deepcopy(ag_fit_kwargs)
+        inner_ag_fit_kwargs["X_val"] = X_val
+        inner_ag_fit_kwargs["X_unlabeled"] = X_unlabeled
+
+        # Verify problem type is set
+        if self.problem_type is None:
+            self._learner.problem_type = self._learner.infer_problem_type(y=X[self.label], silent=True)
+
+        ds_fit_kwargs = dict(
+            clean_up_fits=clean_up_fits,
+            memory_safe_fits=memory_safe_fits,
+        )
+
+        # -- Validation Method
+        if validation_procedure == "holdout":
+            if holdout_data is None:
+                ds_fit_kwargs.update(dict(holdout_frac=holdout_frac, ds_fit_context=ds_fit_context + "/sub_fit_ho"))
+                logger.info(f"Starting holdout-based sub-fit for dynamic stacking. Context path is: {ds_fit_kwargs['ds_fit_context']}.")
+            else:
+                _, holdout_data, _ = self._validate_fit_data(train_data=X, tuning_data=holdout_data)
+                ds_fit_kwargs["ds_fit_context"] = ds_fit_context + "/sub_fit_custom_ho"
+                logger.info(
+                    f"Starting holdout-based sub-fit for dynamic stacking with custom validation data. Context path is: {ds_fit_kwargs['ds_fit_context']}."
+                )
+
+            stacked_overfitting = self._sub_fit_memory_save_wrapper(
+                train_data=X,
+                time_limit=time_limit,
+                ds_fit_kwargs=ds_fit_kwargs,
+                ag_fit_kwargs=inner_ag_fit_kwargs,
+                ag_post_fit_kwargs=ag_post_fit_kwargs,
+                holdout_data=holdout_data,
+            )
+        else:
+            # Holdout is false, use (repeated) cross-validation
+            is_stratified = self.problem_type in [REGRESSION, QUANTILE, SOFTCLASS]
+            self._learner._validate_groups(X=X, X_val=X_val)  # Validate splits before splitting
+            splits = CVSplitter(n_splits=n_folds, n_repeats=n_repeats, groups=self._learner.groups, stratified=is_stratified, random_state=42).split(
+                X=X.drop(self.label, axis=1), y=X[self.label]
+            )
+            n_splits = len(splits)
+            logger.info(
+                f"Starting (repeated-)cross-validation-based sub-fits for dynamic stacking. Context path is: {ds_fit_context}. "
+                f"Run at most {n_splits} sub-fits based on {n_repeats}-repeated {n_folds}-fold cross-validation."
+            )
+            np.random.RandomState(42).shuffle(splits)  # shuffle splits to mix up order such that if only one of the repeats shows leakage we might stop early.
+            for split_index, (train_indices, val_indices) in enumerate(splits):
+                if time_limit is None:
+                    sub_fit_time = None
+                else:
+                    time_spend_sub_fits_so_far = int(time.time() - time_start)
+                    rest_time = time_limit - time_spend_sub_fits_so_far
+                    sub_fit_time = int(1 / (n_splits - split_index) * rest_time)  # if we are faster, give more time to rest of the folds.
+                    if sub_fit_time <= 0:
+                        logger.info(f"Stop cross-validation during dynamic stacking early as no more time left. Consider specifying a larger time_limit.")
+                        break
+                ds_fit_kwargs.update(
+                    dict(
+                        train_indices=train_indices,
+                        val_indices=val_indices,
+                        ds_fit_context=ds_fit_context + f"/sub_fit_{split_index}",
+                    )
+                )
+                logger.info(
+                    f"Starting sub-fit {split_index + 1}. Time limit for the sub-fit of this split is: {'unlimited' if sub_fit_time is None else sub_fit_time}."
+                )
+                stacked_overfitting = self._sub_fit_memory_save_wrapper(
+                    train_data=X,
+                    time_limit=time_limit,
+                    ds_fit_kwargs=ds_fit_kwargs,
+                    ag_fit_kwargs=inner_ag_fit_kwargs,
+                    ag_post_fit_kwargs=ag_post_fit_kwargs,
+                    holdout_data=holdout_data,
+                )
+                if stacked_overfitting:
+                    break
+
+            del splits
+
+        if clean_up_fits:
+            shutil.rmtree(path=ds_fit_context)
+
+        # -- Determine rest time and new num_stack_levels
+        time_spend_sub_fits = int(time.time() - time_start)
+        logger.info(f"Spend {time_spend_sub_fits} seconds for the sub-fit(s) during dynamic stacking.")
+        if time_limit_og is None:
+            time_limit_fit_full = None
+        else:
+            time_limit_fit_full = int(time_limit_og - time_spend_sub_fits)
+            logger.info(f"Time left for full fit of AutoGluon: {time_limit_fit_full} seconds.")
+
+        num_stack_levels = 0 if stacked_overfitting else org_num_stack_levels
+        self._stacked_overfitting_occurred = stacked_overfitting
+
+        # -- Revert back
+        del inner_ag_fit_kwargs
+        if holdout_data is None:
+            ag_fit_kwargs["X"] = X
+        else:
+            logger.log(20, "Concatenating holdout data from dynamic stacking to the training data for the full fit (and reset the index).")
+            ag_fit_kwargs["X"] = pd.concat([X, holdout_data], ignore_index=True)
+
+        ag_fit_kwargs["X_val"] = X_val
+        ag_fit_kwargs["X_unlabeled"] = X_unlabeled
+
+        logger.info(f"Starting full fit now with num_stack_levels {num_stack_levels}.")
+        return num_stack_levels, time_limit_fit_full
+
+    def _sub_fit_memory_save_wrapper(
+        self,
+        train_data: Union[str, pd.DataFrame],
+        time_limit: int,
+        ds_fit_kwargs: dict,
+        ag_fit_kwargs: dict,
+        ag_post_fit_kwargs: dict,
+        holdout_data=Union[str, pd.DataFrame, None],
+    ):
+        """Tries to run the sub-fit in a subprocess (managed by ray). Similar to AutoGluon's parallel fold fitting strategies,
+        this code does not shut down ray after usage. Otherwise, we would also kill outer-scope ray usage."""
+        memory_safe_fits = ds_fit_kwargs.get("memory_safe_fits", True)
+        normal_fit = False
+        if memory_safe_fits:
+            try:
+                _ds_ray = try_import_ray()
+                if not _ds_ray.is_initialized():
+                    _ds_ray.init(address="auto", logging_level=logging.ERROR, log_to_driver=False)
+            except:
+                _ds_ray = None
+
+            if _ds_ray is not None:
+                logger.info(f"Running the sub-fit in a ray process to avoid memory leakage.")
+
+                # Handle resources
+                from autogluon.common.utils.resource_utils import ResourceManager
+
+                total_resources = ag_fit_kwargs["core_kwargs"]["total_resources"]
+
+                num_cpus = total_resources.get("num_cpus", "auto")
+                num_gpus = total_resources.get("num_gpus", "auto")
+
+                if num_cpus == "auto":
+                    num_cpus = ResourceManager.get_cpu_count()
+
+                if num_gpus == "auto":
+                    num_gpus = ResourceManager.get_gpu_count_all()
+
+                # Handle expensive data via put
+                ag_fit_kwargs_ref = _ds_ray.put(ag_fit_kwargs)
+                predictor_ref = _ds_ray.put(self)
+                train_data_ref = _ds_ray.put(train_data)
+
+                if holdout_data is not None:
+                    holdout_data_ref = _ds_ray.put(holdout_data)
+                else:
+                    holdout_data_ref = None
+
+                # Call sub fit in its own subprocess via ray
+                sub_fit_caller = _ds_ray.remote(max_calls=1)(_sub_fit)
+                ref = sub_fit_caller.options(num_cpus=num_cpus, num_gpus=num_gpus).remote(
+                    predictor=predictor_ref,
+                    train_data=train_data_ref,
+                    time_limit=time_limit,
+                    ds_fit_kwargs=ds_fit_kwargs,
+                    ag_fit_kwargs=ag_fit_kwargs_ref,
+                    ag_post_fit_kwargs=ag_post_fit_kwargs,
+                    holdout_data=holdout_data_ref,
+                )
+                finished, unfinished = _ds_ray.wait([ref], num_returns=1)
+                stacked_overfitting = _ds_ray.get(finished[0])
+            else:
+                normal_fit = True
+        else:
+            normal_fit = True
+
+        if normal_fit:
+            stacked_overfitting = _sub_fit(
+                predictor=self,
+                train_data=train_data,
+                time_limit=time_limit,
+                ds_fit_kwargs=ds_fit_kwargs,
+                ag_fit_kwargs=ag_fit_kwargs,
+                ag_post_fit_kwargs=ag_post_fit_kwargs,
+                holdout_data=holdout_data,
+            )
+
+        return stacked_overfitting
 
     def _post_fit(
         self,
@@ -1151,6 +1448,7 @@ class TabularPredictor:
             Refer to kwargs documentation in :meth:`TabularPredictor.fit`.
             Note that the following kwargs are not available in `fit_extra` as they cannot be changed from their values set in `fit()`:
                 [`holdout_frac`, `num_bag_folds`, `auto_stack`, `feature_generator`, `unlabeled_data`]
+            Moreover, `dynamic_stacking` is also not available in `fit_extra` as the detection of stacked overfitting is only supported at the first fit time.
             pseudo_data : pd.DataFrame, default = None
                 Data that has been self labeled by Autogluon model and will be incorporated into training during 'fit_extra'
         """
@@ -3827,7 +4125,7 @@ class TabularPredictor:
         if invalid_keys:
             raise ValueError(f"Invalid kwargs passed: {invalid_keys}\nValid kwargs: {list(valid_kwargs)}")
 
-    def _validate_fit_kwargs(self, kwargs):
+    def _validate_fit_kwargs(self, kwargs) -> dict:
         # TODO:
         #  Valid core_kwargs values:
         #  ag_args, ag_args_fit, ag_args_ensemble, stack_name, ensemble_type, name_suffix, time_limit
@@ -3848,9 +4146,8 @@ class TabularPredictor:
             unlabeled_data=None,
             _feature_generator_kwargs=None,
         )
-
-        kwargs = self._validate_fit_extra_kwargs(kwargs, extra_valid_keys=list(fit_kwargs_default.keys()))
-
+        kwargs, ds_valid_keys = self._sanitize_dynamic_stacking_kwargs(kwargs)
+        kwargs = self._validate_fit_extra_kwargs(kwargs, extra_valid_keys=list(fit_kwargs_default.keys()) + ds_valid_keys)
         kwargs_sanitized = fit_kwargs_default.copy()
         kwargs_sanitized.update(kwargs)
 
@@ -3893,6 +4190,52 @@ class TabularPredictor:
             pseudo_data=None,
             name_suffix=None,
         )
+
+    @staticmethod
+    def _sanitize_dynamic_stacking_kwargs(kwargs: dict) -> Tuple[dict, List[str]]:
+        ds_kwargs_key = "ds_args"
+        ds_args = dict(
+            validation_procedure="holdout",
+            detection_time_frac=1 / 4,
+            holdout_frac=1 / 9,
+            n_folds=2,
+            n_repeats=1,
+            memory_safe_fits=True,
+            clean_up_fits=True,
+            holdout_data=None,
+        )
+        allowed_kes = set(ds_args.keys())
+
+        if ds_kwargs_key in kwargs:
+            kwargs[ds_kwargs_key] = copy.deepcopy(kwargs[ds_kwargs_key])
+            ds_args.update(kwargs[ds_kwargs_key])
+
+        key_missmatch = set(ds_args.keys()) - allowed_kes
+        if key_missmatch:
+            raise ValueError(f"Got invalid keys for `ds_args`. Allowed: {allowed_kes}. Got: {key_missmatch}")
+        if ("validation_procedure" in ds_args) and (
+            (not isinstance(ds_args["validation_procedure"], str)) or (ds_args["validation_procedure"] not in ["holdout", "cv"])
+        ):
+            raise ValueError("`validation_procedure` in `ds_args` must be str in {'holdout','cv'}. " + f"Got: {ds_args['validation_procedure']}")
+        for arg_name in ["memory_safe_fits", "clean_up_fits"]:
+            if (arg_name in ds_args) and (not isinstance(ds_args[arg_name], bool)):
+                raise ValueError(f"`{arg_name}` in `ds_args` must be bool.  Got: {type(ds_args[arg_name])}")
+        for arg_name in ["detection_time_frac", "holdout_frac"]:
+            if (arg_name in ds_args) and ((not isinstance(ds_args[arg_name], float)) or (ds_args[arg_name] >= 1) or (ds_args[arg_name] <= 0)):
+                raise ValueError(f"`{arg_name}` in `ds_args` must be float in (0,1).  Got: {type(ds_args[arg_name])}, {ds_args[arg_name]}")
+        if ("n_folds" in ds_args) and ((not isinstance(ds_args["n_folds"], int)) or (ds_args["n_folds"] < 2)):
+            raise ValueError(f"`n_folds` in `ds_args` must be int in [2, +inf).  Got: {type(ds_args['n_folds'])}, {ds_args['n_folds']}")
+        if ("n_repeats" in ds_args) and ((not isinstance(ds_args["n_repeats"], int)) or (ds_args["n_repeats"] < 1)):
+            raise ValueError(f"`n_repeats` in `ds_args` must be int in [1, +inf).  Got: {type(ds_args['n_repeats'])}, {ds_args['n_repeats']}")
+        if ("holdout_data" in ds_args) and (not isinstance(ds_args["holdout_data"], (str, pd.DataFrame))) and (ds_args["holdout_data"] is not None):
+            raise ValueError(f"`holdout_data` in `ds_args` must be None, str, or pd.DataFrame.  Got: {type(ds_args['holdout_data'])}")
+        if (ds_args["validation_procedure"] == "cv") and (ds_args["holdout_data"] is not None):
+            raise ValueError(
+                "`validation_procedure` in `ds_args` is 'cv' but `holdout_data` in `ds_args` is specified."
+                "You must decide for either (repeated) cross-validation or holdout validation."
+            )
+        kwargs[ds_kwargs_key] = ds_args
+        return kwargs, [ds_kwargs_key]
 
     def _validate_fit_extra_kwargs(self, kwargs, extra_valid_keys=None):
         fit_extra_kwargs_default = self._fit_extra_kwargs_dict()
@@ -4045,7 +4388,7 @@ class TabularPredictor:
             feature_generator=feature_generator, feature_metadata=feature_metadata, init_kwargs=init_kwargs
         )
 
-    def _sanitize_stack_args(self, num_bag_folds, num_bag_sets, num_stack_levels, time_limit, auto_stack, num_train_rows, problem_type):
+    def _sanitize_stack_args(self, num_bag_folds, num_bag_sets, num_stack_levels, time_limit, auto_stack, num_train_rows, problem_type, dynamic_stacking):
         if auto_stack:
             # TODO: What about datasets that are 100k+? At a certain point should we not bag?
             # TODO: What about time_limit? Metalearning can tell us expected runtime of each model, then we can select optimal folds + stack levels to fit time constraint
@@ -4085,7 +4428,11 @@ class TabularPredictor:
                 num_bag_sets = 1
         if not isinstance(num_bag_sets, int):
             raise ValueError(f"num_bag_sets must be an integer. (num_bag_sets={num_bag_sets})")
-        return num_bag_folds, num_bag_sets, num_stack_levels
+
+        if dynamic_stacking and num_stack_levels < 1:
+            logger.log(20, "Dynamic stacking was enabled but stacking is disabled. Setting dynamic stacking to False.")
+            dynamic_stacking = False
+        return num_bag_folds, num_bag_sets, num_stack_levels, dynamic_stacking
 
     # TODO: Add .delete() method to easily clean-up clones?
     #  Would need to be careful that user doesn't delete important things accidentally.
@@ -4274,3 +4621,70 @@ class _TabularPredictorExperimental(TabularPredictor):
         predictor = cls(label=learner.label, path=learner.path)
         predictor._set_post_fit_vars(learner=learner)
         return predictor
+
+
+def _sub_fit(
+    predictor: TabularPredictor,
+    train_data: Union[str, pd.DataFrame],
+    time_limit: int,
+    ds_fit_kwargs: dict,
+    ag_fit_kwargs: dict,
+    ag_post_fit_kwargs: dict,
+    holdout_data=Union[str, pd.DataFrame, None],
+):
+    """Perform a sub-fit of a TabularPredictor on the provided input data and arguments for a TabularPredictor. To perform the sub-fit, the `self._learner` is
+    used for fitting and predicting. After the sub-fit, `self._learner` is reset to its original state and the results of the sub-fit is returned. The sub-fit's
+    training and validation data depends on the arguments in ds_fit_kwargs and holdout_data specified at `fit()`."""
+    holdout_frac = ds_fit_kwargs.get("holdout_frac", None)
+    train_indices = ds_fit_kwargs.get("train_indices", None)
+    if holdout_frac is not None:
+        train_data, val_data = generate_train_test_split_combined(
+            data=train_data,
+            label=predictor.label,
+            problem_type=predictor.problem_type,
+            test_size=holdout_frac,
+            random_state=42,
+        )
+    elif train_indices is not None:
+        val_indices = ds_fit_kwargs.get("val_indices", None)
+        val_data = train_data.iloc[val_indices]
+        train_data = train_data.iloc[train_indices]
+    elif holdout_data is not None:
+        train_data = train_data
+        val_data = holdout_data
+    else:
+        raise ValueError("Unsupported validation procedure during dynamic stacking!")
+
+    set_logger_verbosity(verbosity=ag_fit_kwargs["verbosity"])
+    learner_og = copy.deepcopy(predictor._learner)
+
+    ag_fit_kwargs["X"] = train_data
+    ag_fit_kwargs["time_limit"] = time_limit
+    ds_fit_context = ds_fit_kwargs.get("ds_fit_context")
+    clean_up_fits = ds_fit_kwargs.get("clean_up_fits")
+
+    predictor._learner.set_contexts(path_context=ds_fit_context)
+    predictor._fit(ag_fit_kwargs=ag_fit_kwargs, ag_post_fit_kwargs=ag_post_fit_kwargs)
+
+    if not predictor.get_model_names():
+        logger.info(f"Unable to determine stacked overfitting. AutoGluon's sub-fit did not successfully train any models!")
+        stacked_overfitting = False
+    else:
+        # Determine stacked overfitting
+        ho_leaderboard = predictor.leaderboard(data=val_data, silent=True).reset_index(drop=True).sort_values(by="score_val")
+        stacked_overfitting = check_stacked_overfitting_from_leaderboard(ho_leaderboard)
+        logger.info("Leaderboard on holdout data from dynamic stacking:")
+        with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):
+            # Rename to avoid confusion for the user
+            logger.info(ho_leaderboard.rename({"score_test": "holdout_score"}, axis=1))
+
+    logger.info(f"Stacked overfitting occurred: {stacked_overfitting}.")
+    del predictor._learner
+    predictor._learner = learner_og
+
+    if clean_up_fits:
+        shutil.rmtree(path=ds_fit_context)
+    else:
+        predictor._sub_fits.append(ds_fit_context)
+
+    return stacked_overfitting
