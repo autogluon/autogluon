@@ -9,6 +9,7 @@ USER_DIR_S3_PREFIX=$5  # where to find the pre-generated config. This will eithe
 CDK_DEPLOY_ACCOUNT=369469875935
 CDK_DEPLOY_REGION=us-east-1
 METRICS_BUCKET=autogluon-ci-benchmark
+MAX_MACHINE_NUM=200
 
 if [ $MODULE == "tabular" ] || [ $MODULE == "timeseries" ]; then
     FRAMEWORK=AutoGluon_$PRESET:benchmark
@@ -20,6 +21,7 @@ if [ $MODULE == "tabular" ] || [ $MODULE == "timeseries" ]; then
     --cdk-deploy-account $CDK_DEPLOY_ACCOUNT \
     --cdk-deploy-region $CDK_DEPLOY_REGION \
     --metrics-bucket $METRICS_BUCKET \
+    --max-machine-num $MAX_MACHINE_NUM \
     --instance $INSTANCE_TYPE \
     --framework $FRAMEWORK \
     --amlb-benchmark $BENCHMARK \
@@ -47,7 +49,7 @@ else
     --cdk-deploy-account $CDK_DEPLOY_ACCOUNT \
     --cdk-deploy-region $CDK_DEPLOY_REGION \
     --metrics-bucket $METRICS_BUCKET \
-    --max-machine-num 200 \
+    --max-machine-num $MAX_MACHINE_NUM \
     --data-bucket automl-mm-bench \
     --framework $FRAMEWORK \
     --constraint $TIME_LIMIT \
