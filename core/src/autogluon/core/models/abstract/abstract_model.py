@@ -1704,13 +1704,14 @@ class AbstractModel:
 
     @disable_if_lite_mode()
     def _validate_fit_memory_usage(
-            self,
-            mem_error_threshold: float = 0.9,
-            mem_warning_threshold: float = 0.75,
-            mem_size_threshold: int = None,
-            approx_mem_size_req: int = None,
-            available_mem: int = None,
-            **kwargs):
+        self,
+        mem_error_threshold: float = 0.9,
+        mem_warning_threshold: float = 0.75,
+        mem_size_threshold: int = None,
+        approx_mem_size_req: int = None,
+        available_mem: int = None,
+        **kwargs,
+    ):
         """
         Asserts that enough memory is available to fit the model
 

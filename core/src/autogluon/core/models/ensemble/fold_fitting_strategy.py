@@ -508,7 +508,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                 30,
                 f"\tMemory not enough to fit {user_specified_num_folds_parallel} folds in parallel. "
                 f"Will train {num_folds_parallel} folds in parallel instead (Estimated {mem_proportion_per_fold*100:.2f}% memory usage per fold, "
-                f"{num_folds_parallel*mem_proportion_per_fold*100:.2f}%/{max_memory_usage_ratio*100:.2f}% total)."
+                f"{num_folds_parallel*mem_proportion_per_fold*100:.2f}%/{max_memory_usage_ratio*100:.2f}% total).",
             )
         return num_folds_parallel
 
@@ -665,19 +665,19 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
             self.ray.cancel(task, force=True)
 
     def _fit(
-            self,
-            *,
-            model_base_ref,
-            X_ref,
-            y_ref,
-            X_pseudo_ref,
-            y_pseudo_ref,
-            time_limit_fold: float,
-            fold_ctx: dict,
-            resources: dict,
-            head_node_id: str,
-            kwargs: dict,
-            resources_model: dict = None,
+        self,
+        *,
+        model_base_ref,
+        X_ref,
+        y_ref,
+        X_pseudo_ref,
+        y_pseudo_ref,
+        time_limit_fold: float,
+        fold_ctx: dict,
+        resources: dict,
+        head_node_id: str,
+        kwargs: dict,
+        resources_model: dict = None,
     ):
         if resources_model is None:
             resources_model = resources
