@@ -539,12 +539,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         # it predict memory usage before hand
         # MemoryError is the actual python memory error if the process failed
         except (NotEnoughMemoryError, MemoryError):
-            error_msg = "Consider decrease folds trained in parallel \
-                                by passing num_fold_parallel to ag_args_ensemble \
-                                when calling tabular.fit.\n\
-                                If none working, use sequential folding by passing \
-                                SequentialLocalFoldFittingStrategy to ag_args_ensemble \
-                                when calling tabular.fit and try again."
+            error_msg = "Consider decreasing folds trained in parallel by passing num_folds_parallel to ag_args_ensemble when calling `predictor.fit`."
             logger.warning(error_msg)
             # Terminate all ray tasks because a fold failed
             self.terminate_all_unfinished_tasks(unfinished)
@@ -788,32 +783,29 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
     def _parse_ray_error(self, e):
         error = str(e).lower()
         if "cuda" in error and ("out of memory" in error or "alloc" in error):
-            default_error_msg = "If none working, use sequential folding by passing \
-                         SequentialLocalFoldFittingStrategy to ag_args_ensemble \
-                         when calling tabular.fit and try again."
+            default_error_msg = ("If none working, use sequential folding by passing SequentialLocalFoldFittingStrategy to ag_args_ensemble "
+                                 "when calling `predictor.fit` and try again.")
             # FIXME: Avoid hardcoding model names.
             if self.model_base.__class__.__name__ in [TEXT_MODEL, IMAGE_MODEL]:
-                error_msg = f"Out of CUDA memory while training \
-                            {self.model_base.__class__.__name__}. \
-                            Consider decrease batch size in hyperparameter and try again.\n\
-                            Or decrease folds trained in parallel by passing num_fold_parallel \
-                            to ag_args_ensemble when calling tabular.fit if you have multiple \
-                            gpus and try again"
+                error_msg = (f"Out of CUDA memory while training "
+                             f"{self.model_base.__class__.__name__}. "
+                             f"Consider decreasing batch size in hyperparameter and try again.\n"
+                             f"Alternatively, decrease folds trained in parallel by passing num_folds_parallel "
+                             f"to ag_args_ensemble when calling `predictor.fit` if you have multiple GPUs and try again")
                 logger.warning(error_msg)
             # FIXME: Avoid hardcoding model names.
             elif self.model_base.__class__.__name__ in [TABULAR_TORCH_MODEL, TABULAR_FASTAI_MODEL]:
-                error_msg = f"Out of CUDA memory while training \
-                            {self.model_base.__class__.__name__}. \
-                            Consider decrease batch size in hyperparameter and try again.\n\
-                            Or decrease folds trained in parallel by passing num_fold_parallel \
-                            to ag_args_ensemble when calling tabular.fit and try again"
+                error_msg = (f"Out of CUDA memory while training {self.model_base.__class__.__name__}. "
+                             f"Consider decrasing batch size in hyperparameter and try again.\n"
+                             f"Alternatively, decrease folds trained in parallel by passing num_folds_parallel "
+                             f"to ag_args_ensemble when calling `predictor.fit` and try again")
                 logger.warning(error_msg)
             else:
-                error_msg = f"Out of CUDA memory while training \
-                            {self.model_base.__class__.__name__}. \
-                            Consider decrease folds trained in parallel by passing \
-                            num_fold_parallel to ag_args_ensemble when calling tabular.fit \
-                            and try again"
+                error_msg = (f"Out of CUDA memory while training "
+                             f"{self.model_base.__class__.__name__}. "
+                             f"Consider decreasing folds trained in parallel by passing "
+                             f"num_folds_parallel to ag_args_ensemble when calling `predictor.fit` "
+                             f"and try again.")
                 logger.warning(error_msg)
             logger.warning(default_error_msg)
             e = NotEnoughCudaMemoryError
