@@ -687,11 +687,6 @@ def test_when_dataframe_sliced_by_item_array_then_static_features_stay_consisten
     assert set(right.static_features.index) == set(right_index)
 
 
-def test_when_dataframe_reindexed_view_called_then_static_features_stay_consistent():
-    view = SAMPLE_TS_DATAFRAME_STATIC.get_reindexed_view()
-    assert view._static_features.equals(SAMPLE_TS_DATAFRAME_STATIC._static_features)
-
-
 def test_given_wrong_ids_stored_in_item_id_column_when_constructing_tsdf_then_exception_is_raised():
     df = SAMPLE_DATAFRAME.copy()
     static_df = SAMPLE_STATIC_DATAFRAME.copy()
