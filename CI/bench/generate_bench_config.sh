@@ -57,6 +57,7 @@ else
         shot_value="500"
         seed_value="7"
         custom_dataloader_value="dataloader_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataloader_file;class_name:$class_name;dataset_config_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataset_file;fewshot:$fewshot_flag;shot:$shot_value;lang:en;seed:$seed_value"
+        custom_dataloader_value="${custom_dataloader_value//[\"']}"
     else
         echo "Error: Unsupported benchmark '$BENCHMARK'"
         exit 1
