@@ -36,9 +36,9 @@ else
     class_name=""
     dataset_file=""
     custom_dataloader_value=""
-    fewshow_flag=""
-    shot_value=""
-    seed_value=""
+    fewshow_flag=false
+    shot_value=0
+    seed_value=0
     if [ $BENCHMARK == "image" ]; then
         dataloader_file="vision_dataloader.py"
         class_name="VisionDataLoader"
@@ -53,11 +53,10 @@ else
         dataloader_file="text_dataloader.py"
         class_name="TextDataLoader"
         dataset_file="text_datasets.yaml"
-        fewshot_flag="True"
-        shot_value="500"
-        seed_value="7"
-        custom_dataloader_value="dataloader_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataloader_file;class_name:$class_name;dataset_config_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataset_file;fewshot:$fewshot_flag;shot:$shot_value;lang:en;seed:$seed_value"
-        custom_dataloader_value="${custom_dataloader_value//\'}"
+        fewshot_flag=true
+        shot_value=500
+        seed_value=7
+        custom_dataloader_value="dataloader_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataloader_file;class_name:$class_name;dataset_config_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataset_file;fewshot:$fewshot_flag;shot:$shot_value;seed:$seed_value"
     else
         echo "Error: Unsupported benchmark '$BENCHMARK'"
         exit 1
