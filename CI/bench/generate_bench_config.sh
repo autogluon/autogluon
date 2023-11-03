@@ -38,7 +38,7 @@ else
         dataloader_file="vision_dataloader.py"
         class_name="VisionDataLoader"
         dataset_file="automm_cv_datasets.yaml"
-    elif [ $BENCHMARK == "text-tabular"]; then
+    elif [ $BENCHMARK == "text-tabular" ]; then
         dataloader_file="text_tabular_dataloader.py"
         class_name="TextTabularDataLoader"
         dataset_file="text_tabular_datasets.yaml"
