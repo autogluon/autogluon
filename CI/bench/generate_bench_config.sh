@@ -35,14 +35,22 @@ else
     dataloader_file=""
     class_name=""
     dataset_file=""
+    custom_dataloader_value=""
     if [ $BENCHMARK == "image" ]; then
         dataloader_file="vision_dataloader.py"
         class_name="VisionDataLoader"
         dataset_file="automm_cv_datasets.yaml"
+        custom_dataloader_value="dataloader_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataloader_file;class_name:$class_name;dataset_config_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataset_file"
     elif [ $BENCHMARK == "text-tabular" ]; then
         dataloader_file="text_tabular_dataloader.py"
         class_name="TextTabularDataLoader"
         dataset_file="text_tabular_datasets.yaml"
+        custom_dataloader_value="dataloader_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataloader_file;class_name:$class_name;dataset_config_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataset_file"
+    elif [ $BENCHMARK == "text" ]; then
+        dataloader_file="text_dataloader.py"
+        class_name="TextDataLoader"
+        dataset_file="text_datasets.yaml"
+        custom_dataloader_value="dataloader_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataloader_file;class_name:$class_name;dataset_config_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataset_file;fewshot:True;shot:500;lang:en;seed:7"
     else
         echo "Error: Unsupported benchmark '$BENCHMARK'"
         exit 1
@@ -71,7 +79,7 @@ else
     --constraint $TIME_LIMIT \
     --custom-resource-dir $(dirname "$0")/custom_user_dir \
     --dataset-names "$dataset_names" \
-    --custom-dataloader "dataloader_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataloader_file;class_name:$class_name;dataset_config_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataset_file"
+    --custom-dataloader "$custom_dataloader_value"
 fi
 
 # TO DO: 
