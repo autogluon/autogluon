@@ -1,0 +1,278 @@
+base: &base
+  url: s3://automl-mm-bench/{name}/{split}.csv
+  test_split_name: test
+  splits:
+    - train
+    - test
+  feature_columns:
+    - ImageID
+  label_columns:
+    - LabelName
+  ignore_columns: null
+  annotation: "{name}_{split}_annotations.csv"
+  image_path: "{name}/{value}"
+  metric: acc
+  problem_type: multiclass
+  
+
+prod:
+  <<: *base
+  url: s3://automl-mm-bench/machine_hack_product_sentiment/{split}.csv
+  test_split_name: dev
+  feature_columns:
+    - Product_Description
+    - Product_Type
+  label_columns:
+    - Sentiment
+
+airbnb:
+  <<: *base
+  url: s3://automl-mm-bench/airbnb_melbourne/{split}.pq
+  feature_columns:
+    null
+  label_columns:
+    - price_label
+  ignore_columns:
+    - id
+    - listing_url
+    - scrape_id
+    - last_scraped
+    - picture_url
+    - host_id
+    - host_url
+    - host_name
+    - host_thumbnail_url
+    - host_picture_url
+    - monthly_price
+    - weekly_price
+    - price
+    - calendar_last_scraped
+
+channel:
+  <<: *base
+  url: s3://automl-mm-bench/news_channel/{split}.csv
+  feature_columns:
+    null
+  label_columns:
+    - channel
+  ignore_columns:
+    null
+
+wine:
+  <<: *base
+  url: s3://automl-mm-bench/wine_reviews/{split}.csv
+  feature_columns:
+    null
+  label_columns:
+    - variety
+  ignore_columns:
+    null
+
+imdb:
+  <<: *base
+  url: s3://automl-mm-bench/imdb_genre_prediction/{split}.csv
+  feature_columns:
+    null
+  label_columns:
+    - Genre_is_Drama
+  ignore_columns:
+    null
+  metric: roc_auc
+  problem_type: binary
+
+jigsaw:
+  <<: *base
+  url: s3://automl-mm-bench/jigsaw_unintended_bias100K/{split}.pq
+  feature_columns:
+    - comment_text
+    - asian
+    - atheist
+    - bisexual
+    - black
+    - buddhist
+    - christian
+    - female
+    - heterosexual
+    - hindu
+    - homosexual_gay_or_lesbian
+    - intellectual_or_learning_disability
+    - jewish
+    - latino
+    - male
+    - muslim
+    - other_disability
+    - other_gender
+    - other_race_or_ethnicity
+    - other_religion
+    - other_sexual_orientation
+    - physical_disability
+    - psychiatric_or_mental_illness
+    - transgender
+    - white
+    - funny
+    - wow
+    - sad
+    - likes
+    - disagree
+  label_columns:
+    - target
+  metric: roc_auc
+  problem_type: binary
+
+fake:
+  <<: *base
+  url: s3://automl-mm-bench/fake_job_postings2/{split}.csv
+  feature_columns:
+    null
+  label_columns:
+    - fraudulent
+  ignore_columns:
+    null
+  metric: roc_auc
+  problem_type: binary
+
+kick:
+  <<: *base
+  url: s3://automl-mm-bench/kick_starter_funding/{split}.csv
+  feature_columns:
+    null
+  label_columns:
+    - final_status
+  ignore_columns:
+    null
+  metric: roc_auc
+  problem_type: binary
+
+ae:
+  <<: *base
+  url: s3://automl-mm-bench/ae_price_prediction/{split}.pq
+  feature_columns:
+    null
+  label_columns:
+    - price
+  ignore_columns:
+    - mrp
+    - pdp_url
+  metric: r2
+  problem_type: regression
+
+qaa:
+  <<: *base
+  url: s3://automl-mm-bench/google_quest_qa/{split}.pq
+  test_split_name: dev
+  feature_columns:
+    - question_title
+    - question_body
+    - answer
+    - category
+  label_columns:
+    - answer_type_reason_explanation
+  metric: r2
+  problem_type: regression
+
+qaq:
+  <<: *base
+  url: s3://automl-mm-bench/google_quest_qa/{split}.pq
+  test_split_name: dev
+  feature_columns:
+    - question_title
+    - question_body
+    - answer
+    - category
+  label_columns:
+    - question_type_reason_explanation
+  metric: r2
+  problem_type: regression
+
+cloth:
+  <<: *base
+  url: s3://automl-mm-bench/women_clothing_review/{split}.pq
+  feature_columns:
+    - Title
+    - Review Text
+    - Age
+    - Division Name
+    - Department Name
+    - Class Name
+  label_columns:
+    - Rating
+  metric: r2
+  problem_type: regression
+
+mercari:
+  <<: *base
+  url: s3://automl-mm-bench/mercari_price_suggestion100K/{split}.pq
+  feature_columns:
+    null
+  label_columns:
+    - log_price
+  ignore_columns:
+    - train_id
+    - price
+  metric: r2
+  problem_type: regression
+
+jc:
+  <<: *base
+  url: s3://automl-mm-bench/jc_penney_products/{split}.csv
+  feature_columns:
+    null
+  label_columns:
+    - sale_price
+  ignore_columns:
+    null
+  metric: r2
+  problem_type: regression
+
+pop:
+  <<: *base
+  url: s3://automl-mm-bench/news_popularity2/{split}.csv
+  feature_columns:
+    null
+  label_columns:
+    - log_shares
+  ignore_columns:
+    null
+  metric: r2
+  problem_type: regression
+
+book:
+  <<: *base
+  url: s3://automl-mm-bench/machine_hack_competitions/predict_the_price_of_books/{split}.csv
+  feature_columns:
+    - Title
+    - Author
+    - Edition
+    - Reviews
+    - Ratings
+    - Synopsis
+    - Genre
+    - BookCategory
+  label_columns:
+    - Price
+  ignore_columns:
+    null
+  metric: r2
+  problem_type: regression
+
+salary:
+  <<: *base
+  url: s3://automl-mm-bench/machine_hack_competitions/predict_the_data_scientists_salary_in_india_hackathon/{split}.csv
+  feature_columns:
+    null
+  label_columns:
+    - salary
+  ignore_columns:
+    null
+  metric: acc
+  problem_type: multiclass
+
+house:
+  <<: *base
+  url: s3://automl-mm-bench/kaggle-california-house-prices/{split}.csv
+  feature_columns:
+    null
+  label_columns:
+    - Sold Price
+  metric: r2
+  problem_type: regression

@@ -1,0 +1,137 @@
+# data = custom_class(dataset_name=dataset_name, split=split, **kwargs)
+# custom_class: custom dataloader class, e.g. sample_configs/vision_dataset.py
+
+
+base: &base
+  url: s3://automl-mm-bench/vision_datasets/custom_labels_cv_datasets/image_classification_cleaned/{name}.zip
+  splits:
+    - train
+    - test
+  feature_columns:
+    - ImageID
+  label_columns:
+    - LabelName
+  annotation: "{name}_{split}_annotations.csv"
+  image_path: "{name}/{value}"
+  metric: acc
+  problem_type: multiclass
+  
+
+bayer:
+  <<: *base
+  image_path: "{split}/{value}"
+  problem_type: binary
+
+belgalogos:
+  <<: *base
+ 
+cub200:
+  <<: *base
+
+describabletextures:
+  <<: *base
+
+europeanflooddepth:
+  <<: *base
+  problem_type: binary
+
+fgvc_aircrafts:
+  <<: *base
+
+food101:
+  <<: *base
+  
+ifood:
+  <<: *base
+  
+kindle:
+  <<: *base
+  image_path: "{name}/{split}/{value}"
+
+magnetictiledefects:
+  <<: *base
+
+malariacellimages:
+  <<: *base
+  problem_type: binary
+  
+mit67:
+  <<: *base
+  image_path: "{name}/{split}/{value}"
+
+nike:
+  <<: *base
+  image_path: "{name}/{split}/{value}"
+
+nwpu_resisc45:
+  <<: *base
+
+opensurfacesminc2500:
+  <<: *base
+  
+oxfordflowers:
+  <<: *base
+  image_path: "{name}/{split}/{value}"
+
+redfin:
+  <<: *base
+
+semartschool:
+  <<: *base
+
+stanfordcars:
+  <<: *base
+
+stanforddogs:
+  <<: *base
+  image_path: "{name}/{split}/{value}"
+
+mnist:
+  <<: *base
+  annotation: "{name}_{split}_anno.csv"
+  image_path: "{split}/{value}"
+
+SUN397:
+  <<: *base
+  splits:
+    - train
+    - validation
+    - test
+  annotation: "{name}_{split}_anno.csv"
+  image_path: "{name}/{value}"
+
+OxfordIIITPet:
+  <<: *base
+  splits:
+    - train
+    - validation
+    - test
+  annotation: "{name}_{split}_anno.csv"
+  image_path: "{split}/{value}"
+
+caltech256:
+  <<: *base
+  splits:
+    - train
+    - validation
+    - test
+  annotation: "{name}_{split}_anno.csv"
+  image_path: "{split}/{value}"
+
+cifar100:
+  <<: *base
+  splits:
+    - train
+    - validation
+    - test
+  annotation: "{name}_{split}_anno.csv"
+  image_path: "{split}/{value}"
+
+cifar10:
+  <<: *base
+  splits:
+    - train
+    - validation
+    - test
+  annotation: "{name}_{split}_anno.csv"
+  image_path: "{split}/{value}"
