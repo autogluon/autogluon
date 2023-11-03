@@ -853,7 +853,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
             elif self.model_base.__class__.__name__ in [TABULAR_TORCH_MODEL, TABULAR_FASTAI_MODEL]:
                 error_msg = (
                     f"Out of CUDA memory while training {self.model_base.__class__.__name__}. "
-                    f"Consider decrasing batch size in hyperparameter and try again.\n"
+                    f"Consider decreasing batch size in hyperparameter and try again.\n"
                     f"Alternatively, decrease folds trained in parallel by passing num_folds_parallel "
                     f"to ag_args_ensemble when calling `predictor.fit` and try again"
                 )
