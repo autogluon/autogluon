@@ -181,7 +181,7 @@ class MultimodalFusionMLP(AbstractMultimodalFusionModel):
                 per_output = {per_model.prefix: {}}
                 per_output[per_model.prefix][WEIGHT] = torch.tensor(self.loss_weight).to(per_logits.dtype)
                 per_output[per_model.prefix][LOGITS] = per_logits
-            output.update(per_output)
+                output.update(per_output)
             fusion_output[self.prefix].update({WEIGHT: torch.tensor(1.0).to(logits)})
             output.update(fusion_output)
             return output
