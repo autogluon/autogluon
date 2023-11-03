@@ -14,6 +14,7 @@ from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.data.label_cleaner import LabelCleaner
 from autogluon.core.models import AbstractModel, BaggedEnsembleModel
+from autogluon.core.stacked_overfitting.utils import check_stacked_overfitting_from_leaderboard
 from autogluon.core.utils import download, generate_train_test_split, infer_problem_type, unzip
 from autogluon.features.generators import AbstractFeatureGenerator, AutoMLPipelineFeatureGenerator
 from autogluon.tabular import TabularDataset, TabularPredictor
@@ -141,6 +142,9 @@ class FitHelper:
         path_as_absolute=False,
         compile_models=False,
         compiler_configs=None,
+        allowed_dataset_features=None,
+        expected_stacked_overfitting_at_test=None,
+        expected_stacked_overfitting_at_val=None,
     ):
         if compiler_configs is None:
             compiler_configs = {}
@@ -150,6 +154,10 @@ class FitHelper:
         _init_args = dict(
             label=label,
         )
+        if allowed_dataset_features is not None:
+            train_data = train_data[allowed_dataset_features + [label]]
+            test_data = test_data[allowed_dataset_features + [label]]
+
         if init_args is None:
             init_args = _init_args
         else:
@@ -190,7 +198,8 @@ class FitHelper:
             if predictor.can_predict_proba:
                 predictor.predict_proba(test_data, model=refit_model_name)
         predictor.info()
-        predictor.leaderboard(test_data, extra_info=True, extra_metrics=extra_metrics)
+        lb = predictor.leaderboard(test_data, extra_info=True, extra_metrics=extra_metrics)
+        stacked_overfitting_assert(lb, predictor, expected_stacked_overfitting_at_val, expected_stacked_overfitting_at_test)
 
         predictor_load = predictor.load(path=predictor.path)
         predictor_load.predict(test_data)
@@ -337,3 +346,17 @@ def mock_num_gpus():
 @pytest.fixture
 def k_fold():
     return 2
+
+
+@pytest.fixture
+def stacked_overfitting_assert_func():
+    return stacked_overfitting_assert
+
+
+def stacked_overfitting_assert(lb, predictor, expected_stacked_overfitting_at_val, expected_stacked_overfitting_at_test):
+    if expected_stacked_overfitting_at_val is not None:
+        assert predictor._stacked_overfitting_occurred == expected_stacked_overfitting_at_val, "Expected stacked overfitting at val mismatch!"
+
+    if expected_stacked_overfitting_at_test is not None:
+        stacked_overfitting = check_stacked_overfitting_from_leaderboard(lb)
+        assert stacked_overfitting == expected_stacked_overfitting_at_test, "Expected stacked overfitting at test mismatch!"
