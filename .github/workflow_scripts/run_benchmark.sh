@@ -14,8 +14,6 @@ source $(dirname "$0")/env_setup.sh
 setup_benchmark_env
 
 /bin/bash CI/bench/generate_bench_config.sh $MODULE $PRESET $BENCHMARK $TIME_LIMIT $BRANCH_OR_PR_NUMBER
-echo "Printing Cloud Config File:"
-cat $MODULE"_cloud_configs.yaml"
 agbench run $MODULE"_cloud_configs.yaml" --dev-branch https://github.com/autogluon/autogluon-bench.git#master --wait
 
 # If it is a PR, fetch the cleaned file of master-evaluation
