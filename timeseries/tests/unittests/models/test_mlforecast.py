@@ -59,10 +59,20 @@ def test_when_covariates_and_features_present_then_train_and_val_dfs_have_correc
 @pytest.mark.parametrize("model_type", TESTABLE_MODELS)
 @pytest.mark.parametrize("data", [DATAFRAME_WITH_STATIC, DATAFRAME_WITH_COVARIATES])
 def test_when_covariates_and_features_present_then_model_can_predict(temp_model_path, model_type, data):
-    data = data.copy()
-    model = model_type(path=temp_model_path, freq=data.freq)
-    model.fit(train_data=data, time_limit=10)
-    predictions = model.predict(data)
+    prediction_length = 3
+    known_covariates_names = data.columns.drop("target")
+    data_train, known_covariates = data.get_model_inputs_for_scoring(
+        prediction_length, known_covariates_names=known_covariates_names
+    )
+
+    feat_gen = TimeSeriesFeatureGenerator(target="target", known_covariates_names=known_covariates_names)
+    data_train = feat_gen.fit_transform(data_train)
+
+    model = model_type(
+        path=temp_model_path, prediction_length=prediction_length, freq=data.freq, metadata=feat_gen.covariate_metadata
+    )
+    model.fit(train_data=data_train, time_limit=10)
+    predictions = model.predict(data_train, known_covariates=known_covariates)
     assert isinstance(predictions, TimeSeriesDataFrame)
     assert len(predictions) == data.num_items * model.prediction_length
 
