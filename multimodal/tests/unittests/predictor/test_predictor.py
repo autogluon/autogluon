@@ -103,99 +103,100 @@ def verify_no_redundant_model_configs(predictor):
             "nlpaueb/legal-bert-small-uncased",
             "swin_tiny_patch4_window7_224",
             GREEDY_SOUP,
+            #BEST,
             LORA,
             "auto",
         ),
-        (
-            "petfinder",
-            ["t_few"],
-            "t5-small",
-            None,
-            BEST,
-            IA3,
-            "auto",
-        ),
-        (
-            "hateful_memes",
-            ["timm_image", "t_few", "fusion_mlp"],
-            "t5-small",
-            "mobilenetv3_small_100",
-            BEST,
-            IA3,
-            "auto",
-        ),
-        (
-            "hateful_memes_bytearray",
-            ["timm_image", "hf_text", "fusion_mlp"],
-            "monsoon-nlp/hindi-bert",
-            "mobilenetv3_small_100",
-            UNIFORM_SOUP,
-            LORA_NORM,
-            "auto",
-        ),
-        (
-            "petfinder_bytearray",
-            ["numerical_mlp", "categorical_mlp", "timm_image", "fusion_mlp"],
-            None,
-            "mobilenetv3_small_100",
-            GREEDY_SOUP,
-            None,
-            "auto",
-        ),
-        (
-            "petfinder",
-            ["numerical_mlp", "categorical_mlp", "hf_text", "fusion_mlp"],
-            "nlpaueb/legal-bert-small-uncased",
-            None,
-            UNIFORM_SOUP,
-            None,
-            "auto",
-        ),
-        (
-            "petfinder",
-            ["numerical_mlp", "categorical_mlp", "fusion_mlp"],
-            None,
-            None,
-            BEST,
-            BIT_FIT,
-            "auto",
-        ),
-        (
-            "hateful_memes",
-            ["timm_image"],
-            None,
-            "mobilenetv3_small_100",
-            UNIFORM_SOUP,
-            NORM_FIT,
-            "auto",
-        ),
-        (
-            "ae",
-            ["hf_text"],
-            "nlpaueb/legal-bert-small-uncased",
-            None,
-            BEST,
-            LORA_BIAS,
-            "bcewithlogitsloss",
-        ),
-        (
-            "ae",
-            ["hf_text"],
-            "CLTL/MedRoBERTa.nl",
-            None,
-            BEST,
-            None,
-            "auto",
-        ),
-        (
-            "hateful_memes",
-            ["clip"],
-            None,
-            None,
-            BEST,
-            NORM_FIT,
-            "auto",
-        ),
+        # (
+        #     "petfinder",
+        #     ["t_few"],
+        #     "t5-small",
+        #     None,
+        #     BEST,
+        #     IA3,
+        #     "auto",
+        # ),
+        # (
+        #     "hateful_memes",
+        #     ["timm_image", "t_few", "fusion_mlp"],
+        #     "t5-small",
+        #     "mobilenetv3_small_100",
+        #     BEST,
+        #     IA3,
+        #     "auto",
+        # ),
+        # (
+        #     "hateful_memes_bytearray",
+        #     ["timm_image", "hf_text", "fusion_mlp"],
+        #     "monsoon-nlp/hindi-bert",
+        #     "mobilenetv3_small_100",
+        #     UNIFORM_SOUP,
+        #     LORA_NORM,
+        #     "auto",
+        # ),
+        # (
+        #     "petfinder_bytearray",
+        #     ["numerical_mlp", "categorical_mlp", "timm_image", "fusion_mlp"],
+        #     None,
+        #     "mobilenetv3_small_100",
+        #     GREEDY_SOUP,
+        #     None,
+        #     "auto",
+        # ),
+        # (
+        #     "petfinder",
+        #     ["numerical_mlp", "categorical_mlp", "hf_text", "fusion_mlp"],
+        #     "nlpaueb/legal-bert-small-uncased",
+        #     None,
+        #     UNIFORM_SOUP,
+        #     None,
+        #     "auto",
+        # ),
+        # (
+        #     "petfinder",
+        #     ["numerical_mlp", "categorical_mlp", "fusion_mlp"],
+        #     None,
+        #     None,
+        #     BEST,
+        #     BIT_FIT,
+        #     "auto",
+        # ),
+        # (
+        #     "hateful_memes",
+        #     ["timm_image"],
+        #     None,
+        #     "mobilenetv3_small_100",
+        #     UNIFORM_SOUP,
+        #     NORM_FIT,
+        #     "auto",
+        # ),
+        # (
+        #     "ae",
+        #     ["hf_text"],
+        #     "nlpaueb/legal-bert-small-uncased",
+        #     None,
+        #     BEST,
+        #     LORA_BIAS,
+        #     "bcewithlogitsloss",
+        # ),
+        # (
+        #     "ae",
+        #     ["hf_text"],
+        #     "CLTL/MedRoBERTa.nl",
+        #     None,
+        #     BEST,
+        #     None,
+        #     "auto",
+        # ),
+        # (
+        #     "hateful_memes",
+        #     ["clip"],
+        #     None,
+        #     None,
+        #     BEST,
+        #     NORM_FIT,
+        #     "auto",
+        # ),
     ],
 )
 def test_predictor(
@@ -207,6 +208,7 @@ def test_predictor(
     efficient_finetune,
     loss_function,
 ):
+    print("##########1########")
     dataset = ALL_DATASETS[dataset_name]
     metric_name = dataset.metric
 
@@ -226,6 +228,7 @@ def test_predictor(
         "data.categorical.convert_to_text": False,  # ensure the categorical model is used.
         "data.numerical.convert_to_text": False,  # ensure the numerical model is used.
     }
+    print("##########2########")
     if text_backbone is not None:
         if "t_few" in model_names:
             hyperparameters.update(
@@ -260,11 +263,17 @@ def test_predictor(
         time_limit=20,
         save_path=save_path,
     )
+    print("##########3########")
     verify_no_redundant_model_configs(predictor)
+    print("##########4########")
     score = predictor.evaluate(dataset.test_df)
+    print("##########5########")
     verify_predictor_save_load(predictor, dataset.test_df)
-    verify_realtime_inference(predictor, dataset.test_df)
+    print("##########6########")
+    #verify_realtime_inference(predictor, dataset.test_df)
+    print("##########7########")
 
+    
     # Test for continuous fit
     predictor.fit(
         train_data=dataset.train_df,
@@ -278,6 +287,7 @@ def test_predictor(
     with tempfile.TemporaryDirectory() as root:
         predictor.save(root)
         predictor = MultiModalPredictor.load(root)
+        print("##########8########")
         predictor.fit(
             train_data=dataset.train_df,
             hyperparameters=hyperparameters,

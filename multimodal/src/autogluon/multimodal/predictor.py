@@ -1776,7 +1776,7 @@ class MultiModalPredictor(ExportMixin):
         callbacks = []
         pred_writer = None
         if isinstance(strategy, str) and DDP in strategy:
-            pred_writer = DDPPredictionWriter(output_dir=self._save_path, write_interval="epoch")
+            pred_writer = DDPPredictionWriter(output_dir=self._save_path, write_interval="epoch", strategy=strategy)
             callbacks = [pred_writer]
 
         if self._problem_type == NER:

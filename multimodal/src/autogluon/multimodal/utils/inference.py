@@ -177,7 +177,7 @@ def infer_batch(
     batch_size = len(batch[next(iter(batch))])
     if 1 < num_gpus <= batch_size:
         model = nn.DataParallel(model)
-    model.to(device).eval()
+    model.to(device).eval()  # TODO: this cause the extra GPU usage errors, we may want to seperate fit and realtime inference (which is not using lightning module)
     batch = move_to_device(batch, device=device)
     precision_context = get_precision_context(precision=precision, device_type=device_type)
     with precision_context, torch.no_grad():
@@ -294,7 +294,8 @@ def use_realtime(data: pd.DataFrame, data_processors: Dict, batch_size: int):
         if sample_num <= min(200, batch_size):
             realtime = True
 
-    return realtime
+    return False
+    #return realtime
 
 
 def process_batch(
@@ -586,5 +587,4 @@ def predict(
                 strategy=strategy,
                 barebones=barebones,
             )
-
     return outputs

@@ -1738,6 +1738,11 @@ class MultiModalMatcher:
             is_matching=True,
             realtime=realtime,
         )
+        print("#############################")
+        print("#############################")
+        print(outputs)  # TODO: It is None here
+        print("#############################")
+        print("#############################")
         features = extract_from_output(outputs=outputs, ret_type=FEATURES, as_ndarray=as_tensor is False)
 
         if as_pandas:
