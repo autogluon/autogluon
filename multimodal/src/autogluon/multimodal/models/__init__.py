@@ -18,3 +18,4 @@ from .numerical_mlp import NumericalMLP
 from .ovd import OVDModel
 from .t_few import TFewModel
 from .timm_image import TimmAutoModelForImagePrediction
+from .utils import get_model_postprocess_fn

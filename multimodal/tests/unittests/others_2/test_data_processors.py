@@ -63,4 +63,4 @@ def test_tokenizer_use_fast(checkpoint_name, use_fast, tokenizer_type):
             save_path=save_path,
             hyperparameters=hyperparameters,
         )
-    assert isinstance(predictor._data_processors[TEXT][0].tokenizer, tokenizer_type)
+    assert isinstance(predictor._learner._data_processors[TEXT][0].tokenizer, tokenizer_type)

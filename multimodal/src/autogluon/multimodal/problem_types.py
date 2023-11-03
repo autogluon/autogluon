@@ -19,8 +19,6 @@ from .constants import (
     NER_ANNOTATION,
     NUMERICAL,
     OBJECT_DETECTION,
-    OCR_TEXT_DETECTION,
-    OCR_TEXT_RECOGNITION,
     OPEN_VOCABULARY_OBJECT_DETECTION,
     REGRESSION,
     ROIS,
@@ -208,28 +206,5 @@ PROBLEM_TYPES_REG.register(
         experimental=True,
         supported_modality_type={TEXT},
         force_exist_modality={TEXT},
-    ),
-)
-
-# OCR. TODO: Improve the definition of OCR.
-PROBLEM_TYPES_REG.register(
-    OCR_TEXT_DETECTION,
-    ProblemTypeProperty(
-        name=OCR_TEXT_DETECTION,
-        support_fit=False,
-        support_zero_shot=True,
-        experimental=True,
-        supported_modality_type={IMAGE},
-    ),
-)
-
-PROBLEM_TYPES_REG.register(
-    OCR_TEXT_RECOGNITION,
-    ProblemTypeProperty(
-        name=OCR_TEXT_RECOGNITION,
-        support_fit=False,
-        support_zero_shot=True,
-        experimental=True,
-        supported_modality_type={IMAGE},
     ),
 )

@@ -1,8 +1,17 @@
+import os
+import shutil
+import tempfile
+from unittest import mock
+
+import numpy.testing as npt
 import pandas as pd
 import pytest
+import torch
 from ray import tune
 
 from autogluon.multimodal import MultiModalPredictor
+
+from ..utils.utils import get_home_dir
 
 
 def get_data():
@@ -45,7 +54,7 @@ def test_ner(checkpoint_name, searcher, scheduler):
     predictor = MultiModalPredictor(problem_type="ner", label=label_col)
     predictor.fit(
         train_data=train_data,
-        time_limit=40,
+        time_limit=60,
         hyperparameters={"model.ner_text.checkpoint_name": checkpoint_name, "optimization.learning_rate": lr},
         hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
     )
@@ -62,14 +71,14 @@ def test_ner(checkpoint_name, searcher, scheduler):
     "checkpoint_name",
     [("google/electra-small-discriminator")],
 )
-def test_multi_ner(checkpoint_name):
+def test_multi_column_ner(checkpoint_name):
     train_data = get_data()
     train_data["add_text"] = train_data.text_snippet
     label_col = "entity_annotations"
     predictor = MultiModalPredictor(problem_type="ner", label=label_col)
     predictor.fit(
         train_data=train_data,
-        time_limit=40,
+        time_limit=10,
         column_types={"text_snippet": "text_ner"},
         hyperparameters={"model.ner_text.checkpoint_name": checkpoint_name},
     )
@@ -79,3 +88,49 @@ def test_multi_ner(checkpoint_name):
     predictions = predictor.predict(test_predict)
     proba = predictor.predict_proba(test_predict)
     embeddings = predictor.extract_embedding(test_predict)
+
+
+def test_ner_standalone():
+    requests_gag = mock.patch(
+        "requests.Session.request",
+        mock.Mock(side_effect=RuntimeError("Please use the `responses` library to mock HTTP in your tests.")),
+    )
+    train_data = get_data()
+    label_col = "entity_annotations"
+    test_data = train_data.drop(label_col, axis=1)
+
+    predictor = MultiModalPredictor(problem_type="ner", label=label_col)
+
+    save_path = os.path.join(get_home_dir(), "standalone", "false")
+    if os.path.exists(save_path):
+        shutil.rmtree(save_path)
+
+    predictor.fit(
+        train_data=train_data,
+        time_limit=40,
+        hyperparameters={"model.ner_text.checkpoint_name": "google/electra-small-discriminator"},
+        save_path=save_path,
+    )
+    save_path_standalone = os.path.join(get_home_dir(), "standalone", "true")
+
+    predictor.save(
+        path=save_path_standalone,
+        standalone=True,
+    )
+
+    del predictor
+    torch.cuda.empty_cache()
+
+    loaded_online_predictor = MultiModalPredictor.load(path=save_path)
+    online_predictions = loaded_online_predictor.predict(test_data, as_pandas=False)
+    del loaded_online_predictor
+
+    with requests_gag:
+        # No internet connection here. If any command require internet connection, a RuntimeError will be raised!
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            torch.hub.set_dir(tmpdirname)  # block reading files in `.cache`.
+            loaded_offline_predictor = MultiModalPredictor.load(path=save_path_standalone)
+
+    offline_predictions = loaded_offline_predictor.predict(test_data, as_pandas=False)
+    del loaded_offline_predictor
+    npt.assert_equal(online_predictions[0], offline_predictions[0])

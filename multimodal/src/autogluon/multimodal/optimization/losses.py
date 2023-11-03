@@ -18,8 +18,6 @@ try:
 except ImportError:
     hvd = None
 
-from ..constants import AUTOMM
-
 logger = logging.getLogger(__name__)
 
 

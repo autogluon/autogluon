@@ -1,6 +1,14 @@
 from . import collator, infer_types, randaug, utils
 from .datamodule import BaseDataModule
 from .dataset import BaseDataset
+from .dataset_mmlab import MultiImageMixDataset
+from .infer_types import (
+    infer_column_types,
+    infer_output_shape,
+    infer_problem_type,
+    infer_rois_column_type,
+    is_image_column,
+)
 from .label_encoder import CustomLabelEncoder, NerLabelEncoder
 from .mixup import MixupModule
 from .preprocess_dataframe import MultiModalFeaturePreprocessor

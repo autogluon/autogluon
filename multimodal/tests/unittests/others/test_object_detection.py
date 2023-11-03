@@ -231,7 +231,7 @@ def test_mmdet_object_detection_save_and_load(checkpoint_name):
 
     pred = predictor.predict(test_path)
 
-    model_save_subdir = predictor._model.save()
+    model_save_subdir = predictor._learner._model.save()
 
     new_predictor = MultiModalPredictor(
         hyperparameters={
@@ -458,4 +458,4 @@ def test_detector_hyperparameters_consistency():
         hyperparameters=hyperparameters,
         time_limit=10,
     )
-    assert predictor._config == predictor_2._config
+    assert predictor._learner._config == predictor_2._learner._config
