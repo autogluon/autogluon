@@ -156,7 +156,7 @@ class TimeSeriesPredictor:
             )
         if self.target in known_covariates_names:
             raise ValueError(f"Target column {self.target} cannot be one of the known covariates.")
-        self.known_covariates_names = known_covariates_names
+        self.known_covariates_names = list(known_covariates_names)
 
         self.prediction_length = prediction_length
         # For each validation fold, all time series in training set must have length >= _min_train_length

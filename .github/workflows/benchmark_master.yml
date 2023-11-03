@@ -66,14 +66,14 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v1
         with:
           role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
-          role-duration-seconds: 14400
+          role-duration-seconds: 36000
           aws-region: us-east-1
       - name: Run benchmark - Tabular
         shell: bash -l {0}
         run: |
           nvm install 20
           npm install -g aws-cdk
-          /bin/bash ./.github/workflow_scripts/run_benchmark.sh tabular best small 1h8c ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
+          /bin/bash ./.github/workflow_scripts/run_benchmark.sh tabular best small 1h ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
 
   benchmark-timeseries:
     needs: [generate_amlb_user_dir, benchmark-tabular]
@@ -107,14 +107,14 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v1
         with:
           role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
-          role-duration-seconds: 14400
+          role-duration-seconds: 36000
           aws-region: us-east-1
       - name: Run benchmark - Timeseries
         shell: bash -l {0}
         run: |
           nvm install 20
           npm install -g aws-cdk
-          /bin/bash ./.github/workflow_scripts/run_benchmark.sh timeseries dev timeseries_test test101 ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
+          /bin/bash ./.github/workflow_scripts/run_benchmark.sh timeseries dev timeseries_small 10m4c ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
 
   benchmark-multimodal:
     needs: [generate_amlb_user_dir, benchmark-tabular, benchmark-timeseries]
@@ -148,7 +148,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v1
         with:
           role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
-          role-duration-seconds: 14400
+          role-duration-seconds: 36000
           aws-region: us-east-1
       - name: Run benchmark - Multimodal
         shell: bash -l {0}
