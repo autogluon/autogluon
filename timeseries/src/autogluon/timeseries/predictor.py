@@ -377,6 +377,7 @@ class TimeSeriesPredictor:
         refit_every_n_windows: int = 1,
         refit_full: bool = False,
         enable_ensemble: bool = True,
+        split_time_limit: Optional[bool] = None,
         random_seed: Optional[int] = None,
         verbosity: Optional[int] = None,
     ) -> "TimeSeriesPredictor":
@@ -572,6 +573,10 @@ class TimeSeriesPredictor:
         enable_ensemble : bool, default = True
             If True, the ``TimeSeriesPredictor`` will fit a simple weighted ensemble on top of the models specified via
             ``hyperparameters``.
+        split_time_limit : bool, optional
+            If True, ``time_limit`` will be distributed evenly among all models. If False, each model can be trained up
+            to the full remaining total time limit. If None (default), will be automatically set to True if
+            ``hyperparameter_tune_kwargs`` are provided, or False otherwise.
         random_seed : int, optional
             If provided, fixes the seed of the random number generator for all models. This guarantees reproducible
             results for most models (except those trained on GPU because of the non-determinism of GPU operations).
@@ -604,6 +609,7 @@ class TimeSeriesPredictor:
             num_val_windows=num_val_windows,
             refit_full=refit_full,
             enable_ensemble=enable_ensemble,
+            split_time_limit=split_time_limit,
             random_seed=random_seed,
             verbosity=verbosity,
         )
@@ -662,6 +668,7 @@ class TimeSeriesPredictor:
             val_splitter=val_splitter,
             refit_every_n_windows=refit_every_n_windows,
             enable_ensemble=enable_ensemble,
+            split_time_limit=split_time_limit,
         )
         if refit_full:
             if tuning_data is None:
