@@ -27,7 +27,6 @@ if [ $MODULE == "tabular" ] || [ $MODULE == "timeseries" ]; then
     --amlb-user-dir $(dirname "$0")/amlb_user_dir \
     --git-uri-branch https://github.com/openml/automlbenchmark.git#stable
 else
-# Put out an IF here based on the BENCHMARK value prepare the dataloader
     FRAMEWORK=AutoGluon_$PRESET
     aws s3 cp --recursive s3://autogluon-ci-benchmark/configs/$MODULE/$USER_DIR_S3_PREFIX/latest/ $(dirname "$0")/custom_user_dir/
     DATASET_YAML_PATH="$(dirname "$0")/custom_user_dir/dataloaders/automm_cv_datasets.yaml"
@@ -56,10 +55,3 @@ else
     --dataset-names "$dataset_names" \
     --custom-dataloader "dataloader_file:$(dirname "$0")/custom_user_dir/dataloaders/vision_dataloader.py;class_name:VisionDataLoader;dataset_config_file:$(dirname "$0")/custom_user_dir/dataloaders/automm_cv_datasets.yaml"
 fi
-
-# TO DO: 
-# Add Max Machine Num for all 3 modules
-# Store name of all datasets
-# Fill in the vision, text-tabular part
-# Run Benchmark will change accordingly
-# Benchmark results for multimodal will be stored in vision/text-tabular etc

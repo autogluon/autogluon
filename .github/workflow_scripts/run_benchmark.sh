@@ -13,7 +13,6 @@ source $(dirname "$0")/env_setup.sh
 
 setup_benchmark_env
 
-# Vision is the default for now, we add another arg here to mention the type of benchmarking for AutoMM - can use the $BENCHMARK ARGUMENT to distinguish between vision and text-tabular
 /bin/bash CI/bench/generate_bench_config.sh $MODULE $PRESET $BENCHMARK $TIME_LIMIT $BRANCH_OR_PR_NUMBER
 echo "Printing Cloud Config File:"
 cat $MODULE"_cloud_configs.yaml"
@@ -31,7 +30,6 @@ fi
 
 python CI/bench/evaluate.py --config_path ./ag_bench_runs/$MODULE/ --module_name $MODULE --time_limit $TIME_LIMIT --branch_name $BRANCH_OR_PR_NUMBER
 
-# May need to add a condition here on evaluation based on Vision or Text-Tabular
 for file in ./results/*; do
     # Check if the file does not start with "master"
     if [[ "$(basename "$file")" != "master"* ]]
