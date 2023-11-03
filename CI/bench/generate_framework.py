@@ -20,7 +20,7 @@ folds_to_run = args.folds_to_run
 current_dir = os.path.dirname(__file__)
 
 if module == 'multimodal':
-    framework_template_file = os.path.join(, f"{module}/custom_user_dir", "multimodal_frameworks_template.yaml")
+    framework_template_file = os.path.join(current_dir, f"{module}/custom_user_dir", "multimodal_frameworks_template.yaml")
     framework_benchmark_file = os.path.join(os.path.dirname(framework_template_file), "multimodal_frameworks.yaml")
     constraints_file = os.path.join(current_dir, f"{module}/custom_user_dir", "multimodal_constraints.yaml")
 else:
