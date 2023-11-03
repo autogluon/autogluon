@@ -37,7 +37,7 @@ on:
           - tabular_test
           - tabular_small
           - timeseries_small
-          - image
+          - none
       time_limit:
         description: 'Time limit for the benchmark to run'
         required: true
