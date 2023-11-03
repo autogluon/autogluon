@@ -28,10 +28,12 @@ if [ $BRANCH_OR_PR_NUMBER != "master" ]; then
         aws s3 cp --recursive s3://autogluon-ci-benchmark/cleaned/$MODULE/master/latest/ ./results
         mv "./results/$master_cleaned_file" "./results/$new_master_cleaned_file"
     else
+        echo "I am here"
         master_cleaned_file=$(aws s3 ls s3://autogluon-ci-benchmark/cleaned/$MODULE/$BENCHMARK/master/latest/ | awk '{print $NF}')
         new_master_cleaned_file="master_${master_cleaned_file}"
         aws s3 cp --recursive s3://autogluon-ci-benchmark/cleaned/$MODULE/$BENCHMARK/master/latest/ ./results
         mv "./results/$master_cleaned_file" "./results/$new_master_cleaned_file"
+    fi
 fi
 
 python CI/bench/evaluate.py --config_path ./ag_bench_runs/$MODULE/ --module_name $MODULE --time_limit $TIME_LIMIT --branch_name $BRANCH_OR_PR_NUMBER
