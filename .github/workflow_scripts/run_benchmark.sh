@@ -20,13 +20,18 @@ cat $MODULE"_cloud_configs.yaml"
 agbench run $MODULE"_cloud_configs.yaml" --dev-branch https://github.com/autogluon/autogluon-bench.git#master --wait
 
 # If it is a PR, fetch the cleaned file of master-evaluation
-if [ $BRANCH_OR_PR_NUMBER != "master" ]
-then
+if [ $BRANCH_OR_PR_NUMBER != "master" ]; then
     # Capture the name of the file, rename it and store it in ./results
-    master_cleaned_file=$(aws s3 ls s3://autogluon-ci-benchmark/cleaned/$MODULE/master/latest/ | awk '{print $NF}')
-    new_master_cleaned_file="master_${master_cleaned_file}"
-    aws s3 cp --recursive s3://autogluon-ci-benchmark/cleaned/$MODULE/master/latest/ ./results
-    mv "./results/$master_cleaned_file" "./results/$new_master_cleaned_file"
+    if [ $MODULE != "multimodal" ]; then
+        master_cleaned_file=$(aws s3 ls s3://autogluon-ci-benchmark/cleaned/$MODULE/master/latest/ | awk '{print $NF}')
+        new_master_cleaned_file="master_${master_cleaned_file}"
+        aws s3 cp --recursive s3://autogluon-ci-benchmark/cleaned/$MODULE/master/latest/ ./results
+        mv "./results/$master_cleaned_file" "./results/$new_master_cleaned_file"
+    else
+        master_cleaned_file=$(aws s3 ls s3://autogluon-ci-benchmark/cleaned/$MODULE/$BENCHMARK/master/latest/ | awk '{print $NF}')
+        new_master_cleaned_file="master_${master_cleaned_file}"
+        aws s3 cp --recursive s3://autogluon-ci-benchmark/cleaned/$MODULE/$BENCHMARK/master/latest/ ./results
+        mv "./results/$master_cleaned_file" "./results/$new_master_cleaned_file"
 fi
 
 python CI/bench/evaluate.py --config_path ./ag_bench_runs/$MODULE/ --module_name $MODULE --time_limit $TIME_LIMIT --branch_name $BRANCH_OR_PR_NUMBER
@@ -34,15 +39,22 @@ python CI/bench/evaluate.py --config_path ./ag_bench_runs/$MODULE/ --module_name
 # May need to add a condition here on evaluation based on Vision or Text-Tabular
 for file in ./results/*; do
     # Check if the file does not start with "master"
-    if [[ "$(basename "$file")" != "master"* ]]
-    then
+    if [[ "$(basename "$file")" != "master"* ]] && [ $MODULE != "multimodal" ]; then
         aws s3 cp "$file" "s3://autogluon-ci-benchmark/cleaned/$MODULE/$BRANCH_OR_PR_NUMBER/$SHA/$(basename "$file")"
         aws s3 rm --recursive s3://autogluon-ci-benchmark/cleaned/$MODULE/$BRANCH_OR_PR_NUMBER/latest/
         aws s3 cp "$file" s3://autogluon-ci-benchmark/cleaned/$MODULE/$BRANCH_OR_PR_NUMBER/latest/$(basename "$file")
-    else
+    elif [[ "$(basename "$file")" == "master"* ]] && [ $MODULE != "multimodal" ]; then
         aws s3 cp "$file" "s3://autogluon-ci-benchmark/cleaned/$MODULE/master/$SHA/$(basename "$file")"
         aws s3 rm --recursive s3://autogluon-ci-benchmark/cleaned/$MODULE/master/latest/
         aws s3 cp "$file" s3://autogluon-ci-benchmark/cleaned/$MODULE/master/latest/$(basename "$file")
+    elif [[ "$(basename "$file")" != "master"* ]] && [ $MODULE == "multimodal" ]; then
+        aws s3 cp "$file" "s3://autogluon-ci-benchmark/cleaned/$MODULE/$BENCHMARK/$BRANCH_OR_PR_NUMBER/$SHA/$(basename "$file")"
+        aws s3 rm --recursive s3://autogluon-ci-benchmark/cleaned/$MODULE/$BENCHMARK/$BRANCH_OR_PR_NUMBER/latest/
+        aws s3 cp "$file" s3://autogluon-ci-benchmark/cleaned/$MODULE/$BENCHMARK/$BRANCH_OR_PR_NUMBER/latest/$(basename "$file")
+    elif [[ "$(basename "$file")" == "master"* ]] && [ $MODULE == "multimodal" ]; then
+        aws s3 cp "$file" "s3://autogluon-ci-benchmark/cleaned/$MODULE/$BENCHMARK/master/$SHA/$(basename "$file")"
+        aws s3 rm --recursive s3://autogluon-ci-benchmark/cleaned/$MODULE/$BENCHMARK/master/latest/
+        aws s3 cp "$file" s3://autogluon-ci-benchmark/cleaned/$MODULE/$BENCHMARK/master/latest/$(basename "$file")
     fi
 done
 

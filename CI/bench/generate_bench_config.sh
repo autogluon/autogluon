@@ -20,6 +20,7 @@ if [ $MODULE == "tabular" ] || [ $MODULE == "timeseries" ]; then
     --cdk-deploy-account $CDK_DEPLOY_ACCOUNT \
     --cdk-deploy-region $CDK_DEPLOY_REGION \
     --metrics-bucket $METRICS_BUCKET \
+    --max-machine-num 200 \
     --instance $INSTANCE_TYPE \
     --framework $FRAMEWORK \
     --amlb-benchmark $BENCHMARK \
@@ -30,7 +31,22 @@ else
 # Put out an IF here based on the BENCHMARK value prepare the dataloader
     FRAMEWORK=AutoGluon_$PRESET
     aws s3 cp --recursive s3://autogluon-ci-benchmark/configs/$MODULE/$USER_DIR_S3_PREFIX/latest/ $(dirname "$0")/custom_user_dir/
-    DATASET_YAML_PATH="$(dirname "$0")/custom_user_dir/dataloaders/automm_cv_datasets.yaml"
+    dataloader_file=""
+    class_name=""
+    dataset_file=""
+    if [ $BENCHMARK == "image" ]; then
+        dataloader_file="vision_dataloader.py"
+        class_name="VisionDataLoader"
+        dataset_file="automm_cv_datasets.yaml"
+    elif [ $BENCHMARK == "text-tabular"]; then
+        dataloader_file="text_tabular_dataloader.py"
+        class_name="TextTabularDataLoader"
+        dataset_file="text_tabular_datasets.yaml"
+    else
+        echo "Error: Unsupported benchmark '$BENCHMARK'"
+        exit 1
+    fi
+    DATASET_YAML_PATH="$(dirname "$0")/custom_user_dir/dataloaders/$dataset_file"
     dataset_names=""
     # Use yq to extract the dataset names and concatenate them with commas
     for name in $(yq -r '. | keys[]' "$DATASET_YAML_PATH"); do
@@ -54,12 +70,11 @@ else
     --constraint $TIME_LIMIT \
     --custom-resource-dir $(dirname "$0")/custom_user_dir \
     --dataset-names "$dataset_names" \
-    --custom-dataloader "dataloader_file:$(dirname "$0")/custom_user_dir/dataloaders/vision_dataloader.py;class_name:VisionDataLoader;dataset_config_file:$(dirname "$0")/custom_user_dir/dataloaders/automm_cv_datasets.yaml"
+    --custom-dataloader "dataloader_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataloader_file;class_name:$class_name;dataset_config_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataset_file"
 fi
 
 # TO DO: 
-# Add Max Machine Num for all 3 modules
-# Store name of all datasets
+# Add Max Machine Num for all 3 modules - Done
 # Fill in the vision, text-tabular part
 # Run Benchmark will change accordingly
 # Benchmark results for multimodal will be stored in vision/text-tabular etc

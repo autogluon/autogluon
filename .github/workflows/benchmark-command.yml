@@ -37,7 +37,7 @@ on:
           - test
           - small
           - timeseries_test
-          - none (for AutoMM)
+          - image/text-tabular (for AutoMM)
       time_limit:
         description: 'Time limit for the benchmark to run'
         required: true
