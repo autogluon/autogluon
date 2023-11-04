@@ -44,21 +44,34 @@ logger = logging.getLogger(__name__)
 class ObjectDetectionLearner(BaseLearner):
     def __init__(
         self,
-        label: Optional[str] = None,
+        label: Optional[str] = None,  # TODO: can we let users customize label?
         problem_type: Optional[str] = OBJECT_DETECTION,
         presets: Optional[str] = None,
         eval_metric: Optional[str] = None,
         hyperparameters: Optional[dict] = None,
         path: Optional[str] = None,
         verbosity: Optional[int] = 2,
-        num_classes: Optional[int] = None,  # TODO: can we infer this from data?
-        classes: Optional[list] = None,
+        num_classes: Optional[int] = None,  # TODO: can we infer this from train/predict data?
+        classes: Optional[list] = None,  # TODO: can we infer this from train/predict data?
         warn_if_exist: Optional[bool] = True,
         enable_progress_bar: Optional[bool] = None,
         pretrained: Optional[bool] = True,
-        sample_data_path: Optional[str] = None,
+        validation_metric: Optional[str] = None,
+        sample_data_path: Optional[str] = None,  # TODO: can we use train/predict data instead?
         **kwargs,
     ):
+        """
+        Parameters
+        ----------
+        num_classes
+            Number of classes. Used in classification.
+            If this is specified and is different from the pretrained model's output,
+            the model's head will be changed to have <num_classes> output.
+        classes
+            All classes in this dataset.
+        sample_data_path
+            This is used for automatically inference num_classes, classes, or label.
+        """
         super().__init__(
             problem_type=problem_type,
             presets=presets,
@@ -67,13 +80,16 @@ class ObjectDetectionLearner(BaseLearner):
             path=path,
             verbosity=verbosity,
             num_classes=num_classes,
-            classes=classes,
             warn_if_exist=warn_if_exist,
             enable_progress_bar=enable_progress_bar,
             pretrained=pretrained,
-            sample_data_path=sample_data_path,
+            validation_metric=validation_metric,
         )
         check_if_packages_installed(problem_type=self._problem_type)
+
+        self._output_shape = num_classes
+        self._classes = classes
+        self._sample_data_path = sample_data_path
 
         # TODO: merge object detection and open vocabulary object detection
         if self._problem_type == OBJECT_DETECTION:
@@ -436,7 +452,7 @@ class ObjectDetectionLearner(BaseLearner):
         -------
         A list of output dicts.
         """
-        data = self.data_to_df(data=data)
+        data = self.on_predict_per_run_start(data=data)
         column_types = self.infer_column_types(
             column_types=self._column_types,
             data=data,
@@ -516,7 +532,7 @@ class ObjectDetectionLearner(BaseLearner):
             pred_writer=pred_writer,
             num_gpus=num_gpus,
         )
-        self.clean_trainer_processes(trainer=trainer, is_train=False)
+        self.on_predict_per_run_end(trainer=trainer)
 
         # TODO: remove this by adjusting the return format of mmdet_image or lit_mmdet.
         if pred_writer is None:

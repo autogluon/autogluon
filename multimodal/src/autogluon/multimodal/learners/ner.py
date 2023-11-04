@@ -36,10 +36,10 @@ class NERLearner(BaseLearner):
         hyperparameters: Optional[dict] = None,
         path: Optional[str] = None,
         verbosity: Optional[int] = 2,
-        num_classes: Optional[int] = None,  # TODO: can we infer this from data?
         warn_if_exist: Optional[bool] = True,
         enable_progress_bar: Optional[bool] = None,
         pretrained: Optional[bool] = True,
+        validation_metric: Optional[str] = None,
         **kwargs,
     ):
         super().__init__(
@@ -50,10 +50,10 @@ class NERLearner(BaseLearner):
             hyperparameters=hyperparameters,
             path=path,
             verbosity=verbosity,
-            num_classes=num_classes,
             warn_if_exist=warn_if_exist,
             enable_progress_bar=enable_progress_bar,
             pretrained=pretrained,
+            validation_metric=validation_metric,
         )
 
     def fit(

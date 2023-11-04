@@ -161,13 +161,10 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         hyperparameters: Optional[dict] = None,
         path: Optional[str] = None,
         verbosity: Optional[int] = 2,
-        num_classes: Optional[int] = None,  # TODO: can we infer this from data?
-        classes: Optional[list] = None,
         warn_if_exist: Optional[bool] = True,
         enable_progress_bar: Optional[bool] = None,
         pretrained: Optional[bool] = True,
         validation_metric: Optional[str] = None,
-        sample_data_path: Optional[str] = None,
         **kwargs,
     ):
         """
@@ -241,12 +238,6 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`,
             where `L` ranges from 0 to 50
             (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels)
-        num_classes
-            Number of classes. Used in classification.
-            If this is specified and is different from the pretrained model's output,
-            the model's head will be changed to have <num_classes> output.
-        classes
-            All classes in this dataset.
         warn_if_exist
             Whether to raise warning if the specified path already exists.
         enable_progress_bar
@@ -257,9 +248,6 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         validation_metric
             Validation metric name. If `validation_metric = None`, it is automatically chosen based on `problem_type`.
             Defaults to 'accuracy' for multiclass classification, `roc_auc` for binary classification, and 'root_mean_squared_error' for regression.
-        sample_data_path
-            This is used for automatically inference num_classes, classes, or label.
-
         """
         self._eval_metric_name = None
         self._eval_metric_func = None
@@ -278,8 +266,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         self._presets = presets.lower() if presets else None
         self._validation_metric_name = validation_metric.lower() if validation_metric else None
         self._minmax_mode = None
-        self._output_shape = num_classes
-        self._classes = classes
+        self._output_shape = None
         self._ckpt_path = None
         self._pretrained_path = None
         self._pretrained = pretrained
@@ -293,7 +280,6 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         self._verbosity = verbosity
         self._warn_if_exist = warn_if_exist
         self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
-        self._sample_data_path = sample_data_path
         self._fit_called = False  # Flag whether is continuous training.
         self._save_path = path
         self._hyperparameters = hyperparameters
@@ -527,7 +513,13 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                 self._teacher_learner, str
             ), "HPO with distillation only supports passing a path to the learner."
 
-    def prepare_fit_args(self, time_limit: int, seed: int, standalone: bool, clean_ckpts: bool):
+    def prepare_fit_args(
+        self,
+        time_limit: int,
+        seed: int,
+        standalone: Optional[bool] = True,
+        clean_ckpts: Optional[bool] = True,
+    ):
         if time_limit is not None:
             time_limit = timedelta(seconds=time_limit)
         self._fit_args = dict(
@@ -589,7 +581,12 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         return training_start
 
     def on_fit_end(
-        self, training_start: int, strategy: str, strict_loading: bool, standalone: bool, clean_ckpts: bool
+        self,
+        training_start: float,
+        strategy: Optional[str] = None,
+        strict_loading: Optional[bool] = True,
+        standalone: Optional[bool] = True,
+        clean_ckpts: Optional[bool] = True,
     ):
         self._fit_called = True
         if not self._is_hpo:
@@ -683,17 +680,6 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                 advanced_hyperparameters=advanced_hyperparameters,
             )
         self._config = self.update_strategy_by_env(config=self._config)
-
-    def ensure_predict_ready(self):
-        if not self._fit_called:
-            if not self._problem_type or not self.problem_property.support_zero_shot:
-                raise RuntimeError(
-                    f"problem_type='{self._problem_type}' does not support running inference directly. "
-                    f"You need to call `learner.fit()`, or load a learner first before "
-                    f"running `learner.predict()`, `learner.evaluate()` or `learner.extract_embedding()`."
-                )
-            else:
-                self.init_pretrained()
 
     def get_config_per_run(self, config, hyperparameters):
         config = get_config(
@@ -1178,13 +1164,13 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
     def on_fit_per_run_end(
         self,
-        trainer,
-        config,
-        model,
-        df_preprocessor,
-        data_processors,
-        save_path,
-        standalone,
+        trainer: pl.Trainer,
+        config: DictConfig,
+        model: nn.Module,
+        df_preprocessor: MultiModalFeaturePreprocessor,
+        data_processors: Dict,
+        save_path: str,
+        standalone: bool,
     ):
         self.clean_trainer_processes(trainer=trainer, is_train=True)
         self.save(
@@ -1502,14 +1488,16 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             pred_writer = DDPPredictionWriter(output_dir=self._save_path, write_interval="epoch")
         return pred_writer
 
-    def collect_predictions(self, outputs, trainer, pred_writer, num_gpus):
+    @staticmethod
+    def collect_predictions(outputs, trainer, pred_writer, num_gpus):
         if pred_writer is not None:
             if trainer.global_rank == 0:
                 outputs = pred_writer.collect_all_gpu_results(num_gpus=num_gpus)
 
         return outputs
 
-    def clean_trainer_processes(self, trainer, is_train=True):
+    @staticmethod
+    def clean_trainer_processes(trainer, is_train=True):
         if is_train:
             msg = "Training finished,"
         else:
@@ -1604,10 +1592,17 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         )
         return [output]
 
+    def on_predict_per_run_start(self, data: Union[str, pd.DataFrame]):
+        data = self.data_to_df(data=data)
+        return data
+
+    def on_predict_per_run_end(self, trainer):
+        self.clean_trainer_processes(trainer=trainer, is_train=False)
+
     def predict_per_run(
         self,
         data: Union[pd.DataFrame, dict, list],
-        requires_label: bool,
+        requires_label: Optional[bool] = False,
         realtime: Optional[bool] = None,
         barebones: Optional[bool] = False,
     ) -> List[Dict]:
@@ -1629,7 +1624,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         -------
         A list of output dicts.
         """
-        data = self.data_to_df(data=data)
+        data = self.on_predict_per_run_start(data=data)
         column_types = self.infer_column_types(
             column_types=self._column_types,
             data=data,
@@ -1707,7 +1702,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             precision=precision,
             strategy=strategy,
             callbacks=callbacks,
-            barebones=True,
+            barebones=barebones,
             is_train=False,
         )
         outputs = self.run_trainer(
@@ -1723,19 +1718,23 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             pred_writer=pred_writer,
             num_gpus=num_gpus,
         )
-        self.clean_trainer_processes(trainer=trainer, is_train=False)
+        self.on_predict_per_run_end(trainer=trainer)
 
         return outputs
 
-    def set_num_gpus(self, num_gpus):
-        assert isinstance(num_gpus, int)
-        self._config.env.num_gpus = num_gpus
+    def ensure_predict_ready(self):
+        if not self._fit_called:
+            if not self._problem_type or not self.problem_property.support_zero_shot:
+                raise RuntimeError(
+                    f"problem_type='{self._problem_type}' does not support running inference directly. "
+                    f"You need to call `learner.fit()`, or load a learner first before "
+                    f"running `learner.predict()`, `learner.evaluate()` or `learner.extract_embedding()`."
+                )
+            else:
+                self.init_pretrained()
 
-    def get_num_gpus(self):
-        try:
-            return self._config.env.num_gpus
-        except:
-            return None
+    def on_predict_start(self):
+        self.ensure_predict_ready()
 
     def evaluate(
         self,
@@ -1768,7 +1767,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         A dictionary with the metric names and their corresponding scores.
         Optionally return a dataframe of prediction results.
         """
-        self.ensure_predict_ready()
+        self.on_predict_start()
         ret_type = LOGITS
         outputs = self.predict_per_run(
             data=data,
@@ -1874,7 +1873,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         -------
         Array of predictions, one corresponding to each row in given dataset.
         """
-        self.ensure_predict_ready()
+        self.on_predict_start()
         ret_type = LOGITS
         if candidate_data:
             pred = self._match_queries_and_candidates(
@@ -1941,7 +1940,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         When as_multiclass is True, the output will always have shape (#samples, #classes).
         Otherwise, the output will have shape (#samples,)
         """
-        self.ensure_predict_ready()
+        self.on_predict_start()
         assert self._problem_type not in [
             REGRESSION,
         ], f"Problem {self._problem_type} has no probability output."
@@ -2005,7 +2004,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         It will have shape (#samples, D) where the embedding dimension D is determined
         by the neural network's architecture.
         """
-        self.ensure_predict_ready()
+        self.on_predict_start()
         turn_on_off_feature_column_info(
             data_processors=self._data_processors,
             flag=True,
@@ -2467,3 +2466,13 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             config.env.strategy = "".join(strs)
 
         return config
+
+    def set_num_gpus(self, num_gpus):
+        assert isinstance(num_gpus, int)
+        self._config.env.num_gpus = num_gpus
+
+    def get_num_gpus(self):
+        try:
+            return self._config.env.num_gpus
+        except:
+            return None
