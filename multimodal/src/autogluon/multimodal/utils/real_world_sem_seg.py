@@ -4,6 +4,10 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Union
 
 import pandas as pd
+from .inference import predict, extract_from_output
+from ..constants import LOGITS, LABEL
+import torch
+from ..optimization.utils import get_metric
 
 logger = logging.getLogger(__name__)
 
@@ -120,3 +124,46 @@ def setup_segmentation_eval_data(eval_data):
     else:
         raise TypeError(f"Expected train_data to have type str, but got type: {type(eval_data)}")
     return eval_data
+
+def evaluate_semantic_segmentation(
+    predictor,
+    data: Union[pd.DataFrame, dict, list, str],
+    metrics: Optional[Union[str, List[str]]] = None,
+    realtime: Optional[bool] = None,
+):
+    """
+    Evaluate object detection model on a test dataset in COCO format.
+
+    Parameters
+    ----------
+    predictor
+        A predictor object.
+    """
+    outputs = predict(
+        predictor=predictor,
+        data=data,
+        requires_label=True,
+        realtime=realtime,
+    )
+
+    logits = extract_from_output(ret_type=LOGITS, outputs=outputs, as_ndarray=False)
+    y_pred = logits.float()
+    y_true = [ele[LABEL] for ele in outputs]
+
+    y_true = torch.cat(y_true)
+
+    assert len(y_true) == len(y_pred)
+
+    results = {}
+    for per_metric_name in metrics:
+        per_metric, _ = get_metric(
+            metric_name=per_metric_name.lower()
+        )
+        per_metric.update(y_pred, y_true)
+        score = per_metric.compute()
+
+        results[per_metric_name] = score.item()
+
+    return results
+
+

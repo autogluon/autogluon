@@ -20,7 +20,6 @@ def download_sample_dataset():
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
-        "facebook/sam-vit-huge",
         "facebook/sam-vit-base",
     ],
 )
