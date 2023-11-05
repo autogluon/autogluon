@@ -117,7 +117,7 @@ def test_all_models_can_handle_all_covariates(
         eval_metric=eval_metric,
     )
     predictor.fit(train_data, hyperparameters=ALL_MODELS)
-    predictor.score(test_data)
+    predictor.evaluate(test_data)
     leaderboard = predictor.leaderboard(test_data)
 
     assert_leaderboard_contains_all_models(leaderboard)
@@ -152,7 +152,7 @@ def test_all_models_handle_all_pandas_frequencies(freq):
         known_covariates_names=known_covariates_names if len(known_covariates_names) > 0 else None,
     )
     predictor.fit(train_data, hyperparameters=ALL_MODELS)
-    predictor.score(test_data)
+    predictor.evaluate(test_data)
     leaderboard = predictor.leaderboard(test_data)
 
     assert_leaderboard_contains_all_models(leaderboard)

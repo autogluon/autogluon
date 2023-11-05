@@ -191,6 +191,16 @@ class TimeSeriesLearner(AbstractLearner):
         data = self.feature_generator.transform(data)
         return self.load_trainer().score(data=data, model=model, metric=metric, use_cache=use_cache)
 
+    def evaluate(
+        self,
+        data: Union[TimeSeriesDataFrame, pd.DataFrame, str],
+        model: Optional[str] = None,
+        metrics: Optional[Union[str, TimeSeriesScorer, List[Union[str, TimeSeriesScorer]]]] = None,
+        use_cache: bool = True,
+    ) -> Dict[str, float]:
+        data = self.feature_generator.transform(data)
+        return self.load_trainer().evaluate(data=data, model=model, metrics=metrics, use_cache=use_cache)
+
     def leaderboard(self, data: Optional[TimeSeriesDataFrame] = None, use_cache: bool = True) -> pd.DataFrame:
         if data is not None:
             data = self.feature_generator.transform(data)

@@ -80,7 +80,6 @@ class ObjectDetectionLearner(BaseLearner):
             hyperparameters=hyperparameters,
             path=path,
             verbosity=verbosity,
-            num_classes=num_classes,
             warn_if_exist=warn_if_exist,
             enable_progress_bar=enable_progress_bar,
             pretrained=pretrained,

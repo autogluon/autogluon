@@ -1,0 +1,14 @@
+frameworks:              # configuration namespace for the frameworks definitions.
+  definition_file:       # list of yaml files describing the frameworks base definitions.
+    - '{user}/frameworks.yaml'
+    - '{root}/resources/frameworks.yaml'
+  allow_duplicates: true     # if true, the last definition is used.
+  tags: ['stable', 'latest', '2020Q2', '2021Q3', '2023Q2', 'example', 'benchmark']  # the list of supported tags when looking up frameworks:
+                              # for example frmwk:latest will look for framework frmwk in a frameworks_latest.yaml file if present.
+benchmarks:                     # configuration namespace for the benchmarks definitions.
+  definition_dir:               
+    - '{user}/benchmarks'
+    - '{root}/resources/benchmarks'
+  constraints_file:             # list of yaml files describing the benchmarks runtime constraints.
+    - '{user}/constraints.yaml'
+    - '{root}/resources/constraints.yaml'

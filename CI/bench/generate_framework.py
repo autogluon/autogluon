@@ -6,18 +6,20 @@ import yaml
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
 
+parser.add_argument("--module", help="module to run ag-bench on", type=str, required=True)
 parser.add_argument("--repository", help="git repository to run autogluon on", type=str, required=True)
 parser.add_argument("--branch", help="git branch to run autogluon on", type=str, required=True)
 parser.add_argument("--folds_to_run", help="number of folds to run, has to be greater than 0", type=int, required=False)
 
 args = parser.parse_args()
 
+module = args.module
 repository = args.repository
 branch = args.branch
 folds_to_run = args.folds_to_run
-framework_template_file = os.path.join(os.path.dirname(__file__), "amlb_user_dir", "frameworks_template.yaml")
+framework_template_file = os.path.join(os.path.dirname(__file__), f"{module}/amlb_user_dir", "frameworks_template.yaml")
 framework_benchmark_file = os.path.join(os.path.dirname(framework_template_file), "frameworks_benchmark.yaml")
-constraints_file = os.path.join(os.path.dirname(__file__), "amlb_user_dir", "constraints.yaml")
+constraints_file = os.path.join(os.path.dirname(__file__), f"{module}/amlb_user_dir", "constraints.yaml")
 
 if folds_to_run > 0:
     constraints = {}

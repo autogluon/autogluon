@@ -836,11 +836,30 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         metric: Union[str, TimeSeriesScorer, None] = None,
         use_cache: bool = True,
     ) -> float:
+        eval_metric = self.eval_metric if metric is None else check_get_evaluation_metric(metric)
+        scores_dict = self.evaluate(data=data, model=model, metrics=[eval_metric], use_cache=use_cache)
+        return scores_dict[eval_metric.name]
+
+    def evaluate(
+        self,
+        data: TimeSeriesDataFrame,
+        model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
+        metrics: Optional[Union[str, TimeSeriesScorer, List[Union[str, TimeSeriesScorer]]]] = None,
+        use_cache: bool = True,
+    ) -> Dict[str, float]:
         past_data, known_covariates = data.get_model_inputs_for_scoring(
             prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates_real
         )
         predictions = self.predict(data=past_data, known_covariates=known_covariates, model=model, use_cache=use_cache)
-        return self._score_with_predictions(data=data, predictions=predictions, metric=metric)
+        if not isinstance(metrics, list):  # a single metric is provided
+            metrics = [metrics]
+        scores_dict = {}
+        for metric in metrics:
+            eval_metric = self.eval_metric if metric is None else check_get_evaluation_metric(metric)
+            scores_dict[eval_metric.name] = self._score_with_predictions(
+                data=data, predictions=predictions, metric=eval_metric
+            )
+        return scores_dict
 
     def _predict_model(
         self,
