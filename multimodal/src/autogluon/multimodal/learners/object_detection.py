@@ -764,12 +764,14 @@ class ObjectDetectionLearner(BaseLearner):
             fit_called=fit_called,
             save_model=save_model,
         )
-        with open(os.path.join(path, "assets.json"), "r") as fp:
+        assets_path = os.path.join(path, "assets.json")
+        with open(assets_path, "r") as fp:
             assets = json.load(fp)
-        assets.udpate(
-            {
-                "classes": self._classes,
-            }
-        )
-        with open(os.path.join(path, f"assets.json"), "w") as fp:
-            json.dump(fp, assets, ensure_ascii=True)
+            assets.update(
+                {
+                    "classes": self._classes,
+                }
+            )
+        os.remove(assets_path)
+        with open(assets_path, "w") as fp:
+            json.dump(assets, fp, ensure_ascii=True)
