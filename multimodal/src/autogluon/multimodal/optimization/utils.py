@@ -766,7 +766,8 @@ def get_trainable_params_efficient_finetune(
             f" {', '.join(PEFT_STRATEGIES)}."
         )
 
-    trainable_param_names.extend(extra_params)
+    if extra_params:
+        trainable_param_names.extend(extra_params)
 
     return trainable_param_names
 
