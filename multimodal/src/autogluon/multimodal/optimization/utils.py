@@ -596,8 +596,6 @@ def get_trainable_params_efficient_finetune(
         The parameters associated with the normalization layers
     efficient_finetune
         Efficient finetuning strategy. Trainable parameters will be adjusted according to the method.
-    trainable_param_names
-        Initial specification of layers that should be trained.
 
     Returns
     -------

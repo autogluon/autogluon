@@ -40,12 +40,10 @@ class MMDetLitModule(pl.LightningModule):
         lr_mult: Optional[Union[float, int]] = None,
         weight_decay: Optional[float] = None,
         warmup_steps: Optional[int] = None,
-        loss_func: Optional[_Loss] = None,
         validation_metric: Optional[torchmetrics.Metric] = None,
         validation_metric_name: Optional[str] = None,
         custom_metric_func: Callable = None,
         test_metric: Optional[torchmetrics.Metric] = None,
-        efficient_finetune: Optional[str] = None,
         track_grad_norm: Optional[Union[int, str]] = -1,
     ):
         super().__init__()  # TODO: inherit LitModule
@@ -54,8 +52,6 @@ class MMDetLitModule(pl.LightningModule):
                 "model",
                 "validation_metric",
                 "test_metric",
-                "loss_func",
-                "matches",
             ]
         )
         self.model = model

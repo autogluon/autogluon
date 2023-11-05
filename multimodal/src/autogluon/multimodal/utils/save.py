@@ -71,9 +71,9 @@ def process_save_path(path, resume: Optional[bool] = False, raise_if_exist: Opti
             )
         else:
             logger.warning(
-                "A new predictor save path is created."
-                "This is to prevent you to overwrite previous predictor saved here."
-                "You could check current save path at predictor._save_path."
+                "A new predictor save path is created. "
+                "This is to prevent you to overwrite previous predictor saved here. "
+                "You could check current save path at predictor._save_path. "
                 "If you still want to use this path, set resume=True"
             )
             path = None

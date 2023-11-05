@@ -3,13 +3,14 @@ import json
 import logging
 import os
 import re
+import warnings
 
 import numpy as np
 import pandas as pd
 import torch
 from scipy.special import softmax
 
-from ..constants import AUTOMM
+from ..constants import DEPRECATED_ZERO_SHOT, ZERO_SHOT_IMAGE_CLASSIFICATION
 
 logger = logging.getLogger(__name__)
 
@@ -237,3 +238,44 @@ def visualize_ner(sentence, prediction, seed=0):
     """
     visualizer = NERVisualizer(prediction, sentence, seed)
     return visualizer
+
+
+def handle_deprecated_args(
+    init_scratch: bool,
+    pipeline: str,
+    problem_type: str,
+    pretrained: bool,
+):
+    # Handle `init_scratch`
+    if init_scratch:
+        warnings.warn("init_scratch is deprecated. Try pretrained=False instead.", UserWarning)
+        pretrained = False
+
+    # Handle `pipeline`
+    if pipeline is not None:
+        pipeline = pipeline.lower()
+        warnings.warn(
+            f"pipeline argument has been deprecated and moved to problem_type. "
+            f"Use problem_type='{pipeline}' instead.",
+            DeprecationWarning,
+        )
+        if problem_type is not None:
+            assert pipeline == problem_type, (
+                f"Mismatched pipeline and problem_type. "
+                f"Received pipeline={pipeline}, problem_type={problem_type}. "
+                f"Consider using only the problem_type argument."
+            )
+        problem_type = pipeline
+
+    # Sanity check of `problem_type`
+    if problem_type is not None:
+        problem_type = problem_type.lower()
+        if problem_type == DEPRECATED_ZERO_SHOT:
+            warnings.warn(
+                f'problem_type="{DEPRECATED_ZERO_SHOT}" is deprecated. For inference with CLIP model, '
+                f'use problem_type="{ZERO_SHOT_IMAGE_CLASSIFICATION}" instead.',
+                DeprecationWarning,
+            )
+            problem_type = ZERO_SHOT_IMAGE_CLASSIFICATION
+
+    return problem_type, pretrained

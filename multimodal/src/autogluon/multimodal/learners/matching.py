@@ -22,15 +22,12 @@ from torch import nn
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.core.utils.loaders import load_pd
 
-from . import version as ag_version
-from .constants import (
-    AUTOMM,
+from .. import version as ag_version
+from ..constants import (
     AUTOMM_TUTORIAL_MODE,
     BEST,
     BEST_K_MODELS_FILE,
     BINARY,
-    CLASSIFICATION,
-    DATA,
     FEATURES,
     GREEDY_SOUP,
     IMAGE_TEXT_SIMILARITY,
@@ -38,7 +35,6 @@ from .constants import (
     LAST_CHECKPOINT,
     MAX,
     MIN,
-    MODEL,
     MODEL_CHECKPOINT,
     MULTICLASS,
     PAIR,
@@ -52,19 +48,25 @@ from .constants import (
     Y_PRED_PROB,
     Y_TRUE,
 )
-from .data.datamodule import BaseDataModule
-from .data.infer_types import infer_column_types, infer_output_shape, infer_problem_type
-from .data.preprocess_dataframe import MultiModalFeaturePreprocessor
-from .optimization.lit_matcher import MatcherLitModule
-from .optimization.utils import get_matcher_loss_func, get_matcher_miner_func, get_metric
-from .presets import matcher_presets
-from .utils import (
+from ..data import (
+    BaseDataModule,
+    MultiModalFeaturePreprocessor,
+    infer_column_types,
+    infer_output_shape,
+    infer_problem_type,
+)
+from ..optimization import MatcherLitModule, get_matcher_loss_func, get_matcher_miner_func, get_metric
+from ..presets import matcher_presets
+from ..problem_types import PROBLEM_TYPES_REG
+from ..utils import (
     AutoMMModelCheckpoint,
     CustomUnpickler,
     LogFilter,
+    RealtimeMixin,
     apply_log_filter,
     assign_feature_column_names,
     average_checkpoints,
+    compute_inference_batch_size,
     compute_num_gpus,
     compute_ranking_score,
     compute_score,
@@ -90,8 +92,9 @@ from .utils import (
     infer_metrics,
     infer_precision,
     init_df_preprocessor,
+    is_interactive_strategy,
+    is_lazy_weight_tensor,
     load_text_tokenizers,
-    predict,
     save_pretrained_model_configs,
     save_text_tokenizers,
     select_model,
@@ -102,10 +105,12 @@ from .utils import (
     upgrade_config,
 )
 
+pl_logger = logging.getLogger("lightning")
+pl_logger.propagate = False  # https://github.com/Lightning-AI/lightning/issues/4621
 logger = logging.getLogger(__name__)
 
 
-class MultiModalMatcher:
+class MultiModalMatcher(RealtimeMixin):
     """
     MultiModalMatcher is a framework to learn/extract embeddings for multimodal data including image, text, and tabular.
     These embeddings can be used e.g. with cosine-similarity to find items with similar semantic meanings.
@@ -128,6 +133,7 @@ class MultiModalMatcher:
         enable_progress_bar: Optional[bool] = None,
         pretrained: Optional[bool] = True,
         validation_metric: Optional[str] = None,
+        **kwargs,
     ):
         """
         Parameters
@@ -210,6 +216,7 @@ class MultiModalMatcher:
         self._presets = presets.lower() if presets else None
         self._eval_metric_name = eval_metric.lower() if eval_metric else None
         self._validation_metric_name = validation_metric.lower() if validation_metric else None
+        self._minmax_mode = None
         self._hyperparameters = hyperparameters
         self._output_shape = None
         self._save_path = path
@@ -230,6 +237,8 @@ class MultiModalMatcher:
         self._response_model = None
         self._resume = False
         self._fit_called = False
+        self._train_data = None
+        self._tuning_data = None
         self._verbosity = verbosity
         self._warn_if_exist = warn_if_exist
         self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
@@ -264,8 +273,37 @@ class MultiModalMatcher:
             return self._problem_type
 
     @property
+    def problem_property(self):
+        return PROBLEM_TYPES_REG.get(self._pipeline)
+
+    @property
     def column_types(self):
         return self._column_types
+
+    @property
+    def eval_metric(self):
+        return self._eval_metric_name
+
+    @property
+    def validation_metric(self):
+        return self._validation_metric_name
+
+    @property
+    def total_parameters(self) -> int:
+        return sum(p.numel() if not is_lazy_weight_tensor(p) else 0 for p in self._query_model.parameters())
+
+    @property
+    def trainable_parameters(self) -> int:
+        return sum(
+            p.numel() if not is_lazy_weight_tensor(p) else 0 for p in self._query_model.parameters() if p.requires_grad
+        )
+
+    @property
+    def model_size(self) -> float:
+        model_size = sum(
+            p.numel() * p.element_size() if not is_lazy_weight_tensor(p) else 0 for p in self._query_model.parameters()
+        )
+        return model_size * 1e-6  # convert to megabytes
 
     # This func is required by the abstract trainer of TabularPredictor.
     def set_verbosity(self, verbosity: int):
@@ -354,6 +392,7 @@ class MultiModalMatcher:
         holdout_frac: Optional[float] = None,
         hyperparameter_tune_kwargs: Optional[dict] = None,
         seed: Optional[int] = 123,
+        **kwargs,
     ):
         """
         Fit MultiModalMatcher. Train the model to learn embeddings to simultaneously maximize and minimize
@@ -439,14 +478,16 @@ class MultiModalMatcher:
         if isinstance(tuning_data, str):
             tuning_data = load_pd.load(tuning_data)
 
-        train_data, tuning_data = split_train_tuning_data(
-            train_data=train_data,
-            tuning_data=tuning_data,
-            holdout_frac=holdout_frac,
-            is_classification=self._problem_type in [BINARY, MULTICLASS, CLASSIFICATION],
-            label_column=self._label_column,
-            seed=seed,
-        )
+        if tuning_data is None:
+            train_data, tuning_data = split_train_tuning_data(
+                data=train_data,
+                holdout_frac=holdout_frac,
+                problem_type=self._problem_type,
+                label_column=self._label_column,
+                random_state=seed,
+            )
+        self._train_data = train_data
+        self._tuning_data = tuning_data
 
         if self._label_column:
             self._problem_type = infer_problem_type(
@@ -491,10 +532,11 @@ class MultiModalMatcher:
                 is_matching=self._pipeline in matcher_presets.list_keys(),
                 eval_metric_name=self._eval_metric_name,
             )
+            minmax_mode = get_minmax_mode(validation_metric_name)
         else:
             validation_metric_name = self._validation_metric_name
             eval_metric_name = self._eval_metric_name
-        minmax_mode = get_minmax_mode(validation_metric_name)
+            minmax_mode = self._minmax_mode
 
         if time_limit is not None:
             time_limit = timedelta(seconds=time_limit)
@@ -507,6 +549,7 @@ class MultiModalMatcher:
         # set attributes for saving and prediction
         self._eval_metric_name = eval_metric_name  # In case eval_metric isn't provided in __init__().
         self._validation_metric_name = validation_metric_name
+        self._minmax_mode = minmax_mode
         self._output_shape = output_shape
         self._column_types = column_types
 
@@ -534,11 +577,7 @@ class MultiModalMatcher:
             )
 
         _fit_args = dict(
-            train_df=train_data,
-            val_df=tuning_data,
             id_mappings=id_mappings,
-            validation_metric_name=validation_metric_name,
-            minmax_mode=minmax_mode,
             max_time=time_limit,
             save_path=self._save_path,
             ckpt_path=None if hpo_mode else self._ckpt_path,
@@ -553,19 +592,16 @@ class MultiModalMatcher:
         if hpo_mode:
             # TODO: allow custom gpu
             assert self._resume is False, "You can not resume training with HPO"
-            resources = dict(num_gpus=torch.cuda.device_count())
-            if _fit_args["max_time"] is not None:
-                _fit_args["max_time"] *= 0.95  # give some buffer time to ray lightning trainer
-            _fit_args["predictor"] = self
+            _fit_args["learner"] = self
             predictor = hyperparameter_tune(
                 hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-                resources=resources,
+                resources=dict(num_gpus=torch.cuda.device_count()),
                 is_matching=True,
                 **_fit_args,
             )
             return predictor
 
-        self._fit(**_fit_args)
+        self.fit_per_run(**_fit_args)
 
         # TODO(?) We should have a separate "_post_training_event()" for logging messages.
         logger.info(get_fit_complete_message(self._save_path))
@@ -672,13 +708,9 @@ class MultiModalMatcher:
 
         return query_processors, response_processors, label_processors
 
-    def _fit(
+    def fit_per_run(
         self,
-        train_df: pd.DataFrame,
-        val_df: pd.DataFrame,
         id_mappings: Union[Dict[str, Dict], Dict[str, pd.Series]],
-        validation_metric_name: str,
-        minmax_mode: str,
         max_time: timedelta,
         save_path: str,
         ckpt_path: str,
@@ -691,7 +723,7 @@ class MultiModalMatcher:
         **hpo_kwargs,
     ):
         # TODO(?) We should have a separate "_pre_training_event()" for logging messages.
-        logger.info(get_fit_start_message(save_path, validation_metric_name))
+        logger.info(get_fit_start_message(save_path, self._validation_metric_name))
         config = self._config
         config = get_config(
             problem_type=self._pipeline,
@@ -726,7 +758,7 @@ class MultiModalMatcher:
             response_advanced_hyperparameters = None
 
         query_df_preprocessor, response_df_preprocessor, label_df_preprocessor = self._get_matcher_df_preprocessor(
-            data=train_df,
+            data=self._train_data,
             column_types=self._column_types,
             query_config=query_config,
             response_config=response_config,
@@ -765,12 +797,12 @@ class MultiModalMatcher:
             logger.debug(f"label_processors_count: {label_processors_count}")
 
         validation_metric, custom_metric_func = get_metric(
-            metric_name=validation_metric_name,
+            metric_name=self._validation_metric_name,
             num_classes=self._output_shape,
             is_matching=self._pipeline in matcher_presets.list_keys(),
             problem_type=self._problem_type,
         )
-        logger.debug(f"validation_metric_name: {validation_metric_name}")
+        logger.debug(f"validation_metric_name: {self._validation_metric_name}")
         logger.debug(f"validation_metric: {validation_metric}")
         logger.debug(f"custom_metric_func: {custom_metric_func}")
 
@@ -810,10 +842,7 @@ class MultiModalMatcher:
                 query_model=query_model,
                 response_model=response_model,
                 save_path=save_path,
-                minmax_mode=minmax_mode,
                 top_k_average_method=config.optimization.top_k_average_method,
-                val_df=val_df,
-                validation_metric_name=validation_metric_name,
             )
             return self
 
@@ -828,8 +857,8 @@ class MultiModalMatcher:
             data_processors=data_processors,
             per_gpu_batch_size=config.env.per_gpu_batch_size,
             num_workers=config.env.num_workers,
-            train_data=train_df,
-            validate_data=val_df,
+            train_data=self._train_data,
+            validate_data=self._tuning_data,
             id_mappings=id_mappings,
         )
         optimization_kwargs = dict(
@@ -846,7 +875,7 @@ class MultiModalMatcher:
         )
         metrics_kwargs = dict(
             validation_metric=validation_metric,
-            validation_metric_name=validation_metric_name,
+            validation_metric_name=self._validation_metric_name,
             custom_metric_func=custom_metric_func,
         )
 
@@ -866,21 +895,21 @@ class MultiModalMatcher:
         )
 
         logger.debug(f"validation_metric_name: {task.validation_metric_name}")
-        logger.debug(f"minmax_mode: {minmax_mode}")
+        logger.debug(f"minmax_mode: {self._minmax_mode}")
 
         checkpoint_callback = AutoMMModelCheckpoint(
             dirpath=save_path,
             save_top_k=config.optimization.top_k,
             verbose=True,
             monitor=task.validation_metric_name,
-            mode=minmax_mode,
+            mode=self._minmax_mode,
             save_last=True,
         )
         early_stopping_callback = pl.callbacks.EarlyStopping(
             monitor=task.validation_metric_name,
             patience=config.optimization.patience,
-            mode=minmax_mode,
-            stopping_threshold=get_stopping_threshold(validation_metric_name),
+            mode=self._minmax_mode,
+            stopping_threshold=get_stopping_threshold(self._validation_metric_name),
         )
         lr_callback = pl.callbacks.LearningRateMonitor(logging_interval="step")
         model_summary = pl.callbacks.ModelSummary(max_depth=1)
@@ -892,7 +921,7 @@ class MultiModalMatcher:
         ]
 
         if hpo_mode:
-            from .utils.hpo import get_ray_tune_ckpt_callback
+            from ..utils.hpo import get_ray_tune_ckpt_callback
 
             TuneReportCheckpointCallback = get_ray_tune_ckpt_callback()
             tune_report_callback = TuneReportCheckpointCallback(
@@ -1001,10 +1030,7 @@ class MultiModalMatcher:
                     query_model=query_model,
                     response_model=response_model,
                     save_path=save_path,
-                    minmax_mode=minmax_mode,
                     top_k_average_method=config.optimization.top_k_average_method,
-                    val_df=val_df,
-                    validation_metric_name=validation_metric_name,
                 )
         else:
             sys.exit(f"Training finished, exit the process with global_rank={trainer.global_rank}...")
@@ -1014,10 +1040,7 @@ class MultiModalMatcher:
         query_model,
         response_model,
         save_path,
-        minmax_mode,
         top_k_average_method,
-        val_df,
-        validation_metric_name,
         last_ckpt_path=None,
     ):
         best_k_models_yaml_path = os.path.join(save_path, BEST_K_MODELS_FILE)
@@ -1041,14 +1064,14 @@ class MultiModalMatcher:
                     for v in sorted(
                         list(best_k_models.items()),
                         key=lambda ele: ele[1],
-                        reverse=(minmax_mode == MAX),
+                        reverse=(self._minmax_mode == MAX),
                     )
                 ]
                 if top_k_average_method == GREEDY_SOUP:
                     # Select the ingredients based on the methods proposed in paper
                     #  "Model soups: averaging weights of multiple fine-tuned models improves accuracy without
                     #  increasing inference time", https://arxiv.org/pdf/2203.05482.pdf
-                    monitor_op = {MIN: operator.le, MAX: operator.ge}[minmax_mode]
+                    monitor_op = {MIN: operator.le, MAX: operator.ge}[self._minmax_mode]
 
                     logger.info(f"Start to fuse {len(top_k_model_paths)} checkpoints via the greedy soup algorithm.")
 
@@ -1060,9 +1083,11 @@ class MultiModalMatcher:
                     )
 
                     if self._pipeline == IMAGE_TEXT_SIMILARITY:
-                        best_score = self._evaluate_symmetric_ranking(val_df)
+                        best_score = self._evaluate_symmetric_ranking(self._tuning_data)
                     else:
-                        best_score = self.evaluate(val_df, metrics=[validation_metric_name])[validation_metric_name]
+                        best_score = self.evaluate(self._tuning_data, metrics=[self._validation_metric_name])[
+                            self._validation_metric_name
+                        ]
                     for i in range(1, len(top_k_model_paths)):
                         cand_avg_state_dict = average_checkpoints(
                             checkpoint_paths=ingredients + [top_k_model_paths[i]],
@@ -1073,10 +1098,10 @@ class MultiModalMatcher:
                             state_dict=cand_avg_state_dict,
                         )
                         if self._pipeline == IMAGE_TEXT_SIMILARITY:
-                            cand_score = self._evaluate_symmetric_ranking(val_df)
+                            cand_score = self._evaluate_symmetric_ranking(self._tuning_data)
                         else:
-                            cand_score = self.evaluate(val_df, metrics=[validation_metric_name])[
-                                validation_metric_name
+                            cand_score = self.evaluate(self._tuning_data, metrics=[self._validation_metric_name])[
+                                self._validation_metric_name
                             ]
                         if monitor_op(cand_score, best_score):
                             # Add new ingredient
@@ -1316,6 +1341,166 @@ class MultiModalMatcher:
 
         return outputs
 
+    def _realtime_predict(
+        self,
+        data: pd.DataFrame,
+        df_preprocessor: Union[MultiModalFeaturePreprocessor, List[MultiModalFeaturePreprocessor]],
+        data_processors: Union[Dict, List[Dict]],
+        num_gpus: int,
+        precision: Union[int, str],
+        query_model: Optional[nn.Module] = None,
+        response_model: Optional[nn.Module] = None,
+        id_mappings: Union[Dict[str, Dict], Dict[str, pd.Series]] = None,
+        signature: Optional[str] = None,
+        match_label: Optional[int] = None,
+    ) -> List[Dict]:
+        """
+        Perform realtime inference.
+
+        Parameters
+        ----------
+        data
+            A dataframe.
+        df_preprocessor
+            Dataframe preprocessors.
+        data_processors
+            Data processors.
+        num_gpus
+            Number of GPUs.
+        precision
+            The precision used in inference.
+        query_model
+            Matcher's query model.
+        response_model
+            Matcher's response model.
+        id_mappings
+            Id-to-content mappings. The contents can be text, image, etc.
+            This is used when the dataframe contains the query/response indexes instead of their contents.
+        signature
+            query or response.
+        match_label
+            0 or 1.
+
+        Returns
+        -------
+        A list of output dicts.
+        """
+
+        batch = self.process_batch(
+            data=data,
+            df_preprocessor=df_preprocessor,
+            data_processors=data_processors,
+            id_mappings=id_mappings,
+        )
+        output = self.predict_matcher_batch(
+            batch=batch,
+            query_model=query_model,
+            response_model=response_model,
+            signature=signature,
+            match_label=match_label,
+            precision=precision,
+            num_gpus=num_gpus,
+        )
+
+        return [output]
+
+    def predict_per_run(
+        self,
+        data: Union[pd.DataFrame, dict, list],
+        requires_label: bool,
+        id_mappings: Union[Dict[str, Dict], Dict[str, pd.Series]] = None,
+        signature: Optional[str] = None,
+        realtime: Optional[bool] = None,
+        barebones: Optional[bool] = False,
+    ) -> List[Dict]:
+        """
+        Perform inference for predictor or matcher.
+
+        Parameters
+        ----------
+        data
+            The data for inference.
+        requires_label
+            Whether uses label during inference.
+        id_mappings
+            Id-to-content mappings. The contents can be text, image, etc.
+            This is used when the dataframe contains the query/response indexes instead of their contents.
+        signature
+            query or response.
+        realtime
+            Whether use realtime inference.
+        barebones
+            Whether to run in “barebones mode”, where all lightning's features that may impact raw speed are disabled.
+
+        Returns
+        -------
+        A list of output dicts.
+        """
+        data, df_preprocessor, data_processors, match_label = self._on_predict_start(
+            data=data,
+            id_mappings=id_mappings,
+            requires_label=requires_label,
+            signature=signature,
+        )
+        strategy = self._config.env.strategy  # default used in inference.
+        num_gpus = compute_num_gpus(config_num_gpus=self._config.env.num_gpus, strategy=strategy)
+        if num_gpus <= 1:
+            # Force set strategy to be None if it's cpu-only or we have only one GPU.
+            strategy = "auto"
+        precision = infer_precision(
+            num_gpus=num_gpus,
+            precision=self._config.env.precision,
+            cpu_only_warning=False,
+        )
+        batch_size = compute_inference_batch_size(
+            per_gpu_batch_size=self._config.env.per_gpu_batch_size,
+            eval_batch_size_ratio=OmegaConf.select(self._config, "env.eval_batch_size_ratio"),
+            per_gpu_batch_size_evaluation=self._config.env.per_gpu_batch_size_evaluation,
+            # backward compatibility.
+            num_gpus=num_gpus,
+            strategy=strategy,
+        )
+        realtime = self.use_realtime(
+            realtime=realtime,
+            data=data,
+            data_processors=data_processors,
+            batch_size=batch_size,
+        )
+
+        # TODO: support realtime inference for notebook with multi-gpus
+        if is_interactive_strategy(strategy) and realtime:
+            realtime = False
+            num_gpus = 1
+
+        if realtime:
+            outputs = self._realtime_predict(
+                query_model=self._query_model,
+                response_model=self._response_model,
+                data=data,
+                df_preprocessor=df_preprocessor,
+                data_processors=data_processors,
+                num_gpus=num_gpus,
+                precision=precision,
+                id_mappings=id_mappings,
+                signature=signature,
+                match_label=match_label,
+            )
+        else:
+            outputs = self._default_predict(
+                data=data,
+                id_mappings=id_mappings,
+                df_preprocessor=df_preprocessor,
+                data_processors=data_processors,
+                num_gpus=num_gpus,
+                precision=precision,
+                batch_size=batch_size,
+                strategy=strategy,
+                match_label=match_label,
+                signature=signature,
+            )
+
+        return outputs
+
     def _evaluate_symmetric_ranking(self, data):
         data_with_label, query_data, response_data, label_column = convert_data_for_ranking(
             data=data,
@@ -1416,12 +1601,10 @@ class MultiModalMatcher:
         return_pred: Optional[bool] = False,
         realtime: Optional[bool] = None,
     ):
-        outputs = predict(
-            predictor=self,
+        outputs = self.predict_per_run(
             data=data,
             id_mappings=id_mappings,
             requires_label=True,
-            is_matching=True,
             realtime=realtime,
         )
         prob = extract_from_output(ret_type=PROBABILITY, outputs=outputs)
@@ -1476,6 +1659,7 @@ class MultiModalMatcher:
         cutoffs: Optional[List[int]] = [1, 5, 10],
         label: Optional[str] = None,
         realtime: Optional[bool] = None,
+        **kwargs,
     ):
         """
         Evaluate model on a test dataset.
@@ -1569,6 +1753,7 @@ class MultiModalMatcher:
         id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         as_pandas: Optional[bool] = None,
         realtime: Optional[bool] = None,
+        **kwargs,
     ):
         """
         Predict values for the label column of new data.
@@ -1593,12 +1778,10 @@ class MultiModalMatcher:
         Array of predictions, one corresponding to each row in given dataset.
         """
         self._ensure_inference_ready()
-        outputs = predict(
-            predictor=self,
+        outputs = self.predict_per_run(
             data=data,
             id_mappings=id_mappings,
             requires_label=False,
-            is_matching=True,
             realtime=realtime,
         )
         prob = extract_from_output(outputs=outputs, ret_type=PROBABILITY)
@@ -1625,6 +1808,7 @@ class MultiModalMatcher:
         as_pandas: Optional[bool] = None,
         as_multiclass: Optional[bool] = True,
         realtime: Optional[bool] = None,
+        **kwargs,
     ):
         """
         Predict probabilities class probabilities rather than class labels.
@@ -1655,12 +1839,10 @@ class MultiModalMatcher:
         Otherwise, the output will have shape (#samples,)
         """
         self._ensure_inference_ready()
-        outputs = predict(
-            predictor=self,
+        outputs = self.predict_per_run(
             data=data,
             id_mappings=id_mappings,
             requires_label=False,
-            is_matching=True,
             realtime=realtime,
         )
         prob = extract_from_output(outputs=outputs, ret_type=PROBABILITY)
@@ -1682,6 +1864,7 @@ class MultiModalMatcher:
         as_tensor: Optional[bool] = False,
         as_pandas: Optional[bool] = False,
         realtime: Optional[bool] = None,
+        **kwargs,
     ):
         """
         Extract features for each sample, i.e., one row in the provided dataframe `data`.
@@ -1729,13 +1912,11 @@ class MultiModalMatcher:
             else:
                 signature = QUERY
 
-        outputs = predict(
-            predictor=self,
+        outputs = self.predict_per_run(
             data=data,
             id_mappings=id_mappings,
             signature=signature,
             requires_label=False,
-            is_matching=True,
             realtime=realtime,
         )
         features = extract_from_output(outputs=outputs, ret_type=FEATURES, as_ndarray=as_tensor is False)
@@ -1866,6 +2047,7 @@ class MultiModalMatcher:
                     "presets": self._presets,
                     "eval_metric_name": self._eval_metric_name,
                     "validation_metric_name": self._validation_metric_name,
+                    "minmax_mode": self._minmax_mode,
                     "output_shape": self._output_shape,
                     "save_path": self._save_path,
                     "pretrained": self._pretrained,
@@ -1991,6 +2173,10 @@ class MultiModalMatcher:
         matcher._query_processors = query_processors
         matcher._response_processors = response_processors
         matcher._label_processors = label_processors
+        if "minmax_mode" in assets:
+            matcher._minmax_mode = assets["minmax_mode"]
+        else:
+            matcher._minmax_mode = get_minmax_mode(matcher._validation_metric_name)
 
         return matcher
 
@@ -2074,3 +2260,46 @@ class MultiModalMatcher:
     def set_num_gpus(self, num_gpus):
         assert isinstance(num_gpus, int)
         self._config.env.num_gpus = num_gpus
+
+    def get_num_gpus(self):
+        try:
+            return self._config.env.num_gpus
+        except:
+            return None
+
+    def fit_summary(self, verbosity=0, show_plot=False):
+        """
+        Output summary of information about models produced during `fit()`.
+
+        Parameters
+        ----------
+        verbosity : int, default = 2
+            Verbosity levels range from 0 to 4 and control how much information is printed.
+            verbosity = 0 for no output printing.
+            TODO: Higher levels correspond to more detailed print statements
+        show_plot : bool, default = False
+            If True, shows the model summary plot in browser when verbosity > 1.
+
+        Returns
+        -------
+        Dict containing various detailed information.
+        We do not recommend directly printing this dict as it may be very large.
+        """
+        if self._total_train_time is None:
+            logging.info("There is no `best_score` or `total_train_time`. Have you called `predictor.fit()`?")
+        else:
+            logging.info(
+                f"Here's the model summary:"
+                f""
+                f"The model achieved score '{self._best_score}' on the validation metric"
+                f" '{self._validation_metric_name}'. "
+                f"The total training time is {timedelta(seconds=self._total_train_time)}"
+            )
+        results = {
+            f"val_{self._validation_metric_name}": self._best_score,
+            "training_time": self._total_train_time,
+        }
+        return results
+
+    def list_supported_models(self, pretrained=True):
+        raise ValueError(f"list_supported_models() is not available for problem type: {self._pipeline}")

@@ -29,7 +29,8 @@ def verify_matcher_save_load(matcher, df, verify_embedding=True, cls=MultiModalP
         predictions2_df = loaded_matcher.predict(df, as_pandas=True)
         npt.assert_equal(predictions, predictions2)
         npt.assert_equal(predictions2, predictions2_df.to_numpy())
-        if matcher.problem_type in [BINARY, MULTICLASS]:
+        if matcher.problem_type.endswith((BINARY, MULTICLASS)):
+            print("\nverifying predict and predict_proba...\n")
             predictions_prob = matcher.predict_proba(df, as_pandas=False)
             predictions2_prob = loaded_matcher.predict_proba(df, as_pandas=False)
             predictions2_prob_df = loaded_matcher.predict_proba(df, as_pandas=True)
@@ -48,10 +49,10 @@ def verify_matcher_realtime_inference(matcher, df, verify_embedding=True):
         predictions_default = matcher.predict(df_small, as_pandas=False, realtime=False)
         predictions_realtime = matcher.predict(df_small, as_pandas=False, realtime=True)
         npt.assert_equal(predictions_default, predictions_realtime)
-        if matcher._problem_type in [BINARY, MULTICLASS]:
+        if matcher.problem_type.endswith((BINARY, MULTICLASS)):
             predictions_prob_default = matcher.predict_proba(df_small, as_pandas=False, realtime=False)
             predictions_prob_realtime = matcher.predict_proba(df_small, as_pandas=False, realtime=True)
-            npt.assert_equal(predictions_prob_default, predictions_prob_realtime)
+            npt.assert_almost_equal(predictions_prob_default, predictions_prob_realtime, decimal=5)
         if verify_embedding:
             embeddings_default = matcher.extract_embedding(df_small, signature=QUERY, realtime=False)
             embeddings_realtime = matcher.extract_embedding(df_small, signature=QUERY, realtime=True)
@@ -123,7 +124,7 @@ def evaluate_matcher_ranking(matcher, test_df, query_column, response_column, me
         ),
     ],
 )
-def test_matcher(
+def test_matcher_basic(
     dataset_name,
     query,
     response,
@@ -393,4 +394,4 @@ def test_matcher_hyperparameters_consistency(hyperparameters):
         hyperparameters=hyperparameters,
         time_limit=10,
     )
-    assert predictor._matcher._config == predictor_2._matcher._config
+    assert predictor._learner._config == predictor_2._learner._config
