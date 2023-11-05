@@ -37,6 +37,7 @@ else
     custom_dataloader_value=""
     shot_value=0
     seed_value=0
+    lang="en"
     if [ $BENCHMARK == "image" ]; then
         dataloader_file="vision_dataloader.py"
         class_name="VisionDataLoader"
@@ -86,7 +87,7 @@ else
     --custom-dataloader '$custom_dataloader_value'"
 
     if [ $BENCHMARK == "text" ]; then
-        gen_bench_command="$gen_bench_command --fewshot --shot $shot_value --lang $lang --seed $seed"
+        gen_bench_command="$gen_bench_command --fewshot --shot $shot_value --lang $lang --seed $seed_value"
     fi 
     eval "$gen_bench_command"
 fi
