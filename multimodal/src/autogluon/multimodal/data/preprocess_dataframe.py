@@ -782,6 +782,9 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         assert (
             self._fit_called or self._fit_y_called
         ), "You will need to first call preprocessor.fit_y() before calling preprocessor.transform_label_for_metric."
+        assert (
+                self._label_column in df.columns
+        ), f"Label {self._label_column} is not in the data. Cannot perform evaluation without ground truth labels."
         y_df = df[self._label_column]
         if self.label_type == CATEGORICAL:
             # need to encode to integer labels

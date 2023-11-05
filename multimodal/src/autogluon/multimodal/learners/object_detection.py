@@ -3,8 +3,9 @@ import os
 from datetime import timedelta
 from typing import Dict, List, Optional, Union
 
+import json
 import pandas as pd
-from omegaconf import OmegaConf
+from omegaconf import OmegaConf, DictConfig
 from torch import nn
 
 from ..constants import (
@@ -742,3 +743,34 @@ class ObjectDetectionLearner(BaseLearner):
         learner = super()._load_metadata(learner=learner, path=path, resume=resume, verbosity=verbosity)
         learner._data_processors = None
         return learner
+
+    def save(
+        self,
+        path: str,
+        standalone: Optional[bool] = True,
+        config: Optional[DictConfig] = None,
+        model: Optional[nn.Module] = None,
+        df_preprocessor: Optional[MultiModalFeaturePreprocessor] = None,
+        data_processors: Optional[Dict] = None,
+        fit_called: Optional[bool] = None,
+        save_model: Optional[bool] = True,
+    ):
+        super().save(
+            path=path,
+            standalone=standalone,
+            config=config,
+            model=model,
+            df_preprocessor=df_preprocessor,
+            data_processors=data_processors,
+            fit_called=fit_called,
+            save_model=save_model,
+        )
+        with open(os.path.join(path, "assets.json"), "r") as fp:
+            assets = json.load(fp)
+        assets.udpate(
+            {
+                "classes": self._classes,
+            }
+        )
+        with open(os.path.join(path, f"assets.json"), "w") as fp:
+            json.dump(fp, assets, ensure_ascii=True)

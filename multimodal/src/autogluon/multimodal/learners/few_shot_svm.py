@@ -1,9 +1,6 @@
-import json
 import logging
 import os
 import pickle
-import time
-import warnings
 from datetime import timedelta
 from typing import List, Optional, Union, Dict
 
@@ -19,11 +16,17 @@ from sklearn.svm import SVC
 from sklearn.pipeline import Pipeline
 from omegaconf import DictConfig
 
-from ..constants import BINARY, FEATURE_EXTRACTION, Y_PRED, Y_TRUE, FEATURES, COLUMN_FEATURES
-from ..data.infer_types import infer_problem_type
-from ..data.preprocess_dataframe import MultiModalFeaturePreprocessor
+from autogluon.core.metrics import Scorer
+from autogluon.core.utils.loaders import load_pd
+
+from ..constants import Y_PRED, Y_TRUE, COLUMN_FEATURES
+from ..data import MultiModalFeaturePreprocessor, BaseDataModule
 from .base import BaseLearner
-from ..utils import CustomUnpickler, compute_score, logits_to_prob, setup_save_path, compute_num_gpus, infer_precision, extract_from_output, turn_on_off_feature_column_info
+from ..utils import (
+    CustomUnpickler, compute_score, logits_to_prob, data_to_df,
+    compute_num_gpus, infer_precision, extract_from_output, turn_on_off_feature_column_info,
+    get_available_devices, LogFilter, apply_log_filter
+)
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +86,6 @@ class FewShotSVMLearner(BaseLearner):
         )
 
         self._svm = None
-        self._model_loaded = False
 
     def update_attributes(
         self,
@@ -103,8 +105,43 @@ class FewShotSVMLearner(BaseLearner):
         if svm:
             self._svm = svm
 
+    def prepare_train_tuning_data(
+        self,
+        train_data: Union[pd.DataFrame, str],
+        tuning_data: Optional[Union[pd.DataFrame, str]],
+        holdout_frac: Optional[float],
+        seed: Optional[int],
+    ):
+        if isinstance(train_data, str):
+            train_data = load_pd.load(train_data)
+        if isinstance(tuning_data, str):
+            tuning_data = load_pd.load(tuning_data)
+
+        self._train_data = train_data
+        self._tuning_data = tuning_data  # TODO: use tuning_data in few shot learning?
+
+    def prepare_fit_args(
+        self,
+        time_limit: int,
+        seed: int,
+        standalone: Optional[bool] = True,
+        clean_ckpts: Optional[bool] = True,
+    ):
+        super().prepare_fit_args(
+            time_limit=time_limit,
+            seed=seed,
+            standalone=standalone,
+            clean_ckpts=clean_ckpts,
+        )
+        self._fit_args.pop("ckpt_path", None)
+        self._fit_args.pop("resume", None)
+        self._fit_args.pop("clean_ckpts", None)
+        if self._fit_called:
+            self._fit_args.update(dict(svm=self._svm))
+
     def fit_sanity_check(self):
-        unique_dtypes = set(self._column_types.values())
+        feature_column_types = {k:v for k, v in self._column_types.items() if k != self._label_column}
+        unique_dtypes = set(feature_column_types.values())
         assert len(unique_dtypes) == 1, f"Few shot SVM learner allows single modality data for now, but detected modalities {unique_dtypes}."
 
     def fit(
@@ -159,18 +196,88 @@ class FewShotSVMLearner(BaseLearner):
         df_preprocessor: MultiModalFeaturePreprocessor,
         data_processors: Dict,
         save_path: str,
+        standalone: bool,
     ):
         self.clean_trainer_processes(trainer=trainer, is_train=True)
         self.save(
             path=save_path,
+            standalone=standalone,
             config=config,
             model=model,
             svm=svm,
             df_preprocessor=df_preprocessor,
             data_processors=data_processors,
             fit_called=True,  # fit is called on one run.
-            save_model=False,  # The final model will be saved in top_k_average
+            save_model=True,  # need to save the model now because there will be no top k averaging.
         )
+
+    def get_datamodule_per_run(
+        self,
+        df_preprocessor,
+        data_processors,
+        per_gpu_batch_size,
+        num_workers,
+        predict_data=None,
+        is_train=True,
+    ):
+        datamodule_kwargs = dict(
+            df_preprocessor=df_preprocessor,
+            data_processors=data_processors,
+            per_gpu_batch_size=per_gpu_batch_size,
+            num_workers=num_workers,
+        )
+        if is_train:
+            datamodule_kwargs.update(dict(predict_data=self._train_data))
+        else:
+            datamodule_kwargs.update(dict(predict_data=predict_data))
+
+        datamodule = BaseDataModule(**datamodule_kwargs)
+        return datamodule
+
+    def init_trainer_per_run(
+        self,
+        num_gpus,
+        precision,
+        strategy,
+        callbacks,
+        max_time=None,
+        config=None,
+        enable_progress_bar=None,
+        barebones=False,
+        is_train=True,
+    ):
+        if not is_train:
+            config = self._config
+            enable_progress_bar = self._enable_progress_bar
+
+        blacklist_msgs = []
+        if self._verbosity <= 3:  # turn off logging in prediction
+            blacklist_msgs.append("Automatic Mixed Precision")
+            blacklist_msgs.append("GPU available")
+            blacklist_msgs.append("TPU available")
+            blacklist_msgs.append("IPU available")
+            blacklist_msgs.append("HPU available")
+            blacklist_msgs.append("select gpus")
+            blacklist_msgs.append("Trainer(barebones=True)")
+        log_filter = LogFilter(blacklist_msgs)
+
+        with apply_log_filter(log_filter):
+            trainer = pl.Trainer(
+                accelerator="gpu" if num_gpus > 0 else "auto",
+                devices=get_available_devices(num_gpus, config.env.auto_select_gpus),
+                num_nodes=config.env.num_nodes,
+                precision=precision,
+                strategy=strategy,
+                benchmark=False,
+                enable_progress_bar=False if barebones else enable_progress_bar,
+                deterministic=config.env.deterministic,
+                max_epochs=-1,  # Add max_epochs to disable warning
+                logger=False,
+                callbacks=callbacks,
+                barebones=barebones,
+            )
+
+        return trainer
 
     def fit_per_run(
         self,
@@ -185,6 +292,7 @@ class FewShotSVMLearner(BaseLearner):
         data_processors: Optional[Dict] = None,
         model: Optional[nn.Module] = None,
         svm: Optional[Pipeline] = None,
+        standalone: bool = True,
     ):
         self.on_fit_per_run_start(seed=seed, save_path=save_path)
         config = self.get_config_per_run(config=config, hyperparameters=hyperparameters)
@@ -205,12 +313,14 @@ class FewShotSVMLearner(BaseLearner):
             data_processors=data_processors,
             flag=True,
         )
+        svm = self.get_svm_per_run(svm=svm)
         if max_time == timedelta(seconds=0):
             return dict(
                 config=config,
                 df_preprocessor=df_preprocessor,
                 data_processors=data_processors,
                 model=model,
+                svm=svm,
             )
         datamodule = self.get_datamodule_per_run(
             df_preprocessor=df_preprocessor,
@@ -228,6 +338,7 @@ class FewShotSVMLearner(BaseLearner):
             precision=precision,
             strategy=strategy,
         )
+        print(f"config.model.names: {config.model.names}\n")
         pred_writer = self.get_pred_writer(strategy=strategy)
         callbacks = self.get_callbacks_per_run(pred_writer=pred_writer, is_train=False)
         litmodule = self.get_litmodule_per_run(model=model)
@@ -239,7 +350,6 @@ class FewShotSVMLearner(BaseLearner):
             max_time=max_time,
             callbacks=callbacks,
             enable_progress_bar=enable_progress_bar,
-            is_train=False,  # only use a pretrained model to extract embeddings
         )
         outputs = self.run_trainer(
             trainer=trainer,
@@ -255,15 +365,14 @@ class FewShotSVMLearner(BaseLearner):
             num_gpus=num_gpus,
         )
         self.clean_trainer_processes(trainer=trainer, is_train=False)
-
         features = extract_from_output(outputs=outputs, ret_type=COLUMN_FEATURES, as_ndarray=True)
         features = self.aggregate_column_features(features=features)
+        # no need to call df_preprocessor.transform_label_for_metric since the sklearn pipline encodes the label automatically
         labels = np.array(self._train_data[self._label_column])
-        svm = self.get_svm_per_run(svm=svm)
         svm.fit(features, labels)
-
         self.on_fit_per_run_end(
             save_path=save_path,
+            standalone=standalone,
             trainer=trainer,
             config=config,
             df_preprocessor=df_preprocessor,
@@ -368,9 +477,6 @@ class FewShotSVMLearner(BaseLearner):
         features = self.aggregate_column_features(features=features)
         logits = self._svm.decision_function(features)
         prob = logits_to_prob(logits)
-        if not as_multiclass:
-            if self._problem_type == BINARY:
-                prob = prob[:, 1]
         if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
             prob = self._as_pandas(data=data, to_be_converted=prob)
         return prob
@@ -424,79 +530,83 @@ class FewShotSVMLearner(BaseLearner):
 
     def evaluate(
         self,
-        data: pd.DataFrame,
+        data: Union[pd.DataFrame, dict, list, str],
         metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
         realtime: Optional[bool] = None,
+        **kwargs,
     ):
-        assert (
-            self._label in data.columns
-        ), f"Label {self._label} is not in the data. Cannot perform evaluation without ground truth labels."
-        features = self.extract_embedding(data)
-        preds = self.clf.predict(features)
-        labels = np.array(data[self._label])
+        """
+        Evaluate model on a test dataset.
 
-        metric_data = {}
-        # TODO: Support BINARY vs. MULTICLASS
-        metric_data.update(
-            {
-                Y_PRED: preds,
-                Y_TRUE: labels,
-            }
-        )
+        Parameters
+        ----------
+        data
+            A dataframe, containing the same columns as the training data.
+            Or a str, that is a path of the annotation file for detection.
+        metrics
+            A list of metric names to report.
+            If None, we only return the score for the stored `_eval_metric_name`.
+        return_pred
+            Whether to return the prediction result of each row.
+        realtime
+            Whether to do realtime inference, which is efficient for small data (default None).
+            If not specified, we would infer it on based on the data modalities
+            and sample number.
+
+        Returns
+        -------
+        A dictionary with the metric names and their corresponding scores.
+        Optionally return a dataframe of prediction results.
+        """
+        self.on_predict_start()
+        data = data_to_df(data=data)
+        features = self.extract_embedding(data)
+        pred = self._svm.predict(features)
+        assert (
+                self._label_column in data.columns
+        ), f"Label {self._label_column} is not in the data. Cannot perform evaluation without ground truth labels."
+        y_true = np.array(data[self._label_column])
+        metric_data = {Y_PRED: pred, Y_TRUE: y_true}
         if metrics is None:
-            metrics = [self.learner._eval_metric_name]
-        if isinstance(metrics, str):
+            if self._eval_metric_func:
+                metrics = [self._eval_metric_func]
+            else:
+                metrics = [self._eval_metric_name]
+        if isinstance(metrics, str) or isinstance(metrics, Scorer):
             metrics = [metrics]
 
         results = {}
         for per_metric in metrics:
             if per_metric == "macro_f1":
-                macro_f1 = f1_score(labels, preds, average="macro")
+                macro_f1 = f1_score(y_true, pred, average="macro")
                 results[per_metric] = macro_f1
             else:
                 score = compute_score(
                     metric_data=metric_data,
-                    metric=per_metric.lower(),
+                    metric=per_metric.lower() if isinstance(per_metric, str) else per_metric,
                 )
-                results[per_metric] = score
+                per_metric_name = per_metric if isinstance(per_metric, str) else per_metric.name
+                results[per_metric_name] = score
 
         if return_pred:
-            return results, self.learner._as_pandas(data=data, to_be_converted=preds)
+            return results, self._as_pandas(data=data, to_be_converted=pred)
         return results
 
-    def load_svm(self, path: Optional[str] = None):
-        logger.info(f"Loading from {os.path.join(path, 'svm_model.pkl')}")
-        with open(os.path.join(path, "svm_model.pkl"), "rb") as fp:
-            params = CustomUnpickler(fp).load()
-        self.clf.set_params(**params)
-        self._model_loaded = True
-
-
-    def load_predictor_from_meta_data(self, path: str):
-        with open(os.path.join(path, "fewshot_svm_assets.json"), "r") as fp:
-            assets = json.load(fp)
-            predictor = BaseLearner(
-                label=None,
-                hyperparameters=assets["hyperparameters"],
-                problem_type=FEATURE_EXTRACTION,
-                eval_metric=assets["eval_metric"],
-                path=assets["path"],
-                presets=assets["presets"],
-            )
-        return predictor, assets
-
     @classmethod
-    def load(cls, path: str):
-        predictor = cls("dummy_label")
-        predictor.learner, assets = predictor.load_predictor_from_meta_data(path)
-        predictor._save_path = assets["path"]
-        predictor._label = assets["label"]
-        predictor._hyperparameters = assets["hyperparameters"]
-        predictor._eval_metric = assets["eval_metric"]
-        predictor._presets = assets["presets"]
-        predictor._problem_type = assets["problem_type"]
-        predictor.load_svm(path)
+    def load(
+        cls,
+        path: str,
+        resume: Optional[bool] = False,
+        verbosity: Optional[int] = 3,
+    ):
+        predictor = super().load(path=path, resume=resume, verbosity=verbosity)
+        with open(os.path.join(path, "svm.pkl"), "rb") as fp:
+            params = CustomUnpickler(fp).load()
+        svm = make_pipeline(StandardScaler(), SVC(gamma="auto"))
+        svm.set_params(**params)
+        predictor._svm = svm
+
         return predictor
 
     def save(

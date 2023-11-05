@@ -8,7 +8,6 @@ from .constants import (
     CATEGORICAL,
     CLASSIFICATION,
     FEATURE_EXTRACTION,
-    FEW_SHOT_TEXT_CLASSIFICATION,
     IMAGE,
     IMAGE_BYTEARRAY,
     IMAGE_SIMILARITY,
@@ -26,6 +25,7 @@ from .constants import (
     TEXT_NER,
     TEXT_SIMILARITY,
     ZERO_SHOT_IMAGE_CLASSIFICATION,
+    FEW_SHOT_CLASSIFICATION,
 )
 from .registry import Registry
 
@@ -196,15 +196,13 @@ PROBLEM_TYPES_REG.register(
     ),
 )
 
-# Few-shot Text classification. TODO: For few-shot problems, they may be revised to be presets
 PROBLEM_TYPES_REG.register(
-    FEW_SHOT_TEXT_CLASSIFICATION,
+    FEW_SHOT_CLASSIFICATION,
     ProblemTypeProperty(
-        name=FEW_SHOT_TEXT_CLASSIFICATION,
+        name=FEW_SHOT_CLASSIFICATION,
         support_fit=True,
         support_zero_shot=False,
-        experimental=True,
-        supported_modality_type={TEXT},
-        force_exist_modality={TEXT},
+        supported_modality_type={IMAGE, TEXT},
+        supported_label_type={CATEGORICAL},
     ),
 )

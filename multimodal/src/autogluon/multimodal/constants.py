@@ -34,6 +34,7 @@ OCR_TEXT_RECOGNITION = f"{OCR}_text_recognition"
 IMAGE_SIMILARITY = "image_similarity"
 TEXT_SIMILARITY = "text_similarity"
 IMAGE_TEXT_SIMILARITY = "image_text_similarity"
+FEW_SHOT_CLASSIFICATION = "few_shot_classification"
 
 # Input keys
 IMAGE = "image"

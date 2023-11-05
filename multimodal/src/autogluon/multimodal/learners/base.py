@@ -892,8 +892,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         model=None,
         model_postprocess_fn=None,
         peft_param_names=None,
-        optimization_kwargs=None,
-        distillation_kwargs=None,
+        optimization_kwargs=dict(),
+        distillation_kwargs=dict(),
         is_train=True,
     ):
         if is_train:
@@ -2156,7 +2156,6 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                     "validation_metric_name": self._validation_metric_name,
                     "minmax_mode": self._minmax_mode,
                     "output_shape": self._output_shape,
-                    "classes": self._classes,
                     "save_path": path,
                     "pretrained": self._pretrained,
                     "pretrained_path": self._pretrained_path,
@@ -2318,7 +2317,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         learner._model = create_fusion_model(
             config=learner._config,
             num_classes=learner._output_shape,
-            classes=learner._classes,
+            classes=learner._classes if hasattr(learner, "_classes") else None,
             num_numerical_columns=len(learner._df_preprocessor.numerical_feature_names),
             num_categories=learner._df_preprocessor.categorical_num_categories,
             pretrained=False if not peft else True,  # set "pretrain=False" to prevent downloading online models

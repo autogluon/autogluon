@@ -18,7 +18,6 @@ from transformers.trainer_pt_utils import get_parameter_names
 from ..constants import (
     ACC,
     ACCURACY,
-    AUTOMM,
     AVERAGE_PRECISION,
     BINARY,
     BIT_FIT,
@@ -42,8 +41,6 @@ from ..constants import (
     LORA,
     LORA_BIAS,
     LORA_NORM,
-    MAP,
-    MEAN_AVERAGE_PRECISION,
     MULTI_NEGATIVES_SOFTMAX_LOSS,
     MULTICLASS,
     NER,
@@ -63,6 +60,7 @@ from ..constants import (
     ROC_AUC,
     ROOT_MEAN_SQUARED_ERROR,
     SPEARMANR,
+    FEW_SHOT_CLASSIFICATION,
 )
 from .losses import FocalLoss, MultiNegativesSoftmaxLoss, SoftTargetCrossEntropy
 from .lr_scheduler import (
@@ -121,7 +119,7 @@ def get_loss_func(
             loss_func = nn.MSELoss()
     elif problem_type == NER:
         loss_func = nn.CrossEntropyLoss(ignore_index=0)
-    elif problem_type in [OBJECT_DETECTION, OPEN_VOCABULARY_OBJECT_DETECTION]:
+    elif problem_type in [OBJECT_DETECTION, OPEN_VOCABULARY_OBJECT_DETECTION, FEW_SHOT_CLASSIFICATION]:
         return None
     elif problem_type is None:
         return None
