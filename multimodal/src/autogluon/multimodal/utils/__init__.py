@@ -102,10 +102,4 @@ from .object_detection import (
 from .object_detection_visualizer import Visualizer
 from .ovd import save_ovd_result_df
 from .pipeline import init_pretrained, init_pretrained_matcher
-from .real_world_sem_seg import (
-    save_sem_seg_result_df,
-    setup_segmentation_eval_data,
-    setup_segmentation_train_tuning_data,
-    evaluate_semantic_segmentation
-)
 from .save import process_save_path, save_text_tokenizers, setup_save_path

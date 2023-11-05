@@ -27,8 +27,8 @@ from ..constants import (
     NER_TEXT,
     NUMERICAL,
     OVD,
-    REGRESSION,
     REAL_WORLD_SEM_SEG_IMG,
+    REGRESSION,
     ROIS,
     SAM,
     TEXT,
@@ -310,8 +310,8 @@ def create_fusion_data_processors(
                     model=per_model,
                 )
             )
-            if data_types is not None and IMAGE in data_types:
-                data_types.remove(IMAGE)
+            if data_types is not None and REAL_WORLD_SEM_SEG_IMG in data_types:
+                data_types.remove(REAL_WORLD_SEM_SEG_IMG)
             requires_label = False
 
         if requires_label:

@@ -20,7 +20,15 @@ try:
 except ImportError:
     BICUBIC = PIL.Image.BICUBIC
 
-from ..constants import COLUMN, IMAGE, IMAGE_BYTEARRAY, IMAGE_VALID_NUM, LABEL
+from ..constants import (
+    COLUMN,
+    IMAGE,
+    IMAGE_BYTEARRAY,
+    IMAGE_VALID_NUM,
+    LABEL,
+    REAL_WORLD_SEM_SEG_IMG,
+    REAL_WORLD_SEM_SEG_IMG_GT,
+)
 from .collator import PadCollator, StackCollator
 
 logger = logging.getLogger(__name__)
@@ -89,7 +97,7 @@ class RealWorldSemSegImageProcessor:
         self.requires_column_info = requires_column_info
 
         self.size = model.image_size
-        self.mean, self.std = image_mean_std(model.config["image_norm"])
+        self.mean, self.std = image_mean_std(model_config["image_norm"])
 
         self.normalization = transforms.Normalize(self.mean, self.std)
 
@@ -144,10 +152,9 @@ class RealWorldSemSegImageProcessor:
         """
         fn = {}
         if self.requires_column_info:
-            assert image_column_names, "Empty image column names."
-            for col_name in image_column_names:
-                fn[f"{self.image_column_prefix}_{col_name}"] = StackCollator()
-
+            return NotImplementedError(
+                f"requires_column_info={self.requires_column_info} not implemented for semantic segmentation tasks."
+            )
         fn.update(
             {
                 self.image_key: PadCollator(pad_val=0),
@@ -188,32 +195,25 @@ class RealWorldSemSegImageProcessor:
         """
         images = []
         gts = []
-        zero_images = []
+
         ret = {}
+        annotation_column = None
+        for column_name, column_modality in feature_modalities.items():
+            if column_modality == REAL_WORLD_SEM_SEG_IMG:
+                image_column = column_name
+            if column_modality == REAL_WORLD_SEM_SEG_IMG_GT:
+                annotation_column = column_name
 
-        per_col_image_features, per_col_gt_features = (image_features["image"], image_features["gt"])
-        for img_feature, gt_feature in zip(
-            per_col_image_features[: self.max_img_num_per_col], per_col_gt_features[: self.max_img_num_per_col]
-        ):
-            with warnings.catch_warnings():
-                warnings.filterwarnings(
-                    "ignore",
-                    message=("Palette images with Transparency expressed in bytes should be converted to RGBA images"),
-                )
-                try:
-                    if feature_modalities.get("image") == IMAGE_BYTEARRAY:
-                        image_feature = BytesIO(img_feature)
-                    else:
-                        image_feature = img_feature
-                    with PIL.Image.open(image_feature) as img:
-                        img = img.convert(image_mode)
-                except Exception as e:
-                    if self.missing_value_strategy.lower() == "zero":
-                        logger.debug(f"Using a zero image due to '{e}'")
-                        img = PIL.Image.new(image_mode, (self.size, self.size), color=0)
-                    else:
-                        raise e
+        per_col_image_features = image_features[image_column]
+        if is_training or annotation_column is not None:
+            per_col_gt_features = image_features[annotation_column]
 
+        for idx, img_feature in enumerate(per_col_image_features[: self.max_img_num_per_col]):
+            with PIL.Image.open(img_feature) as img:
+                img = img.convert(image_mode)
+
+            if annotation_column:
+                gt_feature = per_col_gt_features[idx]
                 with PIL.Image.open(gt_feature) as gt:
                     gt = gt.convert("L")
 
@@ -225,18 +225,18 @@ class RealWorldSemSegImageProcessor:
                 gt = self.gt_train_processor(gt)
             else:
                 img = self.val_processor(img)
-                gt = self.gt_val_processor(gt)
+                if annotation_column is not None:
+                    gt = self.gt_val_processor(gt)
 
             images.append(img)
-            gts.append(gt)
+            if is_training or annotation_column is not None:
+                gts.append(gt)
 
         ret.update(
             {
-                self.image_key: torch.tensor([])
-                if len(images + zero_images) == 0
-                else torch.cat(images + zero_images, dim=0),
+                self.image_key: torch.cat(images, dim=0),
                 self.image_valid_num_key: len(images),
-                self.label_key: torch.cat(gts, dim=0),
+                self.label_key: torch.cat(gts, dim=0) if len(gts) != 0 else torch.tensor([]),
             }
         )
         return ret

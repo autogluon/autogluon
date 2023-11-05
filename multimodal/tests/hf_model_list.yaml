@@ -30,7 +30,6 @@ others:
 - xlm-roberta-base
 - yolov3_mobilenetv2_8xb24-320-300e_coco
 - yolox_s
-- facebook/sam-vit-huge
 - facebook/sam-vit-base
 others_2:
 - google/electra-small-discriminator

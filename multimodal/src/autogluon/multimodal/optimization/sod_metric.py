@@ -93,25 +93,20 @@ class Fmeasure(object):
         the mean F-measure, maximum F-measure and F-measure-threshold curve.
         :return: precisions, recalls, changeable_fms
         """
-        # 1. 获取预测结果在真值前背景区域中的直方图
         pred = (pred * 255).astype(np.uint8)
         bins = np.linspace(0, 256, 257)
-        fg_hist, _ = np.histogram(pred[gt], bins=bins)  # 最后一个bin为[255, 256]
+        fg_hist, _ = np.histogram(pred[gt], bins=bins)
         bg_hist, _ = np.histogram(pred[~gt], bins=bins)
-        # 2. 使用累积直方图（Cumulative Histogram）获得对应真值前背景中大于不同阈值的像素数量
-        # 这里使用累加（cumsum）就是为了一次性得出 >=不同阈值 的像素数量, 这里仅计算了前景区域
+
         fg_w_thrs = np.cumsum(np.flip(fg_hist), axis=0)
         bg_w_thrs = np.cumsum(np.flip(bg_hist), axis=0)
-        # 3. 使用不同阈值的结果计算对应的precision和recall
-        # p和r的计算的真值是pred==1&gt==1，二者仅有分母不同，分母前者是pred==1，后者是gt==1
-        # 为了同时计算不同阈值的结果，这里使用hsitogram&flip&cumsum 获得了不同各自的前景像素数量
+
         TPs = fg_w_thrs
         Ps = fg_w_thrs + bg_w_thrs
-        # 为防止除0，这里针对除0的情况分析后直接对于0分母设为1，因为此时分子必为0
+
         Ps[Ps == 0] = 1
         T = max(np.count_nonzero(gt), 1)
-        # TODO: T=0 或者 特定阈值下fg_w_thrs=0或者bg_w_thrs=0，这些都会包含在TPs[i]=0的情况中，
-        #  但是这里使用TPs不便于处理列表
+
         precisions = TPs / Ps
         recalls = TPs / T
 

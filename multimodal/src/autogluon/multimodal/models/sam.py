@@ -49,9 +49,7 @@ class SAMForRealWorldSemSeg(nn.Module):
         self.prefix = prefix
         self.pretrained = pretrained
         self.checkpoint_name = checkpoint_name
-        self.config = config
         self.frozen_layers = frozen_layers
-        self.config_file = config
 
         self.device = None
         self.name_to_id = {}
@@ -69,6 +67,8 @@ class SAMForRealWorldSemSeg(nn.Module):
         self.model.mask_decoder.mask_tokens.weight.data[0] = mask_token_data
         hyper_mlps = self.model.mask_decoder.output_hypernetworks_mlps[0]
         self.model.mask_decoder.output_hypernetworks_mlps = nn.ModuleList([hyper_mlps])
+
+        self.config = self.model.config
 
     def _load_checkpoint(self, checkpoint_name):
         if self.pretrained:
@@ -144,7 +144,9 @@ class SAMForRealWorldSemSeg(nn.Module):
         """
         rets = self.model(batch[self.image_key], multimask_output=False)
         pred_masks = rets.pred_masks[:, 0, :, :, :]
-        pred_masks = F.interpolate(pred_masks, batch[self.label_key].size()[-2:], mode="bilinear", align_corners=False)
+        pred_masks = F.interpolate(
+            pred_masks, (self.image_size, self.image_size), mode="bilinear", align_corners=False
+        )
         if self.training:
             return {self.prefix: {LOGITS: pred_masks}}
         else:

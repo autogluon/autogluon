@@ -14,7 +14,7 @@ except:
 
 from ..constants import BINARY, MULTICLASS, QUANTILE, REGRESSION, SOFTCLASS
 from . import classification_metrics, quantile_metrics
-from .classification_metrics import BER, COD, confusion_matrix
+from .classification_metrics import confusion_matrix
 
 
 class Scorer(object, metaclass=ABCMeta):
@@ -481,6 +481,7 @@ recall = make_scorer("recall", sklearn.metrics.recall_score)
 
 # Register other metrics
 quadratic_kappa = make_scorer("quadratic_kappa", classification_metrics.quadratic_kappa, needs_proba=False)
+
 
 def customized_log_loss(y_true, y_pred, eps=1e-15):
     """

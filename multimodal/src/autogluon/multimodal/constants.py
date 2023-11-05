@@ -51,6 +51,7 @@ TOKEN_TYPE_IDS = "token_type_ids"
 PIXEL_VALUES = "pixel_values"
 INPUT_IDS = "input_ids"
 REAL_WORLD_SEM_SEG_IMG = "real_world_sem_seg_img"
+REAL_WORLD_SEM_SEG_IMG_GT = "real_world_sem_seg_img_gt"
 
 # Output keys
 LOGITS = "logits"

@@ -484,6 +484,7 @@ def apply_model_adaptation(model: nn.Module, config: DictConfig) -> nn.Module:
         lora_alpha=config.optimization.lora.alpha,
         module_filter=config.optimization.lora.module_filter,
         filter=config.optimization.lora.filter,
+        extra_trainable_params=OmegaConf.select(config, "optimization.extra_trainable_params"),
     )
     model.name_to_id = model.get_layer_ids()  # Need to update name to id dictionary.
 

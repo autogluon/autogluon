@@ -482,6 +482,7 @@ def inject_adaptation_to_linear_layer(
     lora_alpha: int = None,
     filter: Optional[List[str]] = None,
     module_filter: Optional[List[str]] = None,
+    extra_trainable_params: Optional[List[str]] = None,
 ) -> nn.Module:
     """
     Injects trainable adatio Low-Rank decomposition matrices (LoRA) into linear
@@ -505,22 +506,27 @@ def inject_adaptation_to_linear_layer(
     module_filter
         Apply loRA only to modules filtered by name (e.g. ".*EncDecAttention|.*DenseReluDense")
         If None, loRA is considered for all modules
-
+    extra_trainable_params
+        Not to apply loRA to modules filtered by name, and these modules are not frozen during training (e.g. "mask_decoder").
+        If None, all the modules except for those applyed loRA are frozen.
     Returns
     -------
     Model with injected LoRA modules.
     """
     for m_name, module in dict(model.named_modules()).items():
-        if not module_filter or any(re.match(filter_module, m_name) for filter_module in module_filter):
-            for c_name, layer in dict(module.named_children()).items():
-                if not filter or any(re.match(filter_layer, c_name) for filter_layer in filter):
-                    assert isinstance(
-                        layer, nn.Linear
-                    ), f"LoRA can only be applied to torch.nn.Linear, but {layer} is {type(layer)}."
-                    adaptation_layer = create_adaptation(efficient_finetune, layer, lora_r, lora_alpha)
-                    adaptation_layer.weight = layer.weight
-                    adaptation_layer.bias = layer.bias
-                    setattr(module, c_name, adaptation_layer)
+        if not extra_trainable_params or not any(
+            re.match(filter_layer, m_name) for filter_layer in extra_trainable_params
+        ):
+            if not module_filter or any(re.match(filter_module, m_name) for filter_module in module_filter):
+                for c_name, layer in dict(module.named_children()).items():
+                    if not filter or any(re.match(filter_layer, c_name) for filter_layer in filter):
+                        assert isinstance(
+                            layer, nn.Linear
+                        ), f"LoRA can only be applied to torch.nn.Linear, but {layer} is {type(layer)}."
+                        adaptation_layer = create_adaptation(efficient_finetune, layer, lora_r, lora_alpha)
+                        adaptation_layer.weight = layer.weight
+                        adaptation_layer.bias = layer.bias
+                        setattr(module, c_name, adaptation_layer)
 
     return model  # return model to enable method chaining
 

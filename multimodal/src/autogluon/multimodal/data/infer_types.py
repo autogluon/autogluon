@@ -30,6 +30,7 @@ from ..constants import (
     OPEN_VOCABULARY_OBJECT_DETECTION,
     REAL_WORLD_SEM_SEG,
     REAL_WORLD_SEM_SEG_IMG,
+    REAL_WORLD_SEM_SEG_IMG_GT,
     REGRESSION,
     ROIS,
     TEXT,
@@ -609,7 +610,7 @@ def infer_label_column_type_by_problem_type(
         NUMERICAL,
         NER_ANNOTATION,
         ROIS,
-        REAL_WORLD_SEM_SEG_IMG,
+        REAL_WORLD_SEM_SEG_IMG_GT,
     ),
     fallback_label_type: Optional[str] = CATEGORICAL,
 ):
@@ -663,6 +664,8 @@ def infer_label_column_type_by_problem_type(
             column_types[col_name] = NER_ANNOTATION
         elif problem_type in [OBJECT_DETECTION, OPEN_VOCABULARY_OBJECT_DETECTION]:
             column_types[col_name] = ROIS
+        elif problem_type == REAL_WORLD_SEM_SEG:
+            column_types[col_name] = REAL_WORLD_SEM_SEG_IMG_GT
 
         if column_types[col_name] not in allowable_label_types:
             column_types[col_name] = fallback_label_type
