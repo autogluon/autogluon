@@ -1,8 +1,8 @@
 import os
 
 import numpy as np
-import pytest
 import pandas as pd
+import pytest
 import torch
 
 from autogluon.core.utils.loaders import load_zip

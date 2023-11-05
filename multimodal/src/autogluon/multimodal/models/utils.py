@@ -508,7 +508,7 @@ def inject_adaptation_to_linear_layer(
         If None, loRA is considered for all modules
     extra_trainable_params
         Not to apply loRA to modules filtered by name, and these modules are not frozen during training (e.g. "mask_decoder").
-        If None, all the modules except for those applyed loRA are frozen.
+        If None, all the modules except for those applied loRA are frozen.
     Returns
     -------
     Model with injected LoRA modules.
