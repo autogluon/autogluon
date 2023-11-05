@@ -29,14 +29,12 @@ if [ $MODULE == "tabular" ] || [ $MODULE == "timeseries" ]; then
     --amlb-user-dir $(dirname "$0")/amlb_user_dir \
     --git-uri-branch https://github.com/openml/automlbenchmark.git#stable
 else
-# Put out an IF here based on the BENCHMARK value prepare the dataloader
     FRAMEWORK=AutoGluon_$PRESET
     aws s3 cp --recursive s3://autogluon-ci-benchmark/configs/$MODULE/$USER_DIR_S3_PREFIX/latest/ $(dirname "$0")/custom_user_dir/
     dataloader_file=""
     class_name=""
     dataset_file=""
     custom_dataloader_value=""
-    fewshow_flag=false
     shot_value=0
     seed_value=0
     if [ $BENCHMARK == "image" ]; then
@@ -53,7 +51,6 @@ else
         dataloader_file="text_dataloader.py"
         class_name="TextDataLoader"
         dataset_file="text_datasets.yaml"
-        fewshot_flag=true
         shot_value=500
         seed_value=7
         custom_dataloader_value="dataloader_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataloader_file;class_name:$class_name;dataset_config_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataset_file"
@@ -73,7 +70,8 @@ else
             fi
         fi
     done
-    agbench generate-cloud-config \
+
+    gen_bench_command="agbench generate-cloud-config \
     --prefix ag-bench \
     --module $MODULE \
     --cdk-deploy-account $CDK_DEPLOY_ACCOUNT \
@@ -85,15 +83,16 @@ else
     --constraint $TIME_LIMIT \
     --custom-resource-dir $(dirname "$0")/custom_user_dir \
     --dataset-names "$dataset_names" \
-    --custom-dataloader "$custom_dataloader_value" \
-    --fewshot $fewshot_flag \
-    --shot $shot_value \
-    --lang $lang \
-    --seed $seed 
+    --custom-dataloader '$custom_dataloader_value'"
+
+    if [ $BENCHMARK == "text" ]; then
+        gen_bench_command="$gen_bench_command --fewshot --shot $shot_value --lang $lang --seed $seed"
+    fi 
+    eval "$gen_bench_command"
 fi
 
 # TO DO: 
 # Add Max Machine Num for all 3 modules - Done
-# Fill in the vision, text-tabular part
-# Run Benchmark will change accordingly
-# Benchmark results for multimodal will be stored in vision/text-tabular etc
+# Fill in the vision, text-tabular part - Done
+# Run Benchmark will change accordingly - Done
+# Benchmark results for multimodal will be stored in vision/text-tabular etc - Done
