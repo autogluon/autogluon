@@ -14,15 +14,8 @@ from torchmetrics.aggregation import BaseAggregator
 from ..constants import LM_TARGET, LOGITS, T_FEW, TEMPLATE_LOGITS, WEIGHT
 from ..data.mixup import MixupModule, multimodel_mixup
 from ..models.utils import run_model
-from .utils import (
-    COD,
-    Balanced_Error_Rate,
-    apply_layerwise_lr_decay,
-    apply_single_lr,
-    apply_two_stages_lr,
-    get_lr_scheduler,
-    get_optimizer,
-)
+from .semantic_segmentation_metrics.metric import COD, Balanced_Error_Rate
+from .utils import apply_layerwise_lr_decay, apply_single_lr, apply_two_stages_lr, get_lr_scheduler, get_optimizer
 
 logger = logging.getLogger(__name__)
 

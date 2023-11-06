@@ -26,8 +26,8 @@ from ..constants import (
     IMAGE_BYTEARRAY,
     IMAGE_VALID_NUM,
     LABEL,
-    REAL_WORLD_SEM_SEG_IMG,
-    REAL_WORLD_SEM_SEG_IMG_GT,
+    SEMANTIC_SEGMENTATION_GT,
+    SEMANTIC_SEGMENTATION_IMG,
 )
 from .collator import PadCollator, StackCollator
 
@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
-class RealWorldSemSegImageProcessor:
+class SemanticSegImageProcessor:
     """
     Prepare image data for the model specified by "prefix". For multiple models requiring image data,
     we need to create a ImageProcessor for each related model so that they will have independent input.
@@ -199,9 +199,9 @@ class RealWorldSemSegImageProcessor:
         ret = {}
         annotation_column = None
         for column_name, column_modality in feature_modalities.items():
-            if column_modality == REAL_WORLD_SEM_SEG_IMG:
+            if column_modality == SEMANTIC_SEGMENTATION_IMG:
                 image_column = column_name
-            if column_modality == REAL_WORLD_SEM_SEG_IMG_GT:
+            if column_modality == SEMANTIC_SEGMENTATION_GT:
                 annotation_column = column_name
 
         per_col_image_features = image_features[image_column]
@@ -209,9 +209,11 @@ class RealWorldSemSegImageProcessor:
             per_col_gt_features = image_features[annotation_column]
 
         for idx, img_feature in enumerate(per_col_image_features[: self.max_img_num_per_col]):
-            with PIL.Image.open(img_feature) as img:
-                img = img.convert(image_mode)
-
+            try:
+                with PIL.Image.open(img_feature) as img:
+                    img = img.convert(image_mode)
+            except Exception as e:
+                continue
             if annotation_column:
                 gt_feature = per_col_gt_features[idx]
                 with PIL.Image.open(gt_feature) as gt:
@@ -234,7 +236,7 @@ class RealWorldSemSegImageProcessor:
 
         ret.update(
             {
-                self.image_key: torch.cat(images, dim=0),
+                self.image_key: torch.cat(images, dim=0) if len(images) != 0 else torch.tensor([]),
                 self.image_valid_num_key: len(images),
                 self.label_key: torch.cat(gts, dim=0) if len(gts) != 0 else torch.tensor([]),
             }

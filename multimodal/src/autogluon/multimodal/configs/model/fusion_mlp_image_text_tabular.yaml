@@ -244,7 +244,7 @@ model:
     config_file: ""
     image_norm: "imagenet"
     data_types:
-      - "real_world_sem_seg_img"
+      - "semantic_segmentation_img"
     aug:
       - "random_horizontal_flip"
     image:

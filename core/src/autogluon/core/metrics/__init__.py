@@ -553,7 +553,10 @@ for scorer in [
     for metric_dict in [BINARY_METRICS, MULTICLASS_METRICS]:
         _add_scorer_to_metric_dict(metric_dict=metric_dict, scorer=scorer)
 
-for scorer in [roc_auc, average_precision]:
+for scorer in [
+    roc_auc,
+    average_precision,
+]:
     _add_scorer_to_metric_dict(metric_dict=BINARY_METRICS, scorer=scorer)
 
 

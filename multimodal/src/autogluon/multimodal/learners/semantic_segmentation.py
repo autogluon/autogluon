@@ -1,15 +1,16 @@
 import logging
 import os
-from typing import Dict, List, Optional, Union
+from typing import Dict, Iterable, List, Optional, Union
 
 import numpy as np
 import pandas as pd
 import torch
 from omegaconf import OmegaConf
+from PIL import Image
 
 from ..constants import LABEL, LOGITS
 from ..optimization.utils import get_metric, get_norm_layer_param_names, get_trainable_params_efficient_finetune
-from ..utils import extract_from_output
+from ..utils import extract_from_output, setup_save_path
 from .base import BaseLearner
 
 logger = logging.getLogger(__name__)
@@ -116,9 +117,8 @@ class SemanticSegmentationLearner(BaseLearner):
     def predict(
         self,
         data: Union[pd.DataFrame, dict, list, str],
-        candidate_data: Optional[Union[pd.DataFrame, dict, list]] = None,
-        as_pandas: Optional[bool] = None,
         realtime: Optional[bool] = None,
+        save_results: Optional[bool] = None,
         **kwargs,
     ):
         """
@@ -129,14 +129,14 @@ class SemanticSegmentationLearner(BaseLearner):
         data
             The data to make predictions for. Should contain same column names as training data and
             follow same format (except for the `label` column).
-        candidate_data
-            The candidate data from which to search the query data's matches.
         as_pandas
             Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
         realtime
             Whether to do realtime inference, which is efficient for small data (default None).
             If not specified, we would infer it on based on the data modalities
             and sample number.
+        save_results
+            Whether to save the prediction results (only works for detection now)
 
         Returns
         -------
@@ -144,29 +144,36 @@ class SemanticSegmentationLearner(BaseLearner):
         """
         self.ensure_predict_ready()
         ret_type = LOGITS
-        if candidate_data:
-            pred = self._match_queries_and_candidates(
-                query_data=data,
-                candidate_data=candidate_data,
-                return_prob=False,
+
+        outputs = self.predict_per_run(
+            data=data,
+            requires_label=False,
+            realtime=realtime,
+        )
+        logits = extract_from_output(outputs=outputs, ret_type=ret_type)
+
+        if self._df_preprocessor:  # 有和没有先fit后predict？结果一样么
+            pred = self._df_preprocessor.transform_prediction(
+                y_pred=logits,
             )
         else:
-            outputs = self.predict_per_run(
-                data=data,
-                requires_label=False,
-                realtime=realtime,
-            )
-            logits = extract_from_output(outputs=outputs, ret_type=ret_type, as_ndarray=False)
-
-            if self._df_preprocessor:
-                pred = self._df_preprocessor.transform_prediction(
-                    y_pred=logits,
-                )
+            if isinstance(logits, (torch.Tensor, np.ndarray)) and logits.ndim == 2:
+                pred = logits.argmax(axis=1)
             else:
-                if isinstance(logits, (torch.Tensor, np.ndarray)) and logits.ndim == 2:
-                    pred = logits.argmax(axis=1)
-                else:
-                    pred = logits
+                pred = logits
+
+        if save_results:
+            self._save_path = setup_save_path(
+                old_save_path=self._save_path,
+                warn_if_exist=False,
+            )
+            self.save_segmentation_result(
+                pred=pred,
+                data=data,
+                result_path=self._save_path,
+            )
+
+        return pred
 
         # if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
         #     # TODO
@@ -182,7 +189,52 @@ class SemanticSegmentationLearner(BaseLearner):
         realtime: Optional[bool] = None,
         **kwargs,
     ):
-        raise NotImplementedError("Semantic segmentation doesn't support calling `predict_proba` yet.")
+        """
+        Predict probabilities class probabilities rather than class labels.
+        This is only for the classification. Calling it for regression will throw an exception.
+
+        Parameters
+        ----------
+        data
+            The data to make predictions for. Should contain same column names as training data and
+              follow same format (except for the `label` column).
+        candidate_data
+            The candidate data from which to search the query data's matches.
+        as_pandas
+            Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
+        as_multiclass
+            Whether to return the probability of all labels or
+            just return the probability of the positive class for binary classification problems.
+        realtime
+            Whether to do realtime inference, which is efficient for small data (default None).
+            If not specified, we would infer it on based on the data modalities
+            and sample number.
+
+        Returns
+        -------
+        Array of predicted class-probabilities, corresponding to each row in the given data.
+        When as_multiclass is True, the output will always have shape (#samples, #classes).
+        Otherwise, the output will have shape (#samples,)
+        """
+        self.ensure_predict_ready()
+
+        outputs = self.predict_per_run(
+            data=data,
+            requires_label=False,
+            realtime=realtime,
+        )
+        logits = extract_from_output(outputs=outputs, ret_type=LOGITS)
+        prob = logits  # for binary
+        # prob = logits_to_prob(logits)
+
+        # if not as_multiclass:
+        #     if self._problem_type == BINARY:
+        #         prob = prob[:, 1]
+
+        # if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
+        #     prob = self._as_pandas(data=data, to_be_converted=prob)
+
+        return prob
 
     def extract_embedding(
         self,
@@ -193,3 +245,38 @@ class SemanticSegmentationLearner(BaseLearner):
         **kwargs,
     ):
         raise NotImplementedError("Semantic segmentation doesn't support calling `extract_embedding` yet.")
+
+    def save_segmentation_result(self, pred: Iterable, data: Union[pd.DataFrame, Dict], result_path: str):
+        """
+        Saving segmentation results in pd.DataFrame format (per image)
+
+        Parameters
+        ----------
+        pred
+            List containing detection results for one image
+        data
+            pandas data frame or dict containing the image information to be tested
+        result_path
+            path to save result
+        Returns
+        -------
+        The paths of the segmentation results as pandas DataFrame
+        """
+        if isinstance(data, dict):
+            image_names = data["image"]
+        else:
+            image_names = data["image"].to_list()
+        results = []
+
+        mask_path = os.path.join(result_path, "masks")
+        txt_path = os.path.join(result_path, "result.txt")
+        os.makedirs(mask_path, exist_ok=True)
+        for image_pred, image_name in zip(pred, image_names):
+            mask = Image.fromarray(np.squeeze(image_pred, axis=0))
+            per_mask_path = os.path.join(mask_path, os.path.basename(image_name))
+            mask.save(per_mask_path)
+            results.append([image_name, per_mask_path])
+
+        result_df = pd.DataFrame(results, columns=["image", "mask"])
+        result_df.to_csv(txt_path, index=False)
+        return result_df

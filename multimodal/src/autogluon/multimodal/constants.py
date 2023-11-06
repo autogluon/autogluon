@@ -34,7 +34,7 @@ OCR_TEXT_RECOGNITION = f"{OCR}_text_recognition"
 IMAGE_SIMILARITY = "image_similarity"
 TEXT_SIMILARITY = "text_similarity"
 IMAGE_TEXT_SIMILARITY = "image_text_similarity"
-REAL_WORLD_SEM_SEG = "real_world_sem_seg"
+SEMANTIC_SEGMENTATION = "semantic_segmentation"
 
 # Input keys
 IMAGE = "image"
@@ -50,8 +50,8 @@ ATTENTION_MASK = "attention_mask"
 TOKEN_TYPE_IDS = "token_type_ids"
 PIXEL_VALUES = "pixel_values"
 INPUT_IDS = "input_ids"
-REAL_WORLD_SEM_SEG_IMG = "real_world_sem_seg_img"
-REAL_WORLD_SEM_SEG_IMG_GT = "real_world_sem_seg_img_gt"
+SEMANTIC_SEGMENTATION_IMG = "semantic_segmentation_img"
+SEMANTIC_SEGMENTATION_GT = "semantic_segmentation_gt"
 
 # Output keys
 LOGITS = "logits"
@@ -158,7 +158,7 @@ METRIC_MODE_MAP = {
     BINARY_IOU: MAX,
     BINARY_DICE: MAX,
     BINARY_ACC: MAX,
-    BER: MAX,
+    BER: MIN,
 }
 VALID_METRICS = METRIC_MODE_MAP.keys()
 
@@ -175,7 +175,7 @@ MMDET = "mmdet"
 MMOCR = "mmocr"
 
 # Modality keys. may need to update here if new modality keys are added in above.
-ALL_MODALITIES = [IMAGE, TEXT, CATEGORICAL, NUMERICAL, TEXT_NER, DOCUMENT, REAL_WORLD_SEM_SEG_IMG]
+ALL_MODALITIES = [IMAGE, TEXT, CATEGORICAL, NUMERICAL, TEXT_NER, DOCUMENT, SEMANTIC_SEGMENTATION_IMG]
 
 # Keys to compute metrics
 Y_PRED = "y_pred"

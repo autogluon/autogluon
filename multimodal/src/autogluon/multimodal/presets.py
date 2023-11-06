@@ -435,9 +435,9 @@ def object_detection(presets: str = DEFAULT):
 
 
 @automm_presets.register()
-def real_world_sem_seg(presets: str = DEFAULT):
+def semantic_segmentation(presets: str = DEFAULT):
     """
-    Register the presets for real_world_sem_seg.
+    Register the presets for semantic_segmentation.
 
     Parameters
     ----------

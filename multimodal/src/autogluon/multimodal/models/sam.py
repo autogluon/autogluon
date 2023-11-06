@@ -10,13 +10,13 @@ from omegaconf import DictConfig
 from torch import nn
 from transformers import SamConfig, SamModel
 
-from ..constants import COLUMN, IMAGE, IMAGE_VALID_NUM, LABEL, LOGITS, REAL_WORLD_SEM_SEG
+from ..constants import COLUMN, IMAGE, IMAGE_VALID_NUM, LABEL, LOGITS, SEMANTIC_SEGMENTATION
 from .utils import assign_layer_ids, freeze_model_layers
 
 logger = logging.getLogger(__name__)
 
 
-class SAMForRealWorldSemSeg(nn.Module):
+class SAMForSemanticSegmentation(nn.Module):
     """
     Support SAM for binary real-world semantic segmentation.
     Refer to https://huggingface.co/docs/transformers/main/model_doc/sam
@@ -36,7 +36,7 @@ class SAMForRealWorldSemSeg(nn.Module):
         Parameters
         ----------
         prefix
-            The prefix of the SAMForRealWorldSemSeg model.
+            The prefix of the SAMForSemanticSegmentation model.
         checkpoint_name
             Name of the SAM checkpoint.
         pretrained
@@ -171,16 +171,12 @@ class SAMForRealWorldSemSeg(nn.Module):
         """
         model_prefix = "model"
         pre_encoder_patterns = (
-            "vision_encoder.pos_embed",
-            "vision_encoder.patch_embed",
-            "vision_encoder.layers",
+            "vision_encoder",
+            "prompt_encoder",
         )
-        post_encoder_patterns = (
-            "mask_decoder",
-            "vision_encoder.neck",
-        )
-        is_frozen_layer = lambda n: any(bb in n for bb in self.frozen_layers)
-        names = [n for n, _ in self.named_parameters() if not is_frozen_layer(n)]
+        post_encoder_patterns = ("mask_decoder",)
+
+        names = [n for n, _ in self.named_parameters()]
 
         name_to_id, names = assign_layer_ids(
             names=names,

@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 
 import numpy as np
+import torch
+import torchmetrics
 from scipy.ndimage import convolve
 from scipy.ndimage import distance_transform_edt as bwdist
 
@@ -127,7 +129,7 @@ class Fmeasure(object):
         return dict(fm=dict(adp=adaptive_fm, curve=changeable_fm), pr=dict(p=precision, r=recall))
 
 
-class MAE(object):
+class MAE_SOD(object):
     def __init__(self):
         """
         MAE(mean absolute error) for SOD.
@@ -568,3 +570,113 @@ class WeightedFmeasure(object):
         """
         weighted_fm = np.mean(np.array(self.weighted_fms, dtype=_TYPE))
         return dict(wfm=weighted_fm)
+
+
+class Balanced_Error_Rate(torchmetrics.Metric):
+    """
+    Compute the balanced error rate.
+    """
+
+    def __init__(
+        self,
+    ):
+        super().__init__()
+        self.add_state("logits", default=[], dist_reduce_fx=None)
+        self.add_state("labels", default=[], dist_reduce_fx=None)
+
+    def update(self, logits, labels):
+        self.logits.append(logits)
+        self.labels.append(labels)
+
+    def compute(self):
+        logits = torch.cat(self.logits).cpu()
+        labels = torch.cat(self.labels).cpu()
+
+        labels = (labels * 255) > 125
+        logits = (logits * 255) > 125
+        ber = 1 - torchmetrics.Accuracy(
+            task="multiclass", num_classes=2, average="macro", multidim_average="samplewise"
+        )(logits, labels)
+        return torch.mean(ber)
+
+
+class COD(torchmetrics.Metric):
+    def __init__(self):
+        super().__init__()
+        self.add_state("logits", default=[], dist_reduce_fx=None)
+        self.add_state("labels", default=[], dist_reduce_fx=None)
+
+    def update(self, logits, labels):
+        self.logits.append(logits)
+        self.labels.append(labels)
+
+    def compute(self):
+        pass
+
+
+class SM(COD):
+    def compute(self):
+        logits = torch.cat(self.logits)
+        labels = torch.cat(self.labels)
+        assert logits.shape == labels.shape
+        batchsize = labels.shape[0]
+
+        metric_SM = Smeasure()
+
+        for i in range(batchsize):
+            true, pred = labels[i, 0].cpu().data.numpy() * 255, logits[i, 0].cpu().data.numpy() * 255
+            metric_SM.step(pred=pred, gt=true)
+
+        return torch.tensor(metric_SM.get_results()["sm"])
+
+
+class FM(COD):
+    def compute(self):
+        logits = torch.cat(self.logits)
+        labels = torch.cat(self.labels)
+        assert logits.shape == labels.shape
+        batchsize = labels.shape[0]
+
+        metric_WFM = WeightedFmeasure()
+        for i in range(batchsize):
+            true, pred = labels[i, 0].cpu().data.numpy() * 255, logits[i, 0].cpu().data.numpy() * 255
+
+            metric_WFM.step(pred=pred, gt=true)
+
+        return torch.tensor(metric_WFM.get_results()["wfm"])
+
+
+class EM(COD):
+    def compute(self):
+        logits = torch.cat(self.logits)
+        labels = torch.cat(self.labels)
+        assert logits.shape == labels.shape
+        batchsize = labels.shape[0]
+
+        metric_EM = Emeasure()
+
+        for i in range(batchsize):
+            true, pred = labels[i, 0].cpu().data.numpy() * 255, logits[i, 0].cpu().data.numpy() * 255
+
+            metric_EM.step(pred=pred, gt=true)
+
+        return torch.tensor(metric_EM.get_results()["em"]["curve"].mean())
+
+
+class MAE(COD):
+    def compute(self):
+        logits = torch.cat(self.logits)
+        labels = torch.cat(self.labels)
+        assert logits.shape == labels.shape
+        batchsize = labels.shape[0]
+
+        metric_MAE = MAE_SOD()
+        for i in range(batchsize):
+            true, pred = labels[i, 0].cpu().data.numpy() * 255, logits[i, 0].cpu().data.numpy() * 255
+
+            metric_MAE.step(pred=pred, gt=true)
+
+        return torch.tensor(metric_MAE.get_results()["mae"])
+
+
+COD_METRICS_NAMES = {"sm": SM(), "fm": FM(), "em": EM(), "mae": MAE()}

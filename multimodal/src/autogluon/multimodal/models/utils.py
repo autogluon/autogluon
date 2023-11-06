@@ -9,7 +9,7 @@ from torch import nn
 from torch.nn.modules.loss import _Loss
 from transformers import AutoConfig, AutoModel, AutoTokenizer, BertTokenizer, CLIPTokenizer, ElectraTokenizer
 
-from ..constants import AUTOMM, COLUMN_FEATURES, FEATURES, LOGITS, MASKS, OCR, REAL_WORLD_SEM_SEG, REGRESSION
+from ..constants import AUTOMM, COLUMN_FEATURES, FEATURES, LOGITS, MASKS, OCR, REGRESSION, SEMANTIC_SEGMENTATION
 from .adaptation_layers import IA3Linear, IA3LoRALinear, LoRALinear
 
 logger = logging.getLogger(__name__)
@@ -514,19 +514,18 @@ def inject_adaptation_to_linear_layer(
     Model with injected LoRA modules.
     """
     for m_name, module in dict(model.named_modules()).items():
-        if not extra_trainable_params or not any(
-            re.match(filter_layer, m_name) for filter_layer in extra_trainable_params
-        ):
-            if not module_filter or any(re.match(filter_module, m_name) for filter_module in module_filter):
-                for c_name, layer in dict(module.named_children()).items():
-                    if not filter or any(re.match(filter_layer, c_name) for filter_layer in filter):
-                        assert isinstance(
-                            layer, nn.Linear
-                        ), f"LoRA can only be applied to torch.nn.Linear, but {layer} is {type(layer)}."
-                        adaptation_layer = create_adaptation(efficient_finetune, layer, lora_r, lora_alpha)
-                        adaptation_layer.weight = layer.weight
-                        adaptation_layer.bias = layer.bias
-                        setattr(module, c_name, adaptation_layer)
+        if extra_trainable_params and any(re.match(filter_layer, m_name) for filter_layer in extra_trainable_params):
+            continue
+        if not module_filter or any(re.match(filter_module, m_name) for filter_module in module_filter):
+            for c_name, layer in dict(module.named_children()).items():
+                if not filter or any(re.match(filter_layer, c_name) for filter_layer in filter):
+                    assert isinstance(
+                        layer, nn.Linear
+                    ), f"LoRA can only be applied to torch.nn.Linear, but {layer} is {type(layer)}."
+                    adaptation_layer = create_adaptation(efficient_finetune, layer, lora_r, lora_alpha)
+                    adaptation_layer.weight = layer.weight
+                    adaptation_layer.bias = layer.bias
+                    setattr(module, c_name, adaptation_layer)
 
     return model  # return model to enable method chaining
 
@@ -624,7 +623,7 @@ def get_model_postprocess_fn(problem_type: str, loss_func: _Loss):
     if problem_type == REGRESSION:
         if isinstance(loss_func, nn.BCEWithLogitsLoss):
             postprocess_func = apply_sigmoid
-    elif problem_type == REAL_WORLD_SEM_SEG:
+    elif problem_type == SEMANTIC_SEGMENTATION:
         postprocess_func = apply_sigmoid
 
     return postprocess_func

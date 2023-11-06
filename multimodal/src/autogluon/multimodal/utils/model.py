@@ -30,8 +30,8 @@ from ..constants import (
     NUMERICAL,
     NUMERICAL_MLP,
     OVD,
-    REAL_WORLD_SEM_SEG_IMG,
     SAM,
+    SEMANTIC_SEGMENTATION_IMG,
     T_FEW,
     TEXT,
     TEXT_NER,
@@ -54,7 +54,7 @@ from ..models import (
     MultimodalFusionTransformer,
     NumericalMLP,
     OVDModel,
-    SAMForRealWorldSemSeg,
+    SAMForSemanticSegmentation,
     TFewModel,
     TimmAutoModelForImagePrediction,
 )
@@ -107,8 +107,8 @@ def select_model(
         data_status[TEXT_NER] = True
     if len(df_preprocessor.document_feature_names) > 0:
         data_status[DOCUMENT] = True
-    if len(df_preprocessor.real_world_sem_seg_feature_names) > 0:
-        data_status[REAL_WORLD_SEM_SEG_IMG] = True
+    if len(df_preprocessor.semantic_segmentation_feature_names) > 0:
+        data_status[SEMANTIC_SEGMENTATION_IMG] = True
 
     names = config.model.names
     if isinstance(names, str):
@@ -374,7 +374,7 @@ def create_model(
             pooling_mode=OmegaConf.select(model_config, "pooling_mode", default="cls"),
         )
     elif model_name.lower().startswith(SAM):
-        model = SAMForRealWorldSemSeg(
+        model = SAMForSemanticSegmentation(
             prefix=model_name,
             checkpoint_name=model_config.checkpoint_name,
             pretrained=pretrained,

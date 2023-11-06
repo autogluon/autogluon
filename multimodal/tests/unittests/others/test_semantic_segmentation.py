@@ -15,7 +15,7 @@ def get_file_paths(directory):
 
 
 def download_sample_dataset():
-    zip_file = "https://automl-mm-bench.s3.amazonaws.com/real_world_sem_seg/tiny_isic2017.zip"
+    zip_file = "https://automl-mm-bench.s3.amazonaws.com/unit-tests/tiny_isic2017.zip"
     download_dir = "./tiny_isic2017"
 
     load_zip.unzip(zip_file, unzip_dir=download_dir)
@@ -30,26 +30,14 @@ def download_sample_dataset():
         "facebook/sam-vit-base",
     ],
 )
-def test_sam_real_world_sem_seg_fit_evaluate_predict_isic(checkpoint_name):
+def test_sam_semantic_segmentation_fit_evaluate_predict_isic(checkpoint_name):
     data_dir = download_sample_dataset()
-    train_data_dir = os.path.join(data_dir, "train")
-    val_data_dir = os.path.join(data_dir, "val")
-    test_data_dir = os.path.join(data_dir, "test")
-
-    train_img_path = os.path.join(train_data_dir, "ISIC-2017_Train")
-    val_img_path = os.path.join(val_data_dir, "ISIC-2017_Val")
-    test_img_path = os.path.join(test_data_dir, "ISIC-2017_Test")
-
-    train_gt_path = os.path.join(train_data_dir, "ISIC-2017_Training_Part1_GroundTruth")
-    val_gt_path = os.path.join(val_data_dir, "ISIC-2017_Validation_Part1_GroundTruth")
-    test_gt_path = os.path.join(test_data_dir, "ISIC-2017_Test_v2_Part1_GroundTruth")
-
-    train_img_files = get_file_paths(train_img_path)
-    train_gt_files = get_file_paths(train_gt_path)
-    val_img_files = get_file_paths(val_img_path)
-    val_gt_files = get_file_paths(val_gt_path)
-    test_img_files = get_file_paths(test_img_path)
-    test_gt_files = get_file_paths(test_gt_path)
+    train_img_files = get_file_paths(os.path.join(data_dir, "train/ISIC-2017_Train"))
+    train_gt_files = get_file_paths(os.path.join(data_dir, "train/ISIC-2017_Training_Part1_GroundTruth"))
+    val_img_files = get_file_paths(os.path.join(data_dir, "val/ISIC-2017_Val"))
+    val_gt_files = get_file_paths(os.path.join(data_dir, "val/ISIC-2017_Validation_Part1_GroundTruth"))
+    test_img_files = get_file_paths(os.path.join(data_dir, "test/ISIC-2017_Test"))
+    test_gt_files = get_file_paths(os.path.join(data_dir, "test/ISIC-2017_Test_v2_Part1_GroundTruth"))
 
     train_df = pd.DataFrame({"image": train_img_files, "label": train_gt_files})
     val_df = pd.DataFrame({"image": val_img_files, "label": val_gt_files})
@@ -57,8 +45,7 @@ def test_sam_real_world_sem_seg_fit_evaluate_predict_isic(checkpoint_name):
 
     validation_metric = "binary_iou"
     predictor = MultiModalPredictor(
-        problem_type="real_world_sem_seg",
-        sample_data_path=train_img_path,
+        problem_type="semantic_segmentation",
         validation_metric=validation_metric,
         eval_metric=validation_metric,
         hyperparameters={
@@ -83,24 +70,13 @@ def test_sam_real_world_sem_seg_fit_evaluate_predict_isic(checkpoint_name):
         "facebook/sam-vit-base",
     ],
 )
-def test_sam_real_world_sem_seg_save_and_load(checkpoint_name):
+def test_sam_semantic_segmentation_save_and_load(checkpoint_name):
     data_dir = download_sample_dataset()
-    train_data_dir = os.path.join(data_dir, "train")
-    val_data_dir = os.path.join(data_dir, "val")
-    test_data_dir = os.path.join(data_dir, "test")
-
-    train_img_path = os.path.join(train_data_dir, "ISIC-2017_Train")
-    val_img_path = os.path.join(val_data_dir, "ISIC-2017_Val")
-    test_img_path = os.path.join(test_data_dir, "ISIC-2017_Test")
-
-    train_gt_path = os.path.join(train_data_dir, "ISIC-2017_Training_Part1_GroundTruth")
-    val_gt_path = os.path.join(val_data_dir, "ISIC-2017_Validation_Part1_GroundTruth")
-
-    train_img_files = get_file_paths(train_img_path)
-    train_gt_files = get_file_paths(train_gt_path)
-    val_img_files = get_file_paths(val_img_path)
-    val_gt_files = get_file_paths(val_gt_path)
-    test_img_files = get_file_paths(test_img_path)
+    train_img_files = get_file_paths(os.path.join(data_dir, "train/ISIC-2017_Train"))
+    train_gt_files = get_file_paths(os.path.join(data_dir, "train/ISIC-2017_Training_Part1_GroundTruth"))
+    val_img_files = get_file_paths(os.path.join(data_dir, "val/ISIC-2017_Val"))
+    val_gt_files = get_file_paths(os.path.join(data_dir, "val/ISIC-2017_Validation_Part1_GroundTruth"))
+    test_img_files = get_file_paths(os.path.join(data_dir, "test/ISIC-2017_Test"))
 
     train_df = pd.DataFrame({"image": train_img_files, "label": train_gt_files})
     val_df = pd.DataFrame({"image": val_img_files, "label": val_gt_files})
@@ -108,8 +84,7 @@ def test_sam_real_world_sem_seg_save_and_load(checkpoint_name):
 
     validation_metric = "binary_iou"
     predictor = MultiModalPredictor(
-        problem_type="real_world_sem_seg",
-        sample_data_path=train_img_path,
+        problem_type="semantic_segmentation",
         validation_metric=validation_metric,
         eval_metric=validation_metric,
         hyperparameters={
@@ -124,9 +99,9 @@ def test_sam_real_world_sem_seg_save_and_load(checkpoint_name):
     # Predict
     pred = predictor.predict(test_df, save_results=False)
 
-    predictor.save("./")
-    new_predictor = MultiModalPredictor.load("./")
+    predictor.save("./sam_semantic_segmentation_save_and_load")
+    new_predictor = MultiModalPredictor.load("./sam_semantic_segmentation_save_and_load")
 
     new_pred = new_predictor.predict(test_df, save_results=False)
 
-    assert torch.allclose(pred, new_pred)
+    assert np.allclose(pred, new_pred)

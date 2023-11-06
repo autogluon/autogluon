@@ -27,9 +27,9 @@ from ..constants import (
     NULL,
     NUMERICAL,
     OVD,
-    REAL_WORLD_SEM_SEG_IMG,
-    REAL_WORLD_SEM_SEG_IMG_GT,
     ROIS,
+    SEMANTIC_SEGMENTATION_GT,
+    SEMANTIC_SEGMENTATION_IMG,
     TEXT,
     TEXT_NER,
 )
@@ -97,7 +97,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             if col_name == self._label_column:
                 continue
             if (
-                col_type.startswith((TEXT, IMAGE, ROIS, TEXT_NER, DOCUMENT, REAL_WORLD_SEM_SEG_IMG))
+                col_type.startswith((TEXT, IMAGE, ROIS, TEXT_NER, DOCUMENT, SEMANTIC_SEGMENTATION_IMG))
                 or col_type == NULL
             ):
                 continue
@@ -143,7 +143,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         self._rois_feature_names = []
         self._ner_feature_names = []
         self._document_feature_names = []
-        self._real_world_sem_seg_feature_names = []
+        self._semantic_segmentation_feature_names = []
 
     @property
     def label_column(self):
@@ -204,10 +204,10 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                 return []
 
     @property
-    def real_world_sem_seg_feature_names(self):
+    def semantic_segmentation_feature_names(self):
         # Added for backward compatibility.
         if hasattr(self, "_document_feature_names"):
-            return self._real_world_sem_seg_feature_names
+            return self._semantic_segmentation_feature_names
         else:
             return []
 
@@ -286,8 +286,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             return self._document_feature_names
         elif modality == LABEL:
             return [self._label_column]  # as a list to be consistent with others
-        elif modality == REAL_WORLD_SEM_SEG_IMG:
-            return self._real_world_sem_seg_feature_names
+        elif modality == SEMANTIC_SEGMENTATION_IMG:
+            return self._semantic_segmentation_feature_names
         elif self.label_type == NER_ANNOTATION:
             return self.ner_feature_names + [self._label_column]
         else:
@@ -361,8 +361,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                 self._document_feature_names.append(col_name)
             elif col_type == ROIS:
                 self._rois_feature_names.append(col_name)
-            elif col_type == REAL_WORLD_SEM_SEG_IMG:
-                self._real_world_sem_seg_feature_names.append(col_name)
+            elif col_type == SEMANTIC_SEGMENTATION_IMG:
+                self._semantic_segmentation_feature_names.append(col_name)
             else:
                 raise NotImplementedError(
                     f"Type of the column is not supported currently. Received {col_name}={col_type}."
@@ -386,7 +386,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         elif self.label_type == NUMERICAL:
             y = pd.to_numeric(y).to_numpy()
             self._label_scaler.fit(np.expand_dims(y, axis=-1))
-        elif self.label_type == ROIS or self.label_type == REAL_WORLD_SEM_SEG_IMG_GT:
+        elif self.label_type == ROIS or self.label_type == SEMANTIC_SEGMENTATION_GT:
             pass  # Do nothing. TODO: Shall we call fit here?
         elif self.label_type == NER_ANNOTATION:
             # If there are ner annotations and text columns but no NER feature columns,
@@ -509,7 +509,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
 
         return ret_data, ret_type
 
-    def transform_real_world_sem_seg_img(
+    def transform_semantic_segmentation_img(
         self,
         df: pd.DataFrame,
     ) -> Tuple[Dict[str, List[List[str]]], Dict[str, str]]:
@@ -534,15 +534,15 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         """
         assert (
             self._fit_called or self._fit_x_called
-        ), "You will need to first call preprocessor.fit_x() before calling preprocessor.transform_real_world_sem_seg_img."
+        ), "You will need to first call preprocessor.fit_x() before calling preprocessor.transform_semantic_segmentation_img."
 
         ret_data = {}
         ret_type = {}
-        for col_name in self._real_world_sem_seg_feature_names:
+        for col_name in self._semantic_segmentation_feature_names:
             col_value = df[col_name]
             col_type = self._column_types[col_name]
 
-            if col_type in [REAL_WORLD_SEM_SEG_IMG]:
+            if col_type in [SEMANTIC_SEGMENTATION_IMG]:
                 processed_data = col_value.apply(lambda ele: str(ele).split(";")).tolist()
             else:
                 raise ValueError(f"Unknown image type {col_type} for column {col_name}")
@@ -550,7 +550,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             ret_data[col_name] = processed_data
             ret_type[col_name] = self._column_types[col_name]
 
-        if self.label_type == REAL_WORLD_SEM_SEG_IMG_GT:
+        if self.label_type == SEMANTIC_SEGMENTATION_GT:
             if self._label_column in df:
                 y = self.transform_label(df)
                 ret_data.update(y[0])
@@ -785,7 +785,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         elif self.label_type == NUMERICAL:
             y = pd.to_numeric(y_df).to_numpy()
             y = self._label_scaler.transform(np.expand_dims(y, axis=-1))[:, 0].astype(np.float32)
-        elif self.label_type == ROIS or self.label_type == REAL_WORLD_SEM_SEG_IMG_GT:
+        elif self.label_type == ROIS or self.label_type == SEMANTIC_SEGMENTATION_GT:
             y = y_df.to_list()
         elif self.label_type == NER_ANNOTATION:
             y = self._label_generator.transform(y_df)
@@ -912,8 +912,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                     y_pred = y_pred[1]
                 else:
                     y_pred = y_pred[0]
-        elif self.label_type == REAL_WORLD_SEM_SEG_IMG_GT:
-            y_pred = y_pred
+        elif self.label_type == SEMANTIC_SEGMENTATION_GT:
+            y_pred = y_pred > 0.5
         else:
             raise NotImplementedError
 
