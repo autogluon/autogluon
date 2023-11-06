@@ -80,7 +80,7 @@ class MultiModalPredictor:
             - 'image_text_similarity': Text-image similarity problem
             - 'feature_extraction': Extracting feature (only support inference)
             - 'zero_shot_image_classification': Zero-shot image classification (only support inference)
-            - 'few_shot_text_classification': (experimental) Few-shot text classification
+            - 'few_shot_classification': Few-shot classification for image or text data.
 
             For certain problem types, the default behavior is to load a pretrained model based on
             the presets / hyperparameters and the predictor will support zero-shot inference
@@ -94,7 +94,7 @@ class MultiModalPredictor:
             - 'image_text_similarity'
             - 'feature_extraction'
             - 'zero_shot_image_classification'
-            - 'few_shot_text_classification' (experimental)
+            - 'few_shot_classification'
 
         query
             Column names of query data (used for matching).

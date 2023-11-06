@@ -43,7 +43,7 @@ from ..constants import (
     FEATURE_EXTRACTION,
     FEATURES,
     FEW_SHOT,
-    FEW_SHOT_TEXT_CLASSIFICATION,
+    FEW_SHOT_CLASSIFICATION,
     GREEDY_SOUP,
     IMAGE_BYTEARRAY,
     IMAGE_PATH,
@@ -190,7 +190,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             - 'image_text_similarity': Text-image similarity problem
             - 'feature_extraction': Extracting feature (only support inference)
             - 'zero_shot_image_classification': Zero-shot image classification (only support inference)
-            - 'few_shot_text_classification': (experimental) Few-shot text classification
+            - 'few_shot_classification': Few-shot classification for image or text data.
 
             For certain problem types, the default behavior is to load a pretrained model based on
             the presets / hyperparameters and the learner will support zero-shot inference
@@ -204,7 +204,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             - 'image_text_similarity'
             - 'feature_extraction'
             - 'zero_shot_image_classification'
-            - 'few_shot_text_classification' (experimental)
+            - 'few_shot_classification'
         presets
             Presets regarding model quality, e.g., best_quality, high_quality, and medium_quality.
         eval_metric
@@ -438,8 +438,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         if scarcity_mode == FEW_SHOT and (
             not self._presets or FEW_SHOT not in self._presets
         ):  # TODO: check for data type
-            logger.info(
-                f"Detected data scarcity. Consider running using the preset '{FEW_SHOT_TEXT_CLASSIFICATION}' for better performance."
+            logger.warning(
+                f"Detected data scarcity. Consider running using the problem_type '{FEW_SHOT_CLASSIFICATION}' for better performance."
             )
 
     def update_attributes(
