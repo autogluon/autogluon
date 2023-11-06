@@ -18,7 +18,7 @@ from torch import nn
 from autogluon.core.metrics import Scorer
 from autogluon.core.utils.loaders import load_pd
 
-from ..constants import COLUMN_FEATURES, Y_PRED, Y_TRUE
+from ..constants import CLIP, COLUMN_FEATURES, HF_TEXT, TIMM_IMAGE, Y_PRED, Y_TRUE
 from ..data import BaseDataModule, MultiModalFeaturePreprocessor
 from ..utils import (
     CustomUnpickler,
@@ -246,8 +246,12 @@ class FewShotSVMLearner(BaseLearner):
 
     @staticmethod
     def update_config_by_data_per_run(config, df_preprocessor):
-        if df_preprocessor.text_feature_names and "clip" in config.model.names:
-            config.model.names.remove("clip")  # for text only data, remove clip model and use only hf_text
+        if df_preprocessor.text_feature_names and CLIP in config.model.names:
+            config.model.names.remove(CLIP)  # for text only data, remove clip model and use hf_text
+        if df_preprocessor.image_feature_names and TIMM_IMAGE in config.model.names and CLIP in config.model.names:
+            config.model.names.remove(
+                CLIP
+            )  # if users add timm_image in hyperparameters, then remove clip and use timm_image
         config = select_model(config=config, df_preprocessor=df_preprocessor, strict=False)
         return config
 

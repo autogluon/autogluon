@@ -661,17 +661,20 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
     def init_pretrained(self):
         # split out the hyperparameters whose values are complex objects
         hyperparameters, advanced_hyperparameters = split_hyperparameters(self._hyperparameters)
-
         if self._config is None:
             self._config = get_config(
-                problem_type=self._problem_type, presets=self._presets, overrides=hyperparameters
+                problem_type=self._problem_type,
+                presets=self._presets,
+                overrides=hyperparameters,
             )
         if self._model is None:
             assert (
                 len(self._config.model.names) == 1
             ), f"Zero shot mode only supports using one model, but detects multiple models {self._config.model.names}"
             self._model = create_fusion_model(
-                config=self._config, pretrained=self._pretrained, num_classes=self._output_shape, classes=self._classes
+                config=self._config,
+                pretrained=self._pretrained,
+                num_classes=self._output_shape,
             )
         if self._data_processors is None:
             self._data_processors = create_fusion_data_processors(

@@ -47,6 +47,10 @@ def test_fewshot_svm_fit_predict():
     predictor = MultiModalPredictor(
         label="label",
         problem_type=FEW_SHOT_CLASSIFICATION,
+        hyperparameters={
+            "model.clip.checkpoint_name": "openai/clip-vit-base-patch32",
+            "model.clip.image_size": 224,
+        },
         eval_metric="acc",
         path=save_path,
     )
@@ -66,15 +70,45 @@ def test_fewshot_svm_save_load():
         label="label",
         problem_type=FEW_SHOT_CLASSIFICATION,
         eval_metric="acc",
+        hyperparameters={
+            "model.clip.checkpoint_name": "openai/clip-vit-base-patch32",
+            "model.clip.image_size": 224,
+        },
         path=save_path,
     )
-
     predictor.fit(train_data)
     results = predictor.evaluate(test_data)
     preds = predictor.predict(test_data.drop(columns=["label"], axis=1))
     predictor2 = MultiModalPredictor.load(save_path)
     results2 = predictor2.evaluate(test_data)
-    preds2 = predictor.predict(test_data.drop(columns=["label"], axis=1))
+    preds2 = predictor2.predict(test_data.drop(columns=["label"], axis=1))
     assert results == results2
     assert (preds == preds2).all()
     predictor2.fit(train_data)
+
+
+@pytest.mark.parametrize(
+    "model_names,timm_ckpt_name",
+    [
+        (["hf_text", "timm_image"], "swin_small_patch4_window7_224"),
+        (["timm_image"], "swin_small_patch4_window7_224"),
+        (["clip", "timm_image"], "swin_small_patch4_window7_224"),
+    ],
+)
+def test_customize_models(model_names, timm_ckpt_name):
+    download_dir = "./ag_automm_tutorial_imgcls"
+    train_data, test_data = shopee_dataset(download_dir)
+    save_path = f"./tmp/{uuid.uuid4().hex}-automm_stanfordcars-8shot-en"
+    predictor = MultiModalPredictor(
+        label="label",
+        problem_type=FEW_SHOT_CLASSIFICATION,
+        hyperparameters={
+            "model.names": model_names,
+            "model.timm_image.checkpoint_name": timm_ckpt_name,
+        },
+        eval_metric="acc",
+        path=save_path,
+    )
+    predictor.fit(train_data)
+    assert predictor._learner._config.model.names == ["timm_image"]
+    assert predictor._learner._config.model.timm_image.checkpoint_name == timm_ckpt_name

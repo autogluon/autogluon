@@ -9,7 +9,7 @@ import lightning.pytorch as pl
 import torch
 from lightning.pytorch.callbacks import BasePredictionWriter
 
-from ..constants import BBOX, WEIGHT
+from ..constants import BBOX, LOGIT_SCALE, WEIGHT
 
 logger = logging.getLogger(__name__)
 
@@ -139,7 +139,7 @@ class DDPPredictionWriter(BasePredictionWriter):
         if len(x[0]) == 0:  # dict is empty
             return dict()
         for k, v in x[0].items():
-            if k == WEIGHT:  # ignore the key
+            if k in [WEIGHT, LOGIT_SCALE]:  # ignore the keys
                 continue
             elif isinstance(v, dict):
                 results[k] = self.collate([i[k] for i in x])

@@ -169,6 +169,15 @@ class ObjectDetectionLearner(BaseLearner):
         # TODO: support inferring output during fit()?
         assert self._output_shape is not None, f"output_shape should have been set in the learner initialization."
 
+    def init_pretrained(self):
+        super().init_pretrained()
+        self._model = create_fusion_model(
+            config=self._config,
+            pretrained=self._pretrained,
+            num_classes=self._output_shape,
+            classes=self._classes,
+        )
+
     def fit(
         self,
         train_data: Union[pd.DataFrame, str],
