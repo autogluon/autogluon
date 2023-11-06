@@ -383,7 +383,7 @@ class FewShotSVMLearner(BaseLearner):
         self.clean_trainer_processes(trainer=trainer, is_train=False)
         features = extract_from_output(outputs=outputs, ret_type=COLUMN_FEATURES, as_ndarray=True)
         features = self.aggregate_column_features(features=features)
-        # no need to call df_preprocessor.transform_label_for_metric since the sklearn pipline encodes the label automatically
+        # no need to call df_preprocessor.transform_label_for_metric since the sklearn pipeline encodes the label automatically
         labels = np.array(self._train_data[self._label_column])
         svm.fit(features, labels)
         self.on_fit_per_run_end(
