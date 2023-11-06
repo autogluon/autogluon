@@ -39,6 +39,8 @@ on:
           - timeseries_test
           - image
           - text-tabular
+          - text
+          - text-tabular-image
       time_limit:
         description: 'Time limit for the benchmark to run'
         required: true

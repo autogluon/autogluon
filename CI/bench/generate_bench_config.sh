@@ -37,7 +37,10 @@ else
     custom_dataloader_value=""
     shot_value=0
     seed_value=0
-    lang="en"
+    lang=""
+    custom_metrics_path=""
+    custom_function_name=""
+    optimum=0
     if [ $BENCHMARK == "image" ]; then
         dataloader_file="vision_dataloader.py"
         class_name="VisionDataLoader"
@@ -52,9 +55,18 @@ else
         dataloader_file="text_dataloader.py"
         class_name="TextDataLoader"
         dataset_file="text_datasets.yaml"
+        lang="en"
         shot_value=500
         seed_value=7
         custom_dataloader_value="dataloader_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataloader_file;class_name:$class_name;dataset_config_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataset_file"
+    elif [ $BENCHMARK == "text-tabular-image" ]; then
+        dataloader_file="text_tabular_image_dataloader.py"
+        class_name="TextTabularImageDataLoader"
+        dataset_file="text_tabular_image_datasets.yaml"
+        custom_dataloader_value="dataloader_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataloader_file;class_name:$class_name;dataset_config_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataset_file"
+        custom_metrics_path="dataloader_file:$(dirname "$0")/custom_metrics/cpp_coverage.py"
+        custom_function_name="coverage"
+        optimum=1
     else
         echo "Error: Unsupported benchmark '$BENCHMARK'"
         exit 1
@@ -88,7 +100,9 @@ else
 
     if [ $BENCHMARK == "text" ]; then
         gen_bench_command="$gen_bench_command --fewshot --shot $shot_value --lang $lang --seed $seed_value"
-    fi 
+    elif [ $BENCHMARK == "text-tabular-image" ]; then
+        gen_bench_command="$gen_bench_command --custom_metrics --metrics-path $custom_metrics_path --function_name $custom_function_name --optimum $optimum --greater_is_better"
+    fi
     eval "$gen_bench_command"
 fi
 

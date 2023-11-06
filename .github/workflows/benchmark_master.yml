@@ -2,7 +2,7 @@
 name: Benchmark Master Branch
 on:
   push:
-    branches: ["master"]
+    branches: ["multimodal-text-tabular"]
   # schedule:
   #   - cron: '00 09 * * SUN' #  UTC 9:00(2:00 PST Time) every Sunday
 
@@ -157,7 +157,48 @@ jobs:
   #         npm install -g aws-cdk
   #         /bin/bash ./.github/workflow_scripts/run_benchmark.sh multimodal stable image g4_12x ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
   
-  benchmark-multimodal-text-tabular:
+  # benchmark-multimodal-text-tabular:
+  #   needs: generate_amlb_user_dir
+  #   runs-on: ubuntu-latest
+  #   defaults:
+  #     run:
+  #       shell: bash
+  #   steps:
+  #     - name: Free Disk Space (Ubuntu)
+  #       # uses: jlumbroso/free-disk-space@v1.2.0
+  #       uses: hirnidrin/free-disk-space@main  # revert back once fix in https://github.com/jlumbroso/free-disk-space/pull/11
+  #       with:
+  #         tool-cache: false
+  #         android: true
+  #         dotnet: true
+  #         haskell: true
+  #         large-packages: true
+  #         docker-images: true
+  #         swap-storage: true
+  #     - name: Checkout repository for PR
+  #       uses: actions/checkout@v2
+  #     - name: Setup Python
+  #       uses: actions/setup-python@v1
+  #       with:
+  #         python-version: '3.9'
+  #     - name: Setup npm
+  #       uses: actions/setup-node@v3
+  #       with:
+  #         node-version: 'latest'
+  #     - name: Configure AWS Credentials
+  #       uses: aws-actions/configure-aws-credentials@v1
+  #       with:
+  #         role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
+  #         role-duration-seconds: 36000
+  #         aws-region: us-east-1
+  #     - name: Run benchmark - Multimodal Text Tabular
+  #       shell: bash -l {0}
+  #       run: |
+  #         nvm install 20
+  #         npm install -g aws-cdk
+  #         /bin/bash ./.github/workflow_scripts/run_benchmark.sh multimodal stable text g4_12x ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
+
+  benchmark-multimodal-text-tabular-image:
     needs: generate_amlb_user_dir
     runs-on: ubuntu-latest
     defaults:
@@ -191,9 +232,9 @@ jobs:
           role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
           role-duration-seconds: 36000
           aws-region: us-east-1
-      - name: Run benchmark - Multimodal Text Tabular
+      - name: Run benchmark - Multimodal Text Tabular Image
         shell: bash -l {0}
         run: |
           nvm install 20
           npm install -g aws-cdk
-          /bin/bash ./.github/workflow_scripts/run_benchmark.sh multimodal stable text g4_12x ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
+          /bin/bash ./.github/workflow_scripts/run_benchmark.sh multimodal stable text-tabular-image g4_12x ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}

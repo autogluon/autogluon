@@ -25,6 +25,7 @@ fi
 if [ $MODULE == 'multimodal' ]; then
     #copy the dataloaders and dataset yamls to git runners directory
     aws s3 cp --recursive s3://autogluon-ci-benchmark/configs/custom-dataloaders/ $(dirname "$0")/$MODULE/custom_user_dir/dataloaders/
+    aws s3 cp --recursive s3://autogluon-ci-benchmark/configs/custom-metrics/ $(dirname "$0")/$MODULE/custom_metrics/
     aws s3 cp --recursive $(dirname "$0")/$MODULE/custom_user_dir/ s3://autogluon-ci-benchmark/configs/$CONFIG_PATH/$SHORT_SHA/
     aws s3 rm --recursive s3://autogluon-ci-benchmark/configs/$CONFIG_PATH/latest/
     aws s3 cp --recursive $(dirname "$0")/$MODULE/custom_user_dir/ s3://autogluon-ci-benchmark/configs/$CONFIG_PATH/latest/
