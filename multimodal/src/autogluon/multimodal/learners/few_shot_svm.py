@@ -25,7 +25,7 @@ from .base import BaseLearner
 from ..utils import (
     CustomUnpickler, compute_score, logits_to_prob, data_to_df,
     compute_num_gpus, infer_precision, extract_from_output, turn_on_off_feature_column_info,
-    get_available_devices, LogFilter, apply_log_filter
+    get_available_devices, LogFilter, apply_log_filter, select_model,
 )
 
 logger = logging.getLogger(__name__)
@@ -234,6 +234,13 @@ class FewShotSVMLearner(BaseLearner):
         datamodule = BaseDataModule(**datamodule_kwargs)
         return datamodule
 
+    @staticmethod
+    def update_config_by_data_per_run(config, df_preprocessor):
+        if df_preprocessor.text_feature_names and "clip" in config.model.names:
+            config.model.names.remove("clip")  # for text only data, remove clip model and use only hf_text
+        config = select_model(config=config, df_preprocessor=df_preprocessor, strict=False)
+        return config
+
     def init_trainer_per_run(
         self,
         num_gpus,
@@ -338,7 +345,6 @@ class FewShotSVMLearner(BaseLearner):
             precision=precision,
             strategy=strategy,
         )
-        print(f"config.model.names: {config.model.names}\n")
         pred_writer = self.get_pred_writer(strategy=strategy)
         callbacks = self.get_callbacks_per_run(pred_writer=pred_writer, is_train=False)
         litmodule = self.get_litmodule_per_run(model=model)
@@ -578,16 +584,12 @@ class FewShotSVMLearner(BaseLearner):
 
         results = {}
         for per_metric in metrics:
-            if per_metric == "macro_f1":
-                macro_f1 = f1_score(y_true, pred, average="macro")
-                results[per_metric] = macro_f1
-            else:
-                score = compute_score(
-                    metric_data=metric_data,
-                    metric=per_metric.lower() if isinstance(per_metric, str) else per_metric,
-                )
-                per_metric_name = per_metric if isinstance(per_metric, str) else per_metric.name
-                results[per_metric_name] = score
+            score = compute_score(
+                metric_data=metric_data,
+                metric=per_metric.lower() if isinstance(per_metric, str) else per_metric,
+            )
+            per_metric_name = per_metric if isinstance(per_metric, str) else per_metric.name
+            results[per_metric_name] = score
 
         if return_pred:
             return results, self._as_pandas(data=data, to_be_converted=pred)

@@ -215,6 +215,16 @@ def few_shot_classification(presets: str = DEFAULT):
         The hyperparameter tuning kwargs.
     """
     hyperparameters, hyperparameter_tune_kwargs = default(presets=presets)
+    hyperparameters.update(
+        {
+            "model.hf_text.checkpoint_name": "sentence-transformers/all-mpnet-base-v2",
+            "model.hf_text.pooling_mode": "mean",
+            "model.names": ["hf_text", "clip"],
+            "model.clip.checkpoint_name": "openai/clip-vit-large-patch14-336",
+            "model.clip.image_size": 336,
+            "env.eval_batch_size_ratio": 1,
+        }
+    )
     hyperparameter_tune_kwargs = {}
 
     return hyperparameters, hyperparameter_tune_kwargs
