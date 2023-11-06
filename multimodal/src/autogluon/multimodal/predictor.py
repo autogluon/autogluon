@@ -14,8 +14,8 @@ import transformers
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
 from autogluon.core.metrics import Scorer
 
-from .constants import AUTOMM_TUTORIAL_MODE, NER, OBJECT_DETECTION, FEW_SHOT_CLASSIFICATION
-from .learners import BaseLearner, MultiModalMatcher, NERLearner, ObjectDetectionLearner, FewShotSVMLearner
+from .constants import AUTOMM_TUTORIAL_MODE, FEW_SHOT_CLASSIFICATION, NER, OBJECT_DETECTION
+from .learners import BaseLearner, FewShotSVMLearner, MultiModalMatcher, NERLearner, ObjectDetectionLearner
 from .problem_types import PROBLEM_TYPES_REG
 from .utils import get_dir_ckpt_paths, handle_deprecated_args
 

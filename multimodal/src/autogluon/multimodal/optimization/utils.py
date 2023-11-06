@@ -30,6 +30,7 @@ from ..constants import (
     DIRECT_LOSS,
     F1,
     FEATURES,
+    FEW_SHOT_CLASSIFICATION,
     HIT_RATE,
     IA3,
     IA3_BIAS,
@@ -60,7 +61,6 @@ from ..constants import (
     ROC_AUC,
     ROOT_MEAN_SQUARED_ERROR,
     SPEARMANR,
-    FEW_SHOT_CLASSIFICATION,
 )
 from .losses import FocalLoss, MultiNegativesSoftmaxLoss, SoftTargetCrossEntropy
 from .lr_scheduler import (

@@ -1,10 +1,10 @@
-import pytest
 import uuid
 
-from autogluon.multimodal import MultiModalPredictor
-from autogluon.multimodal.constants import FEW_SHOT_CLASSIFICATION, BINARY, MULTICLASS
-from autogluon.multimodal.utils.misc import shopee_dataset
+import pytest
 
+from autogluon.multimodal import MultiModalPredictor
+from autogluon.multimodal.constants import BINARY, FEW_SHOT_CLASSIFICATION, MULTICLASS
+from autogluon.multimodal.utils.misc import shopee_dataset
 
 from ..predictor.test_predictor import verify_predictor_save_load, verify_realtime_inference
 

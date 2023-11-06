@@ -8,6 +8,7 @@ from .constants import (
     CATEGORICAL,
     CLASSIFICATION,
     FEATURE_EXTRACTION,
+    FEW_SHOT_CLASSIFICATION,
     IMAGE,
     IMAGE_BYTEARRAY,
     IMAGE_SIMILARITY,
@@ -25,7 +26,6 @@ from .constants import (
     TEXT_NER,
     TEXT_SIMILARITY,
     ZERO_SHOT_IMAGE_CLASSIFICATION,
-    FEW_SHOT_CLASSIFICATION,
 )
 from .registry import Registry
 

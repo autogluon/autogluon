@@ -2,31 +2,39 @@ import logging
 import os
 import pickle
 from datetime import timedelta
-from typing import List, Optional, Union, Dict
+from typing import Dict, List, Optional, Union
 
 import lightning.pytorch as pl
-import torch
-from torch import nn
 import numpy as np
 import pandas as pd
+import torch
+from omegaconf import DictConfig
 from sklearn.metrics import f1_score
-from sklearn.pipeline import make_pipeline
+from sklearn.pipeline import Pipeline, make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
-from sklearn.pipeline import Pipeline
-from omegaconf import DictConfig
+from torch import nn
 
 from autogluon.core.metrics import Scorer
 from autogluon.core.utils.loaders import load_pd
 
-from ..constants import Y_PRED, Y_TRUE, COLUMN_FEATURES
-from ..data import MultiModalFeaturePreprocessor, BaseDataModule
-from .base import BaseLearner
+from ..constants import COLUMN_FEATURES, Y_PRED, Y_TRUE
+from ..data import BaseDataModule, MultiModalFeaturePreprocessor
 from ..utils import (
-    CustomUnpickler, compute_score, logits_to_prob, data_to_df,
-    compute_num_gpus, infer_precision, extract_from_output, turn_on_off_feature_column_info,
-    get_available_devices, LogFilter, apply_log_filter, select_model,
+    CustomUnpickler,
+    LogFilter,
+    apply_log_filter,
+    compute_num_gpus,
+    compute_score,
+    data_to_df,
+    extract_from_output,
+    get_available_devices,
+    infer_precision,
+    logits_to_prob,
+    select_model,
+    turn_on_off_feature_column_info,
 )
+from .base import BaseLearner
 
 logger = logging.getLogger(__name__)
 
@@ -140,9 +148,11 @@ class FewShotSVMLearner(BaseLearner):
             self._fit_args.update(dict(svm=self._svm))
 
     def fit_sanity_check(self):
-        feature_column_types = {k:v for k, v in self._column_types.items() if k != self._label_column}
+        feature_column_types = {k: v for k, v in self._column_types.items() if k != self._label_column}
         unique_dtypes = set(feature_column_types.values())
-        assert len(unique_dtypes) == 1, f"Few shot SVM learner allows single modality data for now, but detected modalities {unique_dtypes}."
+        assert (
+            len(unique_dtypes) == 1
+        ), f"Few shot SVM learner allows single modality data for now, but detected modalities {unique_dtypes}."
 
     def fit(
         self,
@@ -407,7 +417,9 @@ class FewShotSVMLearner(BaseLearner):
             elif self._config.data.aggregate_column_features == "mean":
                 return torch.mean(torch.stack(features.values()), dim=0)
             else:
-                raise ValueError(f"Unsupported aggregate_column_features value {self._config.data.aggregate_column_features}.")
+                raise ValueError(
+                    f"Unsupported aggregate_column_features value {self._config.data.aggregate_column_features}."
+                )
         else:
             raise ValueError(f"Unsupported features type: {type(features)} in aggregating column features.")
 
@@ -570,7 +582,7 @@ class FewShotSVMLearner(BaseLearner):
         features = self.extract_embedding(data)
         pred = self._svm.predict(features)
         assert (
-                self._label_column in data.columns
+            self._label_column in data.columns
         ), f"Label {self._label_column} is not in the data. Cannot perform evaluation without ground truth labels."
         y_true = np.array(data[self._label_column])
         metric_data = {Y_PRED: pred, Y_TRUE: y_true}
