@@ -64,7 +64,7 @@ else
         class_name="TextTabularImageDataLoader"
         dataset_file="text_tabular_image_datasets.yaml"
         custom_dataloader_value="dataloader_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataloader_file;class_name:$class_name;dataset_config_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataset_file"
-        custom_metrics_path="dataloader_file:$(dirname "$0")/custom_metrics/cpp_coverage.py"
+        custom_metrics_path="$(dirname "$0")/custom_metrics/cpp_coverage.py"
         custom_function_name="coverage"
         optimum=1
     else
