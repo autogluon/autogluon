@@ -1,17 +1,16 @@
 import os
 import shutil
-import warnings
 
 import numpy.testing as npt
 import pytest
-from sklearn.model_selection import train_test_split
+from datasets import load_dataset
 
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.constants import BIT_FIT, IA3, IA3_BIAS, IA3_LORA, LORA_BIAS, LORA_NORM, NORM_FIT
 from autogluon.multimodal.models.timm_image import TimmAutoModelForImagePrediction
 from autogluon.multimodal.utils.misc import shopee_dataset
 
-from ..utils.unittest_datasets import AmazonReviewSentimentCrossLingualDataset, PetFinderDataset
+from ..utils.unittest_datasets import AmazonReviewSentimentCrossLingualDataset
 
 
 @pytest.mark.single_gpu
@@ -89,7 +88,7 @@ def test_predictor_skip_final_val():
         time_limit=5,
     )
     predictor_new = MultiModalPredictor.load(path=save_path)
-    assert isinstance(predictor_new._model, TimmAutoModelForImagePrediction)
+    assert isinstance(predictor_new._learner._model, TimmAutoModelForImagePrediction)
 
 
 def test_hyperparameters_in_terminal_format():
@@ -110,3 +109,32 @@ def test_hyperparameters_in_terminal_format():
         hyperparameters=hyperparameters,
         time_limit=2,
     )
+
+
+@pytest.mark.parametrize("eval_metric", ["spearmanr", "pearsonr"])
+def test_predictor_with_spearman_pearson_eval(eval_metric):
+    train_df = load_dataset("SetFit/stsb", split="train").to_pandas()
+    predictor = MultiModalPredictor(label="label", eval_metric=eval_metric)
+    predictor.fit(train_df, presets="medium_quality", time_limit=5)
+    assert predictor.eval_metric == eval_metric
+
+
+@pytest.mark.parametrize("checkpoint_name", ["facebook/bart-base"])
+@pytest.mark.parametrize("efficient_finetune", [None, IA3_LORA])
+def test_predictor_with_bart(checkpoint_name, efficient_finetune):
+    train_data = load_dataset("glue", "mrpc")["train"].to_pandas().drop("idx", axis=1).sample(500)
+    test_data = load_dataset("glue", "mrpc")["validation"].to_pandas().drop("idx", axis=1).sample(20)
+    predictor = MultiModalPredictor(label="label")
+    predictor.fit(
+        train_data,
+        hyperparameters={
+            "model.hf_text.checkpoint_name": checkpoint_name,
+            "optimization.max_epochs": 1,
+            "optimization.efficient_finetune": efficient_finetune,
+            "optimization.top_k": 1,
+            "optimization.top_k_average_method": "best",
+            "env.batch_size": 2,
+        },
+        time_limit=20,
+    )
+    predictor.predict(test_data)

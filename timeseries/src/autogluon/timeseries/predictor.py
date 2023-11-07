@@ -2,6 +2,7 @@ import logging
 import os
 import pprint
 import time
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import pandas as pd
@@ -16,7 +17,7 @@ from autogluon.timeseries import __version__ as current_ag_version
 from autogluon.timeseries.configs import TIMESERIES_PRESETS_CONFIGS
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
 from autogluon.timeseries.learner import AbstractLearner, TimeSeriesLearner
-from autogluon.timeseries.metrics import TimeSeriesScorer
+from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
 from autogluon.timeseries.splitter import ExpandingWindowSplitter
 from autogluon.timeseries.trainer import AbstractTimeSeriesTrainer
 
@@ -97,7 +98,7 @@ class TimeSeriesPredictor:
     quantile_levels : List[float], optional
         List of increasing decimals that specifies which quantiles should be estimated when making distributional
         forecasts. Defaults to ``[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]``.
-    path : str, optional
+    path : str or pathlib.Path, optional
         Path to the directory where models and intermediate outputs will be saved. Defaults to a timestamped folder
         ``AutogluonModels/ag-[TIMESTAMP]`` that will be created in the working directory.
     verbosity : int, default = 2
@@ -128,7 +129,7 @@ class TimeSeriesPredictor:
         freq: str = None,
         eval_metric: Union[str, TimeSeriesScorer, None] = None,
         eval_metric_seasonal_period: Optional[int] = None,
-        path: Optional[str] = None,
+        path: Optional[Union[str, Path]] = None,
         verbosity: int = 2,
         quantile_levels: Optional[List[float]] = None,
         cache_predictions: bool = True,
@@ -156,7 +157,7 @@ class TimeSeriesPredictor:
             )
         if self.target in known_covariates_names:
             raise ValueError(f"Target column {self.target} cannot be one of the known covariates.")
-        self.known_covariates_names = known_covariates_names
+        self.known_covariates_names = list(known_covariates_names)
 
         self.prediction_length = prediction_length
         # For each validation fold, all time series in training set must have length >= _min_train_length
@@ -168,15 +169,7 @@ class TimeSeriesPredictor:
             if std_freq != str(self.freq):
                 logger.info(f"Frequency '{self.freq}' stored as '{std_freq}'")
             self.freq = std_freq
-        # TODO: Change to DeprecationWarning, make sure it's displayed correctly https://github.com/autogluon/autogluon/issues/3465
-        if isinstance(eval_metric, str) and eval_metric == "mean_wQuantileLoss":
-            # We don't use warnings.warn since DeprecationWarning may be silenced by the Python warning filters
-            logger.warning(
-                "DeprecationWarning: Evaluation metric 'mean_wQuantileLoss' has been renamed to 'WQL'. "
-                "Support for the old name will be removed in v1.1.",
-            )
-            eval_metric = "WQL"
-        self.eval_metric = eval_metric
+        self.eval_metric = check_get_evaluation_metric(eval_metric)
         self.eval_metric_seasonal_period = eval_metric_seasonal_period
         if quantile_levels is None:
             quantile_levels = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
@@ -758,11 +751,13 @@ class TimeSeriesPredictor:
         self,
         data: Union[TimeSeriesDataFrame, pd.DataFrame, str],
         model: Optional[str] = None,
-        metric: Union[str, TimeSeriesScorer, None] = None,
+        metrics: Optional[Union[str, TimeSeriesScorer, List[Union[str, TimeSeriesScorer]]]] = None,
         use_cache: bool = True,
-    ):
-        """Evaluate the performance for given dataset, computing the score determined by ``self.eval_metric``
-        on the given data set, and with the same ``prediction_length`` used when training models.
+    ) -> Dict[str, float]:
+        """Evaluate the forecast accuracy for given dataset.
+
+        This method measures the forecast accuracy using the last ``self.prediction_length`` time steps of each time
+        series in ``data`` as a hold-out set.
 
         Parameters
         ----------
@@ -781,25 +776,23 @@ class TimeSeriesPredictor:
         model : str, optional
             Name of the model that you would like to evaluate. By default, the best model during training
             (with highest validation score) will be used.
-        metric : str or TimeSeriesScorer, optional
-            Evaluation metric to compute scores with. Defaults to ``self.eval_metric``
+        metrics : str, TimeSeriesScorer or List[Union[str, TimeSeriesScorer]], optional
+            Metric or a list of metrics to compute scores with. Defaults to ``self.eval_metric``. Supports both
+            metric names as strings and custom metrics based on TimeSeriesScorer.
         use_cache : bool, default = True
             If True, will attempt to use the cached predictions. If False, cached predictions will be ignored.
             This argument is ignored if ``cache_predictions`` was set to False when creating the ``TimeSeriesPredictor``.
 
         Returns
         -------
-        score : float
-            A forecast accuracy score, where higher values indicate better quality. For consistency, error metrics
+        scores_dict : Dict[str, float]
+            Dictionary where keys = metrics, values = performance along each metric. For consistency, error metrics
             will have their signs flipped to obey this convention. For example, negative MAPE values will be reported.
+            To get the ``eval_metric`` score, do ``output[predictor.eval_metric.name]``.
         """
         data = self._check_and_prepare_data_frame(data)
         self._check_data_for_evaluation(data)
-        return self._learner.score(data, model=model, metric=metric, use_cache=use_cache)
-
-    def score(self, data: Union[TimeSeriesDataFrame, pd.DataFrame, str], **kwargs):
-        """See, :meth:`~autogluon.timeseries.TimeSeriesPredictor.evaluate`."""
-        return self.evaluate(data, **kwargs)
+        return self._learner.evaluate(data, model=model, metrics=metrics, use_cache=use_cache)
 
     @classmethod
     def _load_version_file(cls, path: str) -> str:
@@ -808,12 +801,12 @@ class TimeSeriesPredictor:
         return version
 
     @classmethod
-    def load(cls, path: str, require_version_match: bool = True) -> "TimeSeriesPredictor":
+    def load(cls, path: Union[str, Path], require_version_match: bool = True) -> "TimeSeriesPredictor":
         """Load an existing ``TimeSeriesPredictor`` from given ``path``.
 
         Parameters
         ----------
-        path : str
+        path : str or pathlib.Path
             Path where the predictor was saved via :meth:`~autogluon.timeseries.TimeSeriesPredictor.save`.
         require_version_match : bool, default = True
             If True, will raise an AssertionError if the ``autogluon.timeseries`` version of the loaded predictor does
@@ -832,7 +825,7 @@ class TimeSeriesPredictor:
         """
         if not path:
             raise ValueError("`path` cannot be None or empty in load().")
-        path = setup_outputdir(path, warn_if_exist=False)
+        path: str = setup_outputdir(path, warn_if_exist=False)
 
         try:
             version_saved = cls._load_version_file(path=path)

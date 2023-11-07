@@ -44,13 +44,14 @@ def predictor_hpo(searcher, scheduler, presets=None):
     if os.path.exists(save_path):
         shutil.rmtree(save_path)
 
-    predictor = predictor.fit(
+    predictor_hpo = predictor.fit(
         train_data=dataset.train_df,
         hyperparameters=hyperparameters,
         time_limit=30,
         save_path=save_path,
         hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
     )
+    assert predictor == predictor_hpo
 
     score = predictor.evaluate(dataset.test_df)
     verify_predictor_save_load(predictor, dataset.test_df)
@@ -96,13 +97,14 @@ def matcher_hpo(searcher, scheduler, presets=None):
     if os.path.exists(save_path):
         shutil.rmtree(save_path)
 
-    matcher = matcher.fit(
+    matcher_hpo = matcher.fit(
         train_data=dataset.train_df,
         hyperparameters=hyperparameters,
         time_limit=90,
         save_path=save_path,
         hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
     )
+    assert matcher_hpo == matcher
 
     score = matcher.evaluate(dataset.test_df)
     verify_matcher_save_load(matcher, dataset.test_df)
@@ -168,7 +170,7 @@ def test_hpo_distillation(searcher, scheduler):
     if os.path.exists(teacher_save_path):
         shutil.rmtree(teacher_save_path)
 
-    teacher_predictor = teacher_predictor.fit(
+    teacher_predictor.fit(
         train_data=dataset.train_df,
         hyperparameters=hyperparameters,
         time_limit=30,
@@ -195,7 +197,7 @@ def test_hpo_distillation(searcher, scheduler):
     if os.path.exists(student_save_path):
         shutil.rmtree(student_save_path)
 
-    predictor = predictor.fit(
+    predictor.fit(
         train_data=dataset.train_df,
         teacher_predictor=teacher_save_path,
         hyperparameters=hyperparameters,

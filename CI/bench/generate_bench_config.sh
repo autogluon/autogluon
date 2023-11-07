@@ -71,6 +71,7 @@ else
         echo "Error: Unsupported benchmark '$BENCHMARK'"
         exit 1
     fi
+    
     DATASET_YAML_PATH="$(dirname "$0")/custom_user_dir/dataloaders/$dataset_file"
     dataset_names=""
     # Use yq to extract the dataset names and concatenate them with commas
@@ -112,3 +113,4 @@ fi
 # Fill in the vision, text-tabular part - Done
 # Run Benchmark will change accordingly - Done
 # Benchmark results for multimodal will be stored in vision/text-tabular etc - Done
+# Add Custom Metrics - In Progress

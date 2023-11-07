@@ -7,10 +7,6 @@ from autogluon.multimodal.utils.misc import shopee_dataset
 from ..predictor.test_predictor import verify_predictor_save_load, verify_realtime_inference
 
 
-def verify_evaluate(test_data, predictor):
-    results = predictor.evaluate(test_data)
-
-
 def verify_predict_predict_proba(test_data, predictor):
     preds = predictor.predict(test_data)
     proba = predictor.predict_proba(test_data)

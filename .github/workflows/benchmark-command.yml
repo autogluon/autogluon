@@ -28,19 +28,19 @@ on:
           - good
           - medium
           - dev
-          - stable
+          - master_medium
       benchmark:
         description: 'Benchmark to run'
         required: true
         options:
-          - full
-          - test
-          - small
+          - tabular_full
+          - tabular_test
+          - tabular_small
           - timeseries_test
-          - image
-          - text-tabular
-          - text
-          - text-tabular-image
+          - automm-image
+          - automm-text
+          - automm-text-tabular
+          - automm-text-tabular-image
       time_limit:
         description: 'Time limit for the benchmark to run'
         required: true
@@ -50,7 +50,7 @@ on:
           - 8h
           - 16h
           - 24h
-          - test101
+          - 10m4c
           - g4_12x
       folds:
         description: 'Number of folds to run'

@@ -1,6 +1,7 @@
 """Unit tests for predictors"""
 import copy
 import tempfile
+from pathlib import Path
 from unittest import mock
 
 import numpy as np
@@ -10,6 +11,7 @@ import pytest
 from autogluon.common import space
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
+from autogluon.timeseries.metrics import DEFAULT_METRIC_NAME
 from autogluon.timeseries.models import DeepARModel, SimpleFeedForwardModel
 from autogluon.timeseries.predictor import TimeSeriesPredictor
 
@@ -53,6 +55,18 @@ def test_given_hyperparameters_when_predictor_called_then_model_can_predict(temp
     assert all(predicted_item_index == DUMMY_TS_DATAFRAME.item_ids)  # noqa
     assert all(len(predictions.loc[i]) == 3 for i in predicted_item_index)
     assert not np.any(np.isnan(predictions))
+
+
+def test_when_pathlib_path_provided_to_predictor_then_loaded_predictor_can_predict(temp_model_path):
+    predictor = TimeSeriesPredictor(path=Path(temp_model_path))
+    predictor.fit(
+        train_data=DUMMY_TS_DATAFRAME,
+        hyperparameters={"SimpleFeedForward": {"epochs": 1}},
+    )
+    predictor.save()
+    loaded_predictor = TimeSeriesPredictor.load(predictor.path)
+    predictions = loaded_predictor.predict(DUMMY_TS_DATAFRAME)
+    assert isinstance(predictions, TimeSeriesDataFrame)
 
 
 @pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS + ["fast_training"])  # noqa
@@ -309,7 +323,7 @@ def test_given_model_fails_when_predictor_scores_then_exception_is_raised(temp_m
     with mock.patch("autogluon.timeseries.models.local.statsforecast.ETSModel.predict") as arima_predict:
         arima_predict.side_effect = RuntimeError("Numerical error")
         with pytest.raises(RuntimeError, match="Following models failed to predict: \\['ETS'\\]"):
-            predictor.score(DUMMY_TS_DATAFRAME)
+            predictor.evaluate(DUMMY_TS_DATAFRAME)
 
 
 def test_given_no_searchspace_and_hyperparameter_tune_kwargs_when_predictor_fits_then_exception_is_raised(
@@ -450,7 +464,7 @@ def test_when_some_time_series_contain_only_nans_then_exception_is_raised(temp_m
         predictor._check_and_prepare_data_frame(df)
 
 
-@pytest.mark.parametrize("method", ["score", "leaderboard"])
+@pytest.mark.parametrize("method", ["evaluate", "leaderboard"])
 def test_when_scoring_method_receives_only_future_data_then_exception_is_raised(temp_model_path, method):
     prediction_length = 3
     predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length)
@@ -473,7 +487,7 @@ def test_given_data_is_in_dataframe_format_then_predictor_works(temp_model_path)
     predictor = TimeSeriesPredictor(path=temp_model_path)
     predictor.fit(df, hyperparameters={"Naive": {}})
     predictor.leaderboard(df)
-    predictor.score(df)
+    predictor.evaluate(df)
     predictions = predictor.predict(df)
     assert isinstance(predictions, TimeSeriesDataFrame)
 
@@ -485,7 +499,7 @@ def test_given_data_is_in_str_format_then_predictor_works(temp_model_path):
         predictor = TimeSeriesPredictor(path=temp_model_path)
         predictor.fit(df, hyperparameters={"Naive": {}})
         predictor.leaderboard(df)
-        predictor.score(df)
+        predictor.evaluate(df)
         predictions = predictor.predict(df)
         assert isinstance(predictions, TimeSeriesDataFrame)
 
@@ -583,7 +597,7 @@ def test_when_excluded_model_names_provided_then_excluded_models_are_not_trained
     assert leaderboard["model"].values == ["SimpleFeedForward"]
 
 
-@pytest.mark.parametrize("method_name", ["leaderboard", "predict", "score", "evaluate"])
+@pytest.mark.parametrize("method_name", ["leaderboard", "predict", "evaluate"])
 @pytest.mark.parametrize("use_cache", [True, False])
 def test_when_use_cache_is_set_to_false_then_cached_predictions_are_ignored(temp_model_path, use_cache, method_name):
     predictor = TimeSeriesPredictor(path=temp_model_path, cache_predictions=True).fit(
@@ -878,15 +892,37 @@ def test_given_refit_every_n_windows_when_fit_then_model_is_fit_correct_number_o
     assert actual_num_refits == expected_num_refits
 
 
-def test_given_custom_metric_when_creating_predictor_then_predictor_can_score(temp_model_path):
+def test_given_custom_metric_when_creating_predictor_then_predictor_can_evaluate(temp_model_path):
     predictor = TimeSeriesPredictor(path=temp_model_path, eval_metric=CustomMetric())
     predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
-    score = predictor.score(DUMMY_TS_DATAFRAME)
-    assert isinstance(score, float)
+    scores = predictor.evaluate(DUMMY_TS_DATAFRAME)
+    assert isinstance(scores[predictor.eval_metric.name], float)
 
 
-def test_when_custom_metric_passed_to_score_then_predictor_can_score(temp_model_path):
+def test_when_custom_metric_passed_to_score_then_predictor_can_evaluate(temp_model_path):
     predictor = TimeSeriesPredictor(path=temp_model_path, eval_metric="MASE")
     predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
-    score = predictor.score(DUMMY_TS_DATAFRAME, metric=CustomMetric())
-    assert isinstance(score, float)
+    eval_metric = CustomMetric()
+    scores = predictor.evaluate(DUMMY_TS_DATAFRAME, metrics=eval_metric)
+    assert isinstance(scores[eval_metric.name], float)
+
+
+@pytest.mark.parametrize(
+    "fit_metric, metrics_passed_to_eval, expected_keys",
+    [
+        ("MASE", None, ["MASE"]),
+        (None, None, [DEFAULT_METRIC_NAME]),
+        (None, "MASE", ["MASE"]),
+        (CustomMetric(), [None, "WAPE"], [CustomMetric().name, "WAPE"]),
+        (None, ["MAPE", "WAPE"], ["MAPE", "WAPE"]),
+        ("MAPE", ["MASE", CustomMetric(), None], ["MASE", CustomMetric().name, "MAPE"]),
+        (None, ["MASE", CustomMetric(), None], ["MASE", CustomMetric().name, DEFAULT_METRIC_NAME]),
+    ],
+)
+def test_when_evaluate_receives_multiple_metrics_then_score_dict_contains_all_keys(
+    temp_model_path, fit_metric, metrics_passed_to_eval, expected_keys
+):
+    predictor = TimeSeriesPredictor(path=temp_model_path, eval_metric=fit_metric)
+    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
+    scores = predictor.evaluate(DUMMY_TS_DATAFRAME, metrics=metrics_passed_to_eval)
+    assert len(scores) == len(expected_keys) and all(k in scores for k in expected_keys)
