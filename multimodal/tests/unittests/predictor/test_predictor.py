@@ -564,7 +564,7 @@ def test_model_configs():
     config = {
         MODEL: model_config,
         DATA: "default",
-        OPTIMIZATION: "adamw",
+        OPTIMIZATION: "default",
         ENVIRONMENT: "default",
     }
 

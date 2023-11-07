@@ -381,9 +381,9 @@ class MultiModalPredictor:
             automm/configs/model, automm/configs/data, automm/configs/optimization, and automm/configs/environment.
             For example, you can configure a late-fusion model for the image, text, and tabular data as follows:
             config = {
-                        "model": "fusion_mlp_image_text_tabular",
+                        "model": "default",
                         "data": "default",
-                        "optimization": "adamw",
+                        "optimization": "default",
                         "environment": "default",
                     }
             or
