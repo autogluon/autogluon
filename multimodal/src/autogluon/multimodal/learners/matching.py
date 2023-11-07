@@ -105,13 +105,14 @@ from ..utils import (
     update_hyperparameters,
     upgrade_config,
 )
+from .base import BaseLearner
 
 pl_logger = logging.getLogger("lightning")
 pl_logger.propagate = False  # https://github.com/Lightning-AI/lightning/issues/4621
 logger = logging.getLogger(__name__)
 
 
-class MultiModalMatcher(RealtimeMixin):
+class MultiModalMatcher(BaseLearner):
     """
     MultiModalMatcher is a framework to learn/extract embeddings for multimodal data including image, text, and tabular.
     These embeddings can be used e.g. with cosine-similarity to find items with similar semantic meanings.
@@ -1313,6 +1314,10 @@ class MultiModalMatcher(RealtimeMixin):
             blacklist_msgs.append("select gpus")
             blacklist_msgs.append("LOCAL_RANK")
         log_filter = LogFilter(blacklist_msgs)
+
+        pred_writer = self.get_pred_writer(strategy=strategy)
+        callbacks = self.get_callbacks_per_run(pred_writer=pred_writer, is_train=False)
+
         with apply_log_filter(log_filter):
             evaluator = pl.Trainer(
                 accelerator="gpu" if num_gpus > 0 else "auto",
@@ -1324,6 +1329,7 @@ class MultiModalMatcher(RealtimeMixin):
                 enable_progress_bar=self._enable_progress_bar,
                 deterministic=self._config.env.deterministic,
                 max_epochs=-1,  # Add max_epochs to disable warning
+                callbacks=callbacks,
                 logger=False,
             )
 
@@ -1338,6 +1344,14 @@ class MultiModalMatcher(RealtimeMixin):
                     task,
                     datamodule=predict_dm,
                 )
+
+        outputs = self.collect_predictions(
+            outputs=outputs,
+            trainer=evaluator,
+            pred_writer=pred_writer,
+            num_gpus=num_gpus,
+        )
+        self.clean_trainer_processes(trainer=evaluator, is_train=False)
 
         return outputs
 
