@@ -199,7 +199,7 @@ jobs:
           /bin/bash ./.github/workflow_scripts/run_benchmark.sh multimodal master_medium text-tabular g4_12x ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
 
   benchmark-multimodal-image:
-    needs: needs: [generate_amlb_user_dir, benchmark-tabular, benchmark-timeseries, benchmark-multimodal-text, benchmark-multimodal-text-tabular]
+    needs: [generate_amlb_user_dir, benchmark-tabular, benchmark-timeseries, benchmark-multimodal-text, benchmark-multimodal-text-tabular]
     runs-on: ubuntu-latest
     defaults:
       run:
