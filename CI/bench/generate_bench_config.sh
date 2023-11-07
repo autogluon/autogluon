@@ -99,9 +99,9 @@ else
     --dataset-names "$dataset_names" \
     --custom-dataloader '$custom_dataloader_value'"
 
-    if [ $BENCHMARK == "text" ]; then
+    if [ $BENCHMARK == "automm-text" ]; then
         gen_bench_command="$gen_bench_command --fewshot --shot $shot_value --lang $lang --seed $seed_value"
-    elif [ $BENCHMARK == "text-tabular-image" ]; then
+    elif [ $BENCHMARK == "automm-text-tabular-image" ]; then
         # disabling custom metrics for now use custom-metrics flag if required
         gen_bench_command="$gen_bench_command --custom-metrics --metrics-path $custom_metrics_path --function-name $custom_function_name --optimum $optimum --greater-is-better"
     fi
