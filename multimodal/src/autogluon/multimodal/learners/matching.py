@@ -95,6 +95,7 @@ from ..utils import (
     is_interactive_strategy,
     is_lazy_weight_tensor,
     load_text_tokenizers,
+    run_ddp_only_once,
     save_pretrained_model_configs,
     save_text_tokenizers,
     select_model,
@@ -966,6 +967,8 @@ class MultiModalMatcher(RealtimeMixin):
             strategy = "auto"
             num_gpus = min(num_gpus, 1)
 
+        num_gpus, strategy = run_ddp_only_once(num_gpus, strategy)
+
         config.env.num_gpus = num_gpus
         config.env.precision = precision
         config.env.strategy = strategy
@@ -978,10 +981,7 @@ class MultiModalMatcher(RealtimeMixin):
         with apply_log_filter(log_filter):
             trainer = pl.Trainer(
                 accelerator="gpu" if num_gpus > 0 else "auto",
-                devices=get_available_devices(
-                    num_gpus=num_gpus,
-                    auto_select_gpus=config.env.auto_select_gpus,
-                ),
+                devices=num_gpus,
                 num_nodes=config.env.num_nodes,
                 precision=precision,
                 strategy=strategy,
@@ -1316,7 +1316,7 @@ class MultiModalMatcher(RealtimeMixin):
         with apply_log_filter(log_filter):
             evaluator = pl.Trainer(
                 accelerator="gpu" if num_gpus > 0 else "auto",
-                devices=get_available_devices(num_gpus=num_gpus, auto_select_gpus=self._config.env.auto_select_gpus),
+                devices=num_gpus,
                 num_nodes=self._config.env.num_nodes,
                 precision=precision,
                 strategy=strategy,
@@ -1466,6 +1466,7 @@ class MultiModalMatcher(RealtimeMixin):
             data_processors=data_processors,
             batch_size=batch_size,
         )
+        num_gpus, strategy = run_ddp_only_once(num_gpus, strategy)
 
         # TODO: support realtime inference for notebook with multi-gpus
         if is_interactive_strategy(strategy) and realtime:
