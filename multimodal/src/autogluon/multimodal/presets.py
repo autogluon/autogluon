@@ -849,9 +849,9 @@ def get_basic_automm_config(extra: Optional[List[str]] = None):
     A dict config with keys: MODEL, DATA, OPTIMIZATION, ENVIRONMENT, and their default values.
     """
     config = {
-        MODEL: "fusion_mlp_image_text_tabular",
+        MODEL: DEFAULT,
         DATA: DEFAULT,
-        OPTIMIZATION: "adamw",
+        OPTIMIZATION: DEFAULT,
         ENVIRONMENT: DEFAULT,
     }
     if extra:
