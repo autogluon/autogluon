@@ -41,17 +41,17 @@ else
     custom_metrics_path=""
     custom_function_name=""
     optimum=0
-    if [ $BENCHMARK == "image" ]; then
+    if [ $BENCHMARK == "automm-image" ]; then
         dataloader_file="vision_dataloader.py"
         class_name="VisionDataLoader"
         dataset_file="automm_cv_datasets.yaml"
         custom_dataloader_value="dataloader_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataloader_file;class_name:$class_name;dataset_config_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataset_file"
-    elif [ $BENCHMARK == "text-tabular" ]; then
+    elif [ $BENCHMARK == "automm-text-tabular" ]; then
         dataloader_file="text_tabular_dataloader.py"
         class_name="TextTabularDataLoader"
         dataset_file="text_tabular_datasets.yaml"
         custom_dataloader_value="dataloader_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataloader_file;class_name:$class_name;dataset_config_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataset_file"
-    elif [ $BENCHMARK == "text" ]; then
+    elif [ $BENCHMARK == "automm-text" ]; then
         dataloader_file="text_dataloader.py"
         class_name="TextDataLoader"
         dataset_file="text_datasets.yaml"
@@ -59,7 +59,7 @@ else
         shot_value=500
         seed_value=7
         custom_dataloader_value="dataloader_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataloader_file;class_name:$class_name;dataset_config_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataset_file"
-    elif [ $BENCHMARK == "text-tabular-image" ]; then
+    elif [ $BENCHMARK == "automm-text-tabular-image" ]; then
         dataloader_file="text_tabular_image_dataloader.py"
         class_name="TextTabularImageDataLoader"
         dataset_file="text_tabular_image_datasets.yaml"
@@ -71,7 +71,7 @@ else
         echo "Error: Unsupported benchmark '$BENCHMARK'"
         exit 1
     fi
-    
+
     DATASET_YAML_PATH="$(dirname "$0")/custom_user_dir/dataloaders/$dataset_file"
     dataset_names=""
     # Use yq to extract the dataset names and concatenate them with commas
