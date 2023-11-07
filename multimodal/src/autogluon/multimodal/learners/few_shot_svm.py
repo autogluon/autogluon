@@ -128,6 +128,12 @@ class FewShotSVMLearner(BaseLearner):
         self._train_data = train_data
         self._tuning_data = tuning_data  # TODO: use tuning_data in few shot learning?
 
+    def infer_problem_type(self, train_data: pd.DataFrame):
+        return  # problem type should be provided in the learner initialization.
+
+    def infer_output_shape(self):
+        return  # learner doesn't need output shape since svm handles it.
+
     def prepare_fit_args(
         self,
         time_limit: int,
@@ -153,43 +159,6 @@ class FewShotSVMLearner(BaseLearner):
         assert (
             len(unique_dtypes) == 1
         ), f"Few shot SVM learner allows single modality data for now, but detected modalities {unique_dtypes}."
-
-    def fit(
-        self,
-        train_data: Union[pd.DataFrame, str],
-        presets: Optional[str] = None,
-        config: Optional[Dict] = None,
-        tuning_data: Optional[Union[pd.DataFrame, str]] = None,
-        time_limit: Optional[int] = None,
-        save_path: Optional[str] = None,
-        hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
-        column_types: Optional[Dict] = None,
-        holdout_frac: Optional[float] = None,
-        teacher_learner: Union[str, BaseLearner] = None,
-        seed: Optional[int] = 0,
-        standalone: Optional[bool] = True,
-        hyperparameter_tune_kwargs: Optional[Dict] = None,
-        **kwargs,
-    ):
-        training_start = self.on_fit_start(presets=presets, config=config)
-        self.setup_save_path(save_path=save_path)
-        self.prepare_train_tuning_data(
-            train_data=train_data,
-            tuning_data=tuning_data,
-            holdout_frac=holdout_frac,
-            seed=seed,
-        )
-        self.infer_column_types(column_types=column_types)
-        self.update_hyperparameters(
-            hyperparameters=hyperparameters,
-            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-        )
-        self.fit_sanity_check()
-        self.prepare_fit_args(time_limit=time_limit, seed=seed)
-        fit_returns = self.execute_fit()
-        self.on_fit_end(training_start=training_start)
-
-        return self
 
     @staticmethod
     def get_svm_per_run(svm: Pipeline):

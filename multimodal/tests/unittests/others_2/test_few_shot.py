@@ -1,6 +1,7 @@
 import uuid
 
 import pytest
+from omegaconf import OmegaConf
 
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.constants import BINARY, FEW_SHOT_CLASSIFICATION, MULTICLASS
@@ -51,7 +52,6 @@ def test_fewshot_svm_fit_predict():
             "model.clip.checkpoint_name": "openai/clip-vit-base-patch32",
             "model.clip.image_size": 224,
         },
-        eval_metric="acc",
         path=save_path,
     )
     predictor.fit(train_data)
@@ -69,7 +69,6 @@ def test_fewshot_svm_save_load():
     predictor = MultiModalPredictor(
         label="label",
         problem_type=FEW_SHOT_CLASSIFICATION,
-        eval_metric="acc",
         hyperparameters={
             "model.clip.checkpoint_name": "openai/clip-vit-base-patch32",
             "model.clip.image_size": 224,
@@ -88,27 +87,50 @@ def test_fewshot_svm_save_load():
 
 
 @pytest.mark.parametrize(
-    "model_names,timm_ckpt_name",
+    "hyperparameters,gt_ckpt_name,gt_model_name",
     [
-        (["hf_text", "timm_image"], "swin_small_patch4_window7_224"),
-        (["timm_image"], "swin_small_patch4_window7_224"),
-        (["clip", "timm_image"], "swin_small_patch4_window7_224"),
+        (
+            {
+                "model.names": ["hf_text", "timm_image"],
+                "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
+            },
+            "swin_small_patch4_window7_224",
+            ["timm_image"],
+        ),
+        (
+            {
+                "model.names": ["timm_image"],
+                "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
+            },
+            "swin_small_patch4_window7_224",
+            ["timm_image"],
+        ),
+        (
+            {
+                "model.names": ["clip", "timm_image"],
+                "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
+            },
+            "swin_small_patch4_window7_224",
+            ["timm_image"],
+        ),
+        (
+            {
+                "model.names": ["clip", "hf_text"],
+                "model.clip.checkpoint_name": "openai/clip-vit-base-patch32",
+            },
+            "openai/clip-vit-base-patch32",
+            ["clip"],
+        ),
     ],
 )
-def test_customize_models(model_names, timm_ckpt_name):
+def test_customize_models(hyperparameters, gt_ckpt_name, gt_model_name):
     download_dir = "./ag_automm_tutorial_imgcls"
     train_data, test_data = shopee_dataset(download_dir)
-    save_path = f"./tmp/{uuid.uuid4().hex}-automm_stanfordcars-8shot-en"
     predictor = MultiModalPredictor(
         label="label",
         problem_type=FEW_SHOT_CLASSIFICATION,
-        hyperparameters={
-            "model.names": model_names,
-            "model.timm_image.checkpoint_name": timm_ckpt_name,
-        },
-        eval_metric="acc",
-        path=save_path,
+        hyperparameters=hyperparameters,
     )
     predictor.fit(train_data)
-    assert predictor._learner._config.model.names == ["timm_image"]
-    assert predictor._learner._config.model.timm_image.checkpoint_name == timm_ckpt_name
+    assert predictor._learner._config.model.names == gt_model_name
+    assert OmegaConf.select(predictor._learner._config.model, f"{gt_model_name[0]}.checkpoint_name") == gt_ckpt_name
