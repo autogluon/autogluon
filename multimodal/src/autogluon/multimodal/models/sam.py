@@ -77,35 +77,9 @@ class SAMForSemanticSegmentation(nn.Module):
             configuration = SamConfig(name_or_path=checkpoint_name)
             self.model = SamModel(configuration)
 
-    def set_data_preprocessor_device(self):
-        if not self.device:
-            self.device = next(self.model.parameters()).device
-        if self.device != self.data_preprocessor.device:
-            self.data_preprocessor.to(self.device)
-
-    def save(self, save_path: str = "./", tokenizers: Optional[dict] = None):
-        weights_save_path = os.path.join(save_path, "model.pth")
-        configs_save_path = os.path.join(save_path, "config.py")
-
-        self._save_weights(save_path=weights_save_path)
-        self._save_configs(save_path=configs_save_path)
-
-        return save_path
-
-    def _save_weights(self, save_path=None):
-        if not save_path:
-            save_path = f"./{self.checkpoint_name}_autogluon.pth"
-
-        torch.save({"state_dict": self.model.state_dict()}, save_path)
-
-    def _save_configs(self, save_path=None):
-        if not save_path:
-            save_path = f"./{self.checkpoint_name}_autogluon.py"
-
-        self.config.dump(save_path)
-
-    def _load_config(self):
-        return
+    def save(self, save_path: str = "./"):
+        self.model.save_pretrained(save_path)
+        logger.info(f"Model weights for {self.prefix} is saved to {save_path}.")
 
     @property
     def image_key(self):
@@ -151,9 +125,6 @@ class SAMForSemanticSegmentation(nn.Module):
             return {self.prefix: {LOGITS: pred_masks}}
         else:
             return {self.prefix: {LOGITS: pred_masks, LABEL: batch[self.label_key]}}
-
-    def _parse_losses(self, losses):
-        return self.model._parse_losses(losses)
 
     def get_layer_ids(self):
         """

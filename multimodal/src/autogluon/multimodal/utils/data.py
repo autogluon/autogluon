@@ -204,7 +204,12 @@ def create_data_processor(
         )
     elif data_type == SEMANTIC_SEGMENTATION_IMG:
         data_processor = SemanticSegImageProcessor(
-            model=model, model_config=model_config, norm_type=model_config.image_norm
+            model=model,
+            img_transforms=model_config.img_transforms,
+            gt_transforms=model_config.gt_transforms,
+            train_transforms=model_config.train_transforms,
+            val_transforms=model_config.val_transforms,
+            norm_type=model_config.image_norm,
         )
     else:
         raise ValueError(f"unknown data type: {data_type}")

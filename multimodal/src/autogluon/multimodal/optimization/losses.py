@@ -342,7 +342,15 @@ class FocalLoss(nn.Module):
         return loss
 
 
-class IoULoss(nn.Module):
+class StructureLoss(nn.Module):
+    """
+    Structure Loss based on https://github.com/DengPingFan/PraNet/blob/master/MyTrain.py
+    The loss represent the weighted IoU loss and binary cross entropy (BCE) loss for the global restriction and local (pixel-level) restriction.
+
+    References:
+        [1] https://arxiv.org/abs/2006.11392
+    """
+
     def forward(self, input: torch.Tensor, target: torch.Tensor):
         if input.dim() == 3:
             input = input.unsqueeze(1)
@@ -359,7 +367,7 @@ class IoULoss(nn.Module):
 
 class BBCEWithLogitLoss(nn.Module):
     """
-    Balanced BCEWithLogitLoss
+    Balanced BCEWithLogitLoss based on https://github.com/NiFangBaAGe/Explicit-Visual-Prompt/blob/latest_branch/models/segformer.py
     """
 
     def __init__(self):

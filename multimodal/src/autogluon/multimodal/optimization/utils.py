@@ -73,13 +73,13 @@ from ..constants import (
     SM,
     SPEARMANR,
 )
-from .losses import BBCEWithLogitLoss, FocalLoss, IoULoss, MultiNegativesSoftmaxLoss, SoftTargetCrossEntropy
+from .losses import BBCEWithLogitLoss, FocalLoss, MultiNegativesSoftmaxLoss, SoftTargetCrossEntropy, StructureLoss
 from .lr_scheduler import (
     get_cosine_schedule_with_warmup,
     get_linear_schedule_with_warmup,
     get_polynomial_decay_schedule_with_warmup,
 )
-from .semantic_segmentation_metrics.metric import COD_METRICS_NAMES, Balanced_Error_Rate
+from .semantic_seg_metrics import COD_METRICS_NAMES, Balanced_Error_Rate
 
 logger = logging.getLogger(__name__)
 
@@ -134,8 +134,8 @@ def get_loss_func(
     elif problem_type in [OBJECT_DETECTION, OPEN_VOCABULARY_OBJECT_DETECTION]:
         return None
     elif problem_type == SEMANTIC_SEGMENTATION:
-        if "iou_loss" in loss_func_name.lower():
-            loss_func = IoULoss()
+        if "structure_loss" in loss_func_name.lower():
+            loss_func = StructureLoss()
         elif "balanced_bce" in loss_func_name.lower():
             loss_func = BBCEWithLogitLoss()
         else:

@@ -578,7 +578,7 @@ def construct_image_processor(
     size
         Image size.
     normalization
-        A transforms.Normalize object.
+        A transforms.Normalize object. When the image is ground truth image, 'normalization=None' should be specified.
 
     Returns
     -------

@@ -44,10 +44,13 @@ class SemanticSegImageProcessor:
     def __init__(
         self,
         model: nn.Module,
-        model_config: DictConfig,
+        img_transforms: List[str],
+        gt_transforms: List[str],
+        train_transforms: Optional[List[str]] = None,
+        val_transforms: Optional[List[str]] = None,
         norm_type: Optional[str] = None,
         max_img_num_per_col: Optional[int] = 1,
-        missing_value_strategy: Optional[str] = "zero",
+        missing_value_strategy: Optional[str] = "skip",
         requires_column_info: bool = False,
     ):
         """
@@ -55,8 +58,14 @@ class SemanticSegImageProcessor:
         ----------
         model
             The model for which this processor would be created.
-        model_config
-            The config of the model.
+        img_transforms
+            A list of image transforms for image.
+        gt_transforms
+            A list of image transforms for ground truth image.
+        train_transforms
+            A list of image transforms used in training for data augmentation. Note that the transform order matters.
+        val_transforms
+            A list of image transforms used in validation/test/prediction. Note that the transform order matters.
         norm_type
             How to normalize an image. We now support:
             - inception
@@ -72,33 +81,18 @@ class SemanticSegImageProcessor:
             How to deal with a missing image. We now support:
             - skip
                 Skip this sample
-            -zero
-                Use an image with zero pixels.
         requires_column_info
             Whether to require feature column information in dataloader.
         """
 
-        self.model_config = model_config
-
-        train_transforms, val_transforms = self.get_img_transform(kind="img")
-        self.train_transforms = train_transforms
-        self.val_transforms = val_transforms
-        logger.debug(f"image training transforms: {self.train_transforms}")
-        logger.debug(f"image validation transforms: {self.val_transforms}")
-
-        gt_train_transforms, gt_val_transforms = self.get_img_transform(kind="gt")
-        self.gt_train_transforms = gt_train_transforms
-        self.gt_val_transforms = gt_val_transforms
-        logger.debug(f"gt training transforms: {self.gt_train_transforms}")
-        logger.debug(f"gt validation transforms: {self.gt_val_transforms}")
+        self.img_transforms, self.gt_transforms = img_transforms, gt_transforms
 
         self.prefix = model.prefix
         self.missing_value_strategy = missing_value_strategy
         self.requires_column_info = requires_column_info
 
         self.size = model.image_size
-        self.mean, self.std = image_mean_std(model_config["image_norm"])
-
+        self.mean, self.std = image_mean_std(norm_type)
         self.normalization = transforms.Normalize(self.mean, self.std)
 
         self.max_img_num_per_col = max_img_num_per_col
@@ -108,20 +102,13 @@ class SemanticSegImageProcessor:
         self.max_img_num_per_col = max_img_num_per_col
         logger.debug(f"max_img_num_per_col: {max_img_num_per_col}")
 
-        self.train_processor = construct_image_processor(
-            image_transforms=self.train_transforms, size=self.size, normalization=self.normalization
+        self.img_processor = construct_image_processor(
+            image_transforms=self.img_transforms, size=self.size, normalization=self.normalization
         )
-        self.val_processor = construct_image_processor(
-            image_transforms=self.val_transforms, size=self.size, normalization=self.normalization
+        self.gt_processor = construct_image_processor(
+            image_transforms=self.gt_transforms, size=self.size, normalization=None
         )
-
-        self.gt_train_processor = construct_image_processor(
-            image_transforms=self.gt_train_transforms, size=self.size, normalization=None
-        )
-        self.gt_val_processor = construct_image_processor(
-            image_transforms=self.gt_val_transforms, size=self.size, normalization=None
-        )
-        self.augmentation = self.get_aug_transform()
+        self.train_transforms = self.get_train_transforms(train_transforms)
 
     @property
     def image_key(self):
@@ -221,14 +208,14 @@ class SemanticSegImageProcessor:
 
             if is_training:
                 if random.random() < 0.5:
-                    img = self.augmentation(img)
-                    gt = self.augmentation(gt)
-                img = self.train_processor(img)
-                gt = self.gt_train_processor(gt)
+                    img = self.train_transforms(img)
+                    gt = self.train_transforms(gt)
+                img = self.img_processor(img)
+                gt = self.gt_processor(gt)
             else:
-                img = self.val_processor(img)
+                img = self.img_processor(img)
                 if annotation_column is not None:
-                    gt = self.gt_val_processor(gt)
+                    gt = self.gt_processor(gt)
 
             images.append(img)
             if is_training or annotation_column is not None:
@@ -269,43 +256,9 @@ class SemanticSegImageProcessor:
 
         return self.process_one_sample(images, feature_modalities, is_training)
 
-    def __getstate__(self):
-        odict = self.__dict__.copy()  # get attribute dictionary
-        del odict["train_processor"]  # remove augmenter to support pickle
-        return odict
-
-    def __setstate__(self, state):
-        self.__dict__ = state
-        if "train_transform_types" in state:  # backward compatible
-            self.train_transforms = list(self.train_transform_types)
-        if "val_transform_types" in state:
-            self.val_transforms = list(self.val_transform_types)
-
-        self.train_processor = construct_image_processor(
-            image_transforms=self.train_transforms,
-            size=self.size,
-            normalization=self.normalization,
-        )
-
-    def get_img_transform(self, kind: str):
-        if kind == "img":
-            train_transforms = self.model_config.image.train_transforms
-            val_transforms = self.model_config.image.val_transforms
-        elif kind == "gt":
-            train_transforms = self.model_config.gt.train_transforms
-            val_transforms = self.model_config.gt.val_transforms
-        else:
-            raise ValueError("Do not support the usage!")
-        train_transforms = list(train_transforms)
-        val_transforms = list(val_transforms)
-
-        return train_transforms, val_transforms
-
-    def get_aug_transform(self):
-        aug_transforms = self.model_config.aug
-        aug_transforms = list(aug_transforms)
-        aug_trans = []
-        for trans_mode in aug_transforms:
+    def get_train_transforms(self, train_transforms):
+        train_trans = []
+        for trans_mode in train_transforms:
             if trans_mode == "random_horizontal_flip":
-                aug_trans.append(transforms.RandomHorizontalFlip(1.0))
-        return transforms.Compose(aug_trans)
+                train_trans.append(transforms.RandomHorizontalFlip(1.0))
+        return transforms.Compose(train_trans)

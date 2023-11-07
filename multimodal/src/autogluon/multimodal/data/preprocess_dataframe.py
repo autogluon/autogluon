@@ -206,7 +206,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
     @property
     def semantic_segmentation_feature_names(self):
         # Added for backward compatibility.
-        if hasattr(self, "_document_feature_names"):
+        if hasattr(self, "_semantic_segmentation_feature_names"):
             return self._semantic_segmentation_feature_names
         else:
             return []
@@ -514,11 +514,11 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         df: pd.DataFrame,
     ) -> Tuple[Dict[str, List[List[str]]], Dict[str, str]]:
         """
-        Preprocess real-world semantic segmentation data.
+        Preprocess semantic segmentation data.
         For image data we preprocess them by collecting their paths together. If one sample has multiple images
         in an image column, assume that their image paths are separated by ";".
-        For rois data we simply convert them from a column of pandas dataframe to a list.
-        This function needs to be called preceding the rois processor in "process_rois.py".
+        For ground truth image data we simply convert them from a column of pandas dataframe to a list.
+        This function needs to be called preceding the image processor in "process_semantic_seg_img.py".
 
         Parameters
         ----------

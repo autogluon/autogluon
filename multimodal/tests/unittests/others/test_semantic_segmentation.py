@@ -24,13 +24,7 @@ def download_sample_dataset():
     return data_dir
 
 
-@pytest.mark.parametrize(
-    "checkpoint_name",
-    [
-        "facebook/sam-vit-base",
-    ],
-)
-def test_sam_semantic_segmentation_fit_evaluate_predict_isic(checkpoint_name):
+def get_file_df(need_test_gt=False):
     data_dir = download_sample_dataset()
     train_img_files = get_file_paths(os.path.join(data_dir, "train/ISIC-2017_Train"))
     train_gt_files = get_file_paths(os.path.join(data_dir, "train/ISIC-2017_Training_Part1_GroundTruth"))
@@ -41,7 +35,21 @@ def test_sam_semantic_segmentation_fit_evaluate_predict_isic(checkpoint_name):
 
     train_df = pd.DataFrame({"image": train_img_files, "label": train_gt_files})
     val_df = pd.DataFrame({"image": val_img_files, "label": val_gt_files})
-    test_df = pd.DataFrame({"image": test_img_files, "label": test_gt_files})
+    if need_test_gt:
+        test_df = pd.DataFrame({"image": test_img_files, "label": test_gt_files})
+    else:
+        test_df = pd.DataFrame({"image": test_img_files})
+    return train_df, val_df, test_df
+
+
+@pytest.mark.parametrize(
+    "checkpoint_name",
+    [
+        "facebook/sam-vit-base",
+    ],
+)
+def test_sam_semantic_segmentation_fit_evaluate_predict_isic(checkpoint_name):
+    train_df, val_df, test_df = get_file_df(need_test_gt=True)
 
     validation_metric = "binary_iou"
     predictor = MultiModalPredictor(
@@ -71,16 +79,7 @@ def test_sam_semantic_segmentation_fit_evaluate_predict_isic(checkpoint_name):
     ],
 )
 def test_sam_semantic_segmentation_save_and_load(checkpoint_name):
-    data_dir = download_sample_dataset()
-    train_img_files = get_file_paths(os.path.join(data_dir, "train/ISIC-2017_Train"))
-    train_gt_files = get_file_paths(os.path.join(data_dir, "train/ISIC-2017_Training_Part1_GroundTruth"))
-    val_img_files = get_file_paths(os.path.join(data_dir, "val/ISIC-2017_Val"))
-    val_gt_files = get_file_paths(os.path.join(data_dir, "val/ISIC-2017_Validation_Part1_GroundTruth"))
-    test_img_files = get_file_paths(os.path.join(data_dir, "test/ISIC-2017_Test"))
-
-    train_df = pd.DataFrame({"image": train_img_files, "label": train_gt_files})
-    val_df = pd.DataFrame({"image": val_img_files, "label": val_gt_files})
-    test_df = pd.DataFrame({"image": test_img_files})
+    train_df, val_df, test_df = get_file_df(need_test_gt=False)
 
     validation_metric = "binary_iou"
     predictor = MultiModalPredictor(
@@ -105,3 +104,31 @@ def test_sam_semantic_segmentation_save_and_load(checkpoint_name):
     new_pred = new_predictor.predict(test_df, save_results=False)
 
     assert np.allclose(pred, new_pred)
+
+
+@pytest.mark.parametrize(
+    "checkpoint_name",
+    [
+        "facebook/sam-vit-base",
+    ],
+)
+def test_sam_semantic_segmentation_zero_shot_evaluate_predict(checkpoint_name):
+    _, _, test_df = get_file_df(need_test_gt=True)
+
+    validation_metric = "binary_iou"
+    predictor = MultiModalPredictor(
+        problem_type="semantic_segmentation",
+        validation_metric=validation_metric,
+        eval_metric=validation_metric,
+        hyperparameters={
+            "env.num_gpus": 1,
+            "model.sam.checkpoint_name": checkpoint_name,
+        },
+        label="label",
+    )
+
+    # Evaluate
+    predictor.evaluate(test_df, metrics=["binary_iou"])
+
+    # Predict
+    predictor.predict(test_df, save_results=False)

@@ -245,17 +245,12 @@ model:
     image_norm: "imagenet"
     data_types:
       - "semantic_segmentation_img"
-    aug:
+    train_transforms:
       - "random_horizontal_flip"
-    image:
-      train_transforms:
-        - "resize_to_square"
-      val_transforms:
-        - "resize_to_square"
-    gt:
-      train_transforms:
-        - "resize_gt_to_square"
-      val_transforms:
-        - "resize_gt_to_square"
+    val_transforms: []
+    img_transforms:
+      - "resize_to_square"
+    gt_transforms:
+      - "resize_gt_to_square"
     max_img_num_per_col: 1
     frozen_layers: ["mask_decoder.iou_prediction_head", "prompt_encoder"]

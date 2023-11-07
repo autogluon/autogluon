@@ -463,7 +463,7 @@ def semantic_segmentation(presets: str = DEFAULT):
         "env.num_workers": 4,
         "env.precision": 16,
         "optimization.learning_rate": 1e-4,
-        "optimization.loss_function": "iou_loss",
+        "optimization.loss_function": "structure_loss",
         "optimization.lr_decay": 0,
         "optimization.lr_mult": 1,
         "optimization.lr_choice": "single_stage",
