@@ -37,7 +37,7 @@
 :::{grid-item-card} Few Shot Learning with AutoMM
   :link: few_shot_learning.html
 
-  How to foundation models + SVM for few shot learning.
+  How to use foundation models + SVM for few shot learning.
 :::
 
 :::{grid-item-card} How to use FocalLoss
