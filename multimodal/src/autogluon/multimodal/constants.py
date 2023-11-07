@@ -34,6 +34,7 @@ IMAGE_SIMILARITY = "image_similarity"
 TEXT_SIMILARITY = "text_similarity"
 IMAGE_TEXT_SIMILARITY = "image_text_similarity"
 FEW_SHOT_CLASSIFICATION = "few_shot_classification"
+SEMANTIC_SEGMENTATION = "semantic_segmentation"
 
 # Input keys
 IMAGE = "image"
@@ -49,6 +50,8 @@ ATTENTION_MASK = "attention_mask"
 TOKEN_TYPE_IDS = "token_type_ids"
 PIXEL_VALUES = "pixel_values"
 INPUT_IDS = "input_ids"
+SEMANTIC_SEGMENTATION_IMG = "semantic_segmentation_img"
+SEMANTIC_SEGMENTATION_GT = "semantic_segmentation_gt"
 
 # Output keys
 LOGITS = "logits"
@@ -123,6 +126,14 @@ NDCG = "ndcg"
 PRECISION = "precision"
 RECALL = "recall"
 MRR = "mrr"
+SM = "sm"
+EM = "em"
+FM = "fm"
+MAE = "mae"
+BINARY_IOU = "binary_iou"
+BINARY_DICE = "binary_dice"
+BINARY_ACC = "binary_acc"
+BER = "ber"
 RETRIEVAL_METRICS = [NDCG, PRECISION, RECALL, MRR]
 METRIC_MODE_MAP = {
     ACC: MAX,
@@ -143,6 +154,11 @@ METRIC_MODE_MAP = {
     NER_TOKEN_F1: MAX,
     OVERALL_F1: MAX,
     RECALL: MAX,
+    SM: MAX,
+    BINARY_IOU: MAX,
+    BINARY_DICE: MAX,
+    BINARY_ACC: MAX,
+    BER: MIN,
 }
 VALID_METRICS = METRIC_MODE_MAP.keys()
 
@@ -159,7 +175,7 @@ MMDET = "mmdet"
 MMOCR = "mmocr"
 
 # Modality keys. may need to update here if new modality keys are added in above.
-ALL_MODALITIES = [IMAGE, TEXT, CATEGORICAL, NUMERICAL, TEXT_NER, DOCUMENT]
+ALL_MODALITIES = [IMAGE, TEXT, CATEGORICAL, NUMERICAL, TEXT_NER, DOCUMENT, SEMANTIC_SEGMENTATION_IMG]
 
 # Keys to compute metrics
 Y_PRED = "y_pred"
@@ -245,6 +261,7 @@ NER_TEXT = "ner_text"
 DOCUMENT_TRANSFORMER = "document_transformer"
 HF_MODELS = (HF_TEXT, T_FEW, CLIP, NER_TEXT, DOCUMENT_TRANSFORMER)
 MMLAB_MODELS = (MMDET_IMAGE, MMOCR_TEXT_DET, MMOCR_TEXT_RECOG)
+SAM = "sam"
 
 # matcher loss type
 CONTRASTIVE_LOSS = "contrastive_loss"

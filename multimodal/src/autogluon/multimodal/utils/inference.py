@@ -23,6 +23,7 @@ from ..constants import (
     QUERY,
     RESPONSE,
     SCORE,
+    SEMANTIC_SEGMENTATION,
     TEXT,
     TOKEN_WORD_MAPPING,
     WORD_OFFSETS,

@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        AG_MODULE: [tabular, timeseries]
+        AG_MODULE: [tabular, timeseries, multimodal]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
@@ -66,14 +66,14 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v1
         with:
           role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
-          role-duration-seconds: 14400
+          role-duration-seconds: 36000
           aws-region: us-east-1
       - name: Run benchmark - Tabular
         shell: bash -l {0}
         run: |
           nvm install 20
           npm install -g aws-cdk
-          /bin/bash ./.github/workflow_scripts/run_benchmark.sh tabular best small 1h ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
+          /bin/bash ./.github/workflow_scripts/run_benchmark.sh tabular best tabular_small 1h ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
 
   benchmark-timeseries:
     needs: [generate_amlb_user_dir, benchmark-tabular]
@@ -107,7 +107,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v1
         with:
           role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
-          role-duration-seconds: 14400
+          role-duration-seconds: 36000
           aws-region: us-east-1
       - name: Run benchmark - Timeseries
         shell: bash -l {0}
@@ -115,3 +115,44 @@ jobs:
           nvm install 20
           npm install -g aws-cdk
           /bin/bash ./.github/workflow_scripts/run_benchmark.sh timeseries dev timeseries_small 10m4c ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
+
+  benchmark-multimodal:
+    needs: [generate_amlb_user_dir, benchmark-tabular, benchmark-timeseries]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Free Disk Space (Ubuntu)
+        # uses: jlumbroso/free-disk-space@v1.2.0
+        uses: hirnidrin/free-disk-space@main  # revert back once fix in https://github.com/jlumbroso/free-disk-space/pull/11
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+      - name: Checkout repository for PR
+        uses: actions/checkout@v2
+      - name: Setup Python
+        uses: actions/setup-python@v1
+        with:
+          python-version: '3.9'
+      - name: Setup npm
+        uses: actions/setup-node@v3
+        with:
+          node-version: 'latest'
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
+          role-duration-seconds: 36000
+          aws-region: us-east-1
+      - name: Run benchmark - Multimodal
+        shell: bash -l {0}
+        run: |
+          nvm install 20
+          npm install -g aws-cdk
+          /bin/bash ./.github/workflow_scripts/run_benchmark.sh multimodal master_medium none g4_12x ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}

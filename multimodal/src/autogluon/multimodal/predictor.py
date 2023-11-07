@@ -14,8 +14,15 @@ import transformers
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
 from autogluon.core.metrics import Scorer
 
-from .constants import AUTOMM_TUTORIAL_MODE, FEW_SHOT_CLASSIFICATION, NER, OBJECT_DETECTION
-from .learners import BaseLearner, FewShotSVMLearner, MultiModalMatcher, NERLearner, ObjectDetectionLearner
+from .constants import AUTOMM_TUTORIAL_MODE, FEW_SHOT_CLASSIFICATION, NER, OBJECT_DETECTION, SEMANTIC_SEGMENTATION
+from .learners import (
+    BaseLearner,
+    FewShotSVMLearner,
+    MultiModalMatcher,
+    NERLearner,
+    ObjectDetectionLearner,
+    SemanticSegmentationLearner,
+)
 from .problem_types import PROBLEM_TYPES_REG
 from .utils import get_dir_ckpt_paths, handle_deprecated_args
 
@@ -200,6 +207,8 @@ class MultiModalPredictor:
             learner_class = NERLearner
         elif problem_type == FEW_SHOT_CLASSIFICATION:
             learner_class = FewShotSVMLearner
+        elif problem_type == SEMANTIC_SEGMENTATION:
+            learner_class = SemanticSegmentationLearner
         else:
             learner_class = BaseLearner
 
@@ -779,6 +788,8 @@ class MultiModalPredictor:
             learner_class = NERLearner
         elif assets["problem_type"] == FEW_SHOT_CLASSIFICATION:
             learner_class = FewShotSVMLearner
+        elif assets["problem_type"] == SEMANTIC_SEGMENTATION:
+            learner_class = SemanticSegmentationLearner
         else:
             learner_class = BaseLearner
 

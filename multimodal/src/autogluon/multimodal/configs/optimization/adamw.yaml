@@ -42,3 +42,4 @@ optimization:
     alpha: null
     gamma: 2.0
     reduction: "mean"
+  extra_trainable_params: []

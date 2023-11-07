@@ -14,6 +14,7 @@ from torchmetrics.aggregation import BaseAggregator
 from ..constants import LM_TARGET, LOGITS, T_FEW, TEMPLATE_LOGITS, WEIGHT
 from ..data.mixup import MixupModule, multimodel_mixup
 from ..models.utils import run_model
+from .semantic_seg_metrics import COD, Balanced_Error_Rate
 from .utils import apply_layerwise_lr_decay, apply_single_lr, apply_two_stages_lr, get_lr_scheduler, get_optimizer
 
 logger = logging.getLogger(__name__)
@@ -214,6 +215,12 @@ class LitModule(pl.LightningModule):
             metric.update(preds=prob[:, 1], target=label)  # only for binary classification
         elif isinstance(metric, BaseAggregator):
             metric.update(custom_metric_func(logits, label))
+        elif (
+            isinstance(metric, torchmetrics.classification.BinaryJaccardIndex)
+            or isinstance(metric, Balanced_Error_Rate)
+            or isinstance(metric, COD)
+        ):
+            metric.update(logits.float(), label)
         else:
             metric.update(logits.squeeze(dim=1).float(), label)
 
@@ -358,6 +365,8 @@ class LitModule(pl.LightningModule):
         else:
             logger.debug("applying single learning rate...")
             grouped_parameters = apply_single_lr(
+                efficient_finetune=self.hparams.efficient_finetune,
+                trainable_param_names=self.trainable_param_names,
                 **kwargs,
             )
 

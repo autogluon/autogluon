@@ -17,11 +17,18 @@ module = args.module
 repository = args.repository
 branch = args.branch
 folds_to_run = args.folds_to_run
-framework_template_file = os.path.join(os.path.dirname(__file__), f"{module}/amlb_user_dir", "frameworks_template.yaml")
-framework_benchmark_file = os.path.join(os.path.dirname(framework_template_file), "frameworks_benchmark.yaml")
-constraints_file = os.path.join(os.path.dirname(__file__), f"{module}/amlb_user_dir", "constraints.yaml")
+current_dir = os.path.dirname(__file__)
 
-if folds_to_run > 0:
+if module == 'multimodal':
+    framework_template_file = os.path.join(current_dir, f"{module}/custom_user_dir", "multimodal_frameworks_template.yaml")
+    framework_benchmark_file = os.path.join(os.path.dirname(framework_template_file), "multimodal_frameworks.yaml")
+    constraints_file = os.path.join(current_dir, f"{module}/custom_user_dir", "multimodal_constraints.yaml")
+else:
+    framework_template_file = os.path.join(current_dir, f"{module}/amlb_user_dir", "frameworks_template.yaml")
+    framework_benchmark_file = os.path.join(os.path.dirname(framework_template_file), "frameworks_benchmark.yaml")
+    constraints_file = os.path.join(current_dir, f"{module}/amlb_user_dir", "constraints.yaml")
+
+if folds_to_run > 0 and module != 'multimodal':
     constraints = {}
     with open(constraints_file, "r") as f:
         constraints = yaml.safe_load(f)

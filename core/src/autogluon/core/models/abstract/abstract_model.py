@@ -1703,7 +1703,15 @@ class AbstractModel:
         return 4 * get_approximate_df_mem_usage(X).sum()
 
     @disable_if_lite_mode()
-    def _validate_fit_memory_usage(self, mem_error_threshold: float = 0.9, mem_warning_threshold: float = 0.75, mem_size_threshold: int = None, **kwargs):
+    def _validate_fit_memory_usage(
+        self,
+        mem_error_threshold: float = 0.9,
+        mem_warning_threshold: float = 0.75,
+        mem_size_threshold: int = None,
+        approx_mem_size_req: int = None,
+        available_mem: int = None,
+        **kwargs,
+    ):
         """
         Asserts that enough memory is available to fit the model
 
@@ -1722,6 +1730,10 @@ class AbstractModel:
         mem_size_threshold : int, default = None
             If not None, skips checking available memory if the expected model size is less than `mem_size_threshold` bytes.
             This is used to speed-up training by avoiding the check in cases where the machine almost certainly has sufficient memory.
+        approx_mem_size_req: int, default = None
+            If specified, will use this value as the overall memory usage estimate instead of calculating within the method.
+        available_mem: int, default = None
+            If specified, will use this value as the available memory instead of calculating within the method.
         **kwargs : dict,
             Fit time kwargs, including X, y, X_val, and y_val.
             Can be used to customize estimation of memory usage.
@@ -1730,11 +1742,13 @@ class AbstractModel:
         if max_memory_usage_ratio is None:
             return  # Skip memory check
 
-        approx_mem_size_req = self.estimate_memory_usage(**kwargs)
+        if approx_mem_size_req is None:
+            approx_mem_size_req = self.estimate_memory_usage(**kwargs)
         if mem_size_threshold is not None and approx_mem_size_req < (mem_size_threshold * min(max_memory_usage_ratio, 1)):
             return  # Model is smaller than the min threshold to check available mem
 
-        available_mem = ResourceManager.get_available_virtual_mem()
+        if available_mem is None:
+            available_mem = ResourceManager.get_available_virtual_mem()
 
         # The expected memory usage percentage of the model during fit
         expected_memory_usage_ratio = approx_mem_size_req / available_mem

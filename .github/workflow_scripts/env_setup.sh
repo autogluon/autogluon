@@ -23,6 +23,7 @@ function setup_benchmark_env {
     pip install -e ./autogluon-bench
     git clone https://github.com/autogluon/autogluon-dashboard.git
     pip install -e ./autogluon-dashboard
+    pip install yq
 }
 
 function setup_hf_model_mirror {

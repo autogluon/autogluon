@@ -9,7 +9,7 @@ from torch import nn
 from torch.nn.modules.loss import _Loss
 from transformers import AutoConfig, AutoModel, AutoTokenizer, BertTokenizer, CLIPTokenizer, ElectraTokenizer
 
-from ..constants import AUTOMM, COLUMN_FEATURES, FEATURES, LOGITS, MASKS, OCR, REGRESSION
+from ..constants import AUTOMM, COLUMN_FEATURES, FEATURES, LOGITS, MASKS, OCR, REGRESSION, SEMANTIC_SEGMENTATION
 from .adaptation_layers import IA3Linear, IA3LoRALinear, LoRALinear
 
 logger = logging.getLogger(__name__)
@@ -133,7 +133,7 @@ def assign_non_encoder_layer_ids(
     return name_to_id
 
 
-def split_encoder_non_encoder(names: List[str]):
+def split_encoder_non_encoder(names: List[str], post_encoder_patterns: Tuple[str, ...]):
     """
     Group layer names into two types: encoder and non-encoder.
     A layer belongs to encoder if its name contains at least one digit.
@@ -156,6 +156,9 @@ def split_encoder_non_encoder(names: List[str]):
     non_encoder_names = []
     for n in names:
         is_encoder = False
+        if any(p in n for p in post_encoder_patterns):
+            non_encoder_names.append(n)
+            continue
         for i in n.split("."):
             if i.isdigit():
                 encoder_names.append(n)
@@ -229,7 +232,7 @@ def group_param_names(
     non_encoder_names = []
     for child_prefix in children_prefix:
         per_names_group = [n for n in selected_names if n.startswith(child_prefix)]
-        per_encoder_names, per_non_encoder_names = split_encoder_non_encoder(per_names_group)
+        per_encoder_names, per_non_encoder_names = split_encoder_non_encoder(per_names_group, post_encoder_patterns)
         encoder_names_grouped.append(per_encoder_names)
         non_encoder_names.extend(per_non_encoder_names)
 
@@ -479,6 +482,7 @@ def inject_adaptation_to_linear_layer(
     lora_alpha: int = None,
     filter: Optional[List[str]] = None,
     module_filter: Optional[List[str]] = None,
+    extra_trainable_params: Optional[List[str]] = None,
 ) -> nn.Module:
     """
     Injects trainable adatio Low-Rank decomposition matrices (LoRA) into linear
@@ -502,12 +506,16 @@ def inject_adaptation_to_linear_layer(
     module_filter
         Apply loRA only to modules filtered by name (e.g. ".*EncDecAttention|.*DenseReluDense")
         If None, loRA is considered for all modules
-
+    extra_trainable_params
+        Not to apply loRA to modules filtered by name, and these modules are not frozen during training (e.g. "mask_decoder").
+        If None, all the modules except for those applied loRA are frozen.
     Returns
     -------
     Model with injected LoRA modules.
     """
     for m_name, module in dict(model.named_modules()).items():
+        if extra_trainable_params and any(re.match(filter_layer, m_name) for filter_layer in extra_trainable_params):
+            continue
         if not module_filter or any(re.match(filter_module, m_name) for filter_module in module_filter):
             for c_name, layer in dict(module.named_children()).items():
                 if not filter or any(re.match(filter_layer, c_name) for filter_layer in filter):
@@ -615,6 +623,8 @@ def get_model_postprocess_fn(problem_type: str, loss_func: _Loss):
     if problem_type == REGRESSION:
         if isinstance(loss_func, nn.BCEWithLogitsLoss):
             postprocess_func = apply_sigmoid
+    elif problem_type == SEMANTIC_SEGMENTATION:
+        postprocess_func = apply_sigmoid
 
     return postprocess_func
 
