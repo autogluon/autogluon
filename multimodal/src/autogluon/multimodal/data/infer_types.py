@@ -30,6 +30,9 @@ from ..constants import (
     OPEN_VOCABULARY_OBJECT_DETECTION,
     REGRESSION,
     ROIS,
+    SEMANTIC_SEGMENTATION,
+    SEMANTIC_SEGMENTATION_GT,
+    SEMANTIC_SEGMENTATION_IMG,
     TEXT,
     TEXT_NER,
 )
@@ -546,6 +549,8 @@ def infer_column_types(
             # Check if it is document image or not.
             if is_document_image_column(data[col_name], col_name=col_name):
                 column_types[col_name] = DOCUMENT_IMAGE
+            elif problem_type == SEMANTIC_SEGMENTATION:
+                column_types[col_name] = SEMANTIC_SEGMENTATION_IMG
             else:
                 column_types[col_name] = IMAGE_PATH
         elif is_document_pdf_column(data[col_name], col_name=col_name):
@@ -600,7 +605,13 @@ def infer_label_column_type_by_problem_type(
     problem_type: Optional[str],
     data: Optional[pd.DataFrame] = None,
     valid_data: Optional[pd.DataFrame] = None,
-    allowable_label_types: Optional[List[str]] = (CATEGORICAL, NUMERICAL, NER_ANNOTATION, ROIS),
+    allowable_label_types: Optional[List[str]] = (
+        CATEGORICAL,
+        NUMERICAL,
+        NER_ANNOTATION,
+        ROIS,
+        SEMANTIC_SEGMENTATION_GT,
+    ),
     fallback_label_type: Optional[str] = CATEGORICAL,
 ):
     """
@@ -653,6 +664,8 @@ def infer_label_column_type_by_problem_type(
             column_types[col_name] = NER_ANNOTATION
         elif problem_type in [OBJECT_DETECTION, OPEN_VOCABULARY_OBJECT_DETECTION]:
             column_types[col_name] = ROIS
+        elif problem_type == SEMANTIC_SEGMENTATION:
+            column_types[col_name] = SEMANTIC_SEGMENTATION_GT
 
         if column_types[col_name] not in allowable_label_types:
             column_types[col_name] = fallback_label_type
@@ -749,7 +762,7 @@ def infer_output_shape(
             return 1
         else:
             return class_num
-    elif problem_type in [NER, OBJECT_DETECTION, OPEN_VOCABULARY_OBJECT_DETECTION]:
+    elif problem_type in [NER, OBJECT_DETECTION, OPEN_VOCABULARY_OBJECT_DETECTION, SEMANTIC_SEGMENTATION]:
         return None
     else:
         raise ValueError(
@@ -757,7 +770,8 @@ def infer_output_shape(
             f"for training. The supported problem types are"
             f" '{BINARY}', '{MULTICLASS}', '{REGRESSION}',"
             f" '{CLASSIFICATION}', '{NER}',"
-            f" '{OBJECT_DETECTION}', '{OPEN_VOCABULARY_OBJECT_DETECTION}'"
+            f" '{OBJECT_DETECTION}', '{OPEN_VOCABULARY_OBJECT_DETECTION}',"
+            f" '{SEMANTIC_SEGMENTATION}"
         )
 
 

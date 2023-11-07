@@ -29,6 +29,8 @@ from ..constants import (
     OVD,
     REGRESSION,
     ROIS,
+    SAM,
+    SEMANTIC_SEGMENTATION_IMG,
     TEXT,
     TEXT_NER,
 )
@@ -45,6 +47,7 @@ from ..data import (
     NerProcessor,
     NumericalProcessor,
     OVDProcessor,
+    SemanticSegImageProcessor,
     TextProcessor,
 )
 from ..data.infer_types import is_image_column
@@ -199,6 +202,15 @@ def create_data_processor(
             text_max_len=model_config.max_text_len,
             missing_value_strategy=config.data.document.missing_value_strategy,
         )
+    elif data_type == SEMANTIC_SEGMENTATION_IMG:
+        data_processor = SemanticSegImageProcessor(
+            model=model,
+            img_transforms=model_config.img_transforms,
+            gt_transforms=model_config.gt_transforms,
+            train_transforms=model_config.train_transforms,
+            val_transforms=model_config.val_transforms,
+            norm_type=model_config.image_norm,
+        )
     else:
         raise ValueError(f"unknown data type: {data_type}")
 
@@ -243,6 +255,7 @@ def create_fusion_data_processors(
         TEXT_NER: [],
         DOCUMENT: [],
         OVD: [],
+        SEMANTIC_SEGMENTATION_IMG: [],
     }
 
     model_dict = {model.prefix: model}
@@ -294,6 +307,17 @@ def create_fusion_data_processors(
             )
             if data_types is not None and IMAGE in data_types:
                 data_types.remove(IMAGE)
+        elif per_name == SAM:
+            data_processors[SEMANTIC_SEGMENTATION_IMG].append(
+                create_data_processor(
+                    data_type=SEMANTIC_SEGMENTATION_IMG,
+                    config=config,
+                    model=per_model,
+                )
+            )
+            if data_types is not None and SEMANTIC_SEGMENTATION_IMG in data_types:
+                data_types.remove(SEMANTIC_SEGMENTATION_IMG)
+            requires_label = False
 
         if requires_label:
             # each model has its own label processor
