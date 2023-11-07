@@ -16,7 +16,9 @@ logger = logging.getLogger(__name__)
 
 
 class DDPPredictionWriter(BasePredictionWriter):
-    def __init__(self, output_dir: Optional[str], write_interval: Optional[str], strategy: Optional[str], sleep_time=5):
+    def __init__(
+            self, output_dir: Optional[str], write_interval: Optional[str], strategy: Optional[str], sleep_time=5
+        ):
         """
         Parameters
         ----------

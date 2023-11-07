@@ -206,11 +206,11 @@ def get_gpu_message(detected_num_gpus: int, used_num_gpus: int, strategy: str):
     gpu_message = f"{detected_num_gpus} GPUs are detected, and {used_num_gpus} GPUs will be used.\n"
     if not is_interactive_strategy(strategy):
         free_memories_command = "nvidia-smi --query-gpu=memory.free --format=csv"
-        free_memories_info = sp.check_output(free_memories_command.split()).decode('ascii').split('\n')[:-1][1:]
+        free_memories_info = sp.check_output(free_memories_command.split()).decode("ascii").split("\n")[:-1][1:]
         free_memories = [int(x.split()[0]) for i, x in enumerate(free_memories_info)]
 
         total_memories_command = "nvidia-smi --query-gpu=memory.total --format=csv"
-        total_memories_info = sp.check_output(total_memories_command.split()).decode('ascii').split('\n')[:-1][1:]
+        total_memories_info = sp.check_output(total_memories_command.split()).decode("ascii").split("\n")[:-1][1:]
         total_memories = [int(x.split()[0]) for i, x in enumerate(total_memories_info)]
 
         for i in range(detected_num_gpus):
