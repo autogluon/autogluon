@@ -2,7 +2,6 @@ import argparse
 import os
 import yaml
 
-
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
 parser.add_argument("--module", help="module to run ag-bench on", type=str, required=True)

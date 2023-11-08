@@ -31,9 +31,6 @@ with open(config_file, "r") as f:
     config = yaml.safe_load(f)
     benchmark_name = config["benchmark_name"]
 
-#testing purpose
-print("\nBenchmark Name is: ", benchmark_name)
-
 subprocess.run(
     [
         "agbench",
