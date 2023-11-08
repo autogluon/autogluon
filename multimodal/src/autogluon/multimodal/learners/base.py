@@ -130,6 +130,7 @@ from ..utils import (
     list_timm_models,
     load_text_tokenizers,
     logits_to_prob,
+    run_ddp_only_once,
     save_pretrained_model_configs,
     save_text_tokenizers,
     select_model,
@@ -1067,7 +1068,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             with apply_log_filter(log_filter):
                 trainer = pl.Trainer(
                     accelerator="gpu" if num_gpus > 0 else "auto",
-                    devices=get_available_devices(num_gpus, config.env.auto_select_gpus),
+                    devices=num_gpus,
                     num_nodes=config.env.num_nodes,
                     precision=precision,
                     strategy=strategy if strategy else "auto",
@@ -1107,7 +1108,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             with apply_log_filter(log_filter):
                 trainer = pl.Trainer(
                     accelerator="gpu" if num_gpus > 0 else "auto",
-                    devices=get_available_devices(num_gpus, self._config.env.auto_select_gpus),
+                    devices=num_gpus,
                     num_nodes=self._config.env.num_nodes,
                     precision=precision,
                     strategy=strategy,
@@ -1270,6 +1271,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         grad_steps = self.get_grad_steps(num_gpus=num_gpus, config=config)
         strategy = self.get_strategy_per_run(num_gpus=num_gpus, config=config)
         strategy, num_gpus = self.update_strategy_and_num_gpus_for_hpo(strategy=strategy, num_gpus=num_gpus)
+        num_gpus, strategy = run_ddp_only_once(num_gpus, strategy)
         config = self.post_update_config_per_run(
             config=config,
             num_gpus=num_gpus,
@@ -1488,7 +1490,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
     def get_pred_writer(self, strategy):
         pred_writer = None
         if isinstance(strategy, str) and DDP in strategy:
-            pred_writer = DDPPredictionWriter(output_dir=self._save_path, write_interval="epoch")
+            pred_writer = DDPPredictionWriter(output_dir=self._save_path, write_interval="epoch", strategy=strategy)
         return pred_writer
 
     @staticmethod

@@ -2,6 +2,7 @@ import logging
 import os
 import shutil
 import time
+import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
@@ -15,7 +16,9 @@ logger = logging.getLogger(__name__)
 
 
 class DDPPredictionWriter(BasePredictionWriter):
-    def __init__(self, output_dir: Optional[str], write_interval: Optional[str], sleep_time=5):
+    def __init__(
+        self, output_dir: Optional[str], write_interval: Optional[str], strategy: Optional[str], sleep_time=5
+    ):
         """
         Parameters
         ----------
@@ -39,7 +42,10 @@ class DDPPredictionWriter(BasePredictionWriter):
         ), f"Only str and pathlib.Path types are supported for path, but got {output_dir} of type {type(output_dir)}."
         self.sleep_time = sleep_time
         output_dir = os.path.abspath(os.path.expanduser(output_dir))
-        self.output_dir = os.path.join(output_dir, "prediction_cache")
+        if "spawn" in strategy:
+            self.output_dir = os.path.join(output_dir, f"predictions_{uuid.uuid4().hex}")
+        else:
+            self.output_dir = os.path.join(output_dir, "ddp_prediction_cache")
         try:
             os.makedirs(self.output_dir, exist_ok=False)
         except FileExistsError:  # assume the string is unique

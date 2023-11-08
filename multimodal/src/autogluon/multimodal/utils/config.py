@@ -134,9 +134,9 @@ def get_config(
 
         The value of each key can be a string, yaml path, or DictConfig object. For example:
         config = {
-                        "model": "fusion_mlp_image_text_tabular",
+                        "model": "default",
                         "data": "default",
-                        "optimization": "adamw",
+                        "optimization": "default",
                         "environment": "default",
                     }
             or

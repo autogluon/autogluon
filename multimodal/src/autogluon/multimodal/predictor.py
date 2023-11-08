@@ -24,7 +24,7 @@ from .learners import (
     SemanticSegmentationLearner,
 )
 from .problem_types import PROBLEM_TYPES_REG
-from .utils import get_dir_ckpt_paths, handle_deprecated_args
+from .utils import get_dir_ckpt_paths
 
 pl_logger = logging.getLogger("lightning")
 pl_logger.propagate = False  # https://github.com/Lightning-AI/lightning/issues/4621
@@ -49,7 +49,6 @@ class MultiModalPredictor:
         query: Optional[Union[str, List[str]]] = None,
         response: Optional[Union[str, List[str]]] = None,
         match_label: Optional[Union[int, str]] = None,
-        pipeline: Optional[str] = None,
         presets: Optional[str] = None,
         eval_metric: Optional[Union[str, Scorer]] = None,
         hyperparameters: Optional[dict] = None,
@@ -59,7 +58,6 @@ class MultiModalPredictor:
         classes: Optional[list] = None,
         warn_if_exist: Optional[bool] = True,
         enable_progress_bar: Optional[bool] = None,
-        init_scratch: Optional[bool] = False,
         pretrained: Optional[bool] = True,
         validation_metric: Optional[str] = None,
         sample_data_path: Optional[str] = None,
@@ -95,7 +93,7 @@ class MultiModalPredictor:
             problem types:
 
             - 'object_detection'
-            - 'open_vocabulry_object_detection'
+            - 'open_vocabulary_object_detection'
             - 'text_similarity'
             - 'image_similarity'
             - 'image_text_similarity'
@@ -113,8 +111,6 @@ class MultiModalPredictor:
             This is used when the problem_type is one of the matching problem types, and when the labels are binary.
             For example, the label column can contain ["duplicate", "not duplicate"]. And match_label can be "duplicate".
             If match_label is not provided, every sample is assumed to have a unique label.
-        pipeline
-            Pipeline has been deprecated and merged in problem_type.
         presets
             Presets regarding model quality, e.g., best_quality, high_quality, and medium_quality.
         eval_metric
@@ -168,13 +164,8 @@ class MultiModalPredictor:
             This is used for automatically inference num_classes, classes, or label.
 
         """
-        problem_type, pretrained = handle_deprecated_args(
-            init_scratch=init_scratch,
-            pipeline=pipeline,
-            problem_type=problem_type,
-            pretrained=pretrained,
-        )
         if problem_type is not None:
+            problem_type = problem_type.lower()
             assert problem_type in PROBLEM_TYPES_REG, (
                 f"problem_type='{problem_type}' is not supported yet. You may pick a problem type from"
                 f" {PROBLEM_TYPES_REG.list_keys()}."
@@ -390,9 +381,9 @@ class MultiModalPredictor:
             automm/configs/model, automm/configs/data, automm/configs/optimization, and automm/configs/environment.
             For example, you can configure a late-fusion model for the image, text, and tabular data as follows:
             config = {
-                        "model": "fusion_mlp_image_text_tabular",
+                        "model": "default",
                         "data": "default",
-                        "optimization": "adamw",
+                        "optimization": "default",
                         "environment": "default",
                     }
             or

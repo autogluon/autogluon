@@ -20,7 +20,7 @@ MULTICLASS = "multiclass"
 REGRESSION = "regression"
 FEW_SHOT = "few_shot"
 DEFAULT_SHOT = "default_shot"
-DEPRECATED_ZERO_SHOT = "zero_shot"
+ZERO_SHOT = "zero_shot"
 NER = "ner"
 NAMED_ENTITY_RECOGNITION = "named_entity_recognition"
 FEATURE_EXTRACTION = "feature_extraction"
@@ -322,6 +322,9 @@ MULTI_IMAGE_MIX_DATASET = "multi_image_mix_dataset"
 
 # strategies
 DDP = "ddp"
+DDP_FIND_UNUSED_PARAMETERS_FALSE = "ddp_find_unused_parameters_false"
+DDP_FIND_UNUSED_PARAMETERS_TRUE = "ddp_find_unused_parameters_true"
+DDP_STRATEGIES = [DDP, DDP_FIND_UNUSED_PARAMETERS_FALSE, DDP_FIND_UNUSED_PARAMETERS_TRUE]
 
 # torch constants
 TORCH_COMPILE_MIN_VERSION = "2.2.0.dev20230908"

@@ -73,9 +73,8 @@ def select_model(
     If MultiModalFeaturePreprocessor can't detect some modality,
     this function will remove the models that use this modality. This function is to
     maximize the user flexibility in defining the config.
-    For example, if one uses the "fusion_mlp_image_text_tabular" as the model config template
-    but the training data don't have images, this function will filter out all the models
-    using images, such as Swin Transformer and CLIP.
+    For example, if one uses the default, including hf_text and timm_image, as the model config template
+    but the training data don't have images, this function will filter out timm_image.
 
     Parameters
     ----------
