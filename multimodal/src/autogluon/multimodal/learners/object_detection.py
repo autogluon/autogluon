@@ -31,6 +31,7 @@ from ..utils import (
     get_detection_classes,
     infer_precision,
     object_detection_data_to_df,
+    run_ddp_only_once,
     save_ovd_result_df,
     save_result_df,
     setup_save_path,
@@ -366,6 +367,7 @@ class ObjectDetectionLearner(BaseLearner):
         grad_steps = self.get_grad_steps(num_gpus=num_gpus, config=config)
         strategy = self.get_strategy_per_run(num_gpus=num_gpus, config=config)
         strategy, num_gpus = self.update_strategy_and_num_gpus_for_hpo(strategy=strategy, num_gpus=num_gpus)
+        num_gpus, strategy = run_ddp_only_once(num_gpus, strategy)
         config = self.post_update_config_per_run(
             config=config,
             num_gpus=num_gpus,
@@ -470,6 +472,7 @@ class ObjectDetectionLearner(BaseLearner):
         )
         strategy = self.get_strategy_per_run(num_gpus=num_gpus, config=self._config)
         num_gpus = self.update_num_gpus_by_strategy(strategy=strategy, num_gpus=num_gpus)
+        num_gpus, strategy = run_ddp_only_once(num_gpus, strategy)
         batch_size = compute_inference_batch_size(
             per_gpu_batch_size=self._config.env.per_gpu_batch_size,
             eval_batch_size_ratio=OmegaConf.select(self._config, "env.eval_batch_size_ratio"),

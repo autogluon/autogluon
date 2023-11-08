@@ -98,6 +98,7 @@ def evaluate_matcher_ranking(matcher, test_df, query_column, response_column, me
         )
 
 
+# TODO: multi GPU test passed locally with single set parameter and realtime removed
 @pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "dataset_name,query,response,problem_type,text_backbone,image_backbone, is_ranking, symmetric",
