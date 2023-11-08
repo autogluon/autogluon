@@ -962,4 +962,4 @@ def test_given_time_limit_is_not_none_then_first_model_doesnt_receive_full_time_
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             enable_ensemble=enable_ensemble,
         )
-        assert naive_fit.call_args[1]["time_limit"] < expected_time_limit_for_first_model
+        assert snaive_fit.call_args[1]["time_limit"] < expected_time_limit_for_first_model

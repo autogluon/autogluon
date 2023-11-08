@@ -432,7 +432,7 @@ class TimeSeriesPredictor:
 
         time_limit : int, optional
             Approximately how long :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will run (wall-clock time in
-            seconds). If not specified, :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will run until all models 
+            seconds). If not specified, :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will run until all models
             have completed training.
         presets : str, optional
             Optional preset configurations for various arguments in
