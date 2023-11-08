@@ -23,6 +23,7 @@ from ..constants import (
     QUERY,
     RESPONSE,
     SCORE,
+    SEMANTIC_SEGMENTATION,
     TEXT,
     TOKEN_WORD_MAPPING,
     WORD_OFFSETS,
@@ -75,6 +76,8 @@ def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional
         for feature_name in feature_masks[0].keys():
             ret[feature_name] = torch.cat([ele[feature_name] for ele in feature_masks])
     elif ret_type == BBOX:
+        if isinstance(outputs, list) and len(outputs) == 1:
+            outputs = outputs[0]  # TODO: the output should be a dict, find the cause of this (should be in cache.py)
         return [ele[BBOX] for ele in outputs]
     elif ret_type == OVD_RET:
         from .object_detection import bbox_ratio_xywh_to_index_xyxy
@@ -290,7 +293,7 @@ class RealtimeMixin:
             if sample_num <= min(200, batch_size):
                 realtime = True
 
-        return realtime
+        return realtime  # TODO: this should be disabled after multi GPU runs
 
     def process_batch(
         self,

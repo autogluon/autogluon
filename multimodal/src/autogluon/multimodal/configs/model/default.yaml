@@ -238,3 +238,19 @@ model:
     additive_attention: False # Whether to use lightweight additive attention, can be True, False or "auto"
     share_qv_weights: False # Whether to share weight for query and value, can be True, False or "auto"
     pooling_mode: "cls"
+
+  sam:
+    checkpoint_name: "facebook/sam-vit-huge"
+    config_file: ""
+    image_norm: "imagenet"
+    data_types:
+      - "semantic_segmentation_img"
+    train_transforms:
+      - "random_horizontal_flip"
+    val_transforms: []
+    img_transforms:
+      - "resize_to_square"
+    gt_transforms:
+      - "resize_gt_to_square"
+    max_img_num_per_col: 1
+    frozen_layers: ["mask_decoder.iou_prediction_head", "prompt_encoder"]

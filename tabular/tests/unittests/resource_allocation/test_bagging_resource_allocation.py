@@ -121,8 +121,10 @@ def test_parallel_bagging_resources_per_fold():
         bagged_resources={"num_cpus": 8, "num_gpus": 1},
         model_base_resources={"num_cpus": 4, "num_gpus": 1},
         model_base_minimum_resources={"num_cpus": 1, "num_gpus": 0.1},
+        model_base_default_resources={"num_cpus": 8, "num_gpus": 1},
     )
     assert fold_fitting_strategy.resources == {"num_cpus": 4, "num_gpus": 1}
+    assert fold_fitting_strategy.resources_model == {"num_cpus": 4, "num_gpus": 1}
     assert fold_fitting_strategy.num_parallel_jobs == 1
     assert fold_fitting_strategy.batches == 8
 
@@ -133,8 +135,10 @@ def test_parallel_bagging_resources_per_fold():
         bagged_resources={"num_cpus": 8, "num_gpus": 1},
         model_base_resources={"num_cpus": 1, "num_gpus": 0.1},
         model_base_minimum_resources={"num_cpus": 1, "num_gpus": 0.1},
+        model_base_default_resources={"num_cpus": 8, "num_gpus": 1},
     )
     assert fold_fitting_strategy.resources == {"num_cpus": 1, "num_gpus": 0.1}
+    assert fold_fitting_strategy.resources_model == {"num_cpus": 1, "num_gpus": 0.1}
     assert fold_fitting_strategy.num_parallel_jobs == 8
     assert fold_fitting_strategy.batches == 1
 
@@ -146,9 +150,24 @@ def test_parallel_bagging_no_resources_per_fold():
         num_folds_parallel=4,
         bagged_resources={"num_cpus": 8, "num_gpus": 1},
         model_base_minimum_resources={"num_cpus": 1, "num_gpus": 0.1},
+        model_base_default_resources={"num_cpus": 8, "num_gpus": 1},
     )
     assert fold_fitting_strategy.resources == {"num_cpus": 2, "num_gpus": 0.25}
+    assert fold_fitting_strategy.resources_model == {"num_cpus": 2, "num_gpus": 0.25}
     assert fold_fitting_strategy.num_parallel_jobs == 4
+    assert fold_fitting_strategy.batches == 2
+
+    fold_fitting_strategy = _construct_dummy_fold_strategy(
+        fold_strategy_cls=ParallelLocalFoldFittingStrategy,
+        num_jobs=4,
+        num_folds_parallel=2,
+        bagged_resources={"num_cpus": 8, "num_gpus": 1},
+        model_base_minimum_resources={"num_cpus": 1, "num_gpus": 0.1},
+        model_base_default_resources={"num_cpus": 2, "num_gpus": 0.2},
+    )
+    assert fold_fitting_strategy.resources == {"num_cpus": 4, "num_gpus": 0.5}
+    assert fold_fitting_strategy.resources_model == {"num_cpus": 2, "num_gpus": 0.2}
+    assert fold_fitting_strategy.num_parallel_jobs == 2
     assert fold_fitting_strategy.batches == 2
 
 
