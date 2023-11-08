@@ -274,6 +274,7 @@ def zero_shot_image_classification(presets: str = DEFAULT):
         hyperparameters.update(
             {
                 "model.clip.checkpoint_name": "openai/clip-vit-large-patch14-336",
+                "model.clip.image_size": 336,
                 "env.eval_batch_size_ratio": 1,
             }
         )
@@ -749,6 +750,7 @@ def image_text_similarity(presets: str = DEFAULT):
         hyperparameters.update(
             {
                 "model.clip.checkpoint_name": "openai/clip-vit-large-patch14-336",
+                "model.clip.image_size": 336,
                 "env.per_gpu_batch_size": 8,
             }
         )

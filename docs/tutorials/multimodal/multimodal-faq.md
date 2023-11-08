@@ -1,5 +1,10 @@
 # AutoGluon Multimodal FAQ
 
+## How does AutoGluon MultiModal model multimodal data?
+We can automatically detect image, text, tabular, document, and any of their combinations from your data.
+For each modality, we select a corresponding foundation model. 
+If more than one modality are detected, a fusion module will be created on top of the unimodal backbones to fuse their features and make final predictions, hence late fusion.
+
 ## There is no internet access in my deployment environment. What should I do? 
 
 When you have trained the predictor, try to save it with
