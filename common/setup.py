@@ -26,6 +26,7 @@ install_requires = (
         "boto3",  # version range defined in `core/_setup_utils.py`
         "psutil",  # version range defined in `core/_setup_utils.py`
         "tqdm",  # version range defined in `core/_setup_utils.py`
+        "s3fs",  # TODO FIXME: Add version range
         "setuptools",
     ]
     if not ag.LITE_MODE
