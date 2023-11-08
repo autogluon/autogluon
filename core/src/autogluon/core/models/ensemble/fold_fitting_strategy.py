@@ -5,7 +5,7 @@ import os
 import pickle
 import time
 from abc import abstractmethod
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional, Tuple, Union
 
 import pandas as pd
 from numpy import ndarray
@@ -464,29 +464,53 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
     def __init__(self, *, num_jobs: int, num_folds_parallel: int, max_memory_usage_ratio: float = 0.8, model_sync_path: Optional[str] = None, **kwargs):
         super().__init__(**kwargs)
         self.ray = try_import_ray()
-        self.max_memory_usage_ratio = min(max_memory_usage_ratio, 1.0)
+        self.max_memory_usage_ratio = max_memory_usage_ratio
         self.model_sync_path = model_sync_path
         self.time_start_fit = None
         self.time_end_fit = None
         self.fit_time = 0
         self.predict_time = 0
         self.predict_1_time = None
-        self._pseudo_sequential: bool = num_folds_parallel == 1
         # max_calls to guarantee release of gpu resource
         self._ray_fit = self.ray.remote(max_calls=1)(_ray_fit)
-        self.resources, self.batches, self.num_parallel_jobs = self._get_resource_suggestions(
+        self.mem_est_model = self._initialized_model_base.estimate_memory_usage(X=self.X)
+        self.mem_est_data = self._estimate_data_memory_usage()
+        self.mem_available = ResourceManager.get_available_virtual_mem()
+        num_folds_parallel = self.folds_to_fit_in_parallel_with_mem(user_specified_num_folds_parallel=num_folds_parallel)
+        self._pseudo_sequential: bool = num_folds_parallel == 1
+        self.resources, self.resources_model, self.batches, self.num_parallel_jobs = self._get_resource_suggestions(
             num_jobs=num_jobs, user_specified_num_folds_parallel=num_folds_parallel, user_resources_per_job=self.user_resources_per_job
         )
 
-    @disable_if_lite_mode(ret=True)
-    def is_mem_sufficient(self):
+    def mem_est_proportion_per_fold(self):
+        return (self.mem_est_model + self.mem_est_data) / self.mem_available
+
+    @disable_if_lite_mode(ret=1)
+    def folds_to_fit_in_parallel_with_mem(self, user_specified_num_folds_parallel: int) -> int:
         """Check if the memory is sufficient to do parallel training"""
-        model_mem_est = self._initialized_model_base.estimate_memory_usage(X=self.X)
-        total_model_mem_est = self.num_parallel_jobs * model_mem_est
-        data_mem_est = self._estimate_data_memory_usage()
-        total_data_mem_est = self.num_parallel_jobs * data_mem_est
-        mem_available = ResourceManager.get_available_virtual_mem()
-        return (mem_available * self.max_memory_usage_ratio) > (total_model_mem_est + total_data_mem_est)
+        mem_available = self.mem_available
+        # Train 1 fold at least as the estimation might be off
+        mem_est_total = self.mem_est_model + self.mem_est_data
+        mem_proportion_per_fold = mem_est_total / mem_available
+
+        model_max_memory_usage_ratio = self._initialized_model_base.params_aux.get("max_memory_usage_ratio", 1)
+        max_memory_usage_ratio = self.max_memory_usage_ratio * model_max_memory_usage_ratio
+
+        folds_to_train_with_mem_valid = mem_available / mem_est_total * max_memory_usage_ratio
+        max_folds_to_train_with_mem = max(1, int(folds_to_train_with_mem_valid))
+        if max_folds_to_train_with_mem == 1:
+            self._initialized_model_base._validate_fit_memory_usage(approx_mem_size_req=mem_est_total, available_mem=mem_available)
+        num_folds_parallel = user_specified_num_folds_parallel
+        if max_folds_to_train_with_mem < user_specified_num_folds_parallel:
+            # If memory is not sufficient to train num_folds_parallel, reduce to max power of 2 folds that's smaller than folds_can_be_fit_in_parallel.
+            num_folds_parallel = int(math.pow(2, math.floor((math.log10(max_folds_to_train_with_mem) / math.log10(2)))))
+            logger.log(
+                30,
+                f"\tMemory not enough to fit {user_specified_num_folds_parallel} folds in parallel. "
+                f"Will train {num_folds_parallel} folds in parallel instead (Estimated {mem_proportion_per_fold*100:.2f}% memory usage per fold, "
+                f"{num_folds_parallel*mem_proportion_per_fold*100:.2f}%/{max_memory_usage_ratio*100:.2f}% total).",
+            )
+        return num_folds_parallel
 
     def _estimate_data_memory_usage(self):
         X_mem = get_approximate_df_mem_usage(self.X).sum()
@@ -530,12 +554,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         # it predict memory usage before hand
         # MemoryError is the actual python memory error if the process failed
         except (NotEnoughMemoryError, MemoryError):
-            error_msg = "Consider decrease folds trained in parallel \
-                                by passing num_fold_parallel to ag_args_ensemble \
-                                when calling tabular.fit.\n\
-                                If none working, use sequential folding by passing \
-                                SequentialLocalFoldFittingStrategy to ag_args_ensemble \
-                                when calling tabular.fit and try again."
+            error_msg = "Consider decreasing folds trained in parallel by passing num_folds_parallel to ag_args_ensemble when calling `predictor.fit`."
             logger.warning(error_msg)
             # Terminate all ray tasks because a fold failed
             self.terminate_all_unfinished_tasks(unfinished)
@@ -568,6 +587,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                 time_limit_fold=time_limit_fold,
                 fold_ctx=fold_ctx,
                 resources=self.resources,
+                resources_model=self.resources_model,
                 head_node_id=head_node_id,
                 kwargs=self.model_base_kwargs,
             )
@@ -608,6 +628,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                 time_limit_fold=time_limit_fold,
                 fold_ctx=fold_ctx,
                 resources=self.resources,
+                resources_model=self.resources_model,
                 head_node_id=head_node_id,
                 kwargs=self.model_base_kwargs,
             )
@@ -632,8 +653,8 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         if self._pseudo_sequential:
             logger.log(
                 30,
-                f"\tSwitch to pseudo sequential ParallelFoldFittingStrategy to avoid Python memory leakage.\n"
-                f"\tOverrule this behavior by setting fold_fitting_strategy to 'sequential_local' in ag_args_ensemble when when calling predictor.fit",
+                f"\t\tSwitching to pseudo sequential ParallelFoldFittingStrategy to avoid Python memory leakage.\n"
+                f"\t\tOverrule this behavior by setting fold_fitting_strategy to 'sequential_local' in ag_args_ensemble when when calling `predictor.fit`",
             )
             self._run_pseudo_sequential(X, y, X_pseudo, y_pseudo, model_base_ref, time_limit_fold, head_node_id)
         else:
@@ -643,7 +664,23 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         for task in unfinished_tasks:
             self.ray.cancel(task, force=True)
 
-    def _fit(self, *, model_base_ref, X_ref, y_ref, X_pseudo_ref, y_pseudo_ref, time_limit_fold, fold_ctx, resources, head_node_id, kwargs):
+    def _fit(
+        self,
+        *,
+        model_base_ref,
+        X_ref,
+        y_ref,
+        X_pseudo_ref,
+        y_pseudo_ref,
+        time_limit_fold: float,
+        fold_ctx: dict,
+        resources: dict,
+        head_node_id: str,
+        kwargs: dict,
+        resources_model: dict = None,
+    ):
+        if resources_model is None:
+            resources_model = resources
         fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix = self._get_fold_properties(fold_ctx)
         logger.debug(f"Folding resources per job {resources}")
         train_index, val_index = fold
@@ -671,7 +708,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
             fold_ctx=fold_ctx_ref,
             time_limit_fold=time_limit_fold,
             save_bag_folds=save_bag_folds,
-            resources=resources,
+            resources=resources_model,
             kwargs_fold=kwargs_fold,
             head_node_id=head_node_id,
             model_sync_path=self.model_sync_path,
@@ -708,7 +745,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
             time_limit_fold = None
         return time_limit_fold
 
-    def _get_resource_suggestions(self, num_jobs, user_specified_num_folds_parallel, user_resources_per_job):
+    def _get_resource_suggestions(self, num_jobs: int, user_specified_num_folds_parallel: int, user_resources_per_job: dict) -> Tuple[dict, dict, int, int]:
         """
         Get resources per job, number of total batches, and number of jobs running in parallel for a single batch
         based on total number of jobs, user specified number of jobs to be run in parallel, and user specified resources per job.
@@ -749,7 +786,26 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         if num_gpus is not None and num_gpus > 0:
             resources["num_gpus"] = num_gpus
 
-        return resources, batches, num_parallel_jobs
+        num_cpus_model, num_gpus_model = self._initialized_model_base._get_default_resources()
+        resources_model = dict(
+            num_cpus=num_cpus_model,
+            num_gpus=num_gpus_model,
+        )
+
+        if resources["num_cpus"] < resources_model["num_cpus"]:
+            resources_model["num_cpus"] = resources["num_cpus"]
+        if resources["num_gpus"] < resources_model["num_gpus"]:
+            resources_model["num_gpus"] = resources["num_gpus"]
+        if user_resources_per_job is not None:
+            if "num_cpus" in user_resources_per_job:
+                resources_model["num_cpus"] = resources["num_cpus"]
+            if "num_gpus" in user_resources_per_job:
+                resources_model["num_gpus"] = resources["num_gpus"]
+
+        assert resources_model["num_cpus"] <= resources["num_cpus"]
+        assert resources_model["num_gpus"] <= resources["num_gpus"]
+
+        return resources, resources_model, batches, num_parallel_jobs
 
     def _prepare_data(self, in_mem=True):
         X_pseudo = None
@@ -779,32 +835,37 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
     def _parse_ray_error(self, e):
         error = str(e).lower()
         if "cuda" in error and ("out of memory" in error or "alloc" in error):
-            default_error_msg = "If none working, use sequential folding by passing \
-                         SequentialLocalFoldFittingStrategy to ag_args_ensemble \
-                         when calling tabular.fit and try again."
+            default_error_msg = (
+                "If none working, use sequential folding by passing SequentialLocalFoldFittingStrategy to ag_args_ensemble "
+                "when calling `predictor.fit` and try again."
+            )
             # FIXME: Avoid hardcoding model names.
             if self.model_base.__class__.__name__ in [TEXT_MODEL, IMAGE_MODEL]:
-                error_msg = f"Out of CUDA memory while training \
-                            {self.model_base.__class__.__name__}. \
-                            Consider decrease batch size in hyperparameter and try again.\n\
-                            Or decrease folds trained in parallel by passing num_fold_parallel \
-                            to ag_args_ensemble when calling tabular.fit if you have multiple \
-                            gpus and try again"
+                error_msg = (
+                    f"Out of CUDA memory while training "
+                    f"{self.model_base.__class__.__name__}. "
+                    f"Consider decreasing batch size in hyperparameter and try again.\n"
+                    f"Alternatively, decrease folds trained in parallel by passing num_folds_parallel "
+                    f"to ag_args_ensemble when calling `predictor.fit` if you have multiple GPUs and try again"
+                )
                 logger.warning(error_msg)
             # FIXME: Avoid hardcoding model names.
             elif self.model_base.__class__.__name__ in [TABULAR_TORCH_MODEL, TABULAR_FASTAI_MODEL]:
-                error_msg = f"Out of CUDA memory while training \
-                            {self.model_base.__class__.__name__}. \
-                            Consider decrease batch size in hyperparameter and try again.\n\
-                            Or decrease folds trained in parallel by passing num_fold_parallel \
-                            to ag_args_ensemble when calling tabular.fit and try again"
+                error_msg = (
+                    f"Out of CUDA memory while training {self.model_base.__class__.__name__}. "
+                    f"Consider decreasing batch size in hyperparameter and try again.\n"
+                    f"Alternatively, decrease folds trained in parallel by passing num_folds_parallel "
+                    f"to ag_args_ensemble when calling `predictor.fit` and try again"
+                )
                 logger.warning(error_msg)
             else:
-                error_msg = f"Out of CUDA memory while training \
-                            {self.model_base.__class__.__name__}. \
-                            Consider decrease folds trained in parallel by passing \
-                            num_fold_parallel to ag_args_ensemble when calling tabular.fit \
-                            and try again"
+                error_msg = (
+                    f"Out of CUDA memory while training "
+                    f"{self.model_base.__class__.__name__}. "
+                    f"Consider decreasing folds trained in parallel by passing "
+                    f"num_folds_parallel to ag_args_ensemble when calling `predictor.fit` "
+                    f"and try again."
+                )
                 logger.warning(error_msg)
             logger.warning(default_error_msg)
             e = NotEnoughCudaMemoryError

@@ -9,14 +9,12 @@ from autogluon.multimodal.utils import get_config
 
 def test_config():
     cur_path = os.path.dirname(os.path.abspath(__file__))
-    model_config_path = os.path.join(
-        cur_path, "../../../src/autogluon/multimodal/configs/model/fusion_mlp_image_text_tabular.yaml"
-    )
+    model_config_path = os.path.join(cur_path, "../../../src/autogluon/multimodal/configs/model/default.yaml")
     model_config = OmegaConf.load(model_config_path)
     data_config_path = os.path.join(cur_path, "../../../src/autogluon/multimodal/configs/data/default.yaml")
     data_config = OmegaConf.load(data_config_path)
     optimization_config_path = os.path.join(
-        cur_path, "../../../src/autogluon/multimodal/configs/optimization/adamw.yaml"
+        cur_path, "../../../src/autogluon/multimodal/configs/optimization/default.yaml"
     )
     optimization_config = OmegaConf.load(optimization_config_path)
     environemnt_config_path = os.path.join(
@@ -69,9 +67,9 @@ def test_config():
 
     # test default string
     config = {
-        MODEL: f"fusion_mlp_image_text_tabular",
+        MODEL: f"default",
         DATA: "default",
-        OPTIMIZATION: "adamw",
+        OPTIMIZATION: "default",
         ENVIRONMENT: "default",
     }
     config = get_config(config=config)
@@ -92,9 +90,9 @@ def test_config():
 )
 def test_model_selection(model_names):
     config = {
-        MODEL: f"fusion_mlp_image_text_tabular",
+        MODEL: f"default",
         DATA: "default",
-        OPTIMIZATION: "adamw",
+        OPTIMIZATION: "default",
         ENVIRONMENT: "default",
     }
     overrides = {"model.names": model_names}
@@ -119,9 +117,9 @@ def test_model_selection(model_names):
 )
 def test_invalid_model_selection(model_names):
     config = {
-        MODEL: f"fusion_mlp_image_text_tabular",
+        MODEL: f"default",
         DATA: "default",
-        OPTIMIZATION: "adamw",
+        OPTIMIZATION: "default",
         ENVIRONMENT: "default",
     }
     overrides = {"model.names": model_names}

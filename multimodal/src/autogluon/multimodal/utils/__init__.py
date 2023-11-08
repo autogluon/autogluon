@@ -65,14 +65,7 @@ from .metric import (
     infer_metrics,
     infer_problem_type_by_eval_metric,
 )
-from .misc import (
-    handle_deprecated_args,
-    logits_to_prob,
-    merge_bio_format,
-    shopee_dataset,
-    tensor_to_ndarray,
-    visualize_ner,
-)
+from .misc import logits_to_prob, merge_bio_format, shopee_dataset, tensor_to_ndarray, visualize_ner
 from .mmcv import CollateMMDet, CollateMMOcr
 from .model import (
     create_fusion_model,
@@ -102,5 +95,4 @@ from .object_detection import (
 )
 from .object_detection_visualizer import Visualizer
 from .ovd import save_ovd_result_df
-from .pipeline import init_pretrained, init_pretrained_matcher
 from .save import process_save_path, save_text_tokenizers, setup_save_path

@@ -14,6 +14,8 @@ from ..constants import (
     ACCURACY,
     AVERAGE_PRECISION,
     BINARY,
+    BINARY_DICE,
+    BINARY_IOU,
     DIRECT_LOSS,
     F1,
     MAP,

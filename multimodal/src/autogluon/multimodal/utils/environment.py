@@ -273,7 +273,6 @@ def check_if_packages_installed(problem_type: str = None, package_names: List[st
                     raise ValueError(
                         f'Encountered error while importing mmocr: {e}. Try to install mmocr: pip install "mmocr<1.0".'
                     )
-
     if package_names:
         for package_name in package_names:
             if package_name == "mmcv":
