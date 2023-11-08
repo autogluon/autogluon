@@ -73,7 +73,7 @@ jobs:
         run: |
           nvm install 20
           npm install -g aws-cdk
-          /bin/bash ./.github/workflow_scripts/run_benchmark.sh tabular best tabular_full 1h8c ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
+          /bin/bash ./.github/workflow_scripts/run_benchmark.sh tabular best tabular_small 1h8c ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
 
   benchmark-timeseries:
     needs: [generate_amlb_user_dir, benchmark-tabular]
