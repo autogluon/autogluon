@@ -531,7 +531,6 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         hyperparameter_tune_kwargs: Optional[Union[str, dict]] = None,
         excluded_model_types: Optional[List[str]] = None,
         time_limit: Optional[float] = None,
-        split_time_limit: Optional[bool] = None,
     ) -> List[str]:
         logger.info(f"\nStarting training. Start time is {time.strftime('%Y-%m-%d %H:%M:%S')}")
 
@@ -559,9 +558,6 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         logger.info(f"Models that will be trained: {list(m.name for m in models)}")
 
-        if split_time_limit is None:
-            split_time_limit = hyperparameter_tune_kwargs is not None
-
         num_models = len(models)
         if num_models > 1:  # ensemble is only fit len(models) > 1
             num_models += int(self.enable_ensemble)
@@ -569,16 +565,13 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         for i, model in enumerate(models):
             if time_limit is None:
                 time_left = None
+                time_left_for_model = None
             else:
                 time_left = time_limit - (time.time() - time_start)
+                time_left_for_model = time_left / (num_models - i)
                 if time_left <= 0:
                     logger.info(f"Stopping training due to lack of time remaining. Time left: {time_left:.2f} seconds")
                     break
-
-            if time_left is not None and split_time_limit:
-                time_left_for_model = time_left / (num_models - i)
-            else:
-                time_left_for_model = time_left
 
             if contains_searchspace(model.get_user_params()):
                 fit_log_message = f"Hyperparameter tuning model {model.name}. "

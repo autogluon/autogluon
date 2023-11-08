@@ -77,7 +77,6 @@ class TimeSeriesLearner(AbstractLearner):
         time_limit: Optional[int] = None,
         val_splitter: Optional[AbstractWindowSplitter] = None,
         refit_every_n_windows: Optional[int] = 1,
-        split_time_limit: Optional[bool] = None,
         **kwargs,
     ) -> None:
         self._time_limit = time_limit
@@ -127,7 +126,6 @@ class TimeSeriesLearner(AbstractLearner):
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             excluded_model_types=kwargs.get("excluded_model_types"),
             time_limit=time_limit,
-            split_time_limit=split_time_limit,
         )
         self.save_trainer(trainer=self.trainer)
 

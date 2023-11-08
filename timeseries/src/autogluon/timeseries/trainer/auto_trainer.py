@@ -38,7 +38,6 @@ class AutoTimeSeriesTrainer(AbstractTimeSeriesTrainer):
         hyperparameter_tune_kwargs: Optional[Union[str, Dict]] = None,
         excluded_model_types: Optional[List[str]] = None,
         time_limit: Optional[float] = None,
-        split_time_limit: Optional[bool] = None,
     ):
         """
         Fit a set of timeseries models specified by the `hyperparameters`
@@ -68,5 +67,4 @@ class AutoTimeSeriesTrainer(AbstractTimeSeriesTrainer):
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             excluded_model_types=excluded_model_types,
             time_limit=time_limit,
-            split_time_limit=split_time_limit,
         )
