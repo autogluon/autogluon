@@ -11,7 +11,7 @@ from torch import nn
 
 from autogluon.common.utils.resource_utils import ResourceManager
 
-from ..constants import DDP, OBJECT_DETECTION, OCR
+from ..constants import DDP_STRATEGIES, OBJECT_DETECTION, OCR
 
 logger = logging.getLogger(__name__)
 
@@ -273,7 +273,6 @@ def check_if_packages_installed(problem_type: str = None, package_names: List[st
                     raise ValueError(
                         f'Encountered error while importing mmocr: {e}. Try to install mmocr: pip install "mmocr<1.0".'
                     )
-
     if package_names:
         for package_name in package_names:
             if package_name == "mmcv":
@@ -347,3 +346,15 @@ def _get_mmlab_installation_guide(package_name):
         raise ValueError("Available package_name are: mmdet, mmcv, mmengine.")
 
     return err_msg
+
+
+def run_ddp_only_once(num_gpus, strategy):
+    if strategy in DDP_STRATEGIES:
+        global FIRST_DDP_RUN  # Use the global variable to make sure it is tracked per process
+        if "FIRST_DDP_RUN" in globals() and not FIRST_DDP_RUN:
+            # not the first time running DDP, set number of devices to 1 (use single GPU)
+            return 1, "auto"
+        else:
+            if num_gpus > 1:
+                FIRST_DDP_RUN = False  # run DDP for the first time, disable the following runs
+    return num_gpus, strategy

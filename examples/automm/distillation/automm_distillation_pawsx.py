@@ -121,10 +121,10 @@ def main(args):
     from autogluon.multimodal.constants import MODEL, DATA, OPTIMIZATION, ENVIRONMENT, DISTILLER
 
     config = {
-        MODEL: f"fusion_mlp_image_text_tabular",
+        MODEL: f"default",
         DATA: "default",
         DISTILLER: "default",
-        OPTIMIZATION: "adamw",
+        OPTIMIZATION: "default",
         ENVIRONMENT: "default",
     }
     student_predictor = MultiModalPredictor(label="label", eval_metric="accuracy")

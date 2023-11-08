@@ -30,6 +30,8 @@ from ..constants import (
     NUMERICAL,
     NUMERICAL_MLP,
     OVD,
+    SAM,
+    SEMANTIC_SEGMENTATION_IMG,
     T_FEW,
     TEXT,
     TEXT_NER,
@@ -52,6 +54,7 @@ from ..models import (
     MultimodalFusionTransformer,
     NumericalMLP,
     OVDModel,
+    SAMForSemanticSegmentation,
     TFewModel,
     TimmAutoModelForImagePrediction,
 )
@@ -70,9 +73,8 @@ def select_model(
     If MultiModalFeaturePreprocessor can't detect some modality,
     this function will remove the models that use this modality. This function is to
     maximize the user flexibility in defining the config.
-    For example, if one uses the "fusion_mlp_image_text_tabular" as the model config template
-    but the training data don't have images, this function will filter out all the models
-    using images, such as Swin Transformer and CLIP.
+    For example, if one uses the default, including hf_text and timm_image, as the model config template
+    but the training data don't have images, this function will filter out timm_image.
 
     Parameters
     ----------
@@ -104,6 +106,8 @@ def select_model(
         data_status[TEXT_NER] = True
     if len(df_preprocessor.document_feature_names) > 0:
         data_status[DOCUMENT] = True
+    if len(df_preprocessor.semantic_segmentation_feature_names) > 0:
+        data_status[SEMANTIC_SEGMENTATION_IMG] = True
 
     names = config.model.names
     if isinstance(names, str):
@@ -368,6 +372,14 @@ def create_model(
             share_qv_weights=OmegaConf.select(model_config, "share_qv_weights", default=False),
             pooling_mode=OmegaConf.select(model_config, "pooling_mode", default="cls"),
         )
+    elif model_name.lower().startswith(SAM):
+        model = SAMForSemanticSegmentation(
+            prefix=model_name,
+            checkpoint_name=model_config.checkpoint_name,
+            pretrained=pretrained,
+            frozen_layers=OmegaConf.select(model_config, "frozen_layers", default=None),
+            config=model_config,
+        )
     else:
         raise ValueError(f"unknown model name: {model_name}")
 
@@ -471,6 +483,7 @@ def apply_model_adaptation(model: nn.Module, config: DictConfig) -> nn.Module:
         lora_alpha=config.optimization.lora.alpha,
         module_filter=config.optimization.lora.module_filter,
         filter=config.optimization.lora.filter,
+        extra_trainable_params=OmegaConf.select(config, "optimization.extra_trainable_params"),
     )
     model.name_to_id = model.get_layer_ids()  # Need to update name to id dictionary.
 
