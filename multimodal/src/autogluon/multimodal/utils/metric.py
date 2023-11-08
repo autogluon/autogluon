@@ -228,7 +228,7 @@ def compute_score(
     elif metric.name in [F1]:  # only for binary classification
         return f1_score(metric_data[Y_TRUE], metric_data[Y_PRED], pos_label=pos_label)
     elif metric.name in [MACRO_F1, MICRO_F1, WEIGHTED_F1]:
-        average = metric.name.split('_')[1]
+        average = metric.name.split('_')[0]
         return f1_score(metric_data[Y_TRUE], metric_data[Y_PRED], average=average)
     else:
         try:
