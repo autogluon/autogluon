@@ -319,6 +319,7 @@ class FewShotSVMLearner(BaseLearner):
             num_workers=config.env.num_workers,
         )
         num_gpus = compute_num_gpus(config_num_gpus=config.env.num_gpus, strategy=config.env.strategy)
+        num_gpus = self.update_num_gpus_by_data_size(num_gpus=num_gpus, data=self._train_data)
         self.log_gpu_info(num_gpus=num_gpus, config=config)
         precision = infer_precision(num_gpus=num_gpus, precision=config.env.precision)
         strategy = self.get_strategy_per_run(num_gpus=num_gpus, config=config)

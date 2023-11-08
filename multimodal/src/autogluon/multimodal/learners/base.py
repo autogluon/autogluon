@@ -1555,6 +1555,16 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
         return realtime, num_gpus, barebones
 
+    @staticmethod
+    def update_num_gpus_by_data_size(
+        num_gpus: int,
+        data: pd.DataFrame,
+    ):
+        data_size = len(data)
+        if data_size < num_gpus:
+            num_gpus = data_size
+        return num_gpus
+
     def realtime_predict(
         self,
         data: pd.DataFrame,
@@ -1652,6 +1662,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             config_num_gpus=self._config.env.num_gpus,
             strategy=self._config.env.strategy,
         )
+        num_gpus = self.update_num_gpus_by_data_size(num_gpus=num_gpus, data=data)
         precision = infer_precision(
             num_gpus=num_gpus,
             precision=self._config.env.precision,

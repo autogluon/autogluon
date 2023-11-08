@@ -134,3 +134,23 @@ def test_customize_models(hyperparameters, gt_ckpt_name, gt_model_name):
     predictor.fit(train_data)
     assert predictor._learner._config.model.names == gt_model_name
     assert OmegaConf.select(predictor._learner._config.model, f"{gt_model_name[0]}.checkpoint_name") == gt_ckpt_name
+
+
+def test_two_classes_one_shot():
+    download_dir = "./ag_automm_tutorial_imgcls"
+    train_data, test_data = shopee_dataset(download_dir)
+    predictor = MultiModalPredictor(
+        label="label",
+        problem_type=FEW_SHOT_CLASSIFICATION,
+        hyperparameters={
+            "model.clip.checkpoint_name": "openai/clip-vit-base-patch32",
+            "model.clip.image_size": 224,
+        },
+    )
+    train_data = train_data.groupby("label").sample(n=1)[:2]
+    test_data = test_data.groupby("label").sample(n=1)[:2]
+    assert len(train_data) == 2 and len(test_data) == 2
+    assert len(train_data["label"].unique()) == 2 and len(test_data["label"].unique()) == 2
+    predictor.fit(train_data)
+    score = predictor.evaluate(test_data)
+    pred = predictor.predict(test_data.drop(columns=["label"], axis=1))
