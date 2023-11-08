@@ -18,6 +18,9 @@ from ..constants import (
     BINARY_IOU,
     DIRECT_LOSS,
     F1,
+    MACRO_F1,
+    MICRO_F1,
+    WEIGHTED_F1,
     MAP,
     METRIC_MODE_MAP,
     MULTICLASS,
@@ -83,6 +86,13 @@ def infer_metrics(
             F1,
         ]:
             raise ValueError(f"Metric {eval_metric_name} is only supported for binary classification.")
+
+        if problem_type == "binary" and eval_metric_name.lower() in [
+            MACRO_F1,
+            MICRO_F1,
+            WEIGHTED_F1,
+        ]:
+            raise ValueError(f"Metric {eval_metric_name} is not supported for binary classification.")
 
         if eval_metric_name in VALID_METRICS:
             validation_metric_name = eval_metric_name
@@ -217,6 +227,9 @@ def compute_score(
         return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED_PROB][:, pos_label])
     elif metric.name in [F1]:  # only for binary classification
         return f1_score(metric_data[Y_TRUE], metric_data[Y_PRED], pos_label=pos_label)
+    elif metric.name in [MACRO_F1, MICRO_F1, WEIGHTED_F1]:
+        average = metric.name.split('_')[1]
+        return f1_score(metric_data[Y_TRUE], metric_data[Y_PRED], average=average)
     else:
         try:
             return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED], y_prob=metric_data[Y_PRED_PROB])
