@@ -13,7 +13,6 @@ from joblib.parallel import Parallel, delayed
 from pandas.core.internals import ArrayManager, BlockManager
 
 from autogluon.common.loaders import load_pd
-from autogluon.common.utils.deprecated_utils import Deprecated
 
 logger = logging.getLogger(__name__)
 
@@ -951,17 +950,14 @@ class TimeSeriesDataFrame(pd.DataFrame):
         deprecated = ["get_reindexed_view", "to_regular_index"]
         return [d for d in super().__dir__() if d not in deprecated]
 
-    @Deprecated(
-        min_version_to_warn="1.0",
-        min_version_to_error="1.0",
-        custom_warning_msg=(
-            "`get_reindexed_view` has been deprecated. If your data has irregular timestamps, please "
-            "convert it to a regular frequency with `convert_frequency`."
-        ),
-    )
-    def get_reindexed_view(self, freq: str = "S") -> TimeSeriesDataFrame:
-        raise NotImplementedError
+    def get_reindexed_view(self, *args, **kwargs) -> TimeSeriesDataFrame:
+        raise ValueError(
+            "`TimeSeriesDataFrame.get_reindexed_view` has been deprecated. If your data has irregular timestamps, "
+            "please convert it to a regular frequency with `convert_frequency`."
+        )
 
-    @Deprecated(min_version_to_warn="1.0", min_version_to_error="1.0", new="convert_frequency")
-    def to_regular_index(self, freq: str) -> TimeSeriesDataFrame:
-        raise NotImplementedError
+    def to_regular_index(self, *args, **kwargs) -> TimeSeriesDataFrame:
+        raise ValueError(
+            "`TimeSeriesDataFrame.to_regular_index` has been deprecated. "
+            "Please use `TimeSeriesDataFrame.convert_frequency` instead."
+        )

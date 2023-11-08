@@ -7,7 +7,6 @@ from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import pandas as pd
 
-from autogluon.common.utils.deprecated_utils import Deprecated
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.utils import check_saved_predictor_version, seed_everything, setup_outputdir
 from autogluon.core.utils.decorators import apply_presets
@@ -1065,6 +1064,7 @@ class TimeSeriesPredictor:
         deprecated = ["score"]
         return [d for d in super().__dir__() if d not in deprecated]
 
-    @Deprecated(min_version_to_warn="1.0", min_version_to_error="1.0", new="evaluate")
     def score(self, *args, **kwargs):
-        raise NotImplementedError
+        raise ValueError(
+            "`TimeSeriesPredictor.score` has been deprecated. Please use `TimeSeriesPredictor.evaluate` instead."
+        )
