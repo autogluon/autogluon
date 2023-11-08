@@ -56,6 +56,7 @@ class MultiModalPredictor:
         pretrained: Optional[bool] = True,
         validation_metric: Optional[str] = None,
         sample_data_path: Optional[str] = None,
+        realtime_enabled: Optional[bool] = True,
     ):
         """
         Parameters
@@ -219,6 +220,7 @@ class MultiModalPredictor:
             query=query,
             response=response,
             match_label=match_label,
+            realtime_enabled=realtime_enabled,
         )
 
     @property

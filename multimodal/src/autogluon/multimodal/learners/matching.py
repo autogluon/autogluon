@@ -135,6 +135,7 @@ class MultiModalMatcher(BaseLearner):
         enable_progress_bar: Optional[bool] = None,
         pretrained: Optional[bool] = True,
         validation_metric: Optional[str] = None,
+        realtime_enabled: Optional[bool] = True,
         **kwargs,
     ):
         """
@@ -187,6 +188,9 @@ class MultiModalMatcher(BaseLearner):
         validation_metric
             Validation metric name. If `validation_metric = None`, it is automatically chosen based on `problem_type`.
             Defaults to 'roc_auc' for binary classification and 'spearmanr' for multiclass classification and regression.
+        realtime_enabled
+            Realtime inference currently contradicts with lightning strategies.
+            This is a one line control for disabling realtime inference.
         """
         if eval_metric is not None and not isinstance(eval_metric, str):
             eval_metric = eval_metric.name
@@ -244,6 +248,7 @@ class MultiModalMatcher(BaseLearner):
         self._verbosity = verbosity
         self._warn_if_exist = warn_if_exist
         self._enable_progress_bar = enable_progress_bar if enable_progress_bar is not None else True
+        self._realtime_enabled = realtime_enabled
 
     @property
     def query(self):
@@ -1474,12 +1479,15 @@ class MultiModalMatcher(BaseLearner):
             num_gpus=num_gpus,
             strategy=strategy,
         )
-        realtime = self.use_realtime(
-            realtime=realtime,
-            data=data,
-            data_processors=data_processors,
-            batch_size=batch_size,
-        )
+        if self._realtime_enabled:
+            realtime = self.use_realtime(
+                realtime=realtime,
+                data=data,
+                data_processors=data_processors,
+                batch_size=batch_size,
+            )
+        else:
+            realtime = False
         num_gpus, strategy = run_ddp_only_once(num_gpus, strategy)
 
         # TODO: support realtime inference for notebook with multi-gpus
@@ -2068,6 +2076,7 @@ class MultiModalMatcher(BaseLearner):
                     "pretrained": self._pretrained,
                     "pretrained_path": self._pretrained_path,
                     "fit_called": self._fit_called,
+                    "realtime_enabled": self._realtime_enabled,
                     "version": ag_version.__version__,
                 },
                 fp,
@@ -2172,6 +2181,8 @@ class MultiModalMatcher(BaseLearner):
         matcher._pretrained_path = path
         if "pretrained" in assets:
             matcher._pretrained = assets["pretrained"]
+        if "realtime_enabled" in assets:
+            matcher._realtime_enabled = assets["realtime_enabled"]
         if "fit_called" in assets:
             matcher._fit_called = assets["fit_called"]
         else:

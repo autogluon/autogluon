@@ -169,6 +169,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         pretrained: Optional[bool] = True,
         validation_metric: Optional[str] = None,
         sample_data_path: Optional[str] = None,
+        realtime_enabled: Optional[bool] = True,
         **kwargs,
     ):
         """
@@ -260,6 +261,9 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             Defaults to 'accuracy' for multiclass classification, `roc_auc` for binary classification, and 'root_mean_squared_error' for regression.
         sample_data_path
             This is used for automatically inference num_classes, classes, or label.
+        realtime_enabled
+            Realtime inference currently contradicts with lightning strategies.
+            This is a one line control for disabling realtime inference.
 
         """
         self._eval_metric_name = None
@@ -308,6 +312,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         # Summary statistics used in fit summary. TODO: wrap it in a class.
         self._total_train_time = None
         self._best_score = None
+        self._realtime_enabled = realtime_enabled
 
     @property
     def path(self):
@@ -1668,12 +1673,15 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             num_gpus=num_gpus,
             strategy=strategy,
         )
-        realtime = self.use_realtime(
-            realtime=realtime,
-            data=data,
-            data_processors=data_processors,
-            batch_size=batch_size,
-        )
+        if self._realtime_enabled:
+            realtime = self.use_realtime(
+                realtime=realtime,
+                data=data,
+                data_processors=data_processors,
+                batch_size=batch_size,
+            )
+        else:
+            realtime = False
         realtime, num_gpus, barebones = self.update_realtime_for_interactive_env(
             realtime=realtime,
             num_gpus=num_gpus,
@@ -2166,6 +2174,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                     "fit_called": fit_called if fit_called is not None else self._fit_called,
                     "best_score": self._best_score,
                     "total_train_time": self._total_train_time,
+                    "realtime_enabled": self._realtime_enabled,
                     "version": ag_version.__version__,
                 },
                 fp,
@@ -2264,6 +2273,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         learner._pretrained_path = path
         if "pretrained" in assets:
             learner._pretrained = assets["pretrained"]
+        if "realtime_enabled" in assets:
+            learner._realtime_enabled = assets["realtime_enabled"]
         if "fit_called" in assets:
             learner._fit_called = assets["fit_called"]
         else:
