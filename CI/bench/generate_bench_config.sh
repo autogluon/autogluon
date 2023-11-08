@@ -102,16 +102,7 @@ else
     if [ $BENCHMARK == "automm-text" ]; then
         gen_bench_command="$gen_bench_command --fewshot --shot $shot_value --lang $lang --seed $seed_value"
     elif [ $BENCHMARK == "automm-text-tabular-image" ]; then
-        # disabling custom metrics for now use custom-metrics flag if required
         gen_bench_command="$gen_bench_command --custom-metrics --metrics-path $custom_metrics_path --function-name $custom_function_name --optimum $optimum --greater-is-better"
     fi
     eval "$gen_bench_command"
 fi
-
-# TO DO: 
-# Add Max Machine Num for all 3 modules - Done
-# Fill in the vision, text-tabular part - Done
-# Run Benchmark will change accordingly - Done
-# Benchmark results for multimodal will be stored in vision/text-tabular etc - Done
-# Add Custom Metrics - In Progress
-# Test Run
