@@ -1,5 +1,6 @@
 import uuid
 
+import pandas as pd
 import pytest
 from omegaconf import OmegaConf
 
@@ -31,9 +32,6 @@ def verify_predict_single_column(test_data, predictor):
     test_column = test_data.drop(columns=["label"], axis=1)
     preds = predictor.predict(test_column)
     assert len(preds) == len(test_data)
-
-    acc = (preds == test_data["label"].to_numpy()).sum() / len(test_data)
-
     preds2 = predictor.predict(test_data)
     assert len(preds2) == len(test_data)
     assert (preds == preds2).all()
@@ -154,3 +152,41 @@ def test_two_classes_one_shot():
     predictor.fit(train_data)
     score = predictor.evaluate(test_data)
     pred = predictor.predict(test_data.drop(columns=["label"], axis=1))
+    prob = predictor.predict_proba(test_data.drop(columns=["label"], axis=1))
+    embedding = predictor.extract_embedding(test_data.drop(columns=["label"], axis=1))
+
+
+@pytest.mark.parametrize(
+    "column_features_pooling_mode",
+    ["concat", "mean"],
+)
+def test_multi_columns_few_shot(column_features_pooling_mode):
+    download_dir = "./ag_automm_tutorial_imgcls"
+    train_data, test_data = shopee_dataset(download_dir)
+    train_data = pd.concat([train_data["image"]] * 3 + [train_data["label"]], axis=1, ignore_index=True)
+    train_data.rename(
+        dict(zip(train_data.columns, ["image_1", "image_2", "image_3", "label"])),
+        axis=1,
+        inplace=True,
+    )
+    test_data = pd.concat([test_data["image"]] * 3 + [test_data["label"]], axis=1, ignore_index=True)
+    test_data.rename(
+        dict(zip(test_data.columns, ["image_1", "image_2", "image_3", "label"])),
+        axis=1,
+        inplace=True,
+    )
+    assert len(train_data.columns) == 4 and len(test_data.columns) == 4
+    predictor = MultiModalPredictor(
+        label="label",
+        problem_type=FEW_SHOT_CLASSIFICATION,
+        hyperparameters={
+            "model.clip.checkpoint_name": "openai/clip-vit-base-patch32",
+            "model.clip.image_size": 224,
+            "data.column_features_pooling_mode": column_features_pooling_mode,
+        },
+    )
+    predictor.fit(train_data)
+    score = predictor.evaluate(test_data)
+    pred = predictor.predict(test_data.drop(columns=["label"], axis=1))
+    proba = predictor.predict_proba(test_data.drop(columns=["label"], axis=1))
+    embedding = predictor.extract_embedding(test_data.drop(columns=["label"], axis=1))

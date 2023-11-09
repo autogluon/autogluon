@@ -9,7 +9,6 @@ import numpy as np
 import pandas as pd
 import torch
 from omegaconf import DictConfig
-from sklearn.metrics import f1_score
 from sklearn.pipeline import Pipeline, make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
@@ -356,7 +355,10 @@ class FewShotSVMLearner(BaseLearner):
         )
         self.clean_trainer_processes(trainer=trainer, is_train=False)
         features = extract_from_output(outputs=outputs, ret_type=COLUMN_FEATURES, as_ndarray=True)
-        features = self.aggregate_column_features(features=features)
+        features = self.aggregate_column_features(
+            features=features,
+            column_features_pooling_mode=config.data.column_features_pooling_mode,
+        )
         # no need to call df_preprocessor.transform_label_for_metric since the sklearn pipeline encodes the label automatically
         labels = np.array(self._train_data[self._label_column])
         svm.fit(features, labels)
@@ -379,21 +381,27 @@ class FewShotSVMLearner(BaseLearner):
             svm=svm,
         )
 
-    def aggregate_column_features(self, features: Union[Dict, torch.Tensor]):
-        if isinstance(features, torch.Tensor):
+    def aggregate_column_features(
+        self,
+        features: Union[Dict, np.ndarray],
+        column_features_pooling_mode: Optional[str] = None,
+        is_train: Optional[bool] = True,
+    ):
+        if not is_train:
+            column_features_pooling_mode = self._config.data.column_features_pooling_mode
+
+        if isinstance(features, np.ndarray):
             return features
         elif isinstance(features, dict):
             assert len(features) != 0, f"column features are empty."
             if len(features) == 1:
                 return next(iter(features.values()))
-            if self._config.data.aggregate_column_features == "concat":
-                return torch.cat(features.values(), dim=1)
-            elif self._config.data.aggregate_column_features == "mean":
-                return torch.mean(torch.stack(features.values()), dim=0)
+            if column_features_pooling_mode == "concat":
+                return np.concatenate(list(features.values()), axis=1)
+            elif column_features_pooling_mode == "mean":
+                return np.mean(list(features.values()), axis=0)
             else:
-                raise ValueError(
-                    f"Unsupported aggregate_column_features value {self._config.data.aggregate_column_features}."
-                )
+                raise ValueError(f"Unsupported column_features_pooling_mode: {column_features_pooling_mode}.")
         else:
             raise ValueError(f"Unsupported features type: {type(features)} in aggregating column features.")
 
@@ -424,8 +432,7 @@ class FewShotSVMLearner(BaseLearner):
         Array of predictions, one corresponding to each row in given dataset.
         """
         self.on_predict_start()
-        features = self.extract_embedding(data=data, realtime=realtime, as_tensor=True)
-        features = self.aggregate_column_features(features=features)
+        features = self.extract_embedding(data=data, realtime=realtime)
         pred = self._svm.predict(features)
         if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
             pred = self._as_pandas(data=data, to_be_converted=pred)
@@ -465,8 +472,7 @@ class FewShotSVMLearner(BaseLearner):
         Otherwise, the output will have shape (#samples,)
         """
         self.on_predict_start()
-        features = self.extract_embedding(data, realtime=realtime, as_tensor=True)
-        features = self.aggregate_column_features(features=features)
+        features = self.extract_embedding(data, realtime=realtime)
         logits = self._svm.decision_function(features)
         prob = logits_to_prob(logits)
         if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
@@ -515,10 +521,8 @@ class FewShotSVMLearner(BaseLearner):
             realtime=realtime,
         )
         features = extract_from_output(outputs=outputs, ret_type=COLUMN_FEATURES, as_ndarray=as_tensor is False)
-        if len(features) == 1:
-            return next(iter(features.values()))
-        else:
-            return features
+        features = self.aggregate_column_features(features=features, is_train=False)
+        return features
 
     def evaluate(
         self,
