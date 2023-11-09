@@ -94,21 +94,24 @@ def infer_precision(
                 "Consider using an instance with GPU support.",
                 UserWarning,
             )
-        precision = 32  # Force to use fp32 for training since fp16-based AMP is not available in CPU
+        precision = 32  # Force to use fp32 for training since 16-mixed is not available in CPU
     else:
-        if precision == "bf16" and not torch.cuda.is_bf16_supported():
+        if "bf16" in precision and not torch.cuda.is_bf16_supported():
             warnings.warn(
-                "bf16 is not supported by the GPU device / cuda version. "
+                f"{precision} is not supported by the GPU device / cuda version. "
                 "Consider using GPU devices with versions after Amphere or upgrading cuda to be >=11.0. "
-                "MultiModalPredictor is switching precision from bf16 to 32.",
+                f"MultiModalPredictor is switching precision from {precision} to 32.",
                 UserWarning,
             )
             precision = 32
 
     if as_torch:
         precision_mapping = {
-            16: torch.float16,
+            16: torch.half,
+            "16": torch.half,
+            "16-mixed": torch.half,
             "bf16": torch.bfloat16,
+            "bf16-mixed": torch.bfloat16,
             32: torch.float32,
             64: torch.float64,
         }
@@ -229,8 +232,8 @@ def get_precision_context(precision: Union[int, str], device_type: Optional[str]
     if precision == 32:
         assert torch.get_default_dtype() == torch.float32
         return contextlib.nullcontext()
-    elif precision in [16, "bf16"]:
-        return torch.autocast(device_type=device_type, dtype=torch.bfloat16 if precision == "bf16" else torch.half)
+    elif precision in [16, "16", "16-mixed", "bf16", "bf16-mixed"]:
+        return torch.autocast(device_type=device_type, dtype=torch.bfloat16 if "bf16" in precision else torch.half)
     elif precision == 64:
         return double_precision_context()
     else:

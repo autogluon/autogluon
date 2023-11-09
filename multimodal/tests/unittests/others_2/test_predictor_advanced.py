@@ -17,11 +17,11 @@ from ..utils.unittest_datasets import AmazonReviewSentimentCrossLingualDataset
 @pytest.mark.parametrize(
     "backbone,efficient_finetuning,pooling_mode,precision,expected_ratio,standalone",
     [
-        ("t5-small", LORA_NORM, "mean", "bf16", 0.00557, True),
-        ("google/flan-t5-small", IA3_LORA, "mean", "bf16", 0.006865, True),
-        ("google/flan-t5-small", IA3, "mean", "bf16", 0.0004201, False),
-        ("microsoft/deberta-v3-small", LORA_BIAS, "mean", "16", 0.001422, True),
-        ("microsoft/deberta-v3-small", IA3_BIAS, "mean", "16", 0.00044566, False),
+        ("t5-small", LORA_NORM, "mean", "bf16-mixed", 0.00557, True),
+        ("google/flan-t5-small", IA3_LORA, "mean", "bf16-mixed", 0.006865, True),
+        ("google/flan-t5-small", IA3, "mean", "bf16-mixed", 0.0004201, False),
+        ("microsoft/deberta-v3-small", LORA_BIAS, "mean", "16-mixed", 0.001422, True),
+        ("microsoft/deberta-v3-small", IA3_BIAS, "mean", "16-mixed", 0.00044566, False),
     ],
 )
 def test_predictor_gradient_checkpointing(

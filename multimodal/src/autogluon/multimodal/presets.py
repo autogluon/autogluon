@@ -187,7 +187,7 @@ def default(presets: str = DEFAULT):
             {
                 "model.hf_text.checkpoint_name": "microsoft/mdeberta-v3-base",
                 "optimization.top_k": 1,
-                "env.precision": "bf16",
+                "env.precision": "bf16-mixed",
                 "env.per_gpu_batch_size": 4,
             }
         )
@@ -461,7 +461,7 @@ def semantic_segmentation(presets: str = DEFAULT):
         "env.auto_select_gpus": False,
         "env.num_gpus": -1,
         "env.num_workers": 4,
-        "env.precision": 16,
+        "env.precision": "16-mixed",
         "optimization.learning_rate": 1e-4,
         "optimization.loss_function": "structure_loss",
         "optimization.lr_decay": 0,

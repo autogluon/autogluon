@@ -5,7 +5,7 @@ env:
   per_gpu_batch_size: 8  # training per gpu batch size
   eval_batch_size_ratio: 4  # per_gpu_batch_size_evaluation = per_gpu_batch_size * eval_batch_size_ratio
   per_gpu_batch_size_evaluation:  # This is deprecated. Use eval_batch_size_ratio instead.
-  precision: 16  # training precision. Refer to https://lightning.ai/docs/pytorch/1.5.7/advanced/mixed_precision.html#fp16-mixed-precision
+  precision: "16-mixed"  # training precision. Refer to https://lightning.ai/docs/pytorch/stable/common/trainer.html#precision
   num_workers: 2  # pytorch training dataloader workers.
   num_workers_evaluation: 2  # pytorch prediction/test dataloader workers.
   fast_dev_run: False
