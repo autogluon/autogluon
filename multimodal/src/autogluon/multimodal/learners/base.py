@@ -142,6 +142,8 @@ from ..utils import (
     update_hyperparameters,
     update_tabular_config_by_resources,
     upgrade_config,
+    sync_checkpoints,
+    upload_checkpoints,
 )
 
 pl_logger = logging.getLogger("lightning")
@@ -371,6 +373,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             raise_if_exist=True,
             warn_if_exist=False,
             fit_called=self._fit_called,
+            is_distributed=True if os.environ.get("NODE_RANK", None) is not None else False,
         )
 
     def infer_column_types(
@@ -415,6 +418,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         tuning_data: Optional[Union[pd.DataFrame, str]],
         holdout_frac: Optional[float],
         seed: Optional[int],
+        f,
     ):
         if isinstance(train_data, str):
             train_data = load_pd.load(train_data)
@@ -522,6 +526,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         seed: int,
         standalone: Optional[bool] = True,
         clean_ckpts: Optional[bool] = True,
+        sync_path: Optional[str] = None,
     ):
         if time_limit is not None:
             time_limit = timedelta(seconds=time_limit)
@@ -536,6 +541,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             advanced_hyperparameters=self._advanced_hyperparameters,
             standalone=standalone,
             clean_ckpts=clean_ckpts,
+            sync_path=sync_path,
         )
         if self._fit_called:  # continuous training
             continuous_train_args = dict(
@@ -618,6 +624,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         standalone: Optional[bool] = True,
         hyperparameter_tune_kwargs: Optional[Dict] = None,
         clean_ckpts: Optional[bool] = True,
+        sync_path: Optional[str] = None,
         **kwargs,
     ):
         training_start = self.on_fit_start(presets=presets, teacher_learner=teacher_learner)
@@ -642,6 +649,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             seed=seed,
             standalone=standalone,
             clean_ckpts=clean_ckpts,
+            sync_path=sync_path,
         )
         fit_returns = self.execute_fit()
         self.on_fit_end(
@@ -1063,13 +1071,20 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
         return num_gpus, strategy
 
-    @staticmethod
-    def post_update_config_per_run(config, num_gpus, precision, strategy):
+    def post_update_config_per_run(self, config, num_gpus, precision, strategy):
         config.env.num_gpus = num_gpus
         config.env.precision = precision
         # for deepspeed offloading, the strategy becomes is a customized strategy object instead of a string,
         # but config still needs a string.
         config.env.strategy = strategy if not config.env.strategy == DEEPSPEED_OFFLOADING else DEEPSPEED_OFFLOADING
+        if config.env.num_nodes is not None and config.env.num_nodes > 1:
+            if self._config.optimization.top_k_average_method != BEST:
+                logger.warning(
+                    f"AutoGluon doesn't support checkpoint fusing for distributed training currently, changing "
+                    f"top_k_average_method to best"
+                )
+
+            self._config.optimization.top_k_average_method = "best"
         return config
 
     def init_trainer_per_run(
@@ -1118,6 +1133,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                     else 1,
                     plugins=plugins,
                 )
+
         else:
             blacklist_msgs = []
             if self._verbosity <= 3:  # turn off logging in prediction
@@ -1147,6 +1163,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                     callbacks=callbacks,
                     barebones=barebones,
                 )
+        if isinstance(trainer.strategy, DeepSpeedStrategy):
+            trainer.strategy.config["zero_force_ds_cpu_optimizer"] = False
 
         return trainer
 
@@ -1188,11 +1206,6 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                     )
                 return outputs
 
-    def on_fit_per_run_start(self, seed, save_path):
-        pl.seed_everything(seed, workers=True)
-        # TODO(?) We should have a separate "_pre_training_event()" for logging messages.
-        logger.info(get_fit_start_message(save_path, self._validation_metric_name))
-
     def on_fit_per_run_end(
         self,
         trainer: pl.Trainer,
@@ -1202,8 +1215,11 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         data_processors: Dict,
         save_path: str,
         standalone: bool,
+        sync_path: str,
     ):
-        self.clean_trainer_processes(trainer=trainer, is_train=True)
+        self.clean_trainer_processes(
+            trainer=trainer, sync_path=sync_path, config=config, df_preprocessor=df_preprocessor, is_train=True
+        )
         self.save(
             path=save_path,
             standalone=standalone,
@@ -1214,6 +1230,11 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             fit_called=True,  # fit is called on one run.
             save_model=False,  # The final model will be saved in top_k_average
         )
+
+    def on_fit_per_run_start(self, seed, save_path):
+        pl.seed_everything(seed, workers=True)
+        # TODO(?) We should have a separate "_pre_training_event()" for logging messages.
+        logger.info(get_fit_start_message(save_path, self._validation_metric_name))
 
     def fit_per_run(
         self,
@@ -1231,6 +1252,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         model: Optional[nn.Module] = None,
         standalone: bool = True,
         clean_ckpts: bool = True,
+        sync_path: str = None,
     ):
         self.on_fit_per_run_start(seed=seed, save_path=save_path)
         config = self.get_config_per_run(config=config, hyperparameters=hyperparameters)
@@ -1301,6 +1323,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             precision=precision,
             strategy=strategy,
         )
+
         trainer = self.init_trainer_per_run(
             num_gpus=num_gpus,
             config=config,
@@ -1321,8 +1344,10 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             ckpt_path=ckpt_path,
             resume=resume,
         )
+
         self.on_fit_per_run_end(
             save_path=save_path,
+            sync_path=sync_path,
             standalone=standalone,
             trainer=trainer,
             config=config,
@@ -1524,13 +1549,37 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
         return outputs
 
-    @staticmethod
-    def clean_trainer_processes(trainer, is_train=True):
+    def clean_trainer_processes(self, trainer, sync_path, config, df_preprocessor, is_train=True):
         if is_train:
             msg = "Training finished,"
         else:
             msg = "Prediction finished,"
-        if trainer.global_rank != 0:
+
+        if trainer.global_rank == 0:
+            if not self._is_hpo:
+                num_nodes = config.env.num_nodes
+                if not num_nodes:
+                    num_nodes = 1
+                if num_nodes > 1:
+                    sync_checkpoints(
+                        path=self.path,
+                        num_nodes=num_nodes,
+                        sync_path=sync_path,
+                    )
+                self._model = create_fusion_model(
+                    config=config,
+                    num_classes=self._output_shape,
+                    classes=self._classes,
+                    num_numerical_columns=len(df_preprocessor.numerical_feature_names),
+                    num_categories=df_preprocessor.categorical_num_categories,
+                )
+        else:
+            if trainer.node_rank != 0:
+                upload_checkpoints(
+                    trainer=trainer,
+                    path=self.path,
+                    sync_path=sync_path,
+                )
             sys.exit(f"{msg} exit the process with global_rank={trainer.global_rank}...")
 
     def update_image_column_types(self, data):

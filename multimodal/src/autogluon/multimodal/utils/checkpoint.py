@@ -16,6 +16,14 @@ from .cloud_io import get_filesystem
 logger = logging.getLogger(__name__)
 
 
+def _process_checkpoint(path: str):
+    if os.path.isdir(path + "-dir"):  # deepspeed save checkpoints into a directory
+        from pytorch_lightning.utilities.deepspeed import convert_zero_checkpoint_to_fp32_state_dict
+
+        convert_zero_checkpoint_to_fp32_state_dict(path + "-dir", path)
+        shutil.rmtree(path + "-dir")
+
+
 def average_checkpoints(
     checkpoint_paths: List[str],
 ):
@@ -36,14 +44,8 @@ def average_checkpoints(
         avg_state_dict = {}
         avg_counts = {}
         for per_path in checkpoint_paths:
-            if os.path.isdir(per_path + "-dir"):  # deepspeed save checkpoints into a directory
-                from lightning.pytorch.utilities.deepspeed import convert_zero_checkpoint_to_fp32_state_dict
-
-                convert_zero_checkpoint_to_fp32_state_dict(per_path + "-dir", per_path)
-                shutil.rmtree(per_path + "-dir")
-                state_dict = torch.load(per_path, map_location=torch.device("cpu"))["state_dict"]
-            else:
-                state_dict = torch.load(per_path, map_location=torch.device("cpu"))["state_dict"]
+            _process_checkpoint(per_path)
+            state_dict = torch.load(per_path, map_location=torch.device("cpu"))["state_dict"]
             for k, v in state_dict.items():
                 if k not in avg_state_dict:
                     avg_state_dict[k] = v.clone().to(dtype=torch.float64)
@@ -61,6 +63,7 @@ def average_checkpoints(
         for k in avg_state_dict:
             avg_state_dict[k].clamp_(float32_info.min, float32_info.max).to(dtype=torch.float32)
     else:
+        _process_checkpoint(checkpoint_paths[0])
         avg_state_dict = torch.load(checkpoint_paths[0], map_location=torch.device("cpu"))["state_dict"]
 
     return avg_state_dict
@@ -198,4 +201,6 @@ class AutoMMModelCheckpoint(pl.callbacks.ModelCheckpoint):
         super(AutoMMModelCheckpoint, self)._update_best_and_save(
             current=current, trainer=trainer, monitor_candidates=monitor_candidates
         )
-        self.to_yaml()
+        if trainer.node_rank == 0:
+            # Only head node save best_checkpoints.yaml file
+            self.to_yaml()

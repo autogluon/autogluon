@@ -365,6 +365,7 @@ class MultiModalPredictor:
         standalone: Optional[bool] = True,
         hyperparameter_tune_kwargs: Optional[dict] = None,
         clean_ckpts: Optional[bool] = True,
+        sync_path: Optional[str] = None,
     ):
         """
         Fit MultiModalPredictor predict label column of a dataframe based on the other columns,
@@ -448,6 +449,8 @@ class MultiModalPredictor:
                         You don't need to worry about `metric` and `mode`. AutoGluon will figure it out by itself.
         clean_ckpts
             Whether to clean the checkpoints of each validation step after training.
+        sync_path
+            Remote synchronization path. This is required for distributed training checkpoint synchronization.
 
         Returns
         -------
@@ -476,6 +479,7 @@ class MultiModalPredictor:
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             clean_ckpts=clean_ckpts,
             id_mappings=id_mappings,
+            sync_path=sync_path,
         )
 
         return self

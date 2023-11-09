@@ -31,6 +31,7 @@ from .data import (
     turn_on_off_feature_column_info,
 )
 from .distillation import DistillationMixin
+from .distributed import sync_checkpoints, upload_checkpoints
 from .download import download, is_url
 from .environment import (
     check_if_packages_installed,

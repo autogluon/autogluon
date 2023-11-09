@@ -176,19 +176,29 @@ def download_s3_folder(
         Optional arguments to `list_bucket_prefix_suffix_contains_s3` that allow
         more control of which objects are considered.
     """
-    s3_to_local_tuple_list = get_s3_to_local_tuple_list_from_s3_folder(s3_bucket=bucket, s3_prefix=prefix, local_path=local_path, suffix=suffix, **kwargs)
+    s3_to_local_tuple_list = get_s3_to_local_tuple_list_from_s3_folder(
+        s3_bucket=bucket, s3_prefix=prefix, local_path=local_path, suffix=suffix, **kwargs
+    )
     if verbose:
-        logger.log(20, f"Will download {len(s3_to_local_tuple_list)} objects from s3://{bucket}/{prefix} to {local_path}")
+        logger.log(
+            20, f"Will download {len(s3_to_local_tuple_list)} objects from s3://{bucket}/{prefix} to {local_path}"
+        )
     if os.path.isdir(local_path) and not dry_run:
         if error_if_exists:
-            raise ValueError(f"Directory {local_path} already exists. Please pass in a different `local_path` or set `error_if_exsits` to `False`")
+            raise ValueError(
+                f"Directory {local_path} already exists. Please pass in a different `local_path` or set `error_if_exsits` to `False`"
+            )
         if delete_if_exists:
-            logger.warning(f"Will delete {local_path} and all its content within because this folder already exists and `delete_if_exists` = `True`")
+            logger.warning(
+                f"Will delete {local_path} and all its content within because this folder already exists and `delete_if_exists` = `True`"
+            )
             shutil.rmtree(local_path)
     download_s3_files(s3_to_local_tuple_list=s3_to_local_tuple_list, dry_run=dry_run)
 
 
-def get_s3_to_local_tuple_list_from_s3_folder(*, s3_bucket: str, s3_prefix: str, local_path: str, **kwargs) -> List[Tuple[str, str]]:
+def get_s3_to_local_tuple_list_from_s3_folder(
+    *, s3_bucket: str, s3_prefix: str, local_path: str, **kwargs
+) -> List[Tuple[str, str]]:
     """
     Given a s3 bucket and prefix, as well as a target local prefix, return a list of tuples of (s3_path, local_path)
     indicating the origin to target file path when downloading from S3 for each file.
@@ -216,12 +226,17 @@ def get_s3_to_local_tuple_list_from_s3_folder(*, s3_bucket: str, s3_prefix: str,
     if len(s3_prefix) > 0:
         assert s3_prefix.endswith("/"), "Please provide a prefix to a folder and end it with '/'"
     objs = list_bucket_prefix_suffix_contains_s3(bucket=s3_bucket, prefix=s3_prefix, **kwargs)
-    s3_to_local_tuple_list = get_s3_to_local_tuple_list(s3_bucket=s3_bucket, s3_prefix=s3_prefix, local_path=local_path, s3_prefixes=objs)
+    objs = [obj for obj in objs if obj != s3_prefix]
+    s3_to_local_tuple_list = get_s3_to_local_tuple_list(
+        s3_bucket=s3_bucket, s3_prefix=s3_prefix, local_path=local_path, s3_prefixes=objs
+    )
     return s3_to_local_tuple_list
 
 
 # TODO: Add unit tests
-def get_s3_to_local_tuple_list(*, s3_bucket: str, s3_prefix: str, local_path: str, s3_prefixes: List[str]) -> List[Tuple[str, str]]:
+def get_s3_to_local_tuple_list(
+    *, s3_bucket: str, s3_prefix: str, local_path: str, s3_prefixes: List[str]
+) -> List[Tuple[str, str]]:
     """
     Given a list of s3 objects and a target local prefix, return a list of tuples of (s3_path, local_path)
     indicating the origin to target file path when downloading from s3.
