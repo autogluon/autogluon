@@ -323,7 +323,7 @@ jobs:
   #         job-name: AutoGluon-Install
   #         command: chmod +x ./.github/workflow_scripts/test_install.sh && ./.github/workflow_scripts/test_install.sh
   build_tabular_prediction_tutorial:
-    needs: lint-check
+    needs: lint_check
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -340,7 +340,7 @@ jobs:
     strategy:
       matrix:
         SUB_DOC: ["advanced_topics", "image_prediction", "matching", "object_detection", "text_prediction", "document", "multimodal_prediction"]
-    needs: lint-check
+    needs: lint_check
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
