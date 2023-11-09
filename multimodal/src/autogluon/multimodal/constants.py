@@ -134,6 +134,7 @@ BINARY_IOU = "binary_iou"
 BINARY_DICE = "binary_dice"
 BINARY_ACC = "binary_acc"
 BER = "ber"
+MULTICLASS_IOU = "multiclass_iou"
 RETRIEVAL_METRICS = [NDCG, PRECISION, RECALL, MRR]
 METRIC_MODE_MAP = {
     ACC: MAX,
@@ -159,6 +160,7 @@ METRIC_MODE_MAP = {
     BINARY_DICE: MAX,
     BINARY_ACC: MAX,
     BER: MIN,
+    MULTICLASS_IOU: MAX,
 }
 VALID_METRICS = METRIC_MODE_MAP.keys()
 
@@ -308,6 +310,12 @@ BBOX_FORMATS = [XYWH, XYXY]
 # open vocabulary detection
 PROMPT = "prompt"
 OVD_RET = "ovd_ret"
+
+# sam (multi-class)
+CLASS_LOGITS = "class_logits"
+MASK_LABEL = "mask_label"
+CLASS_LABEL = "class_label"
+MASK_SEMANTIC_INFER = "mask_semantic_infer"
 
 # presets
 DEFAULT = "default"

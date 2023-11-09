@@ -627,8 +627,6 @@ def get_model_postprocess_fn(problem_type: str, loss_func: _Loss):
     if problem_type == REGRESSION:
         if isinstance(loss_func, nn.BCEWithLogitsLoss):
             postprocess_func = apply_sigmoid
-    elif problem_type == SEMANTIC_SEGMENTATION:
-        postprocess_func = apply_sigmoid
 
     return postprocess_func
 

@@ -215,12 +215,6 @@ class LitModule(pl.LightningModule):
             metric.update(preds=prob[:, 1], target=label)  # only for binary classification
         elif isinstance(metric, BaseAggregator):
             metric.update(custom_metric_func(logits, label))
-        elif (
-            isinstance(metric, torchmetrics.classification.BinaryJaccardIndex)
-            or isinstance(metric, Balanced_Error_Rate)
-            or isinstance(metric, COD)
-        ):
-            metric.update(logits.float(), label)
         else:
             metric.update(logits.squeeze(dim=1).float(), label)
 

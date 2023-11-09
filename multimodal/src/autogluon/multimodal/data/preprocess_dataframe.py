@@ -916,7 +916,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                 else:
                     y_pred = y_pred[0]
         elif self.label_type == SEMANTIC_SEGMENTATION_GT:
-            y_pred = y_pred > 0.5
+            y_pred = y_pred
         else:
             raise NotImplementedError
 

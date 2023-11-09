@@ -135,6 +135,39 @@ def test_sam_semantic_segmentation_zero_shot_evaluate_predict(checkpoint_name):
 
 
 @pytest.mark.parametrize(
+    "checkpoint_name",
+    [
+        "facebook/sam-vit-base",
+    ],
+)
+def test_sam_semantic_segmentation_fit_evaluate_predict_trans10k(checkpoint_name):
+    train_df, val_df, test_df = get_file_df(need_test_gt=True)
+
+    validation_metric = "multiclass_iou"
+    predictor = MultiModalPredictor(
+        problem_type="semantic_segmentation",
+        validation_metric=validation_metric,
+        eval_metric=validation_metric,
+        hyperparameters={
+            "env.num_gpus": 1,
+            "model.sam.checkpoint_name": checkpoint_name,
+            "optimization.loss_function": "mask2former_loss",
+            "model.sam.num_mask_tokens": 10,
+        },
+        label="label",
+        num_classes=2,
+    )
+
+    predictor.fit(train_data=train_df, tuning_data=val_df, time_limit=20)
+
+    # Evaluate
+    predictor.evaluate(test_df, metrics=[validation_metric])
+
+    # Predict
+    predictor.predict(test_df, save_results=False)
+
+
+@pytest.mark.parametrize(
     "frozen_layers",
     [
         ["prompt_encoder"],

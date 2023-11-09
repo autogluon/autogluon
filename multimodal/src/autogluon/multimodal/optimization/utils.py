@@ -13,6 +13,7 @@ from torch import nn, optim
 from torch.nn import functional as F
 from torchmetrics.detection.mean_ap import MeanAveragePrecision
 from transformers import Adafactor
+from transformers.models.mask2former.modeling_mask2former import Mask2FormerConfig, Mask2FormerLoss
 from transformers.trainer_pt_utils import get_parameter_names
 
 from ..constants import (
@@ -51,6 +52,7 @@ from ..constants import (
     MAE,
     MULTI_NEGATIVES_SOFTMAX_LOSS,
     MULTICLASS,
+    MULTICLASS_IOU,
     NER,
     NER_TOKEN_F1,
     NORM_FIT,
@@ -136,6 +138,13 @@ def get_loss_func(
             loss_func = StructureLoss()
         elif "balanced_bce" in loss_func_name.lower():
             loss_func = BBCEWithLogitLoss()
+        elif "mask2former_loss" in loss_func_name.lower():
+            weight_dict = {
+                "loss_cross_entropy": 2.0,
+                "loss_mask": 10.0,
+                "loss_dice": 10.0,
+            }
+            loss_func = Mask2FormerLoss(config=Mask2FormerConfig(), weight_dict=weight_dict)
         else:
             loss_func = nn.BCEWithLogitsLoss()
     elif problem_type is None:
@@ -305,6 +314,8 @@ def get_metric(
         return Balanced_Error_Rate(), None
     elif metric_name in [SM, EM, FM, MAE]:
         return COD_METRICS_NAMES[metric_name], None
+    elif metric_name == MULTICLASS_IOU:
+        return torchmetrics.JaccardIndex(task="multiclass", num_classes=num_classes), None
     else:
         raise ValueError(f"Unknown metric {metric_name}")
 

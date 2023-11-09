@@ -5,10 +5,14 @@ from typing import Dict, Iterable, List, Optional, Union
 import numpy as np
 import pandas as pd
 import torch
+import torchmetrics
 from omegaconf import OmegaConf
 from PIL import Image
 
-from ..constants import LABEL, LOGITS
+from autogluon.core.metrics import Scorer
+
+from ..constants import LABEL, LOGITS, MASK_SEMANTIC_INFER, SEMANTIC_SEGMENTATION
+from ..optimization.lit_semantic_segmentation import SemanticSegmentationLitModule
 from ..optimization.utils import get_metric, get_norm_layer_param_names, get_trainable_params_efficient_finetune
 from ..utils import extract_from_output, setup_save_path
 from .base import BaseLearner
@@ -17,6 +21,46 @@ logger = logging.getLogger(__name__)
 
 
 class SemanticSegmentationLearner(BaseLearner):
+    def __init__(
+        self,
+        label: Optional[str] = None,
+        problem_type: Optional[str] = SEMANTIC_SEGMENTATION,
+        presets: Optional[str] = None,
+        eval_metric: Optional[Union[str, Scorer]] = None,
+        hyperparameters: Optional[dict] = None,
+        path: Optional[str] = None,
+        verbosity: Optional[int] = 2,
+        num_classes: Optional[int] = None,  # TODO: can we infer this from data?
+        classes: Optional[list] = None,
+        warn_if_exist: Optional[bool] = True,
+        enable_progress_bar: Optional[bool] = None,
+        pretrained: Optional[bool] = True,
+        validation_metric: Optional[str] = None,
+        sample_data_path: Optional[str] = None,
+        **kwargs,
+    ):
+        super().__init__(
+            label=label,
+            problem_type=problem_type,
+            presets=presets,
+            eval_metric=eval_metric,
+            hyperparameters=hyperparameters,
+            path=path,
+            verbosity=verbosity,
+            num_classes=num_classes,
+            classes=classes,
+            warn_if_exist=warn_if_exist,
+            enable_progress_bar=enable_progress_bar,
+            pretrained=pretrained,
+            validation_metric=validation_metric,
+            sample_data_path=sample_data_path,
+        )
+        if self._output_shape == None:
+            self._output_shape = 1  # binary_semantic_segmentation
+
+    def infer_output_shape(self):
+        assert self._output_shape is not None, f"output_shape should have been set in the learner initialization."
+
     @staticmethod
     def get_peft_param_names_per_run(model, config):
         peft_param_names = None
@@ -60,7 +104,10 @@ class SemanticSegmentationLearner(BaseLearner):
             realtime=realtime,
         )
 
-        logits = extract_from_output(ret_type=LOGITS, outputs=outputs, as_ndarray=False)
+        if self._output_shape == 1:
+            logits = extract_from_output(ret_type=LOGITS, outputs=outputs, as_ndarray=False)
+        else:
+            logits = extract_from_output(ret_type=MASK_SEMANTIC_INFER, outputs=outputs, as_ndarray=False)
         y_pred = logits.float()
         y_true = [ele[LABEL] for ele in outputs]
         y_true = torch.cat(y_true)
@@ -69,7 +116,11 @@ class SemanticSegmentationLearner(BaseLearner):
 
         results = {}
         for per_metric_name in metrics:
-            per_metric, _ = get_metric(metric_name=per_metric_name.lower())
+            per_metric, _ = get_metric(metric_name=per_metric_name.lower(), num_classes=self._output_shape)
+            if isinstance(per_metric, torchmetrics.classification.MulticlassJaccardIndex):
+                bs, num_classes = y_pred.shape[0:2]
+                y_pred = y_pred.reshape(bs, num_classes, -1)
+                y_true = y_true.reshape(bs, -1)
             per_metric.update(y_pred, y_true)
             score = per_metric.compute()
 
@@ -79,6 +130,37 @@ class SemanticSegmentationLearner(BaseLearner):
             return results, outputs
         else:
             return results
+
+    def get_litmodule_per_run(
+        self,
+        model=None,
+        model_postprocess_fn=None,
+        peft_param_names=None,
+        optimization_kwargs=None,
+        distillation_kwargs=None,
+        is_train=True,
+    ):
+        if is_train:
+            if self._teacher_learner is not None:
+                return SemanticSegmentationLitModule(
+                    student_model=model,
+                    teacher_model=self._teacher_learner._model,
+                    **optimization_kwargs,
+                    **distillation_kwargs,
+                )
+            else:
+                return SemanticSegmentationLitModule(
+                    model=model,
+                    model_postprocess_fn=model_postprocess_fn,
+                    trainable_param_names=peft_param_names,
+                    **optimization_kwargs,
+                )
+        else:
+            return SemanticSegmentationLitModule(
+                model=self._model,
+                model_postprocess_fn=self._model_postprocess_fn,
+                **optimization_kwargs,
+            )
 
     def evaluate(
         self,
@@ -143,7 +225,10 @@ class SemanticSegmentationLearner(BaseLearner):
         Array of predictions, one corresponding to each row in given dataset.
         """
         self.ensure_predict_ready()
-        ret_type = LOGITS
+        if self._output_shape == 1:
+            ret_type = LOGITS
+        else:
+            ret_type = MASK_SEMANTIC_INFER
 
         outputs = self.predict_per_run(
             data=data,
@@ -152,15 +237,15 @@ class SemanticSegmentationLearner(BaseLearner):
         )
         logits = extract_from_output(outputs=outputs, ret_type=ret_type)
 
-        if self._df_preprocessor:  # 有和没有先fit后predict？结果一样么
+        if self._df_preprocessor:
             pred = self._df_preprocessor.transform_prediction(
                 y_pred=logits,
             )
+
+        if ret_type == MASK_SEMANTIC_INFER:
+            pred = logits.argmax(axis=1)
         else:
-            if isinstance(logits, (torch.Tensor, np.ndarray)) and logits.ndim == 2:
-                pred = logits.argmax(axis=1)
-            else:
-                pred = logits
+            pred = logits > 0.5
 
         if save_results:
             self._save_path = setup_save_path(
@@ -178,8 +263,6 @@ class SemanticSegmentationLearner(BaseLearner):
         # if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
         #     # TODO
         #     pred = self._as_pandas(data=data, to_be_converted=pred)
-
-        return pred
 
     def predict_proba(
         self,
@@ -272,9 +355,18 @@ class SemanticSegmentationLearner(BaseLearner):
         txt_path = os.path.join(result_path, "result.txt")
         os.makedirs(mask_path, exist_ok=True)
         for image_pred, image_name in zip(pred, image_names):
-            mask = Image.fromarray(np.squeeze(image_pred, axis=0))
-            per_mask_path = os.path.join(mask_path, os.path.basename(image_name))
-            mask.save(per_mask_path)
+            if self._output_shape == 1:
+                mask = Image.fromarray(np.squeeze(image_pred, axis=0))
+                per_mask_path = os.path.join(mask_path, os.path.basename(image_name))
+                mask.save(per_mask_path)
+            else:
+                mask = Image.fromarray(image_pred, mode="P")  # multi-class
+                mask_name = ""
+                for i in os.path.basename(image_name).split(".")[:-1]:
+                    mask_name += i
+                per_mask_path = os.path.join(mask_path, mask_name)
+                mask.save(per_mask_path + ".png")
+
             results.append([image_name, per_mask_path])
 
         result_df = pd.DataFrame(results, columns=["image", "mask"])
