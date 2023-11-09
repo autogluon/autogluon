@@ -1673,7 +1673,7 @@ class MultiModalMatcher(BaseLearner):
         similarity_type: Optional[str] = "cosine",
         cutoffs: Optional[List[int]] = [1, 5, 10],
         label: Optional[str] = None,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         **kwargs,
     ):
         """
@@ -1767,7 +1767,7 @@ class MultiModalMatcher(BaseLearner):
         data: Union[pd.DataFrame, dict, list],
         id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         as_pandas: Optional[bool] = None,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         **kwargs,
     ):
         """
@@ -1822,7 +1822,7 @@ class MultiModalMatcher(BaseLearner):
         id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         as_pandas: Optional[bool] = None,
         as_multiclass: Optional[bool] = True,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         **kwargs,
     ):
         """

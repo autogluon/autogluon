@@ -98,8 +98,89 @@ def evaluate_matcher_ranking(matcher, test_df, query_column, response_column, me
         )
 
 
-# TODO: multi GPU test passed locally with single set parameter and realtime removed
+# Conflicts between realtime inference with dp and lightning strategies
 @pytest.mark.single_gpu
+@pytest.mark.parametrize(
+    "dataset_name,query,response,problem_type,text_backbone,image_backbone, is_ranking, symmetric",
+    [
+        (
+            "id_change_detection",
+            "Previous Image",
+            "Current Image",
+            "image_similarity",
+            None,
+            "swin_tiny_patch4_window7_224",
+            False,
+            False,
+        ),
+        (
+            "flickr30k",
+            "caption",
+            "image",
+            "image_text_similarity",
+            "google/electra-small-discriminator",
+            "swin_tiny_patch4_window7_224",
+            True,
+            True,
+        ),
+    ],
+)
+def test_matcher_basic(
+    dataset_name,
+    query,
+    response,
+    problem_type,
+    text_backbone,
+    image_backbone,
+    is_ranking,
+    symmetric,
+):
+    dataset = ALL_DATASETS[dataset_name]()
+
+    matcher = MultiModalPredictor(
+        query=query,
+        response=response,
+        problem_type=problem_type,
+        label=dataset.label_columns[0] if dataset.label_columns else None,
+        match_label=dataset.match_label,
+        eval_metric=dataset.metric,
+    )
+
+    hyperparameters = {
+        "optimization.max_epochs": 1,
+        "env.num_workers": 0,
+        "env.num_workers_evaluation": 0,
+        "optimization.top_k_average_method": "greedy_soup",
+    }
+
+    if text_backbone is not None:
+        hyperparameters.update(
+            {
+                "model.hf_text.checkpoint_name": text_backbone,
+            }
+        )
+    if image_backbone is not None:
+        hyperparameters.update(
+            {
+                "model.timm_image.checkpoint_name": image_backbone,
+            }
+        )
+
+    save_path = os.path.join(get_home_dir(), "outputs", dataset_name)
+    if os.path.exists(save_path):
+        shutil.rmtree(save_path)
+
+    matcher.fit(
+        train_data=dataset.train_df,
+        tuning_data=dataset.val_df if hasattr(dataset, "val_df") else None,
+        hyperparameters=hyperparameters,
+        time_limit=20,
+        save_path=save_path,
+    )
+
+    verify_matcher_realtime_inference(matcher, dataset.test_df)
+
+
 @pytest.mark.parametrize(
     "dataset_name,query,response,problem_type,text_backbone,image_backbone, is_ranking, symmetric",
     [
@@ -210,7 +291,6 @@ def test_matcher_basic(
     else:
         score = matcher.evaluate(dataset.test_df)
     verify_matcher_save_load(matcher, dataset.test_df, cls=MultiModalPredictor)
-    verify_matcher_realtime_inference(matcher, dataset.test_df)
 
     # Test for continuous fit
     matcher.fit(

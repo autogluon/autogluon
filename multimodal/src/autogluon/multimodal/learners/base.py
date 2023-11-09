@@ -1757,7 +1757,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         data: Union[pd.DataFrame, dict, list, str],
         metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         **kwargs,
     ):
         """
@@ -1865,7 +1865,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         data: Union[pd.DataFrame, dict, list, str],
         candidate_data: Optional[Union[pd.DataFrame, dict, list]] = None,
         as_pandas: Optional[bool] = None,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         **kwargs,
     ):
         """
@@ -1926,7 +1926,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         candidate_data: Optional[Union[pd.DataFrame, dict, list]] = None,
         as_pandas: Optional[bool] = None,
         as_multiclass: Optional[bool] = True,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         **kwargs,
     ):
         """

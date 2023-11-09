@@ -614,7 +614,7 @@ class ObjectDetectionLearner(BaseLearner):
         data: Union[pd.DataFrame, dict, list, str],
         metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         eval_tool: Optional[str] = None,
         **kwargs,
     ):
@@ -645,7 +645,7 @@ class ObjectDetectionLearner(BaseLearner):
         self,
         data: Union[pd.DataFrame, dict, list, str],
         as_pandas: Optional[bool] = None,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         save_results: Optional[bool] = None,
         **kwargs,
     ):
