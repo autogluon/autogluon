@@ -22,7 +22,7 @@ runs:
     - name: Install dependencies
       shell: bash
       run: |
-        pip install boto3==1.28.80 botocore==1.31.80
+        pip install boto3==1.28.80 botocore==1.31.80 awscli==1.29.80
     - name: Check for Actor Permission
       id: check
       continue-on-error: true
