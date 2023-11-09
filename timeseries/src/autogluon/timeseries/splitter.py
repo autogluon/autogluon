@@ -2,7 +2,6 @@ from typing import Iterator, Optional, Tuple
 
 from .dataset.ts_dataframe import TimeSeriesDataFrame
 
-
 __all__ = [
     "AbstractWindowSplitter",
     "ExpandingWindowSplitter",

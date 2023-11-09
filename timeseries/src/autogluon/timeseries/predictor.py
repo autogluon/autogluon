@@ -17,8 +17,8 @@ from autogluon.timeseries.configs import TIMESERIES_PRESETS_CONFIGS
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
 from autogluon.timeseries.learner import AbstractLearner, TimeSeriesLearner
 from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
-from autogluon.timeseries.trainer import AbstractTimeSeriesTrainer
 from autogluon.timeseries.splitter import ExpandingWindowSplitter
+from autogluon.timeseries.trainer import AbstractTimeSeriesTrainer
 
 logger = logging.getLogger(__name__)
 
