@@ -115,7 +115,7 @@ def build_final_learner(learner, best_trial_path, save_path, last_ckpt_path, is_
         model = create_fusion_model(
             config=learner._config,
             num_classes=learner._output_shape,
-            classes=learner._classes,
+            classes=learner._classes if hasattr(learner, "_classes") else None,
             num_numerical_columns=len(learner._df_preprocessor.numerical_feature_names),
             num_categories=learner._df_preprocessor.categorical_num_categories,
             pretrained=False,  # set "pretrain=False" to prevent downloading online models
@@ -166,17 +166,12 @@ def hyperparameter_tune(hyperparameter_tune_kwargs, resources, is_matching=False
 
     ray_tune_adapter = AutommRayTuneAdapter()
     search_space = _fit_args.get("hyperparameters", dict())
-    # metric = "val_" + _fit_args.get("validation_metric_name")
     metric = "val_" + _fit_args.get("learner")._validation_metric_name
-    # mode = _fit_args.get("minmax_mode")
     mode = _fit_args.get("learner")._minmax_mode
     save_path = _fit_args.get("save_path")
     time_budget_s = _fit_args.get("max_time")
     if time_budget_s is not None:
         time_budget_s *= 0.95  # give some buffer time to ray
-    is_distill = False
-    if _fit_args.get("teacher_learner", None) is not None:
-        is_distill = True
     try:
         run_config_kwargs = {
             "checkpoint_config": CheckpointConfig(
