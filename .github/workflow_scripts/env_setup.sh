@@ -10,10 +10,8 @@ function setup_build_env {
 }
 
 function setup_build_contrib_env {
-    # python3 -m pip install --upgrade pip
-    # python3 -m pip install --upgrade awscli
     python3 -m pip install -r $(dirname "$0")/../../docs/requirements_doc.txt
-    #removing d2l
+    # removing this package temporarily
     # python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
     export AG_DOCS=1
     export AUTOMM_TUTORIAL_MODE=1 # Disable progress bar in MultiModalPredictor
