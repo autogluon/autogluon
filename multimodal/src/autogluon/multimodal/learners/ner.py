@@ -60,7 +60,6 @@ class NERLearner(BaseLearner):
         self,
         train_data: Union[pd.DataFrame, str],
         presets: Optional[str] = None,
-        config: Optional[Dict] = None,
         tuning_data: Optional[Union[pd.DataFrame, str]] = None,
         time_limit: Optional[int] = None,
         save_path: Optional[str] = None,
@@ -73,7 +72,7 @@ class NERLearner(BaseLearner):
         clean_ckpts: Optional[bool] = True,
         **kwargs,
     ):
-        training_start = self.on_fit_start(presets=presets, config=config)
+        training_start = self.on_fit_start(presets=presets)
         self.setup_save_path(save_path=save_path)
         self.prepare_train_tuning_data(
             train_data=train_data,
