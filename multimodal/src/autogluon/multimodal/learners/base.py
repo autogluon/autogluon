@@ -249,16 +249,11 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             Whether to init model with pretrained weights. If False, it creates a model with random initialization.
         validation_metric
             Validation metric name. If `validation_metric = None`, it is automatically chosen based on `problem_type`.
-            Defaults to 'accuracy' for multiclass classification, `roc_auc` for binary classification, and 'root_mean_squared_error' for regression.
-<<<<<<< HEAD
-        sample_data_path
-            This is used for automatically inference num_classes, classes, or label.
+            Defaults to 'accuracy' for multiclass classification, `roc_auc` for binary classification, and 'root_mean_squared_error' for regression.\
         realtime_enabled
             Realtime inference currently contradicts with lightning strategies.
             This is a one line control for disabling realtime inference.
 
-=======
->>>>>>> cb5098137b3bf604b4a800326533e597614a1507
         """
         self._eval_metric_name = None
         self._eval_metric_func = None
