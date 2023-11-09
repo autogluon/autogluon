@@ -25,7 +25,7 @@ from autogluon.timeseries.models.ensemble import AbstractTimeSeriesEnsembleModel
 from autogluon.timeseries.models.presets import contains_searchspace
 from autogluon.timeseries.utils.features import CovariateMetadata
 from autogluon.timeseries.utils.warning_filters import disable_tqdm
-from autogluon.timeseries.val_splitter import AbstractWindowSplitter, ExpandingWindowSplitter
+from autogluon.timeseries.splitter import AbstractWindowSplitter, ExpandingWindowSplitter
 
 logger = logging.getLogger("autogluon.timeseries.trainer")
 

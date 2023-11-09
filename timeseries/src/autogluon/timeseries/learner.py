@@ -12,7 +12,7 @@ from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.trainer import AbstractTimeSeriesTrainer, AutoTimeSeriesTrainer
 from autogluon.timeseries.utils.features import TimeSeriesFeatureGenerator
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
-from autogluon.timeseries.val_splitter import AbstractWindowSplitter
+from autogluon.timeseries.splitter import AbstractWindowSplitter
 
 logger = logging.getLogger(__name__)
 

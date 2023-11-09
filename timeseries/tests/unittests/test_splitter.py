@@ -1,6 +1,6 @@
 import pytest
 
-from autogluon.timeseries.val_splitter import ExpandingWindowSplitter
+from autogluon.timeseries.splitter import ExpandingWindowSplitter
 
 from .common import DATAFRAME_WITH_COVARIATES, DATAFRAME_WITH_STATIC, DUMMY_VARIABLE_LENGTH_TS_DATAFRAME
 
