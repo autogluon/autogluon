@@ -14,8 +14,15 @@ import transformers
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
 from autogluon.core.metrics import Scorer
 
-from .constants import AUTOMM_TUTORIAL_MODE, NER, OBJECT_DETECTION, SEMANTIC_SEGMENTATION
-from .learners import BaseLearner, MultiModalMatcher, NERLearner, ObjectDetectionLearner, SemanticSegmentationLearner
+from .constants import AUTOMM_TUTORIAL_MODE, FEW_SHOT_CLASSIFICATION, NER, OBJECT_DETECTION, SEMANTIC_SEGMENTATION
+from .learners import (
+    BaseLearner,
+    FewShotSVMLearner,
+    MultiModalMatcher,
+    NERLearner,
+    ObjectDetectionLearner,
+    SemanticSegmentationLearner,
+)
 from .problem_types import PROBLEM_TYPES_REG
 from .utils import get_dir_ckpt_paths
 
@@ -79,7 +86,7 @@ class MultiModalPredictor:
             - 'image_text_similarity': Text-image similarity problem
             - 'feature_extraction': Extracting feature (only support inference)
             - 'zero_shot_image_classification': Zero-shot image classification (only support inference)
-            - 'few_shot_text_classification': (experimental) Few-shot text classification
+            - 'few_shot_classification': Few-shot classification for image or text data.
 
             For certain problem types, the default behavior is to load a pretrained model based on
             the presets / hyperparameters and the predictor will support zero-shot inference
@@ -93,7 +100,7 @@ class MultiModalPredictor:
             - 'image_text_similarity'
             - 'feature_extraction'
             - 'zero_shot_image_classification'
-            - 'few_shot_text_classification' (experimental)
+            - 'few_shot_classification'
 
         query
             Column names of query data (used for matching).
@@ -190,6 +197,8 @@ class MultiModalPredictor:
             learner_class = ObjectDetectionLearner
         elif problem_type == NER:
             learner_class = NERLearner
+        elif problem_type == FEW_SHOT_CLASSIFICATION:
+            learner_class = FewShotSVMLearner
         elif problem_type == SEMANTIC_SEGMENTATION:
             learner_class = SemanticSegmentationLearner
         else:
@@ -770,6 +779,8 @@ class MultiModalPredictor:
             learner_class = ObjectDetectionLearner
         elif assets["problem_type"] == NER:
             learner_class = NERLearner
+        elif assets["problem_type"] == FEW_SHOT_CLASSIFICATION:
+            learner_class = FewShotSVMLearner
         elif assets["problem_type"] == SEMANTIC_SEGMENTATION:
             learner_class = SemanticSegmentationLearner
         else:

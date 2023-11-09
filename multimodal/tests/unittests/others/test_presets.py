@@ -8,7 +8,6 @@ from autogluon.multimodal.constants import (
     DISTILLER,
     ENVIRONMENT,
     FEATURE_EXTRACTION,
-    FEW_SHOT_TEXT_CLASSIFICATION,
     MODEL,
     OPTIMIZATION,
     ZERO_SHOT_IMAGE_CLASSIFICATION,
@@ -60,7 +59,6 @@ def test_preset_in_init(problem_type, presets):
     predictor = MultiModalPredictor(problem_type=problem_type)
     if problem_type not in [
         FEATURE_EXTRACTION,
-        FEW_SHOT_TEXT_CLASSIFICATION,
         ZERO_SHOT_IMAGE_CLASSIFICATION,
     ]:
         predictor = MultiModalPredictor(problem_type=problem_type, presets=presets)

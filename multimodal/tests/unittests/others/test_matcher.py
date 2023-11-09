@@ -390,7 +390,7 @@ def test_image_text_semantic_search():
 
     matcher = MultiModalPredictor(
         problem_type="image_text_similarity",
-        hyperparameters={"model.hf_text.checkpoint_name": "openai/clip-vit-base-patch32"},
+        hyperparameters={"model.clip.checkpoint_name": "openai/clip-vit-base-patch32"},
     )
     text_to_image_hits = semantic_search(
         matcher=matcher,
