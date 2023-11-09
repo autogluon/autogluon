@@ -19,9 +19,9 @@ from ..utils.unittest_datasets import AmazonReviewSentimentCrossLingualDataset
     [
         ("t5-small", LORA_NORM, "mean", "bf16-mixed", 0.00557, True),
         ("google/flan-t5-small", IA3_LORA, "mean", "bf16-mixed", 0.006865, True),
-        ("google/flan-t5-small", IA3, "mean", "bf16-mixed", 0.0004201, False),
+        ("google/flan-t5-small", IA3, "cls", "bf16-mixed", 0.0004201, False),
         ("microsoft/deberta-v3-small", LORA_BIAS, "mean", "16-mixed", 0.001422, True),
-        ("microsoft/deberta-v3-small", IA3_BIAS, "mean", "16-mixed", 0.00044566, False),
+        ("microsoft/deberta-v3-small", IA3_BIAS, "cls", "16-mixed", 0.00044566, False),
     ],
 )
 def test_predictor_gradient_checkpointing(
@@ -46,7 +46,8 @@ def test_predictor_gradient_checkpointing(
             "optimization.lr_decay": 1.0,
             "optimization.learning_rate": 1e-03,
             "optimization.max_epochs": 1,
-            "env.per_gpu_batch_size": 2,
+            "env.precision": precision,
+            "env.per_gpu_batch_size": 1,
             "env.num_workers": 0,
             "env.num_workers_evaluation": 0,
             "env.num_gpus": -1,

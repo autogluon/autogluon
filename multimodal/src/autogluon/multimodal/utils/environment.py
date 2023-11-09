@@ -96,7 +96,7 @@ def infer_precision(
             )
         precision = 32  # Force to use fp32 for training since 16-mixed is not available in CPU
     else:
-        if "bf16" in precision and not torch.cuda.is_bf16_supported():
+        if isinstance(precision, str) and "bf16" in precision and not torch.cuda.is_bf16_supported():
             warnings.warn(
                 f"{precision} is not supported by the GPU device / cuda version. "
                 "Consider using GPU devices with versions after Amphere or upgrading cuda to be >=11.0. "
@@ -110,10 +110,16 @@ def infer_precision(
             16: torch.half,
             "16": torch.half,
             "16-mixed": torch.half,
+            "16-true": torch.half,
             "bf16": torch.bfloat16,
             "bf16-mixed": torch.bfloat16,
+            "bf16-true": torch.bfloat16,
             32: torch.float32,
+            "32": torch.float32,
+            "32-true": torch.float32,
             64: torch.float64,
+            "64": torch.float64,
+            "64-true": torch.float64,
         }
         if precision in precision_mapping:
             precision = precision_mapping[precision]
