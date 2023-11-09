@@ -108,7 +108,7 @@ class ImageProcessor:
                     # We have detected that the model supports using an image size that is
                     # different from the pretrained model, e.g., ConvNets with global pooling
                     if size < self.size:
-                        logger.warn(
+                        logger.warning(
                             f"The provided image size={size} is smaller than the default size "
                             f"of the pretrained backbone, which is {self.size}. "
                             f"Detailed configuration of the backbone is in {model.config}. "
@@ -116,7 +116,7 @@ class ImageProcessor:
                         )
                     self.size = size
             elif size is not None and size != self.size:
-                logger.warn(
+                logger.warning(
                     f"The model does not support using an image size that is different from the default size. "
                     f"Provided image size={size}. Default size={self.size}. "
                     f"Detailed model configuration={model.config}. We have ignored the provided image size."

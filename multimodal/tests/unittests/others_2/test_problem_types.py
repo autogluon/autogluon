@@ -19,7 +19,7 @@ from autogluon.multimodal.problem_types import PROBLEM_TYPES_REG
         "image_text_similarity",
         "feature_extraction",
         "zero_shot_image_classification",
-        "few_shot_text_classification",
+        "few_shot_classification",
     ],
 )
 def test_get_problem_type(name):
