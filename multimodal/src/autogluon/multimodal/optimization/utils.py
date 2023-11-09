@@ -18,7 +18,6 @@ from transformers.trainer_pt_utils import get_parameter_names
 from ..constants import (
     ACC,
     ACCURACY,
-    AUTOMM,
     AVERAGE_PRECISION,
     BER,
     BINARY,
@@ -36,6 +35,7 @@ from ..constants import (
     EM,
     F1,
     FEATURES,
+    FEW_SHOT_CLASSIFICATION,
     FM,
     HIT_RATE,
     IA3,
@@ -49,8 +49,6 @@ from ..constants import (
     LORA_BIAS,
     LORA_NORM,
     MAE,
-    MAP,
-    MEAN_AVERAGE_PRECISION,
     MULTI_NEGATIVES_SOFTMAX_LOSS,
     MULTICLASS,
     NER,
@@ -131,7 +129,7 @@ def get_loss_func(
             loss_func = nn.MSELoss()
     elif problem_type == NER:
         loss_func = nn.CrossEntropyLoss(ignore_index=0)
-    elif problem_type in [OBJECT_DETECTION, OPEN_VOCABULARY_OBJECT_DETECTION]:
+    elif problem_type in [OBJECT_DETECTION, OPEN_VOCABULARY_OBJECT_DETECTION, FEW_SHOT_CLASSIFICATION]:
         return None
     elif problem_type == SEMANTIC_SEGMENTATION:
         if "structure_loss" in loss_func_name.lower():

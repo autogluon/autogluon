@@ -14,10 +14,9 @@ from ..constants import (
     ACCURACY,
     AVERAGE_PRECISION,
     BINARY,
-    BINARY_DICE,
-    BINARY_IOU,
     DIRECT_LOSS,
     F1,
+    FEW_SHOT_CLASSIFICATION,
     MAP,
     METRIC_MODE_MAP,
     MULTICLASS,
@@ -114,6 +113,8 @@ def infer_metrics(
             eval_metric_name = SPEARMANR
         else:
             eval_metric_name = RMSE
+    elif problem_type == FEW_SHOT_CLASSIFICATION:
+        eval_metric_name = ACCURACY
     elif problem_type in [OBJECT_DETECTION, OPEN_VOCABULARY_OBJECT_DETECTION]:
         if (not validation_metric_name) or validation_metric_name.lower() == MAP:
             return MAP, MAP
