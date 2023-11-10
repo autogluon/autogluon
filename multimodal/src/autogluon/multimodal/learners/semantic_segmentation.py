@@ -13,7 +13,12 @@ from autogluon.core.metrics import Scorer
 
 from ..constants import LABEL, LOGITS, MASK_SEMANTIC_INFER, SEMANTIC_SEGMENTATION
 from ..optimization.lit_semantic_segmentation import SemanticSegmentationLitModule
-from ..optimization.utils import get_metric, get_norm_layer_param_names, get_trainable_params_efficient_finetune
+from ..optimization.utils import (
+    get_loss_func,
+    get_metric,
+    get_norm_layer_param_names,
+    get_trainable_params_efficient_finetune,
+)
 from ..utils import extract_from_output, setup_save_path
 from .base import BaseLearner
 
@@ -55,6 +60,7 @@ class SemanticSegmentationLearner(BaseLearner):
             validation_metric=validation_metric,
             sample_data_path=sample_data_path,
         )
+        self._output_shape = num_classes
         if self._output_shape == None:
             self._output_shape = 1  # binary_semantic_segmentation
 
@@ -73,6 +79,16 @@ class SemanticSegmentationLearner(BaseLearner):
                 extra_params=OmegaConf.select(config, "optimization.extra_trainable_params"),
             )
         return peft_param_names
+
+    def get_loss_func_per_run(self, config, mixup_active=None):
+        loss_func = get_loss_func(
+            problem_type=self._problem_type,
+            mixup_active=mixup_active,
+            loss_func_name=OmegaConf.select(config, "optimization.loss_function"),
+            config=config.optimization,
+            num_classes=self._output_shape,
+        )
+        return loss_func
 
     def evaluate_semantic_segmentation(
         self,

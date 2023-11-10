@@ -110,7 +110,7 @@ class SemanticSegmentationLitModule(LitModule):
 
         return output, loss
 
-    def validation_step(self, batch, batch_idx, **kwargs):  # 加个kwargs?
+    def validation_step(self, batch, batch_idx, **kwargs):
         """
         Per validation step. This function is registered by LightningModule.
         Refer to https://lightning.ai/docs/pytorch/stable/common/lightning_module.html#validation-loop

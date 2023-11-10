@@ -89,6 +89,7 @@ def get_loss_func(
     mixup_active: bool,
     loss_func_name: Optional[str] = None,
     config: Optional[DictConfig] = None,
+    **kwargs,
 ):
     """
     Choose a suitable Pytorch loss module based on the provided problem type.
@@ -140,11 +141,13 @@ def get_loss_func(
             loss_func = BBCEWithLogitLoss()
         elif "mask2former_loss" in loss_func_name.lower():
             weight_dict = {
-                "loss_cross_entropy": 2.0,
-                "loss_mask": 10.0,
-                "loss_dice": 10.0,
+                "loss_cross_entropy": OmegaConf.select(config, "mask2former_loss.loss_cross_entropy_weight"),
+                "loss_mask": OmegaConf.select(config, "mask2former_loss.loss_mask_weight"),
+                "loss_dice": OmegaConf.select(config, "mask2former_loss.loss_dice_weight"),
             }
-            loss_func = Mask2FormerLoss(config=Mask2FormerConfig(), weight_dict=weight_dict)
+            loss_func = Mask2FormerLoss(
+                config=Mask2FormerConfig(num_labels=kwargs["num_classes"]), weight_dict=weight_dict
+            )
         else:
             loss_func = nn.BCEWithLogitsLoss()
     elif problem_type is None:

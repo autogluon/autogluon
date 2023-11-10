@@ -4,10 +4,11 @@ import warnings
 from io import BytesIO
 from typing import Dict, List, Optional, Union
 
+import numpy as np
 import PIL
 import torch
 from omegaconf import DictConfig
-from PIL import ImageFile
+from PIL import Image, ImageFile
 from torch import nn
 from torchvision import transforms
 
@@ -311,7 +312,10 @@ class SemanticSegImageProcessor:
                 gt_feature = per_col_gt_features[idx]
                 with PIL.Image.open(gt_feature) as gt:
                     gt = gt.convert("P")
-
+                gt = np.array(gt).astype(
+                    "float32"
+                )  # There may be issues with 'transforms.ToTensor()' withoth the line because 'transforms.ToTensor()' converts 'unit8' to values between 0 and 1.
+                gt = Image.fromarray(gt)
             if is_training:
                 if random.random() < 0.5:
                     img = self.train_transforms(img)
