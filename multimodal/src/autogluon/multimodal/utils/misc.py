@@ -7,7 +7,7 @@ import re
 import numpy as np
 import pandas as pd
 import torch
-from scipy.special import softmax
+from scipy.special import expit, softmax
 
 logger = logging.getLogger(__name__)
 
@@ -25,9 +25,12 @@ def logits_to_prob(logits: np.ndarray):
     -------
     Probabilities.
     """
-    assert logits.ndim == 2
-    prob = softmax(logits, axis=1)
-    return prob
+    if logits.ndim == 1:
+        return expit(logits)
+    elif logits.ndim == 2:
+        return softmax(logits, axis=1)
+    else:
+        raise ValueError(f"Unsupported logit dim: {logits.ndim}.")
 
 
 def tensor_to_ndarray(tensor: torch.Tensor):
