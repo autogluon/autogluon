@@ -2126,6 +2126,7 @@ class TabularPredictor:
         extra_info: bool = False,
         extra_metrics: list | None = None,
         decision_threshold: float | None = None,
+        score_format: str = "score",
         only_pareto_frontier: bool = False,
         skip_score: bool = False,
         silent: bool = False,
@@ -2140,6 +2141,8 @@ class TabularPredictor:
                 NOTE: Metrics scores always show in higher is better form.
                 This means that metrics such as log_loss and root_mean_squared_error will have their signs FLIPPED, and values will be negative.
                 This is necessary to avoid the user needing to know the metric to understand if higher is better when looking at leaderboard.
+            'eval_metric': The evaluation metric name used to calculate the scores.
+                This should be identical to `predictor.eval_metric.name`.
             'pred_time_val': The inference time required to compute predictions on the validation data end-to-end.
                 Equivalent to the sum of all 'pred_time_val_marginal' values for the model and all of its base models.
             'fit_time': The fit time required to train the model end-to-end (Including base models if the model is a stack ensemble).
@@ -2245,6 +2248,11 @@ class TabularPredictor:
             NOTE: `score_val` will not be impacted by this value in v0.8.
                 `score_val` will always show the validation scores achieved with a decision threshold of `0.5`.
                 Only test scores will be properly updated.
+        score_format : {'score', 'error'}
+            If "score", leaderboard is returned as normal.
+            If "error", the column "score_val" is converted to "metric_error_val", and "score_test" is converted to "metric_error_test".
+                "metric_error" is calculated by taking `predictor.eval_metric.convert_score_to_error(score)`.
+                This will result in errors where 0 is perfect and lower is better.
         only_pareto_frontier : bool, default = False
             If `True`, only return model information of models in the Pareto frontier of the accuracy/latency trade-off (models which achieve the highest score within their end-to-end inference time).
             At minimum this will include the model with the highest score and the model with the lowest inference time.
@@ -2271,6 +2279,7 @@ class TabularPredictor:
             extra_metrics=extra_metrics,
             decision_threshold=decision_threshold,
             only_pareto_frontier=only_pareto_frontier,
+            score_format=score_format,
             skip_score=skip_score,
             silent=silent,
         )
