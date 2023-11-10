@@ -542,6 +542,11 @@ def test_when_invalid_argument_passed_to_init_then_exception_is_raised(temp_mode
         TimeSeriesPredictor(path=temp_model_path, invalid_argument=23)
 
 
+def test_when_ignore_time_index_passed_to_predictor_then_exception_is_raised(temp_model_path):
+    with pytest.raises(TypeError, match="has been deprecated"):
+        TimeSeriesPredictor(path=temp_model_path, ignore_time_index=True)
+
+
 def test_when_invalid_argument_passed_to_fit_then_exception_is_raised(temp_model_path):
     predictor = TimeSeriesPredictor(path=temp_model_path)
     with pytest.raises(TypeError, match="unexpected keyword argument 'invalid_argument'"):
