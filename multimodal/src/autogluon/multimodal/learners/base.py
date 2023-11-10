@@ -1985,7 +1985,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         return_masks: Optional[bool] = False,
         as_tensor: Optional[bool] = False,
         as_pandas: Optional[bool] = False,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         **kwargs,
     ):
         """
