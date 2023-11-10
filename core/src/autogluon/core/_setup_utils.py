@@ -25,13 +25,17 @@ DEPENDENT_PACKAGES = {
     "psutil": ">=5.7.3,<6",  # Major version cap
     "networkx": ">=3.0,<4",  # Major version cap
     "tqdm": ">=4.38,<5",  # Major version cap
-    "Pillow": ">=9.3,<9.6",  # "<{N+2}" upper cap
+    "Pillow": ">=10.0.1,<11",  # Major version cap
     "torch": ">=2.0,<2.1",  # "<{N+1}" upper cap, sync with common/src/autogluon/common/utils/try_import.py
     "lightning": ">=2.0.0,<2.1",  # "<{N+1}" upper cap
     "pytorch_lightning": ">=2.0.0,<2.1",  # "<{N+1}" upper cap
 }
 if LITE_MODE:
-    DEPENDENT_PACKAGES = {package: version for package, version in DEPENDENT_PACKAGES.items() if package not in ["psutil", "Pillow", "timm"]}
+    DEPENDENT_PACKAGES = {
+        package: version
+        for package, version in DEPENDENT_PACKAGES.items()
+        if package not in ["psutil", "Pillow", "timm"]
+    }
 
 DEPENDENT_PACKAGES = {package: package + version for package, version in DEPENDENT_PACKAGES.items()}
 # TODO: Use DOCS_PACKAGES and TEST_PACKAGES
