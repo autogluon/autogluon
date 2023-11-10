@@ -23,12 +23,10 @@ from ..utils import (
     CustomUnpickler,
     LogFilter,
     apply_log_filter,
-    compute_num_gpus,
     compute_score,
     data_to_df,
     extract_from_output,
     get_available_devices,
-    infer_precision,
     logits_to_prob,
     select_model,
     turn_on_off_feature_column_info,
@@ -317,11 +315,8 @@ class FewShotSVMLearner(BaseLearner):
             per_gpu_batch_size=config.env.per_gpu_batch_size,
             num_workers=config.env.num_workers,
         )
-        num_gpus = compute_num_gpus(config_num_gpus=config.env.num_gpus, strategy=config.env.strategy)
-        num_gpus = self.update_num_gpus_by_data_size(num_gpus=num_gpus, data=self._train_data)
-        self.log_gpu_info(num_gpus=num_gpus, config=config)
-        precision = infer_precision(num_gpus=num_gpus, precision=config.env.precision)
-        strategy = self.get_strategy_per_run(num_gpus=num_gpus, config=config)
+        num_gpus, strategy = self.get_num_gpus_and_strategy_per_run(config=config)
+        precision = self.get_precision_per_run(num_gpus=num_gpus, precision=config.env.precision)
         config = self.post_update_config_per_run(
             config=config,
             num_gpus=num_gpus,
