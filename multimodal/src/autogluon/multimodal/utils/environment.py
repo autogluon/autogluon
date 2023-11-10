@@ -25,7 +25,7 @@ def is_interactive_env():
 
 
 def is_interactive_strategy(strategy: str):
-    if strategy:
+    if isinstance(strategy, str) and strategy:
         return strategy.startswith(("ddp_fork", "ddp_notebook"))
     else:
         return False

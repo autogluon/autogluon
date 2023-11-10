@@ -106,7 +106,6 @@ from ..utils import (
     data_to_df,
     extract_from_output,
     filter_hyperparameters,
-    get_available_devices,
     get_config,
     get_dir_ckpt_paths,
     get_fit_complete_message,
@@ -1039,6 +1038,33 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         return strategy, num_gpus
 
     @staticmethod
+    def get_precision_per_run(num_gpus: int, precision: Union[str, int], cpu_only_warning: Optional[bool] = True):
+        return infer_precision(num_gpus=num_gpus, precision=precision, cpu_only_warning=cpu_only_warning)
+
+    def get_num_gpus_and_strategy_per_run(
+        self,
+        config: Optional[DictConfig] = None,
+        predict_data: Optional[pd.DataFrame] = None,
+        is_train: Optional[bool] = True,
+    ):
+        if is_train:
+            data = self._train_data
+        else:
+            data = predict_data
+            config = self._config
+
+        num_gpus = compute_num_gpus(config_num_gpus=config.env.num_gpus, strategy=config.env.strategy)
+        num_gpus = self.update_num_gpus_by_data_size(num_gpus=num_gpus, data=data)
+        strategy = self.get_strategy_per_run(num_gpus=num_gpus, config=config)
+        strategy, num_gpus = self.update_strategy_and_num_gpus_for_hpo(strategy=strategy, num_gpus=num_gpus)
+        num_gpus, strategy = run_ddp_only_once(num_gpus, strategy)
+
+        if is_train:
+            self.log_gpu_info(num_gpus=num_gpus, config=config)
+
+        return num_gpus, strategy
+
+    @staticmethod
     def post_update_config_per_run(config, num_gpus, precision, strategy):
         config.env.num_gpus = num_gpus
         config.env.precision = precision
@@ -1265,13 +1291,9 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         callbacks = self.get_callbacks_per_run(save_path=save_path, config=config, litmodule=litmodule)
         plugins = self.get_plugins_per_run(model=model, peft_param_names=peft_param_names)
         tb_logger = self.get_tb_logger(save_path=save_path)
-        num_gpus = compute_num_gpus(config_num_gpus=config.env.num_gpus, strategy=config.env.strategy)
-        self.log_gpu_info(num_gpus=num_gpus, config=config)
-        precision = infer_precision(num_gpus=num_gpus, precision=config.env.precision)
+        num_gpus, strategy = self.get_num_gpus_and_strategy_per_run(config=config)
+        precision = self.get_precision_per_run(num_gpus=num_gpus, precision=config.env.precision)
         grad_steps = self.get_grad_steps(num_gpus=num_gpus, config=config)
-        strategy = self.get_strategy_per_run(num_gpus=num_gpus, config=config)
-        strategy, num_gpus = self.update_strategy_and_num_gpus_for_hpo(strategy=strategy, num_gpus=num_gpus)
-        num_gpus, strategy = run_ddp_only_once(num_gpus, strategy)
         config = self.post_update_config_per_run(
             config=config,
             num_gpus=num_gpus,
@@ -1611,6 +1633,16 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         data = self.data_to_df(data=data)
         return data
 
+    def get_predict_batch_size_per_run(self, num_gpus: int, strategy: str):
+        return compute_inference_batch_size(
+            per_gpu_batch_size=self._config.env.per_gpu_batch_size,
+            eval_batch_size_ratio=OmegaConf.select(self._config, "env.eval_batch_size_ratio"),
+            per_gpu_batch_size_evaluation=self._config.env.per_gpu_batch_size_evaluation,
+            # backward compatibility.
+            num_gpus=num_gpus,
+            strategy=strategy,
+        )
+
     def on_predict_per_run_end(self, trainer):
         self.clean_trainer_processes(trainer=trainer, is_train=False)
 
@@ -1658,25 +1690,16 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             requires_label=requires_label,
             is_train=False,
         )
-        num_gpus = compute_num_gpus(
-            config_num_gpus=self._config.env.num_gpus,
-            strategy=self._config.env.strategy,
+        num_gpus, strategy = self.get_num_gpus_and_strategy_per_run(
+            predict_data=data,
+            is_train=False,
         )
-        num_gpus = self.update_num_gpus_by_data_size(num_gpus=num_gpus, data=data)
-        precision = infer_precision(
+        precision = self.get_precision_per_run(
             num_gpus=num_gpus,
             precision=self._config.env.precision,
             cpu_only_warning=False,
         )
-        strategy = self.get_strategy_per_run(num_gpus=num_gpus, config=self._config)
-        batch_size = compute_inference_batch_size(
-            per_gpu_batch_size=self._config.env.per_gpu_batch_size,
-            eval_batch_size_ratio=OmegaConf.select(self._config, "env.eval_batch_size_ratio"),
-            per_gpu_batch_size_evaluation=self._config.env.per_gpu_batch_size_evaluation,
-            # backward compatibility.
-            num_gpus=num_gpus,
-            strategy=strategy,
-        )
+        batch_size = self.get_predict_batch_size_per_run(num_gpus=num_gpus, strategy=strategy)
         realtime = self.use_realtime(
             realtime=realtime,
             data=data,

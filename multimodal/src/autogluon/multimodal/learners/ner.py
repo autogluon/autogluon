@@ -1,26 +1,21 @@
+import json
 import logging
-import sys
+import os
 import warnings
 from datetime import timedelta
-from typing import Dict, List, Optional, Union
+from typing import Callable, Dict, List, Optional, Union
 
+import lightning.pytorch as pl
 import pandas as pd
-from omegaconf import OmegaConf
+from omegaconf import DictConfig, OmegaConf
 from torch import nn
 
 from autogluon.core.metrics import Scorer
 
-from ..constants import NER, NER_RET, OVERALL_F1, Y_PRED, Y_TRUE
+from ..constants import NER, NER_RET, Y_PRED, Y_TRUE
 from ..data import MultiModalFeaturePreprocessor
-from ..optimization import NerLitModule
-from ..utils import (
-    compute_inference_batch_size,
-    compute_num_gpus,
-    compute_score,
-    extract_from_output,
-    infer_precision,
-    merge_bio_format,
-)
+from ..optimization import NerLitModule, get_metric
+from ..utils import compute_score, create_fusion_model, extract_from_output, merge_bio_format
 from .base import BaseLearner
 
 logger = logging.getLogger(__name__)
@@ -56,54 +51,57 @@ class NERLearner(BaseLearner):
             validation_metric=validation_metric,
         )
 
-    def fit(
+    def infer_problem_type(self, train_data: pd.DataFrame):
+        return  # problem type should be provided in learner initialization
+
+    def infer_output_shape(self):
+        return  # output shape is conditioned on df_preprocessor in fit_per_run().
+
+    def update_attributes(
         self,
-        train_data: Union[pd.DataFrame, str],
-        presets: Optional[str] = None,
         config: Optional[Dict] = None,
-        tuning_data: Optional[Union[pd.DataFrame, str]] = None,
-        time_limit: Optional[int] = None,
-        save_path: Optional[str] = None,
-        hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
-        column_types: Optional[Dict] = None,
-        holdout_frac: Optional[float] = None,
-        seed: Optional[int] = 0,
-        standalone: Optional[bool] = True,
-        hyperparameter_tune_kwargs: Optional[Dict] = None,
-        clean_ckpts: Optional[bool] = True,
+        df_preprocessor: Optional[MultiModalFeaturePreprocessor] = None,
+        data_processors: Optional[Dict] = None,
+        model: Optional[nn.Module] = None,
+        model_postprocess_fn: Optional[Callable] = None,
+        best_score: Optional[float] = None,
+        output_shape: Optional[int] = None,
         **kwargs,
     ):
-        training_start = self.on_fit_start(presets=presets, config=config)
-        self.setup_save_path(save_path=save_path)
-        self.prepare_train_tuning_data(
-            train_data=train_data,
-            tuning_data=tuning_data,
-            holdout_frac=holdout_frac,
-            seed=seed,
+        super().update_attributes(
+            config=config,
+            df_preprocessor=df_preprocessor,
+            data_processors=data_processors,
+            model=model,
+            model_postprocess_fn=model_postprocess_fn,
+            best_score=best_score,
         )
-        self.infer_column_types(column_types=column_types)
-        self.infer_validation_metric()
-        self.update_hyperparameters(
-            hyperparameters=hyperparameters,
-            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-        )
-        self.fit_sanity_check()
-        self.prepare_fit_args(
-            time_limit=time_limit,
-            seed=seed,
-            standalone=standalone,
-            clean_ckpts=clean_ckpts,
-        )
-        fit_returns = self.execute_fit()
-        self.on_fit_end(
-            training_start=training_start,
-            strategy=fit_returns.get("strategy", None),
-            strict_loading=fit_returns.get("strict_loading", True),
-            standalone=standalone,
-            clean_ckpts=clean_ckpts,
-        )
+        if output_shape:
+            self._output_shape = output_shape  # since ner infers output_shape in fit_per_run(), the learners needs to update the attribute afterwards.
 
-        return self
+    def get_validation_metric_per_run(self, output_shape: int):
+        validation_metric, custom_metric_func = get_metric(
+            metric_name=self._validation_metric_name,
+            num_classes=output_shape,
+            problem_type=self._problem_type,
+        )
+        return validation_metric, custom_metric_func
+
+    def get_model_per_run(
+        self,
+        model: nn.Module,
+        config: DictConfig,
+        df_preprocessor: MultiModalFeaturePreprocessor,
+        output_shape: int,
+    ):
+        if model is None:
+            model = create_fusion_model(
+                config=config,
+                num_classes=output_shape,
+                num_numerical_columns=len(df_preprocessor.numerical_feature_names),
+                num_categories=df_preprocessor.categorical_num_categories,
+            )
+        return model
 
     def get_optimization_kwargs_per_run(self, config, validation_metric, custom_metric_func, loss_func):
         return dict(
@@ -146,6 +144,30 @@ class NERLearner(BaseLearner):
         # ner needs to update output_shape with label_generator.
         return len(df_preprocessor.label_generator.unique_entity_groups)
 
+    def on_fit_per_run_end(
+        self,
+        trainer: pl.Trainer,
+        config: DictConfig,
+        model: nn.Module,
+        df_preprocessor: MultiModalFeaturePreprocessor,
+        data_processors: Dict,
+        save_path: str,
+        standalone: bool,
+        output_shape: int,
+    ):
+        self.clean_trainer_processes(trainer=trainer, is_train=True)
+        self.save(
+            path=save_path,
+            standalone=standalone,
+            config=config,
+            model=model,
+            df_preprocessor=df_preprocessor,
+            data_processors=data_processors,
+            fit_called=True,  # fit is called on one run.
+            save_model=False,  # The final model will be saved in top_k_average
+            output_shape=output_shape,
+        )
+
     def fit_per_run(
         self,
         max_time: timedelta,
@@ -170,8 +192,13 @@ class NERLearner(BaseLearner):
             config=config,
         )
         config = self.update_config_by_data_per_run(config=config, df_preprocessor=df_preprocessor)
-        self._output_shape = self.get_output_shape_per_run(df_preprocessor=df_preprocessor)
-        model = self.get_model_per_run(model=model, config=config, df_preprocessor=df_preprocessor)
+        output_shape = self.get_output_shape_per_run(df_preprocessor=df_preprocessor)
+        model = self.get_model_per_run(
+            model=model,
+            config=config,
+            df_preprocessor=df_preprocessor,
+            output_shape=output_shape,
+        )
         model = self.compile_model_per_run(config=config, model=model)
         peft_param_names = self.get_peft_param_names_per_run(model=model, config=config)
         data_processors = self.get_data_processors_per_run(
@@ -180,7 +207,7 @@ class NERLearner(BaseLearner):
             model=model,
             advanced_hyperparameters=advanced_hyperparameters,
         )
-        validation_metric, custom_metric_func = self.get_validation_metric_per_run()
+        validation_metric, custom_metric_func = self.get_validation_metric_per_run(output_shape=output_shape)
         loss_func = self.get_loss_func_per_run(config=config)
         if max_time == timedelta(seconds=0):
             return dict(
@@ -211,12 +238,9 @@ class NERLearner(BaseLearner):
         callbacks = self.get_callbacks_per_run(save_path=save_path, config=config, litmodule=litmodule)
         plugins = self.get_plugins_per_run(model=model, peft_param_names=peft_param_names)
         tb_logger = self.get_tb_logger(save_path=save_path)
-        num_gpus = compute_num_gpus(config_num_gpus=config.env.num_gpus, strategy=config.env.strategy)
-        self.log_gpu_info(num_gpus=num_gpus, config=config)
-        precision = infer_precision(num_gpus=num_gpus, precision=config.env.precision)
+        num_gpus, strategy = self.get_num_gpus_and_strategy_per_run(config=config)
+        precision = self.get_precision_per_run(num_gpus=num_gpus, precision=config.env.precision)
         grad_steps = self.get_grad_steps(num_gpus=num_gpus, config=config)
-        strategy = self.get_strategy_per_run(num_gpus=num_gpus, config=config)
-        strategy, num_gpus = self.update_strategy_and_num_gpus_for_hpo(strategy=strategy, num_gpus=num_gpus)
         config = self.post_update_config_per_run(
             config=config,
             num_gpus=num_gpus,
@@ -251,6 +275,7 @@ class NERLearner(BaseLearner):
             df_preprocessor=df_preprocessor,
             data_processors=data_processors,
             model=model,
+            output_shape=output_shape,
         )
 
         return dict(
@@ -261,6 +286,7 @@ class NERLearner(BaseLearner):
             best_score=trainer.callback_metrics[f"val_{self._validation_metric_name}"].item(),
             strategy=strategy,
             strict_loading=not peft_param_names,
+            output_shape=output_shape,
         )
 
     def evaluate(
@@ -420,3 +446,38 @@ class NERLearner(BaseLearner):
             prob = self._as_pandas(data=data, to_be_converted=prob)
 
         return prob
+
+    def save(
+        self,
+        path: str,
+        standalone: Optional[bool] = True,
+        config: Optional[DictConfig] = None,
+        model: Optional[nn.Module] = None,
+        df_preprocessor: Optional[MultiModalFeaturePreprocessor] = None,
+        data_processors: Optional[Dict] = None,
+        fit_called: Optional[bool] = None,
+        save_model: Optional[bool] = True,
+        output_shape: Optional[int] = None,
+    ):
+        super().save(
+            path=path,
+            standalone=standalone,
+            config=config,
+            model=model,
+            df_preprocessor=df_preprocessor,
+            data_processors=data_processors,
+            fit_called=fit_called,
+            save_model=save_model,
+        )
+        if output_shape:  # output_shape is provided for saving artifacts at on_fit_per_run_end().
+            assets_path = os.path.join(path, "assets.json")
+            with open(assets_path, "r") as fp:
+                assets = json.load(fp)
+                assets.update(
+                    {
+                        "output_shape": output_shape,
+                    }
+                )
+            os.remove(assets_path)
+            with open(assets_path, "w") as fp:
+                json.dump(assets, fp, ensure_ascii=True)

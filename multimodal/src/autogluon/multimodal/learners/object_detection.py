@@ -23,16 +23,12 @@ from ..optimization import MMDetLitModule
 from ..utils import (
     check_if_packages_installed,
     cocoeval,
-    compute_inference_batch_size,
-    compute_num_gpus,
     convert_pred_to_xywh,
     create_fusion_model,
     extract_from_output,
     from_coco_or_voc,
     get_detection_classes,
-    infer_precision,
     object_detection_data_to_df,
-    run_ddp_only_once,
     save_ovd_result_df,
     save_result_df,
     setup_save_path,
@@ -386,13 +382,10 @@ class ObjectDetectionLearner(BaseLearner):
         callbacks = self.get_callbacks_per_run(save_path=save_path, config=config, litmodule=litmodule)
         plugins = self.get_plugins_per_run(model=model)
         tb_logger = self.get_tb_logger(save_path=save_path)
-        num_gpus = compute_num_gpus(config_num_gpus=config.env.num_gpus, strategy=config.env.strategy)
-        self.log_gpu_info(num_gpus=num_gpus, config=config)
-        precision = infer_precision(num_gpus=num_gpus, precision=config.env.precision)
+        num_gpus, strategy = self.get_num_gpus_and_strategy_per_run(config=config)
+        precision = self.get_precision_per_run(num_gpus=num_gpus, precision=config.env.precision)
         grad_steps = self.get_grad_steps(num_gpus=num_gpus, config=config)
         strategy = self.get_strategy_per_run(num_gpus=num_gpus, config=config)
-        strategy, num_gpus = self.update_strategy_and_num_gpus_for_hpo(strategy=strategy, num_gpus=num_gpus)
-        num_gpus, strategy = run_ddp_only_once(num_gpus, strategy)
         config = self.post_update_config_per_run(
             config=config,
             num_gpus=num_gpus,
@@ -486,26 +479,16 @@ class ObjectDetectionLearner(BaseLearner):
             requires_label=requires_label,
             is_train=False,
         )
-        num_gpus = compute_num_gpus(
-            config_num_gpus=self._config.env.num_gpus,
-            strategy=self._config.env.strategy,
+        num_gpus, strategy = self.get_num_gpus_and_strategy_per_run(
+            predict_data=data,
+            is_train=False,
         )
-        precision = infer_precision(
+        precision = self.get_precision_per_run(
             num_gpus=num_gpus,
             precision=self._config.env.precision,
             cpu_only_warning=False,
         )
-        strategy = self.get_strategy_per_run(num_gpus=num_gpus, config=self._config)
-        num_gpus = self.update_num_gpus_by_strategy(strategy=strategy, num_gpus=num_gpus)
-        num_gpus, strategy = run_ddp_only_once(num_gpus, strategy)
-        batch_size = compute_inference_batch_size(
-            per_gpu_batch_size=self._config.env.per_gpu_batch_size,
-            eval_batch_size_ratio=OmegaConf.select(self._config, "env.eval_batch_size_ratio"),
-            per_gpu_batch_size_evaluation=self._config.env.per_gpu_batch_size_evaluation,
-            # backward compatibility.
-            num_gpus=num_gpus,
-            strategy=strategy,
-        )
+        batch_size = self.get_predict_batch_size_per_run(num_gpus=num_gpus, strategy=strategy)
         realtime, num_gpus, barebones = self.update_realtime_for_interactive_env(
             realtime=realtime,
             num_gpus=num_gpus,
