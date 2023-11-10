@@ -7,7 +7,6 @@ from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import pandas as pd
 
-from autogluon.common.utils.deprecated_utils import Deprecated_args
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.utils import check_saved_predictor_version, seed_everything, setup_outputdir
 from autogluon.core.utils.decorators import apply_presets
@@ -120,7 +119,6 @@ class TimeSeriesPredictor:
     predictor_file_name = "predictor.pkl"
     _predictor_version_file_name = "__version__"
 
-    @Deprecated_args(min_version_to_warn="0.9", min_version_to_error="1.0", ignore_time_index=None)
     def __init__(
         self,
         target: Optional[str] = None,
@@ -136,7 +134,7 @@ class TimeSeriesPredictor:
         learner_type: Optional[Type[AbstractLearner]] = None,
         learner_kwargs: Optional[dict] = None,
         label: Optional[str] = None,
-        ignore_time_index: bool = False,
+        **kwargs,
     ):
         self.verbosity = verbosity
         set_logger_verbosity(self.verbosity, logger=logger)
@@ -195,6 +193,17 @@ class TimeSeriesPredictor:
             learner_type = TimeSeriesLearner
         self._learner: AbstractLearner = learner_type(**learner_kwargs)
         self._learner_type = type(self._learner)
+
+        if "ignore_time_index" in kwargs:
+            raise TypeError(
+                "`ignore_time_index` argument to TimeSeriesPredictor.__init__() has been deprecated.\n"
+                "If your data has irregular timestamps, please either 1) specify the desired regular frequency when "
+                "creating the predictor as `TimeSeriesPredictor(freq=...)` or 2) manually convert timestamps to "
+                "regular frequency with `data.convert_frequency(freq=...)`."
+            )
+        if len(kwargs) > 0:
+            for key in kwargs:
+                raise TypeError(f"TimeSeriesPredictor.__init__() got an unexpected keyword argument '{key}'")
 
     @property
     def _trainer(self) -> AbstractTimeSeriesTrainer:
@@ -255,7 +264,7 @@ class TimeSeriesPredictor:
                 raise ValueError(
                     f"Frequency of {name} is not provided and cannot be inferred. Please set the expected data "
                     f"frequency when creating the predictor with `TimeSeriesPredictor(freq=...)` or ensure that "
-                    f"the data has a regular time index with `{name}.to_regular_index(freq=...)`"
+                    f"the data has a regular time index with `{name}.convert_frequency(freq=...)`"
                 )
             else:
                 self.freq = df.freq
@@ -1049,3 +1058,13 @@ class TimeSeriesPredictor:
                     f"Training may have failed on the refit model. AutoGluon will default to using '{model_best}' for predict()."
                 )
         return refit_full_dict
+
+    def __dir__(self) -> List[str]:
+        # This hides method from IPython autocomplete, but not VSCode autocomplete
+        deprecated = ["score"]
+        return [d for d in super().__dir__() if d not in deprecated]
+
+    def score(self, *args, **kwargs):
+        raise ValueError(
+            "`TimeSeriesPredictor.score` has been deprecated. Please use `TimeSeriesPredictor.evaluate` instead."
+        )
