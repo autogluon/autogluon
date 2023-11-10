@@ -110,10 +110,9 @@ def test_mmdet_object_detection_inference_basics(checkpoint_name):
     # Inference on list format data
     pred = predictor.predict([mmdet_image_name] * 20)  # test batch inference
     assert len(pred) == 20  # test data size is 20
-    print(pred)
 
     # Inference on single image path
-    pred = predictor.predict(mmdet_image_name)  # test batch inference
+    pred = predictor.predict(mmdet_image_name)  # test single entry data inference
     assert len(pred) == 1  # test data size is 1
 
     # Inference on dict format data
