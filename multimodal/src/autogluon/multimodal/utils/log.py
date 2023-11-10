@@ -207,7 +207,7 @@ def get_gpu_message(detected_num_gpus: int, used_num_gpus: int, strategy: str):
 
     def _bytes_to_gigabytes(bytes):
         return round((bytes / 1024) / 1024 / 1024, 2)
-    
+
     gpu_message = f"{detected_num_gpus} GPUs are detected, and {used_num_gpus} GPUs will be used.\n"
     if not is_interactive_strategy(strategy):
         for i in range(detected_num_gpus):
