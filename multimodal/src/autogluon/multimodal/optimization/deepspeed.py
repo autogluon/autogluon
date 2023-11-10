@@ -95,7 +95,7 @@ class CustomDeepSpeedStrategy(DeepSpeedStrategy):
         Parameters
         ----------
         zero_optimization
-            Enable ZeRO optimization. This is only compatible with precision=16.
+            Enable ZeRO optimization. This is only compatible with precision="16-mixed".
 
         stage
             Different stages of the ZeRO Optimizer. 0 is disabled,
