@@ -21,14 +21,13 @@ import lightning.pytorch as pl
 import torch
 from lightning.pytorch.accelerators.cuda import CUDAAccelerator
 from lightning.pytorch.overrides.base import _LightningModuleWrapperBase, _LightningPrecisionModuleWrapperBase
-from lightning.pytorch.plugins.environments.cluster_environment import ClusterEnvironment
+from lightning.pytorch.plugins.environments import ClusterEnvironment
 from lightning.pytorch.plugins.precision import PrecisionPlugin
 from lightning.pytorch.strategies import DeepSpeedStrategy
 from lightning.pytorch.utilities import GradClipAlgorithmType
 from lightning.pytorch.utilities.exceptions import MisconfigurationException
 from lightning.pytorch.utilities.model_helpers import is_overridden
 from lightning.pytorch.utilities.rank_zero import rank_zero_warn
-from lightning.pytorch.utilities.types import _PATH
 
 
 class CustomDeepSpeedStrategy(DeepSpeedStrategy):
@@ -74,7 +73,7 @@ class CustomDeepSpeedStrategy(DeepSpeedStrategy):
         reduce_bucket_size: int = 200_000_000,
         zero_allow_untested_optimizer: bool = True,
         logging_batch_size_per_gpu: Union[str, int] = "auto",
-        config: Optional[Union[_PATH, Dict[str, Any]]] = None,
+        config: Optional[Dict[str, Any]] = None,
         logging_level: int = logging.WARN,
         parallel_devices: Optional[List[torch.device]] = None,
         cluster_environment: Optional[ClusterEnvironment] = None,

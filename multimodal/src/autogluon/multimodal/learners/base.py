@@ -586,6 +586,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
     def on_fit_end(
         self,
         training_start: float,
+        config: DictConfig,
         strategy: Optional[str] = None,
         strict_loading: Optional[bool] = True,
         standalone: Optional[bool] = True,
@@ -594,6 +595,22 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         self._fit_called = True
         if not self._is_hpo:
             # top_k_average is called inside hyperparameter_tune() when building the final predictor.
+            num_nodes = config.env.num_nodes
+            if not num_nodes:
+                num_nodes = 1
+            if num_nodes > 1:
+                sync_checkpoints(
+                    path=self.path,
+                    num_nodes=num_nodes,
+                    sync_path=sync_path,
+                )
+            self._model = create_fusion_model(
+                config=config,
+                num_classes=self._output_shape,
+                classes=self._classes if hasattr(self, "_classes") else None,
+                num_numerical_columns=len(self._df_preprocessor.numerical_feature_names),
+                num_categories=self._df_preprocessor.categorical_num_categories,
+            )
             self.top_k_average(
                 save_path=self._save_path,
                 top_k_average_method=self._config.optimization.top_k_average_method,
@@ -654,6 +671,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         fit_returns = self.execute_fit()
         self.on_fit_end(
             training_start=training_start,
+            config=fit_returns.get("config", None),
             strategy=fit_returns.get("strategy", None),
             strict_loading=fit_returns.get("strict_loading", True),
             standalone=standalone,
