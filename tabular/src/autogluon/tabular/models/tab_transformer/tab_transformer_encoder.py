@@ -115,7 +115,6 @@ class ScalarQuantileOrdinalEnc(EncBase):
             self.cat_cards = [n_bins_ + 1]
 
     def fit(self, data):
-
         data = super().fit(data, dtype="float")
         fit_data = [i for i in data if i is not None]
         fit_data = np.array(fit_data).reshape(-1, 1)

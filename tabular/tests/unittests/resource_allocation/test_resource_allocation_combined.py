@@ -56,7 +56,6 @@ def _prepare_data():
 
 
 def _construct_dummy_fold_strategy(fold_strategy_cls, num_jobs, num_folds_parallel, resource_granted, model_base, bagged_model):
-
     train_data, test_data = _prepare_data()
     args = dict(
         model_base=model_base,

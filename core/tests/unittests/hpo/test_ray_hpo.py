@@ -8,7 +8,6 @@ from autogluon.core.hpo.ray_tune_constants import SCHEDULER_PRESETS, SEARCHER_PR
 
 
 class DummyAdapter(RayTuneAdapter):
-
     supported_searchers = list(SEARCHER_PRESETS.keys())
     supported_schedulers = list(SCHEDULER_PRESETS.keys())
 
@@ -34,7 +33,6 @@ def _dummy_objective(x, a, b):
 
 
 def _dummy_trainable(config):
-
     for x in range(20):
         score = _dummy_objective(x, config["a"], config["b"])
 

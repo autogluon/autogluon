@@ -528,7 +528,6 @@ def bbox_ratio_xywh_to_index_xyxy(
         return x, y, x + w, y + h  # xywh to xyxy
     elif isinstance(xywh, np.ndarray):
         if isinstance(image_wh, np.ndarray):
-
             if not xywh.size % 4 == 0:
                 raise IndexError("Bounding boxes must have n * 4 elements, given {}".format(xywh.shape))
             if not image_wh.size % 2 == 0:
@@ -543,7 +542,6 @@ def bbox_ratio_xywh_to_index_xyxy(
             xyxy = np.hstack((xywh[:, :2], xywh[:, :2] + np.maximum(0, xywh[:, 2:] - 1)))
             return xyxy
         elif isinstance(image_wh, (tuple, list)):
-
             if not xywh.size % 4 == 0:
                 raise IndexError("Bounding boxes must have n * 4 elements, given {}".format(xywh.shape))
 
@@ -1132,7 +1130,6 @@ def process_voc_annotations(
     class_names = set()
     xml_file_names = []
     for f in files:
-
         xml_path = os.path.join(voc_annotation_path, f)
         tree = ET.parse(xml_path)
         root = tree.getroot()

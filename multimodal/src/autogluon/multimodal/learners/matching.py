@@ -319,7 +319,6 @@ class MultiModalMatcher(BaseLearner):
         set_logger_verbosity(verbosity, logger=logger)
 
     def _init_pretrained(self):
-
         if self._config is None:
             # split out the hyperparameters whose values are complex objects
             hyperparameters, advanced_hyperparameters = split_hyperparameters(self._hyperparameters)
@@ -1257,7 +1256,6 @@ class MultiModalMatcher(BaseLearner):
         match_label: int,
         signature: Optional[str] = None,
     ) -> List[Dict]:
-
         predict_dm = BaseDataModule(
             df_preprocessor=df_preprocessor,
             data_processors=data_processors,

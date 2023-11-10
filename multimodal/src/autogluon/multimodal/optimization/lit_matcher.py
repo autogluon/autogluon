@@ -208,7 +208,6 @@ class MatcherLitModule(pl.LightningModule):
         logit_scale: Optional[torch.Tensor] = None,
         reverse_prob: Optional[bool] = False,
     ):
-
         if isinstance(metric, BaseAggregator):
             metric.update(custom_metric_func(query_embeddings, response_embeddings, label))
         elif isinstance(metric, CustomHitRate):

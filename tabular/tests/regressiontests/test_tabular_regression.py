@@ -46,7 +46,6 @@ def myfloor(x, base=0.01):
 
 @pytest.mark.regression
 def inner_test_tabular(testname):
-
     # Find the named test
     test = None
     for t in tests:
@@ -75,7 +74,6 @@ def inner_test_tabular(testname):
     if not isinstance(test["params"], list):
         test["params"] = [test["params"]]
     for params in test["params"]:
-
         # Run this model and set of params
         predictor = TabularPredictor(label="label", **params["predict"])
         predictor.fit(dftrain, **params["fit"])

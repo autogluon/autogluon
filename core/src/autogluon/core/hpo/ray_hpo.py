@@ -404,7 +404,6 @@ def _get_scheduler(hyperparameter_tune_kwargs: dict, supported_schedulers: Optio
 
 
 class TabularRayTuneAdapter(RayTuneAdapter):
-
     supported_searchers = ["random", "bayes"]
     supported_schedulers = ["FIFO"]
 
@@ -427,7 +426,6 @@ class TabularRayTuneAdapter(RayTuneAdapter):
 
 
 class AutommRayTuneAdapter(RayTuneAdapter):
-
     supported_searchers = ["random", "bayes"]
     supported_schedulers = ["FIFO", "ASHA"]
 
@@ -458,7 +456,6 @@ class AutommRayTuneAdapter(RayTuneAdapter):
 
 
 class TimeSeriesRayTuneAdapter(TabularRayTuneAdapter):
-
     supported_searchers = ["random", "bayes"]
     supported_schedulers = ["FIFO"]
 
@@ -468,7 +465,6 @@ class TimeSeriesRayTuneAdapter(TabularRayTuneAdapter):
 
 
 class RayTuneAdapterFactory:
-
     __supported_adapters = [
         TabularRayTuneAdapter,
         TimeSeriesRayTuneAdapter,

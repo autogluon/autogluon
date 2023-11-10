@@ -478,7 +478,6 @@ class BaggedEnsembleModel(AbstractModel):
             X_len = len(X)
             # Check if pred_proba is going to take too long
             if time_limit is not None and X_len >= 10000:
-
                 max_allowed_time = time_limit * 1.3  # allow some buffer
                 time_left = max(
                     max_allowed_time - model_base.fit_time,
