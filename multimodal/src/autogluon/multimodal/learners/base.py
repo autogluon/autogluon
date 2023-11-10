@@ -561,7 +561,6 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
     def on_fit_start(
         self,
         presets: Optional[str] = None,
-        config: Optional[Dict] = None,
         teacher_learner: Optional[Union[str, BaseLearner]] = None,
     ):
         self.ensure_fit_ready()
@@ -570,11 +569,6 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                 warnings.warn("Ignoring the provided `presets` as fit() was called before.", UserWarning)
             else:
                 self._presets = presets
-        if config:
-            if self._fit_called:
-                warnings.warn("Ignoring the provided `config` as fit() was called before.", UserWarning)
-            else:
-                self._config = config
         if teacher_learner:
             self._teacher_learner = teacher_learner
 
@@ -611,7 +605,6 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         self,
         train_data: Union[pd.DataFrame, str],
         presets: Optional[str] = None,
-        config: Optional[Dict] = None,
         tuning_data: Optional[Union[pd.DataFrame, str]] = None,
         time_limit: Optional[int] = None,
         save_path: Optional[str] = None,
@@ -625,7 +618,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         clean_ckpts: Optional[bool] = True,
         **kwargs,
     ):
-        training_start = self.on_fit_start(presets=presets, config=config, teacher_learner=teacher_learner)
+        training_start = self.on_fit_start(presets=presets, teacher_learner=teacher_learner)
         self.setup_save_path(save_path=save_path)
         self.infer_problem_type(train_data=train_data)
         self.prepare_train_tuning_data(

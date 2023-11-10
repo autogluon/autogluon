@@ -349,7 +349,6 @@ class MultiModalPredictor:
         self,
         train_data: Union[pd.DataFrame, str],
         presets: Optional[str] = None,
-        config: Optional[dict] = None,
         tuning_data: Optional[Union[pd.DataFrame, str]] = None,
         max_num_tuning_data: Optional[int] = None,
         id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
@@ -374,32 +373,6 @@ class MultiModalPredictor:
             A dataframe containing training data.
         presets
             Presets regarding model quality, e.g., best_quality, high_quality, and medium_quality.
-        config
-            A dictionary with four keys "model", "data", "optimization", and "environment".
-            Each key's value can be a string, yaml file path, or OmegaConf's DictConfig.
-            Strings should be the file names (DO NOT include the postfix ".yaml") in
-            automm/configs/model, automm/configs/data, automm/configs/optimization, and automm/configs/environment.
-            For example, you can configure a late-fusion model for the image, text, and tabular data as follows:
-            config = {
-                        "model": "default",
-                        "data": "default",
-                        "optimization": "default",
-                        "environment": "default",
-                    }
-            or
-            config = {
-                        "model": "/path/to/model/config.yaml",
-                        "data": "/path/to/data/config.yaml",
-                        "optimization": "/path/to/optimization/config.yaml",
-                        "environment": "/path/to/environment/config.yaml",
-                    }
-            or
-            config = {
-                        "model": OmegaConf.load("/path/to/model/config.yaml"),
-                        "data": OmegaConf.load("/path/to/data/config.yaml"),
-                        "optimization": OmegaConf.load("/path/to/optimization/config.yaml"),
-                        "environment": OmegaConf.load("/path/to/environment/config.yaml"),
-                    }
         tuning_data
             A dataframe containing validation data, which should have the same columns as the train_data.
             If `tuning_data = None`, `fit()` will automatically
@@ -487,7 +460,6 @@ class MultiModalPredictor:
         self._learner.fit(
             train_data=train_data,
             presets=presets,
-            config=config,
             tuning_data=tuning_data,
             max_num_tuning_data=max_num_tuning_data,
             time_limit=time_limit,
