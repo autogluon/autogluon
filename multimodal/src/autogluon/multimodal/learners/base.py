@@ -845,7 +845,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         predict_data=None,
         is_train=True,
     ):
-        if self._teacher_learner is not None:
+        if self._teacher_learner is not None and not isinstance(self._teacher_learner, str):
+            # self._teacher_learner is a str in hpo
             df_preprocessor = [df_preprocessor, self._teacher_learner._df_preprocessor]
             data_processors = [data_processors, self._teacher_learner._data_processors]
         datamodule_kwargs = dict(
