@@ -2,12 +2,14 @@ import logging
 import os
 from typing import Dict, Iterable, List, Optional, Union
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
 import torchmetrics
 from omegaconf import OmegaConf
 from PIL import Image
+from scipy.special import softmax
 
 from autogluon.core.metrics import Scorer
 
@@ -312,9 +314,12 @@ class SemanticSegmentationLearner(BaseLearner):
         Returns
         -------
         Array of predicted class-probabilities, corresponding to each row in the given data.
-        When as_multiclass is True, the output will always have shape (#samples, #classes).
-        Otherwise, the output will have shape (#samples,)
+        When as_multiclass is True, the output will always have shape (#samples, #classes, height, width).
+        Otherwise, the output will have shape (#samples, height, width)
         """
+        assert (self._output_shape == 1 and as_multiclass == False) or (
+            self._output_shape > 1 and as_multiclass == True
+        )
         self.ensure_predict_ready()
 
         outputs = self.predict_per_run(
@@ -322,16 +327,12 @@ class SemanticSegmentationLearner(BaseLearner):
             requires_label=False,
             realtime=realtime,
         )
-        logits = extract_from_output(outputs=outputs, ret_type=LOGITS)
-        prob = logits  # for binary
-        # prob = logits_to_prob(logits)
-
-        # if not as_multiclass:
-        #     if self._problem_type == BINARY:
-        #         prob = prob[:, 1]
-
-        # if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
-        #     prob = self._as_pandas(data=data, to_be_converted=prob)
+        if as_multiclass:
+            logits = extract_from_output(outputs=outputs, ret_type=MASK_SEMANTIC_INFER)
+            prob = softmax(logits, axis=1)
+        else:
+            logits = extract_from_output(outputs=outputs, ret_type=LOGITS)
+            prob = logits
 
         return prob
 
@@ -361,6 +362,13 @@ class SemanticSegmentationLearner(BaseLearner):
         -------
         The paths of the segmentation results as pandas DataFrame
         """
+
+        def show_mask(mask, ax):
+            color = np.concatenate([np.random.random(3), np.array([0.6])], axis=0)
+            h, w = mask.shape[-2:]
+            mask_image = mask.reshape(h, w, 1) * color.reshape(1, 1, -1)
+            ax.imshow(mask_image)
+
         if isinstance(data, dict):
             image_names = data["image"]
         else:
@@ -376,12 +384,22 @@ class SemanticSegmentationLearner(BaseLearner):
                 per_mask_path = os.path.join(mask_path, os.path.basename(image_name))
                 mask.save(per_mask_path)
             else:
-                mask = Image.fromarray(image_pred, mode="P")  # multi-class
+                masks = []
+                classes = np.unique(image_pred)
+                for class_id in classes:
+                    if class_id == 0:  # bg
+                        continue
+                    masks.append(image_pred == class_id)
+
+                for mask in masks:
+                    show_mask(mask, plt.gca())
+                # mask = Image.fromarray(image_pred, mode="P")  # multi-class
                 mask_name = ""
                 for i in os.path.basename(image_name).split(".")[:-1]:
                     mask_name += i
-                per_mask_path = os.path.join(mask_path, mask_name)
-                mask.save(per_mask_path + ".png")
+                per_mask_path = os.path.join(mask_path, os.path.basename(image_name))
+                plt.axis("off")
+                plt.savefig(per_mask_path, bbox_inches="tight", dpi=300, pad_inches=0.0)
 
             results.append([image_name, per_mask_path])
 
