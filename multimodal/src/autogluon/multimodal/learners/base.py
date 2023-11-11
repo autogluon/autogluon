@@ -1571,7 +1571,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         # realtime can initialize CUDA, which can cause failures when calling fit again in the interactive env.
         if is_interactive_strategy(strategy) and realtime:
             realtime = False
-            num_gpus = 1
+            num_gpus = min(1, num_gpus)
             barebones = True
 
         return realtime, num_gpus, barebones

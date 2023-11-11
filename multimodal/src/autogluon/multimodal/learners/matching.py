@@ -65,7 +65,6 @@ from ..utils import (
     apply_log_filter,
     assign_feature_column_names,
     average_checkpoints,
-    compute_inference_batch_size,
     compute_ranking_score,
     compute_score,
     compute_semantic_similarity,
@@ -87,12 +86,9 @@ from ..utils import (
     hyperparameter_tune,
     infer_dtypes_by_model_names,
     infer_metrics,
-    infer_precision,
     init_df_preprocessor,
-    is_interactive_strategy,
     is_lazy_weight_tensor,
     load_text_tokenizers,
-    run_ddp_only_once,
     save_pretrained_model_configs,
     save_text_tokenizers,
     select_model,
@@ -942,7 +938,7 @@ class MultiModalMatcher(BaseLearner):
             version="",
         )
         num_gpus, strategy = self.get_num_gpus_and_strategy_per_run(config=config)
-        precision = infer_precision(num_gpus=num_gpus, precision=config.env.precision)
+        precision = self.get_precision_per_run(num_gpus=num_gpus, precision=config.env.precision)
         grad_steps = self.get_grad_steps(num_gpus=num_gpus, config=config)
         config.env.num_gpus = num_gpus
         config.env.precision = precision
@@ -1436,16 +1432,12 @@ class MultiModalMatcher(BaseLearner):
             predict_data=data,
             is_train=False,
         )
-        precision = infer_precision(
+        precision = self.get_precision_per_run(
             num_gpus=num_gpus,
             precision=self._config.env.precision,
             cpu_only_warning=False,
         )
-        batch_size = compute_inference_batch_size(
-            per_gpu_batch_size=self._config.env.per_gpu_batch_size,
-            eval_batch_size_ratio=OmegaConf.select(self._config, "env.eval_batch_size_ratio"),
-            per_gpu_batch_size_evaluation=self._config.env.per_gpu_batch_size_evaluation,
-            # backward compatibility.
+        batch_size = self.get_predict_batch_size_per_run(
             num_gpus=num_gpus,
             strategy=strategy,
         )
@@ -1455,13 +1447,12 @@ class MultiModalMatcher(BaseLearner):
             data_processors=data_processors,
             batch_size=batch_size,
         )
-        num_gpus, strategy = run_ddp_only_once(num_gpus, strategy)
-
-        # TODO: support realtime inference for notebook with multi-gpus
-        if is_interactive_strategy(strategy) and realtime:
-            realtime = False
-            num_gpus = 1
-
+        realtime, num_gpus, barebones = self.update_realtime_for_interactive_env(
+            realtime=realtime,
+            num_gpus=num_gpus,
+            barebones=barebones,
+            strategy=strategy,
+        )
         if realtime:
             outputs = self._realtime_predict(
                 query_model=self._query_model,
