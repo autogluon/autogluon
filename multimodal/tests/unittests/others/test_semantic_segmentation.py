@@ -191,7 +191,7 @@ def test_sam_semantic_segmentation_fit_evaluate_predict_trans10k(checkpoint_name
             "env.precision": 32,
             "model.sam.checkpoint_name": checkpoint_name,
             "optimization.loss_function": "mask2former_loss",
-            "model.sam.num_mask_tokens": 5,
+            "model.sam.num_mask_tokens": 10,
         },
         label="label",
         num_classes=12,
