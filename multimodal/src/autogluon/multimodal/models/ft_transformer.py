@@ -610,6 +610,15 @@ class FT_Transformer(nn.Module):
         return f"{self.prefix}_{NUMERICAL}"
 
     @property
+    def input_keys(self):
+        input_keys = []
+        if self.categorical_feature_tokenizer:
+            input_keys.append(self.categorical_key)
+        if self.numerical_feature_tokenizer:
+            input_keys.append(self.numerical_key)
+        return input_keys
+
+    @property
     def label_key(self):
         return f"{self.prefix}_{LABEL}"
 
