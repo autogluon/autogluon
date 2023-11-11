@@ -302,6 +302,9 @@ class MultiModalMatcher(BaseLearner):
 
     @property
     def model_size(self) -> float:
+        """
+        Returns the model size in Megabyte.
+        """
         model_size = sum(
             p.numel() * p.element_size() if not is_lazy_weight_tensor(p) else 0 for p in self._query_model.parameters()
         )
@@ -981,7 +984,7 @@ class MultiModalMatcher(BaseLearner):
         log_filter = LogFilter(blacklist_msgs)
         with apply_log_filter(log_filter):
             trainer = pl.Trainer(
-                accelerator="gpu" if num_gpus > 0 else "auto",
+                accelerator="gpu" if num_gpus > 0 else OmegaConf.select(config, "env.accelerator", default="auto"),
                 devices=num_gpus if num_gpus > 0 else "auto",
                 num_nodes=config.env.num_nodes,
                 precision=precision,
@@ -1320,7 +1323,9 @@ class MultiModalMatcher(BaseLearner):
 
         with apply_log_filter(log_filter):
             evaluator = pl.Trainer(
-                accelerator="gpu" if num_gpus > 0 else "auto",
+                accelerator="gpu"
+                if num_gpus > 0
+                else OmegaConf.select(self._config, "env.accelerator", default="auto"),
                 devices=num_gpus if num_gpus > 0 else "auto",
                 num_nodes=self._config.env.num_nodes,
                 precision=precision,

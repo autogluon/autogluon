@@ -337,6 +337,9 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
     @property
     def model_size(self) -> float:
+        """
+        Returns the model size in Megabyte.
+        """
         model_size = sum(
             p.numel() * p.element_size() if not is_lazy_weight_tensor(p) else 0 for p in self._model.parameters()
         )
