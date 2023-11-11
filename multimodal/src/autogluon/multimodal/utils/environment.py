@@ -40,7 +40,7 @@ def compute_num_gpus(config_num_gpus: Union[int, float, List], accelerator: str)
     config_num_gpus
         The gpu number provided by config.
     accelerator
-        # "cpu", "gpu", "tpu", "ipu", or "auto".
+        # "cpu", "gpu", or "auto".
 
     Returns
     -------

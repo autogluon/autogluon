@@ -62,12 +62,10 @@ from ..utils import (
     AutoMMModelCheckpoint,
     CustomUnpickler,
     LogFilter,
-    RealtimeMixin,
     apply_log_filter,
     assign_feature_column_names,
     average_checkpoints,
     compute_inference_batch_size,
-    compute_num_gpus,
     compute_ranking_score,
     compute_score,
     compute_semantic_similarity,
@@ -78,7 +76,6 @@ from ..utils import (
     data_to_df,
     extract_from_output,
     filter_hyperparameters,
-    get_available_devices,
     get_config,
     get_dir_ckpt_paths,
     get_fit_complete_message,
@@ -237,6 +234,7 @@ class MultiModalMatcher(BaseLearner):
         self._label_processors = None
         self._query_model = None
         self._response_model = None
+        self._is_hpo = False
         self._resume = False
         self._fit_called = False
         self._train_data = None
@@ -572,8 +570,8 @@ class MultiModalMatcher(BaseLearner):
         # split out the hyperparameters whose values are complex objects
         hyperparameters, advanced_hyperparameters = split_hyperparameters(hyperparameters)
 
-        hpo_mode = True if hyperparameter_tune_kwargs else False
-        if hpo_mode:
+        self._is_hpo = True if hyperparameter_tune_kwargs else False
+        if self._is_hpo:
             hyperparameters = filter_hyperparameters(
                 hyperparameters=hyperparameters,
                 column_types=column_types,
@@ -585,16 +583,15 @@ class MultiModalMatcher(BaseLearner):
             id_mappings=id_mappings,
             max_time=time_limit,
             save_path=self._save_path,
-            ckpt_path=None if hpo_mode else self._ckpt_path,
-            resume=False if hpo_mode else self._resume,
-            enable_progress_bar=False if hpo_mode else self._enable_progress_bar,
+            ckpt_path=None if self._is_hpo else self._ckpt_path,
+            resume=False if self._is_hpo else self._resume,
+            enable_progress_bar=False if self._is_hpo else self._enable_progress_bar,
             presets=presets,
             hyperparameters=hyperparameters,
             advanced_hyperparameters=advanced_hyperparameters,
-            hpo_mode=hpo_mode,  # skip average checkpoint if in hpo mode
         )
 
-        if hpo_mode:
+        if self._is_hpo:
             # TODO: allow custom gpu
             assert self._resume is False, "You can not resume training with HPO"
             _fit_args["learner"] = self
@@ -724,7 +721,6 @@ class MultiModalMatcher(BaseLearner):
         presets: Optional[str] = None,
         hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
         advanced_hyperparameters: Optional[Dict] = None,
-        hpo_mode: bool = False,
         **hpo_kwargs,
     ):
         # TODO(?) We should have a separate "_pre_training_event()" for logging messages.
@@ -925,7 +921,7 @@ class MultiModalMatcher(BaseLearner):
             model_summary,
         ]
 
-        if hpo_mode:
+        if self._is_hpo:
             from ..utils.hpo import get_ray_tune_ckpt_callback
 
             TuneReportCheckpointCallback = get_ray_tune_ckpt_callback()
@@ -945,34 +941,9 @@ class MultiModalMatcher(BaseLearner):
             name="",
             version="",
         )
-
-        num_gpus = compute_num_gpus(config_num_gpus=config.env.num_gpus, strategy=config.env.strategy)
-
+        num_gpus, strategy = self.get_num_gpus_and_strategy_per_run(config=config)
         precision = infer_precision(num_gpus=num_gpus, precision=config.env.precision)
-
-        if num_gpus == 0:  # CPU only training
-            grad_steps = max(
-                config.env.batch_size // (config.env.per_gpu_batch_size * config.env.num_nodes),
-                1,
-            )
-        else:
-            grad_steps = max(
-                config.env.batch_size // (config.env.per_gpu_batch_size * num_gpus * config.env.num_nodes),
-                1,
-            )
-
-        if not hpo_mode:
-            if num_gpus <= 1:
-                strategy = "auto"
-            else:
-                strategy = config.env.strategy
-        else:
-            # TODO: checkout lightning support for ray tune for multi gpu support
-            strategy = "auto"
-            num_gpus = min(num_gpus, 1)
-
-        num_gpus, strategy = run_ddp_only_once(num_gpus, strategy)
-
+        grad_steps = self.get_grad_steps(num_gpus=num_gpus, config=config)
         config.env.num_gpus = num_gpus
         config.env.precision = precision
         config.env.strategy = strategy
@@ -1029,7 +1000,7 @@ class MultiModalMatcher(BaseLearner):
         if trainer.global_rank == 0:
             # We do not perform averaging checkpoint in the case of hpo for each trial
             # We only average the checkpoint of the best trial in the end in the master process
-            if not hpo_mode:
+            if not self._is_hpo:
                 self._top_k_average(
                     query_model=query_model,
                     response_model=response_model,
@@ -1461,11 +1432,10 @@ class MultiModalMatcher(BaseLearner):
             requires_label=requires_label,
             signature=signature,
         )
-        strategy = self._config.env.strategy  # default used in inference.
-        num_gpus = compute_num_gpus(config_num_gpus=self._config.env.num_gpus, strategy=strategy)
-        if num_gpus <= 1:
-            # Force set strategy to be None if it's cpu-only or we have only one GPU.
-            strategy = "auto"
+        num_gpus, strategy = self.get_num_gpus_and_strategy_per_run(
+            predict_data=data,
+            is_train=False,
+        )
         precision = infer_precision(
             num_gpus=num_gpus,
             precision=self._config.env.precision,
