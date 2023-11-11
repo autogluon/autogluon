@@ -46,7 +46,7 @@ def compute_num_gpus(config_num_gpus: Union[int, float, List], accelerator: str)
     -------
     A valid gpu number for the current environment and config.
     """
-    if isinstance(accelerator, str) and accelerator.lower() == "cpu":
+    if isinstance(accelerator, str) and accelerator.lower() not in ["gpu", "auto"]:
         return 0
 
     config_num_gpus = (
