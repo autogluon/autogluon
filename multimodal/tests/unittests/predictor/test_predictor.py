@@ -643,7 +643,7 @@ def test_predictor_cpu_only():
         "env.num_workers_evaluation": 0,
         "data.categorical.convert_to_text": False,  # ensure the categorical model is used.
         "data.numerical.convert_to_text": False,  # ensure the numerical model is used.
-        "env.num_gpus": 0,
+        "env.accelerator": "cpu",
     }
     predictor.fit(
         dataset.train_df,

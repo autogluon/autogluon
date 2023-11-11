@@ -1046,7 +1046,10 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             data = predict_data
             config = self._config
 
-        num_gpus = compute_num_gpus(config_num_gpus=config.env.num_gpus, strategy=config.env.strategy)
+        num_gpus = compute_num_gpus(
+            config_num_gpus=config.env.num_gpus,
+            accelerator=OmegaConf.select(config, "env.accelerator", default="auto"),
+        )
         num_gpus = self.update_num_gpus_by_data_size(num_gpus=num_gpus, data=data)
         strategy = self.get_strategy_per_run(num_gpus=num_gpus, config=config)
         strategy, num_gpus = self.update_strategy_and_num_gpus_for_hpo(strategy=strategy, num_gpus=num_gpus)
@@ -1086,7 +1089,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             log_filter = LogFilter(blacklist_msgs)
             with apply_log_filter(log_filter):
                 trainer = pl.Trainer(
-                    accelerator="gpu" if num_gpus > 0 else "auto",
+                    accelerator="gpu" if num_gpus > 0 else OmegaConf.select(config, "env.accelerator", default="auto"),
                     devices=num_gpus if num_gpus > 0 else "auto",
                     num_nodes=config.env.num_nodes,
                     precision=precision,
@@ -1126,7 +1129,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
             with apply_log_filter(log_filter):
                 trainer = pl.Trainer(
-                    accelerator="gpu" if num_gpus > 0 else "auto",
+                    accelerator="gpu" if num_gpus > 0 else OmegaConf.select(config, "env.accelerator", default="auto"),
                     devices=num_gpus if num_gpus > 0 else "auto",
                     num_nodes=self._config.env.num_nodes,
                     precision=precision,
