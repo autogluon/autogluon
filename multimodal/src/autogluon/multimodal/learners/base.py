@@ -1087,7 +1087,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             with apply_log_filter(log_filter):
                 trainer = pl.Trainer(
                     accelerator="gpu" if num_gpus > 0 else "auto",
-                    devices=num_gpus,
+                    devices=num_gpus if num_gpus > 0 else "auto",
                     num_nodes=config.env.num_nodes,
                     precision=precision,
                     strategy=strategy if strategy else "auto",
@@ -1127,7 +1127,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             with apply_log_filter(log_filter):
                 trainer = pl.Trainer(
                     accelerator="gpu" if num_gpus > 0 else "auto",
-                    devices=num_gpus,
+                    devices=num_gpus if num_gpus > 0 else "auto",
                     num_nodes=self._config.env.num_nodes,
                     precision=precision,
                     strategy=strategy,

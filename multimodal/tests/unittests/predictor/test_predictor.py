@@ -625,3 +625,28 @@ def test_hyperparameters_consistency(hyperparameters):
         time_limit=10,
     )
     assert predictor._learner._config == predictor_2._learner._config
+
+
+def test_predictor_cpu_only():
+    dataset = ALL_DATASETS["petfinder"]
+    metric_name = dataset.metric
+
+    predictor = MultiModalPredictor(
+        label=dataset.label_columns[0],
+        problem_type=dataset.problem_type,
+        eval_metric=metric_name,
+    )
+    hyperparameters = {
+        "optimization.max_epochs": 1,
+        "model.names": ["ft_transformer"],
+        "env.num_workers": 0,
+        "env.num_workers_evaluation": 0,
+        "data.categorical.convert_to_text": False,  # ensure the categorical model is used.
+        "data.numerical.convert_to_text": False,  # ensure the numerical model is used.
+        "env.num_gpus": 0,
+    }
+    predictor.fit(
+        dataset.train_df,
+        hyperparameters=hyperparameters,
+        time_limit=10,
+    )
