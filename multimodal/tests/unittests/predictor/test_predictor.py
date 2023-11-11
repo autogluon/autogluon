@@ -650,3 +650,5 @@ def test_predictor_cpu_only():
         hyperparameters=hyperparameters,
         time_limit=10,
     )
+    predictor.evaluate(dataset.test_df)
+    predictor.predict(dataset.test_df)
