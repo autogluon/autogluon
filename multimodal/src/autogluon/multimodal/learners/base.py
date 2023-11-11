@@ -1568,7 +1568,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
         return outputs
 
-    def clean_trainer_processes(self, trainer, sync_path, config, df_preprocessor, is_train=True):
+    def clean_trainer_processes(self, trainer, config, df_preprocessor, sync_path=None, is_train=True):
         if is_train:
             msg = "Training finished,"
         else:
