@@ -58,6 +58,14 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         self.most_recent_model_folder: Optional[str] = None
         super().__init__(**kwargs)
 
+    def _get_model_base(self):
+        if self.most_recent_model is not None:
+            return self.most_recent_model
+        elif self.model_base is not None:
+            return self.model_base
+        else:
+            raise ValueError("Base model cannot be retrieved from MultiWindowModel")
+
     def _fit(
         self,
         train_data: TimeSeriesDataFrame,

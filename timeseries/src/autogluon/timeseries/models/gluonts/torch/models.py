@@ -6,6 +6,7 @@ from typing import Any, Dict, Type
 
 from gluonts.model.estimator import Estimator as GluonTSEstimator
 
+from autogluon.core.hpo.constants import RAY_BACKEND
 from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
 from autogluon.timeseries.utils.datetime import (
     get_lags_for_frequency,
@@ -81,6 +82,9 @@ class DeepARModel(AbstractGluonTSModel):
     """
 
     supports_known_covariates = True
+
+    def _get_hpo_backend(self):
+        return RAY_BACKEND
 
     def _get_estimator_class(self) -> Type[GluonTSEstimator]:
         from gluonts.torch.model.deepar import DeepAREstimator

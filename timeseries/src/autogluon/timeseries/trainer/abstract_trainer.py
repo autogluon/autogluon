@@ -435,6 +435,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 default_num_trials=default_num_trials,
                 val_splitter=self.val_splitter,
                 refit_every_n_windows=self.refit_every_n_windows,
+                k_fold=1,  # tell the hpo executor we are not performing bagging
             )
         total_tuning_time = time.time() - tuning_start_time
 
