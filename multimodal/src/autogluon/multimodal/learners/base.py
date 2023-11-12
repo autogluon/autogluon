@@ -1568,14 +1568,14 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
         return outputs
 
-    def clean_trainer_processes(self, trainer, config, df_preprocessor, sync_path=None, is_train=True):
+    def clean_trainer_processes(self, trainer, config=None, df_preprocessor=None, sync_path=None, is_train=True):
         if is_train:
             msg = "Training finished,"
         else:
             msg = "Prediction finished,"
 
         if trainer.global_rank == 0:
-            if not self._is_hpo:
+            if not self._is_hpo and is_train:
                 num_nodes = config.env.num_nodes
                 if not num_nodes:
                     num_nodes = 1
@@ -1593,7 +1593,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                     num_categories=df_preprocessor.categorical_num_categories,
                 )
         else:
-            if trainer.node_rank != 0:
+            if trainer.node_rank != 0 and is_train:
                 upload_checkpoints(
                     trainer=trainer,
                     path=self.path,
