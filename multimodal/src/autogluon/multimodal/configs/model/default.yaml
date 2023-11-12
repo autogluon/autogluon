@@ -255,3 +255,4 @@ model:
     max_img_num_per_col: 1
     frozen_layers: ["mask_decoder.iou_prediction_head", "prompt_encoder"]
     num_mask_tokens: 1
+    

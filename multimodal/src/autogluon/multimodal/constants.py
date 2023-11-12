@@ -130,11 +130,10 @@ SM = "sm"
 EM = "em"
 FM = "fm"
 MAE = "mae"
-BINARY_IOU = "binary_iou"
 BINARY_DICE = "binary_dice"
 BINARY_ACC = "binary_acc"
 BER = "ber"
-MULTICLASS_IOU = "multiclass_iou"
+IOU = "iou"
 RETRIEVAL_METRICS = [NDCG, PRECISION, RECALL, MRR]
 METRIC_MODE_MAP = {
     ACC: MAX,
@@ -156,11 +155,10 @@ METRIC_MODE_MAP = {
     OVERALL_F1: MAX,
     RECALL: MAX,
     SM: MAX,
-    BINARY_IOU: MAX,
+    IOU: MAX,
     BINARY_DICE: MAX,
     BINARY_ACC: MAX,
     BER: MIN,
-    MULTICLASS_IOU: MAX,
 }
 VALID_METRICS = METRIC_MODE_MAP.keys()
 

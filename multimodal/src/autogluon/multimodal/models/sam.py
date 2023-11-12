@@ -93,28 +93,22 @@ def multi_class_mask_decoder_forward(
     upscaled_embedding = self.activation(self.upscale_layer_norm(upscaled_embedding))
     upscaled_embedding = self.activation(self.upscale_conv2(upscaled_embedding))
 
-    # new added
-    hyper_in = self.output_hypernetworks_mlps[0](mask_tokens_out)  # bs, num_channels, num_token, 32
+    # NOTE: Modify the original code. Use an MLP to process all the mask proposals.
+    hyper_in = self.output_hypernetworks_mlps[0](mask_tokens_out)
 
     _, num_channels, height, width = upscaled_embedding.shape
     upscaled_embedding = upscaled_embedding.reshape(batch_size, point_batch_size, num_channels, height * width)
     masks = (hyper_in @ upscaled_embedding).reshape(
         batch_size, point_batch_size, -1, height, width
     )  # bs, 1, num_tokens, h, w
+
+    # NOTE: New added class prediction logic.
     class_predictions = self.output_classifier_mlps(mask_tokens_out).reshape(
         batch_size, point_batch_size, -1, self.num_classes + 1
-    )  # new added
+    )
 
     # Generate mask quality predictions
     iou_pred = self.iou_prediction_head(iou_token_out)
-
-    # # Select the correct mask or masks for output
-    # if multimask_output:
-    #     mask_slice = slice(1, None)
-    # else:
-    #     mask_slice = slice(0, 1)
-    # masks = masks[:, :, mask_slice, :, :]
-    # iou_pred = iou_pred[:, :, mask_slice]
 
     outputs = (masks, iou_pred)
 
@@ -145,29 +139,6 @@ def multi_class_sam_model_forward(
     r"""
     Modify the forward method of SamModel for multi-class semantic segmentation.
 
-    Example:
-
-    ```python
-    >>> from PIL import Image
-    >>> import requests
-    >>> from transformers import AutoModel, AutoProcessor
-
-    >>> model = AutoModel.from_pretrained("facebook/sam-vit-base")
-    >>> processor = AutoProcessor.from_pretrained("facebook/sam-vit-base")
-
-    >>> img_url = "https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/transformers/model_doc/sam-car.png"
-    >>> raw_image = Image.open(requests.get(img_url, stream=True).raw).convert("RGB")
-    >>> input_points = [[[400, 650]]]  # 2D location of a window on the car
-    >>> inputs = processor(images=raw_image, input_points=input_points, return_tensors="pt")
-
-    >>> # Get segmentation mask
-    >>> outputs = model(**inputs)
-
-    >>> # Postprocess masks
-    >>> masks = processor.post_process_masks(
-    ...     outputs.pred_masks, inputs["original_sizes"], inputs["reshaped_input_sizes"]
-    ... )
-    ```
     """
     output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
     output_hidden_states = (
@@ -270,13 +241,13 @@ def multi_class_sam_model_forward(
             vision_attentions=vision_attentions,
             mask_decoder_attentions=mask_decoder_attentions,
         ),
-        class_predictions,
-    )  # new_added
+        class_predictions,  # NOTE: New added. Return class predictions as well.
+    )
 
 
 class SAMForSemanticSegmentation(nn.Module):
     """
-    Support SAM for binary real-world semantic segmentation.
+    Support SAM for semantic segmentation.
     Refer to https://huggingface.co/docs/transformers/main/model_doc/sam
     """
 
@@ -326,23 +297,14 @@ class SAMForSemanticSegmentation(nn.Module):
         self.config = self.model.config
 
         self.model.mask_decoder.num_mask_tokens = num_mask_tokens
-        # for Binary Semantic Segmentation Tasks.
-        if num_classes == 1:
-            mask_token_data = self.model.mask_decoder.mask_tokens.weight.data[0]
-            self.model.mask_decoder.mask_tokens = nn.Embedding(1, self.model.mask_decoder.hidden_size)
-            self.model.mask_decoder.mask_tokens.weight.data[0] = mask_token_data
-            hyper_mlps = self.model.mask_decoder.output_hypernetworks_mlps[0]
-            self.model.mask_decoder.output_hypernetworks_mlps = nn.ModuleList([hyper_mlps])
-        # for Multi-class Semantic Segmentation Tasks.
-        else:
+        mask_token_data = self.model.mask_decoder.mask_tokens.weight.data[0]
+        self.model.mask_decoder.mask_tokens = nn.Embedding(num_mask_tokens, self.model.mask_decoder.hidden_size)
+        for i in range(num_mask_tokens):
+            self.model.mask_decoder.mask_tokens.weight.data[i] = mask_token_data
+        hyper_mlps = self.model.mask_decoder.output_hypernetworks_mlps[0]
+        self.model.mask_decoder.output_hypernetworks_mlps = nn.ModuleList([hyper_mlps])
+        if num_classes > 1:
             self.model.mask_decoder.num_classes = num_classes
-            mask_token_data = self.model.mask_decoder.mask_tokens.weight.data[0]
-            self.model.mask_decoder.mask_tokens = nn.Embedding(num_mask_tokens, self.model.mask_decoder.hidden_size)
-            for i in range(num_mask_tokens):
-                self.model.mask_decoder.mask_tokens.weight.data[i] = mask_token_data
-
-            hyper_mlps = self.model.mask_decoder.output_hypernetworks_mlps[0]
-            self.model.mask_decoder.output_hypernetworks_mlps = nn.ModuleList([hyper_mlps])
             self.model.mask_decoder.output_classifier_mlps = nn.Linear(
                 self.model.mask_decoder.hidden_size, num_classes + 1
             )
@@ -484,8 +446,24 @@ class SAMForSemanticSegmentation(nn.Module):
 
         return name_to_id
 
-    # for multi-class semantic segmentation only
     def semantic_inference(self, mask_cls, mask_pred):
+        """
+        Post-processing mask prediction for multi-class semantic segmentation inference based on https://github.com/facebookresearch/Mask2Former/blob/main/mask2former/maskformer_model.py
+
+        Args:
+            mask_cls (`torch.Tensor`):
+                Class logits. A tensor of shape `(num_queries, num_classes + 1)` (include the "no object" category).
+
+            mask_pred (`torch.Tensor`):
+                Mask logits. A tensor of shape `(num_queries, height, width)`.
+
+        Returns:
+            semseg (`torch.Tensor`): The processed mask prediction. A tensor of shape `(num_classes, height, width)`.
+
+        References:
+        [1] https://arxiv.org/abs/2107.06278
+        [2] https://arxiv.org/abs/2112.01527
+        """
         mask_cls = F.softmax(mask_cls, dim=-1)[..., :-1]
         mask_pred = mask_pred.sigmoid()
         semseg = torch.einsum("qc,qhw->chw", mask_cls, mask_pred)

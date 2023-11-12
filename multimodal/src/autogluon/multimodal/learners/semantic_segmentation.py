@@ -14,6 +14,7 @@ from scipy.special import softmax
 from autogluon.core.metrics import Scorer
 
 from ..constants import LABEL, LOGITS, MASK_SEMANTIC_INFER, SEMANTIC_SEGMENTATION
+from ..models import get_model_postprocess_fn
 from ..optimization.lit_semantic_segmentation import SemanticSegmentationLitModule
 from ..optimization.utils import (
     get_loss_func,
@@ -21,7 +22,14 @@ from ..optimization.utils import (
     get_norm_layer_param_names,
     get_trainable_params_efficient_finetune,
 )
-from ..utils import extract_from_output, setup_save_path
+from ..utils import (
+    create_fusion_data_processors,
+    create_fusion_model,
+    extract_from_output,
+    get_dir_ckpt_paths,
+    get_load_ckpt_paths,
+    setup_save_path,
+)
 from .base import BaseLearner
 
 logger = logging.getLogger(__name__)
@@ -63,8 +71,55 @@ class SemanticSegmentationLearner(BaseLearner):
             sample_data_path=sample_data_path,
         )
         self._output_shape = num_classes
+        self._sample_data_path = sample_data_path
+
+        if self._sample_data_path is not None:
+            self._output_shape = self.get_semantic_segmentation_class_num(self._sample_data_path)
+
         if self._output_shape == None:
-            self._output_shape = 1  # binary_semantic_segmentation
+            self._output_shape = 1  # binary semantic segmentation by default
+
+    def get_semantic_segmentation_class_num(self, sample_data_path):
+        """
+        Get the number of classes for given data.
+
+        Parameters
+        ----------
+            sample_data_path
+                This is used for automatically inference num_classes of semantic segmentation dataset.
+                Could be an image directory, image file or pd.DataFrame.
+        Returns
+        -------
+            The number of classes.
+        """
+        if isinstance(sample_data_path, str):
+            if os.path.isdir(sample_data_path):
+                mask_files = os.listdir(sample_data_path)
+                num_classes = []
+                for mask_file in mask_files:
+                    per_num_classes = self.get_semantic_segmentation_class_num(
+                        os.path.join(sample_data_path, mask_file)
+                    )
+                    num_classes.append(per_num_classes)
+                return max(num_classes)
+            else:
+                mask = Image.open(sample_data_path)
+                mode = mask.mode()
+                if mode == "L":
+                    return 1
+                elif mode == "P":
+                    classes = np.unique(mask)
+                    return max(classes) + 1  # include background
+                else:
+                    NotImplementedError
+        elif isinstance(sample_data_path, pd.DataFrame):
+            num_classes = []
+            for idx in range(sample_data_path.shape[0]):
+                row = sample_data_path.iloc[idx]
+                mask_file = row[self.label]
+                per_num_classes = self.get_semantic_segmentation_class_num(mask_file)
+                num_classes.append(per_num_classes)
+            return max(num_classes)
 
     def infer_output_shape(self):
         assert self._output_shape is not None, f"output_shape should have been set in the learner initialization."
@@ -159,20 +214,12 @@ class SemanticSegmentationLearner(BaseLearner):
         is_train=True,
     ):
         if is_train:
-            if self._teacher_learner is not None:
-                return SemanticSegmentationLitModule(
-                    student_model=model,
-                    teacher_model=self._teacher_learner._model,
-                    **optimization_kwargs,
-                    **distillation_kwargs,
-                )
-            else:
-                return SemanticSegmentationLitModule(
-                    model=model,
-                    model_postprocess_fn=model_postprocess_fn,
-                    trainable_param_names=peft_param_names,
-                    **optimization_kwargs,
-                )
+            return SemanticSegmentationLitModule(
+                model=model,
+                model_postprocess_fn=model_postprocess_fn,
+                trainable_param_names=peft_param_names,
+                **optimization_kwargs,
+            )
         else:
             return SemanticSegmentationLitModule(
                 model=self._model,
@@ -211,7 +258,7 @@ class SemanticSegmentationLearner(BaseLearner):
         A dictionary with the metric names and their corresponding scores.
         Optionally return a dataframe of prediction results.
         """
-        self.ensure_predict_ready()
+        self.on_predict_start()
         return self.evaluate_semantic_segmentation(data, metrics, realtime)
 
     def predict(
@@ -242,7 +289,7 @@ class SemanticSegmentationLearner(BaseLearner):
         -------
         Array of predictions, one corresponding to each row in given dataset.
         """
-        self.ensure_predict_ready()
+        self.on_predict_start()
         if self._output_shape == 1:
             ret_type = LOGITS
         else:
@@ -320,7 +367,7 @@ class SemanticSegmentationLearner(BaseLearner):
         assert (self._output_shape == 1 and as_multiclass == False) or (
             self._output_shape > 1 and as_multiclass == True
         )
-        self.ensure_predict_ready()
+        self.on_predict_start()
 
         outputs = self.predict_per_run(
             data=data,
@@ -406,3 +453,77 @@ class SemanticSegmentationLearner(BaseLearner):
         result_df = pd.DataFrame(results, columns=["image", "mask"])
         result_df.to_csv(txt_path, index=False)
         return result_df
+
+    @classmethod
+    def load(
+        cls,
+        path: str,
+        resume: Optional[bool] = False,
+        verbosity: Optional[int] = 3,
+    ):
+        """
+        Load a learner object from a directory specified by `path`. The to-be-loaded learner
+        can be completely or partially trained by .fit(). If a previous training has completed,
+        it will load the checkpoint `model.ckpt`. Otherwise if a previous training accidentally
+        collapses in the middle, it can load the `last.ckpt` checkpoint by setting `resume=True`.
+        It also supports loading one specific checkpoint given its path.
+
+        Parameters
+        ----------
+        path
+            The directory to load the learner object.
+        resume
+            Whether to resume training from `last.ckpt`. This is useful when a training was accidentally
+            broken during the middle and we want to resume the training from the last saved checkpoint.
+        verbosity
+            Verbosity levels range from 0 to 4 and control how much information is printed.
+            Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
+
+        Returns
+        -------
+        The loaded learner object.
+        """
+        dir_path, ckpt_path = get_dir_ckpt_paths(path=path)
+
+        assert os.path.isdir(dir_path), f"'{dir_path}' must be an existing directory."
+        learner = cls(label="dummy_label")
+        learner = cls._load_metadata(learner=learner, path=dir_path, resume=resume, verbosity=verbosity)
+        peft = OmegaConf.select(learner._config, "optimization.efficient_finetune")
+        learner._model = create_fusion_model(
+            config=learner._config,
+            num_classes=learner._output_shape,
+            classes=learner._classes if hasattr(learner, "_classes") else None,
+            num_numerical_columns=len(learner._df_preprocessor.numerical_feature_names),
+            num_categories=learner._df_preprocessor.categorical_num_categories,
+            pretrained=False if not peft else True,  # set "pretrain=False" to prevent downloading online models
+        )
+        if learner._data_processors is None:
+            learner._data_processors = create_fusion_data_processors(
+                config=learner._config,
+                model=learner._model,
+            )
+        load_path, ckpt_path = get_load_ckpt_paths(
+            ckpt_path=ckpt_path,
+            dir_path=dir_path,
+            resume=resume,
+        )
+        learner._load_state_dict(
+            path=load_path,
+            strict=not peft,
+        )
+        learner._ckpt_path = ckpt_path
+        loss_func = get_loss_func(
+            problem_type=learner._problem_type,
+            mixup_active=False,
+            loss_func_name=OmegaConf.select(learner._config, "optimization.loss_function"),
+            config=learner._config.optimization,
+            num_classes=learner._output_shape,  # New added. for semantic segmentation
+        )
+        model_postprocess_fn = get_model_postprocess_fn(
+            problem_type=learner._problem_type,
+            loss_func=loss_func,
+        )
+        learner._model_postprocess_fn = model_postprocess_fn
+        learner._config = learner.update_strategy_by_env(learner._config)
+
+        return learner

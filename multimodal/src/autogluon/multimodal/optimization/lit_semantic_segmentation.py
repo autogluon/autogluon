@@ -16,7 +16,7 @@ from ..constants import CLASS_LOGITS, LM_TARGET, LOGITS, MASK_SEMANTIC_INFER, T_
 from ..data.mixup import MixupModule, multimodel_mixup
 from ..models.utils import run_model
 from .lit_module import LitModule
-from .semantic_seg_metrics import COD, Balanced_Error_Rate
+from .semantic_seg_metrics import COD, Balanced_Error_Rate, Binary_IoU
 from .utils import apply_layerwise_lr_decay, apply_single_lr, apply_two_stages_lr, get_lr_scheduler, get_optimizer
 
 logger = logging.getLogger(__name__)
@@ -38,10 +38,11 @@ class SemanticSegmentationLitModule(LitModule):
             ):  # Do only add template loss if T-Few. #TODO Add compatibility to Fusion models.
                 loss += self._compute_template_loss(per_output, label) * weight
             elif isinstance(self.loss_func, Mask2FormerLoss):
+                mask_labels = [mask_labels.to(per_output[LOGITS]) for mask_labels in kwargs["mask_labels"]]
                 dict_loss = self.loss_func(
-                    masks_queries_logits=per_output[LOGITS],  # bs, num_q, h, w
-                    class_queries_logits=per_output[CLASS_LOGITS],  # bs, num_q, num_labels
-                    mask_labels=kwargs["mask_labels"].to(per_output[LOGITS]),
+                    masks_queries_logits=per_output[LOGITS],  # bs, num_mask_tokens, height, width
+                    class_queries_logits=per_output[CLASS_LOGITS],  # bs, num_mask_tokens, num_classes
+                    mask_labels=mask_labels,
                     class_labels=kwargs["class_labels"],
                 )
                 for v in dict_loss.values():
@@ -71,11 +72,7 @@ class SemanticSegmentationLitModule(LitModule):
             metric.update(preds=prob[:, 1], target=label)  # for binary classification only
         elif isinstance(metric, BaseAggregator):
             metric.update(custom_metric_func(logits, label))
-        elif (
-            isinstance(metric, torchmetrics.classification.BinaryJaccardIndex)
-            or isinstance(metric, Balanced_Error_Rate)
-            or isinstance(metric, COD)
-        ):
+        elif isinstance(metric, Binary_IoU) or isinstance(metric, Balanced_Error_Rate) or isinstance(metric, COD):
             metric.update(logits.float(), label)
         elif isinstance(metric, torchmetrics.classification.MulticlassJaccardIndex):
             bs, num_classes = kwargs["processed_results"].shape[0:2]

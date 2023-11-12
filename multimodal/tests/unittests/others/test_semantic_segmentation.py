@@ -89,7 +89,7 @@ def get_file_df_multi_semantic_seg(need_test_gt=False):
 def test_sam_semantic_segmentation_fit_evaluate_predict_isic(checkpoint_name):
     train_df, val_df, test_df = get_file_df_binary_semantic_seg(need_test_gt=True)
 
-    validation_metric = "binary_iou"
+    validation_metric = "iou"
     predictor = MultiModalPredictor(
         problem_type="semantic_segmentation",
         validation_metric=validation_metric,
@@ -104,7 +104,7 @@ def test_sam_semantic_segmentation_fit_evaluate_predict_isic(checkpoint_name):
     predictor.fit(train_data=train_df, tuning_data=val_df, time_limit=20)
 
     # Evaluate
-    predictor.evaluate(test_df, metrics=["binary_iou"])
+    predictor.evaluate(test_df, metrics=["iou"])
 
     # Predict
     predictor.predict(test_df, save_results=False)
@@ -116,10 +116,10 @@ def test_sam_semantic_segmentation_fit_evaluate_predict_isic(checkpoint_name):
         "facebook/sam-vit-base",
     ],
 )
-def test_sam_semantic_segmentation_save_and_load(checkpoint_name):
+def test_sam_semantic_segmentation_save_and_load_isic(checkpoint_name):
     train_df, val_df, test_df = get_file_df_binary_semantic_seg(need_test_gt=False)
 
-    validation_metric = "binary_iou"
+    validation_metric = "iou"
     predictor = MultiModalPredictor(
         problem_type="semantic_segmentation",
         validation_metric=validation_metric,
@@ -136,8 +136,8 @@ def test_sam_semantic_segmentation_save_and_load(checkpoint_name):
     # Predict
     pred = predictor.predict(test_df, save_results=False)
 
-    predictor.save("./sam_semantic_segmentation_save_and_load")
-    new_predictor = MultiModalPredictor.load("./sam_semantic_segmentation_save_and_load")
+    predictor.save("./sam_semantic_segmentation_save_and_load_isic")
+    new_predictor = MultiModalPredictor.load("./sam_semantic_segmentation_save_and_load_isic")
 
     new_pred = new_predictor.predict(test_df, save_results=False)
 
@@ -153,7 +153,7 @@ def test_sam_semantic_segmentation_save_and_load(checkpoint_name):
 def test_sam_semantic_segmentation_zero_shot_evaluate_predict(checkpoint_name):
     _, _, test_df = get_file_df_binary_semantic_seg(need_test_gt=True)
 
-    validation_metric = "binary_iou"
+    validation_metric = "iou"
     predictor = MultiModalPredictor(
         problem_type="semantic_segmentation",
         validation_metric=validation_metric,
@@ -166,7 +166,7 @@ def test_sam_semantic_segmentation_zero_shot_evaluate_predict(checkpoint_name):
     )
 
     # Evaluate
-    predictor.evaluate(test_df, metrics=["binary_iou"])
+    predictor.evaluate(test_df, metrics=["iou"])
 
     # Predict
     predictor.predict(test_df, save_results=False)
@@ -181,7 +181,7 @@ def test_sam_semantic_segmentation_zero_shot_evaluate_predict(checkpoint_name):
 def test_sam_semantic_segmentation_fit_evaluate_predict_trans10k(checkpoint_name):
     train_df, val_df, test_df = get_file_df_multi_semantic_seg(need_test_gt=True)
 
-    validation_metric = "multiclass_iou"
+    validation_metric = "iou"
     predictor = MultiModalPredictor(
         problem_type="semantic_segmentation",
         validation_metric=validation_metric,
@@ -204,6 +204,44 @@ def test_sam_semantic_segmentation_fit_evaluate_predict_trans10k(checkpoint_name
 
     # Predict
     predictor.predict(test_df, save_results=False)
+
+
+@pytest.mark.parametrize(
+    "checkpoint_name",
+    [
+        "facebook/sam-vit-base",
+    ],
+)
+def test_sam_semantic_segmentation_save_and_load_trans10k(checkpoint_name):
+    train_df, val_df, test_df = get_file_df_multi_semantic_seg(need_test_gt=False)
+
+    validation_metric = "iou"
+    predictor = MultiModalPredictor(
+        problem_type="semantic_segmentation",
+        validation_metric=validation_metric,
+        eval_metric=validation_metric,
+        hyperparameters={
+            "env.num_gpus": 1,
+            "env.precision": 32,
+            "model.sam.checkpoint_name": checkpoint_name,
+            "optimization.loss_function": "mask2former_loss",
+            "model.sam.num_mask_tokens": 10,
+        },
+        label="label",
+        num_classes=12,
+    )
+
+    predictor.fit(train_data=train_df, tuning_data=val_df, time_limit=20)
+
+    # Predict
+    pred = predictor.predict(test_df, save_results=False)
+
+    predictor.save("./sam_semantic_segmentation_save_and_load_trans10k")
+    new_predictor = MultiModalPredictor.load("./sam_semantic_segmentation_save_and_load_trans10k")
+
+    new_pred = new_predictor.predict(test_df, save_results=False)
+
+    assert np.allclose(pred, new_pred)
 
 
 @pytest.mark.parametrize(
