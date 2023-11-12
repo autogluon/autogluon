@@ -74,23 +74,50 @@ def infer_metrics(
     eval_metric_name
         Name of evaluation metric.
     """
+    
+    if is_matching:
+        if eval_metric_name is not None:
+            if eval_metric_name in VALID_METRICS:
+                validation_metric_name = eval_metric_name
+                return validation_metric_name, eval_metric_name
+            elif eval_metric_name in RETRIEVAL_METRICS:
+                # Currently only support recall as validation metric in retrieval tasks.
+                validation_metric_name = RECALL
+                return validation_metric_name, eval_metric_name
+            else:
+                warnings.warn(
+                    f"Metric {eval_metric_name} is not supported as the evaluation metric for {problem_type} in matching tasks. "
+                )
+        if problem_type is None:
+            eval_metric_name, validation_metric_name = MATCHING_METRICS_WITHOUT_PROBLEM_TYPE[problem_type]
+            logger.info(
+                f"Metric {eval_metric_name} and metric {validation_metric_name} are used "
+                f"as the evaluation metric and the validation metric for matching tasks by default. "
+            )
+            return validation_metric_name, eval_metric_name
+        if problem_type in MATCHING_METRICS:
+            eval_metric_name, validation_metric_name = MATCHING_METRICS[problem_type]
+            logger.info(
+                f"Metric {eval_metric_name} and metric {validation_metric_name} are used "
+                f"as the evaluation metric and the validation metric for {problem_type} in matching tasks by default. "
+            )
+            return validation_metric_name, eval_metric_name
+        else:
+            raise NotImplementedError(f"Problem type: {problem_type} is not yet supported for matching!")
 
     if eval_metric_name is not None:
-        if problem_type != BINARY and eval_metric_name.lower() in [
-            ROC_AUC,
-            AVERAGE_PRECISION,
-            F1,
-        ]:
-            raise ValueError(f"Metric {eval_metric_name} is only supported for binary classification.")
-
-        if eval_metric_name in VALID_METRICS:
+        if eval_metric_name.lower() not in EVALUATION_METRICS[problem_type]:
+            warnings.warn(
+                f"Metric {eval_metric_name} is not supported as the evaluation metric for {problem_type}. "
+                f"The evaluation metric is changed to {EVALUATION_METRICS_FALLBACK[problem_type]} by default."
+            )
+            eval_metric_name = EVALUATION_METRICS_FALLBACK[problem_type]
+        
+        if eval_metric_name in VALIDATION_METRICS[problem_type]:
+            logger.info(f"Metric {eval_metric_name} is used as the validation metric. ")
             validation_metric_name = eval_metric_name
-            return validation_metric_name, eval_metric_name
-
-        # Currently only support recall as validation metric in retrieval tasks.
-        if is_matching and eval_metric_name in RETRIEVAL_METRICS:
-            validation_metric_name = RECALL
-            return validation_metric_name, eval_metric_name
+        else:
+            validation_metric_name = VALIDATION_METRICS_FALLBACK[problem_type]
 
         warnings.warn(
             f"Currently, we cannot convert the metric: {eval_metric_name} to a metric supported in torchmetrics. "
@@ -98,38 +125,9 @@ def infer_metrics(
             f", ROC-AUC for binary classification problem, and RMSE for regression problems.",
             UserWarning,
         )
-
-    if problem_type == MULTICLASS:
-        if is_matching:
-            eval_metric_name = SPEARMANR
-        else:
-            eval_metric_name = ACCURACY
-    elif problem_type == NER:
-        return NER_TOKEN_F1, OVERALL_F1
-    elif problem_type == BINARY:
-        eval_metric_name = ROC_AUC
-    elif problem_type == REGRESSION:
-        if is_matching:
-            eval_metric_name = SPEARMANR
-        else:
-            eval_metric_name = RMSE
-    elif problem_type == FEW_SHOT_CLASSIFICATION:
-        eval_metric_name = ACCURACY
-    elif problem_type in [OBJECT_DETECTION, OPEN_VOCABULARY_OBJECT_DETECTION]:
-        if (not validation_metric_name) or validation_metric_name.lower() == MAP:
-            return MAP, MAP
-        elif validation_metric_name.lower() == DIRECT_LOSS:
-            return DIRECT_LOSS, MAP
-        else:
-            raise ValueError(
-                f"Problem type: {problem_type}, validation_metric_name: {validation_metric_name} is not supported!"
-            )
-    elif problem_type is None and is_matching:
-        return RECALL, NDCG
     else:
-        raise NotImplementedError(f"Problem type: {problem_type} is not supported yet!")
-
-    validation_metric_name = eval_metric_name
+        eval_metric_name = EVALUATION_METRICS_FALLBACK[problem_type]
+        validation_metric_name = VALIDATION_METRICS_FALLBACK[problem_type]
 
     return validation_metric_name, eval_metric_name
 

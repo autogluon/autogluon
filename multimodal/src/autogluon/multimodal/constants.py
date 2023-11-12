@@ -13,14 +13,16 @@ DOCUMENT = "document"
 DOCUMENT_IMAGE = "document_image"
 DOCUMENT_PDF = "document_pdf"
 
+# Scarcity modes
+FEW_SHOT = "few_shot"
+DEFAULT_SHOT = "default_shot"
+ZERO_SHOT = "zero_shot"
+
 # Problem types
 CLASSIFICATION = "classification"
 BINARY = "binary"
 MULTICLASS = "multiclass"
 REGRESSION = "regression"
-FEW_SHOT = "few_shot"
-DEFAULT_SHOT = "default_shot"
-ZERO_SHOT = "zero_shot"
 NER = "ner"
 NAMED_ENTITY_RECOGNITION = "named_entity_recognition"
 FEATURE_EXTRACTION = "feature_extraction"
@@ -163,18 +165,91 @@ METRIC_MODE_MAP = {
 VALID_METRICS = METRIC_MODE_MAP.keys()
 
 # Define valid val/eval metrics and the fallback metric for each problem type.
-VALIDATION_METRICS = {
-
-}
-VALIDATION_METRICS_FALLBACK = {
-    
-}
 EVALUATION_METRICS = {
-
+    CLASSIFICATION: [ACCURACY, ACC],  # TODO
+    BINARY: [ROC_AUC, AVERAGE_PRECISION, F1],
+    MULTICLASS: [ACCURACY, ACC],
+    REGRESSION: [RMSE],
+    NER: [OVERALL_F1, NER_TOKEN_F1],
+    NAMED_ENTITY_RECOGNITION: [OVERALL_F1, NER_TOKEN_F1],
+    FEATURE_EXTRACTION: [],  # No metrics needed for feature extraction
+    ZERO_SHOT_IMAGE_CLASSIFICATION: [],  # TODO: No metrics needed for zero shot?
+    OBJECT_DETECTION: DETECTION_METRICS,
+    OPEN_VOCABULARY_OBJECT_DETECTION: DETECTION_METRICS,
+    OCR: [],  # OCR is a WIP feature
+    OCR_TEXT_DETECTION: [],  # OCR is a WIP feature
+    OCR_TEXT_RECOGNITION: [],  # OCR is a WIP feature
+    IMAGE_SIMILARITY: [],  # use matching metrics
+    TEXT_SIMILARITY: [],  # use matching metrics
+    IMAGE_TEXT_SIMILARITY: [],  # use matching metrics
+    FEW_SHOT_CLASSIFICATION: [ACCURACY, ACC],
+    SEMANTIC_SEGMENTATION: [],  # TODO: ADD METRICS FOR SEMANTIC_SEGMENTATION 
 }
 EVALUATION_METRICS_FALLBACK = {
-    
+    CLASSIFICATION: ACCURACY,  # TODO
+    BINARY: ROC_AUC,
+    MULTICLASS: ACCURACY,
+    REGRESSION: RMSE,
+    NER: OVERALL_F1,
+    NAMED_ENTITY_RECOGNITION: OVERALL_F1,
+    FEATURE_EXTRACTION: None,  # No metrics needed for feature extraction
+    ZERO_SHOT_IMAGE_CLASSIFICATION: None,  # TODO: No metrics needed for zero shot?
+    OBJECT_DETECTION: MAP,
+    OPEN_VOCABULARY_OBJECT_DETECTION: MAP,
+    OCR: None,  # OCR is a WIP feature
+    OCR_TEXT_DETECTION: None,  # OCR is a WIP feature
+    OCR_TEXT_RECOGNITION: None,  # OCR is a WIP feature
+    IMAGE_SIMILARITY: None,  # use matching metrics
+    TEXT_SIMILARITY: None,  # use matching metrics
+    IMAGE_TEXT_SIMILARITY: None,  # use matching metrics
+    FEW_SHOT_CLASSIFICATION: ACCURACY,
+    SEMANTIC_SEGMENTATION: None,  # TODO: ADD METRICS FOR SEMANTIC_SEGMENTATION 
 }
+VALIDATION_METRICS = {
+    CLASSIFICATION: [ACCURACY, ACC],  # TODO
+    BINARY: [ROC_AUC],
+    MULTICLASS: [ACCURACY, ACC],
+    REGRESSION: [RMSE],
+    NER: [NER_TOKEN_F1],
+    NAMED_ENTITY_RECOGNITION: [NER_TOKEN_F1],
+    FEATURE_EXTRACTION: [],  # No metrics needed for feature extraction
+    ZERO_SHOT_IMAGE_CLASSIFICATION: [],  # TODO: No metrics needed for zero shot?
+    OBJECT_DETECTION: DETECTION_METRICS + [DIRECT_LOSS],
+    OPEN_VOCABULARY_OBJECT_DETECTION: DETECTION_METRICS + [DIRECT_LOSS],
+    OCR: [],  # OCR is a WIP feature
+    OCR_TEXT_DETECTION: [],  # OCR is a WIP feature
+    OCR_TEXT_RECOGNITION: [],  # OCR is a WIP feature
+    IMAGE_SIMILARITY: [],  # use matching metrics
+    TEXT_SIMILARITY: [],  # use matching metrics
+    IMAGE_TEXT_SIMILARITY: [],  # use matching metrics
+    FEW_SHOT_CLASSIFICATION: [ACCURACY, ACC],
+    SEMANTIC_SEGMENTATION: [],  # TODO: ADD METRICS FOR SEMANTIC_SEGMENTATION 
+}
+VALIDATION_METRICS_FALLBACK = {
+    CLASSIFICATION: ACCURACY,  # TODO
+    BINARY: ROC_AUC,
+    MULTICLASS: ACCURACY,
+    REGRESSION: RMSE,
+    NER: NER_TOKEN_F1,
+    NAMED_ENTITY_RECOGNITION: NER_TOKEN_F1,
+    FEATURE_EXTRACTION: None,  # No metrics needed for feature extraction
+    ZERO_SHOT_IMAGE_CLASSIFICATION: None,  # TODO: No metrics needed for zero shot?
+    OBJECT_DETECTION: MAP,
+    OPEN_VOCABULARY_OBJECT_DETECTION: MAP,
+    OCR: None,  # OCR is a WIP feature
+    OCR_TEXT_DETECTION: None,  # OCR is a WIP feature
+    OCR_TEXT_RECOGNITION: None,  # OCR is a WIP feature
+    IMAGE_SIMILARITY: None,  # use matching metrics
+    TEXT_SIMILARITY: None,  # use matching metrics
+    IMAGE_TEXT_SIMILARITY: None,  # use matching metrics
+    FEW_SHOT_CLASSIFICATION: ACCURACY,
+    SEMANTIC_SEGMENTATION: None,  # TODO: ADD METRICS FOR SEMANTIC_SEGMENTATION 
+}
+MATCHING_METRICS = {
+    "MULTICLASS": [SPEARMANR, SPEARMANR],
+    "REGRESSION": [SPEARMANR, SPEARMANR],
+}
+MATCHING_METRICS_WITHOUT_PROBLEM_TYPE = [RECALL, NDCG]
 
 # Training status
 TRAIN = "train"
