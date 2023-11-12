@@ -844,20 +844,27 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         predict_data=None,
         is_train=True,
     ):
-        if self._teacher_learner is not None and not isinstance(self._teacher_learner, str):
-            # self._teacher_learner is a str in hpo
-            df_preprocessor = [df_preprocessor, self._teacher_learner._df_preprocessor]
-            data_processors = [data_processors, self._teacher_learner._data_processors]
         datamodule_kwargs = dict(
-            df_preprocessor=df_preprocessor,
-            data_processors=data_processors,
             per_gpu_batch_size=per_gpu_batch_size,
             num_workers=num_workers,
         )
         if is_train:
-            datamodule_kwargs.update(dict(train_data=self._train_data, validate_data=self._tuning_data))
+            datamodule_kwargs.update(
+                dict(
+                    df_preprocessor=df_preprocessor if self._teacher_learner is None else [df_preprocessor, self._teacher_learner._df_preprocessor],
+                    data_processors=data_processors if self._teacher_learner is None else [data_processors, self._teacher_learner._data_processors],
+                    train_data=self._train_data, 
+                    validate_data=self._tuning_data
+                )
+            )
         else:
-            datamodule_kwargs.update(dict(predict_data=predict_data))
+            datamodule_kwargs.update(
+                dict(
+                    df_preprocessor=df_preprocessor,
+                    data_processors=data_processors,
+                    predict_data=predict_data
+                )
+            )
 
         datamodule = BaseDataModule(**datamodule_kwargs)
         return datamodule
