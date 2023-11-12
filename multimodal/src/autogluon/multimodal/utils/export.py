@@ -2,7 +2,7 @@ import io
 import logging
 import os
 import warnings
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 from typing import Dict, List, Optional, Union
 
 import pandas as pd
@@ -13,7 +13,7 @@ from ..models.fusion import AbstractMultimodalFusionModel
 from ..models.huggingface_text import HFAutoModelForTextPrediction
 from ..models.mmdet_image import MMDetAutoModelForObjectDetection
 from ..models.timm_image import TimmAutoModelForImagePrediction
-from .environment import compute_num_gpus, get_precision_context, infer_precision, move_to_device
+from .environment import infer_precision
 from .onnx import OnnxModule, onnx_get_dynamic_axes
 
 logger = logging.getLogger(__name__)

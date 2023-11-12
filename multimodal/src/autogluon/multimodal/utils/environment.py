@@ -31,7 +31,7 @@ def is_interactive_strategy(strategy: str):
         return False
 
 
-def compute_num_gpus(config_num_gpus: Union[int, float, List], strategy: str):
+def compute_num_gpus(config_num_gpus: Union[int, float, List], accelerator: str):
     """
     Compute the gpu number to initialize the lightning trainer.
 
@@ -39,13 +39,16 @@ def compute_num_gpus(config_num_gpus: Union[int, float, List], strategy: str):
     ----------
     config_num_gpus
         The gpu number provided by config.
-    strategy
-        A lightning trainer's strategy such as "ddp", "ddp_spawn", and "dp".
+    accelerator
+        # "cpu", "gpu", or "auto".
 
     Returns
     -------
     A valid gpu number for the current environment and config.
     """
+    if isinstance(accelerator, str) and accelerator.lower() not in ["gpu", "auto"]:
+        return 0
+
     config_num_gpus = (
         math.floor(config_num_gpus) if isinstance(config_num_gpus, (int, float)) else len(config_num_gpus)
     )
@@ -362,7 +365,7 @@ def run_ddp_only_once(num_gpus, strategy):
         global FIRST_DDP_RUN  # Use the global variable to make sure it is tracked per process
         if "FIRST_DDP_RUN" in globals() and not FIRST_DDP_RUN:
             # not the first time running DDP, set number of devices to 1 (use single GPU)
-            return 1, "auto"
+            return min(1, num_gpus), "auto"
         else:
             if num_gpus > 1:
                 FIRST_DDP_RUN = False  # run DDP for the first time, disable the following runs

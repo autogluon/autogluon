@@ -203,23 +203,24 @@ def get_gpu_message(detected_num_gpus: int, used_num_gpus: int, strategy: str):
     -------
     A string with the GPU info.
     """
+
+    def _bytes_to_gigabytes(bytes):
+        return round((bytes / 1024) / 1024 / 1024, 2)
+
     gpu_message = f"{detected_num_gpus} GPUs are detected, and {used_num_gpus} GPUs will be used.\n"
-    if not is_interactive_strategy(strategy):
-        free_memories_command = "nvidia-smi --query-gpu=memory.free --format=csv"
-        free_memories_info = sp.check_output(free_memories_command.split()).decode("ascii").split("\n")[:-1][1:]
-        free_memories = [int(x.split()[0]) for i, x in enumerate(free_memories_info)]
+    for i in range(detected_num_gpus):
+        import nvidia_smi
 
-        total_memories_command = "nvidia-smi --query-gpu=memory.total --format=csv"
-        total_memories_info = sp.check_output(total_memories_command.split()).decode("ascii").split("\n")[:-1][1:]
-        total_memories = [int(x.split()[0]) for i, x in enumerate(total_memories_info)]
+        nvidia_smi.nvmlInit()
+        handle = nvidia_smi.nvmlDeviceGetHandleByIndex(i)
+        info = nvidia_smi.nvmlDeviceGetMemoryInfo(handle)
 
-        for i in range(detected_num_gpus):
-            free_memory = free_memories[i]
-            total_memory = total_memories[i]
-            gpu_message += f"   - GPU {i} name: {torch.cuda.get_device_name(i)}\n"
-            gpu_message += (
-                f"   - GPU {i} memory: {free_memory * 1e-9:.2f}GB/{total_memory * 1e-9:.2f}GB (Free/Total)\n"
-            )
+        gpu_mem_used = _bytes_to_gigabytes(info.used)
+        gpu_mem_total = _bytes_to_gigabytes(info.total)
+
+        gpu_message += f"   - GPU {i} name: {torch.cuda.get_device_name(i)}\n"
+        gpu_message += f"   - GPU {i} memory: {gpu_mem_used}GB/{gpu_mem_total}GB (Used/Total)\n"
+
     if torch.cuda.is_available():
         gpu_message += f"CUDA version is {torch.version.cuda}.\n"
 
