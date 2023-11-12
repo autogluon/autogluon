@@ -162,6 +162,20 @@ METRIC_MODE_MAP = {
 }
 VALID_METRICS = METRIC_MODE_MAP.keys()
 
+# Define valid val/eval metrics and the fallback metric for each problem type.
+VALIDATION_METRICS = {
+
+}
+VALIDATION_METRICS_FALLBACK = {
+    
+}
+EVALUATION_METRICS = {
+
+}
+EVALUATION_METRICS_FALLBACK = {
+    
+}
+
 # Training status
 TRAIN = "train"
 VALIDATE = "validate"
