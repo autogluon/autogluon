@@ -1,6 +1,9 @@
 import os
+import shutil
+import uuid
 
 import numpy as np
+import numpy.testing as npt
 import pandas as pd
 import pytest
 import torch
@@ -99,6 +102,7 @@ def test_sam_semantic_segmentation_fit_evaluate_predict_isic(checkpoint_name):
             "model.sam.checkpoint_name": checkpoint_name,
         },
         label="label",
+        sample_data_path=train_df,
     )
 
     predictor.fit(train_data=train_df, tuning_data=val_df, time_limit=20)
@@ -129,19 +133,12 @@ def test_sam_semantic_segmentation_save_and_load_isic(checkpoint_name):
             "model.sam.checkpoint_name": checkpoint_name,
         },
         label="label",
+        sample_data_path=train_df,
     )
 
     predictor.fit(train_data=train_df, tuning_data=val_df, time_limit=20)
 
-    # Predict
-    pred = predictor.predict(test_df, save_results=False)
-
-    predictor.save("./sam_semantic_segmentation_save_and_load_isic")
-    new_predictor = MultiModalPredictor.load("./sam_semantic_segmentation_save_and_load_isic")
-
-    new_pred = new_predictor.predict(test_df, save_results=False)
-
-    assert np.allclose(pred, new_pred)
+    verify_predictor_save_load_for_semantic_seg(predictor, test_df, as_multiclass=False)
 
 
 @pytest.mark.parametrize(
@@ -163,6 +160,7 @@ def test_sam_semantic_segmentation_zero_shot_evaluate_predict(checkpoint_name):
             "model.sam.checkpoint_name": checkpoint_name,
         },
         label="label",
+        sample_data_path=test_df,
     )
 
     # Evaluate
@@ -194,7 +192,7 @@ def test_sam_semantic_segmentation_fit_evaluate_predict_trans10k(checkpoint_name
             "model.sam.num_mask_tokens": 10,
         },
         label="label",
-        num_classes=12,
+        sample_data_path=train_df,
     )
 
     predictor.fit(train_data=train_df, tuning_data=val_df, time_limit=20)
@@ -228,20 +226,34 @@ def test_sam_semantic_segmentation_save_and_load_trans10k(checkpoint_name):
             "model.sam.num_mask_tokens": 10,
         },
         label="label",
-        num_classes=12,
+        sample_data_path=train_df,
     )
 
     predictor.fit(train_data=train_df, tuning_data=val_df, time_limit=20)
 
-    # Predict
-    pred = predictor.predict(test_df, save_results=False)
+    verify_predictor_save_load_for_semantic_seg(predictor, test_df, as_multiclass=True)
 
-    predictor.save("./sam_semantic_segmentation_save_and_load_trans10k")
-    new_predictor = MultiModalPredictor.load("./sam_semantic_segmentation_save_and_load_trans10k")
 
-    new_pred = new_predictor.predict(test_df, save_results=False)
+def verify_predictor_save_load_for_semantic_seg(predictor, df, as_multiclass, cls=MultiModalPredictor):
+    root = str(uuid.uuid4())
+    os.makedirs(root, exist_ok=True)
+    predictor.save(root)
+    predictions = predictor.predict(df, as_pandas=False)
+    # Test fit_summary()
+    predictor.fit_summary()
 
-    assert np.allclose(pred, new_pred)
+    loaded_predictor = cls.load(root)
+    # Test fit_summary()
+    loaded_predictor.fit_summary()
+
+    predictions2 = loaded_predictor.predict(df, as_pandas=False)
+    npt.assert_equal(predictions, predictions2)
+
+    predictions_prob = predictor.predict_proba(df, as_pandas=False, as_multiclass=as_multiclass)
+    predictions2_prob = loaded_predictor.predict_proba(df, as_pandas=False, as_multiclass=as_multiclass)
+    npt.assert_equal(predictions_prob, predictions2_prob)
+
+    shutil.rmtree(root)
 
 
 @pytest.mark.parametrize(

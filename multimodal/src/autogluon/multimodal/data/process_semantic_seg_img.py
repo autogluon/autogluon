@@ -158,20 +158,17 @@ class SemanticSegImageProcessor:
             return NotImplementedError(
                 f"requires_column_info={self.requires_column_info} not implemented for semantic segmentation tasks."
             )
-        if self.num_classes == 1:
+        fn.update(
+            {
+                self.image_key: PadCollator(pad_val=0),
+                self.image_valid_num_key: StackCollator(),
+                self.label_key: PadCollator(pad_val=0),
+            }
+        )
+
+        if self.num_classes > 1:
             fn.update(
                 {
-                    self.image_key: PadCollator(pad_val=0),
-                    self.image_valid_num_key: StackCollator(),
-                    self.label_key: PadCollator(pad_val=0),
-                }
-            )
-        else:
-            fn.update(
-                {
-                    self.image_key: PadCollator(pad_val=0),
-                    self.image_valid_num_key: StackCollator(),
-                    self.label_key: PadCollator(pad_val=0),
                     self.mask_label_key: ListCollator(),
                     self.class_label_key: ListCollator(),
                 }

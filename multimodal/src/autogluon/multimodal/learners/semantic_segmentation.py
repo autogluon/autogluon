@@ -73,11 +73,11 @@ class SemanticSegmentationLearner(BaseLearner):
         self._output_shape = num_classes
         self._sample_data_path = sample_data_path
 
-        if self._sample_data_path is not None:
-            self._output_shape = self.get_semantic_segmentation_class_num(self._sample_data_path)
-
         if self._output_shape == None:
             self._output_shape = 1  # binary semantic segmentation by default
+
+        if self._sample_data_path is not None:
+            self._output_shape = self.get_semantic_segmentation_class_num(self._sample_data_path)
 
     def get_semantic_segmentation_class_num(self, sample_data_path):
         """
@@ -104,12 +104,12 @@ class SemanticSegmentationLearner(BaseLearner):
                 return max(num_classes)
             else:
                 mask = Image.open(sample_data_path)
-                mode = mask.mode()
+                mode = mask.mode
                 if mode == "L":
                     return 1
                 elif mode == "P":
                     classes = np.unique(mask)
-                    return max(classes) + 1  # include background
+                    return max(classes).item() + 1  # include background
                 else:
                     NotImplementedError
         elif isinstance(sample_data_path, pd.DataFrame):
