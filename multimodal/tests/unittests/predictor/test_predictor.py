@@ -134,7 +134,7 @@ def verify_no_redundant_model_configs(predictor):
         ),
         (
             "petfinder_bytearray",
-            ["numerical_mlp", "categorical_mlp", "timm_image", "fusion_mlp"],
+            ["ft_transformer", "timm_image", "fusion_mlp"],
             None,
             "mobilenetv3_small_100",
             GREEDY_SOUP,
@@ -143,7 +143,7 @@ def verify_no_redundant_model_configs(predictor):
         ),
         (
             "petfinder",
-            ["numerical_mlp", "categorical_mlp", "hf_text", "fusion_mlp"],
+            ["ft_transformer", "hf_text", "fusion_mlp"],
             "nlpaueb/legal-bert-small-uncased",
             None,
             UNIFORM_SOUP,
@@ -152,7 +152,7 @@ def verify_no_redundant_model_configs(predictor):
         ),
         (
             "petfinder",
-            ["numerical_mlp", "categorical_mlp", "fusion_mlp"],
+            ["ft_transformer"],
             None,
             None,
             BEST,
