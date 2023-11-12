@@ -851,10 +851,14 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         if is_train:
             datamodule_kwargs.update(
                 dict(
-                    df_preprocessor=df_preprocessor if self._teacher_learner is None else [df_preprocessor, self._teacher_learner._df_preprocessor],
-                    data_processors=data_processors if self._teacher_learner is None else [data_processors, self._teacher_learner._data_processors],
+                    df_preprocessor=df_preprocessor 
+                    if self._teacher_learner is None 
+                    else [df_preprocessor, self._teacher_learner._df_preprocessor],
+                    data_processors=data_processors 
+                    if self._teacher_learner is None 
+                    else [data_processors, self._teacher_learner._data_processors],
                     train_data=self._train_data, 
-                    validate_data=self._tuning_data
+                    validate_data=self._tuning_data,
                 )
             )
         else:
@@ -862,7 +866,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                 dict(
                     df_preprocessor=df_preprocessor,
                     data_processors=data_processors,
-                    predict_data=predict_data
+                    predict_data=predict_data,
                 )
             )
 
