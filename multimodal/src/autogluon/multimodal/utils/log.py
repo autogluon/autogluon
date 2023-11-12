@@ -210,7 +210,7 @@ def get_gpu_message(detected_num_gpus: int, used_num_gpus: int, strategy: str):
     gpu_message = f"{detected_num_gpus} GPUs are detected, and {used_num_gpus} GPUs will be used.\n"
     for i in range(detected_num_gpus):
         import nvidia_smi
-        
+
         nvidia_smi.nvmlInit()
         handle = nvidia_smi.nvmlDeviceGetHandleByIndex(i)
         info = nvidia_smi.nvmlDeviceGetMemoryInfo(handle)
