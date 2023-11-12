@@ -62,12 +62,9 @@ from ..utils import (
     AutoMMModelCheckpoint,
     CustomUnpickler,
     LogFilter,
-    RealtimeMixin,
     apply_log_filter,
     assign_feature_column_names,
     average_checkpoints,
-    compute_inference_batch_size,
-    compute_num_gpus,
     compute_ranking_score,
     compute_score,
     compute_semantic_similarity,
@@ -78,7 +75,6 @@ from ..utils import (
     data_to_df,
     extract_from_output,
     filter_hyperparameters,
-    get_available_devices,
     get_config,
     get_dir_ckpt_paths,
     get_fit_complete_message,
@@ -90,12 +86,9 @@ from ..utils import (
     hyperparameter_tune,
     infer_dtypes_by_model_names,
     infer_metrics,
-    infer_precision,
     init_df_preprocessor,
-    is_interactive_strategy,
     is_lazy_weight_tensor,
     load_text_tokenizers,
-    run_ddp_only_once,
     save_pretrained_model_configs,
     save_text_tokenizers,
     select_model,
@@ -237,6 +230,7 @@ class MultiModalMatcher(BaseLearner):
         self._label_processors = None
         self._query_model = None
         self._response_model = None
+        self._is_hpo = False
         self._resume = False
         self._fit_called = False
         self._train_data = None
@@ -302,6 +296,9 @@ class MultiModalMatcher(BaseLearner):
 
     @property
     def model_size(self) -> float:
+        """
+        Returns the model size in Megabyte.
+        """
         model_size = sum(
             p.numel() * p.element_size() if not is_lazy_weight_tensor(p) else 0 for p in self._query_model.parameters()
         )
@@ -569,8 +566,8 @@ class MultiModalMatcher(BaseLearner):
         # split out the hyperparameters whose values are complex objects
         hyperparameters, advanced_hyperparameters = split_hyperparameters(hyperparameters)
 
-        hpo_mode = True if hyperparameter_tune_kwargs else False
-        if hpo_mode:
+        self._is_hpo = True if hyperparameter_tune_kwargs else False
+        if self._is_hpo:
             hyperparameters = filter_hyperparameters(
                 hyperparameters=hyperparameters,
                 column_types=column_types,
@@ -582,16 +579,15 @@ class MultiModalMatcher(BaseLearner):
             id_mappings=id_mappings,
             max_time=time_limit,
             save_path=self._save_path,
-            ckpt_path=None if hpo_mode else self._ckpt_path,
-            resume=False if hpo_mode else self._resume,
-            enable_progress_bar=False if hpo_mode else self._enable_progress_bar,
+            ckpt_path=None if self._is_hpo else self._ckpt_path,
+            resume=False if self._is_hpo else self._resume,
+            enable_progress_bar=False if self._is_hpo else self._enable_progress_bar,
             presets=presets,
             hyperparameters=hyperparameters,
             advanced_hyperparameters=advanced_hyperparameters,
-            hpo_mode=hpo_mode,  # skip average checkpoint if in hpo mode
         )
 
-        if hpo_mode:
+        if self._is_hpo:
             # TODO: allow custom gpu
             assert self._resume is False, "You can not resume training with HPO"
             _fit_args["learner"] = self
@@ -721,7 +717,6 @@ class MultiModalMatcher(BaseLearner):
         presets: Optional[str] = None,
         hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
         advanced_hyperparameters: Optional[Dict] = None,
-        hpo_mode: bool = False,
         **hpo_kwargs,
     ):
         # TODO(?) We should have a separate "_pre_training_event()" for logging messages.
@@ -922,7 +917,7 @@ class MultiModalMatcher(BaseLearner):
             model_summary,
         ]
 
-        if hpo_mode:
+        if self._is_hpo:
             from ..utils.hpo import get_ray_tune_ckpt_callback
 
             TuneReportCheckpointCallback = get_ray_tune_ckpt_callback()
@@ -942,34 +937,9 @@ class MultiModalMatcher(BaseLearner):
             name="",
             version="",
         )
-
-        num_gpus = compute_num_gpus(config_num_gpus=config.env.num_gpus, strategy=config.env.strategy)
-
-        precision = infer_precision(num_gpus=num_gpus, precision=config.env.precision)
-
-        if num_gpus == 0:  # CPU only training
-            grad_steps = max(
-                config.env.batch_size // (config.env.per_gpu_batch_size * config.env.num_nodes),
-                1,
-            )
-        else:
-            grad_steps = max(
-                config.env.batch_size // (config.env.per_gpu_batch_size * num_gpus * config.env.num_nodes),
-                1,
-            )
-
-        if not hpo_mode:
-            if num_gpus <= 1:
-                strategy = "auto"
-            else:
-                strategy = config.env.strategy
-        else:
-            # TODO: checkout lightning support for ray tune for multi gpu support
-            strategy = "auto"
-            num_gpus = min(num_gpus, 1)
-
-        num_gpus, strategy = run_ddp_only_once(num_gpus, strategy)
-
+        num_gpus, strategy = self.get_num_gpus_and_strategy_per_run(config=config)
+        precision = self.get_precision_per_run(num_gpus=num_gpus, precision=config.env.precision)
+        grad_steps = self.get_grad_steps(num_gpus=num_gpus, config=config)
         config.env.num_gpus = num_gpus
         config.env.precision = precision
         config.env.strategy = strategy
@@ -981,8 +951,8 @@ class MultiModalMatcher(BaseLearner):
         log_filter = LogFilter(blacklist_msgs)
         with apply_log_filter(log_filter):
             trainer = pl.Trainer(
-                accelerator="gpu" if num_gpus > 0 else "auto",
-                devices=num_gpus,
+                accelerator="gpu" if num_gpus > 0 else OmegaConf.select(config, "env.accelerator", default="auto"),
+                devices=num_gpus if num_gpus > 0 else "auto",
                 num_nodes=config.env.num_nodes,
                 precision=precision,
                 strategy=strategy,
@@ -1026,7 +996,7 @@ class MultiModalMatcher(BaseLearner):
         if trainer.global_rank == 0:
             # We do not perform averaging checkpoint in the case of hpo for each trial
             # We only average the checkpoint of the best trial in the end in the master process
-            if not hpo_mode:
+            if not self._is_hpo:
                 self._top_k_average(
                     query_model=query_model,
                     response_model=response_model,
@@ -1320,8 +1290,10 @@ class MultiModalMatcher(BaseLearner):
 
         with apply_log_filter(log_filter):
             evaluator = pl.Trainer(
-                accelerator="gpu" if num_gpus > 0 else "auto",
-                devices=num_gpus,
+                accelerator="gpu"
+                if num_gpus > 0
+                else OmegaConf.select(self._config, "env.accelerator", default="auto"),
+                devices=num_gpus if num_gpus > 0 else "auto",
                 num_nodes=self._config.env.num_nodes,
                 precision=precision,
                 strategy=strategy,
@@ -1456,21 +1428,16 @@ class MultiModalMatcher(BaseLearner):
             requires_label=requires_label,
             signature=signature,
         )
-        strategy = self._config.env.strategy  # default used in inference.
-        num_gpus = compute_num_gpus(config_num_gpus=self._config.env.num_gpus, strategy=strategy)
-        if num_gpus <= 1:
-            # Force set strategy to be None if it's cpu-only or we have only one GPU.
-            strategy = "auto"
-        precision = infer_precision(
+        num_gpus, strategy = self.get_num_gpus_and_strategy_per_run(
+            predict_data=data,
+            is_train=False,
+        )
+        precision = self.get_precision_per_run(
             num_gpus=num_gpus,
             precision=self._config.env.precision,
             cpu_only_warning=False,
         )
-        batch_size = compute_inference_batch_size(
-            per_gpu_batch_size=self._config.env.per_gpu_batch_size,
-            eval_batch_size_ratio=OmegaConf.select(self._config, "env.eval_batch_size_ratio"),
-            per_gpu_batch_size_evaluation=self._config.env.per_gpu_batch_size_evaluation,
-            # backward compatibility.
+        batch_size = self.get_predict_batch_size_per_run(
             num_gpus=num_gpus,
             strategy=strategy,
         )
@@ -1480,13 +1447,12 @@ class MultiModalMatcher(BaseLearner):
             data_processors=data_processors,
             batch_size=batch_size,
         )
-        num_gpus, strategy = run_ddp_only_once(num_gpus, strategy)
-
-        # TODO: support realtime inference for notebook with multi-gpus
-        if is_interactive_strategy(strategy) and realtime:
-            realtime = False
-            num_gpus = 1
-
+        realtime, num_gpus, barebones = self.update_realtime_for_interactive_env(
+            realtime=realtime,
+            num_gpus=num_gpus,
+            barebones=barebones,
+            strategy=strategy,
+        )
         if realtime:
             outputs = self._realtime_predict(
                 query_model=self._query_model,

@@ -277,12 +277,15 @@ class MultiModalPredictor:
 
     @property
     def model_size(self) -> float:
+        """
+        Returns the model size in Megabyte.
+        """
         return self._learner.model_size
 
     @property
     def classes(self):
         """
-        Return the classes of object detection.
+        Returns the classes of object detection.
         """
         return self._learner.classes
 
