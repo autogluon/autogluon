@@ -125,7 +125,7 @@ def evaluate_matcher_ranking(matcher, test_df, query_column, response_column, me
         ),
     ],
 )
-def test_matcher_realtime(
+def test_matcher_realtime_inference(
     dataset_name,
     query,
     response,
