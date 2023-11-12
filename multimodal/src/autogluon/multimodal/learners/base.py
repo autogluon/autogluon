@@ -1726,7 +1726,6 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             predict_data=data,
             is_train=False,
         )
-        num_gpus, strategy = run_ddp_only_once(num_gpus, strategy)
         pred_writer = self.get_pred_writer(strategy=strategy)
         callbacks = self.get_callbacks_per_run(pred_writer=pred_writer, is_train=False)
         # TODO: remove optimization_kwargs from inference
