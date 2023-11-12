@@ -512,8 +512,8 @@ class FewShotSVMLearner(BaseLearner):
         )
         outputs = self.predict_per_run(
             data=data,
-            requires_label=False,
             realtime=realtime,
+            requires_label=False,
         )
         features = extract_from_output(outputs=outputs, ret_type=COLUMN_FEATURES, as_ndarray=as_tensor is False)
         features = self.aggregate_column_features(features=features, is_train=False)

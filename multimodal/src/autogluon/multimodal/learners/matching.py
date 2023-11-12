@@ -1393,10 +1393,10 @@ class MultiModalMatcher(BaseLearner):
     def predict_per_run(
         self,
         data: Union[pd.DataFrame, dict, list],
+        realtime: Optional[bool],
         requires_label: bool,
         id_mappings: Union[Dict[str, Dict], Dict[str, pd.Series]] = None,
         signature: Optional[str] = None,
-        realtime: Optional[bool] = None,
         barebones: Optional[bool] = False,
     ) -> List[Dict]:
         """
@@ -1523,7 +1523,7 @@ class MultiModalMatcher(BaseLearner):
         chunk_size: Optional[int] = 1024,
         similarity_type: Optional[str] = "cosine",
         cutoffs: Optional[List[int]] = [1, 5, 10],
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
     ):
         query_column = query_data.columns[0]
         response_column = response_data.columns[0]
@@ -1580,13 +1580,13 @@ class MultiModalMatcher(BaseLearner):
         id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
     ):
         outputs = self.predict_per_run(
             data=data,
             id_mappings=id_mappings,
-            requires_label=True,
             realtime=realtime,
+            requires_label=True,
         )
         prob = extract_from_output(ret_type=PROBABILITY, outputs=outputs)
 
@@ -1762,8 +1762,8 @@ class MultiModalMatcher(BaseLearner):
         outputs = self.predict_per_run(
             data=data,
             id_mappings=id_mappings,
-            requires_label=False,
             realtime=realtime,
+            requires_label=False,
         )
         prob = extract_from_output(outputs=outputs, ret_type=PROBABILITY)
 
@@ -1823,8 +1823,8 @@ class MultiModalMatcher(BaseLearner):
         outputs = self.predict_per_run(
             data=data,
             id_mappings=id_mappings,
-            requires_label=False,
             realtime=realtime,
+            requires_label=False,
         )
         prob = extract_from_output(outputs=outputs, ret_type=PROBABILITY)
 
@@ -1897,8 +1897,8 @@ class MultiModalMatcher(BaseLearner):
             data=data,
             id_mappings=id_mappings,
             signature=signature,
-            requires_label=False,
             realtime=realtime,
+            requires_label=False,
         )
         features = extract_from_output(outputs=outputs, ret_type=FEATURES, as_ndarray=as_tensor is False)
 

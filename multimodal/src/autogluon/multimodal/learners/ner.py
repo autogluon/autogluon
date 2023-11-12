@@ -301,8 +301,8 @@ class NERLearner(BaseLearner):
         self.ensure_predict_ready()
         outputs = self.predict_per_run(
             data=data,
-            requires_label=True,
             realtime=realtime,
+            requires_label=True,
         )
         logits = extract_from_output(ret_type=NER_RET, outputs=outputs)
         metric_data = {}
@@ -385,8 +385,8 @@ class NERLearner(BaseLearner):
         self.ensure_predict_ready()
         outputs = self.predict_per_run(
             data=data,
-            requires_label=False,
             realtime=realtime,
+            requires_label=False,
         )
         logits = extract_from_output(outputs=outputs, ret_type=NER_RET)
         if self._df_preprocessor:
@@ -434,8 +434,8 @@ class NERLearner(BaseLearner):
         self.ensure_predict_ready()
         outputs = self.predict_per_run(
             data=data,
-            requires_label=False,
             realtime=realtime,
+            requires_label=False,
         )
         ner_outputs = extract_from_output(outputs=outputs, ret_type=NER_RET)
         prob = self._df_preprocessor.transform_prediction(

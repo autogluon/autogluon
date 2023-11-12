@@ -136,7 +136,7 @@ class FewShotSVMPredictor:
         data,
         as_pandas: Optional[bool] = False,
         as_multiclass: Optional[bool] = True,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
     ):
         """
         Predict probabilities class probabilities rather than class labels.
@@ -222,7 +222,7 @@ class FewShotSVMPredictor:
         data: pd.DataFrame,
         metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
     ):
         if not self._fit_called and not self._model_loaded:
             warnings.warn(

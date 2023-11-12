@@ -1660,8 +1660,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
     def predict_per_run(
         self,
         data: Union[pd.DataFrame, dict, list],
+        realtime: Optional[bool],
         requires_label: Optional[bool] = False,
-        realtime: Optional[bool] = None,
         barebones: Optional[bool] = False,
     ) -> List[Dict]:
         """
@@ -1671,10 +1671,10 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         ----------
         data
             The data for inference.
-        requires_label
-            Whether uses label during inference.
         realtime
             Whether use realtime inference.
+        requires_label
+            Whether uses label during inference.
         barebones
             Whether to run in “barebones mode”, where all lightning's features that may impact raw speed are disabled.
 
@@ -1821,8 +1821,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         ret_type = LOGITS
         outputs = self.predict_per_run(
             data=data,
-            requires_label=True,
             realtime=realtime,
+            requires_label=True,
         )
         logits = extract_from_output(ret_type=ret_type, outputs=outputs)
         metric_data = {}
@@ -1934,8 +1934,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         else:
             outputs = self.predict_per_run(
                 data=data,
-                requires_label=False,
                 realtime=realtime,
+                requires_label=False,
             )
             logits = extract_from_output(outputs=outputs, ret_type=ret_type)
 
@@ -2004,8 +2004,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         else:
             outputs = self.predict_per_run(
                 data=data,
-                requires_label=False,
                 realtime=realtime,
+                requires_label=False,
             )
             logits = extract_from_output(outputs=outputs, ret_type=LOGITS)
             prob = logits_to_prob(logits)
@@ -2061,8 +2061,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         )
         outputs = self.predict_per_run(
             data=data,
-            requires_label=False,
             realtime=realtime,
+            requires_label=False,
         )
         if self._problem_type in [FEATURE_EXTRACTION, ZERO_SHOT_IMAGE_CLASSIFICATION]:
             features = extract_from_output(outputs=outputs, ret_type=COLUMN_FEATURES, as_ndarray=as_tensor is False)
