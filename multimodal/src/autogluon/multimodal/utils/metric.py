@@ -74,7 +74,7 @@ def infer_metrics(
     eval_metric_name
         Name of evaluation metric.
     """
-    
+
     if is_matching:
         if eval_metric_name is not None:
             if eval_metric_name in VALID_METRICS:
@@ -112,7 +112,7 @@ def infer_metrics(
                 f"The evaluation metric is changed to {EVALUATION_METRICS_FALLBACK[problem_type]} by default."
             )
             eval_metric_name = EVALUATION_METRICS_FALLBACK[problem_type]
-        
+
         if eval_metric_name in VALIDATION_METRICS[problem_type]:
             logger.info(f"Metric {eval_metric_name} is used as the validation metric. ")
             validation_metric_name = eval_metric_name
