@@ -849,10 +849,13 @@ class AbstractTabularLearner(AbstractLearner):
                 inference_time_col = "pred_time_val"
             leaderboard = get_leaderboard_pareto_frontier(leaderboard=leaderboard, score_col=score_col, inference_time_col=inference_time_col)
         if score_format == "error":
-            leaderboard.rename(columns={
-                "score_test": "metric_error_test",
-                "score_val": "metric_error_val",
-            }, inplace=True)
+            leaderboard.rename(
+                columns={
+                    "score_test": "metric_error_test",
+                    "score_val": "metric_error_val",
+                },
+                inplace=True,
+            )
             if "metric_error_test" in leaderboard:
                 leaderboard["metric_error_test"] = leaderboard["metric_error_test"].apply(self.eval_metric.convert_score_to_error)
             leaderboard["metric_error_val"] = leaderboard["metric_error_val"].apply(self.eval_metric.convert_score_to_error)
