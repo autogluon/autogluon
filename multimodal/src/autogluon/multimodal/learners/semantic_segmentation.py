@@ -35,7 +35,7 @@ class SemanticSegmentationLearner(BaseLearner):
         data: Union[pd.DataFrame, dict, list, str],
         metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
     ):
         """
         Evaluate semantic segmentation on a test dataset based on "torchmetrics".
@@ -56,8 +56,8 @@ class SemanticSegmentationLearner(BaseLearner):
         """
         outputs = self.predict_per_run(
             data=data,
-            requires_label=True,
             realtime=realtime,
+            requires_label=True,
         )
 
         logits = extract_from_output(ret_type=LOGITS, outputs=outputs, as_ndarray=False)
@@ -85,7 +85,7 @@ class SemanticSegmentationLearner(BaseLearner):
         data: Union[pd.DataFrame, dict, list, str],
         metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         **kwargs,
     ):
         """
@@ -102,7 +102,7 @@ class SemanticSegmentationLearner(BaseLearner):
         return_pred
             Whether to return the prediction result of each row.
         realtime
-            Whether to do realtime inference, which is efficient for small data (default None).
+            Whether to do realtime inference, which is efficient for small data (default False).
             If not specified, we would infer it on based on the data modalities
             and sample number.
 
@@ -117,7 +117,7 @@ class SemanticSegmentationLearner(BaseLearner):
     def predict(
         self,
         data: Union[pd.DataFrame, dict, list, str],
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         save_results: Optional[bool] = None,
         **kwargs,
     ):
@@ -132,7 +132,7 @@ class SemanticSegmentationLearner(BaseLearner):
         as_pandas
             Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
         realtime
-            Whether to do realtime inference, which is efficient for small data (default None).
+            Whether to do realtime inference, which is efficient for small data (default False).
             If not specified, we would infer it on based on the data modalities
             and sample number.
         save_results
@@ -147,8 +147,8 @@ class SemanticSegmentationLearner(BaseLearner):
 
         outputs = self.predict_per_run(
             data=data,
-            requires_label=False,
             realtime=realtime,
+            requires_label=False,
         )
         logits = extract_from_output(outputs=outputs, ret_type=ret_type)
 
@@ -186,7 +186,7 @@ class SemanticSegmentationLearner(BaseLearner):
         data: Union[pd.DataFrame, dict, list],
         as_pandas: Optional[bool] = None,
         as_multiclass: Optional[bool] = True,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         **kwargs,
     ):
         """
@@ -206,7 +206,7 @@ class SemanticSegmentationLearner(BaseLearner):
             Whether to return the probability of all labels or
             just return the probability of the positive class for binary classification problems.
         realtime
-            Whether to do realtime inference, which is efficient for small data (default None).
+            Whether to do realtime inference, which is efficient for small data (default False).
             If not specified, we would infer it on based on the data modalities
             and sample number.
 
@@ -220,8 +220,8 @@ class SemanticSegmentationLearner(BaseLearner):
 
         outputs = self.predict_per_run(
             data=data,
-            requires_label=False,
             realtime=realtime,
+            requires_label=False,
         )
         logits = extract_from_output(outputs=outputs, ret_type=LOGITS)
         prob = logits  # for binary
@@ -241,7 +241,7 @@ class SemanticSegmentationLearner(BaseLearner):
         data: Union[pd.DataFrame, dict, list],
         as_tensor: Optional[bool] = False,
         as_pandas: Optional[bool] = False,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         **kwargs,
     ):
         raise NotImplementedError("Semantic segmentation doesn't support calling `extract_embedding` yet.")

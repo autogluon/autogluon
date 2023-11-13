@@ -847,31 +847,19 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         predict_data=None,
         is_train=True,
     ):
+        if is_train and self._teacher_learner is not None:
+            df_preprocessor = [df_preprocessor, self._teacher_learner._df_preprocessor]
+            data_processors = [data_processors, self._teacher_learner._data_processors]
         datamodule_kwargs = dict(
+            df_preprocessor=df_preprocessor,
+            data_processors=data_processors,
             per_gpu_batch_size=per_gpu_batch_size,
             num_workers=num_workers,
         )
         if is_train:
-            datamodule_kwargs.update(
-                dict(
-                    df_preprocessor=df_preprocessor
-                    if self._teacher_learner is None
-                    else [df_preprocessor, self._teacher_learner._df_preprocessor],
-                    data_processors=data_processors
-                    if self._teacher_learner is None
-                    else [data_processors, self._teacher_learner._data_processors],
-                    train_data=self._train_data,
-                    validate_data=self._tuning_data,
-                )
-            )
+            datamodule_kwargs.update(dict(train_data=self._train_data, validate_data=self._tuning_data))
         else:
-            datamodule_kwargs.update(
-                dict(
-                    df_preprocessor=df_preprocessor,
-                    data_processors=data_processors,
-                    predict_data=predict_data,
-                )
-            )
+            datamodule_kwargs.update(dict(predict_data=predict_data))
 
         datamodule = BaseDataModule(**datamodule_kwargs)
         return datamodule
@@ -1143,14 +1131,10 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             log_filter = LogFilter(blacklist_msgs)
 
             with apply_log_filter(log_filter):
-                if num_gpus > 0:
-                    accelerator = "gpu"
-                elif OmegaConf is not None:
-                    accelerator = OmegaConf.select(config, "env.accelerator", default="auto")
-                else:
-                    accelerator = "auto"
                 trainer = pl.Trainer(
-                    accelerator=accelerator,
+                    accelerator="gpu"
+                    if num_gpus > 0
+                    else OmegaConf.select(self._config, "env.accelerator", default="auto"),
                     devices=num_gpus if num_gpus > 0 else "auto",
                     num_nodes=self._config.env.num_nodes,
                     precision=precision,
