@@ -163,13 +163,17 @@ def test_advanced_functionality():
         predictor.plot_ensemble_model()
 
     # Test get_simulation_artifact
-    simulation_artifact = predictor.get_simulation_artifact(test_data=test_data)
-    assert simulation_artifact["label"] == predictor.label
-    assert sorted(list(simulation_artifact["pred_proba_dict_val"].keys())) == sorted(predictor.get_model_names(can_infer=True))
+    simulation_artifact_no_test = predictor.simulation_artifact()
+    assert "pred_proba_dict_test" not in simulation_artifact_no_test
+    assert "y_test" not in simulation_artifact_no_test
+    simulation_artifact = predictor.simulation_artifact(test_data=test_data)
     assert sorted(list(simulation_artifact["pred_proba_dict_test"].keys())) == sorted(predictor.get_model_names(can_infer=True))
     assert simulation_artifact["y_test"].equals(predictor.transform_labels(test_data[label]))
-    assert simulation_artifact["eval_metric"] == predictor.eval_metric.name
-    assert simulation_artifact["problem_type"] == predictor.problem_type
+    for sim_artifact in [simulation_artifact, simulation_artifact_no_test]:
+        assert sim_artifact["label"] == predictor.label
+        assert sorted(list(sim_artifact["pred_proba_dict_val"].keys())) == sorted(predictor.get_model_names(can_infer=True))
+        assert sim_artifact["eval_metric"] == predictor.eval_metric.name
+        assert sim_artifact["problem_type"] == predictor.problem_type
     simulation_artifacts = {dataset["name"]: {0: simulation_artifact}}
 
     # Test convert_simulation_artifacts_to_tabular_predictions_dict

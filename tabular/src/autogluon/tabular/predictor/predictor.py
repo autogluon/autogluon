@@ -3652,6 +3652,7 @@ class TabularPredictor:
         verbosity=None,
     ):
         """
+        [EXPERIMENTAL]
         Distill AutoGluon's most accurate ensemble-predictor into single models which are simpler/faster and require less memory/compute.
         Distillation can produce a model that is more accurate than the same model fit directly on the original training data.
         After calling `distill()`, there will be more models available in this Predictor, which can be evaluated using `predictor.leaderboard(test_data)` and deployed with: `predictor.predict(test_data, model=MODEL_NAME)`.
@@ -4547,15 +4548,16 @@ class TabularPredictor:
         predictor_clone.save_space()
         return predictor_clone if return_clone else predictor_clone.path
 
-    def get_simulation_artifact(self, test_data: pd.DataFrame) -> dict:
+    def simulation_artifact(self, test_data: pd.DataFrame = None) -> dict:
         """
         [Advanced] Computes and returns the necessary information to perform zeroshot HPO simulation.
         For a usage example, refer to https://github.com/autogluon/tabrepo/blob/main/examples/run_quickstart_from_scratch.py
 
         Parameters
         ----------
-        test_data: pd.DataFrame
+        test_data: pd.DataFrame, default = None
             The test data to predict with.
+            If None, the keys `pred_proba_dict_test` and `y_test` will not be present in the output.
 
         Returns
         -------
@@ -4576,23 +4578,32 @@ class TabularPredictor:
         """
         models = self.get_model_names(can_infer=True)
 
+        pred_proba_dict_test = None
         if self.can_predict_proba:
             pred_proba_dict_val = self.predict_proba_multi(inverse_transform=False, as_multiclass=False, models=models)
-            pred_proba_dict_test = self.predict_proba_multi(test_data, inverse_transform=False, as_multiclass=False, models=models)
+            if test_data is not None:
+                pred_proba_dict_test = self.predict_proba_multi(test_data, inverse_transform=False, as_multiclass=False, models=models)
         else:
             pred_proba_dict_val = self.predict_multi(inverse_transform=False, models=models)
-            pred_proba_dict_test = self.predict_multi(test_data, inverse_transform=False, models=models)
+            if test_data is not None:
+                pred_proba_dict_test = self.predict_multi(test_data, inverse_transform=False, models=models)
 
         val_data_source = "val" if self.has_val else "train"
         _, y_val = self.load_data_internal(data=val_data_source, return_X=False, return_y=True)
-        y_test = test_data[self.label]
-        y_test = self.transform_labels(y_test, inverse=False)
+        if test_data is not None:
+            y_test = test_data[self.label]
+            y_test = self.transform_labels(y_test, inverse=False)
+            test_info = dict(
+                pred_proba_dict_test=pred_proba_dict_test,
+                y_test=y_test,
+            )
+        else:
+            test_info = dict()
 
         simulation_dict = dict(
+            **test_info,
             pred_proba_dict_val=pred_proba_dict_val,
-            pred_proba_dict_test=pred_proba_dict_test,
             y_val=y_val,
-            y_test=y_test,
             eval_metric=self.eval_metric.name,
             problem_type=self.problem_type,
             problem_type_transform=self._learner.label_cleaner.problem_type_transform,
