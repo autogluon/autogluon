@@ -1707,9 +1707,6 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             data_processors=data_processors,
             batch_size=batch_size,
         )
-        # For cpu only tasks, use realtime.
-        if not num_gpus:
-            realtime = True
         realtime, num_gpus, barebones = self.update_realtime_for_interactive_env(
             realtime=realtime,
             num_gpus=num_gpus,
