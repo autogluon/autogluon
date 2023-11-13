@@ -278,15 +278,21 @@ class TabularPredictor:
         self._stacked_overfitting_occurred: bool | None = None
 
     @property
-    def class_labels(self):
+    def classes_(self) -> list:
+        """Returns the class labels"""
         return self._learner.class_labels
 
     @property
-    def class_labels_internal(self):
+    def class_labels(self) -> list:
+        """Alias to self.classes_"""
+        return self.classes_
+
+    @property
+    def class_labels_internal(self) -> list:
         return self._learner.label_cleaner.ordered_class_labels_transformed
 
     @property
-    def class_labels_internal_map(self):
+    def class_labels_internal_map(self) -> dict:
         return self._learner.label_cleaner.inv_map
 
     @property
@@ -364,6 +370,14 @@ class TabularPredictor:
             return self.feature_metadata.get_features()
         else:
             raise ValueError(f"Unknown feature_stage: '{feature_stage}'. Must be one of {['original', 'transformed']}")
+
+    @property
+    def has_val(self) -> bool:
+        """
+        Return True if holdout validation data was used during fit, else return False.
+        """
+        self._assert_is_fit("has_val")
+        return self._trainer.has_val
 
     @property
     def feature_metadata(self):
@@ -2112,6 +2126,7 @@ class TabularPredictor:
         extra_info: bool = False,
         extra_metrics: list | None = None,
         decision_threshold: float | None = None,
+        score_format: str = "score",
         only_pareto_frontier: bool = False,
         skip_score: bool = False,
         silent: bool = False,
@@ -2126,6 +2141,8 @@ class TabularPredictor:
                 NOTE: Metrics scores always show in higher is better form.
                 This means that metrics such as log_loss and root_mean_squared_error will have their signs FLIPPED, and values will be negative.
                 This is necessary to avoid the user needing to know the metric to understand if higher is better when looking at leaderboard.
+            'eval_metric': The evaluation metric name used to calculate the scores.
+                This should be identical to `predictor.eval_metric.name`.
             'pred_time_val': The inference time required to compute predictions on the validation data end-to-end.
                 Equivalent to the sum of all 'pred_time_val_marginal' values for the model and all of its base models.
             'fit_time': The fit time required to train the model end-to-end (Including base models if the model is a stack ensemble).
@@ -2231,6 +2248,11 @@ class TabularPredictor:
             NOTE: `score_val` will not be impacted by this value in v0.8.
                 `score_val` will always show the validation scores achieved with a decision threshold of `0.5`.
                 Only test scores will be properly updated.
+        score_format : {'score', 'error'}
+            If "score", leaderboard is returned as normal.
+            If "error", the column "score_val" is converted to "metric_error_val", and "score_test" is converted to "metric_error_test".
+                "metric_error" is calculated by taking `predictor.eval_metric.convert_score_to_error(score)`.
+                This will result in errors where 0 is perfect and lower is better.
         only_pareto_frontier : bool, default = False
             If `True`, only return model information of models in the Pareto frontier of the accuracy/latency trade-off (models which achieve the highest score within their end-to-end inference time).
             At minimum this will include the model with the highest score and the model with the lowest inference time.
@@ -2257,6 +2279,7 @@ class TabularPredictor:
             extra_metrics=extra_metrics,
             decision_threshold=decision_threshold,
             only_pareto_frontier=only_pareto_frontier,
+            score_format=score_format,
             skip_score=skip_score,
             silent=silent,
         )
@@ -2335,7 +2358,7 @@ class TabularPredictor:
         data : str or DataFrame, default = None
             The data to predict on.
             If None:
-                If self.trainer.has_val, the validation data is used.
+                If self.has_val, the validation data is used.
                 Else, the out-of-fold prediction probabilities are used.
         models : List[str], default = None
             The list of models to get predictions for.
@@ -2403,7 +2426,7 @@ class TabularPredictor:
         data : DataFrame, default = None
             The data to predict on.
             If None:
-                If self.trainer.has_val, the validation data is used.
+                If self.has_val, the validation data is used.
                 Else, the out-of-fold prediction probabilities are used.
         models : List[str], default = None
             The list of models to get predictions for.
@@ -3629,6 +3652,7 @@ class TabularPredictor:
         verbosity=None,
     ):
         """
+        [EXPERIMENTAL]
         Distill AutoGluon's most accurate ensemble-predictor into single models which are simpler/faster and require less memory/compute.
         Distillation can produce a model that is more accurate than the same model fit directly on the original training data.
         After calling `distill()`, there will be more models available in this Predictor, which can be evaluated using `predictor.leaderboard(test_data)` and deployed with: `predictor.predict(test_data, model=MODEL_NAME)`.
@@ -4523,6 +4547,73 @@ class TabularPredictor:
         )
         predictor_clone.save_space()
         return predictor_clone if return_clone else predictor_clone.path
+
+    def simulation_artifact(self, test_data: pd.DataFrame = None) -> dict:
+        """
+        [Advanced] Computes and returns the necessary information to perform zeroshot HPO simulation.
+        For a usage example, refer to https://github.com/autogluon/tabrepo/blob/main/examples/run_quickstart_from_scratch.py
+
+        Parameters
+        ----------
+        test_data: pd.DataFrame, default = None
+            The test data to predict with.
+            If None, the keys `pred_proba_dict_test` and `y_test` will not be present in the output.
+
+        Returns
+        -------
+        simulation_dict: dict
+            The dictionary of information required for zeroshot HPO simulation.
+            Keys are as follows:
+                pred_proba_dict_val: Dictionary of model name to prediction probabilities (or predictions if regression) on the validation data
+                pred_proba_dict_test: Dictionary of model name to prediction probabilities (or predictions if regression) on the test data
+                y_val: Pandas Series of ground truth labels for the validation data (internal representation)
+                y_test: Pandas Series of ground truth labels for the test data (internal representation)
+                eval_metric: The string name of the evaluation metric (obtained via `predictor.eval_metric.name`)
+                problem_type: The problem type (obtained via `predictor.problem_type`)
+                problem_type_transform: The transformed (internal) problem type (obtained via `predictor._learner.label_cleaner.problem_type_transform,`)
+                ordered_class_labels: The original class labels (`predictor._learner.label_cleaner.ordered_class_labels`)
+                ordered_Class_labels_transformed: The transformed (internal) class labels (`predictor._learner.label_cleaner.ordered_class_labels_transformed`)
+                num_classes: The number of internal classes (`self._learner.label_cleaner.num_classes`)
+                label: The label column name (`predictor.label`)
+        """
+        models = self.get_model_names(can_infer=True)
+
+        pred_proba_dict_test = None
+        if self.can_predict_proba:
+            pred_proba_dict_val = self.predict_proba_multi(inverse_transform=False, as_multiclass=False, models=models)
+            if test_data is not None:
+                pred_proba_dict_test = self.predict_proba_multi(test_data, inverse_transform=False, as_multiclass=False, models=models)
+        else:
+            pred_proba_dict_val = self.predict_multi(inverse_transform=False, models=models)
+            if test_data is not None:
+                pred_proba_dict_test = self.predict_multi(test_data, inverse_transform=False, models=models)
+
+        val_data_source = "val" if self.has_val else "train"
+        _, y_val = self.load_data_internal(data=val_data_source, return_X=False, return_y=True)
+        if test_data is not None:
+            y_test = test_data[self.label]
+            y_test = self.transform_labels(y_test, inverse=False)
+            test_info = dict(
+                pred_proba_dict_test=pred_proba_dict_test,
+                y_test=y_test,
+            )
+        else:
+            test_info = dict()
+
+        simulation_dict = dict(
+            **test_info,
+            pred_proba_dict_val=pred_proba_dict_val,
+            y_val=y_val,
+            eval_metric=self.eval_metric.name,
+            problem_type=self.problem_type,
+            problem_type_transform=self._learner.label_cleaner.problem_type_transform,
+            ordered_class_labels=self._learner.label_cleaner.ordered_class_labels,
+            ordered_class_labels_transformed=self._learner.label_cleaner.ordered_class_labels_transformed,
+            num_classes=self._learner.label_cleaner.num_classes,
+            label=self.label,
+        )
+
+        return simulation_dict
 
     @staticmethod
     def _check_if_hyperparameters_handle_text(hyperparameters: dict) -> bool:

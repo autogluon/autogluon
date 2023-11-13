@@ -608,6 +608,7 @@ class AbstractTabularLearner(AbstractLearner):
             explicit_order += extra_metrics_names
         explicit_order += [
             "score_val",
+            "eval_metric",
             "pred_time_test",
             "pred_time_val",
             "fit_time",
@@ -818,8 +819,18 @@ class AbstractTabularLearner(AbstractLearner):
         return X, y
 
     def leaderboard(
-        self, X=None, y=None, extra_info=False, extra_metrics=None, decision_threshold=None, only_pareto_frontier=False, skip_score=False, silent=False
+        self,
+        X=None,
+        y=None,
+        extra_info=False,
+        extra_metrics=None,
+        decision_threshold=None,
+        only_pareto_frontier=False,
+        skip_score=False,
+        score_format: str = "score",
+        silent=False,
     ) -> pd.DataFrame:
+        assert score_format in ["score", "error"]
         if X is not None:
             leaderboard = self.score_debug(
                 X=X, y=y, extra_info=extra_info, extra_metrics=extra_metrics, decision_threshold=decision_threshold, skip_score=skip_score, silent=True
@@ -837,6 +848,17 @@ class AbstractTabularLearner(AbstractLearner):
                 score_col = "score_val"
                 inference_time_col = "pred_time_val"
             leaderboard = get_leaderboard_pareto_frontier(leaderboard=leaderboard, score_col=score_col, inference_time_col=inference_time_col)
+        if score_format == "error":
+            leaderboard.rename(
+                columns={
+                    "score_test": "metric_error_test",
+                    "score_val": "metric_error_val",
+                },
+                inplace=True,
+            )
+            if "metric_error_test" in leaderboard:
+                leaderboard["metric_error_test"] = leaderboard["metric_error_test"].apply(self.eval_metric.convert_score_to_error)
+            leaderboard["metric_error_val"] = leaderboard["metric_error_val"].apply(self.eval_metric.convert_score_to_error)
         if not silent:
             with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):
                 print(leaderboard)
