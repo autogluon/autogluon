@@ -1143,8 +1143,14 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             log_filter = LogFilter(blacklist_msgs)
 
             with apply_log_filter(log_filter):
+                if num_gpus > 0: 
+                    accelerator = "gpu"
+                elif OmegaConf is not None:
+                    accelerator = OmegaConf.select(config, "env.accelerator", default="auto")
+                else:
+                    accelerator = "auto"
                 trainer = pl.Trainer(
-                    accelerator="gpu" if num_gpus > 0 else OmegaConf.select(config, "env.accelerator", default="auto"),
+                    accelerator=accelerator,
                     devices=num_gpus if num_gpus > 0 else "auto",
                     num_nodes=self._config.env.num_nodes,
                     precision=precision,
