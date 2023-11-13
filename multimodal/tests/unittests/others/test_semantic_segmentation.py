@@ -159,8 +159,7 @@ def test_sam_semantic_segmentation_lora_insert(checkpoint_name):
         predictor.evaluate(test_df, metrics=["binary_iou"])
 
         model = predictor._learner._model
-        if hasattr(model, "frozen_layers") and model.frozen_layers:
-            for k, v in model.named_parameters():
-                for filter_layer in model.frozen_layers:
-                    if filter_layer in k:
-                        assert "lora" not in k
+        for k, v in model.named_parameters():
+            for filter_layer in model.frozen_layers:
+                if filter_layer in k:
+                    assert "lora" not in k
