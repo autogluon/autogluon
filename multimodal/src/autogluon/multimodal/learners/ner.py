@@ -297,7 +297,28 @@ class NERLearner(BaseLearner):
         realtime: Optional[bool] = False,
         **kwargs,
     ):
-        """ """
+        """
+        Evaluate model on a test dataset.
+
+        Parameters
+        ----------
+        data
+            A dataframe, containing the same columns as the training data.
+        metrics
+            A list of metric names to report.
+            If None, we only return the score for the stored `_eval_metric_name`.
+        return_pred
+            Whether to return the prediction result of each row.
+        realtime
+            Whether to do realtime inference, which is efficient for small data (default False).
+            If provided None, we would infer it on based on the data modalities
+            and sample number.
+
+        Returns
+        -------
+        A dictionary with the metric names and their corresponding scores.
+        Optionally return a dataframe of prediction results.
+        """
         self.ensure_predict_ready()
         outputs = self.predict_per_run(
             data=data,
@@ -375,7 +396,7 @@ class NERLearner(BaseLearner):
             Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
         realtime
             Whether to do realtime inference, which is efficient for small data (default False).
-            If not specified, we would infer it on based on the data modalities
+            If provided None, we would infer it on based on the data modalities
             and sample number.
 
         Returns
@@ -422,7 +443,7 @@ class NERLearner(BaseLearner):
             Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
         realtime
             Whether to do realtime inference, which is efficient for small data (default False).
-            If not specified, we would infer it on based on the data modalities
+            If provided None, we would infer it on based on the data modalities
             and sample number.
 
         Returns

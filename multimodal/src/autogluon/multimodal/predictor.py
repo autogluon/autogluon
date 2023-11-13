@@ -526,7 +526,7 @@ class MultiModalPredictor:
             Whether to return the prediction result of each row.
         realtime
             Whether to do realtime inference, which is efficient for small data (default False).
-            If not specified, we would infer it on based on the data modalities
+            If provided None, we would infer it on based on the data modalities
             and sample number.
         eval_tool
             The eval_tool for object detection. Could be "pycocotools" or "torchmetrics".
@@ -577,7 +577,7 @@ class MultiModalPredictor:
             Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
         realtime
             Whether to do realtime inference, which is efficient for small data (default False).
-            If not specified, we would infer it on based on the data modalities
+            If provided None, we would infer it on based on the data modalities
             and sample number.
         save_results
             Whether to save the prediction results (only works for detection now)
@@ -625,7 +625,7 @@ class MultiModalPredictor:
             just return the probability of the positive class for binary classification problems.
         realtime
             Whether to do realtime inference, which is efficient for small data (default False).
-            If not specified, we would infer it on based on the data modalities
+            If provided None, we would infer it on based on the data modalities
             and sample number.
 
         Returns
@@ -673,7 +673,7 @@ class MultiModalPredictor:
             Whether to return the output as a pandas DataFrame (True) or numpy array (False).
         realtime
             Whether to do realtime inference, which is efficient for small data (default False).
-            If not specified, we would infer it on based on the data modalities
+            If provided None, we would infer it on based on the data modalities
             and sample number.
         signature
             When using matcher, it can be query or response.
