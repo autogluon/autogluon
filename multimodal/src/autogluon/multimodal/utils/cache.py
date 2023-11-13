@@ -10,7 +10,7 @@ import lightning.pytorch as pl
 import torch
 from lightning.pytorch.callbacks import BasePredictionWriter
 
-from ..constants import BBOX, LOGIT_SCALE, WEIGHT
+from ..constants import BBOX, LM_TARGET, LOGIT_SCALE, LOGITS, TEMPLATE_LOGITS, WEIGHT
 
 logger = logging.getLogger(__name__)
 
@@ -144,9 +144,17 @@ class DDPPredictionWriter(BasePredictionWriter):
         results = dict()
         if len(x[0]) == 0:  # dict is empty
             return dict()
+
+        # TODO: this is for t-few (AutoModelForSeq2SeqLM), reduce the logic!
+        if TEMPLATE_LOGITS in x[0]:
+            num_choices = x[0][LOGITS].shape[1]  # shape: (batch_size, num_choices)
+
         for k, v in x[0].items():
             if k in [WEIGHT, LOGIT_SCALE]:  # ignore the keys
                 continue
+            elif k in [TEMPLATE_LOGITS, LM_TARGET]:
+                # (batch_size*num_choices, ...) -> (batch_size, num_choices, ...)
+                results[k] = torch.cat([i[k].reshape(-1, num_choices, *i[k].shape[1:]) for i in x])
             elif isinstance(v, dict):
                 results[k] = self.collate([i[k] for i in x])
             elif isinstance(v, torch.Tensor):
@@ -179,9 +187,12 @@ class DDPPredictionWriter(BasePredictionWriter):
             if isinstance(v, dict):
                 results[k] = self.sort(v, indices)
             else:
-                assert len(indices) == len(v)
+                assert len(indices) == len(v), f"Size mismatch, {k}: {v} of len {len(v)} and indices {indices} of length {len(indices)}"
                 results[k] = [x for _, x in sorted(zip(indices, v), key=lambda ele: ele[0])]
                 results[k] = torch.stack(results[k])
+                if k in [TEMPLATE_LOGITS, LM_TARGET]:
+                    # (batch_size, num_choices, ...) -> (batch_size*num_choices, ...) 
+                    results[k] = results[k].reshape(-1, *results[k].shape[2:])
 
         return results
 
