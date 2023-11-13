@@ -188,7 +188,7 @@ class AutoGluonModelEvaluator(AbstractAnalysis):
 
         _data = test_data if test_data_present else val_data
         importance = predictor.feature_importance(_data.reset_index(drop=True), silent=True)
-        leaderboard = predictor.leaderboard(_data, silent=True)
+        leaderboard = predictor.leaderboard(_data)
 
         labels = predictor.class_labels
         s = {

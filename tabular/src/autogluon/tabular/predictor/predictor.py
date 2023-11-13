@@ -2129,7 +2129,8 @@ class TabularPredictor:
         score_format: str = "score",
         only_pareto_frontier: bool = False,
         skip_score: bool = False,
-        silent: bool = False,
+        verbose: bool = False,
+        **kwargs,
     ) -> pd.DataFrame:
         """
         Output summary of information about models produced during `fit()` as a :class:`pd.DataFrame`.
@@ -2262,13 +2263,20 @@ class TabularPredictor:
             [Advanced, primarily for developers]
             If `True`, will skip computing `score_test` if `data` is specified. `score_test` will be set to NaN for all models.
             `pred_time_test` and related columns will still be computed.
-        silent : bool, default = False
-            Should leaderboard DataFrame be printed?
+        verbose : bool, default = False
+            If True, the output DataFrame is printed to stdout.
 
         Returns
         -------
         :class:`pd.DataFrame` of model performance summary information.
         """
+        if "silent" in kwargs:
+            # keep `silent` logic for backwards compatibility
+            assert isinstance(kwargs["silent"], bool)
+            verbose = not kwargs.pop("silent")
+        if len(kwargs) > 0:
+            for key in kwargs:
+                raise TypeError(f"TabularPredictor.leaderboard() got an unexpected keyword argument '{key}'")
         self._assert_is_fit("leaderboard")
         data = self._get_dataset(data, allow_nan=True)
         if decision_threshold is None:
@@ -2281,7 +2289,7 @@ class TabularPredictor:
             only_pareto_frontier=only_pareto_frontier,
             score_format=score_format,
             skip_score=skip_score,
-            silent=silent,
+            silent=not verbose,
         )
 
     def get_model_failures(self, verbose: bool = False) -> pd.DataFrame:
@@ -2951,7 +2959,7 @@ class TabularPredictor:
         models : list of str or str, default = 'all'
             Model names of models to unpersist.
             If 'all' then all models are unpersisted.
-            Valid models are listed in this `predictor` by calling `predictor.get_model_names_persisted()`.
+            Valid models are listed in this `predictor` by calling `predictor.get_model_names(persisted=True)`.
 
         Returns
         -------
@@ -3185,7 +3193,7 @@ class TabularPredictor:
         models = []
 
         if expand_pareto_frontier:
-            leaderboard = self.leaderboard(silent=True)
+            leaderboard = self.leaderboard()
             leaderboard = leaderboard[leaderboard["model"].isin(base_models)]
             leaderboard = leaderboard.sort_values(by="pred_time_val")
             models_to_check = leaderboard["model"].tolist()
@@ -3626,16 +3634,46 @@ class TabularPredictor:
         """
         return get_directory_size_per_file(self.path, sort_by=sort_by, include_path_in_name=include_path_in_name)
 
-    # TODO: v0.1 add documentation for arguments
-    def get_model_names(self, stack_name=None, level=None, can_infer: bool = None, models: list = None) -> list:
-        """Returns the list of model names trained in this `predictor` object."""
-        self._assert_is_fit("get_model_names")
-        return self._trainer.get_model_names(stack_name=stack_name, level=level, can_infer=can_infer, models=models)
+    def get_model_names(
+        self,
+        stack_name: str = None,
+        level: int = None,
+        can_infer: bool = None,
+        models: List[str] = None,
+        persisted: bool = None,
+    ) -> List[str]:
+        """
+        Returns the list of model names trained in this `predictor` object.
 
-    def get_model_names_persisted(self) -> list:
-        """Returns the list of model names which are persisted in memory."""
-        self._assert_is_fit("get_model_names_persisted")
-        return list(self._learner.load_trainer().models.keys())
+        Parameters
+        ----------
+        stack_name: str, default = None
+            If specified, returns only models under a given stack name.
+        level: int, default = None
+            If specified, returns only models at the given stack level.
+        can_infer: bool, default = None
+            If specified, returns only models that can/cannot infer on new data.
+        models: List[str], default = None
+            The list of model names to consider.
+            If None, considers all models.
+        persisted: bool, default = None
+            If None: no filtering will occur based on persisted status
+            If True: will return only the models that are persisted in memory via `predictor.persist_models()`
+            If False: will return only the models that are not persisted in memory via `predictor.persist_models()`
+
+        Returns
+        -------
+        List of model names
+        """
+        self._assert_is_fit("get_model_names")
+        model_names = self._trainer.get_model_names(stack_name=stack_name, level=level, can_infer=can_infer, models=models)
+        if persisted is not None:
+            persisted_model_names = list(self._learner.load_trainer().models.keys())
+            if persisted:
+                model_names = [m for m in model_names if m in persisted_model_names]
+            else:
+                model_names = [m for m in model_names if m not in persisted_model_names]
+        return model_names
 
     def distill(
         self,
@@ -4762,7 +4800,7 @@ def _sub_fit(
         stacked_overfitting = False
     else:
         # Determine stacked overfitting
-        ho_leaderboard = predictor.leaderboard(data=val_data, silent=True).reset_index(drop=True).sort_values(by="score_val")
+        ho_leaderboard = predictor.leaderboard(data=val_data).reset_index(drop=True).sort_values(by="score_val")
         stacked_overfitting = check_stacked_overfitting_from_leaderboard(ho_leaderboard)
         logger.info("Leaderboard on holdout data from dynamic stacking:")
         with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):

@@ -55,7 +55,7 @@ class InterpretableTabularPredictor(TabularPredictor):
             raise ValueError(f"{self.__class__.__name__} does not support `auto_stack`.")
         return kwargs
 
-    def leaderboard_interpretable(self, silent=False, **kwargs) -> pd.DataFrame:
+    def leaderboard_interpretable(self, verbose: bool = False, silent: bool = None, **kwargs) -> pd.DataFrame:
         """
         Leaderboard of fitted interpretable models along with their corresponding complexities.
         Identical to `.leaderboard`, but with an additional 'complexity' column indicating
@@ -63,7 +63,9 @@ class InterpretableTabularPredictor(TabularPredictor):
 
         Models which do not support calculating 'complexity' will be filtered from this result.
         """
-        leaderboard = self.leaderboard(silent=True, **kwargs)
+        if silent is not None:
+            verbose = not silent
+        leaderboard = self.leaderboard(**kwargs)
 
         complexities = []
         info = self.info()
@@ -74,7 +76,7 @@ class InterpretableTabularPredictor(TabularPredictor):
         leaderboard = leaderboard[~pd.isna(leaderboard.complexity)]  # remove non-interpretable models
         score_col = "score_test" if "score_test" in leaderboard.columns else "score_val"
         leaderboard = leaderboard.sort_values(by=[score_col, "complexity"], ascending=[False, True], ignore_index=True)
-        if not silent:
+        if verbose:
             with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):
                 print(leaderboard)
         return leaderboard
@@ -92,7 +94,7 @@ class InterpretableTabularPredictor(TabularPredictor):
             Optionally print rules for a particular model, ignoring the complexity threshold.
         """
         if model_name is None:
-            summaries = self.leaderboard_interpretable(silent=True)
+            summaries = self.leaderboard_interpretable()
             summaries_filtered = summaries[summaries.complexity <= complexity_threshold]
             if summaries_filtered.shape[0] == 0:
                 summaries_filtered = summaries

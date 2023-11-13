@@ -231,21 +231,21 @@ def test_advanced_functionality():
         y_pred_proba_from_transform = predictor.predict_proba(test_data_transformed, transform_features=False)
         assert y_pred_proba.equals(y_pred_proba_from_transform)
 
-    assert predictor.get_model_names_persisted() == []  # Assert that no models were persisted during training
+    assert predictor.get_model_names(persisted=True) == []  # Assert that no models were persisted during training
     assert predictor.unpersist_models() == []  # Assert that no models were unpersisted
 
     persisted_models = predictor.persist_models(models="all", max_memory=None)
-    assert set(predictor.get_model_names_persisted()) == set(persisted_models)  # Ensure all models are persisted
+    assert set(predictor.get_model_names(persisted=True)) == set(persisted_models)  # Ensure all models are persisted
     assert predictor.persist_models(models="all", max_memory=None) == []  # Ensure that no additional models are persisted on repeated calls
     unpersised_models = predictor.unpersist_models()
     assert set(unpersised_models) == set(persisted_models)
-    assert predictor.get_model_names_persisted() == []  # Assert that all models were unpersisted
+    assert predictor.get_model_names(persisted=True) == []  # Assert that all models were unpersisted
 
     # Raise exception
     with pytest.raises(NetworkXError):
         predictor.persist_models(models=["UNKNOWN_MODEL_1", "UNKNOWN_MODEL_2"])
 
-    assert predictor.get_model_names_persisted() == []
+    assert predictor.get_model_names(persisted=True) == []
 
     assert predictor.unpersist_models(models=["UNKNOWN_MODEL_1", "UNKNOWN_MODEL_2"]) == []
 
@@ -254,7 +254,7 @@ def test_advanced_functionality():
     predictor_loaded = TabularPredictor.load(predictor.path)  # Assert that predictor loading works
     leaderboard_loaded = predictor_loaded.leaderboard(data=test_data)
     assert len(leaderboard) == len(leaderboard_loaded)
-    assert predictor_loaded.get_model_names_persisted() == []  # Assert that models were not still persisted after loading predictor
+    assert predictor_loaded.get_model_names(persisted=True) == []  # Assert that models were not still persisted after loading predictor
 
     _assert_predictor_size(predictor=predictor)
     # Test cloning logic
