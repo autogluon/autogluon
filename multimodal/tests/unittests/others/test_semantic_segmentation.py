@@ -89,7 +89,8 @@ def get_file_df_multi_semantic_seg(need_test_gt=False):
         "facebook/sam-vit-base",
     ],
 )
-def test_sam_semantic_segmentation_fit_evaluate_predict_isic(checkpoint_name):
+def test_sam_semantic_segmentation_isic_fit_eval_predict_save_load(checkpoint_name):
+    # Binary semantic segmentation
     train_df, val_df, test_df = get_file_df_binary_semantic_seg(need_test_gt=True)
 
     validation_metric = "iou"
@@ -105,39 +106,13 @@ def test_sam_semantic_segmentation_fit_evaluate_predict_isic(checkpoint_name):
         sample_data_path=train_df,
     )
 
+    # Fit
     predictor.fit(train_data=train_df, tuning_data=val_df, time_limit=20)
 
-    # Evaluate
-    predictor.evaluate(test_df, metrics=["iou"])
+    # Evaluation
+    predictor.evaluate(test_df, metrics=[validation_metric])
 
-    # Predict
-    predictor.predict(test_df, save_results=False)
-
-
-@pytest.mark.parametrize(
-    "checkpoint_name",
-    [
-        "facebook/sam-vit-base",
-    ],
-)
-def test_sam_semantic_segmentation_save_and_load_isic(checkpoint_name):
-    train_df, val_df, test_df = get_file_df_binary_semantic_seg(need_test_gt=False)
-
-    validation_metric = "iou"
-    predictor = MultiModalPredictor(
-        problem_type="semantic_segmentation",
-        validation_metric=validation_metric,
-        eval_metric=validation_metric,
-        hyperparameters={
-            "env.num_gpus": 1,
-            "model.sam.checkpoint_name": checkpoint_name,
-        },
-        label="label",
-        sample_data_path=train_df,
-    )
-
-    predictor.fit(train_data=train_df, tuning_data=val_df, time_limit=20)
-
+    # Predict, save and load
     verify_predictor_save_load_for_semantic_seg(predictor, test_df, as_multiclass=False)
 
 
@@ -169,6 +144,11 @@ def test_sam_semantic_segmentation_zero_shot_evaluate_predict(checkpoint_name):
     # Predict
     predictor.predict(test_df, save_results=False)
 
+    # Predict without ground truth
+    _, _, test_df = get_file_df_binary_semantic_seg(need_test_gt=False)
+    predictor._learner._label_column = None
+    predictor.predict(test_df, save_results=False)
+
 
 @pytest.mark.parametrize(
     "checkpoint_name",
@@ -176,7 +156,8 @@ def test_sam_semantic_segmentation_zero_shot_evaluate_predict(checkpoint_name):
         "facebook/sam-vit-base",
     ],
 )
-def test_sam_semantic_segmentation_fit_evaluate_predict_trans10k(checkpoint_name):
+def test_sam_semantic_segmentation_trans10k_fit_eval_predict_save_load(checkpoint_name):
+    # Multi-class semantic segmentation
     train_df, val_df, test_df = get_file_df_multi_semantic_seg(need_test_gt=True)
 
     validation_metric = "iou"
@@ -195,42 +176,13 @@ def test_sam_semantic_segmentation_fit_evaluate_predict_trans10k(checkpoint_name
         sample_data_path=train_df,
     )
 
+    # Fit
     predictor.fit(train_data=train_df, tuning_data=val_df, time_limit=20)
 
-    # Evaluate
+    # Evaluation
     predictor.evaluate(test_df, metrics=[validation_metric])
 
-    # Predict
-    predictor.predict(test_df, save_results=False)
-
-
-@pytest.mark.parametrize(
-    "checkpoint_name",
-    [
-        "facebook/sam-vit-base",
-    ],
-)
-def test_sam_semantic_segmentation_save_and_load_trans10k(checkpoint_name):
-    train_df, val_df, test_df = get_file_df_multi_semantic_seg(need_test_gt=False)
-
-    validation_metric = "iou"
-    predictor = MultiModalPredictor(
-        problem_type="semantic_segmentation",
-        validation_metric=validation_metric,
-        eval_metric=validation_metric,
-        hyperparameters={
-            "env.num_gpus": 1,
-            "env.precision": 32,
-            "model.sam.checkpoint_name": checkpoint_name,
-            "optimization.loss_function": "mask2former_loss",
-            "model.sam.num_mask_tokens": 10,
-        },
-        label="label",
-        sample_data_path=train_df,
-    )
-
-    predictor.fit(train_data=train_df, tuning_data=val_df, time_limit=20)
-
+    # Predict, save and load
     verify_predictor_save_load_for_semantic_seg(predictor, test_df, as_multiclass=True)
 
 
@@ -257,6 +209,41 @@ def verify_predictor_save_load_for_semantic_seg(predictor, df, as_multiclass, cl
 
 
 @pytest.mark.parametrize(
+    "checkpoint_name",
+    [
+        "facebook/sam-vit-base",
+    ],
+)
+def test_sam_semantic_segmentation_get_class_num_func(checkpoint_name):
+    train_df, _, _ = get_file_df_multi_semantic_seg(need_test_gt=True)
+
+    validation_metric = "iou"
+    predictor = MultiModalPredictor(
+        problem_type="semantic_segmentation",
+        validation_metric=validation_metric,
+        eval_metric=validation_metric,
+        hyperparameters={
+            "env.num_gpus": 1,
+            "env.precision": 32,
+            "model.sam.checkpoint_name": checkpoint_name,
+            "optimization.loss_function": "mask2former_loss",
+            "model.sam.num_mask_tokens": 10,
+        },
+        label="label",
+    )
+
+    get_class_num_func = predictor._learner.get_semantic_segmentation_class_num
+    num_classes = 11  # the true number of classes within the provided data
+
+    # pd.DataFrame as input
+    assert num_classes == get_class_num_func(train_df)
+    # file path as input
+    assert num_classes == get_class_num_func(train_df["label"][2])  # tiny_trans10kcls12/train/masks_12/2492_mask.png
+    # file directory path as input
+    assert num_classes == get_class_num_func(os.path.dirname(train_df["label"][0]))
+
+
+@pytest.mark.parametrize(
     "frozen_layers",
     [
         ["prompt_encoder"],
@@ -264,7 +251,7 @@ def verify_predictor_save_load_for_semantic_seg(predictor, df, as_multiclass, cl
     ],
 )
 def test_sam_semantic_segmentation_lora_insert(frozen_layers):
-    _, _, test_df = get_file_df(need_test_gt=True)
+    _, _, test_df = get_file_df_binary_semantic_seg(need_test_gt=True)
     # SAM's vision encoder has query and value linear layers, while the prompt encoder does not.
     predictor = MultiModalPredictor(
         problem_type="semantic_segmentation",
@@ -276,7 +263,7 @@ def test_sam_semantic_segmentation_lora_insert(frozen_layers):
         label="label",
     )
     # Evaluate
-    predictor.evaluate(test_df, metrics=["binary_iou"])
+    predictor.evaluate(test_df, metrics=["iou"])
     model = predictor._learner._model
     assert hasattr(model, "frozen_layers") and len(model.frozen_layers) > 0
     for k, v in model.named_parameters():

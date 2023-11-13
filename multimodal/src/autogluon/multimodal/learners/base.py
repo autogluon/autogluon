@@ -2380,6 +2380,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             mixup_active=False,
             loss_func_name=OmegaConf.select(learner._config, "optimization.loss_function"),
             config=learner._config.optimization,
+            num_classes=learner._output_shape,
         )
         model_postprocess_fn = get_model_postprocess_fn(
             problem_type=learner._problem_type,

@@ -33,11 +33,7 @@ class SemanticSegmentationLitModule(LitModule):
         loss = 0
         for _, per_output in output.items():
             weight = per_output[WEIGHT] if WEIGHT in per_output else 1
-            if (
-                TEMPLATE_LOGITS in per_output and self.model.prefix == T_FEW
-            ):  # Do only add template loss if T-Few. #TODO Add compatibility to Fusion models.
-                loss += self._compute_template_loss(per_output, label) * weight
-            elif isinstance(self.loss_func, Mask2FormerLoss):
+            if isinstance(self.loss_func, Mask2FormerLoss):
                 mask_labels = [mask_labels.to(per_output[LOGITS]) for mask_labels in kwargs["mask_labels"]]
                 dict_loss = self.loss_func(
                     masks_queries_logits=per_output[LOGITS],  # bs, num_mask_tokens, height, width
@@ -50,7 +46,7 @@ class SemanticSegmentationLitModule(LitModule):
             else:
                 loss += (
                     self.loss_func(
-                        input=per_output[LOGITS].squeeze(dim=1),
+                        input=per_output[LOGITS],
                         target=label,
                     )
                     * weight
@@ -65,22 +61,13 @@ class SemanticSegmentationLitModule(LitModule):
         label: torch.Tensor,
         **kwargs,
     ):
-        if isinstance(
-            metric, (torchmetrics.classification.BinaryAUROC, torchmetrics.classification.BinaryAveragePrecision)
-        ):
-            prob = F.softmax(logits.float(), dim=1)
-            metric.update(preds=prob[:, 1], target=label)  # for binary classification only
-        elif isinstance(metric, BaseAggregator):
-            metric.update(custom_metric_func(logits, label))
-        elif isinstance(metric, Binary_IoU) or isinstance(metric, Balanced_Error_Rate) or isinstance(metric, COD):
+        if isinstance(metric, Binary_IoU) or isinstance(metric, Balanced_Error_Rate) or isinstance(metric, COD):
             metric.update(logits.float(), label)
         elif isinstance(metric, torchmetrics.classification.MulticlassJaccardIndex):
             bs, num_classes = kwargs["processed_results"].shape[0:2]
             processed_results = kwargs["processed_results"].float().reshape(bs, num_classes, -1)
             label = label.reshape(bs, -1)
             metric.update(processed_results, label)
-        else:
-            metric.update(logits.squeeze(dim=1).float(), label)
 
     def _shared_step(
         self,

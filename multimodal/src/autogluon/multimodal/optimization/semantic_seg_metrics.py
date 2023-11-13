@@ -573,6 +573,11 @@ class WeightedFmeasure(object):
 
 
 class Binary_IoU(torchmetrics.Metric):
+    """
+    Compute the IoU for binary semantic segmentation. The direct use of torchmetrics to calculate IoU for multiple samples does not yield accurate results.
+    So we iteratively calculate metric values and then take the average.
+    """
+
     def __init__(
         self,
     ):

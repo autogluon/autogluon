@@ -230,12 +230,10 @@ class SemanticSegImageProcessor:
                 continue
             if annotation_column:
                 gt_feature = per_col_gt_features[idx]
-                if self.num_classes == 1:
-                    with PIL.Image.open(gt_feature) as gt:
-                        gt = gt.convert("L")
-                else:
-                    with PIL.Image.open(gt_feature) as gt:
-                        gt = gt.convert("P")
+
+                with PIL.Image.open(gt_feature) as gt:
+                    gt = gt.convert(gt.mode)
+                if self.num_classes > 1:
                     gt = np.array(gt).astype(
                         "float32"
                     )  # There may be issues with 'transforms.ToTensor()' without this line because 'transforms.ToTensor()' converts 'unit8' to values between 0 and 1.
@@ -263,9 +261,9 @@ class SemanticSegImageProcessor:
 
         ret.update(
             {
-                self.image_key: torch.cat(images, dim=0) if len(images) != 0 else torch.tensor([]),
+                self.image_key: images[0] if len(images) != 0 else torch.tensor([]),
                 self.image_valid_num_key: len(images),
-                self.label_key: torch.cat(gts, dim=0) if len(gts) != 0 else torch.tensor([]),
+                self.label_key: gts[0] if len(gts) != 0 else torch.tensor([]),
             }
         )
         if self.num_classes > 1:

@@ -73,11 +73,14 @@ class SemanticSegmentationLearner(BaseLearner):
         self._output_shape = num_classes
         self._sample_data_path = sample_data_path
 
-        if self._output_shape == None:
-            self._output_shape = 1  # binary semantic segmentation by default
-
         if self._sample_data_path is not None:
-            self._output_shape = self.get_semantic_segmentation_class_num(self._sample_data_path)
+            infer_output_shape = self.get_semantic_segmentation_class_num(self._sample_data_path)
+            if num_classes is not None:
+                assert (
+                    num_classes == infer_output_shape
+                ), "The provided number of classes and the inferred class number from the sample data should be consistent."
+            else:
+                self._output_shape = infer_output_shape
 
     def get_semantic_segmentation_class_num(self, sample_data_path):
         """
@@ -111,18 +114,22 @@ class SemanticSegmentationLearner(BaseLearner):
                     classes = np.unique(mask)
                     return max(classes).item() + 1  # include background
                 else:
-                    NotImplementedError
+                    NotImplementedError(
+                        f"Current image mode '{mode}' is not supported. 'P' (Palette) mode and 'L' (Luminance) mode are supported."
+                    )
+
         elif isinstance(sample_data_path, pd.DataFrame):
             num_classes = []
             for idx in range(sample_data_path.shape[0]):
                 row = sample_data_path.iloc[idx]
-                mask_file = row[self.label]
+                mask_file = row["label"]
                 per_num_classes = self.get_semantic_segmentation_class_num(mask_file)
                 num_classes.append(per_num_classes)
             return max(num_classes)
 
-    def infer_output_shape(self):
-        assert self._output_shape is not None, f"output_shape should have been set in the learner initialization."
+    def infer_output_shape(self, train_data: pd.DataFrame):
+        if self._output_shape is None:
+            self._output_shape = self.get_semantic_segmentation_class_num(train_data)
 
     @staticmethod
     def get_peft_param_names_per_run(model, config):
@@ -227,6 +234,62 @@ class SemanticSegmentationLearner(BaseLearner):
                 **optimization_kwargs,
             )
 
+    def fit(
+        self,
+        train_data: Union[pd.DataFrame, str],
+        presets: Optional[str] = None,
+        tuning_data: Optional[Union[pd.DataFrame, str]] = None,
+        time_limit: Optional[int] = None,
+        save_path: Optional[str] = None,
+        hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
+        column_types: Optional[Dict] = None,
+        holdout_frac: Optional[float] = None,
+        teacher_learner: Union[str, BaseLearner] = None,
+        seed: Optional[int] = 0,
+        standalone: Optional[bool] = True,
+        hyperparameter_tune_kwargs: Optional[Dict] = None,
+        clean_ckpts: Optional[bool] = True,
+        **kwargs,
+    ):
+        training_start = self.on_fit_start(presets=presets, teacher_learner=teacher_learner)
+        self.setup_save_path(save_path=save_path)
+        self.infer_problem_type(train_data=train_data)
+        self.prepare_train_tuning_data(
+            train_data=train_data,
+            tuning_data=tuning_data,
+            holdout_frac=holdout_frac,
+            seed=seed,
+        )
+        self.infer_column_types(column_types=column_types)
+        self.infer_output_shape(train_data)
+        self.infer_validation_metric()
+        self.update_hyperparameters(
+            hyperparameters=hyperparameters,
+            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+        )
+        self.fit_sanity_check()
+        self.prepare_fit_args(
+            time_limit=time_limit,
+            seed=seed,
+            standalone=standalone,
+            clean_ckpts=clean_ckpts,
+        )
+        fit_returns = self.execute_fit()
+        self.on_fit_end(
+            training_start=training_start,
+            strategy=fit_returns.get("strategy", None),
+            strict_loading=fit_returns.get("strict_loading", True),
+            standalone=standalone,
+            clean_ckpts=clean_ckpts,
+        )
+
+        return self
+
+    def on_predict_start(self, data: pd.DataFrame):
+        if self._output_shape is None:  # for zero-shot evaluation/prediction
+            self._output_shape = self.get_semantic_segmentation_class_num(data)
+        self.ensure_predict_ready()
+
     def evaluate(
         self,
         data: Union[pd.DataFrame, dict, list, str],
@@ -258,7 +321,7 @@ class SemanticSegmentationLearner(BaseLearner):
         A dictionary with the metric names and their corresponding scores.
         Optionally return a dataframe of prediction results.
         """
-        self.on_predict_start()
+        self.on_predict_start(data)
         return self.evaluate_semantic_segmentation(data, metrics, realtime)
 
     def predict(
@@ -289,7 +352,7 @@ class SemanticSegmentationLearner(BaseLearner):
         -------
         Array of predictions, one corresponding to each row in given dataset.
         """
-        self.on_predict_start()
+        self.on_predict_start(data)
         if self._output_shape == 1:
             ret_type = LOGITS
         else:
@@ -367,7 +430,7 @@ class SemanticSegmentationLearner(BaseLearner):
         assert (self._output_shape == 1 and as_multiclass == False) or (
             self._output_shape > 1 and as_multiclass == True
         )
-        self.on_predict_start()
+        self.on_predict_start(data)
 
         outputs = self.predict_per_run(
             data=data,

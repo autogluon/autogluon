@@ -275,7 +275,7 @@ class SAMForSemanticSegmentation(nn.Module):
             Whether using the pretrained SAM models. If pretrained=True, download the pretrained model.
         frozen_layers
             A list of substrings of frozen layers' names.
-        num_tokens
+        num_mask_tokens
             The number of mask proposals.
         """
 
