@@ -187,11 +187,13 @@ class DDPPredictionWriter(BasePredictionWriter):
             if isinstance(v, dict):
                 results[k] = self.sort(v, indices)
             else:
-                assert len(indices) == len(v), f"Size mismatch, {k}: {v} of len {len(v)} and indices {indices} of length {len(indices)}"
+                assert len(indices) == len(
+                    v
+                ), f"Size mismatch, {k}: {v} of len {len(v)} and indices {indices} of length {len(indices)}"
                 results[k] = [x for _, x in sorted(zip(indices, v), key=lambda ele: ele[0])]
                 results[k] = torch.stack(results[k])
                 if k in [TEMPLATE_LOGITS, LM_TARGET]:
-                    # (batch_size, num_choices, ...) -> (batch_size*num_choices, ...) 
+                    # (batch_size, num_choices, ...) -> (batch_size*num_choices, ...)
                     results[k] = results[k].reshape(-1, *results[k].shape[2:])
 
         return results
