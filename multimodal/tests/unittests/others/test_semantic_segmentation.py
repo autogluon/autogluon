@@ -135,31 +135,29 @@ def test_sam_semantic_segmentation_zero_shot_evaluate_predict(checkpoint_name):
 
 
 @pytest.mark.parametrize(
-    "checkpoint_name",
+    "frozen_layers",
     [
-        "facebook/sam-vit-base",
+        ["prompt_encoder"],
+        ["vision_encoder"],
     ],
 )
-def test_sam_semantic_segmentation_lora_insert(checkpoint_name):
+def test_sam_semantic_segmentation_lora_insert(frozen_layers):
     _, _, test_df = get_file_df(need_test_gt=True)
-
     # SAM's vision encoder has query and value linear layers, while the prompt encoder does not.
-    for frozen_layers in [["prompt_encoder"], ["vision_encoder"]]:
-        predictor = MultiModalPredictor(
-            problem_type="semantic_segmentation",
-            hyperparameters={
-                "env.num_gpus": 1,
-                "model.sam.checkpoint_name": checkpoint_name,
-                "model.sam.frozen_layers": frozen_layers,
-            },
-            label="label",
-        )
-
-        # Evaluate
-        predictor.evaluate(test_df, metrics=["binary_iou"])
-
-        model = predictor._learner._model
-        for k, v in model.named_parameters():
-            for filter_layer in model.frozen_layers:
-                if filter_layer in k:
-                    assert "lora" not in k
+    predictor = MultiModalPredictor(
+        problem_type="semantic_segmentation",
+        hyperparameters={
+            "env.num_gpus": 1,
+            "model.sam.checkpoint_name": "facebook/sam-vit-base",
+            "model.sam.frozen_layers": frozen_layers,
+        },
+        label="label",
+    )
+    # Evaluate
+    predictor.evaluate(test_df, metrics=["binary_iou"])
+    model = predictor._learner._model
+    assert hasattr(model, "frozen_layers") and len(model.frozen_layers) > 0
+    for k, v in model.named_parameters():
+        for filter_layer in model.frozen_layers:
+            if filter_layer in k:
+                assert "lora" not in k
