@@ -383,7 +383,6 @@ class NumEmbeddings(nn.Module):
             )
 
         for x in embedding_arch[1:]:
-
             layers.append(
                 nn.ReLU()
                 if x == "relu"

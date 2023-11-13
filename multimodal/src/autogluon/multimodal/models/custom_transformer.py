@@ -392,7 +392,6 @@ class AdditiveAttention(nn.Module):
         x_kv: Tensor,
         *args,  # Not used. just to make the input consistent with MultiheadAttention.
     ) -> Tuple[Tensor, Dict[str, Tensor]]:
-
         batch_size, n_q_tokens, d_token = x_q.shape
         batch_size, n_k_tokens, d_token = x_kv.shape
 

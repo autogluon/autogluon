@@ -184,7 +184,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
         total_loss, total_correct, total_num = 0.0, 0.0, 0
         data_bar = tqdm(loader_train, disable=databar_disable) if is_train else tqdm(loader_val, disable=databar_disable)
 
-        with (torch.enable_grad() if is_train else torch.no_grad()):
+        with torch.enable_grad() if is_train else torch.no_grad():
             for data, target in data_bar:
                 data, target = pretext.get(data, target)
 

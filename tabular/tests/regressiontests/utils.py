@@ -312,7 +312,6 @@ def make_dataset(request, seed):
     random.seed(seed)
     np.random.seed(seed)
     if request["type"] == "regression":
-
         x, y = make_regression(
             n_samples=int(request["n_samples"] * (1 / (1 - TEST_SIZE))), n_features=request["n_features"], noise=4
         )  # To make it hard enough that we get better performance on slower models
