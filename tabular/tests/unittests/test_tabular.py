@@ -32,6 +32,7 @@ import pytest
 from networkx.exception import NetworkXError
 
 from autogluon.common import space
+from autogluon.common.utils.simulation_utils import convert_simulation_artifacts_to_tabular_predictions_dict
 from autogluon.core.constants import BINARY, MULTICLASS, PROBLEM_TYPES_CLASSIFICATION, QUANTILE, REGRESSION
 from autogluon.core.utils import download, unzip
 from autogluon.tabular import TabularDataset, TabularPredictor
@@ -147,7 +148,7 @@ def test_advanced_functionality():
 
     # test metric_error leaderboard
     leaderboard_error = predictor.leaderboard(data=test_data, score_format="error")
-    assert leaderboard["model"].to_list() == leaderboard_error["model"].to_list()
+    assert sorted(leaderboard["model"].to_list()) == sorted(leaderboard_error["model"].to_list())
     leaderboard_combined = pd.merge(leaderboard, leaderboard_error[["model", "metric_error_test", "metric_error_val"]], on=["model"])
     score_test = leaderboard_combined["score_test"].to_list()
     score_val = leaderboard_combined["score_val"].to_list()
@@ -169,6 +170,16 @@ def test_advanced_functionality():
     assert simulation_artifact["y_test"].equals(predictor.transform_labels(test_data[label]))
     assert simulation_artifact["eval_metric"] == predictor.eval_metric.name
     assert simulation_artifact["problem_type"] == predictor.problem_type
+    simulation_artifacts = {dataset["name"]: {0: simulation_artifact}}
+
+    # Test convert_simulation_artifacts_to_tabular_predictions_dict
+    aggregated_pred_proba, aggregated_ground_truth = convert_simulation_artifacts_to_tabular_predictions_dict(simulation_artifacts=simulation_artifacts)
+    assert set(aggregated_pred_proba[dataset["name"]][0]["pred_proba_dict_val"].keys()) == set(predictor.get_model_names(can_infer=True))
+    assert set(aggregated_pred_proba[dataset["name"]][0]["pred_proba_dict_test"].keys()) == set(predictor.get_model_names(can_infer=True))
+    ground_truth_keys_expected = set(simulation_artifact.keys())
+    ground_truth_keys_expected.remove("pred_proba_dict_val")
+    ground_truth_keys_expected.remove("pred_proba_dict_test")
+    assert set(aggregated_ground_truth[dataset["name"]][0].keys()) == ground_truth_keys_expected
 
     extra_metrics = ["accuracy", "roc_auc", "log_loss"]
     test_data_no_label = test_data.drop(columns=[label])

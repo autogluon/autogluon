@@ -64,7 +64,6 @@ def convert_simulation_artifacts_to_tabular_predictions_dict(simulation_artifact
                     "label",
                 ]:
                     aggregated_ground_truth[task_name][fold][k] = zeroshot_metadata[k]
-                aggregated_ground_truth[task_name][fold]["task"] = task_name
             for k in ["pred_proba_dict_val", "pred_proba_dict_test"]:
                 for m, pred_proba in zeroshot_metadata[k].items():
                     if aggregated_ground_truth[task_name][fold]["problem_type"] == "binary":
