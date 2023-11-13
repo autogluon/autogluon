@@ -137,16 +137,19 @@ class FewShotSVMLearner(BaseLearner):
         seed: int,
         standalone: Optional[bool] = True,
         clean_ckpts: Optional[bool] = True,
+        sync_path: Optional[str] = None,
     ):
         super().prepare_fit_args(
             time_limit=time_limit,
             seed=seed,
             standalone=standalone,
             clean_ckpts=clean_ckpts,
+            sync_path=sync_path,
         )
         self._fit_args.pop("ckpt_path", None)
         self._fit_args.pop("resume", None)
         self._fit_args.pop("clean_ckpts", None)
+        self._fit_args.pop("sync_path", None)
         if self._fit_called:
             self._fit_args.update(dict(svm=self._svm))
 
@@ -280,6 +283,7 @@ class FewShotSVMLearner(BaseLearner):
         model: Optional[nn.Module] = None,
         svm: Optional[Pipeline] = None,
         standalone: bool = True,
+        sync_path: Optional[str] = None,
     ):
         self.on_fit_per_run_start(seed=seed, save_path=save_path)
         config = self.get_config_per_run(config=config, hyperparameters=hyperparameters)
