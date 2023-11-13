@@ -1,6 +1,19 @@
+from collections import defaultdict
 from typing import Any, Dict, Tuple
 
 import pandas as pd
+
+
+def _recursive_dd():
+    return defaultdict(_recursive_dd)
+
+
+def _dd_to_dict(dd):
+    dd = dict(dd)
+    for k, v in dd.items():
+        if isinstance(v, defaultdict):
+            dd[k] = _dd_to_dict(v)
+    return dd
 
 
 def convert_simulation_artifacts_to_tabular_predictions_dict(simulation_artifacts: Dict[str, Dict[int, Dict[str, Any]]]) -> Tuple[dict, dict]:
@@ -32,17 +45,13 @@ def convert_simulation_artifacts_to_tabular_predictions_dict(simulation_artifact
             "num_classes",  # The number of classes
             "label",  # The label column name
     """
-    aggregated_pred_proba = {}
-    aggregated_ground_truth = {}
+    aggregated_pred_proba = _recursive_dd()
+    aggregated_ground_truth = _recursive_dd()
     for task_name in simulation_artifacts.keys():
         for fold in simulation_artifacts[task_name].keys():
             zeroshot_metadata = simulation_artifacts[task_name][fold]
             fold = int(fold)
-
-            if task_name not in aggregated_ground_truth:
-                aggregated_ground_truth[task_name] = {}
             if fold not in aggregated_ground_truth[task_name]:
-                aggregated_ground_truth[task_name][fold] = {}
                 for k in [
                     "y_val",
                     "y_test",
@@ -56,13 +65,7 @@ def convert_simulation_artifacts_to_tabular_predictions_dict(simulation_artifact
                 ]:
                     aggregated_ground_truth[task_name][fold][k] = zeroshot_metadata[k]
                 aggregated_ground_truth[task_name][fold]["task"] = task_name
-            if task_name not in aggregated_pred_proba:
-                aggregated_pred_proba[task_name] = {}
-            if fold not in aggregated_pred_proba[task_name]:
-                aggregated_pred_proba[task_name][fold] = {}
             for k in ["pred_proba_dict_val", "pred_proba_dict_test"]:
-                if k not in aggregated_pred_proba[task_name][fold]:
-                    aggregated_pred_proba[task_name][fold][k] = {}
                 for m, pred_proba in zeroshot_metadata[k].items():
                     if aggregated_ground_truth[task_name][fold]["problem_type"] == "binary":
                         if isinstance(pred_proba, pd.DataFrame):
@@ -70,4 +73,6 @@ def convert_simulation_artifacts_to_tabular_predictions_dict(simulation_artifact
                             pred_proba = pred_proba[1]
                         assert isinstance(pred_proba, pd.Series)
                     aggregated_pred_proba[task_name][fold][k][m] = pred_proba
+    aggregated_pred_proba = _dd_to_dict(aggregated_pred_proba)
+    aggregated_ground_truth = _dd_to_dict(aggregated_ground_truth)
     return aggregated_pred_proba, aggregated_ground_truth
