@@ -4547,22 +4547,32 @@ class TabularPredictor:
         predictor_clone.save_space()
         return predictor_clone if return_clone else predictor_clone.path
 
-    # TODO: Cleanup, unit test, add docs
     def get_simulation_artifact(self, test_data: pd.DataFrame) -> dict:
         """
         [Advanced] Computes and returns the necessary information to perform zeroshot HPO simulation.
+        For a usage example, refer to https://github.com/autogluon/tabrepo/blob/main/examples/run_quickstart_from_scratch.py
 
         Parameters
         ----------
         test_data: pd.DataFrame
-            The test data.
+            The test data to predict with.
 
         Returns
         -------
         simulation_dict: dict
-            The dictionary of information requires for zeroshot HPO simulation.
-            TODO: Describe keys
-
+            The dictionary of information required for zeroshot HPO simulation.
+            Keys are as follows:
+                pred_proba_dict_val: Dictionary of model name to prediction probabilities (or predictions if regression) on the validation data
+                pred_proba_dict_test: Dictionary of model name to prediction probabilities (or predictions if regression) on the test data
+                y_val: Pandas Series of ground truth labels for the validation data (internal representation)
+                y_test: Pandas Series of ground truth labels for the test data (internal representation)
+                eval_metric: The string name of the evaluation metric (obtained via `predictor.eval_metric.name`)
+                problem_type: The problem type (obtained via `predictor.problem_type`)
+                problem_type_transform: The transformed (internal) problem type (obtained via `predictor._learner.label_cleaner.problem_type_transform,`)
+                ordered_class_labels: The original class labels (`predictor._learner.label_cleaner.ordered_class_labels`)
+                ordered_Class_labels_transformed: The transformed (internal) class labels (`predictor._learner.label_cleaner.ordered_class_labels_transformed`)
+                num_classes: The number of internal classes (`self._learner.label_cleaner.num_classes`)
+                label: The label column name (`predictor.label`)
         """
         models = self.get_model_names(can_infer=True)
 
@@ -4585,9 +4595,9 @@ class TabularPredictor:
             y_test=y_test,
             eval_metric=self.eval_metric.name,
             problem_type=self.problem_type,
+            problem_type_transform=self._learner.label_cleaner.problem_type_transform,
             ordered_class_labels=self._learner.label_cleaner.ordered_class_labels,
             ordered_class_labels_transformed=self._learner.label_cleaner.ordered_class_labels_transformed,
-            problem_type_transform=self._learner.label_cleaner.problem_type_transform,
             num_classes=self._learner.label_cleaner.num_classes,
             label=self.label,
         )

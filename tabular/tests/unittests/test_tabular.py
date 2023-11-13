@@ -146,6 +146,16 @@ def test_advanced_functionality():
     leaderboard = predictor.leaderboard(data=test_data)
     if not on_windows:
         predictor.plot_ensemble_model()
+
+    # Test get_simulation_artifact
+    simulation_artifact = predictor.get_simulation_artifact(test_data=test_data)
+    assert simulation_artifact["label"] == predictor.label
+    assert sorted(list(simulation_artifact["pred_proba_dict_val"].keys())) == sorted(predictor.get_model_names(can_infer=True))
+    assert sorted(list(simulation_artifact["pred_proba_dict_test"].keys())) == sorted(predictor.get_model_names(can_infer=True))
+    assert simulation_artifact["y_test"].equals(predictor.transform_labels(test_data[label]))
+    assert simulation_artifact["eval_metric"] == predictor.eval_metric.name
+    assert simulation_artifact["problem_type"] == predictor.problem_type
+
     extra_metrics = ["accuracy", "roc_auc", "log_loss"]
     test_data_no_label = test_data.drop(columns=[label])
     with pytest.raises(ValueError):

@@ -48,9 +48,9 @@ def convert_simulation_artifacts_to_tabular_predictions_dict(simulation_artifact
                     "y_test",
                     "eval_metric",
                     "problem_type",
+                    "problem_type_transform",
                     "ordered_class_labels",
                     "ordered_class_labels_transformed",
-                    "problem_type_transform",
                     "num_classes",
                     "label",
                 ]:
