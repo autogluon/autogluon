@@ -144,6 +144,20 @@ def test_advanced_functionality():
     savedir_predictor_original = savedir + "predictor/"
     predictor: TabularPredictor = TabularPredictor(label=label, path=savedir_predictor_original).fit(train_data)
     leaderboard = predictor.leaderboard(data=test_data)
+
+    # test metric_error leaderboard
+    leaderboard_error = predictor.leaderboard(data=test_data, score_format="error")
+    assert leaderboard["model"].to_list() == leaderboard_error["model"].to_list()
+    leaderboard_combined = pd.merge(leaderboard, leaderboard_error[["model", "metric_error_test", "metric_error_val"]], on=["model"])
+    score_test = leaderboard_combined["score_test"].to_list()
+    score_val = leaderboard_combined["score_val"].to_list()
+    metric_error_test = leaderboard_combined["metric_error_test"].to_list()
+    metric_error_val = leaderboard_combined["metric_error_val"].to_list()
+    for score, error in zip(score_test, metric_error_test):
+        assert predictor.eval_metric.convert_score_to_error(score) == error
+    for score, error in zip(score_val, metric_error_val):
+        assert predictor.eval_metric.convert_score_to_error(score) == error
+
     if not on_windows:
         predictor.plot_ensemble_model()
 
