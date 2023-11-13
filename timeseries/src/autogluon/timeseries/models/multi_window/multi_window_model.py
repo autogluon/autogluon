@@ -66,6 +66,9 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         else:
             raise ValueError("Base model cannot be retrieved from MultiWindowModel")
 
+    def _get_hpo_backend(self) -> str:
+        return self._get_model_base()._get_hpo_backend()
+
     def _fit(
         self,
         train_data: TimeSeriesDataFrame,

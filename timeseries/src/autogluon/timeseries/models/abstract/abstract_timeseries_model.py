@@ -384,6 +384,16 @@ class AbstractTimeSeriesModel(AbstractModel):
         """
         return train_fn_kwargs
 
+    def hyperparameter_tune(self, hyperparameter_tune_kwargs="auto", hpo_executor: HpoExecutor = None, time_limit: float = None, **kwargs):
+        k_fold = kwargs.pop("k_fold", 1)
+        return super().hyperparameter_tune(
+            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+            hpo_executor=hpo_executor,
+            time_limit=time_limit,
+            k_fold=k_fold,
+            **kwargs,
+        )
+
     def _hyperparameter_tune(
         self,
         train_data: TimeSeriesDataFrame,

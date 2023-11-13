@@ -10,6 +10,7 @@ import pytest
 from flaky import flaky
 
 from autogluon.common import space
+from autogluon.core.hpo.constants import RAY_BACKEND
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 from autogluon.timeseries.metrics import AVAILABLE_METRICS
@@ -412,6 +413,12 @@ def test_when_custom_metric_passed_to_model_then_model_can_hyperparameter_tune(m
         },
         eval_metric=CustomMetric(),
     )
+    backend = model._get_hpo_backend()
+    if backend is RAY_BACKEND:
+        # Ray has trouble keeping references to the custom metric in the test namespace. We therefore
+        # skip this test.
+        pytest.skip()
+
     if isinstance(model, MultiWindowBacktestingModel):
         val_data = None
     else:
