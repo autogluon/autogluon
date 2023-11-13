@@ -516,6 +516,10 @@ def inject_adaptation_to_linear_layer(
     for m_name, module in dict(model.named_modules()).items():
         if extra_trainable_params and any(re.match(filter_layer, m_name) for filter_layer in extra_trainable_params):
             continue
+        if hasattr(model, "frozen_layers") and any(
+            re.search(filter_layer, m_name) for filter_layer in model.frozen_layers
+        ):
+            continue
         if not module_filter or any(re.match(filter_module, m_name) for filter_module in module_filter):
             for c_name, layer in dict(module.named_children()).items():
                 if not filter or any(re.match(filter_layer, c_name) for filter_layer in filter):

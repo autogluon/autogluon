@@ -132,3 +132,32 @@ def test_sam_semantic_segmentation_zero_shot_evaluate_predict(checkpoint_name):
 
     # Predict
     predictor.predict(test_df, save_results=False)
+
+
+@pytest.mark.parametrize(
+    "checkpoint_name",
+    [
+        "facebook/sam-vit-base",
+    ],
+)
+def test_sam_semantic_segmentation_lora_insert(checkpoint_name):
+    _, _, test_df = get_file_df(need_test_gt=True)
+
+    predictor = MultiModalPredictor(
+        problem_type="semantic_segmentation",
+        hyperparameters={
+            "env.num_gpus": 1,
+            "model.sam.checkpoint_name": checkpoint_name,
+        },
+        label="label",
+    )
+
+    # Evaluate
+    predictor.evaluate(test_df, metrics=["binary_iou"])
+
+    model = predictor._learner._model
+    if hasattr(model, "frozen_layers") and model.frozen_layers:
+        for k, v in model.named_parameters():
+            for filter_layer in model.frozen_layers:
+                if filter_layer in k:
+                    assert "lora" not in k
