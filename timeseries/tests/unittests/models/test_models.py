@@ -436,3 +436,43 @@ def test_when_custom_metric_passed_to_model_then_model_can_hyperparameter_tune(m
     for result in hpo_results.values():
         assert 1 <= result["hyperparameters"]["epochs"] <= 3
         assert np.isfinite(result["val_score"])
+
+
+@pytest.mark.parametrize("searcher", ["random", "bayes"])
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+def test_given_searcher_when_ray_backend_used_in_hpo_then_correct_searcher_used(model_class, searcher):
+    model = model_class(
+        prediction_length=3,
+        freq=DUMMY_TS_DATAFRAME.freq,
+        hyperparameters={
+            "epochs": space.Int(1, 3),
+            "num_batches_per_epoch": 1,
+            "use_fallback_model": False,
+        },
+        eval_metric="MASE",
+    )
+    backend = model._get_hpo_backend()
+    if backend is not RAY_BACKEND:
+        # Ray has trouble keeping references to the custom metric in the test namespace. We therefore
+        # skip this test.
+        pytest.skip()
+
+    val_data = None if isinstance(model, MultiWindowBacktestingModel) else DUMMY_TS_DATAFRAME
+    num_trials = 2
+
+    with mock.patch("ray.tune.Tuner") as mock_tuner:
+        try:
+            _ = model.hyperparameter_tune(
+                hyperparameter_tune_kwargs={"num_trials": num_trials, "scheduler": "FIFO", "searcher": searcher},
+                time_limit=300,
+                train_data=DUMMY_TS_DATAFRAME,
+                val_data=val_data,
+            )
+        except:
+            pass
+
+        ray_searcher_class_name = mock_tuner.call_args[1]["tune_config"].search_alg.__class__.__name__
+        assert {
+            "bayes": "HyperOpt",
+            "random": "BasicVariant",
+        }.get(searcher) in ray_searcher_class_name
