@@ -222,7 +222,6 @@ model:
     embedding_arch:
       - 'linear'
     d_token: 192
-    adapter_output_feature: 192
     hidden_size: 192
     n_blocks: 3
     attention_n_heads: 8

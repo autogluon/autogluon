@@ -354,7 +354,7 @@ def create_model(
             num_categories=num_categories,
             embedding_arch=model_config.embedding_arch,
             d_token=model_config.d_token,
-            adapter_output_feature=model_config.adapter_output_feature,
+            hidden_size=model_config.hidden_size,
             hidden_features=model_config.hidden_size,
             num_classes=num_classes,
             n_blocks=model_config.n_blocks,
