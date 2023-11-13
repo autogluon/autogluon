@@ -83,10 +83,10 @@ def infer_metrics(
 
     if is_matching:
         if eval_metric_name is not None:
-            if eval_metric_name in VALID_METRICS:
+            if eval_metric_name.lower() in VALID_METRICS:
                 validation_metric_name = eval_metric_name
                 return validation_metric_name, eval_metric_name
-            elif eval_metric_name in RETRIEVAL_METRICS:
+            elif eval_metric_name.lower() in RETRIEVAL_METRICS:
                 # Currently only support recall as validation metric in retrieval tasks.
                 validation_metric_name = RECALL
                 return validation_metric_name, eval_metric_name
@@ -94,6 +94,7 @@ def infer_metrics(
                 warnings.warn(
                     f"Metric {eval_metric_name} is not supported as the evaluation metric for {problem_type} in matching tasks. "
                 )
+
         if problem_type is None:
             eval_metric_name, validation_metric_name = MATCHING_METRICS_WITHOUT_PROBLEM_TYPE[problem_type]
             logger.info(
@@ -101,7 +102,7 @@ def infer_metrics(
                 f"as the evaluation metric and the validation metric for matching tasks by default. "
             )
             return validation_metric_name, eval_metric_name
-        if problem_type in MATCHING_METRICS:
+        elif problem_type in MATCHING_METRICS:
             eval_metric_name, validation_metric_name = MATCHING_METRICS[problem_type]
             logger.info(
                 f"Metric {eval_metric_name} and metric {validation_metric_name} are used "
@@ -119,7 +120,7 @@ def infer_metrics(
             )
             eval_metric_name = EVALUATION_METRICS_FALLBACK[problem_type]
 
-        if eval_metric_name in VALIDATION_METRICS[problem_type]:
+        if eval_metric_name.lower() in VALIDATION_METRICS[problem_type]:
             logger.info(f"Metric {eval_metric_name} is used as the validation metric. ")
             validation_metric_name = eval_metric_name
         else:
