@@ -433,7 +433,7 @@ class FT_Transformer(nn.Module):
         num_categories: List[int],
         embedding_arch: List[str],
         d_token: int,
-        adapter_output_feature: Optional[int] = 192,
+        hidden_size: Optional[int] = 192,
         hidden_features: Optional[int] = 192,
         num_classes: Optional[int] = 0,
         token_bias: Optional[bool] = True,
@@ -466,7 +466,9 @@ class FT_Transformer(nn.Module):
         num_categories
             A list of integers. Each one is the number of categories in one categorical column.
         d_token
-            The size of one token for `_CategoricalFeatureTokenizer`.
+            The size of one token after categorical/numerical tokenizers.
+        hidden_size
+            The embedding dimension of the transformer backbone.
         out_features
             Dimension of output features.
         num_classes
@@ -529,7 +531,7 @@ class FT_Transformer(nn.Module):
         assert token_initialization in ["uniform", "normal"], "initialization must be uniform or normal"
 
         self.prefix = prefix
-        self.out_features = adapter_output_feature
+        self.out_features = hidden_size
         self.pooling_mode = pooling_mode
 
         self.categorical_feature_tokenizer = None
@@ -543,7 +545,7 @@ class FT_Transformer(nn.Module):
                 bias=token_bias,
                 initialization=token_initialization,
             )
-            self.categorical_adapter = nn.Linear(d_token, adapter_output_feature)
+            self.categorical_adapter = nn.Linear(d_token, hidden_size)
 
         if num_numerical_columns > 0:
             self.numerical_feature_tokenizer = NumEmbeddings(
@@ -551,10 +553,10 @@ class FT_Transformer(nn.Module):
                 d_embedding=d_token,
                 embedding_arch=embedding_arch,
             )
-            self.numerical_adapter = nn.Linear(d_token, adapter_output_feature)
+            self.numerical_adapter = nn.Linear(d_token, hidden_size)
 
         self.transformer = Custom_Transformer(
-            d_token=adapter_output_feature,
+            d_token=hidden_size,
             n_blocks=n_blocks,
             attention_n_heads=attention_n_heads,
             attention_dropout=attention_dropout,
@@ -580,7 +582,7 @@ class FT_Transformer(nn.Module):
         )
 
         self.head = Custom_Transformer.Head(
-            d_in=adapter_output_feature,
+            d_in=hidden_size,
             d_out=num_classes,
             bias=True,
             activation=head_activation,
@@ -588,7 +590,7 @@ class FT_Transformer(nn.Module):
         )
 
         self.cls_token = CLSToken(
-            d_token=adapter_output_feature,
+            d_token=hidden_size,
             initialization="uniform",
         )
 
