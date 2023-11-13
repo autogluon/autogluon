@@ -1391,10 +1391,10 @@ class MultiModalMatcher(BaseLearner):
     def predict_per_run(
         self,
         data: Union[pd.DataFrame, dict, list],
+        realtime: Optional[bool],
         requires_label: bool,
         id_mappings: Union[Dict[str, Dict], Dict[str, pd.Series]] = None,
         signature: Optional[str] = None,
-        realtime: Optional[bool] = None,
         barebones: Optional[bool] = False,
     ) -> List[Dict]:
         """
@@ -1521,7 +1521,7 @@ class MultiModalMatcher(BaseLearner):
         chunk_size: Optional[int] = 1024,
         similarity_type: Optional[str] = "cosine",
         cutoffs: Optional[List[int]] = [1, 5, 10],
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
     ):
         query_column = query_data.columns[0]
         response_column = response_data.columns[0]
@@ -1578,13 +1578,13 @@ class MultiModalMatcher(BaseLearner):
         id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
     ):
         outputs = self.predict_per_run(
             data=data,
             id_mappings=id_mappings,
-            requires_label=True,
             realtime=realtime,
+            requires_label=True,
         )
         prob = extract_from_output(ret_type=PROBABILITY, outputs=outputs)
 
@@ -1637,7 +1637,7 @@ class MultiModalMatcher(BaseLearner):
         similarity_type: Optional[str] = "cosine",
         cutoffs: Optional[List[int]] = [1, 5, 10],
         label: Optional[str] = None,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         **kwargs,
     ):
         """
@@ -1673,7 +1673,7 @@ class MultiModalMatcher(BaseLearner):
             The label column name in data. Some tasks, e.g., image<-->text matching, have no label column in training data,
             but the label column is still required in evaluation.
         realtime
-            Whether to do realtime inference, which is efficient for small data (default None).
+            Whether to do realtime inference, which is efficient for small data (default False).
             If not specified, we would infer it on based on the data modalities
             and sample number.
 
@@ -1731,7 +1731,7 @@ class MultiModalMatcher(BaseLearner):
         data: Union[pd.DataFrame, dict, list],
         id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         as_pandas: Optional[bool] = None,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         **kwargs,
     ):
         """
@@ -1748,7 +1748,7 @@ class MultiModalMatcher(BaseLearner):
         as_pandas
             Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
         realtime
-            Whether to do realtime inference, which is efficient for small data (default None).
+            Whether to do realtime inference, which is efficient for small data (default False).
             If not specified, we would infer it on based on the data modalities
             and sample number.
 
@@ -1760,8 +1760,8 @@ class MultiModalMatcher(BaseLearner):
         outputs = self.predict_per_run(
             data=data,
             id_mappings=id_mappings,
-            requires_label=False,
             realtime=realtime,
+            requires_label=False,
         )
         prob = extract_from_output(outputs=outputs, ret_type=PROBABILITY)
 
@@ -1786,7 +1786,7 @@ class MultiModalMatcher(BaseLearner):
         id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         as_pandas: Optional[bool] = None,
         as_multiclass: Optional[bool] = True,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         **kwargs,
     ):
         """
@@ -1807,7 +1807,7 @@ class MultiModalMatcher(BaseLearner):
             Whether to return the probability of all labels or
             just return the probability of the positive class for binary classification problems.
         realtime
-            Whether to do realtime inference, which is efficient for small data (default None).
+            Whether to do realtime inference, which is efficient for small data (default False).
             If not specified, we would infer it on based on the data modalities
             and sample number.
 
@@ -1821,8 +1821,8 @@ class MultiModalMatcher(BaseLearner):
         outputs = self.predict_per_run(
             data=data,
             id_mappings=id_mappings,
-            requires_label=False,
             realtime=realtime,
+            requires_label=False,
         )
         prob = extract_from_output(outputs=outputs, ret_type=PROBABILITY)
 
@@ -1842,7 +1842,7 @@ class MultiModalMatcher(BaseLearner):
         id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         as_tensor: Optional[bool] = False,
         as_pandas: Optional[bool] = False,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         **kwargs,
     ):
         """
@@ -1863,7 +1863,7 @@ class MultiModalMatcher(BaseLearner):
         as_pandas
             Whether to return the output as a pandas DataFrame (True) or numpy array (False).
         realtime
-            Whether to do realtime inference, which is efficient for small data (default None).
+            Whether to do realtime inference, which is efficient for small data (default False).
             If not specified, we would infer it on based on the data modalities
             and sample number.
 
@@ -1895,8 +1895,8 @@ class MultiModalMatcher(BaseLearner):
             data=data,
             id_mappings=id_mappings,
             signature=signature,
-            requires_label=False,
             realtime=realtime,
+            requires_label=False,
         )
         features = extract_from_output(outputs=outputs, ret_type=FEATURES, as_ndarray=as_tensor is False)
 

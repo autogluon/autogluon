@@ -294,15 +294,15 @@ class NERLearner(BaseLearner):
         data: Union[pd.DataFrame, dict, list, str],
         metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         **kwargs,
     ):
         """ """
         self.ensure_predict_ready()
         outputs = self.predict_per_run(
             data=data,
-            requires_label=True,
             realtime=realtime,
+            requires_label=True,
         )
         logits = extract_from_output(ret_type=NER_RET, outputs=outputs)
         metric_data = {}
@@ -360,7 +360,7 @@ class NERLearner(BaseLearner):
         self,
         data: Union[pd.DataFrame, dict, list, str],
         as_pandas: Optional[bool] = None,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         **kwargs,
     ):
         """
@@ -374,7 +374,7 @@ class NERLearner(BaseLearner):
         as_pandas
             Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
         realtime
-            Whether to do realtime inference, which is efficient for small data (default None).
+            Whether to do realtime inference, which is efficient for small data (default False).
             If not specified, we would infer it on based on the data modalities
             and sample number.
 
@@ -385,8 +385,8 @@ class NERLearner(BaseLearner):
         self.ensure_predict_ready()
         outputs = self.predict_per_run(
             data=data,
-            requires_label=False,
             realtime=realtime,
+            requires_label=False,
         )
         logits = extract_from_output(outputs=outputs, ret_type=NER_RET)
         if self._df_preprocessor:
@@ -406,7 +406,7 @@ class NERLearner(BaseLearner):
         self,
         data: Union[pd.DataFrame, dict, list],
         as_pandas: Optional[bool] = None,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         **kwargs,
     ):
         """
@@ -421,7 +421,7 @@ class NERLearner(BaseLearner):
         as_pandas
             Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
         realtime
-            Whether to do realtime inference, which is efficient for small data (default None).
+            Whether to do realtime inference, which is efficient for small data (default False).
             If not specified, we would infer it on based on the data modalities
             and sample number.
 
@@ -434,8 +434,8 @@ class NERLearner(BaseLearner):
         self.ensure_predict_ready()
         outputs = self.predict_per_run(
             data=data,
-            requires_label=False,
             realtime=realtime,
+            requires_label=False,
         )
         ner_outputs = extract_from_output(outputs=outputs, ret_type=NER_RET)
         prob = self._df_preprocessor.transform_prediction(

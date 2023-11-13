@@ -112,7 +112,7 @@ class FewShotSVMPredictor:
         as_pandas
             Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
         realtime
-            Whether to do realtime inference, which is efficient for small data (default None).
+            Whether to do realtime inference, which is efficient for small data (default False).
             If not specified, we would infer it on based on the data modalities
             and sample number.
 
@@ -136,7 +136,7 @@ class FewShotSVMPredictor:
         data,
         as_pandas: Optional[bool] = False,
         as_multiclass: Optional[bool] = True,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
     ):
         """
         Predict probabilities class probabilities rather than class labels.
@@ -153,7 +153,7 @@ class FewShotSVMPredictor:
             Whether to return the probability of all labels or
             just return the probability of the positive class for binary classification problems.
         realtime
-            Whether to do realtime inference, which is efficient for small data (default None).
+            Whether to do realtime inference, which is efficient for small data (default False).
             If not specified, we would infer it on based on the data modalities
             and sample number.
 
@@ -199,7 +199,7 @@ class FewShotSVMPredictor:
         as_pandas
             Whether to return the output as a pandas DataFrame (True) or numpy array (False).
         realtime
-            Whether to do realtime inference, which is efficient for small data (default None).
+            Whether to do realtime inference, which is efficient for small data (default False).
             If not specified, we would infer it on based on the data modalities
             and sample number.
 
@@ -222,7 +222,7 @@ class FewShotSVMPredictor:
         data: pd.DataFrame,
         metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
     ):
         if not self._fit_called and not self._model_loaded:
             warnings.warn(

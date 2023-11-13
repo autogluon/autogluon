@@ -433,8 +433,8 @@ class ObjectDetectionLearner(BaseLearner):
     def predict_per_run(
         self,
         data: Union[pd.DataFrame, dict, list],
+        realtime: Optional[bool],
         requires_label: bool,
-        realtime: Optional[bool] = None,
         barebones: Optional[bool] = False,
     ) -> List[Dict]:
         """
@@ -444,10 +444,10 @@ class ObjectDetectionLearner(BaseLearner):
         ----------
         data
             The data for inference.
-        requires_label
-            Whether uses label during inference.
         realtime
             Whether use realtime inference.
+        requires_label
+            Whether uses label during inference.
         barebones
             Whether to run in “barebones mode”, where all lightning's features that may impact raw speed are disabled.
 
@@ -569,6 +569,7 @@ class ObjectDetectionLearner(BaseLearner):
 
         outputs = self.predict_per_run(
             data=data,
+            realtime=False,
             requires_label=True,
         )  # outputs shape: num_batch, 1(["bbox"]), batch_size, 2(if using mask_rcnn)/na, 80, n, 5
 
@@ -596,7 +597,7 @@ class ObjectDetectionLearner(BaseLearner):
         data: Union[pd.DataFrame, dict, list, str],
         metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         eval_tool: Optional[str] = None,
         **kwargs,
     ):
@@ -627,7 +628,7 @@ class ObjectDetectionLearner(BaseLearner):
         self,
         data: Union[pd.DataFrame, dict, list, str],
         as_pandas: Optional[bool] = None,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         save_results: Optional[bool] = None,
         **kwargs,
     ):
@@ -642,7 +643,7 @@ class ObjectDetectionLearner(BaseLearner):
         as_pandas
             Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
         realtime
-            Whether to do realtime inference, which is efficient for small data (default None).
+            Whether to do realtime inference, which is efficient for small data (default False).
             If not specified, we would infer it on based on the data modalities
             and sample number.
         save_results
@@ -663,8 +664,8 @@ class ObjectDetectionLearner(BaseLearner):
 
         outputs = self.predict_per_run(
             data=data,
-            requires_label=False,
             realtime=realtime,
+            requires_label=False,
         )
         pred = extract_from_output(outputs=outputs, ret_type=ret_type)
         if self._problem_type == OBJECT_DETECTION:
@@ -711,7 +712,7 @@ class ObjectDetectionLearner(BaseLearner):
         data: Union[pd.DataFrame, dict, list],
         as_pandas: Optional[bool] = None,
         as_multiclass: Optional[bool] = True,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         **kwargs,
     ):
         raise NotImplementedError("Object detection doesn't support calling `predict_proba` yet.")
@@ -721,7 +722,7 @@ class ObjectDetectionLearner(BaseLearner):
         data: Union[pd.DataFrame, dict, list],
         as_tensor: Optional[bool] = False,
         as_pandas: Optional[bool] = False,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         **kwargs,
     ):
         raise NotImplementedError("Object detection doesn't support calling `extract_embedding` yet.")
