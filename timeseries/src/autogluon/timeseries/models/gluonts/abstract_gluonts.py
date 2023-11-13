@@ -19,6 +19,7 @@ from pandas.tseries.frequencies import to_offset
 
 from autogluon.common.loaders import load_pkl
 from autogluon.common.utils.log_utils import set_logger_verbosity
+from autogluon.core.hpo.constants import RAY_BACKEND
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.datetime import norm_freq_str
@@ -206,6 +207,9 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                 model.set_contexts(path)
             model.gts_predictor = PyTorchPredictor.deserialize(Path(path) / cls.gluonts_model_path)
         return model
+
+    def _get_hpo_backend(self):
+        return RAY_BACKEND
 
     def _deferred_init_params_aux(self, **kwargs) -> None:
         """Update GluonTS specific parameters with information available
