@@ -135,10 +135,7 @@ def get_default_hps(key):
             "DirectTabular": {},
             "TemporalFusionTransformer": {},
             "PatchTST": {},
-            "DeepAR": {
-                "num_layers": space.Int(1, 3, default=2),
-                "hidden_size": space.Int(40, 80, default=40),
-            },
+            "DeepAR": {},
         },
     }
 
