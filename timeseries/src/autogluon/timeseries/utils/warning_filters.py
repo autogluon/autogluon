@@ -1,7 +1,9 @@
 import contextlib
 import functools
+import io
 import logging
 import os
+import sys
 import warnings
 
 from statsmodels.tools.sm_exceptions import ConvergenceWarning, ValueWarning
@@ -44,3 +46,11 @@ def disable_tqdm():
         yield
     else:
         tqdm.__init__ = _init
+
+
+@contextlib.contextmanager
+def disable_stdout():
+    save_stdout = sys.stdout
+    sys.stdout = io.StringIO()
+    yield
+    sys.stdout = save_stdout

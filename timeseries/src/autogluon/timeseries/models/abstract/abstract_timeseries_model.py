@@ -2,17 +2,19 @@ import logging
 import os
 import re
 import time
+from contextlib import nullcontext
 from typing import Any, Dict, List, Optional, Union
 
 from autogluon.common import space
 from autogluon.common.loaders import load_pkl
 from autogluon.common.savers import save_pkl
 from autogluon.core.hpo.exceptions import EmptySearchSpace
-from autogluon.core.hpo.executors import HpoExecutor
+from autogluon.core.hpo.executors import HpoExecutor, RayHpoExecutor
 from autogluon.core.models import AbstractModel
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
 from autogluon.timeseries.utils.features import CovariateMetadata
+from autogluon.timeseries.utils.warning_filters import disable_stdout, warning_filter
 
 from .model_trial import model_trial, skip_hpo
 
@@ -441,21 +443,26 @@ class AbstractTimeSeriesModel(AbstractModel):
         model_estimate_memory_usage = None
         if self.estimate_memory_usage is not None:
             model_estimate_memory_usage = self.estimate_memory_usage(**kwargs)
-        hpo_executor.execute(
-            model_trial=model_trial,
-            train_fn_kwargs=train_fn_kwargs,
-            directory=directory,
-            minimum_cpu_per_trial=self.get_minimum_resources().get("num_cpus", 1),
-            minimum_gpu_per_trial=self.get_minimum_resources().get("num_gpus", 0),
-            model_estimate_memory_usage=model_estimate_memory_usage,
-            adapter_type="timeseries",
-        )
 
-        return hpo_executor.get_hpo_results(
-            model_name=self.name,
-            model_path_root=self.path_root,
-            time_start=time_start,
-        )
+        hpo_context = disable_stdout if isinstance(hpo_executor, RayHpoExecutor) else nullcontext
+        with hpo_context(), warning_filter():  # prevent Ray from outputting its results to stdout with print
+            hpo_executor.execute(
+                model_trial=model_trial,
+                train_fn_kwargs=train_fn_kwargs,
+                directory=directory,
+                minimum_cpu_per_trial=self.get_minimum_resources().get("num_cpus", 1),
+                minimum_gpu_per_trial=self.get_minimum_resources().get("num_gpus", 0),
+                model_estimate_memory_usage=model_estimate_memory_usage,
+                adapter_type="timeseries",
+            )
+
+            hpo_models, analysis = hpo_executor.get_hpo_results(
+                model_name=self.name,
+                model_path_root=self.path_root,
+                time_start=time_start,
+            )
+
+        return hpo_models, analysis
 
     def preprocess(self, data: Any, **kwargs) -> Any:
         return data
