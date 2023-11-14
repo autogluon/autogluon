@@ -1404,6 +1404,8 @@ class MultiModalMatcher(BaseLearner):
         ----------
         data
             The data for inference.
+        realtime
+            Whether use realtime inference.
         requires_label
             Whether uses label during inference.
         id_mappings
@@ -1411,8 +1413,6 @@ class MultiModalMatcher(BaseLearner):
             This is used when the dataframe contains the query/response indexes instead of their contents.
         signature
             query or response.
-        realtime
-            Whether use realtime inference.
         barebones
             Whether to run in “barebones mode”, where all lightning's features that may impact raw speed are disabled.
 
@@ -1674,7 +1674,7 @@ class MultiModalMatcher(BaseLearner):
             but the label column is still required in evaluation.
         realtime
             Whether to do realtime inference, which is efficient for small data (default False).
-            If not specified, we would infer it on based on the data modalities
+            If provided None, we would infer it on based on the data modalities
             and sample number.
 
         Returns
@@ -1749,7 +1749,7 @@ class MultiModalMatcher(BaseLearner):
             Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
         realtime
             Whether to do realtime inference, which is efficient for small data (default False).
-            If not specified, we would infer it on based on the data modalities
+            If provided None, we would infer it on based on the data modalities
             and sample number.
 
         Returns
@@ -1808,7 +1808,7 @@ class MultiModalMatcher(BaseLearner):
             just return the probability of the positive class for binary classification problems.
         realtime
             Whether to do realtime inference, which is efficient for small data (default False).
-            If not specified, we would infer it on based on the data modalities
+            If provided None, we would infer it on based on the data modalities
             and sample number.
 
         Returns
@@ -1864,7 +1864,7 @@ class MultiModalMatcher(BaseLearner):
             Whether to return the output as a pandas DataFrame (True) or numpy array (False).
         realtime
             Whether to do realtime inference, which is efficient for small data (default False).
-            If not specified, we would infer it on based on the data modalities
+            If provided None, we would infer it on based on the data modalities
             and sample number.
 
         Returns

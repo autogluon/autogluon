@@ -51,7 +51,7 @@ class SemanticSegmentationLearner(BaseLearner):
             Whether to return the prediction result of each row.
         realtime
             Whether to do realtime inference, which is efficient for small data (default None).
-            If not specified, we would infer it on based on the data modalities
+            If provided None, we would infer it on based on the data modalities
             and sample number.
         """
         outputs = self.predict_per_run(
@@ -103,7 +103,7 @@ class SemanticSegmentationLearner(BaseLearner):
             Whether to return the prediction result of each row.
         realtime
             Whether to do realtime inference, which is efficient for small data (default False).
-            If not specified, we would infer it on based on the data modalities
+            If provided None, we would infer it on based on the data modalities
             and sample number.
 
         Returns
@@ -129,11 +129,9 @@ class SemanticSegmentationLearner(BaseLearner):
         data
             The data to make predictions for. Should contain same column names as training data and
             follow same format (except for the `label` column).
-        as_pandas
-            Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
         realtime
             Whether to do realtime inference, which is efficient for small data (default False).
-            If not specified, we would infer it on based on the data modalities
+            If provided None, we would infer it on based on the data modalities
             and sample number.
         save_results
             Whether to save the prediction results (only works for detection now)
@@ -198,8 +196,6 @@ class SemanticSegmentationLearner(BaseLearner):
         data
             The data to make predictions for. Should contain same column names as training data and
               follow same format (except for the `label` column).
-        candidate_data
-            The candidate data from which to search the query data's matches.
         as_pandas
             Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
         as_multiclass
@@ -207,7 +203,7 @@ class SemanticSegmentationLearner(BaseLearner):
             just return the probability of the positive class for binary classification problems.
         realtime
             Whether to do realtime inference, which is efficient for small data (default False).
-            If not specified, we would infer it on based on the data modalities
+            If provided None, we would infer it on based on the data modalities
             and sample number.
 
         Returns

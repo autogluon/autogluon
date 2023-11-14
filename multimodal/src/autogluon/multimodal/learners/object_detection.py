@@ -601,7 +601,31 @@ class ObjectDetectionLearner(BaseLearner):
         eval_tool: Optional[str] = None,
         **kwargs,
     ):
-        """ """
+        """
+        Evaluate model on a test dataset.
+
+        Parameters
+        ----------
+        data
+            A dataframe, containing the same columns as the training data.
+            Or a str, that is a path of the annotation file for detection.
+        metrics
+            A list of metric names to report.
+            If None, we only return the score for the stored `_eval_metric_name`.
+        return_pred
+            Whether to return the prediction result of each row.
+        realtime
+            Whether to do realtime inference, which is efficient for small data (default False).
+            If provided None, we would infer it on based on the data modalities
+            and sample number.
+        eval_tool
+            The eval_tool for object detection. Could be "pycocotools" or "torchmetrics".
+
+        Returns
+        -------
+        A dictionary with the metric names and their corresponding scores.
+        Optionally return a dataframe of prediction results.
+        """
         self.ensure_predict_ready()
         if self._problem_type == OPEN_VOCABULARY_OBJECT_DETECTION:
             raise NotImplementedError("Open vocabulary object detection doesn't support calling `evaluate` yet.")
@@ -644,7 +668,7 @@ class ObjectDetectionLearner(BaseLearner):
             Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
         realtime
             Whether to do realtime inference, which is efficient for small data (default False).
-            If not specified, we would infer it on based on the data modalities
+            If provided None, we would infer it on based on the data modalities
             and sample number.
         save_results
             Whether to save the prediction results (only works for detection now)
