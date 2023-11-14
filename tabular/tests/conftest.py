@@ -186,7 +186,7 @@ class FitHelper:
             with pytest.raises(AssertionError):
                 predictor.predict_proba(test_data)
 
-        model_names = predictor.get_model_names()
+        model_names = predictor.model_names()
         model_name = model_names[0]
         assert len(model_names) == expected_model_count
         if refit_full:

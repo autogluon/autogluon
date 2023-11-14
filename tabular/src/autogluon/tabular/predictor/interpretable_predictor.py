@@ -116,7 +116,7 @@ class InterpretableTabularPredictor(TabularPredictor):
             If str is passed, `data` will be loaded using the str value as the file path.
         model : str (optional)
             The name of the model to get predictions from. Defaults to None, which uses the highest scoring model on the validation set.
-            Valid models are listed in this `predictor` by calling `predictor.get_model_names()`
+            Valid models are listed in this `predictor` by calling `predictor.model_names()`
         print_rules : bool, optional
             Whether to print the learned rules
 

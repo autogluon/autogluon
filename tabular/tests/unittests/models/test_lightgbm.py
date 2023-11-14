@@ -88,7 +88,7 @@ def test_lightgbm_binary_with_calibrate_decision_threshold(fit_helper):
         y_pred_multi_val_w_decision_threshold_cache = predictor.predict_multi(decision_threshold=decision_threshold)
 
         y_pred_proba_val = predictor.predict_proba(data=X_val, transform_features=False)
-        y_pred_val_w_decision_threshold_from_proba = predictor.get_pred_from_proba(y_pred_proba=y_pred_proba_val, decision_threshold=decision_threshold)
+        y_pred_val_w_decision_threshold_from_proba = predictor.predict_from_proba(y_pred_proba=y_pred_proba_val, decision_threshold=decision_threshold)
 
         assert y_pred_val_w_decision_threshold.equals(y_pred_multi_val_w_decision_threshold[predictor.model_best()])
         assert y_pred_val_w_decision_threshold.equals(y_pred_multi_val_w_decision_threshold_cache[predictor.model_best()])

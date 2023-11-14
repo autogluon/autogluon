@@ -20,7 +20,7 @@ def test_no_models(fit_helper, dataset_loader_helper):
 
     predictor = fit_helper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
 
-    assert not predictor.get_model_names()
+    assert not predictor.model_names()
     with pytest.raises(AssertionError):
         predictor.predict(test_data)
     assert len(predictor.leaderboard()) == 0
@@ -44,7 +44,7 @@ def test_no_models_raise(fit_helper, dataset_loader_helper):
 
     predictor = fit_helper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
 
-    assert not predictor.get_model_names()
+    assert not predictor.model_names()
     with pytest.raises(AssertionError):
         predictor.predict(test_data)
     assert len(predictor.leaderboard()) == 0

@@ -83,8 +83,8 @@ def _assert_predict_dict_identical_to_predict(predictor: TabularPredictor, data)
     for as_pandas in [True, False]:
         for inverse_transform in [True, False]:
             predict_dict = predictor.predict_multi(data=data, as_pandas=as_pandas, inverse_transform=inverse_transform)
-            assert set(predictor.get_model_names()) == set(predict_dict.keys())
-            for m in predictor.get_model_names():
+            assert set(predictor.model_names()) == set(predict_dict.keys())
+            for m in predictor.model_names():
                 if not inverse_transform:
                     model_pred = predictor._learner.predict(data, model=m, as_pandas=as_pandas, inverse_transform=inverse_transform)
                 else:
@@ -103,8 +103,8 @@ def _assert_predict_proba_dict_identical_to_predict_proba(predictor: TabularPred
                 predict_proba_dict = predictor.predict_proba_multi(
                     data=data, as_pandas=as_pandas, as_multiclass=as_multiclass, inverse_transform=inverse_transform
                 )
-                assert set(predictor.get_model_names()) == set(predict_proba_dict.keys())
-                for m in predictor.get_model_names():
+                assert set(predictor.model_names()) == set(predict_proba_dict.keys())
+                for m in predictor.model_names():
                     if not inverse_transform:
                         model_pred_proba = predictor._learner.predict_proba(
                             data, model=m, as_pandas=as_pandas, as_multiclass=as_multiclass, inverse_transform=inverse_transform
@@ -167,19 +167,19 @@ def test_advanced_functionality():
     assert "pred_proba_dict_test" not in simulation_artifact_no_test
     assert "y_test" not in simulation_artifact_no_test
     simulation_artifact = predictor.simulation_artifact(test_data=test_data)
-    assert sorted(list(simulation_artifact["pred_proba_dict_test"].keys())) == sorted(predictor.get_model_names(can_infer=True))
+    assert sorted(list(simulation_artifact["pred_proba_dict_test"].keys())) == sorted(predictor.model_names(can_infer=True))
     assert simulation_artifact["y_test"].equals(predictor.transform_labels(test_data[label]))
     for sim_artifact in [simulation_artifact, simulation_artifact_no_test]:
         assert sim_artifact["label"] == predictor.label
-        assert sorted(list(sim_artifact["pred_proba_dict_val"].keys())) == sorted(predictor.get_model_names(can_infer=True))
+        assert sorted(list(sim_artifact["pred_proba_dict_val"].keys())) == sorted(predictor.model_names(can_infer=True))
         assert sim_artifact["eval_metric"] == predictor.eval_metric.name
         assert sim_artifact["problem_type"] == predictor.problem_type
     simulation_artifacts = {dataset["name"]: {0: simulation_artifact}}
 
     # Test convert_simulation_artifacts_to_tabular_predictions_dict
     aggregated_pred_proba, aggregated_ground_truth = convert_simulation_artifacts_to_tabular_predictions_dict(simulation_artifacts=simulation_artifacts)
-    assert set(aggregated_pred_proba[dataset["name"]][0]["pred_proba_dict_val"].keys()) == set(predictor.get_model_names(can_infer=True))
-    assert set(aggregated_pred_proba[dataset["name"]][0]["pred_proba_dict_test"].keys()) == set(predictor.get_model_names(can_infer=True))
+    assert set(aggregated_pred_proba[dataset["name"]][0]["pred_proba_dict_val"].keys()) == set(predictor.model_names(can_infer=True))
+    assert set(aggregated_pred_proba[dataset["name"]][0]["pred_proba_dict_test"].keys()) == set(predictor.model_names(can_infer=True))
     ground_truth_keys_expected = set(simulation_artifact.keys())
     ground_truth_keys_expected.remove("pred_proba_dict_val")
     ground_truth_keys_expected.remove("pred_proba_dict_test")
@@ -205,12 +205,12 @@ def test_advanced_functionality():
     leaderboard_extra = predictor.leaderboard(data=test_data, extra_info=True, extra_metrics=extra_metrics)
     _assert_predict_dict_identical_to_predict(predictor=predictor, data=test_data)
     _assert_predict_proba_dict_identical_to_predict_proba(predictor=predictor, data=test_data)
-    assert set(predictor.get_model_names()) == set(leaderboard["model"])
-    assert set(predictor.get_model_names()) == set(leaderboard_extra["model"])
+    assert set(predictor.model_names()) == set(leaderboard["model"])
+    assert set(predictor.model_names()) == set(leaderboard_extra["model"])
     assert set(leaderboard_extra.columns).issuperset(set(leaderboard.columns))
     assert len(leaderboard) == len(leaderboard_extra)
     assert set(leaderboard_extra.columns).issuperset(set(extra_metrics))  # Assert that extra_metrics are present in output
-    num_models = len(predictor.get_model_names())
+    num_models = len(predictor.model_names())
     feature_importances = predictor.feature_importance(data=test_data)
     original_features = set(train_data.columns)
     original_features.remove(label)
@@ -231,21 +231,21 @@ def test_advanced_functionality():
         y_pred_proba_from_transform = predictor.predict_proba(test_data_transformed, transform_features=False)
         assert y_pred_proba.equals(y_pred_proba_from_transform)
 
-    assert predictor.get_model_names(persisted=True) == []  # Assert that no models were persisted during training
+    assert predictor.model_names(persisted=True) == []  # Assert that no models were persisted during training
     assert predictor.unpersist() == []  # Assert that no models were unpersisted
 
     persisted_models = predictor.persist(models="all", max_memory=None)
-    assert set(predictor.get_model_names(persisted=True)) == set(persisted_models)  # Ensure all models are persisted
+    assert set(predictor.model_names(persisted=True)) == set(persisted_models)  # Ensure all models are persisted
     assert predictor.persist(models="all", max_memory=None) == []  # Ensure that no additional models are persisted on repeated calls
     unpersised_models = predictor.unpersist()
     assert set(unpersised_models) == set(persisted_models)
-    assert predictor.get_model_names(persisted=True) == []  # Assert that all models were unpersisted
+    assert predictor.model_names(persisted=True) == []  # Assert that all models were unpersisted
 
     # Raise exception
     with pytest.raises(NetworkXError):
         predictor.persist(models=["UNKNOWN_MODEL_1", "UNKNOWN_MODEL_2"])
 
-    assert predictor.get_model_names(persisted=True) == []
+    assert predictor.model_names(persisted=True) == []
 
     assert predictor.unpersist(models=["UNKNOWN_MODEL_1", "UNKNOWN_MODEL_2"]) == []
 
@@ -254,7 +254,7 @@ def test_advanced_functionality():
     predictor_loaded = TabularPredictor.load(predictor.path)  # Assert that predictor loading works
     leaderboard_loaded = predictor_loaded.leaderboard(data=test_data)
     assert len(leaderboard) == len(leaderboard_loaded)
-    assert predictor_loaded.get_model_names(persisted=True) == []  # Assert that models were not still persisted after loading predictor
+    assert predictor_loaded.model_names(persisted=True) == []  # Assert that models were not still persisted after loading predictor
 
     _assert_predictor_size(predictor=predictor)
     # Test cloning logic
@@ -297,17 +297,17 @@ def test_advanced_functionality():
     if not on_windows:
         predictor.plot_ensemble_model()
     assert len(predictor.get_model_full_dict()) == num_models
-    assert len(predictor.get_model_names()) == num_models * 2
-    for model in predictor.get_model_names():
+    assert len(predictor.model_names()) == num_models * 2
+    for model in predictor.model_names():
         predictor.predict(data=test_data, model=model)
     predictor.refit_full()  # Confirm that refit_models aren't further refit.
     assert len(predictor.get_model_full_dict()) == num_models
-    assert len(predictor.get_model_names()) == num_models * 2
+    assert len(predictor.model_names()) == num_models * 2
     predictor.delete_models(models_to_keep=[])  # Test that dry-run doesn't delete models
-    assert len(predictor.get_model_names()) == num_models * 2
+    assert len(predictor.model_names()) == num_models * 2
     predictor.predict(data=test_data)
     predictor.delete_models(models_to_keep=[], dry_run=False)  # Test that dry-run deletes models
-    assert len(predictor.get_model_names()) == 0
+    assert len(predictor.model_names()) == 0
     assert len(predictor.leaderboard()) == 0
     assert len(predictor.leaderboard(extra_info=True)) == 0
     # Assert that predictor can no longer predict
@@ -362,7 +362,7 @@ def test_advanced_functionality_bagging():
     )
 
     expected_num_models = 2
-    assert len(predictor.get_model_names()) == expected_num_models
+    assert len(predictor.model_names()) == expected_num_models
 
     _assert_predict_dict_identical_to_predict(predictor=predictor, data=test_data)
     _assert_predict_proba_dict_identical_to_predict_proba(predictor=predictor, data=test_data)
@@ -371,7 +371,7 @@ def test_advanced_functionality_bagging():
     assert len(oof_pred_proba) == len(train_data)
 
     predict_proba_dict_oof = predictor.predict_proba_multi()
-    for m in predictor.get_model_names():
+    for m in predictor.model_names():
         predict_proba_oof = predictor.get_oof_pred_proba(model=m)
         assert predict_proba_oof.equals(predict_proba_dict_oof[m])
 
@@ -380,7 +380,7 @@ def test_advanced_functionality_bagging():
 
     predictor.refit_full()
     assert len(predictor.get_model_full_dict()) == expected_num_models
-    assert len(predictor.get_model_names()) == expected_num_models * 2
+    assert len(predictor.model_names()) == expected_num_models * 2
 
     model_best_refit = predictor.model_best()
     assert model_best != model_best_refit

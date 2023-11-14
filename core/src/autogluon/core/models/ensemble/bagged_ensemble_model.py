@@ -1186,7 +1186,7 @@ class BaggedEnsembleModel(AbstractModel):
                 if requires_save and self.low_memory:
                     self.save_child(model=model)
 
-    def _get_model_names(self):
+    def _model_names(self):
         model_names = []
         for model in self.models:
             if isinstance(model, str):
@@ -1222,7 +1222,7 @@ class BaggedEnsembleModel(AbstractModel):
         bagged_info = dict(
             child_model_type=self._child_type.__name__,
             num_child_models=self.n_children,
-            child_model_names=self._get_model_names(),
+            child_model_names=self._model_names(),
             _n_repeats=self._n_repeats,
             # _n_repeats_finished=self._n_repeats_finished,  # commented out because these are too technical
             # _k_fold_end=self._k_fold_end,
