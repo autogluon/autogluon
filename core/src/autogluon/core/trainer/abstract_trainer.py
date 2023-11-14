@@ -3020,7 +3020,7 @@ class AbstractTrainer:
 
         return df_sorted
 
-    def get_model_failures(self) -> pd.DataFrame:
+    def model_failures(self) -> pd.DataFrame:
         """
         [Advanced] Get the model failures that occurred during the fitting of this predictor, in the form of a pandas DataFrame.
 

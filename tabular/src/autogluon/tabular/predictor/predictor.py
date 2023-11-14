@@ -2292,7 +2292,7 @@ class TabularPredictor:
             silent=not verbose,
         )
 
-    def get_model_failures(self, verbose: bool = False) -> pd.DataFrame:
+    def model_failures(self, verbose: bool = False) -> pd.DataFrame:
         """
         [Advanced] Get the model failures that occurred during the fitting of this model, in the form of a pandas DataFrame.
 
@@ -2331,8 +2331,8 @@ class TabularPredictor:
                 "exc_traceback": The full traceback message of the exception as a string
                 "exc_order": The order of the model failure (starting from 1)
         """
-        self._assert_is_fit("get_model_failures")
-        model_failures_df = self._trainer.get_model_failures()
+        self._assert_is_fit("model_failures")
+        model_failures_df = self._trainer.model_failures()
         if verbose:
             with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):
                 print(model_failures_df)
