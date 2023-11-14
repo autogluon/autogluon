@@ -389,7 +389,8 @@ def object_detection(presets: str = DEFAULT):
     elif presets in [DEFAULT, HIGH_QUALITY]:
         hyperparameters.update(
             {
-                "model.mmdet_image.checkpoint_name": "dino-4scale_r50_8xb2-12e_coco",
+                # In mmdet=3.2.0, for dino checkpoints there is .py postfix
+                "model.mmdet_image.checkpoint_name": "dino-4scale_r50_8xb2-12e_coco.py",
                 "model.mmdet_image.frozen_layers": ["backbone", "model.level_embed"],
                 "env.per_gpu_batch_size": 1,  # Works on 16G GPU
                 "optimization.learning_rate": 1e-4,
@@ -402,7 +403,8 @@ def object_detection(presets: str = DEFAULT):
     elif presets == BEST_QUALITY:
         hyperparameters.update(
             {
-                "model.mmdet_image.checkpoint_name": "dino-5scale_swin-l_8xb2-36e_coco",
+                # In mmdet=3.2.0, for dino checkpoints there is .py postfix
+                "model.mmdet_image.checkpoint_name": "dino-5scale_swin-l_8xb2-36e_coco.py",
                 "model.mmdet_image.frozen_layers": ["backbone", "model.level_embed"],
                 "env.per_gpu_batch_size": 1,  # Works on 24G GPU
                 "optimization.learning_rate": 1e-4,
