@@ -292,16 +292,16 @@ def test_advanced_functionality():
     with pytest.raises(FileNotFoundError):
         predictor_clone_for_deployment.refit_full()
 
-    assert predictor.get_model_full_dict() == dict()
+    assert predictor.model_refit_map() == dict()
     predictor.refit_full()
     if not on_windows:
         predictor.plot_ensemble_model()
-    assert len(predictor.get_model_full_dict()) == num_models
+    assert len(predictor.model_refit_map()) == num_models
     assert len(predictor.model_names()) == num_models * 2
     for model in predictor.model_names():
         predictor.predict(data=test_data, model=model)
     predictor.refit_full()  # Confirm that refit_models aren't further refit.
-    assert len(predictor.get_model_full_dict()) == num_models
+    assert len(predictor.model_refit_map()) == num_models
     assert len(predictor.model_names()) == num_models * 2
     predictor.delete_models(models_to_keep=[])  # Test that dry-run doesn't delete models
     assert len(predictor.model_names()) == num_models * 2
@@ -367,26 +367,26 @@ def test_advanced_functionality_bagging():
     _assert_predict_dict_identical_to_predict(predictor=predictor, data=test_data)
     _assert_predict_proba_dict_identical_to_predict_proba(predictor=predictor, data=test_data)
 
-    oof_pred_proba = predictor.get_oof_pred_proba()
+    oof_pred_proba = predictor.predict_proba_oof()
     assert len(oof_pred_proba) == len(train_data)
 
     predict_proba_dict_oof = predictor.predict_proba_multi()
     for m in predictor.model_names():
-        predict_proba_oof = predictor.get_oof_pred_proba(model=m)
+        predict_proba_oof = predictor.predict_proba_oof(model=m)
         assert predict_proba_oof.equals(predict_proba_dict_oof[m])
 
     score_oof = predictor.evaluate_predictions(train_data[label], oof_pred_proba)
     model_best = predictor.model_best()
 
     predictor.refit_full()
-    assert len(predictor.get_model_full_dict()) == expected_num_models
+    assert len(predictor.model_refit_map()) == expected_num_models
     assert len(predictor.model_names()) == expected_num_models * 2
 
     model_best_refit = predictor.model_best()
     assert model_best != model_best_refit
 
     # assert that refit model uses original model's OOF predictions
-    oof_pred_proba_refit = predictor.get_oof_pred_proba()
+    oof_pred_proba_refit = predictor.predict_proba_oof()
     assert oof_pred_proba.equals(oof_pred_proba_refit)
 
 
@@ -557,10 +557,10 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
                 )
             if predictor._trainer.bagged_mode and not crash_in_oof:
                 # TODO: Test index alignment with original training data (first handle duplicated rows / dropped rows edge cases)
-                y_pred_oof = predictor.get_oof_pred()
-                y_pred_proba_oof = predictor.get_oof_pred_proba(as_multiclass=False)
-                y_pred_oof_transformed = predictor.get_oof_pred(transformed=True)
-                y_pred_proba_oof_transformed = predictor.get_oof_pred_proba(as_multiclass=False, transformed=True)
+                y_pred_oof = predictor.predict_oof()
+                y_pred_proba_oof = predictor.predict_proba_oof(as_multiclass=False)
+                y_pred_oof_transformed = predictor.predict_oof(transformed=True)
+                y_pred_proba_oof_transformed = predictor.predict_proba_oof(as_multiclass=False, transformed=True)
 
                 # Assert expected type output
                 assert isinstance(y_pred_oof, pd.Series)
@@ -570,7 +570,7 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
                     assert isinstance(y_pred_proba_oof_transformed, pd.DataFrame)
                 else:
                     if predictor.problem_type == BINARY:
-                        assert isinstance(predictor.get_oof_pred_proba(), pd.DataFrame)
+                        assert isinstance(predictor.predict_proba_oof(), pd.DataFrame)
                     assert isinstance(y_pred_proba_oof, pd.Series)
                     assert isinstance(y_pred_proba_oof_transformed, pd.Series)
 
@@ -602,9 +602,9 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
             else:
                 # Raise exception
                 with pytest.raises(AssertionError):
-                    predictor.get_oof_pred()
+                    predictor.predict_oof()
                 with pytest.raises(AssertionError):
-                    predictor.get_oof_pred_proba()
+                    predictor.predict_proba_oof()
             if run_distill:
                 predictor.distill(time_limit=60, augment_args={"size_factor": 0.5})
 

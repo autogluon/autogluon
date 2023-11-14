@@ -93,7 +93,7 @@ class AutoTrainer(AbstractTrainer):
                 # TODO: User could be intending to blend instead. Add support for blend stacking.
                 #  This error message is necessary because when calculating out-of-fold predictions for user, we want to return them in the form given in train_data,
                 #  but if we merge train and val here, it becomes very confusing from a users perspective, especially because we reset index, making it impossible to match
-                #  the original train_data to the out-of-fold predictions from `predictor.get_oof_pred_proba()`.
+                #  the original train_data to the out-of-fold predictions from `predictor.predict_proba_oof()`.
                 raise AssertionError(
                     "X_val, y_val is not None, but bagged mode was specified. "
                     "If calling from `TabularPredictor.fit()`, `tuning_data` should be None.\n"

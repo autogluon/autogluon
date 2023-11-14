@@ -144,12 +144,12 @@ class BaggedEnsembleModel(AbstractModel):
     def is_valid_oof(self):
         return self.is_fit() and (self._child_oof or self._bagged_mode)
 
-    def get_oof_pred_proba(self, **kwargs):
+    def predict_proba_oof(self, **kwargs):
         # TODO: Require is_valid == True (add option param to ignore is_valid)
-        return self._oof_pred_proba_func(self._oof_pred_proba, self._oof_pred_model_repeats)
+        return self._predict_proba_oof(self._oof_pred_proba, self._oof_pred_model_repeats)
 
     @staticmethod
-    def _oof_pred_proba_func(oof_pred_proba, oof_pred_model_repeats, return_type=np.float32):
+    def _predict_proba_oof(oof_pred_proba, oof_pred_model_repeats, return_type=np.float32):
         oof_pred_model_repeats_without_0 = np.where(oof_pred_model_repeats == 0, 1, oof_pred_model_repeats)
         if oof_pred_proba.ndim == 2:
             oof_pred_model_repeats_without_0 = oof_pred_model_repeats_without_0[:, None]
@@ -458,7 +458,7 @@ class BaggedEnsembleModel(AbstractModel):
         self._load_oof()
         valid_indices = self._oof_pred_model_repeats > 0
         y = y[valid_indices]
-        y_pred_proba = self.get_oof_pred_proba()[valid_indices]
+        y_pred_proba = self.predict_proba_oof()[valid_indices]
         if sample_weight is not None:
             sample_weight = sample_weight[valid_indices]
         return self.score_with_y_pred_proba(y=y, y_pred_proba=y_pred_proba, sample_weight=sample_weight)
@@ -507,10 +507,10 @@ class BaggedEnsembleModel(AbstractModel):
                 )
                 time_start_predict = time.time()
                 if model_base._get_tags().get("valid_oof", False):
-                    self._oof_pred_proba = model_base.get_oof_pred_proba(X=X, y=y)
+                    self._oof_pred_proba = model_base.predict_proba_oof(X=X, y=y)
                 else:
                     logger.warning(
-                        "\tWARNING: `use_child_oof` was specified but child model does not have a dedicated `get_oof_pred_proba` method. This model may have heavily overfit validation scores."
+                        "\tWARNING: `use_child_oof` was specified but child model does not have a dedicated `predict_proba_oof` method. This model may have heavily overfit validation scores."
                     )
                     self._oof_pred_proba = model_base.predict_proba(X=X)
                 self._child_oof = True
@@ -1096,7 +1096,7 @@ class BaggedEnsembleModel(AbstractModel):
             model._load_oof()
             oof_pred_proba = model._oof_pred_proba
             oof_pred_model_repeats = model._oof_pred_model_repeats
-        return cls._oof_pred_proba_func(oof_pred_proba=oof_pred_proba, oof_pred_model_repeats=oof_pred_model_repeats)
+        return cls._predict_proba_oof(oof_pred_proba=oof_pred_proba, oof_pred_model_repeats=oof_pred_model_repeats)
 
     def _load_oof(self):
         if self._oof_pred_proba is not None:

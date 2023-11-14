@@ -9,7 +9,7 @@ import pprint
 import shutil
 import time
 import warnings
-from typing import List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import networkx as nx
 import numpy as np
@@ -3028,9 +3028,9 @@ class TabularPredictor:
                 model_to_set_best = set_best_to_refit_full
             else:
                 model_to_set_best = model_best
-            model_full_dict = self._trainer.get_model_full_dict()
-            if model_to_set_best in model_full_dict:
-                self._trainer.model_best = model_full_dict[model_to_set_best]
+            model_refit_map = self._trainer.model_full_dict()
+            if model_to_set_best in model_refit_map:
+                self._trainer.model_best = model_refit_map[model_to_set_best]
                 # Note: model_best will be overwritten if additional training is done with new models,
                 # since model_best will have validation score of None and any new model will have a better validation score.
                 # This has the side-effect of having the possibility of model_best being overwritten by a worse model than the original model_best.
@@ -3040,7 +3040,7 @@ class TabularPredictor:
                     f'Updated best model to "{self._trainer.model_best}" (Previously "{model_best}"). '
                     f'AutoGluon will default to using "{self._trainer.model_best}" for predict() and predict_proba().',
                 )
-            elif model_to_set_best in model_full_dict.values():
+            elif model_to_set_best in model_refit_map.values():
                 # Model best is already a refit full model
                 prev_best = self._trainer.model_best
                 self._trainer.model_best = model_to_set_best
@@ -3103,7 +3103,7 @@ class TabularPredictor:
         if save_trainer:
             self._trainer.save()
 
-    def get_model_full_dict(self, inverse=False):
+    def model_refit_map(self, inverse=False) -> Dict[str, str]:
         """
         Returns a dictionary of original model name -> refit full model name.
         Empty unless `refit_full=True` was set during fit or `predictor.refit_full()` was called.
@@ -3118,8 +3118,8 @@ class TabularPredictor:
         -------
         Dictionary of original model name -> refit full model name.
         """
-        self._assert_is_fit("get_model_full_dict")
-        return self._trainer.get_model_full_dict(inverse=inverse)
+        self._assert_is_fit("model_refit_map")
+        return self._trainer.model_full_dict(inverse=inverse)
 
     def info(self):
         """
@@ -3297,37 +3297,37 @@ class TabularPredictor:
 
         return self._learner.calibrate_decision_threshold(data=data, metric=metric, model=model, decision_thresholds=decision_thresholds, verbose=verbose)
 
-    def get_oof_pred(self, model: str = None, transformed=False, train_data=None, internal_oof=False, decision_threshold=None, can_infer=None) -> pd.Series:
+    def predict_oof(self, model: str = None, *, transformed=False, train_data=None, internal_oof=False, decision_threshold=None, can_infer=None) -> pd.Series:
         """
         Note: This is advanced functionality not intended for normal usage.
 
         Returns the out-of-fold (OOF) predictions for every row in the training data.
 
-        For more information, refer to `get_oof_pred_proba()` documentation.
+        For more information, refer to `predict_proba_oof()` documentation.
 
         Parameters
         ----------
         model : str (optional)
-            Refer to `get_oof_pred_proba()` documentation.
+            Refer to `predict_proba_oof()` documentation.
         transformed : bool, default = False
-            Refer to `get_oof_pred_proba()` documentation.
+            Refer to `predict_proba_oof()` documentation.
         train_data : pd.DataFrame, default = None
-            Refer to `get_oof_pred_proba()` documentation.
+            Refer to `predict_proba_oof()` documentation.
         internal_oof : bool, default = False
-            Refer to `get_oof_pred_proba()` documentation.
+            Refer to `predict_proba_oof()` documentation.
         decision_threshold : float, default = None
             Refer to `predict_multi` documentation.
         can_infer : bool, default = None
-            Refer to `get_oof_pred_proba()` documentation.
+            Refer to `predict_proba_oof()` documentation.
 
         Returns
         -------
         :class:`pd.Series` object of the out-of-fold training predictions of the model.
         """
-        self._assert_is_fit("get_oof_pred")
+        self._assert_is_fit("predict_oof")
         if decision_threshold is None:
             decision_threshold = self.decision_threshold
-        y_pred_proba_oof = self.get_oof_pred_proba(
+        y_pred_proba_oof = self.predict_proba_oof(
             model=model, transformed=transformed, as_multiclass=True, train_data=train_data, internal_oof=internal_oof, can_infer=can_infer
         )
         y_pred_oof = get_pred_from_proba_df(y_pred_proba_oof, problem_type=self.problem_type, decision_threshold=decision_threshold)
@@ -3338,9 +3338,9 @@ class TabularPredictor:
     # TODO: Improve error messages when trying to get oof from refit_full and distilled models.
     # TODO: v0.1 add tutorial related to this method, as it is very powerful.
     # TODO: Remove train_data argument once we start caching the raw original data: Can just load that instead.
-    def get_oof_pred_proba(
-        self, model: str = None, transformed=False, as_multiclass=True, train_data=None, internal_oof=False, can_infer=None
-    ) -> Union[pd.DataFrame, pd.Series]:
+    def predict_proba_oof(
+        self, model: str = None, *, transformed=False, as_multiclass=True, train_data=None, internal_oof=False, can_infer=None
+    ) -> pd.DataFrame | pd.Series:
         """
         Note: This is advanced functionality not intended for normal usage.
 
@@ -3389,7 +3389,7 @@ class TabularPredictor:
         -------
         :class:`pd.Series` or :class:`pd.DataFrame` object of the out-of-fold training prediction probabilities of the model.
         """
-        self._assert_is_fit("get_oof_pred_proba")
+        self._assert_is_fit("predict_proba_oof")
         if model is None:
             model = self._model_best(can_infer=can_infer)
         if not self._trainer.bagged_mode:
@@ -3422,8 +3422,8 @@ class TabularPredictor:
                         f"If attempting to get `oof_pred_proba`, DO NOT pass `train_data` into `predictor.predict_proba` or `predictor.transform_features`!\n"
                         f"Instead this can be done by the following "
                         f"(Ensure `train_data` is identical to when it was used in fit):\n"
-                        f"oof_pred_proba = predictor.get_oof_pred_proba(train_data=train_data)\n"
-                        f"oof_pred = predictor.get_oof_pred(train_data=train_data)\n"
+                        f"oof_pred_proba = predictor.predict_proba_oof(train_data=train_data)\n"
+                        f"oof_pred = predictor.predict_oof(train_data=train_data)\n"
                     )
                 else:
                     missing_idx = list(train_data.index.difference(y_pred_proba_oof_transformed.index))
@@ -4720,6 +4720,21 @@ class TabularPredictor:
     def get_pred_from_proba(self, **kwargs) -> pd.Series | np.array:
         """Deprecated method. Use `predict_from_proba` instead."""
         return self.predict_from_proba(**kwargs)
+
+    @Deprecated(min_version_to_warn="0.8", min_version_to_error="1.1", version_to_remove="1.1", new="model_refit_map")
+    def get_model_full_dict(self, **kwargs) -> Dict[str, str]:
+        """Deprecated method. Use `model_refit_map` instead."""
+        return self.model_refit_map(**kwargs)
+
+    @Deprecated(min_version_to_warn="0.8", min_version_to_error="1.1", version_to_remove="1.1", new="predict_proba_oof")
+    def get_oof_pred_proba(self, **kwargs) -> pd.DataFrame | pd.Series:
+        """Deprecated method. Use `predict_proba_oof` instead."""
+        return self.predict_proba_oof(**kwargs)
+
+    @Deprecated(min_version_to_warn="0.8", min_version_to_error="1.1", version_to_remove="1.1", new="predict_oof")
+    def get_oof_pred(self, **kwargs) -> pd.Series:
+        """Deprecated method. Use `predict_oof` instead."""
+        return self.predict_oof(**kwargs)
 
 
 # Location to store WIP functionality that will be later added to TabularPredictor
