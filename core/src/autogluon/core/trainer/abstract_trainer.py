@@ -1487,7 +1487,7 @@ class AbstractTrainer:
         if self.low_memory:
             self.models = models
 
-    def compile_models(self, model_names="all", with_ancestors=False, compiler_configs=None) -> List[str]:
+    def compile(self, model_names="all", with_ancestors=False, compiler_configs=None) -> List[str]:
         """
         Compile a list of models for accelerated prediction.
 

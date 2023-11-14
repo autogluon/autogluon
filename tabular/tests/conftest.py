@@ -140,7 +140,7 @@ class FitHelper:
         extra_metrics=None,
         expected_model_count=2,
         path_as_absolute=False,
-        compile_models=False,
+        compile=False,
         compiler_configs=None,
         allowed_dataset_features=None,
         expected_stacked_overfitting_at_test=None,
@@ -171,8 +171,8 @@ class FitHelper:
             assert PathConverter._is_absolute(path=init_args["path"])
         save_path = init_args["path"]
         predictor = FitHelper.fit_dataset(train_data=train_data, init_args=init_args, fit_args=fit_args, sample_size=sample_size)
-        if compile_models:
-            predictor.compile_models(models="all", compiler_configs=compiler_configs)
+        if compile:
+            predictor.compile(models="all", compiler_configs=compiler_configs)
             predictor.persist_models(models="all")
         if sample_size is not None and sample_size < len(test_data):
             test_data = test_data.sample(n=sample_size, random_state=0)

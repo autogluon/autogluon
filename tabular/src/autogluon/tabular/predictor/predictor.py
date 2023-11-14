@@ -273,7 +273,7 @@ class TabularPredictor:
             **learner_kwargs,
         )
         self._learner_type = type(self._learner)
-        self._trainer = None
+        self._trainer: AbstractTrainer = None
         self._sub_fits: List[str] = []
         self._stacked_overfitting_occurred: bool | None = None
 
@@ -2867,7 +2867,7 @@ class TabularPredictor:
             fi_df[low_str] = pd.Series(ci_low_dict)
         return fi_df
 
-    def compile_models(self, models="best", with_ancestors=True, compiler_configs="auto"):
+    def compile(self, models="best", with_ancestors=True, compiler_configs="auto"):
         """
         Compile models for accelerated prediction.
         This can be helpful to reduce prediction latency and improve throughput.
@@ -2908,7 +2908,7 @@ class TabularPredictor:
                     Increasing batch size to a number that is larger than 1 would help increase the prediction throughput.
                     This comes with an expense of utilizing larger memory for prediction.
         """
-        self._assert_is_fit("compile_models")
+        self._assert_is_fit("compile")
         if isinstance(compiler_configs, str):
             if compiler_configs == "auto":
                 compiler_configs = {
@@ -2918,7 +2918,7 @@ class TabularPredictor:
                 }
             else:
                 raise ValueError(f'Unknown compiler_configs preset: "{compiler_configs}"')
-        self._trainer.compile_models(model_names=models, with_ancestors=with_ancestors, compiler_configs=compiler_configs)
+        self._trainer.compile(model_names=models, with_ancestors=with_ancestors, compiler_configs=compiler_configs)
 
     def persist_models(self, models="best", with_ancestors=True, max_memory=0.4) -> list:
         """
@@ -3010,7 +3010,7 @@ class TabularPredictor:
         """
         self._assert_is_fit("refit_full")
         ts = time.time()
-        model_best = self._get_model_best(can_infer=None)
+        model_best = self._model_best(can_infer=None)
         if model == "best":
             model = model_best
         logger.log(
@@ -3069,9 +3069,9 @@ class TabularPredictor:
         -------
         String model name of the best model
         """
-        return self._get_model_best(can_infer=True)
+        return self._model_best(can_infer=True)
 
-    def _get_model_best(self, can_infer=None):
+    def _model_best(self, can_infer=None):
         self._assert_is_fit("get_model_best")
         # TODO: Set self._trainer.model_best to the best model at end of fit instead of best WeightedEnsemble.
         if self._trainer.model_best is not None:
@@ -3390,7 +3390,7 @@ class TabularPredictor:
         """
         self._assert_is_fit("get_oof_pred_proba")
         if model is None:
-            model = self._get_model_best(can_infer=can_infer)
+            model = self._model_best(can_infer=can_infer)
         if not self._trainer.bagged_mode:
             raise AssertionError("Predictor must be in bagged mode to get out-of-fold predictions.")
         if self._trainer.get_model_attribute(model=model, attribute="refit_full", default=False):

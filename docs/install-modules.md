@@ -10,7 +10,7 @@ AutoGluon is modularized into [sub-modules](https://packaging.python.org/guides/
     - Experimental optional dependency: `tabpfn`. This will enable the usage of the TabPFN model, and allow you to fit TabPFN in TabularPredictor. Use `pip install autogluon.tabular[all,tabpfn]` to enable.
     - Optional dependency: `vowpalwabbit`. This will install the VowpalWabbit package and allow you to fit VowpalWabbit in TabularPredictor.
     - Experimental optional dependency: `imodels`. This will install the imodels package and allow you to fit interpretable models in TabularPredictor.
-    - Optional dependency: `skl2onnx`. This will enable ONNX model compilation via `predictor.compile_models()` on supported models.
+    - Optional dependency: `skl2onnx`. This will enable ONNX model compilation via `predictor.compile()` on supported models.
 - `autogluon.multimodal` - functionality for image, text, and multimodal problems. Focus on deep learning models.
     - To try object detection functionality using `MultiModalPredictor`, please install additional dependencies via `mim install "mmcv==2.1.0"`, `pip install "mmdet==3.2.0"` and `pip install pycocotools`. Note that Windows users should also install `pycocotools` by: `pip install pycocotools-windows`, but it only supports python 3.6/3.7/3.8.
 - `autogluon.timeseries` - only functionality for time series data (TimeSeriesPredictor).

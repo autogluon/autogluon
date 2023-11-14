@@ -149,7 +149,7 @@ class AutoTrainer(AbstractTrainer):
     def _get_default_proxy_model_class(self):
         return LGBModel
 
-    def compile_models(self, model_names="all", with_ancestors=False, compiler_configs: dict = None) -> List[str]:
+    def compile(self, model_names="all", with_ancestors=False, compiler_configs: dict = None) -> List[str]:
         """Ensures that compiler_configs maps to the correct models if the user specified the same keys as in hyperparameters such as RT, XT, etc."""
         if compiler_configs is not None:
             model_types_map = self._get_model_types_map()
@@ -160,7 +160,7 @@ class AutoTrainer(AbstractTrainer):
                 else:
                     compiler_configs_new[k] = compiler_configs[k]
             compiler_configs = compiler_configs_new
-        return super().compile_models(model_names=model_names, with_ancestors=with_ancestors, compiler_configs=compiler_configs)
+        return super().compile(model_names=model_names, with_ancestors=with_ancestors, compiler_configs=compiler_configs)
 
     def _get_model_types_map(self) -> Dict[str, AbstractModel]:
         return MODEL_TYPES
