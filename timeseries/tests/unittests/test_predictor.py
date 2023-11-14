@@ -780,10 +780,13 @@ def test_given_short_and_long_series_in_train_data_when_fit_called_then_trainer_
 ):
     predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length, freq="H")
     min_train_length = predictor._min_train_length
+    min_val_length = min_train_length + prediction_length + (num_val_windows - 1) * val_step_size
 
     item_id_to_length = {
-        "long_series_1": min_train_length + prediction_length + num_val_windows * val_step_size,
-        "long_series_2": min_train_length + prediction_length + (num_val_windows - 1) * val_step_size,
+        "long_series_1": min_val_length + val_step_size,
+        "long_series_2": min_val_length,
+        "long_series_3": min_val_length,
+        "long_series_4": min_val_length,
         "short_series_1": min_train_length + (num_val_windows - 1) * val_step_size,
         "short_series_2": min_train_length + 1,
         "short_series_3": 2,
@@ -793,7 +796,9 @@ def test_given_short_and_long_series_in_train_data_when_fit_called_then_trainer_
         predictor.fit(data, num_val_windows=num_val_windows, val_step_size=val_step_size)
         learner_fit_kwargs = learner_fit.call_args[1]
         item_ids_received_by_learner = learner_fit_kwargs["train_data"].item_ids
-        assert (item_ids_received_by_learner == ["long_series_1", "long_series_2"]).all()
+        assert (
+            item_ids_received_by_learner == ["long_series_1", "long_series_2", "long_series_3", "long_series_4"]
+        ).all()
 
 
 @pytest.mark.parametrize("prediction_length", [1, 7])
@@ -816,7 +821,7 @@ def test_given_short_and_long_series_in_train_data_and_tuning_data_when_fit_call
         assert (item_ids_received_by_learner == ["long_series_1"]).all()
 
 
-@pytest.mark.parametrize("num_val_windows", [1, 3, None])
+@pytest.mark.parametrize("num_val_windows", [1, 3, 5])
 def test_given_tuning_data_when_fit_called_then_num_val_windows_is_set_to_zero(temp_model_path, num_val_windows):
     predictor = TimeSeriesPredictor(path=temp_model_path)
     with mock.patch("autogluon.timeseries.learner.TimeSeriesLearner.fit") as learner_fit:
@@ -827,18 +832,17 @@ def test_given_tuning_data_when_fit_called_then_num_val_windows_is_set_to_zero(t
 
 @pytest.mark.parametrize("prediction_length", [1, 5, 7])
 @pytest.mark.parametrize("val_step_size", [1, 3])
-def test_when_num_val_windows_is_recommended_then_increasing_num_val_windows_raises_error(
-    temp_model_path, prediction_length, val_step_size
+@pytest.mark.parametrize("original_num_val_windows, expected_num_val_windows", [(4, 1), (4, 3), (1, 1), (4, 4)])
+def test_given_num_val_windows_too_high_for_given_data_then_num_val_windows_is_reduced(
+    temp_model_path, prediction_length, val_step_size, original_num_val_windows, expected_num_val_windows
 ):
-    df = DUMMY_TS_DATAFRAME.copy()
     predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length)
-    recommended_num_val_windows = predictor._recommend_num_val_windows(
-        df, max_num_val_windows=100, val_step_size=val_step_size
+    min_val_length = predictor._min_train_length + prediction_length + (expected_num_val_windows - 1) * val_step_size
+    df = get_data_frame_with_variable_lengths({item_id: min_val_length for item_id in ["A", "B", "C"]})
+    reduced_num_val_windows = predictor._reduce_num_val_windows_if_necessary(
+        df, original_num_val_windows=original_num_val_windows, val_step_size=val_step_size
     )
-    # assert that recommended_num_val_windows is the highest value for num_val_windows that doesn't raise an exception
-    assert predictor._filter_short_series(df, recommended_num_val_windows, val_step_size).num_items == df.num_items
-    with pytest.raises(ValueError, match="At least some time series in train\_data must have length"):
-        predictor._filter_short_series(df, recommended_num_val_windows + 1, val_step_size).num_items < df.num_items
+    assert reduced_num_val_windows == expected_num_val_windows
 
 
 @pytest.mark.parametrize("prediction_length", [1, 7])
@@ -861,8 +865,9 @@ def test_given_only_short_series_in_train_data_when_fit_called_then_exception_is
 
 
 @pytest.mark.parametrize("prediction_length", [1, 7])
-def test_given_only_short_series_when_num_val_windows_is_recommended_then_exception_is_raised(
-    temp_model_path, prediction_length
+@pytest.mark.parametrize("num_val_windows", [1, 2])
+def test_given_only_short_series_in_train_data_then_exception_is_raised(
+    temp_model_path, prediction_length, num_val_windows
 ):
     predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length, freq="H")
     min_train_length = predictor._min_train_length
@@ -874,7 +879,7 @@ def test_given_only_short_series_when_num_val_windows_is_recommended_then_except
     }
     data = get_data_frame_with_variable_lengths(item_id_to_length, freq="H")
     with pytest.raises(ValueError, match="At least some time series in train\_data must have length"):
-        predictor.fit(data, num_val_windows=None)
+        predictor.fit(data, num_val_windows=num_val_windows, hyperparameters=TEST_HYPERPARAMETER_SETTINGS[0])
 
 
 @pytest.mark.parametrize(
