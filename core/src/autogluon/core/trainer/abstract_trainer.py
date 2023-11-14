@@ -1272,7 +1272,7 @@ class AbstractTrainer:
 
         levels = sorted(model_levels.keys())
         models_trained_full = []
-        model_full_dict = {}
+        model_refit_map = {}
         for level in levels:
             models_level = model_levels[level]
             for model in models_level:
@@ -1325,7 +1325,7 @@ class AbstractTrainer:
                         refit_full=True,
                     )
                 if len(models_trained) == 1:
-                    model_full_dict[model_name] = models_trained[0]
+                    model_refit_map[model_name] = models_trained[0]
                 for model_trained in models_trained:
                     self._update_model_attr(
                         model_trained,
@@ -1336,11 +1336,11 @@ class AbstractTrainer:
                 models_trained_full += models_trained
 
         keys_to_del = []
-        for model in model_full_dict.keys():
-            if model_full_dict[model] not in models_trained_full:
+        for model in model_refit_map.keys():
+            if model_refit_map[model] not in models_trained_full:
                 keys_to_del.append(model)
         for key in keys_to_del:
-            del model_full_dict[key]
+            del model_refit_map[key]
         self.save()  # TODO: This could be more efficient by passing in arg to not save if called by refit_ensemble_full since it saves anyways later.
         return models_trained_full
 
@@ -1358,10 +1358,10 @@ class AbstractTrainer:
             ensemble_set = self.get_minimum_model_set(model)
         existing_models = self.get_model_names()
         ensemble_set_valid = []
-        model_full_dict = self.model_full_dict()
+        model_refit_map = self.model_full_dict()
         for model in ensemble_set:
-            if model in model_full_dict and model_full_dict[model] in existing_models:
-                logger.log(20, f"Model '{model}' already has a refit _FULL model: '{model_full_dict[model]}', skipping refit...")
+            if model in model_refit_map and model_refit_map[model] in existing_models:
+                logger.log(20, f"Model '{model}' already has a refit _FULL model: '{model_refit_map[model]}', skipping refit...")
             else:
                 ensemble_set_valid.append(model)
         if ensemble_set_valid:
@@ -1369,7 +1369,7 @@ class AbstractTrainer:
         else:
             models_trained_full = []
 
-        model_full_dict = self.model_full_dict()
+        model_refit_map = self.model_full_dict()
         for model_full in models_trained_full:
             # TODO: Consider moving base model info to a separate pkl file so that it can be edited without having to load/save the model again
             #  Downside: Slower inference speed when models are not persisted in memory prior.
@@ -1377,7 +1377,7 @@ class AbstractTrainer:
             if isinstance(model_loaded, StackerEnsembleModel):
                 for stack_column_prefix in model_loaded.stack_column_prefix_lst:
                     base_model = model_loaded.stack_column_prefix_to_model_map[stack_column_prefix]
-                    new_base_model = model_full_dict[base_model]
+                    new_base_model = model_refit_map[base_model]
                     new_base_model_type = self.get_model_attribute(model=new_base_model, attribute="type")
                     new_base_model_path = self.get_model_attribute(model=new_base_model, attribute="path")
 
@@ -2806,10 +2806,10 @@ class AbstractTrainer:
 
         If inverse=True, return dict of refit model -> parent model
         """
-        model_full_dict = self.get_models_attribute_dict(attribute="refit_full_parent")
+        model_refit_map = self.get_models_attribute_dict(attribute="refit_full_parent")
         if not inverse:
-            model_full_dict = {parent: refit for refit, parent in model_full_dict.items()}
-        return model_full_dict
+            model_refit_map = {parent: refit for refit, parent in model_refit_map.items()}
+        return model_refit_map
 
     def model_exists(self, model: str) -> bool:
         return model in self.get_model_names()
@@ -3661,9 +3661,9 @@ class AbstractTrainer:
             if model_name is None:
                 model_name = self.get_model_best(can_infer=can_infer)
 
-        model_full_dict = self.model_full_dict()
+        model_refit_map = self.model_full_dict()
         model_name_og = model_name
-        for m, m_full in model_full_dict.items():
+        for m, m_full in model_refit_map.items():
             if m_full == model_name:
                 model_name_og = m
                 break
