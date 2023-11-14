@@ -3599,13 +3599,13 @@ class TabularPredictor:
             dry_run=dry_run,
         )
 
-    def size(self) -> int:
+    def disk_size(self) -> int:
         """
         Returns the combined size of all files under the `predictor.path` directory in bytes.
         """
         return get_directory_size(self.path)
 
-    def size_per_file(self, *, sort_by: str = "size", include_path_in_name: bool = False) -> pd.Series:
+    def disk_size_per_file(self, *, sort_by: str = "size", include_path_in_name: bool = False) -> pd.Series:
         """
         Returns the size of each file under the `predictor.path` directory in bytes.
 
@@ -4730,15 +4730,15 @@ class TabularPredictor:
         """Deprecated method. Use `predict_oof` instead."""
         return self.predict_oof(*args, **kwargs)
 
-    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.1", version_to_remove="1.1", new="size_per_file")
+    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.1", version_to_remove="1.1", new="disk_size_per_file")
     def get_size_disk_per_file(self, *args, **kwargs) -> pd.Series:
-        """Deprecated method. Use `size_per_file` instead."""
-        return self.size_per_file(*args, **kwargs)
+        """Deprecated method. Use `disk_size_per_file` instead."""
+        return self.disk_size_per_file(*args, **kwargs)
 
-    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.1", version_to_remove="1.1", new="size")
+    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.1", version_to_remove="1.1", new="disk_size")
     def get_size_disk(self) -> int:
-        """Deprecated method. Use `size` instead."""
-        return self.size()
+        """Deprecated method. Use `disk_size` instead."""
+        return self.disk_size()
 
     @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.1", version_to_remove="1.1", new="model_names(persisted=True)")
     def get_model_names_persisted(self) -> List[str]:

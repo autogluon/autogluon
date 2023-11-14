@@ -328,9 +328,9 @@ def test_advanced_functionality():
 
 
 def _assert_predictor_size(predictor: TabularPredictor):
-    predictor_size_disk = predictor.size()
-    predictor_size_disk_per_file = predictor.size_per_file()
-    assert predictor_size_disk > 0  # Assert that .size() produces a >0 result and doesn't crash
+    predictor_size_disk = predictor.disk_size()
+    predictor_size_disk_per_file = predictor.disk_size_per_file()
+    assert predictor_size_disk > 0  # Assert that .disk_size() produces a >0 result and doesn't crash
     assert len(predictor_size_disk_per_file) > 0
     assert predictor_size_disk == predictor_size_disk_per_file.sum()
 
