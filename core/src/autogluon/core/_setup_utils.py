@@ -26,9 +26,9 @@ DEPENDENT_PACKAGES = {
     "networkx": ">=3.0,<4",  # Major version cap
     "tqdm": ">=4.38,<5",  # Major version cap
     "Pillow": ">=10.0.1,<11",  # Major version cap
-    "torch": ">=2.0,<2.1",  # "<{N+1}" upper cap, sync with common/src/autogluon/common/utils/try_import.py
-    "lightning": ">=2.0.0,<2.1",  # "<{N+1}" upper cap
-    "pytorch_lightning": ">=2.0.0,<2.1",  # "<{N+1}" upper cap, capping `lightning` does not cap `pytorch_lightning`!
+    "torch": ">=2.0,<2.2",  # "<{N+1}" upper cap, sync with common/src/autogluon/common/utils/try_import.py
+    "lightning": ">=2.0.0,<2.2",  # "<{N+1}" upper cap
+    "pytorch_lightning": ">=2.0.0,<2.2",  # "<{N+1}" upper cap, capping `lightning` does not cap `pytorch_lightning`!
 }
 if LITE_MODE:
     DEPENDENT_PACKAGES = {package: version for package, version in DEPENDENT_PACKAGES.items() if package not in ["psutil", "Pillow", "timm"]}
