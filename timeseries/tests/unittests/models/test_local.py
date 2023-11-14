@@ -6,11 +6,16 @@ import pytest
 
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.models.local import (
+    ADIDAModel,
     AutoARIMAModel,
     AutoETSModel,
     AverageModel,
+    CrostonClassicModel,
+    CrostonOptimizedModel,
+    CrostonSBAModel,
     DynamicOptimizedThetaModel,
     ETSModel,
+    IMAPAModel,
     NaiveModel,
     NPTSModel,
     SeasonalAverageModel,
@@ -26,11 +31,16 @@ from ..common import (
 )
 
 TESTABLE_MODELS = [
+    ADIDAModel,
     AutoARIMAModel,
     AutoETSModel,
     AverageModel,
+    CrostonClassicModel,
+    CrostonSBAModel,
+    CrostonOptimizedModel,
     DynamicOptimizedThetaModel,
     ETSModel,
+    IMAPAModel,
     ThetaModel,
     NaiveModel,
     NPTSModel,
