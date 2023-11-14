@@ -570,14 +570,14 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 time_left = time_limit - (time.time() - time_start)
                 time_left_for_model = time_left / (num_models - i)
                 if time_left <= 0:
-                    logger.info(f"Stopping training due to lack of time remaining. Time left: {time_left:.2f} seconds")
+                    logger.info(f"Stopping training due to lack of time remaining. Time left: {time_left:.1f} seconds")
                     break
 
             if contains_searchspace(model.get_user_params()):
                 fit_log_message = f"Hyperparameter tuning model {model.name}. "
                 if time_left is not None:
                     fit_log_message += (
-                        f"Tuning model for up to {time_left_for_model:.2f}s of the {time_left:.2f}s remaining."
+                        f"Tuning model for up to {time_left_for_model:.1f}s of the {time_left:.1f}s remaining."
                     )
                 logger.info(fit_log_message)
                 with tqdm.external_write_mode():
@@ -592,7 +592,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 fit_log_message = f"Training timeseries model {model.name}. "
                 if time_left is not None:
                     fit_log_message += (
-                        f"Training for up to {time_left_for_model:.2f}s of the {time_left:.2f}s of remaining time."
+                        f"Training for up to {time_left_for_model:.1f}s of the {time_left:.1f}s of remaining time."
                     )
                 logger.info(fit_log_message)
                 model_names_trained += self._train_and_save(
@@ -609,7 +609,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             if time_left_for_ensemble is not None and time_left_for_ensemble <= 0:
                 logger.info(
                     "Not fitting ensemble due to lack of time remaining. "
-                    f"Time left: {time_left_for_ensemble:.2f} seconds"
+                    f"Time left: {time_left_for_ensemble:.1f} seconds"
                 )
             elif len(models_available_for_ensemble) <= 1:
                 logger.info(
