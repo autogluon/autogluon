@@ -1,4 +1,6 @@
 """Storing the constants"""
+from autogluon.core.metrics import METRICS
+
 
 # Column/Label Types
 NULL = "null"
@@ -164,7 +166,7 @@ METRIC_MODE_MAP = {
 }
 VALID_METRICS = METRIC_MODE_MAP.keys()
 
-
+# Define valid val/eval metrics and the fallback metric for each problem type.
 EVALUATION_METRICS = METRICS + {
     NER: [OVERALL_F1, NER_TOKEN_F1],
     NAMED_ENTITY_RECOGNITION: [OVERALL_F1, NER_TOKEN_F1],
@@ -181,16 +183,11 @@ EVALUATION_METRICS = METRICS + {
     FEW_SHOT_CLASSIFICATION: METRICS[BINARY] + METRICS[MULTICLASS],
     SEMANTIC_SEGMENTATION: [BINARY_IOU],  # TODO: ADD METRICS FOR SEMANTIC_SEGMENTATION
 }
-
-# Define valid val/eval metrics and the fallback metric for each problem type.
-from autogluon.core.metrics import METRICS
-
 EVALUATION_METRICS_FALLBACK = {problem_type: metrics[0] for problem_type, metrics in EVALUATION_METRICS.items()}
 EVALUATION_METRICS_FALLBACK[BINARY] = ROC_AUC
 EVALUATION_METRICS_FALLBACK[MULTICLASS] = ACCURACY
 EVALUATION_METRICS_FALLBACK[REGRESSION] = RMSE
 EVALUATION_METRICS_FALLBACK[FEW_SHOT_CLASSIFICATION] = ACCURACY
-
 VALIDATION_METRICS = {problem_type: [m for m in metrics if m in VALID_METRICS] for problem_type, metrics in EVALUATION_METRICS.items()}
 VALIDATION_METRICS_FALLBACK = {
     BINARY: ROC_AUC,
