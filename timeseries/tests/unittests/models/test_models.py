@@ -453,8 +453,6 @@ def test_given_searcher_when_ray_backend_used_in_hpo_then_correct_searcher_used(
     )
     backend = model._get_hpo_backend()
     if backend is not RAY_BACKEND:
-        # Ray has trouble keeping references to the custom metric in the test namespace. We therefore
-        # skip this test.
         pytest.skip()
 
     val_data = None if isinstance(model, MultiWindowBacktestingModel) else DUMMY_TS_DATAFRAME

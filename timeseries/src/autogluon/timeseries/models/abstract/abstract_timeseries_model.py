@@ -386,17 +386,35 @@ class AbstractTimeSeriesModel(AbstractModel):
         """
         return train_fn_kwargs
 
+    def _is_gpu_available(self) -> bool:
+        return False
+
     def hyperparameter_tune(
         self, hyperparameter_tune_kwargs="auto", hpo_executor: HpoExecutor = None, time_limit: float = None, **kwargs
     ):
-        k_fold = kwargs.pop("k_fold", 1)
-        return super().hyperparameter_tune(
-            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-            hpo_executor=hpo_executor,
-            time_limit=time_limit,
-            k_fold=k_fold,
-            **kwargs,
+        if hpo_executor is None:
+            hpo_executor = self._get_default_hpo_executor()
+            default_num_trials = kwargs.pop("default_num_trials", None)
+        hpo_executor.initialize(
+            hyperparameter_tune_kwargs, default_num_trials=default_num_trials, time_limit=time_limit
         )
+        kwargs = self.initialize(time_limit=time_limit, **kwargs)
+
+        self._register_fit_metadata(**kwargs)
+        self._validate_fit_memory_usage(**kwargs)
+
+        kwargs = self._preprocess_fit_resources(
+            parallel_hpo=hpo_executor.executor_type == "ray", silent=True, **kwargs
+        )
+        self.validate_fit_resources(**kwargs)
+
+        # autogluon.core runs a complicated logic to determine the final number of gpus
+        # used in trials, which results in unintended setting of num_gpus=0. We override this
+        # logic here, and set to minimum num_gpus to 1 if it is set to 0 when GPUs are available
+        kwargs["num_gpus"] = 0 if not self._is_gpu_available() else max(kwargs.get("num_gpus", 1), 1)
+
+        hpo_executor.register_resources(self, k_fold=1, **kwargs)
+        return self._hyperparameter_tune(hpo_executor=hpo_executor, **kwargs)
 
     def _hyperparameter_tune(
         self,
@@ -444,14 +462,15 @@ class AbstractTimeSeriesModel(AbstractModel):
         if self.estimate_memory_usage is not None:
             model_estimate_memory_usage = self.estimate_memory_usage(**kwargs)
 
+        minimum_resources = self.get_minimum_resources(is_gpu_available=self._is_gpu_available())
         hpo_context = disable_stdout if isinstance(hpo_executor, RayHpoExecutor) else nullcontext
         with hpo_context(), warning_filter():  # prevent Ray from outputting its results to stdout with print
             hpo_executor.execute(
                 model_trial=model_trial,
                 train_fn_kwargs=train_fn_kwargs,
                 directory=directory,
-                minimum_cpu_per_trial=self.get_minimum_resources().get("num_cpus", 1),
-                minimum_gpu_per_trial=self.get_minimum_resources().get("num_gpus", 0),
+                minimum_cpu_per_trial=minimum_resources.get("num_cpus", 1),
+                minimum_gpu_per_trial=minimum_resources.get("num_gpus", 0),
                 model_estimate_memory_usage=model_estimate_memory_usage,
                 adapter_type="timeseries",
             )

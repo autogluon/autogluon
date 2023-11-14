@@ -69,6 +69,12 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
     def _get_hpo_backend(self) -> str:
         return self._get_model_base()._get_hpo_backend()
 
+    def _is_gpu_available(self) -> bool:
+        return self._get_model_base()._is_gpu_available()
+
+    def get_minimum_resources(self, is_gpu_available: bool = False) -> bool:
+        return self._get_model_base().get_minimum_resources(is_gpu_available)
+
     def _fit(
         self,
         train_data: TimeSeriesDataFrame,

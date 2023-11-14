@@ -291,7 +291,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             "default_root_dir": self.path,
         }
 
-        if torch.cuda.is_available():
+        if self._is_gpu_available():
             default_trainer_kwargs["accelerator"] = "gpu"
             default_trainer_kwargs["devices"] = 1
         else:
@@ -305,6 +305,11 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             trainer_kwargs=default_trainer_kwargs,
             **init_args,
         )
+
+    def _is_gpu_available(self) -> bool:
+        import torch.cuda
+
+        return torch.cuda.is_available()
 
     def get_minimum_resources(self, is_gpu_available: bool = False) -> Dict[str, Union[int, float]]:
         minimum_resources = {"num_cpus": 1}
