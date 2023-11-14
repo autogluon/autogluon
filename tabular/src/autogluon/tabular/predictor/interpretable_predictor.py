@@ -55,7 +55,7 @@ class InterpretableTabularPredictor(TabularPredictor):
             raise ValueError(f"{self.__class__.__name__} does not support `auto_stack`.")
         return kwargs
 
-    def leaderboard_interpretable(self, verbose: bool = False, silent: bool = None, **kwargs) -> pd.DataFrame:
+    def leaderboard_interpretable(self, verbose: bool = False, **kwargs) -> pd.DataFrame:
         """
         Leaderboard of fitted interpretable models along with their corresponding complexities.
         Identical to `.leaderboard`, but with an additional 'complexity' column indicating
@@ -63,6 +63,7 @@ class InterpretableTabularPredictor(TabularPredictor):
 
         Models which do not support calculating 'complexity' will be filtered from this result.
         """
+        silent = kwargs.pop("silent", None)
         if silent is not None:
             verbose = not silent
         leaderboard = self.leaderboard(**kwargs)
