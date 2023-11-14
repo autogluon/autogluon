@@ -161,7 +161,6 @@ class SemanticSegImageProcessor:
         fn.update(
             {
                 self.image_key: PadCollator(pad_val=0),
-                self.image_valid_num_key: StackCollator(),
                 self.label_key: PadCollator(pad_val=0),
             }
         )
@@ -262,7 +261,6 @@ class SemanticSegImageProcessor:
         ret.update(
             {
                 self.image_key: images[0] if len(images) != 0 else torch.tensor([]),
-                self.image_valid_num_key: len(images),
                 self.label_key: gts[0] if len(gts) != 0 else torch.tensor([]),
             }
         )

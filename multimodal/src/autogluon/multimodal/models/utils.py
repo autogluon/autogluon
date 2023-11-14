@@ -5,11 +5,24 @@ from typing import Dict, List, Optional, Tuple
 
 import torch
 import torch._dynamo
+import torch.nn.functional as F
 from torch import nn
 from torch.nn.modules.loss import _Loss
 from transformers import AutoConfig, AutoModel, AutoTokenizer, BertTokenizer, CLIPTokenizer, ElectraTokenizer
+from transformers.models.mask2former.modeling_mask2former import Mask2FormerLoss
 
-from ..constants import AUTOMM, COLUMN_FEATURES, FEATURES, LOGITS, MASKS, OCR, REGRESSION, SEMANTIC_SEGMENTATION
+from ..constants import (
+    AUTOMM,
+    CLASS_LOGITS,
+    COLUMN_FEATURES,
+    FEATURES,
+    LOGITS,
+    MASKS,
+    OCR,
+    REGRESSION,
+    SEMANTIC_MASK,
+    SEMANTIC_SEGMENTATION,
+)
 from .adaptation_layers import IA3Linear, IA3LoRALinear, LoRALinear
 
 logger = logging.getLogger(__name__)
@@ -608,6 +621,57 @@ def apply_sigmoid(output: Dict):
     return output
 
 
+def apply_multi_class_semantic_seg_postprocess(output: Dict):
+    """
+    Apply the semantic postprocessing to logits.
+
+    Parameters
+    ----------
+    output
+        The model output dict.
+
+    Returns
+    -------
+    The output with post-proceesed semantic masks.
+    """
+
+    def semantic_inference(mask_cls, mask_pred):
+        """
+        Post-processing mask prediction for multi-class semantic segmentation inference based on https://github.com/facebookresearch/Mask2Former/blob/main/mask2former/maskformer_model.py
+
+        Args:
+            mask_cls (`torch.Tensor`):
+                Class logits. A tensor of shape `(num_queries, num_classes + 1)` (include the "no object" category).
+
+            mask_pred (`torch.Tensor`):
+                Mask logits. A tensor of shape `(num_queries, height, width)`.
+
+        Returns:
+            semseg (`torch.Tensor`): The processed mask prediction. A tensor of shape `(num_classes, height, width)`.
+
+        References:
+        [1] https://arxiv.org/abs/2107.06278
+        [2] https://arxiv.org/abs/2112.01527
+        """
+        mask_cls = F.softmax(mask_cls, dim=-1)[..., :-1]
+        mask_pred = mask_pred.sigmoid()
+        semseg = torch.einsum("qc,qhw->chw", mask_cls, mask_pred)
+        return semseg
+
+    for k, v in output.items():
+        pred_classes = output[k][CLASS_LOGITS]
+        pred_masks = output[k][LOGITS]
+        semantic_masks = []
+        for mask_cls_result, mask_pred_result in zip(
+            pred_classes, pred_masks
+        ):  # bs, num_q, num_class and bs, num_q, h, w
+            per_sample_semantic_masks = semantic_inference(mask_cls_result, mask_pred_result)  # num_class, h, w
+            semantic_masks.append(per_sample_semantic_masks)
+        semantic_masks = torch.stack(semantic_masks, dim=0)
+        output[k][SEMANTIC_MASK] = semantic_masks
+    return output
+
+
 def get_model_postprocess_fn(problem_type: str, loss_func: _Loss):
     """
     Get the postprocessing function for the model outputs.
@@ -626,6 +690,11 @@ def get_model_postprocess_fn(problem_type: str, loss_func: _Loss):
     postprocess_func = None
     if problem_type == REGRESSION:
         if isinstance(loss_func, nn.BCEWithLogitsLoss):
+            postprocess_func = apply_sigmoid
+    elif problem_type == SEMANTIC_SEGMENTATION:
+        if isinstance(loss_func, Mask2FormerLoss):
+            postprocess_func = apply_multi_class_semantic_seg_postprocess
+        else:
             postprocess_func = apply_sigmoid
 
     return postprocess_func

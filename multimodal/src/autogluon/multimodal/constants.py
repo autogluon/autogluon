@@ -313,7 +313,7 @@ OVD_RET = "ovd_ret"
 CLASS_LOGITS = "class_logits"
 MASK_LABEL = "mask_label"
 CLASS_LABEL = "class_label"
-MASK_SEMANTIC_INFER = "mask_semantic_infer"
+SEMANTIC_MASK = "semantic_mask"
 
 # presets
 DEFAULT = "default"

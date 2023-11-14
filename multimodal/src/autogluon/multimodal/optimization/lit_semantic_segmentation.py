@@ -12,7 +12,7 @@ from torch.nn.modules.loss import _Loss
 from torchmetrics.aggregation import BaseAggregator
 from transformers.models.mask2former.modeling_mask2former import Mask2FormerLoss
 
-from ..constants import CLASS_LOGITS, LM_TARGET, LOGITS, MASK_SEMANTIC_INFER, T_FEW, TEMPLATE_LOGITS, WEIGHT
+from ..constants import CLASS_LOGITS, LM_TARGET, LOGITS, SEMANTIC_MASK, T_FEW, TEMPLATE_LOGITS, WEIGHT
 from ..data.mixup import MixupModule, multimodel_mixup
 from ..models.utils import run_model
 from .lit_module import LitModule
@@ -64,10 +64,10 @@ class SemanticSegmentationLitModule(LitModule):
         if isinstance(metric, Binary_IoU) or isinstance(metric, Balanced_Error_Rate) or isinstance(metric, COD):
             metric.update(logits.float(), label)
         elif isinstance(metric, torchmetrics.classification.MulticlassJaccardIndex):
-            bs, num_classes = kwargs["processed_results"].shape[0:2]
-            processed_results = kwargs["processed_results"].float().reshape(bs, num_classes, -1)
+            bs, num_classes = kwargs["semantic_masks"].shape[0:2]
+            semantic_masks = kwargs["semantic_masks"].float().reshape(bs, num_classes, -1)
             label = label.reshape(bs, -1)
-            metric.update(processed_results, label)
+            metric.update(semantic_masks, label)
 
     def _shared_step(
         self,
@@ -75,9 +75,6 @@ class SemanticSegmentationLitModule(LitModule):
     ):
         label = batch[self.model.label_key]
         # prepare_targets
-        if self.mixup_fn is not None:
-            self.mixup_fn.mixup_enabled = self.training & (self.current_epoch < self.hparams.mixup_off_epoch)
-            batch, label = multimodel_mixup(batch=batch, model=self.model, mixup_fn=self.mixup_fn)
         output = run_model(self.model, batch)
         if isinstance(self.loss_func, Mask2FormerLoss):
             loss = self._compute_loss(
@@ -121,7 +118,7 @@ class SemanticSegmentationLitModule(LitModule):
                 custom_metric_func=self.custom_metric_func,
                 logits=output[self.model.prefix][LOGITS],
                 label=batch[self.model.label_key],
-                processed_results=output[self.model.prefix][MASK_SEMANTIC_INFER],
+                semantic_masks=output[self.model.prefix][SEMANTIC_MASK],
             )
         else:
             self._compute_metric_score(

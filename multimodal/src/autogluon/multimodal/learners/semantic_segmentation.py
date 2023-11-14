@@ -13,7 +13,7 @@ from scipy.special import softmax
 
 from autogluon.core.metrics import Scorer
 
-from ..constants import LABEL, LOGITS, MASK_SEMANTIC_INFER, SEMANTIC_SEGMENTATION
+from ..constants import LABEL, LOGITS, SEMANTIC_MASK, SEMANTIC_SEGMENTATION
 from ..models import get_model_postprocess_fn
 from ..optimization.lit_semantic_segmentation import SemanticSegmentationLitModule
 from ..optimization.utils import (
@@ -62,13 +62,10 @@ class SemanticSegmentationLearner(BaseLearner):
             hyperparameters=hyperparameters,
             path=path,
             verbosity=verbosity,
-            num_classes=num_classes,
-            classes=classes,
             warn_if_exist=warn_if_exist,
             enable_progress_bar=enable_progress_bar,
             pretrained=pretrained,
             validation_metric=validation_metric,
-            sample_data_path=sample_data_path,
         )
         self._output_shape = num_classes
         self._sample_data_path = sample_data_path
@@ -78,7 +75,7 @@ class SemanticSegmentationLearner(BaseLearner):
             if num_classes is not None:
                 assert (
                     num_classes == infer_output_shape
-                ), "The provided number of classes and the inferred class number from the sample data should be consistent."
+                ), f"The provided number of classes '{num_classes}' and the inferred class number {infer_output_shape}' from the sample data should be consistent."
             else:
                 self._output_shape = infer_output_shape
 
@@ -127,9 +124,9 @@ class SemanticSegmentationLearner(BaseLearner):
                 num_classes.append(per_num_classes)
             return max(num_classes)
 
-    def infer_output_shape(self, train_data: pd.DataFrame):
+    def infer_output_shape(self):
         if self._output_shape is None:
-            self._output_shape = self.get_semantic_segmentation_class_num(train_data)
+            self._output_shape = self.get_semantic_segmentation_class_num(self._train_data)
 
     @staticmethod
     def get_peft_param_names_per_run(model, config):
@@ -187,7 +184,7 @@ class SemanticSegmentationLearner(BaseLearner):
         if self._output_shape == 1:
             logits = extract_from_output(ret_type=LOGITS, outputs=outputs, as_ndarray=False)
         else:
-            logits = extract_from_output(ret_type=MASK_SEMANTIC_INFER, outputs=outputs, as_ndarray=False)
+            logits = extract_from_output(ret_type=SEMANTIC_MASK, outputs=outputs, as_ndarray=False)
         y_pred = logits.float()
         y_true = [ele[LABEL] for ele in outputs]
         y_true = torch.cat(y_true)
@@ -233,57 +230,6 @@ class SemanticSegmentationLearner(BaseLearner):
                 model_postprocess_fn=self._model_postprocess_fn,
                 **optimization_kwargs,
             )
-
-    def fit(
-        self,
-        train_data: Union[pd.DataFrame, str],
-        presets: Optional[str] = None,
-        tuning_data: Optional[Union[pd.DataFrame, str]] = None,
-        time_limit: Optional[int] = None,
-        save_path: Optional[str] = None,
-        hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
-        column_types: Optional[Dict] = None,
-        holdout_frac: Optional[float] = None,
-        teacher_learner: Union[str, BaseLearner] = None,
-        seed: Optional[int] = 0,
-        standalone: Optional[bool] = True,
-        hyperparameter_tune_kwargs: Optional[Dict] = None,
-        clean_ckpts: Optional[bool] = True,
-        **kwargs,
-    ):
-        training_start = self.on_fit_start(presets=presets, teacher_learner=teacher_learner)
-        self.setup_save_path(save_path=save_path)
-        self.infer_problem_type(train_data=train_data)
-        self.prepare_train_tuning_data(
-            train_data=train_data,
-            tuning_data=tuning_data,
-            holdout_frac=holdout_frac,
-            seed=seed,
-        )
-        self.infer_column_types(column_types=column_types)
-        self.infer_output_shape(train_data)
-        self.infer_validation_metric()
-        self.update_hyperparameters(
-            hyperparameters=hyperparameters,
-            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-        )
-        self.fit_sanity_check()
-        self.prepare_fit_args(
-            time_limit=time_limit,
-            seed=seed,
-            standalone=standalone,
-            clean_ckpts=clean_ckpts,
-        )
-        fit_returns = self.execute_fit()
-        self.on_fit_end(
-            training_start=training_start,
-            strategy=fit_returns.get("strategy", None),
-            strict_loading=fit_returns.get("strict_loading", True),
-            standalone=standalone,
-            clean_ckpts=clean_ckpts,
-        )
-
-        return self
 
     def on_predict_start(self, data: pd.DataFrame):
         if self._output_shape is None:  # for zero-shot evaluation/prediction
@@ -356,7 +302,7 @@ class SemanticSegmentationLearner(BaseLearner):
         if self._output_shape == 1:
             ret_type = LOGITS
         else:
-            ret_type = MASK_SEMANTIC_INFER
+            ret_type = SEMANTIC_MASK
 
         outputs = self.predict_per_run(
             data=data,
@@ -365,12 +311,7 @@ class SemanticSegmentationLearner(BaseLearner):
         )
         logits = extract_from_output(outputs=outputs, ret_type=ret_type)
 
-        if self._df_preprocessor:
-            pred = self._df_preprocessor.transform_prediction(
-                y_pred=logits,
-            )
-
-        if ret_type == MASK_SEMANTIC_INFER:
+        if ret_type == SEMANTIC_MASK:
             pred = logits.argmax(axis=1)
         else:
             pred = logits > 0.5
@@ -438,7 +379,7 @@ class SemanticSegmentationLearner(BaseLearner):
             realtime=realtime,
         )
         if as_multiclass:
-            logits = extract_from_output(outputs=outputs, ret_type=MASK_SEMANTIC_INFER)
+            logits = extract_from_output(outputs=outputs, ret_type=SEMANTIC_MASK)
             prob = softmax(logits, axis=1)
         else:
             logits = extract_from_output(outputs=outputs, ret_type=LOGITS)

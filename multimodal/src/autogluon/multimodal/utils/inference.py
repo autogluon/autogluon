@@ -14,7 +14,6 @@ from ..constants import (
     IMAGE,
     IMAGE_META,
     LOGITS,
-    MASK_SEMANTIC_INFER,
     MASKS,
     NER_ANNOTATION,
     NER_RET,
@@ -24,6 +23,7 @@ from ..constants import (
     QUERY,
     RESPONSE,
     SCORE,
+    SEMANTIC_MASK,
     TEXT,
     TOKEN_WORD_MAPPING,
     WORD_OFFSETS,
@@ -128,9 +128,9 @@ def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional
                         counter += 1
                 ner_pred.append((pred_one_sentence, word_offset, pred_proba))
         return ner_pred
-    elif ret_type == MASK_SEMANTIC_INFER:
-        logits = [ele[MASK_SEMANTIC_INFER] for ele in outputs]
-        ret = torch.cat(logits).nan_to_num(nan=-1e4)
+    elif ret_type == SEMANTIC_MASK:
+        masks = [ele[SEMANTIC_MASK] for ele in outputs]
+        ret = torch.cat(masks)
     else:
         raise ValueError(f"Unknown return type: {ret_type}")
 

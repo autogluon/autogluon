@@ -20,7 +20,6 @@ from ..constants import (
     LABEL,
     LOGITS,
     MASK_LABEL,
-    MASK_SEMANTIC_INFER,
 )
 from .utils import assign_layer_ids, freeze_model_layers
 
@@ -39,7 +38,8 @@ def multi_class_mask_decoder_forward(
     target_embedding: torch.Tensor = None,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """
-    Modify the forward method of SamMaskDecoder for multi-class semantic segmentation.
+    Modify the forward method of SamMaskDecoder for multi-class semantic segmentation
+    based on https://github.com/huggingface/transformers/blob/main/src/transformers/models/sam/modeling_sam.py#L468.
 
     Args:
         image_embeddings (`torch.Tensor`):
@@ -93,8 +93,16 @@ def multi_class_mask_decoder_forward(
     upscaled_embedding = self.activation(self.upscale_layer_norm(upscaled_embedding))
     upscaled_embedding = self.activation(self.upscale_conv2(upscaled_embedding))
 
-    # NOTE: Modify the original code. Use an MLP to process all the mask proposals.
+    ################ Modify the original code. We aim at returning a single mask for each object.
+    ################ Original logic is to return multiple masks.
+    ################ So we use an MLP network to process all the mask proposals instead of multiple networks.
+    # hyper_in_list = []
+    # for i in range(self.num_mask_tokens):
+    #     current_mlp = self.output_hypernetworks_mlps[i]
+    #     hyper_in_list += [current_mlp(mask_tokens_out[:, :, i, :])]
+    # hyper_in = torch.stack(hyper_in_list, dim=2)
     hyper_in = self.output_hypernetworks_mlps[0](mask_tokens_out)
+    ################
 
     _, num_channels, height, width = upscaled_embedding.shape
     upscaled_embedding = upscaled_embedding.reshape(batch_size, point_batch_size, num_channels, height * width)
@@ -102,10 +110,11 @@ def multi_class_mask_decoder_forward(
         batch_size, point_batch_size, -1, height, width
     )  # bs, 1, num_tokens, h, w
 
-    # NOTE: New added class prediction logic.
+    ################ New added class prediction logic.
     class_predictions = self.output_classifier_mlps(mask_tokens_out).reshape(
         batch_size, point_batch_size, -1, self.num_classes + 1
     )
+    ################
 
     # Generate mask quality predictions
     iou_pred = self.iou_prediction_head(iou_token_out)
@@ -137,7 +146,8 @@ def multi_class_sam_model_forward(
     **kwargs,
 ) -> List[Dict[str, torch.Tensor]]:
     r"""
-    Modify the forward method of SamModel for multi-class semantic segmentation.
+    Modify the forward method of SamModel for multi-class semantic segmentation
+    based on https://github.com/huggingface/transformers/blob/main/src/transformers/models/sam/modeling_sam.py#L1279.
 
     """
     output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
@@ -241,7 +251,9 @@ def multi_class_sam_model_forward(
             vision_attentions=vision_attentions,
             mask_decoder_attentions=mask_decoder_attentions,
         ),
-        class_predictions,  # NOTE: New added. Return class predictions as well.
+        ################ New added. Return class predictions as well.
+        class_predictions,
+        ################
     )
 
 
@@ -381,7 +393,7 @@ class SAMForSemanticSegmentation(nn.Module):
             if self.training:
                 return {self.prefix: {LOGITS: pred_masks}}
             else:
-                return {self.prefix: {LOGITS: torch.sigmoid(pred_masks), LABEL: batch[self.label_key]}}
+                return {self.prefix: {LOGITS: pred_masks, LABEL: batch[self.label_key]}}
 
         # multi-class
         else:
@@ -393,19 +405,13 @@ class SAMForSemanticSegmentation(nn.Module):
             )
             if self.training:
                 return {self.prefix: {LOGITS: pred_masks, CLASS_LOGITS: pred_classes}}
-            else:
-                processed_results = []
-                for mask_cls_result, mask_pred_result in zip(pred_classes, pred_masks):
-                    r = self.semantic_inference(mask_cls_result, mask_pred_result)
-                    processed_results.append(r.unsqueeze(0))
-                processed_results = torch.cat(processed_results, dim=0)
 
+            else:
                 return {
                     self.prefix: {
                         LOGITS: pred_masks,
                         CLASS_LOGITS: pred_classes,
                         LABEL: batch[self.label_key],
-                        MASK_SEMANTIC_INFER: processed_results,
                     }
                 }
 
@@ -445,26 +451,3 @@ class SAMForSemanticSegmentation(nn.Module):
             name_to_id[n] = 0
 
         return name_to_id
-
-    def semantic_inference(self, mask_cls, mask_pred):
-        """
-        Post-processing mask prediction for multi-class semantic segmentation inference based on https://github.com/facebookresearch/Mask2Former/blob/main/mask2former/maskformer_model.py
-
-        Args:
-            mask_cls (`torch.Tensor`):
-                Class logits. A tensor of shape `(num_queries, num_classes + 1)` (include the "no object" category).
-
-            mask_pred (`torch.Tensor`):
-                Mask logits. A tensor of shape `(num_queries, height, width)`.
-
-        Returns:
-            semseg (`torch.Tensor`): The processed mask prediction. A tensor of shape `(num_classes, height, width)`.
-
-        References:
-        [1] https://arxiv.org/abs/2107.06278
-        [2] https://arxiv.org/abs/2112.01527
-        """
-        mask_cls = F.softmax(mask_cls, dim=-1)[..., :-1]
-        mask_pred = mask_pred.sigmoid()
-        semseg = torch.einsum("qc,qhw->chw", mask_cls, mask_pred)
-        return semseg

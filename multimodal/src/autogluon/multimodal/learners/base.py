@@ -718,7 +718,9 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                     column_types=column_types,
                     label_column=self._label_column,
                     train_df_x=data,
-                    train_df_y=data[self._label_column] if self._label_column else None,
+                    train_df_y=data[self._label_column]
+                    if self._label_column
+                    else None,  # TODO: Not support zero-shot evaluation and prediction simultaneously for semantic segmentation.
                 )
 
         return df_preprocessor
