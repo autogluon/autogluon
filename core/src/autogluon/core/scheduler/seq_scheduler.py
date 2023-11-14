@@ -100,7 +100,7 @@ class LocalSequentialScheduler(object):
         self.metadata = {
             "search_space": search_space,
             "search_strategy": self.searcher,
-            "stop_criterion": {"time_limits": self.time_out, "max_reward": self.max_reward},
+            "stop_criterion": {"time_limit": self.time_out, "max_reward": self.max_reward},
             "resources_per_trial": self.resource,
         }
 

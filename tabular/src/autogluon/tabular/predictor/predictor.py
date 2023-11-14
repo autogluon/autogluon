@@ -69,19 +69,13 @@ logger = logging.getLogger(__name__)  # return autogluon root logger
 
 # TODO: num_bag_sets -> ag_args
 
-# Extra TODOs (Stretch): Can occur post v0.1
+# Extra TODOs (Stretch): Can occur post v1.0
 # TODO: make core_kwargs a kwargs argument to predictor.fit
 # TODO: add aux_kwargs to predictor.fit
 # TODO: add pip freeze + python version output after fit + log file, validate that same pip freeze on load as cached
-# TODO: predictor.clone()
 # TODO: Add logging comments that models are serialized on disk after fit
 # TODO: consider adding kwarg option for data which has already been preprocessed by feature generator to skip feature generation.
 # TODO: Resolve raw text feature usage in default feature generator
-
-# Done for Tabular
-# TODO: Remove all `time_limits` in project, replace with `time_limit`
-
-
 class TabularPredictor:
     """
     AutoGluon TabularPredictor predicts values in a column of a tabular dataset (classification or regression).
