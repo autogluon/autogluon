@@ -11,16 +11,7 @@ from torch import nn
 from transformers import SamConfig, SamModel
 from transformers.models.sam.modeling_sam import SamImageSegmentationOutput
 
-from ..constants import (
-    CLASS_LABEL,
-    CLASS_LOGITS,
-    COLUMN,
-    IMAGE,
-    IMAGE_VALID_NUM,
-    LABEL,
-    LOGITS,
-    MASK_LABEL,
-)
+from ..constants import CLASS_LABEL, CLASS_LOGITS, COLUMN, IMAGE, IMAGE_VALID_NUM, LABEL, LOGITS, MASK_LABEL
 from .utils import assign_layer_ids, freeze_model_layers
 
 logger = logging.getLogger(__name__)
