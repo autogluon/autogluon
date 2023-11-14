@@ -2921,7 +2921,7 @@ class TabularPredictor:
                 raise ValueError(f'Unknown compiler_configs preset: "{compiler_configs}"')
         self._trainer.compile(model_names=models, with_ancestors=with_ancestors, compiler_configs=compiler_configs)
 
-    def persist(self, models="best", with_ancestors=True, max_memory=0.4) -> list:
+    def persist(self, models="best", with_ancestors=True, max_memory=0.4) -> List[str]:
         """
         Persist models in memory for reduced inference latency. This is particularly important if the models are being used for online-inference where low latency is critical.
         If models are not persisted in memory, they are loaded from disk every time they are asked to make predictions.
@@ -2949,7 +2949,7 @@ class TabularPredictor:
         self._assert_is_fit("persist")
         return self._learner.persist_trainer(low_memory=False, models=models, with_ancestors=with_ancestors, max_memory=max_memory)
 
-    def unpersist(self, models="all") -> list:
+    def unpersist(self, models="all") -> List[str]:
         """
         Unpersist models in memory for reduced memory usage.
         If models are not persisted in memory, they are loaded from disk every time they are asked to make predictions.
@@ -3060,7 +3060,7 @@ class TabularPredictor:
         logger.log(20, f'Refit complete, total runtime = {round(te - ts, 2)}s ... Best model: "{self._trainer.model_best}"')
         return refit_full_dict
 
-    def get_model_best(self):
+    def model_best(self) -> str:
         """
         Returns the string model name of the best model by validation score that can infer.
         This is the same model used during inference when `predictor.predict` is called without specifying a model.
@@ -3072,8 +3072,8 @@ class TabularPredictor:
         """
         return self._model_best(can_infer=True)
 
-    def _model_best(self, can_infer=None):
-        self._assert_is_fit("get_model_best")
+    def _model_best(self, can_infer=None) -> str:
+        self._assert_is_fit("model_best")
         # TODO: Set self._trainer.model_best to the best model at end of fit instead of best WeightedEnsemble.
         if self._trainer.model_best is not None:
             models = self._trainer.get_model_names(can_infer=can_infer)
@@ -3293,7 +3293,7 @@ class TabularPredictor:
         if metric is None:
             metric = self.eval_metric
         if model == "best":
-            model = self.get_model_best()
+            model = self.model_best()
 
         return self._learner.calibrate_decision_threshold(data=data, metric=metric, model=model, decision_thresholds=decision_thresholds, verbose=verbose)
 
@@ -3596,7 +3596,7 @@ class TabularPredictor:
         """
         self._assert_is_fit("delete_models")
         if models_to_keep == "best":
-            models_to_keep = self.get_model_best()
+            models_to_keep = self.model_best()
         self._trainer.delete_models(
             models_to_keep=models_to_keep,
             models_to_delete=models_to_delete,
@@ -3844,7 +3844,7 @@ class TabularPredictor:
 
         primary_model = model
         if primary_model == "best":
-            primary_model = self.get_model_best()
+            primary_model = self.model_best()
         all_models = self.get_model_names()
         assert primary_model in all_models, f'Unknown model "{primary_model}"! Valid models: {all_models}'
         if prune_unused_nodes == True:
@@ -4572,7 +4572,7 @@ class TabularPredictor:
         """
         predictor_clone = self.clone(path=path, return_clone=True, dirs_exist_ok=dirs_exist_ok)
         if model == "best":
-            model = predictor_clone.get_model_best()
+            model = predictor_clone.model_best()
             logger.log(30, f"Clone: Keeping minimum set of models required to predict with best model '{model}'...")
         else:
             logger.log(30, f"Clone: Keeping minimum set of models required to predict with model '{model}'...")
@@ -4697,14 +4697,19 @@ class TabularPredictor:
             raise AssertionError(error_message)
 
     @Deprecated(min_version_to_warn="0.8", min_version_to_error="1.1", version_to_remove="1.1", new="persist")
-    def persist_models(self, **kwargs):
+    def persist_models(self, **kwargs) -> List[str]:
         """Deprecated method. Use `persist` instead."""
         return self.persist(**kwargs)
 
     @Deprecated(min_version_to_warn="0.8", min_version_to_error="1.1", version_to_remove="1.1", new="unpersist")
-    def unpersist_models(self, **kwargs):
+    def unpersist_models(self, **kwargs) -> List[str]:
         """Deprecated method. Use `unpersist` instead."""
         return self.unpersist(**kwargs)
+
+    @Deprecated(min_version_to_warn="0.8", min_version_to_error="1.1", version_to_remove="1.1", new="model_best")
+    def get_model_best(self) -> str:
+        """Deprecated method. Use `model_best` instead."""
+        return self.model_best()
 
 
 # Location to store WIP functionality that will be later added to TabularPredictor
