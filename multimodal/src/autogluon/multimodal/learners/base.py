@@ -718,7 +718,9 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                     column_types=column_types,
                     label_column=self._label_column,
                     train_df_x=data,
-                    train_df_y=data[self._label_column] if self._label_column else None,
+                    train_df_y=data[self._label_column]
+                    if self._label_column
+                    else None,  # TODO: Not support zero-shot evaluation and prediction simultaneously for semantic segmentation.
                 )
 
         return df_preprocessor
@@ -2381,6 +2383,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             mixup_active=False,
             loss_func_name=OmegaConf.select(learner._config, "optimization.loss_function"),
             config=learner._config.optimization,
+            num_classes=learner._output_shape,
         )
         model_postprocess_fn = get_model_postprocess_fn(
             problem_type=learner._problem_type,

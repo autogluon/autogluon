@@ -210,6 +210,7 @@ def create_data_processor(
             train_transforms=model_config.train_transforms,
             val_transforms=model_config.val_transforms,
             norm_type=model_config.image_norm,
+            ignore_label=model_config.ignore_label,
         )
     else:
         raise ValueError(f"unknown data type: {data_type}")

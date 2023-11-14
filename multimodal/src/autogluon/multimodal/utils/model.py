@@ -376,9 +376,10 @@ def create_model(
         model = SAMForSemanticSegmentation(
             prefix=model_name,
             checkpoint_name=model_config.checkpoint_name,
+            num_classes=num_classes,
             pretrained=pretrained,
             frozen_layers=OmegaConf.select(model_config, "frozen_layers", default=None),
-            config=model_config,
+            num_mask_tokens=OmegaConf.select(model_config, "num_mask_tokens", default=1),
         )
     else:
         raise ValueError(f"unknown model name: {model_name}")
