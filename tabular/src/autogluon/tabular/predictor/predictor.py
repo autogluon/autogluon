@@ -3605,13 +3605,13 @@ class TabularPredictor:
             dry_run=dry_run,
         )
 
-    def get_size_disk(self) -> int:
+    def size(self) -> int:
         """
         Returns the combined size of all files under the `predictor.path` directory in bytes.
         """
         return get_directory_size(self.path)
 
-    def get_size_disk_per_file(self, *, sort_by: str = "size", include_path_in_name: bool = False) -> pd.Series:
+    def size_per_file(self, *, sort_by: str = "size", include_path_in_name: bool = False) -> pd.Series:
         """
         Returns the size of each file under the `predictor.path` directory in bytes.
 
@@ -4735,6 +4735,17 @@ class TabularPredictor:
     def get_oof_pred(self, **kwargs) -> pd.Series:
         """Deprecated method. Use `predict_oof` instead."""
         return self.predict_oof(**kwargs)
+
+    @Deprecated(min_version_to_warn="0.8", min_version_to_error="1.1", version_to_remove="1.1", new="size_per_file")
+    def get_size_disk_per_file(self, **kwargs) -> pd.Series:
+        """Deprecated method. Use `size_per_file` instead."""
+        return self.size_per_file(**kwargs)
+
+    @Deprecated(min_version_to_warn="0.8", min_version_to_error="1.1", version_to_remove="1.1", new="size")
+    def get_size_disk(self) -> int:
+        """Deprecated method. Use `size` instead."""
+        return self.size()
+
 
 
 # Location to store WIP functionality that will be later added to TabularPredictor
