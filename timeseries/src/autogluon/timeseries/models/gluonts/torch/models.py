@@ -6,7 +6,6 @@ from typing import Any, Dict, Type
 
 from gluonts.model.estimator import Estimator as GluonTSEstimator
 
-from autogluon.core.hpo.constants import CUSTOM_BACKEND
 from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
 from autogluon.timeseries.utils.datetime import (
     get_lags_for_frequency,
@@ -197,11 +196,6 @@ class TemporalFusionTransformerModel(AbstractGluonTSModel):
     @property
     def default_context_length(self) -> int:
         return max(64, 2 * self.prediction_length)
-
-    def _get_hpo_backend(self):
-        # TFT performs HPO with the default custom backend instead of Ray Tune due to
-        # known issues with parallelization
-        return CUSTOM_BACKEND
 
     def _get_estimator_class(self) -> Type[GluonTSEstimator]:
         from gluonts.torch.model.tft import TemporalFusionTransformerEstimator

@@ -518,7 +518,7 @@ class TimeSeriesPredictor:
 
             If type is ``str``, then this argument specifies a preset.
                 Valid preset values:
-                    'auto': Performs HPO via bayesian optimization search on GluonTS-backed models except Temporal Fusion Transformer, and
+                    'auto': Performs HPO via bayesian optimization search on GluonTS-backed neural forecasting models and
                         random search on other models using local scheduler.
                     'random': Performs HPO via random search.
             You can also provide a dict to specify searchers and schedulers
