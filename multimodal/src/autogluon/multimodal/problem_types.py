@@ -109,7 +109,9 @@ class ProblemTypeProperty:
     @property
     def supported_validation_metrics(self):
         if self._supported_evaluation_metrics:
-            return [metric for metric in self._supported_evaluation_metrics if metric in METRIC_MODE_MAP.keys()] + [DIRECT_LOSS]
+            return [metric for metric in self._supported_evaluation_metrics if metric in METRIC_MODE_MAP.keys()] + [
+                DIRECT_LOSS
+            ]
         else:
             return []
 
@@ -255,8 +257,8 @@ _ner_property = ProblemTypeProperty(
     supported_modality_type={IMAGE, TEXT, CATEGORICAL, NUMERICAL, TEXT_NER},
     supported_label_type={NER_ANNOTATION},
     force_exist_modality={TEXT_NER},
-        _supported_evaluation_metrics=[OVERALL_F1, NER_TOKEN_F1],
-        _fallback_validation_metric=NER_TOKEN_F1,
+    _supported_evaluation_metrics=[OVERALL_F1, NER_TOKEN_F1],
+    _fallback_validation_metric=NER_TOKEN_F1,
 )
 PROBLEM_TYPES_REG.register(NER, _ner_property),
 PROBLEM_TYPES_REG.register(NAMED_ENTITY_RECOGNITION, _ner_property),

@@ -156,7 +156,9 @@ def get_minmax_mode(
         - max
             It means that larger metric is better.
     """
-    assert metric_name in METRIC_MODE_MAP, f"{metric_name} is not a supported metric. Options are: {METRIC_MODE_MAP.keys()}"
+    assert (
+        metric_name in METRIC_MODE_MAP
+    ), f"{metric_name} is not a supported metric. Options are: {METRIC_MODE_MAP.keys()}"
     return METRIC_MODE_MAP.get(metric_name)
 
 
