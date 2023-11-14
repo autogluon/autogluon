@@ -199,7 +199,6 @@ class SemanticSegmentationLearner(BaseLearner):
                 y_true = y_true.reshape(bs, -1)
             per_metric.update(y_pred, y_true)
             score = per_metric.compute()
-
             results[per_metric_name] = score.item()
 
         if return_pred:
@@ -291,11 +290,13 @@ class SemanticSegmentationLearner(BaseLearner):
             If not specified, we would infer it on based on the data modalities
             and sample number.
         save_results
-            Whether to save the prediction results (only works for detection now)
+            Whether to save the prediction results.
 
         Returns
         -------
         Array of predictions, one corresponding to each row in given dataset.
+        When save_results is True, the output is a pandas dataframe containing the path of the predicted mask file for each input image.
+        Otherwise, the output will have shape (#samples, height, width).
         """
         self.on_predict_start(data)
         if self._output_shape == 1:
@@ -313,14 +314,14 @@ class SemanticSegmentationLearner(BaseLearner):
         if ret_type == SEMANTIC_MASK:
             pred = logits.argmax(axis=1)
         else:
-            pred = logits > 0.5
+            pred = (logits > 0.5).squeeze(axis=1)
 
         if save_results:
             self._save_path = setup_save_path(
                 old_save_path=self._save_path,
                 warn_if_exist=False,
             )
-            self.save_segmentation_result(
+            pred = self.save_segmentation_result(
                 pred=pred,
                 data=data,
                 result_path=self._save_path,
@@ -364,8 +365,7 @@ class SemanticSegmentationLearner(BaseLearner):
         Returns
         -------
         Array of predicted class-probabilities, corresponding to each row in the given data.
-        When as_multiclass is True, the output will always have shape (#samples, #classes, height, width).
-        Otherwise, the output will have shape (#samples, height, width)
+        The output will always have shape (#samples, #classes, height, width).
         """
         assert (self._output_shape == 1 and as_multiclass == False) or (
             self._output_shape > 1 and as_multiclass == True
@@ -430,7 +430,7 @@ class SemanticSegmentationLearner(BaseLearner):
         os.makedirs(mask_path, exist_ok=True)
         for image_pred, image_name in zip(pred, image_names):
             if self._output_shape == 1:
-                mask = Image.fromarray(np.squeeze(image_pred, axis=0))
+                mask = Image.fromarray(image_pred)
                 per_mask_path = os.path.join(mask_path, os.path.basename(image_name))
                 mask.save(per_mask_path)
             else:
@@ -443,7 +443,6 @@ class SemanticSegmentationLearner(BaseLearner):
 
                 for mask in masks:
                     show_mask(mask, plt.gca())
-                # mask = Image.fromarray(image_pred, mode="P")  # multi-class
                 mask_name = ""
                 for i in os.path.basename(image_name).split(".")[:-1]:
                     mask_name += i

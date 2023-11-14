@@ -61,13 +61,13 @@ class SemanticSegmentationLitModule(LitModule):
         label: torch.Tensor,
         **kwargs,
     ):
-        if isinstance(metric, Binary_IoU) or isinstance(metric, Balanced_Error_Rate) or isinstance(metric, COD):
-            metric.update(logits.float(), label)
-        elif isinstance(metric, torchmetrics.classification.MulticlassJaccardIndex):
+        if isinstance(metric, torchmetrics.classification.MulticlassJaccardIndex):
             bs, num_classes = kwargs["semantic_masks"].shape[0:2]
             semantic_masks = kwargs["semantic_masks"].float().reshape(bs, num_classes, -1)
             label = label.reshape(bs, -1)
             metric.update(semantic_masks, label)
+        else:
+            metric.update(logits.float(), label)
 
     def _shared_step(
         self,
