@@ -4707,7 +4707,7 @@ class TabularPredictor:
         return self.unpersist(**kwargs)
 
     @Deprecated(min_version_to_warn="0.8", min_version_to_error="1.1", version_to_remove="1.1", new="model_names")
-    def get_model_names(self, **kwargs) -> str:
+    def get_model_names(self, **kwargs) -> List[str]:
         """Deprecated method. Use `model_names` instead."""
         return self.model_names(**kwargs)
 
@@ -4746,6 +4746,10 @@ class TabularPredictor:
         """Deprecated method. Use `size` instead."""
         return self.size()
 
+    @Deprecated(min_version_to_warn="0.8", min_version_to_error="1.1", version_to_remove="1.1", new="model_names(persisted=True)")
+    def get_model_names_persisted(self) -> List[str]:
+        """Deprecated method. Use `model_names(persisted=True)` instead."""
+        return self.model_names(persisted=True)
 
 
 # Location to store WIP functionality that will be later added to TabularPredictor
