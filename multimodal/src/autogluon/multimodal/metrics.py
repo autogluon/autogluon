@@ -1,0 +1,54 @@
+# Define valid val/eval metrics and the fallback metric for each problem type.
+from autogluon.core.metrics import METRICS
+
+from .constants import *
+
+
+EVALUATION_METRICS = METRICS + {
+    NER: [OVERALL_F1, NER_TOKEN_F1],
+    NAMED_ENTITY_RECOGNITION: [OVERALL_F1, NER_TOKEN_F1],
+    FEATURE_EXTRACTION: [None],  # No metrics needed for feature extraction
+    ZERO_SHOT_IMAGE_CLASSIFICATION: [None],  # TODO: No eval metrics needed for zero shot?
+    OBJECT_DETECTION: DETECTION_METRICS,
+    OPEN_VOCABULARY_OBJECT_DETECTION: DETECTION_METRICS,
+    OCR: [None],  # OCR is a WIP feature
+    OCR_TEXT_DETECTION: [None],  # OCR is a WIP feature
+    OCR_TEXT_RECOGNITION: [None],  # OCR is a WIP feature
+    IMAGE_SIMILARITY: [None],  # use matching metrics
+    TEXT_SIMILARITY: [None],  # use matching metrics
+    IMAGE_TEXT_SIMILARITY: [None],  # use matching metrics
+    FEW_SHOT_CLASSIFICATION: METRICS[BINARY] + METRICS[MULTICLASS],
+    SEMANTIC_SEGMENTATION: [BINARY_IOU],  # TODO: ADD METRICS FOR SEMANTIC_SEGMENTATION
+}
+
+EVALUATION_METRICS_FALLBACK = {problem_type: metrics[0] for problem_type, metrics in EVALUATION_METRICS.items()}
+EVALUATION_METRICS_FALLBACK[BINARY] = ROC_AUC
+EVALUATION_METRICS_FALLBACK[MULTICLASS] = ACCURACY
+EVALUATION_METRICS_FALLBACK[REGRESSION] = RMSE
+EVALUATION_METRICS_FALLBACK[FEW_SHOT_CLASSIFICATION] = ACCURACY
+
+VALIDATION_METRICS = {problem_type: [m for m in metrics if m in VALID_METRICS] for problem_type, metrics in EVALUATION_METRICS.items()}
+VALIDATION_METRICS_FALLBACK = {
+    BINARY: ROC_AUC,
+    MULTICLASS: ACCURACY,
+    REGRESSION: RMSE,
+    NER: NER_TOKEN_F1,
+    NAMED_ENTITY_RECOGNITION: NER_TOKEN_F1,
+    FEATURE_EXTRACTION: None,  # No metrics needed for feature extraction
+    ZERO_SHOT_IMAGE_CLASSIFICATION: None,
+    OBJECT_DETECTION: MAP,
+    OPEN_VOCABULARY_OBJECT_DETECTION: MAP,
+    OCR: None,  # OCR is a WIP feature
+    OCR_TEXT_DETECTION: None,  # OCR is a WIP feature
+    OCR_TEXT_RECOGNITION: None,  # OCR is a WIP feature
+    IMAGE_SIMILARITY: None,  # use matching metrics
+    TEXT_SIMILARITY: None,  # use matching metrics
+    IMAGE_TEXT_SIMILARITY: None,  # use matching metrics
+    FEW_SHOT_CLASSIFICATION: ACCURACY,
+    SEMANTIC_SEGMENTATION: BINARY_IOU,  # TODO: ADD METRICS FOR SEMANTIC_SEGMENTATION
+}
+MATCHING_METRICS = {
+    "MULTICLASS": [SPEARMANR, SPEARMANR],
+    "REGRESSION": [SPEARMANR, SPEARMANR],
+}
+MATCHING_METRICS_WITHOUT_PROBLEM_TYPE = [RECALL, NDCG]
