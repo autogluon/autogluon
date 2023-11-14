@@ -280,8 +280,6 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         # As GluonTSPyTorchLightningEstimator objects do not implement `from_hyperparameters` convenience
         # constructors, we re-implement the logic here.
         # we translate the "epochs" parameter to "max_epochs" for consistency in the AbstractGluonTSModel interface
-        import torch
-
         init_args = self._get_estimator_init_args()
 
         default_trainer_kwargs = {

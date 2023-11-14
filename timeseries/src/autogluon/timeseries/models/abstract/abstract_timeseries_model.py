@@ -413,6 +413,8 @@ class AbstractTimeSeriesModel(AbstractModel):
         # logic here, and set to minimum num_gpus to 1 if it is set to 0 when GPUs are available
         kwargs["num_gpus"] = 0 if not self._is_gpu_available() else max(kwargs.get("num_gpus", 1), 1)
 
+        # we use k_fold=1 to circumvent autogluon.core logic to manage resources during parallelization
+        # of different folds
         hpo_executor.register_resources(self, k_fold=1, **kwargs)
         return self._hyperparameter_tune(hpo_executor=hpo_executor, **kwargs)
 
