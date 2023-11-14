@@ -4690,57 +4690,57 @@ class TabularPredictor:
                 error_message = f"{error_message} `.{message_suffix}`."
             raise AssertionError(error_message)
 
-    @Deprecated(min_version_to_warn="0.8", min_version_to_error="1.1", version_to_remove="1.1", new="persist")
-    def persist_models(self, **kwargs) -> List[str]:
+    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.1", version_to_remove="1.1", new="persist")
+    def persist_models(self, *args, **kwargs) -> List[str]:
         """Deprecated method. Use `persist` instead."""
-        return self.persist(**kwargs)
+        return self.persist(*args, **kwargs)
 
-    @Deprecated(min_version_to_warn="0.8", min_version_to_error="1.1", version_to_remove="1.1", new="unpersist")
-    def unpersist_models(self, **kwargs) -> List[str]:
+    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.1", version_to_remove="1.1", new="unpersist")
+    def unpersist_models(self, *args, **kwargs) -> List[str]:
         """Deprecated method. Use `unpersist` instead."""
-        return self.unpersist(**kwargs)
+        return self.unpersist(*args, **kwargs)
 
-    @Deprecated(min_version_to_warn="0.8", min_version_to_error="1.1", version_to_remove="1.1", new="model_names")
-    def get_model_names(self, **kwargs) -> List[str]:
+    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.1", version_to_remove="1.1", new="model_names")
+    def get_model_names(self, *args, **kwargs) -> List[str]:
         """Deprecated method. Use `model_names` instead."""
-        return self.model_names(**kwargs)
+        return self.model_names(*args, **kwargs)
 
-    @Deprecated(min_version_to_warn="0.8", min_version_to_error="1.1", version_to_remove="1.1", new="model_best")
+    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.1", version_to_remove="1.1", new="model_best")
     def get_model_best(self) -> str:
         """Deprecated method. Use `model_best` instead."""
         return self.model_best()
 
-    @Deprecated(min_version_to_warn="0.8", min_version_to_error="1.1", version_to_remove="1.1", new="predict_from_proba")
-    def get_pred_from_proba(self, **kwargs) -> pd.Series | np.array:
+    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.1", version_to_remove="1.1", new="predict_from_proba")
+    def get_pred_from_proba(self, *args, **kwargs) -> pd.Series | np.array:
         """Deprecated method. Use `predict_from_proba` instead."""
-        return self.predict_from_proba(**kwargs)
+        return self.predict_from_proba(*args, **kwargs)
 
-    @Deprecated(min_version_to_warn="0.8", min_version_to_error="1.1", version_to_remove="1.1", new="model_refit_map")
-    def get_model_full_dict(self, **kwargs) -> Dict[str, str]:
+    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.1", version_to_remove="1.1", new="model_refit_map")
+    def get_model_full_dict(self, *args, **kwargs) -> Dict[str, str]:
         """Deprecated method. Use `model_refit_map` instead."""
-        return self.model_refit_map(**kwargs)
+        return self.model_refit_map(*args, **kwargs)
 
-    @Deprecated(min_version_to_warn="0.8", min_version_to_error="1.1", version_to_remove="1.1", new="predict_proba_oof")
-    def get_oof_pred_proba(self, **kwargs) -> pd.DataFrame | pd.Series:
+    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.1", version_to_remove="1.1", new="predict_proba_oof")
+    def get_oof_pred_proba(self, *args, **kwargs) -> pd.DataFrame | pd.Series:
         """Deprecated method. Use `predict_proba_oof` instead."""
-        return self.predict_proba_oof(**kwargs)
+        return self.predict_proba_oof(*args, **kwargs)
 
-    @Deprecated(min_version_to_warn="0.8", min_version_to_error="1.1", version_to_remove="1.1", new="predict_oof")
-    def get_oof_pred(self, **kwargs) -> pd.Series:
+    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.1", version_to_remove="1.1", new="predict_oof")
+    def get_oof_pred(self, *args, **kwargs) -> pd.Series:
         """Deprecated method. Use `predict_oof` instead."""
-        return self.predict_oof(**kwargs)
+        return self.predict_oof(*args, **kwargs)
 
-    @Deprecated(min_version_to_warn="0.8", min_version_to_error="1.1", version_to_remove="1.1", new="size_per_file")
-    def get_size_disk_per_file(self, **kwargs) -> pd.Series:
+    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.1", version_to_remove="1.1", new="size_per_file")
+    def get_size_disk_per_file(self, *args, **kwargs) -> pd.Series:
         """Deprecated method. Use `size_per_file` instead."""
-        return self.size_per_file(**kwargs)
+        return self.size_per_file(*args, **kwargs)
 
-    @Deprecated(min_version_to_warn="0.8", min_version_to_error="1.1", version_to_remove="1.1", new="size")
+    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.1", version_to_remove="1.1", new="size")
     def get_size_disk(self) -> int:
         """Deprecated method. Use `size` instead."""
         return self.size()
 
-    @Deprecated(min_version_to_warn="0.8", min_version_to_error="1.1", version_to_remove="1.1", new="model_names(persisted=True)")
+    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.1", version_to_remove="1.1", new="model_names(persisted=True)")
     def get_model_names_persisted(self) -> List[str]:
         """Deprecated method. Use `model_names(persisted=True)` instead."""
         return self.model_names(persisted=True)
