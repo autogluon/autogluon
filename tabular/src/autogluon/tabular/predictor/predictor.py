@@ -4696,6 +4696,16 @@ class TabularPredictor:
                 error_message = f"{error_message} `.{message_suffix}`."
             raise AssertionError(error_message)
 
+    @Deprecated(min_version_to_warn="0.8", min_version_to_error="1.1", version_to_remove="1.1", new="persist")
+    def persist_models(self, **kwargs):
+        """Deprecated method. Use `persist` instead."""
+        return self.persist(**kwargs)
+
+    @Deprecated(min_version_to_warn="0.8", min_version_to_error="1.1", version_to_remove="1.1", new="unpersist")
+    def unpersist_models(self, **kwargs):
+        """Deprecated method. Use `unpersist` instead."""
+        return self.unpersist(**kwargs)
+
 
 # Location to store WIP functionality that will be later added to TabularPredictor
 class _TabularPredictorExperimental(TabularPredictor):
@@ -4751,16 +4761,6 @@ class _TabularPredictorExperimental(TabularPredictor):
         predictor = cls(label=learner.label, path=learner.path)
         predictor._set_post_fit_vars(learner=learner)
         return predictor
-
-    @Deprecated(min_version_to_warn="0.8", min_version_to_error="1.1", version_to_remove="1.1", new="persist")
-    def persist_models(self, **kwargs):
-        """Deprecated method. Use `persist` instead."""
-        return self.persist(**kwargs)
-
-    @Deprecated(min_version_to_warn="0.8", min_version_to_error="1.1", version_to_remove="1.1", new="unpersist")
-    def unpersist_models(self, **kwargs):
-        """Deprecated method. Use `unpersist` instead."""
-        return self.unpersist(**kwargs)
 
 
 def _sub_fit(
