@@ -1,5 +1,4 @@
 import logging
-import traceback
 from typing import Any, Dict, Type
 
 import numpy as np
