@@ -1358,7 +1358,7 @@ class AbstractTrainer:
             ensemble_set = self.get_minimum_model_set(model)
         existing_models = self.get_model_names()
         ensemble_set_valid = []
-        model_refit_map = self.model_full_dict()
+        model_refit_map = self.model_refit_map()
         for model in ensemble_set:
             if model in model_refit_map and model_refit_map[model] in existing_models:
                 logger.log(20, f"Model '{model}' already has a refit _FULL model: '{model_refit_map[model]}', skipping refit...")
@@ -1369,7 +1369,7 @@ class AbstractTrainer:
         else:
             models_trained_full = []
 
-        model_refit_map = self.model_full_dict()
+        model_refit_map = self.model_refit_map()
         for model_full in models_trained_full:
             # TODO: Consider moving base model info to a separate pkl file so that it can be edited without having to load/save the model again
             #  Downside: Slower inference speed when models are not persisted in memory prior.
@@ -1397,7 +1397,7 @@ class AbstractTrainer:
                     self.model_graph.add_edge(base_model_name, model_loaded.name)
 
         self.save()
-        return self.model_full_dict()
+        return self.model_refit_map()
 
     def get_refit_full_parent(self, model: str) -> str:
         """Get refit full model's parent. If model does not have a parent, return `model`."""
@@ -2800,7 +2800,7 @@ class AbstractTrainer:
         base_model_set = list(self.model_graph.predecessors(model))
         return base_model_set
 
-    def model_full_dict(self, inverse=False) -> Dict[str, str]:
+    def model_refit_map(self, inverse=False) -> Dict[str, str]:
         """
         Returns dict of parent model -> refit model
 
@@ -3661,7 +3661,7 @@ class AbstractTrainer:
             if model_name is None:
                 model_name = self.get_model_best(can_infer=can_infer)
 
-        model_refit_map = self.model_full_dict()
+        model_refit_map = self.model_refit_map()
         model_name_og = model_name
         for m, m_full in model_refit_map.items():
             if m_full == model_name:

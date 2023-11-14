@@ -3022,7 +3022,7 @@ class TabularPredictor:
                 model_to_set_best = set_best_to_refit_full
             else:
                 model_to_set_best = model_best
-            model_refit_map = self._trainer.model_full_dict()
+            model_refit_map = self._trainer.model_refit_map()
             if model_to_set_best in model_refit_map:
                 self._trainer.model_best = model_refit_map[model_to_set_best]
                 # Note: model_best will be overwritten if additional training is done with new models,
@@ -3113,7 +3113,7 @@ class TabularPredictor:
         Dictionary of original model name -> refit full model name.
         """
         self._assert_is_fit("model_refit_map")
-        return self._trainer.model_full_dict(inverse=inverse)
+        return self._trainer.model_refit_map(inverse=inverse)
 
     def info(self):
         """

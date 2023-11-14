@@ -419,7 +419,7 @@ def test_when_refit_full_called_then_all_models_are_retrained(trained_and_refit_
     leaderboard_refit = refit_trainer.leaderboard()
 
     expected_refit_full_dict = {name: name + ag.constants.REFIT_FULL_SUFFIX for name in trainer.get_model_names()}
-    assert dict_equal_primitive(refit_trainer.model_full_dict, expected_refit_full_dict)
+    assert dict_equal_primitive(refit_trainer.model_refit_map, expected_refit_full_dict)
     assert len(leaderboard_refit) == len(leaderboard_initial) + len(expected_refit_full_dict)
 
 
@@ -440,8 +440,8 @@ def test_when_refit_full_called_with_model_name_then_single_model_is_updated(tem
             "SimpleFeedForward": {"epochs": 1, "num_batches_per_epoch": 1},
         },
     )
-    model_full_dict = trainer.refit_full("DeepAR")
-    assert list(model_full_dict.values()) == ["DeepAR_FULL"]
+    model_refit_map = trainer.refit_full("DeepAR")
+    assert list(model_refit_map.values()) == ["DeepAR_FULL"]
 
 
 @pytest.mark.parametrize(
