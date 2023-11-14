@@ -3,7 +3,7 @@ import os
 import shutil
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterator, List, Optional, Type
+from typing import Any, Callable, Dict, Iterator, List, Optional, Type, Union
 
 import gluonts
 import gluonts.core.settings
@@ -305,6 +305,13 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             trainer_kwargs=default_trainer_kwargs,
             **init_args,
         )
+
+    def get_minimum_resources(self, is_gpu_available: bool = False) -> Dict[str, Union[int, float]]:
+        minimum_resources = {"num_cpus": 1}
+        # if GPU is available, we train with 1 GPU per trial
+        if is_gpu_available:
+            minimum_resources["num_gpus"] = 1
+        return minimum_resources
 
     def _to_gluonts_dataset(
         self, time_series_df: Optional[TimeSeriesDataFrame], known_covariates: Optional[TimeSeriesDataFrame] = None
