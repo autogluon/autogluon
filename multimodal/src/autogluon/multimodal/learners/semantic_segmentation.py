@@ -144,7 +144,6 @@ class SemanticSegmentationLearner(BaseLearner):
     def get_loss_func_per_run(self, config, mixup_active=None):
         loss_func = get_loss_func(
             problem_type=self._problem_type,
-            mixup_active=mixup_active,
             loss_func_name=OmegaConf.select(config, "optimization.loss_function"),
             config=config.optimization,
             num_classes=self._output_shape,

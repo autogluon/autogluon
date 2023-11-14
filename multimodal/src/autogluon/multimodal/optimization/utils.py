@@ -85,7 +85,7 @@ logger = logging.getLogger(__name__)
 
 def get_loss_func(
     problem_type: str,
-    mixup_active: bool,
+    mixup_active: Optional[bool] = None,
     loss_func_name: Optional[str] = None,
     config: Optional[DictConfig] = None,
     **kwargs,
