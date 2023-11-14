@@ -21,6 +21,7 @@ TEST_HYPERPARAMETER_SETTINGS = [
     {"SimpleFeedForward": {"epochs": 1, "num_batches_per_epoch": 1}},
     {"ETS": {"maxiter": 1}, "SimpleFeedForward": {"epochs": 1, "num_batches_per_epoch": 1}},
 ]
+DUMMY_HYPERPARAMETERS = {"SeasonalNaive": {"n_jobs": 1}, "Average": {"n_jobs": 1}}
 
 
 def test_predictor_can_be_initialized(temp_model_path):
@@ -931,3 +932,34 @@ def test_when_evaluate_receives_multiple_metrics_then_score_dict_contains_all_ke
     predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
     scores = predictor.evaluate(DUMMY_TS_DATAFRAME, metrics=metrics_passed_to_eval)
     assert len(scores) == len(expected_keys) and all(k in scores for k in expected_keys)
+
+
+@pytest.mark.parametrize("enable_ensemble", [True, False])
+@pytest.mark.parametrize(
+    "hyperparameters, hyperparameter_tune_kwargs",
+    [
+        (DUMMY_HYPERPARAMETERS, None),
+        (
+            {
+                "SeasonalNaive": {"seasonal_period": space.Categorical(1, 2), "n_jobs": 1},
+                "Average": {"n_jobs": 1},
+            },
+            "auto",
+        ),
+    ],
+)
+def test_given_time_limit_is_not_none_then_first_model_doesnt_receive_full_time_limit(
+    temp_model_path, enable_ensemble, hyperparameters, hyperparameter_tune_kwargs
+):
+    time_limit = 20
+    expected_time_limit_for_first_model = time_limit / (len(hyperparameters) + int(enable_ensemble))
+    predictor = TimeSeriesPredictor(path=temp_model_path)
+    with mock.patch("autogluon.timeseries.models.local.naive.SeasonalNaiveModel.fit") as snaive_fit:
+        predictor.fit(
+            DUMMY_TS_DATAFRAME,
+            time_limit=time_limit,
+            hyperparameters=hyperparameters,
+            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+            enable_ensemble=enable_ensemble,
+        )
+        assert snaive_fit.call_args[1]["time_limit"] < expected_time_limit_for_first_model

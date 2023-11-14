@@ -37,7 +37,7 @@ class AutoTimeSeriesTrainer(AbstractTimeSeriesTrainer):
         val_data: Optional[TimeSeriesDataFrame] = None,
         hyperparameter_tune_kwargs: Optional[Union[str, Dict]] = None,
         excluded_model_types: Optional[List[str]] = None,
-        time_limit: float = None,
+        time_limit: Optional[float] = None,
     ):
         """
         Fit a set of timeseries models specified by the `hyperparameters`

@@ -558,54 +558,45 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         logger.info(f"Models that will be trained: {list(m.name for m in models)}")
 
-        time_limit_model_split = time_limit
-        if time_limit is not None and len(models) > 0:
-            time_limit_model_split /= len(models)
-
+        num_models = len(models)
+        if num_models > 1:  # ensemble is only fit len(models) > 1
+            num_models += int(self.enable_ensemble)
         model_names_trained = []
         for i, model in enumerate(models):
-            if hyperparameter_tune_kwargs is not None:
-                time_left = time_limit_model_split
+            if time_limit is None:
+                time_left = None
+                time_left_for_model = None
+            else:
+                time_left = time_limit - (time.time() - time_start)
+                time_left_for_model = time_left / (num_models - i)
+                if time_left <= 0:
+                    logger.info(f"Stopping training due to lack of time remaining. Time left: {time_left:.1f} seconds")
+                    break
 
-                fit_log_message = f"Hyperparameter tuning model: {model.name}. "
-                if time_limit is not None and time_limit_model_split is not None:
+            if contains_searchspace(model.get_user_params()):
+                fit_log_message = f"Hyperparameter tuning model {model.name}. "
+                if time_left is not None:
                     fit_log_message += (
-                        f"Tuning model for up to {time_limit_model_split:.2f}s " f"of the {time_limit:.2f}s remaining."
+                        f"Tuning model for up to {time_left_for_model:.1f}s of the {time_left:.1f}s remaining."
                     )
                 logger.info(fit_log_message)
-
-                if contains_searchspace(model.get_user_params()):
-                    with tqdm.external_write_mode():
-                        model_names_trained += self.tune_model_hyperparameters(
-                            model,
-                            time_limit=time_left,
-                            train_data=train_data,
-                            val_data=val_data,
-                            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-                        )
-                else:
-                    model_names_trained += self._train_and_save(
-                        train_data, model=model, val_data=val_data, time_limit=time_left
+                with tqdm.external_write_mode():
+                    model_names_trained += self.tune_model_hyperparameters(
+                        model,
+                        time_limit=time_left_for_model,
+                        train_data=train_data,
+                        val_data=val_data,
+                        hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
                     )
             else:
-                time_left = None
                 fit_log_message = f"Training timeseries model {model.name}. "
-                if time_limit is not None:
-                    time_start_model = time.time()
-                    time_left = time_limit - (time_start_model - time_start)
-                    if time_left <= 0:
-                        logger.info(
-                            f"Stopping training due to lack of time remaining. Time left: {time_left:.2f} seconds"
-                        )
-                        break
-
+                if time_left is not None:
                     fit_log_message += (
-                        f"Training for up to {time_left:.2f}s of " f"the {time_left:.2f}s of remaining time."
+                        f"Training for up to {time_left_for_model:.1f}s of the {time_left:.1f}s of remaining time."
                     )
-
                 logger.info(fit_log_message)
                 model_names_trained += self._train_and_save(
-                    train_data, model=model, val_data=val_data, time_limit=time_left
+                    train_data, model=model, val_data=val_data, time_limit=time_left_for_model
                 )
 
         if self.enable_ensemble:
@@ -618,7 +609,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             if time_left_for_ensemble is not None and time_left_for_ensemble <= 0:
                 logger.info(
                     "Not fitting ensemble due to lack of time remaining. "
-                    f"Time left: {time_left_for_ensemble:.2f} seconds"
+                    f"Time left: {time_left_for_ensemble:.1f} seconds"
                 )
             elif len(models_available_for_ensemble) <= 1:
                 logger.info(
