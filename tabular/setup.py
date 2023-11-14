@@ -33,7 +33,7 @@ install_requires = [
 
 extras_require = {
     "lightgbm": [
-        "lightgbm>=3.3,<4.2",  # {N+1} upper cap, where N is the latest released minor version
+        "lightgbm>=3.3,<4.2",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "catboost": [
         # CatBoost wheel build is not working correctly on darwin for CatBoost 1.2, so use old version in this case.
@@ -46,7 +46,7 @@ extras_require = {
     #  It is possibly only present on MacOS, haven't tested linux.
     # XGBoost made API breaking changes in 1.6 with custom metric and callback support, so we don't support older versions.
     "xgboost": [
-        "xgboost>=1.6,<2.1",  # {N+1} upper cap, where N is the latest released minor version
+        "xgboost>=1.6,<2.1",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "fastai": [
         "torch",  # version range defined in `core/_setup_utils.py`
