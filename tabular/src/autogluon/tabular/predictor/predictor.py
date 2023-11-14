@@ -8,8 +8,7 @@ import os
 import pprint
 import shutil
 import time
-import warnings
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import networkx as nx
 import numpy as np
@@ -67,8 +66,6 @@ from ..trainer.model_presets.presets import MODEL_TYPES
 logger = logging.getLogger(__name__)  # return autogluon root logger
 
 
-# TODO: num_bag_sets -> ag_args
-
 # Extra TODOs (Stretch): Can occur post v1.0
 # TODO: make core_kwargs a kwargs argument to predictor.fit
 # TODO: add aux_kwargs to predictor.fit
@@ -76,6 +73,7 @@ logger = logging.getLogger(__name__)  # return autogluon root logger
 # TODO: Add logging comments that models are serialized on disk after fit
 # TODO: consider adding kwarg option for data which has already been preprocessed by feature generator to skip feature generation.
 # TODO: Resolve raw text feature usage in default feature generator
+# TODO: num_bag_sets -> ag_args
 class TabularPredictor:
     """
     AutoGluon TabularPredictor predicts values in a column of a tabular dataset (classification or regression).
@@ -309,7 +307,7 @@ class TabularPredictor:
         return self._learner.problem_type
 
     @property
-    def decision_threshold(self) -> float:
+    def decision_threshold(self) -> float | None:
         """
         The decision threshold used to convert prediction probabilities to predictions.
         Only relevant for binary classification, otherwise the value will be None.
@@ -1404,14 +1402,14 @@ class TabularPredictor:
     # TODO: Consider adding infer_limit to fit_extra
     def fit_extra(
         self,
-        hyperparameters,
-        time_limit=None,
-        base_model_names=None,
-        fit_weighted_ensemble=True,
-        fit_full_last_level_weighted_ensemble=True,
-        full_weighted_ensemble_additionally=False,
-        num_cpus="auto",
-        num_gpus="auto",
+        hyperparameters: str | Dict[str, Any],
+        time_limit: float = None,
+        base_model_names: List[str] = None,
+        fit_weighted_ensemble: bool = True,
+        fit_full_last_level_weighted_ensemble: bool = True,
+        full_weighted_ensemble_additionally: bool = False,
+        num_cpus: str | int = "auto",
+        num_gpus: str | int = "auto",
         **kwargs,
     ):
         """
@@ -1427,7 +1425,7 @@ class TabularPredictor:
             dictionary is relative, not absolute.
         time_limit : int, default = None
             Refer to argument documentation in :meth:`TabularPredictor.fit`.
-        base_model_names : list, default = None
+        base_model_names : List[str], default = None
             The names of the models to use as base models for this fit call.
             Base models will provide their out-of-fold predictions as additional features to the models in `hyperparameters`.
             If specified, all models trained will be stack ensembles.
@@ -1494,6 +1492,7 @@ class TabularPredictor:
         # labeled pseudo data has new labels unseen in the original train. Probably need to refit
         # data preprocessor if this is the case.
         if pseudo_data is not None:
+            assert isinstance(pseudo_data, pd.DataFrame)
             if self.label not in pseudo_data.columns:
                 raise ValueError("'pseudo_data' does not contain the labeled column.")
 
@@ -1668,6 +1667,7 @@ class TabularPredictor:
         """
         previous_score = self.info()["best_model_score_val"]
         y_pseudo_og = pd.Series()
+        y_pred_proba_og = None
         if return_pred_prob:
             if self.problem_type is REGRESSION:
                 y_pred_proba_og = pd.Series()
@@ -2605,7 +2605,7 @@ class TabularPredictor:
             print("*** End of fit() summary ***")
         return results
 
-    def transform_features(self, data=None, model=None, base_models=None, return_original_features=True):
+    def transform_features(self, data=None, model: str = None, base_models: List[str] = None, return_original_features: bool = True) -> pd.DataFrame:
         """
         Transforms data features through the AutoGluon feature generator.
         This is useful to gain an understanding of how AutoGluon interprets the data features.
@@ -2618,7 +2618,7 @@ class TabularPredictor:
 
         Parameters
         ----------
-        data : str or :class:`TabularDataset` or :class:`pd.DataFrame` (optional)
+        data: str or :class:`TabularDataset` or :class:`pd.DataFrame` (optional)
             The data to apply feature transformation to.
             This data does not require the label column.
             If str is passed, `data` will be loaded using the str value as the file path.
@@ -2637,7 +2637,7 @@ class TabularPredictor:
                     `base_model` features generated in this instance will be from out-of-fold predictions.
                     Note that the training set may differ from the training set originally passed during fit(), as AutoGluon may choose to drop or duplicate rows during training.
                     Warning: Do not pass the original training set through `data` if `model` or `base_models` are set. This will result in overfit feature transformation. Instead set `data=None`.
-        model : str, default = None
+        model: str, default = None
             Model to generate input features for.
             The output data will be equivalent to the input data that would be sent into `model.predict_proba(data)`.
                 Note: This only applies to cases where `data` is not the training data.
@@ -2645,13 +2645,13 @@ class TabularPredictor:
             Valid models are listed in this `predictor` by calling `predictor.model_names()`.
             Specifying a `refit_full` model will cause an exception if `data=None`.
             `base_models=None` is a requirement when specifying `model`.
-        base_models : list, default = None
+        base_models: List[str], default = None
             List of model names to use as base_models for a hypothetical stacker model when generating input features.
             If `None`, then only return generically preprocessed features prior to any model fitting.
             Valid models are listed in this `predictor` by calling `predictor.model_names()`.
             If a stacker model S exists with `base_models=M`, then setting `base_models=M` is equivalent to setting `model=S`.
             `model=None` is a requirement when specifying `base_models`.
-        return_original_features : bool, default = True
+        return_original_features: bool, default = True
             Whether to return the original features.
             If False, only returns the additional output columns from specifying `model` or `base_models`.
                 This is useful to set to False if the intent is to use the output as input to further stacker models without the original features.
@@ -2675,7 +2675,7 @@ class TabularPredictor:
         data = self._get_dataset(data, allow_nan=True)
         return self._learner.get_inputs_to_stacker(dataset=data, model=model, base_models=base_models, use_orig_features=return_original_features)
 
-    def transform_labels(self, labels, inverse=False, proba=False):
+    def transform_labels(self, labels: np.ndarray | pd.Series, inverse: bool = False, proba: bool = False) -> pd.Series | pd.DataFrame:
         """
         Transforms data labels to the internal label representation.
         This can be useful for training your own models on the same data label representation as AutoGluon.
@@ -2684,13 +2684,13 @@ class TabularPredictor:
 
         Parameters
         ----------
-        labels : :class:`np.ndarray` or :class:`pd.Series`
+        labels: :class:`np.ndarray` or :class:`pd.Series`
             Labels to transform.
             If `proba=False`, an example input would be the output of `predictor.predict(test_data)`.
             If `proba=True`, an example input would be the output of `predictor.predict_proba(test_data, as_multiclass=False)`.
-        inverse : boolean, default = False
+        inverse: bool, default = False
             When `True`, the input labels are treated as being in the internal representation and the original representation is outputted.
-        proba : boolean, default = False
+        proba: bool, default = False
             When `True`, the input labels are treated as probabilities and the output will be the internal representation of probabilities.
                 In this case, it is expected that `labels` be a :class:`pd.DataFrame` or :class:`np.ndarray`.
                 If the `problem_type` is multiclass:
@@ -2711,15 +2711,15 @@ class TabularPredictor:
     def feature_importance(
         self,
         data=None,
-        model=None,
-        features=None,
-        feature_stage="original",
-        subsample_size=5000,
-        time_limit=None,
-        num_shuffle_sets=None,
-        include_confidence_band=True,
-        confidence_level=0.99,
-        silent=False,
+        model: str = None,
+        features: list = None,
+        feature_stage: str = "original",
+        subsample_size: int = 5000,
+        time_limit: float = None,
+        num_shuffle_sets: int = None,
+        include_confidence_band: bool = True,
+        confidence_level: float = 0.99,
+        silent: bool = False,
     ):
         """
         Calculates feature importance scores for the given model via permutation importance. Refer to https://explained.ai/rf-importance/ for an explanation of permutation importance.
@@ -2963,7 +2963,7 @@ class TabularPredictor:
         self._assert_is_fit("unpersist")
         return self._learner.load_trainer().unpersist(model_names=models)
 
-    def refit_full(self, model="all", set_best_to_refit_full=True):
+    def refit_full(self, model: str | List[str] = "all", set_best_to_refit_full: bool = True) -> Dict[str, str]:
         """
         Retrain model on all of the data (training + validation).
         For bagged models:
@@ -2987,8 +2987,8 @@ class TabularPredictor:
 
         Parameters
         ----------
-        model : str, default = 'all'
-            Model name of model to refit.
+        model : str | List[str], default = 'all'
+            Model name of model(s) to refit.
                 If 'all' then all models are refitted.
                 If 'best' then the model with the highest validation score is refit.
             All ancestor models will also be refit in the case that the selected model is a weighted or stacker ensemble.
@@ -4329,15 +4329,15 @@ class TabularPredictor:
 
         return kwargs_sanitized
 
-    def _prune_data_features(self, train_features: pd.DataFrame, other_features: pd.DataFrame, is_labeled: bool):
+    def _prune_data_features(self, train_features: list, other_features: list, is_labeled: bool):
         """
         Removes certain columns from the provided datasets that do not contain predictive features.
 
         Parameters
         ----------
-        train_features : pd.DataFrame
+        train_features : list
             The features/columns for the incoming training data
-        other_features : pd.DataFrame
+        other_features : list
             Features of other auxiliary data that contains the same covariates as the training data.
             Examples of this could be: tuning data, pseudo data
         is_labeled: bool
