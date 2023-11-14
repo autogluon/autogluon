@@ -28,14 +28,8 @@ from . import (
     ThetaModel,
     WaveNetModel,
 )
-from .local import (
-    ADIDAModel,
-    CrostonClassicModel,
-    CrostonOptimizedModel,
-    CrostonSBAModel,
-    IMAPAModel,
-)
 from .abstract import AbstractTimeSeriesModel
+from .local import ADIDAModel, CrostonClassicModel, CrostonOptimizedModel, CrostonSBAModel, IMAPAModel
 from .multi_window.multi_window_model import MultiWindowBacktestingModel
 
 # TODO: Enable ARIMAModel after upgrading to StatsForecast >=1.5.0 - currently ARIMA model is broken

@@ -3,8 +3,17 @@ import joblib.externals.loky
 from .naive import AverageModel, NaiveModel, SeasonalAverageModel, SeasonalNaiveModel
 from .npts import NPTSModel
 from .statsforecast import (
-    ARIMAModel, AutoARIMAModel, AutoETSModel, DynamicOptimizedThetaModel, ETSModel, ThetaModel,
-    CrostonClassicModel, CrostonOptimizedModel, CrostonSBAModel, ADIDAModel, IMAPAModel
+    ADIDAModel,
+    ARIMAModel,
+    AutoARIMAModel,
+    AutoETSModel,
+    CrostonClassicModel,
+    CrostonOptimizedModel,
+    CrostonSBAModel,
+    DynamicOptimizedThetaModel,
+    ETSModel,
+    IMAPAModel,
+    ThetaModel,
 )
 
 # By default, joblib w/ loky backend kills processes that take >300MB of RAM assuming that this is caused by a memory
