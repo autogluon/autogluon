@@ -1576,7 +1576,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
         if trainer.global_rank == 0:
             if not self._is_hpo and is_train:
-                num_nodes = config.env.num_nodes
+                num_nodes = config.get("env", {}).get("num_nodes", None)
                 if not num_nodes:
                     num_nodes = 1
                 if num_nodes > 1:
