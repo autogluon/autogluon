@@ -200,7 +200,7 @@ class TemporalFusionTransformerModel(AbstractGluonTSModel):
 
     def _get_hpo_backend(self):
         # TFT performs HPO with the default custom backend instead of Ray Tune due to
-        # known issues with paralellization
+        # known issues with parallelization
         return CUSTOM_BACKEND
 
     def _get_estimator_class(self) -> Type[GluonTSEstimator]:
