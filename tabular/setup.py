@@ -46,7 +46,7 @@ extras_require = {
     #  It is possibly only present on MacOS, haven't tested linux.
     # XGBoost made API breaking changes in 1.6 with custom metric and callback support, so we don't support older versions.
     "xgboost": [
-        "xgboost>=1.6,<1.8",
+        "xgboost>=1.6,<2.1",    # {N+1} upper cap, where N is the latest released minor version
     ],
     "fastai": [
         "torch",  # version range defined in `core/_setup_utils.py`
