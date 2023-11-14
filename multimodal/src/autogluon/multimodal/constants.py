@@ -166,7 +166,8 @@ METRIC_MODE_MAP = {
 VALID_METRICS = METRIC_MODE_MAP.keys()
 
 # Define valid val/eval metrics and the fallback metric for each problem type.
-EVALUATION_METRICS = METRICS.update({
+EVALUATION_METRICS = dict(METRICS)
+EVALUATION_METRICS.update({
     NER: [OVERALL_F1, NER_TOKEN_F1],
     NAMED_ENTITY_RECOGNITION: [OVERALL_F1, NER_TOKEN_F1],
     FEATURE_EXTRACTION: [None],  # No metrics needed for feature extraction
