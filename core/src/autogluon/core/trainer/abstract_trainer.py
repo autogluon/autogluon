@@ -1561,7 +1561,7 @@ class AbstractTrainer:
         self.save()
         return model_names
 
-    def persist_models(self, model_names="all", with_ancestors=False, max_memory=None) -> List[str]:
+    def persist(self, model_names="all", with_ancestors=False, max_memory=None) -> List[str]:
         if model_names == "all":
             model_names = self.get_model_names()
         elif model_names == "best":
@@ -1640,7 +1640,7 @@ class AbstractTrainer:
                 model_type = self.get_model_attribute(model=model_name, attribute="type")
             return model_type.load(path=os.path.join(self.path, path), reset_paths=self.reset_paths)
 
-    def unpersist_models(self, model_names="all") -> list:
+    def unpersist(self, model_names="all") -> list:
         if model_names == "all":
             model_names = list(self.models.keys())
         if not isinstance(model_names, list):

@@ -232,24 +232,24 @@ def test_advanced_functionality():
         assert y_pred_proba.equals(y_pred_proba_from_transform)
 
     assert predictor.get_model_names(persisted=True) == []  # Assert that no models were persisted during training
-    assert predictor.unpersist_models() == []  # Assert that no models were unpersisted
+    assert predictor.unpersist() == []  # Assert that no models were unpersisted
 
-    persisted_models = predictor.persist_models(models="all", max_memory=None)
+    persisted_models = predictor.persist(models="all", max_memory=None)
     assert set(predictor.get_model_names(persisted=True)) == set(persisted_models)  # Ensure all models are persisted
-    assert predictor.persist_models(models="all", max_memory=None) == []  # Ensure that no additional models are persisted on repeated calls
-    unpersised_models = predictor.unpersist_models()
+    assert predictor.persist(models="all", max_memory=None) == []  # Ensure that no additional models are persisted on repeated calls
+    unpersised_models = predictor.unpersist()
     assert set(unpersised_models) == set(persisted_models)
     assert predictor.get_model_names(persisted=True) == []  # Assert that all models were unpersisted
 
     # Raise exception
     with pytest.raises(NetworkXError):
-        predictor.persist_models(models=["UNKNOWN_MODEL_1", "UNKNOWN_MODEL_2"])
+        predictor.persist(models=["UNKNOWN_MODEL_1", "UNKNOWN_MODEL_2"])
 
     assert predictor.get_model_names(persisted=True) == []
 
-    assert predictor.unpersist_models(models=["UNKNOWN_MODEL_1", "UNKNOWN_MODEL_2"]) == []
+    assert predictor.unpersist(models=["UNKNOWN_MODEL_1", "UNKNOWN_MODEL_2"]) == []
 
-    predictor.persist_models(models="all", max_memory=None)
+    predictor.persist(models="all", max_memory=None)
     predictor.save()  # Save predictor while models are persisted: Intended functionality is that they won't be persisted when loaded.
     predictor_loaded = TabularPredictor.load(predictor.path)  # Assert that predictor loading works
     leaderboard_loaded = predictor_loaded.leaderboard(data=test_data)

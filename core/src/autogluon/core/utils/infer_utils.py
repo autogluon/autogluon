@@ -55,7 +55,7 @@ def get_model_true_infer_speed_per_row_batch(data, *, predictor, batch_size: int
         raise AssertionError(f"len(data_batch) must equal batch_size! ({len_data} != {batch_size})")
 
     if persist_models:
-        predictor.persist_models(models="all")
+        predictor.persist(models="all")
 
     ts = time.time()
     for i in range(repeats):
@@ -150,7 +150,7 @@ def get_model_true_infer_speed_per_row_batch_bulk(
     infer_transform_dfs = dict()
 
     if persist_models:
-        predictor.persist_models(models="all")
+        predictor.persist(models="all")
 
     for batch_size in batch_sizes:
         infer_df, time_per_row_transform = get_model_true_infer_speed_per_row_batch(

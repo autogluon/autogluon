@@ -17,6 +17,7 @@ import pandas as pd
 
 from autogluon.common.loaders import load_json
 from autogluon.common.savers import save_json
+from autogluon.common.utils import Deprecated
 from autogluon.common.utils.file_utils import get_directory_size, get_directory_size_per_file
 from autogluon.common.utils.log_utils import add_log_to_file, set_logger_verbosity
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
@@ -643,7 +644,7 @@ class TabularPredictor:
             The inference time limit in seconds per row to adhere to during fit.
             If infer_limit=0.05 and infer_limit_batch_size=1000, AutoGluon will avoid training models that take longer than 50 ms/row to predict when given a batch of 1000 rows to predict (must predict 1000 rows in no more than 50 seconds).
             If bagging is enabled, the inference time limit will be respected based on estimated inference speed of `_FULL` models after refit_full is called, NOT on the inference speed of the bagged ensembles.
-            The inference times calculated for models are assuming `predictor.persist_models('all')` is called after fit.
+            The inference times calculated for models are assuming `predictor.persist('all')` is called after fit.
             If None, no limit is enforced.
             If it is impossible to satisfy the constraint, an exception will be raised.
         infer_limit_batch_size : int, default = None
@@ -2920,7 +2921,7 @@ class TabularPredictor:
                 raise ValueError(f'Unknown compiler_configs preset: "{compiler_configs}"')
         self._trainer.compile(model_names=models, with_ancestors=with_ancestors, compiler_configs=compiler_configs)
 
-    def persist_models(self, models="best", with_ancestors=True, max_memory=0.4) -> list:
+    def persist(self, models="best", with_ancestors=True, max_memory=0.4) -> list:
         """
         Persist models in memory for reduced inference latency. This is particularly important if the models are being used for online-inference where low latency is critical.
         If models are not persisted in memory, they are loaded from disk every time they are asked to make predictions.
@@ -2945,10 +2946,10 @@ class TabularPredictor:
         -------
         List of persisted model names.
         """
-        self._assert_is_fit("persist_models")
+        self._assert_is_fit("persist")
         return self._learner.persist_trainer(low_memory=False, models=models, with_ancestors=with_ancestors, max_memory=max_memory)
 
-    def unpersist_models(self, models="all") -> list:
+    def unpersist(self, models="all") -> list:
         """
         Unpersist models in memory for reduced memory usage.
         If models are not persisted in memory, they are loaded from disk every time they are asked to make predictions.
@@ -2965,8 +2966,8 @@ class TabularPredictor:
         -------
         List of unpersisted model names.
         """
-        self._assert_is_fit("unpersist_models")
-        return self._learner.load_trainer().unpersist_models(model_names=models)
+        self._assert_is_fit("unpersist")
+        return self._learner.load_trainer().unpersist(model_names=models)
 
     def refit_full(self, model="all", set_best_to_refit_full=True):
         """
@@ -3658,8 +3659,8 @@ class TabularPredictor:
             If None, considers all models.
         persisted: bool, default = None
             If None: no filtering will occur based on persisted status
-            If True: will return only the models that are persisted in memory via `predictor.persist_models()`
-            If False: will return only the models that are not persisted in memory via `predictor.persist_models()`
+            If True: will return only the models that are persisted in memory via `predictor.persist()`
+            If False: will return only the models that are not persisted in memory via `predictor.persist()`
 
         Returns
         -------
@@ -4750,6 +4751,16 @@ class _TabularPredictorExperimental(TabularPredictor):
         predictor = cls(label=learner.label, path=learner.path)
         predictor._set_post_fit_vars(learner=learner)
         return predictor
+
+    @Deprecated(min_version_to_warn="0.8", min_version_to_error="1.1", version_to_remove="1.1", new="persist")
+    def persist_models(self, **kwargs):
+        """Deprecated method. Use `persist` instead."""
+        return self.persist(**kwargs)
+
+    @Deprecated(min_version_to_warn="0.8", min_version_to_error="1.1", version_to_remove="1.1", new="unpersist")
+    def unpersist_models(self, **kwargs):
+        """Deprecated method. Use `unpersist` instead."""
+        return self.unpersist(**kwargs)
 
 
 def _sub_fit(

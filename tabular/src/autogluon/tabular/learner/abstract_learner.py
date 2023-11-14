@@ -933,7 +933,7 @@ class AbstractTabularLearner(AbstractLearner):
     def persist_trainer(self, low_memory=False, models="all", with_ancestors=False, max_memory=None) -> list:
         self.trainer = self.load_trainer()
         if not low_memory:
-            return self.trainer.persist_models(models, with_ancestors=with_ancestors, max_memory=max_memory)
+            return self.trainer.persist(models, with_ancestors=with_ancestors, max_memory=max_memory)
             # Warning: After calling this, it is not necessarily safe to save learner or trainer anymore
             #  If neural network is persisted and then trainer or learner is saved, there will be an exception thrown
         else:
