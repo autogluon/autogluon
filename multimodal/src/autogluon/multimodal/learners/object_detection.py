@@ -420,7 +420,7 @@ class ObjectDetectionLearner(BaseLearner):
             df_preprocessor=df_preprocessor,
             data_processors=data_processors,
             model=model,
-            sync_path=sync_path,,
+            sync_path=sync_path,
         )
 
         return dict(
