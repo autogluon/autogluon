@@ -223,6 +223,7 @@ def test_predictor_basic(
         "optimization.efficient_finetune": efficient_finetune,
         "optimization.loss_function": loss_function,
         "data.categorical.convert_to_text": False,  # ensure the categorical model is used.
+        "data.categorical.minimum_cat_count": 10,  # ensure the categorical model is used on a small subset of dataset (e.g., petfinder).
         "data.numerical.convert_to_text": False,  # ensure the numerical model is used.
     }
     if text_backbone is not None:
@@ -342,6 +343,7 @@ def test_predictor_realtime_inference(
         "optimization.efficient_finetune": efficient_finetune,
         "optimization.loss_function": loss_function,
         "data.categorical.convert_to_text": False,  # ensure the categorical model is used.
+        "data.categorical.minimum_cat_count": 10,  # ensure the categorical model is used on a small subset of dataset (e.g., petfinder).
         "data.numerical.convert_to_text": False,  # ensure the numerical model is used.
     }
     if text_backbone is not None:
