@@ -2,8 +2,8 @@ import copy
 import inspect
 import logging
 
-from .seq_scheduler import LocalSequentialScheduler
 from ..utils.utils import setup_compute
+from .seq_scheduler import LocalSequentialScheduler
 
 logger = logging.getLogger(__name__)
 
