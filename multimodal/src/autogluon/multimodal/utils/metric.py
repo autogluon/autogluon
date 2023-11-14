@@ -15,8 +15,6 @@ from ..constants import (
     AVERAGE_PRECISION,
     BINARY,
     DIRECT_LOSS,
-    EVALUATION_METRICS,
-    EVALUATION_METRICS_FALLBACK,
     F1,
     FEW_SHOT_CLASSIFICATION,
     MAP,
@@ -39,9 +37,6 @@ from ..constants import (
     RMSE,
     ROC_AUC,
     SPEARMANR,
-    VALID_METRICS,
-    VALIDATION_METRICS,
-    VALIDATION_METRICS_FALLBACK,
     Y_PRED,
     Y_PRED_PROB,
     Y_TRUE,
@@ -80,10 +75,12 @@ def infer_metrics(
     eval_metric_name
         Name of evaluation metric.
     """
+    if problem_type is not None:
+        problem_property = PROBLEM_TYPES_REG.get(problem_type)
 
     if is_matching:
         if eval_metric_name is not None:
-            if eval_metric_name.lower() in VALID_METRICS:
+            if eval_metric_name.lower() in METRIC_MODE_MAP.keys():
                 validation_metric_name = eval_metric_name
                 return validation_metric_name, eval_metric_name
             elif eval_metric_name.lower() in RETRIEVAL_METRICS:
@@ -113,18 +110,18 @@ def infer_metrics(
             raise NotImplementedError(f"Problem type: {problem_type} is not yet supported for matching!")
 
     if eval_metric_name is not None:
-        if eval_metric_name.lower() not in EVALUATION_METRICS[problem_type]:
+        if eval_metric_name.lower() not in problem_property.supported_evaluation_metrics:
             warnings.warn(
                 f"Metric {eval_metric_name} is not supported as the evaluation metric for {problem_type}. "
-                f"The evaluation metric is changed to {EVALUATION_METRICS_FALLBACK[problem_type]} by default."
+                f"The evaluation metric is changed to {problem_property.fallback_evaluation_metric} by default."
             )
-            eval_metric_name = EVALUATION_METRICS_FALLBACK[problem_type]
+            eval_metric_name = problem_property.fallback_evaluation_metric
 
-        if eval_metric_name.lower() in VALIDATION_METRICS[problem_type]:
+        if eval_metric_name.lower() in problem_property.supported_validation_metrics:
             logger.info(f"Metric {eval_metric_name} is used as the validation metric. ")
             validation_metric_name = eval_metric_name
         else:
-            validation_metric_name = VALIDATION_METRICS_FALLBACK[problem_type]
+            validation_metric_name = problem_property.fallback_validation_metric
 
         warnings.warn(
             f"Currently, we cannot convert the metric: {eval_metric_name} to a metric supported in torchmetrics. "
@@ -133,8 +130,8 @@ def infer_metrics(
             UserWarning,
         )
     else:
-        eval_metric_name = EVALUATION_METRICS_FALLBACK[problem_type]
-        validation_metric_name = VALIDATION_METRICS_FALLBACK[problem_type]
+        eval_metric_name = problem_property.fallback_evaluation_metric
+        validation_metric_name = problem_property.fallback_validation_metric
 
     return validation_metric_name, eval_metric_name
 
@@ -159,7 +156,7 @@ def get_minmax_mode(
         - max
             It means that larger metric is better.
     """
-    assert metric_name in METRIC_MODE_MAP, f"{metric_name} is not a supported metric. Options are: {VALID_METRICS}"
+    assert metric_name in METRIC_MODE_MAP, f"{metric_name} is not a supported metric. Options are: {METRIC_MODE_MAP.keys()}"
     return METRIC_MODE_MAP.get(metric_name)
 
 
