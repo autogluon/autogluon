@@ -486,9 +486,9 @@ class AbstractTabularLearner(AbstractLearner):
 
     # Scores both learner and all individual models, along with computing the optimal ensemble score + weights (oracle)
     def score_debug(
-        self, X: DataFrame, y=None, extra_info=False, compute_oracle=False, extra_metrics=None, decision_threshold=None, skip_score=False, silent=False
+        self, X: DataFrame, y=None, extra_info=False, compute_oracle=False, extra_metrics=None, decision_threshold=None, skip_score=False, verbose=False
     ):
-        leaderboard_df = self.leaderboard(extra_info=extra_info, silent=silent)
+        leaderboard_df = self.leaderboard(extra_info=extra_info, verbose=verbose)
         if extra_metrics is None:
             extra_metrics = []
         if y is None:
@@ -828,12 +828,12 @@ class AbstractTabularLearner(AbstractLearner):
         only_pareto_frontier=False,
         skip_score=False,
         score_format: str = "score",
-        silent=False,
+        verbose=False,
     ) -> pd.DataFrame:
         assert score_format in ["score", "error"]
         if X is not None:
             leaderboard = self.score_debug(
-                X=X, y=y, extra_info=extra_info, extra_metrics=extra_metrics, decision_threshold=decision_threshold, skip_score=skip_score, silent=True
+                X=X, y=y, extra_info=extra_info, extra_metrics=extra_metrics, decision_threshold=decision_threshold, skip_score=skip_score, verbose=False
             )
         else:
             if extra_metrics:
@@ -859,7 +859,7 @@ class AbstractTabularLearner(AbstractLearner):
             if "metric_error_test" in leaderboard:
                 leaderboard["metric_error_test"] = leaderboard["metric_error_test"].apply(self.eval_metric.convert_score_to_error)
             leaderboard["metric_error_val"] = leaderboard["metric_error_val"].apply(self.eval_metric.convert_score_to_error)
-        if not silent:
+        if verbose:
             with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):
                 print(leaderboard)
         return leaderboard

@@ -2284,7 +2284,7 @@ class TabularPredictor:
             only_pareto_frontier=only_pareto_frontier,
             score_format=score_format,
             skip_score=skip_score,
-            silent=not verbose,
+            verbose=verbose,
         )
 
     def model_failures(self, verbose: bool = False) -> pd.DataFrame:
