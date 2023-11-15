@@ -115,13 +115,16 @@ def infer_metrics(
                 f"Metric {eval_metric_name} is not supported as the evaluation metric for {problem_type}. "
                 f"The evaluation metric is changed to {problem_property.fallback_evaluation_metric} by default."
             )
-            eval_metric_name = problem_property.fallback_evaluation_metric
+            if problem_property.fallback_evaluation_metric is not None:
+                eval_metric_name = problem_property.fallback_evaluation_metric
 
         if eval_metric_name.lower() in problem_property.supported_validation_metrics:
             logger.info(f"Metric {eval_metric_name} is used as the validation metric. ")
             validation_metric_name = eval_metric_name
         else:
-            validation_metric_name = problem_property.fallback_validation_metric
+            # TODO: change semantic segmentation logics to use this function to infer metrics
+            if problem_property.fallback_validation_metric is not None:
+                validation_metric_name = problem_property.fallback_validation_metric
 
         warnings.warn(
             f"Currently, we cannot convert the metric: {eval_metric_name} to a metric supported in torchmetrics. "
