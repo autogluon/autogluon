@@ -18,6 +18,7 @@ function setup_build_contrib_env {
 
 function setup_benchmark_env {
     # pip install -U autogluon.bench - revert back when latest update in PyPi
+    # test
     git clone https://github.com/autogluon/autogluon-bench.git
     pip install -e ./autogluon-bench
     git clone https://github.com/autogluon/autogluon-dashboard.git
