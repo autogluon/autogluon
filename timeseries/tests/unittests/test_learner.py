@@ -56,7 +56,7 @@ def test_learner_can_be_initialized(temp_model_path):
 @pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS)
 def test_when_learner_called_then_training_is_performed(hyperparameters, trained_learners):
     learner = trained_learners[repr(hyperparameters)]
-    assert learner.load_trainer().model_names()
+    assert learner.load_trainer().get_model_names()
 
 
 @pytest.mark.parametrize(
@@ -172,7 +172,7 @@ def test_given_hyperparameters_when_learner_called_and_loaded_back_then_all_mode
 
     loaded_learner = TimeSeriesLearner.load(temp_model_path)
 
-    for model_name in loaded_learner.load_trainer().model_names():
+    for model_name in loaded_learner.load_trainer().get_model_names():
         predictions = loaded_learner.predict(DUMMY_TS_DATAFRAME, model=model_name)
 
         assert isinstance(predictions, TimeSeriesDataFrame)
