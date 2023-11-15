@@ -8,7 +8,6 @@ from autogluon.core.metrics import METRICS
 from .constants import (
     ACCURACY,
     BINARY,
-    BINARY_IOU,
     CATEGORICAL,
     CLASSIFICATION,
     DETECTION_METRICS,
