@@ -121,9 +121,9 @@ def test_f1_metrics_for_multiclass(eval_metric):
         time_limit=20,
         save_path=save_path,
     )
-    val_scores = predictor._learner._callback_metrics[f'val_{eval_metric}'].item()
+    val_score = predictor._learner._best_score
     eval_score = predictor.evaluate(dataset.test_df)[eval_metric]
-    assert abs(val_scores - eval_score) < 1e-4
+    assert abs(val_score - eval_score) < 1e-4
 
 
 def ref_symmetric_hit_rate(features_a, features_b, logit_scale, top_ks=[1, 5, 10]):
