@@ -192,7 +192,7 @@ def test_given_hyperparameters_when_predictor_called_and_loaded_back_then_all_mo
         assert not np.any(np.isnan(predictions))
 
 
-@pytest.mark.skipif(sys.platform.startswith("win"))
+@pytest.mark.skipif(sys.platform.startswith("win"), reason="HPO tests lead to known issues in Windows platform tests")
 @pytest.mark.parametrize("target_column", ["target", "custom"])
 @pytest.mark.parametrize(
     "hyperparameters",

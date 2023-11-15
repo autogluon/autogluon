@@ -518,19 +518,23 @@ class TimeSeriesPredictor:
 
             If type is ``str``, then this argument specifies a preset.
             Valid preset values:
-                - "auto": Performs HPO via bayesian optimization search on GluonTS-backed neural forecasting models and
-                    random search on other models using local scheduler.
-                - "random": Performs HPO via random search.
+            
+            * "auto": Performs HPO via bayesian optimization search on GluonTS-backed neural forecasting models and
+                random search on other models using local scheduler.
+            * "random": Performs HPO via random search.
+            
             You can also provide a dict to specify searchers and schedulers
             Valid keys:
-                - "num_trials": How many HPO trials to run
-                - "scheduler": Which scheduler to use. Valid values:
-                    - "local": Local shceduler that schedules trials FIFO
-                - "searcher": Which searching algorithm to use. Valid values:
-                    - "local_random": Uses the "random" searcher
-                    - "random": Perform random search
-                    - "bayes": Perform HPO with HyperOpt on GluonTS-backed models via Ray tune. Perform random search on other models.
-                    - "auto": alias for "bayes"
+            
+            * "num_trials": How many HPO trials to run
+            * "scheduler": Which scheduler to use. Valid values:
+                * "local": Local shceduler that schedules trials FIFO
+            * "searcher": Which searching algorithm to use. Valid values:
+                * "local_random": Uses the "random" searcher
+                * "random": Perform random search
+                * "bayes": Perform HPO with HyperOpt on GluonTS-backed models via Ray tune. Perform random search on other models.
+                * "auto": alias for "bayes"
+            
             The "scheduler" and "searcher" key are required when providing a dict.
 
             Example::
