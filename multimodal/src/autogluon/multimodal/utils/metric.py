@@ -93,7 +93,7 @@ def infer_metrics(
                 )
 
         if problem_type is None:
-            eval_metric_name, validation_metric_name = MATCHING_METRICS_WITHOUT_PROBLEM_TYPE[problem_type]
+            eval_metric_name, validation_metric_name = MATCHING_METRICS_WITHOUT_PROBLEM_TYPE
             logger.info(
                 f"Metric {eval_metric_name} and metric {validation_metric_name} are used "
                 f"as the evaluation metric and the validation metric for matching tasks by default. "
@@ -110,6 +110,7 @@ def infer_metrics(
             raise NotImplementedError(f"Problem type: {problem_type} is not yet supported for matching!")
 
     if eval_metric_name is not None:
+        # Infer evaluation metric
         if eval_metric_name.lower() not in problem_property.supported_evaluation_metrics:
             warnings.warn(
                 f"Metric {eval_metric_name} is not supported as the evaluation metric for {problem_type}. "
@@ -118,6 +119,7 @@ def infer_metrics(
             if problem_property.fallback_evaluation_metric is not None:
                 eval_metric_name = problem_property.fallback_evaluation_metric
 
+        # Infer validation metric
         if eval_metric_name.lower() in problem_property.supported_validation_metrics:
             logger.info(f"Metric {eval_metric_name} is used as the validation metric. ")
             validation_metric_name = eval_metric_name
