@@ -68,7 +68,7 @@ def _get_sys_info():
         "num_cores": ResourceManager.get_cpu_count(),
         "cpu_ram_mb": ResourceManager.get_memory_size(),
         "cuda version": cuda_version,
-        "num_gpus": ResourceManager.get_gpu_count_all(),
+        "num_gpus": ResourceManager.get_gpu_count(),
         "gpu_ram_mb": ResourceManager.get_gpu_free_memory(),
         "avail_disk_size_mb": ResourceManager.get_available_disk_size(),
     }

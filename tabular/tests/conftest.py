@@ -303,14 +303,14 @@ class ModelFitHelper:
 @contextmanager
 def mock_system_resourcses(num_cpus=None, num_gpus=None):
     original_get_cpu_count = ResourceManager.get_cpu_count
-    original_get_gpu_count_all = ResourceManager.get_gpu_count_all
+    original_get_gpu_count = ResourceManager.get_gpu_count
     if num_cpus is not None:
         ResourceManager.get_cpu_count = lambda: num_cpus
     if num_gpus is not None:
-        ResourceManager.get_gpu_count_all = lambda: num_gpus
+        ResourceManager.get_gpu_count = lambda: num_gpus
     yield
     ResourceManager.get_cpu_count = original_get_cpu_count
-    ResourceManager.get_gpu_count_all = original_get_gpu_count_all
+    ResourceManager.get_gpu_count = original_get_gpu_count
 
 
 @pytest.fixture
