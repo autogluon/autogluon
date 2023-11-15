@@ -73,10 +73,10 @@ jobs:
         run: |
           nvm install 20
           npm install -g aws-cdk
-          /bin/bash ./.github/workflow_scripts/run_benchmark.sh tabular best tabular_small 1h8c ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
+          /bin/bash ./.github/workflow_scripts/run_benchmark.sh tabular best tabular_full 1h8c ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
 
   benchmark-timeseries:
-    needs: [generate_amlb_user_dir, benchmark-tabular]
+    needs: benchmark-tabular
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -117,7 +117,7 @@ jobs:
           /bin/bash ./.github/workflow_scripts/run_benchmark.sh timeseries dev timeseries_small 10m4c ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
 
   benchmark-multimodal-text:
-    needs: [generate_amlb_user_dir, benchmark-tabular, benchmark-timeseries]
+    needs: benchmark-timeseries
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -158,7 +158,7 @@ jobs:
           /bin/bash ./.github/workflow_scripts/run_benchmark.sh multimodal master_medium automm-text g4_12x ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
 
   benchmark-multimodal-text-tabular:
-    needs: [generate_amlb_user_dir, benchmark-tabular, benchmark-timeseries, benchmark-multimodal-text]
+    needs: benchmark-multimodal-text
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -199,7 +199,7 @@ jobs:
           /bin/bash ./.github/workflow_scripts/run_benchmark.sh multimodal master_medium automm-text-tabular g4_12x ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
 
   benchmark-multimodal-image:
-    needs: [generate_amlb_user_dir, benchmark-tabular, benchmark-timeseries, benchmark-multimodal-text, benchmark-multimodal-text-tabular]
+    needs: benchmark-multimodal-text-tabular
     runs-on: ubuntu-latest
     defaults:
       run:
