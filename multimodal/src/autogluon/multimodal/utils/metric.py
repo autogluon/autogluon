@@ -127,11 +127,12 @@ def infer_metrics(
             # TODO: change semantic segmentation logics to use this function to infer metrics
             if problem_property.fallback_validation_metric is not None:
                 validation_metric_name = problem_property.fallback_validation_metric
-            warnings.warn(
-                f"Currently, we cannot convert the metric: {eval_metric_name} to a metric supported in torchmetrics. "
-                f"Thus, we fall-back to use {validation_metric_name} as validation metric.",
-                UserWarning,
-            )
+                warnings.warn(
+                    f"Currently, we cannot convert the metric: {eval_metric_name} to a metric supported in torchmetrics. "
+                    f"Thus, we fall-back to use {validation_metric_name} as validation metric.",
+                    UserWarning,
+
+                )
     else:
         eval_metric_name = problem_property.fallback_evaluation_metric
         validation_metric_name = problem_property.fallback_validation_metric

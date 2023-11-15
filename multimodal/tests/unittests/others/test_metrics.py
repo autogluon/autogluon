@@ -12,7 +12,7 @@ import autogluon.core.metrics as ag_metrics
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.constants import MULTICLASS, Y_PRED, Y_TRUE
 from autogluon.multimodal.optimization.utils import compute_hit_rate, get_loss_func, get_metric
-from autogluon.multimodal.utils import compute_score
+from autogluon.multimodal.utils import compute_score, infer_metrics
 
 from ..utils.unittest_datasets import HatefulMeMesDataset, PetFinderDataset
 from ..utils.utils import get_home_dir
@@ -124,6 +124,27 @@ def test_f1_metrics_for_multiclass(eval_metric):
     val_score = predictor._learner._best_score
     eval_score = predictor.evaluate(dataset.test_df)[eval_metric]
     assert abs(val_score - eval_score) < 1e-4
+
+
+@pytest.mark.parametrize(
+    "problem_type, eval_metric_name, validation_metric_name, is_matching, target_eval_metric_name, target_validation_metric_name",
+    [
+        ("binary", "acc", None, False, "acc", "acc"),
+        ("multiclass", "f1_macro", None, False, "f1_macro", "f1_macro"),
+        ("regression", "f1", None, False, "rmse", "rmse"),
+        ("object_detection", "map", "map", False, "map", "map"),
+        ("open_vocabulary_object_detection", "f1", None, False, "map", "map"),
+        ("semantic_segmentation", None, None, False, "iou", "iou"),
+        ("multiclass", None, None, True, "spearmanr", "spearmanr"),
+        ("regression", "pearsonr", None, True, "pearsonr", "pearsonr"),
+        (None, None, None, True, "recall", "ndcg"),
+        ("feature_extraction", None, None, False, None, None),
+    ],
+)
+def test_infer_metrics(problem_type, eval_metric_name, validation_metric_name, is_matching, target_eval_metric_name, target_validation_metric_name):
+    validation_metric_name, eval_metric_name = infer_metrics(problem_type, eval_metric_name, validation_metric_name, is_matching)
+    assert eval_metric_name == target_eval_metric_name
+    assert validation_metric_name == target_validation_metric_name
 
 
 def ref_symmetric_hit_rate(features_a, features_b, logit_scale, top_ks=[1, 5, 10]):

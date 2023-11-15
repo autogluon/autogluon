@@ -18,6 +18,7 @@ from .constants import (
     IMAGE_BYTEARRAY,
     IMAGE_SIMILARITY,
     IMAGE_TEXT_SIMILARITY,
+    IOU,
     MAP,
     METRIC_MODE_MAP,
     MULTICLASS,
@@ -210,6 +211,9 @@ PROBLEM_TYPES_REG.register(
         supported_modality_type={IMAGE},
         supported_label_type={IMAGE},
         force_exist_modality={IMAGE},
+        _supported_evaluation_metrics=[IOU],
+        _fallback_evaluation_metric=IOU,
+        _fallback_validation_metric=IOU,
     ),
 )
 
