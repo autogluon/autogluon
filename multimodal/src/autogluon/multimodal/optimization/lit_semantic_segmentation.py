@@ -16,7 +16,7 @@ from ..constants import CLASS_LOGITS, LM_TARGET, LOGITS, SEMANTIC_MASK, T_FEW, T
 from ..data.mixup import MixupModule, multimodel_mixup
 from ..models.utils import run_model
 from .lit_module import LitModule
-from .semantic_seg_metrics import COD, Balanced_Error_Rate, Binary_IoU
+from .semantic_seg_metrics import Multiclass_IoU
 from .utils import apply_layerwise_lr_decay, apply_single_lr, apply_two_stages_lr, get_lr_scheduler, get_optimizer
 
 logger = logging.getLogger(__name__)
@@ -61,11 +61,8 @@ class SemanticSegmentationLitModule(LitModule):
         label: torch.Tensor,
         **kwargs,
     ):
-        if isinstance(metric, torchmetrics.classification.MulticlassJaccardIndex):
-            bs, num_classes = kwargs["semantic_masks"].shape[0:2]
-            semantic_masks = kwargs["semantic_masks"].float().reshape(bs, num_classes, -1)
-            label = label.reshape(bs, -1)
-            metric.update(semantic_masks, label)
+        if isinstance(metric, Multiclass_IoU):
+            metric.update(kwargs["semantic_masks"], label)
         else:
             metric.update(logits.float(), label)
 

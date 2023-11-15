@@ -193,11 +193,8 @@ class SemanticSegmentationLearner(BaseLearner):
         results = {}
         for per_metric_name in metrics:
             per_metric, _ = get_metric(metric_name=per_metric_name.lower(), num_classes=self._output_shape)
-            if isinstance(per_metric, torchmetrics.classification.MulticlassJaccardIndex):
-                bs, num_classes = y_pred.shape[0:2]
-                y_pred = y_pred.reshape(bs, num_classes, -1)
-                y_true = y_true.reshape(bs, -1)
-            per_metric.update(y_pred, y_true)
+            for y_p, y_t in zip(y_pred, y_true):
+                per_metric.update(y_p.unsqueeze(0), y_t.unsqueeze(0))
             score = per_metric.compute()
             results[per_metric_name] = score.item()
 

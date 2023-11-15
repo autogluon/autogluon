@@ -572,6 +572,45 @@ class WeightedFmeasure(object):
         return dict(wfm=weighted_fm)
 
 
+class Multiclass_IoU(torchmetrics.Metric):
+    """
+    Compute the IoU for multi-class semantic segmentation based on https://github.com/xieenze/Trans2Seg/blob/master/segmentron/utils/score.py.
+    The direct use of torchmetrics for large dataset will lead to issues such as high CPU usage or insufficient memory.
+    """
+
+    def __init__(self, num_classes):
+        super().__init__()
+        self.add_state("total_inter", default=torch.zeros(num_classes), dist_reduce_fx=None)
+        self.add_state("total_union", default=torch.zeros(num_classes), dist_reduce_fx=None)
+        self.num_classes = num_classes
+
+    def update(self, logits, labels):
+        inter, union = self.batch_intersection_union(logits, labels)
+        self.total_inter += inter
+        self.total_union += union
+
+    def compute(self):
+        IoU = 1.0 * self.total_inter / (2.220446049250313e-16 + self.total_union)
+        return torch.tensor(IoU.mean().item())
+
+    def batch_intersection_union(self, output, target):
+        mini = 1
+        maxi = self.num_classes
+        nbins = self.num_classes
+        predict = torch.argmax(output, 1) + 1
+        target = target.float() + 1
+
+        predict = predict.float() * (target > 0).float()
+        intersection = predict * (predict == target).float()
+        # areas of intersection and union
+        area_inter = torch.histc(intersection, bins=nbins, min=mini, max=maxi)
+        area_pred = torch.histc(predict, bins=nbins, min=mini, max=maxi)
+        area_lab = torch.histc(target, bins=nbins, min=mini, max=maxi)
+        area_union = area_pred + area_lab - area_inter
+        assert torch.sum(area_inter > area_union).item() == 0, "Intersection area should be smaller than Union area"
+        return area_inter.float(), area_union.float()
+
+
 class Binary_IoU(torchmetrics.Metric):
     """
     Compute the IoU for binary semantic segmentation. The direct use of torchmetrics to calculate IoU for multiple samples does not yield accurate results.
