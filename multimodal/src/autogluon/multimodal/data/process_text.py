@@ -429,7 +429,6 @@ class TextProcessor:
         else:
             auglist = []
             for aug_type in augment_types:
-
                 if "(" in aug_type:
                     trans_mode = aug_type[0 : aug_type.find("(")]
                     args = ast.literal_eval(aug_type[aug_type.find("(") :])

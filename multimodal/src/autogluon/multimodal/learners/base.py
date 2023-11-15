@@ -337,6 +337,9 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
     @property
     def model_size(self) -> float:
+        """
+        Returns the model size in Megabyte.
+        """
         model_size = sum(
             p.numel() * p.element_size() if not is_lazy_weight_tensor(p) else 0 for p in self._model.parameters()
         )
@@ -715,7 +718,9 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                     column_types=column_types,
                     label_column=self._label_column,
                     train_df_x=data,
-                    train_df_y=data[self._label_column] if self._label_column else None,
+                    train_df_y=data[self._label_column]
+                    if self._label_column
+                    else None,  # TODO: Not support zero-shot evaluation and prediction simultaneously for semantic segmentation.
                 )
 
         return df_preprocessor
@@ -844,7 +849,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         predict_data=None,
         is_train=True,
     ):
-        if self._teacher_learner is not None:
+        if is_train and self._teacher_learner is not None:
             df_preprocessor = [df_preprocessor, self._teacher_learner._df_preprocessor]
             data_processors = [data_processors, self._teacher_learner._data_processors]
         datamodule_kwargs = dict(
@@ -1046,7 +1051,10 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             data = predict_data
             config = self._config
 
-        num_gpus = compute_num_gpus(config_num_gpus=config.env.num_gpus, strategy=config.env.strategy)
+        num_gpus = compute_num_gpus(
+            config_num_gpus=config.env.num_gpus,
+            accelerator=OmegaConf.select(config, "env.accelerator", default="auto"),
+        )
         num_gpus = self.update_num_gpus_by_data_size(num_gpus=num_gpus, data=data)
         strategy = self.get_strategy_per_run(num_gpus=num_gpus, config=config)
         strategy, num_gpus = self.update_strategy_and_num_gpus_for_hpo(strategy=strategy, num_gpus=num_gpus)
@@ -1086,8 +1094,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             log_filter = LogFilter(blacklist_msgs)
             with apply_log_filter(log_filter):
                 trainer = pl.Trainer(
-                    accelerator="gpu" if num_gpus > 0 else "auto",
-                    devices=num_gpus,
+                    accelerator="gpu" if num_gpus > 0 else OmegaConf.select(config, "env.accelerator", default="auto"),
+                    devices=num_gpus if num_gpus > 0 else "auto",
                     num_nodes=config.env.num_nodes,
                     precision=precision,
                     strategy=strategy if strategy else "auto",
@@ -1126,8 +1134,10 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
             with apply_log_filter(log_filter):
                 trainer = pl.Trainer(
-                    accelerator="gpu" if num_gpus > 0 else "auto",
-                    devices=num_gpus,
+                    accelerator="gpu"
+                    if num_gpus > 0
+                    else OmegaConf.select(self._config, "env.accelerator", default="auto"),
+                    devices=num_gpus if num_gpus > 0 else "auto",
                     num_nodes=self._config.env.num_nodes,
                     precision=precision,
                     strategy=strategy,
@@ -1565,7 +1575,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         # realtime can initialize CUDA, which can cause failures when calling fit again in the interactive env.
         if is_interactive_strategy(strategy) and realtime:
             realtime = False
-            num_gpus = 1
+            num_gpus = min(1, num_gpus)
             barebones = True
 
         return realtime, num_gpus, barebones
@@ -1642,8 +1652,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
     def predict_per_run(
         self,
         data: Union[pd.DataFrame, dict, list],
+        realtime: Optional[bool],
         requires_label: Optional[bool] = False,
-        realtime: Optional[bool] = None,
         barebones: Optional[bool] = False,
     ) -> List[Dict]:
         """
@@ -1653,10 +1663,10 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         ----------
         data
             The data for inference.
-        requires_label
-            Whether uses label during inference.
         realtime
             Whether use realtime inference.
+        requires_label
+            Whether uses label during inference.
         barebones
             Whether to run in “barebones mode”, where all lightning's features that may impact raw speed are disabled.
 
@@ -1773,7 +1783,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         data: Union[pd.DataFrame, dict, list, str],
         metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         **kwargs,
     ):
         """
@@ -1783,15 +1793,14 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         ----------
         data
             A dataframe, containing the same columns as the training data.
-            Or a str, that is a path of the annotation file for detection.
         metrics
             A list of metric names to report.
             If None, we only return the score for the stored `_eval_metric_name`.
         return_pred
             Whether to return the prediction result of each row.
         realtime
-            Whether to do realtime inference, which is efficient for small data (default None).
-            If not specified, we would infer it on based on the data modalities
+            Whether to do realtime inference, which is efficient for small data (default False).
+            If provided None, we would infer it on based on the data modalities
             and sample number.
 
         Returns
@@ -1803,8 +1812,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         ret_type = LOGITS
         outputs = self.predict_per_run(
             data=data,
-            requires_label=True,
             realtime=realtime,
+            requires_label=True,
         )
         logits = extract_from_output(ret_type=ret_type, outputs=outputs)
         metric_data = {}
@@ -1881,7 +1890,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         data: Union[pd.DataFrame, dict, list, str],
         candidate_data: Optional[Union[pd.DataFrame, dict, list]] = None,
         as_pandas: Optional[bool] = None,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         **kwargs,
     ):
         """
@@ -1897,8 +1906,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         as_pandas
             Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
         realtime
-            Whether to do realtime inference, which is efficient for small data (default None).
-            If not specified, we would infer it on based on the data modalities
+            Whether to do realtime inference, which is efficient for small data (default False).
+            If provided None, we would infer it on based on the data modalities
             and sample number.
 
         Returns
@@ -1916,8 +1925,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         else:
             outputs = self.predict_per_run(
                 data=data,
-                requires_label=False,
                 realtime=realtime,
+                requires_label=False,
             )
             logits = extract_from_output(outputs=outputs, ret_type=ret_type)
 
@@ -1942,7 +1951,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         candidate_data: Optional[Union[pd.DataFrame, dict, list]] = None,
         as_pandas: Optional[bool] = None,
         as_multiclass: Optional[bool] = True,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         **kwargs,
     ):
         """
@@ -1962,8 +1971,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             Whether to return the probability of all labels or
             just return the probability of the positive class for binary classification problems.
         realtime
-            Whether to do realtime inference, which is efficient for small data (default None).
-            If not specified, we would infer it on based on the data modalities
+            Whether to do realtime inference, which is efficient for small data (default False).
+            If provided None, we would infer it on based on the data modalities
             and sample number.
 
         Returns
@@ -1986,8 +1995,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         else:
             outputs = self.predict_per_run(
                 data=data,
-                requires_label=False,
                 realtime=realtime,
+                requires_label=False,
             )
             logits = extract_from_output(outputs=outputs, ret_type=LOGITS)
             prob = logits_to_prob(logits)
@@ -2007,7 +2016,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         return_masks: Optional[bool] = False,
         as_tensor: Optional[bool] = False,
         as_pandas: Optional[bool] = False,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         **kwargs,
     ):
         """
@@ -2026,8 +2035,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         as_pandas
             Whether to return the output as a pandas DataFrame (True) or numpy array (False).
         realtime
-            Whether to do realtime inference, which is efficient for small data (default None).
-            If not specified, we would infer it on based on the data modalities
+            Whether to do realtime inference, which is efficient for small data (default False).
+            If provided None, we would infer it on based on the data modalities
             and sample number.
 
         Returns
@@ -2043,8 +2052,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         )
         outputs = self.predict_per_run(
             data=data,
-            requires_label=False,
             realtime=realtime,
+            requires_label=False,
         )
         if self._problem_type in [FEATURE_EXTRACTION, ZERO_SHOT_IMAGE_CLASSIFICATION]:
             features = extract_from_output(outputs=outputs, ret_type=COLUMN_FEATURES, as_ndarray=as_tensor is False)
@@ -2374,6 +2383,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             mixup_active=False,
             loss_func_name=OmegaConf.select(learner._config, "optimization.loss_function"),
             config=learner._config.optimization,
+            num_classes=learner._output_shape,
         )
         model_postprocess_fn = get_model_postprocess_fn(
             problem_type=learner._problem_type,

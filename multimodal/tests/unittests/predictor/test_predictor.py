@@ -93,7 +93,6 @@ def verify_no_redundant_model_configs(predictor):
     assert sorted(predictor._learner._config.model.names) == sorted(model_names)
 
 
-@pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "dataset_name,model_names,text_backbone,image_backbone,top_k_average_method,efficient_finetune,loss_function",
     [
@@ -263,7 +262,6 @@ def test_predictor_basic(
     verify_no_redundant_model_configs(predictor)
     score = predictor.evaluate(dataset.test_df)
     verify_predictor_save_load(predictor, dataset.test_df)
-    verify_realtime_inference(predictor, dataset.test_df)
 
     # Test for continuous fit
     predictor.fit(
@@ -283,6 +281,104 @@ def test_predictor_basic(
             hyperparameters=hyperparameters,
             time_limit=10,
         )
+
+
+@pytest.mark.single_gpu
+@pytest.mark.parametrize(
+    "dataset_name,model_names,text_backbone,image_backbone,top_k_average_method,efficient_finetune,loss_function",
+    [
+        (
+            "petfinder",
+            ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "fusion_mlp"],
+            "nlpaueb/legal-bert-small-uncased",
+            "swin_tiny_patch4_window7_224",
+            GREEDY_SOUP,
+            LORA,
+            "auto",
+        ),
+        (
+            "hateful_memes",
+            ["timm_image", "t_few", "fusion_mlp"],
+            "t5-small",
+            "mobilenetv3_small_100",
+            BEST,
+            IA3,
+            "auto",
+        ),
+        (
+            "hateful_memes",
+            ["clip"],
+            None,
+            None,
+            BEST,
+            NORM_FIT,
+            "auto",
+        ),
+    ],
+)
+def test_predictor_realtime_inference(
+    dataset_name,
+    model_names,
+    text_backbone,
+    image_backbone,
+    top_k_average_method,
+    efficient_finetune,
+    loss_function,
+):
+    dataset = ALL_DATASETS[dataset_name]
+    metric_name = dataset.metric
+
+    predictor = MultiModalPredictor(
+        label=dataset.label_columns[0],
+        problem_type=dataset.problem_type,
+        eval_metric=metric_name,
+    )
+    hyperparameters = {
+        "optimization.max_epochs": 1,
+        "model.names": model_names,
+        "env.num_workers": 0,
+        "env.num_workers_evaluation": 0,
+        "optimization.top_k_average_method": top_k_average_method,
+        "optimization.efficient_finetune": efficient_finetune,
+        "optimization.loss_function": loss_function,
+        "data.categorical.convert_to_text": False,  # ensure the categorical model is used.
+        "data.numerical.convert_to_text": False,  # ensure the numerical model is used.
+    }
+    if text_backbone is not None:
+        if "t_few" in model_names:
+            hyperparameters.update(
+                {
+                    "model.t_few.checkpoint_name": "t5-small",
+                    "model.t_few.gradient_checkpointing": False,
+                }
+            )
+        else:
+            hyperparameters.update(
+                {
+                    "model.hf_text.checkpoint_name": text_backbone,
+                }
+            )
+    if image_backbone is not None:
+        hyperparameters.update(
+            {
+                "model.timm_image.checkpoint_name": image_backbone,
+            }
+        )
+    save_path = os.path.join(get_home_dir(), "outputs", dataset_name)
+    if text_backbone is not None:
+        save_path = os.path.join(save_path, text_backbone)
+    if image_backbone is not None:
+        save_path = os.path.join(save_path, image_backbone)
+
+    if os.path.exists(save_path):
+        shutil.rmtree(save_path)
+    predictor.fit(
+        train_data=dataset.train_df,
+        hyperparameters=hyperparameters,
+        time_limit=20,
+        save_path=save_path,
+    )
+    verify_realtime_inference(predictor, dataset.test_df)
 
 
 def test_predictor_standalone():  # test standalone feature in MultiModalPredictor.save()
@@ -625,3 +721,30 @@ def test_hyperparameters_consistency(hyperparameters):
         time_limit=10,
     )
     assert predictor._learner._config == predictor_2._learner._config
+
+
+def test_predictor_cpu_only():
+    dataset = ALL_DATASETS["petfinder"]
+    metric_name = dataset.metric
+
+    predictor = MultiModalPredictor(
+        label=dataset.label_columns[0],
+        problem_type=dataset.problem_type,
+        eval_metric=metric_name,
+    )
+    hyperparameters = {
+        "optimization.max_epochs": 1,
+        "model.names": ["ft_transformer"],
+        "env.num_workers": 0,
+        "env.num_workers_evaluation": 0,
+        "data.categorical.convert_to_text": False,  # ensure the categorical model is used.
+        "data.numerical.convert_to_text": False,  # ensure the numerical model is used.
+        "env.accelerator": "cpu",
+    }
+    predictor.fit(
+        dataset.train_df,
+        hyperparameters=hyperparameters,
+        time_limit=10,
+    )
+    predictor.evaluate(dataset.test_df)
+    predictor.predict(dataset.test_df)

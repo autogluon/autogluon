@@ -75,7 +75,6 @@ class MMDetLitModule(pl.LightningModule):
         return self._base_step(batch=batch, mode="loss")
 
     def _get_map_input(self, pred_results):
-
         preds = []
         target = []
 

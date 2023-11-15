@@ -23,7 +23,7 @@ from ..constants import (
     QUERY,
     RESPONSE,
     SCORE,
-    SEMANTIC_SEGMENTATION,
+    SEMANTIC_MASK,
     TEXT,
     TOKEN_WORD_MAPPING,
     WORD_OFFSETS,
@@ -128,6 +128,9 @@ def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional
                         counter += 1
                 ner_pred.append((pred_one_sentence, word_offset, pred_proba))
         return ner_pred
+    elif ret_type == SEMANTIC_MASK:
+        masks = [ele[SEMANTIC_MASK] for ele in outputs]
+        ret = torch.cat(masks)
     else:
         raise ValueError(f"Unknown return type: {ret_type}")
 

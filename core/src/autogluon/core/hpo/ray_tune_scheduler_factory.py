@@ -2,7 +2,6 @@ from ray.tune.schedulers import AsyncHyperBandScheduler, FIFOScheduler
 
 
 class SchedulerFactory:
-
     scheduler_presets = {
         "FIFO": FIFOScheduler,
         "ASHA": AsyncHyperBandScheduler,

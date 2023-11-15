@@ -60,7 +60,6 @@ def get_hyper_params():
 
 
 def get_default_param():
-
     params = get_fixed_params()
     params.update(get_hyper_params())
 

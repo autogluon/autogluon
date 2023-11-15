@@ -572,7 +572,6 @@ class CustomHpoExecutor(HpoExecutor):
 
 
 class HpoExecutorFactory:
-
     __supported_executors = [
         RayHpoExecutor,
         CustomHpoExecutor,

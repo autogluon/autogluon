@@ -143,11 +143,6 @@ def test_when_metric_evaluated_then_output_equal_to_gluonts(
 def test_given_all_zero_data_when_metric_evaluated_then_output_equal_to_gluonts(
     ag_metric_name, gts_metric_name, gts_metric, deepar_trained_zero_data
 ):
-    if ag_metric_name in ["WQL", "WAPE"]:
-        pytest.skip(
-            "GluonTS produces incorrect values for these metrics on all-zero data https://github.com/awslabs/gluonts/issues/3034"
-        )
-
     check_gluonts_parity(
         ag_metric_name,
         gts_metric_name,

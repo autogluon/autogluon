@@ -49,7 +49,7 @@ extras_require = {
         "flaky>=3.7,<4",
         "pytest-timeout>=2.1,<3",
         "isort>=5.10",
-        "black>=22.3,<23.0",
+        "black~=23.0",
     ],
 }
 

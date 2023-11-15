@@ -69,7 +69,8 @@ class SimpleGluonTSDataset(GluonTSDataset):
         self.item_ids = indices_sizes.index  # shape [num_items]
         cum_sizes = indices_sizes.values.cumsum()
         self.indptr = np.append(0, cum_sizes).astype(np.int32)
-        self.timestamps = target_df.index.get_level_values(TIMESTAMP)  # shape [len(target_df)]
+        self.start_timestamps = target_df.reset_index(TIMESTAMP).groupby(level=ITEMID, sort=False).first()[TIMESTAMP]
+        assert len(self.item_ids) == len(self.start_timestamps)
 
     @staticmethod
     def _to_array(df: Optional[pd.DataFrame], dtype: np.dtype) -> Optional[np.ndarray]:
@@ -103,7 +104,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
             # GluonTS expects item_id to be a string
             ts = {
                 FieldName.ITEM_ID: str(self.item_ids[j]),
-                FieldName.START: pd.Period(self.timestamps[j], freq=self.freq),
+                FieldName.START: pd.Period(self.start_timestamps[j], freq=self.freq),
                 FieldName.TARGET: self.target_array[start_idx:end_idx],
             }
             if self.feat_static_cat is not None:

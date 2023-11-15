@@ -3,7 +3,6 @@ from ray.tune.search.hyperopt import HyperOptSearch
 
 
 class SearcherFactory:
-
     searcher_presets = {
         "random": BasicVariantGenerator,
         "bayes": HyperOptSearch,

@@ -76,6 +76,7 @@ logger = logging.getLogger(__name__)
 #  If kfold = 5, scores are 0.9, 0.85, 0.8, 0.75, and 0.7, the score is not 0.8! It is much lower because probs are combined together and AUC is recalculated
 #  Do we want this to happen? Should we calculate score by 5 separate scores and then averaging instead?
 
+
 # TODO: Dynamic model loading for ensemble models during prediction, only load more models if prediction is uncertain. This dynamically reduces inference time.
 # TODO: Try midstack Semi-Supervised. Just take final models and re-train them, use bagged preds for SS rows. This would be very cheap and easy to try.
 # TODO: Move to autogluon.core
@@ -1901,6 +1902,8 @@ class AbstractTrainer:
             predict_child_time=predict_child_time,
             predict_1_child_time=predict_1_child_time,
             val_score=model.val_score,
+            eval_metric=model.eval_metric.name,
+            stopping_metric=model.stopping_metric.name,
             path=os.path.relpath(model.path, self.path).split(os.sep),  # model's relative path to trainer
             type=type(model),  # Outer type, can be BaggedEnsemble, StackEnsemble (Type that is able to load the model)
             type_inner=type_inner,  # Inner type, if Ensemble then it is the type of the inner model (May not be able to load with this type)
@@ -2870,6 +2873,8 @@ class AbstractTrainer:
     def leaderboard(self, extra_info=False):
         model_names = self.get_model_names()
         score_val = []
+        eval_metric = []
+        stopping_metric = []
         fit_time_marginal = []
         pred_time_val_marginal = []
         stack_level = []
@@ -2878,6 +2883,8 @@ class AbstractTrainer:
         can_infer = []
         fit_order = list(range(1, len(model_names) + 1))
         score_val_dict = self.get_models_attribute_dict("val_score")
+        eval_metric_dict = self.get_models_attribute_dict("eval_metric")
+        stopping_metric_dict = self.get_models_attribute_dict("stopping_metric")
         fit_time_marginal_dict = self.get_models_attribute_dict("fit_time")
         predict_time_marginal_dict = self.get_models_attribute_dict("predict_time")
         fit_time_dict = self.get_models_attribute_full(attribute="fit_time", models=model_names, func=sum)
@@ -2885,6 +2892,8 @@ class AbstractTrainer:
         can_infer_dict = self.get_models_attribute_full(attribute="can_infer", models=model_names, func=min)
         for model_name in model_names:
             score_val.append(score_val_dict[model_name])
+            eval_metric.append(eval_metric_dict[model_name])
+            stopping_metric.append(stopping_metric_dict[model_name])
             fit_time_marginal.append(fit_time_marginal_dict[model_name])
             fit_time.append(fit_time_dict[model_name])
             pred_time_val_marginal.append(predict_time_marginal_dict[model_name])
@@ -2893,6 +2902,7 @@ class AbstractTrainer:
             can_infer.append(can_infer_dict[model_name])
 
         model_info_dict = defaultdict(list)
+        extra_info_dict = dict()
         if extra_info:
             # TODO: feature_metadata
             # TODO: disk size
@@ -2957,10 +2967,15 @@ class AbstractTrainer:
             model_info_dict["ancestors"] = ancestors
             model_info_dict["descendants"] = descendants
 
+            extra_info_dict = {
+                "stopping_metric": stopping_metric,
+            }
+
         df = pd.DataFrame(
             data={
                 "model": model_names,
                 "score_val": score_val,
+                "eval_metric": eval_metric,
                 "pred_time_val": pred_time_val,
                 "fit_time": fit_time,
                 "pred_time_val_marginal": pred_time_val_marginal,
@@ -2968,6 +2983,7 @@ class AbstractTrainer:
                 "stack_level": stack_level,
                 "can_infer": can_infer,
                 "fit_order": fit_order,
+                **extra_info_dict,
                 **model_info_dict,
             }
         )
@@ -2977,6 +2993,7 @@ class AbstractTrainer:
         explicit_order = [
             "model",
             "score_val",
+            "eval_metric",
             "pred_time_val",
             "fit_time",
             "pred_time_val_marginal",

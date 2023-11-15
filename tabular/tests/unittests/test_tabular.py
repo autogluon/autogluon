@@ -32,6 +32,7 @@ import pytest
 from networkx.exception import NetworkXError
 
 from autogluon.common import space
+from autogluon.common.utils.simulation_utils import convert_simulation_artifacts_to_tabular_predictions_dict
 from autogluon.core.constants import BINARY, MULTICLASS, PROBLEM_TYPES_CLASSIFICATION, QUANTILE, REGRESSION
 from autogluon.core.utils import download, unzip
 from autogluon.tabular import TabularDataset, TabularPredictor
@@ -144,8 +145,46 @@ def test_advanced_functionality():
     savedir_predictor_original = savedir + "predictor/"
     predictor: TabularPredictor = TabularPredictor(label=label, path=savedir_predictor_original).fit(train_data)
     leaderboard = predictor.leaderboard(data=test_data)
+
+    # test metric_error leaderboard
+    leaderboard_error = predictor.leaderboard(data=test_data, score_format="error")
+    assert sorted(leaderboard["model"].to_list()) == sorted(leaderboard_error["model"].to_list())
+    leaderboard_combined = pd.merge(leaderboard, leaderboard_error[["model", "metric_error_test", "metric_error_val"]], on=["model"])
+    score_test = leaderboard_combined["score_test"].to_list()
+    score_val = leaderboard_combined["score_val"].to_list()
+    metric_error_test = leaderboard_combined["metric_error_test"].to_list()
+    metric_error_val = leaderboard_combined["metric_error_val"].to_list()
+    for score, error in zip(score_test, metric_error_test):
+        assert predictor.eval_metric.convert_score_to_error(score) == error
+    for score, error in zip(score_val, metric_error_val):
+        assert predictor.eval_metric.convert_score_to_error(score) == error
+
     if not on_windows:
         predictor.plot_ensemble_model()
+
+    # Test get_simulation_artifact
+    simulation_artifact_no_test = predictor.simulation_artifact()
+    assert "pred_proba_dict_test" not in simulation_artifact_no_test
+    assert "y_test" not in simulation_artifact_no_test
+    simulation_artifact = predictor.simulation_artifact(test_data=test_data)
+    assert sorted(list(simulation_artifact["pred_proba_dict_test"].keys())) == sorted(predictor.get_model_names(can_infer=True))
+    assert simulation_artifact["y_test"].equals(predictor.transform_labels(test_data[label]))
+    for sim_artifact in [simulation_artifact, simulation_artifact_no_test]:
+        assert sim_artifact["label"] == predictor.label
+        assert sorted(list(sim_artifact["pred_proba_dict_val"].keys())) == sorted(predictor.get_model_names(can_infer=True))
+        assert sim_artifact["eval_metric"] == predictor.eval_metric.name
+        assert sim_artifact["problem_type"] == predictor.problem_type
+    simulation_artifacts = {dataset["name"]: {0: simulation_artifact}}
+
+    # Test convert_simulation_artifacts_to_tabular_predictions_dict
+    aggregated_pred_proba, aggregated_ground_truth = convert_simulation_artifacts_to_tabular_predictions_dict(simulation_artifacts=simulation_artifacts)
+    assert set(aggregated_pred_proba[dataset["name"]][0]["pred_proba_dict_val"].keys()) == set(predictor.get_model_names(can_infer=True))
+    assert set(aggregated_pred_proba[dataset["name"]][0]["pred_proba_dict_test"].keys()) == set(predictor.get_model_names(can_infer=True))
+    ground_truth_keys_expected = set(simulation_artifact.keys())
+    ground_truth_keys_expected.remove("pred_proba_dict_val")
+    ground_truth_keys_expected.remove("pred_proba_dict_test")
+    assert set(aggregated_ground_truth[dataset["name"]][0].keys()) == ground_truth_keys_expected
+
     extra_metrics = ["accuracy", "roc_auc", "log_loss"]
     test_data_no_label = test_data.drop(columns=[label])
     with pytest.raises(ValueError):
