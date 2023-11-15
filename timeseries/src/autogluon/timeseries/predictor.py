@@ -1011,7 +1011,7 @@ class TimeSeriesPredictor:
         results = {
             "model_types": model_typenames,  # dict with key = model-name, value = type of model (class-name)
             "model_performance": self._trainer.get_models_attribute_dict("val_score"),
-            "model_best": self._trainer.model_best(),  # the name of the best model (on validation data)
+            "model_best": self._trainer.get_model_best(),  # the name of the best model (on validation data)
             "model_paths": self._trainer.get_models_attribute_dict("path"),
             "model_fit_times": self._trainer.get_models_attribute_dict("fit_time"),
             "model_pred_times": self._trainer.get_models_attribute_dict("predict_time"),
