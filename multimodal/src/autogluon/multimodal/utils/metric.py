@@ -39,6 +39,8 @@ from ..constants import (
     Y_PRED,
     Y_PRED_PROB,
     Y_TRUE,
+    SEMANTIC_SEGMENTATION,
+    IOU,
 )
 from ..problem_types import PROBLEM_TYPES_REG
 
@@ -126,6 +128,8 @@ def infer_metrics(
             )
     elif problem_type is None and is_matching:
         return RECALL, NDCG
+    elif problem_type == SEMANTIC_SEGMENTATION:
+        return IOU, IOU
     else:
         raise NotImplementedError(f"Problem type: {problem_type} is not supported yet!")
 

@@ -46,7 +46,6 @@ class SemanticSegmentationLearner(BaseLearner):
         path: Optional[str] = None,
         verbosity: Optional[int] = 2,
         num_classes: Optional[int] = None,  # TODO: can we infer this from data?
-        classes: Optional[list] = None,
         warn_if_exist: Optional[bool] = True,
         enable_progress_bar: Optional[bool] = None,
         pretrained: Optional[bool] = True,
@@ -230,9 +229,11 @@ class SemanticSegmentationLearner(BaseLearner):
             )
 
     def on_predict_start(self, data: pd.DataFrame):
+        data = self.data_to_df(data=data)
         if self._output_shape is None:  # for zero-shot evaluation/prediction
             self._output_shape = self.get_semantic_segmentation_class_num(data)
         self.ensure_predict_ready()
+        return data
 
     def evaluate(
         self,
@@ -265,7 +266,7 @@ class SemanticSegmentationLearner(BaseLearner):
         A dictionary with the metric names and their corresponding scores.
         Optionally return a dataframe of prediction results.
         """
-        self.on_predict_start(data)
+        data = self.on_predict_start(data)
         return self.evaluate_semantic_segmentation(data, metrics, realtime)
 
     def predict(
@@ -296,7 +297,7 @@ class SemanticSegmentationLearner(BaseLearner):
         When save_results is True, the output is a pandas dataframe containing the path of the predicted mask file for each input image.
         Otherwise, the output will have shape (#samples, height, width).
         """
-        self.on_predict_start(data)
+        data = self.on_predict_start(data)
         if self._output_shape == 1:
             ret_type = LOGITS
         else:
@@ -366,7 +367,7 @@ class SemanticSegmentationLearner(BaseLearner):
         assert (self._output_shape == 1 and as_multiclass == False) or (
             self._output_shape > 1 and as_multiclass == True
         )
-        self.on_predict_start(data)
+        data = self.on_predict_start(data)
 
         outputs = self.predict_per_run(
             data=data,
