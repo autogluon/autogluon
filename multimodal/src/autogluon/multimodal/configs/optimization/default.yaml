@@ -42,4 +42,8 @@ optimization:
     alpha: null
     gamma: 2.0
     reduction: "mean"
+  mask2former_loss:
+    loss_cross_entropy_weight: 10.0
+    loss_mask_weight: 5.0
+    loss_dice_weight: 5.0
   extra_trainable_params: []

@@ -550,8 +550,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             ret_data[col_name] = processed_data
             ret_type[col_name] = self._column_types[col_name]
 
-        if self.label_type == SEMANTIC_SEGMENTATION_GT:
-            if self._label_column in df:
+        if self._label_column in df:
+            if self.label_type == SEMANTIC_SEGMENTATION_GT:
                 y = self.transform_label(df)
                 ret_data.update(y[0])
                 ret_type.update(y[1])
@@ -915,8 +915,6 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                     y_pred = y_pred[1]
                 else:
                     y_pred = y_pred[0]
-        elif self.label_type == SEMANTIC_SEGMENTATION_GT:
-            y_pred = y_pred > 0.5
         else:
             raise NotImplementedError
 
