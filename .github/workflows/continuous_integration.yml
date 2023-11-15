@@ -236,7 +236,7 @@ jobs:
             other_than_docs:
               - '!(docs/**)**'
       - name: Test Multimodal Others Multi-GPU on AWS Batch
-        if: steps.changes.outputs.other_than_docs == 'true'
+        if: steps.changes.outputs.other_than_docs == 'true' && contains(github.event.pull_request.labels.*.name, 'skip-multi-gpu')
         uses: ./.github/actions/submit-job
         with:
           job-type: CI-MULTI-GPU
@@ -256,7 +256,7 @@ jobs:
             other_than_docs:
               - '!(docs/**)**'
       - name: Test Multimodal Others 2 Multi-GPU on AWS Batch
-        if: steps.changes.outputs.other_than_docs == 'true'
+        if: steps.changes.outputs.other_than_docs == 'true' && contains(github.event.pull_request.labels.*.name, 'skip-multi-gpu')
         uses: ./.github/actions/submit-job
         with:
           job-type: CI-MULTI-GPU
@@ -276,7 +276,7 @@ jobs:
             other_than_docs:
               - '!(docs/**)**'
       - name: Test Multimodal Predictor Multi-GPU on AWS Batch
-        if: steps.changes.outputs.other_than_docs == 'true'
+        if: steps.changes.outputs.other_than_docs == 'true' && contains(github.event.pull_request.labels.*.name, 'skip-multi-gpu')
         uses: ./.github/actions/submit-job
         with:
           job-type: CI-MULTI-GPU
