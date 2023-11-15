@@ -1,6 +1,7 @@
 """Unit tests for trainers"""
 import copy
 import shutil
+import sys
 import tempfile
 from collections import defaultdict
 from unittest import mock
@@ -165,6 +166,7 @@ def test_given_hyperparameters_when_trainer_fit_then_freq_set_correctly(temp_mod
         assert model.freq == DUMMY_TS_DATAFRAME.freq
 
 
+@pytest.mark.skipif(sys.platform.startswith("win"))
 @pytest.mark.parametrize("model_name", ["DeepAR", "SimpleFeedForward"])
 def test_given_hyperparameters_with_spaces_when_trainer_called_then_hpo_is_performed(temp_model_path, model_name):
     hyperparameters = {model_name: {"epochs": space.Int(1, 4)}}

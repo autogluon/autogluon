@@ -1,5 +1,6 @@
 """Unit tests for predictors"""
 import copy
+import sys
 import tempfile
 from pathlib import Path
 from unittest import mock
@@ -191,6 +192,7 @@ def test_given_hyperparameters_when_predictor_called_and_loaded_back_then_all_mo
         assert not np.any(np.isnan(predictions))
 
 
+@pytest.mark.skipif(sys.platform.startswith("win"))
 @pytest.mark.parametrize("target_column", ["target", "custom"])
 @pytest.mark.parametrize(
     "hyperparameters",

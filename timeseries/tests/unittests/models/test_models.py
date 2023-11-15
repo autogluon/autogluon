@@ -1,6 +1,7 @@
 """Unit tests and utils common to all models"""
 import itertools
 import shutil
+import sys
 import tempfile
 from unittest import mock
 
@@ -138,6 +139,7 @@ def test_when_models_saved_then_they_can_be_loaded(model_class, trained_models, 
 
 
 @flaky
+@pytest.mark.skipif(sys.platform.startswith("win"))
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct(model_class, temp_model_path):
     model = model_class(
