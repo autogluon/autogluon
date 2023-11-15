@@ -2535,7 +2535,7 @@ class TabularPredictor:
         if verbosity > 0:  # print stuff
             print("*** Summary of fit() ***")
             print("Estimated performance of each model:")
-            results["leaderboard"] = self._learner.leaderboard(silent=False)
+            results["leaderboard"] = self._learner.leaderboard(verbose=True)
             # self._summarize('model_performance', 'Validation performance of individual models', results)
             #  self._summarize('model_best', 'Best model (based on validation performance)', results)
             # self._summarize('hyperparameter_tune', 'Hyperparameter-tuning used', results)
