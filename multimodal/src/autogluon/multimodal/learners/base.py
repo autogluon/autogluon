@@ -293,6 +293,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         # Summary statistics used in fit summary. TODO: wrap it in a class.
         self._total_train_time = None
         self._best_score = None
+        self._callback_metrics = None
 
     @property
     def path(self):
@@ -1323,6 +1324,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             ckpt_path=ckpt_path,
             resume=resume,
         )
+        self._callback_metrics = trainer.callback_metrics
         self.on_fit_per_run_end(
             save_path=save_path,
             standalone=standalone,

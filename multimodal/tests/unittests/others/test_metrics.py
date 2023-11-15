@@ -14,7 +14,8 @@ from autogluon.multimodal.constants import MULTICLASS, Y_PRED, Y_TRUE
 from autogluon.multimodal.optimization.utils import compute_hit_rate, get_loss_func, get_metric
 from autogluon.multimodal.utils import compute_score
 
-from ..utils.unittest_datasets import HatefulMeMesDataset
+from ..utils.unittest_datasets import HatefulMeMesDataset, PetFinderDataset
+from ..utils.utils import get_home_dir
 
 
 @pytest.mark.parametrize(
@@ -82,6 +83,47 @@ def test_bce_with_logits_loss(problem_type, loss_func_name):
     bceloss = torch.nn.BCELoss()
     score2 = bceloss(input=preds, target=targets)
     assert pytest.approx(score1, 1e-6) == score2
+
+
+# TODO (1): torchmetrics will give slightly different result under multi GPU runs
+# TODO (2): "F1" is not supported for multiclass, will fallback to accuracy
+@pytest.mark.single_gpu
+@pytest.mark.parametrize(
+    "eval_metric",
+    ["f1_macro","f1_micro","f1_weighted"],
+)
+def test_f1_metrics_for_multiclass(eval_metric):
+    dataset = PetFinderDataset()
+    predictor = MultiModalPredictor(
+        label=dataset.label_columns[0],
+        problem_type="multiclass",
+        eval_metric=eval_metric,
+    )
+    hyperparameters = {
+        "optimization.max_epochs": 1,
+        "model.names": ["ft_transformer"],
+        "env.num_gpus": 1,
+        "env.num_workers": 0,
+        "env.num_workers_evaluation": 0,
+        "optimization.top_k_average_method": "best",
+        "optimization.loss_function": "auto",
+        "data.categorical.convert_to_text": False,  # ensure the categorical model is used.
+        "data.numerical.convert_to_text": False,  # ensure the numerical model is used.
+    }
+    save_path = os.path.join(get_home_dir(), "outputs", eval_metric)
+
+    if os.path.exists(save_path):
+        shutil.rmtree(save_path)
+    predictor.fit(
+        train_data=dataset.train_df,
+        tuning_data=dataset.test_df,
+        hyperparameters=hyperparameters,
+        time_limit=20,
+        save_path=save_path,
+    )
+    val_scores = predictor._learner._callback_metrics[f'val_{eval_metric}'].item()
+    eval_score = predictor.evaluate(dataset.test_df)[eval_metric]
+    assert abs(val_scores - eval_score) < 1e-4
 
 
 def ref_symmetric_hit_rate(features_a, features_b, logit_scale, top_ks=[1, 5, 10]):
