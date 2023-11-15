@@ -34,6 +34,9 @@ from ..constants import (
     DIRECT_LOSS,
     EM,
     F1,
+    F1_MACRO,
+    F1_MICRO,
+    F1_WEIGHTED,
     FEATURES,
     FEW_SHOT_CLASSIFICATION,
     FM,
@@ -280,6 +283,9 @@ def get_metric(
             return torchmetrics.SpearmanCorrCoef(), None
     elif metric_name == F1:
         return torchmetrics.F1Score(task=problem_type, num_classes=num_classes), None
+    elif metric_name in [F1_MACRO, F1_MICRO, F1_WEIGHTED]:
+        average = metric_name.split("_")[1]
+        return torchmetrics.F1Score(task=problem_type, num_classes=num_classes, average=average), None
     elif metric_name in DETECTION_METRICS:
         return (
             MeanAveragePrecision(box_format="xyxy", iou_type="bbox", class_metrics=False),

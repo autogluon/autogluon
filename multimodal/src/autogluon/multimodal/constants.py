@@ -122,6 +122,9 @@ CROSS_ENTROPY = "cross_entropy"
 COSINE_EMBEDDING_LOSS = "cosine_embedding_loss"
 F1 = "f1"
 OVERALL_F1 = "overall_f1"
+F1_MACRO = "f1_macro"
+F1_MICRO = "f1_micro"
+F1_WEIGHTED = "f1_weighted"
 NER_TOKEN_F1 = "ner_token_f1"
 DIRECT_LOSS = "direct_loss"
 HIT_RATE = "hit_rate"
@@ -152,6 +155,9 @@ METRIC_MODE_MAP = {
     PEARSONR: MAX,
     SPEARMANR: MAX,
     F1: MAX,
+    F1_MACRO: MAX,
+    F1_MICRO: MAX,
+    F1_WEIGHTED: MAX,
     MAP: MAX,
     MEAN_AVERAGE_PRECISION: MAX,
     NER_TOKEN_F1: MAX,
