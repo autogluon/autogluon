@@ -54,6 +54,7 @@ function install_multimodal_no_groundingdino {
     source $(dirname "$0")/setup_mmcv.sh
 
     # launch different process for each test to make sure memory is released
+    # test
     python3 -m pip install --upgrade pytest-xdist
     install_local_packages "multimodal/$1"
     setup_mmcv
