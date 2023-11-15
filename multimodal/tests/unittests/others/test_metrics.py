@@ -90,7 +90,7 @@ def test_bce_with_logits_loss(problem_type, loss_func_name):
 @pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "eval_metric",
-    ["f1_macro","f1_micro","f1_weighted"],
+    ["f1_macro", "f1_micro", "f1_weighted"],
 )
 def test_f1_metrics_for_multiclass(eval_metric):
     dataset = PetFinderDataset()
