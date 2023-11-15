@@ -195,7 +195,6 @@ class AutoMMModelCheckpoint(pl.callbacks.ModelCheckpoint):
         trainer: "pl.Trainer",
         monitor_candidates: Dict[str, torch.Tensor],
     ) -> None:
-
         super(AutoMMModelCheckpoint, self)._update_best_and_save(
             current=current, trainer=trainer, monitor_candidates=monitor_candidates
         )

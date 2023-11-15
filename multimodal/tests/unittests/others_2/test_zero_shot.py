@@ -100,10 +100,6 @@ def test_clip_zero_shot():
     with pytest.raises(ValueError):
         embedding = predictor.extract_embedding({"image": [cat_image_name], "text": [cat_text, bird_text]})
 
-    # invalid API usage 2: predicting probability with only one dictionary as input.
-    with pytest.raises(AssertionError):
-        prob = predictor.predict_proba({"image": [cat_image_name], "text": [cat_text]})
-
 
 @pytest.mark.parametrize(
     "checkpoint_name,num_gpus",

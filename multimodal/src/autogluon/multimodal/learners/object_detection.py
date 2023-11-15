@@ -1,10 +1,11 @@
+import json
 import logging
 import os
 from datetime import timedelta
 from typing import Dict, List, Optional, Union
 
 import pandas as pd
-from omegaconf import OmegaConf
+from omegaconf import DictConfig, OmegaConf
 from torch import nn
 
 from ..constants import (
@@ -22,16 +23,12 @@ from ..optimization import MMDetLitModule
 from ..utils import (
     check_if_packages_installed,
     cocoeval,
-    compute_inference_batch_size,
-    compute_num_gpus,
     convert_pred_to_xywh,
     create_fusion_model,
     extract_from_output,
     from_coco_or_voc,
     get_detection_classes,
-    infer_precision,
     object_detection_data_to_df,
-    run_ddp_only_once,
     save_ovd_result_df,
     save_result_df,
     setup_save_path,
@@ -45,21 +42,34 @@ logger = logging.getLogger(__name__)
 class ObjectDetectionLearner(BaseLearner):
     def __init__(
         self,
-        label: Optional[str] = None,
+        label: Optional[str] = None,  # TODO: can we let users customize label?
         problem_type: Optional[str] = OBJECT_DETECTION,
         presets: Optional[str] = None,
         eval_metric: Optional[str] = None,
         hyperparameters: Optional[dict] = None,
         path: Optional[str] = None,
         verbosity: Optional[int] = 2,
-        num_classes: Optional[int] = None,  # TODO: can we infer this from data?
-        classes: Optional[list] = None,
+        num_classes: Optional[int] = None,  # TODO: can we infer this from train/predict data?
+        classes: Optional[list] = None,  # TODO: can we infer this from train/predict data?
         warn_if_exist: Optional[bool] = True,
         enable_progress_bar: Optional[bool] = None,
         pretrained: Optional[bool] = True,
-        sample_data_path: Optional[str] = None,
+        validation_metric: Optional[str] = None,
+        sample_data_path: Optional[str] = None,  # TODO: can we use train/predict data instead?
         **kwargs,
     ):
+        """
+        Parameters
+        ----------
+        num_classes
+            Number of classes. Used in classification.
+            If this is specified and is different from the pretrained model's output,
+            the model's head will be changed to have <num_classes> output.
+        classes
+            All classes in this dataset.
+        sample_data_path
+            This is used for automatically inference num_classes, classes, or label.
+        """
         super().__init__(
             problem_type=problem_type,
             presets=presets,
@@ -67,14 +77,16 @@ class ObjectDetectionLearner(BaseLearner):
             hyperparameters=hyperparameters,
             path=path,
             verbosity=verbosity,
-            num_classes=num_classes,
-            classes=classes,
             warn_if_exist=warn_if_exist,
             enable_progress_bar=enable_progress_bar,
             pretrained=pretrained,
-            sample_data_path=sample_data_path,
+            validation_metric=validation_metric,
         )
         check_if_packages_installed(problem_type=self._problem_type)
+
+        self._output_shape = num_classes
+        self._classes = classes
+        self._sample_data_path = sample_data_path
 
         # TODO: merge object detection and open vocabulary object detection
         if self._problem_type == OBJECT_DETECTION:
@@ -154,11 +166,19 @@ class ObjectDetectionLearner(BaseLearner):
         # TODO: support inferring output during fit()?
         assert self._output_shape is not None, f"output_shape should have been set in the learner initialization."
 
+    def init_pretrained(self):
+        super().init_pretrained()
+        self._model = create_fusion_model(
+            config=self._config,
+            pretrained=self._pretrained,
+            num_classes=self._output_shape,
+            classes=self._classes,
+        )
+
     def fit(
         self,
         train_data: Union[pd.DataFrame, str],
         presets: Optional[str] = None,
-        config: Optional[Dict] = None,
         tuning_data: Optional[Union[pd.DataFrame, str]] = None,
         max_num_tuning_data: Optional[int] = None,
         time_limit: Optional[int] = None,
@@ -172,7 +192,7 @@ class ObjectDetectionLearner(BaseLearner):
         clean_ckpts: Optional[bool] = True,
         **kwargs,
     ):
-        training_start = self.on_fit_start(presets=presets, config=config)
+        training_start = self.on_fit_start(presets=presets)
         self.setup_save_path(save_path=save_path)
         self.prepare_train_tuning_data(
             train_data=train_data,
@@ -361,13 +381,10 @@ class ObjectDetectionLearner(BaseLearner):
         callbacks = self.get_callbacks_per_run(save_path=save_path, config=config, litmodule=litmodule)
         plugins = self.get_plugins_per_run(model=model)
         tb_logger = self.get_tb_logger(save_path=save_path)
-        num_gpus = compute_num_gpus(config_num_gpus=config.env.num_gpus, strategy=config.env.strategy)
-        self.log_gpu_info(num_gpus=num_gpus, config=config)
-        precision = infer_precision(num_gpus=num_gpus, precision=config.env.precision)
+        num_gpus, strategy = self.get_num_gpus_and_strategy_per_run(config=config)
+        precision = self.get_precision_per_run(num_gpus=num_gpus, precision=config.env.precision)
         grad_steps = self.get_grad_steps(num_gpus=num_gpus, config=config)
         strategy = self.get_strategy_per_run(num_gpus=num_gpus, config=config)
-        strategy, num_gpus = self.update_strategy_and_num_gpus_for_hpo(strategy=strategy, num_gpus=num_gpus)
-        num_gpus, strategy = run_ddp_only_once(num_gpus, strategy)
         config = self.post_update_config_per_run(
             config=config,
             num_gpus=num_gpus,
@@ -416,8 +433,8 @@ class ObjectDetectionLearner(BaseLearner):
     def predict_per_run(
         self,
         data: Union[pd.DataFrame, dict, list],
+        realtime: Optional[bool],
         requires_label: bool,
-        realtime: Optional[bool] = None,
         barebones: Optional[bool] = False,
     ) -> List[Dict]:
         """
@@ -427,10 +444,10 @@ class ObjectDetectionLearner(BaseLearner):
         ----------
         data
             The data for inference.
-        requires_label
-            Whether uses label during inference.
         realtime
             Whether use realtime inference.
+        requires_label
+            Whether uses label during inference.
         barebones
             Whether to run in “barebones mode”, where all lightning's features that may impact raw speed are disabled.
 
@@ -438,7 +455,7 @@ class ObjectDetectionLearner(BaseLearner):
         -------
         A list of output dicts.
         """
-        data = self.data_to_df(data=data)
+        data = self.on_predict_per_run_start(data=data)
         column_types = self.infer_column_types(
             column_types=self._column_types,
             data=data,
@@ -461,26 +478,16 @@ class ObjectDetectionLearner(BaseLearner):
             requires_label=requires_label,
             is_train=False,
         )
-        num_gpus = compute_num_gpus(
-            config_num_gpus=self._config.env.num_gpus,
-            strategy=self._config.env.strategy,
+        num_gpus, strategy = self.get_num_gpus_and_strategy_per_run(
+            predict_data=data,
+            is_train=False,
         )
-        precision = infer_precision(
+        precision = self.get_precision_per_run(
             num_gpus=num_gpus,
             precision=self._config.env.precision,
             cpu_only_warning=False,
         )
-        strategy = self.get_strategy_per_run(num_gpus=num_gpus, config=self._config)
-        num_gpus = self.update_num_gpus_by_strategy(strategy=strategy, num_gpus=num_gpus)
-        num_gpus, strategy = run_ddp_only_once(num_gpus, strategy)
-        batch_size = compute_inference_batch_size(
-            per_gpu_batch_size=self._config.env.per_gpu_batch_size,
-            eval_batch_size_ratio=OmegaConf.select(self._config, "env.eval_batch_size_ratio"),
-            per_gpu_batch_size_evaluation=self._config.env.per_gpu_batch_size_evaluation,
-            # backward compatibility.
-            num_gpus=num_gpus,
-            strategy=strategy,
-        )
+        batch_size = self.get_predict_batch_size_per_run(num_gpus=num_gpus, strategy=strategy)
         realtime, num_gpus, barebones = self.update_realtime_for_interactive_env(
             realtime=realtime,
             num_gpus=num_gpus,
@@ -519,7 +526,7 @@ class ObjectDetectionLearner(BaseLearner):
             pred_writer=pred_writer,
             num_gpus=num_gpus,
         )
-        self.clean_trainer_processes(trainer=trainer, is_train=False)
+        self.on_predict_per_run_end(trainer=trainer)
 
         # TODO: remove this by adjusting the return format of mmdet_image or lit_mmdet.
         if pred_writer is None:
@@ -562,6 +569,7 @@ class ObjectDetectionLearner(BaseLearner):
 
         outputs = self.predict_per_run(
             data=data,
+            realtime=False,
             requires_label=True,
         )  # outputs shape: num_batch, 1(["bbox"]), batch_size, 2(if using mask_rcnn)/na, 80, n, 5
 
@@ -589,11 +597,35 @@ class ObjectDetectionLearner(BaseLearner):
         data: Union[pd.DataFrame, dict, list, str],
         metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         eval_tool: Optional[str] = None,
         **kwargs,
     ):
-        """ """
+        """
+        Evaluate model on a test dataset.
+
+        Parameters
+        ----------
+        data
+            A dataframe, containing the same columns as the training data.
+            Or a str, that is a path of the annotation file for detection.
+        metrics
+            A list of metric names to report.
+            If None, we only return the score for the stored `_eval_metric_name`.
+        return_pred
+            Whether to return the prediction result of each row.
+        realtime
+            Whether to do realtime inference, which is efficient for small data (default False).
+            If provided None, we would infer it on based on the data modalities
+            and sample number.
+        eval_tool
+            The eval_tool for object detection. Could be "pycocotools" or "torchmetrics".
+
+        Returns
+        -------
+        A dictionary with the metric names and their corresponding scores.
+        Optionally return a dataframe of prediction results.
+        """
         self.ensure_predict_ready()
         if self._problem_type == OPEN_VOCABULARY_OBJECT_DETECTION:
             raise NotImplementedError("Open vocabulary object detection doesn't support calling `evaluate` yet.")
@@ -620,7 +652,7 @@ class ObjectDetectionLearner(BaseLearner):
         self,
         data: Union[pd.DataFrame, dict, list, str],
         as_pandas: Optional[bool] = None,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         save_results: Optional[bool] = None,
         **kwargs,
     ):
@@ -635,8 +667,8 @@ class ObjectDetectionLearner(BaseLearner):
         as_pandas
             Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
         realtime
-            Whether to do realtime inference, which is efficient for small data (default None).
-            If not specified, we would infer it on based on the data modalities
+            Whether to do realtime inference, which is efficient for small data (default False).
+            If provided None, we would infer it on based on the data modalities
             and sample number.
         save_results
             Whether to save the prediction results (only works for detection now)
@@ -656,8 +688,8 @@ class ObjectDetectionLearner(BaseLearner):
 
         outputs = self.predict_per_run(
             data=data,
-            requires_label=False,
             realtime=realtime,
+            requires_label=False,
         )
         pred = extract_from_output(outputs=outputs, ret_type=ret_type)
         if self._problem_type == OBJECT_DETECTION:
@@ -704,7 +736,7 @@ class ObjectDetectionLearner(BaseLearner):
         data: Union[pd.DataFrame, dict, list],
         as_pandas: Optional[bool] = None,
         as_multiclass: Optional[bool] = True,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         **kwargs,
     ):
         raise NotImplementedError("Object detection doesn't support calling `predict_proba` yet.")
@@ -714,7 +746,7 @@ class ObjectDetectionLearner(BaseLearner):
         data: Union[pd.DataFrame, dict, list],
         as_tensor: Optional[bool] = False,
         as_pandas: Optional[bool] = False,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         **kwargs,
     ):
         raise NotImplementedError("Object detection doesn't support calling `extract_embedding` yet.")
@@ -729,3 +761,36 @@ class ObjectDetectionLearner(BaseLearner):
         learner = super()._load_metadata(learner=learner, path=path, resume=resume, verbosity=verbosity)
         learner._data_processors = None
         return learner
+
+    def save(
+        self,
+        path: str,
+        standalone: Optional[bool] = True,
+        config: Optional[DictConfig] = None,
+        model: Optional[nn.Module] = None,
+        df_preprocessor: Optional[MultiModalFeaturePreprocessor] = None,
+        data_processors: Optional[Dict] = None,
+        fit_called: Optional[bool] = None,
+        save_model: Optional[bool] = True,
+    ):
+        super().save(
+            path=path,
+            standalone=standalone,
+            config=config,
+            model=model,
+            df_preprocessor=df_preprocessor,
+            data_processors=data_processors,
+            fit_called=fit_called,
+            save_model=save_model,
+        )
+        assets_path = os.path.join(path, "assets.json")
+        with open(assets_path, "r") as fp:
+            assets = json.load(fp)
+            assets.update(
+                {
+                    "classes": self._classes,
+                }
+            )
+        os.remove(assets_path)
+        with open(assets_path, "w") as fp:
+            json.dump(assets, fp, ensure_ascii=True)

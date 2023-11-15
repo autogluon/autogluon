@@ -13,18 +13,17 @@ from torch import nn, optim
 from torch.nn import functional as F
 from torchmetrics.detection.mean_ap import MeanAveragePrecision
 from transformers import Adafactor
+from transformers.models.mask2former.modeling_mask2former import Mask2FormerConfig, Mask2FormerLoss
 from transformers.trainer_pt_utils import get_parameter_names
 
 from ..constants import (
     ACC,
     ACCURACY,
-    AUTOMM,
     AVERAGE_PRECISION,
     BER,
     BINARY,
     BINARY_ACC,
     BINARY_DICE,
-    BINARY_IOU,
     BIT_FIT,
     COLUMN_FEATURES,
     CONTRASTIVE_LOSS,
@@ -36,6 +35,7 @@ from ..constants import (
     EM,
     F1,
     FEATURES,
+    FEW_SHOT_CLASSIFICATION,
     FM,
     HIT_RATE,
     IA3,
@@ -44,13 +44,12 @@ from ..constants import (
     IA3_LORA_BIAS,
     IA3_LORA_NORM,
     IA3_NORM,
+    IOU,
     LOG_LOSS,
     LORA,
     LORA_BIAS,
     LORA_NORM,
     MAE,
-    MAP,
-    MEAN_AVERAGE_PRECISION,
     MULTI_NEGATIVES_SOFTMAX_LOSS,
     MULTICLASS,
     NER,
@@ -79,16 +78,17 @@ from .lr_scheduler import (
     get_linear_schedule_with_warmup,
     get_polynomial_decay_schedule_with_warmup,
 )
-from .semantic_seg_metrics import COD_METRICS_NAMES, Balanced_Error_Rate
+from .semantic_seg_metrics import COD_METRICS_NAMES, Balanced_Error_Rate, Binary_IoU
 
 logger = logging.getLogger(__name__)
 
 
 def get_loss_func(
     problem_type: str,
-    mixup_active: bool,
+    mixup_active: Optional[bool] = None,
     loss_func_name: Optional[str] = None,
     config: Optional[DictConfig] = None,
+    **kwargs,
 ):
     """
     Choose a suitable Pytorch loss module based on the provided problem type.
@@ -131,13 +131,22 @@ def get_loss_func(
             loss_func = nn.MSELoss()
     elif problem_type == NER:
         loss_func = nn.CrossEntropyLoss(ignore_index=0)
-    elif problem_type in [OBJECT_DETECTION, OPEN_VOCABULARY_OBJECT_DETECTION]:
+    elif problem_type in [OBJECT_DETECTION, OPEN_VOCABULARY_OBJECT_DETECTION, FEW_SHOT_CLASSIFICATION]:
         return None
     elif problem_type == SEMANTIC_SEGMENTATION:
         if "structure_loss" in loss_func_name.lower():
             loss_func = StructureLoss()
         elif "balanced_bce" in loss_func_name.lower():
             loss_func = BBCEWithLogitLoss()
+        elif "mask2former_loss" in loss_func_name.lower():
+            weight_dict = {
+                "loss_cross_entropy": config.mask2former_loss.loss_cross_entropy_weight,
+                "loss_mask": config.mask2former_loss.loss_mask_weight,
+                "loss_dice": config.mask2former_loss.loss_dice_weight,
+            }
+            loss_func = Mask2FormerLoss(
+                config=Mask2FormerConfig(num_labels=kwargs["num_classes"]), weight_dict=weight_dict
+            )
         else:
             loss_func = nn.BCEWithLogitsLoss()
     elif problem_type is None:
@@ -297,8 +306,6 @@ def get_metric(
             return CustomHitRate(), None
         else:  # TODO: support recall for general classification tasks.
             raise ValueError("Recall is not supported yet.")
-    elif metric_name == BINARY_IOU:
-        return torchmetrics.JaccardIndex(task="binary"), None
     elif metric_name == BINARY_DICE:
         return torchmetrics.Dice(multiclass=False), None
     elif metric_name == BINARY_ACC:
@@ -307,6 +314,11 @@ def get_metric(
         return Balanced_Error_Rate(), None
     elif metric_name in [SM, EM, FM, MAE]:
         return COD_METRICS_NAMES[metric_name], None
+    elif metric_name == IOU:
+        if num_classes == 1:
+            return Binary_IoU(), None
+        else:
+            return torchmetrics.JaccardIndex(task="multiclass", num_classes=num_classes), None
     else:
         raise ValueError(f"Unknown metric {metric_name}")
 

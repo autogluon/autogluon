@@ -63,7 +63,6 @@ class RayBoolSpaceConverter(RayIntSpaceConverter):
 
 
 class RaySpaceConverterFactory:
-
     __supported_converters = [
         RayCategoricalSpaceConverter,
         RayRealSpaceConverter,

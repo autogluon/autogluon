@@ -15,6 +15,7 @@ cudaLib = None
 libLoadLock = threading.Lock()
 _cudaLib_refcount = 0  # Incremented on each cudaInit and decremented on cudaShutdown
 
+
 ## C function wrappers ##
 def cudaInit():
     if not _LoadNvmlLibrary():

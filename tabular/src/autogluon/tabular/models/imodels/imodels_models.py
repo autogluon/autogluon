@@ -50,7 +50,6 @@ class _IModelsModel(AbstractModel):
         return X.fillna(0)
 
     def _fit(self, X: pd.DataFrame, y: pd.Series, **kwargs):  # training data  # training labels
-
         model_cls = self.get_model()
         X = self.preprocess(X, is_train=True)
         params = self._get_model_params()

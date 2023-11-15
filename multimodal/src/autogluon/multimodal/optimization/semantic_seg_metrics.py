@@ -572,6 +572,34 @@ class WeightedFmeasure(object):
         return dict(wfm=weighted_fm)
 
 
+class Binary_IoU(torchmetrics.Metric):
+    """
+    Compute the IoU for binary semantic segmentation. The direct use of torchmetrics to calculate IoU for multiple samples does not yield accurate results.
+    So we iteratively calculate metric values and then take the average.
+    """
+
+    def __init__(
+        self,
+    ):
+        super().__init__()
+        self.add_state("logits", default=[], dist_reduce_fx=None)
+        self.add_state("labels", default=[], dist_reduce_fx=None)
+
+    def update(self, logits, labels):
+        self.logits.append(logits)
+        self.labels.append(labels)
+
+    def compute(self):
+        logits = torch.cat(self.logits).cpu()
+        labels = torch.cat(self.labels).cpu()
+
+        res_list = []
+        metric = torchmetrics.JaccardIndex(task="binary")
+        for logit, label in zip(logits, labels):
+            res_list.append(metric(logit, label))
+        return torch.mean(torch.tensor(res_list))
+
+
 class Balanced_Error_Rate(torchmetrics.Metric):
     """
     Compute the balanced error rate.

@@ -48,7 +48,7 @@ class RayParallelFitter(SequentialLocalFoldFittingStrategy):
 
     def wait_for_completion(self):
         print("...wait")
-        for (results_ref, time_start_fold, on_fit_end_fn) in self.jobs:
+        for results_ref, time_start_fold, on_fit_end_fn in self.jobs:
             fold_model, time_train_end_fold = ray.get(results_ref)
             print(f"{fold_model} | {time_train_end_fold}")
             on_fit_end_fn(fold_model, time_train_end_fold, time_start_fold)

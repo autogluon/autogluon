@@ -53,12 +53,13 @@ install_requires = [
     "jinja2>=3.0.3,<3.2",
     "tensorboard>=2.9,<3",
     "pytesseract>=0.3.9,<0.3.11",
+    "nvidia-ml-py3==7.352.0",
 ]
 
 install_requires = ag.get_dependency_version_ranges(install_requires)
 
 tests_require = [
-    "black>=22.3,<23.0",
+    "black~=23.0",
     "isort>=5.10",
     "datasets>=2.10.0,<2.15.0",
     "onnx>=1.13.0,<1.14.0",

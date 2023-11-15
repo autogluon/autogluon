@@ -10,7 +10,7 @@ import lightning.pytorch as pl
 import torch
 from lightning.pytorch.callbacks import BasePredictionWriter
 
-from ..constants import BBOX, WEIGHT
+from ..constants import BBOX, LM_TARGET, LOGIT_SCALE, LOGITS, TEMPLATE_LOGITS, WEIGHT
 
 logger = logging.getLogger(__name__)
 
@@ -144,8 +144,9 @@ class DDPPredictionWriter(BasePredictionWriter):
         results = dict()
         if len(x[0]) == 0:  # dict is empty
             return dict()
+
         for k, v in x[0].items():
-            if k == WEIGHT:  # ignore the key
+            if k in [WEIGHT, LOGIT_SCALE]:  # ignore the keys
                 continue
             elif isinstance(v, dict):
                 results[k] = self.collate([i[k] for i in x])
@@ -179,7 +180,9 @@ class DDPPredictionWriter(BasePredictionWriter):
             if isinstance(v, dict):
                 results[k] = self.sort(v, indices)
             else:
-                assert len(indices) == len(v)
+                assert len(indices) == len(
+                    v
+                ), f"Size mismatch, {k}: {v} of len {len(v)} and indices {indices} of length {len(indices)}"
                 results[k] = [x for _, x in sorted(zip(indices, v), key=lambda ele: ele[0])]
                 results[k] = torch.stack(results[k])
 

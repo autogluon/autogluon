@@ -237,10 +237,10 @@ In the following, we decomposed the functionalities of AutoMM and prepared step-
   How to use AutoMM presets.
 :::
 
-:::{grid-item-card} Few Shot Learning with FewShotSVMPredictor
+:::{grid-item-card} Few Shot Learning with AutoMM
   :link: advanced_topics/few_shot_learning.html
 
-  How to use SVM combined with feature extraction for few shot learning.
+  How to use foundation models + SVM for few shot learning.
 :::
 
 :::{grid-item-card} How to use FocalLoss

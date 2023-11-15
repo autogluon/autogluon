@@ -187,7 +187,7 @@ def default(presets: str = DEFAULT):
             {
                 "model.hf_text.checkpoint_name": "microsoft/mdeberta-v3-base",
                 "optimization.top_k": 1,
-                "env.precision": "bf16",
+                "env.precision": "bf16-mixed",
                 "env.per_gpu_batch_size": 4,
             }
         )
@@ -198,9 +198,9 @@ def default(presets: str = DEFAULT):
 
 
 @automm_presets.register()
-def few_shot_text_classification(presets: str = DEFAULT):
+def few_shot_classification(presets: str = DEFAULT):
     """
-    Register the presets for few_shot_text_classification.
+    Register the presets for few_shot_classification.
 
     Parameters
     ----------
@@ -214,35 +214,18 @@ def few_shot_text_classification(presets: str = DEFAULT):
     hyperparameter_tune_kwargs
         The hyperparameter tuning kwargs.
     """
-    hyperparameters = {
-        "model.names": ["t_few"],
-        "model.t_few.checkpoint_name": "google/flan-t5-xl",  # 3B model. google/flan-t5-xxl for 11B model.
-        "model.t_few.gradient_checkpointing": True,
-        "optimization.learning_rate": 1e-3,
-        "optimization.lr_decay": 1.0,
-        "optimization.efficient_finetune": "ia3_lora",
-        "optimization.max_steps": 600,  # Find better solution to train for long
-        "optimization.check_val_every_n_epoch": 10,  # Might need adjustment
-        "optimization.val_check_interval": 1.0,
-        "optimization.top_k_average_method": "best",
-        "optimization.warmup_steps": 0.06,
-        "optimization.lora.module_filter": [".*SelfAttention|.*EncDecAttention|.*DenseReluDense"],
-        "optimization.lora.filter": ["q|k|v|wi_1.*"],
-        "optimization.top_k": 1,
-        "optimization.max_epochs": -1,
-        "env.batch_size": 8,
-        "env.per_gpu_batch_size": 8,
-        "env.precision": "bf16",
-        "data.templates.turn_on": True,
-        "env.eval_batch_size_ratio": 2,
-    }
+    hyperparameters, hyperparameter_tune_kwargs = default(presets=presets)
+    hyperparameters.update(
+        {
+            "model.hf_text.checkpoint_name": "sentence-transformers/all-mpnet-base-v2",
+            "model.hf_text.pooling_mode": "mean",
+            "model.names": ["hf_text", "clip"],
+            "model.clip.checkpoint_name": "openai/clip-vit-large-patch14-336",
+            "model.clip.image_size": 336,
+            "env.eval_batch_size_ratio": 1,
+        }
+    )
     hyperparameter_tune_kwargs = {}
-
-    presets, use_hpo = parse_presets_str(presets)
-    if use_hpo:
-        default_tunable_hyperparameters, default_hyperparameter_tune_kwargs = get_default_hpo_setup()
-        hyperparameters.update(default_tunable_hyperparameters)
-        hyperparameter_tune_kwargs.update(default_hyperparameter_tune_kwargs)
 
     return hyperparameters, hyperparameter_tune_kwargs
 
@@ -274,6 +257,7 @@ def zero_shot_image_classification(presets: str = DEFAULT):
         hyperparameters.update(
             {
                 "model.clip.checkpoint_name": "openai/clip-vit-large-patch14-336",
+                "model.clip.image_size": 336,
                 "env.eval_batch_size_ratio": 1,
             }
         )
@@ -461,7 +445,7 @@ def semantic_segmentation(presets: str = DEFAULT):
         "env.auto_select_gpus": False,
         "env.num_gpus": -1,
         "env.num_workers": 4,
-        "env.precision": 16,
+        "env.precision": "16-mixed",
         "optimization.learning_rate": 1e-4,
         "optimization.loss_function": "structure_loss",
         "optimization.lr_decay": 0,
@@ -749,6 +733,7 @@ def image_text_similarity(presets: str = DEFAULT):
         hyperparameters.update(
             {
                 "model.clip.checkpoint_name": "openai/clip-vit-large-patch14-336",
+                "model.clip.image_size": 336,
                 "env.per_gpu_batch_size": 8,
             }
         )

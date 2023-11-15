@@ -491,7 +491,6 @@ class TemplateCollection:
     """
 
     def __init__(self):
-
         # Dict of all the DatasetTemplates, key is the tuple (dataset_name, subset_name)
         fetching_templates_if_not_exist()
         self.datasets_templates: Dict[(str, Optional[str]), DatasetTemplates] = self._collect_datasets()

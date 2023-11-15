@@ -383,7 +383,6 @@ class NumEmbeddings(nn.Module):
             )
 
         for x in embedding_arch[1:]:
-
             layers.append(
                 nn.ReLU()
                 if x == "relu"
@@ -608,6 +607,15 @@ class FT_Transformer(nn.Module):
     @property
     def numerical_key(self):
         return f"{self.prefix}_{NUMERICAL}"
+
+    @property
+    def input_keys(self):
+        input_keys = []
+        if self.categorical_feature_tokenizer:
+            input_keys.append(self.categorical_key)
+        if self.numerical_feature_tokenizer:
+            input_keys.append(self.numerical_key)
+        return input_keys
 
     @property
     def label_key(self):

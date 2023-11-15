@@ -14,8 +14,15 @@ import transformers
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
 from autogluon.core.metrics import Scorer
 
-from .constants import AUTOMM_TUTORIAL_MODE, NER, OBJECT_DETECTION, SEMANTIC_SEGMENTATION
-from .learners import BaseLearner, MultiModalMatcher, NERLearner, ObjectDetectionLearner, SemanticSegmentationLearner
+from .constants import AUTOMM_TUTORIAL_MODE, FEW_SHOT_CLASSIFICATION, NER, OBJECT_DETECTION, SEMANTIC_SEGMENTATION
+from .learners import (
+    BaseLearner,
+    FewShotSVMLearner,
+    MultiModalMatcher,
+    NERLearner,
+    ObjectDetectionLearner,
+    SemanticSegmentationLearner,
+)
 from .problem_types import PROBLEM_TYPES_REG
 from .utils import get_dir_ckpt_paths
 
@@ -78,7 +85,7 @@ class MultiModalPredictor:
             - 'image_text_similarity': Text-image similarity problem
             - 'feature_extraction': Extracting feature (only support inference)
             - 'zero_shot_image_classification': Zero-shot image classification (only support inference)
-            - 'few_shot_text_classification': (experimental) Few-shot text classification
+            - 'few_shot_classification': Few-shot classification for image or text data.
 
             For certain problem types, the default behavior is to load a pretrained model based on
             the presets / hyperparameters and the predictor will support zero-shot inference
@@ -92,7 +99,7 @@ class MultiModalPredictor:
             - 'image_text_similarity'
             - 'feature_extraction'
             - 'zero_shot_image_classification'
-            - 'few_shot_text_classification' (experimental)
+            - 'few_shot_classification'
 
         query
             Column names of query data (used for matching).
@@ -189,6 +196,8 @@ class MultiModalPredictor:
             learner_class = ObjectDetectionLearner
         elif problem_type == NER:
             learner_class = NERLearner
+        elif problem_type == FEW_SHOT_CLASSIFICATION:
+            learner_class = FewShotSVMLearner
         elif problem_type == SEMANTIC_SEGMENTATION:
             learner_class = SemanticSegmentationLearner
         else:
@@ -268,12 +277,15 @@ class MultiModalPredictor:
 
     @property
     def model_size(self) -> float:
+        """
+        Returns the model size in Megabyte.
+        """
         return self._learner.model_size
 
     @property
     def classes(self):
         """
-        Return the classes of object detection.
+        Returns the classes of object detection.
         """
         return self._learner.classes
 
@@ -340,7 +352,6 @@ class MultiModalPredictor:
         self,
         train_data: Union[pd.DataFrame, str],
         presets: Optional[str] = None,
-        config: Optional[dict] = None,
         tuning_data: Optional[Union[pd.DataFrame, str]] = None,
         max_num_tuning_data: Optional[int] = None,
         id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
@@ -365,32 +376,6 @@ class MultiModalPredictor:
             A dataframe containing training data.
         presets
             Presets regarding model quality, e.g., best_quality, high_quality, and medium_quality.
-        config
-            A dictionary with four keys "model", "data", "optimization", and "environment".
-            Each key's value can be a string, yaml file path, or OmegaConf's DictConfig.
-            Strings should be the file names (DO NOT include the postfix ".yaml") in
-            automm/configs/model, automm/configs/data, automm/configs/optimization, and automm/configs/environment.
-            For example, you can configure a late-fusion model for the image, text, and tabular data as follows:
-            config = {
-                        "model": "default",
-                        "data": "default",
-                        "optimization": "default",
-                        "environment": "default",
-                    }
-            or
-            config = {
-                        "model": "/path/to/model/config.yaml",
-                        "data": "/path/to/data/config.yaml",
-                        "optimization": "/path/to/optimization/config.yaml",
-                        "environment": "/path/to/environment/config.yaml",
-                    }
-            or
-            config = {
-                        "model": OmegaConf.load("/path/to/model/config.yaml"),
-                        "data": OmegaConf.load("/path/to/data/config.yaml"),
-                        "optimization": OmegaConf.load("/path/to/optimization/config.yaml"),
-                        "environment": OmegaConf.load("/path/to/environment/config.yaml"),
-                    }
         tuning_data
             A dataframe containing validation data, which should have the same columns as the train_data.
             If `tuning_data = None`, `fit()` will automatically
@@ -478,7 +463,6 @@ class MultiModalPredictor:
         self._learner.fit(
             train_data=train_data,
             presets=presets,
-            config=config,
             tuning_data=tuning_data,
             max_num_tuning_data=max_num_tuning_data,
             time_limit=time_limit,
@@ -508,7 +492,7 @@ class MultiModalPredictor:
         cutoffs: Optional[List[int]] = [1, 5, 10],
         label: Optional[str] = None,
         return_pred: Optional[bool] = False,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         eval_tool: Optional[str] = None,
     ):
         """
@@ -541,8 +525,8 @@ class MultiModalPredictor:
         return_pred
             Whether to return the prediction result of each row.
         realtime
-            Whether to do realtime inference, which is efficient for small data (default None).
-            If not specified, we would infer it on based on the data modalities
+            Whether to do realtime inference, which is efficient for small data (default False).
+            If provided None, we would infer it on based on the data modalities
             and sample number.
         eval_tool
             The eval_tool for object detection. Could be "pycocotools" or "torchmetrics".
@@ -573,7 +557,7 @@ class MultiModalPredictor:
         candidate_data: Optional[Union[pd.DataFrame, dict, list]] = None,
         id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         as_pandas: Optional[bool] = None,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         save_results: Optional[bool] = None,
     ):
         """
@@ -592,8 +576,8 @@ class MultiModalPredictor:
         as_pandas
             Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
         realtime
-            Whether to do realtime inference, which is efficient for small data (default None).
-            If not specified, we would infer it on based on the data modalities
+            Whether to do realtime inference, which is efficient for small data (default False).
+            If provided None, we would infer it on based on the data modalities
             and sample number.
         save_results
             Whether to save the prediction results (only works for detection now)
@@ -618,7 +602,7 @@ class MultiModalPredictor:
         id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         as_pandas: Optional[bool] = None,
         as_multiclass: Optional[bool] = True,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
     ):
         """
         Predict probabilities class probabilities rather than class labels.
@@ -640,8 +624,8 @@ class MultiModalPredictor:
             Whether to return the probability of all labels or
             just return the probability of the positive class for binary classification problems.
         realtime
-            Whether to do realtime inference, which is efficient for small data (default None).
-            If not specified, we would infer it on based on the data modalities
+            Whether to do realtime inference, which is efficient for small data (default False).
+            If provided None, we would infer it on based on the data modalities
             and sample number.
 
         Returns
@@ -666,7 +650,7 @@ class MultiModalPredictor:
         return_masks: Optional[bool] = False,
         as_tensor: Optional[bool] = False,
         as_pandas: Optional[bool] = False,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         signature: Optional[str] = None,
     ):
         """
@@ -688,8 +672,8 @@ class MultiModalPredictor:
         as_pandas
             Whether to return the output as a pandas DataFrame (True) or numpy array (False).
         realtime
-            Whether to do realtime inference, which is efficient for small data (default None).
-            If not specified, we would infer it on based on the data modalities
+            Whether to do realtime inference, which is efficient for small data (default False).
+            If provided None, we would infer it on based on the data modalities
             and sample number.
         signature
             When using matcher, it can be query or response.
@@ -768,6 +752,8 @@ class MultiModalPredictor:
             learner_class = ObjectDetectionLearner
         elif assets["problem_type"] == NER:
             learner_class = NERLearner
+        elif assets["problem_type"] == FEW_SHOT_CLASSIFICATION:
+            learner_class = FewShotSVMLearner
         elif assets["problem_type"] == SEMANTIC_SEGMENTATION:
             learner_class = SemanticSegmentationLearner
         else:

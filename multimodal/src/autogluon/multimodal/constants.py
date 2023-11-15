@@ -19,7 +19,6 @@ BINARY = "binary"
 MULTICLASS = "multiclass"
 REGRESSION = "regression"
 FEW_SHOT = "few_shot"
-FEW_SHOT_TEXT_CLASSIFICATION = "few_shot_text_classification"
 DEFAULT_SHOT = "default_shot"
 ZERO_SHOT = "zero_shot"
 NER = "ner"
@@ -34,6 +33,7 @@ OCR_TEXT_RECOGNITION = f"{OCR}_text_recognition"
 IMAGE_SIMILARITY = "image_similarity"
 TEXT_SIMILARITY = "text_similarity"
 IMAGE_TEXT_SIMILARITY = "image_text_similarity"
+FEW_SHOT_CLASSIFICATION = "few_shot_classification"
 SEMANTIC_SEGMENTATION = "semantic_segmentation"
 
 # Input keys
@@ -130,10 +130,10 @@ SM = "sm"
 EM = "em"
 FM = "fm"
 MAE = "mae"
-BINARY_IOU = "binary_iou"
 BINARY_DICE = "binary_dice"
 BINARY_ACC = "binary_acc"
 BER = "ber"
+IOU = "iou"
 RETRIEVAL_METRICS = [NDCG, PRECISION, RECALL, MRR]
 METRIC_MODE_MAP = {
     ACC: MAX,
@@ -155,7 +155,7 @@ METRIC_MODE_MAP = {
     OVERALL_F1: MAX,
     RECALL: MAX,
     SM: MAX,
-    BINARY_IOU: MAX,
+    IOU: MAX,
     BINARY_DICE: MAX,
     BINARY_ACC: MAX,
     BER: MIN,
@@ -308,6 +308,12 @@ BBOX_FORMATS = [XYWH, XYXY]
 # open vocabulary detection
 PROMPT = "prompt"
 OVD_RET = "ovd_ret"
+
+# sam (multi-class)
+CLASS_LOGITS = "class_logits"
+MASK_LABEL = "mask_label"
+CLASS_LABEL = "class_label"
+SEMANTIC_MASK = "semantic_mask"
 
 # presets
 DEFAULT = "default"

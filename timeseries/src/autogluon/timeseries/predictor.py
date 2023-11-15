@@ -7,7 +7,6 @@ from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import pandas as pd
 
-from autogluon.common.utils.deprecated_utils import Deprecated_args
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.utils import check_saved_predictor_version, seed_everything, setup_outputdir
 from autogluon.core.utils.decorators import apply_presets
@@ -120,7 +119,6 @@ class TimeSeriesPredictor:
     predictor_file_name = "predictor.pkl"
     _predictor_version_file_name = "__version__"
 
-    @Deprecated_args(min_version_to_warn="0.9", min_version_to_error="1.0", ignore_time_index=None)
     def __init__(
         self,
         target: Optional[str] = None,
@@ -136,7 +134,7 @@ class TimeSeriesPredictor:
         learner_type: Optional[Type[AbstractLearner]] = None,
         learner_kwargs: Optional[dict] = None,
         label: Optional[str] = None,
-        ignore_time_index: bool = False,
+        **kwargs,
     ):
         self.verbosity = verbosity
         set_logger_verbosity(self.verbosity, logger=logger)
@@ -195,6 +193,17 @@ class TimeSeriesPredictor:
             learner_type = TimeSeriesLearner
         self._learner: AbstractLearner = learner_type(**learner_kwargs)
         self._learner_type = type(self._learner)
+
+        if "ignore_time_index" in kwargs:
+            raise TypeError(
+                "`ignore_time_index` argument to TimeSeriesPredictor.__init__() has been deprecated.\n"
+                "If your data has irregular timestamps, please either 1) specify the desired regular frequency when "
+                "creating the predictor as `TimeSeriesPredictor(freq=...)` or 2) manually convert timestamps to "
+                "regular frequency with `data.convert_frequency(freq=...)`."
+            )
+        if len(kwargs) > 0:
+            for key in kwargs:
+                raise TypeError(f"TimeSeriesPredictor.__init__() got an unexpected keyword argument '{key}'")
 
     @property
     def _trainer(self) -> AbstractTimeSeriesTrainer:
@@ -255,7 +264,7 @@ class TimeSeriesPredictor:
                 raise ValueError(
                     f"Frequency of {name} is not provided and cannot be inferred. Please set the expected data "
                     f"frequency when creating the predictor with `TimeSeriesPredictor(freq=...)` or ensure that "
-                    f"the data has a regular time index with `{name}.to_regular_index(freq=...)`"
+                    f"the data has a regular time index with `{name}.convert_frequency(freq=...)`"
                 )
             else:
                 self.freq = df.freq
@@ -298,15 +307,16 @@ class TimeSeriesPredictor:
             f"Median time series length is {median_length} (min={min_length}, max={max_length}). "
         )
 
-    def _recommend_num_val_windows(
+    def _reduce_num_val_windows_if_necessary(
         self,
         train_data: TimeSeriesDataFrame,
+        original_num_val_windows: int,
         val_step_size: int,
-        max_num_val_windows: int = 5,
     ) -> int:
-        """Automatically recommend num_val_windows based on the length of training time series.
+        """Adjust num_val_windows based on the length of time series in train_data.
 
-        Chooses num_val_windows such that TS with median length is long enough to perform num_val_windows validations.
+        Chooses num_val_windows such that TS with median length is long enough to perform num_val_windows validations
+        (at least 1, at most `original_num_val_windows`).
 
         In other words, find largest `num_val_windows` that satisfies
         median_length >= min_train_length + prediction_length + (num_val_windows - 1) * val_step_size
@@ -315,7 +325,13 @@ class TimeSeriesPredictor:
         num_val_windows_for_median_ts = int(
             (median_length - self._min_train_length - self.prediction_length) // val_step_size + 1
         )
-        return min(max_num_val_windows, max(1, num_val_windows_for_median_ts))
+        new_num_val_windows = min(original_num_val_windows, max(1, num_val_windows_for_median_ts))
+        if new_num_val_windows < original_num_val_windows:
+            logger.warning(
+                f"Time series in train_data are too short for chosen num_val_windows={original_num_val_windows}. "
+                f"Reducing num_val_windows to {new_num_val_windows}."
+            )
+        return new_num_val_windows
 
     def _filter_short_series(
         self,
@@ -462,9 +478,9 @@ class TimeSeriesPredictor:
                     ...
                     hyperparameters={
                         "DeepAR": {},
-                        "ETS": [
-                            {"seasonal": "add"},
-                            {"seasonal": None},
+                        "Theta": [
+                            {"decomposition_type": "additive"},
+                            {"seasonal_period": 1},
                         ],
                     }
                 )
@@ -472,8 +488,8 @@ class TimeSeriesPredictor:
             The above example will train three models:
 
             * ``DeepAR`` with default hyperparameters
-            * ``ETS`` with additive seasonality (all other parameters set to their defaults)
-            * ``ETS`` with seasonality disabled (all other parameters set to their defaults)
+            * ``Theta`` with additive seasonal decomposition (all other parameters set to their defaults)
+            * ``Theta`` with seasonality disabled (all other parameters set to their defaults)
 
             Full list of available models and their hyperparameters is provided in :ref:`forecasting_zoo`.
 
@@ -530,10 +546,10 @@ class TimeSeriesPredictor:
                     presets="high_quality",
                     excluded_model_types=["DeepAR"],
                 )
-        num_val_windows : int or None, default = 1
+        num_val_windows : int, default = 1
             Number of backtests done on ``train_data`` for each trained model to estimate the validation performance.
-            If ``num_val_windows=None``, the predictor will attempt to set this parameter automatically based on the
-            length of time series in ``train_data`` (at most to 5).
+            If ``num_val_windows > 1`` is provided, this value may be automatically reduced to ensure that the majority
+            of time series in ``train_data`` are long enough for the chosen number of backtests.
 
             Increasing this parameter increases the training time roughly by a factor of ``num_val_windows // refit_every_n_windows``.
             See :attr:`refit_every_n_windows` and :attr:`val_step_size`: for details.
@@ -611,8 +627,10 @@ class TimeSeriesPredictor:
         if val_step_size is None:
             val_step_size = self.prediction_length
 
-        if num_val_windows is None:
-            num_val_windows = self._recommend_num_val_windows(train_data, val_step_size=val_step_size)
+        if num_val_windows > 0:
+            num_val_windows = self._reduce_num_val_windows_if_necessary(
+                train_data, original_num_val_windows=num_val_windows, val_step_size=val_step_size
+            )
 
         if tuning_data is not None:
             tuning_data = self._check_and_prepare_data_frame(tuning_data, name="tuning_data")
@@ -621,7 +639,7 @@ class TimeSeriesPredictor:
             # TODO: Use num_val_windows to perform multi-window backtests on tuning_data
             if num_val_windows > 0:
                 logger.warning(
-                    "\tSetting num_val_windows = 0 (disabling backtesting) because tuning_data is provided."
+                    "\tSetting num_val_windows = 0 (disabling backtesting on train_data) because tuning_data is provided."
                 )
                 num_val_windows = 0
 
@@ -1049,3 +1067,13 @@ class TimeSeriesPredictor:
                     f"Training may have failed on the refit model. AutoGluon will default to using '{model_best}' for predict()."
                 )
         return refit_full_dict
+
+    def __dir__(self) -> List[str]:
+        # This hides method from IPython autocomplete, but not VSCode autocomplete
+        deprecated = ["score"]
+        return [d for d in super().__dir__() if d not in deprecated]
+
+    def score(self, *args, **kwargs):
+        raise ValueError(
+            "`TimeSeriesPredictor.score` has been deprecated. Please use `TimeSeriesPredictor.evaluate` instead."
+        )
