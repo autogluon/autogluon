@@ -1,5 +1,6 @@
 """Unit tests for learners"""
 import shutil
+import sys
 import tempfile
 from collections import defaultdict
 from unittest import mock
@@ -93,6 +94,7 @@ def test_given_hyperparameters_when_learner_called_then_model_can_predict(
     assert not np.any(np.isnan(predictions))
 
 
+@pytest.mark.skipif(sys.platform.startswith("win"), reason="HPO tests lead to known issues in Windows platform tests")
 @pytest.mark.parametrize("model_name", ["DeepAR", "SimpleFeedForward"])
 def test_given_hyperparameters_with_spaces_when_learner_called_then_hpo_is_performed(temp_model_path, model_name):
     hyperparameters = {model_name: {"epochs": space.Int(1, 3)}}
