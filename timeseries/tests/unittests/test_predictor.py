@@ -354,6 +354,7 @@ def test_given_searchspace_and_no_hyperparameter_tune_kwargs_when_predictor_fits
         )
 
 
+@pytest.mark.skipif(sys.platform.startswith("win"), reason="HPO tests lead to known issues in Windows platform tests")
 def test_given_mixed_searchspace_and_hyperparameter_tune_kwargs_when_predictor_fits_then_no_exception_is_raised(
     temp_model_path,
 ):
@@ -941,6 +942,7 @@ def test_when_evaluate_receives_multiple_metrics_then_score_dict_contains_all_ke
     assert len(scores) == len(expected_keys) and all(k in scores for k in expected_keys)
 
 
+@pytest.mark.skipif(sys.platform.startswith("win"), reason="HPO tests lead to known issues in Windows platform tests")
 @pytest.mark.parametrize("enable_ensemble", [True, False])
 @pytest.mark.parametrize(
     "hyperparameters, hyperparameter_tune_kwargs",
