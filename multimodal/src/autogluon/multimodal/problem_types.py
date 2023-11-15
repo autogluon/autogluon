@@ -211,8 +211,6 @@ PROBLEM_TYPES_REG.register(
         supported_modality_type={IMAGE},
         supported_label_type={IMAGE},
         force_exist_modality={IMAGE},
-        _supported_evaluation_metrics=[BINARY_IOU],
-        _fallback_validation_metric=BINARY_IOU,
     ),
 )
 
