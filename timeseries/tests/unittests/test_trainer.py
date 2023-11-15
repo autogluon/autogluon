@@ -59,7 +59,7 @@ def test_trainer_can_be_initialized(temp_model_path):
 # smoke test for the short 'happy path'
 @pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS)
 def test_when_trainer_called_then_training_is_performed(trained_trainers, hyperparameters):
-    assert trained_trainers[repr(hyperparameters)].get_model_names()
+    assert trained_trainers[repr(hyperparameters)].model_names()
 
 
 @pytest.mark.parametrize("eval_metric", ["MAPE", None])
@@ -161,7 +161,7 @@ def test_given_hyperparameters_when_trainer_fit_then_freq_set_correctly(temp_mod
         hyperparameters=hyperparameters,
     )
 
-    for model_name in trainer.get_model_names():
+    for model_name in trainer.model_names():
         model = trainer.load_model(model_name)
         assert model.freq == DUMMY_TS_DATAFRAME.freq
 
@@ -286,7 +286,7 @@ def test_given_repeating_model_when_trainer_called_incrementally_then_name_colli
             hyperparameters=hp,
         )
 
-    model_names = trainer.get_model_names()
+    model_names = trainer.model_names()
 
     # account for the ensemble if it should be fitted, and drop ensemble names
     assert len(model_names) == expected_number_of_unique_names
@@ -313,7 +313,7 @@ def test_when_trainer_fit_and_deleted_models_load_back_correctly_and_can_predict
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters=hyperparameters,
     )
-    model_names = copy.copy(trainer.get_model_names())
+    model_names = copy.copy(trainer.model_names())
     trainer.save()
     del trainer
 
@@ -346,7 +346,7 @@ def test_when_trainer_fit_and_deleted_then_oof_predictions_can_be_loaded(temp_mo
             "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1},
         },
     )
-    model_names = copy.copy(trainer.get_model_names())
+    model_names = copy.copy(trainer.model_names())
     trainer.save()
     del trainer
 
@@ -427,7 +427,7 @@ def test_when_refit_full_called_then_all_models_are_retrained(trained_and_refit_
 
 def test_when_refit_full_called_then_all_models_can_predict(trained_and_refit_trainers):
     _, refit_trainer = trained_and_refit_trainers
-    for model in refit_trainer.get_model_names():
+    for model in refit_trainer.model_names():
         preds = refit_trainer.predict(DUMMY_TS_DATAFRAME, model=model)
         assert isinstance(preds, TimeSeriesDataFrame)
         assert len(preds) == DUMMY_TS_DATAFRAME.num_items * refit_trainer.prediction_length
@@ -508,11 +508,11 @@ def test_given_cache_predictions_is_true_when_calling_get_model_pred_dict_then_p
     trainer = AutoTimeSeriesTrainer(path=temp_model_path)
     trainer.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}, "SeasonalNaive": {}})
     assert not trainer._cached_predictions_path.exists()
-    trainer.get_model_pred_dict(trainer.get_model_names(), data=DUMMY_TS_DATAFRAME, record_pred_time=True)
+    trainer.get_model_pred_dict(trainer.model_names(), data=DUMMY_TS_DATAFRAME, record_pred_time=True)
 
     dataset_hash = trainer._compute_dataset_hash(DUMMY_TS_DATAFRAME)
     model_pred_dict, pred_time_dict = trainer._get_cached_pred_dicts(dataset_hash)
-    assert pred_time_dict.keys() == model_pred_dict.keys() == set(trainer.get_model_names())
+    assert pred_time_dict.keys() == model_pred_dict.keys() == set(trainer.model_names())
     assert all(isinstance(v, TimeSeriesDataFrame) for v in model_pred_dict.values())
     assert all(isinstance(v, float) for v in pred_time_dict.values())
 
@@ -556,5 +556,5 @@ def test_given_cache_predictions_is_false_when_calling_get_model_pred_dict_then_
     trainer = AutoTimeSeriesTrainer(path=temp_model_path, cache_predictions=False)
     trainer.fit(DUMMY_TS_DATAFRAME, hyperparameters=DUMMY_TRAINER_HYPERPARAMETERS)
     assert not trainer._cached_predictions_path.exists()
-    trainer.get_model_pred_dict(trainer.get_model_names(), data=DUMMY_TS_DATAFRAME)
+    trainer.get_model_pred_dict(trainer.model_names(), data=DUMMY_TS_DATAFRAME)
     assert not trainer._cached_predictions_path.exists()
