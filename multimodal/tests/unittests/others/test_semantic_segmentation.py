@@ -199,11 +199,13 @@ def verify_predictor_save_load_for_semantic_seg(predictor, df, as_multiclass, cl
     loaded_predictor.fit_summary()
 
     predictions2 = loaded_predictor.predict(df, as_pandas=False)
-    npt.assert_equal(predictions, predictions2)
+    for prediction, prediction2 in zip(predictions, predictions2):
+        npt.assert_equal(prediction, prediction2)
 
     predictions_prob = predictor.predict_proba(df, as_pandas=False, as_multiclass=as_multiclass)
     predictions2_prob = loaded_predictor.predict_proba(df, as_pandas=False, as_multiclass=as_multiclass)
-    npt.assert_equal(predictions_prob, predictions2_prob)
+    for prediction_prob, prediction2_prob in zip(predictions_prob, predictions2_prob):
+        npt.assert_equal(prediction_prob, prediction2_prob)
 
     shutil.rmtree(root)
 

@@ -4,7 +4,7 @@ from .lit_matcher import MatcherLitModule
 from .lit_mmdet import MMDetLitModule
 from .lit_module import LitModule
 from .lit_ner import NerLitModule
-from .lit_semantic_segmentation import SemanticSegmentationLitModule
+from .lit_semantic_seg import SemanticSegmentationLitModule
 from .losses import RKDLoss
 from .utils import (
     get_loss_func,

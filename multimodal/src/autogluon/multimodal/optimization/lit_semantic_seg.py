@@ -1,23 +1,14 @@
 import logging
-from typing import Callable, Dict, List, Optional, Union
+from typing import Callable, Dict
 
-import lightning.pytorch as pl
 import torch
-import torch.nn.functional as F
 import torchmetrics
-from lightning.pytorch.strategies import DeepSpeedStrategy
-from lightning.pytorch.utilities import grad_norm
-from torch import nn
-from torch.nn.modules.loss import _Loss
-from torchmetrics.aggregation import BaseAggregator
 from transformers.models.mask2former.modeling_mask2former import Mask2FormerLoss
 
-from ..constants import CLASS_LOGITS, LM_TARGET, LOGITS, SEMANTIC_MASK, T_FEW, TEMPLATE_LOGITS, WEIGHT
-from ..data.mixup import MixupModule, multimodel_mixup
+from ..constants import CLASS_LOGITS, LOGITS, SEMANTIC_MASK, WEIGHT
 from ..models.utils import run_model
 from .lit_module import LitModule
 from .semantic_seg_metrics import Multiclass_IoU
-from .utils import apply_layerwise_lr_decay, apply_single_lr, apply_two_stages_lr, get_lr_scheduler, get_optimizer
 
 logger = logging.getLogger(__name__)
 
