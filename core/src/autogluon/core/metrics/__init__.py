@@ -111,6 +111,14 @@ class Scorer(object, metaclass=ABCMeta):
         """
         return self.optimum - score
 
+    def convert_error_to_score(self, error: float) -> float:
+        """
+        Converts error in lower_is_better format to score in higher_is_better format.
+
+        An error of 0 indicates a perfect score.
+        """
+        return self.optimum - error
+
     @property
     def optimum(self) -> float:
         """
@@ -503,7 +511,7 @@ def customized_log_loss(y_true, y_pred, eps=1e-15):
     else:
         assert y_pred.ndim == 2, "Only ndim=2 is supported"
         labels = np.arange(y_pred.shape[1], dtype=np.int32)
-        return sklearn.metrics.log_loss(y_true.astype(np.int32), y_pred, labels=labels, eps=eps)
+        return sklearn.metrics.log_loss(y_true.astype(np.int32), y_pred, labels=labels)
 
 
 # Score function for probabilistic classification

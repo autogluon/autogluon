@@ -1,6 +1,7 @@
 """Unit tests and utils common to all models"""
 import itertools
 import shutil
+import sys
 import tempfile
 from unittest import mock
 
@@ -10,19 +11,20 @@ import pytest
 from flaky import flaky
 
 from autogluon.common import space
-from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesEvaluator
+from autogluon.core.hpo.constants import RAY_BACKEND
+from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
+from autogluon.timeseries.metrics import AVAILABLE_METRICS
 from autogluon.timeseries.models import DeepARModel, ETSModel
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
 
-from ..common import DUMMY_TS_DATAFRAME, dict_equal_primitive, get_data_frame_with_item_index
+from ..common import DUMMY_TS_DATAFRAME, CustomMetric, dict_equal_primitive, get_data_frame_with_item_index
 from .test_gluonts import TESTABLE_MODELS as GLUONTS_TESTABLE_MODELS
 from .test_local import TESTABLE_MODELS as LOCAL_TESTABLE_MODELS
 from .test_mlforecast import TESTABLE_MODELS as MLFORECAST_TESTABLE_MODELS
 from .test_multi_window_model import get_multi_window_deepar
 
-AVAILABLE_METRICS = TimeSeriesEvaluator.AVAILABLE_METRICS
 TESTABLE_MODELS = (
     GLUONTS_TESTABLE_MODELS + LOCAL_TESTABLE_MODELS + MLFORECAST_TESTABLE_MODELS + [get_multi_window_deepar]
 )
@@ -137,6 +139,7 @@ def test_when_models_saved_then_they_can_be_loaded(model_class, trained_models, 
 
 
 @flaky
+@pytest.mark.skipif(sys.platform.startswith("win"), reason="HPO tests lead to known issues in Windows platform tests")
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct(model_class, temp_model_path):
     model = model_class(
@@ -146,7 +149,7 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct
         hyperparameters={
             "epochs": space.Int(1, 3),
             "num_batches_per_epoch": 1,
-            "maxiter": 1,
+            "use_fallback_model": False,
         },
     )
     if isinstance(model, MultiWindowBacktestingModel):
@@ -187,7 +190,7 @@ def test_given_hyperparameter_spaces_to_init_when_fit_called_then_error_is_raise
 @pytest.mark.parametrize(
     "quantile_levels",
     [
-        [0.1, 0.44, 0.9],
+        [0.1, 0.44, 0.72],
         [0.1, 0.5, 0.9],
     ],
 )
@@ -207,8 +210,9 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_has_
     assert isinstance(predictions, TimeSeriesDataFrame)
 
     predicted_item_index = predictions.item_ids
+    expected_columns = ["mean"] + [str(q) for q in quantile_levels]
     assert all(predicted_item_index == DUMMY_TS_DATAFRAME.item_ids)  # noqa
-    assert all(k in predictions.columns for k in ["mean"] + [str(q) for q in quantile_levels])
+    assert (predictions.columns == expected_columns).all()
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
@@ -352,3 +356,123 @@ def test_when_get_info_is_called_then_all_keys_are_present(model_class, predicti
     ]
     for key in expected_keys:
         assert key in info
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+def test_when_median_not_in_quantile_levels_then_median_is_present_in_raw_predictions(model_class):
+    model = model_class(
+        prediction_length=3,
+        quantile_levels=[0.1, 0.15],
+        freq=DUMMY_TS_DATAFRAME.freq,
+        hyperparameters=DUMMY_HYPERPARAMETERS,
+    )
+    if isinstance(model, MultiWindowBacktestingModel):
+        # Median is present in the predictions of the base model, but not in the MultiWindowBacktestingModel wrapper
+        pytest.skip()
+    model.fit(train_data=DUMMY_TS_DATAFRAME)
+
+    raw_predictions = model._predict(DUMMY_TS_DATAFRAME)
+    assert "0.5" in raw_predictions.columns
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+def test_when_median_not_in_quantile_levels_then_median_is_dropped_at_prediction_time(model_class):
+    model = model_class(
+        prediction_length=3,
+        quantile_levels=[0.1, 0.15],
+        freq=DUMMY_TS_DATAFRAME.freq,
+        hyperparameters=DUMMY_HYPERPARAMETERS,
+    )
+    assert model.must_drop_median
+    model.fit(train_data=DUMMY_TS_DATAFRAME)
+    final_predictions = model.predict(DUMMY_TS_DATAFRAME)
+    assert "0.5" not in final_predictions.columns
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+def test_when_custom_metric_passed_to_model_then_model_can_score(model_class):
+    model = model_class(
+        prediction_length=3,
+        freq=DUMMY_TS_DATAFRAME.freq,
+        quantile_levels=[0.1, 0.15],
+        hyperparameters=DUMMY_HYPERPARAMETERS,
+        eval_metric=CustomMetric(),
+    )
+    model.fit(train_data=DUMMY_TS_DATAFRAME)
+    score = model.score(DUMMY_TS_DATAFRAME)
+    assert isinstance(score, float)
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+def test_when_custom_metric_passed_to_model_then_model_can_hyperparameter_tune(model_class):
+    model = model_class(
+        prediction_length=3,
+        freq=DUMMY_TS_DATAFRAME.freq,
+        hyperparameters={
+            "epochs": space.Int(1, 3),
+            "num_batches_per_epoch": 1,
+            "use_fallback_model": False,
+        },
+        eval_metric=CustomMetric(),
+    )
+    backend = model._get_hpo_backend()
+    if backend is RAY_BACKEND:
+        # Ray has trouble keeping references to the custom metric in the test namespace. We therefore
+        # skip this test.
+        pytest.skip()
+
+    if isinstance(model, MultiWindowBacktestingModel):
+        val_data = None
+    else:
+        val_data = DUMMY_TS_DATAFRAME
+
+    num_trials = 2
+
+    hpo_results, _ = model.hyperparameter_tune(
+        hyperparameter_tune_kwargs={"num_trials": num_trials, "scheduler": "local", "searcher": "random"},
+        time_limit=300,
+        train_data=DUMMY_TS_DATAFRAME,
+        val_data=val_data,
+    )
+    assert len(hpo_results) == num_trials
+    for result in hpo_results.values():
+        assert 1 <= result["hyperparameters"]["epochs"] <= 3
+        assert np.isfinite(result["val_score"])
+
+
+@pytest.mark.parametrize("searcher", ["random", "bayes"])
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+def test_given_searcher_when_ray_backend_used_in_hpo_then_correct_searcher_used(model_class, searcher):
+    model = model_class(
+        prediction_length=3,
+        freq=DUMMY_TS_DATAFRAME.freq,
+        hyperparameters={
+            "epochs": space.Int(1, 3),
+            "num_batches_per_epoch": 1,
+            "use_fallback_model": False,
+        },
+        eval_metric="MASE",
+    )
+    backend = model._get_hpo_backend()
+    if backend is not RAY_BACKEND:
+        pytest.skip()
+
+    val_data = None if isinstance(model, MultiWindowBacktestingModel) else DUMMY_TS_DATAFRAME
+    num_trials = 2
+
+    with mock.patch("ray.tune.Tuner") as mock_tuner:
+        try:
+            _ = model.hyperparameter_tune(
+                hyperparameter_tune_kwargs={"num_trials": num_trials, "scheduler": "FIFO", "searcher": searcher},
+                time_limit=300,
+                train_data=DUMMY_TS_DATAFRAME,
+                val_data=val_data,
+            )
+        except:
+            pass
+
+        ray_searcher_class_name = mock_tuner.call_args[1]["tune_config"].search_alg.__class__.__name__
+        assert {
+            "bayes": "HyperOpt",
+            "random": "BasicVariant",
+        }.get(searcher) in ray_searcher_class_name

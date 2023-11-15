@@ -8,7 +8,7 @@ from .constants import (
     CATEGORICAL,
     CLASSIFICATION,
     FEATURE_EXTRACTION,
-    FEW_SHOT_TEXT_CLASSIFICATION,
+    FEW_SHOT_CLASSIFICATION,
     IMAGE,
     IMAGE_BYTEARRAY,
     IMAGE_SIMILARITY,
@@ -19,11 +19,10 @@ from .constants import (
     NER_ANNOTATION,
     NUMERICAL,
     OBJECT_DETECTION,
-    OCR_TEXT_DETECTION,
-    OCR_TEXT_RECOGNITION,
     OPEN_VOCABULARY_OBJECT_DETECTION,
     REGRESSION,
     ROIS,
+    SEMANTIC_SEGMENTATION,
     TEXT,
     TEXT_NER,
     TEXT_SIMILARITY,
@@ -133,6 +132,19 @@ PROBLEM_TYPES_REG.register(
     ),
 )
 
+# Real-World Semantic Segmentation: image --> image
+PROBLEM_TYPES_REG.register(
+    SEMANTIC_SEGMENTATION,
+    ProblemTypeProperty(
+        name=SEMANTIC_SEGMENTATION,
+        support_zero_shot=True,
+        support_fit=True,
+        supported_modality_type={IMAGE},
+        supported_label_type={IMAGE},
+        force_exist_modality={IMAGE},
+    ),
+)
+
 # Matching: text <--> text, image <--> image, text <--> image
 PROBLEM_TYPES_REG.register(
     TEXT_SIMILARITY,
@@ -198,38 +210,13 @@ PROBLEM_TYPES_REG.register(
     ),
 )
 
-# Few-shot Text classification. TODO: For few-shot problems, they may be revised to be presets
 PROBLEM_TYPES_REG.register(
-    FEW_SHOT_TEXT_CLASSIFICATION,
+    FEW_SHOT_CLASSIFICATION,
     ProblemTypeProperty(
-        name=FEW_SHOT_TEXT_CLASSIFICATION,
+        name=FEW_SHOT_CLASSIFICATION,
         support_fit=True,
         support_zero_shot=False,
-        experimental=True,
-        supported_modality_type={TEXT},
-        force_exist_modality={TEXT},
-    ),
-)
-
-# OCR. TODO: Improve the definition of OCR.
-PROBLEM_TYPES_REG.register(
-    OCR_TEXT_DETECTION,
-    ProblemTypeProperty(
-        name=OCR_TEXT_DETECTION,
-        support_fit=False,
-        support_zero_shot=True,
-        experimental=True,
-        supported_modality_type={IMAGE},
-    ),
-)
-
-PROBLEM_TYPES_REG.register(
-    OCR_TEXT_RECOGNITION,
-    ProblemTypeProperty(
-        name=OCR_TEXT_RECOGNITION,
-        support_fit=False,
-        support_zero_shot=True,
-        experimental=True,
-        supported_modality_type={IMAGE},
+        supported_modality_type={IMAGE, TEXT},
+        supported_label_type={CATEGORICAL},
     ),
 )

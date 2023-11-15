@@ -3,8 +3,8 @@ from typing import List, Optional
 from torch import nn
 
 from ..constants import FEATURES, LABEL, LOGITS, NUMERICAL
+from .ft_transformer import NumEmbeddings
 from .mlp import MLP
-from .numerical_transformer import NumEmbeddings
 from .utils import init_weights
 
 

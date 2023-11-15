@@ -58,6 +58,18 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         self.most_recent_model_folder: Optional[str] = None
         super().__init__(**kwargs)
 
+    def _get_model_base(self):
+        return self.model_base
+
+    def _get_hpo_backend(self) -> str:
+        return self._get_model_base()._get_hpo_backend()
+
+    def _is_gpu_available(self) -> bool:
+        return self._get_model_base()._is_gpu_available()
+
+    def get_minimum_resources(self, is_gpu_available: bool = False) -> bool:
+        return self._get_model_base().get_minimum_resources(is_gpu_available)
+
     def _fit(
         self,
         train_data: TimeSeriesDataFrame,
@@ -105,7 +117,9 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
 
             oof_predictions_per_window.append(model.get_oof_predictions()[0])
 
-            logger.debug(f"\t\t{model.val_score:<7.4f}".ljust(15) + f"= Validation score ({model.eval_metric})")
+            logger.debug(
+                f"\t\t{model.val_score:<7.4f}".ljust(15) + f"= Validation score ({model.eval_metric.name_with_sign})"
+            )
             logger.debug(f"\t\t{model.fit_time:<7.3f} s".ljust(15) + "= Training runtime")
             logger.debug(f"\t\t{model.predict_time:<7.3f} s".ljust(15) + "= Training runtime")
 
@@ -137,7 +151,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         model.rename(self.name + os.sep + f"W{window_index}")
         return model
 
-    def predict(
+    def _predict(
         self,
         data: TimeSeriesDataFrame,
         known_covariates: Optional[TimeSeriesDataFrame] = None,

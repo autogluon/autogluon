@@ -17,6 +17,8 @@ on:
         required: true
         options:
           - tabular
+          - timeseries
+          - multimodal
       preset:
         description: 'Preset to run for tabular'
         required: true
@@ -25,12 +27,17 @@ on:
           - high
           - good
           - medium
+          - dev
+          - stable
       benchmark:
         description: 'Benchmark to run'
         required: true
         options:
-          - full
-          - test
+          - tabular_full
+          - tabular_test
+          - tabular_small
+          - timeseries_small
+          - none
       time_limit:
         description: 'Time limit for the benchmark to run'
         required: true
@@ -40,11 +47,16 @@ on:
           - 8h
           - 16h
           - 24h
+          - 10m4c
+          - g4_12x
+      folds:
+        description: 'Number of folds to run'
+        required: false
       branch_or_pr_number:
         description: 'Branch or PR number to run the benchmark on'
         required: true
       fork_info:
-        description: 'Get forked repository name and branch'
+        description: 'Get the forked PR repository name and branch, e.g. username/autogluon|test_branch'
         required: true
       
 permissions:
@@ -86,9 +98,17 @@ jobs:
           role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmarkConfig
           role-duration-seconds: 3600
           aws-region: us-east-1
-      - name: Generate AMLB User Dir
+      - name: Extract Fork Info
+        id: parse_fork_info
+        env:
+          FORK_INFO: ${{ github.event.inputs.fork_info }}
         run: |
-          /bin/bash CI/bench/generate_amlb_user_dir.sh ${{ github.event.inputs.fork_name }} ${{ github.event.inputs.fork_branch }} ${{ github.sha }}
+          IFS="|" read -r fork_name fork_branch <<< "$FORK_INFO"
+          echo "FORK_NAME=$fork_name" >> $GITHUB_OUTPUT
+          echo "FORK_BRANCH=$fork_branch" >> $GITHUB_OUTPUT
+      - name: Generate AMLB User Dir - {{ github.event.inputs.module }}
+        run: |
+          /bin/bash CI/bench/generate_amlb_user_dir.sh ${{ github.event.inputs.module }} ${{ steps.parse_fork_info.outputs.FORK_NAME }} ${{ steps.parse_fork_info.outputs.FORK_BRANCH }} ${{ github.sha }} "" ${{ github.event.inputs.folds }}
 
   benchmark:
     needs: generate_amlb_user_dir
@@ -128,14 +148,22 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v1
         with:
           role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
-          role-duration-seconds: 14400
+          role-duration-seconds: 36000
           aws-region: us-east-1
+      - name: Extract Fork Info
+        id: parse_fork_info
+        env:
+          FORK_INFO: ${{ github.event.inputs.fork_info }}
+        run: |
+          IFS="|" read -r fork_name fork_branch <<< "$FORK_INFO"
+          echo "FORK_NAME=$fork_name" >> $GITHUB_OUTPUT
+          echo "FORK_BRANCH=$fork_branch" >> $GITHUB_OUTPUT
       - name: Run benchmark
         shell: bash -l {0}
         run: |
           nvm install 20
           npm install -g aws-cdk
-          /bin/bash ./.github/workflow_scripts/run_benchmark.sh ${{ github.event.inputs.module }} ${{ github.event.inputs.preset }} ${{ github.event.inputs.benchmark }} ${{ github.event.inputs.time_limit }} ${{ github.event.inputs.fork_branch }} ${{ github.sha }}
+          /bin/bash ./.github/workflow_scripts/run_benchmark.sh ${{ github.event.inputs.module }} ${{ github.event.inputs.preset }} ${{ github.event.inputs.benchmark }} ${{ github.event.inputs.time_limit }} ${{ steps.parse_fork_info.outputs.FORK_BRANCH }} ${{ github.sha }}
       - name: Upload website.txt
         uses: actions/upload-artifact@v3
         with:

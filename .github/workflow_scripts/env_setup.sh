@@ -2,7 +2,7 @@ function setup_build_env {
     python3 -m pip install --upgrade pip
     python3 -m pip install tox
     python3 -m pip install flake8
-    python3 -m pip install "black>=22.3,<23.0"
+    python3 -m pip install "black~=23.0"
     python3 -m pip install isort>=5.10
     python3 -m pip install bandit
     python3 -m pip install packaging
@@ -12,15 +12,17 @@ function setup_build_env {
 function setup_build_contrib_env {
     python3 -m pip install --upgrade pip
     python3 -m pip install -r $(dirname "$0")/../../docs/requirements_doc.txt
-    python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
     export AG_DOCS=1
     export AUTOMM_TUTORIAL_MODE=1 # Disable progress bar in MultiModalPredictor
 }
 
 function setup_benchmark_env {
-    pip install -U autogluon.bench
+    # pip install -U autogluon.bench - revert back when latest update in PyPi
+    git clone https://github.com/autogluon/autogluon-bench.git
+    pip install -e ./autogluon-bench
     git clone https://github.com/autogluon/autogluon-dashboard.git
     pip install -e ./autogluon-dashboard
+    pip install yq
 }
 
 function setup_hf_model_mirror {

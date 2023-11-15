@@ -14,6 +14,7 @@ from torchmetrics.aggregation import BaseAggregator
 from ..constants import LM_TARGET, LOGITS, T_FEW, TEMPLATE_LOGITS, WEIGHT
 from ..data.mixup import MixupModule, multimodel_mixup
 from ..models.utils import run_model
+from .semantic_seg_metrics import COD, Balanced_Error_Rate
 from .utils import apply_layerwise_lr_decay, apply_single_lr, apply_two_stages_lr, get_lr_scheduler, get_optimizer
 
 logger = logging.getLogger(__name__)
@@ -119,7 +120,15 @@ class LitModule(pl.LightningModule):
         """
         super().__init__()
         self.save_hyperparameters(
-            ignore=["model", "validation_metric", "test_metric", "loss_func", "model_postprocess_fn"]
+            ignore=[
+                "model",
+                "validation_metric",
+                "test_metric",
+                "loss_func",
+                "model_postprocess_fn",
+                "mixup_fn",
+                "trainable_param_names",
+            ]
         )
         self.model = model
         self.validation_metric = validation_metric
@@ -146,12 +155,12 @@ class LitModule(pl.LightningModule):
         choices_scores = per_output[LOGITS]
         lm_target = per_output[LM_TARGET]
 
-        num_choices = self.model.num_classes
-        bs = int(lm_target.size(0) / num_choices)
+        bs = lm_target.size(0)
+        num_choices = lm_target.size(1)
 
         lm_loss = F.cross_entropy(
-            logits.view(bs, num_choices, *logits.size()[1:])[range(bs), label].flatten(0, 1),
-            lm_target.view(bs, num_choices, -1)[range(bs), label].flatten(0, 1),
+            logits[range(bs), label].flatten(0, 1),
+            lm_target[range(bs), label].flatten(0, 1),
         )
         if self.model.mc_loss > 0:
             mc_loss = F.cross_entropy(choices_scores, label)
@@ -159,10 +168,10 @@ class LitModule(pl.LightningModule):
             mc_loss = 0.0
 
         if self.model.unlikely_loss > 0:
-            cand_loglikely = -F.cross_entropy(logits.flatten(0, 1), lm_target.flatten(0, 1), reduction="none").view(
+            cand_loglikely = -F.cross_entropy(logits.flatten(0, 2), lm_target.flatten(0, 2), reduction="none").view(
                 bs, num_choices, -1
             )
-            cand_loglikely += (lm_target < 0).view(bs, num_choices, -1) * -100
+            cand_loglikely += (lm_target < 0) * -100
             cand_loglikely[range(bs), label] = -100
             unlikely_loss = -torch.log(1 - torch.exp(cand_loglikely) + 1e-2).sum() / (cand_loglikely != -100).sum()
         else:
@@ -350,6 +359,8 @@ class LitModule(pl.LightningModule):
         else:
             logger.debug("applying single learning rate...")
             grouped_parameters = apply_single_lr(
+                efficient_finetune=self.hparams.efficient_finetune,
+                trainable_param_names=self.trainable_param_names,
                 **kwargs,
             )
 

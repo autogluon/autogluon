@@ -30,6 +30,7 @@ from .data import (
     split_train_tuning_data,
     turn_on_off_feature_column_info,
 )
+from .distillation import DistillationMixin
 from .download import download, is_url
 from .environment import (
     check_if_packages_installed,
@@ -41,10 +42,11 @@ from .environment import (
     is_interactive_env,
     is_interactive_strategy,
     move_to_device,
+    run_ddp_only_once,
 )
 from .export import ExportMixin
 from .hpo import hyperparameter_tune
-from .inference import extract_from_output, infer_batch, predict, process_batch, use_realtime
+from .inference import RealtimeMixin, extract_from_output
 from .load import CustomUnpickler, get_dir_ckpt_paths, get_load_ckpt_paths, load_text_tokenizers
 from .log import (
     LogFilter,
@@ -55,7 +57,14 @@ from .log import (
     make_exp_dir,
 )
 from .matcher import compute_semantic_similarity, convert_data_for_ranking, create_siamese_model, semantic_search
-from .metric import compute_ranking_score, compute_score, get_minmax_mode, get_stopping_threshold, infer_metrics
+from .metric import (
+    compute_ranking_score,
+    compute_score,
+    get_minmax_mode,
+    get_stopping_threshold,
+    infer_metrics,
+    infer_problem_type_by_eval_metric,
+)
 from .misc import logits_to_prob, merge_bio_format, shopee_dataset, tensor_to_ndarray, visualize_ner
 from .mmcv import CollateMMDet, CollateMMOcr
 from .model import (
@@ -72,7 +81,6 @@ from .object_detection import (
     bbox_xyxy_to_xywh,
     cocoeval,
     convert_pred_to_xywh,
-    evaluate_coco,
     from_coco,
     from_coco_or_voc,
     from_dict,
@@ -83,10 +91,8 @@ from .object_detection import (
     save_result_coco_format,
     save_result_df,
     save_result_voc_format,
-    setup_detection_train_tuning_data,
     visualize_detection,
 )
 from .object_detection_visualizer import Visualizer
 from .ovd import save_ovd_result_df
-from .pipeline import init_pretrained, init_pretrained_matcher
 from .save import process_save_path, save_text_tokenizers, setup_save_path

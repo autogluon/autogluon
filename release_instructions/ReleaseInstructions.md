@@ -42,6 +42,7 @@
   * Ensure a fresh venv is used for each submodule.
   * Doing this will avoid issues like in v0.4 release with `autogluon.text` crashing when installed standalone due to missing setup.py dependencies
     * https://github.com/autogluon/autogluon/issues/1607
+* Fix any broken website links in the dev branch by referring to the following table (updated daily): https://github.com/autogluon/autogluon-brokenlinks/blob/master/Broken%20Links%20Dev.csv
 * If minor fixes are needed, create PRs and merge them as necessary if they are low risk. Ensure fixes are tested manually.
 * If major fixes are needed, consider the severity and if they are release critical. If they are, consider delaying release to ensure the issue is fixed (and tested).
 

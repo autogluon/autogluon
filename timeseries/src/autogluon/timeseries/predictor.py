@@ -2,11 +2,11 @@ import logging
 import os
 import pprint
 import time
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import pandas as pd
 
-from autogluon.common.utils.deprecated_utils import Deprecated_args
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.utils import check_saved_predictor_version, seed_everything, setup_outputdir
 from autogluon.core.utils.decorators import apply_presets
@@ -16,6 +16,7 @@ from autogluon.timeseries import __version__ as current_ag_version
 from autogluon.timeseries.configs import TIMESERIES_PRESETS_CONFIGS
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
 from autogluon.timeseries.learner import AbstractLearner, TimeSeriesLearner
+from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
 from autogluon.timeseries.splitter import ExpandingWindowSplitter
 from autogluon.timeseries.trainer import AbstractTimeSeriesTrainer
 
@@ -57,12 +58,18 @@ class TimeSeriesPredictor:
 
         If ``freq`` is provided when creating the predictor, all data passed to the predictor will be automatically
         resampled at this frequency.
-    eval_metric : str, default = "WQL"
+    eval_metric : Union[str, TimeSeriesScorer], default = "WQL"
         Metric by which predictions will be ultimately evaluated on future test data. AutoGluon tunes hyperparameters
         in order to improve this metric on validation data, and ranks models (on validation data) according to this
-        metric. Available options:
+        metric.
 
-        - ``"WQL"``: mean weighted quantile loss, defined as average of quantile losses for the specified ``quantile_levels`` scaled by the total value of the time series
+        Probabilistic forecast metrics (evaluated on quantile forecasts for the specified ``quantile_levels``):
+
+        - ``"WQL"``: mean weighted quantile loss, defined as average of quantile losses divided by the sum of absolute time series values in the forecast horizon.
+        - ``"SQL"``: scaled quantile loss, defined as average of quantile losses divided by the in-sample seasonal error.
+
+        Point forecast metrics (these are always evaluated on the ``"mean"`` column of the predictions):
+
         - ``"MAPE"``: mean absolute percentage error
         - ``"sMAPE"``: "symmetric" mean absolute percentage error
         - ``"MASE"``: mean absolute scaled error
@@ -73,9 +80,8 @@ class TimeSeriesPredictor:
 
         For more information about these metrics, see https://docs.aws.amazon.com/forecast/latest/dg/metrics.html.
     eval_metric_seasonal_period : int, optional
-        Seasonal period used to compute the mean absolute scaled error (MASE) evaluation metric. This parameter is only
-        used if ``eval_metric="MASE"``. See https://en.wikipedia.org/wiki/Mean_absolute_scaled_error for more details.
-        Defaults to ``None``, in which case the seasonal period is computed based on the data frequency.
+        Seasonal period used to compute some evaluation metrics such as mean absolute scaled error (MASE). Defaults to
+        ``None``, in which case the seasonal period is computed based on the data frequency.
     known_covariates_names: List[str], optional
         Names of the covariates that are known in advance for all time steps in the forecast horizon. These are also
         known as dynamic features, exogenous variables, additional regressors or related time series. Examples of such
@@ -91,7 +97,7 @@ class TimeSeriesPredictor:
     quantile_levels : List[float], optional
         List of increasing decimals that specifies which quantiles should be estimated when making distributional
         forecasts. Defaults to ``[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]``.
-    path : str, optional
+    path : str or pathlib.Path, optional
         Path to the directory where models and intermediate outputs will be saved. Defaults to a timestamped folder
         ``AutogluonModels/ag-[TIMESTAMP]`` that will be created in the working directory.
     verbosity : int, default = 2
@@ -113,23 +119,22 @@ class TimeSeriesPredictor:
     predictor_file_name = "predictor.pkl"
     _predictor_version_file_name = "__version__"
 
-    @Deprecated_args(min_version_to_warn="0.9", min_version_to_error="1.0", ignore_time_index=None)
     def __init__(
         self,
         target: Optional[str] = None,
         known_covariates_names: Optional[List[str]] = None,
         prediction_length: int = 1,
         freq: str = None,
-        eval_metric: Optional[str] = None,
+        eval_metric: Union[str, TimeSeriesScorer, None] = None,
         eval_metric_seasonal_period: Optional[int] = None,
-        path: Optional[str] = None,
+        path: Optional[Union[str, Path]] = None,
         verbosity: int = 2,
         quantile_levels: Optional[List[float]] = None,
         cache_predictions: bool = True,
         learner_type: Optional[Type[AbstractLearner]] = None,
         learner_kwargs: Optional[dict] = None,
         label: Optional[str] = None,
-        ignore_time_index: bool = False,
+        **kwargs,
     ):
         self.verbosity = verbosity
         set_logger_verbosity(self.verbosity, logger=logger)
@@ -150,7 +155,7 @@ class TimeSeriesPredictor:
             )
         if self.target in known_covariates_names:
             raise ValueError(f"Target column {self.target} cannot be one of the known covariates.")
-        self.known_covariates_names = known_covariates_names
+        self.known_covariates_names = list(known_covariates_names)
 
         self.prediction_length = prediction_length
         # For each validation fold, all time series in training set must have length >= _min_train_length
@@ -162,14 +167,7 @@ class TimeSeriesPredictor:
             if std_freq != str(self.freq):
                 logger.info(f"Frequency '{self.freq}' stored as '{std_freq}'")
             self.freq = std_freq
-        if eval_metric == "mean_wQuantileLoss":
-            # We don't use warnings.warn since DeprecationWarning may be silenced by the Python warning filters
-            logger.warning(
-                "DeprecationWarning: Evaluation metric 'mean_wQuantileLoss' has been renamed to 'WQL'. "
-                "Support for the old name will be removed in v1.1.",
-            )
-            eval_metric = "WQL"
-        self.eval_metric = eval_metric
+        self.eval_metric = check_get_evaluation_metric(eval_metric)
         self.eval_metric_seasonal_period = eval_metric_seasonal_period
         if quantile_levels is None:
             quantile_levels = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
@@ -195,6 +193,17 @@ class TimeSeriesPredictor:
             learner_type = TimeSeriesLearner
         self._learner: AbstractLearner = learner_type(**learner_kwargs)
         self._learner_type = type(self._learner)
+
+        if "ignore_time_index" in kwargs:
+            raise TypeError(
+                "`ignore_time_index` argument to TimeSeriesPredictor.__init__() has been deprecated.\n"
+                "If your data has irregular timestamps, please either 1) specify the desired regular frequency when "
+                "creating the predictor as `TimeSeriesPredictor(freq=...)` or 2) manually convert timestamps to "
+                "regular frequency with `data.convert_frequency(freq=...)`."
+            )
+        if len(kwargs) > 0:
+            for key in kwargs:
+                raise TypeError(f"TimeSeriesPredictor.__init__() got an unexpected keyword argument '{key}'")
 
     @property
     def _trainer(self) -> AbstractTimeSeriesTrainer:
@@ -255,7 +264,7 @@ class TimeSeriesPredictor:
                 raise ValueError(
                     f"Frequency of {name} is not provided and cannot be inferred. Please set the expected data "
                     f"frequency when creating the predictor with `TimeSeriesPredictor(freq=...)` or ensure that "
-                    f"the data has a regular time index with `{name}.to_regular_index(freq=...)`"
+                    f"the data has a regular time index with `{name}.convert_frequency(freq=...)`"
                 )
             else:
                 self.freq = df.freq
@@ -298,15 +307,16 @@ class TimeSeriesPredictor:
             f"Median time series length is {median_length} (min={min_length}, max={max_length}). "
         )
 
-    def _recommend_num_val_windows(
+    def _reduce_num_val_windows_if_necessary(
         self,
         train_data: TimeSeriesDataFrame,
+        original_num_val_windows: int,
         val_step_size: int,
-        max_num_val_windows: int = 5,
     ) -> int:
-        """Automatically recommend num_val_windows based on the length of training time series.
+        """Adjust num_val_windows based on the length of time series in train_data.
 
-        Chooses num_val_windows such that TS with median length is long enough to perform num_val_windows validations.
+        Chooses num_val_windows such that TS with median length is long enough to perform num_val_windows validations
+        (at least 1, at most `original_num_val_windows`).
 
         In other words, find largest `num_val_windows` that satisfies
         median_length >= min_train_length + prediction_length + (num_val_windows - 1) * val_step_size
@@ -315,7 +325,13 @@ class TimeSeriesPredictor:
         num_val_windows_for_median_ts = int(
             (median_length - self._min_train_length - self.prediction_length) // val_step_size + 1
         )
-        return min(max_num_val_windows, max(1, num_val_windows_for_median_ts))
+        new_num_val_windows = min(original_num_val_windows, max(1, num_val_windows_for_median_ts))
+        if new_num_val_windows < original_num_val_windows:
+            logger.warning(
+                f"Time series in train_data are too short for chosen num_val_windows={original_num_val_windows}. "
+                f"Reducing num_val_windows to {new_num_val_windows}."
+            )
+        return new_num_val_windows
 
     def _filter_short_series(
         self,
@@ -462,9 +478,9 @@ class TimeSeriesPredictor:
                     ...
                     hyperparameters={
                         "DeepAR": {},
-                        "ETS": [
-                            {"seasonal": "add"},
-                            {"seasonal": None},
+                        "Theta": [
+                            {"decomposition_type": "additive"},
+                            {"seasonal_period": 1},
                         ],
                     }
                 )
@@ -472,8 +488,8 @@ class TimeSeriesPredictor:
             The above example will train three models:
 
             * ``DeepAR`` with default hyperparameters
-            * ``ETS`` with additive seasonality (all other parameters set to their defaults)
-            * ``ETS`` with seasonality disabled (all other parameters set to their defaults)
+            * ``Theta`` with additive seasonal decomposition (all other parameters set to their defaults)
+            * ``Theta`` with seasonality disabled (all other parameters set to their defaults)
 
             Full list of available models and their hyperparameters is provided in :ref:`forecasting_zoo`.
 
@@ -497,19 +513,29 @@ class TimeSeriesPredictor:
             In the above example, multiple versions of the DeepAR model with different values of the parameters
             "hidden_size" and "dropout_rate" will be trained.
         hyperparameter_tune_kwargs : str or dict, optional
-            Hyperparameter tuning strategy and kwargs (for example, how many HPO trials to run). If ``None``, then
-            hyperparameter tuning will not be performed.
+            Hyperparameter tuning strategy and kwargs (for example, how many HPO trials to run).
+            If None, then hyperparameter tuning will not be performed.
 
-            Currently, only HPO based on random search is supported for time series models.
+            If type is ``str``, then this argument specifies a preset.
+            Valid preset values:
 
-            Setting this parameter to string ``"random"`` performs 10 trials of random search per model.
+            * "auto": Performs HPO via bayesian optimization search on GluonTS-backed neural forecasting models and
+                random search on other models using local scheduler.
+            * "random": Performs HPO via random search.
 
-            We can change the number of random search trials per model by passing a dictionary as `hyperparameter_tune_kwargs`.
-            The dict must include the following keys
+            You can also provide a dict to specify searchers and schedulers
+            Valid keys:
 
-            - ``"num_trials"``: int, number of configurations to train for each tuned model
-            - ``"searcher"``: currently, the only supported option is ``"random"`` (random search)
-            - ``"scheduler"``: currently, the only supported option is ``"local"`` (all models trained on the same machine)
+            * "num_trials": How many HPO trials to run
+            * "scheduler": Which scheduler to use. Valid values:
+                * "local": Local shceduler that schedules trials FIFO
+            * "searcher": Which searching algorithm to use. Valid values:
+                * "local_random": Uses the "random" searcher
+                * "random": Perform random search
+                * "bayes": Perform HPO with HyperOpt on GluonTS-backed models via Ray tune. Perform random search on other models.
+                * "auto": alias for "bayes"
+
+            The "scheduler" and "searcher" key are required when providing a dict.
 
             Example::
 
@@ -517,7 +543,7 @@ class TimeSeriesPredictor:
                     ...
                     hyperparameter_tune_kwargs={
                         "num_trials": 5,
-                        "searcher": "random",
+                        "searcher": "auto",
                         "scheduler": "local",
                     },
                 )
@@ -530,10 +556,10 @@ class TimeSeriesPredictor:
                     presets="high_quality",
                     excluded_model_types=["DeepAR"],
                 )
-        num_val_windows : int or None, default = 1
+        num_val_windows : int, default = 1
             Number of backtests done on ``train_data`` for each trained model to estimate the validation performance.
-            If ``num_val_windows=None``, the predictor will attempt to set this parameter automatically based on the
-            length of time series in ``train_data`` (at most to 5).
+            If ``num_val_windows > 1`` is provided, this value may be automatically reduced to ensure that the majority
+            of time series in ``train_data`` are long enough for the chosen number of backtests.
 
             Increasing this parameter increases the training time roughly by a factor of ``num_val_windows // refit_every_n_windows``.
             See :attr:`refit_every_n_windows` and :attr:`val_step_size`: for details.
@@ -611,8 +637,10 @@ class TimeSeriesPredictor:
         if val_step_size is None:
             val_step_size = self.prediction_length
 
-        if num_val_windows is None:
-            num_val_windows = self._recommend_num_val_windows(train_data, val_step_size=val_step_size)
+        if num_val_windows > 0:
+            num_val_windows = self._reduce_num_val_windows_if_necessary(
+                train_data, original_num_val_windows=num_val_windows, val_step_size=val_step_size
+            )
 
         if tuning_data is not None:
             tuning_data = self._check_and_prepare_data_frame(tuning_data, name="tuning_data")
@@ -621,7 +649,7 @@ class TimeSeriesPredictor:
             # TODO: Use num_val_windows to perform multi-window backtests on tuning_data
             if num_val_windows > 0:
                 logger.warning(
-                    "\tSetting num_val_windows = 0 (disabling backtesting) because tuning_data is provided."
+                    "\tSetting num_val_windows = 0 (disabling backtesting on train_data) because tuning_data is provided."
                 )
                 num_val_windows = 0
 
@@ -747,9 +775,17 @@ class TimeSeriesPredictor:
         predictions = self._learner.predict(data, known_covariates=known_covariates, model=model, use_cache=use_cache)
         return predictions.reindex(original_item_id_order, level=ITEMID)
 
-    def evaluate(self, data: Union[TimeSeriesDataFrame, pd.DataFrame, str], **kwargs):
-        """Evaluate the performance for given dataset, computing the score determined by ``self.eval_metric``
-        on the given data set, and with the same ``prediction_length`` used when training models.
+    def evaluate(
+        self,
+        data: Union[TimeSeriesDataFrame, pd.DataFrame, str],
+        model: Optional[str] = None,
+        metrics: Optional[Union[str, TimeSeriesScorer, List[Union[str, TimeSeriesScorer]]]] = None,
+        use_cache: bool = True,
+    ) -> Dict[str, float]:
+        """Evaluate the forecast accuracy for given dataset.
+
+        This method measures the forecast accuracy using the last ``self.prediction_length`` time steps of each time
+        series in ``data`` as a hold-out set.
 
         Parameters
         ----------
@@ -765,31 +801,26 @@ class TimeSeriesPredictor:
 
             If provided data is an instance of pandas DataFrame, AutoGluon will attempt to automatically convert it
             to a ``TimeSeriesDataFrame``.
-
-        Other Parameters
-        ----------------
         model : str, optional
             Name of the model that you would like to evaluate. By default, the best model during training
             (with highest validation score) will be used.
-        metric : str, optional
-            Name of the evaluation metric to compute scores with. Defaults to ``self.eval_metric``
+        metrics : str, TimeSeriesScorer or List[Union[str, TimeSeriesScorer]], optional
+            Metric or a list of metrics to compute scores with. Defaults to ``self.eval_metric``. Supports both
+            metric names as strings and custom metrics based on TimeSeriesScorer.
         use_cache : bool, default = True
             If True, will attempt to use the cached predictions. If False, cached predictions will be ignored.
             This argument is ignored if ``cache_predictions`` was set to False when creating the ``TimeSeriesPredictor``.
 
         Returns
         -------
-        score : float
-            A forecast accuracy score, where higher values indicate better quality. For consistency, error metrics
+        scores_dict : Dict[str, float]
+            Dictionary where keys = metrics, values = performance along each metric. For consistency, error metrics
             will have their signs flipped to obey this convention. For example, negative MAPE values will be reported.
+            To get the ``eval_metric`` score, do ``output[predictor.eval_metric.name]``.
         """
         data = self._check_and_prepare_data_frame(data)
         self._check_data_for_evaluation(data)
-        return self._learner.score(data, **kwargs)
-
-    def score(self, data: Union[TimeSeriesDataFrame, pd.DataFrame, str], **kwargs):
-        """See, :meth:`~autogluon.timeseries.TimeSeriesPredictor.evaluate`."""
-        return self.evaluate(data, **kwargs)
+        return self._learner.evaluate(data, model=model, metrics=metrics, use_cache=use_cache)
 
     @classmethod
     def _load_version_file(cls, path: str) -> str:
@@ -798,12 +829,12 @@ class TimeSeriesPredictor:
         return version
 
     @classmethod
-    def load(cls, path: str, require_version_match: bool = True) -> "TimeSeriesPredictor":
+    def load(cls, path: Union[str, Path], require_version_match: bool = True) -> "TimeSeriesPredictor":
         """Load an existing ``TimeSeriesPredictor`` from given ``path``.
 
         Parameters
         ----------
-        path : str
+        path : str or pathlib.Path
             Path where the predictor was saved via :meth:`~autogluon.timeseries.TimeSeriesPredictor.save`.
         require_version_match : bool, default = True
             If True, will raise an AssertionError if the ``autogluon.timeseries`` version of the loaded predictor does
@@ -822,7 +853,7 @@ class TimeSeriesPredictor:
         """
         if not path:
             raise ValueError("`path` cannot be None or empty in load().")
-        path = setup_outputdir(path, warn_if_exist=False)
+        path: str = setup_outputdir(path, warn_if_exist=False)
 
         try:
             version_saved = cls._load_version_file(path=path)
@@ -1046,3 +1077,13 @@ class TimeSeriesPredictor:
                     f"Training may have failed on the refit model. AutoGluon will default to using '{model_best}' for predict()."
                 )
         return refit_full_dict
+
+    def __dir__(self) -> List[str]:
+        # This hides method from IPython autocomplete, but not VSCode autocomplete
+        deprecated = ["score"]
+        return [d for d in super().__dir__() if d not in deprecated]
+
+    def score(self, *args, **kwargs):
+        raise ValueError(
+            "`TimeSeriesPredictor.score` has been deprecated. Please use `TimeSeriesPredictor.evaluate` instead."
+        )

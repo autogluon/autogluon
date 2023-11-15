@@ -110,7 +110,7 @@ def load(
         )  # TODO: Add arguments!
     elif format == "multipart_local":
         paths = [join(path, f) for f in listdir(path) if (isfile(join(path, f))) & (f.startswith("part-"))]
-        return load_multipart(
+        return _load_multipart(
             paths=paths,
             delimiter=delimiter,
             encoding=encoding,

@@ -4,18 +4,14 @@ import os
 import warnings
 from typing import Dict, List, Optional, Tuple, Union
 
-import numpy as np
 import pandas as pd
-import PIL
 from omegaconf import DictConfig, OmegaConf
-from sklearn.model_selection import train_test_split
 from torch import nn
 
+from autogluon.core.utils import default_holdout_frac, generate_train_test_split_combined
 from autogluon.core.utils.loaders import load_pd
-from autogluon.core.utils.utils import default_holdout_frac
 
 from ..constants import (
-    AUTOMM,
     BINARY,
     CATEGORICAL,
     DEFAULT_SHOT,
@@ -25,12 +21,16 @@ from ..constants import (
     IMAGE_PATH,
     LABEL,
     MMLAB_MODELS,
+    MULTICLASS,
     NER,
     NER_ANNOTATION,
     NER_TEXT,
     NUMERICAL,
     OVD,
+    REGRESSION,
     ROIS,
+    SAM,
+    SEMANTIC_SEGMENTATION_IMG,
     TEXT,
     TEXT_NER,
 )
@@ -47,6 +47,7 @@ from ..data import (
     NerProcessor,
     NumericalProcessor,
     OVDProcessor,
+    SemanticSegImageProcessor,
     TextProcessor,
 )
 from ..data.infer_types import is_image_column
@@ -201,6 +202,16 @@ def create_data_processor(
             text_max_len=model_config.max_text_len,
             missing_value_strategy=config.data.document.missing_value_strategy,
         )
+    elif data_type == SEMANTIC_SEGMENTATION_IMG:
+        data_processor = SemanticSegImageProcessor(
+            model=model,
+            img_transforms=model_config.img_transforms,
+            gt_transforms=model_config.gt_transforms,
+            train_transforms=model_config.train_transforms,
+            val_transforms=model_config.val_transforms,
+            norm_type=model_config.image_norm,
+            ignore_label=model_config.ignore_label,
+        )
     else:
         raise ValueError(f"unknown data type: {data_type}")
 
@@ -245,6 +256,7 @@ def create_fusion_data_processors(
         TEXT_NER: [],
         DOCUMENT: [],
         OVD: [],
+        SEMANTIC_SEGMENTATION_IMG: [],
     }
 
     model_dict = {model.prefix: model}
@@ -296,6 +308,17 @@ def create_fusion_data_processors(
             )
             if data_types is not None and IMAGE in data_types:
                 data_types.remove(IMAGE)
+        elif per_name == SAM:
+            data_processors[SEMANTIC_SEGMENTATION_IMG].append(
+                create_data_processor(
+                    data_type=SEMANTIC_SEGMENTATION_IMG,
+                    config=config,
+                    model=per_model,
+                )
+            )
+            if data_types is not None and SEMANTIC_SEGMENTATION_IMG in data_types:
+                data_types.remove(SEMANTIC_SEGMENTATION_IMG)
+            requires_label = False
 
         if requires_label:
             # each model has its own label processor
@@ -571,45 +594,54 @@ def infer_dtypes_by_model_names(model_config: DictConfig):
     return allowable_dtypes, fallback_dtype
 
 
-def split_train_tuning_data(train_data, tuning_data, holdout_frac, is_classification, label_column, seed):
+def split_train_tuning_data(
+    data: pd.DataFrame,
+    holdout_frac: float = None,
+    problem_type: str = None,
+    label_column: str = None,
+    random_state: int = 0,
+) -> (pd.DataFrame, pd.DataFrame):
     """
-    Split training and tuning data.
+    Splits `data` into `train_data` and `tuning_data`.
+    If the problem_type is one of ['binary', 'multiclass']:
+        The split will be done with stratification on the label column.
+        Will guarantee at least 1 sample of every class in `data` will be present in `train_data`.
+            If only 1 sample of a class exists, it will always be put in `train_data` and not `tuning_data`.
 
     Parameters
     ----------
-    train_data
-        Provided training data.
-    tuning_data
-        Provided tuning data.
-    holdout_frac
-        Fraction of train_data to holdout as tuning_data.
-    is_classification
-        Whether is a classification task.
-    label_column
-        Header of label column.
-    seed
-        Random seed.
+    data : pd.DataFrame
+        The data to be split
+    holdout_frac : float, default = None
+        The ratio of data to use as validation.
+        If 0.2, 20% of the data will be used for validation, and 80% for training.
+        If None, the ratio is automatically determined,
+        ranging from 0.2 for small row count to 0.01 for large row count.
+    random_state : int, default = 0
+        The random state to use when splitting the data, to make the splitting process deterministic.
+        If None, a random value is used.
 
     Returns
     -------
-    The split training and tuning data.
+    Tuple of (train_data, tuning_data) of the split `data`
     """
-    if tuning_data is None:
-        if is_classification:
-            stratify = train_data[label_column]
-        else:
-            stratify = None
-        if holdout_frac is None:
-            val_frac = default_holdout_frac(len(train_data), hyperparameter_tune=False)
-        else:
-            val_frac = holdout_frac
-        train_data, tuning_data = train_test_split(
-            train_data,
-            test_size=val_frac,
-            stratify=stratify,
-            random_state=np.random.RandomState(seed),
-        )
+    if holdout_frac is None:
+        holdout_frac = default_holdout_frac(num_train_rows=len(data), hyperparameter_tune=False)
 
+    # TODO: Hack since the recognized problem types are only binary, multiclass, and regression
+    #  Problem types used for purpose of stratification, so regression = no stratification
+    if problem_type in [BINARY, MULTICLASS]:
+        problem_type_for_split = problem_type
+    else:
+        problem_type_for_split = REGRESSION
+
+    train_data, tuning_data = generate_train_test_split_combined(
+        data=data,
+        label=label_column,
+        test_size=holdout_frac,
+        problem_type=problem_type_for_split,
+        random_state=random_state,
+    )
     return train_data, tuning_data
 
 

@@ -12,5 +12,9 @@ benchmarks:                     # configuration namespace for the benchmarks def
     - '{root}/resources/benchmarks'
   constraints_file:             # list of yaml files describing the benchmarks runtime constraints.
     - '{user}/constraints.yaml'
+<<<<<<< HEAD
     - '{root}/resources/constraints.yaml'
+=======
+    - '{root}/resources/constraints.yaml'   
+>>>>>>> 66482607ff3d41bf5b44dc55dee1fb7a9ac2c94b
   overhead_time_seconds: 72000   # amount of additional time allowed for the job to complete before sending an interruption signal

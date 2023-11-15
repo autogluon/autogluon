@@ -3,16 +3,16 @@ from __future__ import annotations
 import copy
 import itertools
 import logging
+import reprlib
 from collections.abc import Iterable
+from pathlib import Path
 from typing import Any, List, Optional, Tuple, Type, Union
 
-import numpy as np
 import pandas as pd
 from joblib.parallel import Parallel, delayed
 from pandas.core.internals import ArrayManager, BlockManager
 
 from autogluon.common.loaders import load_pd
-from autogluon.common.utils.deprecated_utils import Deprecated
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
     Parameters
     ----------
-    data : Any
+    data : pd.DataFrame, str, pathlib.Path or Iterable
         Time series data to construct a ``TimeSeriesDataFrame``. The class currently supports four input formats.
 
         1. Time series data in a pandas DataFrame format without multi-index. For example::
@@ -46,9 +46,13 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 7        2 2019-01-02       7
                 8        2 2019-01-03       8
 
-        2. Time series data in pandas DataFrame format with multi-index on ``item_id`` and ``timestamp``. For example::
+            You can also use :meth:`~autogluon.timeseries.TimeSeriesDataFrame.from_data_frame` for loading data in such format.
 
-                                        target
+        2. Path to a data file in CSV or Parquet format. The file must contain columns ``item_id`` and ``timestamp``, as well as columns with time series values. This is similar to Option 1 above (pandas DataFrame format without multi-index). Both remote (e.g., S3) and local paths are accepted. You can also use :meth:`~autogluon.timeseries.TimeSeriesDataFrame.from_path` for loading data in such format.
+
+        3. Time series data in pandas DataFrame format with multi-index on ``item_id`` and ``timestamp``. For example::
+
+                                    target
                 item_id timestamp
                 0       2019-01-01       0
                         2019-01-02       1
@@ -60,8 +64,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
                         2019-01-02       7
                         2019-01-03       8
 
-        3. Path to a data file in CSV or Parquet format. The file must contain columns ``item_id`` and ``timestamp``, as well as columns with time series values. This is similar to Option 1 above (pandas DataFrame format without multi-index). Both remote (e.g., S3) and local paths are accepted.
-
         4. Time series data in Iterable format. For example::
 
                 iterable_dataset = [
@@ -70,16 +72,46 @@ class TimeSeriesDataFrame(pd.DataFrame):
                     {"target": [6, 7, 8], "start": pd.Period("01-01-2019", freq='D')}
                 ]
 
-    static_features : Optional[pd.DataFrame]
-        An optional data frame describing the metadata attributes of individual items in the item index. These
-        may be categorical or real valued attributes for each item. For example, if the item index refers to
-        time series data of individual households, static features may refer to time-independent demographic
-        features. When provided during ``fit``, the ``TimeSeriesPredictor`` expects the same metadata to be available
-        during prediction time. When provided, the index of the ``static_features`` index must match the item index
-        of the ``TimeSeriesDataFrame``.
+            You can also use :meth:`~autogluon.timeseries.TimeSeriesDataFrame.from_iterable_dataset` for loading data in such format.
 
-        ``TimeSeriesDataFrame`` will ensure consistency of static features during serialization/deserialization,
-        copy and slice operations although these features should be considered experimental.
+    static_features : pd.DataFrame, str or pathlib.Path, optional
+        An optional data frame describing the metadata of each individual time series that does not change with time.
+        Can take real-valued or categorical values. For example, if ``TimeSeriesDataFrame`` contains sales of various
+        products, static features may refer to time-independent features like color or brand.
+
+        The index of the ``static_features`` index must contain a single entry for each item present in the respective
+        ``TimeSeriesDataFrame``. For example, the following ``TimeSeriesDataFrame``::
+
+                                target
+            item_id timestamp
+            A       2019-01-01       0
+                    2019-01-02       1
+                    2019-01-03       2
+            B       2019-01-01       3
+                    2019-01-02       4
+                    2019-01-03       5
+
+        is compatible with the following ``static_features``::
+
+                     feat_1 feat_2
+            item_id
+            A           2.0    bar
+            B           5.0    foo
+
+        ``TimeSeriesDataFrame`` will ensure consistency of static features during serialization/deserialization, copy
+        and slice operations.
+
+        If ``static_features`` are provided during ``fit``, the ``TimeSeriesPredictor`` expects the same metadata to be
+        available during prediction time.
+    id_column : str, optional
+        Name of the ``item_id`` column, if it's different from the default. This argument is only used when
+        constructing a TimeSeriesDataFrame using format 1 (DataFrame without multi-index) or 2 (path to a file).
+    timestamp_column : str, optional
+        Name of the ``timestamp`` column, if it's different from the default. This argument is only used when
+        constructing a TimeSeriesDataFrame using format 1 (DataFrame without multi-index) or 2 (path to a file).
+    num_cpus : int, default = -1
+        Number of CPU cores used to process the iterable dataset in parallel. Set to -1 to use all cores. This argument
+        is only used when constructing a TimeSeriesDataFrame using format 4 (iterable dataset).
 
     Attributes
     ----------
@@ -94,11 +126,19 @@ class TimeSeriesDataFrame(pd.DataFrame):
         List of unique time series IDs contained in the data set.
     """
 
-    DUMMY_INDEX_START_TIME = pd.Timestamp("1900-01-01 00:00:00")
     index: pd.MultiIndex
     _metadata = ["_static_features", "_cached_freq"]
 
-    def __init__(self, data: Any, static_features: Optional[pd.DataFrame] = None, *args, **kwargs):
+    def __init__(
+        self,
+        data: Union[pd.DataFrame, str, Path, Iterable],
+        static_features: Optional[Union[pd.DataFrame, str, Path]] = None,
+        id_column: Optional[str] = None,
+        timestamp_column: Optional[str] = None,
+        num_cpus: int = -1,
+        *args,
+        **kwargs,
+    ):
         if isinstance(data, (BlockManager, ArrayManager)):
             # necessary for copy constructor to work in pandas <= 2.0.x. In >= 2.1.x this is replaced by _constructor_from_mgr
             pass
@@ -106,17 +146,21 @@ class TimeSeriesDataFrame(pd.DataFrame):
             if isinstance(data.index, pd.MultiIndex):
                 self._validate_multi_index_data_frame(data)
             else:
-                data = self._construct_pandas_frame_from_data_frame(data)
-        elif isinstance(data, str):
-            data = self._load_data_frame_from_file(data)
+                data = self._construct_tsdf_from_data_frame(
+                    data, id_column=id_column, timestamp_column=timestamp_column
+                )
+        elif isinstance(data, (str, Path)):
+            data = self._construct_tsdf_from_data_frame(
+                load_pd.load(str(data)), id_column=id_column, timestamp_column=timestamp_column
+            )
         elif isinstance(data, Iterable):
-            data = self._construct_pandas_frame_from_iterable_dataset(data)
+            data = self._construct_tsdf_from_iterable_dataset(data, num_cpus=num_cpus)
         else:
-            raise ValueError("Data input type not recognized, must be DataFrame, iterable or string.")
+            raise ValueError(f"data must be a pd.DataFrame, Iterable, string or Path (received {type(data)}).")
         super().__init__(data=data, *args, **kwargs)
         self._static_features: Optional[pd.DataFrame] = None
         if static_features is not None:
-            self.static_features = static_features
+            self.static_features = self._construct_static_features(static_features, id_column=id_column)
 
         # internal value for cached frequency values that are inferred. corresponds to either a
         # pandas-compatible frequency string, the value IRREGULAR_TIME_INDEX_FREQSTR that signals
@@ -136,6 +180,225 @@ class TimeSeriesDataFrame(pd.DataFrame):
         df._cached_freq = self._cached_freq
         return df
 
+    @classmethod
+    def _construct_tsdf_from_data_frame(
+        cls,
+        df: pd.DataFrame,
+        id_column: Optional[str] = None,
+        timestamp_column: Optional[str] = None,
+    ) -> pd.DataFrame:
+        df = df.copy()
+        if id_column is not None:
+            assert id_column in df.columns, f"Column '{id_column}' not found!"
+            if id_column != ITEMID and ITEMID in df.columns:
+                logger.warning(f"Renaming existing column '{ITEMID}' -> '__{ITEMID}' to avoid name collisions.")
+                df.rename(columns={ITEMID: "__" + ITEMID}, inplace=True)
+            df.rename(columns={id_column: ITEMID}, inplace=True)
+
+        if timestamp_column is not None:
+            assert timestamp_column in df.columns, f"Column '{timestamp_column}' not found!"
+            if timestamp_column != TIMESTAMP and TIMESTAMP in df.columns:
+                logger.warning(f"Renaming existing column '{TIMESTAMP}' -> '__{TIMESTAMP}' to avoid name collisions.")
+                df.rename(columns={TIMESTAMP: "__" + TIMESTAMP}, inplace=True)
+            df.rename(columns={timestamp_column: TIMESTAMP}, inplace=True)
+
+        if TIMESTAMP in df.columns:
+            df[TIMESTAMP] = pd.to_datetime(df[TIMESTAMP])
+
+        cls._validate_data_frame(df)
+        return df.set_index([ITEMID, TIMESTAMP])
+
+    @classmethod
+    def _construct_tsdf_from_iterable_dataset(cls, iterable_dataset: Iterable, num_cpus: int = -1) -> pd.DataFrame:
+        def load_single_item(item_id: int, ts: dict) -> pd.DataFrame:
+            start_timestamp = ts["start"]
+            freq = start_timestamp.freq
+            if isinstance(start_timestamp, pd.Period):
+                start_timestamp = start_timestamp.to_timestamp(how="S")
+            target = ts["target"]
+            datetime_index = tuple(pd.date_range(start_timestamp, periods=len(target), freq=freq))
+            idx = pd.MultiIndex.from_product([(item_id,), datetime_index], names=[ITEMID, TIMESTAMP])
+            return pd.Series(target, name="target", index=idx).to_frame()
+
+        cls._validate_iterable(iterable_dataset)
+        all_ts = Parallel(n_jobs=num_cpus)(
+            delayed(load_single_item)(item_id, ts) for item_id, ts in enumerate(iterable_dataset)
+        )
+        return pd.concat(all_ts)
+
+    @classmethod
+    def _validate_multi_index_data_frame(cls, data: pd.DataFrame):
+        """Validate a multi-index pd.DataFrame can be converted to TimeSeriesDataFrame"""
+
+        if not isinstance(data, pd.DataFrame):
+            raise ValueError(f"data must be a pd.DataFrame, got {type(data)}")
+        if not isinstance(data.index, pd.MultiIndex):
+            raise ValueError(f"data must have pd.MultiIndex, got {type(data.index)}")
+        if not pd.api.types.is_datetime64_dtype(data.index.dtypes[TIMESTAMP]):
+            raise ValueError(f"for {TIMESTAMP}, the only pandas dtype allowed is `datetime64`.")
+        if not data.index.names == (f"{ITEMID}", f"{TIMESTAMP}"):
+            raise ValueError(f"data must have index names as ('{ITEMID}', '{TIMESTAMP}'), got {data.index.names}")
+        item_id_index = data.index.get_level_values(level=ITEMID)
+        if not (pd.api.types.is_integer_dtype(item_id_index) or pd.api.types.is_string_dtype(item_id_index)):
+            raise ValueError(f"all entries in index `{ITEMID}` must be of integer or string dtype")
+
+    @classmethod
+    def _validate_data_frame(cls, df: pd.DataFrame):
+        """Validate that a pd.DataFrame with ITEMID and TIMESTAMP columns can be converted to TimeSeriesDataFrame"""
+        if not isinstance(df, pd.DataFrame):
+            raise ValueError(f"data must be a pd.DataFrame, got {type(df)}")
+        if ITEMID not in df.columns:
+            raise ValueError(f"data must have a `{ITEMID}` column")
+        if TIMESTAMP not in df.columns:
+            raise ValueError(f"data must have a `{TIMESTAMP}` column")
+        if df[ITEMID].isnull().any():
+            raise ValueError(f"`{ITEMID}` column can not have nan")
+        if df[TIMESTAMP].isnull().any():
+            raise ValueError(f"`{TIMESTAMP}` column can not have nan")
+        if not pd.api.types.is_datetime64_dtype(df[TIMESTAMP]):
+            raise ValueError(f"for {TIMESTAMP}, the only pandas dtype allowed is `datetime64`.")
+        item_id_column = df[ITEMID]
+        if not (pd.api.types.is_integer_dtype(item_id_column) or pd.api.types.is_string_dtype(item_id_column)):
+            raise ValueError(f"all entries in column `{ITEMID}` must be of integer or string dtype")
+
+    @classmethod
+    def _validate_iterable(cls, data: Iterable):
+        if not isinstance(data, Iterable):
+            raise ValueError("data must be of type Iterable.")
+
+        first = next(iter(data), None)
+        if first is None:
+            raise ValueError("data has no time-series.")
+
+        for i, ts in enumerate(itertools.chain([first], data)):
+            if not isinstance(ts, dict):
+                raise ValueError(f"{i}'th time-series in data must be a dict, got{type(ts)}")
+            if not ("target" in ts and "start" in ts):
+                raise ValueError(f"{i}'th time-series in data must have 'target' and 'start', got{ts.keys()}")
+            if not isinstance(ts["start"], pd.Period):
+                raise ValueError(f"{i}'th time-series must have a pandas Period as 'start', got {ts['start']}")
+
+    @classmethod
+    def from_data_frame(
+        cls,
+        df: pd.DataFrame,
+        id_column: Optional[str] = None,
+        timestamp_column: Optional[str] = None,
+        static_features_df: Optional[pd.DataFrame] = None,
+    ) -> TimeSeriesDataFrame:
+        """Construct a ``TimeSeriesDataFrame`` from a pandas DataFrame.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            A pd.DataFrame with 'item_id' and 'timestamp' as columns. For example::
+
+                   item_id  timestamp  target
+                0        0 2019-01-01       0
+                1        0 2019-01-02       1
+                2        0 2019-01-03       2
+                3        1 2019-01-01       3
+                4        1 2019-01-02       4
+                5        1 2019-01-03       5
+                6        2 2019-01-01       6
+                7        2 2019-01-02       7
+                8        2 2019-01-03       8
+        id_column : str, optional
+            Name of the 'item_id' column if column name is different
+        timestamp_column : str, optional
+            Name of the 'timestamp' column if column name is different
+        static_features_df : pd.DataFrame, optional
+            A pd.DataFrame with 'item_id' column that contains the static features for each time series. For example::
+
+                   item_id feat_1   feat_2
+                0        0 foo         0.5
+                1        1 foo         2.2
+                2        2 bar         0.1
+
+        Returns
+        -------
+        ts_df: TimeSeriesDataFrame
+            A data frame in TimeSeriesDataFrame format.
+        """
+        return cls(df, static_features=static_features_df, id_column=id_column, timestamp_column=timestamp_column)
+
+    @classmethod
+    def from_path(
+        cls,
+        path: Union[str, Path],
+        id_column: Optional[str] = None,
+        timestamp_column: Optional[str] = None,
+        static_features_path: Optional[Union[str, Path]] = None,
+    ) -> TimeSeriesDataFrame:
+        """Construct a ``TimeSeriesDataFrame`` from a CSV or Parquet file.
+
+        Parameters
+        ----------
+        path : str or pathlib.Path
+            Path to a local or remote (e.g., S3) file containing the time series data in CSV or Parquet format.
+            Example file contents::
+
+                item_id,timestamp,target
+                0,2019-01-01,0
+                0,2019-01-02,1
+                0,2019-01-03,2
+                1,2019-01-01,3
+                1,2019-01-02,4
+                1,2019-01-03,5
+                2,2019-01-01,6
+                2,2019-01-02,7
+                2,2019-01-03,8
+
+        id_column : str, optional
+            Name of the 'item_id' column if column name is different
+        timestamp_column : str, optional
+            Name of the 'timestamp' column if column name is different
+        static_features_path : str or pathlib.Path, optional
+            Path to a local or remote (e.g., S3) file containing static features in CSV or Parquet format.
+            Example file contents::
+
+                item_id,feat_1,feat_2
+                0,foo,0.5
+                1,foo,2.2
+                2,bar,0.1
+
+        Returns
+        -------
+        ts_df: TimeSeriesDataFrame
+            A data frame in TimeSeriesDataFrame format.
+        """
+        return cls(path, static_features=static_features_path, id_column=id_column, timestamp_column=timestamp_column)
+
+    @classmethod
+    def from_iterable_dataset(cls, iterable_dataset: Iterable, num_cpus: int = -1) -> TimeSeriesDataFrame:
+        """Construct a ``TimeSeriesDataFrame`` from an Iterable of dictionaries each of which
+        represent a single time series.
+
+        This function also offers compatibility with GluonTS data sets, see
+        https://ts.gluon.ai/stable/api/gluonts/gluonts.dataset.common.html#gluonts.dataset.common.ListDataset.
+
+        Parameters
+        ----------
+        iterable_dataset: Iterable
+            An iterator over dictionaries, each with a ``target`` field specifying the value of the
+            (univariate) time series, and a ``start`` field with the starting time as a pandas Period .
+            Example::
+
+                iterable_dataset = [
+                    {"target": [0, 1, 2], "start": pd.Period("01-01-2019", freq='D')},
+                    {"target": [3, 4, 5], "start": pd.Period("01-01-2019", freq='D')},
+                    {"target": [6, 7, 8], "start": pd.Period("01-01-2019", freq='D')}
+                ]
+        num_cpus : int, default = -1
+            Number of CPU cores used to process the iterable dataset in parallel. Set to -1 to use all cores.
+
+        Returns
+        -------
+        ts_df: TimeSeriesDataFrame
+            A data frame in TimeSeriesDataFrame format.
+        """
+        return cls(iterable_dataset, num_cpus=num_cpus)
+
     @property
     def item_ids(self) -> pd.Index:
         return self.index.unique(level=ITEMID)
@@ -143,6 +406,26 @@ class TimeSeriesDataFrame(pd.DataFrame):
     @property
     def static_features(self):
         return self._static_features
+
+    def _construct_static_features(
+        cls,
+        static_features: Union[pd.DataFrame, str, Path],
+        id_column: Optional[str] = None,
+    ) -> pd.DataFrame:
+        if isinstance(static_features, (str, Path)):
+            static_features = load_pd.load(str(static_features))
+        if not isinstance(static_features, pd.DataFrame):
+            raise ValueError(
+                f"static_features must be a pd.DataFrame, string or Path (received {type(static_features)})"
+            )
+
+        if id_column is not None:
+            assert id_column in static_features.columns, f"Column '{id_column}' not found in static_features!"
+            if id_column != ITEMID and ITEMID in static_features.columns:
+                logger.warning(f"Renaming existing column '{ITEMID}' -> '__{ITEMID}' to avoid name collisions.")
+                static_features.rename(columns={ITEMID: "__" + ITEMID}, inplace=True)
+            static_features.rename(columns={id_column: ITEMID}, inplace=True)
+        return static_features
 
     @static_features.setter
     def static_features(self, value: Optional[pd.DataFrame]):
@@ -157,19 +440,24 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 value = value.to_frame()
             if not isinstance(value, pd.DataFrame):
                 raise ValueError(f"static_features must be a pandas DataFrame (received object of type {type(value)})")
+            if isinstance(value.index, pd.MultiIndex):
+                raise ValueError("static_features cannot have a MultiIndex")
+
+            # Avoid modifying static features inplace
+            value = value.copy()
+            if ITEMID in value.columns and value.index.name != ITEMID:
+                value = value.set_index(ITEMID)
+            if value.index.name != ITEMID:
+                value.index.rename(ITEMID, inplace=True)
             missing_item_ids = self.item_ids.difference(value.index)
             if len(missing_item_ids) > 0:
                 raise ValueError(
-                    f"Following item_ids are missing from the index of static_features: {missing_item_ids.to_list()}"
+                    "Following item_ids are missing from the index of static_features: "
+                    f"{reprlib.repr(missing_item_ids.to_list())}"
                 )
             # if provided static features are a strict superset of the item index, we take a subset to ensure consistency
             if len(value.index.difference(self.item_ids)) > 0:
-                value = value.loc[self.item_ids]
-            # Avoid modifying static features inplace
-            value = value.copy()
-            # TODO: If item_id is a column, set this column as index
-            if value.index.name != ITEMID:
-                value.index.rename(ITEMID, inplace=True)
+                value = value.reindex(self.item_ids)
 
         self._static_features = value
 
@@ -202,229 +490,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
     def num_timesteps_per_item(self) -> pd.Series:
         """Length of each time series in the dataframe."""
         return self.groupby(level=ITEMID, sort=False).size()
-
-    @classmethod
-    def _validate_iterable(cls, data: Iterable):
-        if not isinstance(data, Iterable):
-            raise ValueError("data must be of type Iterable.")
-
-        first = next(iter(data), None)
-        if first is None:
-            raise ValueError("data has no time-series.")
-
-        for i, ts in enumerate(itertools.chain([first], data)):
-            if not isinstance(ts, dict):
-                raise ValueError(f"{i}'th time-series in data must be a dict, got{type(ts)}")
-            if not ("target" in ts and "start" in ts):
-                raise ValueError(f"{i}'th time-series in data must have 'target' and 'start', got{ts.keys()}")
-            if not isinstance(ts["start"], pd.Period):
-                raise ValueError(f"{i}'th time-series must have a pandas Period as 'start', got {ts['start']}")
-
-    @classmethod
-    def _validate_data_frame(cls, df: pd.DataFrame):
-        if not isinstance(df, pd.DataFrame):
-            raise ValueError(f"data must be a pd.DataFrame, got {type(df)}")
-        if ITEMID not in df.columns:
-            raise ValueError(f"data must have a `{ITEMID}` column")
-        if TIMESTAMP not in df.columns:
-            raise ValueError(f"data must have a `{TIMESTAMP}` column")
-        if df[ITEMID].isnull().any():
-            raise ValueError(f"`{ITEMID}` column can not have nan")
-        if df[TIMESTAMP].isnull().any():
-            raise ValueError(f"`{TIMESTAMP}` column can not have nan")
-        if not pd.api.types.is_datetime64_dtype(df[TIMESTAMP]):
-            raise ValueError(f"for {TIMESTAMP}, the only pandas dtype allowed is `datetime64`.")
-        item_id_column = df[ITEMID]
-        item_id_is_string = pd.api.types.is_string_dtype(item_id_column)
-        item_id_is_int = pd.api.types.is_integer_dtype(item_id_column)
-        if not (item_id_is_string or item_id_is_int):
-            raise ValueError(f"all entries in column `{ITEMID}` must be of integer or string dtype")
-
-    @classmethod
-    def _validate_multi_index_data_frame(cls, data: pd.DataFrame):
-        """Validate a multi-index pd.DataFrame can be converted to TimeSeriesDataFrame
-
-        Parameters
-        ----------
-        data: pd.DataFrame
-            a data frame in pd.DataFrame format.
-        """
-
-        if not isinstance(data, pd.DataFrame):
-            raise ValueError(f"data must be a pd.DataFrame, got {type(data)}")
-        if not isinstance(data.index, pd.MultiIndex):
-            raise ValueError(f"data must have pd.MultiIndex, got {type(data.index)}")
-        if not pd.api.types.is_datetime64_dtype(data.index.dtypes[TIMESTAMP]):
-            raise ValueError(f"for {TIMESTAMP}, the only pandas dtype allowed is `datetime64`.")
-        if not data.index.names == (f"{ITEMID}", f"{TIMESTAMP}"):
-            raise ValueError(f"data must have index names as ('{ITEMID}', '{TIMESTAMP}'), got {data.index.names}")
-        item_id_index = data.index.get_level_values(level=ITEMID)
-        item_id_is_string = pd.api.types.is_string_dtype(item_id_index)
-        item_id_is_int = pd.api.types.is_integer_dtype(item_id_index)
-        if not (item_id_is_string or item_id_is_int):
-            raise ValueError(f"all entries in index `{ITEMID}` must be of integer or string dtype")
-
-    @classmethod
-    def _construct_pandas_frame_from_iterable_dataset(
-        cls, iterable_dataset: Iterable, num_cpus: int = -1
-    ) -> pd.DataFrame:
-        def load_single_item(item_id: int, ts: dict) -> pd.DataFrame:
-            start_timestamp = ts["start"]
-            freq = start_timestamp.freq
-            if isinstance(start_timestamp, pd.Period):
-                start_timestamp = start_timestamp.to_timestamp(how="S")
-            target = ts["target"]
-            datetime_index = tuple(pd.date_range(start_timestamp, periods=len(target), freq=freq))
-            idx = pd.MultiIndex.from_product([(item_id,), datetime_index], names=[ITEMID, TIMESTAMP])
-            return pd.Series(target, name="target", index=idx).to_frame()
-
-        cls._validate_iterable(iterable_dataset)
-        all_ts = Parallel(n_jobs=num_cpus)(
-            delayed(load_single_item)(item_id, ts) for item_id, ts in enumerate(iterable_dataset)
-        )
-        return pd.concat(all_ts)
-
-    @classmethod
-    def from_iterable_dataset(cls, iterable_dataset: Iterable, num_cpus: int = -1) -> pd.DataFrame:
-        """Construct a ``TimeSeriesDataFrame`` from an Iterable of dictionaries each of which
-        represent a single time series.
-
-        This function also offers compatibility with GluonTS data sets, see
-        https://ts.gluon.ai/_modules/gluonts/dataset/common.html#ListDataset.
-
-        Parameters
-        ----------
-        iterable_dataset: Iterable
-            An iterator over dictionaries, each with a ``target`` field specifying the value of the
-            (univariate) time series, and a ``start`` field with the starting time as a pandas Period .
-            Example::
-
-                iterable_dataset = [
-                    {"target": [0, 1, 2], "start": pd.Period("01-01-2019", freq='D')},
-                    {"target": [3, 4, 5], "start": pd.Period("01-01-2019", freq='D')},
-                    {"target": [6, 7, 8], "start": pd.Period("01-01-2019", freq='D')}
-                ]
-        num_cpus : int, default = -1
-            Number of CPU cores used to process the iterable dataset in parallel. Set to -1 to use all cores.
-
-        Returns
-        -------
-        ts_df: TimeSeriesDataFrame
-            A data frame in TimeSeriesDataFrame format.
-        """
-        return cls(cls._construct_pandas_frame_from_iterable_dataset(iterable_dataset, num_cpus=num_cpus))
-
-    @classmethod
-    def _load_data_frame_from_file(cls, path: str) -> pd.DataFrame:
-        df = load_pd.load(path)
-        return cls._construct_pandas_frame_from_data_frame(df)
-
-    @classmethod
-    def _construct_pandas_frame_from_data_frame(
-        cls,
-        df: pd.DataFrame,
-        id_column: Optional[str] = None,
-        timestamp_column: Optional[str] = None,
-    ) -> pd.DataFrame:
-        df = df.copy()
-        if id_column is not None:
-            assert id_column in df.columns, f"Column '{id_column}' not found!"
-            if id_column != ITEMID and ITEMID in df.columns:
-                logger.warning(f"Renaming existing column '{ITEMID}' -> '__{ITEMID}' to avoid name collisions.")
-                df.rename(columns={ITEMID: "__" + ITEMID}, inplace=True)
-            df.rename(columns={id_column: ITEMID}, inplace=True)
-
-        if timestamp_column is not None:
-            assert timestamp_column in df.columns, f"Column '{timestamp_column}' not found!"
-            if timestamp_column != TIMESTAMP and TIMESTAMP in df.columns:
-                logger.warning(f"Renaming existing column '{TIMESTAMP}' -> '__{TIMESTAMP}' to avoid name collisions.")
-                df.rename(columns={TIMESTAMP: "__" + TIMESTAMP}, inplace=True)
-            df.rename(columns={timestamp_column: TIMESTAMP}, inplace=True)
-
-        if TIMESTAMP in df.columns:
-            df[TIMESTAMP] = pd.to_datetime(df[TIMESTAMP])
-
-        cls._validate_data_frame(df)
-        return df.set_index([ITEMID, TIMESTAMP])
-
-    @classmethod
-    def from_path(
-        cls,
-        path: str,
-        id_column: Optional[str] = None,
-        timestamp_column: Optional[str] = None,
-    ) -> TimeSeriesDataFrame:
-        """Construct a ``TimeSeriesDataFrame`` from a CSV or Parquet file.
-
-        Parameters
-        ----------
-        path : str
-            Path to a local or remote (e.g., S3) file containing the time series data in CSV or Parquet format.
-            Example file contents::
-
-                item_id,timestamp,target
-                0,2019-01-01,0
-                0,2019-01-02,1
-                0,2019-01-03,2
-                1,2019-01-01,3
-                1,2019-01-02,4
-                1,2019-01-03,5
-                2,2019-01-01,6
-                2,2019-01-02,7
-                2,2019-01-03,8
-
-        id_column: str
-            Name of the 'item_id' column if column name is different
-        timestamp_column: str
-            Name of the 'timestamp' column if column name is different
-
-        Returns
-        -------
-        ts_df: TimeSeriesDataFrame
-            A data frame in TimeSeriesDataFrame format.
-        """
-        df = load_pd.load(path)
-        return cls.from_data_frame(df, id_column=id_column, timestamp_column=timestamp_column)
-
-    @classmethod
-    def from_data_frame(
-        cls,
-        df: pd.DataFrame,
-        id_column: Optional[str] = None,
-        timestamp_column: Optional[str] = None,
-    ) -> TimeSeriesDataFrame:
-        """Construct a ``TimeSeriesDataFrame`` from a pandas DataFrame.
-
-        Parameters
-        ----------
-        df: pd.DataFrame
-            A pd.DataFrame with 'item_id' and 'timestamp' as columns. For example:
-
-            .. code-block::
-
-                   item_id  timestamp  target
-                0        0 2019-01-01       0
-                1        0 2019-01-02       1
-                2        0 2019-01-03       2
-                3        1 2019-01-01       3
-                4        1 2019-01-02       4
-                5        1 2019-01-03       5
-                6        2 2019-01-01       6
-                7        2 2019-01-02       7
-                8        2 2019-01-03       8
-        id_column: str
-            Name of the 'item_id' column if column name is different
-        timestamp_column: str
-            Name of the 'timestamp' column if column name is different
-
-        Returns
-        -------
-        ts_df: TimeSeriesDataFrame
-            A data frame in TimeSeriesDataFrame format.
-        """
-        return cls(
-            cls._construct_pandas_frame_from_data_frame(df, id_column=id_column, timestamp_column=timestamp_column)
-        )
 
     def copy(self: TimeSeriesDataFrame, deep: bool = True) -> pd.DataFrame:  # noqa
         obj = super().copy(deep=deep)
@@ -619,79 +684,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
         except Exception as err:  # noqa
             raise IOError(f"Could not load pickled data set due to error: {str(err)}")
 
-    @Deprecated(min_version_to_warn="0.9", min_version_to_error="1.0")
-    def get_reindexed_view(self, freq: str = "S") -> TimeSeriesDataFrame:
-        """Returns a new TimeSeriesDataFrame object with the same underlying data and
-        static features as the current data frame, except the time index is replaced by
-        a new "dummy" time series index with the given frequency. This is useful when
-        suggesting AutoGluon-TimeSeries to "ignore" the time information, for example when
-        dealing with irregularly sampled time series or sequences (e.g., financial time
-        series).
-
-        Parameters
-        ----------
-        freq: str
-            Frequency string of the new time series data index.
-
-        Returns
-            TimeSeriesDataFrame: the new view object with replaced index, but the same underlying
-            data. Note that the underlying data is not copied.
-        """
-        df_view = self.iloc[:]  # return a view without copying data
-
-        # build the surrogate index
-        indexes = []
-        for i in self.item_ids:
-            idx = pd.MultiIndex.from_product(
-                [(i,), pd.date_range(self.DUMMY_INDEX_START_TIME, periods=len(self.loc[i]), freq=freq)]
-            )
-            indexes.append(idx)
-
-        new_index = pd.MultiIndex.from_tuples(np.concatenate(indexes), names=[ITEMID, TIMESTAMP])
-        df_view.set_index(new_index, inplace=True)
-        df_view._cached_freq = freq
-
-        return df_view
-
-    @Deprecated(min_version_to_warn="0.9", min_version_to_error="1.0", new="convert_frequency")
-    def to_regular_index(self, freq: str) -> TimeSeriesDataFrame:
-        """Fill the gaps in an irregularly-sampled time series with NaNs.
-
-        Parameters
-        ----------
-        freq: str
-            Frequency string of the new time series data index.
-
-        Examples
-        --------
-        >>> ts_df
-                            target
-        item_id timestamp
-        0       2019-01-01     NaN
-                2019-01-03     1.0
-                2019-01-06     2.0
-                2019-01-07     NaN
-        1       2019-02-04     3.0
-                2019-02-07     4.0
-
-        >>> ts_df.to_regular_index(freq="D")
-                            target
-        item_id timestamp
-        0       2019-01-01     NaN
-                2019-01-02     NaN
-                2019-01-03     1.0
-                2019-01-04     NaN
-                2019-01-05     NaN
-                2019-01-06     2.0
-                2019-01-07     NaN
-        1       2019-02-04     3.0
-                2019-02-05     NaN
-                2019-02-06     NaN
-                2019-02-07     4.0
-
-        """
-        return self.convert_frequency(freq=freq)
-
     def fill_missing_values(self, method: str = "auto", value: float = 0.0) -> TimeSeriesDataFrame:
         """Fill missing values represented by NaN.
 
@@ -744,7 +736,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         if self.freq is None:
             raise ValueError(
                 "Please make sure that all time series have a regular index before calling `fill_missing_values`"
-                "(for example, using the `to_regular_index` method)."
+                "(for example, using the `convert_frequency` method)."
             )
 
         grouped_df = pd.DataFrame(self).groupby(level=ITEMID, sort=False, group_keys=False)
@@ -952,3 +944,20 @@ class TimeSeriesDataFrame(pd.DataFrame):
         )
         resampled_df.static_features = self.static_features
         return resampled_df
+
+    def __dir__(self) -> List[str]:
+        # This hides method from IPython autocomplete, but not VSCode autocomplete
+        deprecated = ["get_reindexed_view", "to_regular_index"]
+        return [d for d in super().__dir__() if d not in deprecated]
+
+    def get_reindexed_view(self, *args, **kwargs) -> TimeSeriesDataFrame:
+        raise ValueError(
+            "`TimeSeriesDataFrame.get_reindexed_view` has been deprecated. If your data has irregular timestamps, "
+            "please convert it to a regular frequency with `convert_frequency`."
+        )
+
+    def to_regular_index(self, *args, **kwargs) -> TimeSeriesDataFrame:
+        raise ValueError(
+            "`TimeSeriesDataFrame.to_regular_index` has been deprecated. "
+            "Please use `TimeSeriesDataFrame.convert_frequency` instead."
+        )

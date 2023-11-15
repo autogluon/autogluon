@@ -478,7 +478,6 @@ class BaggedEnsembleModel(AbstractModel):
             X_len = len(X)
             # Check if pred_proba is going to take too long
             if time_limit is not None and X_len >= 10000:
-
                 max_allowed_time = time_limit * 1.3  # allow some buffer
                 time_left = max(
                     max_allowed_time - model_base.fit_time,
@@ -665,20 +664,21 @@ class BaggedEnsembleModel(AbstractModel):
             fold_fitting_strategy_args["model_sync_path"] = DistributedContext.get_model_sync_path()
         fold_fitting_strategy: FoldFittingStrategy = fold_fitting_strategy_cls(**fold_fitting_strategy_args)
 
-        if type(fold_fitting_strategy) == ParallelLocalFoldFittingStrategy and not fold_fitting_strategy.is_mem_sufficient():
-            # If memory is not sufficient, fall back to sequential fold strategy
-            fold_fitting_strategy: FoldFittingStrategy = SequentialLocalFoldFittingStrategy(**fold_fitting_strategy_args)
-            logger.log(
-                30,
-                f"\tMemory not enough to fit {model_base.__class__.__name__} folds in parallel. Will do sequential fitting instead. "
-                f"\tConsider decreasing folds trained in parallel by passing num_folds_parallel to ag_args_ensemble when calling predictor.fit",
-            )
+        if isinstance(fold_fitting_strategy, ParallelFoldFittingStrategy):
+            num_parallel_jobs = fold_fitting_strategy.num_parallel_jobs
+            num_cpus_per = fold_fitting_strategy.resources_model["num_cpus"]
+            num_gpus_per = fold_fitting_strategy.resources_model["num_gpus"]
+            mem_est_proportion_per_fold = fold_fitting_strategy.mem_est_proportion_per_fold()
+            extra_log = f" ({num_parallel_jobs} workers, " f"per: cpus={num_cpus_per}, gpus={num_gpus_per}, " f"memory={mem_est_proportion_per_fold:.2f}%)"
+        else:
+            extra_log = ""
 
         logger.log(
             20,
             f"\tFitting {len(fold_fit_args_list)} child models "
             f'({fold_fit_args_list[0]["fold_ctx"]["model_name_suffix"]} - {fold_fit_args_list[-1]["fold_ctx"]["model_name_suffix"]}) | '
-            f"Fitting with {fold_fitting_strategy.__class__.__name__}",
+            f"Fitting with {fold_fitting_strategy.__class__.__name__}"
+            f"{extra_log}",
         )
 
         # noinspection PyCallingNonCallable

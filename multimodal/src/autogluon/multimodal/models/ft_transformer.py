@@ -1,543 +1,504 @@
-import enum
-import math
-import warnings
-from typing import Callable, Dict, List, Optional, Tuple, Union, cast
+from typing import List, Optional
 
 import torch
-import torch.nn.functional as F
 from torch import Tensor, nn
 
+from ..constants import CATEGORICAL, FEATURES, LABEL, LOGITS, NUMERICAL
+from .custom_transformer import CLSToken, Custom_Transformer, _TokenInitialization
 from .utils import init_weights
 
-ModuleType = Union[str, Callable[..., nn.Module]]
-_INTERNAL_ERROR_MESSAGE = "Internal error. Please, open an issue."
 
-
-def _is_glu_activation(activation: ModuleType):
-    return isinstance(activation, str) and activation.endswith("glu") or activation in [ReGLU, GEGLU]
-
-
-def _make_nn_module(module_type: ModuleType, *args) -> nn.Module:
-    if isinstance(module_type, str):
-        if module_type == "reglu":
-            return ReGLU()
-        elif module_type == "geglu":
-            return GEGLU()
-        elif module_type == "gelu":
-            return nn.GELU()
-        elif module_type == "relu":
-            return nn.ReLU()
-        elif module_type == "leaky_relu":
-            return nn.LeakyReLU()
-        elif module_type == "layer_norm":
-            return nn.LayerNorm(*args)
-        else:
-            try:
-                cls = getattr(nn, module_type)
-            except AttributeError as err:
-                raise ValueError(f"Failed to construct the module {module_type} with the arguments {args}") from err
-            return cls(*args)
-    else:
-        return module_type(*args)
-
-
-def _all_or_none(values):
-    return all(x is None for x in values) or all(x is not None for x in values)
-
-
-def reglu(x: Tensor) -> Tensor:
-    """The ReGLU activation function from [1].
-
-    References:
-    ----------
-    [1] Noam Shazeer, "GLU Variants Improve Transformer", 2020
+class CategoricalFeatureTokenizer(nn.Module):
     """
-    assert x.shape[-1] % 2 == 0
-    a, b = x.chunk(2, dim=-1)
-    return a * F.relu(b)
+    Feature tokenizer for categorical features in tabular data.
+    It transforms the input categorical features to tokens (embeddings).
 
-
-def geglu(x: Tensor) -> Tensor:
-    """The GEGLU activation function from [1].
-
-    References:
-    ----------
-    [1] Noam Shazeer, "GLU Variants Improve Transformer", 2020
-    """
-    assert x.shape[-1] % 2 == 0
-    a, b = x.chunk(2, dim=-1)
-    return a * F.gelu(b)
-
-
-class ReGLU(nn.Module):
-    """
-    The ReGLU activation function from [1].
-
-    References:
-    ----------
-    [1] Noam Shazeer, "GLU Variants Improve Transformer", 2020
+    The categorical features usually refers to discrete features.
     """
 
-    def forward(self, x: Tensor) -> Tensor:
-        return reglu(x)
-
-
-class GEGLU(nn.Module):
-    """
-    The GEGLU activation function from [1].
-
-    References:
-    ----------
-    [1] Noam Shazeer, "GLU Variants Improve Transformer", 2020
-    """
-
-    def forward(self, x: Tensor) -> Tensor:
-        return geglu(x)
-
-
-class CLSToken(nn.Module):
-    """[CLS]-token for BERT-like inference.
-
-    To learn about the [CLS]-based inference, see [1].
-
-    When used as a module, the [CLS]-token is appended **to the end** of each item in
-    the batch.
-
-    References:
-    ----------
-    [1] Jacob Devlin, Ming-Wei Chang, Kenton Lee, Kristina Toutanova "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding" 2018
-    """
-
-    def __init__(self, d_token: int, initialization: str) -> None:
+    def __init__(
+        self,
+        num_categories: List[int],
+        d_token: int,
+        bias: Optional[bool] = True,
+        initialization: Optional[str] = "normal",
+    ) -> None:
         """
-        Args:
-            d_token: the size of token
-            initialization: initialization policy for parameters. Must be one of
-                :code:`['uniform', 'normal']`. Let :code:`s = d ** -0.5`. Then, the
-                corresponding distributions are :code:`Uniform(-s, s)` and :code:`Normal(0, s)`. In
-                the paper [gorishniy2021revisiting], the 'uniform' initialization was
-                used.
+        Parameters
+        ----------
+        num_categories:
+            A list of integers. Each one is the number of categories in one categorical column.
+        d_token:
+            The size of one token.
+        bias:
+            If `True`, for each feature, an additional trainable vector will be added to the
+            embedding regardless of feature value. Notablly, the bias are not shared between features.
+        initialization:
+            Initialization policy for parameters. Must be one of `['uniform', 'normal']`.
 
-        References:
-            * [gorishniy2021revisiting] Yury Gorishniy, Ivan Rubachev, Valentin Khrulkov, Artem Babenko "Revisiting Deep Learning Models for Tabular Data", 2021
+        References
+        ----------
+        1. Yury Gorishniy, Ivan Rubachev, Valentin Khrulkov, Artem Babenko,
+        "Revisiting Deep Learning Models for Tabular Data", 2021
+        https://arxiv.org/pdf/2106.11959.pdf
+        2. Code: https://github.com/Yura52/tabular-dl-revisiting-models
         """
         super().__init__()
+
+        self.num_categories = num_categories
+        category_offsets = torch.tensor([0] + num_categories[:-1]).cumsum(0)
+
+        self.register_buffer("category_offsets", category_offsets, persistent=False)
+        self.embeddings = nn.Embedding(sum(num_categories), d_token)
+        self.bias = nn.Parameter(Tensor(len(num_categories), d_token)) if bias else None
         initialization_ = _TokenInitialization.from_str(initialization)
-        self.weight = nn.Parameter(Tensor(d_token))
-        initialization_.apply(self.weight, d_token)
 
-    def expand(self, *leading_dimensions: int) -> Tensor:
-        """Expand (repeat) the underlying [CLS]-token to a tensor with the given leading dimensions.
+        for parameter in [self.embeddings.weight, self.bias]:
+            if parameter is not None:
+                initialization_.apply(parameter, d_token)
 
-        A possible use case is building a batch of [CLS]-tokens. See `_CLSToken` for
-        examples of usage.
+    @property
+    def n_tokens(self) -> int:
+        """The number of tokens."""
+        return len(self.num_categories)
 
-        Note:
-            Under the hood, the `torch.Tensor.expand` method is applied to the
-            underlying :code:`weight` parameter, so gradients will be propagated as
-            expected.
-
-        Args:
-            leading_dimensions: the additional new dimensions
-
-        Returns:
-            tensor of the shape :code:`(*leading_dimensions, len(self.weight))`
-        """
-        if not leading_dimensions:
-            return self.weight
-        new_dims = (1,) * (len(leading_dimensions) - 1)
-        return self.weight.view(*new_dims, -1).expand(*leading_dimensions, -1)
+    @property
+    def d_token(self) -> int:
+        """The size of one token."""
+        return self.embeddings.embedding_dim
 
     def forward(self, x: Tensor) -> Tensor:
-        """Append self **to the end** of each item in the batch (see `_CLSToken`)."""
-        return torch.cat([x, self.expand(len(x), 1)], dim=1)
+        x = self.embeddings(x + self.category_offsets[None])
+
+        if self.bias is not None:
+            x = x + self.bias[None]
+
+        return x
 
 
-class _TokenInitialization(enum.Enum):
-    UNIFORM = "uniform"
-    NORMAL = "normal"
+class Periodic(nn.Module):
+    def __init__(
+        self,
+        in_features: int,
+        d_embedding: int,
+        trainable: Optional[bool] = True,
+        initialization: Optional[str] = "normal",
+        sigma: Optional[float] = 1.0,
+    ):
+        """
+        Parameters
+        ----------
+        in_features
+            Input feature size.
+        d_embedding
+            Output feature size, should be an even number.
+        trainable
+            Determine whether the coefficients needed to be updated.
+        initialization
+            Initialization scheme.
+        sigma
+            Standard deviation used for initialization='normal'
 
-    @classmethod
-    def from_str(cls, initialization: str) -> "_TokenInitialization":
-        try:
-            return cls(initialization)
-        except ValueError:
-            valid_values = [x.value for x in _TokenInitialization]
-            raise ValueError(f"initialization must be one of {valid_values}")
+        Reference:
+        ----------
+        1. Code: https://github.com/Yura52/tabular-dl-num-embeddings
+        2. Paper: On Embeddings for Numerical Features in Tabular Deep Learning, https://arxiv.org/abs/2203.05556
+        """
+        super().__init__()
 
-    def apply(self, x: Tensor, d: int) -> None:
-        d_sqrt_inv = 1 / math.sqrt(d)
-        if self == _TokenInitialization.UNIFORM:
-            # used in the paper "Revisiting Deep Learning Models for Tabular Data";
-            # is equivalent to `nn.init.kaiming_uniform_(x, a=math.sqrt(5))` (which is
-            # used by torch to initialize nn.Linear.weight, for example)
-            nn.init.uniform_(x, a=-d_sqrt_inv, b=d_sqrt_inv)
-        elif self == _TokenInitialization.NORMAL:
-            nn.init.normal_(x, std=d_sqrt_inv)
+        assert d_embedding % 2 == 0, "d_embedding mod 2 should be 0, current d_embedding is {}".format(d_embedding)
+
+        if initialization == "log-linear":
+            coefficients = sigma ** (torch.arange(d_embedding // 2) / (d_embedding // 2))
+            coefficients = coefficients[None].repeat(in_features, 1)
+        elif initialization == "normal":
+            coefficients = torch.normal(0.0, sigma, (in_features, d_embedding // 2))
+
+        if trainable:
+            self.coefficients = nn.Parameter(coefficients)
+        else:
+            self.register_buffer("coefficients", coefficients)
+
+    def cos_sin(self, x: Tensor):
+        return torch.cat([torch.cos(x), torch.sin(x)], -1)
+
+    def forward(self, x: Tensor):
+        assert x.ndim == 2, "Periodic should only be applied to first layer i.e. ndim==2"
+        return self.cos_sin(2 * torch.pi * self.coefficients[None] * x[..., None])
 
 
-class MultiheadAttention(nn.Module):
-    """Multihead Attention (self-/cross-) with optional 'linear' attention.
+class NLinear(nn.Module):
+    def __init__(self, n: int, d_in: int, d_out: int, bias: bool = True):
+        super().__init__()
+        self.weight = nn.Parameter(Tensor(n, d_in, d_out))
+        self.bias = nn.Parameter(Tensor(n, d_out)) if bias else None
+        with torch.no_grad():
+            for i in range(n):
+                layer = nn.Linear(d_in, d_out)
+                self.weight[i] = layer.weight.T
+                if self.bias is not None:
+                    self.bias[i] = layer.bias
 
-    To learn more about Multihead Attention, see [1]. See the implementation
-    of `Transformer` and the examples below to learn how to use the compression technique
-    from [2] to speed up the module when the number of tokens is large.
+    def forward(self, x):
+        assert x.ndim == 3, "Error input dimension, should be 3, but given {}".format(x.ndim)
+        x = x[..., None] * self.weight[None]
+        x = x.sum(-2)
+        if self.bias is not None:
+            x = x + self.bias[None]
+        return x
 
-    References:
-    ----------
-    [1] Jacob Devlin, Ming-Wei Chang, Kenton Lee, Kristina Toutanova "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding" 2018
-    [2] Sinong Wang, Belinda Z. Li, Madian Khabsa, Han Fang, Hao Ma "Linformer: Self-Attention with Linear Complexity", 2020
+
+class NLinearMemoryEfficient(nn.Module):
+    def __init__(self, n: int, d_in: int, d_out: int):
+        super().__init__()
+        self.layers = nn.ModuleList([nn.Linear(d_in, d_out) for _ in range(n)])
+
+    def forward(self, x):
+        return torch.stack([l(x[:, i]) for i, l in enumerate(self.layers)], 1)
+
+
+class NLayerNorm(nn.Module):
+    def __init__(self, n_features: int, d: int):
+        super().__init__()
+        self.weight = nn.Parameter(torch.ones(n_features, d))
+        self.bias = nn.Parameter(torch.zeros(n_features, d))
+
+    def forward(self, x: Tensor):
+        assert x.ndim == 3
+        x = (x - x.mean(-1, keepdim=True)) / x.std(-1, keepdim=True)
+        x = self.weight * x + self.bias
+        return x
+
+
+class NumericalFeatureTokenizer(nn.Module):
+    """
+    Numerical tokenizer for numerical features in tabular data.
+    It transforms the input numerical features to tokens (embeddings).
+
+    The numerical features usually refers to continuous features.
+
+    It consists of two steps:
+        1. each feature is multiplied by a trainable vector i.e., weights,
+        2. another trainable vector is added i.e., bias.
+
+    Note that each feature has its separate pair of trainable vectors,
+    i.e. the vectors are not shared between features.
     """
 
     def __init__(
         self,
-        *,
+        in_features: int,
         d_token: int,
-        n_heads: int,
-        dropout: float,
-        bias: bool,
-        initialization: str,
-    ) -> None:
+        bias: Optional[bool] = True,
+        initialization: Optional[str] = "normal",
+    ):
         """
         Parameters
         ----------
+        in_features:
+            Dimension of input features i.e. the number of continuous (scalar) features
         d_token:
-            the token size. Must be a multiple of :code:`n_heads`.
-        n_heads:
-            the number of heads. If greater than 1, then the module will have
-            an addition output layer (so called "mixing" layer).
-        dropout:
-            dropout rate for the attention map. The dropout is applied to
-            *probabilities* and do not affect logits.
+            The size of one token.
         bias:
-            if `True`, then input (and output, if presented) layers also have bias.
-            `True` is a reasonable default choice.
+            If `True`, for each feature, an additional trainable vector will be added to the
+            embedding regardless of feature value. Notablly, the bias are not shared between features.
         initialization:
-            initialization for input projection layers. Must be one of
-            :code:`['kaiming', 'xavier']`. `kaiming` is a reasonable default choice.
+            Initialization policy for parameters. Must be one of `['uniform', 'normal']`.
 
-        Raises
+        References
         ----------
-            AssertionError: if requirements for the inputs are not met.
+        Yury Gorishniy, Ivan Rubachev, Valentin Khrulkov, Artem Babenko,
+        "Revisiting Deep Learning Models for Tabular Data", 2021
+        https://arxiv.org/pdf/2106.11959.pdf
         """
         super().__init__()
-        if n_heads > 1:
-            assert d_token % n_heads == 0, "d_token must be a multiple of n_heads"
-        assert initialization in ["kaiming", "xavier"]
 
-        self.W_q = nn.Linear(d_token, d_token, bias)
-        self.W_k = nn.Linear(d_token, d_token, bias)
-        self.W_v = nn.Linear(d_token, d_token, bias)
-        self.W_out = nn.Linear(d_token, d_token, bias) if n_heads > 1 else None
-        self.n_heads = n_heads
-        self.dropout = nn.Dropout(dropout) if dropout else None
+        initialization_ = _TokenInitialization.from_str(initialization)
+        self.weight = nn.Parameter(Tensor(in_features, d_token))
+        self.bias = nn.Parameter(Tensor(in_features, d_token)) if bias else None
+        for parameter in [self.weight, self.bias]:
+            if parameter is not None:
+                initialization_.apply(parameter, d_token)
 
-        for m in [self.W_q, self.W_k, self.W_v]:
-            # the "xavier" branch tries to follow torch.nn.MultiheadAttention;
-            # the second condition checks if W_v plays the role of W_out; the latter one
-            # is initialized with Kaiming in torch
-            if initialization == "xavier" and (m is not self.W_v or self.W_out is not None):
-                # gain is needed since W_qkv is represented with 3 separate layers (it
-                # implies different fan_out)
-                nn.init.xavier_uniform_(m.weight, gain=1 / math.sqrt(2))
-            if m.bias is not None:
-                nn.init.zeros_(m.bias)
-        if self.W_out is not None:
-            nn.init.zeros_(self.W_out.bias)
+    @property
+    def n_tokens(self) -> int:
+        """The number of tokens."""
+        return len(self.weight)
 
-    def _reshape(self, x: Tensor) -> Tensor:
-        batch_size, n_tokens, d = x.shape
-        d_head = d // self.n_heads
-        return (
-            x.reshape(batch_size, n_tokens, self.n_heads, d_head)
-            .transpose(1, 2)
-            .reshape(batch_size * self.n_heads, n_tokens, d_head)
-        )
+    @property
+    def d_token(self) -> int:
+        """The size of one token."""
+        return self.weight.shape[1]
 
     def forward(
         self,
-        x_q: Tensor,
-        x_kv: Tensor,
-        key_compression: Optional[nn.Linear],
-        value_compression: Optional[nn.Linear],
-    ) -> Tuple[Tensor, Dict[str, Tensor]]:
-        """Perform the forward pass.
+        x: Tensor,
+    ) -> Tensor:
+        x = self.weight[None] * x[..., None]
+        if self.bias is not None:
+            x = x + self.bias[None]
 
-        Parameters
-        ----------
-        x_q:
-            query tokens
-        x_kv:
-            key-value tokens
-        key_compression:
-            Linformer-style compression for keys
-        value_compression:
-            Linformer-style compression for values
-
-        Returns:
-        ----------
-            (tokens, attention_stats)
-        """
-        assert _all_or_none(
-            [key_compression, value_compression]
-        ), "If key_compression is (not) None, then value_compression must (not) be None"
-        q, k, v = self.W_q(x_q), self.W_k(x_kv), self.W_v(x_kv)
-        for tensor in [q, k, v]:
-            assert tensor.shape[-1] % self.n_heads == 0, _INTERNAL_ERROR_MESSAGE
-        if key_compression is not None:
-            k = key_compression(k.transpose(1, 2)).transpose(1, 2)
-            v = value_compression(v.transpose(1, 2)).transpose(1, 2)  # type: ignore
-
-        batch_size = len(q)
-        d_head_key = k.shape[-1] // self.n_heads
-        d_head_value = v.shape[-1] // self.n_heads
-        n_q_tokens = q.shape[1]
-
-        q = self._reshape(q)
-        k = self._reshape(k)
-        attention_logits = q @ k.transpose(1, 2) / math.sqrt(d_head_key)
-        attention_probs = F.softmax(attention_logits, dim=-1)
-        if self.dropout is not None:
-            attention_probs = self.dropout(attention_probs)
-        x = attention_probs @ self._reshape(v)
-        x = (
-            x.reshape(batch_size, self.n_heads, n_q_tokens, d_head_value)
-            .transpose(1, 2)
-            .reshape(batch_size, n_q_tokens, self.n_heads * d_head_value)
-        )
-        if self.W_out is not None:
-            x = self.W_out(x)
-        return x, {
-            "attention_logits": attention_logits,
-            "attention_probs": attention_probs,
-        }
+        return x
 
 
-class AdditiveAttention(nn.Module):
-    """Additive Attention with linear complexity to input sequence length.
-
-    Additive attention was proposed and used in FastFormer.
-    See Ref. [1] for details.
-    This implementation is motivated by: https://github.com/jrzaurin/pytorch-widedeep.git
-
-    References:
-    ----------
-    [1] Wu, Chuhan, et al. "Fastformer: Additive attention can be all you need." arXiv preprint arXiv:2108.09084 (2021).
+class AutoDis(nn.Module):
+    """
+    Paper (the version is important): https://arxiv.org/abs/2012.08986v2
+    Code: https://github.com/mindspore-ai/models/tree/bdf2d8bcf11fe28e4ad3060cf2ddc818eacd8597/research/recommend/autodis
+    We borrow the implementations from: https://github.com/Yura52/tabular-dl-num-embeddings/blob/main/bin/train4.py
+    The paper is significantly different from the code (it looks like the code
+    implements the first version of the paper). We implement the second version
+    here. Not all technical details are given for the second version, so what we do
+    here can be different from what authors actually did.
+    Anyway, AutoDis (v2) is essentially the following sequence of layers (applied from
+    left to right): [Linear(no bias), LeakyReLU, Linear(no bias), Softmax, Linear]
     """
 
     def __init__(
         self,
-        *,
-        d_token: int,
-        n_heads: int,
-        dropout: float,
-        bias: bool,
-        share_qv_weights: bool,
-        initialization: str,
-    ) -> None:
+        in_features: int,
+        d_embedding: int,
+        n_meta_embeddings: int,
+        temperature: Optional[float] = 3.0,
+    ):
+        super().__init__()
+        self.first_layer = NumericalFeatureTokenizer(
+            in_features=in_features,
+            d_token=n_meta_embeddings,
+            bias=False,
+            initialization="uniform",
+        )
+        self.leaky_relu = nn.LeakyReLU()
+        self.second_layer = NLinear(in_features, n_meta_embeddings, n_meta_embeddings, False)
+        self.softmax = nn.Softmax(-1)
+        self.temperature = temperature
+        # "meta embeddings" from the paper are just a linear layer
+        self.third_layer = NLinear(in_features, n_meta_embeddings, d_embedding, False)
+        # 0.01 is taken from the source code
+        nn.init.uniform_(self.third_layer.weight, 0.01)
+
+    def forward(self, x: Tensor):
+        x = self.first_layer(x)
+        x = self.leaky_relu(x)
+        x = self.second_layer(x)
+        x = self.softmax(x / self.temperature)
+        x = self.third_layer(x)
+        return x
+
+
+class NumEmbeddings(nn.Module):
+    def __init__(
+        self,
+        in_features: int,
+        embedding_arch: List[str],
+        d_embedding: Optional[int] = None,
+        memory_efficient: Optional[bool] = False,
+    ):
         """
         Parameters
         ----------
-        d_token:
-            the token size. Must be a multiple of :code:`n_heads`.
-        n_heads:
-            the number of heads. If greater than 1, then the module will have
-            an addition output layer (so called "mixing" layer).
-        dropout:
-            dropout rate for the attention map. The dropout is applied to
-            *probabilities* and do not affect logits.
-        bias:
-            if `True`, then input (and output, if presented) layers also have bias.
-            `True` is a reasonable default choice.
-        share_qv_weights:
-            if 'True', then value and query transformation parameters are shared.
-        initialization:
-            initialization for input projection layers. Must be one of
-            :code:`['kaiming', 'xavier']`. `kaiming` is a reasonable default choice.
+        in_features
+            Input feature size.
+        embedding_arch
+            A list containing the names of embedding layers.
+            Currently support:
+                {'linear', 'shared_linear', 'autodis', 'positional', 'relu', 'leaky_relu', 'layernorm'}
+            To use the embedding schemes summarized in Table 3 of 'On Embeddings for Numerical Features in Tabular Deep Learning' (https://arxiv.org/abs/2203.05556)
+            By setting the embedding_arch as follows:
+                1. `L`: ['linear']
+                2. `LR`: ['linear', 'relu']
+                3. `LRLR`: ['linear', 'relu', 'linear', 'relu']
+                4. `P`: ['positional']
+                5. `PL`: ['positional', 'linear']
+                6. `PLR`: ['positional', 'linear', 'relu']
+                7. `PLRLR`: ['positional', 'linear', 'relu', 'linear', 'relu']
+                8. `AutoDis`: ['autodis']
+                9. `Leaky Gates` in [ref.3]: ['linear', 'leaky_relu']
+            Notably, in `L` (i.e. embedding_arch=['linear']) for numerical transformer,
+            it identical as the original feature_tokenzier in FT_Transformer (c.f. Figure 2.a in https://arxiv.org/pdf/2106.11959.pdf).
+        d_embedding:
+            Dimension of the embeddings.
+            The output shape should be [batch_size, number_of_numerical_featurs, d_embedding]
+        memory_efficient:
+            Use efficient linear layer scheme if True. Default is False.
+
+        Reference:
+        ----------
+        1. Code: https://github.com/Yura52/tabular-dl-num-embeddings
+        2. Paper: On Embeddings for Numerical Features in Tabular Deep Learning, https://arxiv.org/abs/2203.05556
+        3. Paper: Simple Modifications to Improve Tabular Neural Networks: https://arxiv.org/pdf/2108.03214
         """
+
         super().__init__()
-
-        assert d_token % n_heads == 0, "d_token must be a multiple of n_heads"
-        assert initialization in ["kaiming", "xavier"]
-
-        self.head_dim = d_token // n_heads
-        self.n_heads = n_heads
-        self.share_qv_weights = share_qv_weights
-        self.dropout = nn.Dropout(dropout)
-        trainable = []
-        if share_qv_weights:
-            self.qv_proj = nn.Linear(d_token, d_token, bias=bias)
-            trainable.extend([self.qv_proj])
-        else:
-            self.q_proj = nn.Linear(d_token, d_token, bias=bias)
-            self.v_proj = nn.Linear(d_token, d_token, bias=bias)
-            trainable.extend([self.q_proj, self.v_proj])
-
-        self.k_proj = nn.Linear(d_token, d_token, bias=bias)
-        self.W_q = nn.Linear(d_token, n_heads)
-        self.W_k = nn.Linear(d_token, n_heads)
-        self.r_out = nn.Linear(d_token, d_token)
-        trainable.extend([self.k_proj, self.W_q, self.W_k, self.r_out])
-
-        if initialization == "xavier":
-            self.apply(init_weights)
-        else:
-            for m in trainable:
-                if m.bias is not None:
-                    nn.init.zeros_(m.bias)
-
-    def forward(
-        self,
-        x_q: Tensor,
-        x_kv: Tensor,
-        *args,  # Not used. just to make the input consistent with MultiheadAttention.
-    ) -> Tuple[Tensor, Dict[str, Tensor]]:
-
-        batch_size, n_q_tokens, d_token = x_q.shape
-        batch_size, n_k_tokens, d_token = x_kv.shape
-
-        q = self.qv_proj(x_q) if self.share_qv_weights else self.q_proj(x_q)
-        v = self.qv_proj(x_kv) if self.share_qv_weights else self.v_proj(x_kv)
-        k = self.k_proj(x_kv)
-
-        alphas = (self.W_q(q) / math.sqrt(self.head_dim)).softmax(dim=1)
-        q_r = q.reshape(batch_size, n_q_tokens, self.n_heads, self.head_dim)
-        global_query = torch.einsum(" b s h, b s h d -> b h d", alphas, q_r)
-        global_query = global_query.reshape(batch_size, self.n_heads * self.head_dim).unsqueeze(1)
-
-        p = k * global_query
-
-        betas = (self.W_k(p) / math.sqrt(self.head_dim)).softmax(dim=1)
-        p_r = p.reshape(batch_size, n_k_tokens, self.n_heads, self.head_dim)
-        global_key = torch.einsum(" b s h, b s h d -> b h d", betas, p_r)
-        global_key = global_key.reshape(batch_size, self.n_heads * self.head_dim).unsqueeze(1)
-
-        u = v * global_key
-        output = q + self.dropout(self.r_out(u))
-
-        return output, {
-            "query_weight": alphas,
-            "key_weight": betas,
+        assert embedding_arch
+        assert set(embedding_arch) <= {
+            "linear",
+            "shared_linear",
+            "autodis",
+            "positional",
+            "relu",
+            "leaky_relu",
+            "layernorm",
         }
+
+        if any(x in embedding_arch for x in ["linear", "shared_linear", "autodis"]):
+            assert d_embedding is not None
+
+        assert embedding_arch.count("positional") <= 1
+
+        if "autodis" in embedding_arch:
+            embedding_arch = ["autodis"]
+
+        NLinear_ = NLinearMemoryEfficient if memory_efficient else NLinear
+        layers: list[nn.Module] = []
+
+        if embedding_arch[0] == "linear":
+            layers.append(
+                NumericalFeatureTokenizer(
+                    in_features=in_features, d_token=d_embedding, bias=True, initialization="normal"
+                )
+            )
+        elif embedding_arch[0] == "positional":
+            layers.append(
+                Periodic(
+                    in_features=in_features,
+                    d_embedding=d_embedding,
+                    trainable=True,
+                    initialization="normal",
+                    sigma=1.0,
+                )
+            )
+        elif embedding_arch[0] == "autodis":
+            layers.append(
+                AutoDis(
+                    in_features=in_features,
+                    d_embedding=d_embedding,
+                    n_meta_embeddings=d_embedding,
+                    temperature=3.0,
+                )
+            )
+        else:
+            layers.append(
+                nn.Identity(),
+            )
+
+        for x in embedding_arch[1:]:
+            layers.append(
+                nn.ReLU()
+                if x == "relu"
+                else nn.LeakyReLU()
+                if x == "leaky_relu"
+                else NLinear_(in_features, d_embedding, d_embedding)
+                if x == "linear"
+                else nn.Linear(d_embedding, d_embedding)
+                if x == "shared_linear"
+                else NLayerNorm(in_features, d_embedding)
+                if x == "layernorm"
+                else nn.Identity()
+            )
+
+            assert not isinstance(layers[-1], nn.Identity)
+
+        self.d_embedding = d_embedding
+        self.in_features = in_features
+        self.layers = nn.Sequential(*layers)
+
+    @property
+    def n_tokens(self) -> int:
+        """The number of tokens."""
+        y = self.forward(torch.ones(1, self.in_features))
+        return y.shape[1]
+
+    @property
+    def d_token(self) -> int:
+        """The size of one token."""
+        y = self.forward(torch.ones(1, self.in_features))
+        return y.shape[-1]
+
+    def forward(self, x):
+        return self.layers(x)
 
 
 class FT_Transformer(nn.Module):
-    """Transformer with extra features.
-
-    This module is the backbone of `FTTransformer`."""
-
-    WARNINGS = {"first_prenormalization": True, "prenormalization": True}
-
-    class FFN(nn.Module):
-        """The Feed-Forward Network module used in every `Transformer` block."""
-
-        def __init__(
-            self,
-            *,
-            d_token: int,
-            d_hidden: int,
-            bias_first: bool,
-            bias_second: bool,
-            dropout: float,
-            activation: ModuleType,
-        ):
-            super().__init__()
-            self.linear_first = nn.Linear(
-                d_token,
-                d_hidden * (2 if _is_glu_activation(activation) else 1),
-                bias_first,
-            )
-            self.activation = _make_nn_module(activation)
-            self.dropout = nn.Dropout(dropout)
-            self.linear_second = nn.Linear(d_hidden, d_token, bias_second)
-
-        def forward(self, x: Tensor) -> Tensor:
-            x = self.linear_first(x)
-            x = self.activation(x)
-            x = self.dropout(x)
-            x = self.linear_second(x)
-            return x
-
-    class Head(nn.Module):
-        """The final module of the `Transformer` that performs BERT-like inference."""
-
-        def __init__(
-            self,
-            *,
-            d_in: int,
-            bias: bool,
-            activation: ModuleType,
-            normalization: ModuleType,
-            d_out: int,
-        ):
-            super().__init__()
-            self.normalization = _make_nn_module(normalization, d_in)
-            self.activation = _make_nn_module(activation)
-            self.linear = nn.Linear(d_in, d_out, bias)
-
-        def forward(self, x: Tensor) -> Tensor:
-            x = x[:, -1]
-            x = self.normalization(x)
-            x = self.activation(x)
-            x = self.linear(x)
-            return x
+    """
+    FT-Transformer for categorical tabular features.
+    The input dimension is automatically computed based on
+    the number of categories in each categorical column.
+    """
 
     def __init__(
         self,
-        *,
-        d_token: int,
-        n_blocks: int,
-        attention_n_heads: int,
-        attention_dropout: float,
-        attention_initialization: str,
-        attention_normalization: str,
-        ffn_d_hidden: int,
-        ffn_dropout: float,
-        ffn_activation: str,
-        ffn_normalization: str,
-        residual_dropout: float,
-        prenormalization: bool,
-        first_prenormalization: bool,
-        last_layer_query_idx: Union[None, List[int], slice],
-        n_tokens: Optional[int],
-        kv_compression_ratio: Optional[float],
-        kv_compression_sharing: Optional[str],
-        head_activation: ModuleType,
-        head_normalization: ModuleType,
-        d_out: int,
-        projection: Optional[bool] = False,
+        prefix: str,
+        num_numerical_columns: int,
+        num_categories: List[int],
+        embedding_arch: List[str],
+        token_dim: int,
+        hidden_size: Optional[int] = 192,
+        hidden_features: Optional[int] = 192,
+        num_classes: Optional[int] = 0,
+        token_bias: Optional[bool] = True,
+        token_initialization: Optional[str] = "normal",
+        num_blocks: Optional[int] = 0,
+        attention_n_heads: Optional[int] = 8,
+        attention_initialization: Optional[str] = "kaiming",
+        attention_normalization: Optional[str] = "layer_norm",
+        attention_dropout: Optional[str] = 0.2,
+        residual_dropout: Optional[str] = 0.0,
+        ffn_activation: Optional[str] = "reglu",
+        ffn_normalization: Optional[str] = "layer_norm",
+        ffn_hidden_size: Optional[str] = 6,
+        ffn_dropout: Optional[str] = 0.0,
+        prenormalization: Optional[bool] = True,
+        first_prenormalization: Optional[bool] = False,
+        kv_compression_ratio: Optional[float] = None,
+        kv_compression_sharing: Optional[str] = None,
+        head_activation: Optional[str] = "relu",
+        head_normalization: Optional[str] = "layer_norm",
         additive_attention: Optional[bool] = False,
         share_qv_weights: Optional[bool] = False,
+        pooling_mode: Optional[str] = "cls",
     ) -> None:
         """
         Parameters
         ----------
-        d_token
-            The size of one token for `_CategoricalFeatureTokenizer`.
-        n_blocks
+        prefix
+            The model prefix.
+        num_categories
+            A list of integers. Each one is the number of categories in one categorical column.
+        token_dim
+            The size of one token after categorical/numerical tokenizers.
+        hidden_size
+            The embedding dimension of the transformer backbone.
+        out_features
+            Dimension of output features.
+        num_classes
+            Number of classes. 1 for a regression task.
+        token_bias
+            If `True`, for each feature, an additional trainable vector will be added in `_CategoricalFeatureTokenizer`
+            to the embedding regardless of feature value. Notably, the bias are not shared between features.
+        token_initialization
+            Initialization policy for parameters in `_CategoricalFeatureTokenizer` and `_CLSToke`.
+            Must be one of `['uniform', 'normal']`.
+        num_blocks
             Number of the `FT_Transformer` blocks, which should be non-negative.
         attention_n_heads
             Number of attention heads in each `FT_Transformer` block, which should be positive.
-        attention_dropout
-            Dropout ratio for the Multi Headed Attention module.
         attention_initialization
             Weights initialization scheme for Multi Headed Attention module.
-        attention_normalization
-            Normalization policy for attention layers. "layer_norm" is a good default.
-        ffn_d_hidden
-            Number of the hidden nodes of the linear layers in the Feed-Forward Network module.
-        ffn_dropout
-            Dropout ratio of the hidden nodes of the linear layers in the Feed-Forward Network module.
+        attention_dropout
+            Dropout ratio for the Multi Headed Attention module.
+        residual_dropout
+            Dropout ratio for the linear layers in FT_Transformer block.
         ffn_activation
             Activation function type for the Feed-Forward Network module.
         ffn_normalization
             Normalization scheme of the Feed-Forward Network module.
-        residual_dropout
-            Dropout ratio for the linear layers in FT_Transformer block.
+        ffn_hidden_size
+            Number of the hidden nodes of the linear layers in the Feed-Forward Network module.
+        ffn_dropout
+            Dropout ratio of the hidden nodes of the linear layers in the Feed-Forward Network module.
         prenormalization, first_prenormalization
             Prenormalization to stabilize the training.
-        n_tokens
-            Number of tokens of the input sequence.
         kv_compression_ratio
             The compression ration to reduce the input sequence length.
         kv_compression_sharing
@@ -546,172 +507,183 @@ class FT_Transformer(nn.Module):
             Activation function type of the MLP layer.
         head_normalization
             Normalization scheme of the MLP layer.
-        d_out
-            Output dimension.
-        projection
-            Whether to use a project head.
         additive_attention
             If 'true' the transformer will use additive attention with linear complexity to sequence length.
         share_qv_weights
             if 'true', then value and query transformation parameters are shared in additive attention.
+        pooling_mode
+            The pooling mode for the Transformer. Can be "cls", or "mean"
+
+        References
+        ----------
+        1. Yury Gorishniy, Ivan Rubachev, Valentin Khrulkov, Artem Babenko,
+        "Revisiting Deep Learning Models for Tabular Data", 2021
+        https://arxiv.org/pdf/2106.11959.pdf
+        2. Code: https://github.com/Yura52/tabular-dl-revisiting-models
         """
+
         super().__init__()
-        if isinstance(last_layer_query_idx, int):
-            raise ValueError(
-                "last_layer_query_idx must be None, list[int] or slice. "
-                f"Do you mean last_layer_query_idx=[{last_layer_query_idx}] ?"
+
+        assert num_categories or num_numerical_columns > 0, "there must be categorical columns or numerical columns"
+        assert token_dim > 0, "d_token must be positive"
+        assert num_blocks >= 0, "n_blocks must be non-negative"
+        assert attention_n_heads > 0, "attention_n_heads must be positive"
+        assert token_initialization in ["uniform", "normal"], "initialization must be uniform or normal"
+
+        self.prefix = prefix
+        self.out_features = hidden_size
+        self.pooling_mode = pooling_mode
+
+        self.categorical_feature_tokenizer = None
+        self.numerical_feature_tokenizer = None
+
+        if num_categories:
+            self.num_categories = num_categories
+            self.categorical_feature_tokenizer = CategoricalFeatureTokenizer(
+                num_categories=num_categories,
+                d_token=token_dim,
+                bias=token_bias,
+                initialization=token_initialization,
             )
-        if not prenormalization:
-            assert (
-                not first_prenormalization
-            ), "If `prenormalization` is False, then `first_prenormalization` must be False"
-        assert _all_or_none([n_tokens, kv_compression_ratio, kv_compression_sharing]), (
-            "If any of the following arguments is (not) None, then all of them must (not) be None: "
-            "n_tokens, kv_compression_ratio, kv_compression_sharing"
-        )
-        assert (
-            additive_attention or not share_qv_weights
-        ), "If `share_qv_weights` is True, then `additive_attention` must be True"
-        assert kv_compression_sharing in [None, "headwise", "key-value", "layerwise"]
-        if not prenormalization:
-            if self.WARNINGS["prenormalization"]:
-                warnings.warn(
-                    "prenormalization is set to False. Are you sure about this? "
-                    "The training can become less stable. "
-                    "You can turn off this warning by tweaking the "
-                    "rtdl.Transformer.WARNINGS dictionary.",
-                    UserWarning,
-                )
-            assert (
-                not first_prenormalization
-            ), "If prenormalization is False, then first_prenormalization is ignored and must be set to False"
-        if prenormalization and first_prenormalization and self.WARNINGS["first_prenormalization"]:
-            warnings.warn(
-                "first_prenormalization is set to True. Are you sure about this? "
-                "For example, the vanilla FTTransformer with "
-                "first_prenormalization=True performs SIGNIFICANTLY worse. "
-                "You can turn off this warning by tweaking the "
-                "rtdl.Transformer.WARNINGS dictionary.",
-                UserWarning,
+            self.categorical_adapter = nn.Linear(token_dim, hidden_size)
+
+        if num_numerical_columns > 0:
+            self.numerical_feature_tokenizer = NumEmbeddings(
+                in_features=num_numerical_columns,
+                d_embedding=token_dim,
+                embedding_arch=embedding_arch,
             )
+            self.numerical_adapter = nn.Linear(token_dim, hidden_size)
 
-        def make_kv_compression():
-            assert n_tokens and kv_compression_ratio, _INTERNAL_ERROR_MESSAGE  # for mypy
-            # https://github.com/pytorch/fairseq/blob/1bba712622b8ae4efb3eb793a8a40da386fe11d0/examples/linformer/linformer_src/modules/multihead_linear_attention.py#L83
-            return nn.Linear(n_tokens, int(n_tokens * kv_compression_ratio), bias=False)
-
-        self.shared_kv_compression = (
-            make_kv_compression() if kv_compression_ratio and kv_compression_sharing == "layerwise" else None
-        )
-
-        self.prenormalization = prenormalization
-        self.last_layer_query_idx = last_layer_query_idx
-
-        self.blocks = nn.ModuleList([])
-        for layer_idx in range(n_blocks):
-            layer = nn.ModuleDict(
-                {
-                    "attention": AdditiveAttention(
-                        d_token=d_token,
-                        n_heads=attention_n_heads,
-                        dropout=attention_dropout,
-                        bias=True,
-                        share_qv_weights=share_qv_weights,
-                        initialization=attention_initialization,
-                    )
-                    if additive_attention
-                    else MultiheadAttention(
-                        d_token=d_token,
-                        n_heads=attention_n_heads,
-                        dropout=attention_dropout,
-                        bias=True,
-                        initialization=attention_initialization,
-                    ),
-                    "ffn": FT_Transformer.FFN(
-                        d_token=d_token,
-                        d_hidden=ffn_d_hidden,
-                        bias_first=True,
-                        bias_second=True,
-                        dropout=ffn_dropout,
-                        activation=ffn_activation,
-                    ),
-                    "attention_residual_dropout": nn.Dropout(residual_dropout),
-                    "ffn_residual_dropout": nn.Dropout(residual_dropout),
-                    "output": nn.Identity(),  # for hooks-based introspection
-                }
-            )
-            if layer_idx or not prenormalization or first_prenormalization:
-                layer["attention_normalization"] = _make_nn_module(attention_normalization, d_token)
-            layer["ffn_normalization"] = _make_nn_module(ffn_normalization, d_token)
-            if kv_compression_ratio and self.shared_kv_compression is None:
-                layer["key_compression"] = make_kv_compression()
-                if kv_compression_sharing == "headwise":
-                    layer["value_compression"] = make_kv_compression()
-                else:
-                    assert kv_compression_sharing == "key-value", _INTERNAL_ERROR_MESSAGE
-            self.blocks.append(layer)
-
-        self.head = (
-            FT_Transformer.Head(
-                d_in=d_token,
-                d_out=d_out,
-                bias=True,
-                activation=head_activation,  # type: ignore
-                normalization=head_normalization if prenormalization else "Identity",
-            )
-            if projection
-            else nn.Identity()
+        self.transformer = Custom_Transformer(
+            d_token=hidden_size,
+            n_blocks=num_blocks,
+            attention_n_heads=attention_n_heads,
+            attention_dropout=attention_dropout,
+            attention_initialization=attention_initialization,
+            attention_normalization=attention_normalization,
+            ffn_d_hidden=ffn_hidden_size,
+            ffn_dropout=ffn_dropout,
+            ffn_activation=ffn_activation,
+            ffn_normalization=ffn_normalization,
+            residual_dropout=residual_dropout,
+            prenormalization=prenormalization,
+            first_prenormalization=first_prenormalization,
+            last_layer_query_idx=None,
+            n_tokens=None,
+            kv_compression_ratio=kv_compression_ratio,
+            kv_compression_sharing=kv_compression_sharing,
+            head_activation=head_activation,
+            head_normalization=head_normalization,
+            d_out=hidden_features,
+            projection=False,
+            additive_attention=additive_attention,
+            share_qv_weights=share_qv_weights,
         )
 
-    def _get_kv_compressions(self, layer):
-        return (
-            (self.shared_kv_compression, self.shared_kv_compression)
-            if self.shared_kv_compression is not None
-            else (layer["key_compression"], layer["value_compression"])
-            if "key_compression" in layer and "value_compression" in layer
-            else (layer["key_compression"], layer["key_compression"])
-            if "key_compression" in layer
-            else (None, None)
+        self.head = Custom_Transformer.Head(
+            d_in=hidden_size,
+            d_out=num_classes,
+            bias=True,
+            activation=head_activation,
+            normalization=head_normalization,
         )
 
-    def _start_residual(self, layer, stage, x):
-        assert stage in ["attention", "ffn"], _INTERNAL_ERROR_MESSAGE
-        x_residual = x
-        if self.prenormalization:
-            norm_key = f"{stage}_normalization"
-            if norm_key in layer:
-                x_residual = layer[norm_key](x_residual)
-        return x_residual
+        self.cls_token = CLSToken(
+            d_token=hidden_size,
+            initialization="uniform",
+        )
 
-    def _end_residual(self, layer, stage, x, x_residual):
-        assert stage in ["attention", "ffn"], _INTERNAL_ERROR_MESSAGE
-        x_residual = layer[f"{stage}_residual_dropout"](x_residual)
-        x = x + x_residual
-        if not self.prenormalization:
-            x = layer[f"{stage}_normalization"](x)
-        return x
+        # init weights
+        if self.numerical_feature_tokenizer:
+            self.numerical_adapter.apply(init_weights)
+        if self.categorical_feature_tokenizer:
+            self.categorical_adapter.apply(init_weights)
+        self.head.apply(init_weights)
+        self.name_to_id = self.get_layer_ids()
 
-    def forward(self, x: Tensor) -> Tensor:
-        assert x.ndim == 3, "The input must have 3 dimensions: (n_objects, n_tokens, d_token)"
-        for layer_idx, layer in enumerate(self.blocks):
-            layer = cast(nn.ModuleDict, layer)
+    @property
+    def categorical_key(self):
+        return f"{self.prefix}_{CATEGORICAL}"
 
-            query_idx = self.last_layer_query_idx if layer_idx + 1 == len(self.blocks) else None
-            x_residual = self._start_residual(layer, "attention", x)
-            x_residual, _ = layer["attention"](
-                x_residual if query_idx is None else x_residual[:, query_idx],
-                x_residual,
-                *self._get_kv_compressions(layer),
-            )
-            if query_idx is not None:
-                x = x[:, query_idx]
-            x = self._end_residual(layer, "attention", x, x_residual)
+    @property
+    def numerical_key(self):
+        return f"{self.prefix}_{NUMERICAL}"
 
-            x_residual = self._start_residual(layer, "ffn", x)
-            x_residual = layer["ffn"](x_residual)
-            x = self._end_residual(layer, "ffn", x, x_residual)
-            x = layer["output"](x)
+    @property
+    def input_keys(self):
+        input_keys = []
+        if self.categorical_feature_tokenizer:
+            input_keys.append(self.categorical_key)
+        if self.numerical_feature_tokenizer:
+            input_keys.append(self.numerical_key)
+        return input_keys
 
-        x = self.head(x)
+    @property
+    def label_key(self):
+        return f"{self.prefix}_{LABEL}"
 
-        return x
+    def forward(self, batch: dict):
+        """
+
+        Parameters
+        ----------
+        batch
+            A dictionary containing the input mini-batch data.
+            We need to use the keys with the model prefix to index required data.
+
+        Returns
+        -------
+            A dictionary with logits and features.
+        """
+        multimodal_features = []
+        if self.categorical_feature_tokenizer:
+            categorical_inputs = []
+            for categorical_input in batch[self.categorical_key]:
+                categorical_inputs.append(categorical_input)
+            categorical_inputs = torch.stack(categorical_inputs, dim=1)
+
+            categorical_features = self.categorical_feature_tokenizer(categorical_inputs)
+            categorical_features = self.categorical_adapter(categorical_features)
+            multimodal_features.append(categorical_features)
+        if self.numerical_feature_tokenizer:
+            numerical_features = self.numerical_feature_tokenizer(batch[self.numerical_key])
+            numerical_features = self.numerical_adapter(numerical_features)
+            multimodal_features.append(numerical_features)
+
+        multimodal_features = torch.cat(multimodal_features, dim=1)
+        multimodal_features = self.cls_token(multimodal_features)
+        features = self.transformer(multimodal_features)
+        logits = self.head(features)
+
+        if self.pooling_mode == "cls":
+            features = features[:, -1, :]
+        elif self.pooling_mode == "mean":
+            features = features.mean(dim=1)
+        else:
+            raise NotImplementedError(f"Pooling mode={self.pooling_mode} is not supported.")
+
+        output = {
+            self.prefix: {
+                LOGITS: logits,
+                FEATURES: features,
+            }
+        }
+
+        return output
+
+    def get_layer_ids(
+        self,
+    ):
+        """
+        All layers have the same id 0 since there is no pre-trained models used here.
+
+        Returns
+        -------
+        A dictionary mapping the layer names (keys) to their ids (values).
+        """
+        name_to_id = {}
+        for n, _ in self.named_parameters():
+            name_to_id[n] = 0
+
+        return name_to_id

@@ -18,7 +18,8 @@ from autogluon.core.models import AbstractModel
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_json, save_pkl
-from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesEvaluator
+from autogluon.timeseries import TimeSeriesDataFrame
+from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.ensemble import AbstractTimeSeriesEnsembleModel, TimeSeriesGreedyEnsemble
 from autogluon.timeseries.models.presets import contains_searchspace
@@ -253,7 +254,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         self,
         path: str,
         prediction_length: Optional[int] = 1,
-        eval_metric: Optional[str] = None,
+        eval_metric: Union[str, TimeSeriesScorer, None] = None,
         eval_metric_seasonal_period: Optional[int] = None,
         save_data: bool = True,
         enable_ensemble: bool = True,
@@ -280,7 +281,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         # self.refit_single_full() and self.refit_full().
         self.model_full_dict = {}
 
-        self.eval_metric = TimeSeriesEvaluator.check_get_evaluation_metric(eval_metric)
+        self.eval_metric: TimeSeriesScorer = check_get_evaluation_metric(eval_metric)
         self.eval_metric_seasonal_period = eval_metric_seasonal_period
         if val_splitter is None:
             val_splitter = ExpandingWindowSplitter(prediction_length=self.prediction_length)
@@ -451,17 +452,12 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         logger.info(f"\tTrained {len(model_names_trained)} models while tuning {model.name}.")
 
         if len(model_names_trained) > 0:
-            if TimeSeriesEvaluator.METRIC_COEFFICIENTS[self.eval_metric] == -1:
-                sign_str = "-"
-            else:
-                sign_str = ""
-
             trained_model_results = [hpo_models[model_name] for model_name in model_names_trained]
             best_model_result = max(trained_model_results, key=lambda x: x["val_score"])
 
             logger.info(
                 f"\t{best_model_result['val_score']:<7.4f}".ljust(15)
-                + f"= Validation score ({sign_str}{self.eval_metric})"
+                + f"= Validation score ({self.eval_metric.name_with_sign})"
             )
             logger.info(f"\t{total_tuning_time:<7.2f} s".ljust(15) + "= Total tuning time")
             logger.debug(f"\tBest hyperparameter configuration: {best_model_result['hyperparameters']}")
@@ -520,11 +516,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         predict_time: Optional[float] = None,
     ):
         if val_score is not None:
-            if TimeSeriesEvaluator.METRIC_COEFFICIENTS[self.eval_metric] == -1:
-                sign_str = "-"
-            else:
-                sign_str = ""
-            logger.info(f"\t{val_score:<7.4f}".ljust(15) + f"= Validation score ({sign_str}{self.eval_metric})")
+            logger.info(f"\t{val_score:<7.4f}".ljust(15) + f"= Validation score ({self.eval_metric.name_with_sign})")
         if fit_time is not None:
             logger.info(f"\t{fit_time:<7.2f} s".ljust(15) + "= Training runtime")
         if predict_time is not None:
@@ -566,54 +558,45 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         logger.info(f"Models that will be trained: {list(m.name for m in models)}")
 
-        time_limit_model_split = time_limit
-        if time_limit is not None and len(models) > 0:
-            time_limit_model_split /= len(models)
-
+        num_models = len(models)
+        if num_models > 1:  # ensemble is only fit len(models) > 1
+            num_models += int(self.enable_ensemble)
         model_names_trained = []
         for i, model in enumerate(models):
-            if hyperparameter_tune_kwargs is not None:
-                time_left = time_limit_model_split
+            if time_limit is None:
+                time_left = None
+                time_left_for_model = None
+            else:
+                time_left = time_limit - (time.time() - time_start)
+                time_left_for_model = time_left / (num_models - i)
+                if time_left <= 0:
+                    logger.info(f"Stopping training due to lack of time remaining. Time left: {time_left:.1f} seconds")
+                    break
 
-                fit_log_message = f"Hyperparameter tuning model: {model.name}. "
-                if time_limit is not None and time_limit_model_split is not None:
+            if contains_searchspace(model.get_user_params()):
+                fit_log_message = f"Hyperparameter tuning model {model.name}. "
+                if time_left is not None:
                     fit_log_message += (
-                        f"Tuning model for up to {time_limit_model_split:.2f}s " f"of the {time_limit:.2f}s remaining."
+                        f"Tuning model for up to {time_left_for_model:.1f}s of the {time_left:.1f}s remaining."
                     )
                 logger.info(fit_log_message)
-
-                if contains_searchspace(model.get_user_params()):
-                    with tqdm.external_write_mode():
-                        model_names_trained += self.tune_model_hyperparameters(
-                            model,
-                            time_limit=time_left,
-                            train_data=train_data,
-                            val_data=val_data,
-                            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-                        )
-                else:
-                    model_names_trained += self._train_and_save(
-                        train_data, model=model, val_data=val_data, time_limit=time_left
+                with tqdm.external_write_mode():
+                    model_names_trained += self.tune_model_hyperparameters(
+                        model,
+                        time_limit=time_left_for_model,
+                        train_data=train_data,
+                        val_data=val_data,
+                        hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
                     )
             else:
-                time_left = None
                 fit_log_message = f"Training timeseries model {model.name}. "
-                if time_limit is not None:
-                    time_start_model = time.time()
-                    time_left = time_limit - (time_start_model - time_start)
-                    if time_left <= 0:
-                        logger.info(
-                            f"Stopping training due to lack of time remaining. Time left: {time_left:.2f} seconds"
-                        )
-                        break
-
+                if time_left is not None:
                     fit_log_message += (
-                        f"Training for up to {time_left:.2f}s of " f"the {time_left:.2f}s of remaining time."
+                        f"Training for up to {time_left_for_model:.1f}s of the {time_left:.1f}s of remaining time."
                     )
-
                 logger.info(fit_log_message)
                 model_names_trained += self._train_and_save(
-                    train_data, model=model, val_data=val_data, time_limit=time_left
+                    train_data, model=model, val_data=val_data, time_limit=time_left_for_model
                 )
 
         if self.enable_ensemble:
@@ -626,7 +609,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             if time_left_for_ensemble is not None and time_left_for_ensemble <= 0:
                 logger.info(
                     "Not fitting ensemble due to lack of time remaining. "
-                    f"Time left: {time_left_for_ensemble:.2f} seconds"
+                    f"Time left: {time_left_for_ensemble:.1f} seconds"
                 )
             elif len(models_available_for_ensemble) <= 1:
                 logger.info(
@@ -825,30 +808,49 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         self,
         data: TimeSeriesDataFrame,
         predictions: TimeSeriesDataFrame,
-        metric: Optional[str] = None,
+        metric: Union[str, TimeSeriesScorer, None] = None,
     ) -> float:
         """Compute the score measuring how well the predictions align with the data."""
-        eval_metric = self.eval_metric if metric is None else metric
-        evaluator = TimeSeriesEvaluator(
-            eval_metric=eval_metric,
-            eval_metric_seasonal_period=self.eval_metric_seasonal_period,
+        eval_metric = self.eval_metric if metric is None else check_get_evaluation_metric(metric)
+        return eval_metric.score(
+            data=data,
+            predictions=predictions,
             prediction_length=self.prediction_length,
-            target_column=self.target,
+            target=self.target,
+            seasonal_period=self.eval_metric_seasonal_period,
         )
-        return evaluator(data, predictions) * evaluator.coefficient
 
     def score(
         self,
         data: TimeSeriesDataFrame,
         model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
-        metric: Optional[str] = None,
+        metric: Union[str, TimeSeriesScorer, None] = None,
         use_cache: bool = True,
     ) -> float:
+        eval_metric = self.eval_metric if metric is None else check_get_evaluation_metric(metric)
+        scores_dict = self.evaluate(data=data, model=model, metrics=[eval_metric], use_cache=use_cache)
+        return scores_dict[eval_metric.name]
+
+    def evaluate(
+        self,
+        data: TimeSeriesDataFrame,
+        model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
+        metrics: Optional[Union[str, TimeSeriesScorer, List[Union[str, TimeSeriesScorer]]]] = None,
+        use_cache: bool = True,
+    ) -> Dict[str, float]:
         past_data, known_covariates = data.get_model_inputs_for_scoring(
             prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates_real
         )
         predictions = self.predict(data=past_data, known_covariates=known_covariates, model=model, use_cache=use_cache)
-        return self._score_with_predictions(data=data, predictions=predictions, metric=metric)
+        if not isinstance(metrics, list):  # a single metric is provided
+            metrics = [metrics]
+        scores_dict = {}
+        for metric in metrics:
+            eval_metric = self.eval_metric if metric is None else check_get_evaluation_metric(metric)
+            scores_dict[eval_metric.name] = self._score_with_predictions(
+                data=data, predictions=predictions, metric=eval_metric
+            )
+        return scores_dict
 
     def _predict_model(
         self,

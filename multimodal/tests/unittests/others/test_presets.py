@@ -8,10 +8,7 @@ from autogluon.multimodal.constants import (
     DISTILLER,
     ENVIRONMENT,
     FEATURE_EXTRACTION,
-    FEW_SHOT_TEXT_CLASSIFICATION,
     MODEL,
-    OCR_TEXT_DETECTION,
-    OCR_TEXT_RECOGNITION,
     OPTIMIZATION,
     ZERO_SHOT_IMAGE_CLASSIFICATION,
 )
@@ -59,16 +56,9 @@ def test_basic_config():
 @pytest.mark.parametrize("problem_type", list(PROBLEM_TYPES_REG.list_keys()))
 @pytest.mark.parametrize("presets", ALL_MODEL_QUALITIES)
 def test_preset_in_init(problem_type, presets):
-    if problem_type in [
-        OCR_TEXT_DETECTION,
-        OCR_TEXT_RECOGNITION,
-    ]:
-        pytest.skip(reason="Need to fix these presets before testing them.")
-
     predictor = MultiModalPredictor(problem_type=problem_type)
     if problem_type not in [
         FEATURE_EXTRACTION,
-        FEW_SHOT_TEXT_CLASSIFICATION,
         ZERO_SHOT_IMAGE_CLASSIFICATION,
     ]:
         predictor = MultiModalPredictor(problem_type=problem_type, presets=presets)

@@ -255,9 +255,10 @@ class AutoETSModel(AbstractStatsForecastModel):
         time_series: pd.Series,
         local_model_args: dict,
     ) -> pd.DataFrame:
-        # Disable seasonality if time series too short for chosen season_length or season_length == 1,
-        # otherwise model will crash
-        if len(time_series) < 2 * local_model_args["season_length"] or local_model_args["season_length"] == 1:
+        # Disable seasonality if time series too short for chosen season_length, season_length is too high, or
+        # season_length == 1. Otherwise model will crash
+        season_length = local_model_args["season_length"]
+        if len(time_series) < 2 * season_length or season_length == 1 or season_length > 24:
             # changing last character to "N" disables seasonality, e.g., model="AAA" -> model="AAN"
             local_model_args["model"] = local_model_args["model"][:-1] + "N"
         return super()._predict_with_local_model(time_series=time_series, local_model_args=local_model_args)

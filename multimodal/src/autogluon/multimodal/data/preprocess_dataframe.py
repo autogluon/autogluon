@@ -28,6 +28,8 @@ from ..constants import (
     NUMERICAL,
     OVD,
     ROIS,
+    SEMANTIC_SEGMENTATION_GT,
+    SEMANTIC_SEGMENTATION_IMG,
     TEXT,
     TEXT_NER,
 )
@@ -94,7 +96,10 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         for col_name, col_type in self._column_types.items():
             if col_name == self._label_column:
                 continue
-            if col_type.startswith((TEXT, IMAGE, ROIS, TEXT_NER, DOCUMENT)) or col_type == NULL:
+            if (
+                col_type.startswith((TEXT, IMAGE, ROIS, TEXT_NER, DOCUMENT, SEMANTIC_SEGMENTATION_IMG))
+                or col_type == NULL
+            ):
                 continue
             elif col_type == CATEGORICAL:
                 generator = CategoryFeatureGenerator(
@@ -138,6 +143,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         self._rois_feature_names = []
         self._ner_feature_names = []
         self._document_feature_names = []
+        self._semantic_segmentation_feature_names = []
 
     @property
     def label_column(self):
@@ -196,6 +202,14 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                 return self.text_feature_names[:1]
             else:
                 return []
+
+    @property
+    def semantic_segmentation_feature_names(self):
+        # Added for backward compatibility.
+        if hasattr(self, "_semantic_segmentation_feature_names"):
+            return self._semantic_segmentation_feature_names
+        else:
+            return []
 
     @property
     def required_feature_names(self):
@@ -272,6 +286,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             return self._document_feature_names
         elif modality == LABEL:
             return [self._label_column]  # as a list to be consistent with others
+        elif modality == SEMANTIC_SEGMENTATION_IMG:
+            return self._semantic_segmentation_feature_names
         elif self.label_type == NER_ANNOTATION:
             return self.ner_feature_names + [self._label_column]
         else:
@@ -345,6 +361,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                 self._document_feature_names.append(col_name)
             elif col_type == ROIS:
                 self._rois_feature_names.append(col_name)
+            elif col_type == SEMANTIC_SEGMENTATION_IMG:
+                self._semantic_segmentation_feature_names.append(col_name)
             else:
                 raise NotImplementedError(
                     f"Type of the column is not supported currently. Received {col_name}={col_type}."
@@ -368,7 +386,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         elif self.label_type == NUMERICAL:
             y = pd.to_numeric(y).to_numpy()
             self._label_scaler.fit(np.expand_dims(y, axis=-1))
-        elif self.label_type == ROIS:
+        elif self.label_type == ROIS or self.label_type == SEMANTIC_SEGMENTATION_GT:
             pass  # Do nothing. TODO: Shall we call fit here?
         elif self.label_type == NER_ANNOTATION:
             # If there are ner annotations and text columns but no NER feature columns,
@@ -489,6 +507,54 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             ret_data[col_name] = processed_data
             ret_type[col_name] = self._column_types[col_name]
 
+        return ret_data, ret_type
+
+    def transform_semantic_segmentation_img(
+        self,
+        df: pd.DataFrame,
+    ) -> Tuple[Dict[str, List[List[str]]], Dict[str, str]]:
+        """
+        Preprocess semantic segmentation data.
+        For image data we preprocess them by collecting their paths together. If one sample has multiple images
+        in an image column, assume that their image paths are separated by ";".
+        For ground truth image data we simply convert them from a column of pandas dataframe to a list.
+        This function needs to be called preceding the image processor in "process_semantic_seg_img.py".
+
+        Parameters
+        ----------
+        df
+            The multimodal pd.DataFrame.
+
+        Returns
+        -------
+        image_features
+            All the image data stored in a dictionary.
+        image_types
+            The column types of these image data, e.g., image_path or image_identifier.
+        """
+        assert (
+            self._fit_called or self._fit_x_called
+        ), "You will need to first call preprocessor.fit_x() before calling preprocessor.transform_semantic_segmentation_img."
+
+        ret_data = {}
+        ret_type = {}
+        for col_name in self._semantic_segmentation_feature_names:
+            col_value = df[col_name]
+            col_type = self._column_types[col_name]
+
+            if col_type in [SEMANTIC_SEGMENTATION_IMG]:
+                processed_data = col_value.apply(lambda ele: str(ele).split(";")).tolist()
+            else:
+                raise ValueError(f"Unknown image type {col_type} for column {col_name}")
+
+            ret_data[col_name] = processed_data
+            ret_type[col_name] = self._column_types[col_name]
+
+        if self._label_column in df:
+            if self.label_type == SEMANTIC_SEGMENTATION_GT:
+                y = self.transform_label(df)
+                ret_data.update(y[0])
+                ret_type.update(y[1])
         return ret_data, ret_type
 
     def transform_ovd(
@@ -719,7 +785,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         elif self.label_type == NUMERICAL:
             y = pd.to_numeric(y_df).to_numpy()
             y = self._label_scaler.transform(np.expand_dims(y, axis=-1))[:, 0].astype(np.float32)
-        elif self.label_type == ROIS:
+        elif self.label_type == ROIS or self.label_type == SEMANTIC_SEGMENTATION_GT:
             y = y_df.to_list()
         elif self.label_type == NER_ANNOTATION:
             y = self._label_generator.transform(y_df)
@@ -782,6 +848,9 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         assert (
             self._fit_called or self._fit_y_called
         ), "You will need to first call preprocessor.fit_y() before calling preprocessor.transform_label_for_metric."
+        assert (
+            self._label_column in df.columns
+        ), f"Label {self._label_column} is not in the data. Cannot perform evaluation without ground truth labels."
         y_df = df[self._label_column]
         if self.label_type == CATEGORICAL:
             # need to encode to integer labels
@@ -846,7 +915,6 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                     y_pred = y_pred[1]
                 else:
                     y_pred = y_pred[0]
-
         else:
             raise NotImplementedError
 

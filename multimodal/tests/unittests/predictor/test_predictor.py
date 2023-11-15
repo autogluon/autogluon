@@ -88,12 +88,11 @@ def verify_realtime_inference(predictor, df, verify_embedding=True):
 
 
 def verify_no_redundant_model_configs(predictor):
-    model_names = list(predictor._config.model.keys())
+    model_names = list(predictor._learner._config.model.keys())
     model_names.remove("names")
-    assert sorted(predictor._config.model.names) == sorted(model_names)
+    assert sorted(predictor._learner._config.model.names) == sorted(model_names)
 
 
-@pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "dataset_name,model_names,text_backbone,image_backbone,top_k_average_method,efficient_finetune,loss_function",
     [
@@ -135,7 +134,7 @@ def verify_no_redundant_model_configs(predictor):
         ),
         (
             "petfinder_bytearray",
-            ["numerical_mlp", "categorical_mlp", "timm_image", "fusion_mlp"],
+            ["ft_transformer", "timm_image", "fusion_mlp"],
             None,
             "mobilenetv3_small_100",
             GREEDY_SOUP,
@@ -144,7 +143,7 @@ def verify_no_redundant_model_configs(predictor):
         ),
         (
             "petfinder",
-            ["numerical_mlp", "categorical_mlp", "hf_text", "fusion_mlp"],
+            ["ft_transformer", "hf_text", "fusion_mlp"],
             "nlpaueb/legal-bert-small-uncased",
             None,
             UNIFORM_SOUP,
@@ -153,7 +152,7 @@ def verify_no_redundant_model_configs(predictor):
         ),
         (
             "petfinder",
-            ["numerical_mlp", "categorical_mlp", "fusion_mlp"],
+            ["ft_transformer"],
             None,
             None,
             BEST,
@@ -198,7 +197,7 @@ def verify_no_redundant_model_configs(predictor):
         ),
     ],
 )
-def test_predictor(
+def test_predictor_basic(
     dataset_name,
     model_names,
     text_backbone,
@@ -263,7 +262,6 @@ def test_predictor(
     verify_no_redundant_model_configs(predictor)
     score = predictor.evaluate(dataset.test_df)
     verify_predictor_save_load(predictor, dataset.test_df)
-    verify_realtime_inference(predictor, dataset.test_df)
 
     # Test for continuous fit
     predictor.fit(
@@ -285,7 +283,105 @@ def test_predictor(
         )
 
 
-def test_standalone():  # test standalone feature in MultiModalPredictor.save()
+@pytest.mark.single_gpu
+@pytest.mark.parametrize(
+    "dataset_name,model_names,text_backbone,image_backbone,top_k_average_method,efficient_finetune,loss_function",
+    [
+        (
+            "petfinder",
+            ["numerical_mlp", "categorical_mlp", "timm_image", "hf_text", "fusion_mlp"],
+            "nlpaueb/legal-bert-small-uncased",
+            "swin_tiny_patch4_window7_224",
+            GREEDY_SOUP,
+            LORA,
+            "auto",
+        ),
+        (
+            "hateful_memes",
+            ["timm_image", "t_few", "fusion_mlp"],
+            "t5-small",
+            "mobilenetv3_small_100",
+            BEST,
+            IA3,
+            "auto",
+        ),
+        (
+            "hateful_memes",
+            ["clip"],
+            None,
+            None,
+            BEST,
+            NORM_FIT,
+            "auto",
+        ),
+    ],
+)
+def test_predictor_realtime_inference(
+    dataset_name,
+    model_names,
+    text_backbone,
+    image_backbone,
+    top_k_average_method,
+    efficient_finetune,
+    loss_function,
+):
+    dataset = ALL_DATASETS[dataset_name]
+    metric_name = dataset.metric
+
+    predictor = MultiModalPredictor(
+        label=dataset.label_columns[0],
+        problem_type=dataset.problem_type,
+        eval_metric=metric_name,
+    )
+    hyperparameters = {
+        "optimization.max_epochs": 1,
+        "model.names": model_names,
+        "env.num_workers": 0,
+        "env.num_workers_evaluation": 0,
+        "optimization.top_k_average_method": top_k_average_method,
+        "optimization.efficient_finetune": efficient_finetune,
+        "optimization.loss_function": loss_function,
+        "data.categorical.convert_to_text": False,  # ensure the categorical model is used.
+        "data.numerical.convert_to_text": False,  # ensure the numerical model is used.
+    }
+    if text_backbone is not None:
+        if "t_few" in model_names:
+            hyperparameters.update(
+                {
+                    "model.t_few.checkpoint_name": "t5-small",
+                    "model.t_few.gradient_checkpointing": False,
+                }
+            )
+        else:
+            hyperparameters.update(
+                {
+                    "model.hf_text.checkpoint_name": text_backbone,
+                }
+            )
+    if image_backbone is not None:
+        hyperparameters.update(
+            {
+                "model.timm_image.checkpoint_name": image_backbone,
+            }
+        )
+    save_path = os.path.join(get_home_dir(), "outputs", dataset_name)
+    if text_backbone is not None:
+        save_path = os.path.join(save_path, text_backbone)
+    if image_backbone is not None:
+        save_path = os.path.join(save_path, image_backbone)
+
+    if os.path.exists(save_path):
+        shutil.rmtree(save_path)
+    predictor.fit(
+        train_data=dataset.train_df,
+        hyperparameters=hyperparameters,
+        time_limit=20,
+        save_path=save_path,
+    )
+    verify_realtime_inference(predictor, dataset.test_df)
+
+
+def test_predictor_standalone():  # test standalone feature in MultiModalPredictor.save()
     from unittest import mock
 
     import torch
@@ -408,9 +504,9 @@ def test_customizing_model_names(
         save_path=save_path,
     )
 
-    assert sorted(predictor._config.model.names) == sorted(hyperparameters_gt["model.names"])
+    assert sorted(predictor._learner._config.model.names) == sorted(hyperparameters_gt["model.names"])
     for per_name in hyperparameters_gt["model.names"]:
-        assert hasattr(predictor._config.model, per_name)
+        assert hasattr(predictor._learner._config.model, per_name)
 
     score = predictor.evaluate(dataset.test_df)
     verify_predictor_save_load(predictor, dataset.test_df)
@@ -421,9 +517,9 @@ def test_customizing_model_names(
         hyperparameters=hyperparameters,
         time_limit=20,
     )
-    assert sorted(predictor._config.model.names) == sorted(hyperparameters_gt["model.names"])
+    assert sorted(predictor._learner._config.model.names) == sorted(hyperparameters_gt["model.names"])
     for per_name in hyperparameters_gt["model.names"]:
-        assert hasattr(predictor._config.model, per_name)
+        assert hasattr(predictor._learner._config.model, per_name)
     verify_predictor_save_load(predictor, dataset.test_df)
 
     # Saving to folder, loading the saved model and call fit again (continuous fit)
@@ -435,164 +531,9 @@ def test_customizing_model_names(
             hyperparameters=hyperparameters,
             time_limit=10,
         )
-        assert sorted(predictor._config.model.names) == sorted(hyperparameters_gt["model.names"])
+        assert sorted(predictor._learner._config.model.names) == sorted(hyperparameters_gt["model.names"])
         for per_name in hyperparameters_gt["model.names"]:
-            assert hasattr(predictor._config.model, per_name)
-
-
-def test_model_configs():
-    dataset = ALL_DATASETS["petfinder"]
-    metric_name = dataset.metric
-
-    predictor = MultiModalPredictor(
-        label=dataset.label_columns[0],
-        problem_type=dataset.problem_type,
-        eval_metric=metric_name,
-    )
-
-    model_config = {
-        "model": {
-            "names": [
-                "hf_text",
-                "timm_image",
-                "clip",
-                "categorical_transformer",
-                "numerical_transformer",
-                "fusion_transformer",
-            ],
-            "categorical_transformer": {
-                "out_features": 192,
-                "d_token": 192,
-                "num_trans_blocks": 0,
-                "num_attn_heads": 4,
-                "residual_dropout": 0.0,
-                "attention_dropout": 0.2,
-                "ffn_dropout": 0.1,
-                "normalization": "layer_norm",
-                "ffn_activation": "reglu",
-                "head_activation": "relu",
-                "data_types": ["categorical"],
-                "additive_attention": "auto",
-                "share_qv_weights": "auto",
-            },
-            "numerical_transformer": {
-                "out_features": 192,
-                "d_token": 192,
-                "num_trans_blocks": 0,
-                "num_attn_heads": 4,
-                "residual_dropout": 0.0,
-                "attention_dropout": 0.2,
-                "ffn_dropout": 0.1,
-                "normalization": "layer_norm",
-                "ffn_activation": "reglu",
-                "head_activation": "relu",
-                "data_types": ["numerical"],
-                "embedding_arch": ["linear", "relu"],
-                "merge": "concat",
-                "additive_attention": "auto",
-                "share_qv_weights": "auto",
-            },
-            "t_few": {
-                "checkpoint_name": "t5-small",
-                "gradient_checkpointing": False,
-                "data_types": ["text"],
-                "tokenizer_name": "hf_auto",
-                "length_norm": 1.0,
-                "unlikely_loss": 1.0,
-                "mc_loss": 1.0,
-                "max_text_len": 512,
-                "insert_sep": True,
-                "text_segment_num": 2,
-                "stochastic_chunk": False,
-                "text_aug_detect_length": 10,
-            },
-            "hf_text": {
-                "checkpoint_name": "google/electra-small-discriminator",
-                "data_types": ["text"],
-                "tokenizer_name": "hf_auto",
-                "max_text_len": 512,
-                "insert_sep": True,
-                "text_segment_num": 2,
-                "stochastic_chunk": False,
-                "text_aug_detect_length": 10,
-                "text_trivial_aug_maxscale": 0.05,
-                "test_train_augment_types": ["synonym_replacement(0.1)"],
-            },
-            "timm_image": {
-                "checkpoint_name": "swin_tiny_patch4_window7_224",
-                "mix_choice": "all_logits",
-                "data_types": ["image"],
-                "train_transforms": ["resize_shorter_side", "center_crop"],
-                "val_transforms": ["resize_shorter_side", "center_crop"],
-                "image_norm": "imagenet",
-                "image_size": 224,
-                "max_img_num_per_col": 2,
-            },
-            "clip": {
-                "checkpoint_name": "openai/clip-vit-base-patch32",
-                "data_types": ["image", "text"],
-                "train_transforms": ["resize_shorter_side", "center_crop"],
-                "val_transforms": ["resize_shorter_side", "center_crop"],
-                "image_norm": "clip",
-                "image_size": 224,
-                "max_img_num_per_col": 2,
-                "tokenizer_name": "clip",
-                "max_text_len": 77,
-                "insert_sep": False,
-                "text_segment_num": 1,
-                "stochastic_chunk": False,
-                "text_aug_detect_length": 10,
-                "text_trivial_aug_maxscale": 0.05,
-                "test_train_augment_types": ["synonym_replacement(0.1)"],
-            },
-            "fusion_transformer": {
-                "hidden_size": 192,
-                "n_blocks": 2,
-                "attention_n_heads": 4,
-                "adapt_in_features": "max",
-                "attention_dropout": 0.2,
-                "residual_dropout": 0.0,
-                "ffn_dropout": 0.1,
-                "ffn_d_hidden": 192,
-                "normalization": "layer_norm",
-                "ffn_activation": "geglu",
-                "head_activation": "relu",
-                "data_types": None,
-                "additive_attention": "auto",
-                "share_qv_weights": "auto",
-            },
-        }
-    }
-
-    hyperparameters = {
-        "optimization.max_epochs": 1,
-        "optimization.top_k_average_method": BEST,
-        "env.num_workers": 0,
-        "env.num_workers_evaluation": 0,
-        "data.categorical.convert_to_text": False,
-        "data.numerical.convert_to_text": False,
-    }
-
-    config = {
-        MODEL: model_config,
-        DATA: "default",
-        OPTIMIZATION: "adamw",
-        ENVIRONMENT: "default",
-    }
-
-    with tempfile.TemporaryDirectory() as save_path:
-        if os.path.isdir(save_path):
-            shutil.rmtree(save_path)
-        predictor.fit(
-            train_data=dataset.train_df,
-            config=config,
-            time_limit=30,
-            save_path=save_path,
-            hyperparameters=hyperparameters,
-        )
-
-        score = predictor.evaluate(dataset.test_df)
-        verify_predictor_save_load(predictor, dataset.test_df)
+            assert hasattr(predictor._learner._config.model, per_name)
 
 
 def test_modifying_duplicate_model_names():
@@ -629,28 +570,33 @@ def test_modifying_duplicate_model_names():
         time_limit=0,
     )
 
-    teacher_predictor = modify_duplicate_model_names(
-        predictor=teacher_predictor,
+    teacher_predictor._learner = modify_duplicate_model_names(
+        learner=teacher_predictor._learner,
         postfix="teacher",
-        blacklist=student_predictor._config.model.names,
+        blacklist=student_predictor._learner._config.model.names,
     )
 
     # verify teacher and student have no duplicate model names
-    assert all([n not in teacher_predictor._config.model.names for n in student_predictor._config.model.names]), (
-        f"teacher model names {teacher_predictor._config.model.names} and"
-        f" student model names {student_predictor._config.model.names} have duplicates."
+    assert all(
+        [
+            n not in teacher_predictor._learner._config.model.names
+            for n in student_predictor._learner._config.model.names
+        ]
+    ), (
+        f"teacher model names {teacher_predictor._learner._config.model.names} and"
+        f" student model names {student_predictor._learner._config.model.names} have duplicates."
     )
 
     # verify each model name prefix is valid
-    assert teacher_predictor._model.prefix in teacher_predictor._config.model.names
-    if isinstance(teacher_predictor._model.model, nn.ModuleList):
-        for per_model in teacher_predictor._model.model:
-            assert per_model.prefix in teacher_predictor._config.model.names
+    assert teacher_predictor._learner._model.prefix in teacher_predictor._learner._config.model.names
+    if isinstance(teacher_predictor._learner._model.model, nn.ModuleList):
+        for per_model in teacher_predictor._learner._model.model:
+            assert per_model.prefix in teacher_predictor._learner._config.model.names
 
     # verify each data processor's prefix is valid
-    for per_modality_processors in teacher_predictor._data_processors.values():
+    for per_modality_processors in teacher_predictor._learner._data_processors.values():
         for per_processor in per_modality_processors:
-            assert per_processor.prefix in teacher_predictor._config.model.names
+            assert per_processor.prefix in teacher_predictor._learner._config.model.names
 
 
 def test_image_bytearray():
@@ -774,4 +720,31 @@ def test_hyperparameters_consistency(hyperparameters):
         hyperparameters=hyperparameters,
         time_limit=10,
     )
-    assert predictor._config == predictor_2._config
+    assert predictor._learner._config == predictor_2._learner._config
+
+
+def test_predictor_cpu_only():
+    dataset = ALL_DATASETS["petfinder"]
+    metric_name = dataset.metric
+
+    predictor = MultiModalPredictor(
+        label=dataset.label_columns[0],
+        problem_type=dataset.problem_type,
+        eval_metric=metric_name,
+    )
+    hyperparameters = {
+        "optimization.max_epochs": 1,
+        "model.names": ["ft_transformer"],
+        "env.num_workers": 0,
+        "env.num_workers_evaluation": 0,
+        "data.categorical.convert_to_text": False,  # ensure the categorical model is used.
+        "data.numerical.convert_to_text": False,  # ensure the numerical model is used.
+        "env.accelerator": "cpu",
+    }
+    predictor.fit(
+        dataset.train_df,
+        hyperparameters=hyperparameters,
+        time_limit=10,
+    )
+    predictor.evaluate(dataset.test_df)
+    predictor.predict(dataset.test_df)

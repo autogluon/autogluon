@@ -37,7 +37,7 @@ def tutorial_script_for_visualize_detection_results():
 
     visualize_detection(
         pred=pred,
-        detection_classes=predictor.get_predictor_classes(),
+        detection_classes=predictor.classes,
         conf_threshold=conf_threshold,
         visualization_result_dir=visualization_result_dir,
     )
@@ -64,7 +64,7 @@ def visualize_detection_results(
 
     visualize_detection(
         pred=pred,
-        detection_classes=predictor.get_predictor_classes(),
+        detection_classes=predictor.classes,
         conf_threshold=conf_threshold,
         visualization_result_dir=visualization_result_dir,
     )

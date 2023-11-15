@@ -57,6 +57,7 @@ class DistillerLitModule(pl.LightningModule):
         custom_metric_func: Callable = None,
         test_metric: Optional[torchmetrics.Metric] = None,
         track_grad_norm: Optional[Union[int, str]] = -1,
+        **kwargs,
     ):
         """
         Parameters
@@ -160,6 +161,8 @@ class DistillerLitModule(pl.LightningModule):
                 "output_feature_adaptor",
                 "output_feature_loss_func",
                 "rkd_loss_func",
+                "loss_func",
+                "mixup_fn",
             ]
         )
         if matches:

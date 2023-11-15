@@ -11,7 +11,7 @@ from torch import nn
 
 from autogluon.common.utils.resource_utils import ResourceManager
 
-from ..constants import DDP, OBJECT_DETECTION, OCR
+from ..constants import DDP_STRATEGIES, OBJECT_DETECTION, OCR
 
 logger = logging.getLogger(__name__)
 
@@ -25,13 +25,13 @@ def is_interactive_env():
 
 
 def is_interactive_strategy(strategy: str):
-    if strategy:
+    if isinstance(strategy, str) and strategy:
         return strategy.startswith(("ddp_fork", "ddp_notebook"))
     else:
         return False
 
 
-def compute_num_gpus(config_num_gpus: Union[int, float, List], strategy: str):
+def compute_num_gpus(config_num_gpus: Union[int, float, List], accelerator: str):
     """
     Compute the gpu number to initialize the lightning trainer.
 
@@ -39,13 +39,16 @@ def compute_num_gpus(config_num_gpus: Union[int, float, List], strategy: str):
     ----------
     config_num_gpus
         The gpu number provided by config.
-    strategy
-        A lightning trainer's strategy such as "ddp", "ddp_spawn", and "dp".
+    accelerator
+        # "cpu", "gpu", or "auto".
 
     Returns
     -------
     A valid gpu number for the current environment and config.
     """
+    if isinstance(accelerator, str) and accelerator.lower() not in ["gpu", "auto"]:
+        return 0
+
     config_num_gpus = (
         math.floor(config_num_gpus) if isinstance(config_num_gpus, (int, float)) else len(config_num_gpus)
     )
@@ -94,23 +97,32 @@ def infer_precision(
                 "Consider using an instance with GPU support.",
                 UserWarning,
             )
-        precision = 32  # Force to use fp32 for training since fp16-based AMP is not available in CPU
+        precision = 32  # Force to use fp32 for training since 16-mixed is not available in CPU
     else:
-        if precision == "bf16" and not torch.cuda.is_bf16_supported():
+        if isinstance(precision, str) and "bf16" in precision and not torch.cuda.is_bf16_supported():
             warnings.warn(
-                "bf16 is not supported by the GPU device / cuda version. "
+                f"{precision} is not supported by the GPU device / cuda version. "
                 "Consider using GPU devices with versions after Amphere or upgrading cuda to be >=11.0. "
-                "MultiModalPredictor is switching precision from bf16 to 32.",
+                f"MultiModalPredictor is switching precision from {precision} to 32.",
                 UserWarning,
             )
             precision = 32
 
     if as_torch:
         precision_mapping = {
-            16: torch.float16,
+            16: torch.half,
+            "16": torch.half,
+            "16-mixed": torch.half,
+            "16-true": torch.half,
             "bf16": torch.bfloat16,
+            "bf16-mixed": torch.bfloat16,
+            "bf16-true": torch.bfloat16,
             32: torch.float32,
+            "32": torch.float32,
+            "32-true": torch.float32,
             64: torch.float64,
+            "64": torch.float64,
+            "64-true": torch.float64,
         }
         if precision in precision_mapping:
             precision = precision_mapping[precision]
@@ -229,8 +241,8 @@ def get_precision_context(precision: Union[int, str], device_type: Optional[str]
     if precision == 32:
         assert torch.get_default_dtype() == torch.float32
         return contextlib.nullcontext()
-    elif precision in [16, "bf16"]:
-        return torch.autocast(device_type=device_type, dtype=torch.bfloat16 if precision == "bf16" else torch.half)
+    elif precision in [16, "16", "16-mixed", "bf16", "bf16-mixed"]:
+        return torch.autocast(device_type=device_type, dtype=torch.bfloat16 if "bf16" in precision else torch.half)
     elif precision == 64:
         return double_precision_context()
     else:
@@ -273,7 +285,6 @@ def check_if_packages_installed(problem_type: str = None, package_names: List[st
                     raise ValueError(
                         f'Encountered error while importing mmocr: {e}. Try to install mmocr: pip install "mmocr<1.0".'
                     )
-
     if package_names:
         for package_name in package_names:
             if package_name == "mmcv":
@@ -324,7 +335,10 @@ def get_available_devices(num_gpus: int, auto_select_gpus: bool):
     """
     if num_gpus > 0:
         if auto_select_gpus:
-            devices = find_usable_cuda_devices(num_gpus)
+            if is_interactive_env():
+                devices = list(range(num_gpus))
+            else:
+                devices = find_usable_cuda_devices(num_gpus)
         else:
             devices = num_gpus
     else:
@@ -335,12 +349,24 @@ def get_available_devices(num_gpus: int, auto_select_gpus: bool):
 
 def _get_mmlab_installation_guide(package_name):
     if package_name == "mmdet":
-        err_msg = 'Please install MMDetection by: pip install "mmdet>=3.0.0".'
+        err_msg = 'Please install MMDetection by: pip install "mmdet==3.2.0".'
     elif package_name == "mmcv":
-        err_msg = "Please install MMCV by: mim install mmcv"
+        err_msg = 'Please install MMCV by: mim install "mmcv==2.1.0"'
     elif package_name == "mmengine":
-        err_msg = "Please install MMCV by: mim install mmengine"
+        err_msg = 'Please install MMEngine by: mim install "mmengine<0.8"'
     else:
         raise ValueError("Available package_name are: mmdet, mmcv, mmengine.")
 
     return err_msg
+
+
+def run_ddp_only_once(num_gpus, strategy):
+    if strategy in DDP_STRATEGIES:
+        global FIRST_DDP_RUN  # Use the global variable to make sure it is tracked per process
+        if "FIRST_DDP_RUN" in globals() and not FIRST_DDP_RUN:
+            # not the first time running DDP, set number of devices to 1 (use single GPU)
+            return min(1, num_gpus), "auto"
+        else:
+            if num_gpus > 1:
+                FIRST_DDP_RUN = False  # run DDP for the first time, disable the following runs
+    return num_gpus, strategy

@@ -1,0 +1,15 @@
+---
+# Locally stored instead of fetched from openml to avoid server errors
+# Small datasets to test benchmarking - extracted from autogluon-bench/data/metadata/task_metadata.csv
+
+# binary
+- name: Australian
+  openml_task_id: 146818
+
+# multiclass
+- name: vehicle
+  openml_task_id: 190146
+
+# regression
+- name: sensory
+  openml_task_id: 359931

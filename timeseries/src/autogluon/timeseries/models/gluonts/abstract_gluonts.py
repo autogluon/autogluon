@@ -3,7 +3,7 @@ import os
 import shutil
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterator, List, Optional, Type
+from typing import Any, Callable, Dict, Iterator, List, Optional, Type, Union
 
 import gluonts
 import gluonts.core.settings
@@ -19,13 +19,14 @@ from pandas.tseries.frequencies import to_offset
 
 from autogluon.common.loaders import load_pkl
 from autogluon.common.utils.log_utils import set_logger_verbosity
+from autogluon.core.hpo.constants import RAY_BACKEND
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.datetime import norm_freq_str
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 from autogluon.timeseries.utils.warning_filters import disable_root_logger, warning_filter
 
-# NOTE: We avoid imports for torch and pytorch_lightning at the top level and hide them inside class methods.
+# NOTE: We avoid imports for torch and lightning.pytorch at the top level and hide them inside class methods.
 # This is done to skip these imports during multiprocessing (which may cause bugs)
 
 logger = logging.getLogger(__name__)
@@ -69,7 +70,8 @@ class SimpleGluonTSDataset(GluonTSDataset):
         self.item_ids = indices_sizes.index  # shape [num_items]
         cum_sizes = indices_sizes.values.cumsum()
         self.indptr = np.append(0, cum_sizes).astype(np.int32)
-        self.timestamps = target_df.index.get_level_values(TIMESTAMP)  # shape [len(target_df)]
+        self.start_timestamps = target_df.reset_index(TIMESTAMP).groupby(level=ITEMID, sort=False).first()[TIMESTAMP]
+        assert len(self.item_ids) == len(self.start_timestamps)
 
     @staticmethod
     def _to_array(df: Optional[pd.DataFrame], dtype: np.dtype) -> Optional[np.ndarray]:
@@ -103,7 +105,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
             # GluonTS expects item_id to be a string
             ts = {
                 FieldName.ITEM_ID: str(self.item_ids[j]),
-                FieldName.START: pd.Period(self.timestamps[j], freq=self.freq),
+                FieldName.START: pd.Period(self.start_timestamps[j], freq=self.freq),
                 FieldName.TARGET: self.target_array[start_idx:end_idx],
             }
             if self.feat_static_cat is not None:
@@ -146,7 +148,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
     gluonts_model_path = "gluon_ts"
     # default number of samples for prediction
-    default_num_samples: int = 1000
+    default_num_samples: int = 250
     supports_known_covariates: bool = False
     supports_past_covariates: bool = False
 
@@ -176,12 +178,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         self.num_feat_dynamic_real = 0
         self.num_past_feat_dynamic_real = 0
         self.feat_static_cat_cardinality: List[int] = []
-
-        if 0.5 not in self.quantile_levels:
-            self.must_drop_median = True
-            self.quantile_levels = sorted(set([0.5] + self.quantile_levels))
-        else:
-            self.must_drop_median = False
+        self.negative_data = True
 
     def save(self, path: str = None, verbose: bool = True) -> str:
         # we flush callbacks instance variable if it has been set. it can keep weak references which breaks training
@@ -211,6 +208,9 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             model.gts_predictor = PyTorchPredictor.deserialize(Path(path) / cls.gluonts_model_path)
         return model
 
+    def _get_hpo_backend(self):
+        return RAY_BACKEND
+
     def _deferred_init_params_aux(self, **kwargs) -> None:
         """Update GluonTS specific parameters with information available
         only at training time.
@@ -238,6 +238,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             disable_past_covariates = model_params.get("disable_past_covariates", False)
             if not disable_past_covariates and self.supports_past_covariates:
                 self.num_past_feat_dynamic_real = len(self.metadata.past_covariates_real)
+            self.negative_data = (ds[self.target] < 0).any()
 
         if "callbacks" in kwargs:
             self.callbacks += kwargs["callbacks"]
@@ -263,7 +264,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         )
         # Support MXNet kwarg names for backwards compatibility
         init_args.setdefault("lr", init_args.get("learning_rate", 1e-3))
-        init_args.setdefault("max_epochs", init_args.get("epochs"))
+        init_args.setdefault("max_epochs", init_args.get("epochs", 100))
         return init_args
 
     def _get_estimator_init_args(self) -> Dict[str, Any]:
@@ -279,8 +280,6 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         # As GluonTSPyTorchLightningEstimator objects do not implement `from_hyperparameters` convenience
         # constructors, we re-implement the logic here.
         # we translate the "epochs" parameter to "max_epochs" for consistency in the AbstractGluonTSModel interface
-        import torch
-
         init_args = self._get_estimator_init_args()
 
         default_trainer_kwargs = {
@@ -290,7 +289,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             "default_root_dir": self.path,
         }
 
-        if torch.cuda.is_available():
+        if self._is_gpu_available():
             default_trainer_kwargs["accelerator"] = "gpu"
             default_trainer_kwargs["devices"] = 1
         else:
@@ -305,10 +304,23 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             **init_args,
         )
 
+    def _is_gpu_available(self) -> bool:
+        import torch.cuda
+
+        return torch.cuda.is_available()
+
+    def get_minimum_resources(self, is_gpu_available: bool = False) -> Dict[str, Union[int, float]]:
+        minimum_resources = {"num_cpus": 1}
+        # if GPU is available, we train with 1 GPU per trial
+        if is_gpu_available:
+            minimum_resources["num_gpus"] = 1
+        return minimum_resources
+
     def _to_gluonts_dataset(
         self, time_series_df: Optional[TimeSeriesDataFrame], known_covariates: Optional[TimeSeriesDataFrame] = None
     ) -> Optional[GluonTSDataset]:
         if time_series_df is not None:
+            # TODO: Preprocess real-valued features with StdScaler?
             if self.num_feat_static_cat > 0:
                 feat_static_cat = time_series_df.static_features[self.metadata.static_features_cat]
             else:
@@ -316,6 +328,8 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
             if self.num_feat_static_real > 0:
                 feat_static_real = time_series_df.static_features[self.metadata.static_features_real]
+                if feat_static_real.isna().values.any():
+                    feat_static_real = feat_static_real.fillna(feat_static_real.mean())
             else:
                 feat_static_real = None
 
@@ -361,11 +375,11 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         **kwargs,
     ) -> None:
         # necessary to initialize the loggers
-        import pytorch_lightning  # noqa
+        import lightning.pytorch  # noqa
 
         verbosity = kwargs.get("verbosity", 2)
         for logger_name in logging.root.manager.loggerDict:
-            if "pytorch_lightning" in logger_name:
+            if "lightning" in logger_name:
                 pl_logger = logging.getLogger(logger_name)
                 pl_logger.setLevel(logging.ERROR if verbosity <= 3 else logging.INFO)
         set_logger_verbosity(verbosity, logger=logger)
@@ -408,7 +422,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         early_stopping_patience: Optional[int] = None,
     ) -> List[Callable]:
         """Retrieve a list of callback objects for the GluonTS trainer"""
-        from pytorch_lightning.callbacks import EarlyStopping, Timer
+        from lightning.pytorch.callbacks import EarlyStopping, Timer
 
         callbacks = []
         if time_limit is not None:
@@ -417,32 +431,21 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             callbacks.append(EarlyStopping(monitor="val_loss", patience=early_stopping_patience))
         return callbacks
 
-    def predict(
+    def _predict(
         self,
         data: TimeSeriesDataFrame,
         known_covariates: Optional[TimeSeriesDataFrame] = None,
-        quantile_levels: List[float] = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
         if self.gts_predictor is None:
             raise ValueError("Please fit the model before predicting.")
 
-        logger.debug(f"Predicting with time series model {self.name}")
-        logger.debug(
-            f"\tProvided data for prediction with {len(data)} rows, {data.num_items} items. "
-            f"Average time series length is {len(data) / data.num_items}."
-        )
         with warning_filter(), gluonts.core.settings.let(gluonts.env.env, use_tqdm=False):
-            quantiles = quantile_levels or self.quantile_levels
-            if not all(0 < q < 1 for q in quantiles):
-                raise ValueError("Invalid quantile value specified. Quantiles must be between 0 and 1 (exclusive).")
-
             predicted_targets = self._predict_gluonts_forecasts(data, known_covariates=known_covariates, **kwargs)
             df = self._gluonts_forecasts_to_data_frame(
                 predicted_targets,
                 forecast_index=get_forecast_horizon_index_ts_dataframe(data, self.prediction_length),
             )
-
         return df
 
     def _predict_gluonts_forecasts(
@@ -544,6 +547,4 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             raise ValueError(f"Unrecognized forecast type {type(forecasts[0])}")
 
         forecast_df.index = forecast_index
-        if self.must_drop_median:
-            forecast_df = forecast_df.drop("0.5", axis=1)
         return TimeSeriesDataFrame(forecast_df)

@@ -4,16 +4,12 @@ import shutil
 import numpy as np
 import numpy.testing
 import pytest
-import torch
-from datasets import load_dataset
 from packaging import version
 from scipy.stats import pearsonr, spearmanr
 from sklearn.metrics.pairwise import paired_cosine_distances
-from torch import FloatTensor
 
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.constants import REGRESSION
-from autogluon.multimodal.utils import logits_to_prob
 from autogluon.multimodal.utils.misc import shopee_dataset
 from autogluon.multimodal.utils.onnx import OnnxModule
 
@@ -30,7 +26,6 @@ except ImportError:
     tensorrt = None
 
 
-@pytest.mark.single_gpu
 def evaluate(predictor, df, onnx_session=None):
     labels = df["score"].to_numpy()
 
@@ -38,8 +33,8 @@ def evaluate(predictor, df, onnx_session=None):
         QEmb = predictor.extract_embedding(df[["sentence1"]])["sentence1"]
         AEmb = predictor.extract_embedding(df[["sentence2"]])["sentence2"]
     else:
-        QEmb = onnx_session.run(None, predictor.get_processed_batch_for_deployment(data=df[["sentence1"]]))[0]
-        AEmb = onnx_session.run(None, predictor.get_processed_batch_for_deployment(data=df[["sentence2"]]))[0]
+        QEmb = onnx_session.run(None, predictor._learner.get_processed_batch_for_deployment(data=df[["sentence1"]]))[0]
+        AEmb = onnx_session.run(None, predictor._learner.get_processed_batch_for_deployment(data=df[["sentence2"]]))[0]
 
     cosine_scores = 1 - paired_cosine_distances(QEmb, AEmb)
     eval_pearson_cosine, _ = pearsonr(labels, cosine_scores)
@@ -131,7 +126,7 @@ def test_onnx_export_timm_image(checkpoint_name, num_gpus):
     )
     predictor.fit(
         train_data=train_data,
-        time_limit=30,  # seconds
+        time_limit=10,  # seconds
     )
     predictor.save(path=model_path)
     loaded_predictor = MultiModalPredictor.load(path=model_path)
@@ -148,12 +143,12 @@ def test_onnx_export_timm_image(checkpoint_name, num_gpus):
 
     # create onnx module for evaluation
     onnx_module = OnnxModule(onnx_path, providers=["CUDAExecutionProvider"])
-    onnx_module.input_keys = loaded_predictor._model.input_keys
-    onnx_module.prefix = loaded_predictor._model.prefix
-    onnx_module.get_output_dict = loaded_predictor._model.get_output_dict
+    onnx_module.input_keys = loaded_predictor._learner._model.input_keys
+    onnx_module.prefix = loaded_predictor._learner._model.prefix
+    onnx_module.get_output_dict = loaded_predictor._learner._model.get_output_dict
 
     # simply replace _model in the loaded predictor to predict with onnxruntime
-    loaded_predictor._model = onnx_module
+    loaded_predictor._learner._model = onnx_module
     onnx_proba = loaded_predictor.predict_proba({"image": [image_path_test]})
 
     # assert allclose
@@ -172,12 +167,12 @@ def test_onnx_export_timm_image(checkpoint_name, num_gpus):
 
     # create onnx module for evaluation
     onnx_module = OnnxModule(onnx_path, providers=["CUDAExecutionProvider"])
-    onnx_module.input_keys = loaded_predictor._model.input_keys
-    onnx_module.prefix = loaded_predictor._model.prefix
-    onnx_module.get_output_dict = loaded_predictor._model.get_output_dict
+    onnx_module.input_keys = loaded_predictor._learner._model.input_keys
+    onnx_module.prefix = loaded_predictor._learner._model.prefix
+    onnx_module.get_output_dict = loaded_predictor._learner._model.get_output_dict
 
     # simply replace _model in the loaded predictor to predict with onnxruntime
-    loaded_predictor._model = onnx_module
+    loaded_predictor._learner._model = onnx_module
     onnx_proba = loaded_predictor.predict_proba({"image": [image_path_test]})
 
     # assert allclose
@@ -247,8 +242,8 @@ def test_onnx_optimize_for_inference(dataset_name, model_names, text_backbone, i
 
         # Check module type of optimized predictor
         assert isinstance(
-            predictor_opt._model, OnnxModule
-        ), f"invalid onnx module type, expected to be OnnxModule, but the model type is {type(predictor._model)}"
+            predictor_opt._learner._model, OnnxModule
+        ), f"invalid onnx module type, expected to be OnnxModule, but the model type is {type(predictor_opt._learner._model)}"
 
         # We should support dynamic shape
         for batch_size in [2, 4, 8]:

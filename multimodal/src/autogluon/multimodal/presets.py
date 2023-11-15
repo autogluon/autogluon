@@ -187,7 +187,7 @@ def default(presets: str = DEFAULT):
             {
                 "model.hf_text.checkpoint_name": "microsoft/mdeberta-v3-base",
                 "optimization.top_k": 1,
-                "env.precision": "bf16",
+                "env.precision": "bf16-mixed",
                 "env.per_gpu_batch_size": 4,
             }
         )
@@ -198,9 +198,9 @@ def default(presets: str = DEFAULT):
 
 
 @automm_presets.register()
-def few_shot_text_classification(presets: str = DEFAULT):
+def few_shot_classification(presets: str = DEFAULT):
     """
-    Register the presets for few_shot_text_classification.
+    Register the presets for few_shot_classification.
 
     Parameters
     ----------
@@ -214,35 +214,18 @@ def few_shot_text_classification(presets: str = DEFAULT):
     hyperparameter_tune_kwargs
         The hyperparameter tuning kwargs.
     """
-    hyperparameters = {
-        "model.names": ["t_few"],
-        "model.t_few.checkpoint_name": "google/flan-t5-xl",  # 3B model. google/flan-t5-xxl for 11B model.
-        "model.t_few.gradient_checkpointing": True,
-        "optimization.learning_rate": 1e-3,
-        "optimization.lr_decay": 1.0,
-        "optimization.efficient_finetune": "ia3_lora",
-        "optimization.max_steps": 600,  # Find better solution to train for long
-        "optimization.check_val_every_n_epoch": 10,  # Might need adjustment
-        "optimization.val_check_interval": 1.0,
-        "optimization.top_k_average_method": "best",
-        "optimization.warmup_steps": 0.06,
-        "optimization.lora.module_filter": [".*SelfAttention|.*EncDecAttention|.*DenseReluDense"],
-        "optimization.lora.filter": ["q|k|v|wi_1.*"],
-        "optimization.top_k": 1,
-        "optimization.max_epochs": -1,
-        "env.batch_size": 8,
-        "env.per_gpu_batch_size": 8,
-        "env.precision": "bf16",
-        "data.templates.turn_on": True,
-        "env.eval_batch_size_ratio": 2,
-    }
+    hyperparameters, hyperparameter_tune_kwargs = default(presets=presets)
+    hyperparameters.update(
+        {
+            "model.hf_text.checkpoint_name": "sentence-transformers/all-mpnet-base-v2",
+            "model.hf_text.pooling_mode": "mean",
+            "model.names": ["hf_text", "clip"],
+            "model.clip.checkpoint_name": "openai/clip-vit-large-patch14-336",
+            "model.clip.image_size": 336,
+            "env.eval_batch_size_ratio": 1,
+        }
+    )
     hyperparameter_tune_kwargs = {}
-
-    presets, use_hpo = parse_presets_str(presets)
-    if use_hpo:
-        default_tunable_hyperparameters, default_hyperparameter_tune_kwargs = get_default_hpo_setup()
-        hyperparameters.update(default_tunable_hyperparameters)
-        hyperparameter_tune_kwargs.update(default_hyperparameter_tune_kwargs)
 
     return hyperparameters, hyperparameter_tune_kwargs
 
@@ -274,6 +257,7 @@ def zero_shot_image_classification(presets: str = DEFAULT):
         hyperparameters.update(
             {
                 "model.clip.checkpoint_name": "openai/clip-vit-large-patch14-336",
+                "model.clip.image_size": 336,
                 "env.eval_batch_size_ratio": 1,
             }
         )
@@ -367,7 +351,7 @@ def object_detection(presets: str = DEFAULT):
         "env.eval_batch_size_ratio": 1,
         "env.precision": 32,
         "env.strategy": "ddp",
-        "env.auto_select_gpus": False,  # Have to turn off for detection!
+        "env.auto_select_gpus": True,  # Turn on for detection to return devices in a list, TODO: fix the extra GPU usage bug
         "env.num_gpus": -1,
         "env.per_gpu_batch_size": 8,  # Works on 8G GPU
         "env.num_workers": 2,
@@ -405,7 +389,7 @@ def object_detection(presets: str = DEFAULT):
     elif presets in [DEFAULT, HIGH_QUALITY]:
         hyperparameters.update(
             {
-                "model.mmdet_image.checkpoint_name": "dino-4scale_r50_8xb2-12e_coco.py",
+                "model.mmdet_image.checkpoint_name": "dino-4scale_r50_8xb2-12e_coco",
                 "model.mmdet_image.frozen_layers": ["backbone", "model.level_embed"],
                 "env.per_gpu_batch_size": 1,  # Works on 16G GPU
                 "optimization.learning_rate": 1e-4,
@@ -418,7 +402,7 @@ def object_detection(presets: str = DEFAULT):
     elif presets == BEST_QUALITY:
         hyperparameters.update(
             {
-                "model.mmdet_image.checkpoint_name": "dino-5scale_swin-l_8xb2-36e_coco.py",
+                "model.mmdet_image.checkpoint_name": "dino-5scale_swin-l_8xb2-36e_coco",
                 "model.mmdet_image.frozen_layers": ["backbone", "model.level_embed"],
                 "env.per_gpu_batch_size": 1,  # Works on 24G GPU
                 "optimization.learning_rate": 1e-4,
@@ -430,6 +414,66 @@ def object_detection(presets: str = DEFAULT):
         )
     else:
         raise ValueError(f"Unknown preset type: {presets}")
+
+    return hyperparameters, hyperparameter_tune_kwargs
+
+
+@automm_presets.register()
+def semantic_segmentation(presets: str = DEFAULT):
+    """
+    Register the presets for semantic_segmentation.
+
+    Parameters
+    ----------
+    presets
+        The preset name.
+
+    Returns
+    -------
+    hyperparameters
+        The hyperparameters for a given preset.
+    hyperparameter_tune_kwargs
+        The hyperparameter tuning kwargs.
+    """
+    hyperparameters = {
+        "model.names": ["sam"],
+        "model.sam.checkpoint_name": "facebook/sam-vit-huge",
+        "env.batch_size": 4,
+        "env.per_gpu_batch_size": 1,
+        "env.eval_batch_size_ratio": 1,
+        "env.strategy": "ddp",
+        "env.auto_select_gpus": False,
+        "env.num_gpus": -1,
+        "env.num_workers": 4,
+        "env.precision": "16-mixed",
+        "optimization.learning_rate": 1e-4,
+        "optimization.loss_function": "structure_loss",
+        "optimization.lr_decay": 0,
+        "optimization.lr_mult": 1,
+        "optimization.lr_choice": "single_stage",
+        "optimization.lr_schedule": "polynomial_decay",
+        "optimization.max_epochs": 30,
+        "optimization.top_k": 3,
+        "optimization.top_k_average_method": "best",
+        "optimization.warmup_steps": 0.0,
+        "optimization.weight_decay": 0.0001,
+        "optimization.patience": 10,
+        "optimization.val_check_interval": 1.0,
+        "optimization.check_val_every_n_epoch": 1,
+        "optimization.efficient_finetune": "lora",
+        "optimization.lora.module_filter": [".*vision_encoder.*attn"],
+        "optimization.lora.filter": ["q", "v"],
+        "optimization.extra_trainable_params": [".*mask_decoder"],
+        "optimization.lora.r": 3,
+        "optimization.lora.alpha": 32,
+    }
+    hyperparameter_tune_kwargs = {}
+
+    presets, use_hpo = parse_presets_str(presets)
+    if use_hpo:
+        default_tunable_hyperparameters, default_hyperparameter_tune_kwargs = get_default_hpo_setup()
+        hyperparameters.update(default_tunable_hyperparameters)
+        hyperparameter_tune_kwargs.update(default_hyperparameter_tune_kwargs)
 
     return hyperparameters, hyperparameter_tune_kwargs
 
@@ -689,6 +733,7 @@ def image_text_similarity(presets: str = DEFAULT):
         hyperparameters.update(
             {
                 "model.clip.checkpoint_name": "openai/clip-vit-large-patch14-336",
+                "model.clip.image_size": 336,
                 "env.per_gpu_batch_size": 8,
             }
         )
@@ -789,9 +834,9 @@ def get_basic_automm_config(extra: Optional[List[str]] = None):
     A dict config with keys: MODEL, DATA, OPTIMIZATION, ENVIRONMENT, and their default values.
     """
     config = {
-        MODEL: "fusion_mlp_image_text_tabular",
+        MODEL: DEFAULT,
         DATA: DEFAULT,
-        OPTIMIZATION: "adamw",
+        OPTIMIZATION: DEFAULT,
         ENVIRONMENT: DEFAULT,
     }
     if extra:

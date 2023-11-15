@@ -19,9 +19,8 @@ BINARY = "binary"
 MULTICLASS = "multiclass"
 REGRESSION = "regression"
 FEW_SHOT = "few_shot"
-FEW_SHOT_TEXT_CLASSIFICATION = "few_shot_text_classification"
 DEFAULT_SHOT = "default_shot"
-DEPRECATED_ZERO_SHOT = "zero_shot"
+ZERO_SHOT = "zero_shot"
 NER = "ner"
 NAMED_ENTITY_RECOGNITION = "named_entity_recognition"
 FEATURE_EXTRACTION = "feature_extraction"
@@ -34,6 +33,8 @@ OCR_TEXT_RECOGNITION = f"{OCR}_text_recognition"
 IMAGE_SIMILARITY = "image_similarity"
 TEXT_SIMILARITY = "text_similarity"
 IMAGE_TEXT_SIMILARITY = "image_text_similarity"
+FEW_SHOT_CLASSIFICATION = "few_shot_classification"
+SEMANTIC_SEGMENTATION = "semantic_segmentation"
 
 # Input keys
 IMAGE = "image"
@@ -49,6 +50,8 @@ ATTENTION_MASK = "attention_mask"
 TOKEN_TYPE_IDS = "token_type_ids"
 PIXEL_VALUES = "pixel_values"
 INPUT_IDS = "input_ids"
+SEMANTIC_SEGMENTATION_IMG = "semantic_segmentation_img"
+SEMANTIC_SEGMENTATION_GT = "semantic_segmentation_gt"
 
 # Output keys
 LOGITS = "logits"
@@ -123,6 +126,14 @@ NDCG = "ndcg"
 PRECISION = "precision"
 RECALL = "recall"
 MRR = "mrr"
+SM = "sm"
+EM = "em"
+FM = "fm"
+MAE = "mae"
+BINARY_DICE = "binary_dice"
+BINARY_ACC = "binary_acc"
+BER = "ber"
+IOU = "iou"
 RETRIEVAL_METRICS = [NDCG, PRECISION, RECALL, MRR]
 METRIC_MODE_MAP = {
     ACC: MAX,
@@ -141,7 +152,13 @@ METRIC_MODE_MAP = {
     MAP: MAX,
     MEAN_AVERAGE_PRECISION: MAX,
     NER_TOKEN_F1: MAX,
+    OVERALL_F1: MAX,
     RECALL: MAX,
+    SM: MAX,
+    IOU: MAX,
+    BINARY_DICE: MAX,
+    BINARY_ACC: MAX,
+    BER: MIN,
 }
 VALID_METRICS = METRIC_MODE_MAP.keys()
 
@@ -158,7 +175,7 @@ MMDET = "mmdet"
 MMOCR = "mmocr"
 
 # Modality keys. may need to update here if new modality keys are added in above.
-ALL_MODALITIES = [IMAGE, TEXT, CATEGORICAL, NUMERICAL, TEXT_NER, DOCUMENT]
+ALL_MODALITIES = [IMAGE, TEXT, CATEGORICAL, NUMERICAL, TEXT_NER, DOCUMENT, SEMANTIC_SEGMENTATION_IMG]
 
 # Keys to compute metrics
 Y_PRED = "y_pred"
@@ -231,11 +248,10 @@ HF_TEXT = "hf_text"
 T_FEW = "t_few"
 NUMERICAL_MLP = "numerical_mlp"
 CATEGORICAL_MLP = "categorical_mlp"
-NUMERICAL_TRANSFORMER = "numerical_transformer"
-CATEGORICAL_TRANSFORMER = "categorical_transformer"
 FUSION = "fusion"
 FUSION_MLP = f"{FUSION}_mlp"
 FUSION_TRANSFORMER = f"{FUSION}_transformer"
+FT_TRANSFORMER = "ft_transformer"
 FUSION_NER = f"{FUSION}_{NER}"
 MMDET_IMAGE = "mmdet_image"
 MMOCR_TEXT_DET = "mmocr_text_detection"
@@ -245,6 +261,7 @@ NER_TEXT = "ner_text"
 DOCUMENT_TRANSFORMER = "document_transformer"
 HF_MODELS = (HF_TEXT, T_FEW, CLIP, NER_TEXT, DOCUMENT_TRANSFORMER)
 MMLAB_MODELS = (MMDET_IMAGE, MMOCR_TEXT_DET, MMOCR_TEXT_RECOG)
+SAM = "sam"
 
 # matcher loss type
 CONTRASTIVE_LOSS = "contrastive_loss"
@@ -292,6 +309,12 @@ BBOX_FORMATS = [XYWH, XYXY]
 PROMPT = "prompt"
 OVD_RET = "ovd_ret"
 
+# sam (multi-class)
+CLASS_LOGITS = "class_logits"
+MASK_LABEL = "mask_label"
+CLASS_LABEL = "class_label"
+SEMANTIC_MASK = "semantic_mask"
+
 # presets
 DEFAULT = "default"
 HIGH_QUALITY = "high_quality"
@@ -305,6 +328,9 @@ MULTI_IMAGE_MIX_DATASET = "multi_image_mix_dataset"
 
 # strategies
 DDP = "ddp"
+DDP_FIND_UNUSED_PARAMETERS_FALSE = "ddp_find_unused_parameters_false"
+DDP_FIND_UNUSED_PARAMETERS_TRUE = "ddp_find_unused_parameters_true"
+DDP_STRATEGIES = [DDP, DDP_FIND_UNUSED_PARAMETERS_FALSE, DDP_FIND_UNUSED_PARAMETERS_TRUE]
 
 # torch constants
 TORCH_COMPILE_MIN_VERSION = "2.2.0.dev20230908"

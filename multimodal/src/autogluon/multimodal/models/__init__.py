@@ -1,8 +1,8 @@
 from . import utils
 from .categorical_mlp import CategoricalMLP
-from .categorical_transformer import CategoricalTransformer
 from .clip import CLIPForImageText
 from .document_transformer import DocumentTransformer
+from .ft_transformer import FT_Transformer
 from .fusion import (
     AbstractMultimodalFusionModel,
     MultimodalFusionMLP,
@@ -15,7 +15,8 @@ from .mmocr_text_detection import MMOCRAutoModelForTextDetection
 from .mmocr_text_recognition import MMOCRAutoModelForTextRecognition
 from .ner_text import HFAutoModelForNER
 from .numerical_mlp import NumericalMLP
-from .numerical_transformer import NumericalTransformer
 from .ovd import OVDModel
+from .sam import SAMForSemanticSegmentation
 from .t_few import TFewModel
 from .timm_image import TimmAutoModelForImagePrediction
+from .utils import get_model_postprocess_fn

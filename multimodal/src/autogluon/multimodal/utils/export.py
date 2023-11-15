@@ -2,7 +2,7 @@ import io
 import logging
 import os
 import warnings
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 from typing import Dict, List, Optional, Union
 
 import pandas as pd
@@ -13,8 +13,7 @@ from ..models.fusion import AbstractMultimodalFusionModel
 from ..models.huggingface_text import HFAutoModelForTextPrediction
 from ..models.mmdet_image import MMDetAutoModelForObjectDetection
 from ..models.timm_image import TimmAutoModelForImagePrediction
-from .environment import compute_num_gpus, get_precision_context, infer_precision, move_to_device
-from .inference import process_batch
+from .environment import infer_precision
 from .onnx import OnnxModule, onnx_get_dynamic_axes
 
 logger = logging.getLogger(__name__)
@@ -245,12 +244,27 @@ class ExportMixin:
         Tensor or numpy array.
         The output processed batch could be used for export/evaluate deployed model.
         """
-        data, df_preprocessor, data_processors = self._on_predict_start(
+        data = self.data_to_df(data=data)
+        column_types = self.infer_column_types(
+            column_types=self._column_types,
             data=data,
+            is_train=False,
+        )
+        df_preprocessor = self.get_df_preprocessor_per_run(
+            df_preprocessor=self._df_preprocessor,
+            data=data,
+            column_types=column_types,
+            is_train=False,
+        )
+        if self._fit_called:
+            df_preprocessor._column_types = self.update_image_column_types(data=data)
+        data_processors = self.get_data_processors_per_run(
+            data_processors=self._data_processors,
             requires_label=requires_label,
+            is_train=False,
         )
 
-        batch = process_batch(
+        batch = self.process_batch(
             data=data,
             df_preprocessor=df_preprocessor,
             data_processors=data_processors,

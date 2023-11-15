@@ -196,7 +196,6 @@ class NonParallelGpuResourceCalculator(ResourceCalculator):
 
 
 class ResourceCalculatorFactory:
-
     __supported_calculators = [
         CpuResourceCalculator,
         GpuResourceCalculator,

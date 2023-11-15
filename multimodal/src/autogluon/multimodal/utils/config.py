@@ -11,12 +11,11 @@ from torch import nn
 
 from ..constants import (
     AUTOMM,
-    CATEGORICAL_TRANSFORMER,
     DATA,
+    FT_TRANSFORMER,
     FUSION_TRANSFORMER,
     HF_MODELS,
     MODEL,
-    NUMERICAL_TRANSFORMER,
     REGRESSION,
     VALID_CONFIG_KEYS,
 )
@@ -135,9 +134,9 @@ def get_config(
 
         The value of each key can be a string, yaml path, or DictConfig object. For example:
         config = {
-                        "model": "fusion_mlp_image_text_tabular",
+                        "model": "default",
                         "data": "default",
-                        "optimization": "adamw",
+                        "optimization": "default",
                         "environment": "default",
                     }
             or
@@ -424,9 +423,9 @@ def upgrade_config(config, loaded_version):
     if version.parse(loaded_version) <= version.parse("0.6.2"):
         logger.info(f"Start to upgrade the previous configuration trained by AutoMM version={loaded_version}.")
         if OmegaConf.select(config, "model.timm_image") is not None:
-            logger.warn(
+            logger.warning(
                 "Loading a model that has been trained via AutoGluon Multimodal<=0.6.2. "
-                "Try to update the timm image size."
+                "Setting config.model.timm_image.image_size = None."
             )
             config.model.timm_image.image_size = None
     return config
@@ -583,9 +582,8 @@ def update_tabular_config_by_resources(
     The modified config.
     """
     columns_per_model = {
-        NUMERICAL_TRANSFORMER: num_numerical_columns,
-        CATEGORICAL_TRANSFORMER: num_categorical_columns,
         FUSION_TRANSFORMER: num_categorical_columns + num_numerical_columns,
+        FT_TRANSFORMER: num_categorical_columns + num_numerical_columns,
     }
 
     # Threshold is expected to be ~= batch_size * num_tokens, for additive attention.
@@ -646,7 +644,6 @@ def update_hyperparameters(
     presets,
     provided_hyperparameters,
     provided_hyperparameter_tune_kwargs,
-    teacher_predictor: Optional[str] = None,
 ):
     """
     Update preset hyperparameters hyperparameter_tune_kwargs by the provided.
@@ -663,8 +660,6 @@ def update_hyperparameters(
         The hyperparameters provided by users.
     provided_hyperparameter_tune_kwargs
         The hyperparameter_tune_kwargs provided by users.
-    teacher_predictor
-        The path of a saved teacher predictor, used for distillation HPO.
 
     Returns
     -------
@@ -687,10 +682,6 @@ def update_hyperparameters(
         assert isinstance(
             hyperparameters, dict
         ), "Please provide hyperparameters as a dictionary if you want to do HPO"
-        if teacher_predictor is not None:
-            assert isinstance(
-                teacher_predictor, str
-            ), "HPO with distillation only supports passing a path to the predictor"
 
     return hyperparameters, hyperparameter_tune_kwargs
 

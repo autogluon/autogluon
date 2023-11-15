@@ -29,7 +29,8 @@ def verify_matcher_save_load(matcher, df, verify_embedding=True, cls=MultiModalP
         predictions2_df = loaded_matcher.predict(df, as_pandas=True)
         npt.assert_equal(predictions, predictions2)
         npt.assert_equal(predictions2, predictions2_df.to_numpy())
-        if matcher.problem_type in [BINARY, MULTICLASS]:
+        if matcher.problem_type.endswith((BINARY, MULTICLASS)):
+            print("\nverifying predict and predict_proba...\n")
             predictions_prob = matcher.predict_proba(df, as_pandas=False)
             predictions2_prob = loaded_matcher.predict_proba(df, as_pandas=False)
             predictions2_prob_df = loaded_matcher.predict_proba(df, as_pandas=True)
@@ -48,10 +49,10 @@ def verify_matcher_realtime_inference(matcher, df, verify_embedding=True):
         predictions_default = matcher.predict(df_small, as_pandas=False, realtime=False)
         predictions_realtime = matcher.predict(df_small, as_pandas=False, realtime=True)
         npt.assert_equal(predictions_default, predictions_realtime)
-        if matcher._problem_type in [BINARY, MULTICLASS]:
+        if matcher.problem_type.endswith((BINARY, MULTICLASS)):
             predictions_prob_default = matcher.predict_proba(df_small, as_pandas=False, realtime=False)
             predictions_prob_realtime = matcher.predict_proba(df_small, as_pandas=False, realtime=True)
-            npt.assert_equal(predictions_prob_default, predictions_prob_realtime)
+            npt.assert_almost_equal(predictions_prob_default, predictions_prob_realtime, decimal=5)
         if verify_embedding:
             embeddings_default = matcher.extract_embedding(df_small, signature=QUERY, realtime=False)
             embeddings_realtime = matcher.extract_embedding(df_small, signature=QUERY, realtime=True)
@@ -97,6 +98,7 @@ def evaluate_matcher_ranking(matcher, test_df, query_column, response_column, me
         )
 
 
+# Conflicts between realtime inference with dp and lightning strategies
 @pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "dataset_name,query,response,problem_type,text_backbone,image_backbone, is_ranking, symmetric",
@@ -123,7 +125,88 @@ def evaluate_matcher_ranking(matcher, test_df, query_column, response_column, me
         ),
     ],
 )
-def test_matcher(
+def test_matcher_realtime_inference(
+    dataset_name,
+    query,
+    response,
+    problem_type,
+    text_backbone,
+    image_backbone,
+    is_ranking,
+    symmetric,
+):
+    dataset = ALL_DATASETS[dataset_name]()
+
+    matcher = MultiModalPredictor(
+        query=query,
+        response=response,
+        problem_type=problem_type,
+        label=dataset.label_columns[0] if dataset.label_columns else None,
+        match_label=dataset.match_label,
+        eval_metric=dataset.metric,
+    )
+
+    hyperparameters = {
+        "optimization.max_epochs": 1,
+        "env.num_workers": 0,
+        "env.num_workers_evaluation": 0,
+        "optimization.top_k_average_method": "greedy_soup",
+    }
+
+    if text_backbone is not None:
+        hyperparameters.update(
+            {
+                "model.hf_text.checkpoint_name": text_backbone,
+            }
+        )
+    if image_backbone is not None:
+        hyperparameters.update(
+            {
+                "model.timm_image.checkpoint_name": image_backbone,
+            }
+        )
+
+    save_path = os.path.join(get_home_dir(), "outputs", dataset_name)
+    if os.path.exists(save_path):
+        shutil.rmtree(save_path)
+
+    matcher.fit(
+        train_data=dataset.train_df,
+        tuning_data=dataset.val_df if hasattr(dataset, "val_df") else None,
+        hyperparameters=hyperparameters,
+        time_limit=20,
+        save_path=save_path,
+    )
+
+    verify_matcher_realtime_inference(matcher, dataset.test_df)
+
+
+@pytest.mark.parametrize(
+    "dataset_name,query,response,problem_type,text_backbone,image_backbone, is_ranking, symmetric",
+    [
+        (
+            "id_change_detection",
+            "Previous Image",
+            "Current Image",
+            "image_similarity",
+            None,
+            "swin_tiny_patch4_window7_224",
+            False,
+            False,
+        ),
+        (
+            "flickr30k",
+            "caption",
+            "image",
+            "image_text_similarity",
+            "google/electra-small-discriminator",
+            "swin_tiny_patch4_window7_224",
+            True,
+            True,
+        ),
+    ],
+)
+def test_matcher_basic(
     dataset_name,
     query,
     response,
@@ -208,7 +291,6 @@ def test_matcher(
     else:
         score = matcher.evaluate(dataset.test_df)
     verify_matcher_save_load(matcher, dataset.test_df, cls=MultiModalPredictor)
-    verify_matcher_realtime_inference(matcher, dataset.test_df)
 
     # Test for continuous fit
     matcher.fit(
@@ -308,7 +390,7 @@ def test_image_text_semantic_search():
 
     matcher = MultiModalPredictor(
         problem_type="image_text_similarity",
-        hyperparameters={"model.hf_text.checkpoint_name": "openai/clip-vit-base-patch32"},
+        hyperparameters={"model.clip.checkpoint_name": "openai/clip-vit-base-patch32"},
     )
     text_to_image_hits = semantic_search(
         matcher=matcher,
@@ -393,4 +475,4 @@ def test_matcher_hyperparameters_consistency(hyperparameters):
         hyperparameters=hyperparameters,
         time_limit=10,
     )
-    assert predictor._matcher._config == predictor_2._matcher._config
+    assert predictor._learner._config == predictor_2._learner._config

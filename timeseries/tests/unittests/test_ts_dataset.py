@@ -53,6 +53,7 @@ SAMPLE_TS_DATAFRAME_STATIC = _build_ts_dataframe(
     ),
 )
 SAMPLE_DATAFRAME = pd.DataFrame(SAMPLE_TS_DATAFRAME).reset_index()
+SAMPLE_STATIC_DATAFRAME = SAMPLE_TS_DATAFRAME_STATIC.static_features.reset_index()
 
 
 SAMPLE_ITERABLE = [
@@ -686,9 +687,40 @@ def test_when_dataframe_sliced_by_item_array_then_static_features_stay_consisten
     assert set(right.static_features.index) == set(right_index)
 
 
-def test_when_dataframe_reindexed_view_called_then_static_features_stay_consistent():
-    view = SAMPLE_TS_DATAFRAME_STATIC.get_reindexed_view()
-    assert view._static_features.equals(SAMPLE_TS_DATAFRAME_STATIC._static_features)
+def test_given_wrong_ids_stored_in_item_id_column_when_constructing_tsdf_then_exception_is_raised():
+    df = SAMPLE_DATAFRAME.copy()
+    static_df = SAMPLE_STATIC_DATAFRAME.copy()
+    static_df.index = ["B", "C", "A"]
+    static_df["item_id"] = ["B", "C", "A"]
+    with pytest.raises(ValueError, match="ids are missing from the index"):
+        TimeSeriesDataFrame(df, static_features=static_df)
+
+
+def test_given_static_features_have_multiindex_when_constructing_tsdf_then_exception_is_raised():
+    df = SAMPLE_DATAFRAME.copy()
+    static_df = SAMPLE_STATIC_DATAFRAME.copy()
+    static_df.index = pd.MultiIndex.from_arrays([ITEM_IDS, ["B", "C", "A"]], names=["item_id", "extra_level"])
+    with pytest.raises(ValueError, match="cannot have a MultiIndex"):
+        TimeSeriesDataFrame(df, static_features=static_df)
+
+
+def test_given_item_id_is_stored_as_column_and_not_index_in_static_features_then_tsdf_is_constructed_correctly():
+    df = SAMPLE_DATAFRAME.copy()
+    static_df = SAMPLE_STATIC_DATAFRAME.copy()
+    static_df.index = ["B", "C", "A"]
+    static_df["item_id"] = ITEM_IDS
+    ts_df = TimeSeriesDataFrame(df, static_features=static_df)
+    assert ts_df.static_features.equals(SAMPLE_TS_DATAFRAME_STATIC.static_features)
+
+
+def test_given_item_id_stored_in_both_index_and_column_when_constructing_tsdf_then_values_in_index_are_used():
+    df = SAMPLE_DATAFRAME.copy()
+    static_df = SAMPLE_STATIC_DATAFRAME.copy()
+    static_df = static_df.set_index(ITEMID)
+    static_df[ITEMID] = ["B", "C", "A"]  # these shouldn't be used; static_df.index should be used instead
+    ts_df = TimeSeriesDataFrame(df)
+    ts_df.static_features = static_df
+    assert (ts_df.static_features[ITEMID] == ["B", "C", "A"]).all()
 
 
 SAMPLE_DATAFRAME_WITH_MIXED_INDEX = pd.DataFrame(
@@ -708,7 +740,7 @@ SAMPLE_DATAFRAME_WITH_MIXED_INDEX = pd.DataFrame(
         SAMPLE_DATAFRAME_WITH_MIXED_INDEX.set_index([ITEMID, TIMESTAMP]),
     ],
 )
-def test_when_item_id_index_has_mixed_dtype_then_value_error_is_raied(input_df):
+def test_when_item_id_index_has_mixed_dtype_then_value_error_is_raised(input_df):
     with pytest.raises(ValueError, match="must be of integer or string dtype"):
         TimeSeriesDataFrame(input_df)
 
@@ -744,6 +776,43 @@ def test_when_path_is_given_to_constructor_then_tsdf_is_constructed_correctly():
         assert isinstance(ts_df.index, pd.MultiIndex)
         assert ts_df.index.names == [ITEMID, TIMESTAMP]
         assert len(ts_df) == len(SAMPLE_TS_DATAFRAME)
+
+
+def test_given_custom_id_column_when_data_and_static_are_loaded_from_path_them_tsdf_is_constructed_correctly():
+    df = pd.DataFrame(SAMPLE_TS_DATAFRAME_STATIC).reset_index()
+    static_df = SAMPLE_TS_DATAFRAME_STATIC.static_features.reset_index()
+
+    df = df.rename(columns={ITEMID: "custom_item_id"})
+    static_df = static_df.rename(columns={ITEMID: "custom_item_id"})
+
+    with TemporaryDirectory() as temp_dir:
+        temp_file = Path(temp_dir) / "data.csv"
+        df.to_csv(temp_file, index=False)
+
+        temp_static_file = Path(temp_dir) / "static.csv"
+        static_df.to_csv(temp_static_file, index=False)
+
+        ts_df = TimeSeriesDataFrame.from_path(
+            temp_file, id_column="custom_item_id", static_features_path=temp_static_file
+        )
+    assert isinstance(ts_df, TimeSeriesDataFrame)
+    assert isinstance(ts_df.index, pd.MultiIndex)
+    assert ts_df.index.names == [ITEMID, TIMESTAMP]
+    assert len(ts_df) == len(SAMPLE_TS_DATAFRAME_STATIC)
+
+    assert ts_df.static_features.index.equals(SAMPLE_TS_DATAFRAME_STATIC.static_features.index)
+    assert ts_df.static_features.columns.equals(SAMPLE_TS_DATAFRAME_STATIC.static_features.columns)
+
+
+def test_given_static_features_are_missing_when_loading_from_path_then_tsdf_can_be_constructed():
+    df = SAMPLE_DATAFRAME.copy()
+    with TemporaryDirectory() as temp_dir:
+        temp_file = Path(temp_dir) / "data.csv"
+        df.to_csv(temp_file, index=False)
+
+        ts_df = TimeSeriesDataFrame.from_path(temp_file, id_column=ITEMID, static_features_path=None)
+    assert isinstance(ts_df, TimeSeriesDataFrame)
+    assert ts_df.static_features is None
 
 
 FILL_METHODS = ["auto", "ffill", "pad", "backfill", "bfill", "interpolate", "constant"]
@@ -787,11 +856,30 @@ def test_when_dropna_called_then_missing_values_are_dropped():
     assert not df_dropped.isna().any().any()
 
 
+def test_given_static_features_dont_contain_custom_id_column_when_from_data_frame_called_then_exception_is_raised():
+    df = SAMPLE_DATAFRAME.copy()
+    df = df.rename(columns={ITEMID: "custom_id"})
+    static_df = SAMPLE_STATIC_DATAFRAME.copy()
+    with pytest.raises(AssertionError, match="id' not found in static"):
+        TimeSeriesDataFrame.from_data_frame(df, id_column="custom_id", static_features_df=static_df)
+
+
 def test_when_data_contains_item_id_column_that_is_unused_then_column_is_renamed():
     df = SAMPLE_DATAFRAME.copy()
     df["custom_id"] = df[ITEMID]
     ts_df = TimeSeriesDataFrame.from_data_frame(df, id_column="custom_id")
     assert f"__{ITEMID}" in ts_df.columns
+
+
+def test_when_static_features_contain_item_id_column_that_is_unused_then_column_is_renamed():
+    df = SAMPLE_DATAFRAME.copy()
+    df["custom_id"] = df[ITEMID]
+
+    static_df = SAMPLE_STATIC_DATAFRAME.copy()
+    static_df["custom_id"] = static_df[ITEMID]
+
+    ts_df = TimeSeriesDataFrame.from_data_frame(df, id_column="custom_id", static_features_df=static_df)
+    assert f"__{ITEMID}" in ts_df.static_features.columns
 
 
 def test_when_data_contains_timestamp_column_that_is_unused_then_column_is_renamed():

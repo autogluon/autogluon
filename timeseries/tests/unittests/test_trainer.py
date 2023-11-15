@@ -1,11 +1,13 @@
 """Unit tests for trainers"""
 import copy
 import shutil
+import sys
 import tempfile
 from collections import defaultdict
 from unittest import mock
 
 import numpy as np
+import pandas as pd
 import pytest
 
 import autogluon.core as ag
@@ -164,6 +166,7 @@ def test_given_hyperparameters_when_trainer_fit_then_freq_set_correctly(temp_mod
         assert model.freq == DUMMY_TS_DATAFRAME.freq
 
 
+@pytest.mark.skipif(sys.platform.startswith("win"), reason="HPO tests lead to known issues in Windows platform tests")
 @pytest.mark.parametrize("model_name", ["DeepAR", "SimpleFeedForward"])
 def test_given_hyperparameters_with_spaces_when_trainer_called_then_hpo_is_performed(temp_model_path, model_name):
     hyperparameters = {model_name: {"epochs": space.Int(1, 4)}}
@@ -536,15 +539,15 @@ def test_given_cache_predictions_is_true_when_predicting_multiple_times_then_cac
 ):
     trainer = AutoTimeSeriesTrainer(path=temp_model_path)
     trainer.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
-    mock_return_value = "mock_return_value"
+    mock_predictions = pd.DataFrame(columns=["mock_prediction"])
     with mock.patch("autogluon.timeseries.models.local.naive.NaiveModel.predict") as naive_predict:
-        naive_predict.return_value = mock_return_value
+        naive_predict.return_value = mock_predictions
         trainer.predict(DUMMY_TS_DATAFRAME, model="Naive")
 
     with mock.patch("autogluon.timeseries.models.local.naive.NaiveModel.predict") as naive_predict:
         predictions = trainer.predict(DUMMY_TS_DATAFRAME, model="Naive")
         naive_predict.assert_not_called()
-        assert predictions == mock_return_value
+        assert predictions.equals(mock_predictions)
 
 
 def test_given_cache_predictions_is_false_when_calling_get_model_pred_dict_then_predictions_are_not_cached(
