@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
-import torchmetrics
+import torch.nn.functional as F
 from omegaconf import OmegaConf
 from PIL import Image
 from scipy.special import softmax
@@ -14,8 +14,7 @@ from scipy.special import softmax
 from autogluon.core.metrics import Scorer
 
 from ..constants import LABEL, LOGITS, SEMANTIC_MASK, SEMANTIC_SEGMENTATION
-from ..models import get_model_postprocess_fn
-from ..optimization.lit_semantic_segmentation import SemanticSegmentationLitModule
+from ..optimization.lit_semantic_seg import SemanticSegmentationLitModule
 from ..optimization.utils import (
     get_loss_func,
     get_metric,
@@ -41,7 +40,7 @@ class SemanticSegmentationLearner(BaseLearner):
         label: Optional[str] = None,
         problem_type: Optional[str] = SEMANTIC_SEGMENTATION,
         presets: Optional[str] = None,
-        eval_metric: Optional[Union[str, Scorer]] = None,
+        eval_metric: Optional[Union[str, Scorer]] = "iou",
         hyperparameters: Optional[dict] = None,
         path: Optional[str] = None,
         verbosity: Optional[int] = 2,
@@ -49,7 +48,7 @@ class SemanticSegmentationLearner(BaseLearner):
         warn_if_exist: Optional[bool] = True,
         enable_progress_bar: Optional[bool] = None,
         pretrained: Optional[bool] = True,
-        validation_metric: Optional[str] = None,
+        validation_metric: Optional[str] = "iou",
         sample_data_path: Optional[str] = None,
         **kwargs,
     ):
@@ -192,11 +191,8 @@ class SemanticSegmentationLearner(BaseLearner):
         results = {}
         for per_metric_name in metrics:
             per_metric, _ = get_metric(metric_name=per_metric_name.lower(), num_classes=self._output_shape)
-            if isinstance(per_metric, torchmetrics.classification.MulticlassJaccardIndex):
-                bs, num_classes = y_pred.shape[0:2]
-                y_pred = y_pred.reshape(bs, num_classes, -1)
-                y_true = y_true.reshape(bs, -1)
-            per_metric.update(y_pred, y_true)
+            for y_p, y_t in zip(y_pred, y_true):
+                per_metric.update(y_p.unsqueeze(0), y_t.unsqueeze(0))
             score = per_metric.compute()
             results[per_metric_name] = score.item()
 
@@ -308,12 +304,16 @@ class SemanticSegmentationLearner(BaseLearner):
             realtime=realtime,
             requires_label=False,
         )
-        logits = extract_from_output(outputs=outputs, ret_type=ret_type)
 
-        if ret_type == SEMANTIC_MASK:
-            pred = logits.argmax(axis=1)
-        else:
-            pred = (logits > 0.5).squeeze(axis=1)
+        logits = self.post_process_prediction(data, outputs, ret_type)
+
+        pred = []
+        for logit in logits:
+            logit = logit.numpy()
+            if ret_type == SEMANTIC_MASK:
+                pred.append(logit.argmax(axis=1))
+            else:
+                pred.append((logit > 0.5).squeeze(axis=1))
 
         if save_results:
             self._save_path = setup_save_path(
@@ -374,12 +374,21 @@ class SemanticSegmentationLearner(BaseLearner):
             realtime=realtime,
             requires_label=False,
         )
+
         if as_multiclass:
-            logits = extract_from_output(outputs=outputs, ret_type=SEMANTIC_MASK)
-            prob = softmax(logits, axis=1)
+            ret_type = SEMANTIC_MASK
         else:
-            logits = extract_from_output(outputs=outputs, ret_type=LOGITS)
-            prob = logits
+            ret_type = LOGITS
+
+        logits = self.post_process_prediction(data, outputs, ret_type)
+
+        prob = []
+        for logit in logits:
+            logit = logit.numpy()
+            if ret_type == SEMANTIC_MASK:
+                prob.append(softmax(logit, axis=1))
+            else:
+                prob.append(logit)
 
         return prob
 
@@ -400,11 +409,11 @@ class SemanticSegmentationLearner(BaseLearner):
         Parameters
         ----------
         pred
-            List containing detection results for one image
+            List containing segmentation results for one image
         data
-            pandas data frame or dict containing the image information to be tested
+            Pandas data frame or dict containing the image information to be tested
         result_path
-            path to save result
+            Path to save result
         Returns
         -------
         The paths of the segmentation results as pandas DataFrame
@@ -427,7 +436,7 @@ class SemanticSegmentationLearner(BaseLearner):
         os.makedirs(mask_path, exist_ok=True)
         for image_pred, image_name in zip(pred, image_names):
             if self._output_shape == 1:
-                mask = Image.fromarray(image_pred)
+                mask = Image.fromarray(image_pred.squeeze(axis=0))
                 per_mask_path = os.path.join(mask_path, os.path.basename(image_name))
                 mask.save(per_mask_path)
             else:
@@ -452,3 +461,28 @@ class SemanticSegmentationLearner(BaseLearner):
         result_df = pd.DataFrame(results, columns=["image", "mask"])
         result_df.to_csv(txt_path, index=False)
         return result_df
+
+    def post_process_prediction(self, data, outputs, ret_type):
+        """
+        Post-process segmentation results to match the size of original input images.
+
+        Parameters
+        ----------
+        data
+            Pandas data frame or dict containing the image information.
+        outputs
+            A list of segmentation output results.
+        ret_type
+            What kind of information to extract from model outputs.
+
+        Returns
+        -------
+        A list of the post-processed segmentation results.
+        """
+        logits = [ele[ret_type] for ele in outputs]
+        for idx in range(data.shape[0]):
+            ori_image_size = Image.open(data["image"][idx]).size  # width, height
+            logits[idx] = F.interpolate(
+                logits[idx].float(), (ori_image_size[1], ori_image_size[0]), mode="bilinear", align_corners=False
+            )
+        return logits
