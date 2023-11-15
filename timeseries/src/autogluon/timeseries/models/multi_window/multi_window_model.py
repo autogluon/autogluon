@@ -59,12 +59,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         super().__init__(**kwargs)
 
     def _get_model_base(self):
-        if self.most_recent_model is not None:
-            return self.most_recent_model
-        elif self.model_base is not None:
-            return self.model_base
-        else:
-            raise ValueError("Base model cannot be retrieved from MultiWindowModel")
+        return self.model_base
 
     def _get_hpo_backend(self) -> str:
         return self._get_model_base()._get_hpo_backend()

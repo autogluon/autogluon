@@ -395,9 +395,10 @@ class AbstractTimeSeriesModel(AbstractModel):
         if hpo_executor is None:
             hpo_executor = self._get_default_hpo_executor()
             default_num_trials = kwargs.pop("default_num_trials", None)
-        hpo_executor.initialize(
-            hyperparameter_tune_kwargs, default_num_trials=default_num_trials, time_limit=time_limit
-        )
+            hpo_executor.initialize(
+                hyperparameter_tune_kwargs, default_num_trials=default_num_trials, time_limit=time_limit
+            )
+
         kwargs = self.initialize(time_limit=time_limit, **kwargs)
 
         self._register_fit_metadata(**kwargs)
