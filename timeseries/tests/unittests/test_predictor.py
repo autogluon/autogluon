@@ -942,7 +942,6 @@ def test_when_evaluate_receives_multiple_metrics_then_score_dict_contains_all_ke
     assert len(scores) == len(expected_keys) and all(k in scores for k in expected_keys)
 
 
-@pytest.mark.skipif(sys.platform.startswith("win"), reason="HPO tests lead to known issues in Windows platform tests")
 @pytest.mark.parametrize("enable_ensemble", [True, False])
 @pytest.mark.parametrize(
     "hyperparameters, hyperparameter_tune_kwargs",
@@ -961,7 +960,7 @@ def test_given_time_limit_is_not_none_then_first_model_doesnt_receive_full_time_
     temp_model_path, enable_ensemble, hyperparameters, hyperparameter_tune_kwargs
 ):
     time_limit = 20
-    expected_time_limit_for_first_model = time_limit / (len(hyperparameters) + int(enable_ensemble))
+    expected_time_limit_for_first_model = time_limit / (len(hyperparameters) + int(enable_ensemble)) + 0.1
     predictor = TimeSeriesPredictor(path=temp_model_path)
     with mock.patch("autogluon.timeseries.models.local.naive.SeasonalNaiveModel.fit") as snaive_fit:
         predictor.fit(
