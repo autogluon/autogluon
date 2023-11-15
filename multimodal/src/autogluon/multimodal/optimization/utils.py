@@ -78,7 +78,7 @@ from .lr_scheduler import (
     get_linear_schedule_with_warmup,
     get_polynomial_decay_schedule_with_warmup,
 )
-from .semantic_seg_metrics import COD_METRICS_NAMES, Balanced_Error_Rate, Binary_IoU
+from .semantic_seg_metrics import COD_METRICS_NAMES, Balanced_Error_Rate, Binary_IoU, Multiclass_IoU
 
 logger = logging.getLogger(__name__)
 
@@ -318,7 +318,7 @@ def get_metric(
         if num_classes == 1:
             return Binary_IoU(), None
         else:
-            return torchmetrics.JaccardIndex(task="multiclass", num_classes=num_classes), None
+            return Multiclass_IoU(num_classes=num_classes), None
     else:
         raise ValueError(f"Unknown metric {metric_name}")
 
