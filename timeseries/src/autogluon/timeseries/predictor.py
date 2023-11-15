@@ -513,19 +513,29 @@ class TimeSeriesPredictor:
             In the above example, multiple versions of the DeepAR model with different values of the parameters
             "hidden_size" and "dropout_rate" will be trained.
         hyperparameter_tune_kwargs : str or dict, optional
-            Hyperparameter tuning strategy and kwargs (for example, how many HPO trials to run). If ``None``, then
-            hyperparameter tuning will not be performed.
+            Hyperparameter tuning strategy and kwargs (for example, how many HPO trials to run).
+            If None, then hyperparameter tuning will not be performed.
 
-            Currently, only HPO based on random search is supported for time series models.
+            If type is ``str``, then this argument specifies a preset.
+            Valid preset values:
 
-            Setting this parameter to string ``"random"`` performs 10 trials of random search per model.
+            * "auto": Performs HPO via bayesian optimization search on GluonTS-backed neural forecasting models and
+                random search on other models using local scheduler.
+            * "random": Performs HPO via random search.
 
-            We can change the number of random search trials per model by passing a dictionary as `hyperparameter_tune_kwargs`.
-            The dict must include the following keys
+            You can also provide a dict to specify searchers and schedulers
+            Valid keys:
 
-            - ``"num_trials"``: int, number of configurations to train for each tuned model
-            - ``"searcher"``: currently, the only supported option is ``"random"`` (random search)
-            - ``"scheduler"``: currently, the only supported option is ``"local"`` (all models trained on the same machine)
+            * "num_trials": How many HPO trials to run
+            * "scheduler": Which scheduler to use. Valid values:
+                * "local": Local shceduler that schedules trials FIFO
+            * "searcher": Which searching algorithm to use. Valid values:
+                * "local_random": Uses the "random" searcher
+                * "random": Perform random search
+                * "bayes": Perform HPO with HyperOpt on GluonTS-backed models via Ray tune. Perform random search on other models.
+                * "auto": alias for "bayes"
+
+            The "scheduler" and "searcher" key are required when providing a dict.
 
             Example::
 
@@ -533,7 +543,7 @@ class TimeSeriesPredictor:
                     ...
                     hyperparameter_tune_kwargs={
                         "num_trials": 5,
-                        "searcher": "random",
+                        "searcher": "auto",
                         "scheduler": "local",
                     },
                 )

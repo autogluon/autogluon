@@ -3,7 +3,7 @@ import os
 import shutil
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterator, List, Optional, Type
+from typing import Any, Callable, Dict, Iterator, List, Optional, Type, Union
 
 import gluonts
 import gluonts.core.settings
@@ -19,6 +19,7 @@ from pandas.tseries.frequencies import to_offset
 
 from autogluon.common.loaders import load_pkl
 from autogluon.common.utils.log_utils import set_logger_verbosity
+from autogluon.core.hpo.constants import RAY_BACKEND
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.datetime import norm_freq_str
@@ -207,6 +208,9 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             model.gts_predictor = PyTorchPredictor.deserialize(Path(path) / cls.gluonts_model_path)
         return model
 
+    def _get_hpo_backend(self):
+        return RAY_BACKEND
+
     def _deferred_init_params_aux(self, **kwargs) -> None:
         """Update GluonTS specific parameters with information available
         only at training time.
@@ -276,8 +280,6 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         # As GluonTSPyTorchLightningEstimator objects do not implement `from_hyperparameters` convenience
         # constructors, we re-implement the logic here.
         # we translate the "epochs" parameter to "max_epochs" for consistency in the AbstractGluonTSModel interface
-        import torch
-
         init_args = self._get_estimator_init_args()
 
         default_trainer_kwargs = {
@@ -287,7 +289,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             "default_root_dir": self.path,
         }
 
-        if torch.cuda.is_available():
+        if self._is_gpu_available():
             default_trainer_kwargs["accelerator"] = "gpu"
             default_trainer_kwargs["devices"] = 1
         else:
@@ -301,6 +303,18 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             trainer_kwargs=default_trainer_kwargs,
             **init_args,
         )
+
+    def _is_gpu_available(self) -> bool:
+        import torch.cuda
+
+        return torch.cuda.is_available()
+
+    def get_minimum_resources(self, is_gpu_available: bool = False) -> Dict[str, Union[int, float]]:
+        minimum_resources = {"num_cpus": 1}
+        # if GPU is available, we train with 1 GPU per trial
+        if is_gpu_available:
+            minimum_resources["num_gpus"] = 1
+        return minimum_resources
 
     def _to_gluonts_dataset(
         self, time_series_df: Optional[TimeSeriesDataFrame], known_covariates: Optional[TimeSeriesDataFrame] = None
