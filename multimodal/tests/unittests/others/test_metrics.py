@@ -141,7 +141,14 @@ def test_f1_metrics_for_multiclass(eval_metric):
         ("feature_extraction", None, None, False, None, None),
     ],
 )
-def test_infer_metrics(problem_type, eval_metric_name, validation_metric_name, is_matching, target_eval_metric_name, target_validation_metric_name):
+def test_infer_metrics(
+        problem_type,
+        eval_metric_name,
+        validation_metric_name,
+        is_matching,
+        target_eval_metric_name,
+        target_validation_metric_name,
+):
     validation_metric_name, eval_metric_name = infer_metrics(problem_type, eval_metric_name, validation_metric_name, is_matching)
     assert eval_metric_name == target_eval_metric_name
     assert validation_metric_name == target_validation_metric_name
