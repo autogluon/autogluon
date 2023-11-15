@@ -8,9 +8,9 @@ from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import pandas as pd
 
+from autogluon.common.utils.deprecated_utils import Deprecated
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.utils import check_saved_predictor_version, seed_everything, setup_outputdir
-from autogluon.common.utils.deprecated_utils import Deprecated
 from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
