@@ -52,7 +52,7 @@ class SimpleAbstractTrainer:
 
         self._extra_banned_names = set()
 
-    def model_names(self, **kwargs) -> List[str]:
+    def get_model_names(self, **kwargs) -> List[str]:
         """Get all model names that are registered in the model graph"""
         return list(self.model_graph.nodes)
 
@@ -60,21 +60,21 @@ class SimpleAbstractTrainer:
         """Gets all model names which would cause model files to be overwritten if a new model
         was trained with the name
         """
-        return self.model_names() + list(self._extra_banned_names)
+        return self.get_model_names() + list(self._extra_banned_names)
 
     def get_models_attribute_dict(self, attribute: str, models: List[str] = None) -> Dict[str, Any]:
         """Get an attribute from the `model_graph` for each of the model names
         specified. If `models` is none, the attribute will be returned for all models"""
         results = {}
         if models is None:
-            models = self.model_names()
+            models = self.get_model_names()
         for model in models:
             results[model] = self.model_graph.nodes[model][attribute]
         return results
 
-    def model_best(self) -> str:
+    def get_model_best(self) -> str:
         """Return the name of the best model by model performance on the validation set."""
-        models = self.model_names()
+        models = self.get_model_names()
         if not models:
             raise ValueError("Trainer has no fit models that can predict.")
         model_performances = self.get_models_attribute_dict(attribute="val_score")
@@ -185,7 +185,7 @@ class SimpleAbstractTrainer:
 
     def get_models_info(self, models: List[str] = None) -> Dict[str, Any]:
         if models is None:
-            models = self.model_names()
+            models = self.get_model_names()
         model_info_dict = dict()
         for model in models:
             if isinstance(model, str):
@@ -219,12 +219,12 @@ class SimpleAbstractTrainer:
         return info
 
     def get_info(self, include_model_info: bool = False) -> Dict[str, Any]:
-        num_models_trained = len(self.model_names())
+        num_models_trained = len(self.get_model_names())
         if self.model_best is not None:
             best_model = self.model_best
         else:
             try:
-                best_model = self.model_best()
+                best_model = self.get_model_best()
             except AssertionError:
                 best_model = None
         if best_model is not None:
@@ -386,7 +386,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         return levels
 
-    def model_names(self, level: Optional[int] = None, **kwargs) -> List[str]:
+    def get_model_names(self, level: Optional[int] = None, **kwargs) -> List[str]:
         """Get model names that are registered in the model graph"""
         if level is not None:
             return list(node for node, l in self._get_model_levels().items() if l == level)  # noqa: E741
@@ -600,7 +600,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 )
 
         if self.enable_ensemble:
-            models_available_for_ensemble = self.model_names(level=0)
+            models_available_for_ensemble = self.get_model_names(level=0)
 
             time_left_for_ensemble = None
             if time_limit is not None:
@@ -639,7 +639,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         logger.info(f"Training complete. Models trained: {model_names_trained}")
         logger.info(f"Total runtime: {time.time() - time_start:.2f} s")
         try:
-            best_model = self.model_best()
+            best_model = self.get_model_best()
             logger.info(f"Best model: {best_model}")
             logger.info(f"Best model score: {self.get_model_attribute(best_model, 'val_score'):.4f}")
         except ValueError as e:
@@ -711,7 +711,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
     def leaderboard(self, data: Optional[TimeSeriesDataFrame] = None, use_cache: bool = True) -> pd.DataFrame:
         logger.debug("Generating leaderboard for all models trained")
 
-        model_names = self.model_names()
+        model_names = self.get_model_names()
         model_info = {}
         for ix, model_name in enumerate(model_names):
             model_info[model_name] = {
@@ -777,7 +777,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         """
         if model is None:
             if self.model_best is None:
-                best_model_name: str = self.model_best()
+                best_model_name: str = self.get_model_best()
                 self.model_best = best_model_name
             logger.info(
                 f"Model not specified in predict, will default to the model with the "
@@ -1037,7 +1037,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         refit_full_data = self._merge_refit_full_data(train_data, val_data)
 
         if models is None:
-            models = self.model_names()
+            models = self.get_model_names()
 
         model_to_level = self._get_model_levels()
         models_sorted_by_level = sorted(models, key=model_to_level.get)
@@ -1076,11 +1076,11 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
     def refit_full(self, model: str = "all") -> Dict[str, str]:
         time_start = time.time()
-        existing_models = self.model_names()
+        existing_models = self.get_model_names()
         if model == "all":
             model_names = existing_models
         elif model == "best":
-            model_names = self.get_minimum_model_set(self.model_best())
+            model_names = self.get_minimum_model_set(self.get_model_best())
         else:
             model_names = self.get_minimum_model_set(model)
 

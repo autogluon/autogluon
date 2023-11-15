@@ -695,7 +695,7 @@ class TimeSeriesPredictor:
 
     def model_names(self) -> List[str]:
         """Returns the list of model names trained by this predictor object."""
-        return self._trainer.model_names()
+        return self._trainer.get_model_names()
 
     def predict(
         self,
@@ -912,10 +912,10 @@ class TimeSeriesPredictor:
     def model_best(self) -> str:
         """Returns the name of the best model from trainer."""
         if self._trainer.model_best is not None:
-            models = self._trainer.model_names()
+            models = self._trainer.get_model_names()
             if self._trainer.model_best in models:
                 return self._trainer.model_best
-        return self._trainer.model_best()
+        return self._trainer.get_model_best()
 
     def leaderboard(
         self,
