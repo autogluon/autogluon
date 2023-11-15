@@ -12,7 +12,7 @@ class Visualizer:
                 File path of the image.
         """
         image = Image.open(img_path)
-        self.img = plt.imshow(image)
+        plt.imshow(image)
 
     def draw_image(self, pred: np.array, output_path: str = None):
         """
