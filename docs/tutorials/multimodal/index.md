@@ -113,6 +113,19 @@ In the following, we decomposed the functionalities of AutoMM and prepared step-
 ::::
 
 
+## Image Data -- Segmentation
+
+::::{grid} 2
+  :gutter: 3
+
+:::{grid-item-card} AutoMM for Semantic Segmentation - Quick Start
+  :link: beginner_semantic_seg.html
+
+  How to train semantic segmentation models with AutoMM.
+:::
+::::
+
+
 ## Document Data
 
 ::::{grid} 2
