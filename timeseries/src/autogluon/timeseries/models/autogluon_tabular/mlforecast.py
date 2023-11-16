@@ -89,7 +89,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
 
     def _get_model_params(self) -> dict:
         model_params = super()._get_model_params().copy()
-        model_params.setdefault("max_num_items", 20_000)
+        model_params.setdefault("max_num_items", 10_000)
         model_params.setdefault("max_num_samples", 1_000_000)
         model_params.setdefault("tabular_hyperparameters", {"GBM": {}})
         model_params.setdefault("tabular_fit_kwargs", {})
@@ -328,7 +328,7 @@ class DirectTabularModel(AbstractMLForecastModel):
         Defaults to ``{"GBM": {}}``.
     tabular_fit_kwargs : Dict[str, Any], optional
         Additional keyword arguments passed to ``TabularPredictor.fit``. Defaults to an empty dict.
-    max_num_items : int or None, default = 20_000
+    max_num_items : int or None, default = 10_000
         If not None, the model will randomly select this many time series for training and validation.
     max_num_samples : int or None, default = 1_000_000
         If not None, training dataset passed to TabularPredictor will contain at most this many rows (starting from the
@@ -462,7 +462,7 @@ class RecursiveTabularModel(AbstractMLForecastModel):
         Defaults to ``{"GBM": {}}``.
     tabular_fit_kwargs : Dict[str, Any], optional
         Additional keyword arguments passed to ``TabularPredictor.fit``. Defaults to an empty dict.
-    max_num_items : int or None, default = 20_000
+    max_num_items : int or None, default = 10_000
         If not None, the model will randomly select this many time series for training and validation.
     max_num_samples : int or None, default = 1_000_000
         If not None, training dataset passed to TabularPredictor will contain at most this many rows (starting from the
