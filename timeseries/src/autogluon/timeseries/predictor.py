@@ -618,6 +618,7 @@ class TimeSeriesPredictor:
         fit_args = dict(
             prediction_length=self.prediction_length,
             target=self.target,
+            known_covariates_names=self.known_covariates_names,
             eval_metric=self.eval_metric,
             eval_metric_seasonal_period=self.eval_metric_seasonal_period,
             quantile_levels=self.quantile_levels,
