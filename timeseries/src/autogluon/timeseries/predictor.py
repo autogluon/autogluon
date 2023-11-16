@@ -10,6 +10,7 @@ import pandas as pd
 
 from autogluon.common.utils.deprecated_utils import Deprecated
 from autogluon.common.utils.log_utils import set_logger_verbosity
+from autogluon.common.utils.system_info import get_ag_system_info
 from autogluon.common.utils.utils import check_saved_predictor_version, seed_everything, setup_outputdir
 from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl, load_str
@@ -270,7 +271,7 @@ class TimeSeriesPredictor:
                 )
             else:
                 self.freq = df.freq
-                logger.info(f"Inferred time series frequency: {df.freq}")
+                logger.info(f"Inferred time series frequency: '{df.freq}'")
         else:
             if df.freq != self.freq:
                 logger.warning(f"{name} with frequency '{df.freq}' has been resampled to frequency '{self.freq}'.")
@@ -603,6 +604,10 @@ class TimeSeriesPredictor:
         if self._learner.is_fit:
             raise AssertionError("Predictor is already fit! To fit additional models create a new `Predictor`.")
 
+        logger.info("Beginning AutoGluon training..." + (f" Time limit = {time_limit}s" if time_limit else ""))
+        logger.info(f"AutoGluon will save models to '{self.path}'")
+        logger.info(get_ag_system_info(path=self.path, include_gpu_count=True))
+
         if hyperparameters is None:
             hyperparameters = "default"
 
@@ -614,6 +619,7 @@ class TimeSeriesPredictor:
             prediction_length=self.prediction_length,
             target=self.target,
             eval_metric=self.eval_metric,
+            eval_metric_seasonal_period=self.eval_metric_seasonal_period,
             quantile_levels=self.quantile_levels,
             freq=self.freq,
             time_limit=time_limit,
@@ -621,17 +627,17 @@ class TimeSeriesPredictor:
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             excluded_model_types=excluded_model_types,
             num_val_windows=num_val_windows,
+            val_step_size=val_step_size,
+            refit_every_n_windows=refit_every_n_windows,
             refit_full=refit_full,
             enable_ensemble=enable_ensemble,
             random_seed=random_seed,
             verbosity=verbosity,
         )
-        logger.info("================ TimeSeriesPredictor ================")
-        logger.info("TimeSeriesPredictor.fit() called")
         if presets is not None:
             logger.info(f"Setting presets to: {presets}")
-        logger.info("Fitting with arguments:")
-        logger.info(f"{pprint.pformat(fit_args)}\n")
+        logger.info("\nFitting with arguments:")
+        logger.info(f"{pprint.pformat({k: v for k, v in fit_args.items() if v is not None})}\n")
 
         train_data = self._check_and_prepare_data_frame(train_data, name="train_data")
         logger.info(f"Provided train_data has {self._get_dataset_stats(train_data)}")
@@ -665,8 +671,6 @@ class TimeSeriesPredictor:
         val_splitter = ExpandingWindowSplitter(
             prediction_length=self.prediction_length, num_val_windows=num_val_windows, val_step_size=val_step_size
         )
-
-        logger.info("=====================================================\n")
 
         if random_seed is not None:
             seed_everything(random_seed)
