@@ -1591,13 +1591,13 @@ class AbstractModel:
     #  Has not been tested on Windows
     #  Does not work if model is located in S3
     #  Does not work if called before model was saved to disk (Will output 0)
-    def get_disk_size(self) -> int:
+    def disk_usage(self) -> int:
         # Taken from https://stackoverflow.com/a/1392549
         from pathlib import Path
 
         model_path = Path(self.path)
-        model_disk_size = sum(f.stat().st_size for f in model_path.glob("**/*") if f.is_file())
-        return model_disk_size
+        model_disk_usage = sum(f.stat().st_size for f in model_path.glob("**/*") if f.is_file())
+        return model_disk_usage
 
     def get_memory_size(self, allow_exception: bool = False) -> int | None:
         """
@@ -1844,7 +1844,7 @@ class AbstractModel:
             "num_features": len(self.features) if self.features else None,
             "features": self.features,
             "feature_metadata": self.feature_metadata,
-            # 'disk_size': self.get_disk_size(),
+            # 'disk_usage': self.disk_usage(),
             "memory_size": self.get_memory_size(allow_exception=True),  # Memory usage of model in bytes
             "compile_time": self.compile_time if hasattr(self, "compile_time") else None,
             "is_initialized": self.is_initialized(),
