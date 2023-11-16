@@ -76,7 +76,8 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         from mlforecast import MLForecast
         from mlforecast.target_transforms import BaseTargetTransform
 
-        self._required_ts_length: Optional[int] = None
+        self._sum_of_differences: int = 0  # number of time steps removed from each series by differencing
+        self._max_ts_length: Optional[int] = None
         self._target_lags: Optional[List[int]] = None
         self._date_features: Optional[List[str]] = None
         self._mlf: Optional[MLForecast] = None
@@ -88,7 +89,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
 
     def _get_model_params(self) -> dict:
         model_params = super()._get_model_params().copy()
-        model_params.setdefault("max_num_items", 10_000)
+        model_params.setdefault("max_num_items", 20_000)
         model_params.setdefault("max_num_samples", 1_000_000)
         model_params.setdefault("tabular_hyperparameters", {"GBM": {}})
         model_params.setdefault("tabular_fit_kwargs", {})
@@ -127,7 +128,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
 
         if len(differences) > 0:
             target_transforms.append(Differences(differences))
-            self._required_ts_length = sum(differences)
+            self._sum_of_differences = sum(differences)
 
         scaler_name = model_params.get("scaler")
         if scaler_name is None:
@@ -145,7 +146,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             target_transforms.append(self._scaler)
 
         return {
-            "lags": self._target_lags,
+            "lags": self._target_lags.tolist(),
             "date_features": self._date_features,
             "target_transforms": target_transforms,
         }
@@ -158,13 +159,18 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         """
         return df
 
+    @staticmethod
+    def _shorten_all_series(mlforecast_df: pd.DataFrame, max_length: int):
+        logger.debug(f"Shortening all series to at most {max_length}")
+        return mlforecast_df.groupby(MLF_ITEMID, as_index=False, sort=False).tail(max_length)
+
     def _generate_train_val_dfs(
         self, data: TimeSeriesDataFrame, max_num_items: Optional[int] = None, max_num_samples: Optional[int] = None
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
         # Exclude items that are too short for chosen differences - otherwise exception will be raised
-        if self._required_ts_length is not None:
+        if self._sum_of_differences > 0:
             ts_lengths = data.num_timesteps_per_item()
-            items_to_exclude = ts_lengths.index[ts_lengths < self._required_ts_length]
+            items_to_exclude = ts_lengths.index[ts_lengths < self._sum_of_differences]
             if len(items_to_exclude) > 0:
                 logger.debug(f"Removing {len(items_to_exclude)} items that are too short for chosen differences")
                 data = data.query("item_id not in @items_to_exclude")
@@ -174,6 +180,13 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             data = data.query("item_id in @items_to_keep")
 
         mlforecast_df = self._to_mlforecast_df(data, data.static_features)
+
+        if max_num_samples is not None:
+            # Training data will contain at most this many rows for each time series
+            max_samples_per_ts = max(1000, math.ceil(max_num_samples / data.num_items))
+            self._max_ts_length = max_samples_per_ts + self.prediction_length + self._sum_of_differences
+            mlforecast_df = self._shorten_all_series(mlforecast_df, self._max_ts_length)
+
         # Unless we set static_features=[], MLForecast interprets all known covariates as static features
         df = self._mlf.preprocess(mlforecast_df, dropna=False, static_features=[])
         # df.query results in 2x memory saving compared to df.dropna(subset="y")
@@ -184,14 +197,11 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         grouped_df = df.groupby(MLF_ITEMID, sort=False)
         num_items = len(grouped_df)
 
-        if max_num_samples is not None and len(df) > max_num_samples:
-            df = grouped_df.tail(self.prediction_length + math.ceil(max_num_samples / num_items))
-            grouped_df = df.groupby(MLF_ITEMID, sort=False)
-
         # Use up to `prediction_length` last rows as validation set (but no more than 50% of the rows)
         val_rows_per_item = min(self.prediction_length, math.ceil(0.5 * len(df) / num_items))
         train_df = grouped_df.nth(slice(None, -val_rows_per_item))
         val_df = grouped_df.tail(val_rows_per_item)
+        logger.debug(f"train_df shape: {train_df.shape}, val_df shape: {val_df.shape}")
 
         return train_df.drop([MLF_ITEMID, MLF_TIMESTAMP], axis=1), val_df.drop([MLF_ITEMID, MLF_TIMESTAMP], axis=1)
 
@@ -318,7 +328,7 @@ class DirectTabularModel(AbstractMLForecastModel):
         Defaults to ``{"GBM": {}}``.
     tabular_fit_kwargs : Dict[str, Any], optional
         Additional keyword arguments passed to ``TabularPredictor.fit``. Defaults to an empty dict.
-    max_num_items: int or None, default = 10_000
+    max_num_items : int or None, default = 20_000
         If not None, the model will randomly select this many time series for training and validation.
     max_num_samples : int or None, default = 1_000_000
         If not None, training dataset passed to TabularPredictor will contain at most this many rows (starting from the
@@ -367,6 +377,9 @@ class DirectTabularModel(AbstractMLForecastModel):
         data_future[self.target] = float("inf")
         data_extended = pd.concat([data, data_future])
         mlforecast_df = self._to_mlforecast_df(data_extended, data.static_features)
+        if self._max_ts_length is not None:
+            # We appended `prediction_length` time steps to each series, so increase length
+            mlforecast_df = self._shorten_all_series(mlforecast_df, self._max_ts_length + self.prediction_length)
         df = self._mlf.preprocess(mlforecast_df, dropna=False, static_features=[])
         df = df.groupby(MLF_ITEMID, sort=False).tail(self.prediction_length)
         df = df.replace(float("inf"), float("nan"))
@@ -377,7 +390,10 @@ class DirectTabularModel(AbstractMLForecastModel):
 
         if hasattr(self._mlf.ts, "target_transforms"):
             # Ensure that transforms are fitted only on past data
-            self._mlf.preprocess(self._to_mlforecast_df(data, None), static_features=[])
+            mlforecast_df_past = self._to_mlforecast_df(data, None)
+            if self._max_ts_length is not None:
+                mlforecast_df_past = self._shorten_all_series(mlforecast_df_past, self._max_ts_length)
+            self._mlf.preprocess(mlforecast_df_past, static_features=[])
             for tfm in self._mlf.ts.target_transforms[::-1]:
                 predictions = tfm.inverse_transform(predictions)
         predictions = predictions.rename(columns={MLF_ITEMID: ITEMID, MLF_TIMESTAMP: TIMESTAMP}).set_index(
@@ -446,7 +462,7 @@ class RecursiveTabularModel(AbstractMLForecastModel):
         Defaults to ``{"GBM": {}}``.
     tabular_fit_kwargs : Dict[str, Any], optional
         Additional keyword arguments passed to ``TabularPredictor.fit``. Defaults to an empty dict.
-    max_num_items: int or None, default = 10_000
+    max_num_items : int or None, default = 20_000
         If not None, the model will randomly select this many time series for training and validation.
     max_num_samples : int or None, default = 1_000_000
         If not None, training dataset passed to TabularPredictor will contain at most this many rows (starting from the
@@ -468,6 +484,8 @@ class RecursiveTabularModel(AbstractMLForecastModel):
         from scipy.stats import norm
 
         new_df = self._to_mlforecast_df(data, data.static_features)
+        if self._max_ts_length is not None:
+            new_df = self._shorten_all_series(new_df, self._max_ts_length)
         if known_covariates is None:
             future_index = get_forecast_horizon_index_ts_dataframe(data, self.prediction_length)
             known_covariates = pd.DataFrame(columns=[self.target], index=future_index, dtype="float32")
