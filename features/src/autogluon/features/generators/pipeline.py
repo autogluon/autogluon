@@ -116,8 +116,7 @@ class PipelineFeatureGenerator(BulkFeatureGenerator):
         self._log(20, f"\tAvailable Memory:                    {(pre_memory_usage_mb + available_mem_mb):.2f} MB")
         self._log(
             20,
-            f"\tTrain Data (Original)  Memory Usage: {pre_memory_usage_mb:.2f} MB "
-            f"({(pre_memory_usage_percent * 100):.1f}% of available memory)",
+            f"\tTrain Data (Original)  Memory Usage: {pre_memory_usage_mb:.2f} MB " f"({(pre_memory_usage_percent * 100):.1f}% of available memory)",
         )
         if pre_memory_usage_percent > 0.05:
             self._log(
@@ -136,8 +135,7 @@ class PipelineFeatureGenerator(BulkFeatureGenerator):
         post_memory_usage_percent = post_memory_usage_mb / (available_mem_mb + post_memory_usage_mb + pre_memory_usage_mb)
         self._log(
             20,
-            f"\tTrain Data (Processed) Memory Usage: {post_memory_usage_mb:.2f} MB "
-            f"({(post_memory_usage_percent * 100):.1f}% of available memory)",
+            f"\tTrain Data (Processed) Memory Usage: {post_memory_usage_mb:.2f} MB " f"({(post_memory_usage_percent * 100):.1f}% of available memory)",
         )
         if post_memory_usage_percent > 0.15:
             self._log(
