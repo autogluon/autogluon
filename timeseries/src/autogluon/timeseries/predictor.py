@@ -1118,10 +1118,8 @@ class TimeSeriesPredictor:
     def get_model_names(self) -> str:
         return self.model_names()
 
-    def get_simulation_artifact(self, test_data: TimeSeriesDataFrame) -> dict:
-        """
-        [Advanced] Computes and returns the necessary information to perform zeroshot HPO simulation.
-        """
+    def simulation_artifact(self, test_data: TimeSeriesDataFrame) -> dict:
+        """[Advanced] Computes and returns the necessary information to perform zeroshot HPO simulation."""
         test_data = self._check_and_prepare_data_frame(test_data)
         self._check_data_for_evaluation(test_data, name="test_data")
 
@@ -1129,14 +1127,14 @@ class TimeSeriesPredictor:
         train_data = trainer.load_train_data()
         val_data = trainer.load_val_data()
         base_models = trainer.get_model_names(level=0)
-        pred_dict_val: Dict[str, List[TimeSeriesDataFrame]] = {
+        pred_proba_dict_val: Dict[str, List[TimeSeriesDataFrame]] = {
             model: trainer._get_model_oof_predictions(model) for model in base_models
         }
 
         past_data, known_covariates = test_data.get_model_inputs_for_scoring(
             prediction_length=self.prediction_length, known_covariates_names=trainer.metadata.known_covariates_real
         )
-        pred_dict_test: Dict[str, TimeSeriesDataFrame] = trainer.get_model_pred_dict(
+        pred_proba_dict_test: Dict[str, TimeSeriesDataFrame] = trainer.get_model_pred_dict(
             base_models, data=past_data, known_covariates=known_covariates
         )
 
@@ -1146,13 +1144,13 @@ class TimeSeriesPredictor:
         y_test: TimeSeriesDataFrame = test_data[[self.target]]
 
         simulation_dict = dict(
-            pred_dict_val=pred_dict_val,
-            pred_dict_test=pred_dict_test,
+            pred_proba_dict_val=pred_proba_dict_val,
+            pred_proba_dict_test=pred_proba_dict_test,
             y_val=y_val,
             y_test=y_test,
             target=self.target,
             prediction_length=self.prediction_length,
-            eval_metric=self.eval_metric,
+            eval_metric=self.eval_metric.name,
             eval_metric_seasonal_period=self.eval_metric_seasonal_period,
             quantile_levels=self.quantile_levels,
         )
