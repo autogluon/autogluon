@@ -99,7 +99,6 @@ def test_sam_semantic_segmentation_isic_fit_eval_predict_save_load(checkpoint_na
         validation_metric=validation_metric,
         eval_metric=validation_metric,
         hyperparameters={
-            "env.num_gpus": 1,
             "model.sam.checkpoint_name": checkpoint_name,
         },
         label="label",
@@ -131,7 +130,6 @@ def test_sam_semantic_segmentation_zero_shot_evaluate_predict(checkpoint_name):
         validation_metric=validation_metric,
         eval_metric=validation_metric,
         hyperparameters={
-            "env.num_gpus": 1,
             "model.sam.checkpoint_name": checkpoint_name,
         },
         label="label",
@@ -166,7 +164,6 @@ def test_sam_semantic_segmentation_trans10k_fit_eval_predict_save_load(checkpoin
         validation_metric=validation_metric,
         eval_metric=validation_metric,
         hyperparameters={
-            "env.num_gpus": 1,
             "env.precision": 32,
             "model.sam.checkpoint_name": checkpoint_name,
             "optimization.loss_function": "mask2former_loss",
@@ -225,7 +222,6 @@ def test_sam_semantic_segmentation_get_class_num_func(checkpoint_name):
         validation_metric=validation_metric,
         eval_metric=validation_metric,
         hyperparameters={
-            "env.num_gpus": 1,
             "env.precision": 32,
             "model.sam.checkpoint_name": checkpoint_name,
             "optimization.loss_function": "mask2former_loss",
@@ -258,7 +254,6 @@ def test_sam_semantic_segmentation_lora_insert(frozen_layers):
     predictor = MultiModalPredictor(
         problem_type="semantic_segmentation",
         hyperparameters={
-            "env.num_gpus": 1,
             "model.sam.checkpoint_name": "facebook/sam-vit-base",
             "model.sam.frozen_layers": frozen_layers,
         },
