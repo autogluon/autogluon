@@ -117,7 +117,7 @@ class SemanticSegmentationLearner(BaseLearner):
             num_classes = []
             for idx in range(sample_data_path.shape[0]):
                 row = sample_data_path.iloc[idx]
-                mask_file = row["label"]
+                mask_file = row[self._label_column]
                 per_num_classes = self.get_semantic_segmentation_class_num(mask_file)
                 num_classes.append(per_num_classes)
             return max(num_classes)

@@ -17,6 +17,7 @@ from ..constants import (
     DIRECT_LOSS,
     F1,
     FEW_SHOT_CLASSIFICATION,
+    IOU,
     MAP,
     METRIC_MODE_MAP,
     MULTICLASS,
@@ -34,13 +35,12 @@ from ..constants import (
     RETRIEVAL_METRICS,
     RMSE,
     ROC_AUC,
+    SEMANTIC_SEGMENTATION,
     SPEARMANR,
     VALID_METRICS,
     Y_PRED,
     Y_PRED_PROB,
     Y_TRUE,
-    SEMANTIC_SEGMENTATION,
-    IOU,
 )
 from ..problem_types import PROBLEM_TYPES_REG
 
