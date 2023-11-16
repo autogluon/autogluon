@@ -609,7 +609,7 @@ class AbstractModel:
         """
         resource_manager = get_resource_manager()
         system_num_cpus = resource_manager.get_cpu_count()
-        system_num_gpus = resource_manager.get_gpu_count_all()
+        system_num_gpus = resource_manager.get_gpu_count()
         if total_resources is None:
             total_resources = {}
         num_cpus = total_resources.get("num_cpus", "auto")

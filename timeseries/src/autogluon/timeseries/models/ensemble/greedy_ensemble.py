@@ -158,9 +158,9 @@ class TimeSeriesGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
         info["model_weights"] = self.model_to_weight
         return info
 
-    def remap_base_models(self, model_full_dict: Dict[str, str]) -> None:
+    def remap_base_models(self, model_refit_map: Dict[str, str]) -> None:
         updated_weights = {}
         for model, weight in self.model_to_weight.items():
-            model_full_name = model_full_dict.get(model, model)
+            model_full_name = model_refit_map.get(model, model)
             updated_weights[model_full_name] = weight
         self.model_to_weight = updated_weights

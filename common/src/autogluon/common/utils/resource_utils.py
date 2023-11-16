@@ -28,7 +28,7 @@ class ResourceManager:
 
     @staticmethod
     @disable_if_lite_mode(ret=0)
-    def get_gpu_count_all():
+    def get_gpu_count() -> int:
         num_gpus = ResourceManager._get_gpu_count_cuda()
         if num_gpus == 0:
             num_gpus = ResourceManager.get_gpu_count_torch()
@@ -163,8 +163,7 @@ class RayResourceManager:
         return int(RayResourceManager._get_cluster_resources("CPU"))
 
     @staticmethod
-    # TODO: find a better naming, "all" sounds unnecessary
-    def get_gpu_count_all() -> int:
+    def get_gpu_count() -> int:
         """Get number of gpus available in the cluster"""
         return int(RayResourceManager._get_cluster_resources("GPU"))
 
