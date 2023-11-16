@@ -325,6 +325,22 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             forecast_for_short_series = None
         return data_long, known_covariates_long, forecast_for_short_series
 
+    def _add_gaussian_quantiles(self, predictions: pd.DataFrame, item_ids: pd.Series):
+        """
+        Add quantile levels assuming that residuals follow normal distribution
+        """
+        from scipy.stats import norm
+
+        scale_per_item = self._get_scale_per_item(item_ids)
+        num_items = int(len(predictions) / self.prediction_length)
+        sqrt_h = np.sqrt(np.arange(1, self.prediction_length + 1))
+        # Series where normal_scale_per_timestep.loc[item_id].loc[N] = sqrt(1 + N) for N in range(prediction_length)
+        normal_scale_per_timestep = pd.Series(np.tile(sqrt_h, num_items), index=item_ids)
+        std_per_timestep = self._avg_residuals_std * scale_per_item * normal_scale_per_timestep
+        for q in self.quantile_levels:
+            predictions[str(q)] = predictions["mean"] + norm.ppf(q) * std_per_timestep.to_numpy()
+        return predictions
+
 
 class DirectTabularModel(AbstractMLForecastModel):
     """Predict all future time series values simultaneously using TabularPredictor from AutoGluon-Tabular.
@@ -429,7 +445,7 @@ class DirectTabularModel(AbstractMLForecastModel):
         df = df.replace(float("inf"), float("nan"))
 
         raw_predictions = self._mlf.models_["mean"].predict(df)
-        predictions = self._postprocess_predictions(raw_predictions)
+        predictions = self._postprocess_predictions(raw_predictions, item_ids=data.item_ids)
         predictions[[MLF_ITEMID, MLF_TIMESTAMP]] = df[[MLF_ITEMID, MLF_TIMESTAMP]].values
 
         if hasattr(self._mlf.ts, "target_transforms"):
@@ -447,15 +463,14 @@ class DirectTabularModel(AbstractMLForecastModel):
             predictions = predictions.reindex(original_item_id_order, level=ITEMID)
         return predictions
 
-    def _postprocess_predictions(self, predictions: np.ndarray) -> pd.DataFrame:
+    def _postprocess_predictions(self, predictions: np.ndarray, item_ids: pd.Series) -> pd.DataFrame:
         if self.is_quantile_model:
             predictions = pd.DataFrame(predictions, columns=[str(q) for q in self.quantile_levels])
             predictions.values.sort(axis=1)
             predictions["mean"] = predictions["0.5"]
         else:
             predictions = pd.DataFrame(predictions, columns=["mean"])
-            for q in self.quantile_levels:
-                predictions[str(q)] = predictions["mean"]  # + norm.ppf(q) * self._residuals_std
+            predictions = self._add_gaussian_quantiles(predictions, item_ids=item_ids)
 
         column_order = ["mean"] + [col for col in predictions.columns if col != "mean"]
         return predictions[column_order]
@@ -527,8 +542,6 @@ class RecursiveTabularModel(AbstractMLForecastModel):
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
-        from scipy.stats import norm
-
         original_item_id_order = data.item_ids
         data, known_covariates, forecast_for_short_series = self._generate_fallback_forecast_for_short_series(
             data=data, known_covariates=known_covariates
@@ -554,18 +567,7 @@ class RecursiveTabularModel(AbstractMLForecastModel):
                 X_df=X_df,
             )
         predictions = raw_predictions.rename(columns={MLF_ITEMID: ITEMID, MLF_TIMESTAMP: TIMESTAMP})
-
-        # Add quantile levels assuming that residuals follow normal distribution
-        scale_per_item = self._get_scale_per_item(predictions[ITEMID].unique())
-        num_items = int(len(predictions) / self.prediction_length)
-        sqrt_h = np.sqrt(np.arange(1, self.prediction_length + 1))
-        # Series where normal_scale_per_timestep.loc[item_id].loc[N] = sqrt(1 + N) for N in range(prediction_length)
-        normal_scale_per_timestep = pd.Series(np.tile(sqrt_h, num_items), index=predictions[ITEMID])
-
-        std_per_timestep = self._avg_residuals_std * scale_per_item * normal_scale_per_timestep
-        for q in self.quantile_levels:
-            predictions[str(q)] = predictions["mean"] + norm.ppf(q) * std_per_timestep.to_numpy()
-        predictions = TimeSeriesDataFrame(predictions)
+        predictions = TimeSeriesDataFrame(self._add_gaussian_quantiles(predictions, item_ids=data.item_ids))
 
         if forecast_for_short_series is not None:
             predictions = pd.concat([predictions, forecast_for_short_series])
