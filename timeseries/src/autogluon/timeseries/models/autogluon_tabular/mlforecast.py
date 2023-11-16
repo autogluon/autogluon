@@ -325,17 +325,17 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             forecast_for_short_series = None
         return data_long, known_covariates_long, forecast_for_short_series
 
-    def _add_gaussian_quantiles(self, predictions: pd.DataFrame, item_ids: pd.Series):
+    def _add_gaussian_quantiles(self, predictions: pd.DataFrame, repeated_item_ids: pd.Series):
         """
         Add quantile levels assuming that residuals follow normal distribution
         """
         from scipy.stats import norm
 
-        scale_per_item = self._get_scale_per_item(item_ids)
+        scale_per_item = self._get_scale_per_item(repeated_item_ids.unique())
         num_items = int(len(predictions) / self.prediction_length)
         sqrt_h = np.sqrt(np.arange(1, self.prediction_length + 1))
         # Series where normal_scale_per_timestep.loc[item_id].loc[N] = sqrt(1 + N) for N in range(prediction_length)
-        normal_scale_per_timestep = pd.Series(np.tile(sqrt_h, num_items), index=item_ids)
+        normal_scale_per_timestep = pd.Series(np.tile(sqrt_h, num_items), index=repeated_item_ids)
         std_per_timestep = self._avg_residuals_std * scale_per_item * normal_scale_per_timestep
         for q in self.quantile_levels:
             predictions[str(q)] = predictions["mean"] + norm.ppf(q) * std_per_timestep.to_numpy()
@@ -445,7 +445,7 @@ class DirectTabularModel(AbstractMLForecastModel):
         df = df.replace(float("inf"), float("nan"))
 
         raw_predictions = self._mlf.models_["mean"].predict(df)
-        predictions = self._postprocess_predictions(raw_predictions, item_ids=data.item_ids)
+        predictions = self._postprocess_predictions(raw_predictions, repeated_item_ids=df[MLF_ITEMID])
         predictions[[MLF_ITEMID, MLF_TIMESTAMP]] = df[[MLF_ITEMID, MLF_TIMESTAMP]].values
 
         if hasattr(self._mlf.ts, "target_transforms"):
@@ -463,14 +463,14 @@ class DirectTabularModel(AbstractMLForecastModel):
             predictions = predictions.reindex(original_item_id_order, level=ITEMID)
         return predictions
 
-    def _postprocess_predictions(self, predictions: np.ndarray, item_ids: pd.Series) -> pd.DataFrame:
+    def _postprocess_predictions(self, predictions: np.ndarray, repeated_item_ids: pd.Series) -> pd.DataFrame:
         if self.is_quantile_model:
             predictions = pd.DataFrame(predictions, columns=[str(q) for q in self.quantile_levels])
             predictions.values.sort(axis=1)
             predictions["mean"] = predictions["0.5"]
         else:
             predictions = pd.DataFrame(predictions, columns=["mean"])
-            predictions = self._add_gaussian_quantiles(predictions, item_ids=item_ids)
+            predictions = self._add_gaussian_quantiles(predictions, repeated_item_ids=repeated_item_ids)
 
         column_order = ["mean"] + [col for col in predictions.columns if col != "mean"]
         return predictions[column_order]
@@ -567,7 +567,9 @@ class RecursiveTabularModel(AbstractMLForecastModel):
                 X_df=X_df,
             )
         predictions = raw_predictions.rename(columns={MLF_ITEMID: ITEMID, MLF_TIMESTAMP: TIMESTAMP})
-        predictions = TimeSeriesDataFrame(self._add_gaussian_quantiles(predictions, item_ids=data.item_ids))
+        predictions = TimeSeriesDataFrame(
+            self._add_gaussian_quantiles(predictions, repeated_item_ids=predictions[ITEMID])
+        )
 
         if forecast_for_short_series is not None:
             predictions = pd.concat([predictions, forecast_for_short_series])
