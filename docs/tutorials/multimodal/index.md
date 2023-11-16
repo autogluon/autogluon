@@ -26,7 +26,7 @@ Here are some example use-cases of AutoMM:
 In the following, we decomposed the functionalities of AutoMM and prepared step-by-step guide for each functionality.
 
 
-## Text Data
+## Text Data -- Classification / Regression / NER
 
 ::::{grid} 2
   :gutter: 3
@@ -113,6 +113,19 @@ In the following, we decomposed the functionalities of AutoMM and prepared step-
 ::::
 
 
+## Image Data -- Segmentation
+
+::::{grid} 2
+  :gutter: 3
+
+:::{grid-item-card} AutoMM for Semantic Segmentation - Quick Start
+  :link: beginner_semantic_seg.html
+
+  How to train semantic segmentation models with AutoMM.
+:::
+::::
+
+
 ## Document Data -- Classification / Regression
 
 ::::{grid} 2
@@ -169,7 +182,7 @@ In the following, we decomposed the functionalities of AutoMM and prepared step-
 
 ::::
 
-## Multimodal Data
+## Multimodal Data -- Classification / Regression
 
 ::::{grid} 2
   :gutter: 3
