@@ -6,25 +6,25 @@
 :::{grid-item-card} AutoMM for Text Prediction - Quick Start
   :link: beginner_text.html
 
-  How to train high-quality text prediction models with MultiModalPredictor.
+  How to train high-quality text prediction models with AutoMM.
 :::
 
 :::{grid-item-card} AutoMM for Text Prediction - Multilingual Problems
   :link: multilingual_text.html
 
-  How to use MultiModalPredictor to build models on datasets with languages other than English.
+  How to use AutoMM to build models on datasets with languages other than English.
 :::
 
 :::{grid-item-card} AutoMM for Named Entity Recognition - Quick Start
   :link: ner.html
 
-  How to use MultiModalPredictor for entity extraction.
+  How to use AutoMM for entity extraction.
 :::
 
 :::{grid-item-card} AutoMM for Named Entity Recognition in Chinese - Quick Start
   :link: chinese_ner.html
 
-  How to use MultiModalPredictor for entity extraction in Chinese text.
+  How to use AutoMM for entity extraction in Chinese text.
 :::
 ::::
 
