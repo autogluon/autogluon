@@ -7,6 +7,7 @@ import pytest
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.models.autogluon_tabular.mlforecast import DirectTabularModel, RecursiveTabularModel
 from autogluon.timeseries.utils.features import TimeSeriesFeatureGenerator
+from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 
 from ..common import (
     DATAFRAME_WITH_COVARIATES,
@@ -126,3 +127,54 @@ def test_given_long_time_series_passed_to_model_then_preprocess_receives_shorten
             pass
         received_mlforecast_df = mock_preprocess.call_args[0][0]
         assert len(received_mlforecast_df) == max_num_samples + prediction_length + sum(differences)
+
+
+@pytest.mark.parametrize("model_type", TESTABLE_MODELS)
+@pytest.mark.parametrize("differences", [[5], [15]])
+def test_given_some_time_series_are_too_short_then_forecast_doesnt_contain_nans_and_index_correct(
+    temp_model_path, model_type, differences
+):
+    data = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME
+    prediction_length = 5
+    model = model_type(
+        path=temp_model_path,
+        freq=data.freq,
+        hyperparameters={"differences": differences},
+        prediction_length=prediction_length,
+    )
+    model.fit(train_data=data)
+
+    df_with_short = get_data_frame_with_variable_lengths(
+        {"A": sum(differences), "B": sum(differences) + 5}, freq=model.freq
+    )
+    expected_forecast_index = get_forecast_horizon_index_ts_dataframe(df_with_short, prediction_length)
+
+    predictions = model.predict(df_with_short)
+    assert not predictions.isna().any()
+    assert (predictions.index == expected_forecast_index).all()
+
+
+@pytest.mark.parametrize("model_type", TESTABLE_MODELS)
+@pytest.mark.parametrize("differences", [[5], [15]])
+def test_given_some_time_series_are_too_short_then_seasonal_naive_forecast_is_used(
+    temp_model_path, model_type, differences
+):
+    data = get_data_frame_with_variable_lengths({"A": 50, "B": 60})
+    prediction_length = 5
+    model = model_type(
+        path=temp_model_path,
+        freq=data.freq,
+        hyperparameters={"differences": differences},
+        prediction_length=prediction_length,
+    )
+    model.fit(train_data=data)
+
+    df_with_short = get_data_frame_with_variable_lengths(
+        {"A": sum(differences), "B": sum(differences) + 5}, freq=model.freq
+    )
+    with mock.patch("autogluon.timeseries.models.local.naive.SeasonalNaiveModel.predict") as snaive_predict:
+        try:
+            model.predict(df_with_short)
+        except TypeError:
+            pass
+        assert snaive_predict.call_args[0][0].equals(df_with_short.loc[["A"]])

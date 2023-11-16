@@ -9,9 +9,11 @@ import pandas as pd
 from sklearn.base import BaseEstimator
 
 import autogluon.core as ag
+from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.tabular import TabularPredictor
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
+from autogluon.timeseries.models.local import SeasonalNaiveModel
 from autogluon.timeseries.utils.datetime import (
     get_lags_for_frequency,
     get_seasonality,
@@ -170,7 +172,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         # Exclude items that are too short for chosen differences - otherwise exception will be raised
         if self._sum_of_differences > 0:
             ts_lengths = data.num_timesteps_per_item()
-            items_to_exclude = ts_lengths.index[ts_lengths < self._sum_of_differences]
+            items_to_exclude = ts_lengths.index[ts_lengths <= self._sum_of_differences]
             if len(items_to_exclude) > 0:
                 logger.debug(f"Removing {len(items_to_exclude)} items that are too short for chosen differences")
                 data = data.query("item_id not in @items_to_exclude")
@@ -246,6 +248,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         from mlforecast import MLForecast
 
         self._check_fit_params()
+        set_logger_verbosity(verbosity, logger=logger)
         fit_start_time = time.time()
         # TabularEstimator is passed to MLForecast later to include tuning_data
         model_params = self._get_model_params()
@@ -291,6 +294,36 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             return self._scaler.stats_["_scale"].copy().reindex(item_ids)
         else:
             return pd.Series(1.0, index=item_ids)
+
+    def _generate_fallback_forecast_for_short_series(
+        self,
+        data: TimeSeriesDataFrame,
+        known_covariates: Optional[TimeSeriesDataFrame] = None,
+    ):
+        """Generate naive forecast for time series that are too short for chosen differencing."""
+        ts_lengths = data.num_timesteps_per_item()
+        short_series = ts_lengths.index[ts_lengths <= self._sum_of_differences]
+        if len(short_series) > 0:
+            logger.warning(
+                f"Warning: {len(short_series)} time series ({len(short_series) / len(ts_lengths):.1%}) are shorter "
+                f"than {self._sum_of_differences} and cannot be predicted by {self.name}. "
+                "Fallback model SeasonalNaive is used for these time series."
+            )
+            data_short = data.query("item_id in @short_series")
+            seasonal_naive = SeasonalNaiveModel(freq=self.freq, prediction_length=self.prediction_length)
+            seasonal_naive.fit(train_data=data_short)
+            forecast_for_short_series = seasonal_naive.predict(data_short)
+
+            data_long = data.query("item_id not in @short_series")
+            if known_covariates is not None:
+                known_covariates_long = known_covariates.query("item_id not in @short_series")
+            else:
+                known_covariates_long = None
+        else:
+            data_long = data
+            known_covariates_long = known_covariates
+            forecast_for_short_series = None
+        return data_long, known_covariates_long, forecast_for_short_series
 
 
 class DirectTabularModel(AbstractMLForecastModel):
@@ -371,6 +404,14 @@ class DirectTabularModel(AbstractMLForecastModel):
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
+        original_item_id_order = data.item_ids
+        data, known_covariates, forecast_for_short_series = self._generate_fallback_forecast_for_short_series(
+            data=data, known_covariates=known_covariates
+        )
+        if len(data) == 0:
+            # All time series are too short for chosen differences
+            return forecast_for_short_series
+
         if known_covariates is not None:
             data_future = known_covariates.copy()
         else:
@@ -399,10 +440,12 @@ class DirectTabularModel(AbstractMLForecastModel):
             self._mlf.preprocess(mlforecast_df_past, static_features=[])
             for tfm in self._mlf.ts.target_transforms[::-1]:
                 predictions = tfm.inverse_transform(predictions)
-        predictions = predictions.rename(columns={MLF_ITEMID: ITEMID, MLF_TIMESTAMP: TIMESTAMP}).set_index(
-            [ITEMID, TIMESTAMP]
-        )
-        return TimeSeriesDataFrame(predictions)
+        predictions = TimeSeriesDataFrame(predictions.rename(columns={MLF_ITEMID: ITEMID, MLF_TIMESTAMP: TIMESTAMP}))
+
+        if forecast_for_short_series is not None:
+            predictions = pd.concat([predictions, forecast_for_short_series])
+            predictions = predictions.reindex(original_item_id_order, level=ITEMID)
+        return predictions
 
     def _postprocess_predictions(self, predictions: np.ndarray) -> pd.DataFrame:
         if self.is_quantile_model:
@@ -486,6 +529,14 @@ class RecursiveTabularModel(AbstractMLForecastModel):
     ) -> TimeSeriesDataFrame:
         from scipy.stats import norm
 
+        original_item_id_order = data.item_ids
+        data, known_covariates, forecast_for_short_series = self._generate_fallback_forecast_for_short_series(
+            data=data, known_covariates=known_covariates
+        )
+        if len(data) == 0:
+            # All time series are too short for chosen differences
+            return forecast_for_short_series
+
         new_df = self._to_mlforecast_df(data, data.static_features)
         if self._max_ts_length is not None:
             new_df = self._shorten_all_series(new_df, self._max_ts_length)
@@ -514,7 +565,11 @@ class RecursiveTabularModel(AbstractMLForecastModel):
         std_per_timestep = self._avg_residuals_std * scale_per_item * normal_scale_per_timestep
         for q in self.quantile_levels:
             predictions[str(q)] = predictions["mean"] + norm.ppf(q) * std_per_timestep.to_numpy()
-        return TimeSeriesDataFrame(predictions).reindex(data.item_ids, level=ITEMID)
+        predictions = TimeSeriesDataFrame(predictions)
+
+        if forecast_for_short_series is not None:
+            predictions = pd.concat([predictions, forecast_for_short_series])
+        return predictions.reindex(original_item_id_order, level=ITEMID)
 
     def _get_extra_tabular_init_kwargs(self) -> dict:
         return {

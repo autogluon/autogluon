@@ -225,6 +225,8 @@ class AutoETSModel(AbstractStatsForecastModel):
         When set to None, seasonal_period will be inferred from the frequency of the training data. Can also be
         specified manually by providing an integer > 1.
         If seasonal_period (inferred or provided) is equal to 1, seasonality will be disabled.
+    damped : bool, default = True
+        Whether to dampen the trend.
     n_jobs : int or float, default = 0.5
         Number of CPU cores used to fit the models in parallel.
         When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
@@ -236,6 +238,7 @@ class AutoETSModel(AbstractStatsForecastModel):
     """
 
     allowed_local_model_args = [
+        "damped",
         "model",
         "seasonal_period",
     ]
@@ -283,6 +286,8 @@ class ETSModel(AutoETSModel):
         When set to None, seasonal_period will be inferred from the frequency of the training data. Can also be
         specified manually by providing an integer > 1.
         If seasonal_period (inferred or provided) is equal to 1, seasonality will be disabled.
+    damped : bool, default = False
+        Whether to dampen the trend.
     n_jobs : int or float, default = 0.5
         Number of CPU cores used to fit the models in parallel.
         When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
