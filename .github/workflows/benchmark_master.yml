@@ -1,10 +1,10 @@
 # Workflow to trigger/schedule benchmarking, cleaning, aggregating on master branch only and storing results in S3
 name: Benchmark Master Branch
 on:
-  push:
-    branches: ["master"]  # Uncomment post v1.0
-  # schedule:
-  #   - cron: '00 09 * * SUN' #  UTC 9:00(2:00 PST Time) every Sunday
+  # push:
+  #   branches: ["master"]  # Uncomment post v1.0
+  schedule:
+    - cron: '00 09 * * SUN' #  UTC 9:00(2:00 PST Time) every Sunday
 
 env:
   AG_BRANCH_NAME: master
