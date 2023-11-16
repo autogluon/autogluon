@@ -2014,7 +2014,7 @@ class TabularPredictor:
         self._assert_is_fit("can_predict_proba")
         return problem_type_info.can_predict_proba(problem_type=self.problem_type)
 
-    def evaluate(self, data, model=None, decision_threshold=None, silent=False, auxiliary_metrics=True, detailed_report=False) -> dict:
+    def evaluate(self, data, model=None, decision_threshold=None, display: bool = False, auxiliary_metrics=True, detailed_report=False, **kwargs) -> dict:
         """
         Report the predictive performance evaluated over a given dataset.
         This is basically a shortcut for: `pred_proba = predict_proba(data); evaluate_predictions(data[label], pred_proba)`.
@@ -2033,8 +2033,8 @@ class TabularPredictor:
             This will impact the scores of metrics such as `f1` and `accuracy`.
             If None, defaults to `predictor.decision_threshold`. Ignored unless `problem_type='binary'`.
             Refer to the `predictor.decision_threshold` docstring for more information.
-        silent : bool, default = False
-            If False, performance results are printed.
+        display : bool, default = False
+            If True, performance results are printed.
         auxiliary_metrics: bool, default = True
             Should we compute other (`problem_type` specific) metrics in addition to the default metric?
         detailed_report : bool, default = False
@@ -2046,6 +2046,13 @@ class TabularPredictor:
         NOTE: Metrics scores always show in higher is better form.
         This means that metrics such as log_loss and root_mean_squared_error will have their signs FLIPPED, and values will be negative.
         """
+        if "silent" in kwargs:
+            # keep `silent` logic for backwards compatibility
+            assert isinstance(kwargs["silent"], bool)
+            display = not kwargs.pop("silent")
+        if len(kwargs) > 0:
+            for key in kwargs:
+                raise TypeError(f"TabularPredictor.evaluate() got an unexpected keyword argument '{key}'")
         self._assert_is_fit("evaluate")
         data = self._get_dataset(data)
         if decision_threshold is None:
@@ -2063,13 +2070,13 @@ class TabularPredictor:
             y_pred=y_pred,
             sample_weight=sample_weight,
             decision_threshold=decision_threshold,
-            silent=silent,
+            display=display,
             auxiliary_metrics=auxiliary_metrics,
             detailed_report=detailed_report,
         )
 
     def evaluate_predictions(
-        self, y_true, y_pred, sample_weight=None, decision_threshold=None, silent=False, auxiliary_metrics=True, detailed_report=False
+        self, y_true, y_pred, sample_weight=None, decision_threshold=None, display: bool = False, auxiliary_metrics=True, detailed_report=False, **kwargs
     ) -> dict:
         """
         Evaluate the provided prediction probabilities against ground truth labels.
@@ -2090,8 +2097,8 @@ class TabularPredictor:
             This will impact the scores of metrics such as `f1` and `accuracy`.
             If None, defaults to `predictor.decision_threshold`. Ignored unless `problem_type='binary'`.
             Refer to the `predictor.decision_threshold` docstring for more information.
-        silent : bool, default = False
-            If False, performance results are printed.
+        display : bool, default = False
+            If True, performance results are printed.
         auxiliary_metrics: bool, default = True
             Should we compute other (`problem_type` specific) metrics in addition to the default metric?
         detailed_report : bool, default = False
@@ -2103,6 +2110,13 @@ class TabularPredictor:
         NOTE: Metrics scores always show in higher is better form.
         This means that metrics such as log_loss and root_mean_squared_error will have their signs FLIPPED, and values will be negative.
         """
+        if "silent" in kwargs:
+            # keep `silent` logic for backwards compatibility
+            assert isinstance(kwargs["silent"], bool)
+            display = not kwargs.pop("silent")
+        if len(kwargs) > 0:
+            for key in kwargs:
+                raise TypeError(f"TabularPredictor.evaluate_predictions() got an unexpected keyword argument '{key}'")
         if decision_threshold is None:
             decision_threshold = self.decision_threshold
         return self._learner.evaluate_predictions(
@@ -2110,7 +2124,7 @@ class TabularPredictor:
             y_pred=y_pred,
             sample_weight=sample_weight,
             decision_threshold=decision_threshold,
-            silent=silent,
+            display=display,
             auxiliary_metrics=auxiliary_metrics,
             detailed_report=detailed_report,
         )
@@ -2124,7 +2138,7 @@ class TabularPredictor:
         score_format: str = "score",
         only_pareto_frontier: bool = False,
         skip_score: bool = False,
-        verbose: bool = False,
+        display: bool = False,
         **kwargs,
     ) -> pd.DataFrame:
         """
@@ -2258,7 +2272,7 @@ class TabularPredictor:
             [Advanced, primarily for developers]
             If `True`, will skip computing `score_test` if `data` is specified. `score_test` will be set to NaN for all models.
             `pred_time_test` and related columns will still be computed.
-        verbose : bool, default = False
+        display : bool, default = False
             If True, the output DataFrame is printed to stdout.
 
         Returns
@@ -2268,7 +2282,7 @@ class TabularPredictor:
         if "silent" in kwargs:
             # keep `silent` logic for backwards compatibility
             assert isinstance(kwargs["silent"], bool)
-            verbose = not kwargs.pop("silent")
+            display = not kwargs.pop("silent")
         if len(kwargs) > 0:
             for key in kwargs:
                 raise TypeError(f"TabularPredictor.leaderboard() got an unexpected keyword argument '{key}'")
@@ -2284,7 +2298,7 @@ class TabularPredictor:
             only_pareto_frontier=only_pareto_frontier,
             score_format=score_format,
             skip_score=skip_score,
-            verbose=verbose,
+            display=display,
         )
 
     def model_failures(self, verbose: bool = False) -> pd.DataFrame:
@@ -2535,7 +2549,7 @@ class TabularPredictor:
         if verbosity > 0:  # print stuff
             print("*** Summary of fit() ***")
             print("Estimated performance of each model:")
-            results["leaderboard"] = self._learner.leaderboard(verbose=True)
+            results["leaderboard"] = self._learner.leaderboard(display=True)
             # self._summarize('model_performance', 'Validation performance of individual models', results)
             #  self._summarize('model_best', 'Best model (based on validation performance)', results)
             # self._summarize('hyperparameter_tune', 'Hyperparameter-tuning used', results)

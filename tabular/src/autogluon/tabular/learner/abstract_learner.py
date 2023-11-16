@@ -486,9 +486,9 @@ class AbstractTabularLearner(AbstractLearner):
 
     # Scores both learner and all individual models, along with computing the optimal ensemble score + weights (oracle)
     def score_debug(
-        self, X: DataFrame, y=None, extra_info=False, compute_oracle=False, extra_metrics=None, decision_threshold=None, skip_score=False, verbose=False
+        self, X: DataFrame, y=None, extra_info=False, compute_oracle=False, extra_metrics=None, decision_threshold=None, skip_score=False, display=False
     ):
-        leaderboard_df = self.leaderboard(extra_info=extra_info, verbose=verbose)
+        leaderboard_df = self.leaderboard(extra_info=extra_info, display=display)
         if extra_metrics is None:
             extra_metrics = []
         if y is None:
@@ -675,10 +675,10 @@ class AbstractTabularLearner(AbstractLearner):
                     f"Multiclass scoring with eval_metric='{self.eval_metric.name}' does not support unknown classes. Unknown classes: {unknown_classes}"
                 )
 
-    def evaluate_predictions(self, y_true, y_pred, sample_weight=None, decision_threshold=None, silent=False, auxiliary_metrics=True, detailed_report=False):
+    def evaluate_predictions(self, y_true, y_pred, sample_weight=None, decision_threshold=None, display=False, auxiliary_metrics=True, detailed_report=False):
         """Evaluate predictions. Does not support sample weights since this method reports a variety of metrics.
         Args:
-            silent (bool): Should we print which metric is being used as well as performance.
+            display (bool): Should we print which metric is being used as well as performance.
             auxiliary_metrics (bool): Should we compute other (problem_type specific) metrics in addition to the default metric?
             detailed_report (bool): Should we computed more-detailed versions of the auxiliary_metrics? (requires auxiliary_metrics=True).
 
@@ -778,7 +778,7 @@ class AbstractTabularLearner(AbstractLearner):
                     score = self._score_with_pred(y_pred_internal=y_pred_internal, metric=aux_metric, **scoring_args)
                 performance_dict[aux_metric.name] = score
 
-        if not silent:
+        if display:
             if self.eval_metric.name in performance_dict:
                 score_eval = performance_dict[self.eval_metric.name]
                 logger.log(20, f"Evaluation: {self.eval_metric.name} on test data: {score_eval}")
@@ -803,7 +803,7 @@ class AbstractTabularLearner(AbstractLearner):
                     performance_dict[metric_name] = cl_metric(y_true, y_pred)
                 except ValueError:
                     pass
-                if not silent and metric_name in performance_dict:
+                if display and metric_name in performance_dict:
                     logger.log(20, "Detailed (per-class) classification report:")
                     logger.log(20, json.dumps(performance_dict[metric_name], indent=4))
         return performance_dict
@@ -828,12 +828,12 @@ class AbstractTabularLearner(AbstractLearner):
         only_pareto_frontier=False,
         skip_score=False,
         score_format: str = "score",
-        verbose=False,
+        display=False,
     ) -> pd.DataFrame:
         assert score_format in ["score", "error"]
         if X is not None:
             leaderboard = self.score_debug(
-                X=X, y=y, extra_info=extra_info, extra_metrics=extra_metrics, decision_threshold=decision_threshold, skip_score=skip_score, verbose=False
+                X=X, y=y, extra_info=extra_info, extra_metrics=extra_metrics, decision_threshold=decision_threshold, skip_score=skip_score, display=False
             )
         else:
             if extra_metrics:
@@ -859,7 +859,7 @@ class AbstractTabularLearner(AbstractLearner):
             if "metric_error_test" in leaderboard:
                 leaderboard["metric_error_test"] = leaderboard["metric_error_test"].apply(self.eval_metric.convert_score_to_error)
             leaderboard["metric_error_val"] = leaderboard["metric_error_val"].apply(self.eval_metric.convert_score_to_error)
-        if verbose:
+        if display:
             with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):
                 print(leaderboard)
         return leaderboard
