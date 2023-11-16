@@ -2,8 +2,8 @@ import platform
 import sys
 from typing import Tuple
 
-from .resource_utils import ResourceManager, get_resource_manager
 from .. import __version__
+from .resource_utils import ResourceManager, get_resource_manager
 
 
 def get_ag_system_info_disk_space(path: str) -> Tuple[str, int]:

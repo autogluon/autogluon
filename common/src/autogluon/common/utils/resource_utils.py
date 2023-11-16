@@ -163,6 +163,7 @@ class ResourceManager:
     @disable_if_lite_mode(ret=1073741824)  # set to 1GB as an empirical value in lite/web-browser mode.
     def _get_memory_size() -> float:
         import psutil
+
         return psutil.virtual_memory().total
 
     @staticmethod
@@ -174,6 +175,7 @@ class ResourceManager:
     @disable_if_lite_mode(ret=1073741824)  # set to 1GB as an empirical value in lite/web-browser mode.
     def _get_available_virtual_mem() -> float:
         import psutil
+
         return psutil.virtual_memory().available
 
 
