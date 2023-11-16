@@ -1,7 +1,7 @@
 import pandas as pd
 
 
-def get_model_true_infer_speed_per_row_batch(data, *, predictor, batch_size: int = 100000, repeats=1, persist_models=True, silent=False):
+def get_model_true_infer_speed_per_row_batch(data, *, predictor, batch_size: int = 100000, repeats=1, persist=True, silent=False):
     """
     Get per-model true inference speed per row for a given batch size of data.
 
@@ -17,7 +17,7 @@ def get_model_true_infer_speed_per_row_batch(data, *, predictor, batch_size: int
         If simulating large-scale batch inference, values of 100000+ are recommended to get genuine throughput estimates.
     repeats : int, default = 1
         Repeats of calling leaderboard. Repeat times are averaged to get more stable inference speed estimates.
-    persist_models : bool, default = True
+    persist : bool, default = True
         If True, attempts to persist models into memory for more genuine throughput calculation.
     silent : False
         If False, logs information regarding the speed of each model + feature preprocessing.
@@ -54,8 +54,8 @@ def get_model_true_infer_speed_per_row_batch(data, *, predictor, batch_size: int
     if len_data != batch_size:
         raise AssertionError(f"len(data_batch) must equal batch_size! ({len_data} != {batch_size})")
 
-    if persist_models:
-        predictor.persist_models(models="all")
+    if persist:
+        predictor.persist(models="all")
 
     ts = time.time()
     for i in range(repeats):
@@ -64,7 +64,7 @@ def get_model_true_infer_speed_per_row_batch(data, *, predictor, batch_size: int
 
     leaderboards = []
     for i in range(repeats):
-        leaderboard = predictor.leaderboard(data_batch, skip_score=True, silent=True)
+        leaderboard = predictor.leaderboard(data_batch, skip_score=True)
         leaderboard = leaderboard[leaderboard["can_infer"]][["model", "pred_time_test", "pred_time_test_marginal"]]
         leaderboard = leaderboard.set_index("model")
         leaderboards.append(leaderboard)
@@ -101,7 +101,7 @@ def get_model_true_infer_speed_per_row_batch(data, *, predictor, batch_size: int
 
 
 def get_model_true_infer_speed_per_row_batch_bulk(
-    data: pd.DataFrame, *, predictor, batch_sizes: list = None, repeats=1, persist_models=True, include_transform_features=False, silent=False
+    data: pd.DataFrame, *, predictor, batch_sizes: list = None, repeats=1, persist=True, include_transform_features=False, silent=False
 ) -> (pd.DataFrame, pd.DataFrame):
     """
     Get per-model true inference speed per row for a list of batch sizes of data.
@@ -118,7 +118,7 @@ def get_model_true_infer_speed_per_row_batch_bulk(
         If simulating large-scale batch inference, values of 100000+ are recommended to get genuine throughput estimates.
     repeats : int, default = 1
         Repeats of calling leaderboard. Repeat times are averaged to get more stable inference speed estimates.
-    persist_models : bool, default = True
+    persist : bool, default = True
         If True, attempts to persist models into memory for more genuine throughput calculation.
     include_transform_features : bool, default = False
         If True, adds transform_features (data preprocessing) speeds into the first DataFrame output as if it was a model with the name "transform_features".
@@ -149,12 +149,12 @@ def get_model_true_infer_speed_per_row_batch_bulk(
     infer_dfs = dict()
     infer_transform_dfs = dict()
 
-    if persist_models:
-        predictor.persist_models(models="all")
+    if persist:
+        predictor.persist(models="all")
 
     for batch_size in batch_sizes:
         infer_df, time_per_row_transform = get_model_true_infer_speed_per_row_batch(
-            data=data, predictor=predictor, batch_size=batch_size, repeats=repeats, persist_models=False, silent=silent
+            data=data, predictor=predictor, batch_size=batch_size, repeats=repeats, persist=False, silent=silent
         )
         infer_dfs[batch_size] = infer_df
         infer_transform_dfs[batch_size] = time_per_row_transform

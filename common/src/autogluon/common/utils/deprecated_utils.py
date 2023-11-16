@@ -17,15 +17,15 @@ def _deprecation_warning(
 ):
     msg = custom_warning_msg
     if msg is None:
-        msg = f"`{old}` has been deprecated. "
-        msg += f"And will be removed in version {version_to_remove} " if version_to_remove is not None else ""
+        msg = f"`{old}` has been deprecated"
+        msg += f" and will be removed in version {version_to_remove}. " if version_to_remove is not None else ". "
         msg += f"Please use `{new}` instead" if new is not None else ""
 
     if error:
         raise ValueError(msg)
     else:
         warnings.warn(
-            f"Deprecation Warning: {msg}. This will raise an error in the future!",
+            f"{msg}. This will raise an error in the future!",
             category=DeprecationWarning,
             stacklevel=3,
         )

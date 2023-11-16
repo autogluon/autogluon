@@ -568,10 +568,10 @@ def test_when_refit_full_called_then_best_model_is_updated(temp_model_path, set_
         },
     )
     model_best_before = predictor.get_model_best()
-    model_full_dict = predictor.refit_full(set_best_to_refit_full=set_best_to_refit_full)
+    model_refit_map = predictor.refit_full(set_best_to_refit_full=set_best_to_refit_full)
     model_best_after = predictor.get_model_best()
     if set_best_to_refit_full:
-        assert model_best_after == model_full_dict[model_best_before]
+        assert model_best_after == model_refit_map[model_best_before]
     else:
         assert model_best_after == model_best_before
 

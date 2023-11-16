@@ -19,14 +19,14 @@ Here are some example use-cases of AutoMM:
 - Image classification: [Tutorial](image_prediction/beginner_image_cls)
 - Object detection: [Tutorial](object_detection/quick_start/quick_start_coco), [Example](https://github.com/autogluon/autogluon/tree/master/examples/automm/object_detection)
 - Extracting named entities: [Tutorial](text_prediction/ner)
-- Search for relevant text / image via text queries: [Tutorial](matching/index)
-- Document Classification (Experimental): [Tutorial](document/index)
+- Search for relevant text / image via text queries: [Tutorial](semantic_matching/index)
+- Document Classification (Experimental): [Tutorial](document_prediction/index)
 
 
 In the following, we decomposed the functionalities of AutoMM and prepared step-by-step guide for each functionality.
 
 
-## Text Data
+## Text Data -- Classification / Regression / NER
 
 ::::{grid} 2
   :gutter: 3
@@ -113,6 +113,7 @@ In the following, we decomposed the functionalities of AutoMM and prepared step-
 ::::
 
 
+<<<<<<< HEAD
 ## Image Data -- Segmentation
 
 ::::{grid} 2
@@ -126,63 +127,63 @@ In the following, we decomposed the functionalities of AutoMM and prepared step-
 ::::
 
 
-## Document Data
+## Document Data -- Classification / Regression
 
 ::::{grid} 2
   :gutter: 3
 
 :::{grid-item-card} AutoMM for Scanned Document Classification
-  :link: document/document_classification.html
+  :link: document_prediction/document_classification.html
 
-  How to use MultiModalPredictor to build a scanned document classifier.
+  How to use AutoMM to build a scanned document classifier.
 :::
 
 :::{grid-item-card} Classifying PDF Documents with AutoMM
-  :link: document/pdf_classification.html
+  :link: document_prediction/pdf_classification.html
 
-  How to use MultiModalPredictor to build a PDF document classifier.
+  How to use AutoMM to build a PDF document classifier.
 :::
 ::::
 
 
-## Matching
+## Semantic Matching
 
 ::::{grid} 2
   :gutter: 3
 
-:::{grid-item-card} Text-to-text Matching with AutoMM - Quick Start
-  :link: matching/text2text_matching.html
+:::{grid-item-card} Text-to-text Semantic Matching with AutoMM - Quick Start
+  :link: semantic_matching/text2text_matching.html
 
-  How to use AutoMM for text to text matching.
+  How to use AutoMM for text-to-text semantic matching.
 :::
 
-:::{grid-item-card} Image-to-Image Matching with AutoMM - Quick Start
-  :link: matching/image2image_matching.html
+:::{grid-item-card} Image-to-Image Semantic Matching with AutoMM - Quick Start
+  :link: semantic_matching/image2image_matching.html
 
-  How to use AutoMM for image to image matching.
+  How to use AutoMM for image-to-image semantic matching.
 :::
 
-:::{grid-item-card} Image-to-Text Matching with AutoMM - Quick Start
-  :link: matching/image_text_matching.html
+:::{grid-item-card} Image-Text Semantic Matching with AutoMM - Quick Start
+  :link: semantic_matching/image_text_matching.html
 
-  How to use AutoMM for image to text matching.
+  How to use AutoMM for image-text semantic matching.
 :::
 
-:::{grid-item-card} Zero Shot Image-to-Text Matching with AutoMM
-  :link: matching/zero_shot_img_txt_matching.html
+:::{grid-item-card} Zero Shot Image-Text Semantic Matching with AutoMM
+  :link: semantic_matching/zero_shot_img_txt_matching.html
 
-  How to use AutoMM for zero shot image to text matching.
+  How to use AutoMM for zero shot image-text semantic matching.
 :::
 
 :::{grid-item-card} Text Semantic Search with AutoMM
-  :link: matching/text_semantic_search.html
+  :link: semantic_matching/text_semantic_search.html
 
   How to use semantic embeddings to improve search ranking performance.
 :::
 
 ::::
 
-## Multimodal Data
+## Multimodal Data -- Classification / Regression
 
 ::::{grid} 2
   :gutter: 3
@@ -312,22 +313,22 @@ text_prediction/index
 
 ```{toctree}
 ---
-caption: Document
+caption: Document Prediction
 maxdepth: 1
 hidden: true
 ---
 
-document/index
+document_prediction/index
 ```
 
 ```{toctree}
 ---
-caption: Matching
+caption: Semantic Matching
 maxdepth: 1
 hidden: true
 ---
 
-matching/index
+semantic_matching/index
 ```
 
 ```{toctree}

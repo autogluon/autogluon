@@ -14,31 +14,47 @@ source $(dirname "$0")/env_setup.sh
 setup_benchmark_env
 
 /bin/bash CI/bench/generate_bench_config.sh $MODULE $PRESET $BENCHMARK $TIME_LIMIT $BRANCH_OR_PR_NUMBER
-agbench run $MODULE"_cloud_configs.yaml" --dev-branch https://github.com/autogluon/autogluon-bench.git#master --wait
+agbench run $MODULE"_cloud_configs.yaml" --wait
 
 # If it is a PR, fetch the cleaned file of master-evaluation
-if [ $BRANCH_OR_PR_NUMBER != "master" ]
-then
+if [ $BRANCH_OR_PR_NUMBER != "master" ]; then
     # Capture the name of the file, rename it and store it in ./results
-    master_cleaned_file=$(aws s3 ls s3://autogluon-ci-benchmark/cleaned/$MODULE/master/latest/ | awk '{print $NF}')
-    new_master_cleaned_file="master_${master_cleaned_file}"
-    aws s3 cp --recursive s3://autogluon-ci-benchmark/cleaned/$MODULE/master/latest/ ./results
-    mv "./results/$master_cleaned_file" "./results/$new_master_cleaned_file"
+    if [ $MODULE != "multimodal" ]; then
+        master_cleaned_file=$(aws s3 ls s3://autogluon-ci-benchmark/cleaned/$MODULE/master/latest/ | awk '{print $NF}')
+        new_master_cleaned_file="master_${master_cleaned_file}"
+        aws s3 cp --recursive s3://autogluon-ci-benchmark/cleaned/$MODULE/master/latest/ ./results
+        mv "./results/$master_cleaned_file" "./results/$new_master_cleaned_file"
+    else
+        master_cleaned_file=$(aws s3 ls s3://autogluon-ci-benchmark/cleaned/$MODULE/$BENCHMARK/master/latest/ | awk '{print $NF}')
+        new_master_cleaned_file="master_${master_cleaned_file}"
+        aws s3 cp --recursive s3://autogluon-ci-benchmark/cleaned/$MODULE/$BENCHMARK/master/latest/ ./results
+        mv "./results/$master_cleaned_file" "./results/$new_master_cleaned_file"
+    fi
 fi
 
 python CI/bench/evaluate.py --config_path ./ag_bench_runs/$MODULE/ --module_name $MODULE --time_limit $TIME_LIMIT --branch_name $BRANCH_OR_PR_NUMBER
 
 for file in ./results/*; do
-    # Check if the file does not start with "master"
-    if [[ "$(basename "$file")" != "master"* ]]
-    then
-        aws s3 cp "$file" "s3://autogluon-ci-benchmark/cleaned/$MODULE/$BRANCH_OR_PR_NUMBER/$SHA/$(basename "$file")"
-        aws s3 rm --recursive s3://autogluon-ci-benchmark/cleaned/$MODULE/$BRANCH_OR_PR_NUMBER/latest/
-        aws s3 cp "$file" s3://autogluon-ci-benchmark/cleaned/$MODULE/$BRANCH_OR_PR_NUMBER/latest/$(basename "$file")
-    else
-        aws s3 cp "$file" "s3://autogluon-ci-benchmark/cleaned/$MODULE/master/$SHA/$(basename "$file")"
-        aws s3 rm --recursive s3://autogluon-ci-benchmark/cleaned/$MODULE/master/latest/
-        aws s3 cp "$file" s3://autogluon-ci-benchmark/cleaned/$MODULE/master/latest/$(basename "$file")
+    CLEANED_PATH="s3://autogluon-ci-benchmark/cleaned/$MODULE"
+    EVALUATION_PATH="s3://autogluon-ci-benchmark/evaluation/$MODULE"
+    BRANCH_NAME="master"
+    if [[ "$(basename "$file")" != "master"* ]]; then
+        BRANCH_NAME="$BRANCH_OR_PR_NUMBER"
+    fi
+
+    if [ $MODULE == "multimodal" ]; then
+        CLEANED_PATH="$CLEANED_PATH/$BENCHMARK"
+        EVALUATION_PATH="$EVALUATION_PATH/$BENCHMARK"
+    fi
+
+    aws s3 cp "$file" "$CLEANED_PATH/$BRANCH_NAME/$SHA/$(basename "$file")"
+    aws s3 rm --recursive "$CLEANED_PATH/$BRANCH_NAME/latest/"
+    aws s3 cp "$file" "$CLEANED_PATH/$BRANCH_NAME/latest/$(basename "$file")"
+
+    if [[ "$(basename "$file")" != "master"* ]]; then
+        aws s3 cp --recursive ./evaluate "$EVALUATION_PATH/$BRANCH_NAME/$SHA/"
+        aws s3 rm --recursive "$EVALUATION_PATH/$BRANCH_NAME/latest/"
+        aws s3 cp --recursive ./evaluate "$EVALUATION_PATH/$BRANCH_NAME/latest/"
     fi
 done
 

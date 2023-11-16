@@ -41,7 +41,7 @@ def test_rf_binary_compile_onnx(fit_helper):
     )
     dataset_name = "adult"
     compiler_configs = {RFModel: {"compiler": "onnx"}}
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, compile_models=True, compiler_configs=compiler_configs)
+    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, compile=True, compiler_configs=compiler_configs)
 
 
 def test_rf_multiclass_compile_onnx(fit_helper):
@@ -50,7 +50,7 @@ def test_rf_multiclass_compile_onnx(fit_helper):
     )
     dataset_name = "covertype_small"
     compiler_configs = {RFModel: {"compiler": "onnx"}}
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, compile_models=True, compiler_configs=compiler_configs)
+    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, compile=True, compiler_configs=compiler_configs)
 
 
 def test_rf_regression_compile_onnx(fit_helper):
@@ -59,7 +59,7 @@ def test_rf_regression_compile_onnx(fit_helper):
     )
     dataset_name = "ames"
     compiler_configs = {RFModel: {"compiler": "onnx"}}
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, compile_models=True, compiler_configs=compiler_configs)
+    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, compile=True, compiler_configs=compiler_configs)
 
 
 def test_rf_binary_compile_onnx_no_config_bagging(fit_helper):
@@ -82,4 +82,4 @@ def test_rf_binary_compile_onnx_no_config_bagging(fit_helper):
         )
         dataset_name = "adult"
         compiler_configs = "auto"
-        fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, compile_models=True, compiler_configs=compiler_configs)
+        fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, compile=True, compiler_configs=compiler_configs)

@@ -140,7 +140,7 @@ class FitHelper:
         extra_metrics=None,
         expected_model_count=2,
         path_as_absolute=False,
-        compile_models=False,
+        compile=False,
         compiler_configs=None,
         allowed_dataset_features=None,
         expected_stacked_overfitting_at_test=None,
@@ -171,9 +171,9 @@ class FitHelper:
             assert PathConverter._is_absolute(path=init_args["path"])
         save_path = init_args["path"]
         predictor = FitHelper.fit_dataset(train_data=train_data, init_args=init_args, fit_args=fit_args, sample_size=sample_size)
-        if compile_models:
-            predictor.compile_models(models="all", compiler_configs=compiler_configs)
-            predictor.persist_models(models="all")
+        if compile:
+            predictor.compile(models="all", compiler_configs=compiler_configs)
+            predictor.persist(models="all")
         if sample_size is not None and sample_size < len(test_data):
             test_data = test_data.sample(n=sample_size, random_state=0)
         predictor.predict(test_data)
@@ -186,7 +186,7 @@ class FitHelper:
             with pytest.raises(AssertionError):
                 predictor.predict_proba(test_data)
 
-        model_names = predictor.get_model_names()
+        model_names = predictor.model_names()
         model_name = model_names[0]
         assert len(model_names) == expected_model_count
         if refit_full:
@@ -303,14 +303,14 @@ class ModelFitHelper:
 @contextmanager
 def mock_system_resourcses(num_cpus=None, num_gpus=None):
     original_get_cpu_count = ResourceManager.get_cpu_count
-    original_get_gpu_count_all = ResourceManager.get_gpu_count_all
+    original_get_gpu_count = ResourceManager.get_gpu_count
     if num_cpus is not None:
         ResourceManager.get_cpu_count = lambda: num_cpus
     if num_gpus is not None:
-        ResourceManager.get_gpu_count_all = lambda: num_gpus
+        ResourceManager.get_gpu_count = lambda: num_gpus
     yield
     ResourceManager.get_cpu_count = original_get_cpu_count
-    ResourceManager.get_gpu_count_all = original_get_gpu_count_all
+    ResourceManager.get_gpu_count = original_get_gpu_count
 
 
 @pytest.fixture

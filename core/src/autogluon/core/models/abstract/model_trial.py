@@ -97,7 +97,7 @@ def fit_and_save_model(model, fit_args, predict_proba_args, y_val, time_start, t
     time_fit_end = time.time()
 
     if model._get_tags().get("valid_oof", False):
-        oof_pred_proba = model.get_oof_pred_proba(X=fit_args["X"], y=fit_args["y"])
+        oof_pred_proba = model.predict_proba_oof(X=fit_args["X"], y=fit_args["y"])
         time_pred_end = time.time()
         # TODO: use sample_weight?
         # sample_weight = fit_args.get('sample_weight', None)
