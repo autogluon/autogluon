@@ -89,7 +89,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
 
     def _get_model_params(self) -> dict:
         model_params = super()._get_model_params().copy()
-        model_params.setdefault("max_num_items", 10_000)
+        model_params.setdefault("max_num_items", 20_000)
         model_params.setdefault("max_num_samples", 1_000_000)
         model_params.setdefault("tabular_hyperparameters", {"GBM": {}})
         model_params.setdefault("tabular_fit_kwargs", {})
@@ -179,11 +179,12 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             items_to_keep = data.item_ids.to_series().sample(n=int(max_num_items))  # noqa: F841
             data = data.query("item_id in @items_to_keep")
 
+        num_items = data.num_items
         mlforecast_df = self._to_mlforecast_df(data, data.static_features)
 
+        # Shorten time series before calling preprocess to avoid high memory usage
         if max_num_samples is not None:
-            # Training data will contain at most this many rows for each time series
-            max_samples_per_ts = max(1000, math.ceil(max_num_samples / data.num_items))
+            max_samples_per_ts = max(200, math.ceil(max_num_samples / num_items))
             self._max_ts_length = max_samples_per_ts + self.prediction_length + self._sum_of_differences
             mlforecast_df = self._shorten_all_series(mlforecast_df, self._max_ts_length)
 
@@ -194,8 +195,10 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
 
         df = self._mask_df(df)
 
+        if max_num_samples is not None and len(df) > max_num_samples:
+            df = df.sample(n=max_num_samples)
+
         grouped_df = df.groupby(MLF_ITEMID, sort=False)
-        num_items = len(grouped_df)
 
         # Use up to `prediction_length` last rows as validation set (but no more than 50% of the rows)
         val_rows_per_item = min(self.prediction_length, math.ceil(0.5 * len(df) / num_items))
@@ -328,7 +331,7 @@ class DirectTabularModel(AbstractMLForecastModel):
         Defaults to ``{"GBM": {}}``.
     tabular_fit_kwargs : Dict[str, Any], optional
         Additional keyword arguments passed to ``TabularPredictor.fit``. Defaults to an empty dict.
-    max_num_items : int or None, default = 10_000
+    max_num_items : int or None, default = 20_000
         If not None, the model will randomly select this many time series for training and validation.
     max_num_samples : int or None, default = 1_000_000
         If not None, training dataset passed to TabularPredictor will contain at most this many rows (starting from the
@@ -462,7 +465,7 @@ class RecursiveTabularModel(AbstractMLForecastModel):
         Defaults to ``{"GBM": {}}``.
     tabular_fit_kwargs : Dict[str, Any], optional
         Additional keyword arguments passed to ``TabularPredictor.fit``. Defaults to an empty dict.
-    max_num_items : int or None, default = 10_000
+    max_num_items : int or None, default = 20_000
         If not None, the model will randomly select this many time series for training and validation.
     max_num_samples : int or None, default = 1_000_000
         If not None, training dataset passed to TabularPredictor will contain at most this many rows (starting from the

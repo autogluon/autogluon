@@ -1,3 +1,5 @@
+from unittest import mock
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -100,3 +102,27 @@ def test_when_scaler_used_during_fit_then_scales_are_stored(temp_model_path, mod
     scale_per_item = model._get_scale_per_item(data.item_ids)
     assert model._scaler is not None
     assert scale_per_item.index.equals(data.item_ids)
+
+
+@pytest.mark.parametrize("model_type", TESTABLE_MODELS)
+@pytest.mark.parametrize("differences", [[], [14]])
+def test_given_long_time_series_passed_to_model_then_preprocess_receives_shortened_time_series(
+    temp_model_path, model_type, differences
+):
+    max_num_samples = 1000
+    prediction_length = 17
+    data = get_data_frame_with_variable_lengths({"A": 1_000_000}, freq="T")
+    model = model_type(
+        path=temp_model_path,
+        freq=data.freq,
+        hyperparameters={"max_num_samples": max_num_samples, "differences": differences},
+        prediction_length=prediction_length,
+    )
+    with mock.patch("mlforecast.MLForecast.preprocess") as mock_preprocess:
+        try:
+            model.fit(train_data=data)
+        # using mock leads to AssertionError
+        except AssertionError:
+            pass
+        received_mlforecast_df = mock_preprocess.call_args[0][0]
+        assert len(received_mlforecast_df) == max_num_samples + prediction_length + sum(differences)
