@@ -908,7 +908,6 @@ class TimeSeriesPredictor:
         """Returns a dictionary of objects each describing an attribute of the training process and trained models."""
         return self._learner.get_info(include_model_info=True)
 
-    @property
     def model_best(self) -> str:
         """Returns the name of the best model from trainer."""
         if self._trainer.model_best is not None:
