@@ -17,6 +17,7 @@ from ..constants import (
     DIRECT_LOSS,
     F1,
     FEW_SHOT_CLASSIFICATION,
+    IOU,
     MAP,
     METRIC_MODE_MAP,
     MULTICLASS,
@@ -34,6 +35,7 @@ from ..constants import (
     RETRIEVAL_METRICS,
     RMSE,
     ROC_AUC,
+    SEMANTIC_SEGMENTATION,
     SPEARMANR,
     VALID_METRICS,
     Y_PRED,
@@ -126,6 +128,8 @@ def infer_metrics(
             )
     elif problem_type is None and is_matching:
         return RECALL, NDCG
+    elif problem_type == SEMANTIC_SEGMENTATION:
+        return IOU, IOU
     else:
         raise NotImplementedError(f"Problem type: {problem_type} is not supported yet!")
 
