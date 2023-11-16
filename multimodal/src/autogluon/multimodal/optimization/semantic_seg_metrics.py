@@ -749,7 +749,7 @@ class MAE(COD):
 COD_METRICS_NAMES = {"sm": SM(), "fm": FM(), "em": EM(), "mae": MAE()}
 
 
-# TODO: Modify multi-gpu evalution error. Maybe there will be a more elegant way.
+# TODO: Modify multi-gpu evaluation error. Maybe there will be a more elegant way.
 class Multiclass_IoU_Pred:
     """
     Compute the IoU for multi-class semantic segmentation based on https://github.com/xieenze/Trans2Seg/blob/master/segmentron/utils/score.py.
