@@ -113,7 +113,6 @@ In the following, we decomposed the functionalities of AutoMM and prepared step-
 ::::
 
 
-<<<<<<< HEAD
 ## Image Data -- Segmentation
 
 ::::{grid} 2
