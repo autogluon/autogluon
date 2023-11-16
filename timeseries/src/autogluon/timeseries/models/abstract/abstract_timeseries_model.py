@@ -59,7 +59,7 @@ class AbstractTimeSeriesModel(AbstractModel):
     # TODO: refactor "pruned" methods after AbstractModel is refactored
     predict_proba = None
     score_with_y_pred_proba = None
-    get_disk_size = None  # disk / memory size
+    disk_usage = None  # disk / memory size
     estimate_memory_usage = None
     reduce_memory_size = None
     compute_feature_importance = None  # feature processing and importance
