@@ -149,7 +149,9 @@ def test_infer_metrics(
     target_eval_metric_name,
     target_validation_metric_name,
 ):
-    validation_metric_name, eval_metric_name = infer_metrics(problem_type, eval_metric_name, validation_metric_name, is_matching)
+    validation_metric_name, eval_metric_name = infer_metrics(
+        problem_type, eval_metric_name, validation_metric_name, is_matching
+    )
     assert eval_metric_name == target_eval_metric_name
     assert validation_metric_name == target_validation_metric_name
 
