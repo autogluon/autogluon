@@ -1,4 +1,4 @@
-# Document Data
+# Document Prediction
 
 ## Pre-requisite
 
@@ -48,7 +48,6 @@ For additional support, please refer to official instructions for [tesseract](ht
 
 ```{toctree}
 ---
-caption: Document Data
 maxdepth: 1
 hidden: true
 ---
