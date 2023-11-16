@@ -109,19 +109,20 @@ class PipelineFeatureGenerator(BulkFeatureGenerator):
     def _compute_pre_memory_usage(self, X: DataFrame):
         X_len = len(X)
         self.pre_memory_usage = get_approximate_df_mem_usage(X, sample_ratio=0.2).sum()
+        pre_memory_usage_mb = ResourceManager.bytes_converter(value=self.pre_memory_usage, format_in="B", format_out="MB")
         self.pre_memory_usage_per_row = self.pre_memory_usage / X_len
-        available_mem = ResourceManager.get_available_virtual_mem()
-        pre_memory_usage_percent = self.pre_memory_usage / (available_mem + self.pre_memory_usage)
-        self._log(20, f"\tAvailable Memory:                    {(round((self.pre_memory_usage + available_mem) / 1e6, 2))} MB")
+        available_mem_mb = ResourceManager.get_available_virtual_mem(format="MB")
+        pre_memory_usage_percent = pre_memory_usage_mb / (available_mem_mb + pre_memory_usage_mb)
+        self._log(20, f"\tAvailable Memory:                    {(pre_memory_usage_mb + available_mem_mb):.2f} MB")
         self._log(
             20,
-            f"\tTrain Data (Original)  Memory Usage: {round(self.pre_memory_usage / 1e6, 2)} MB "
-            f"({round(pre_memory_usage_percent * 100, 1)}% of available memory)",
+            f"\tTrain Data (Original)  Memory Usage: {pre_memory_usage_mb:.2f} MB "
+            f"({(pre_memory_usage_percent * 100):.1f}% of available memory)",
         )
         if pre_memory_usage_percent > 0.05:
             self._log(
                 30,
-                f"\tWarning: Data size prior to feature transformation consumes {round(pre_memory_usage_percent * 100, 1)}% of available memory. "
+                f"\tWarning: Data size prior to feature transformation consumes {(pre_memory_usage_percent * 100):.1f}% of available memory. "
                 f"Consider increasing memory or subsampling the data to avoid instability.",
             )
 
@@ -129,18 +130,19 @@ class PipelineFeatureGenerator(BulkFeatureGenerator):
         X_len = len(X)
         self.post_memory_usage = get_approximate_df_mem_usage(X, sample_ratio=0.2).sum()
         self.post_memory_usage_per_row = self.post_memory_usage / X_len
-
-        available_mem = ResourceManager.get_available_virtual_mem()
-        post_memory_usage_percent = self.post_memory_usage / (available_mem + self.post_memory_usage + self.pre_memory_usage)
+        post_memory_usage_mb = ResourceManager.bytes_converter(value=self.post_memory_usage, format_in="B", format_out="MB")
+        pre_memory_usage_mb = ResourceManager.bytes_converter(value=self.pre_memory_usage, format_in="B", format_out="MB")
+        available_mem_mb = ResourceManager.get_available_virtual_mem(format="MB")
+        post_memory_usage_percent = post_memory_usage_mb / (available_mem_mb + post_memory_usage_mb + pre_memory_usage_mb)
         self._log(
             20,
-            f"\tTrain Data (Processed) Memory Usage: {round(self.post_memory_usage / 1e6, 2)} MB "
-            f"({round(post_memory_usage_percent * 100, 1)}% of available memory)",
+            f"\tTrain Data (Processed) Memory Usage: {post_memory_usage_mb:.2f} MB "
+            f"({(post_memory_usage_percent * 100):.1f}% of available memory)",
         )
         if post_memory_usage_percent > 0.15:
             self._log(
                 30,
-                f"\tWarning: Data size post feature transformation consumes {round(post_memory_usage_percent * 100, 1)}% of available memory. "
+                f"\tWarning: Data size post feature transformation consumes {(post_memory_usage_percent * 100):.1f}% of available memory. "
                 f"Consider increasing memory or subsampling the data to avoid instability.",
             )
 

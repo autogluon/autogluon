@@ -65,10 +65,51 @@ class ResourceManager:
 
     @staticmethod
     @disable_if_lite_mode(ret=4096)
-    def get_memory_size():
-        import psutil
+    def get_memory_size(format: str = "B") -> float:
+        """
 
-        return bytes_to_mega_bytes(psutil.virtual_memory().total)
+        Parameters
+        ----------
+        format: {"B", "KB", "MB", "GB", "TB", "PB"}
+
+        Returns
+        -------
+        Memory size in the provided `format`.
+
+        """
+        import psutil
+        bytes = psutil.virtual_memory().total
+        return ResourceManager.bytes_converter(value=bytes, format_in="B", format_out=format)
+
+    @staticmethod
+    def bytes_converter(value: float, format_in: str, format_out: str) -> float:
+        """
+        Converts bytes `value` from `format_in` to `format_out`.
+
+        Parameters
+        ----------
+        value: float
+        format_in: {"B", "KB", "MB", "GB", "TB", "PB"}
+        format_out: {"B", "KB", "MB", "GB", "TB", "PB"}
+
+        Returns
+        -------
+        value in `format_out` format.
+        """
+        valid_formats = ["B", "KB", "MB", "GB", "TB", "PB"]
+        assert format_in in valid_formats
+        assert format_out in valid_formats
+        bytes = value
+        for format in valid_formats:
+            if format_in == format:
+                break
+            bytes *= 1024
+        output = bytes
+        for format in valid_formats:
+            if format_out == format:
+                break
+            output /= 1024
+        return output
 
     @staticmethod
     @disable_if_lite_mode(ret=None)
@@ -79,15 +120,16 @@ class ResourceManager:
 
     @staticmethod
     @disable_if_lite_mode(ret=1073741824)  # set to 1GB as an empirical value in lite/web-browser mode.
-    def get_memory_rss():
-        return ResourceManager.get_process().memory_info().rss
+    def get_memory_rss(format: str = "B") -> float:
+        bytes = ResourceManager.get_process().memory_info().rss
+        return ResourceManager.bytes_converter(value=bytes, format_in="B", format_out=format)
 
     @staticmethod
     @disable_if_lite_mode(ret=1073741824)  # set to 1GB as an empirical value in lite/web-browser mode.
-    def get_available_virtual_mem():
+    def get_available_virtual_mem(format: str = "B") -> float:
         import psutil
-
-        return psutil.virtual_memory().available
+        bytes = psutil.virtual_memory().available
+        return ResourceManager.bytes_converter(value=bytes, format_in="B", format_out=format)
 
     @staticmethod
     def get_available_disk_size():
