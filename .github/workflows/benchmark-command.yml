@@ -20,7 +20,7 @@ on:
           - timeseries
           - multimodal
       preset:
-        description: 'Preset to run for tabular'
+        description: 'Preset to run for tabular/timeseries/multimodal'
         required: true
         options:
           - best
@@ -28,7 +28,7 @@ on:
           - good
           - medium
           - dev
-          - stable
+          - master_medium
       benchmark:
         description: 'Benchmark to run'
         required: true
@@ -36,8 +36,11 @@ on:
           - tabular_full
           - tabular_test
           - tabular_small
-          - timeseries_small
-          - none
+          - timeseries_test
+          - automm-image
+          - automm-text
+          - automm-text-tabular
+          - automm-text-tabular-image
       time_limit:
         description: 'Time limit for the benchmark to run'
         required: true
