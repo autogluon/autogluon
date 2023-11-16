@@ -93,14 +93,14 @@ def infer_metrics(
                 )
 
         if problem_type is None:
-            eval_metric_name, validation_metric_name = MATCHING_METRICS_WITHOUT_PROBLEM_TYPE
+            validation_metric_name, eval_metric_name = MATCHING_METRICS_WITHOUT_PROBLEM_TYPE
             logger.info(
                 f"Metric {eval_metric_name} and metric {validation_metric_name} are used "
                 f"as the evaluation metric and the validation metric for matching tasks by default. "
             )
             return validation_metric_name, eval_metric_name
         elif problem_type in MATCHING_METRICS:
-            eval_metric_name, validation_metric_name = MATCHING_METRICS[problem_type]
+            validation_metric_name, eval_metric_name = MATCHING_METRICS[problem_type]
             logger.info(
                 f"Metric {eval_metric_name} and metric {validation_metric_name} are used "
                 f"as the evaluation metric and the validation metric for {problem_type} in matching tasks by default. "
