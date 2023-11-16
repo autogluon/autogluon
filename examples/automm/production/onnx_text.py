@@ -32,11 +32,11 @@ def eval_cosine(predictor, df, onnx_session):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--checkpoint_name", default="sentence-transformers/msmarco-MiniLM-L-12-v3", type=str)
-    parser.add_argument("--onnx_path", default=None, type=str)
+    parser.add_argument("--model_path", default=None, type=str)
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
-    if not args.onnx_path:
-        args.onnx_path = args.checkpoint_name.replace("/", "_") + ".onnx"
+    if not args.model_path:
+        args.model_path = args.checkpoint_name.replace("/", "_") + ".onnx"
 
     # Load Dataset
     val_df = load_dataset("wietsedv/stsbenchmark", split="validation").to_pandas()
@@ -51,7 +51,7 @@ if __name__ == "__main__":
     )
 
     # Export ONNX model
-    onnx_path = predictor.export_onnx(data=val_df, path=args.onnx_path, verbose=args.verbose)
+    onnx_path = predictor.export_onnx(data=val_df, path=args.model_path, verbose=args.verbose)
 
     # Load ONNX model
     ort_sess = ort.InferenceSession(onnx_path, providers=["CUDAExecutionProvider"])
