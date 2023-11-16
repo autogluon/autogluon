@@ -111,7 +111,7 @@ In the following, we decompose the functionalities of AutoMM and prepare step-by
   :gutter: 3
 
 :::{grid-item-card} AutoMM for Semantic Segmentation - Quick Start
-  :link: beginner_semantic_seg.html
+  :link: image_segmentation/beginner_semantic_seg.html
 
   How to train semantic segmentation models with AutoMM.
 :::
