@@ -1,29 +1,21 @@
-# Multimodal Prediction
+# AutoGluon Multimodal (AutoMM): Supercharging Multimodal AutoML with Foundation Models
 
-For problems on multimodal data tables that contain image, text, and tabular data, AutoGluon provides `MultiModalPredictor` (abbreviated as `AutoMM`)
-that automatically selects, fuses, and tunes foundation models from popular packages like [timm](https://github.com/rwightman/pytorch-image-models),
+Foundation models have transformed landscapes across fields like computer vision and natural language processing. 
+These models are pre-trained on extensive common-domain data, serving as powerful tools for a wide range of applications. 
+However, seamlessly integrating foundation models into real-world application scenarios has posed challenges. 
+The diversity of data modalities, the multitude of available foundation models, 
+and the considerable model sizes make this integration a nontrivial task.
+
+AutoMM is dedicated to breaking these barriers 
+by substantially reducing the engineering effort and manual intervention required in data preprocessing, model selection, and finetuning. 
+With AutoMM, users can effortlessly adapt foundation models (from popular model zoos like [TIMM](https://github.com/rwightman/pytorch-image-models),
 [huggingface/transformers](https://github.com/huggingface/transformers),
-[CLIP](https://github.com/openai/CLIP), [MMDetection](https://github.com/open-mmlab/mmdetection) etc.
+ [MMDetection](https://github.com/open-mmlab/mmdetection)) to their domain-specific data using just three lines of code. 
+Our toolkit accommodates various data types, including tabular, text, and image data, either individually or in combination. 
+It offers support for an array of tasks, encompassing classification, regression, object detection, named entity recognition, semantic matching, and image segmentation.
+AutoMM represents a state-of-the-art and user-friendly solution, empowering multimodal AutoML with foundation models.
 
-You can not only use `AutoMM` to solve standard NLP/Vision tasks
-such as sentiment classification, intent detection, paraphrase detection, image classification, but also use it for multimodal problems that involve image,
-text, tabular features, object bounding boxes, named entities, etc. Moreover, `AutoMM` can be used as a basic model in the multi-layer
-stack-ensemble of [AutoGluon Tabular](https://auto.gluon.ai/stable/tutorials/tabular/index.html), and is powering up the FT-Transformer in `TabularPredictor`.
-
-Here are some example use-cases of AutoMM:
-
-- Multilingual text classification: [Tutorial](text_prediction/multilingual_text)
-- Predicting pets' popularity based on their description, photo, and other metadata: [Tutorial](multimodal_prediction/beginner_multimodal), [Example](https://github.com/autogluon/autogluon/tree/master/examples/automm/kaggle_pawpularity)
-- Predicting the price of book: [Tutorial](multimodal_prediction/multimodal_text_tabular)
-- Scoring student's essays: [Example](https://github.com/autogluon/autogluon/tree/master/examples/automm/kaggle_feedback_prize)
-- Image classification: [Tutorial](image_prediction/beginner_image_cls)
-- Object detection: [Tutorial](object_detection/quick_start/quick_start_coco), [Example](https://github.com/autogluon/autogluon/tree/master/examples/automm/object_detection)
-- Extracting named entities: [Tutorial](text_prediction/ner)
-- Search for relevant text / image via text queries: [Tutorial](semantic_matching/index)
-- Document Classification (Experimental): [Tutorial](document_prediction/index)
-
-
-In the following, we decomposed the functionalities of AutoMM and prepared step-by-step guide for each functionality.
+In the following, we decompose the functionalities of AutoMM and prepare step-by-step guide for each functionality.
 
 
 ## Text Data -- Classification / Regression / NER
@@ -40,13 +32,13 @@ In the following, we decomposed the functionalities of AutoMM and prepared step-
 :::{grid-item-card} AutoMM for Text Prediction - Multilingual Problems
   :link: text_prediction/multilingual_text.html
 
-  How to use MultiModalPredictor to build models on datasets with languages other than English.
+  How to use AutoMM to build models on datasets with languages other than English.
 :::
 
 :::{grid-item-card} AutoMM for Named Entity Recognition - Quick Start
   :link: text_prediction/ner.html
 
-  How to use MultiModalPredictor for entity extraction.
+  How to use AutoMM for entity extraction.
 :::
 ::::
 
@@ -59,7 +51,7 @@ In the following, we decomposed the functionalities of AutoMM and prepared step-
 :::{grid-item-card} AutoMM for Image Classification - Quick Start
   :link: image_prediction/beginner_image_cls.html
 
-  How to train image classification models with MultiModalPredictor.
+  How to train image classification models with AutoMM.
 :::
 
 :::{grid-item-card} Zero-Shot Image Classification with CLIP
@@ -78,7 +70,7 @@ In the following, we decomposed the functionalities of AutoMM and prepared step-
 :::{grid-item-card} Quick Start on a Tiny COCO Format Dataset
   :link: object_detection/quick_start/quick_start_coco.html
 
-  How to train high quality object detection model with MultiModalPredictor in under 5 minutes on COCO format dataset.
+  How to train high quality object detection model with AutoMM in under 5 minutes on COCO format dataset.
 :::
 
 :::{grid-item-card} Prepare COCO2017 Dataset
@@ -190,20 +182,20 @@ In the following, we decomposed the functionalities of AutoMM and prepared step-
 :::{grid-item-card} AutoMM for Text + Tabular - Quick Start
   :link: multimodal_prediction/multimodal_text_tabular.html
 
-  How MultiModalPredictor can be applied to multimodal data tables with a mix of text, numerical, and
+  How AutoMM can be applied to multimodal data tables with a mix of text, numerical, and
   categorical columns.
 :::
 
 :::{grid-item-card} AutoMM for Image + Text + Tabular - Quick Start
   :link: multimodal_prediction/beginner_multimodal.html
 
-  How to use MultiModalPredictor to train a model on image, text, numerical, and categorical data.
+  How to use AutoMM to train a model on image, text, numerical, and categorical data.
 :::
 
 :::{grid-item-card} AutoMM for Entity Extraction with Text and Image - Quick Start
   :link: multimodal_prediction/multimodal_ner.html
 
-  How to use MultiModalPredictor to train a model for multimodal named entity recognition.
+  How to use AutoMM to train a model for multimodal named entity recognition.
 :::
 ::::
 

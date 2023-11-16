@@ -8,7 +8,7 @@
 :::{grid-item-card} Quick Start on a Tiny COCO Format Dataset
   :link: quick_start/quick_start_coco.html
 
-  How to train high quality object detection model with MultiModalPredictor in under 5 minutes on COCO format dataset.
+  How to train high quality object detection model with AutoMM in under 5 minutes on COCO format dataset.
 :::
 
 :::{grid-item-card} Quick Start on Open Voccabulary Detection
@@ -62,7 +62,7 @@
 :::{grid-item-card} Finetune on COCO Format Dataset with Customized Settings
   :link: advanced/finetune_coco.html
 
-  How to customize high quality object detection model with MultiModalPredictor on COCO format dataset in under 5 minutes.
+  How to customize high quality object detection model with AutoMM on COCO format dataset in under 5 minutes.
 :::
 
 ::::
