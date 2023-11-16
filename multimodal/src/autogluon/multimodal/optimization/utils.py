@@ -22,8 +22,6 @@ from ..constants import (
     AVERAGE_PRECISION,
     BER,
     BINARY,
-    BINARY_ACC,
-    BINARY_DICE,
     BIT_FIT,
     COLUMN_FEATURES,
     CONTRASTIVE_LOSS,
@@ -306,10 +304,6 @@ def get_metric(
             return CustomHitRate(), None
         else:  # TODO: support recall for general classification tasks.
             raise ValueError("Recall is not supported yet.")
-    elif metric_name == BINARY_DICE:
-        return torchmetrics.Dice(multiclass=False), None
-    elif metric_name == BINARY_ACC:
-        return torchmetrics.classification.BinaryAccuracy(), None
     elif metric_name == BER:
         return Balanced_Error_Rate(), None
     elif metric_name in [SM, EM, FM, MAE]:
