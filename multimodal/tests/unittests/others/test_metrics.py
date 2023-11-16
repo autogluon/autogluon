@@ -126,6 +126,7 @@ def test_f1_metrics_for_multiclass(eval_metric):
     assert abs(val_score - eval_score) < 1e-4
 
 
+@pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "problem_type, eval_metric_name, validation_metric_name, is_matching, target_eval_metric_name, target_validation_metric_name",
     [
