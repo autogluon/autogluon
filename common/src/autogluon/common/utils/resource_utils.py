@@ -64,7 +64,6 @@ class ResourceManager:
         return memory_free_values
 
     @staticmethod
-    @disable_if_lite_mode(ret=4096)
     def get_memory_size(format: str = "B") -> float:
         """
 
@@ -77,8 +76,17 @@ class ResourceManager:
         Memory size in the provided `format`.
 
         """
-        import psutil
-        bytes = psutil.virtual_memory().total
+        bytes = ResourceManager._get_memory_size()
+        return ResourceManager.bytes_converter(value=bytes, format_in="B", format_out=format)
+
+    @staticmethod
+    def get_memory_rss(format: str = "B") -> float:
+        bytes = ResourceManager._get_memory_rss()
+        return ResourceManager.bytes_converter(value=bytes, format_in="B", format_out=format)
+
+    @staticmethod
+    def get_available_virtual_mem(format: str = "B") -> float:
+        bytes = ResourceManager._get_available_virtual_mem()
         return ResourceManager.bytes_converter(value=bytes, format_in="B", format_out=format)
 
     @staticmethod
@@ -119,19 +127,6 @@ class ResourceManager:
         return psutil.Process(pid)
 
     @staticmethod
-    @disable_if_lite_mode(ret=1073741824)  # set to 1GB as an empirical value in lite/web-browser mode.
-    def get_memory_rss(format: str = "B") -> float:
-        bytes = ResourceManager.get_process().memory_info().rss
-        return ResourceManager.bytes_converter(value=bytes, format_in="B", format_out=format)
-
-    @staticmethod
-    @disable_if_lite_mode(ret=1073741824)  # set to 1GB as an empirical value in lite/web-browser mode.
-    def get_available_virtual_mem(format: str = "B") -> float:
-        import psutil
-        bytes = psutil.virtual_memory().available
-        return ResourceManager.bytes_converter(value=bytes, format_in="B", format_out=format)
-
-    @staticmethod
     def get_available_disk_size():
         # FIXME: os.statvfs doesn't work on Windows...
         # Need to find another way to calculate disk on Windows.
@@ -163,6 +158,23 @@ class ResourceManager:
         gpu_count = cudaDeviceGetCount()
         cudaShutdown()
         return gpu_count
+
+    @staticmethod
+    @disable_if_lite_mode(ret=1073741824)  # set to 1GB as an empirical value in lite/web-browser mode.
+    def _get_memory_size() -> float:
+        import psutil
+        return psutil.virtual_memory().total
+
+    @staticmethod
+    @disable_if_lite_mode(ret=1073741824)  # set to 1GB as an empirical value in lite/web-browser mode.
+    def _get_memory_rss() -> float:
+        return ResourceManager.get_process().memory_info().rss
+
+    @staticmethod
+    @disable_if_lite_mode(ret=1073741824)  # set to 1GB as an empirical value in lite/web-browser mode.
+    def _get_available_virtual_mem() -> float:
+        import psutil
+        return psutil.virtual_memory().available
 
 
 class RayResourceManager:
