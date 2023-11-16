@@ -230,12 +230,15 @@ class AutoETSModel(AbstractStatsForecastModel):
         When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
         When set to a positive integer, that many cores are used.
         When set to -1, all CPU cores are used.
+    damped : bool, default = True
+        Whether to dampen the trend.
     max_ts_length : int, default = 2500
         If not None, only the last ``max_ts_length`` time steps of each time series will be used to train the model.
         This significantly speeds up fitting and usually leads to no change in accuracy.
     """
 
     allowed_local_model_args = [
+        "damped",
         "model",
         "seasonal_period",
     ]
@@ -288,6 +291,8 @@ class ETSModel(AutoETSModel):
         When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
         When set to a positive integer, that many cores are used.
         When set to -1, all CPU cores are used.
+    damped : bool, default = False
+        Whether to dampen the trend.
     max_ts_length : int, default = 2500
         If not None, only the last ``max_ts_length`` time steps of each time series will be used to train the model.
         This significantly speeds up fitting and usually leads to no change in accuracy.
