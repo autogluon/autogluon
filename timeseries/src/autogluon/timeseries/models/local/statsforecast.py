@@ -51,7 +51,7 @@ class AutoARIMAModel(AbstractStatsForecastModel):
 
     Automatically selects the best (p,d,q,P,D,Q) model parameters using an information criterion
 
-    Based on `statsforecast.models.AutoARIMA <https://nixtla.github.io/statsforecast/models.html#autoarima>`_.
+    Based on `statsforecast.models.AutoARIMA <https://nixtla.mintlify.app/statsforecast/docs/models/autoarima.html>`_.
 
     Other Parameters
     ----------------
@@ -211,7 +211,7 @@ class AutoETSModel(AbstractStatsForecastModel):
 
     Automatically selects the best ETS (Error, Trend, Seasonality) model using an information criterion
 
-    Based on `statsforecast.models.AutoETS <https://nixtla.github.io/statsforecast/models.html#autoets>`_.
+    Based on `statsforecast.models.AutoETS <https://nixtla.mintlify.app/statsforecast/docs/models/autoets.html>`_.
 
     Other Parameters
     ----------------
@@ -269,7 +269,7 @@ class ETSModel(AutoETSModel):
 
     The E (error), T (trend) and S (seasonal) components are fixed and provided by the user.
 
-    This is an alias for `statsforecast.models.AutoETS <https://nixtla.github.io/statsforecast/models.html#autoets>`_.
+    This is an alias for `statsforecast.models.AutoETS <https://nixtla.mintlify.app/statsforecast/docs/models/autoets.html>`_.
 
     Other Parameters
     ----------------
@@ -347,7 +347,7 @@ class DynamicOptimizedThetaModel(AbstractStatsForecastModel):
 class ThetaModel(AbstractStatsForecastModel):
     """Theta forecasting model [Assimakopoulos2000]_.
 
-    Based on `statsforecast.models.Theta <https://nixtla.github.io/statsforecast/models.html#theta>`_.
+    Based on `statsforecast.models.Theta <https://nixtla.mintlify.app/statsforecast/docs/models/autotheta.html>`_.
 
 
     References
