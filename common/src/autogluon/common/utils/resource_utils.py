@@ -28,7 +28,7 @@ class ResourceManager:
 
     @staticmethod
     @disable_if_lite_mode(ret=0)
-    def get_gpu_count_all():
+    def get_gpu_count() -> int:
         num_gpus = ResourceManager._get_gpu_count_cuda()
         if num_gpus == 0:
             num_gpus = ResourceManager.get_gpu_count_torch()
@@ -64,11 +64,60 @@ class ResourceManager:
         return memory_free_values
 
     @staticmethod
-    @disable_if_lite_mode(ret=4096)
-    def get_memory_size():
-        import psutil
+    def get_memory_size(format: str = "B") -> float:
+        """
 
-        return bytes_to_mega_bytes(psutil.virtual_memory().total)
+        Parameters
+        ----------
+        format: {"B", "KB", "MB", "GB", "TB", "PB"}
+
+        Returns
+        -------
+        Memory size in the provided `format`.
+
+        """
+        bytes = ResourceManager._get_memory_size()
+        return ResourceManager.bytes_converter(value=bytes, format_in="B", format_out=format)
+
+    @staticmethod
+    def get_memory_rss(format: str = "B") -> float:
+        bytes = ResourceManager._get_memory_rss()
+        return ResourceManager.bytes_converter(value=bytes, format_in="B", format_out=format)
+
+    @staticmethod
+    def get_available_virtual_mem(format: str = "B") -> float:
+        bytes = ResourceManager._get_available_virtual_mem()
+        return ResourceManager.bytes_converter(value=bytes, format_in="B", format_out=format)
+
+    @staticmethod
+    def bytes_converter(value: float, format_in: str, format_out: str) -> float:
+        """
+        Converts bytes `value` from `format_in` to `format_out`.
+
+        Parameters
+        ----------
+        value: float
+        format_in: {"B", "KB", "MB", "GB", "TB", "PB"}
+        format_out: {"B", "KB", "MB", "GB", "TB", "PB"}
+
+        Returns
+        -------
+        value in `format_out` format.
+        """
+        valid_formats = ["B", "KB", "MB", "GB", "TB", "PB"]
+        assert format_in in valid_formats
+        assert format_out in valid_formats
+        bytes = value
+        for format in valid_formats:
+            if format_in == format:
+                break
+            bytes *= 1024
+        output = bytes
+        for format in valid_formats:
+            if format_out == format:
+                break
+            output /= 1024
+        return output
 
     @staticmethod
     @disable_if_lite_mode(ret=None)
@@ -76,18 +125,6 @@ class ResourceManager:
         import psutil
 
         return psutil.Process(pid)
-
-    @staticmethod
-    @disable_if_lite_mode(ret=1073741824)  # set to 1GB as an empirical value in lite/web-browser mode.
-    def get_memory_rss():
-        return ResourceManager.get_process().memory_info().rss
-
-    @staticmethod
-    @disable_if_lite_mode(ret=1073741824)  # set to 1GB as an empirical value in lite/web-browser mode.
-    def get_available_virtual_mem():
-        import psutil
-
-        return psutil.virtual_memory().available
 
     @staticmethod
     def get_available_disk_size():
@@ -121,6 +158,25 @@ class ResourceManager:
         gpu_count = cudaDeviceGetCount()
         cudaShutdown()
         return gpu_count
+
+    @staticmethod
+    @disable_if_lite_mode(ret=1073741824)  # set to 1GB as an empirical value in lite/web-browser mode.
+    def _get_memory_size() -> float:
+        import psutil
+
+        return psutil.virtual_memory().total
+
+    @staticmethod
+    @disable_if_lite_mode(ret=1073741824)  # set to 1GB as an empirical value in lite/web-browser mode.
+    def _get_memory_rss() -> float:
+        return ResourceManager.get_process().memory_info().rss
+
+    @staticmethod
+    @disable_if_lite_mode(ret=1073741824)  # set to 1GB as an empirical value in lite/web-browser mode.
+    def _get_available_virtual_mem() -> float:
+        import psutil
+
+        return psutil.virtual_memory().available
 
 
 class RayResourceManager:
@@ -163,8 +219,7 @@ class RayResourceManager:
         return int(RayResourceManager._get_cluster_resources("CPU"))
 
     @staticmethod
-    # TODO: find a better naming, "all" sounds unnecessary
-    def get_gpu_count_all() -> int:
+    def get_gpu_count() -> int:
         """Get number of gpus available in the cluster"""
         return int(RayResourceManager._get_cluster_resources("GPU"))
 

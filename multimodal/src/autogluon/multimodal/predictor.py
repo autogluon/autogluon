@@ -813,6 +813,10 @@ class MultiModalPredictor:
             A string that indicates location of the exported onnx model, if `path` argument is provided.
             Otherwise, would return the onnx model as bytes.
         """
+
+        # Make sure _model is initialized
+        self._learner.on_predict_start()
+
         return self._learner.export_onnx(
             data=data,
             path=path,

@@ -2,17 +2,19 @@ import logging
 import os
 import re
 import time
+from contextlib import nullcontext
 from typing import Any, Dict, List, Optional, Union
 
 from autogluon.common import space
 from autogluon.common.loaders import load_pkl
 from autogluon.common.savers import save_pkl
 from autogluon.core.hpo.exceptions import EmptySearchSpace
-from autogluon.core.hpo.executors import HpoExecutor
+from autogluon.core.hpo.executors import HpoExecutor, RayHpoExecutor
 from autogluon.core.models import AbstractModel
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
 from autogluon.timeseries.utils.features import CovariateMetadata
+from autogluon.timeseries.utils.warning_filters import disable_stdout, warning_filter
 
 from .model_trial import model_trial, skip_hpo
 
@@ -57,7 +59,7 @@ class AbstractTimeSeriesModel(AbstractModel):
     # TODO: refactor "pruned" methods after AbstractModel is refactored
     predict_proba = None
     score_with_y_pred_proba = None
-    get_disk_size = None  # disk / memory size
+    disk_usage = None  # disk / memory size
     estimate_memory_usage = None
     reduce_memory_size = None
     compute_feature_importance = None  # feature processing and importance
@@ -384,6 +386,39 @@ class AbstractTimeSeriesModel(AbstractModel):
         """
         return train_fn_kwargs
 
+    def _is_gpu_available(self) -> bool:
+        return False
+
+    def hyperparameter_tune(
+        self, hyperparameter_tune_kwargs="auto", hpo_executor: HpoExecutor = None, time_limit: float = None, **kwargs
+    ):
+        if hpo_executor is None:
+            hpo_executor = self._get_default_hpo_executor()
+            default_num_trials = kwargs.pop("default_num_trials", None)
+            hpo_executor.initialize(
+                hyperparameter_tune_kwargs, default_num_trials=default_num_trials, time_limit=time_limit
+            )
+
+        kwargs = self.initialize(time_limit=time_limit, **kwargs)
+
+        self._register_fit_metadata(**kwargs)
+        self._validate_fit_memory_usage(**kwargs)
+
+        kwargs = self._preprocess_fit_resources(
+            parallel_hpo=hpo_executor.executor_type == "ray", silent=True, **kwargs
+        )
+        self.validate_fit_resources(**kwargs)
+
+        # autogluon.core runs a complicated logic to determine the final number of gpus
+        # used in trials, which results in unintended setting of num_gpus=0. We override this
+        # logic here, and set to minimum num_gpus to 1 if it is set to 0 when GPUs are available
+        kwargs["num_gpus"] = 0 if not self._is_gpu_available() else max(kwargs.get("num_gpus", 1), 1)
+
+        # we use k_fold=1 to circumvent autogluon.core logic to manage resources during parallelization
+        # of different folds
+        hpo_executor.register_resources(self, k_fold=1, **kwargs)
+        return self._hyperparameter_tune(hpo_executor=hpo_executor, **kwargs)
+
     def _hyperparameter_tune(
         self,
         train_data: TimeSeriesDataFrame,
@@ -429,21 +464,27 @@ class AbstractTimeSeriesModel(AbstractModel):
         model_estimate_memory_usage = None
         if self.estimate_memory_usage is not None:
             model_estimate_memory_usage = self.estimate_memory_usage(**kwargs)
-        hpo_executor.execute(
-            model_trial=model_trial,
-            train_fn_kwargs=train_fn_kwargs,
-            directory=directory,
-            minimum_cpu_per_trial=self.get_minimum_resources().get("num_cpus", 1),
-            minimum_gpu_per_trial=self.get_minimum_resources().get("num_gpus", 0),
-            model_estimate_memory_usage=model_estimate_memory_usage,
-            adapter_type="timeseries",
-        )
 
-        return hpo_executor.get_hpo_results(
-            model_name=self.name,
-            model_path_root=self.path_root,
-            time_start=time_start,
-        )
+        minimum_resources = self.get_minimum_resources(is_gpu_available=self._is_gpu_available())
+        hpo_context = disable_stdout if isinstance(hpo_executor, RayHpoExecutor) else nullcontext
+        with hpo_context(), warning_filter():  # prevent Ray from outputting its results to stdout with print
+            hpo_executor.execute(
+                model_trial=model_trial,
+                train_fn_kwargs=train_fn_kwargs,
+                directory=directory,
+                minimum_cpu_per_trial=minimum_resources.get("num_cpus", 1),
+                minimum_gpu_per_trial=minimum_resources.get("num_gpus", 0),
+                model_estimate_memory_usage=model_estimate_memory_usage,
+                adapter_type="timeseries",
+            )
+
+            hpo_models, analysis = hpo_executor.get_hpo_results(
+                model_name=self.name,
+                model_path_root=self.path_root,
+                time_start=time_start,
+            )
+
+        return hpo_models, analysis
 
     def preprocess(self, data: Any, **kwargs) -> Any:
         return data

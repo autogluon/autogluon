@@ -251,9 +251,9 @@ class RFModel(AbstractModel):
         y_pred_proba = self.model.predict_proba(X)
         return self._convert_proba_to_unified_form(y_pred_proba)
 
-    def get_oof_pred_proba(self, X, normalize=None, **kwargs):
+    def predict_proba_oof(self, X, normalize=None, **kwargs):
         """X should be the same X passed to `.fit`"""
-        y_oof_pred_proba = self._get_oof_pred_proba(X=X, **kwargs)
+        y_oof_pred_proba = self._predict_proba_oof(X=X, **kwargs)
         if normalize is None:
             normalize = self.normalize_pred_probas
         if normalize:
@@ -271,7 +271,7 @@ class RFModel(AbstractModel):
         return callable(getattr(self.model, "_set_oob_score", None)) or self._is_sklearn_1()
 
     # FIXME: Unknown if this works with quantile regression
-    def _get_oof_pred_proba(self, X, y, **kwargs):
+    def _predict_proba_oof(self, X, y, **kwargs):
         if not self.model.bootstrap:
             raise ValueError("Forest models must set `bootstrap=True` to compute out-of-fold predictions via out-of-bag predictions.")
 

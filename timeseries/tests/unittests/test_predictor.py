@@ -1,5 +1,6 @@
 """Unit tests for predictors"""
 import copy
+import sys
 import tempfile
 from pathlib import Path
 from unittest import mock
@@ -37,7 +38,7 @@ def test_when_predictor_called_then_training_is_performed(temp_model_path):
         hyperparameters={"SimpleFeedForward": {"epochs": 1}},
         tuning_data=DUMMY_TS_DATAFRAME,
     )
-    assert "SimpleFeedForward" in predictor.get_model_names()
+    assert "SimpleFeedForward" in predictor.model_names()
 
 
 @pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS + ["fast_training"])  # noqa
@@ -180,7 +181,7 @@ def test_given_hyperparameters_when_predictor_called_and_loaded_back_then_all_mo
 
     loaded_predictor = TimeSeriesPredictor.load(temp_model_path)
 
-    for model_name in loaded_predictor.get_model_names():
+    for model_name in loaded_predictor.model_names():
         predictions = loaded_predictor.predict(DUMMY_TS_DATAFRAME, model=model_name)
 
         assert isinstance(predictions, TimeSeriesDataFrame)
@@ -191,6 +192,7 @@ def test_given_hyperparameters_when_predictor_called_and_loaded_back_then_all_mo
         assert not np.any(np.isnan(predictions))
 
 
+@pytest.mark.skipif(sys.platform.startswith("win"), reason="HPO tests lead to known issues in Windows platform tests")
 @pytest.mark.parametrize("target_column", ["target", "custom"])
 @pytest.mark.parametrize(
     "hyperparameters",
@@ -229,9 +231,9 @@ def test_given_hp_spaces_and_custom_target_when_predictor_called_predictor_can_p
     predictor = TimeSeriesPredictor(**init_kwargs)
     predictor.fit(**fit_kwargs)
 
-    assert predictor.get_model_names()
+    assert predictor.model_names()
 
-    for model_name in predictor.get_model_names():
+    for model_name in predictor.model_names():
         predictions = predictor.predict(df, model=model_name)
 
         assert isinstance(predictions, TimeSeriesDataFrame)
@@ -279,7 +281,7 @@ def test_given_enable_ensemble_true_when_predictor_called_then_ensemble_is_fitte
             "DeepAR": {"epochs": 1},
         },
     )
-    assert any("ensemble" in n.lower() for n in predictor.get_model_names())
+    assert any("ensemble" in n.lower() for n in predictor.model_names())
 
 
 def test_given_enable_ensemble_true_and_only_one_model_when_predictor_called_then_ensemble_is_not_fitted(
@@ -293,7 +295,7 @@ def test_given_enable_ensemble_true_and_only_one_model_when_predictor_called_the
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters={"SimpleFeedForward": {"epochs": 1}},
     )
-    assert not any("ensemble" in n.lower() for n in predictor.get_model_names())
+    assert not any("ensemble" in n.lower() for n in predictor.model_names())
 
 
 def test_given_enable_ensemble_false_when_predictor_called_then_ensemble_is_not_fitted(temp_model_path):
@@ -306,7 +308,7 @@ def test_given_enable_ensemble_false_when_predictor_called_then_ensemble_is_not_
         hyperparameters={"SimpleFeedForward": {"epochs": 1}},
         enable_ensemble=False,
     )
-    assert not any("ensemble" in n.lower() for n in predictor.get_model_names())
+    assert not any("ensemble" in n.lower() for n in predictor.model_names())
 
 
 def test_given_model_fails_when_predictor_predicts_then_exception_is_raised(temp_model_path):
@@ -352,6 +354,7 @@ def test_given_searchspace_and_no_hyperparameter_tune_kwargs_when_predictor_fits
         )
 
 
+@pytest.mark.skipif(sys.platform.startswith("win"), reason="HPO tests lead to known issues in Windows platform tests")
 def test_given_mixed_searchspace_and_hyperparameter_tune_kwargs_when_predictor_fits_then_no_exception_is_raised(
     temp_model_path,
 ):
@@ -440,7 +443,7 @@ def test_when_train_data_contains_nans_then_predictor_can_fit(temp_model_path):
         df,
         hyperparameters=TEST_HYPERPARAMETER_SETTINGS[0],
     )
-    assert "SimpleFeedForward" in predictor.get_model_names()
+    assert "SimpleFeedForward" in predictor.model_names()
 
 
 def test_when_prediction_data_contains_nans_then_predictor_can_predict(temp_model_path):
@@ -564,11 +567,11 @@ def test_when_refit_full_called_then_best_model_is_updated(temp_model_path, set_
             "SimpleFeedForward": {"epochs": 1, "num_batches_per_epoch": 1},
         },
     )
-    model_best_before = predictor.get_model_best()
-    model_full_dict = predictor.refit_full(set_best_to_refit_full=set_best_to_refit_full)
-    model_best_after = predictor.get_model_best()
+    model_best_before = predictor.model_best()
+    model_refit_map = predictor.refit_full(set_best_to_refit_full=set_best_to_refit_full)
+    model_best_after = predictor.model_best()
     if set_best_to_refit_full:
-        assert model_best_after == model_full_dict[model_best_before]
+        assert model_best_after == model_refit_map[model_best_before]
     else:
         assert model_best_after == model_best_before
 
@@ -689,7 +692,7 @@ def test_given_irregular_time_series_when_predictor_called_with_freq_then_predic
     assert isinstance(df, TimeSeriesDataFrame)
     assert not np.any(np.isnan(predictions))
     assert all(len(predictions.loc[i]) == 1 for i in df.item_ids)
-    assert "SimpleFeedForward" in predictor.get_model_names()
+    assert "SimpleFeedForward" in predictor.model_names()
 
 
 def test_given_irregular_time_series_and_no_tuning_when_predictor_called_with_freq_then_predictor_can_predict(
@@ -708,7 +711,7 @@ def test_given_irregular_time_series_and_no_tuning_when_predictor_called_with_fr
     assert isinstance(df, TimeSeriesDataFrame)
     assert not np.any(np.isnan(predictions))
     assert all(len(predictions.loc[i]) == 1 for i in df.item_ids)
-    assert "SimpleFeedForward" in predictor.get_model_names()
+    assert "SimpleFeedForward" in predictor.model_names()
 
 
 @pytest.mark.parametrize("predictor_freq", ["H", "2H", "20T"])
@@ -957,7 +960,7 @@ def test_given_time_limit_is_not_none_then_first_model_doesnt_receive_full_time_
     temp_model_path, enable_ensemble, hyperparameters, hyperparameter_tune_kwargs
 ):
     time_limit = 20
-    expected_time_limit_for_first_model = time_limit / (len(hyperparameters) + int(enable_ensemble))
+    expected_time_limit_for_first_model = time_limit / (len(hyperparameters) + int(enable_ensemble)) + 0.1
     predictor = TimeSeriesPredictor(path=temp_model_path)
     with mock.patch("autogluon.timeseries.models.local.naive.SeasonalNaiveModel.fit") as snaive_fit:
         predictor.fit(

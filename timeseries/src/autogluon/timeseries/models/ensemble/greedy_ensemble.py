@@ -1,5 +1,6 @@
 import copy
 import logging
+import pprint
 from typing import Dict, List, Optional
 
 import numpy as np
@@ -131,6 +132,9 @@ class TimeSeriesGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
             if weight != 0:
                 self.model_to_weight[model_name] = weight
 
+        weights_for_printing = {model: round(weight, 2) for model, weight in self.model_to_weight.items()}
+        logger.info(f"\tEnsemble weights: {pprint.pformat(weights_for_printing, width=200)}")
+
     @property
     def model_names(self) -> List[str]:
         return list(self.model_to_weight.keys())
@@ -158,9 +162,9 @@ class TimeSeriesGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
         info["model_weights"] = self.model_to_weight
         return info
 
-    def remap_base_models(self, model_full_dict: Dict[str, str]) -> None:
+    def remap_base_models(self, model_refit_map: Dict[str, str]) -> None:
         updated_weights = {}
         for model, weight in self.model_to_weight.items():
-            model_full_name = model_full_dict.get(model, model)
+            model_full_name = model_refit_map.get(model, model)
             updated_weights[model_full_name] = weight
         self.model_to_weight = updated_weights

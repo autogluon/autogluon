@@ -50,13 +50,13 @@ class PetFinderDataset:
 
         _, self._train_df = train_test_split(
             self._train_df,
-            test_size=0.1,
+            test_size=0.3,
             random_state=np.random.RandomState(123),
             stratify=self._train_df[self.label_columns[0]],
         )
         _, self._test_df = train_test_split(
             self._test_df,
-            test_size=0.1,
+            test_size=0.3,
             random_state=np.random.RandomState(123),
             stratify=self._test_df[self.label_columns[0]],
         )

@@ -77,7 +77,7 @@ def inner_test_tabular(testname):
         # Run this model and set of params
         predictor = TabularPredictor(label="label", **params["predict"])
         predictor.fit(dftrain, **params["fit"])
-        leaderboard = predictor.leaderboard(dftest, silent=True)
+        leaderboard = predictor.leaderboard(dftest)
         leaderboard = leaderboard.sort_values(by="model")  # So we can pre-generate sample config in alphabetical order
 
         # Store proposed new config based on the current run, in case the developer wants to keep thee results (just cut and paste).

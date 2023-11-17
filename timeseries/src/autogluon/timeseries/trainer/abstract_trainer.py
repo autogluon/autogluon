@@ -279,7 +279,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         # Dict of normal model -> FULL model. FULL models are produced by
         # self.refit_single_full() and self.refit_full().
-        self.model_full_dict = {}
+        self.model_refit_map = {}
 
         self.eval_metric: TimeSeriesScorer = check_get_evaluation_metric(eval_metric)
         self.eval_metric_seasonal_period = eval_metric_seasonal_period
@@ -1042,7 +1042,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         model_to_level = self._get_model_levels()
         models_sorted_by_level = sorted(models, key=model_to_level.get)
 
-        model_full_dict = {}
+        model_refit_map = {}
         models_trained_full = []
         for model in models_sorted_by_level:
             model = self.load_model(model)
@@ -1060,17 +1060,17 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 logger.info(f"Fitting model: {model_full.name} | Skipping fit via cloning parent ...")
                 models_trained = [model_full.name]
                 if isinstance(model_full, AbstractTimeSeriesEnsembleModel):
-                    model_full.remap_base_models(model_full_dict)
+                    model_full.remap_base_models(model_refit_map)
                     self._add_model(model_full, base_models=model_full.model_names)
                 else:
                     self._add_model(model_full)
                 self.save_model(model_full)
 
             if len(models_trained) == 1:
-                model_full_dict[model_name] = models_trained[0]
+                model_refit_map[model_name] = models_trained[0]
             models_trained_full += models_trained
 
-        self.model_full_dict.update(model_full_dict)
+        self.model_refit_map.update(model_refit_map)
         self.save()
         return models_trained_full
 
@@ -1086,10 +1086,10 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         valid_model_set = []
         for name in model_names:
-            if name in self.model_full_dict and self.model_full_dict[model] in existing_models:
+            if name in self.model_refit_map and self.model_refit_map[model] in existing_models:
                 logger.info(
                     f"Model '{name}' already has a refit _FULL model: "
-                    f"'{self.model_full_dict[model]}', skipping refit...",
+                    f"'{self.model_refit_map[model]}', skipping refit...",
                 )
             else:
                 valid_model_set.append(name)
@@ -1102,7 +1102,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         self.save()
         logger.info(f"Refit complete. Models trained: {models_trained_full}")
         logger.info(f"Total runtime: {time.time() - time_start:.2f} s")
-        return copy.deepcopy(self.model_full_dict)
+        return copy.deepcopy(self.model_refit_map)
 
     def construct_model_templates(
         self, hyperparameters: Union[str, Dict[str, Any]], multi_window: bool = False, **kwargs

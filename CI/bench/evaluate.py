@@ -132,11 +132,11 @@ if branch_name != "master":
         if "master" in row['framework']:
             master_win_rate = row['winrate']
 
-    pr_comment = "\nBenchmark Test Result - Pass\n"
+    pr_comment = f"\nBenchmark Test Result - Pass\nEvaluation Results Path: s3://autogluon-ci-benchmark/evaluation/{module_name}/{branch_name}\n"
     for _, row in df.iterrows():
         if ("master" not in row['framework']) and (master_win_rate >= row['winrate']):
             pr_comment = ""
-            pr_comment = "\nBenchmark Test Result - Fail\n"
+            pr_comment = f"\nBenchmark Test Result - Fail\nEvaluation Results Path: s3://autogluon-ci-benchmark/evaluation/{module_name}/{branch_name}\n"
 
     with open("final_eval.txt", "w") as file:
         file.write(pr_comment)

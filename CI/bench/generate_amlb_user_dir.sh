@@ -7,8 +7,7 @@ SHORT_SHA=$4
 PR_NUMBER=$5
 FOLDS=$6
 
-
-# generate custom benchmark configs
+# generate custom amlb configs
 if [ -z "$FOLDS" ] || [ $MODULE == 'multimodal' ] ; then
     python $(dirname "$0")/generate_framework.py --module $MODULE --repository https://github.com/$REPOSITORY.git --branch $BRANCH --folds_to_run -1
 else
@@ -26,6 +25,7 @@ USER_DIR="amlb_user_dir"
 if [ $MODULE == 'multimodal' ]; then
     USER_DIR="custom_user_dir"
     aws s3 cp --recursive s3://autogluon-ci-benchmark/configs/custom-dataloaders/ $(dirname "$0")/$MODULE/$USER_DIR/dataloaders/
+    aws s3 cp --recursive s3://autogluon-ci-benchmark/configs/custom-metrics/ $(dirname "$0")/$MODULE/custom_metrics/
 fi
 
 # keep commit sha for future reference

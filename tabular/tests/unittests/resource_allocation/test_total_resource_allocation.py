@@ -48,7 +48,7 @@ def test_bagged_model_with_total_resources(mock_system_resources_ctx_mgr, mock_n
         }
         resources = bagged_model._preprocess_fit_resources(total_resources=total_resources, k_fold=k_fold)
         resources.pop("k_fold")
-        assert resources == {"num_cpus": ResourceManager.get_cpu_count(), "num_gpus": ResourceManager.get_gpu_count_all()}
+        assert resources == {"num_cpus": ResourceManager.get_cpu_count(), "num_gpus": ResourceManager.get_gpu_count()}
 
 
 def test_bagged_model_with_total_resources_and_ensemble_resources(mock_system_resources_ctx_mgr, mock_num_cpus, mock_num_gpus, k_fold):
@@ -100,7 +100,7 @@ def test_bagged_model_with_total_resources_but_no_gpu_specified(mock_system_reso
         bagged_model.initialize()
         resources = bagged_model._preprocess_fit_resources(total_resources=total_resources, k_fold=k_fold)
         resources.pop("k_fold")
-        default_model_resources = {"num_cpus": 2, "num_gpus": ResourceManager.get_gpu_count_all()}  # return all gpu resources as default needs gpu
+        default_model_resources = {"num_cpus": 2, "num_gpus": ResourceManager.get_gpu_count()}  # return all gpu resources as default needs gpu
         assert resources == default_model_resources
 
 
@@ -145,7 +145,7 @@ def test_bagged_model_without_total_resources_and_without_model_resources(mock_s
         # Bagged model should take all resources and internally calculate correct resources given ag_args_ensemble and ag_args_fit
         expected_model_resources = {
             "num_cpus": ResourceManager.get_cpu_count(),
-            "num_gpus": ResourceManager.get_gpu_count_all(),
+            "num_gpus": ResourceManager.get_gpu_count(),
         }
         assert resources == expected_model_resources
 
@@ -223,6 +223,6 @@ def test_nonbagged_model_without_total_resources_and_without_model_resources(moc
         default_model_num_cpus, default_model_num_gpus = model_base._get_default_resources()
         default_model_resources = {
             "num_cpus": min(default_model_num_cpus, ResourceManager.get_cpu_count()),
-            "num_gpus": min(default_model_num_gpus, ResourceManager.get_gpu_count_all()),
+            "num_gpus": min(default_model_num_gpus, ResourceManager.get_gpu_count()),
         }
         assert resources == default_model_resources
