@@ -51,8 +51,9 @@ from .load import CustomUnpickler, get_dir_ckpt_paths, get_load_ckpt_paths, load
 from .log import (
     LogFilter,
     apply_log_filter,
-    get_fit_complete_message,
-    get_fit_start_message,
+    on_fit_start_message,
+    on_per_fit_run_start_message,
+    on_fit_end_message,
     get_gpu_message,
     make_exp_dir,
 )

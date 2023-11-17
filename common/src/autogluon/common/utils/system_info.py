@@ -37,7 +37,7 @@ def get_ag_system_info_disk_space(path: str) -> Tuple[str, int]:
         return msg, disk_verbosity
 
 
-def get_ag_system_info(*, path: str = None, include_gpu_count=False) -> str:
+def get_ag_system_info(*, path: str = None, include_gpu_count=False, include_pytorch=False, include_cuda=False) -> str:
     resource_manager: ResourceManager = get_resource_manager()
     system_num_cpus = resource_manager.get_cpu_count()
     available_mem = ResourceManager.get_available_virtual_mem("GB")
@@ -54,7 +54,23 @@ def get_ag_system_info(*, path: str = None, include_gpu_count=False) -> str:
         f"Platform Version:   {platform.version()}",
         f"CPU Count:          {system_num_cpus}",
     ]
-
+    if include_pytorch:
+        try:
+            import torch
+            torch_version = torch.__version__
+        except Exception as e:
+            torch_version = "Can't import torch"
+        msg_list.append(f"Pytorch Version:   {torch_version}")
+    if include_cuda:
+        try:
+            import torch
+            if torch.cuda.is_available():
+                cuda_version = torch.version.cuda
+            else:
+                cuda_version = "CUDA is not available"
+        except Exception as e:
+            cuda_version = "Can't get cuda version from torch"
+        msg_list.append(f"CUDA Version:   {cuda_version}")
     if include_gpu_count:
         try:
             system_num_gpus = resource_manager.get_gpu_count_torch()

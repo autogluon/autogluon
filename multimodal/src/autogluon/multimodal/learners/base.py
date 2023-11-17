@@ -108,8 +108,9 @@ from ..utils import (
     filter_hyperparameters,
     get_config,
     get_dir_ckpt_paths,
-    get_fit_complete_message,
-    get_fit_start_message,
+    on_fit_start_message,
+    on_per_fit_run_start_message,
+    on_fit_end_message,
     get_gpu_message,
     get_load_ckpt_paths,
     get_local_pretrained_config_paths,
@@ -573,7 +574,9 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                 self._presets = presets
         if teacher_learner:
             self._teacher_learner = teacher_learner
-
+        assert os.path.exists(self._save_path), f"path {self._save_path} doesn't exist"
+        exit()
+        logger.info(on_fit_start_message(path=self._save_path))
         training_start = time.time()
         return training_start
 
@@ -601,7 +604,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         training_end = time.time()
         self._total_train_time = training_end - training_start
         # TODO(?) We should have a separate "_post_training_event()" for logging messages.
-        logger.info(get_fit_complete_message(self._save_path))
+        logger.info(on_fit_end_message(self._save_path))
 
     def fit(
         self,
@@ -620,8 +623,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         clean_ckpts: Optional[bool] = True,
         **kwargs,
     ):
-        training_start = self.on_fit_start(presets=presets, teacher_learner=teacher_learner)
         self.setup_save_path(save_path=save_path)
+        training_start = self.on_fit_start(presets=presets, teacher_learner=teacher_learner)
         self.infer_problem_type(train_data=train_data)
         self.prepare_train_tuning_data(
             train_data=train_data,
@@ -1058,7 +1061,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         num_gpus = self.update_num_gpus_by_data_size(num_gpus=num_gpus, data=data)
         strategy = self.get_strategy_per_run(num_gpus=num_gpus, config=config)
         strategy, num_gpus = self.update_strategy_and_num_gpus_for_hpo(strategy=strategy, num_gpus=num_gpus)
-        num_gpus, strategy = run_ddp_only_once(num_gpus, strategy)
+        num_gpus, strategy = run_ddp_only_once(num_gpus=num_gpus, strategy=strategy)
 
         if is_train:
             self.log_gpu_info(num_gpus=num_gpus, config=config)
@@ -1191,9 +1194,9 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                 return outputs
 
     def on_fit_per_run_start(self, seed, save_path):
-        pl.seed_everything(seed, workers=True)
         # TODO(?) We should have a separate "_pre_training_event()" for logging messages.
-        logger.info(get_fit_start_message(save_path, self._validation_metric_name))
+        logger.info(on_per_fit_run_start_message(save_path, self._validation_metric_name))
+        pl.seed_everything(seed, workers=True)
 
     def on_fit_per_run_end(
         self,

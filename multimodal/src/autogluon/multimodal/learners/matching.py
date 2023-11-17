@@ -10,6 +10,7 @@ import sys
 import warnings
 from datetime import timedelta
 from typing import Callable, Dict, List, Optional, Union
+import time
 
 import lightning.pytorch as pl
 import numpy as np
@@ -77,8 +78,7 @@ from ..utils import (
     filter_hyperparameters,
     get_config,
     get_dir_ckpt_paths,
-    get_fit_complete_message,
-    get_fit_start_message,
+    on_fit_end_message,
     get_load_ckpt_paths,
     get_local_pretrained_config_paths,
     get_minmax_mode,
@@ -459,9 +459,6 @@ class MultiModalMatcher(BaseLearner):
         """
         fit_called = self._fit_called  # used in current function
         self._fit_called = True
-
-        pl.seed_everything(seed, workers=True)
-
         self._save_path = setup_save_path(
             resume=self._resume,
             old_save_path=self._save_path,
@@ -470,7 +467,7 @@ class MultiModalMatcher(BaseLearner):
             warn_if_exist=False,
             fit_called=fit_called,
         )
-
+        training_start = self.on_fit_start(presets=presets)
         if isinstance(train_data, str):
             train_data = load_pd.load(train_data)
         if isinstance(tuning_data, str):
@@ -581,6 +578,7 @@ class MultiModalMatcher(BaseLearner):
             ckpt_path=None if self._is_hpo else self._ckpt_path,
             resume=False if self._is_hpo else self._resume,
             enable_progress_bar=False if self._is_hpo else self._enable_progress_bar,
+            seed=seed,
             presets=presets,
             hyperparameters=hyperparameters,
             advanced_hyperparameters=advanced_hyperparameters,
@@ -599,9 +597,11 @@ class MultiModalMatcher(BaseLearner):
             return predictor
 
         self.fit_per_run(**_fit_args)
+        training_end = time.time()
+        self._total_train_time = training_end - training_start
 
         # TODO(?) We should have a separate "_post_training_event()" for logging messages.
-        logger.info(get_fit_complete_message(self._save_path))
+        logger.info(on_fit_end_message(self._save_path))
         return self
 
     def _get_matcher_df_preprocessor(
@@ -713,13 +713,12 @@ class MultiModalMatcher(BaseLearner):
         ckpt_path: str,
         resume: bool,
         enable_progress_bar: bool,
+        seed: int,
         presets: Optional[str] = None,
         hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
         advanced_hyperparameters: Optional[Dict] = None,
-        **hpo_kwargs,
     ):
-        # TODO(?) We should have a separate "_pre_training_event()" for logging messages.
-        logger.info(get_fit_start_message(save_path, self._validation_metric_name))
+        self.on_fit_per_run_start(seed=seed, save_path=save_path)
         config = self._config
         config = get_config(
             problem_type=self._pipeline,
@@ -1002,6 +1001,7 @@ class MultiModalMatcher(BaseLearner):
                     save_path=save_path,
                     top_k_average_method=config.optimization.top_k_average_method,
                 )
+            self._best_score = trainer.callback_metrics[f"val_{self._validation_metric_name}"].item()
         else:
             sys.exit(f"Training finished, exit the process with global_rank={trainer.global_rank}...")
 
