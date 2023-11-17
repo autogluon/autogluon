@@ -1,5 +1,6 @@
 import copy
 import logging
+import pprint
 from typing import Dict, List, Optional
 
 import numpy as np
@@ -130,6 +131,9 @@ class TimeSeriesGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
         for model_name, weight in zip(predictions_per_window.keys(), ensemble_selection.weights_):
             if weight != 0:
                 self.model_to_weight[model_name] = weight
+
+        weights_for_printing = {model: round(weight, 2) for model, weight in self.model_to_weight.items()}
+        logger.info(f"\tEnsemble weights: {pprint.pformat(weights_for_printing, width=200)}")
 
     @property
     def model_names(self) -> List[str]:

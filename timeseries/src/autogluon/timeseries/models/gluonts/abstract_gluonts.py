@@ -105,7 +105,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
             # GluonTS expects item_id to be a string
             ts = {
                 FieldName.ITEM_ID: str(self.item_ids[j]),
-                FieldName.START: pd.Period(self.start_timestamps[j], freq=self.freq),
+                FieldName.START: pd.Period(self.start_timestamps.iloc[j], freq=self.freq),
                 FieldName.TARGET: self.target_array[start_idx:end_idx],
             }
             if self.feat_static_cat is not None:

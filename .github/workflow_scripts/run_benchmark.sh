@@ -51,7 +51,7 @@ for file in ./results/*; do
     aws s3 rm --recursive "$CLEANED_PATH/$BRANCH_NAME/latest/"
     aws s3 cp "$file" "$CLEANED_PATH/$BRANCH_NAME/latest/$(basename "$file")"
 
-    if [[ "$(basename "$file")" != "master"* ]]; then
+    if [[ "$(basename "$file")" == "master"* ]]; then
         aws s3 cp --recursive ./evaluate "$EVALUATION_PATH/$BRANCH_NAME/$SHA/"
         aws s3 rm --recursive "$EVALUATION_PATH/$BRANCH_NAME/latest/"
         aws s3 cp --recursive ./evaluate "$EVALUATION_PATH/$BRANCH_NAME/latest/"

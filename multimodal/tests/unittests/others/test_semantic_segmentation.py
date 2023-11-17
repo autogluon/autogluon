@@ -148,7 +148,6 @@ def test_sam_semantic_segmentation_zero_shot_evaluate_predict(checkpoint_name):
 
     # Predict without ground truth
     _, _, test_df = get_file_df_binary_semantic_seg(need_test_gt=False)
-    predictor._learner._label_column = None
     predictor.predict(test_df, save_results=False)
 
 

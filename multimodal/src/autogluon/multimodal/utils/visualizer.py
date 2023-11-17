@@ -2,24 +2,26 @@
 # Disclaimer: Special thanks to the Detectron2 developers
 # https://github.com/facebookresearch/detectron2/blob/main/detectron2/utils/visualizer.py!
 # We use part of its provided, open-source functionalities.
-
+import collections
 import colorsys
 import logging
+import re
 from enum import Enum, unique
 from typing import List
 
 import matplotlib as mpl
 import matplotlib.colors as mplc
 import matplotlib.figure as mplfigure
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.backends.backend_agg import FigureCanvasAgg
+from PIL import Image
 
 from .colormap import random_color
+from .misc import merge_spans
 
 logger = logging.getLogger(__name__)
-
-__all__ = ["ColorMode", "VisImage", "Visualizer"]
 
 
 _SMALL_OBJECT_AREA_THRESH = 1000
@@ -158,7 +160,7 @@ class VisImage:
         return rgb.astype("uint8")
 
 
-class Visualizer:
+class ObjectDetectionVisualizer:
     """
     Visualizer that draws data about detection on images.
 
@@ -491,3 +493,132 @@ class Visualizer:
         modified_lightness = 1.0 if modified_lightness > 1.0 else modified_lightness
         modified_color = colorsys.hls_to_rgb(polygon_color[0], modified_lightness, polygon_color[2])
         return modified_color
+
+
+class SemanticSegmentationVisualizer:
+    """
+    Visualize images and predicted semantic segmentation masks.
+    """
+
+    def plot_image(self, img_path: str):
+        """
+        Parameters
+        ----------
+            img_path
+                File path of the image.
+        """
+        image = Image.open(img_path)
+        plt.imshow(image)
+
+    def plot_mask(self, pred: np.array, output_path: str = None):
+        """
+        Parameters
+        ----------
+            pred
+                np.array of the mask prediction
+            output_path
+                The path to save the mask image.
+        """
+
+        def show_mask(mask, ax):
+            color = np.concatenate([np.random.random(3), np.array([0.6])], axis=0)
+            h, w = mask.shape[-2:]
+            mask_image = mask.reshape(h, w, 1) * color.reshape(1, 1, -1)
+            ax.imshow(mask_image)
+
+        class_ids = np.unique(pred)
+        for class_id in class_ids:
+            if class_id == 0:  # background
+                continue
+            show_mask(pred == class_id, plt.gca())
+
+        if output_path:
+            plt.savefig(output_path)
+        plt.show()
+
+
+class NERVisualizer:
+    """An NER visualizer that renders NER prediction as a string of HTML
+    inline to any Python class Jupyter notebooks.
+    """
+
+    def __init__(self, pred, sent, seed):
+        self.pred = pred
+        self.sent = sent
+        self.colors = {}
+        self.spans = merge_spans(sent, pred, for_visualizer=True)
+        self.spans = collections.OrderedDict(sorted(self.spans.items()))
+        self.rng = np.random.RandomState(seed)
+
+    @staticmethod
+    def escape_html(text: str) -> str:
+        """Replace <, >, &, " with their HTML encoded representation. Intended to
+        prevent HTML errors in rendered displaCy markup.
+        text (str): The original text.
+        RETURNS (str): Equivalent text to be safely used within HTML.
+        """
+        text = text.replace("&", "&amp;")
+        text = text.replace("<", "&lt;")
+        text = text.replace(">", "&gt;")
+        text = text.replace('"', "&quot;")
+        return text
+
+    def html_template(self, text, label, color):
+        """
+        Generate an HTML template for the given text and its label.
+
+        Parameters
+        ----------
+        text
+            The text to be highlighted.
+        label
+            The predicted label for the given text.
+        color
+            The background color of the mark tag.
+        """
+        text = '<mark style="background-color:{}; color:white; border-radius: .6em .6em; padding: .1em;">{} \
+         <b style="background-color:white; color:black; font-size:x-small; border-radius: 0.5em .5em; padding: .0em;">{} </b> \
+         </mark>'.format(
+            color, self.escape_html(text), self.escape_html(label)
+        )
+        return text
+
+    def _repr_html_(self):
+        entities = []
+        new_sent = ""
+        last = 0
+        for key, value in self.spans.items():
+            entity_group = value[-1]
+            if re.match("B-", entity_group, re.IGNORECASE) or re.match("I-", entity_group, re.IGNORECASE):
+                entity_group = entity_group[2:]
+            if entity_group not in self.colors:
+                self.colors.update({entity_group: "#%06X" % self.rng.randint(0, 0xFFFFFF)})
+            start = key
+            new_sent += self.sent[last:start]
+            last = end = value[0]
+            entity_text = self.html_template(self.sent[start:end], entity_group, color=self.colors[entity_group])
+            new_sent += entity_text
+        new_sent += self.sent[last:]
+
+        return new_sent
+
+
+def visualize_ner(sentence, prediction, seed=0):
+    """
+    Visualize the prediction of NER.
+
+    Parameters
+    ----------
+    sentence
+        The input sentence.
+    prediction
+        The NER prediction for the sentence.
+    seed
+        The seed for colorpicker.
+
+    Returns
+    -------
+    An NER html visualizer.
+    """
+    visualizer = NERVisualizer(prediction, sentence, seed)
+    return visualizer
