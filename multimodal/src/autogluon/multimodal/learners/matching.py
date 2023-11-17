@@ -22,6 +22,7 @@ from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.core.utils.loaders import load_pd
+from autogluon.common.utils.resource_utils import ResourceManager
 
 from .. import version as ag_version
 from ..constants import (
@@ -94,7 +95,7 @@ from ..utils import (
     select_model,
     setup_save_path,
     split_hyperparameters,
-    split_train_tuning_data,
+    update_config_by_rules,
     update_hyperparameters,
     upgrade_config,
 )
@@ -377,6 +378,72 @@ class MultiModalMatcher(BaseLearner):
         if not self._fit_called:
             self._init_pretrained()
 
+    def prepare_fit_args(
+        self,
+        time_limit: int,
+        seed: int,
+        standalone: Optional[bool] = True,
+        clean_ckpts: Optional[bool] = True,
+    ):
+        if time_limit is not None:
+            time_limit = timedelta(seconds=time_limit)
+        self._fit_args = dict(
+            max_time=time_limit,
+            save_path=self._save_path,  # In HPO mode, this would be overwritten by per trial path.
+            ckpt_path=None if self._is_hpo else self._ckpt_path,
+            resume=False if self._is_hpo else self._resume,
+            enable_progress_bar=False if self._is_hpo else self._enable_progress_bar,
+            seed=seed,
+            hyperparameters=self._hyperparameters,  # In HPO mode, this would be overwritten by sampled hyperparameters.
+            advanced_hyperparameters=self._advanced_hyperparameters,
+            standalone=standalone,
+            clean_ckpts=clean_ckpts,
+        )
+        if self._fit_called:  # continuous training
+            continuous_train_args = dict(
+                config=self._config,
+            )  # TODO: add more continuous training arguments
+            self._fit_args.update(continuous_train_args)
+
+    def update_attributes(
+        self,
+        config: Optional[Dict] = None,
+        df_preprocessor: Optional[MultiModalFeaturePreprocessor] = None,
+        data_processors: Optional[Dict] = None,
+        model: Optional[nn.Module] = None,
+        best_score: Optional[float] = None,
+        **kwargs,
+    ):
+        self._config = config
+        self._query_config = query_config
+        self._response_config = response_config
+        self._query_model = query_model
+        self._response_model = response_model
+        self._query_df_preprocessor = query_df_preprocessor
+        self._response_df_preprocessor = response_df_preprocessor
+        self._label_df_preprocessor = label_df_preprocessor
+        self._query_processors = query_processors
+        self._response_processors = response_processors
+        self._label_processors = label_processors
+        self._loss_func = loss_func
+        if best_score:
+            self._best_score = best_score
+
+    def execute_fit(self):
+        if self._is_hpo:
+            self._fit_args["learner"] = self
+            hyperparameter_tune(
+                hyperparameter_tune_kwargs=self._hyperparameter_tune_kwargs,
+                resources=dict(num_gpus=ResourceManager.get_gpu_count_torch()),  # TODO: allow customizing GPUs
+                is_matching=True,
+                **self._fit_args,
+            )
+            return dict()
+        else:
+            attributes = self.fit_per_run(**self._fit_args)
+            self.update_attributes(**attributes)  # only update attributes for non-HPO mode
+            return attributes
+
     def fit(
         self,
         train_data: pd.DataFrame,
@@ -390,6 +457,8 @@ class MultiModalMatcher(BaseLearner):
         holdout_frac: Optional[float] = None,
         hyperparameter_tune_kwargs: Optional[dict] = None,
         seed: Optional[int] = 123,
+        standalone: Optional[bool] = True,
+        clean_ckpts: Optional[bool] = True,
         **kwargs,
     ):
         """
@@ -457,151 +526,37 @@ class MultiModalMatcher(BaseLearner):
         -------
         An "MultiModalMatcher" object (itself).
         """
-        fit_called = self._fit_called  # used in current function
-        self._fit_called = True
-        self._save_path = setup_save_path(
-            resume=self._resume,
-            old_save_path=self._save_path,
-            proposed_save_path=save_path,
-            raise_if_exist=True,
-            warn_if_exist=False,
-            fit_called=fit_called,
-        )
+        self.setup_save_path(save_path=save_path)
         training_start = self.on_fit_start(presets=presets)
-        if isinstance(train_data, str):
-            train_data = load_pd.load(train_data)
-        if isinstance(tuning_data, str):
-            tuning_data = load_pd.load(tuning_data)
-
-        if tuning_data is None:
-            train_data, tuning_data = split_train_tuning_data(
-                data=train_data,
-                holdout_frac=holdout_frac,
-                problem_type=self._problem_type,
-                label_column=self._label_column,
-                random_state=seed,
-            )
-        self._train_data = train_data
-        self._tuning_data = tuning_data
-
-        if self._label_column:
-            self._problem_type = infer_problem_type(
-                y_train_data=train_data[self._label_column],
-                provided_problem_type=self._problem_type,
-            )
-
-        column_types = infer_column_types(
-            data=train_data,
-            valid_data=tuning_data,
-            label_columns=self._label_column,
-            provided_column_types=column_types,
-            problem_type=self._problem_type,  # used to update the corresponding column type
-        )
-
-        output_shape = infer_output_shape(
-            label_column=self._label_column,
-            data=train_data,
-            problem_type=self._problem_type,
-        )
-
-        logger.debug(f"column_types: {column_types}")
-        logger.debug(f"image columns: {[k for k, v in column_types.items() if v == 'image_path']}")
-
-        if self._column_types is not None and self._column_types != column_types:
-            warnings.warn(
-                f"Inferred column types {column_types} are inconsistent with "
-                f"the previous {self._column_types}. "
-                f"New columns will not be used in the current training."
-            )
-            # use previous column types to avoid inconsistency with previous numerical mlp and categorical mlp
-            column_types = self._column_types
-
-        if self._output_shape is not None:
-            assert self._output_shape == output_shape, (
-                f"Inferred output shape {output_shape} is different from " f"the previous {self._output_shape}"
-            )
-
-        if self._validation_metric_name is None or self._eval_metric_name is None:
-            validation_metric_name, eval_metric_name = infer_metrics(
-                problem_type=self._problem_type,
-                is_matching=self._pipeline in matcher_presets.list_keys(),
-                eval_metric_name=self._eval_metric_name,
-            )
-            minmax_mode = get_minmax_mode(validation_metric_name)
-        else:
-            validation_metric_name = self._validation_metric_name
-            eval_metric_name = self._eval_metric_name
-            minmax_mode = self._minmax_mode
-
-        if time_limit is not None:
-            time_limit = timedelta(seconds=time_limit)
-
-        if self._presets is not None:
-            presets = self._presets
-        else:
-            self._presets = presets
-
-        # set attributes for saving and prediction
-        self._eval_metric_name = eval_metric_name  # In case eval_metric isn't provided in __init__().
-        self._validation_metric_name = validation_metric_name
-        self._minmax_mode = minmax_mode
-        self._output_shape = output_shape
-        self._column_types = column_types
-
-        if self._hyperparameters and hyperparameters:
-            self._hyperparameters.update(hyperparameters)
-        elif hyperparameters:
-            self._hyperparameters = hyperparameters
-
-        hyperparameters, hyperparameter_tune_kwargs = update_hyperparameters(
-            problem_type=self._pipeline,
-            presets=presets,
-            provided_hyperparameters=self._hyperparameters,
-            provided_hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-        )
-        # split out the hyperparameters whose values are complex objects
-        hyperparameters, advanced_hyperparameters = split_hyperparameters(hyperparameters)
-
-        self._is_hpo = True if hyperparameter_tune_kwargs else False
-        if self._is_hpo:
-            hyperparameters = filter_hyperparameters(
-                hyperparameters=hyperparameters,
-                column_types=column_types,
-                config=self._config,
-                fit_called=fit_called,
-            )
-
-        _fit_args = dict(
-            id_mappings=id_mappings,
-            max_time=time_limit,
-            save_path=self._save_path,
-            ckpt_path=None if self._is_hpo else self._ckpt_path,
-            resume=False if self._is_hpo else self._resume,
-            enable_progress_bar=False if self._is_hpo else self._enable_progress_bar,
+        self.infer_problem_type(train_data=train_data)
+        self.prepare_train_tuning_data(
+            train_data=train_data,
+            tuning_data=tuning_data,
+            holdout_frac=holdout_frac,
             seed=seed,
-            presets=presets,
-            hyperparameters=hyperparameters,
-            advanced_hyperparameters=advanced_hyperparameters,
         )
-
-        if self._is_hpo:
-            # TODO: allow custom gpu
-            assert self._resume is False, "You can not resume training with HPO"
-            _fit_args["learner"] = self
-            predictor = hyperparameter_tune(
-                hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-                resources=dict(num_gpus=torch.cuda.device_count()),
-                is_matching=True,
-                **_fit_args,
-            )
-            return predictor
-
-        self.fit_per_run(**_fit_args)
-        training_end = time.time()
-        self._total_train_time = training_end - training_start
-
-        # TODO(?) We should have a separate "_post_training_event()" for logging messages.
-        logger.info(on_fit_end_message(self._save_path))
+        self.infer_column_types(column_types=column_types)
+        self.infer_output_shape()
+        self.infer_validation_metric(is_matching=True)
+        self.update_hyperparameters(
+            hyperparameters=hyperparameters,
+            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+        )
+        self.fit_sanity_check()
+        self.prepare_fit_args(
+            time_limit=time_limit,
+            seed=seed,
+            standalone=standalone,
+            clean_ckpts=clean_ckpts,
+        )
+        fit_returns = self.execute_fit()
+        self.on_fit_end(
+            training_start=training_start,
+            strategy=fit_returns.get("strategy", None),
+            strict_loading=fit_returns.get("strict_loading", True),
+            standalone=standalone,
+            clean_ckpts=clean_ckpts,
+        )
         return self
 
     def _get_matcher_df_preprocessor(
@@ -705,6 +660,57 @@ class MultiModalMatcher(BaseLearner):
 
         return query_processors, response_processors, label_processors
 
+    def get_config_per_run(self, config, hyperparameters):
+        config = get_config(
+            problem_type=self._pipeline,
+            presets=self._presets,
+            config=config,
+            overrides=hyperparameters,  # don't use self._hyperparameters due to HPO.
+            extra=["matcher"],
+        )
+        config = update_config_by_rules(
+            problem_type=self._pipeline,
+            config=config,
+        )
+        config = self.update_strategy_by_env(config=config)
+        return config
+
+    def on_fit_per_run_end(
+        self,
+        trainer: pl.Trainer,
+        config: DictConfig,
+        query_config: DictConfig,
+        response_config: DictConfig,
+        query_model: nn.Module,
+        response_model: nn.Module,
+        query_df_preprocessor: MultiModalFeaturePreprocessor,
+        response_df_preprocessor: MultiModalFeaturePreprocessor,
+        label_df_preprocessor: MultiModalFeaturePreprocessor,
+        query_processors: Dict,
+        response_processors: Dict,
+        label_processors: Dict,
+        save_path: str,
+        standalone: bool,
+    ):
+        self.clean_trainer_processes(trainer=trainer, is_train=True)
+        self.save(
+            path=save_path,
+            standalone=standalone,
+            config=config,
+            query_config=query_config,
+            response_config=response_config,
+            query_model=query_model,
+            response_model=response_model,
+            query_df_preprocessor=query_df_preprocessor,
+            response_df_preprocessor=response_df_preprocessor,
+            label_df_preprocessor=label_df_preprocessor,
+            query_processors=query_processors,
+            response_processors=response_processors,
+            label_processors=label_processors,
+            fit_called=True,  # fit is called on one run.
+            save_model=False,  # The final model will be saved in top_k_average
+        )
+
     def fit_per_run(
         self,
         id_mappings: Union[Dict[str, Dict], Dict[str, pd.Series]],
@@ -714,19 +720,14 @@ class MultiModalMatcher(BaseLearner):
         resume: bool,
         enable_progress_bar: bool,
         seed: int,
-        presets: Optional[str] = None,
+        config: Optional[str] = None,
         hyperparameters: Optional[Union[str, Dict, List[str]]] = None,
         advanced_hyperparameters: Optional[Dict] = None,
+        standalone: bool = True,
+        clean_ckpts: bool = True,
     ):
         self.on_fit_per_run_start(seed=seed, save_path=save_path)
-        config = self._config
-        config = get_config(
-            problem_type=self._pipeline,
-            presets=presets,
-            config=config,
-            overrides=hyperparameters,
-            extra=["matcher"],
-        )
+        config = self.get_config_per_run(config=config, hyperparameters=hyperparameters)
 
         if self._query_config is None:
             query_config = copy.deepcopy(config)
@@ -818,19 +819,6 @@ class MultiModalMatcher(BaseLearner):
                 neg_margin=config.matcher.miner.neg_margin,
                 distance_type=config.matcher.distance.type,
             )
-
-        self._config = config
-        self._query_config = query_config
-        self._response_config = response_config
-        self._query_model = query_model
-        self._response_model = response_model
-        self._query_df_preprocessor = query_df_preprocessor
-        self._response_df_preprocessor = response_df_preprocessor
-        self._label_df_preprocessor = label_df_preprocessor
-        self._query_processors = query_processors
-        self._response_processors = response_processors
-        self._label_processors = label_processors
-        self._loss_func = loss_func
 
         if max_time == timedelta(seconds=0):
             self._top_k_average(
@@ -1004,6 +992,40 @@ class MultiModalMatcher(BaseLearner):
             self._best_score = trainer.callback_metrics[f"val_{self._validation_metric_name}"].item()
         else:
             sys.exit(f"Training finished, exit the process with global_rank={trainer.global_rank}...")
+
+        self.on_fit_per_run_end(
+            trainer=trainer,
+            standalone=standalone,
+            save_path=save_path,
+            config=config,
+            query_config=query_config,
+            response_config=response_config,
+            query_model=query_model,
+            response_model=response_model,
+            query_df_preprocessor=query_df_preprocessor,
+            response_df_preprocessor=response_df_preprocessor,
+            label_df_preprocessor=label_df_preprocessor,
+            query_processors=query_processors,
+            response_processors=response_processors,
+            label_processors=label_processors,
+        )
+
+        return dict(
+            config = config,
+            query_config = query_config,
+            response_config = response_config,
+            query_model = query_model,
+            response_model = response_model,
+            query_df_preprocessor = query_df_preprocessor,
+            response_df_preprocessor = response_df_preprocessor,
+            label_df_preprocessor = label_df_preprocessor,
+            query_processors = query_processors,
+            response_processors = response_processors,
+            label_processors = label_processors,
+            loss_func = loss_func,
+            best_score=trainer.callback_metrics[f"val_{self._validation_metric_name}"].item(),
+            strategy=strategy,
+        )
 
     def _top_k_average(
         self,
@@ -1953,7 +1975,24 @@ class MultiModalMatcher(BaseLearner):
         }
         return state_dict_processed
 
-    def save(self, path: str, standalone: Optional[bool] = True):
+    def save(
+        self,
+        path: str,
+        standalone: Optional[bool] = True,
+        config: Optional[DictConfig] = None,
+        query_config: Optional[DictConfig] = None,
+        response_config: Optional[DictConfig] = None,
+        query_model: Optional[nn.Module] = None,
+        response_model: Optional[nn.Module] = None,
+        query_df_preprocessor: Optional[MultiModalFeaturePreprocessor] = None,
+        response_df_preprocessor: Optional[MultiModalFeaturePreprocessor] = None,
+        label_df_preprocessor: Optional[MultiModalFeaturePreprocessor] = None,
+        query_processors: Optional[Dict] = None,
+        response_processors: Optional[Dict] = None,
+        label_processors: Optional[Dict] = None,
+        fit_called: Optional[bool] = None,
+        save_model: Optional[bool] = True,
+    ):
         """
         Save this matcher to file in directory specified by `path`.
 
@@ -1967,29 +2006,41 @@ class MultiModalMatcher(BaseLearner):
             and reset the associate model.model_name.checkpoint_name start with `local://` in config.yaml.
             When standalone = False, the saved artifact may require an online environment to process in load().
         """
+        config = config if config else self._config
+        query_config = query_config if query_config else self._query_config
+        response_config = response_config if response_config else self._response_config
+        query_model = query_model if query_model else self._query_model
+        response_model = response_model if response_model else self._response_model
+        query_df_preprocessor = query_df_preprocessor if query_df_preprocessor else self._query_df_preprocessor
+        response_df_preprocessor = response_df_preprocessor if response_df_preprocessor else self._response_df_preprocessor
+        label_df_preprocessor = label_df_preprocessor if label_df_preprocessor else self._label_df_preprocessor
+        query_processors = query_processors if query_processors else self._query_processors
+        response_processors = response_processors if response_processors else self._response_processors
+        label_processors = label_processors if label_processors else self._label_processors
+
         path = os.path.abspath(os.path.expanduser(path))
-        query_config = copy.deepcopy(self._query_config)
-        response_config = copy.deepcopy(self._response_config)
+        query_config = copy.deepcopy(query_config)
+        response_config = copy.deepcopy(response_config)
         if standalone:
-            query_config = save_pretrained_model_configs(model=self._query_model, config=query_config, path=path)
+            query_config = save_pretrained_model_configs(model=query_model, config=query_config, path=path)
             response_config = save_pretrained_model_configs(
-                model=self._response_model, config=response_config, path=path
+                model=response_model, config=response_config, path=path
             )
 
         os.makedirs(path, exist_ok=True)
-        config = {"generic": self._config, QUERY: query_config, RESPONSE: response_config}
+        config = {"generic": config, QUERY: query_config, RESPONSE: response_config}
         OmegaConf.save(config=config, f=os.path.join(path, "config.yaml"))
 
         df_preprocessor = {
-            QUERY: self._query_df_preprocessor,
-            RESPONSE: self._response_df_preprocessor,
-            LABEL: self._label_df_preprocessor,
+            QUERY: query_df_preprocessor,
+            RESPONSE: response_df_preprocessor,
+            LABEL: label_df_preprocessor,
         }
         with open(os.path.join(path, "df_preprocessor.pkl"), "wb") as fp:
             pickle.dump(df_preprocessor, fp)
 
         # Save text tokenizers before saving data processors
-        query_processors = copy.deepcopy(self._query_processors)
+        query_processors = copy.deepcopy(query_processors)
         if TEXT in query_processors:
             query_processors[TEXT] = save_text_tokenizers(
                 text_processors=query_processors[TEXT],
@@ -1997,7 +2048,7 @@ class MultiModalMatcher(BaseLearner):
             )
 
         # Save text tokenizers before saving data processors
-        response_processors = copy.deepcopy(self._response_processors)
+        response_processors = copy.deepcopy(response_processors)
         if TEXT in response_processors:
             response_processors[TEXT] = save_text_tokenizers(
                 text_processors=response_processors[TEXT],
@@ -2007,7 +2058,7 @@ class MultiModalMatcher(BaseLearner):
         data_processors = {
             QUERY: query_processors,
             RESPONSE: response_processors,
-            LABEL: self._label_processors,
+            LABEL: label_processors,
         }
         with open(os.path.join(path, "data_processors.pkl"), "wb") as fp:
             pickle.dump(data_processors, fp)
@@ -2031,20 +2082,22 @@ class MultiModalMatcher(BaseLearner):
                     "save_path": self._save_path,
                     "pretrained": self._pretrained,
                     "pretrained_path": self._pretrained_path,
-                    "fit_called": self._fit_called,
+                    "fit_called": fit_called if fit_called is not None else self._fit_called,
+                    "best_score": self._best_score,
+                    "total_train_time": self._total_train_time,
                     "version": ag_version.__version__,
                 },
                 fp,
                 ensure_ascii=True,
             )
 
-        task = MatcherLitModule(
-            query_model=self._query_model,
-            response_model=self._response_model,
-        )
-
-        checkpoint = {"state_dict": task.state_dict()}
-        torch.save(checkpoint, os.path.join(path, MODEL_CHECKPOINT))
+        if save_model:
+            task = MatcherLitModule(
+                query_model=self._query_model,
+                response_model=self._response_model,
+            )
+            checkpoint = {"state_dict": task.state_dict()}
+            torch.save(checkpoint, os.path.join(path, MODEL_CHECKPOINT))
 
     @staticmethod
     def _load_metadata(
@@ -2235,50 +2288,3 @@ class MultiModalMatcher(BaseLearner):
         else:
             warnings.warn("Accessing class names for a non-classification problem. Return None.")
             return None
-
-    def set_num_gpus(self, num_gpus):
-        assert isinstance(num_gpus, int)
-        self._config.env.num_gpus = num_gpus
-
-    def get_num_gpus(self):
-        try:
-            return self._config.env.num_gpus
-        except:
-            return None
-
-    def fit_summary(self, verbosity=0, show_plot=False):
-        """
-        Output summary of information about models produced during `fit()`.
-
-        Parameters
-        ----------
-        verbosity : int, default = 2
-            Verbosity levels range from 0 to 4 and control how much information is printed.
-            verbosity = 0 for no output printing.
-            TODO: Higher levels correspond to more detailed print statements
-        show_plot : bool, default = False
-            If True, shows the model summary plot in browser when verbosity > 1.
-
-        Returns
-        -------
-        Dict containing various detailed information.
-        We do not recommend directly printing this dict as it may be very large.
-        """
-        if self._total_train_time is None:
-            logging.info("There is no `best_score` or `total_train_time`. Have you called `predictor.fit()`?")
-        else:
-            logging.info(
-                f"Here's the model summary:"
-                f""
-                f"The model achieved score '{self._best_score}' on the validation metric"
-                f" '{self._validation_metric_name}'. "
-                f"The total training time is {timedelta(seconds=self._total_train_time)}"
-            )
-        results = {
-            f"val_{self._validation_metric_name}": self._best_score,
-            "training_time": self._total_train_time,
-        }
-        return results
-
-    def list_supported_models(self, pretrained=True):
-        raise ValueError(f"list_supported_models() is not available for problem type: {self._pipeline}")

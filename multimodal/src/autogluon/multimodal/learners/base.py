@@ -469,19 +469,21 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         if best_score:
             self._best_score = best_score
 
-    def infer_validation_metric(self):
+    def infer_validation_metric(self, is_matching: Optional[bool] = False):
         if self._fit_called:
             return
         self._validation_metric_name, self._eval_metric_name = infer_metrics(
             problem_type=self._problem_type,
             eval_metric_name=self._eval_metric_name,
             validation_metric_name=self._validation_metric_name,
+            is_matching=is_matching,
         )
         self._minmax_mode = get_minmax_mode(self._validation_metric_name)
         logger.debug(f"validation_metric_name: {self._validation_metric_name}")
         logger.debug(f"minmax_mode: {self._minmax_mode}")
 
     def update_hyperparameters(self, hyperparameters: Dict, hyperparameter_tune_kwargs: Dict):
+        problem_type = self._pipeline if hasattr(self, "_pipeline") else self._problem_type  # matching uses pipeline
         if self._hyperparameters and hyperparameters:
             self._hyperparameters.update(hyperparameters)
         elif hyperparameters:
@@ -493,7 +495,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             self._hyperparameter_tune_kwargs = hyperparameter_tune_kwargs
 
         self._hyperparameters, self._hyperparameter_tune_kwargs = update_hyperparameters(
-            problem_type=self._problem_type,
+            problem_type=problem_type,
             presets=self._presets,
             provided_hyperparameters=self._hyperparameters,
             provided_hyperparameter_tune_kwargs=self._hyperparameter_tune_kwargs,
@@ -574,8 +576,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                 self._presets = presets
         if teacher_learner:
             self._teacher_learner = teacher_learner
-        assert os.path.exists(self._save_path), f"path {self._save_path} doesn't exist"
-        exit()
+
         logger.info(on_fit_start_message(path=self._save_path))
         training_start = time.time()
         return training_start
@@ -2216,19 +2217,6 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             checkpoint = {"state_dict": {"model." + name: param for name, param in model.state_dict().items()}}
             torch.save(checkpoint, os.path.join(os.path.abspath(path), MODEL_CHECKPOINT))
 
-        # # In case that users save to a path, which is not the original save_path.
-        # if os.path.abspath(path) != os.path.abspath(self._save_path):
-        #     model_path = os.path.join(self._save_path, "model.ckpt")
-        #     if os.path.isfile(model_path):
-        #         shutil.copy(model_path, path)
-        #     else:
-        #         # FIXME(?) Fix the saving logic
-        #         RuntimeError(
-        #             f"Cannot find the model checkpoint in '{model_path}'. Have you removed the folder that "
-        #             f"is created in .fit()? Currently, .save() won't function appropriately if that folder is "
-        #             f"removed."
-        #         )
-
     @staticmethod
     def _load_metadata(
         learner: BaseLearner,
@@ -2462,7 +2450,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         We do not recommend directly printing this dict as it may be very large.
         """
         if self._total_train_time is None:
-            logging.info("There is no `best_score` or `total_train_time`. Have you called `learner.fit()`?")
+            logging.info("There is no `best_score` or `total_train_time`. Have you called `predictor.fit()`?")
         else:
             logging.info(
                 f"Here's the model summary:"
