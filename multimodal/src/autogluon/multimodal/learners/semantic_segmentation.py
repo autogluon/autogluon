@@ -208,7 +208,7 @@ class SemanticSegmentationLearner(BaseLearner):
         outputs = self.predict_per_run(
             data=data,
             realtime=realtime,
-            requires_label=True,
+            requires_label=False,
         )
 
         if self._output_shape == 1:
@@ -522,10 +522,17 @@ class SemanticSegmentationLearner(BaseLearner):
             )
         return logits
 
-    def get_image_column_name(self, data):
+    def get_image_column_name(self, data: pd.DataFrame):
         if self.column_types is None:
-            self._column_types = self.infer_column_types(data=data, is_train=False)  # only use in inference now
-        for k, v in self.column_types.items():
-            if v == SEMANTIC_SEGMENTATION_IMG:
-                return k
+            column_names = list(data.columns)
+            if self._label_column in column_names:
+                column_names.remove(self._label_column)
+            assert (
+                len(column_names) == 1
+            ), f"More than one image columns {column_names} exist in the data. Make sure to provide data with one image column."
+            return column_names[0]
+        else:
+            for k, v in self.column_types.items():
+                if v == SEMANTIC_SEGMENTATION_IMG:
+                    return k
         return None
