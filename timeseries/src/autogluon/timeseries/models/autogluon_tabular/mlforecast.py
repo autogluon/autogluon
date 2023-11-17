@@ -84,7 +84,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         self._date_features: Optional[List[str]] = None
         self._mlf: Optional[MLForecast] = None
         self._scaler: Optional[BaseTargetTransform] = None
-        self._avg_residuals_std: float = 1.0
+        self._avg_residuals_std: Optional[float] = None
 
     def _get_extra_tabular_init_kwargs(self) -> dict:
         raise NotImplementedError
@@ -295,12 +295,22 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         else:
             return pd.Series(1.0, index=item_ids)
 
-    def _generate_fallback_forecast_for_short_series(
+    def _remove_short_ts_and_generate_fallback_forecast(
         self,
         data: TimeSeriesDataFrame,
         known_covariates: Optional[TimeSeriesDataFrame] = None,
-    ):
-        """Generate naive forecast for time series that are too short for chosen differencing."""
+    ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame], Optional[TimeSeriesDataFrame]]:
+        """Remove series that are too short for chosen differencing from data and generate naive forecast for them.
+
+        Returns
+        -------
+        data_long : TimeSeriesDataFrame
+            Data containing only time series that are long enough for the model to predict.
+        known_covariates_long : TimeSeriesDataFrame or None
+            Future known covariates containing only time series that are long enough for the model to predict.
+        forecast_for_short_series : TimeSeriesDataFrame or None
+            Seasonal naive forecast for short series, if there are any in the dataset.
+        """
         ts_lengths = data.num_timesteps_per_item()
         short_series = ts_lengths.index[ts_lengths <= self._sum_of_differences]
         if len(short_series) > 0:
@@ -421,7 +431,7 @@ class DirectTabularModel(AbstractMLForecastModel):
         **kwargs,
     ) -> TimeSeriesDataFrame:
         original_item_id_order = data.item_ids
-        data, known_covariates, forecast_for_short_series = self._generate_fallback_forecast_for_short_series(
+        data, known_covariates, forecast_for_short_series = self._remove_short_ts_and_generate_fallback_forecast(
             data=data, known_covariates=known_covariates
         )
         if len(data) == 0:
@@ -543,7 +553,7 @@ class RecursiveTabularModel(AbstractMLForecastModel):
         **kwargs,
     ) -> TimeSeriesDataFrame:
         original_item_id_order = data.item_ids
-        data, known_covariates, forecast_for_short_series = self._generate_fallback_forecast_for_short_series(
+        data, known_covariates, forecast_for_short_series = self._remove_short_ts_and_generate_fallback_forecast(
             data=data, known_covariates=known_covariates
         )
         if len(data) == 0:
