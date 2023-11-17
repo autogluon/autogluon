@@ -13,6 +13,14 @@ class WQL(TimeSeriesScorer):
     """Weighted quantile loss.
 
     Also known as weighted pinball loss.
+
+    When to use:
+    
+        - Data 
+
+    When not to use:
+    
+        - 
     """
 
     needs_quantile = True

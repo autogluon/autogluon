@@ -74,7 +74,7 @@ class TimeSeriesPredictor:
         Point forecast metrics (these are always evaluated on the ``"mean"`` column of the predictions):
 
         - ``"MAPE"``: mean absolute percentage error
-        - ``"sMAPE"``: "symmetric" mean absolute percentage error
+        - ``"SMAPE"``: "symmetric" mean absolute percentage error
         - ``"MASE"``: mean absolute scaled error
         - ``"MSE"``: mean squared error
         - ``"RMSE"``: root mean squared error

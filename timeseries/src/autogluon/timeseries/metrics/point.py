@@ -14,7 +14,26 @@ logger = logging.getLogger(__name__)
 
 
 class RMSE(TimeSeriesScorer):
-    """Root mean squared error."""
+    r"""Root mean squared error.
+
+    Defined as
+    
+    .. math::
+
+        \sqrt{\sum_{i,t}  (y_{i,t} - f_{i,t})^2}
+
+
+    Properties:
+    
+    - estimates the mean (expected value) of the time series
+    - scale-dependent
+
+    
+    References
+    ----------
+    - `Wikipedia <https://en.wikipedia.org/wiki/Root-mean-square_deviation>`_
+    - `Forecasting: Principles and Practice <https://otexts.com/fpp3/accuracy.html#scale-dependent-errors>`_
+    """
 
     equivalent_tabular_regression_metric = "root_mean_squared_error"
 
@@ -26,7 +45,19 @@ class RMSE(TimeSeriesScorer):
 
 
 class MSE(TimeSeriesScorer):
-    """Mean squared error."""
+    r"""Mean squared error.
+
+    Using this metric will lead to forecast of the mean.
+
+    .. math::
+
+        \sum_{i,t}  (y_{i,t} - f_{i,t})^2
+    
+    References
+    ----------
+    - `Wikipedia <https://en.wikipedia.org/wiki/Mean_squared_error>`_
+    
+    """
 
     equivalent_tabular_regression_metric = "mean_squared_error"
 
@@ -38,7 +69,19 @@ class MSE(TimeSeriesScorer):
 
 
 class MAE(TimeSeriesScorer):
-    """Mean absolute error."""
+    r"""Mean absolute error.
+
+    Using this metric will lead to forecast of the median.
+
+    .. math::
+
+        \sum_{i,t}  |y_{i,t} - f_{i,t}|
+
+    References
+    ----------
+    - `Wikipedia <https://en.wikipedia.org/wiki/Mean_absolute_percentage_error#WMAPE>`_
+    - `Forecasting: Principles and Practice <https://otexts.com/fpp3/accuracy.html#scale-dependent-errors>`_
+    """
 
     optimized_by_median = True
     equivalent_tabular_regression_metric = "mean_absolute_error"
@@ -51,7 +94,20 @@ class MAE(TimeSeriesScorer):
 
 
 class WAPE(TimeSeriesScorer):
-    """Weighted absolute percentage error."""
+    r"""Weighted absolute percentage error.
+
+    Properties:
+    
+    - Using this metric will lead to forecast of the median.
+
+    .. math::
+
+        \frac{1}{\sum_{i, t} |y_{i, t}|} \sum_{i,t}  |y_{i,t} - f_{i,t}|
+    
+    References
+    ----------
+    - `Wikipedia <https://en.wikipedia.org/wiki/Mean_absolute_percentage_error#WMAPE>`_
+    """
 
     optimized_by_median = True
     equivalent_tabular_regression_metric = "mean_absolute_error"
@@ -63,8 +119,23 @@ class WAPE(TimeSeriesScorer):
         return (y_true - y_pred).abs().sum() / y_true.abs().sum()
 
 
-class sMAPE(TimeSeriesScorer):
-    """Symmetric mean absolute percentage error."""
+class SMAPE(TimeSeriesScorer):
+    r"""Symmetric mean absolute percentage error.
+
+    Properties:
+    
+    - Poorly suited 
+    - Penalizes overpredictions stronger than underpredictions
+
+    .. math::
+        
+        2 \cdot \sum_{i,t} \frac{ |y_{i,t} - f_{i,t}|}{|y_{i,t}| + |f_{i,t}|}
+    
+    References
+    ----------
+    - `Wikipedia <https://en.wikipedia.org/wiki/Symmetric_mean_absolute_percentage_error>`_
+    - `Forecasting: Principles and Practice <https://otexts.com/fpp3/accuracy.html#percentage-errors>`_
+    """
 
     optimized_by_median = True
     equivalent_tabular_regression_metric = "symmetric_mean_absolute_percentage_error"
@@ -77,7 +148,17 @@ class sMAPE(TimeSeriesScorer):
 
 
 class MAPE(TimeSeriesScorer):
-    """Mean Absolute Percentage Error."""
+    r"""Mean absolute percentage error.
+
+    .. math::
+        
+        \sum_{i,t} \frac{ |y_{i,t} - f_{i,t}|}{|y_{i,t}|}
+    
+    References
+    ----------
+    - `Wikipedia <https://en.wikipedia.org/wiki/Mean_absolute_percentage_error>`_
+    - `Forecasting: Principles and Practice <https://otexts.com/fpp3/accuracy.html#percentage-errors>`_
+    """
 
     optimized_by_median = True
     equivalent_tabular_regression_metric = "mean_absolute_percentage_error"
@@ -90,7 +171,13 @@ class MAPE(TimeSeriesScorer):
 
 
 class MASE(TimeSeriesScorer):
-    """Mean absolute scaled error."""
+    r"""Mean absolute scaled error.
+ 
+    References
+    ----------
+    - `Wikipedia <https://en.wikipedia.org/wiki/Mean_absolute_scaled_error>`_
+    - `Forecasting: Principles and Practice <https://otexts.com/fpp3/accuracy.html#scaled-errors>`_
+    """
 
     optimized_by_median = True
     equivalent_tabular_regression_metric = "mean_absolute_error"
@@ -120,7 +207,12 @@ class MASE(TimeSeriesScorer):
 
 
 class RMSSE(TimeSeriesScorer):
-    """Root mean squared scaled error."""
+    r"""Root mean squared scaled error.
+    
+    References
+    ----------
+    - `Forecasting: Principles and Practice <https://otexts.com/fpp3/accuracy.html#scaled-errors>`_
+    """
 
     equivalent_tabular_regression_metric = "root_mean_squared_error"
 
