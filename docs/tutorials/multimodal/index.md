@@ -294,6 +294,16 @@ image_prediction/index
 
 ```{toctree}
 ---
+caption: Image Segmentation
+maxdepth: 1
+hidden: true
+---
+
+image_segmentation/index
+```
+
+```{toctree}
+---
 caption: Text Prediction
 maxdepth: 1
 hidden: true
