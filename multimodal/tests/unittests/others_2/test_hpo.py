@@ -201,7 +201,7 @@ def test_hpo_distillation(searcher, scheduler):
         train_data=dataset.train_df,
         teacher_predictor=teacher_save_path,
         hyperparameters=hyperparameters,
-        time_limit=60,
+        time_limit=200,  # make sure one epoch is finished, otherwise the config.yaml is not saved
         hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
         save_path=student_save_path,
     )
