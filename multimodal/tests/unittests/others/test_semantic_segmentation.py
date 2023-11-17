@@ -83,6 +83,8 @@ def get_file_df_multi_semantic_seg(need_test_gt=False):
     return train_df, val_df, test_df
 
 
+# TODO: Pytest does not support DDP
+@pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -115,6 +117,8 @@ def test_sam_semantic_segmentation_isic_fit_eval_predict_save_load(checkpoint_na
     verify_predictor_save_load_for_semantic_seg(predictor, test_df, as_multiclass=False)
 
 
+# TODO: Pytest does not support DDP
+@pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -148,6 +152,8 @@ def test_sam_semantic_segmentation_zero_shot_evaluate_predict(checkpoint_name):
     predictor.predict(test_df, save_results=False)
 
 
+# TODO: Pytest does not support DDP
+@pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -207,6 +213,8 @@ def verify_predictor_save_load_for_semantic_seg(predictor, df, as_multiclass, cl
     shutil.rmtree(root)
 
 
+# TODO: Pytest does not support DDP
+@pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -241,6 +249,8 @@ def test_sam_semantic_segmentation_get_class_num_func(checkpoint_name):
     assert num_classes == get_class_num_func(os.path.dirname(train_df["label"][0]))
 
 
+# TODO: Pytest does not support DDP
+@pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "frozen_layers",
     [
