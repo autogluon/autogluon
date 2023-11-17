@@ -174,7 +174,7 @@ In the following, we decompose the functionalities of AutoMM and prepare step-by
 
 ::::
 
-## Multimodal Data -- Classification / Regression
+## Multimodal Data -- Classification / Regression / NER
 
 ::::{grid} 2
   :gutter: 3
