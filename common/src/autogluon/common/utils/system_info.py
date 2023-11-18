@@ -57,20 +57,22 @@ def get_ag_system_info(*, path: str = None, include_gpu_count=False, include_pyt
     if include_pytorch:
         try:
             import torch
+
             torch_version = torch.__version__
         except Exception as e:
             torch_version = "Can't import torch"
-        msg_list.append(f"Pytorch Version:   {torch_version}")
+        msg_list.append(f"Pytorch Version:    {torch_version}")
     if include_cuda:
         try:
             import torch
+
             if torch.cuda.is_available():
                 cuda_version = torch.version.cuda
             else:
                 cuda_version = "CUDA is not available"
         except Exception as e:
             cuda_version = "Can't get cuda version from torch"
-        msg_list.append(f"CUDA Version:   {cuda_version}")
+        msg_list.append(f"CUDA Version:       {cuda_version}")
     if include_gpu_count:
         try:
             system_num_gpus = resource_manager.get_gpu_count_torch()
