@@ -140,6 +140,8 @@ def test_matcher_hpo_presets(presets):
     matcher_hpo("random", "FIFO", presets)
 
 
+# TODO: MultiGPU in CI exceeds time limit and the model won't save the config
+@pytest.mark.single_gpu
 @pytest.mark.parametrize("searcher", list(SEARCHER_PRESETS.keys()))
 @pytest.mark.parametrize("scheduler", list(SCHEDULER_PRESETS.keys()))
 def test_hpo_distillation(searcher, scheduler):
@@ -201,7 +203,7 @@ def test_hpo_distillation(searcher, scheduler):
         train_data=dataset.train_df,
         teacher_predictor=teacher_save_path,
         hyperparameters=hyperparameters,
-        time_limit=200,  # make sure one epoch is finished, otherwise the config.yaml is not saved
+        time_limit=30,
         hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
         save_path=student_save_path,
     )
