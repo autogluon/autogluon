@@ -561,8 +561,9 @@ def infer_problem_type(y: Series, silent=False) -> str:
     """Identifies which type of prediction problem we are interested in (if user has not specified).
     Ie. binary classification, multi-class classification, or regression.
     """
-    with pd.option_context("mode.use_inf_as_na", True):  # treat None, NaN, INF, NINF as NA
-        y = y.dropna()
+    # treat None, NaN, INF, NINF as NA
+    y = y.replace([np.inf, -np.inf], np.nan, inplace=False)
+    y = y.dropna()
     num_rows = len(y)
 
     if num_rows == 0:
