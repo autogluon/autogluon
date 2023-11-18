@@ -286,7 +286,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             )
 
         self._residuals_std_per_item = self._compute_residuals_std(val_df)
-        self._avg_residuals_std = self._residuals_std_per_item.mean()
+        self._avg_residuals_std = np.mean(self._residuals_std_per_item)
 
     def _compute_residuals_std(self, val_df: pd.DataFrame) -> float:
         residuals = val_df[MLF_TARGET] - self._mlf.models_["mean"].predict(val_df)
