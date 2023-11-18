@@ -28,6 +28,7 @@ from ..constants import (
     NUMERICAL,
     OVD,
     ROIS,
+    SEMANTIC_SEGMENTATION,
     SEMANTIC_SEGMENTATION_GT,
     SEMANTIC_SEGMENTATION_IMG,
     TEXT,
@@ -96,10 +97,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         for col_name, col_type in self._column_types.items():
             if col_name == self._label_column:
                 continue
-            if (
-                col_type.startswith((TEXT, IMAGE, ROIS, TEXT_NER, DOCUMENT, SEMANTIC_SEGMENTATION_IMG))
-                or col_type == NULL
-            ):
+            if col_type.startswith((TEXT, IMAGE, ROIS, TEXT_NER, DOCUMENT, SEMANTIC_SEGMENTATION)) or col_type == NULL:
                 continue
             elif col_type == CATEGORICAL:
                 generator = CategoryFeatureGenerator(

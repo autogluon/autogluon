@@ -51,7 +51,7 @@ class AutoARIMAModel(AbstractStatsForecastModel):
 
     Automatically selects the best (p,d,q,P,D,Q) model parameters using an information criterion
 
-    Based on `statsforecast.models.AutoARIMA <https://nixtla.github.io/statsforecast/models.html#autoarima>`_.
+    Based on `statsforecast.models.AutoARIMA <https://nixtla.mintlify.app/statsforecast/docs/models/autoarima.html>`_.
 
     Other Parameters
     ----------------
@@ -211,7 +211,7 @@ class AutoETSModel(AbstractStatsForecastModel):
 
     Automatically selects the best ETS (Error, Trend, Seasonality) model using an information criterion
 
-    Based on `statsforecast.models.AutoETS <https://nixtla.github.io/statsforecast/models.html#autoets>`_.
+    Based on `statsforecast.models.AutoETS <https://nixtla.mintlify.app/statsforecast/docs/models/autoets.html>`_.
 
     Other Parameters
     ----------------
@@ -225,6 +225,8 @@ class AutoETSModel(AbstractStatsForecastModel):
         When set to None, seasonal_period will be inferred from the frequency of the training data. Can also be
         specified manually by providing an integer > 1.
         If seasonal_period (inferred or provided) is equal to 1, seasonality will be disabled.
+    damped : bool, default = True
+        Whether to dampen the trend.
     n_jobs : int or float, default = 0.5
         Number of CPU cores used to fit the models in parallel.
         When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
@@ -236,6 +238,7 @@ class AutoETSModel(AbstractStatsForecastModel):
     """
 
     allowed_local_model_args = [
+        "damped",
         "model",
         "seasonal_period",
     ]
@@ -269,7 +272,7 @@ class ETSModel(AutoETSModel):
 
     The E (error), T (trend) and S (seasonal) components are fixed and provided by the user.
 
-    This is an alias for `statsforecast.models.AutoETS <https://nixtla.github.io/statsforecast/models.html#autoets>`_.
+    This is an alias for `statsforecast.models.AutoETS <https://nixtla.mintlify.app/statsforecast/docs/models/autoets.html>`_.
 
     Other Parameters
     ----------------
@@ -283,6 +286,8 @@ class ETSModel(AutoETSModel):
         When set to None, seasonal_period will be inferred from the frequency of the training data. Can also be
         specified manually by providing an integer > 1.
         If seasonal_period (inferred or provided) is equal to 1, seasonality will be disabled.
+    damped : bool, default = False
+        Whether to dampen the trend.
     n_jobs : int or float, default = 0.5
         Number of CPU cores used to fit the models in parallel.
         When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
@@ -347,7 +352,7 @@ class DynamicOptimizedThetaModel(AbstractStatsForecastModel):
 class ThetaModel(AbstractStatsForecastModel):
     """Theta forecasting model [Assimakopoulos2000]_.
 
-    Based on `statsforecast.models.Theta <https://nixtla.github.io/statsforecast/models.html#theta>`_.
+    Based on `statsforecast.models.Theta <https://nixtla.mintlify.app/statsforecast/docs/models/autotheta.html>`_.
 
 
     References

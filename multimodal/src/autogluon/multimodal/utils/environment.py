@@ -360,7 +360,7 @@ def _get_mmlab_installation_guide(package_name):
     return err_msg
 
 
-def run_ddp_only_once(num_gpus, strategy):
+def run_ddp_only_once(num_gpus: int, strategy: str):
     if strategy in DDP_STRATEGIES:
         global FIRST_DDP_RUN  # Use the global variable to make sure it is tracked per process
         if "FIRST_DDP_RUN" in globals() and not FIRST_DDP_RUN:

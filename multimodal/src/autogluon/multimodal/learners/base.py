@@ -108,8 +108,6 @@ from ..utils import (
     filter_hyperparameters,
     get_config,
     get_dir_ckpt_paths,
-    get_fit_complete_message,
-    get_fit_start_message,
     get_gpu_message,
     get_load_ckpt_paths,
     get_local_pretrained_config_paths,
@@ -129,6 +127,9 @@ from ..utils import (
     list_timm_models,
     load_text_tokenizers,
     logits_to_prob,
+    on_fit_end_message,
+    on_fit_per_run_start_message,
+    on_fit_start_message,
     run_ddp_only_once,
     save_pretrained_model_configs,
     save_text_tokenizers,
@@ -468,19 +469,21 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         if best_score:
             self._best_score = best_score
 
-    def infer_validation_metric(self):
+    def infer_validation_metric(self, is_matching: Optional[bool] = False):
         if self._fit_called:
             return
         self._validation_metric_name, self._eval_metric_name = infer_metrics(
             problem_type=self._problem_type,
             eval_metric=self._eval_metric_name if self._eval_metric_func is None else self._eval_metric_func,
             validation_metric_name=self._validation_metric_name,
+            is_matching=is_matching,
         )
         self._minmax_mode = get_minmax_mode(self._validation_metric_name)
         logger.debug(f"validation_metric_name: {self._validation_metric_name}")
         logger.debug(f"minmax_mode: {self._minmax_mode}")
 
     def update_hyperparameters(self, hyperparameters: Dict, hyperparameter_tune_kwargs: Dict):
+        problem_type = self._pipeline if hasattr(self, "_pipeline") else self._problem_type  # matching uses pipeline
         if self._hyperparameters and hyperparameters:
             self._hyperparameters.update(hyperparameters)
         elif hyperparameters:
@@ -492,7 +495,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             self._hyperparameter_tune_kwargs = hyperparameter_tune_kwargs
 
         self._hyperparameters, self._hyperparameter_tune_kwargs = update_hyperparameters(
-            problem_type=self._problem_type,
+            problem_type=problem_type,
             presets=self._presets,
             provided_hyperparameters=self._hyperparameters,
             provided_hyperparameter_tune_kwargs=self._hyperparameter_tune_kwargs,
@@ -511,7 +514,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
     def fit_sanity_check(self):
         assert not self._resume or not self._is_hpo, "You can not resume training with HPO."
-        if self._is_hpo and self._teacher_learner is not None:
+        if self._is_hpo and hasattr(self, "_teacher_learner") and self._teacher_learner is not None:
             assert isinstance(
                 self._teacher_learner, str
             ), "HPO with distillation only supports passing a path to the learner."
@@ -574,6 +577,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         if teacher_learner:
             self._teacher_learner = teacher_learner
 
+        logger.info(on_fit_start_message(path=self._save_path))
         training_start = time.time()
         return training_start
 
@@ -601,7 +605,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         training_end = time.time()
         self._total_train_time = training_end - training_start
         # TODO(?) We should have a separate "_post_training_event()" for logging messages.
-        logger.info(get_fit_complete_message(self._save_path))
+        logger.info(on_fit_end_message(self._save_path))
 
     def fit(
         self,
@@ -620,8 +624,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         clean_ckpts: Optional[bool] = True,
         **kwargs,
     ):
-        training_start = self.on_fit_start(presets=presets, teacher_learner=teacher_learner)
         self.setup_save_path(save_path=save_path)
+        training_start = self.on_fit_start(presets=presets, teacher_learner=teacher_learner)
         self.infer_problem_type(train_data=train_data)
         self.prepare_train_tuning_data(
             train_data=train_data,
@@ -718,9 +722,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                     column_types=column_types,
                     label_column=self._label_column,
                     train_df_x=data,
-                    train_df_y=data[self._label_column]
-                    if self._label_column
-                    else None,  # TODO: Not support zero-shot evaluation and prediction simultaneously for semantic segmentation.
+                    train_df_y=data[self._label_column] if self._label_column in data else None,
                 )
 
         return df_preprocessor
@@ -1058,7 +1060,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         num_gpus = self.update_num_gpus_by_data_size(num_gpus=num_gpus, data=data)
         strategy = self.get_strategy_per_run(num_gpus=num_gpus, config=config)
         strategy, num_gpus = self.update_strategy_and_num_gpus_for_hpo(strategy=strategy, num_gpus=num_gpus)
-        num_gpus, strategy = run_ddp_only_once(num_gpus, strategy)
+        num_gpus, strategy = run_ddp_only_once(num_gpus=num_gpus, strategy=strategy)
 
         if is_train:
             self.log_gpu_info(num_gpus=num_gpus, config=config)
@@ -1191,9 +1193,9 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                 return outputs
 
     def on_fit_per_run_start(self, seed, save_path):
-        pl.seed_everything(seed, workers=True)
         # TODO(?) We should have a separate "_pre_training_event()" for logging messages.
-        logger.info(get_fit_start_message(save_path, self._validation_metric_name))
+        logger.info(on_fit_per_run_start_message(save_path, self._validation_metric_name))
+        pl.seed_everything(seed, workers=True)
 
     def on_fit_per_run_end(
         self,
@@ -2215,19 +2217,6 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             checkpoint = {"state_dict": {"model." + name: param for name, param in model.state_dict().items()}}
             torch.save(checkpoint, os.path.join(os.path.abspath(path), MODEL_CHECKPOINT))
 
-        # # In case that users save to a path, which is not the original save_path.
-        # if os.path.abspath(path) != os.path.abspath(self._save_path):
-        #     model_path = os.path.join(self._save_path, "model.ckpt")
-        #     if os.path.isfile(model_path):
-        #         shutil.copy(model_path, path)
-        #     else:
-        #         # FIXME(?) Fix the saving logic
-        #         RuntimeError(
-        #             f"Cannot find the model checkpoint in '{model_path}'. Have you removed the folder that "
-        #             f"is created in .fit()? Currently, .save() won't function appropriately if that folder is "
-        #             f"removed."
-        #         )
-
     @staticmethod
     def _load_metadata(
         learner: BaseLearner,
@@ -2461,7 +2450,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         We do not recommend directly printing this dict as it may be very large.
         """
         if self._total_train_time is None:
-            logging.info("There is no `best_score` or `total_train_time`. Have you called `learner.fit()`?")
+            logging.info("There is no `best_score` or `total_train_time`. Have you called `predictor.fit()`?")
         else:
             logging.info(
                 f"Here's the model summary:"

@@ -88,17 +88,13 @@ def build_final_learner(learner, best_trial_path, save_path, last_ckpt_path, is_
         # reload the learner metadata
         matcher = MultiModalMatcher._load_metadata(matcher=learner, path=best_trial_path)
         # construct the model
-        query_model, response_model = create_siamese_model(
+        matcher._query_model, matcher._response_model = create_siamese_model(
             query_config=matcher._query_config,
             response_config=matcher._response_config,
             pretrained=False,
         )
-        matcher._query_model = query_model
-        matcher._response_model = response_model
         # average checkpoint
-        matcher._top_k_average(
-            query_model=query_model,
-            response_model=response_model,
+        matcher.top_k_average(
             save_path=best_trial_path,
             last_ckpt_path=last_ckpt_path,
             top_k_average_method=matcher._config.optimization.top_k_average_method,

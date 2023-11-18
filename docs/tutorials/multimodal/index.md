@@ -111,7 +111,7 @@ In the following, we decompose the functionalities of AutoMM and prepare step-by
   :gutter: 3
 
 :::{grid-item-card} AutoMM for Semantic Segmentation - Quick Start
-  :link: beginner_semantic_seg.html
+  :link: image_segmentation/beginner_semantic_seg.html
 
   How to train semantic segmentation models with AutoMM.
 :::
@@ -174,7 +174,7 @@ In the following, we decompose the functionalities of AutoMM and prepare step-by
 
 ::::
 
-## Multimodal Data -- Classification / Regression
+## Multimodal Data -- Classification / Regression / NER
 
 ::::{grid} 2
   :gutter: 3
@@ -290,6 +290,16 @@ hidden: true
 ---
 
 image_prediction/index
+```
+
+```{toctree}
+---
+caption: Image Segmentation
+maxdepth: 1
+hidden: true
+---
+
+image_segmentation/index
 ```
 
 ```{toctree}
