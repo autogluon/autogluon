@@ -1,4 +1,5 @@
 import logging
+from typing import Dict
 
 import numpy as np
 import pandas as pd
@@ -9,6 +10,7 @@ from autogluon.timeseries.models.local import (
     ADIDAModel,
     AutoARIMAModel,
     AutoETSModel,
+    AutoCESModel,
     AverageModel,
     CrostonClassicModel,
     CrostonOptimizedModel,
@@ -22,6 +24,7 @@ from autogluon.timeseries.models.local import (
     SeasonalNaiveModel,
     ThetaModel,
 )
+from autogluon.timeseries.models.local.statsforecast import AbstractConformalizedStatsForecastModel
 
 from ..common import (
     DUMMY_TS_DATAFRAME,
@@ -30,23 +33,27 @@ from ..common import (
     get_data_frame_with_item_index,
 )
 
-TESTABLE_MODELS = [
-    ADIDAModel,
+LOCAL_TESTABLE_MODELS = [
     AutoARIMAModel,
     AutoETSModel,
+    AutoCESModel,
     AverageModel,
-    CrostonClassicModel,
-    CrostonSBAModel,
-    CrostonOptimizedModel,
     DynamicOptimizedThetaModel,
     ETSModel,
-    IMAPAModel,
     ThetaModel,
     NaiveModel,
     NPTSModel,
     SeasonalAverageModel,
     SeasonalNaiveModel,
 ]
+IDF_TESTABLE_MODELS = [
+    ADIDAModel,
+    CrostonClassicModel,
+    CrostonSBAModel,
+    CrostonOptimizedModel,
+    IMAPAModel,
+]
+TESTABLE_MODELS = LOCAL_TESTABLE_MODELS + IDF_TESTABLE_MODELS
 
 
 # Restrict to single core for faster training on small datasets
@@ -95,13 +102,13 @@ def test_when_local_model_predicts_then_time_index_is_correct(model_class, predi
 
 
 def get_seasonal_period_from_fitted_local_model(model):
-    if model.name in ["ARIMA", "AutoETS", "AutoARIMA", "DynamicOptimizedTheta", "ETS", "Theta"]:
+    if model.name in ["ARIMA", "AutoETS", "AutoARIMA", "AutoCES", "DynamicOptimizedTheta", "ETS", "Theta"]:
         return model._local_model_args["season_length"]
     else:
         return model._local_model_args["seasonal_period"]
 
 
-@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+@pytest.mark.parametrize("model_class", LOCAL_TESTABLE_MODELS)
 @pytest.mark.parametrize(
     "hyperparameters", [{**DEFAULT_HYPERPARAMETERS, "seasonal_period": None}, DEFAULT_HYPERPARAMETERS]
 )
@@ -130,7 +137,7 @@ def test_when_seasonal_period_is_set_to_none_then_inferred_period_is_used(
     assert get_seasonal_period_from_fitted_local_model(model) == expected_seasonal_period
 
 
-@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+@pytest.mark.parametrize("model_class", LOCAL_TESTABLE_MODELS)
 @pytest.mark.parametrize(
     "freqstr, ts_length, provided_seasonal_period",
     [
@@ -276,3 +283,28 @@ def test_when_npts_fit_with_default_seasonal_features_then_predictions_match_glu
     assert (pred_gts.mean == pred_ag["mean"]).all()
     for q in npts_ag.quantile_levels:
         assert (pred_gts.quantile(str(q)) == pred_ag[str(q)]).all()
+
+
+# def test_when_conformalized_model_called_then_conformalization_correct():
+#     class MockConformalModel(AbstractConformalizedStatsForecastModel):
+#         def _get_point_forecast(self, time_series: pd.Series, local_model_args: Dict):
+#             return pd.DataFrame({"mean": np.ones(self.prediction_length)})
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+@pytest.mark.parametrize("prediction_length", [1, 3])
+def test_when_local_models_fit_then_quantiles_are_present_and_ranked(model_class, prediction_length, temp_model_path):
+    data = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME
+    model = model_class(
+        path=temp_model_path,
+        prediction_length=prediction_length,
+        hyperparameters=DEFAULT_HYPERPARAMETERS,
+        freq=data.freq,
+    )
+    model.fit(train_data=data)
+    predictions = model.predict(data=data)
+
+    quantile_columns = sorted(list(set(predictions.columns) - {"mean"}))
+
+    assert set(model.quantile_levels) == set(float(q) for q in quantile_columns)
+    assert np.diff(predictions[quantile_columns].values, axis=1).min() >= 0

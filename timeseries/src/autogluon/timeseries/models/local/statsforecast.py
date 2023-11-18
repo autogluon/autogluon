@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, Type
+from typing import Any, Dict, List, Type, Union
 
 import numpy as np
 import pandas as pd
@@ -23,14 +23,29 @@ class AbstractStatsForecastModel(AbstractLocalModel):
     def _get_model_type(self) -> Type:
         raise NotImplementedError
 
+    def _get_local_model(self, local_model_args: Dict):
+        model_type = self._get_model_type()
+        return model_type(**local_model_args)
+
     def _predict_with_local_model(
         self,
         time_series: pd.Series,
         local_model_args: dict,
     ) -> pd.DataFrame:
-        model_type = self._get_model_type()
-        model = model_type(**local_model_args)
+        forecast = self._get_local_model(local_model_args).forecast(
+            h=self.prediction_length, y=time_series.values.ravel()
+        )
+        predictions = {"mean": forecast["mean"]}
 
+        return pd.DataFrame(predictions)
+
+
+class AbstractProbabilisticStatsForecastModel(AbstractStatsForecastModel):
+    def _predict_with_local_model(
+        self,
+        time_series: pd.Series,
+        local_model_args: dict,
+    ) -> pd.DataFrame:
         # Code does conversion between confidence levels and quantiles
         levels = []
         quantile_to_key = {}
@@ -41,14 +56,16 @@ class AbstractStatsForecastModel(AbstractLocalModel):
             quantile_to_key[str(q)] = f"{suffix}-{level}"
         levels = sorted(list(set(levels)))
 
-        forecast = model.forecast(h=self.prediction_length, y=time_series.values.ravel(), level=levels)
+        forecast = self._get_local_model(local_model_args).forecast(
+            h=self.prediction_length, y=time_series.values.ravel(), level=levels
+        )
         predictions = {"mean": forecast["mean"]}
         for q, key in quantile_to_key.items():
             predictions[q] = forecast[key]
         return pd.DataFrame(predictions)
 
 
-class AutoARIMAModel(AbstractStatsForecastModel):
+class AutoARIMAModel(AbstractProbabilisticStatsForecastModel):
     """Automatically tuned ARIMA model.
 
     Automatically selects the best (p,d,q,P,D,Q) model parameters using an information criterion
@@ -140,10 +157,10 @@ class AutoARIMAModel(AbstractStatsForecastModel):
         return AutoARIMA
 
 
-class ARIMAModel(AbstractStatsForecastModel):
+class ARIMAModel(AbstractProbabilisticStatsForecastModel):
     """Autoregressive Integrated Moving Average (ARIMA) model with fixed parameters.
 
-    Based on `statsforecast.models.ARIMA <https://nixtla.github.io/statsforecast/models.html#arima>`_.
+    Based on `statsforecast.models.ARIMA <https://nixtla.mintlify.app/statsforecast/src/core/models.html#arima>`_.
 
 
     Other Parameters
@@ -208,7 +225,7 @@ class ARIMAModel(AbstractStatsForecastModel):
         return ARIMA
 
 
-class AutoETSModel(AbstractStatsForecastModel):
+class AutoETSModel(AbstractProbabilisticStatsForecastModel):
     """Automatically tuned exponential smoothing with trend and seasonality.
 
     Automatically selects the best ETS (Error, Trend, Seasonality) model using an information criterion
@@ -307,10 +324,10 @@ class ETSModel(AutoETSModel):
         return local_model_args
 
 
-class DynamicOptimizedThetaModel(AbstractStatsForecastModel):
+class DynamicOptimizedThetaModel(AbstractProbabilisticStatsForecastModel):
     """Optimized Theta forecasting model [Fiorucci2016]_.
 
-    Based on `statsforecast.models.DynamicOptimizedTheta <https://nixtla.github.io/statsforecast/models.html#dynamic-optimized-theta-method>`_.
+    Based on `statsforecast.models.DynamicOptimizedTheta <https://nixtla.mintlify.app/statsforecast/src/core/models.html#dynamic-optimized-theta-method>`_.
 
 
     References
@@ -351,7 +368,7 @@ class DynamicOptimizedThetaModel(AbstractStatsForecastModel):
         return DynamicOptimizedTheta
 
 
-class ThetaModel(AbstractStatsForecastModel):
+class ThetaModel(AbstractProbabilisticStatsForecastModel):
     """Theta forecasting model [Assimakopoulos2000]_.
 
     Based on `statsforecast.models.Theta <https://nixtla.mintlify.app/statsforecast/docs/models/autotheta.html>`_.
@@ -395,42 +412,169 @@ class ThetaModel(AbstractStatsForecastModel):
         return Theta
 
 
-class AbstractStatsForecastIntermittentDemandModel(AbstractStatsForecastModel):
-    allowed_local_model_args = []
+class AbstractConformalizedStatsForecastModel(AbstractStatsForecastModel):
+    max_num_conformalization_windows = 5
 
-    def _update_local_model_args(self, local_model_args: Dict[str, Any]) -> Dict[str, Any]:
-        _ = local_model_args.pop("seasonal_period")
-        return local_model_args
+    def _get_nonconformity_scores(
+        self,
+        time_series: pd.Series,
+        local_model_args: Dict,
+    ) -> np.ndarray:
+        h = self.prediction_length
+        y = time_series.values.ravel()
+
+        if len(y) <= h:
+            # if there is only prediction_length many time steps in sample, we fall back to
+            # the naive-1 forecaster to compute residuals for as many time steps as possible
+            nonconf_scores = np.abs(y - y[0])
+            if len(y) > 1:
+                # discard the first residual (0 by definition)
+                nonconf_scores = np.full((h,), y[-1])
+                nonconf_scores[: (len(y) - 1)] = y[1:]
+            return nonconf_scores.reshape(1, -1)
+
+        test_length = min(len(y) - 1, h * self.max_num_conformalization_windows)
+        cutoffs = list(range(-h, -test_length - 1, -h))
+
+        nonconf_scores = np.full((len(cutoffs), h), np.nan)
+        for i, cutoff in enumerate(cutoffs, start=0):
+            forecast = self._get_point_forecast(pd.Series(y[:cutoff]), local_model_args)
+            forecast_horizon = y[cutoff:] if cutoff + h == 0 else y[cutoff : cutoff + h]
+            nonconf_scores[i] = np.abs(forecast - forecast_horizon)
+
+        return nonconf_scores
+
+    def _get_point_forecast(
+        self,
+        time_series: pd.Series,
+        local_model_args: Dict,
+    ):
+        return self._get_local_model(local_model_args).forecast(
+            h=self.prediction_length, y=time_series.values.ravel()
+        )["mean"]
 
     def _predict_with_local_model(
         self,
         time_series: pd.Series,
         local_model_args: dict,
     ) -> pd.DataFrame:
-        model_type = self._get_model_type()
-        model = model_type(**local_model_args)
+        nonconf_scores = self._get_nonconformity_scores(time_series, local_model_args).ravel()
 
-        # get residuals for the last window of the time series
-        target = time_series.values.ravel()
-        calibration_context = target[: -self.prediction_length]
-        calibration_forecast = model.forecast(h=self.prediction_length, y=calibration_context)
-        residuals = calibration_forecast["mean"] - target[-self.prediction_length :]
+        # conformalize with naive pooling of nonconformity scores
+        n = len(nonconf_scores)
+        levels = np.array(self.quantile_levels)
+        alpha = 1 - np.abs(2 * levels - 1)  # failure probabilities corresponding to quantiles
+        q_sign = np.sign(2 * levels - 1)
+        ehat = np.quantile(
+            nonconf_scores,
+            q=np.ceil((1 - alpha) * (n + 1)) / n,
+            method="lower",
+        )
 
-        # estimate forecast intervals in-sample by assuming 0-mean Gaussian iid residuals
-        stdev_estimate = max(np.sqrt(np.mean(residuals**2)), 1e-5)
-        quantile_offsets = {q: sst.norm(0, stdev_estimate).ppf(q) for q in self.quantile_levels}
-
-        # forecast the time series and add the residual distribution to each time step
-        # target_minimum = min(0, target.min())
-        forecast = model.forecast(h=self.prediction_length, y=target)
+        point_forecast = self._get_point_forecast(time_series, local_model_args)
         predictions = {
-            "mean": forecast["mean"],
-            **{str(q): forecast["mean"] + qo for q, qo in quantile_offsets.items()},
+            "mean": point_forecast,
+            **{str(q): point_forecast + q_sign[i] * ehat[i] for i, q in enumerate(levels)},
         }
         return pd.DataFrame(predictions)
 
 
+class AutoCESModel(AbstractConformalizedStatsForecastModel):
+    """Forecasting with an Complex Exponential Smoothing model where the model selection is performed using the
+    Akaike Information Criterion.
+
+    Based on `statsforecast.models.AutoCES <https://nixtla.mintlify.app/statsforecast/src/core/models.html#autoces>`_.
+
+
+    References
+    ----------
+    .. [Svetunkov2022] Svetunkov, Ivan, Nikolaos Kourentzes, and John Keith Ord. "Complex exponential
+        smoothing." Naval Research Logistics (NRL) 69.8 (2022): 1108-1123.
+
+
+    Other Parameters
+    ----------------
+    model : str, default = "Z"
+        Defines type of CES model, "N" for simple CES, "S" for simple seasonality, "P" for partial seasonality
+        (without complex part), $F$ for full seasonality. When "Z" is selected, the best model is selected using
+        Akaike Information Criterion (AIC).
+    seasonal_period : int or None, default = None
+        Number of time steps in a complete seasonal cycle for seasonal models. For example, 7 for daily data with a
+        weekly cycle or 12 for monthly data with an annual cycle.
+        When set to None, seasonal_period will be inferred from the frequency of the training data. Can also be
+        specified manually by providing an integer > 1.
+        If seasonal_period (inferred or provided) is equal to 1, seasonality will be disabled.
+    n_jobs : int or float, default = 0.5
+        Number of CPU cores used to fit the models in parallel.
+        When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
+        When set to a positive integer, that many cores are used.
+        When set to -1, all CPU cores are used.
+    max_ts_length : int, default = 2500
+        If not None, only the last ``max_ts_length`` time steps of each time series will be used to train the model.
+        This significantly speeds up fitting and usually leads to no change in accuracy.
+    """
+
+    allowed_local_model_args = [
+        "model",
+        "seasonal_period",
+    ]
+
+    def _get_model_type(self):
+        from statsforecast.models import AutoCES
+
+        return AutoCES
+
+    def _update_local_model_args(self, local_model_args: dict) -> dict:
+        local_model_args = super()._update_local_model_args(local_model_args)
+        local_model_args.setdefault("model", "Z")
+        return local_model_args
+
+    def _get_point_forecast(self, time_series: pd.Series, local_model_args: Dict):
+        # Disable seasonality if time series too short for chosen season_length or season_length == 1,
+        # otherwise model will crash
+        if len(time_series) < 5:
+            # AutoCES does not handle "tiny" datasets, fall back to naive
+            return np.full(self.prediction_length, time_series.values[-1])
+        if len(time_series) < 2 * local_model_args["season_length"] + 1 or local_model_args["season_length"] == 1:
+            local_model_args["model"] = "N"
+        return super()._get_point_forecast(time_series, local_model_args)
+
+
+class AbstractStatsForecastIntermittentDemandModel(AbstractConformalizedStatsForecastModel):
+    allowed_local_model_args = []
+    max_num_conformalization_windows = 5
+
+    def _update_local_model_args(self, local_model_args: Dict[str, Any]) -> Dict[str, Any]:
+        _ = local_model_args.pop("seasonal_period")
+        return local_model_args
+
+
 class ADIDAModel(AbstractStatsForecastIntermittentDemandModel):
+    """Intermittent demand forecasting model using the Aggregate-Dissagregate Intermittent
+    Demand Approach [Nikolopoulos2011]_.
+
+    Based on `statsforecast.models.ADIDA <https://nixtla.mintlify.app/statsforecast/src/core/models.html#adida>`_.
+
+
+    References
+    ----------
+    .. [Nikolopoulos2011] Nikolopoulos, K., Syntetos, A., Boylan, J. et al. An aggregate–disaggregate
+        intermittent demand approach (ADIDA) to forecasting: an empirical proposition and analysis.
+        J Oper Res Soc 62, 544–554 (2011). https://doi.org/10.1057/jors.2010.32
+
+
+    Other Parameters
+    ----------------
+    n_jobs : int or float, default = 0.5
+        Number of CPU cores used to fit the models in parallel.
+        When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
+        When set to a positive integer, that many cores are used.
+        When set to -1, all CPU cores are used.
+    max_ts_length : int, default = 2500
+        If not None, only the last ``max_ts_length`` time steps of each time series will be used to train the model.
+        This significantly speeds up fitting and usually leads to no change in accuracy.
+    """
+
     def _get_model_type(self):
         from statsforecast.models import ADIDA
 
@@ -438,6 +582,30 @@ class ADIDAModel(AbstractStatsForecastIntermittentDemandModel):
 
 
 class CrostonSBAModel(AbstractStatsForecastIntermittentDemandModel):
+    """Intermittent demand forecasting model using Croston's model with the Syntetos-Boylan
+    bias correction approach [SyntetosBoylan2001]_.
+
+    Based on `statsforecast.models.CrostonSBA <https://nixtla.mintlify.app/statsforecast/src/core/models.html#crostonsba>`_.
+
+
+    References
+    ----------
+    .. [SyntetosBoylan2001] Syntetos, Aris A., and John E. Boylan. "On the bias of intermittent
+        demand estimates." International journal of production economics 71.1-3 (2001): 457-466.
+
+
+    Other Parameters
+    ----------------
+    n_jobs : int or float, default = 0.5
+        Number of CPU cores used to fit the models in parallel.
+        When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
+        When set to a positive integer, that many cores are used.
+        When set to -1, all CPU cores are used.
+    max_ts_length : int, default = 2500
+        If not None, only the last ``max_ts_length`` time steps of each time series will be used to train the model.
+        This significantly speeds up fitting and usually leads to no change in accuracy.
+    """
+
     def _get_model_type(self):
         from statsforecast.models import CrostonSBA
 
@@ -445,6 +613,30 @@ class CrostonSBAModel(AbstractStatsForecastIntermittentDemandModel):
 
 
 class CrostonOptimizedModel(AbstractStatsForecastIntermittentDemandModel):
+    """Intermittent demand forecasting model using Croston's model where the smoothing parameter
+    is optimized [Croston1972]_.
+
+    Based on `statsforecast.models.CrostonOptimized <https://nixtla.mintlify.app/statsforecast/src/core/models.html#crostonoptimized>`_.
+
+
+    References
+    ----------
+    .. [Croston1972] Croston, John D. "Forecasting and stock control for intermittent demands." Journal of
+        the Operational Research Society 23.3 (1972): 289-303.
+
+
+    Other Parameters
+    ----------------
+    n_jobs : int or float, default = 0.5
+        Number of CPU cores used to fit the models in parallel.
+        When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
+        When set to a positive integer, that many cores are used.
+        When set to -1, all CPU cores are used.
+    max_ts_length : int, default = 2500
+        If not None, only the last ``max_ts_length`` time steps of each time series will be used to train the model.
+        This significantly speeds up fitting and usually leads to no change in accuracy.
+    """
+
     def _get_model_type(self):
         from statsforecast.models import CrostonOptimized
 
@@ -452,6 +644,30 @@ class CrostonOptimizedModel(AbstractStatsForecastIntermittentDemandModel):
 
 
 class CrostonClassicModel(AbstractStatsForecastIntermittentDemandModel):
+    """Intermittent demand forecasting model using Croston's model where the smoothing parameter
+    is fixed to 0.1 [Croston1972]_.
+
+    Based on `statsforecast.models.CrostonClassic <https://nixtla.mintlify.app/statsforecast/src/core/models.html#crostonclassic>`_.
+
+
+    References
+    ----------
+    .. [Croston1972] Croston, John D. "Forecasting and stock control for intermittent demands." Journal of
+        the Operational Research Society 23.3 (1972): 289-303.
+
+
+    Other Parameters
+    ----------------
+    n_jobs : int or float, default = 0.5
+        Number of CPU cores used to fit the models in parallel.
+        When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
+        When set to a positive integer, that many cores are used.
+        When set to -1, all CPU cores are used.
+    max_ts_length : int, default = 2500
+        If not None, only the last ``max_ts_length`` time steps of each time series will be used to train the model.
+        This significantly speeds up fitting and usually leads to no change in accuracy.
+    """
+
     def _get_model_type(self):
         from statsforecast.models import CrostonClassic
 
@@ -459,6 +675,31 @@ class CrostonClassicModel(AbstractStatsForecastIntermittentDemandModel):
 
 
 class IMAPAModel(AbstractStatsForecastIntermittentDemandModel):
+    """Intermittent demand forecasting model using the Intermittent Multiple Aggregation Prediction Algorithm
+    [Petropoulos2015]_.
+
+
+    Based on `statsforecast.models.IMAPA <https://nixtla.mintlify.app/statsforecast/src/core/models.html#imapa>`_.
+
+
+    References
+    ----------
+    .. [Petropoulos2015] Petropoulos, Fotios, and Nikolaos Kourentzes. "Forecast combinations for intermittent
+        demand." Journal of the Operational Research Society 66.6 (2015): 914-924.
+
+
+    Other Parameters
+    ----------------
+    n_jobs : int or float, default = 0.5
+        Number of CPU cores used to fit the models in parallel.
+        When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
+        When set to a positive integer, that many cores are used.
+        When set to -1, all CPU cores are used.
+    max_ts_length : int, default = 2500
+        If not None, only the last ``max_ts_length`` time steps of each time series will be used to train the model.
+        This significantly speeds up fitting and usually leads to no change in accuracy.
+    """
+
     def _get_model_type(self):
         from statsforecast.models import IMAPA
 
