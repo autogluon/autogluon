@@ -747,3 +747,181 @@ class MAE(COD):
 
 
 COD_METRICS_NAMES = {"sm": SM(), "fm": FM(), "em": EM(), "mae": MAE()}
+
+
+# TODO: Modify multi-gpu evaluation error. Maybe there will be a more elegant way.
+class Multiclass_IoU_Pred:
+    """
+    Compute the IoU for multi-class semantic segmentation based on https://github.com/xieenze/Trans2Seg/blob/master/segmentron/utils/score.py.
+    The direct use of torchmetrics for large dataset will lead to issues such as high CPU usage or insufficient memory.
+    """
+
+    def __init__(self, num_classes):
+        super().__init__()
+        self.total_inter = torch.zeros(num_classes)
+        self.total_union = torch.zeros(num_classes)
+        self.num_classes = num_classes
+
+    def update(self, logits, labels):
+        inter, union = self.batch_intersection_union(logits, labels)
+        self.total_inter += inter
+        self.total_union += union
+
+    def compute(self):
+        IoU = 1.0 * self.total_inter / (2.220446049250313e-16 + self.total_union)
+        return torch.tensor(IoU.mean().item())
+
+    def batch_intersection_union(self, output, target):
+        mini = 1
+        maxi = self.num_classes
+        nbins = self.num_classes
+        predict = torch.argmax(output, 1) + 1
+        target = target.float() + 1
+
+        predict = predict.float() * (target > 0).float()
+        intersection = predict * (predict == target).float()
+        # areas of intersection and union
+        area_inter = torch.histc(intersection, bins=nbins, min=mini, max=maxi)
+        area_pred = torch.histc(predict, bins=nbins, min=mini, max=maxi)
+        area_lab = torch.histc(target, bins=nbins, min=mini, max=maxi)
+        area_union = area_pred + area_lab - area_inter
+        assert torch.sum(area_inter > area_union).item() == 0, "Intersection area should be smaller than Union area"
+        return area_inter.float(), area_union.float()
+
+
+class Binary_IoU_Pred:
+    """
+    Compute the IoU for binary semantic segmentation. The direct use of torchmetrics to calculate IoU for multiple samples does not yield accurate results.
+    So we iteratively calculate metric values and then take the average.
+    """
+
+    def __init__(
+        self,
+    ):
+        super().__init__()
+        self.logits = []
+        self.labels = []
+
+    def update(self, logits, labels):
+        self.logits.append(logits)
+        self.labels.append(labels)
+
+    def compute(self):
+        logits = torch.cat(self.logits).cpu()
+        labels = torch.cat(self.labels).cpu()
+
+        res_list = []
+        metric = torchmetrics.JaccardIndex(task="binary")
+        for logit, label in zip(logits, labels):
+            res_list.append(metric(logit, label))
+        return torch.mean(torch.tensor(res_list))
+
+
+class Balanced_Error_Rate_Pred:
+    """
+    Compute the balanced error rate.
+    """
+
+    def __init__(
+        self,
+    ):
+        super().__init__()
+        self.logits = []
+        self.labels = []
+
+    def update(self, logits, labels):
+        self.logits.append(logits)
+        self.labels.append(labels)
+
+    def compute(self):
+        logits = torch.cat(self.logits).cpu()
+        labels = torch.cat(self.labels).cpu()
+
+        labels = (labels * 255) > 125
+        logits = (logits * 255) > 125
+        ber = 1 - torchmetrics.Accuracy(
+            task="multiclass", num_classes=2, average="macro", multidim_average="samplewise"
+        )(logits, labels)
+        return torch.mean(ber)
+
+
+class COD_Pred:
+    def __init__(self):
+        super().__init__()
+        self.logits = []
+        self.labels = []
+
+    def update(self, logits, labels):
+        self.logits.append(logits)
+        self.labels.append(labels)
+
+    def compute(self):
+        pass
+
+
+class SM_Pred(COD_Pred):
+    def compute(self):
+        logits = torch.cat(self.logits)
+        labels = torch.cat(self.labels)
+        assert logits.shape == labels.shape
+        batchsize = labels.shape[0]
+
+        metric_SM = Smeasure()
+
+        for i in range(batchsize):
+            true, pred = labels[i, 0].cpu().data.numpy() * 255, logits[i, 0].cpu().data.numpy() * 255
+            metric_SM.step(pred=pred, gt=true)
+
+        return torch.tensor(metric_SM.get_results()["sm"])
+
+
+class FM_Pred(COD_Pred):
+    def compute(self):
+        logits = torch.cat(self.logits)
+        labels = torch.cat(self.labels)
+        assert logits.shape == labels.shape
+        batchsize = labels.shape[0]
+
+        metric_WFM = WeightedFmeasure()
+        for i in range(batchsize):
+            true, pred = labels[i, 0].cpu().data.numpy() * 255, logits[i, 0].cpu().data.numpy() * 255
+
+            metric_WFM.step(pred=pred, gt=true)
+
+        return torch.tensor(metric_WFM.get_results()["wfm"])
+
+
+class EM_Pred(COD_Pred):
+    def compute(self):
+        logits = torch.cat(self.logits)
+        labels = torch.cat(self.labels)
+        assert logits.shape == labels.shape
+        batchsize = labels.shape[0]
+
+        metric_EM = Emeasure()
+
+        for i in range(batchsize):
+            true, pred = labels[i, 0].cpu().data.numpy() * 255, logits[i, 0].cpu().data.numpy() * 255
+
+            metric_EM.step(pred=pred, gt=true)
+
+        return torch.tensor(metric_EM.get_results()["em"]["curve"].mean())
+
+
+class MAE_Pred(COD_Pred):
+    def compute(self):
+        logits = torch.cat(self.logits)
+        labels = torch.cat(self.labels)
+        assert logits.shape == labels.shape
+        batchsize = labels.shape[0]
+
+        metric_MAE = MAE_SOD()
+        for i in range(batchsize):
+            true, pred = labels[i, 0].cpu().data.numpy() * 255, logits[i, 0].cpu().data.numpy() * 255
+
+            metric_MAE.step(pred=pred, gt=true)
+
+        return torch.tensor(metric_MAE.get_results()["mae"])
+
+
+COD_METRICS_NAMES_Pred = {"sm": SM_Pred(), "fm": FM_Pred(), "em": EM_Pred(), "mae": MAE_Pred()}

@@ -240,7 +240,6 @@ model:
 
   sam:
     checkpoint_name: "facebook/sam-vit-huge"
-    config_file: ""
     image_norm: "imagenet"
     data_types:
       - "semantic_segmentation_img"

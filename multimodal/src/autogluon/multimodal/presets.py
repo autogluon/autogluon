@@ -441,7 +441,7 @@ def semantic_segmentation(presets: str = DEFAULT):
         "env.batch_size": 4,
         "env.per_gpu_batch_size": 1,
         "env.eval_batch_size_ratio": 1,
-        "env.strategy": "ddp",
+        "env.strategy": "ddp_find_unused_parameters_true",
         "env.auto_select_gpus": False,
         "env.num_gpus": -1,
         "env.num_workers": 4,
