@@ -19,7 +19,7 @@ from ..constants import (
     XYWH,
 )
 from ..data import BaseDataModule, MultiImageMixDataset, MultiModalFeaturePreprocessor, infer_rois_column_type
-from ..optimization import MMDetLitModule
+from ..optimization import MMDetLitModule, LitModule
 from ..utils import (
     check_if_packages_installed,
     cocoeval,
@@ -305,13 +305,21 @@ class ObjectDetectionLearner(BaseLearner):
         optimization_kwargs: Optional[dict] = None,
         is_train=True,
     ):
+        # add ovd
+        if self._problem_type == OPEN_VOCABULARY_OBJECT_DETECTION:
+            LightningModule = LitModule
+        elif self._problem_type == OBJECT_DETECTION:
+            LightningModule = MMDetLitModule
+        else:
+            raise(f"problem type {self._problem_type} is not supported by ObjectDetectionLearner.")
+
         if is_train:
-            return MMDetLitModule(
+            return LightningModule(
                 model=model,
                 **optimization_kwargs,
             )
         else:
-            return MMDetLitModule(model=self._model)
+            return LightningModule(model=self._model)
 
     def get_model_per_run(self, model, config):
         if model is None:
