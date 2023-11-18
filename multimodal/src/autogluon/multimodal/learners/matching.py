@@ -528,7 +528,7 @@ class MultiModalMatcher(BaseLearner):
             validation_metric_name, eval_metric_name = infer_metrics(
                 problem_type=self._problem_type,
                 is_matching=self._pipeline in matcher_presets.list_keys(),
-                eval_metric=self._eval_metric_name if self._eval_metric_func is None else self._eval_metric_func,
+                eval_metric=self._eval_metric_name,
             )
             minmax_mode = get_minmax_mode(validation_metric_name)
         else:
