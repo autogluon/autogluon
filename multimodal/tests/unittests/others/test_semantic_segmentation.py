@@ -83,6 +83,8 @@ def get_file_df_multi_semantic_seg(need_test_gt=False):
     return train_df, val_df, test_df
 
 
+# TODO: Pytest does not support DDP
+@pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -99,7 +101,6 @@ def test_sam_semantic_segmentation_isic_fit_eval_predict_save_load(checkpoint_na
         validation_metric=validation_metric,
         eval_metric=validation_metric,
         hyperparameters={
-            "env.num_gpus": 1,
             "model.sam.checkpoint_name": checkpoint_name,
         },
         label="label",
@@ -116,6 +117,8 @@ def test_sam_semantic_segmentation_isic_fit_eval_predict_save_load(checkpoint_na
     verify_predictor_save_load_for_semantic_seg(predictor, test_df, as_multiclass=False)
 
 
+# TODO: Pytest does not support DDP
+@pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -131,7 +134,6 @@ def test_sam_semantic_segmentation_zero_shot_evaluate_predict(checkpoint_name):
         validation_metric=validation_metric,
         eval_metric=validation_metric,
         hyperparameters={
-            "env.num_gpus": 1,
             "model.sam.checkpoint_name": checkpoint_name,
         },
         label="label",
@@ -149,6 +151,8 @@ def test_sam_semantic_segmentation_zero_shot_evaluate_predict(checkpoint_name):
     predictor.predict(test_df, save_results=False)
 
 
+# TODO: Pytest does not support DDP
+@pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -165,7 +169,6 @@ def test_sam_semantic_segmentation_trans10k_fit_eval_predict_save_load(checkpoin
         validation_metric=validation_metric,
         eval_metric=validation_metric,
         hyperparameters={
-            "env.num_gpus": 1,
             "env.precision": 32,
             "model.sam.checkpoint_name": checkpoint_name,
             "optimization.loss_function": "mask2former_loss",
@@ -209,6 +212,8 @@ def verify_predictor_save_load_for_semantic_seg(predictor, df, as_multiclass, cl
     shutil.rmtree(root)
 
 
+# TODO: Pytest does not support DDP
+@pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -224,7 +229,6 @@ def test_sam_semantic_segmentation_get_class_num_func(checkpoint_name):
         validation_metric=validation_metric,
         eval_metric=validation_metric,
         hyperparameters={
-            "env.num_gpus": 1,
             "env.precision": 32,
             "model.sam.checkpoint_name": checkpoint_name,
             "optimization.loss_function": "mask2former_loss",
@@ -244,6 +248,8 @@ def test_sam_semantic_segmentation_get_class_num_func(checkpoint_name):
     assert num_classes == get_class_num_func(os.path.dirname(train_df["label"][0]))
 
 
+# TODO: Pytest does not support DDP
+@pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "frozen_layers",
     [
@@ -257,7 +263,6 @@ def test_sam_semantic_segmentation_lora_insert(frozen_layers):
     predictor = MultiModalPredictor(
         problem_type="semantic_segmentation",
         hyperparameters={
-            "env.num_gpus": 1,
             "model.sam.checkpoint_name": "facebook/sam-vit-base",
             "model.sam.frozen_layers": frozen_layers,
         },
