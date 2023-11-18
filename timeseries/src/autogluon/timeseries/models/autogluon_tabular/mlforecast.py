@@ -84,6 +84,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         self._date_features: Optional[List[str]] = None
         self._mlf: Optional[MLForecast] = None
         self._scaler: Optional[BaseTargetTransform] = None
+        self._residuals_std_per_item: Optional[pd.Series] = None
         self._avg_residuals_std: Optional[float] = None
 
     def _get_extra_tabular_init_kwargs(self) -> dict:
@@ -208,7 +209,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         val_df = grouped_df.tail(val_rows_per_item)
         logger.debug(f"train_df shape: {train_df.shape}, val_df shape: {val_df.shape}")
 
-        return train_df.drop([MLF_ITEMID, MLF_TIMESTAMP], axis=1), val_df.drop([MLF_ITEMID, MLF_TIMESTAMP], axis=1)
+        return train_df, val_df
 
     def _to_mlforecast_df(
         self,
@@ -271,7 +272,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
                 **self._get_extra_tabular_init_kwargs(),
             },
             predictor_fit_kwargs={
-                "tuning_data": val_df,
+                "tuning_data": val_df.drop(columns=[MLF_ITEMID, MLF_TIMESTAMP]),
                 "time_limit": None if time_limit is None else time_limit - (time.time() - fit_start_time),
                 "hyperparameters": model_params["tabular_hyperparameters"],
                 **model_params["tabular_fit_kwargs"],
@@ -280,13 +281,17 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         self._mlf.models = {"mean": estimator}
 
         with warning_filter():
-            self._mlf.fit_models(X=train_df.drop(MLF_TARGET, axis=1), y=train_df[MLF_TARGET])
+            self._mlf.fit_models(
+                X=train_df.drop(columns=[MLF_TARGET, MLF_ITEMID, MLF_TIMESTAMP]), y=train_df[MLF_TARGET]
+            )
 
-        self._avg_residuals_std = self._compute_residuals_std(val_df)
+        self._residuals_std_per_item = self._compute_residuals_std(val_df)
+        self._avg_residuals_std = self._residuals_std_per_item.mean()
 
     def _compute_residuals_std(self, val_df: pd.DataFrame) -> float:
         residuals = val_df[MLF_TARGET] - self._mlf.models_["mean"].predict(val_df)
-        return np.sqrt(residuals.pow(2.0).mean())
+        return residuals.pow(2).groupby(val_df[MLF_ITEMID]).mean().pow(0.5)
+        # return np.sqrt(residuals.pow(2.0).mean())
 
     def _get_scale_per_item(self, item_ids: pd.Index) -> pd.Series:
         """Extract the '_scale' values from the scaler object, if available."""
@@ -346,7 +351,11 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         sqrt_h = np.sqrt(np.arange(1, self.prediction_length + 1))
         # Series where normal_scale_per_timestep.loc[item_id].loc[N] = sqrt(1 + N) for N in range(prediction_length)
         normal_scale_per_timestep = pd.Series(np.tile(sqrt_h, num_items), index=repeated_item_ids)
-        std_per_timestep = self._avg_residuals_std * scale_per_item * normal_scale_per_timestep
+
+        residuals_std_per_timestep = self._residuals_std_per_item.reindex(repeated_item_ids)
+        # Use avg_residuals_std in case unseen item received for prediction
+        residuals_std_per_timestep = residuals_std_per_timestep.fillna(self._avg_residuals_std)
+        std_per_timestep = residuals_std_per_timestep * scale_per_item * normal_scale_per_timestep
         for q in self.quantile_levels:
             predictions[str(q)] = predictions["mean"] + norm.ppf(q) * std_per_timestep.to_numpy()
         return predictions
@@ -364,7 +373,7 @@ class DirectTabularModel(AbstractMLForecastModel):
 
     Features not known during the forecast horizon (e.g., future target values) are replaced by NaNs.
 
-    If ``eval_metric=="WQL"``, the TabularPredictor will be trained with ``"quantile"`` problem type.
+    If ``eval_metric.needs_quantile``, the TabularPredictor will be trained with ``"quantile"`` problem type.
     Otherwise, TabularPredictor will be trained with ``"regression"`` problem type, and dummy quantiles will be
     obtained by assuming that the residuals follow zero-mean normal distribution.
 
