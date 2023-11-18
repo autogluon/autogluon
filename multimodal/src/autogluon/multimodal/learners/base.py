@@ -108,9 +108,6 @@ from ..utils import (
     filter_hyperparameters,
     get_config,
     get_dir_ckpt_paths,
-    on_fit_start_message,
-    on_per_fit_run_start_message,
-    on_fit_end_message,
     get_gpu_message,
     get_load_ckpt_paths,
     get_local_pretrained_config_paths,
@@ -130,6 +127,9 @@ from ..utils import (
     list_timm_models,
     load_text_tokenizers,
     logits_to_prob,
+    on_fit_end_message,
+    on_fit_start_message,
+    on_per_fit_run_start_message,
     run_ddp_only_once,
     save_pretrained_model_configs,
     save_text_tokenizers,
@@ -514,7 +514,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
     def fit_sanity_check(self):
         assert not self._resume or not self._is_hpo, "You can not resume training with HPO."
-        if self._is_hpo and self._teacher_learner is not None:
+        if self._is_hpo and hasattr(self, "_teacher_learner") and self._teacher_learner is not None:
             assert isinstance(
                 self._teacher_learner, str
             ), "HPO with distillation only supports passing a path to the learner."
