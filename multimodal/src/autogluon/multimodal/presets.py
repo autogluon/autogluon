@@ -761,8 +761,7 @@ def ner(presets: str = DEFAULT):
     """
     hyperparameters = {
         "model.names": [
-            "categorical_mlp",
-            "numerical_mlp",
+            "ft_transformer",
             "timm_image",
             "ner_text",
             "fusion_ner",
