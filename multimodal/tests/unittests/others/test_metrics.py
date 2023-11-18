@@ -149,6 +149,7 @@ def test_f1_metrics_for_multiclass(eval_metric):
         ("regression", "pearsonr", None, True, "pearsonr", "pearsonr"),
         (None, None, None, True, "ndcg", "recall"),
         ("feature_extraction", None, None, False, None, None),
+        ("feature_extraction", "f1", None, False, None, None),
     ],
 )
 def test_infer_metrics(
@@ -161,6 +162,27 @@ def test_infer_metrics(
 ):
     validation_metric_name, eval_metric_name = infer_metrics(
         problem_type, eval_metric_name, validation_metric_name, is_matching
+    )
+    assert eval_metric_name == target_eval_metric_name
+    assert validation_metric_name == target_validation_metric_name
+
+
+@pytest.mark.single_gpu
+@pytest.mark.parametrize(
+    "problem_type, eval_metric, is_matching, target_eval_metric_name, target_validation_metric_name",
+    [
+        ("binary", ag_metrics.make_scorer("dummy", ag_metrics.get_metric("acc")), False, "dummy", "roc_auc"),
+    ],
+)
+def test_infer_metrics_custom(
+    problem_type,
+    eval_metric,
+    is_matching,
+    target_eval_metric_name,
+    target_validation_metric_name,
+):
+    validation_metric_name, eval_metric_name = infer_metrics(
+        problem_type, eval_metric, None, is_matching
     )
     assert eval_metric_name == target_eval_metric_name
     assert validation_metric_name == target_validation_metric_name
@@ -199,7 +221,9 @@ def test_symmetric_hit_rate():
 def test_custom_metric():
     dataset = HatefulMeMesDataset()
     metric_name = dataset.metric
+    custom_metric_name = "customized"
     metric_scorer = ag_metrics.get_metric(metric_name)
+    metric_scorer.name = custom_metric_name
     predictor_by_name = MultiModalPredictor(
         label=dataset.label_columns[0],
         problem_type=dataset.problem_type,
@@ -238,4 +262,5 @@ def test_custom_metric():
         data=dataset.test_df,
         metrics=None,
     )
-    assert scores_by_name[metric_name] == scores_by_scorer_eval[metric_name] == scores_by_scorer_init[metric_name]
+    assert scores_by_scorer_eval[custom_metric_name] == scores_by_scorer_init[custom_metric_name]
+    assert scores_by_name[metric_name] == scores_by_scorer_eval[custom_metric_name]

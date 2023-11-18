@@ -21,7 +21,9 @@ from ..constants import (
     MAP,
     MATCHING_METRICS,
     MATCHING_METRICS_WITHOUT_PROBLEM_TYPE,
+    MAX,
     METRIC_MODE_MAP,
+    MIN,
     MULTICLASS,
     NDCG,
     NER,
@@ -50,7 +52,7 @@ logger = logging.getLogger(__name__)
 
 def infer_metrics(
     problem_type: Optional[str] = None,
-    eval_metric_name: Optional[str] = None,
+    eval_metric: Optional[Union[str, Scorer]] = None,
     validation_metric_name: Optional[str] = None,
     is_matching: Optional[bool] = False,
 ):
@@ -77,6 +79,17 @@ def infer_metrics(
     eval_metric_name
         Name of evaluation metric.
     """
+    is_customized = False
+    if eval_metric is None:
+        eval_metric_name = None
+    elif isinstance(eval_metric, str):
+        eval_metric_name = eval_metric
+    elif isinstance(eval_metric, Scorer):
+        eval_metric_name = eval_metric.name
+        is_customized = True
+    else:
+        raise TypeError(f"eval_metric can be a str, a Scorer, or None, but is type: {type(eval_metric)}")
+
     if problem_type is not None:
         problem_property = PROBLEM_TYPES_REG.get(problem_type)
 
@@ -91,7 +104,7 @@ def infer_metrics(
                 return validation_metric_name, eval_metric_name
             else:
                 warnings.warn(
-                    f"Metric {eval_metric_name} is not supported as the evaluation metric for {problem_type} in matching tasks. "
+                    f"Metric {eval_metric_name} is not supported as the evaluation metric for {problem_type} in matching tasks."
                 )
 
         if problem_type is None:
@@ -113,13 +126,15 @@ def infer_metrics(
 
     if eval_metric_name is not None:
         # Infer evaluation metric
-        if eval_metric_name.lower() not in problem_property.supported_evaluation_metrics:
+        if eval_metric_name.lower() not in problem_property.supported_evaluation_metrics and not is_customized:
             warnings.warn(
                 f"Metric {eval_metric_name} is not supported as the evaluation metric for {problem_type}. "
                 f"The evaluation metric is changed to {problem_property.fallback_evaluation_metric} by default."
             )
             if problem_property.fallback_evaluation_metric is not None:
                 eval_metric_name = problem_property.fallback_evaluation_metric
+            else:
+                return None, None
 
         # Infer validation metric
         if eval_metric_name.lower() in problem_property.supported_validation_metrics:
@@ -142,7 +157,7 @@ def infer_metrics(
 
 
 def get_minmax_mode(
-    metric_name: str,
+    metric_name: Union[str, Scorer],
 ):
     """
     Get minmax mode based on metric name
@@ -161,10 +176,13 @@ def get_minmax_mode(
         - max
             It means that larger metric is better.
     """
-    assert (
-        metric_name in METRIC_MODE_MAP
-    ), f"{metric_name} is not a supported metric. Options are: {METRIC_MODE_MAP.keys()}"
-    return METRIC_MODE_MAP.get(metric_name)
+    if isinstance(metric_name, str):
+        assert (
+            metric_name in METRIC_MODE_MAP
+        ), f"{metric_name} is not a supported metric. Options are: {METRIC_MODE_MAP.keys()}"
+        return METRIC_MODE_MAP.get(metric_name)
+    else:
+        return MAX if metric_name._sign > 0 else MIN
 
 
 def get_stopping_threshold(metric_name: str):
