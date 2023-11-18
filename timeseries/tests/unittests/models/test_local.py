@@ -12,6 +12,7 @@ from autogluon.timeseries.models.local import (
     AutoETSModel,
     AutoCESModel,
     AverageModel,
+    ConformalizedZeroModel,
     CrostonClassicModel,
     CrostonOptimizedModel,
     CrostonSBAModel,
@@ -48,6 +49,7 @@ LOCAL_TESTABLE_MODELS = [
 ]
 IDF_TESTABLE_MODELS = [
     ADIDAModel,
+    ConformalizedZeroModel,
     CrostonClassicModel,
     CrostonSBAModel,
     CrostonOptimizedModel,

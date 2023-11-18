@@ -8,6 +8,7 @@ from .statsforecast import (
     AutoARIMAModel,
     AutoETSModel,
     AutoCESModel,
+    ConformalizedZeroModel,
     CrostonClassicModel,
     CrostonOptimizedModel,
     CrostonSBAModel,

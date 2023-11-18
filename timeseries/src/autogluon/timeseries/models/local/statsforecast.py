@@ -27,15 +27,21 @@ class AbstractStatsForecastModel(AbstractLocalModel):
         model_type = self._get_model_type()
         return model_type(**local_model_args)
 
+    def _get_point_forecast(
+        self,
+        time_series: pd.Series,
+        local_model_args: Dict,
+    ):
+        return self._get_local_model(local_model_args).forecast(
+            h=self.prediction_length, y=time_series.values.ravel()
+        )["mean"]
+
     def _predict_with_local_model(
         self,
         time_series: pd.Series,
         local_model_args: dict,
     ) -> pd.DataFrame:
-        forecast = self._get_local_model(local_model_args).forecast(
-            h=self.prediction_length, y=time_series.values.ravel()
-        )
-        predictions = {"mean": forecast["mean"]}
+        predictions = {"mean": self._get_point_forecast(time_series, local_model_args)}
 
         return pd.DataFrame(predictions)
 
@@ -444,14 +450,6 @@ class AbstractConformalizedStatsForecastModel(AbstractStatsForecastModel):
 
         return nonconf_scores
 
-    def _get_point_forecast(
-        self,
-        time_series: pd.Series,
-        local_model_args: Dict,
-    ):
-        return self._get_local_model(local_model_args).forecast(
-            h=self.prediction_length, y=time_series.values.ravel()
-        )["mean"]
 
     def _predict_with_local_model(
         self,
@@ -547,6 +545,15 @@ class AbstractStatsForecastIntermittentDemandModel(AbstractConformalizedStatsFor
     def _update_local_model_args(self, local_model_args: Dict[str, Any]) -> Dict[str, Any]:
         _ = local_model_args.pop("seasonal_period")
         return local_model_args
+    
+    def _predict_with_local_model(
+        self,
+        time_series: pd.Series,
+        local_model_args: dict,
+    ) -> pd.DataFrame:
+        # intermittent demand models clip their predictions at 0 or lower if the time series has lower values
+        predictions = super()._predict_with_local_model(time_series=time_series, local_model_args=local_model_args)
+        return predictions.clip(lower=min(0, time_series.min()))
 
 
 class ADIDAModel(AbstractStatsForecastIntermittentDemandModel):
@@ -704,3 +711,32 @@ class IMAPAModel(AbstractStatsForecastIntermittentDemandModel):
         from statsforecast.models import IMAPA
 
         return IMAPA
+
+
+class ConformalizedZeroModel(AbstractStatsForecastIntermittentDemandModel):
+    """A naive forecaster that always returns 0 forecasts across the prediction horizon, where the prediction
+    intervals are computed using conformal prediction.
+
+    Other Parameters
+    ----------------
+    n_jobs : int or float, default = 0.5
+        Number of CPU cores used to fit the models in parallel.
+        When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
+        When set to a positive integer, that many cores are used.
+        When set to -1, all CPU cores are used.
+    max_ts_length : int, default = 2500
+        If not None, only the last ``max_ts_length`` time steps of each time series will be used to train the model.
+        This significantly speeds up fitting and usually leads to no change in accuracy.
+    """
+    def _get_model_type(self):
+        raise NotImplementedError
+
+    def _get_local_model(self, local_model_args: Dict):
+        raise NotImplementedError
+    
+    def _get_point_forecast(
+        self,
+        time_series: pd.Series,
+        local_model_args: Dict,
+    ):
+        return np.zeros(self.prediction_length)
