@@ -54,8 +54,8 @@ from .log import (
     get_gpu_message,
     make_exp_dir,
     on_fit_end_message,
+    on_fit_per_run_start_message,
     on_fit_start_message,
-    on_per_fit_run_start_message,
 )
 from .matcher import compute_semantic_similarity, convert_data_for_ranking, create_siamese_model, semantic_search
 from .metric import (

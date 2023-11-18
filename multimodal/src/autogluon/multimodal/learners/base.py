@@ -128,8 +128,8 @@ from ..utils import (
     load_text_tokenizers,
     logits_to_prob,
     on_fit_end_message,
+    on_fit_per_run_start_message,
     on_fit_start_message,
-    on_per_fit_run_start_message,
     run_ddp_only_once,
     save_pretrained_model_configs,
     save_text_tokenizers,
@@ -1194,7 +1194,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
     def on_fit_per_run_start(self, seed, save_path):
         # TODO(?) We should have a separate "_pre_training_event()" for logging messages.
-        logger.info(on_per_fit_run_start_message(save_path, self._validation_metric_name))
+        logger.info(on_fit_per_run_start_message(save_path, self._validation_metric_name))
         pl.seed_everything(seed, workers=True)
 
     def on_fit_per_run_end(

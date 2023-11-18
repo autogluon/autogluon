@@ -152,7 +152,7 @@ def on_fit_start_message(path: Optional[str] = None):
     )
 
 
-def on_per_fit_run_start_message(save_path, validation_metric_name):
+def on_fit_per_run_start_message(save_path, validation_metric_name):
     return f"""\
 
 AutoMM starts to create your model. ✨✨✨
