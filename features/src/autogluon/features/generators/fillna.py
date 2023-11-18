@@ -56,7 +56,7 @@ class FillNaFeatureGenerator(AbstractFeatureGenerator):
     def _transform(self, X: DataFrame) -> DataFrame:
         if self._fillna_feature_map:
             with warnings.catch_warnings():
-                warnings.simplefilter(action='ignore', category=FutureWarning)
+                warnings.simplefilter(action="ignore", category=FutureWarning)
                 # FIXME: v1.1 Remove this warning filter and resolve.
                 #  In Pandas 2.1, the `downcast` argument was deprecated,
                 #  but we need it to avoid incorrect type conversion.
