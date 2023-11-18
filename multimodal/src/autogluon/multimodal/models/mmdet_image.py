@@ -225,6 +225,14 @@ class MMDetAutoModelForObjectDetection(nn.Module):
                 "url": "https://download.openmmlab.com/mmdetection/v2.0/yolox/yolox_x_8x8_300e_coco/yolox_x_8x8_300e_coco_20211126_140254-1ef88d67.pth",
                 "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_x_8xb8-300e_coco.py"),
             },
+            "co_dino": {
+                "url": "https://download.openmmlab.com/mmdetection/v3.0/codetr/co_dino_5scale_swin_large_16e_o365tococo-614254c9.pth",
+                "config_file": os.path.join(mmdet_configs_dir, "co_dino", "co_dino_5scale_swin_l_16xb1_16e_o365tococo.py"),
+            },
+            "co_dino_r50": {
+                "url": "https://download.openmmlab.com/mmdetection/v3.0/codetr/co_dino_5scale_r50_1x_coco-7481f903.pth",
+                "config_file": os.path.join(mmdet_configs_dir, "co_dino", "co_dino_5scale_r50_8xb2_1x_coco.py"),
+            },
         }
 
         if os.path.isfile(checkpoint_name):

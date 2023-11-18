@@ -26,8 +26,8 @@ def tutorial_script_for_quick_start():
     with open(test_path_no_label, "w+") as f_nolabel:
         json.dump(test_data, f_nolabel)
 
-    checkpoint_name = "yolov3_mobilenetv2_8xb24-320-300e_coco"
-    num_gpus = -1
+    checkpoint_name = "co_dino"
+    num_gpus = 1
 
     # Init predictor
     predictor = MultiModalPredictor(
