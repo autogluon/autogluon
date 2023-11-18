@@ -19,7 +19,7 @@ from ..constants import (
     XYWH,
 )
 from ..data import BaseDataModule, MultiImageMixDataset, MultiModalFeaturePreprocessor, infer_rois_column_type
-from ..optimization import MMDetLitModule, LitModule
+from ..optimization import LitModule, MMDetLitModule
 from ..utils import (
     check_if_packages_installed,
     cocoeval,
