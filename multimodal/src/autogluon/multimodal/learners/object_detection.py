@@ -311,7 +311,7 @@ class ObjectDetectionLearner(BaseLearner):
         elif self._problem_type == OBJECT_DETECTION:
             LightningModule = MMDetLitModule
         else:
-            raise(f"problem type {self._problem_type} is not supported by ObjectDetectionLearner.")
+            raise TypeError(f"problem type {self._problem_type} is not supported by ObjectDetectionLearner.")
 
         if is_train:
             return LightningModule(
