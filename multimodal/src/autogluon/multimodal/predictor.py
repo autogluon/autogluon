@@ -14,7 +14,14 @@ import transformers
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
 from autogluon.core.metrics import Scorer
 
-from .constants import AUTOMM_TUTORIAL_MODE, FEW_SHOT_CLASSIFICATION, NER, OBJECT_DETECTION, SEMANTIC_SEGMENTATION
+from .constants import (
+    AUTOMM_TUTORIAL_MODE,
+    FEW_SHOT_CLASSIFICATION,
+    NER,
+    OBJECT_DETECTION,
+    OPEN_VOCABULARY_OBJECT_DETECTION,
+    SEMANTIC_SEGMENTATION,
+)
 from .learners import (
     BaseLearner,
     FewShotSVMLearner,
@@ -192,7 +199,7 @@ class MultiModalPredictor:
 
         if problem_property and problem_property.is_matching:
             learner_class = MultiModalMatcher
-        elif problem_type == OBJECT_DETECTION:
+        elif problem_type == OBJECT_DETECTION or OPEN_VOCABULARY_OBJECT_DETECTION:
             learner_class = ObjectDetectionLearner
         elif problem_type == NER:
             learner_class = NERLearner
@@ -748,7 +755,7 @@ class MultiModalPredictor:
             assets = json.load(fp)
         if "class_name" in assets and assets["class_name"] == "MultiModalMatcher":
             learner_class = MultiModalMatcher
-        elif assets["problem_type"] == OBJECT_DETECTION:
+        elif assets["problem_type"] == OBJECT_DETECTION or OPEN_VOCABULARY_OBJECT_DETECTION:
             learner_class = ObjectDetectionLearner
         elif assets["problem_type"] == NER:
             learner_class = NERLearner
