@@ -175,7 +175,7 @@ To load the model, use the code below:
     predictor = MultiModalPredictor.load("{save_path}")
     ```
 
-- If you are not satisfied with the model, try to increase the training time, 
+If you are not satisfied with the model, try to increase the training time, 
 adjust the hyperparameters (https://auto.gluon.ai/stable/tutorials/multimodal/advanced_topics/customization.html),
 or post issues on GitHub (https://github.com/autogluon/autogluon/issues).
 
