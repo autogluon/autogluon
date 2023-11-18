@@ -214,8 +214,8 @@ def get_gpu_message(detected_num_gpus: int, used_num_gpus: int, strategy: str):
 
         gpu_mem_used = _bytes_to_gigabytes(info.used)
         gpu_mem_total = _bytes_to_gigabytes(info.total)
-
-        gpu_message += f"GPU {i} Name: {torch.cuda.get_device_name(i)}\n"
+        if torch.cuda.is_available():
+            gpu_message += f"GPU {i} Name: {torch.cuda.get_device_name(i)}\n"
         gpu_message += f"GPU {i} Memory: {gpu_mem_used}GB/{gpu_mem_total}GB (Used/Total)\n"
 
     return gpu_message
