@@ -167,11 +167,13 @@ def test_infer_metrics(
     assert validation_metric_name == target_validation_metric_name
 
 
+# Once eval metric is customized, shall not use the fallback eval
 @pytest.mark.single_gpu
 @pytest.mark.parametrize(
     "problem_type, eval_metric, is_matching, target_eval_metric_name, target_validation_metric_name",
     [
         ("binary", ag_metrics.make_scorer("dummy", ag_metrics.get_metric("acc")), False, "dummy", "roc_auc"),
+        ("regression", ag_metrics.make_scorer("dummy", ag_metrics.get_metric("acc")), True, "dummy", "spearmanr"),
     ],
 )
 def test_infer_metrics_custom(

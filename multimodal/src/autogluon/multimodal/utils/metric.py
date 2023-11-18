@@ -95,6 +95,7 @@ def infer_metrics(
 
     if is_matching:
         if eval_metric_name is not None:
+            # if eval_metric_name is a valid metric
             if eval_metric_name.lower() in METRIC_MODE_MAP.keys():
                 validation_metric_name = eval_metric_name
                 return validation_metric_name, eval_metric_name
@@ -103,26 +104,33 @@ def infer_metrics(
                 validation_metric_name = RECALL
                 return validation_metric_name, eval_metric_name
             else:
-                warnings.warn(
-                    f"Metric {eval_metric_name} is not supported as the evaluation metric for {problem_type} in matching tasks."
-                )
+                if not is_customized:
+                    warnings.warn(
+                        f"Metric {eval_metric_name} is not supported as the evaluation metric for {problem_type} in matching tasks."
+                    )
 
+        # Fallback based on problem type unless it's a customized metric
         if problem_type is None:
-            validation_metric_name, eval_metric_name = MATCHING_METRICS_WITHOUT_PROBLEM_TYPE
+            validation_metric_name, fallback_eval_metric_name = MATCHING_METRICS_WITHOUT_PROBLEM_TYPE
             logger.info(
                 f"Metric {eval_metric_name} and metric {validation_metric_name} are used "
                 f"as the evaluation metric and the validation metric for matching tasks by default. "
             )
-            return validation_metric_name, eval_metric_name
         elif problem_type in MATCHING_METRICS:
-            validation_metric_name, eval_metric_name = MATCHING_METRICS[problem_type]
+            validation_metric_name, fallback_eval_metric_name = MATCHING_METRICS[problem_type]
             logger.info(
                 f"Metric {eval_metric_name} and metric {validation_metric_name} are used "
                 f"as the evaluation metric and the validation metric for {problem_type} in matching tasks by default. "
             )
-            return validation_metric_name, eval_metric_name
         else:
             raise NotImplementedError(f"Problem type: {problem_type} is not yet supported for matching!")
+        if not is_customized:
+            eval_metric_name = fallback_eval_metric_name
+        logger.info(
+            f"Metric {eval_metric_name} and metric {validation_metric_name} are used "
+            f"as the evaluation metric and the validation metric for {problem_type} in matching tasks by default. "
+        )
+        return validation_metric_name, eval_metric_name
 
     if eval_metric_name is not None:
         # Infer evaluation metric
