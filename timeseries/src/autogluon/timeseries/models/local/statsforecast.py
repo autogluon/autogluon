@@ -30,7 +30,7 @@ class AbstractStatsForecastModel(AbstractLocalModel):
         self,
         time_series: pd.Series,
         local_model_args: Dict,
-    ):
+    ) -> np.ndarray:
         return self._get_local_model(local_model_args).forecast(
             h=self.prediction_length, y=time_series.values.ravel()
         )["mean"]
@@ -506,9 +506,9 @@ class AutoCESModel(AbstractConformalizedStatsForecastModel):
 
     Other Parameters
     ----------------
-    model : str, default = "Z"
+    model : {"Z", "N", "S", "P", "F"}, default = "Z"
         Defines type of CES model, "N" for simple CES, "S" for simple seasonality, "P" for partial seasonality
-        (without complex part), $F$ for full seasonality. When "Z" is selected, the best model is selected using
+        (without complex part), "F" for full seasonality. When "Z" is selected, the best model is selected using
         Akaike Information Criterion (AIC).
     seasonal_period : int or None, default = None
         Number of time steps in a complete seasonal cycle for seasonal models. For example, 7 for daily data with a
