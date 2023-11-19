@@ -9,8 +9,8 @@ from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.models.local import (
     ADIDAModel,
     AutoARIMAModel,
-    AutoETSModel,
     AutoCESModel,
+    AutoETSModel,
     AverageModel,
     ConformalizedZeroModel,
     CrostonClassicModel,
@@ -287,10 +287,118 @@ def test_when_npts_fit_with_default_seasonal_features_then_predictions_match_glu
         assert (pred_gts.quantile(str(q)) == pred_ag[str(q)]).all()
 
 
-# def test_when_conformalized_model_called_then_conformalization_correct():
-#     class MockConformalModel(AbstractConformalizedStatsForecastModel):
-#         def _get_point_forecast(self, time_series: pd.Series, local_model_args: Dict):
-#             return pd.DataFrame({"mean": np.ones(self.prediction_length)})
+class MockConformalModel(AbstractConformalizedStatsForecastModel):
+    def _get_point_forecast(self, time_series: pd.Series, local_model_args: Dict):
+        return np.ones(self.prediction_length)
+
+    def _get_nonconformity_scores(self, time_series: pd.Series, local_model_args: Dict):
+        scores = super()._get_nonconformity_scores(time_series, local_model_args)
+        self.returned_nonconformity_scores = scores
+        return scores
+
+
+@pytest.mark.parametrize(
+    "prediction_length, time_series_length, expected_num_windows",
+    [
+        (1, 100, 5),
+        (1, 10, 5),
+        (3, 100, 5),
+        (3, 10, 3),
+        (10, 40, 3),
+        (10, 41, 4),
+        (10, 100, 5),
+        (10, 11, 1),
+        (10, 10, 1),
+        (3, 3, 1),
+        (1, 1, 1),
+    ],
+)
+def test_when_conformalized_model_called_then_nonconformity_score_shapes_correct(
+    prediction_length, time_series_length, expected_num_windows
+):
+    model = MockConformalModel(
+        prediction_length=prediction_length, hyperparameters={"n_jobs": 1, "use_fallback_model": False}
+    )
+
+    data = get_data_frame_with_item_index(["A", "B", "C"], data_length=time_series_length)
+
+    model.fit(train_data=data)
+    _ = model.predict(data)
+
+    assert model.returned_nonconformity_scores.shape == (expected_num_windows, prediction_length)
+
+
+@pytest.mark.parametrize(
+    "prediction_length, time_series_length, expected_num_windows",
+    [
+        (1, 100, 5),
+        (1, 10, 5),
+        (3, 100, 5),
+        (3, 10, 3),
+        (10, 40, 3),
+        (10, 41, 4),
+        (10, 100, 5),
+        (10, 11, 1),
+        (10, 10, 1),
+        (3, 3, 1),
+        (1, 1, 1),
+    ],
+)
+def test_when_conformalized_model_called_then_nonconformity_score_values_correct(
+    prediction_length, time_series_length, expected_num_windows
+):
+    model = MockConformalModel(
+        prediction_length=prediction_length, hyperparameters={"n_jobs": 1, "use_fallback_model": False}
+    )
+
+    data = get_data_frame_with_item_index(["A"], data_length=time_series_length)
+    data["target"] = np.arange(time_series_length)
+
+    model.fit(train_data=data)
+    _ = model.predict(data)
+
+    test_length = expected_num_windows * prediction_length
+
+    expected_scores = np.abs(data.values.ravel()[-test_length:] - 1)
+    if time_series_length == prediction_length:
+        # conformalization will fall back to naive
+        expected_scores = np.abs(data.values.ravel()[-test_length + 1 :] - data.values.ravel()[0])
+        expected_scores = np.r_[expected_scores, expected_scores[-1]]
+    expected_scores = np.sort(expected_scores)
+
+    returned_scores = np.sort(model.returned_nonconformity_scores.ravel())
+
+    assert np.allclose(expected_scores, returned_scores)
+
+
+@pytest.mark.parametrize("model_class", IDF_TESTABLE_MODELS)
+@pytest.mark.parametrize("prediction_length", [1, 3, 10])
+@pytest.mark.parametrize("positive_only", [True, False])
+def test_when_intermittent_models_fit_then_values_are_lower_bounded(
+    model_class, prediction_length, positive_only, temp_model_path
+):
+    data = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME
+    if positive_only:
+        data = data.clip(0, None)
+    else:
+        # make sure there are some negative values
+        for c in data.columns:
+            data[c] *= np.random.randn(*data[c].values.shape)
+
+    model = model_class(
+        path=temp_model_path,
+        prediction_length=prediction_length,
+        hyperparameters=DEFAULT_HYPERPARAMETERS,
+        freq=data.freq,
+    )
+    model.fit(train_data=data)
+    predictions = model.predict(data=data)
+
+    for item_id in data.index.levels[0]:
+        if positive_only:
+            predictions.loc[item_id].values.min() >= 0
+        else:
+            predictions.loc[item_id].values.min() >= data.loc[item_id].values.min()
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)

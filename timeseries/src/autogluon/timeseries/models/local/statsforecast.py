@@ -450,7 +450,6 @@ class AbstractConformalizedStatsForecastModel(AbstractStatsForecastModel):
 
         return nonconf_scores
 
-
     def _predict_with_local_model(
         self,
         time_series: pd.Series,
@@ -465,7 +464,11 @@ class AbstractConformalizedStatsForecastModel(AbstractStatsForecastModel):
         q_sign = np.sign(2 * levels - 1)
         ehat = np.quantile(
             nonconf_scores,
-            q=np.ceil((1 - alpha) * (n + 1)) / n,
+            q=np.clip(
+                np.ceil((1 - alpha) * (n + 1)) / n,
+                a_min=0.0,
+                a_max=1.0,
+            ),
             method="lower",
         )
 
@@ -545,7 +548,7 @@ class AbstractStatsForecastIntermittentDemandModel(AbstractConformalizedStatsFor
     def _update_local_model_args(self, local_model_args: Dict[str, Any]) -> Dict[str, Any]:
         _ = local_model_args.pop("seasonal_period")
         return local_model_args
-    
+
     def _predict_with_local_model(
         self,
         time_series: pd.Series,
@@ -728,12 +731,13 @@ class ConformalizedZeroModel(AbstractStatsForecastIntermittentDemandModel):
         If not None, only the last ``max_ts_length`` time steps of each time series will be used to train the model.
         This significantly speeds up fitting and usually leads to no change in accuracy.
     """
+
     def _get_model_type(self):
         raise NotImplementedError
 
     def _get_local_model(self, local_model_args: Dict):
         raise NotImplementedError
-    
+
     def _get_point_forecast(
         self,
         time_series: pd.Series,
