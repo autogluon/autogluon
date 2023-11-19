@@ -103,33 +103,22 @@ def infer_metrics(
                 # Currently only support recall as validation metric in retrieval tasks.
                 validation_metric_name = RECALL
                 return validation_metric_name, eval_metric_name
-            else:
-                if not is_customized:
-                    warnings.warn(
-                        f"Metric {eval_metric_name} is not supported as the evaluation metric for {problem_type} in matching tasks."
-                    )
 
+        # When eval_metric_name is either None or not supported:
         # Fallback based on problem type unless it's a customized metric
         if problem_type is None:
-            validation_metric_name, fallback_eval_metric_name = MATCHING_METRICS_WITHOUT_PROBLEM_TYPE
-            logger.info(
-                f"Metric {eval_metric_name} and metric {validation_metric_name} are used "
-                f"as the evaluation metric and the validation metric for matching tasks by default. "
-            )
+            validation_metric_name, fallback_evaluation_metric = MATCHING_METRICS_WITHOUT_PROBLEM_TYPE
         elif problem_type in MATCHING_METRICS:
-            validation_metric_name, fallback_eval_metric_name = MATCHING_METRICS[problem_type]
-            logger.info(
-                f"Metric {eval_metric_name} and metric {validation_metric_name} are used "
-                f"as the evaluation metric and the validation metric for {problem_type} in matching tasks by default. "
-            )
+            validation_metric_name, fallback_evaluation_metric = MATCHING_METRICS[problem_type]
         else:
             raise NotImplementedError(f"Problem type: {problem_type} is not yet supported for matching!")
         if not is_customized:
-            eval_metric_name = fallback_eval_metric_name
-        logger.info(
-            f"Metric {eval_metric_name} and metric {validation_metric_name} are used "
-            f"as the evaluation metric and the validation metric for {problem_type} in matching tasks by default. "
-        )
+            if eval_metric_name is not None:
+                warnings.warn(
+                    f"Metric {eval_metric_name} is not supported as the evaluation metric for {problem_type} in matching tasks."
+                    f"The evaluation metric is changed to {fallback_evaluation_metric} by default."
+                )
+            eval_metric_name = fallback_evaluation_metric
         return validation_metric_name, eval_metric_name
 
     if eval_metric_name is not None:
@@ -142,21 +131,15 @@ def infer_metrics(
             if problem_property.fallback_evaluation_metric is not None:
                 eval_metric_name = problem_property.fallback_evaluation_metric
             else:
+                # Problem types like extract_embedding does not need a eval/val metric
                 return None, None
 
         # Infer validation metric
         if eval_metric_name.lower() in problem_property.supported_validation_metrics:
-            logger.info(f"Metric {eval_metric_name} is used as the validation metric. ")
             validation_metric_name = eval_metric_name
         else:
-            # TODO: change semantic segmentation logics to use this function to infer metrics
             if problem_property.fallback_validation_metric is not None:
                 validation_metric_name = problem_property.fallback_validation_metric
-                warnings.warn(
-                    f"Currently, we cannot convert the metric: {eval_metric_name} to a metric supported in torchmetrics. "
-                    f"Thus, we fall-back to use {validation_metric_name} as validation metric.",
-                    UserWarning,
-                )
     else:
         eval_metric_name = problem_property.fallback_evaluation_metric
         validation_metric_name = problem_property.fallback_validation_metric
@@ -190,7 +173,7 @@ def get_minmax_mode(
         ), f"{metric_name} is not a supported metric. Options are: {METRIC_MODE_MAP.keys()}"
         return METRIC_MODE_MAP.get(metric_name)
     else:
-        return MAX if metric_name._sign > 0 else MIN
+        return MAX if metric_name.greater_is_better else MIN
 
 
 def get_stopping_threshold(metric_name: str):
