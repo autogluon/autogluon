@@ -890,19 +890,20 @@ def test_given_only_short_series_in_train_data_then_exception_is_raised(
 @pytest.mark.parametrize(
     "num_val_windows, refit_every_n_windows, expected_num_refits", [(5, None, 1), (7, 7, 1), (5, 1, 5), (6, 2, 3)]
 )
+@pytest.mark.parametrize("model_name", ["Naive", "RecursiveTabular"])
 def test_given_refit_every_n_windows_when_fit_then_model_is_fit_correct_number_of_times(
-    temp_model_path, num_val_windows, refit_every_n_windows, expected_num_refits
+    temp_model_path, num_val_windows, refit_every_n_windows, expected_num_refits, model_name
 ):
     predictor = TimeSeriesPredictor(path=temp_model_path)
     predictor.fit(
         DUMMY_TS_DATAFRAME,
         num_val_windows=num_val_windows,
         refit_every_n_windows=refit_every_n_windows,
-        hyperparameters={"Naive": {}},
+        hyperparameters={model_name: {}},
     )
-    models_info = predictor._trainer.get_models_info(["Naive"])
+    models_info = predictor._trainer.get_models_info([model_name])
     actual_num_refits = 0
-    for window_info in models_info["Naive"]["info_per_val_window"]:
+    for window_info in models_info[model_name]["info_per_val_window"]:
         actual_num_refits += window_info["refit_this_window"]
     assert actual_num_refits == expected_num_refits
 
