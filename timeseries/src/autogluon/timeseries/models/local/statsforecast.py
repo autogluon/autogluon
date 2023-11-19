@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, List, Type, Union
+from typing import Any, Dict, Type
 
 import numpy as np
 import pandas as pd
