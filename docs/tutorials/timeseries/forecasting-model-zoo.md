@@ -48,10 +48,17 @@ Note that some of the models' hyperparameters have names and default values that
    SeasonalNaiveModel
    AverageModel
    SeasonalAverageModel
+   ZeroModel
    ETSModel
    AutoARIMAModel
    AutoETSModel
+   AutoCESModel
    ThetaModel
+   ADIDAModel
+   CrostonClassicModel
+   CrostonOptimizedModel
+   CrostonSBAModel
+   IMAPAModel
    NPTSModel
    DeepARModel
    DLinearModel
@@ -93,6 +100,13 @@ Baseline models are simple approaches that use minimal historical data to make p
 
 ```
 
+
+```{eval-rst}
+.. autoclass:: ZeroModel 
+   :members: init
+
+```
+
 ## Statistical models
 
 Statistical models capture simple patterns in the data like trends and seasonality.
@@ -118,6 +132,12 @@ Statistical models capture simple patterns in the data like trends and seasonali
 
 
 ```{eval-rst}
+.. autoclass:: AutoCESModel
+   :members: init
+```
+
+
+```{eval-rst}
 .. autoclass:: ThetaModel
    :members: init
 ```
@@ -127,6 +147,42 @@ Statistical models capture simple patterns in the data like trends and seasonali
 .. autoclass:: NPTSModel
    :members: init
 
+```
+
+
+## Statistical models for sparse data
+
+Statistical models that are built specifically for sparse and nonnegative data, especially for use
+in intermittent demand forecasting.
+
+
+```{eval-rst}
+.. autoclass:: ADIDAModel 
+   :members: init
+```
+
+
+```{eval-rst}
+.. autoclass:: CrostonClassicModel 
+   :members: init
+```
+
+
+```{eval-rst}
+.. autoclass:: CrostonOptimizedModel 
+   :members: init
+```
+
+
+```{eval-rst}
+.. autoclass:: CrostonSBAModel 
+   :members: init
+```
+
+
+```{eval-rst}
+.. autoclass:: IMAPAModel  
+   :members: init
 ```
 
 ## Deep learning models
