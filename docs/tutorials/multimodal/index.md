@@ -248,10 +248,10 @@ In the following, we decompose the functionalities of AutoMM and prepare step-by
   How to use foundation models + SVM for few shot learning.
 :::
 
-:::{grid-item-card} How to use FocalLoss
+:::{grid-item-card} Handling Class Imbalance with AutoMM - Focal Loss
   :link: advanced_topics/focal_loss.html
 
-  How to use focal loss in AutoMM.
+  How to use AutoMM to handle class imbalance.
 :::
 
 :::{grid-item-card} Faster Prediction with TensorRT

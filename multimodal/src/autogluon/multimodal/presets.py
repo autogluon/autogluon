@@ -105,6 +105,7 @@ def default(presets: str = DEFAULT):
                             "swin_base_patch4_window7_224",
                             "convnext_base_in22ft1k",
                             "vit_base_patch16_clip_224.laion2b_ft_in12k_in1k",
+                            "caformer_b36.sail_in22k_ft_in1k",
                         ]
                     ),
                     "model.document_transformer.checkpoint_name": "microsoft/layoutlmv3-base",
@@ -114,7 +115,7 @@ def default(presets: str = DEFAULT):
             hyperparameters.update(
                 {
                     "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
-                    "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
+                    "model.timm_image.checkpoint_name": "caformer_b36.sail_in22k_ft_in1k",
                     "model.document_transformer.checkpoint_name": "microsoft/layoutlmv3-base",
                 }
             )
@@ -606,7 +607,7 @@ def image_similarity(presets: str = DEFAULT):
     if presets in [DEFAULT, HIGH_QUALITY]:
         hyperparameters.update(
             {
-                "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
+                "model.timm_image.checkpoint_name": "caformer_b36.sail_in22k_ft_in1k",
             }
         )
     elif presets == MEDIUM_QUALITY:
