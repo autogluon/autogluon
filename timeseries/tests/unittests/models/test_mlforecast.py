@@ -50,7 +50,11 @@ def test_when_covariates_and_features_present_then_train_and_val_dfs_have_correc
     model.fit(train_data=data, time_limit=3)
     train_df, val_df = model._generate_train_val_dfs(data)
     expected_num_features = (
-        len(lags) + len(known_covariates_names) + len(static_features_names) + len(model._date_features) + 1
+        len(lags)
+        + len(known_covariates_names)
+        + len(static_features_names)
+        + len(model._date_features)
+        + 2  # target, item_id
     )
     # sum(differences) rows  dropped per item, prediction_length rows are reserved for validation
     expected_num_train_rows = len(data) - (sum(differences) + model.prediction_length) * data.num_items

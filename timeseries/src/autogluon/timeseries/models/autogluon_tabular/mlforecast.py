@@ -209,7 +209,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         val_df = grouped_df.tail(val_rows_per_item)
         logger.debug(f"train_df shape: {train_df.shape}, val_df shape: {val_df.shape}")
 
-        return train_df, val_df
+        return train_df.drop(columns=[MLF_TIMESTAMP]), val_df.drop(columns=[MLF_TIMESTAMP])
 
     def _to_mlforecast_df(
         self,
@@ -272,7 +272,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
                 **self._get_extra_tabular_init_kwargs(),
             },
             predictor_fit_kwargs={
-                "tuning_data": val_df.drop(columns=[MLF_ITEMID, MLF_TIMESTAMP]),
+                "tuning_data": val_df.drop(columns=[MLF_ITEMID]),
                 "time_limit": None if time_limit is None else time_limit - (time.time() - fit_start_time),
                 "hyperparameters": model_params["tabular_hyperparameters"],
                 **model_params["tabular_fit_kwargs"],
@@ -281,9 +281,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         self._mlf.models = {"mean": estimator}
 
         with warning_filter():
-            self._mlf.fit_models(
-                X=train_df.drop(columns=[MLF_TARGET, MLF_ITEMID, MLF_TIMESTAMP]), y=train_df[MLF_TARGET]
-            )
+            self._mlf.fit_models(X=train_df.drop(columns=[MLF_TARGET, MLF_ITEMID]), y=train_df[MLF_TARGET])
 
         self._residuals_std_per_item = self._compute_residuals_std(val_df)
         self._avg_residuals_std = np.mean(self._residuals_std_per_item)
