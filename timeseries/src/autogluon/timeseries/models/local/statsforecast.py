@@ -496,7 +496,7 @@ class AutoCESModel(AbstractConformalizedStatsForecastModel):
     """Forecasting with an Complex Exponential Smoothing model where the model selection is performed using the
     Akaike Information Criterion.
 
-    Based on `statsforecast.models.AutoCES <https://nixtla.mintlify.app/statsforecast/src/core/models.html#autoces>`_.
+    Based on `statsforecast.models.AutoCES <https://nixtla.mintlify.app/statsforecast/docs/models/autoces.html>`_.
 
 
     References
@@ -575,7 +575,7 @@ class ADIDAModel(AbstractStatsForecastIntermittentDemandModel):
     """Intermittent demand forecasting model using the Aggregate-Dissagregate Intermittent
     Demand Approach [Nikolopoulos2011]_.
 
-    Based on `statsforecast.models.ADIDA <https://nixtla.mintlify.app/statsforecast/src/core/models.html#adida>`_.
+    Based on `statsforecast.models.ADIDA <https://nixtla.mintlify.app/statsforecast/docs/models/adida.html>`_.
 
 
     References
@@ -607,7 +607,7 @@ class CrostonSBAModel(AbstractStatsForecastIntermittentDemandModel):
     """Intermittent demand forecasting model using Croston's model with the Syntetos-Boylan
     bias correction approach [SyntetosBoylan2001]_.
 
-    Based on `statsforecast.models.CrostonSBA <https://nixtla.mintlify.app/statsforecast/src/core/models.html#crostonsba>`_.
+    Based on `statsforecast.models.CrostonSBA <https://nixtla.mintlify.app/statsforecast/docs/models/crostonsba.html>`_.
 
 
     References
@@ -638,7 +638,7 @@ class CrostonOptimizedModel(AbstractStatsForecastIntermittentDemandModel):
     """Intermittent demand forecasting model using Croston's model where the smoothing parameter
     is optimized [Croston1972]_.
 
-    Based on `statsforecast.models.CrostonOptimized <https://nixtla.mintlify.app/statsforecast/src/core/models.html#crostonoptimized>`_.
+    Based on `statsforecast.models.CrostonOptimized <https://nixtla.mintlify.app/statsforecast/docs/models/crostonoptimized.html>`_.
 
 
     References
@@ -669,7 +669,7 @@ class CrostonClassicModel(AbstractStatsForecastIntermittentDemandModel):
     """Intermittent demand forecasting model using Croston's model where the smoothing parameter
     is fixed to 0.1 [Croston1972]_.
 
-    Based on `statsforecast.models.CrostonClassic <https://nixtla.mintlify.app/statsforecast/src/core/models.html#crostonclassic>`_.
+    Based on `statsforecast.models.CrostonClassic <https://nixtla.mintlify.app/statsforecast/docs/models/crostonclassic.html>`_.
 
 
     References
@@ -701,7 +701,7 @@ class IMAPAModel(AbstractStatsForecastIntermittentDemandModel):
     [Petropoulos2015]_.
 
 
-    Based on `statsforecast.models.IMAPA <https://nixtla.mintlify.app/statsforecast/src/core/models.html#imapa>`_.
+    Based on `statsforecast.models.IMAPA <https://nixtla.mintlify.app/statsforecast/docs/models/imapa.html>`_.
 
 
     References
