@@ -195,12 +195,11 @@ def test_given_some_time_series_are_too_short_then_seasonal_naive_forecast_is_us
 def test_when_point_forecast_metric_is_used_then_per_item_residuals_are_used_for_prediction(
     temp_model_path, model_type
 ):
-    data = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME.copy()
+    data = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME.sort_index()
     prediction_length = 5
     model = model_type(
         path=temp_model_path,
         freq=data.freq,
-        hyperparameters={},
         prediction_length=prediction_length,
         eval_metric="MASE",
     )

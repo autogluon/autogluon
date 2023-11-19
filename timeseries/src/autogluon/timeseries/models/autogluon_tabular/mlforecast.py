@@ -352,7 +352,8 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
 
         residuals_std_per_timestep = self._residuals_std_per_item.reindex(repeated_item_ids)
         # Use avg_residuals_std in case unseen item received for prediction
-        residuals_std_per_timestep = residuals_std_per_timestep.fillna(self._avg_residuals_std)
+        if residuals_std_per_timestep.isna().any():
+            residuals_std_per_timestep = residuals_std_per_timestep.fillna(value=self._avg_residuals_std)
         std_per_timestep = residuals_std_per_timestep * scale_per_item * normal_scale_per_timestep
         for q in self.quantile_levels:
             predictions[str(q)] = predictions["mean"] + norm.ppf(q) * std_per_timestep.to_numpy()
