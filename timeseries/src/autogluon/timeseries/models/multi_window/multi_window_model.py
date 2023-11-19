@@ -100,16 +100,27 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
             logger.debug(f"\tWindow {window_index}")
             # refit_this_window is always True for the 0th window
             refit_this_window = window_index % refit_every_n_windows == 0
-            # For local models we call `fit` for every window to ensure that the time_limit is respected
-            if refit_this_window or issubclass(self.model_base_type, AbstractLocalModel):
+            if time_limit is None:
+                time_left_for_window = None
+            else:
+                time_left = time_limit - (time.time() - global_fit_start_time)
+                if issubclass(self.model_base_type, AbstractLocalModel):
+                    # For local models we call `fit` for every window to ensure that the time_limit is respected.
+                    refit_this_window = True
+                    # Local models cannot early stop, we allocate all remaining time and hope that they finish in time
+                    time_left_for_window = time_left
+                else:
+                    num_future_refits = (val_splitter.num_val_windows - window_index) // refit_every_n_windows
+                    # Reserve 10% of the remaining time for prediction, use 90% of time for training
+                    time_left_for_window = 0.9 * time_left / (refit_this_window + num_future_refits)
+
+            if refit_this_window:
                 model = self.get_child_model(window_index)
                 model_fit_start_time = time.time()
                 model.fit(
                     train_data=train_fold,
                     val_data=val_fold,
-                    time_limit=None
-                    if time_limit is None
-                    else time_limit - (model_fit_start_time - global_fit_start_time),
+                    time_limit=time_left_for_window,
                     **kwargs,
                 )
                 model.fit_time = time.time() - model_fit_start_time
@@ -121,7 +132,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
                 f"\t\t{model.val_score:<7.4f}".ljust(15) + f"= Validation score ({model.eval_metric.name_with_sign})"
             )
             logger.debug(f"\t\t{model.fit_time:<7.3f} s".ljust(15) + "= Training runtime")
-            logger.debug(f"\t\t{model.predict_time:<7.3f} s".ljust(15) + "= Training runtime")
+            logger.debug(f"\t\t{model.predict_time:<7.3f} s".ljust(15) + "= Prediction runtime")
 
             self.info_per_val_window.append(
                 {
