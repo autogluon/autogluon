@@ -9,14 +9,18 @@ from autogluon.core import constants
 from autogluon.timeseries.metrics import TimeSeriesScorer
 
 from . import (
+    ADIDAModel,
     AutoARIMAModel,
+    AutoCESModel,
     AutoETSModel,
     AverageModel,
+    CrostonSBAModel,
     DeepARModel,
     DirectTabularModel,
     DLinearModel,
     DynamicOptimizedThetaModel,
     ETSModel,
+    IMAPAModel,
     NaiveModel,
     NPTSModel,
     PatchTSTModel,
@@ -27,6 +31,7 @@ from . import (
     TemporalFusionTransformerModel,
     ThetaModel,
     WaveNetModel,
+    ZeroModel,
 )
 from .abstract import AbstractTimeSeriesModel
 from .multi_window.multi_window_model import MultiWindowBacktestingModel
@@ -52,12 +57,17 @@ MODEL_TYPES = dict(
     SeasonalAverage=SeasonalAverageModel,
     Naive=NaiveModel,
     SeasonalNaive=SeasonalNaiveModel,
+    Zero=ZeroModel,
     AutoETS=AutoETSModel,
+    AutoCES=AutoCESModel,
     AutoARIMA=AutoARIMAModel,
     DynamicOptimizedTheta=DynamicOptimizedThetaModel,
     NPTS=NPTSModel,
     Theta=ThetaModel,
     ETS=ETSModel,
+    ADIDA=ADIDAModel,
+    CrostonSBA=CrostonSBAModel,
+    IMAPA=IMAPAModel,
 )
 
 DEFAULT_MODEL_NAMES = {v: k for k, v in MODEL_TYPES.items()}
@@ -70,6 +80,8 @@ DEFAULT_MODEL_PRIORITY = dict(
     NPTS=80,
     AutoETS=80,
     ETS=80,
+    Zero=80,
+    CrostonSBAModel=80,
     RecursiveTabular=70,
     DeepAR=60,
     TemporalFusionTransformer=50,
@@ -77,7 +89,10 @@ DEFAULT_MODEL_PRIORITY = dict(
     DirectTabular=40,
     AutoARIMA=30,
     # Models below are not included in any presets
+    AutoCES=30,
     ARIMA=30,
+    ADIDA=30,
+    IMAPA=30,
     SimpleFeedForward=30,
     DynamicOptimizedTheta=30,
 )

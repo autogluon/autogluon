@@ -12,7 +12,6 @@ from autogluon.timeseries.models.local import (
     AutoCESModel,
     AutoETSModel,
     AverageModel,
-    ConformalizedZeroModel,
     CrostonClassicModel,
     CrostonOptimizedModel,
     CrostonSBAModel,
@@ -24,6 +23,7 @@ from autogluon.timeseries.models.local import (
     SeasonalAverageModel,
     SeasonalNaiveModel,
     ThetaModel,
+    ZeroModel,
 )
 from autogluon.timeseries.models.local.statsforecast import AbstractConformalizedStatsForecastModel
 
@@ -51,7 +51,7 @@ SEASONAL_TESTABLE_MODELS = [
 # intermittent demand models do not accept seasonal_period
 NONSEASONAL_TESTABLE_MODELS = [
     ADIDAModel,
-    ConformalizedZeroModel,
+    ZeroModel,
     CrostonClassicModel,
     CrostonSBAModel,
     CrostonOptimizedModel,

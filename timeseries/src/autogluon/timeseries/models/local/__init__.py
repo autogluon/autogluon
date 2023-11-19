@@ -8,7 +8,6 @@ from .statsforecast import (
     AutoARIMAModel,
     AutoCESModel,
     AutoETSModel,
-    ConformalizedZeroModel,
     CrostonClassicModel,
     CrostonOptimizedModel,
     CrostonSBAModel,
@@ -16,6 +15,7 @@ from .statsforecast import (
     ETSModel,
     IMAPAModel,
     ThetaModel,
+    ZeroModel,
 )
 
 # By default, joblib w/ loky backend kills processes that take >300MB of RAM assuming that this is caused by a memory

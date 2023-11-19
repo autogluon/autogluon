@@ -40,9 +40,7 @@ class AbstractStatsForecastModel(AbstractLocalModel):
         time_series: pd.Series,
         local_model_args: dict,
     ) -> pd.DataFrame:
-        predictions = {"mean": self._get_point_forecast(time_series, local_model_args)}
-
-        return pd.DataFrame(predictions)
+        raise NotImplementedError
 
 
 class AbstractProbabilisticStatsForecastModel(AbstractStatsForecastModel):
@@ -491,6 +489,7 @@ class AbstractConformalizedStatsForecastModel(AbstractStatsForecastModel):
         return pd.DataFrame(predictions)
 
 
+# TODO: Starting from StatsForecast v1.5.0, AutoCES can inherit from AbstractProbabilisticStatsForecastModel
 class AutoCESModel(AbstractConformalizedStatsForecastModel):
     """Forecasting with an Complex Exponential Smoothing model where the model selection is performed using the
     Akaike Information Criterion.
@@ -553,9 +552,6 @@ class AutoCESModel(AbstractConformalizedStatsForecastModel):
 
 
 class AbstractStatsForecastIntermittentDemandModel(AbstractConformalizedStatsForecastModel):
-    allowed_local_model_args = []
-    max_num_conformalization_windows = 5
-
     def _update_local_model_args(self, local_model_args: Dict[str, Any]) -> Dict[str, Any]:
         _ = local_model_args.pop("seasonal_period")
         return local_model_args
@@ -727,7 +723,7 @@ class IMAPAModel(AbstractStatsForecastIntermittentDemandModel):
         return IMAPA
 
 
-class ConformalizedZeroModel(AbstractStatsForecastIntermittentDemandModel):
+class ZeroModel(AbstractStatsForecastIntermittentDemandModel):
     """A naive forecaster that always returns 0 forecasts across the prediction horizon, where the prediction
     intervals are computed using conformal prediction.
 
@@ -744,9 +740,7 @@ class ConformalizedZeroModel(AbstractStatsForecastIntermittentDemandModel):
     """
 
     def _get_model_type(self):
-        raise NotImplementedError
-
-    def _get_local_model(self, local_model_args: Dict):
+        # ZeroModel does not depend on a StatsForecast implementation
         raise NotImplementedError
 
     def _get_point_forecast(

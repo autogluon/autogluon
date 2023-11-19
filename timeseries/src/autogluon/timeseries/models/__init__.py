@@ -14,7 +14,6 @@ from .local import (
     AutoCESModel,
     AutoETSModel,
     AverageModel,
-    ConformalizedZeroModel,
     CrostonClassicModel,
     CrostonOptimizedModel,
     CrostonSBAModel,
@@ -26,6 +25,7 @@ from .local import (
     SeasonalAverageModel,
     SeasonalNaiveModel,
     ThetaModel,
+    ZeroModel,
 )
 
 __all__ = [
@@ -35,7 +35,6 @@ __all__ = [
     "AutoCESModel",
     "AutoETSModel",
     "AverageModel",
-    "ConformalizedZeroModel",
     "CrostonClassicModel",
     "CrostonSBAModel",
     "CrostonOptimizedModel",
@@ -55,4 +54,5 @@ __all__ = [
     "TemporalFusionTransformerModel",
     "ThetaModel",
     "WaveNetModel",
+    "ZeroModel",
 ]
