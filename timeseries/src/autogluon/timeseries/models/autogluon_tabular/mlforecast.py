@@ -291,7 +291,6 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
     def _compute_residuals_std(self, val_df: pd.DataFrame) -> float:
         residuals = val_df[MLF_TARGET] - self._mlf.models_["mean"].predict(val_df)
         return residuals.pow(2).groupby(val_df[MLF_ITEMID]).mean().pow(0.5)
-        # return np.sqrt(residuals.pow(2.0).mean())
 
     def _get_scale_per_item(self, item_ids: pd.Index) -> pd.Series:
         """Extract the '_scale' values from the scaler object, if available."""

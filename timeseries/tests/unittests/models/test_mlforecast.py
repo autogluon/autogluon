@@ -185,3 +185,28 @@ def test_given_some_time_series_are_too_short_then_seasonal_naive_forecast_is_us
         except TypeError:
             pass
         assert snaive_predict.call_args[0][0].equals(df_with_short.loc[["A"]])
+
+
+@pytest.mark.parametrize("model_type", TESTABLE_MODELS)
+def test_when_point_forecast_metric_is_used_then_per_item_residuals_are_used_for_prediction(
+    temp_model_path, model_type
+):
+    data = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME.copy()
+    prediction_length = 5
+    model = model_type(
+        path=temp_model_path,
+        freq=data.freq,
+        hyperparameters={},
+        prediction_length=prediction_length,
+        eval_metric="MASE",
+    )
+    model.fit(train_data=data, time_limit=15)
+    assert (model._residuals_std_per_item.index == sorted(data.item_ids)).all()
+
+    # Remove _avg_residuals_std to ensure that it's not used to impute missing values
+    model._avg_residuals_std = None
+
+    predictions = model.predict(data)
+    expected_forecast_index = get_forecast_horizon_index_ts_dataframe(data, prediction_length)
+    assert not predictions.isna().values.any()
+    assert (predictions.index == expected_forecast_index).all()
