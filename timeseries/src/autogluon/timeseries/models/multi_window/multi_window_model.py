@@ -1,6 +1,7 @@
 import copy
 import inspect
 import logging
+import math
 import os
 import time
 from typing import Dict, Optional, Type, Union
@@ -110,9 +111,11 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
                     # Local models cannot early stop, we allocate all remaining time and hope that they finish in time
                     time_left_for_window = time_left
                 else:
-                    num_future_refits = (val_splitter.num_val_windows - window_index) // refit_every_n_windows
+                    num_refits_remaining = math.ceil(
+                        (val_splitter.num_val_windows - window_index) / refit_every_n_windows
+                    )
                     # Reserve 10% of the remaining time for prediction, use 90% of time for training
-                    time_left_for_window = 0.9 * time_left / (refit_this_window + num_future_refits)
+                    time_left_for_window = 0.9 * time_left / num_refits_remaining
 
             if refit_this_window:
                 model = self.get_child_model(window_index)

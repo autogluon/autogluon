@@ -1,5 +1,6 @@
 """Unit tests for predictors"""
 import copy
+import math
 import sys
 import tempfile
 from pathlib import Path
@@ -971,3 +972,31 @@ def test_given_time_limit_is_not_none_then_first_model_doesnt_receive_full_time_
             enable_ensemble=enable_ensemble,
         )
         assert snaive_fit.call_args[1]["time_limit"] < expected_time_limit_for_first_model
+
+
+@pytest.mark.parametrize("num_val_windows", [1, 5])
+@pytest.mark.parametrize("refit_every_n_windows", [1, 2, 5, 6])
+@pytest.mark.parametrize("time_limit", [15, 60])
+@pytest.mark.parametrize("enable_ensemble", [True, False])
+def test_given_time_limit_is_not_none_then_time_is_distributed_across_windows_for_global_models(
+    temp_model_path, num_val_windows, time_limit, refit_every_n_windows, enable_ensemble
+):
+    data = get_data_frame_with_variable_lengths({"A": 100, "B": 100})
+    num_refits = math.ceil(num_val_windows / refit_every_n_windows)
+    expected_time_limit_for_first_model = 0.9 * time_limit / num_refits + 0.1
+
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=5)
+    with mock.patch("autogluon.timeseries.models.RecursiveTabularModel.fit") as mock_fit:
+        mock_fit.side_effect = RuntimeError("Numerical error")
+        try:
+            predictor.fit(
+                data,
+                time_limit=time_limit,
+                hyperparameters={"RecursiveTabular": {"tabular_hyperparameters": {"DUMMY": {}}}},
+                num_val_windows=num_val_windows,
+                refit_every_n_windows=refit_every_n_windows,
+                enable_ensemble=enable_ensemble,
+            )
+        except RuntimeError:
+            pass
+        assert mock_fit.call_args[1]["time_limit"] < expected_time_limit_for_first_model
