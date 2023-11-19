@@ -127,6 +127,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
                     **kwargs,
                 )
                 model.fit_time = time.time() - model_fit_start_time
+                most_recent_refit_window = f"W{window_index}"
             model.score_and_cache_oof(val_fold, store_val_score=True, store_predict_time=True)
 
             oof_predictions_per_window.append(model.get_oof_predictions()[0])
@@ -149,7 +150,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
 
         # Only the model trained on most recent data is saved & used for prediction
         self.most_recent_model = model
-        self.most_recent_model_folder = model.name.rsplit("/")[-1]
+        self.most_recent_model_folder = most_recent_refit_window
         self.predict_time = self.most_recent_model.predict_time
         self.fit_time = time.time() - global_fit_start_time - self.predict_time
         self._oof_predictions = oof_predictions_per_window
