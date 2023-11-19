@@ -380,6 +380,7 @@ class WaveNetModel(AbstractGluonTSModel):
     """
 
     supports_known_covariates = True
+    default_num_samples: int = 100
 
     def _get_estimator_class(self) -> Type[GluonTSEstimator]:
         from gluonts.torch.model.wavenet import WaveNetEstimator
