@@ -34,7 +34,8 @@ from ..common import (
     get_data_frame_with_item_index,
 )
 
-LOCAL_TESTABLE_MODELS = [
+# models accepting seasonal_period
+SEASONAL_TESTABLE_MODELS = [
     AutoARIMAModel,
     AutoETSModel,
     AutoCESModel,
@@ -47,7 +48,8 @@ LOCAL_TESTABLE_MODELS = [
     SeasonalAverageModel,
     SeasonalNaiveModel,
 ]
-IDF_TESTABLE_MODELS = [
+# intermittent demand models do not accept seasonal_period
+NONSEASONAL_TESTABLE_MODELS = [
     ADIDAModel,
     ConformalizedZeroModel,
     CrostonClassicModel,
@@ -55,7 +57,7 @@ IDF_TESTABLE_MODELS = [
     CrostonOptimizedModel,
     IMAPAModel,
 ]
-TESTABLE_MODELS = LOCAL_TESTABLE_MODELS + IDF_TESTABLE_MODELS
+TESTABLE_MODELS = SEASONAL_TESTABLE_MODELS + NONSEASONAL_TESTABLE_MODELS
 
 
 # Restrict to single core for faster training on small datasets
@@ -110,7 +112,7 @@ def get_seasonal_period_from_fitted_local_model(model):
         return model._local_model_args["seasonal_period"]
 
 
-@pytest.mark.parametrize("model_class", LOCAL_TESTABLE_MODELS)
+@pytest.mark.parametrize("model_class", SEASONAL_TESTABLE_MODELS)
 @pytest.mark.parametrize(
     "hyperparameters", [{**DEFAULT_HYPERPARAMETERS, "seasonal_period": None}, DEFAULT_HYPERPARAMETERS]
 )
@@ -139,7 +141,7 @@ def test_when_seasonal_period_is_set_to_none_then_inferred_period_is_used(
     assert get_seasonal_period_from_fitted_local_model(model) == expected_seasonal_period
 
 
-@pytest.mark.parametrize("model_class", LOCAL_TESTABLE_MODELS)
+@pytest.mark.parametrize("model_class", SEASONAL_TESTABLE_MODELS)
 @pytest.mark.parametrize(
     "freqstr, ts_length, provided_seasonal_period",
     [
@@ -371,7 +373,7 @@ def test_when_conformalized_model_called_then_nonconformity_score_values_correct
     assert np.allclose(expected_scores, returned_scores)
 
 
-@pytest.mark.parametrize("model_class", IDF_TESTABLE_MODELS)
+@pytest.mark.parametrize("model_class", NONSEASONAL_TESTABLE_MODELS)
 @pytest.mark.parametrize("prediction_length", [1, 3, 10])
 @pytest.mark.parametrize("positive_only", [True, False])
 def test_when_intermittent_models_fit_then_values_are_lower_bounded(

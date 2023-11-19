@@ -3,7 +3,6 @@ from typing import Any, Dict, List, Type, Union
 
 import numpy as np
 import pandas as pd
-import scipy.stats as sst
 
 from .abstract_local_model import AbstractLocalModel
 
