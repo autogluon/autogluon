@@ -288,7 +288,8 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         self._residuals_std_per_item = self._compute_residuals_std(val_df)
         self._avg_residuals_std = np.mean(self._residuals_std_per_item)
 
-    def _compute_residuals_std(self, val_df: pd.DataFrame) -> float:
+    def _compute_residuals_std(self, val_df: pd.DataFrame) -> pd.Series:
+        """Compute standard deviation of residuals for each item using the validation set."""
         residuals = val_df[MLF_TARGET] - self._mlf.models_["mean"].predict(val_df)
         return residuals.pow(2).groupby(val_df[MLF_ITEMID]).mean().pow(0.5)
 
@@ -426,9 +427,10 @@ class DirectTabularModel(AbstractMLForecastModel):
         df.loc[:, lag_cols] = df[lag_cols].where(mask, other=np.nan)
         return df
 
-    def _compute_residuals_std(self, val_df: pd.DataFrame) -> float:
+    def _compute_residuals_std(self, val_df: pd.DataFrame) -> pd.Series:
         if self.is_quantile_model:
-            return 1.0  # Quantile model does not require residuals to produce prediction intervals
+            # Quantile model does not require residuals to produce prediction intervals
+            return pd.Series(1.0, index=val_df[MLF_ITEMID].unique())
         else:
             return super()._compute_residuals_std(val_df=val_df)
 
