@@ -537,7 +537,7 @@ class ObjectDetectionLearner(BaseLearner):
         self.on_predict_per_run_end(trainer=trainer)
 
         # TODO: remove this by adjusting the return format of mmdet_image or lit_mmdet.
-        if pred_writer is None:
+        if pred_writer is None and self._problem_type == OBJECT_DETECTION:
             outputs = [output for batch_outputs in outputs for output in batch_outputs]
 
         return outputs
