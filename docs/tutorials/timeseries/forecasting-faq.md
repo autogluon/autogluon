@@ -14,7 +14,7 @@ Currently, AutoGluon does not support features such as hierarchical forecasting 
 To maximize the forecast accuracy, set the `predictor.fit()` argument `presets="best_quality"` and provide a high `time_limit`.
 
 ## How should I choose the evaluation metric?
-See ["How to choose and interpret the evaluation metric?" in the In Depth Tutorial](forecasting-indepth.ipynb)
+See [Evaluation Metrics](forecasting-metrics.md)
 
 ## Are there any restrictions on the data that I can pass to TimeSeriesPredictor?
 See ["What data format is expected by `TimeSeriesPredictor`?" in the In Depth Tutorial](forecasting-indepth.ipynb)
@@ -31,7 +31,7 @@ Multi-GPU training is not yet supported.
 AutoGluon can be run on any machine including your laptop.
 It is not necessary to use a GPU to train `TimeSeriesPredictor`, so CPU machines are fine.
 Using a machine with more CPU cores and more RAM will lead to faster training and allow you to quickly generate forecasts for larger datasets.
-For example if using AWS instances for Tabular: we recommend [M6 instances](https://aws.amazon.com/ec2/instance-types/m6i/) instances, where a `m6i.24xlarge` machine should be able to handle most datasets.
+For example if using AWS instances: we recommend [M6 instances](https://aws.amazon.com/ec2/instance-types/m6i/) instances, where a `m6i.24xlarge` machine should be able to handle most datasets.
 
 
 ## Issues not addressed here

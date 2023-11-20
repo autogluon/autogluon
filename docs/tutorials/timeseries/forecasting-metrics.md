@@ -9,8 +9,13 @@ from autogluon.timeseries import TimeSeriesPredictor
 
 predictor = TimeSeriesPredictor(eval_metric="MASE")
 ```
-
 AutoGluon will use the provided metric to tune model hyperparameters, rank models, and construct the final ensemble for prediction.
+
+:::{note}
+AutoGluon always reports all metrics in a **higher-is-better** format.
+For this purpose, some metrics are multiplied by -1.
+For example, if we set `eval_metric="MASE"`, the predictor will actually report `-MASE` (i.e., MASE score multiplied by -1). This means the `test_score` will be between 0 (best possible forecast) and $-\infty$ (worst possible forecast).
+:::
 
 
 Currently, AutoGluon supports following evaluation metrics:
