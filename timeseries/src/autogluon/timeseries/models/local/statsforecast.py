@@ -247,7 +247,7 @@ class AutoETSModel(AbstractProbabilisticStatsForecastModel):
         When set to None, seasonal_period will be inferred from the frequency of the training data. Can also be
         specified manually by providing an integer > 1.
         If seasonal_period (inferred or provided) is equal to 1, seasonality will be disabled.
-    damped : bool, default = True
+    damped : bool, default = False
         Whether to dampen the trend.
     n_jobs : int or float, default = 0.5
         Number of CPU cores used to fit the models in parallel.
@@ -273,6 +273,7 @@ class AutoETSModel(AbstractProbabilisticStatsForecastModel):
     def _update_local_model_args(self, local_model_args: dict) -> dict:
         local_model_args = super()._update_local_model_args(local_model_args)
         local_model_args.setdefault("model", "ZZZ")
+        local_model_args.setdefault("damped", False)
         return local_model_args
 
     def _predict_with_local_model(
@@ -323,7 +324,6 @@ class ETSModel(AutoETSModel):
     def _update_local_model_args(self, local_model_args: dict) -> dict:
         local_model_args = super()._update_local_model_args(local_model_args)
         local_model_args.setdefault("model", "AAA")
-        local_model_args.setdefault("damped", False)
         return local_model_args
 
 
