@@ -66,7 +66,7 @@ class DeepARModel(AbstractGluonTSModel):
         Whether to automatically scale the target values
     max_epochs : int, default = 100
         Number of epochs the model will be trained for
-    batch_size : int, default = 128
+    batch_size : int, default = 64
         Size of batches used during training
     predict_batch_size : int, default = 500
         Size of batches used during prediction.
@@ -119,7 +119,7 @@ class SimpleFeedForwardModel(AbstractGluonTSModel):
         Scale the network input by the data mean and the network output by its inverse
     max_epochs : int, default = 100
         Number of epochs the model will be trained for
-    batch_size : int, default = 128
+    batch_size : int, default = 64
         Size of batches used during training
     predict_batch_size : int, default = 500
         Size of batches used during prediction.
@@ -176,7 +176,7 @@ class TemporalFusionTransformerModel(AbstractGluonTSModel):
         Dropout regularization parameter
     max_epochs : int, default = 100
         Number of epochs the model will be trained for
-    batch_size : int, default = 128
+    batch_size : int, default = 64
         Size of batches used during training
     predict_batch_size : int, default = 500
         Size of batches used during prediction.
@@ -240,7 +240,7 @@ class DLinearModel(AbstractGluonTSModel):
         Scaling applied to the inputs. One of ``"mean"`` (mean absolute scaling), ``"std"`` (standardization), ``None`` (no scaling).
     max_epochs : int, default = 100
         Number of epochs the model will be trained for
-    batch_size : int, default = 128
+    batch_size : int, default = 64
         Size of batches used during training
     predict_batch_size : int, default = 500
         Size of batches used during prediction.
@@ -298,7 +298,7 @@ class PatchTSTModel(AbstractGluonTSModel):
         Scaling applied to the inputs. One of ``"mean"`` (mean absolute scaling), ``"std"`` (standardization), ``None`` (no scaling).
     max_epochs : int, default = 100
         Number of epochs the model will be trained for
-    batch_size : int, default = 128
+    batch_size : int, default = 64
         Size of batches used during training
     num_batches_per_epoch : int, default = 50
         Number of batches processed every epoch
@@ -363,7 +363,7 @@ class WaveNetModel(AbstractGluonTSModel):
         Flag indicating whether the time series take negative values.
     max_epochs : int, default = 100
         Number of epochs the model will be trained for
-    batch_size : int, default = 128
+    batch_size : int, default = 64
         Size of batches used during training
     predict_batch_size : int, default = 500
         Size of batches used during prediction.

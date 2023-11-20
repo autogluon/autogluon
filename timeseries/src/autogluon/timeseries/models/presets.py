@@ -107,34 +107,24 @@ VALID_AG_ARGS_KEYS = {
 
 def get_default_hps(key):
     default_model_hps = {
-        "fast_training": {
+        "very_fast": {
             "Naive": {},
             "SeasonalNaive": {},
             "ETS": {},
             "Theta": {},
             "RecursiveTabular": {"max_num_samples": 100_000},
+            "DirectTabular": {"max_num_samples": 100_000},
         },
-        "medium_quality": {
+        "fast": {
             "Naive": {},
             "SeasonalNaive": {},
-            "AutoETS": {},
-            "Theta": {},
-            "RecursiveTabular": {},
-            "DeepAR": {},
-        },
-        "high_quality": {
-            "Naive": {},
-            "SeasonalNaive": {},
-            "AutoETS": {},
-            "AutoARIMA": {},
+            "ETS": {},
             "Theta": {},
             "RecursiveTabular": {},
             "DirectTabular": {},
-            "DeepAR": {},
             "TemporalFusionTransformer": {},
-            "PatchTST": {},
         },
-        "best_quality": {
+        "default": {
             "SeasonalNaive": {},
             "CrostonSBA": {},
             "AutoETS": {},
@@ -152,10 +142,6 @@ def get_default_hps(key):
             "WaveNet": {},
         },
     }
-
-    # For backwards compatibility
-    default_model_hps["default"] = default_model_hps["medium_quality"]
-    default_model_hps["default_hpo"] = default_model_hps["best_quality"]
 
     return default_model_hps[key]
 
