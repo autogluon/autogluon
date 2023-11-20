@@ -38,7 +38,7 @@ class WeightedEnsembleModel(StackerEnsembleModel):
         self.stack_column_prefix_to_model_map = min_stack_column_prefix_to_model_map
         return self
 
-    def _get_model_weights(self):
+    def _get_model_weights(self) -> dict:
         weights_dict = defaultdict(int)
         num_models = len(self.models)
         for model in self.models:
@@ -48,6 +48,7 @@ class WeightedEnsembleModel(StackerEnsembleModel):
                 weights_dict[key] += model_weight_dict[key]
         for key in weights_dict:
             weights_dict[key] = weights_dict[key] / num_models
+        weights_dict = dict(weights_dict)
         return weights_dict
 
     def compute_feature_importance(self, X, y, features=None, is_oof=True, **kwargs) -> pd.DataFrame:
@@ -82,5 +83,8 @@ class WeightedEnsembleModel(StackerEnsembleModel):
         This model can generate out-of-fold (oof) predictions by predicting directly on the training data.
         This will make the result slightly overfit, but the weighted ensemble has limited degrees of freedom intentionally, making the overfitting negligible.
         """
-        tags = {"can_get_oof_from_train": True}
+        tags = {
+            "can_get_oof_from_train": True,
+            "print_weights": True,
+        }
         return tags

@@ -1779,6 +1779,11 @@ class AbstractTrainer:
                     return model_names_trained
                 if self._time_limit is not None and self._time_train_start is not None:
                     time_left_total = self._time_limit - (fit_start_time - self._time_train_start)
+                    # If only a very small amount of time remains, skip training
+                    min_time_required = min(self._time_limit * 0.01, 10)
+                    if (time_left_total < min_time_required) and (time_limit < min_time_required):
+                        logger.log(15, f"Skipping {model.name} due to lack of time remaining.")
+                        return model_names_trained
                 else:
                     time_left_total = time_limit
                 fit_log_message += f" Training model for up to {round(time_limit, 2)}s of the {round(time_left_total, 2)}s of remaining time."
@@ -2002,6 +2007,19 @@ class AbstractTrainer:
     def _log_model_stats(self, model, _is_refit=False):
         """Logs model fit time, val score, predict time, and predict_1_time"""
         model = self.load_model(model)
+        print_weights = model._get_tags().get("print_weights", False)
+
+        if print_weights:
+            model_weights = model._get_model_weights()
+            model_weights = {k: round(v, 3) for k, v in model_weights.items()}
+            msg_weights = ""
+            is_first = True
+            for key, value in sorted(model_weights.items(), key=lambda x: x[1], reverse=True):
+                if not is_first:
+                    msg_weights += ", "
+                msg_weights += f"'{key}': {value}"
+                is_first = False
+            logger.log(20, f"\tEnsemble Weights: {{{msg_weights}}}")
         if model.val_score is not None:
             if model.eval_metric.name != self.eval_metric.name:
                 logger.log(20, f"\tNote: model has different eval_metric than default.")
