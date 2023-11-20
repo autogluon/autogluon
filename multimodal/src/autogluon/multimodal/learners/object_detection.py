@@ -19,7 +19,7 @@ from ..constants import (
     XYWH,
 )
 from ..data import BaseDataModule, MultiImageMixDataset, MultiModalFeaturePreprocessor, infer_rois_column_type
-from ..optimization import MMDetLitModule
+from ..optimization import LitModule, MMDetLitModule
 from ..utils import (
     check_if_packages_installed,
     cocoeval,
@@ -305,13 +305,21 @@ class ObjectDetectionLearner(BaseLearner):
         optimization_kwargs: Optional[dict] = None,
         is_train=True,
     ):
+        # add ovd
+        if self._problem_type == OPEN_VOCABULARY_OBJECT_DETECTION:
+            LightningModule = LitModule
+        elif self._problem_type == OBJECT_DETECTION:
+            LightningModule = MMDetLitModule
+        else:
+            raise TypeError(f"problem type {self._problem_type} is not supported by ObjectDetectionLearner.")
+
         if is_train:
-            return MMDetLitModule(
+            return LightningModule(
                 model=model,
                 **optimization_kwargs,
             )
         else:
-            return MMDetLitModule(model=self._model)
+            return LightningModule(model=self._model)
 
     def get_model_per_run(self, model, config):
         if model is None:
@@ -529,7 +537,7 @@ class ObjectDetectionLearner(BaseLearner):
         self.on_predict_per_run_end(trainer=trainer)
 
         # TODO: remove this by adjusting the return format of mmdet_image or lit_mmdet.
-        if pred_writer is None:
+        if pred_writer is None and self._problem_type == OBJECT_DETECTION:
             outputs = [output for batch_outputs in outputs for output in batch_outputs]
 
         return outputs
