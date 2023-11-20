@@ -435,7 +435,7 @@ class DirectTabularModel(AbstractMLForecastModel):
             self._residuals_std_per_item = pd.Series(1.0, index=val_df[MLF_ITEMID].unique())
             self._avg_residuals_std = 1.0
         else:
-            return super()._compute_residuals_std(val_df=val_df)
+            super()._save_residuals_std(val_df=val_df)
 
     def _predict(
         self,
