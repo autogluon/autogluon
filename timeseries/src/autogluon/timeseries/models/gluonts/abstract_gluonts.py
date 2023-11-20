@@ -250,7 +250,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
     def _get_model_params(self) -> dict:
         """Gets params that are passed to the inner model."""
         init_args = super()._get_model_params().copy()
-        init_args.setdefault("batch_size", 64)
+        init_args.setdefault("batch_size", 128)
         init_args.setdefault("context_length", self.default_context_length)
         init_args.setdefault("predict_batch_size", 500)
         init_args.setdefault("early_stopping_patience", 20)
