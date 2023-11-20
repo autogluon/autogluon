@@ -19,7 +19,11 @@ from ..constants import (
     FEW_SHOT_CLASSIFICATION,
     IOU,
     MAP,
+    MATCHING_METRICS,
+    MATCHING_METRICS_WITHOUT_PROBLEM_TYPE,
+    MAX,
     METRIC_MODE_MAP,
+    MIN,
     MULTICLASS,
     NDCG,
     NER,
@@ -37,7 +41,6 @@ from ..constants import (
     ROC_AUC,
     SEMANTIC_SEGMENTATION,
     SPEARMANR,
-    VALID_METRICS,
     Y_PRED,
     Y_PRED_PROB,
     Y_TRUE,
@@ -49,7 +52,7 @@ logger = logging.getLogger(__name__)
 
 def infer_metrics(
     problem_type: Optional[str] = None,
-    eval_metric_name: Optional[str] = None,
+    eval_metric: Optional[Union[str, Scorer]] = None,
     validation_metric_name: Optional[str] = None,
     is_matching: Optional[bool] = False,
 ):
@@ -76,70 +79,76 @@ def infer_metrics(
     eval_metric_name
         Name of evaluation metric.
     """
+    is_customized = False
+    if eval_metric is None:
+        eval_metric_name = None
+    elif isinstance(eval_metric, str):
+        eval_metric_name = eval_metric
+    elif isinstance(eval_metric, Scorer):
+        eval_metric_name = eval_metric.name
+        is_customized = True
+    else:
+        raise TypeError(f"eval_metric can be a str, a Scorer, or None, but is type: {type(eval_metric)}")
+
+    if problem_type is not None:
+        problem_property = PROBLEM_TYPES_REG.get(problem_type)
+
+    if is_matching:
+        if eval_metric_name is not None:
+            # if eval_metric_name is a valid metric
+            if eval_metric_name.lower() in METRIC_MODE_MAP.keys():
+                validation_metric_name = eval_metric_name
+                return validation_metric_name, eval_metric_name
+            elif eval_metric_name.lower() in RETRIEVAL_METRICS:
+                # Currently only support recall as validation metric in retrieval tasks.
+                validation_metric_name = RECALL
+                return validation_metric_name, eval_metric_name
+
+        # When eval_metric_name is either None or not supported:
+        # Fallback based on problem type unless it's a customized metric
+        if problem_type is None:
+            validation_metric_name, fallback_evaluation_metric = MATCHING_METRICS_WITHOUT_PROBLEM_TYPE
+        elif problem_type in MATCHING_METRICS:
+            validation_metric_name, fallback_evaluation_metric = MATCHING_METRICS[problem_type]
+        else:
+            raise NotImplementedError(f"Problem type: {problem_type} is not yet supported for matching!")
+        if not is_customized:
+            if eval_metric_name is not None:
+                warnings.warn(
+                    f"Metric {eval_metric_name} is not supported as the evaluation metric for {problem_type} in matching tasks."
+                    f"The evaluation metric is changed to {fallback_evaluation_metric} by default."
+                )
+            eval_metric_name = fallback_evaluation_metric
+        return validation_metric_name, eval_metric_name
 
     if eval_metric_name is not None:
-        if problem_type != BINARY and eval_metric_name.lower() in [
-            ROC_AUC,
-            AVERAGE_PRECISION,
-            F1,
-        ]:
-            raise ValueError(f"Metric {eval_metric_name} is only supported for binary classification.")
-
-        if eval_metric_name in VALID_METRICS:
-            validation_metric_name = eval_metric_name
-            return validation_metric_name, eval_metric_name
-
-        # Currently only support recall as validation metric in retrieval tasks.
-        if is_matching and eval_metric_name in RETRIEVAL_METRICS:
-            validation_metric_name = RECALL
-            return validation_metric_name, eval_metric_name
-
-        warnings.warn(
-            f"Currently, we cannot convert the metric: {eval_metric_name} to a metric supported in torchmetrics. "
-            f"Thus, we will fall-back to use accuracy for multi-class classification problems "
-            f", ROC-AUC for binary classification problem, and RMSE for regression problems.",
-            UserWarning,
-        )
-
-    if problem_type == MULTICLASS:
-        if is_matching:
-            eval_metric_name = SPEARMANR
-        else:
-            eval_metric_name = ACCURACY
-    elif problem_type == NER:
-        return NER_TOKEN_F1, OVERALL_F1
-    elif problem_type == BINARY:
-        eval_metric_name = ROC_AUC
-    elif problem_type == REGRESSION:
-        if is_matching:
-            eval_metric_name = SPEARMANR
-        else:
-            eval_metric_name = RMSE
-    elif problem_type == FEW_SHOT_CLASSIFICATION:
-        eval_metric_name = ACCURACY
-    elif problem_type in [OBJECT_DETECTION, OPEN_VOCABULARY_OBJECT_DETECTION]:
-        if (not validation_metric_name) or validation_metric_name.lower() == MAP:
-            return MAP, MAP
-        elif validation_metric_name.lower() == DIRECT_LOSS:
-            return DIRECT_LOSS, MAP
-        else:
-            raise ValueError(
-                f"Problem type: {problem_type}, validation_metric_name: {validation_metric_name} is not supported!"
+        # Infer evaluation metric
+        if eval_metric_name.lower() not in problem_property.supported_evaluation_metrics and not is_customized:
+            warnings.warn(
+                f"Metric {eval_metric_name} is not supported as the evaluation metric for {problem_type}. "
+                f"The evaluation metric is changed to {problem_property.fallback_evaluation_metric} by default."
             )
-    elif problem_type is None and is_matching:
-        return RECALL, NDCG
-    elif problem_type == SEMANTIC_SEGMENTATION:
-        return IOU, IOU
-    else:
-        raise NotImplementedError(f"Problem type: {problem_type} is not supported yet!")
+            if problem_property.fallback_evaluation_metric is not None:
+                eval_metric_name = problem_property.fallback_evaluation_metric
+            else:
+                # Problem types like extract_embedding does not need a eval/val metric
+                return None, None
 
-    validation_metric_name = eval_metric_name
+        # Infer validation metric
+        if eval_metric_name.lower() in problem_property.supported_validation_metrics:
+            validation_metric_name = eval_metric_name
+        else:
+            if problem_property.fallback_validation_metric is not None:
+                validation_metric_name = problem_property.fallback_validation_metric
+    else:
+        eval_metric_name = problem_property.fallback_evaluation_metric
+        validation_metric_name = problem_property.fallback_validation_metric
 
     return validation_metric_name, eval_metric_name
 
 
 def get_minmax_mode(
-    metric_name: str,
+    metric_name: Union[str, Scorer],
 ):
     """
     Get minmax mode based on metric name
@@ -158,8 +167,13 @@ def get_minmax_mode(
         - max
             It means that larger metric is better.
     """
-    assert metric_name in METRIC_MODE_MAP, f"{metric_name} is not a supported metric. Options are: {VALID_METRICS}"
-    return METRIC_MODE_MAP.get(metric_name)
+    if isinstance(metric_name, str):
+        assert (
+            metric_name in METRIC_MODE_MAP
+        ), f"{metric_name} is not a supported metric. Options are: {METRIC_MODE_MAP.keys()}"
+        return METRIC_MODE_MAP.get(metric_name)
+    else:
+        return MAX if metric_name.greater_is_better else MIN
 
 
 def get_stopping_threshold(metric_name: str):

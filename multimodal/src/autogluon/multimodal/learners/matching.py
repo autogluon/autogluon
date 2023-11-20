@@ -186,6 +186,7 @@ class MultiModalMatcher(BaseLearner):
         self._pipeline = problem_type.lower() if problem_type is not None else None
         self._presets = presets.lower() if presets else None
         self._eval_metric_name = eval_metric.lower() if eval_metric else None
+        self._eval_metric_func = None
         self._validation_metric_name = validation_metric.lower() if validation_metric else None
         self._minmax_mode = None
         self._hyperparameters = hyperparameters

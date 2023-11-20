@@ -474,7 +474,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             return
         self._validation_metric_name, self._eval_metric_name = infer_metrics(
             problem_type=self._problem_type,
-            eval_metric_name=self._eval_metric_name,
+            eval_metric=self._eval_metric_name if self._eval_metric_func is None else self._eval_metric_func,
             validation_metric_name=self._validation_metric_name,
             is_matching=is_matching,
         )
@@ -1356,7 +1356,9 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         standalone=True,
         clean_ckpts=True,
     ):
-        minmax_mode = get_minmax_mode(self._eval_metric_name)
+        minmax_mode = get_minmax_mode(
+            self._eval_metric_name if self._eval_metric_func is None else self._eval_metric_func
+        )
         best_k_models_yaml_path = os.path.join(save_path, BEST_K_MODELS_FILE)
         if os.path.exists(best_k_models_yaml_path):
             with open(best_k_models_yaml_path, "r") as f:
