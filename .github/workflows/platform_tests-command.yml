@@ -1,7 +1,7 @@
 name: Platform Tests
 on:
   schedule:
-    - cron: '59 07 * * *'  #  UTC 7:59(23:59 PST Winter Time) everyday
+    - cron: '59 07 * * *'  #  UTC 7:59(23:59 PST Winter Time) everyday test
   workflow_dispatch:
     inputs:
       repository:

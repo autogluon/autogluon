@@ -9,6 +9,7 @@ source $(dirname "$0")/env_setup.sh
 setup_build_env
 install_local_packages "common/[tests]" "core/[all,tests]"
 
+echo "Hello Core test"
 cd core/
 if [ "$OSTYPE" == "msys" ]
 then
