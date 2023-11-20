@@ -2,7 +2,7 @@ from pprint import pformat
 from typing import Type, Union
 
 from .abstract import TimeSeriesScorer
-from .point import MAE, MAPE, MASE, MSE, RMSE, RMSSE, WAPE, SMAPE
+from .point import MAE, MAPE, MASE, MSE, RMSE, RMSSE, SMAPE, WAPE
 from .quantile import SQL, WQL
 
 __all__ = [

@@ -13,15 +13,15 @@ class WQL(TimeSeriesScorer):
     r"""Weighted quantile loss.
 
     Also known as weighted pinball loss.
-    
+
     Defined as total quantile loss divided by the sum of absolute time series values in the forecast horizon.
-    
+
     .. math::
 
         \operatorname{WQL} = \frac{1}{\sum_{i=1}^{N} \sum_{t=T+1}^{T+H} |y_{i, t}|} \sum_{i=1}^{N} \sum_{t=T+1}^{T+H} \sum_{q}  \rho_q(y_{i,t}, f^q_{i,t})
 
     Properties:
-    
+
     - scale-dependent (time series with large absolute value contribute more to the loss)
     - equivalent to WAPE if ``quantile_levels = [0.5]``
 
@@ -58,16 +58,16 @@ class SQL(TimeSeriesScorer):
         \operatorname{SQL} = \frac{1}{\sum_{i=1}^{N} \sum_{t=T+1}^{T+H} |y_{i, t}|} \sum_{i=1}^{N} \sum_{t=T+1}^{T+H} \sum_{q}  \rho_q(y_{i,t}, f^q_{i,t})
 
     where :math:`a_i` is the historic absolute seasonal error defined as
-    
+
     .. math::
 
         a_i = \frac{1}{T-m} \sum_{t=m+1}^T |y_{i,t} - y_{i,t-m}|
-    
+
     and :math:`m` is the seasonal period of the time series (``eval_metric_seasonal_period``).
 
 
     Properties:
-    
+
     - scaled metric (normalizes the error for each time series by the scale of that time series)
     - undefined for constant time series
     - equivalent to MASE if ``quantile_levels = [0.5]``
