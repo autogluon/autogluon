@@ -245,7 +245,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
     @property
     def default_context_length(self) -> int:
-        return max(10, 2 * self.prediction_length)
+        return min(512, max(10, 2 * self.prediction_length))
 
     def _get_model_params(self) -> dict:
         """Gets params that are passed to the inner model."""

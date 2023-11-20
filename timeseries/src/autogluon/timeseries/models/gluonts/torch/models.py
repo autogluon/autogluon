@@ -195,7 +195,7 @@ class TemporalFusionTransformerModel(AbstractGluonTSModel):
 
     @property
     def default_context_length(self) -> int:
-        return max(64, 2 * self.prediction_length)
+        return min(512, max(64, 2 * self.prediction_length))
 
     def _get_estimator_class(self) -> Type[GluonTSEstimator]:
         from gluonts.torch.model.tft import TemporalFusionTransformerEstimator
