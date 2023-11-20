@@ -1,7 +1,6 @@
 # Forecasting Time Series - Evaluation Metrics
 
 Picking the right evaluation metric is one of the most important choices when using an AutoML framework.
-
 This page lists the forecast evaluation metrics available in AutoGluon, explains when different metrics should be used, and describes how to define custom metrics.
 
 When using AutoGluon, you can specify the metric using the `eval_metric` argument to `TimeSeriesPredictor`, for example:
@@ -57,7 +56,7 @@ predictor = TimeSeriesPredictor(eval_metric="WQL", quantile_levels=[0.1, 0.5, 0.
 ```
 
 All remaining forecast metrics described on this page are **point** forecast metrics.
-Note that if you select a point forecast metric in AutoGluon, then the forecast minimizing this metric will always be provided in the `"mean"` column of the predictions data frame.
+Note that if you select the `eval_metric` to a point forecast metric when creating the `TimeSeriesPredictor`, then the forecast minimizing this metric will always be provided in the `"mean"` column of the predictions data frame.
 
 **2. Do you care more about accurately predicting time series with large values?**
 
@@ -130,6 +129,14 @@ If your goal is to predict the **mean** (expected value), you should use `MSE`, 
 
 
 ## Point forecast metrics
+We use the following notation in mathematical definitions of point forecast metrics:
+
+- $y_{i,t}$ - observed value of time series $i$ at time $t$
+- $f_{i,t}$ - predicted value of time series $i$ at time $t$
+- $N$ - number of time series (number of items) in the dataset
+- $T$ - length of the observed time series
+- $H$ - length of the forecast horizon (`prediction_length`)
+
 
 ```{eval-rst}
 .. autoclass:: MAE
@@ -165,6 +172,19 @@ If your goal is to predict the **mean** (expected value), you should use `MSE`, 
 
 
 ## Probabilistic forecast metrics
+In addition to the notation listed above, we use following notation to define probabilistic forecast metrics:
+
+- $f_{i,t}^q$ - predicted quantile $q$ of time series $i$ at time $t$
+- $\rho_q(y, f) $ - quantile loss at level $q$ defined as
+
+$$
+      \rho_q(y, f) =    \begin{cases}
+      2 \cdot (1 - q) \cdot (f^q_{i,t} - y_{i,t}), & \text{ if } y_{i,t} < f_{i,t}^q\\
+      2 \cdot q \cdot (y_{i,t} - f^q_{i,t} ), & \text{ if } y_{i,t} \ge f_{i,t}^q\\
+      \end{cases}
+$$
+
+
 
 ```{eval-rst}
 .. autoclass:: SQL
@@ -177,194 +197,45 @@ If your goal is to predict the **mean** (expected value), you should use `MSE`, 
 
 ## Custom metrics
 If none of the built-in metrics meet your requirements, you can train provide a custom evaluation metric to AutoGluon.
+To define a custom metric, you need to create a class that inherits from `TimeSeriesScorer` and implements the `compute_metric` method according to the following API specification:
+```{eval-rst}
+.. automethod:: TimeSeriesScorer.compute_metric
+```
+
+Here is an example of how you can define a custom Mean Absolute Error (MAE) metric
 
 ```python
 from autogluon.timeseries.metrics import TimeSeriesScorer
+
+class CustomMeanAbsoluteError(TimeSeriesScorer):
+   greater_is_better_internal = False
+
+   def compute_metric(self, data_future, predictions, target, **kwargs):
+      return np.abs(np.mean((data_future[target] - predictions["mean"])))
+```
+
+To better understand the inputs 
+
+
+Here is an example of what the inputs to the `compute_metric_methods` may look like:
+```python
+import pandas as pd
+from autogluon.timeseries import TimeSeriesPredictor, TimeSeriesDataFrame
+
+data = TimeSeriesDataFrame.from_iterable_dataset(
+   {"start": pd.Period("2023-01-01", freq="D"), "target": range(20)}
+)
+prediction_length = 3
+train_data, test_data = data.train_test_split(prediction_length=prediction_length)
+predictor = TimeSeriesPredictor(prediction_length=prediction_length, verbosity=0).fit(train_data, hyperparameters={"SeasonalNaive": {}})
+
+predictions = predictor.predict(train_data)
+predictions
 ```
 
 
-Below is the full documentation
-```{eval-rst}
-.. autoclass:: TimeSeriesScorer
-   :members: compute_metric, save_past_metrics, clear_past_metrics
-
-```
-
-<!-- ## Baseline models
-
-Baseline models are simple approaches that use minimal historical data to make predictions. They serve as benchmarks for evaluating more complex methods.
-
-```{eval-rst}
-.. autoclass:: NaiveModel
-   :members: init
+```python
+data_future = test_data.slice_by_timestep(-prediction_length, None)
 ```
 
 
-```{eval-rst}
-.. autoclass:: SeasonalNaiveModel
-   :members: init
-
-```
-
-
-```{eval-rst}
-.. autoclass:: AverageModel
-   :members: init
-```
-
-
-```{eval-rst}
-.. autoclass:: SeasonalAverageModel
-   :members: init
-
-```
-
-## Statistical models
-
-Statistical models capture simple patterns in the data like trends and seasonality.
-
-
-```{eval-rst}
-.. autoclass:: ETSModel
-   :members: init
-
-```
-
-
-```{eval-rst}
-.. autoclass:: AutoARIMAModel
-   :members: init
-```
-
-
-```{eval-rst}
-.. autoclass:: AutoETSModel
-   :members: init
-```
-
-
-```{eval-rst}
-.. autoclass:: ThetaModel
-   :members: init
-```
-
-
-```{eval-rst}
-.. autoclass:: NPTSModel
-   :members: init
-
-```
-
-## Deep learning models
-
-Deep learning models use neural networks to capture complex patterns in the data.
-
-```{eval-rst}
-.. autoclass:: DeepARModel
-   :members: init
-
-```
-
-
-```{eval-rst}
-.. autoclass:: DLinearModel
-   :members: init
-
-```
-
-
-```{eval-rst}
-.. autoclass:: PatchTSTModel
-   :members: init
-
-```
-
-
-```{eval-rst}
-.. autoclass:: SimpleFeedForwardModel
-   :members: init
-
-```
-
-
-```{eval-rst}
-.. autoclass:: TemporalFusionTransformerModel
-   :members: init
-
-
-```
-
-
-```{eval-rst}
-.. autoclass:: WaveNetModel
-   :members: init
-
-
-```
-
-## Tabular models
-
-Tabular models convert time series forecasting into a tabular regression problem.
-
-
-```{eval-rst}
-.. autoclass:: DirectTabularModel
-   :members: init
-
-```
-
-
-```{eval-rst}
-.. autoclass:: RecursiveTabularModel
-   :members: init
-
-```
-
-## MXNet Models
-
-MXNet models from GluonTS have been deprecated because of dependency conflicts caused by MXNet.
-
-
-## Additional features
-
-Overview of the additional features and covariates supported by different models.
-Models not included in this table currently do not support any additional features.
-
-```{eval-rst}
-.. list-table::
-   :header-rows: 1
-   :stub-columns: 1
-   :align: center
-   :widths: 40 15 15 15 15
-
-   * - Model
-     - Static features (continuous)
-     - Static features (categorical)
-     - Known covariates (continuous)
-     - Past covariates (continuous)
-   * - :class:`~autogluon.timeseries.models.DirectTabularModel`
-     - ✓
-     - ✓
-     - ✓
-     -
-   * - :class:`~autogluon.timeseries.models.RecursiveTabularModel`
-     - ✓
-     - ✓
-     - ✓
-     -
-   * - :class:`~autogluon.timeseries.models.DeepARModel`
-     - ✓
-     - ✓
-     - ✓
-     -
-   * - :class:`~autogluon.timeseries.models.TemporalFusionTransformerModel`
-     - ✓
-     - ✓
-     - ✓
-     - ✓
-   * - :class:`~autogluon.timeseries.models.WaveNetModel`
-     - ✓
-     - ✓
-     - ✓
-     - 
-``` -->

@@ -16,17 +16,17 @@ logger = logging.getLogger(__name__)
 class RMSE(TimeSeriesScorer):
     r"""Root mean squared error.
 
-    Defined as
-    
     .. math::
 
-        \sqrt{\sum_{i,t}  (y_{i,t} - f_{i,t})^2}
+        \operatorname{RMSE} = \sqrt{\frac{1}{N} \frac{1}{H} \sum_{i=1}^{N}\sum_{t=T+1}^{T+H}  (y_{i,t} - f_{i,t})^2}
 
 
     Properties:
     
-    - estimates the mean (expected value) of the time series
-    - scale-dependent
+    - scale-dependent (time series with large absolute value contribute more to the loss)
+    - heavily penalizes models that cannot quickly adapt to abrupt changes in the time series
+    - sensitive to outliers
+    - prefers models that accurately estimate the mean (expected value)
 
     
     References
@@ -51,7 +51,14 @@ class MSE(TimeSeriesScorer):
 
     .. math::
 
-        \sum_{i,t}  (y_{i,t} - f_{i,t})^2
+        \operatorname{MSE} = \frac{1}{N} \frac{1}{H} \sum_{i=1}^{N}\sum_{t=T+1}^{T+H}  (y_{i,t} - f_{i,t})^2
+
+    Properties:
+    
+    - scale-dependent (time series with large absolute value contribute more to the loss)
+    - heavily penalizes models that cannot quickly adapt to abrupt changes in the time series
+    - sensitive to outliers
+    - prefers models that accurately estimate the mean (expected value)
     
     References
     ----------
@@ -71,10 +78,15 @@ class MSE(TimeSeriesScorer):
 class MAE(TimeSeriesScorer):
     r"""Mean absolute error.
 
-
     .. math::
 
-        \sum_{i,t}  |y_{i,t} - f_{i,t}|
+        \operatorname{MAE} = \frac{1}{N} \frac{1}{H} \sum_{i=1}^{N}\sum_{t=T+1}^{T+H}  |y_{i,t} - f_{i,t}|
+
+    Properties:
+    
+    - scale-dependent (time series with large absolute value contribute more to the loss)
+    - not sensitive to outliers
+    - prefers models that accurately estimate the median
 
     References
     ----------
@@ -99,7 +111,13 @@ class WAPE(TimeSeriesScorer):
 
     .. math::
 
-        \operatorname{WAPE} = \frac{1}{\sum_{i, t} |y_{i, t}|} \sum_{i,t}  |y_{i,t} - f_{i,t}|
+        \operatorname{WAPE} = \frac{1}{\sum_{i=1}^{N} \sum_{t=T+1}^{T+H} |y_{i, t}|} \sum_{i=1}^{N} \sum_{t=T+1}^{T+H}  |y_{i,t} - f_{i,t}|
+
+    Properties:
+    
+    - scale-dependent (time series with large absolute value contribute more to the loss)
+    - not sensitive to outliers
+    - prefers models that accurately estimate the median
 
     
     References
@@ -120,14 +138,15 @@ class WAPE(TimeSeriesScorer):
 class SMAPE(TimeSeriesScorer):
     r"""Symmetric mean absolute percentage error.
 
-    Properties:
-    
-    - Poorly suited 
-    - Penalizes overpredictions stronger than underpredictions
-
     .. math::
         
-        2 \cdot \sum_{i,t} \frac{ |y_{i,t} - f_{i,t}|}{|y_{i,t}| + |f_{i,t}|}
+        \operatorname{SMAPE} = 2 \frac{1}{N} \frac{1}{H} \sum_{i=1}^{N} \sum_{t=T+1}^{T+H} \frac{ |y_{i,t} - f_{i,t}|}{|y_{i,t}| + |f_{i,t}|}
+
+    Properties:
+    
+    - should only be used if all time series have positive values
+    - poorly suited for sparse & intermittent time series that contain zero values
+    - penalizes overprediction more heavily than underprediction
     
     References
     ----------
@@ -150,7 +169,13 @@ class MAPE(TimeSeriesScorer):
 
     .. math::
         
-        \sum_{i,t} \frac{ |y_{i,t} - f_{i,t}|}{|y_{i,t}|}
+        \operatorname{MAPE} = \frac{1}{N} \frac{1}{H} \sum_{i=1}^{N} \sum_{t=T+1}^{T+H} \frac{ |y_{i,t} - f_{i,t}|}{|y_{i,t}|}
+
+    Properties:
+    
+    - should only be used if all time series have positive values
+    - undefined for time series that contain zero values
+    - penalizes overprediction more heavily than underprediction
     
     References
     ----------
@@ -170,6 +195,27 @@ class MAPE(TimeSeriesScorer):
 
 class MASE(TimeSeriesScorer):
     r"""Mean absolute scaled error.
+    
+    Normalizes the absolute error for each time series by the historic seasonal error of this time series.
+
+    .. math::
+    
+        \operatorname{MASE} = \frac{1}{N} \frac{1}{H} \sum_{i=1}^{N} \frac{1}{a_i} \sum_{t=T+1}^{T+H} |y_{i,t} - f_{i,t}|
+
+    where :math:`a_i` is the historic absolute seasonal error defined as
+    
+    .. math::
+
+        a_i = \frac{1}{T-m} \sum_{t=m+1}^T |y_{i,t} - y_{i,t-m}|
+    
+    and :math:`m` is the seasonal period of the time series (``eval_metric_seasonal_period``).
+
+    Properties:
+    
+    - scaled metric (normalizes the error for each time series by the scale of that time series)
+    - undefined for constant time series
+    - not sensitive to outliers
+    - prefers models that accurately estimate the median
  
     References
     ----------
@@ -206,6 +252,30 @@ class MASE(TimeSeriesScorer):
 
 class RMSSE(TimeSeriesScorer):
     r"""Root mean squared scaled error.
+
+    Normalizes the absolute error for each time series by the historic seasonal error of this time series.
+
+    .. math::
+    
+        \operatorname{RMSSE} = \sqrt{\frac{1}{N} \frac{1}{H} \sum_{i=1}^{N} \frac{1}{s_i} \sum_{t=T+1}^{T+H} (y_{i,t} - f_{i,t})^2}
+
+    where :math:`s_i` is the historic squared seasonal error defined as
+    
+    .. math::
+
+        s_i = \frac{1}{T-m} \sum_{t=m+1}^T (y_{i,t} - y_{i,t-m})^2
+
+    and :math:`m` is the seasonal period of the time series (``eval_metric_seasonal_period``).
+
+
+    Properties:
+    
+    - scaled metric (normalizes the error for each time series by the scale of that time series)
+    - undefined for constant time series
+    - heavily penalizes models that cannot quickly adapt to abrupt changes in the time series
+    - sensitive to outliers
+    - prefers models that accurately estimate the mean (expected value)
+
     
     References
     ----------
