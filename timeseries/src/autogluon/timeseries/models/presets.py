@@ -135,23 +135,21 @@ def get_default_hps(key):
             "PatchTST": {},
         },
         "best_quality": {
-            "Naive": {},
             "SeasonalNaive": {},
+            "CrostonSBA": {},
             "AutoETS": {},
             "AutoARIMA": {},
             "NPTS": {},
             "DynamicOptimizedTheta": {},
             # TODO: Define separate model for each tabular submodel?
             "RecursiveTabular": {
-                "tabular_hyperparameters": {
-                    "NN_TORCH": {"proc.impute_strategy": "constant"},
-                    "GBM": [{}, {"extra_trees": True, "ag_args": {"name_suffix": "XT"}}],
-                },
+                "tabular_hyperparameters": {"NN_TORCH": {"proc.impute_strategy": "constant"}, "GBM": {}},
             },
             "DirectTabular": {},
             "TemporalFusionTransformer": {},
             "PatchTST": {},
             "DeepAR": {},
+            "WaveNet": {},
         },
     }
 
