@@ -68,20 +68,21 @@ class TimeSeriesPredictor:
 
         Probabilistic forecast metrics (evaluated on quantile forecasts for the specified ``quantile_levels``):
 
-        - ``"WQL"``: mean weighted quantile loss, defined as average of quantile losses divided by the sum of absolute time series values in the forecast horizon.
-        - ``"SQL"``: scaled quantile loss, defined as average of quantile losses divided by the in-sample seasonal error.
+        - ``"SQL"``: scaled quantile loss, defined as average of quantile losses divided by the in-sample seasonal error
+        - ``"WQL"``: mean weighted quantile loss, defined as average of quantile losses divided by the sum of absolute time series values in the forecast horizon
 
         Point forecast metrics (these are always evaluated on the ``"mean"`` column of the predictions):
 
+        - ``"MAE"``: mean absolute error
         - ``"MAPE"``: mean absolute percentage error
-        - ``"SMAPE"``: "symmetric" mean absolute percentage error
         - ``"MASE"``: mean absolute scaled error
         - ``"MSE"``: mean squared error
         - ``"RMSE"``: root mean squared error
+        - ``"RMSSE"``: root mean squared scaled error
+        - ``"SMAPE"``: "symmetric" mean absolute percentage error
         - ``"WAPE"``: weighted absolute percentage error
-        - ``"RMSSE"``: Root Mean Squared Scaled Error . See https://otexts.com/fpp3/accuracy.html#scaled-errors
 
-        For more information about these metrics, see https://docs.aws.amazon.com/forecast/latest/dg/metrics.html.
+        For more information about these metrics, see https://auto.gluon.ai/stable/tutorials/timeseries/forecasting-metrics.html.
     eval_metric_seasonal_period : int, optional
         Seasonal period used to compute some evaluation metrics such as mean absolute scaled error (MASE). Defaults to
         ``None``, in which case the seasonal period is computed based on the data frequency.
