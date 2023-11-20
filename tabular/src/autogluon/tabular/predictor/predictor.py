@@ -923,7 +923,7 @@ class TabularPredictor:
         >>> time_limit = 3600  # set as long as you are willing to wait (in sec)
         >>> predictor = TabularPredictor(label=label, eval_metric=eval_metric).fit(train_data, presets=['best_quality'], time_limit=time_limit)
         """
-        if self._learner.is_fit:
+        if self.is_fit:
             raise AssertionError("Predictor is already fit! To fit additional models, refer to `predictor.fit_extra`, or create a new `Predictor`.")
         kwargs_orig = kwargs.copy()
         kwargs = self._validate_fit_kwargs(kwargs)
@@ -1811,7 +1811,7 @@ class TabularPredictor:
 
         self._validate_unique_indices(pseudo_data, "pseudo_data")
 
-        if not self._learner.is_fit:
+        if not self.is_fit:
             if "train_data" not in kwargs.keys():
                 Exception(
                     "Autogluon is required to be fit or given 'train_data' in order to run 'fit_pseudolabel'."
@@ -1832,7 +1832,7 @@ class TabularPredictor:
 
         hyperparameters = kwargs.get("hyperparameters", None)
         if hyperparameters is None:
-            if self._learner.is_fit:
+            if self.is_fit:
                 hyperparameters = self.fit_hyperparameters_
         elif isinstance(hyperparameters, str):
             hyperparameters = get_hyperparameter_config(hyperparameters)
@@ -2013,6 +2013,13 @@ class TabularPredictor:
         """
         self._assert_is_fit("can_predict_proba")
         return problem_type_info.can_predict_proba(problem_type=self.problem_type)
+
+    @property
+    def is_fit(self) -> bool:
+        """
+        Return True if `predictor.fit` has been called, otherwise return False.
+        """
+        return self._learner.is_fit
 
     def evaluate(self, data, model=None, decision_threshold=None, display: bool = False, auxiliary_metrics=True, detailed_report=False, **kwargs) -> dict:
         """
@@ -3068,6 +3075,7 @@ class TabularPredictor:
         logger.log(20, f'Refit complete, total runtime = {round(te - ts, 2)}s ... Best model: "{self._trainer.model_best}"')
         return refit_full_dict
 
+    @property
     def model_best(self) -> str:
         """
         Returns the string model name of the best model by validation score that can infer.
@@ -3266,7 +3274,7 @@ class TabularPredictor:
             If None, uses `predictor.eval_metric`.
         model : str, default = 'best'
             The model to use prediction probabilities of when calibrating the threshold.
-            If 'best', will use `predictor.get_model_best()`.
+            If 'best', will use `predictor.model_best`.
         decision_thresholds : Union[int, List[float]], default = 50
             The number of decision thresholds on either side of `0.5` to search.
             The default of 50 will result in 101 searched thresholds: [0.00, 0.01, 0.02, ..., 0.49, 0.50, 0.51, ..., 0.98, 0.99, 1.00]
@@ -3301,7 +3309,7 @@ class TabularPredictor:
         if metric is None:
             metric = self.eval_metric
         if model == "best":
-            model = self.model_best()
+            model = self.model_best
 
         return self._learner.calibrate_decision_threshold(data=data, metric=metric, model=model, decision_thresholds=decision_thresholds, verbose=verbose)
 
@@ -3604,7 +3612,7 @@ class TabularPredictor:
         """
         self._assert_is_fit("delete_models")
         if models_to_keep == "best":
-            models_to_keep = self.model_best()
+            models_to_keep = self.model_best
         self._trainer.delete_models(
             models_to_keep=models_to_keep,
             models_to_delete=models_to_delete,
@@ -3815,7 +3823,7 @@ class TabularPredictor:
         ----------
         model : str, default 'best'
             The model to highlight in golden orange, with all component models highlighted in yellow.
-            If 'best', will default to the best model returned from `self.get_model_best()`
+            If 'best', will default to the best model returned from `self.model_best`
         prune_unused_nodes : bool, default True
             If True, only plot the models that are components of the specified `model`.
             If False, will plot all models.
@@ -3852,7 +3860,7 @@ class TabularPredictor:
 
         primary_model = model
         if primary_model == "best":
-            primary_model = self.model_best()
+            primary_model = self.model_best
         all_models = self.model_names()
         assert primary_model in all_models, f'Unknown model "{primary_model}"! Valid models: {all_models}'
         if prune_unused_nodes == True:
@@ -4580,7 +4588,7 @@ class TabularPredictor:
         """
         predictor_clone = self.clone(path=path, return_clone=True, dirs_exist_ok=dirs_exist_ok)
         if model == "best":
-            model = predictor_clone.model_best()
+            model = predictor_clone.model_best
             logger.log(30, f"Clone: Keeping minimum set of models required to predict with best model '{model}'...")
         else:
             logger.log(30, f"Clone: Keeping minimum set of models required to predict with model '{model}'...")
@@ -4696,7 +4704,7 @@ class TabularPredictor:
             return False
 
     def _assert_is_fit(self, message_suffix: str = None):
-        if not self._learner.is_fit:
+        if not self.is_fit:
             error_message = "Predictor is not fit. Call `.fit` before calling"
             if message_suffix is None:
                 error_message = f"{error_message} this method."
@@ -4722,7 +4730,7 @@ class TabularPredictor:
     @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="model_best")
     def get_model_best(self) -> str:
         """Deprecated method. Use `model_best` instead."""
-        return self.model_best()
+        return self.model_best
 
     @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="predict_from_proba")
     def get_pred_from_proba(self, *args, **kwargs) -> pd.Series | np.array:
