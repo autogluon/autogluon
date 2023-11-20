@@ -935,6 +935,16 @@ class TabularPredictor:
             if not isinstance(presets, list):
                 presets = [presets]
             logger.log(20, f"Presets specified: {presets}")
+        else:
+            logger.log(
+                20,
+                "No presets specified! To achieve strong results with AutoGluon, it is recommended to use the available presets.\n"
+                "\tRecommended Presets (For more details refer to https://auto.gluon.ai/stable/tutorials/tabular/tabular-essentials.html#presets):\n"
+                "\tpresets='best_quality'   : Maximize accuracy. Default time_limit=3600.\n"
+                "\tpresets='high_quality'   : Strong accuracy with fast inference speed. Default time_limit=3600.\n"
+                "\tpresets='good_quality'   : Good accuracy with very fast inference speed. Default time_limit=3600.\n"
+                "\tpresets='medium_quality' : Fast training time, ideal for initial prototyping."
+            )
 
         if verbosity >= 3:
             logger.log(20, "============ fit kwarg info ============")

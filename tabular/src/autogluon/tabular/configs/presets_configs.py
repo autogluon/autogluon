@@ -39,6 +39,35 @@ tabular_presets_dict = dict(
     # ------------------------------------------
     # Experimental presets. Only use these presets if you are ok with unstable and potentially poor performing presets.
     #  Experimental presets can be removed or changed without warning.
+    best_quality_v1={
+        "num_stack_levels": 1,
+        "num_bag_folds": 8,
+        "num_bag_sets": 1,
+        "hyperparameters": "zeroshot",
+        "time_limit": 3600,
+        "dynamic_stacking": True,
+    },
+    high_quality_v1={
+        "num_stack_levels": 1,
+        "num_bag_folds": 8,
+        "num_bag_sets": 1,
+        "hyperparameters": "zeroshot",
+        "time_limit": 3600,
+        "dynamic_stacking": True,
+        "refit_full": True,
+        "set_best_to_refit_full": True,
+        "_save_bag_folds": False,
+    },
+    good_quality_v1={
+        "num_stack_levels": 0,
+        "num_bag_folds": 8,
+        "num_bag_sets": 1,
+        "hyperparameters": "zeroshot",
+        "time_limit": 3600,
+        "refit_full": True,
+        "set_best_to_refit_full": True,
+        "_save_bag_folds": False
+    },
     # Best quality with an additional FTTransformer model, GPU is recommended.
     experimental_best_quality={"auto_stack": True, "hyperparameters": "default_FTT"},
     # Best quality with an additional FTTransformer and TabPFN model, GPU is recommended.
