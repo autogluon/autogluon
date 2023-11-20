@@ -1,7 +1,7 @@
 # Forecasting Time Series - Evaluation Metrics
 
 Picking the right evaluation metric is one of the most important choices when using an AutoML framework.
-This page lists the forecast evaluation metrics available in AutoGluon, explains when different metrics should be used, and describes how to define custom metrics.
+This page lists the forecast evaluation metrics available in AutoGluon and explains when different metrics should be used. 
 
 When using AutoGluon, you can specify the metric using the `eval_metric` argument to `TimeSeriesPredictor`, for example:
 ```python
@@ -193,49 +193,3 @@ $$
 ```{eval-rst}
 .. autoclass:: WQL
 ```
-
-
-## Custom metrics
-If none of the built-in metrics meet your requirements, you can train provide a custom evaluation metric to AutoGluon.
-To define a custom metric, you need to create a class that inherits from `TimeSeriesScorer` and implements the `compute_metric` method according to the following API specification:
-```{eval-rst}
-.. automethod:: TimeSeriesScorer.compute_metric
-```
-
-Here is an example of how you can define a custom Mean Absolute Error (MAE) metric
-
-```python
-from autogluon.timeseries.metrics import TimeSeriesScorer
-
-class CustomMeanAbsoluteError(TimeSeriesScorer):
-   greater_is_better_internal = False
-
-   def compute_metric(self, data_future, predictions, target, **kwargs):
-      return np.abs(np.mean((data_future[target] - predictions["mean"])))
-```
-
-To better understand the inputs 
-
-
-Here is an example of what the inputs to the `compute_metric_methods` may look like:
-```python
-import pandas as pd
-from autogluon.timeseries import TimeSeriesPredictor, TimeSeriesDataFrame
-
-data = TimeSeriesDataFrame.from_iterable_dataset(
-   {"start": pd.Period("2023-01-01", freq="D"), "target": range(20)}
-)
-prediction_length = 3
-train_data, test_data = data.train_test_split(prediction_length=prediction_length)
-predictor = TimeSeriesPredictor(prediction_length=prediction_length, verbosity=0).fit(train_data, hyperparameters={"SeasonalNaive": {}})
-
-predictions = predictor.predict(train_data)
-predictions
-```
-
-
-```python
-data_future = test_data.slice_by_timestep(-prediction_length, None)
-```
-
-
