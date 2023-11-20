@@ -50,7 +50,11 @@ def test_when_covariates_and_features_present_then_train_and_val_dfs_have_correc
     model.fit(train_data=data, time_limit=3)
     train_df, val_df = model._generate_train_val_dfs(data)
     expected_num_features = (
-        len(lags) + len(known_covariates_names) + len(static_features_names) + len(model._date_features) + 1
+        len(lags)
+        + len(known_covariates_names)
+        + len(static_features_names)
+        + len(model._date_features)
+        + 2  # target, item_id
     )
     # sum(differences) rows  dropped per item, prediction_length rows are reserved for validation
     expected_num_train_rows = len(data) - (sum(differences) + model.prediction_length) * data.num_items
@@ -185,3 +189,27 @@ def test_given_some_time_series_are_too_short_then_seasonal_naive_forecast_is_us
         except TypeError:
             pass
         assert snaive_predict.call_args[0][0].equals(df_with_short.loc[["A"]])
+
+
+@pytest.mark.parametrize("model_type", TESTABLE_MODELS)
+def test_when_point_forecast_metric_is_used_then_per_item_residuals_are_used_for_prediction(
+    temp_model_path, model_type
+):
+    data = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME.sort_index()
+    prediction_length = 5
+    model = model_type(
+        path=temp_model_path,
+        freq=data.freq,
+        prediction_length=prediction_length,
+        eval_metric="MASE",
+    )
+    model.fit(train_data=data, time_limit=15)
+    assert (model._residuals_std_per_item.index == sorted(data.item_ids)).all()
+
+    # Remove _avg_residuals_std to ensure that it's not used to impute missing values
+    model._avg_residuals_std = None
+
+    predictions = model.predict(data)
+    expected_forecast_index = get_forecast_horizon_index_ts_dataframe(data, prediction_length)
+    assert not predictions.isna().values.any()
+    assert (predictions.index == expected_forecast_index).all()
