@@ -71,7 +71,6 @@ class MSE(TimeSeriesScorer):
 class MAE(TimeSeriesScorer):
     r"""Mean absolute error.
 
-    Using this metric will lead to forecast of the median.
 
     .. math::
 
@@ -96,13 +95,12 @@ class MAE(TimeSeriesScorer):
 class WAPE(TimeSeriesScorer):
     r"""Weighted absolute percentage error.
 
-    Properties:
-    
-    - Using this metric will lead to forecast of the median.
+    Defined as sum of absolute errors divided by the sum of absolute time series values in the forecast horizon.
 
     .. math::
 
-        \frac{1}{\sum_{i, t} |y_{i, t}|} \sum_{i,t}  |y_{i,t} - f_{i,t}|
+        \operatorname{WAPE} = \frac{1}{\sum_{i, t} |y_{i, t}|} \sum_{i,t}  |y_{i,t} - f_{i,t}|
+
     
     References
     ----------
