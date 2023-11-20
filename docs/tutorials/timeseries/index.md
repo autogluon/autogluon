@@ -50,4 +50,5 @@ hidden: true
 Quick Start <forecasting-quick-start>
 In Depth <forecasting-indepth>
 Model Zoo <forecasting-model-zoo>
+Metrics <forecasting-metrics>
 ```
