@@ -10,11 +10,43 @@ from autogluon.timeseries import TimeSeriesPredictor
 
 predictor = TimeSeriesPredictor(eval_metric="MASE")
 ```
+
 AutoGluon will use the provided metric to tune model hyperparameters, rank models, and construct the final ensemble for prediction.
+
+
+Currently, AutoGluon supports following evaluation metrics:
+
+```{eval-rst}
+.. automodule:: autogluon.timeseries.metrics
+```
+
+```{eval-rst}
+.. currentmodule:: autogluon.timeseries.metrics
+```
+
+
+```{eval-rst}
+.. autosummary::
+   :nosignatures:
+
+   SQL
+   WQL
+   MAE
+   MAPE
+   MASE
+   MSE
+   RMSE
+   RMSSE
+   SMAPE
+   WAPE
+
+``` 
+
+## Which evaluation metric to choose?
 
 If you are not sure which evaluation metric to pick, here are three questions that can help you make the right choice for your use case.
 
-**Are you interested in a point forecast or a probabilistic forecast?**
+**1. Are you interested in a point forecast or a probabilistic forecast?**
 
 If your goal is to generate an accurate **probabilistic** forecast, you should use `WQL` or `SQL` metrics.
 These metrics are based on the [quantile loss](https://en.wikipedia.org/wiki/Quantile_regression) and measure the accuracy of the quantile forecasts.
@@ -27,18 +59,18 @@ predictor = TimeSeriesPredictor(eval_metric="WQL", quantile_levels=[0.1, 0.5, 0.
 All remaining forecast metrics described on this page are **point** forecast metrics.
 Note that if you select a point forecast metric in AutoGluon, then the forecast minimizing this metric will always be provided in the `"mean"` column of the predictions data frame.
 
-**(Point forecast only) Do you want to estimate the mean or the median?**
-
-To estimate the **median**, you need to use metrics such as `MAE`, `MASE` or `WAPE`.
-If your goal is to predict the **mean** (expected value), you should use `MSE`, `RMSE` or `RMSSE` metrics.
-
-**Do you care more about accurately predicting time series with large values?**
+**2. Do you care more about accurately predicting time series with large values?**
 
 If the answer is "yes" (for example, if it's important to more accurately predict sales of popular products), you should use **scale-dependent** metrics like `WQL`, `MAE`, `RMSE`, or `WAPE`.
 These metrics are also well-suited for dealing with sparse (intermittent) time series that have lots of zeros.
 
 If the answer is "no" (you care equally about all time series in the dataset), consider **scaled** metrics like `SQL`, `MASE` and `RMSSE`. Alternatively, **percentage-based** metrics `MAPE` and `SMAPE` can also be used to equalize the scale across time series. However, these precentage-based metrics have some [well-documented limitations](https://robjhyndman.com/publications/another-look-at-measures-of-forecast-accuracy/), so we don't recommend using them in practice.
 Note that both scaled and percentage-based metrics are poorly suited for sparse (intermittent) data.
+
+**3. (Point forecast only) Do you want to estimate the mean or the median?**
+
+To estimate the **median**, you need to use metrics such as `MAE`, `MASE` or `WAPE`.
+If your goal is to predict the **mean** (expected value), you should use `MSE`, `RMSE` or `RMSSE` metrics.
 
 
 
@@ -95,17 +127,7 @@ Note that both scaled and percentage-based metrics are poorly suited for sparse 
      - 
 ```
 
-## Overview
 
-## Probabilistic forecast metrics
-
-```{eval-rst}
-.. autoclass:: SQL
-```
-
-```{eval-rst}
-.. autoclass:: WQL
-```
 
 ## Point forecast metrics
 
@@ -142,6 +164,15 @@ Note that both scaled and percentage-based metrics are poorly suited for sparse 
 ```
 
 
+## Probabilistic forecast metrics
+
+```{eval-rst}
+.. autoclass:: SQL
+```
+
+```{eval-rst}
+.. autoclass:: WQL
+```
 
 
 ## Custom metrics
