@@ -136,7 +136,12 @@ class XGBoostModel(AbstractModel):
 
         model_type = XGBClassifier if self.problem_type in PROBLEM_TYPES_CLASSIFICATION else XGBRegressor
         self.model = model_type(**params)
-        self.model.fit(X=X, y=y, eval_set=eval_set, verbose=False, sample_weight=sample_weight)
+        import warnings
+
+        with warnings.catch_warnings():
+            # FIXME: v1.1: Upgrade XGBoost to 2.0.1+ to avoid deprecation warnings from Pandas 2.1+ during XGBoost fit.
+            warnings.simplefilter(action="ignore", category=FutureWarning)
+            self.model.fit(X=X, y=y, eval_set=eval_set, verbose=False, sample_weight=sample_weight)
 
         bst = self.model.get_booster()
         # TODO: Investigate speed-ups from GPU inference
