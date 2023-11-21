@@ -453,26 +453,26 @@ class TimeSeriesPredictor:
             and various other properties of the returned predictor. It is recommended to specify presets and avoid
             specifying most other :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` arguments or model
             hyperparameters prior to becoming familiar with AutoGluon. For example, set ``presets="high_quality"``
-            to get a high-accuracy predictor, or set ``presets="fast_training"`` to quickly fit multiple simple
-            statistical models.
+            to get a high-accuracy predictor, or set ``presets="fast_training"`` to quickly get the results.
             Any user-specified arguments in :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will
             override the values used by presets.
 
             Available presets:
 
-            - ``"fast_training"``: fit simple statistical models (``ETS``, ``Theta``, ``Naive``, ``SeasonalNaive``) + fast tree-based model ``RecursiveTabular``. These models are fast to train but may not be very accurate.
-            - ``"medium_quality"``: all models mentioned above + deep learning model ``DeepAR``. Default setting that produces good forecasts with reasonable training time.
-            - ``"high_quality"``: all models mentioned above + automatically tuned statistical models (``AutoETS``, ``AutoARIMA``) + tree-based model ``DirectTabular`` + deep learning models ``TemporalFusionTransformer`` and ``PatchTST`` . Much more accurate than ``medium_quality``, but takes longer to train.
-            - ``"best_quality"``: all models mentioned above + more tabular models + training multiple copies of ``DeepAR``. Usually better than ``high_quality``, but takes even longer to train.
+            - ``"fast_training"``: fit simple statistical models (``ETS``, ``Theta``, ``Naive``, ``SeasonalNaive``) + fast tree-based models ``RecursiveTabular`` and ``DirectTabular``. These models are fast to train but may not be very accurate.
+            - ``"medium_quality"``: all models mentioned above + deep learning model ``TemporalFusionTransformer``. Default setting that produces good forecasts with reasonable training time.
+            - ``"high_quality"``: All ML models available in AutoGluon + additional statistical models (``NPTS``, ``AutoETS``, ``AutoARIMA``, ``CrostonSBA``, ``DynamicOptimizedTheta``). Much more accurate than ``medium_quality``, but takes longer to train.
+            - ``"best_quality"``: Same models as in ``"high_quality"`, but performs validation with multiple backtests. Usually better than ``high_quality``, but takes even longer to train.
 
             Details for these presets can be found in ``autogluon/timeseries/configs/presets_configs.py``. If not
             provided, user-provided values for ``hyperparameters`` and ``hyperparameter_tune_kwargs`` will be used
             (defaulting to their default values specified below).
-        hyperparameters : str or dict, default = "medium_quality"
+        hyperparameters : str or dict, optional
             Determines what models are trained and what hyperparameters are used by each model.
 
-            If str is passed, will use a preset hyperparameter configuration defined in`
-            `autogluon/timeseries/trainer/models/presets.py``.
+            If str is passed, will use a preset hyperparameter configuration defined in
+            ``autogluon/timeseries/trainer/models/presets.py``. Supported values are ``"default"``, ``"light"`` and
+            ``"very_light"``.
 
             If dict is provided, the keys are strings or types that indicate which models to train. Each value is
             itself a dict containing hyperparameters for each of the trained models, or a list of such dicts. Any

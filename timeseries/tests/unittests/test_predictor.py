@@ -42,7 +42,7 @@ def test_when_predictor_called_then_training_is_performed(temp_model_path):
     assert "SimpleFeedForward" in predictor.model_names()
 
 
-@pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS + ["fast_training"])  # noqa
+@pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS + ["very_light"])  # noqa
 def test_given_hyperparameters_when_predictor_called_then_model_can_predict(temp_model_path, hyperparameters):
     predictor = TimeSeriesPredictor(path=temp_model_path, eval_metric="MAPE", prediction_length=3)
     predictor.fit(
@@ -72,7 +72,7 @@ def test_when_pathlib_path_provided_to_predictor_then_loaded_predictor_can_predi
     assert isinstance(predictions, TimeSeriesDataFrame)
 
 
-@pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS + ["fast_training"])  # noqa
+@pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS + ["very_light"])  # noqa
 def test_given_different_target_name_when_predictor_called_then_model_can_predict(temp_model_path, hyperparameters):
     df = TimeSeriesDataFrame(copy.copy(DUMMY_TS_DATAFRAME))
     df.rename(columns={"target": "mytarget"}, inplace=True)
