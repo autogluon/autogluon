@@ -109,7 +109,7 @@ VALID_AG_ARGS_KEYS = {
 
 def get_default_hps(key):
     default_model_hps = {
-        "very_fast": {
+        "very_light": {
             "Naive": {},
             "SeasonalNaive": {},
             "ETS": {},
@@ -117,7 +117,7 @@ def get_default_hps(key):
             "RecursiveTabular": {"max_num_samples": 100_000},
             "DirectTabular": {"max_num_samples": 100_000},
         },
-        "fast": {
+        "light": {
             "Naive": {},
             "SeasonalNaive": {},
             "ETS": {},
@@ -168,7 +168,7 @@ def get_preset_models(
     """
     models = []
     if hyperparameters is None:
-        hp_string = "default_hpo" if hyperparameter_tune else "default"
+        hp_string = "default"
         hyperparameters = copy.deepcopy(get_default_hps(hp_string))
     elif isinstance(hyperparameters, str):
         hyperparameters = copy.deepcopy(get_default_hps(hyperparameters))

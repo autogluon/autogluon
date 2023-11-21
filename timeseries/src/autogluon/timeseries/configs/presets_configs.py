@@ -6,6 +6,6 @@
 TIMESERIES_PRESETS_CONFIGS = dict(
     best_quality={"hyperparameters": "default", "num_val_windows": 2},
     high_quality={"hyperparameters": "default"},
-    medium_quality={"hyperparameters": "fast"},
-    fast_training={"hyperparameters": "very_fast"},
+    medium_quality={"hyperparameters": "light"},
+    fast_training={"hyperparameters": "very_light"},
 )

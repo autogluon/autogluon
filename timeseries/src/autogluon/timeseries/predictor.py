@@ -444,7 +444,7 @@ class TimeSeriesPredictor:
             Approximately how long :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will run (wall-clock time in
             seconds). If not specified, :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will run until all models
             have completed training.
-        presets : str, default = "medium_quality"
+        presets : str, optional
             Optional preset configurations for various arguments in
             :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit`.
 
@@ -470,8 +470,8 @@ class TimeSeriesPredictor:
             Determines what models are trained and what hyperparameters are used by each model.
 
             If str is passed, will use a preset hyperparameter configuration defined in
-            ``autogluon/timeseries/trainer/models/presets.py``. Supported values are ``"default"``, ``"fast"`` and
-            ``"very_fast"``.
+            ``autogluon/timeseries/trainer/models/presets.py``. Supported values are ``"default"``, ``"light"`` and
+            ``"very_light"``.
 
             If dict is provided, the keys are strings or types that indicate which models to train. Each value is
             itself a dict containing hyperparameters for each of the trained models, or a list of such dicts. Any
