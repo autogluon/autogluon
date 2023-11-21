@@ -5,6 +5,7 @@ from collections import defaultdict
 from typing import Any, Dict, List, Optional, Type, Union
 
 from autogluon.common import space
+from autogluon.common.utils.resource_utils import get_resource_manager
 from autogluon.core import constants
 from autogluon.timeseries.metrics import TimeSeriesScorer
 
@@ -88,6 +89,7 @@ DEFAULT_MODEL_PRIORITY = dict(
     DirectTabular=50,
     DeepAR=40,
     TemporalFusionTransformer=30,
+    WaveNet=25,
     PatchTST=20,
     # Models below are not included in any presets
     AutoCES=10,
@@ -139,10 +141,11 @@ def get_default_hps(key):
             "TemporalFusionTransformer": {},
             "PatchTST": {},
             "DeepAR": {},
-            "WaveNet": {},
         },
     }
-
+    # Inference of WaveNet is very slow on CPU, so we only add it to the presets if training on GPU
+    if get_resource_manager().get_gpu_count() > 0:
+        default_model_hps["default"]["WaveNet"] = {}
     return default_model_hps[key]
 
 
