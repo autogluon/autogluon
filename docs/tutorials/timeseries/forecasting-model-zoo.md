@@ -273,28 +273,28 @@ Models not included in this table currently do not support any additional featur
      - Known covariates (continuous)
      - Past covariates (continuous)
    * - :class:`~autogluon.timeseries.models.DirectTabularModel`
-     - ✓
-     - ✓
-     - ✓
+     - ✅
+     - ✅
+     - ✅
      -
    * - :class:`~autogluon.timeseries.models.RecursiveTabularModel`
-     - ✓
-     - ✓
-     - ✓
+     - ✅
+     - ✅
+     - ✅
      -
    * - :class:`~autogluon.timeseries.models.DeepARModel`
-     - ✓
-     - ✓
-     - ✓
+     - ✅
+     - ✅
+     - ✅
      -
    * - :class:`~autogluon.timeseries.models.TemporalFusionTransformerModel`
-     - ✓
-     - ✓
-     - ✓
-     - ✓
+     - ✅
+     - ✅
+     - ✅
+     - ✅
    * - :class:`~autogluon.timeseries.models.WaveNetModel`
-     - ✓
-     - ✓
-     - ✓
+     - ✅
+     - ✅
+     - ✅
      - 
 ```
