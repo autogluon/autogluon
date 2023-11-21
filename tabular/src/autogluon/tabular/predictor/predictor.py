@@ -943,7 +943,7 @@ class TabularPredictor:
                 "\tpresets='best_quality'   : Maximize accuracy. Default time_limit=3600.\n"
                 "\tpresets='high_quality'   : Strong accuracy with fast inference speed. Default time_limit=3600.\n"
                 "\tpresets='good_quality'   : Good accuracy with very fast inference speed. Default time_limit=3600.\n"
-                "\tpresets='medium_quality' : Fast training time, ideal for initial prototyping."
+                "\tpresets='medium_quality' : Fast training time, ideal for initial prototyping.",
             )
 
         if verbosity >= 3:

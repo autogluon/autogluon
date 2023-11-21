@@ -77,7 +77,7 @@ tabular_presets_dict = dict(
         "dynamic_stacking": True,
         "refit_full": True,
         "set_best_to_refit_full": True,
-        "_save_bag_folds": False
+        "_save_bag_folds": False,
     },
     # Best quality with an additional FTTransformer model, GPU is recommended.
     experimental_best_quality={"auto_stack": True, "hyperparameters": "default_FTT"},
