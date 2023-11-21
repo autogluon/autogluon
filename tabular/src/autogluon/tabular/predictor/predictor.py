@@ -85,7 +85,7 @@ class TabularPredictor:
     problem_type : str, default = None
         Type of prediction problem, i.e. is this a binary/multiclass classification or regression problem (options: 'binary', 'multiclass', 'regression', 'quantile').
         If `problem_type = None`, the prediction problem type is inferred based on the label-values in provided dataset.
-    eval_metric : function or str, default = None
+    eval_metric : str or Scorer, default = None
         Metric by which predictions will be ultimately evaluated on test data.
         AutoGluon tunes factors such as hyperparameters, early-stopping, ensemble-weights, etc. in order to improve this metric on validation data.
 
@@ -178,7 +178,7 @@ class TabularPredictor:
         Path to directory where all models used by this Predictor are stored.
     problem_type : str
         What type of prediction problem this Predictor has been trained for.
-    eval_metric : function or str
+    eval_metric : str or Scorer
         What metric is used to evaluate predictive performance.
     label : str
         Name of table column that contains data from the variable to predict (often referred to as: labels, response variable, target variable, dependent variable, Y, etc).
@@ -221,16 +221,16 @@ class TabularPredictor:
 
     def __init__(
         self,
-        label,
-        problem_type=None,
-        eval_metric=None,
-        path=None,
-        verbosity=2,
-        log_to_file=False,
-        log_file_path="auto",
-        sample_weight=None,
-        weight_evaluation=False,
-        groups=None,
+        label: str,
+        problem_type: str = None,
+        eval_metric: str | Scorer = None,
+        path: str = None,
+        verbosity: int = 2,
+        log_to_file: bool = False,
+        log_file_path: str = "auto",
+        sample_weight: str = None,
+        weight_evaluation: bool = False,
+        groups: str = None,
         **kwargs,
     ):
         self.verbosity = verbosity
@@ -289,11 +289,11 @@ class TabularPredictor:
         return self._learner.label_cleaner.inv_map
 
     @property
-    def quantile_levels(self):
+    def quantile_levels(self) -> List[float]:
         return self._learner.quantile_levels
 
     @property
-    def eval_metric(self):
+    def eval_metric(self) -> Scorer:
         return self._learner.eval_metric
 
     @property
@@ -303,7 +303,7 @@ class TabularPredictor:
         return self._learner.original_features
 
     @property
-    def problem_type(self):
+    def problem_type(self) -> str:
         return self._learner.problem_type
 
     @property
@@ -343,7 +343,7 @@ class TabularPredictor:
             )
         self._decision_threshold = decision_threshold
 
-    def features(self, feature_stage: str = "original"):
+    def features(self, feature_stage: str = "original") -> list:
         """
         Returns a list of feature names dependent on the value of feature_stage.
 
@@ -385,7 +385,7 @@ class TabularPredictor:
         return self._learner.label
 
     @property
-    def path(self):
+    def path(self) -> str:
         return self._learner.path
 
     @apply_presets(tabular_presets_dict, tabular_presets_alias)
@@ -393,17 +393,17 @@ class TabularPredictor:
         self,
         train_data,
         tuning_data=None,
-        time_limit=None,
-        presets=None,
-        hyperparameters=None,
+        time_limit: float = None,
+        presets: List[str] | str = None,
+        hyperparameters: dict | str = None,
         feature_metadata="infer",
-        infer_limit=None,
-        infer_limit_batch_size=None,
+        infer_limit: float = None,
+        infer_limit_batch_size: int = None,
         fit_weighted_ensemble: bool = True,
         fit_full_last_level_weighted_ensemble: bool = True,
         full_weighted_ensemble_additionally: bool = False,
         dynamic_stacking: bool = False,
-        calibrate_decision_threshold=False,
+        calibrate_decision_threshold: bool = False,
         num_cpus="auto",
         num_gpus="auto",
         **kwargs,

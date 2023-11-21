@@ -436,6 +436,8 @@ def generate_train_test_split(
         The train_data and test_data after performing the split, separated into X and y.
 
     """
+    if len(X) == 1:
+        raise ValueError(f"Cannot split data into train/val as it contains only one sample.")
     if isinstance(test_size, float):
         if (test_size <= 0.0) or (test_size >= 1.0):
             raise ValueError("fraction of data to hold-out must be specified between 0 and 1")
