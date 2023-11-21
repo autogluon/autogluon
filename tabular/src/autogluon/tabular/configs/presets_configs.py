@@ -58,12 +58,23 @@ tabular_presets_dict = dict(
         "set_best_to_refit_full": True,
         "_save_bag_folds": False,
     },
-    good_quality_v1={
+    high_quality_v2={
         "num_stack_levels": 0,
         "num_bag_folds": 8,
         "num_bag_sets": 1,
         "hyperparameters": "zeroshot",
         "time_limit": 3600,
+        "refit_full": True,
+        "set_best_to_refit_full": True,
+        "_save_bag_folds": False,
+    },
+    good_quality_v1={
+        "num_stack_levels": 1,
+        "num_bag_folds": 8,
+        "num_bag_sets": 1,
+        "hyperparameters": "light",
+        "time_limit": 3600,
+        "dynamic_stacking": True,
         "refit_full": True,
         "set_best_to_refit_full": True,
         "_save_bag_folds": False
