@@ -213,3 +213,25 @@ def test_when_point_forecast_metric_is_used_then_per_item_residuals_are_used_for
     expected_forecast_index = get_forecast_horizon_index_ts_dataframe(data, prediction_length)
     assert not predictions.isna().values.any()
     assert (predictions.index == expected_forecast_index).all()
+
+
+@pytest.mark.parametrize(
+    "model_type, eval_metric",
+    [(RecursiveTabularModel, "WQL"), (DirectTabularModel, "WQL"), (DirectTabularModel, "MASE")],
+)
+def test_when_mlf_model_is_used_then_predictions_have_correct_scale(temp_model_path, model_type, eval_metric):
+    prediction_length = 5
+    value = 2e6
+    data = TimeSeriesDataFrame.from_iterable_dataset(
+        [{"start": pd.Period("2020-01-01", freq="D"), "target": np.random.normal(loc=value, scale=10, size=[30])}]
+    )
+    model = model_type(
+        path=temp_model_path,
+        freq=data.freq,
+        eval_metric=eval_metric,
+        quantile_levels=[0.1, 0.5, 0.9],
+        prediction_length=prediction_length,
+    )
+    model.fit(train_data=data)
+    predictions = model.predict(data)
+    assert np.all(np.abs(predictions.values - value) < value)
