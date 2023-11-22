@@ -669,7 +669,9 @@ class BaggedEnsembleModel(AbstractModel):
             num_cpus_per = fold_fitting_strategy.resources_model["num_cpus"]
             num_gpus_per = fold_fitting_strategy.resources_model["num_gpus"]
             mem_est_proportion_per_fold = fold_fitting_strategy.mem_est_proportion_per_fold()
-            extra_log = f" ({num_parallel_jobs} workers, " f"per: cpus={num_cpus_per}, gpus={num_gpus_per}, " f"memory={(100*mem_est_proportion_per_fold):.2f}%)"
+            extra_log = (
+                f" ({num_parallel_jobs} workers, " f"per: cpus={num_cpus_per}, gpus={num_gpus_per}, " f"memory={(100*mem_est_proportion_per_fold):.2f}%)"
+            )
         else:
             extra_log = ""
 
