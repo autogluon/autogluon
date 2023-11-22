@@ -296,10 +296,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
 
     def _get_scale_per_item(self, item_ids: pd.Index) -> pd.Series:
         """Extract the '_scale' values from the scaler object, if available."""
-        if self._scaler is not None:
-            return self._scaler.stats_["_scale"].copy().reindex(item_ids)
-        else:
-            return pd.Series(1.0, index=item_ids)
+        raise NotImplementedError
 
     def _remove_short_ts_and_generate_fallback_forecast(
         self,
@@ -469,7 +466,9 @@ class DirectTabularModel(AbstractMLForecastModel):
 
         raw_predictions = self._mlf.models_["mean"].predict(df)
         predictions = self._postprocess_predictions(raw_predictions, repeated_item_ids=df[MLF_ITEMID])
-        predictions[[MLF_ITEMID, MLF_TIMESTAMP]] = df[[MLF_ITEMID, MLF_TIMESTAMP]].values
+        # Paste columns one by one to preserve dtypes
+        predictions[MLF_ITEMID] = df[MLF_ITEMID].values
+        predictions[MLF_TIMESTAMP] = df[MLF_TIMESTAMP].values
 
         if hasattr(self._mlf.ts, "target_transforms"):
             # Ensure that transforms are fitted only on past data
@@ -497,6 +496,10 @@ class DirectTabularModel(AbstractMLForecastModel):
 
         column_order = ["mean"] + [col for col in predictions.columns if col != "mean"]
         return predictions[column_order]
+
+    def _get_scale_per_item(self, item_ids: pd.Index) -> pd.Series:
+        # Rescaling is applied in the inverse_transform step, no need to scale predictions
+        return pd.Series(1.0, index=item_ids)
 
     def _get_extra_tabular_init_kwargs(self) -> dict:
         if self.is_quantile_model:
@@ -603,3 +606,9 @@ class RecursiveTabularModel(AbstractMLForecastModel):
             "problem_type": ag.constants.REGRESSION,
             "eval_metric": self.eval_metric.equivalent_tabular_regression_metric or "mean_absolute_error",
         }
+
+    def _get_scale_per_item(self, item_ids: pd.Index) -> pd.Series:
+        if self._scaler is not None:
+            return self._scaler.stats_["_scale"].copy().reindex(item_ids)
+        else:
+            return pd.Series(1.0, index=item_ids)
