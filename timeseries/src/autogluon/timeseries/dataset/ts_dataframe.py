@@ -962,6 +962,8 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 resampled_dfs.append(pd.concat({item_id: resampled_df}, names=[ITEMID]))
             return pd.concat(resampled_dfs)
 
+        # Resampling time for 1 item < overhead time for a single parallel job. Therefore, we group items into chunks
+        # so that the speedup from parallelization isn't dominated by the communication costs.
         chunks = split_into_chunks(pd.DataFrame(self).groupby(level=ITEMID, sort=False), chunk_size)
         resampled_chunks = Parallel(n_jobs=num_cpus)(delayed(resample_chunk)(chunk) for chunk in chunks)
         resampled_df = TimeSeriesDataFrame(pd.concat(resampled_chunks))
