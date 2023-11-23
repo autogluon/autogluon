@@ -5,6 +5,7 @@ import itertools
 import logging
 import reprlib
 from collections.abc import Iterable
+from itertools import islice
 from pathlib import Path
 from typing import Any, List, Optional, Tuple, Type, Union
 
@@ -849,6 +850,8 @@ class TimeSeriesDataFrame(pd.DataFrame):
         freq: Union[str, pd.DateOffset],
         agg_numeric: str = "mean",
         agg_categorical: str = "first",
+        num_cpus: int = -1,
+        chunk_size: int = 100,
         **kwargs,
     ) -> TimeSeriesDataFrame:
         """Convert each time series in the data frame to the given frequency.
@@ -857,6 +860,10 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
         1. Converting an irregularly-sampled time series to a regular time index.
         2. Aggregating time series data by downsampling (e.g., convert daily sales into weekly sales)
+
+        Standard ``df.groupby(...).resample(...)`` can be extremely slow for large datasets, so we parallelize this
+        operation across multiple CPU cores.
+
 
         Parameters
         ----------
@@ -867,6 +874,10 @@ class TimeSeriesDataFrame(pd.DataFrame):
             Aggregation method applied to numeric columns.
         agg_categorical : {"first", "last"}, default = "first"
             Aggregation method applied to categorical columns.
+        num_cpus : int, default = -1
+            Number of CPU cores used when resampling in parallel. Set to -1 to use all cores.
+        chunk_size : int, default = 100
+            Number of time series in a chunk assigned to each parallel worker.
         **kwargs
             Additional keywords arguments that will be passed to ``pandas.DataFrameGroupBy.resample``.
 
@@ -928,7 +939,8 @@ class TimeSeriesDataFrame(pd.DataFrame):
         0       2020-12-31    10.0
                 2021-12-31    26.0
         """
-        if self.freq == pd.tseries.frequencies.to_offset(freq).freqstr:
+        offset = pd.tseries.frequencies.to_offset(freq)
+        if self.freq == offset.freqstr:
             return self
 
         # We need to aggregate categorical columns separately because .agg("mean") deletes all non-numeric columns
@@ -939,9 +951,20 @@ class TimeSeriesDataFrame(pd.DataFrame):
             else:
                 aggregation[col] = agg_categorical
 
-        resampled_df = TimeSeriesDataFrame(
-            self.groupby(level=ITEMID, sort=False).resample(freq, level=TIMESTAMP, **kwargs).agg(aggregation)
-        )
+        def split_into_chunks(iterable: Iterable, size: int) -> Iterable[Iterable]:
+            iterable = iter(iterable)
+            return iter(lambda: tuple(islice(iterable, size)), ())
+
+        def resample_chunk(chunk: Iterable[Tuple[str, pd.DataFrame]]) -> pd.DataFrame:
+            resampled_dfs = []
+            for item_id, df in chunk:
+                resampled_df = df.resample(offset, level=TIMESTAMP, **kwargs).agg(aggregation)
+                resampled_dfs.append(pd.concat({item_id: resampled_df}, names=[ITEMID]))
+            return pd.concat(resampled_dfs)
+
+        chunks = split_into_chunks(pd.DataFrame(self).groupby(level=ITEMID, sort=False), chunk_size)
+        resampled_chunks = Parallel(n_jobs=num_cpus)(delayed(resample_chunk)(chunk) for chunk in chunks)
+        resampled_df = TimeSeriesDataFrame(pd.concat(resampled_chunks))
         resampled_df.static_features = self.static_features
         return resampled_df
 
