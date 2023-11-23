@@ -37,6 +37,8 @@ install_requires = [
     "utilsforecast>=0.0.10,<0.0.11",
     "tqdm",  # version range defined in `core/_setup_utils.py`
     "orjson~=3.9",  # use faster JSON implementation in GluonTS
+    # TODO v1.1: use lightning[pytorch-extra] instead of explicitly installing tensorboard
+    "tensorboard>=2.9,<3",  # fixes https://github.com/autogluon/autogluon/issues/3612
     f"autogluon.core[raytune]=={version}",
     f"autogluon.common=={version}",
     f"autogluon.tabular[catboost,lightgbm,xgboost]=={version}",
