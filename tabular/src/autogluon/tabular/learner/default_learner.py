@@ -176,7 +176,7 @@ class DefaultLearner(AbstractTabularLearner):
                     30,
                     f"WARNING: Impossible to satisfy inference constraint, budget is exceeded during data preprocessing!\n"
                     f"\tAutoGluon will be unable to satisfy the constraint, but will return the fastest model it can.\n"
-                    f"\tConsider using fewer features, relaxing the inference constraint, or simplifying the feature generator."
+                    f"\tConsider using fewer features, relaxing the inference constraint, or simplifying the feature generator.",
                 )
             infer_limit = infer_limit_new
         return infer_limit

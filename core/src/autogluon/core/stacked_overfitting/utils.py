@@ -31,7 +31,7 @@ def get_affected_stacked_overfitting_model_names(leaderboard: pd.DataFrame) -> T
     for model_name in set(leaderboard["model"]):
         # TODO: move away from using names to metadata properties (somehow).
         #   - include something like linear models once we are sure that they cannot leak
-        if (model_name.startswith("WeightedEnsemble") and model_to_level_map[model_name] <= stack_level) or model_to_level_map[model_name] <= (stack_level-1):
+        if (model_name.startswith("WeightedEnsemble") and model_to_level_map[model_name] <= stack_level) or model_to_level_map[model_name] <= (stack_level - 1):
             non_affected.append(model_name)
         else:
             affected.append(model_name)
