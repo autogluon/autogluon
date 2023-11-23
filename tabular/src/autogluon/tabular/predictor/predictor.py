@@ -1117,6 +1117,7 @@ class TabularPredictor:
         self._post_fit(**ag_post_fit_kwargs)
         self.save()
 
+    # TODO: When >2 layers, will only choose between using all layers or using only base models. Would be better to choose the optimal layer.
     def _dynamic_stacking(
         self,
         ag_fit_kwargs: dict,
@@ -1156,6 +1157,9 @@ class TabularPredictor:
         inner_ag_fit_kwargs = copy.deepcopy(ag_fit_kwargs)
         inner_ag_fit_kwargs["X_val"] = X_val
         inner_ag_fit_kwargs["X_unlabeled"] = X_unlabeled
+        inner_ag_fit_kwargs["keep_only_best"] = False  # Do not keep only best, otherwise it eliminates the purpose of the comparison
+        inner_ag_fit_kwargs["calibrate"] = False  # Do not calibrate as calibration is only applied to the model with the best validation score
+        # FIXME: Ensure all weighted ensembles have skip connections
 
         # Verify problem type is set
         if self.problem_type is None:
@@ -2155,6 +2159,8 @@ class TabularPredictor:
         score_format: str = "score",
         only_pareto_frontier: bool = False,
         skip_score: bool = False,
+        refit_full: bool | None = None,
+        set_refit_score_to_parent: bool = False,
         display: bool = False,
         **kwargs,
     ) -> pd.DataFrame:
@@ -2289,6 +2295,13 @@ class TabularPredictor:
             [Advanced, primarily for developers]
             If `True`, will skip computing `score_test` if `data` is specified. `score_test` will be set to NaN for all models.
             `pred_time_test` and related columns will still be computed.
+        refit_full : bool, default = None
+            If True, will return only models that have been refit (ex: have `_FULL` in the name).
+            If False, will return only models that have not been refit.
+            If None, will return all models.
+        set_refit_score_to_parent : bool, default = False
+            If True, the `score_val` of refit models will be set to the `score_val` of their parent.
+            While this does not represent the genuine validation score of the refit model, it is a reasonable proxy.
         display : bool, default = False
             If True, the output DataFrame is printed to stdout.
 
@@ -2315,6 +2328,8 @@ class TabularPredictor:
             only_pareto_frontier=only_pareto_frontier,
             score_format=score_format,
             skip_score=skip_score,
+            refit_full=refit_full,
+            set_refit_score_to_parent=set_refit_score_to_parent,
             display=display,
         )
 
@@ -4881,13 +4896,16 @@ def _sub_fit(
         logger.info(f"Unable to determine stacked overfitting. AutoGluon's sub-fit did not successfully train any models!")
         stacked_overfitting = False
     else:
+        leaderboard_kwargs = dict()
+        if predictor.model_best in predictor.model_refit_map(inverse=True):
+            leaderboard_kwargs = dict(refit_full=True, set_refit_score_to_parent=True)
         # Determine stacked overfitting
-        ho_leaderboard = predictor.leaderboard(data=val_data).reset_index(drop=True).sort_values(by="score_val")
-        stacked_overfitting = check_stacked_overfitting_from_leaderboard(ho_leaderboard)
+        ho_leaderboard = predictor.leaderboard(data=val_data, **leaderboard_kwargs).reset_index(drop=True)
         logger.info("Leaderboard on holdout data from dynamic stacking:")
         with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):
             # Rename to avoid confusion for the user
             logger.info(ho_leaderboard.rename({"score_test": "holdout_score"}, axis=1))
+        stacked_overfitting = check_stacked_overfitting_from_leaderboard(ho_leaderboard)
 
     logger.info(f"Stacked overfitting occurred: {stacked_overfitting}.")
     del predictor._learner

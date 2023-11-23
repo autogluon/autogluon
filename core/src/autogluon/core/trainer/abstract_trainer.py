@@ -1445,10 +1445,20 @@ class AbstractTrainer:
             else:
                 predict_1_time_attribute = "predict_1_time"
             models_predict_1_time = self.get_models_attribute_full(models=models, attribute=predict_1_time_attribute)
+            models_og = copy.deepcopy(models)
             for model_key in models_predict_1_time:
                 if models_predict_1_time[model_key] > infer_limit:
                     models.remove(model_key)
-                    logger.log(20, f"Removing {model_key}")
+            if models_og and not models:
+                # get the fastest model
+                models_predict_time_list = [models_predict_1_time[m] for m in models_og]
+                min_time = np.array(models_predict_time_list).min()
+                infer_limit_new = min_time * 1.2  # Give 20% lee-way
+                logger.log(30, f"WARNING: Impossible to satisfy infer_limit constraint. Relaxing constraint from {infer_limit} to {infer_limit_new} ...")
+                models = models_og
+                for model_key in models_predict_1_time:
+                    if models_predict_1_time[model_key] > infer_limit_new:
+                        models.remove(model_key)
         if not models:
             raise AssertionError(
                 f"Trainer has no fit models that can infer while satisfying the constraints: (infer_limit={infer_limit}, allow_full={allow_full})."
@@ -2888,8 +2898,14 @@ class AbstractTrainer:
             model_info_flat[key] = custom_info[key]
         return model_info_flat
 
-    def leaderboard(self, extra_info=False):
+    def leaderboard(self, extra_info=False, refit_full: bool = None, set_refit_score_to_parent: bool = False):
         model_names = self.get_model_names()
+        models_full_dict = self.get_models_attribute_dict(models=model_names, attribute="refit_full_parent")
+        if refit_full is not None:
+            if refit_full:
+                model_names = [model for model in model_names if model in models_full_dict]
+            else:
+                model_names = [model for model in model_names if model not in models_full_dict]
         score_val = []
         eval_metric = []
         stopping_metric = []
@@ -2909,7 +2925,10 @@ class AbstractTrainer:
         pred_time_val_dict = self.get_models_attribute_full(attribute="predict_time", models=model_names, func=sum)
         can_infer_dict = self.get_models_attribute_full(attribute="can_infer", models=model_names, func=min)
         for model_name in model_names:
-            score_val.append(score_val_dict[model_name])
+            if set_refit_score_to_parent and (model_name in models_full_dict):
+                score_val.append(score_val_dict[models_full_dict[model_name]])
+            else:
+                score_val.append(score_val_dict[model_name])
             eval_metric.append(eval_metric_dict[model_name])
             stopping_metric.append(stopping_metric_dict[model_name])
             fit_time_marginal.append(fit_time_marginal_dict[model_name])
