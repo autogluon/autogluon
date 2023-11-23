@@ -171,9 +171,12 @@ class DefaultLearner(AbstractTabularLearner):
                 f"\t\t{round(infer_limit_new_log, 3)}{time_unit_infer_limit_new} inference time budget remaining for models...",
             )
             if infer_limit_new <= 0:
-                raise AssertionError(
-                    "Impossible to satisfy inference constraint, budget is exceeded during data preprocessing!\n"
-                    "Consider using fewer features, relaxing the inference constraint, or simplifying the feature generator."
+                infer_limit_new = 0
+                logger.log(
+                    30,
+                    f"WARNING: Impossible to satisfy inference constraint, budget is exceeded during data preprocessing!\n"
+                    f"\tAutoGluon will be unable to satisfy the constraint, but will return the fastest model it can.\n"
+                    f"\tConsider using fewer features, relaxing the inference constraint, or simplifying the feature generator."
                 )
             infer_limit = infer_limit_new
         return infer_limit
