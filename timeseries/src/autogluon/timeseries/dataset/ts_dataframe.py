@@ -952,6 +952,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 aggregation[col] = agg_categorical
 
         def split_into_chunks(iterable: Iterable, size: int) -> Iterable[Iterable]:
+            # Based on https://stackoverflow.com/a/22045226/5497447
             iterable = iter(iterable)
             return iter(lambda: tuple(islice(iterable, size)), ())
 
