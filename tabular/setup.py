@@ -46,7 +46,8 @@ extras_require = {
     #  It is possibly only present on MacOS, haven't tested linux.
     # XGBoost made API breaking changes in 1.6 with custom metric and callback support, so we don't support older versions.
     "xgboost": [
-        "xgboost>=1.6,<2.1",  # <{N+1} upper cap, where N is the latest released minor version
+        # FIXME: XGBoost 2.x has a major bug that must be fixed before we use it: https://github.com/autogluon/autogluon/issues/3759
+        "xgboost>=1.6,<2.0",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "fastai": [
         "torch",  # version range defined in `core/_setup_utils.py`
