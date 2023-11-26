@@ -82,7 +82,7 @@ class TimeSeriesPredictor:
         - ``"SMAPE"``: "symmetric" mean absolute percentage error
         - ``"WAPE"``: weighted absolute percentage error
 
-        For more information about these metrics, see https://auto.gluon.ai/stable/tutorials/timeseries/forecasting-metrics.html.
+        For more information about these metrics, see :ref:`Forecasting Time Series - Evaluation Metrics <forecasting_metrics>`.
     eval_metric_seasonal_period : int, optional
         Seasonal period used to compute some evaluation metrics such as mean absolute scaled error (MASE). Defaults to
         ``None``, in which case the seasonal period is computed based on the data frequency.
@@ -495,7 +495,7 @@ class TimeSeriesPredictor:
             * ``Theta`` with additive seasonal decomposition (all other parameters set to their defaults)
             * ``Theta`` with seasonality disabled (all other parameters set to their defaults)
 
-            Full list of available models and their hyperparameters is provided in :ref:`forecasting_zoo`.
+            Full list of available models and their hyperparameters is provided in :ref:`Forecasting Time Series - Model Zoo <forecasting_model_zoo>`.
 
             The hyperparameters for each model can be fixed values (as shown above), or search spaces over which
             hyperparameter optimization is performed. A search space should only be provided when
