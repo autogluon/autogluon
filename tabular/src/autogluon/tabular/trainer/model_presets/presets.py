@@ -233,6 +233,11 @@ def get_preset_models(
     model_cfg_priority_dict = defaultdict(list)
     model_type_list = list(hp_level.keys())
     for model_type in model_type_list:
+        if problem_type == QUANTILE:
+            if model_type not in DEFAULT_QUANTILE_MODEL:
+                logger.log(20, f"Model {model_type} does not support quantile regression and won't be trained")
+                continue
+
         models_of_type = hp_level[model_type]
         if not isinstance(models_of_type, list):
             models_of_type = [models_of_type]
