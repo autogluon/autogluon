@@ -68,8 +68,8 @@ class TimeSeriesPredictor:
 
         Probabilistic forecast metrics (evaluated on quantile forecasts for the specified ``quantile_levels``):
 
-        - ``"SQL"``: scaled quantile loss, defined as average of quantile losses divided by the in-sample seasonal error
-        - ``"WQL"``: mean weighted quantile loss, defined as average of quantile losses divided by the sum of absolute time series values in the forecast horizon
+        - ``"SQL"``: scaled quantile loss
+        - ``"WQL"``: weighted quantile loss
 
         Point forecast metrics (these are always evaluated on the ``"mean"`` column of the predictions):
 
