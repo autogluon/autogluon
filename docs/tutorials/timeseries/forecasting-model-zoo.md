@@ -1,3 +1,4 @@
+(forecasting_model_zoo)=
 # Forecasting Time Series - Model Zoo
 
 :::{note}
