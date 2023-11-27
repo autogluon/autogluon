@@ -194,7 +194,7 @@ In addition to the notation listed above, we use following notation to define pr
 - $\rho_q(y, f) $ - quantile loss at level $q$ defined as
 
 $$
-      \rho_q(y, f) =    \begin{cases}
+      \rho_q(y_{i,t}, f_{i,t}^q) =    \begin{cases}
       2 \cdot (1 - q) \cdot (f^q_{i,t} - y_{i,t}), & \text{ if } y_{i,t} < f_{i,t}^q\\
       2 \cdot q \cdot (y_{i,t} - f^q_{i,t} ), & \text{ if } y_{i,t} \ge f_{i,t}^q\\
       \end{cases}
