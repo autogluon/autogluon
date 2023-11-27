@@ -26,7 +26,22 @@ from autogluon.timeseries.trainer import AbstractTimeSeriesTrainer
 logger = logging.getLogger(__name__)
 
 
-class TimeSeriesPredictor:
+class TimeSeriresPredictorDeprecatedMixin:
+    """Contains deprecated methods from TimeSeriesPredictor that shouldn't show up in API documentation."""
+    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="evaluate")
+    def score(self, *args, **kwargs):
+        return self.evaluate(*args, **kwargs)
+
+    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="model_best")
+    def get_model_best(self) -> str:
+        return self.model_best()
+
+    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="model_names")
+    def get_model_names(self) -> str:
+        return self.model_names()
+
+
+class TimeSeriesPredictor(TimeSeriresPredictorDeprecatedMixin):
     """AutoGluon ``TimeSeriesPredictor`` predicts future values of multiple related time series.
 
     ``TimeSeriesPredictor`` provides probabilistic (quantile) multi-step-ahead forecasts for univariate time series.
