@@ -4497,19 +4497,22 @@ class TabularPredictor:
             # TODO: What about datasets that are 100k+? At a certain point should we not bag?
             # TODO: What about time_limit? Metalearning can tell us expected runtime of each model, then we can select optimal folds + stack levels to fit time constraint
             if num_bag_folds is None:
-                num_bag_folds = min(8, max(5, math.floor(num_train_rows / 100)))
+                num_bag_folds = min(8, max(5, math.floor(num_train_rows / 50)))
             # TODO: Leverage use_bag_holdout when data is large to enable multi-layer stacking
             #  if num_train_rows >= 100000 and num_val_rows is None and use_bag_holdout is None:
             #      use_bag_holdout = True
             if num_stack_levels is None:
-                if problem_type == BINARY:
-                    # Disable multi-layer stacking to avoid stack info leakage
-                    num_stack_levels = 0
-                    # TODO:
-                    #  if use_bag_holdout:
-                    #      num_stack_levels = min(1, max(0, math.floor(num_train_rows / 750)))
+                if dynamic_stacking:
+                    num_stack_levels = 1
                 else:
-                    num_stack_levels = min(1, max(0, math.floor(num_train_rows / 750)))
+                    if problem_type == BINARY:
+                        # Disable multi-layer stacking to avoid stack info leakage
+                        num_stack_levels = 0
+                        # TODO:
+                        #  if use_bag_holdout:
+                        #      num_stack_levels = min(1, max(0, math.floor(num_train_rows / 750)))
+                    else:
+                        num_stack_levels = min(1, max(0, math.floor(num_train_rows / 750)))
         if num_bag_folds is None:
             num_bag_folds = 0
         if num_stack_levels is None:
