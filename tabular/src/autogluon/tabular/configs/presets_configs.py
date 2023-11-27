@@ -71,7 +71,6 @@ tabular_presets_dict = dict(
     # Good predictive accuracy with very fast inference. ~4x faster inference and ~4x lower disk usage than `high_quality`.
     # Recommended for applications that require fast inference speed.
     good_quality_v082={"auto_stack": True, "refit_full": True, "set_best_to_refit_full": True, "_save_bag_folds": False, "hyperparameters": "light"},
-
     # ------------------------------------------
     # Experimental presets. Only use these presets if you are ok with unstable and potentially poor performing presets.
     #  Experimental presets can be removed or changed without warning.
