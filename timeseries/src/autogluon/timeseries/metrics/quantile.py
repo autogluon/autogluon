@@ -55,7 +55,7 @@ class SQL(TimeSeriesScorer):
 
     .. math::
 
-        \operatorname{SQL} = \frac{1}{\sum_{i=1}^{N} \sum_{t=T+1}^{T+H} |y_{i, t}|} \sum_{i=1}^{N} \sum_{t=T+1}^{T+H} \sum_{q}  \rho_q(y_{i,t}, f^q_{i,t})
+        \operatorname{SQL} = \frac{1}{N} \frac{1}{H} \sum_{i=1}^{N} \frac{1}{a_i} \sum_{t=T+1}^{T+H} \sum_{q}  \rho_q(y_{i,t}, f^q_{i,t})
 
     where :math:`a_i` is the historic absolute seasonal error defined as
 
