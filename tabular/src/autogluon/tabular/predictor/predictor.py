@@ -4528,7 +4528,7 @@ class TabularPredictor:
         if num_bag_sets is None:
             if num_bag_folds >= 2:
                 if time_limit is not None:
-                    num_bag_sets = 20  # TODO: v0.1 Reduce to 5 or 3 as 20 is unnecessarily extreme as a default.
+                    num_bag_sets = 5
                 else:
                     num_bag_sets = 1
             else:
