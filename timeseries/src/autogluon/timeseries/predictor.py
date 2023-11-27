@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 
 class TimeSeriresPredictorDeprecatedMixin:
     """Contains deprecated methods from TimeSeriesPredictor that shouldn't show up in API documentation."""
+
     @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="evaluate")
     def score(self, *args, **kwargs):
         return self.evaluate(*args, **kwargs)

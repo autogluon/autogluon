@@ -25,6 +25,7 @@ IRREGULAR_TIME_INDEX_FREQSTR = "IRREG"
 
 class TimeSeriresDataFrameDeprecatedMixin:
     """Contains deprecated methods from TimeSeriesDataFrame that shouldn't show up in API documentation."""
+
     def get_reindexed_view(self, *args, **kwargs) -> TimeSeriesDataFrame:
         raise ValueError(
             "`TimeSeriesDataFrame.get_reindexed_view` has been deprecated. If your data has irregular timestamps, "
