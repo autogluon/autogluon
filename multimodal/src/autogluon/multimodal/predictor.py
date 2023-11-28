@@ -43,9 +43,9 @@ class MultiModalPredictor:
     AutoMM is designed to simplify the fine-tuning of foundation models
     for downstream applications with just three lines of code.
     AutoMM seamlessly integrates with popular model zoos such as
-    HuggingFace Transformers (https://github.com/huggingface/transformers),
-    TIMM (https://github.com/huggingface/pytorch-image-models),
-    and MMDetection (https://github.com/open-mmlab/mmdetection),
+    `HuggingFace Transformers <https://github.com/huggingface/transformers>`_,
+    `TIMM <https://github.com/huggingface/pytorch-image-models>`_,
+    and `MMDetection <https://github.com/open-mmlab/mmdetection>`_,
     accommodating a diverse range of data modalities,
     including image, text, tabular, and document data, whether used individually or in combination.
     It offers support for an array of tasks, encompassing classification, regression,
