@@ -163,7 +163,11 @@ class XGBoostModel(AbstractModel):
 
     def _predict_proba(self, X, num_cpus=-1, **kwargs):
         X = self.preprocess(X, **kwargs)
-        self.model.set_params(n_jobs=num_cpus)
+        if self.problem_type in [MULTICLASS, SOFTCLASS]:
+            # Bug fix for "xgboost>=2,<2.0.3" : https://github.com/dmlc/xgboost/issues/9807
+            self.model.set_params(n_jobs=num_cpus, objective="multi:softprob")
+        else:
+            self.model.set_params(n_jobs=num_cpus)
 
         if self.problem_type == REGRESSION:
             return self.model.predict(X)
