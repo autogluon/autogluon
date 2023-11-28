@@ -568,9 +568,9 @@ def test_when_refit_full_called_then_best_model_is_updated(temp_model_path, set_
             "SimpleFeedForward": {"epochs": 1, "num_batches_per_epoch": 1},
         },
     )
-    model_best_before = predictor.model_best()
+    model_best_before = predictor.model_best
     model_refit_map = predictor.refit_full(set_best_to_refit_full=set_best_to_refit_full)
-    model_best_after = predictor.model_best()
+    model_best_after = predictor.model_best
     if set_best_to_refit_full:
         assert model_best_after == model_refit_map[model_best_before]
     else:

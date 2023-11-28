@@ -914,6 +914,7 @@ class TimeSeriesPredictor:
         """Returns a dictionary of objects each describing an attribute of the training process and trained models."""
         return self._learner.get_info(include_model_info=True)
 
+    @property
     def model_best(self) -> str:
         """Returns the name of the best model from trainer."""
         if self._trainer.model_best is not None:
@@ -1075,7 +1076,7 @@ class TimeSeriesPredictor:
             "\tModels trained in this way will have the suffix '_FULL' and have NaN validation score.\n"
             "\tThis process is not bound by time_limit, but should take less time than the original `fit` call."
         )
-        model_best = self.model_best()
+        model_best = self.model_best
         refit_full_dict = self._learner.refit_full(model=model)
 
         if set_best_to_refit_full:
@@ -1113,8 +1114,8 @@ class TimeSeriesPredictor:
 
     @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="model_best")
     def get_model_best(self) -> str:
-        return self.model_best()
+        return self.model_best
 
     @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="model_names")
-    def get_model_names(self) -> str:
+    def get_model_names(self) -> List[str]:
         return self.model_names()

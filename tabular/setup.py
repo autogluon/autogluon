@@ -46,21 +46,21 @@ extras_require = {
     #  It is possibly only present on MacOS, haven't tested linux.
     # XGBoost made API breaking changes in 1.6 with custom metric and callback support, so we don't support older versions.
     "xgboost": [
-        "xgboost>=1.6,<1.8",  # Holding the old version, 2.0 - major release breaks tests
+        # FIXME: XGBoost 2.x has a major bug that must be fixed before we use it: https://github.com/autogluon/autogluon/issues/3759
+        "xgboost>=1.6,<2.0",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "fastai": [
         "torch",  # version range defined in `core/_setup_utils.py`
-        "fastai>=2.3.1,<2.8",
+        "fastai>=2.3.1,<2.8",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "tabpfn": [
-        "tabpfn>=0.1,<0.2",
+        "tabpfn>=0.1,<0.2",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "ray": [
         f"{ag.PACKAGE_NAME}.core[all]=={version}",
     ],
     "skex": [
-        # Note: 2021.7 released on Sep 2022, version 2022.x doesn't exist (went directly from 2021.7 to 2023.0)
-        "scikit-learn-intelex>=2021.7,<2023.2",
+        "scikit-learn-intelex>=2023.0,<2024.1",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "imodels": [
         "imodels>=1.3.10,<1.4.0",  # 1.3.8/1.3.9 either remove/renamed attribute `complexity_` causing failures. https://github.com/csinva/imodels/issues/147
