@@ -297,7 +297,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
         self._log_filters = [
             ".*does not have many workers.* in the `DataLoader` init to improve performance.*",
-            "Checkpoint directory .* exists and is not empty."
+            "Checkpoint directory .* exists and is not empty.",
         ]
 
     @property
