@@ -6,6 +6,7 @@ from typing import Dict, List, Optional, Tuple, Union
 
 import pytz
 import torch
+from pytorch_lightning.utilities import rank_zero_only
 
 from autogluon.common.utils.system_info import get_ag_system_info
 
@@ -143,6 +144,7 @@ def apply_log_filter(log_filter):
         remove_log_filter(logging.getLogger("lightning.pytorch"), log_filter)
 
 
+@rank_zero_only
 def on_fit_start_message(path: Optional[str] = None):
     return get_ag_system_info(
         path=path,
@@ -152,6 +154,7 @@ def on_fit_start_message(path: Optional[str] = None):
     )
 
 
+@rank_zero_only
 def on_fit_per_run_start_message(save_path, validation_metric_name):
     return f"""\
 
@@ -165,6 +168,7 @@ To track the learning progress, you can open a terminal and launch Tensorboard:
 """
 
 
+@rank_zero_only
 def on_fit_end_message(save_path):
     return f"""\
 AutoMM has created your model. 🎉🎉🎉
@@ -182,6 +186,7 @@ or post issues on GitHub (https://github.com/autogluon/autogluon/issues).
 """
 
 
+@rank_zero_only
 def get_gpu_message(detected_num_gpus: int, used_num_gpus: int, strategy: str):
     """
     Get the GPU related info (GPU name, total memory, free memory, and CUDA version) for logging.
