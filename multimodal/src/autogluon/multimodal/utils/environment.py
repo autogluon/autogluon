@@ -68,6 +68,43 @@ def compute_num_gpus(config_num_gpus: Union[int, float, List], accelerator: str)
     return num_gpus
 
 
+def convert_to_torch_precision(precision: Union[int, str]):
+    """
+    Convert a precision integer or string to the corresponding torch precision.
+
+    Parameters
+    ----------
+    precision
+    a precision integer or string from the config.
+
+    Returns
+    -------
+    A torch precision object.
+    """
+    precision_mapping = {
+        16: torch.half,
+        "16": torch.half,
+        "16-mixed": torch.half,
+        "16-true": torch.half,
+        "bf16": torch.bfloat16,
+        "bf16-mixed": torch.bfloat16,
+        "bf16-true": torch.bfloat16,
+        32: torch.float32,
+        "32": torch.float32,
+        "32-true": torch.float32,
+        64: torch.float64,
+        "64": torch.float64,
+        "64-true": torch.float64,
+    }
+
+    if precision in precision_mapping:
+        precision = precision_mapping[precision]
+    else:
+        raise ValueError(f"Unknown precision: {precision}")
+
+    return precision
+
+
 def infer_precision(
     num_gpus: int, precision: Union[int, str], as_torch: Optional[bool] = False, cpu_only_warning: bool = True
 ):
@@ -109,25 +146,7 @@ def infer_precision(
             precision = 32
 
     if as_torch:
-        precision_mapping = {
-            16: torch.half,
-            "16": torch.half,
-            "16-mixed": torch.half,
-            "16-true": torch.half,
-            "bf16": torch.bfloat16,
-            "bf16-mixed": torch.bfloat16,
-            "bf16-true": torch.bfloat16,
-            32: torch.float32,
-            "32": torch.float32,
-            "32-true": torch.float32,
-            64: torch.float64,
-            "64": torch.float64,
-            "64-true": torch.float64,
-        }
-        if precision in precision_mapping:
-            precision = precision_mapping[precision]
-        else:
-            raise ValueError(f"Unknown precision: {precision}")
+        precision = convert_to_torch_precision(precision=precision)
 
     return precision
 
@@ -238,14 +257,17 @@ def get_precision_context(precision: Union[int, str], device_type: Optional[str]
     -------
     A precision context manager.
     """
-    precision = infer_precision(num_gpus=1, precision=precision, as_torch=True)
+    precision = convert_to_torch_precision(precision=precision)
+
+    if precision in [torch.half, torch.float16, torch.bfloat16]:
+        return torch.autocast(device_type=device_type, dtype=precision)
     if precision == torch.float32:
         assert torch.get_default_dtype() == torch.float32
         return contextlib.nullcontext()
     elif precision == torch.float64:
         return double_precision_context()
     else:
-        return torch.autocast(device_type=device_type, dtype=precision)
+        raise ValueError(f"Unknown precision: {precision}")
 
 
 def check_if_packages_installed(problem_type: str = None, package_names: List[str] = None):
