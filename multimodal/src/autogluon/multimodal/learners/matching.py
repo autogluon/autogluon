@@ -221,6 +221,8 @@ class MultiModalMatcher(BaseLearner):
         self._total_train_time = None
         self._best_score = None
 
+        self._log_filters = []
+
     @property
     def query(self):
         return self._query
