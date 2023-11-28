@@ -9,9 +9,11 @@ import pandas as pd
 from sklearn.base import BaseEstimator
 
 import autogluon.core as ag
+from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.tabular import TabularPredictor
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
+from autogluon.timeseries.models.local import SeasonalNaiveModel
 from autogluon.timeseries.utils.datetime import (
     get_lags_for_frequency,
     get_seasonality,
@@ -76,19 +78,21 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         from mlforecast import MLForecast
         from mlforecast.target_transforms import BaseTargetTransform
 
-        self._required_ts_length: Optional[int] = None
+        self._sum_of_differences: int = 0  # number of time steps removed from each series by differencing
+        self._max_ts_length: Optional[int] = None
         self._target_lags: Optional[List[int]] = None
         self._date_features: Optional[List[str]] = None
         self._mlf: Optional[MLForecast] = None
         self._scaler: Optional[BaseTargetTransform] = None
-        self._avg_residuals_std: float = 1.0
+        self._residuals_std_per_item: Optional[pd.Series] = None
+        self._avg_residuals_std: Optional[float] = None
 
     def _get_extra_tabular_init_kwargs(self) -> dict:
         raise NotImplementedError
 
     def _get_model_params(self) -> dict:
         model_params = super()._get_model_params().copy()
-        model_params.setdefault("max_num_items", 10_000)
+        model_params.setdefault("max_num_items", 20_000)
         model_params.setdefault("max_num_samples", 1_000_000)
         model_params.setdefault("tabular_hyperparameters", {"GBM": {}})
         model_params.setdefault("tabular_fit_kwargs", {})
@@ -127,7 +131,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
 
         if len(differences) > 0:
             target_transforms.append(Differences(differences))
-            self._required_ts_length = sum(differences)
+            self._sum_of_differences = sum(differences)
 
         scaler_name = model_params.get("scaler")
         if scaler_name is None:
@@ -145,7 +149,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             target_transforms.append(self._scaler)
 
         return {
-            "lags": self._target_lags,
+            "lags": self._target_lags.tolist(),
             "date_features": self._date_features,
             "target_transforms": target_transforms,
         }
@@ -158,13 +162,18 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         """
         return df
 
+    @staticmethod
+    def _shorten_all_series(mlforecast_df: pd.DataFrame, max_length: int):
+        logger.debug(f"Shortening all series to at most {max_length}")
+        return mlforecast_df.groupby(MLF_ITEMID, as_index=False, sort=False).tail(max_length)
+
     def _generate_train_val_dfs(
         self, data: TimeSeriesDataFrame, max_num_items: Optional[int] = None, max_num_samples: Optional[int] = None
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
         # Exclude items that are too short for chosen differences - otherwise exception will be raised
-        if self._required_ts_length is not None:
+        if self._sum_of_differences > 0:
             ts_lengths = data.num_timesteps_per_item()
-            items_to_exclude = ts_lengths.index[ts_lengths < self._required_ts_length]
+            items_to_exclude = ts_lengths.index[ts_lengths <= self._sum_of_differences]
             if len(items_to_exclude) > 0:
                 logger.debug(f"Removing {len(items_to_exclude)} items that are too short for chosen differences")
                 data = data.query("item_id not in @items_to_exclude")
@@ -173,7 +182,15 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             items_to_keep = data.item_ids.to_series().sample(n=int(max_num_items))  # noqa: F841
             data = data.query("item_id in @items_to_keep")
 
+        num_items = data.num_items
         mlforecast_df = self._to_mlforecast_df(data, data.static_features)
+
+        # Shorten time series before calling preprocess to avoid high memory usage
+        if max_num_samples is not None:
+            max_samples_per_ts = max(200, math.ceil(max_num_samples / num_items))
+            self._max_ts_length = max_samples_per_ts + self.prediction_length + self._sum_of_differences
+            mlforecast_df = self._shorten_all_series(mlforecast_df, self._max_ts_length)
+
         # Unless we set static_features=[], MLForecast interprets all known covariates as static features
         df = self._mlf.preprocess(mlforecast_df, dropna=False, static_features=[])
         # df.query results in 2x memory saving compared to df.dropna(subset="y")
@@ -181,19 +198,18 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
 
         df = self._mask_df(df)
 
-        grouped_df = df.groupby(MLF_ITEMID, sort=False)
-        num_items = len(grouped_df)
-
         if max_num_samples is not None and len(df) > max_num_samples:
-            df = grouped_df.tail(self.prediction_length + math.ceil(max_num_samples / num_items))
-            grouped_df = df.groupby(MLF_ITEMID, sort=False)
+            df = df.sample(n=max_num_samples)
+
+        grouped_df = df.groupby(MLF_ITEMID, sort=False)
 
         # Use up to `prediction_length` last rows as validation set (but no more than 50% of the rows)
         val_rows_per_item = min(self.prediction_length, math.ceil(0.5 * len(df) / num_items))
         train_df = grouped_df.nth(slice(None, -val_rows_per_item))
         val_df = grouped_df.tail(val_rows_per_item)
+        logger.debug(f"train_df shape: {train_df.shape}, val_df shape: {val_df.shape}")
 
-        return train_df.drop([MLF_ITEMID, MLF_TIMESTAMP], axis=1), val_df.drop([MLF_ITEMID, MLF_TIMESTAMP], axis=1)
+        return train_df.drop(columns=[MLF_TIMESTAMP]), val_df.drop(columns=[MLF_TIMESTAMP])
 
     def _to_mlforecast_df(
         self,
@@ -233,6 +249,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         from mlforecast import MLForecast
 
         self._check_fit_params()
+        set_logger_verbosity(verbosity, logger=logger)
         fit_start_time = time.time()
         # TabularEstimator is passed to MLForecast later to include tuning_data
         model_params = self._get_model_params()
@@ -255,7 +272,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
                 **self._get_extra_tabular_init_kwargs(),
             },
             predictor_fit_kwargs={
-                "tuning_data": val_df,
+                "tuning_data": val_df.drop(columns=[MLF_ITEMID]),
                 "time_limit": None if time_limit is None else time_limit - (time.time() - fit_start_time),
                 "hyperparameters": model_params["tabular_hyperparameters"],
                 **model_params["tabular_fit_kwargs"],
@@ -264,20 +281,83 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         self._mlf.models = {"mean": estimator}
 
         with warning_filter():
-            self._mlf.fit_models(X=train_df.drop(MLF_TARGET, axis=1), y=train_df[MLF_TARGET])
+            self._mlf.fit_models(X=train_df.drop(columns=[MLF_TARGET, MLF_ITEMID]), y=train_df[MLF_TARGET])
 
-        self._avg_residuals_std = self._compute_residuals_std(val_df)
+        self._save_residuals_std(val_df)
 
-    def _compute_residuals_std(self, val_df: pd.DataFrame) -> float:
+    def _save_residuals_std(self, val_df: pd.DataFrame) -> None:
+        """Compute standard deviation of residuals for each item using the validation set.
+
+        Saves per-item residuals to `self.residuals_std_per_item` and average std to `self._avg_residuals_std`.
+        """
         residuals = val_df[MLF_TARGET] - self._mlf.models_["mean"].predict(val_df)
-        return np.sqrt(residuals.pow(2.0).mean())
+        self._residuals_std_per_item = residuals.pow(2.0).groupby(val_df[MLF_ITEMID], sort=False).mean().pow(0.5)
+        self._avg_residuals_std = np.sqrt(residuals.pow(2.0).mean())
 
     def _get_scale_per_item(self, item_ids: pd.Index) -> pd.Series:
         """Extract the '_scale' values from the scaler object, if available."""
-        if self._scaler is not None:
-            return self._scaler.stats_["_scale"].copy().reindex(item_ids)
+        raise NotImplementedError
+
+    def _remove_short_ts_and_generate_fallback_forecast(
+        self,
+        data: TimeSeriesDataFrame,
+        known_covariates: Optional[TimeSeriesDataFrame] = None,
+    ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame], Optional[TimeSeriesDataFrame]]:
+        """Remove series that are too short for chosen differencing from data and generate naive forecast for them.
+
+        Returns
+        -------
+        data_long : TimeSeriesDataFrame
+            Data containing only time series that are long enough for the model to predict.
+        known_covariates_long : TimeSeriesDataFrame or None
+            Future known covariates containing only time series that are long enough for the model to predict.
+        forecast_for_short_series : TimeSeriesDataFrame or None
+            Seasonal naive forecast for short series, if there are any in the dataset.
+        """
+        ts_lengths = data.num_timesteps_per_item()
+        short_series = ts_lengths.index[ts_lengths <= self._sum_of_differences]
+        if len(short_series) > 0:
+            logger.warning(
+                f"Warning: {len(short_series)} time series ({len(short_series) / len(ts_lengths):.1%}) are shorter "
+                f"than {self._sum_of_differences} and cannot be predicted by {self.name}. "
+                "Fallback model SeasonalNaive is used for these time series."
+            )
+            data_short = data.query("item_id in @short_series")
+            seasonal_naive = SeasonalNaiveModel(freq=self.freq, prediction_length=self.prediction_length)
+            seasonal_naive.fit(train_data=data_short)
+            forecast_for_short_series = seasonal_naive.predict(data_short)
+
+            data_long = data.query("item_id not in @short_series")
+            if known_covariates is not None:
+                known_covariates_long = known_covariates.query("item_id not in @short_series")
+            else:
+                known_covariates_long = None
         else:
-            return pd.Series(1.0, index=item_ids)
+            data_long = data
+            known_covariates_long = known_covariates
+            forecast_for_short_series = None
+        return data_long, known_covariates_long, forecast_for_short_series
+
+    def _add_gaussian_quantiles(self, predictions: pd.DataFrame, repeated_item_ids: pd.Series):
+        """
+        Add quantile levels assuming that residuals follow normal distribution
+        """
+        from scipy.stats import norm
+
+        scale_per_item = self._get_scale_per_item(repeated_item_ids.unique())
+        num_items = int(len(predictions) / self.prediction_length)
+        sqrt_h = np.sqrt(np.arange(1, self.prediction_length + 1))
+        # Series where normal_scale_per_timestep.loc[item_id].loc[N] = sqrt(1 + N) for N in range(prediction_length)
+        normal_scale_per_timestep = pd.Series(np.tile(sqrt_h, num_items), index=repeated_item_ids)
+
+        residuals_std_per_timestep = self._residuals_std_per_item.reindex(repeated_item_ids)
+        # Use avg_residuals_std in case unseen item received for prediction
+        if residuals_std_per_timestep.isna().any():
+            residuals_std_per_timestep = residuals_std_per_timestep.fillna(value=self._avg_residuals_std)
+        std_per_timestep = residuals_std_per_timestep * scale_per_item * normal_scale_per_timestep
+        for q in self.quantile_levels:
+            predictions[str(q)] = predictions["mean"] + norm.ppf(q) * std_per_timestep.to_numpy()
+        return predictions
 
 
 class DirectTabularModel(AbstractMLForecastModel):
@@ -292,7 +372,7 @@ class DirectTabularModel(AbstractMLForecastModel):
 
     Features not known during the forecast horizon (e.g., future target values) are replaced by NaNs.
 
-    If ``eval_metric=="WQL"``, the TabularPredictor will be trained with ``"quantile"`` problem type.
+    If ``eval_metric.needs_quantile``, the TabularPredictor will be trained with ``"quantile"`` problem type.
     Otherwise, TabularPredictor will be trained with ``"regression"`` problem type, and dummy quantiles will be
     obtained by assuming that the residuals follow zero-mean normal distribution.
 
@@ -318,7 +398,7 @@ class DirectTabularModel(AbstractMLForecastModel):
         Defaults to ``{"GBM": {}}``.
     tabular_fit_kwargs : Dict[str, Any], optional
         Additional keyword arguments passed to ``TabularPredictor.fit``. Defaults to an empty dict.
-    max_num_items: int or None, default = 10_000
+    max_num_items : int or None, default = 20_000
         If not None, the model will randomly select this many time series for training and validation.
     max_num_samples : int or None, default = 1_000_000
         If not None, training dataset passed to TabularPredictor will contain at most this many rows (starting from the
@@ -346,11 +426,13 @@ class DirectTabularModel(AbstractMLForecastModel):
         df.loc[:, lag_cols] = df[lag_cols].where(mask, other=np.nan)
         return df
 
-    def _compute_residuals_std(self, val_df: pd.DataFrame) -> float:
+    def _save_residuals_std(self, val_df: pd.DataFrame) -> None:
         if self.is_quantile_model:
-            return 1.0  # Quantile model does not require residuals to produce prediction intervals
+            # Quantile model does not require residuals to produce prediction intervals
+            self._residuals_std_per_item = pd.Series(1.0, index=val_df[MLF_ITEMID].unique())
+            self._avg_residuals_std = 1.0
         else:
-            return super()._compute_residuals_std(val_df=val_df)
+            super()._save_residuals_std(val_df=val_df)
 
     def _predict(
         self,
@@ -358,6 +440,14 @@ class DirectTabularModel(AbstractMLForecastModel):
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
+        original_item_id_order = data.item_ids
+        data, known_covariates, forecast_for_short_series = self._remove_short_ts_and_generate_fallback_forecast(
+            data=data, known_covariates=known_covariates
+        )
+        if len(data) == 0:
+            # All time series are too short for chosen differences
+            return forecast_for_short_series
+
         if known_covariates is not None:
             data_future = known_covariates.copy()
         else:
@@ -367,36 +457,49 @@ class DirectTabularModel(AbstractMLForecastModel):
         data_future[self.target] = float("inf")
         data_extended = pd.concat([data, data_future])
         mlforecast_df = self._to_mlforecast_df(data_extended, data.static_features)
+        if self._max_ts_length is not None:
+            # We appended `prediction_length` time steps to each series, so increase length
+            mlforecast_df = self._shorten_all_series(mlforecast_df, self._max_ts_length + self.prediction_length)
         df = self._mlf.preprocess(mlforecast_df, dropna=False, static_features=[])
         df = df.groupby(MLF_ITEMID, sort=False).tail(self.prediction_length)
         df = df.replace(float("inf"), float("nan"))
 
         raw_predictions = self._mlf.models_["mean"].predict(df)
-        predictions = self._postprocess_predictions(raw_predictions)
-        predictions[[MLF_ITEMID, MLF_TIMESTAMP]] = df[[MLF_ITEMID, MLF_TIMESTAMP]].values
+        predictions = self._postprocess_predictions(raw_predictions, repeated_item_ids=df[MLF_ITEMID])
+        # Paste columns one by one to preserve dtypes
+        predictions[MLF_ITEMID] = df[MLF_ITEMID].values
+        predictions[MLF_TIMESTAMP] = df[MLF_TIMESTAMP].values
 
         if hasattr(self._mlf.ts, "target_transforms"):
             # Ensure that transforms are fitted only on past data
-            self._mlf.preprocess(self._to_mlforecast_df(data, None), static_features=[])
+            mlforecast_df_past = self._to_mlforecast_df(data, None)
+            if self._max_ts_length is not None:
+                mlforecast_df_past = self._shorten_all_series(mlforecast_df_past, self._max_ts_length)
+            self._mlf.preprocess(mlforecast_df_past, static_features=[])
             for tfm in self._mlf.ts.target_transforms[::-1]:
                 predictions = tfm.inverse_transform(predictions)
-        predictions = predictions.rename(columns={MLF_ITEMID: ITEMID, MLF_TIMESTAMP: TIMESTAMP}).set_index(
-            [ITEMID, TIMESTAMP]
-        )
-        return TimeSeriesDataFrame(predictions)
+        predictions = TimeSeriesDataFrame(predictions.rename(columns={MLF_ITEMID: ITEMID, MLF_TIMESTAMP: TIMESTAMP}))
 
-    def _postprocess_predictions(self, predictions: np.ndarray) -> pd.DataFrame:
+        if forecast_for_short_series is not None:
+            predictions = pd.concat([predictions, forecast_for_short_series])
+            predictions = predictions.reindex(original_item_id_order, level=ITEMID)
+        return predictions
+
+    def _postprocess_predictions(self, predictions: np.ndarray, repeated_item_ids: pd.Series) -> pd.DataFrame:
         if self.is_quantile_model:
             predictions = pd.DataFrame(predictions, columns=[str(q) for q in self.quantile_levels])
             predictions.values.sort(axis=1)
             predictions["mean"] = predictions["0.5"]
         else:
             predictions = pd.DataFrame(predictions, columns=["mean"])
-            for q in self.quantile_levels:
-                predictions[str(q)] = predictions["mean"]  # + norm.ppf(q) * self._residuals_std
+            predictions = self._add_gaussian_quantiles(predictions, repeated_item_ids=repeated_item_ids)
 
         column_order = ["mean"] + [col for col in predictions.columns if col != "mean"]
         return predictions[column_order]
+
+    def _get_scale_per_item(self, item_ids: pd.Index) -> pd.Series:
+        # Rescaling is applied in the inverse_transform step, no need to scale predictions
+        return pd.Series(1.0, index=item_ids)
 
     def _get_extra_tabular_init_kwargs(self) -> dict:
         if self.is_quantile_model:
@@ -446,7 +549,7 @@ class RecursiveTabularModel(AbstractMLForecastModel):
         Defaults to ``{"GBM": {}}``.
     tabular_fit_kwargs : Dict[str, Any], optional
         Additional keyword arguments passed to ``TabularPredictor.fit``. Defaults to an empty dict.
-    max_num_items: int or None, default = 10_000
+    max_num_items : int or None, default = 20_000
         If not None, the model will randomly select this many time series for training and validation.
     max_num_samples : int or None, default = 1_000_000
         If not None, training dataset passed to TabularPredictor will contain at most this many rows (starting from the
@@ -465,9 +568,17 @@ class RecursiveTabularModel(AbstractMLForecastModel):
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
-        from scipy.stats import norm
+        original_item_id_order = data.item_ids
+        data, known_covariates, forecast_for_short_series = self._remove_short_ts_and_generate_fallback_forecast(
+            data=data, known_covariates=known_covariates
+        )
+        if len(data) == 0:
+            # All time series are too short for chosen differences
+            return forecast_for_short_series
 
         new_df = self._to_mlforecast_df(data, data.static_features)
+        if self._max_ts_length is not None:
+            new_df = self._shorten_all_series(new_df, self._max_ts_length)
         if known_covariates is None:
             future_index = get_forecast_horizon_index_ts_dataframe(data, self.prediction_length)
             known_covariates = pd.DataFrame(columns=[self.target], index=future_index, dtype="float32")
@@ -482,21 +593,22 @@ class RecursiveTabularModel(AbstractMLForecastModel):
                 X_df=X_df,
             )
         predictions = raw_predictions.rename(columns={MLF_ITEMID: ITEMID, MLF_TIMESTAMP: TIMESTAMP})
+        predictions = TimeSeriesDataFrame(
+            self._add_gaussian_quantiles(predictions, repeated_item_ids=predictions[ITEMID])
+        )
 
-        # Add quantile levels assuming that residuals follow normal distribution
-        scale_per_item = self._get_scale_per_item(predictions[ITEMID].unique())
-        num_items = int(len(predictions) / self.prediction_length)
-        sqrt_h = np.sqrt(np.arange(1, self.prediction_length + 1))
-        # Series where normal_scale_per_timestep.loc[item_id].loc[N] = sqrt(1 + N) for N in range(prediction_length)
-        normal_scale_per_timestep = pd.Series(np.tile(sqrt_h, num_items), index=predictions[ITEMID])
-
-        std_per_timestep = self._avg_residuals_std * scale_per_item * normal_scale_per_timestep
-        for q in self.quantile_levels:
-            predictions[str(q)] = predictions["mean"] + norm.ppf(q) * std_per_timestep.to_numpy()
-        return TimeSeriesDataFrame(predictions).reindex(data.item_ids, level=ITEMID)
+        if forecast_for_short_series is not None:
+            predictions = pd.concat([predictions, forecast_for_short_series])
+        return predictions.reindex(original_item_id_order, level=ITEMID)
 
     def _get_extra_tabular_init_kwargs(self) -> dict:
         return {
             "problem_type": ag.constants.REGRESSION,
             "eval_metric": self.eval_metric.equivalent_tabular_regression_metric or "mean_absolute_error",
         }
+
+    def _get_scale_per_item(self, item_ids: pd.Index) -> pd.Series:
+        if self._scaler is not None:
+            return self._scaler.stats_["_scale"].copy().reindex(item_ids)
+        else:
+            return pd.Series(1.0, index=item_ids)

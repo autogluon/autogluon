@@ -82,18 +82,6 @@ class TimeSeriesLearner(AbstractLearner):
         self._time_limit = time_limit
         time_start = time.time()
 
-        logger.debug(
-            "Beginning AutoGluon training with TimeSeriesLearner "
-            + (f"Time limit = {time_limit}" if time_limit else "")
-        )
-        logger.info(f"AutoGluon will save models to {self.path}")
-
-        logger.info(f"AutoGluon will gauge predictive performance using evaluation metric: '{self.eval_metric}'")
-        if not self.eval_metric.greater_is_better_internal:
-            logger.info(
-                "\tThis metric's sign has been flipped to adhere to being 'higher is better'. "
-                "The reported score can be multiplied by -1 to get the metric value.",
-            )
         train_data = self.feature_generator.fit_transform(train_data, data_frame_name="train_data")
         if val_data is not None:
             val_data = self.feature_generator.transform(val_data, data_frame_name="tuning_data")
@@ -118,6 +106,14 @@ class TimeSeriesLearner(AbstractLearner):
         self.trainer = self.trainer_type(**trainer_init_kwargs)
         self.trainer_path = self.trainer.path
         self.save()
+
+        logger.info(f"\nAutoGluon will gauge predictive performance using evaluation metric: '{self.eval_metric}'")
+        if not self.eval_metric.greater_is_better_internal:
+            logger.info(
+                "\tThis metric's sign has been flipped to adhere to being higher_is_better. The metric score can be multiplied by -1 to get the metric value."
+            )
+
+        logger.info("===================================================")
 
         self.trainer.fit(
             train_data=train_data,

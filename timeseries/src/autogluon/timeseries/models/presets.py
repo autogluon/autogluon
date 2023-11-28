@@ -9,14 +9,18 @@ from autogluon.core import constants
 from autogluon.timeseries.metrics import TimeSeriesScorer
 
 from . import (
+    ADIDAModel,
     AutoARIMAModel,
+    AutoCESModel,
     AutoETSModel,
     AverageModel,
+    CrostonSBAModel,
     DeepARModel,
     DirectTabularModel,
     DLinearModel,
     DynamicOptimizedThetaModel,
     ETSModel,
+    IMAPAModel,
     NaiveModel,
     NPTSModel,
     PatchTSTModel,
@@ -27,6 +31,7 @@ from . import (
     TemporalFusionTransformerModel,
     ThetaModel,
     WaveNetModel,
+    ZeroModel,
 )
 from .abstract import AbstractTimeSeriesModel
 from .multi_window.multi_window_model import MultiWindowBacktestingModel
@@ -52,12 +57,17 @@ MODEL_TYPES = dict(
     SeasonalAverage=SeasonalAverageModel,
     Naive=NaiveModel,
     SeasonalNaive=SeasonalNaiveModel,
+    Zero=ZeroModel,
     AutoETS=AutoETSModel,
+    AutoCES=AutoCESModel,
     AutoARIMA=AutoARIMAModel,
     DynamicOptimizedTheta=DynamicOptimizedThetaModel,
     NPTS=NPTSModel,
     Theta=ThetaModel,
     ETS=ETSModel,
+    ADIDA=ADIDAModel,
+    CrostonSBA=CrostonSBAModel,
+    IMAPA=IMAPAModel,
 )
 
 DEFAULT_MODEL_NAMES = {v: k for k, v in MODEL_TYPES.items()}
@@ -66,20 +76,26 @@ DEFAULT_MODEL_PRIORITY = dict(
     SeasonalNaive=100,
     Average=100,
     SeasonalAverage=100,
-    Theta=90,
-    NPTS=80,
+    Zero=100,
+    NPTS=90,
+    ETS=90,
+    CrostonSBA=90,
+    Theta=80,
+    DynamicOptimizedTheta=80,
     AutoETS=80,
-    ETS=80,
-    RecursiveTabular=70,
-    DeepAR=60,
-    TemporalFusionTransformer=50,
-    PatchTST=50,
-    DirectTabular=40,
-    AutoARIMA=30,
+    AutoARIMA=70,
+    RecursiveTabular=60,
+    DirectTabular=50,
+    DeepAR=40,
+    TemporalFusionTransformer=30,
+    WaveNet=25,
+    PatchTST=20,
     # Models below are not included in any presets
-    ARIMA=30,
-    SimpleFeedForward=30,
-    DynamicOptimizedTheta=30,
+    AutoCES=10,
+    ARIMA=10,
+    ADIDA=10,
+    IMAPA=10,
+    SimpleFeedForward=10,
 )
 DEFAULT_CUSTOM_MODEL_PRIORITY = 0
 
@@ -92,45 +108,33 @@ VALID_AG_ARGS_KEYS = {
 
 def get_default_hps(key):
     default_model_hps = {
-        "fast_training": {
+        "very_light": {
             "Naive": {},
             "SeasonalNaive": {},
             "ETS": {},
             "Theta": {},
             "RecursiveTabular": {"max_num_samples": 100_000},
+            "DirectTabular": {"max_num_samples": 100_000},
         },
-        "medium_quality": {
+        "light": {
             "Naive": {},
             "SeasonalNaive": {},
-            "AutoETS": {},
-            "Theta": {},
-            "RecursiveTabular": {},
-            "DeepAR": {},
-        },
-        "high_quality": {
-            "Naive": {},
-            "SeasonalNaive": {},
-            "AutoETS": {},
-            "AutoARIMA": {},
+            "ETS": {},
             "Theta": {},
             "RecursiveTabular": {},
             "DirectTabular": {},
-            "DeepAR": {},
             "TemporalFusionTransformer": {},
-            "PatchTST": {},
         },
-        "best_quality": {
-            "Naive": {},
+        "default": {
             "SeasonalNaive": {},
+            "CrostonSBA": {},
             "AutoETS": {},
             "AutoARIMA": {},
-            "Theta": {},
+            "NPTS": {},
+            "DynamicOptimizedTheta": {},
             # TODO: Define separate model for each tabular submodel?
             "RecursiveTabular": {
-                "tabular_hyperparameters": {
-                    "NN_TORCH": {"proc.impute_strategy": "constant"},
-                    "GBM": [{}, {"extra_trees": True, "ag_args": {"name_suffix": "XT"}}],
-                },
+                "tabular_hyperparameters": {"NN_TORCH": {"proc.impute_strategy": "constant"}, "GBM": {}},
             },
             "DirectTabular": {},
             "TemporalFusionTransformer": {},
@@ -138,11 +142,6 @@ def get_default_hps(key):
             "DeepAR": {},
         },
     }
-
-    # For backwards compatibility
-    default_model_hps["default"] = default_model_hps["medium_quality"]
-    default_model_hps["default_hpo"] = default_model_hps["best_quality"]
-
     return default_model_hps[key]
 
 
@@ -165,7 +164,7 @@ def get_preset_models(
     """
     models = []
     if hyperparameters is None:
-        hp_string = "default_hpo" if hyperparameter_tune else "default"
+        hp_string = "default"
         hyperparameters = copy.deepcopy(get_default_hps(hp_string))
     elif isinstance(hyperparameters, str):
         hyperparameters = copy.deepcopy(get_default_hps(hyperparameters))

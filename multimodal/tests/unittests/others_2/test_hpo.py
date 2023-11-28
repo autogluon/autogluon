@@ -47,7 +47,6 @@ def predictor_hpo(searcher, scheduler, presets=None):
     predictor_hpo = predictor.fit(
         train_data=dataset.train_df,
         hyperparameters=hyperparameters,
-        time_limit=30,
         save_path=save_path,
         hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
     )
@@ -60,7 +59,6 @@ def predictor_hpo(searcher, scheduler, presets=None):
     predictor = predictor.fit(
         train_data=dataset.train_df,
         hyperparameters=hyperparameters,
-        time_limit=30,
         hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
     )
 
@@ -100,7 +98,6 @@ def matcher_hpo(searcher, scheduler, presets=None):
     matcher_hpo = matcher.fit(
         train_data=dataset.train_df,
         hyperparameters=hyperparameters,
-        time_limit=90,
         save_path=save_path,
         hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
     )
@@ -113,7 +110,6 @@ def matcher_hpo(searcher, scheduler, presets=None):
     predictor = matcher.fit(
         train_data=dataset.train_df,
         hyperparameters=hyperparameters,
-        time_limit=90,
         hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
     )
 
@@ -173,7 +169,6 @@ def test_hpo_distillation(searcher, scheduler):
     teacher_predictor.fit(
         train_data=dataset.train_df,
         hyperparameters=hyperparameters,
-        time_limit=30,
         save_path=teacher_save_path,
     )
 
@@ -201,7 +196,6 @@ def test_hpo_distillation(searcher, scheduler):
         train_data=dataset.train_df,
         teacher_predictor=teacher_save_path,
         hyperparameters=hyperparameters,
-        time_limit=60,
         hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
         save_path=student_save_path,
     )

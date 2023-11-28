@@ -307,6 +307,12 @@ class FocalLoss(nn.Module):
         self.reduction = reduction
         self.eps = eps
         if alpha is not None:
+            if isinstance(alpha, str):  # handles Ray Tune HPO sampled hyperparameter
+                try:
+                    numbers = alpha.strip("()").split(",")
+                    alpha = [float(num) for num in numbers]
+                except:
+                    raise ValueError(f"{type(alpha)} {alpha} is not in a supported format.")
             alpha = torch.tensor(alpha)
         self.nll_loss = nn.NLLLoss(weight=alpha, reduction="none")
 

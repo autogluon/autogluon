@@ -940,7 +940,7 @@ def test_when_convert_frequency_called_then_static_features_are_kept():
 @pytest.mark.parametrize("freq", ["D", "M", "6H"])
 def test_given_index_is_regular_when_convert_frequency_is_called_then_new_index_has_desired_frequency(freq):
     start = "2020-05-01"
-    end = "2020-06-30"
+    end = "2020-07-31"
     timestamps_original = pd.date_range(start=start, end=end, freq="D")
     timestamps_resampled = pd.date_range(start=start, end=end, freq=freq)
     df = pd.DataFrame(
@@ -979,6 +979,20 @@ def test_when_aggregation_method_is_changed_then_aggregated_result_is_correct(ag
     )
     aggregated = ts_df.convert_frequency(freq="W", agg_numeric=agg_method)
     assert np.all(aggregated.values.ravel() == np.array(values_after_aggregation))
+
+
+@pytest.mark.parametrize("freq", ["D", "W", "M", "Q", "A", "Y", "H", "T", "min", "S", "30T", "2H", "17S"])
+def test_when_convert_frequency_called_then_categorical_columns_are_preserved(freq):
+    df_original = get_data_frame_with_variable_lengths({"B": 15, "A": 20}, freq=freq, covariates_names=["Y", "X"])
+    cat_columns = ["cat_1", "cat_2"]
+    for col in cat_columns:
+        df_original[col] = np.random.choice(["foo", "bar", "baz"], size=len(df_original))
+    # Select random rows & reset cached freq
+    df_irregular = df_original.iloc[[2, 5, 7, 10, 14, 15, 16, 33]]
+    df_irregular._cached_freq = None
+    df_regular = df_irregular.convert_frequency(freq=freq)
+    assert all(col in df_regular.columns for col in cat_columns)
+    assert df_regular.freq == pd.tseries.frequencies.to_offset(freq).freqstr
 
 
 @pytest.mark.parametrize("dtype", ["datetime64[ns]", "datetime64[us]", "datetime64[ms]", "datetime64[s]"])

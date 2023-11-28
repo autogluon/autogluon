@@ -105,7 +105,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
             # GluonTS expects item_id to be a string
             ts = {
                 FieldName.ITEM_ID: str(self.item_ids[j]),
-                FieldName.START: pd.Period(self.start_timestamps[j], freq=self.freq),
+                FieldName.START: pd.Period(self.start_timestamps.iloc[j], freq=self.freq),
                 FieldName.TARGET: self.target_array[start_idx:end_idx],
             }
             if self.feat_static_cat is not None:
@@ -245,7 +245,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
     @property
     def default_context_length(self) -> int:
-        return max(10, 2 * self.prediction_length)
+        return min(512, max(10, 2 * self.prediction_length))
 
     def _get_model_params(self) -> dict:
         """Gets params that are passed to the inner model."""
@@ -283,6 +283,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         init_args = self._get_estimator_init_args()
 
         default_trainer_kwargs = {
+            "limit_val_batches": 3,
             "max_epochs": init_args["max_epochs"],
             "callbacks": init_args["callbacks"],
             "enable_progress_bar": False,

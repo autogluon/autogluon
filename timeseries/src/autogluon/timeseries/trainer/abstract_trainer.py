@@ -558,9 +558,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         logger.info(f"Models that will be trained: {list(m.name for m in models)}")
 
-        num_models = len(models)
-        if num_models > 1:  # ensemble is only fit len(models) > 1
-            num_models += int(self.enable_ensemble)
+        num_base_models = len(models)
         model_names_trained = []
         for i, model in enumerate(models):
             if time_limit is None:
@@ -568,7 +566,12 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 time_left_for_model = None
             else:
                 time_left = time_limit - (time.time() - time_start)
-                time_left_for_model = time_left / (num_models - i)
+                if num_base_models > 1 and self.enable_ensemble:
+                    time_reserved_for_ensemble = min(600.0, time_left / (num_base_models - i + 1))
+                    logger.debug(f"Reserving {time_reserved_for_ensemble:.1f}s for ensemble")
+                else:
+                    time_reserved_for_ensemble = 0.0
+                time_left_for_model = (time_left - time_reserved_for_ensemble) / (num_base_models - i)
                 if time_left <= 0:
                     logger.info(f"Stopping training due to lack of time remaining. Time left: {time_left:.1f} seconds")
                     break
@@ -685,7 +688,9 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             quantile_levels=self.quantile_levels,
             metadata=self.metadata,
         )
-        ensemble.fit_ensemble(model_preds, data_per_window=data_per_window, time_limit=time_limit)
+        ensemble.fit_ensemble(
+            model_preds, data_per_window=data_per_window, time_limit=time_limit, verbosity=self.verbosity
+        )
         ensemble.fit_time = time.time() - time_start
 
         predict_time = 0

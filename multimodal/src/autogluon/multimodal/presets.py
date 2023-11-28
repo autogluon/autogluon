@@ -69,8 +69,7 @@ def default(presets: str = DEFAULT):
     """
     hyperparameters = {
         "model.names": [
-            "categorical_mlp",
-            "numerical_mlp",
+            "ft_transformer",
             "timm_image",
             "hf_text",
             "document_transformer",
@@ -106,6 +105,7 @@ def default(presets: str = DEFAULT):
                             "swin_base_patch4_window7_224",
                             "convnext_base_in22ft1k",
                             "vit_base_patch16_clip_224.laion2b_ft_in12k_in1k",
+                            "caformer_b36.sail_in22k_ft_in1k",
                         ]
                     ),
                     "model.document_transformer.checkpoint_name": "microsoft/layoutlmv3-base",
@@ -115,7 +115,7 @@ def default(presets: str = DEFAULT):
             hyperparameters.update(
                 {
                     "model.hf_text.checkpoint_name": "google/electra-base-discriminator",
-                    "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
+                    "model.timm_image.checkpoint_name": "caformer_b36.sail_in22k_ft_in1k",
                     "model.document_transformer.checkpoint_name": "microsoft/layoutlmv3-base",
                 }
             )
@@ -441,7 +441,7 @@ def semantic_segmentation(presets: str = DEFAULT):
         "env.batch_size": 4,
         "env.per_gpu_batch_size": 1,
         "env.eval_batch_size_ratio": 1,
-        "env.strategy": "ddp",
+        "env.strategy": "ddp_find_unused_parameters_true",
         "env.auto_select_gpus": False,
         "env.num_gpus": -1,
         "env.num_workers": 4,
@@ -607,7 +607,7 @@ def image_similarity(presets: str = DEFAULT):
     if presets in [DEFAULT, HIGH_QUALITY]:
         hyperparameters.update(
             {
-                "model.timm_image.checkpoint_name": "swin_base_patch4_window7_224",
+                "model.timm_image.checkpoint_name": "caformer_b36.sail_in22k_ft_in1k",
             }
         )
     elif presets == MEDIUM_QUALITY:
@@ -762,8 +762,7 @@ def ner(presets: str = DEFAULT):
     """
     hyperparameters = {
         "model.names": [
-            "categorical_mlp",
-            "numerical_mlp",
+            "ft_transformer",
             "timm_image",
             "ner_text",
             "fusion_ner",

@@ -181,6 +181,7 @@ def hash_pandas_df(df: Optional[pd.DataFrame]) -> str:
 
 def seed_everything(seed: int) -> None:
     """Set random seeds for numpy and PyTorch."""
+    logger.debug(f"Setting random seed to {seed}")
     np.random.seed(seed)
     try:
         import torch

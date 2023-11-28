@@ -399,7 +399,7 @@ def test_when_custom_metric_passed_to_model_then_model_can_score(model_class):
         eval_metric=CustomMetric(),
     )
     model.fit(train_data=DUMMY_TS_DATAFRAME)
-    score = model.score(DUMMY_TS_DATAFRAME)
+    score = model.score(DUMMY_TS_DATAFRAME.sort_index())
     assert isinstance(score, float)
 
 
@@ -424,7 +424,7 @@ def test_when_custom_metric_passed_to_model_then_model_can_hyperparameter_tune(m
     if isinstance(model, MultiWindowBacktestingModel):
         val_data = None
     else:
-        val_data = DUMMY_TS_DATAFRAME
+        val_data = DUMMY_TS_DATAFRAME.sort_index()
 
     num_trials = 2
 

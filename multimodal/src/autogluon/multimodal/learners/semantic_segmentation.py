@@ -13,25 +13,19 @@ from scipy.special import softmax
 
 from autogluon.core.metrics import Scorer
 
-from ..constants import LABEL, LOGITS, SEMANTIC_MASK, SEMANTIC_SEGMENTATION
+from ..constants import LABEL, LOGITS, SEMANTIC_MASK, SEMANTIC_SEGMENTATION, SEMANTIC_SEGMENTATION_IMG
 from ..optimization.lit_semantic_seg import SemanticSegmentationLitModule
-from ..optimization.utils import (
-    get_loss_func,
-    get_metric,
-    get_norm_layer_param_names,
-    get_trainable_params_efficient_finetune,
-)
-from ..utils import (
-    create_fusion_data_processors,
-    create_fusion_model,
-    extract_from_output,
-    get_dir_ckpt_paths,
-    get_load_ckpt_paths,
-    setup_save_path,
-)
+from ..optimization.semantic_seg_metrics import Balanced_Error_Rate_Pred as Balanced_Error_Rate
+from ..optimization.semantic_seg_metrics import Binary_IoU_Pred as Binary_IoU
+from ..optimization.semantic_seg_metrics import COD_METRICS_NAMES_Pred as COD_METRICS_NAMES
+from ..optimization.semantic_seg_metrics import Multiclass_IoU_Pred as Multiclass_IoU
+from ..optimization.utils import get_loss_func, get_norm_layer_param_names, get_trainable_params_efficient_finetune
+from ..utils import extract_from_output, setup_save_path
 from .base import BaseLearner
 
 logger = logging.getLogger(__name__)
+
+from ..constants import BER, EM, FM, IOU, MAE, SEMANTIC_SEGMENTATION, SM
 
 
 class SemanticSegmentationLearner(BaseLearner):
@@ -44,8 +38,7 @@ class SemanticSegmentationLearner(BaseLearner):
         hyperparameters: Optional[dict] = None,
         path: Optional[str] = None,
         verbosity: Optional[int] = 2,
-        num_classes: Optional[int] = None,
-        classes: Optional[list] = None,
+        num_classes: Optional[int] = None,  # TODO: can we infer this from data?
         warn_if_exist: Optional[bool] = True,
         enable_progress_bar: Optional[bool] = None,
         pretrained: Optional[bool] = True,
@@ -118,7 +111,7 @@ class SemanticSegmentationLearner(BaseLearner):
             num_classes = []
             for idx in range(sample_data_path.shape[0]):
                 row = sample_data_path.iloc[idx]
-                mask_file = row["label"]
+                mask_file = row[self._label_column]
                 per_num_classes = self.get_semantic_segmentation_class_num(mask_file)
                 num_classes.append(per_num_classes)
             return max(num_classes)
@@ -173,10 +166,49 @@ class SemanticSegmentationLearner(BaseLearner):
             If provided None, we would infer it on based on the data modalities
             and sample number.
         """
+
+        def get_metric_predict(
+            metric_name: str,
+            num_classes: Optional[int] = None,
+        ):
+            """
+            Obtain a torchmerics.Metric from its name.
+            Define a customized metric function in case that torchmetrics doesn't support some metric.
+
+            Parameters
+            ----------
+            metric_name
+                Name of metric.
+            num_classes
+                Number of classes.
+            is_matching
+                Whether is matching.
+            problem_type
+                Type of problem, e.g., binary and multiclass.
+
+            Returns
+            -------
+            torchmetrics.Metric
+                A torchmetrics.Metric object.
+            custom_metric_func
+                A customized metric function.
+            """
+            if metric_name == BER:
+                return Balanced_Error_Rate()
+            elif metric_name in [SM, EM, FM, MAE]:
+                return COD_METRICS_NAMES[metric_name]
+            elif metric_name == IOU:
+                if num_classes == 1:
+                    return Binary_IoU()
+                else:
+                    return Multiclass_IoU(num_classes=num_classes)
+            else:
+                raise ValueError(f"Unknown metric {metric_name}")
+
         outputs = self.predict_per_run(
             data=data,
             realtime=realtime,
-            requires_label=True,
+            requires_label=False,
         )
 
         if self._output_shape == 1:
@@ -191,7 +223,7 @@ class SemanticSegmentationLearner(BaseLearner):
 
         results = {}
         for per_metric_name in metrics:
-            per_metric, _ = get_metric(metric_name=per_metric_name.lower(), num_classes=self._output_shape)
+            per_metric = get_metric_predict(metric_name=per_metric_name.lower(), num_classes=self._output_shape)
             for y_p, y_t in zip(y_pred, y_true):
                 per_metric.update(y_p.unsqueeze(0), y_t.unsqueeze(0))
             score = per_metric.compute()
@@ -226,9 +258,11 @@ class SemanticSegmentationLearner(BaseLearner):
             )
 
     def on_predict_start(self, data: pd.DataFrame):
+        data = self.data_to_df(data=data)
         if self._output_shape is None:  # for zero-shot evaluation/prediction
             self._output_shape = self.get_semantic_segmentation_class_num(data)
         self.ensure_predict_ready()
+        return data
 
     def evaluate(
         self,
@@ -261,7 +295,7 @@ class SemanticSegmentationLearner(BaseLearner):
         A dictionary with the metric names and their corresponding scores.
         Optionally return a dataframe of prediction results.
         """
-        self.on_predict_start(data)
+        data = self.on_predict_start(data)
         return self.evaluate_semantic_segmentation(data, metrics, realtime)
 
     def predict(
@@ -292,7 +326,7 @@ class SemanticSegmentationLearner(BaseLearner):
         When save_results is True, the output is a pandas dataframe containing the path of the predicted mask file for each input image.
         Otherwise, the output will have shape (#samples, height, width).
         """
-        self.on_predict_start(data)
+        data = self.on_predict_start(data)
         if self._output_shape == 1:
             ret_type = LOGITS
         else:
@@ -366,7 +400,7 @@ class SemanticSegmentationLearner(BaseLearner):
         assert (self._output_shape == 1 and as_multiclass == False) or (
             self._output_shape > 1 and as_multiclass == True
         )
-        self.on_predict_start(data)
+        data = self.on_predict_start(data)
 
         outputs = self.predict_per_run(
             data=data,
@@ -424,10 +458,11 @@ class SemanticSegmentationLearner(BaseLearner):
             mask_image = mask.reshape(h, w, 1) * color.reshape(1, 1, -1)
             ax.imshow(mask_image)
 
+        image_column_name = self.get_image_column_name(data)
         if isinstance(data, dict):
-            image_names = data["image"]
+            image_names = data[image_column_name]
         else:
-            image_names = data["image"].to_list()
+            image_names = data[image_column_name].to_list()
         results = []
 
         mask_path = os.path.join(result_path, "masks")
@@ -479,9 +514,25 @@ class SemanticSegmentationLearner(BaseLearner):
         A list of the post-processed segmentation results.
         """
         logits = [ele[ret_type] for ele in outputs]
+        image_column_name = self.get_image_column_name(data)
         for idx in range(data.shape[0]):
-            ori_image_size = Image.open(data["image"][idx]).size  # width, height
+            ori_image_size = Image.open(data[image_column_name][idx]).size  # width, height
             logits[idx] = F.interpolate(
                 logits[idx].float(), (ori_image_size[1], ori_image_size[0]), mode="bilinear", align_corners=False
             )
         return logits
+
+    def get_image_column_name(self, data: pd.DataFrame):
+        if self.column_types is None:
+            column_names = list(data.columns)
+            if self._label_column in column_names:
+                column_names.remove(self._label_column)
+            assert (
+                len(column_names) == 1
+            ), f"More than one image columns {column_names} exist in the data. Make sure to provide data with one image column."
+            return column_names[0]
+        else:
+            for k, v in self.column_types.items():
+                if v == SEMANTIC_SEGMENTATION_IMG:
+                    return k
+        return None

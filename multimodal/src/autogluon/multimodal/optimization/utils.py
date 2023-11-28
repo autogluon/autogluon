@@ -22,8 +22,6 @@ from ..constants import (
     AVERAGE_PRECISION,
     BER,
     BINARY,
-    BINARY_ACC,
-    BINARY_DICE,
     BIT_FIT,
     COLUMN_FEATURES,
     CONTRASTIVE_LOSS,
@@ -34,6 +32,9 @@ from ..constants import (
     DIRECT_LOSS,
     EM,
     F1,
+    F1_MACRO,
+    F1_MICRO,
+    F1_WEIGHTED,
     FEATURES,
     FEW_SHOT_CLASSIFICATION,
     FM,
@@ -291,6 +292,9 @@ def get_metric(
             return torchmetrics.SpearmanCorrCoef(), None
     elif metric_name == F1:
         return torchmetrics.F1Score(task=problem_type, num_classes=num_classes), None
+    elif metric_name in [F1_MACRO, F1_MICRO, F1_WEIGHTED]:
+        average = metric_name.split("_")[1]
+        return torchmetrics.F1Score(task=problem_type, num_classes=num_classes, average=average), None
     elif metric_name in DETECTION_METRICS:
         return (
             MeanAveragePrecision(box_format="xyxy", iou_type="bbox", class_metrics=False),
@@ -306,10 +310,6 @@ def get_metric(
             return CustomHitRate(), None
         else:  # TODO: support recall for general classification tasks.
             raise ValueError("Recall is not supported yet.")
-    elif metric_name == BINARY_DICE:
-        return torchmetrics.Dice(multiclass=False), None
-    elif metric_name == BINARY_ACC:
-        return torchmetrics.classification.BinaryAccuracy(), None
     elif metric_name == BER:
         return Balanced_Error_Rate(), None
     elif metric_name in [SM, EM, FM, MAE]:

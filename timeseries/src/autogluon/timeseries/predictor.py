@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import pprint
@@ -7,7 +8,9 @@ from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import pandas as pd
 
+from autogluon.common.utils.deprecated_utils import Deprecated
 from autogluon.common.utils.log_utils import set_logger_verbosity
+from autogluon.common.utils.system_info import get_ag_system_info
 from autogluon.common.utils.utils import check_saved_predictor_version, seed_everything, setup_outputdir
 from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl, load_str
@@ -65,20 +68,21 @@ class TimeSeriesPredictor:
 
         Probabilistic forecast metrics (evaluated on quantile forecasts for the specified ``quantile_levels``):
 
-        - ``"WQL"``: mean weighted quantile loss, defined as average of quantile losses divided by the sum of absolute time series values in the forecast horizon.
-        - ``"SQL"``: scaled quantile loss, defined as average of quantile losses divided by the in-sample seasonal error.
+        - ``"SQL"``: scaled quantile loss
+        - ``"WQL"``: weighted quantile loss
 
         Point forecast metrics (these are always evaluated on the ``"mean"`` column of the predictions):
 
+        - ``"MAE"``: mean absolute error
         - ``"MAPE"``: mean absolute percentage error
-        - ``"sMAPE"``: "symmetric" mean absolute percentage error
         - ``"MASE"``: mean absolute scaled error
         - ``"MSE"``: mean squared error
         - ``"RMSE"``: root mean squared error
+        - ``"RMSSE"``: root mean squared scaled error
+        - ``"SMAPE"``: "symmetric" mean absolute percentage error
         - ``"WAPE"``: weighted absolute percentage error
-        - ``"RMSSE"``: Root Mean Squared Scaled Error . See https://otexts.com/fpp3/accuracy.html#scaled-errors
 
-        For more information about these metrics, see https://docs.aws.amazon.com/forecast/latest/dg/metrics.html.
+        For more information about these metrics, see :ref:`Forecasting Time Series - Evaluation Metrics <forecasting_metrics>`.
     eval_metric_seasonal_period : int, optional
         Seasonal period used to compute some evaluation metrics such as mean absolute scaled error (MASE). Defaults to
         ``None``, in which case the seasonal period is computed based on the data frequency.
@@ -268,7 +272,7 @@ class TimeSeriesPredictor:
                 )
             else:
                 self.freq = df.freq
-                logger.info(f"Inferred time series frequency: {df.freq}")
+                logger.info(f"Inferred time series frequency: '{df.freq}'")
         else:
             if df.freq != self.freq:
                 logger.warning(f"{name} with frequency '{df.freq}' has been resampled to frequency '{self.freq}'.")
@@ -384,7 +388,7 @@ class TimeSeriesPredictor:
         refit_every_n_windows: int = 1,
         refit_full: bool = False,
         enable_ensemble: bool = True,
-        random_seed: Optional[int] = None,
+        random_seed: Optional[int] = 123,
         verbosity: Optional[int] = None,
     ) -> "TimeSeriesPredictor":
         """Fit probabilistic forecasting models to the given time series dataset.
@@ -449,26 +453,26 @@ class TimeSeriesPredictor:
             and various other properties of the returned predictor. It is recommended to specify presets and avoid
             specifying most other :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` arguments or model
             hyperparameters prior to becoming familiar with AutoGluon. For example, set ``presets="high_quality"``
-            to get a high-accuracy predictor, or set ``presets="fast_training"`` to quickly fit multiple simple
-            statistical models.
+            to get a high-accuracy predictor, or set ``presets="fast_training"`` to quickly get the results.
             Any user-specified arguments in :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will
             override the values used by presets.
 
             Available presets:
 
-            - ``"fast_training"``: fit simple statistical models (``ETS``, ``Theta``, ``Naive``, ``SeasonalNaive``) + fast tree-based model ``RecursiveTabular``. These models are fast to train but may not be very accurate.
-            - ``"medium_quality"``: all models mentioned above + deep learning model ``DeepAR``. Default setting that produces good forecasts with reasonable training time.
-            - ``"high_quality"``: all models mentioned above + automatically tuned statistical models (``AutoETS``, ``AutoARIMA``) + tree-based model ``DirectTabular`` + deep learning models ``TemporalFusionTransformer`` and ``PatchTST`` . Much more accurate than ``medium_quality``, but takes longer to train.
-            - ``"best_quality"``: all models mentioned above + more tabular models + training multiple copies of ``DeepAR``. Usually better than ``high_quality``, but takes even longer to train.
+            - ``"fast_training"``: fit simple statistical models (``ETS``, ``Theta``, ``Naive``, ``SeasonalNaive``) + fast tree-based models ``RecursiveTabular`` and ``DirectTabular``. These models are fast to train but may not be very accurate.
+            - ``"medium_quality"``: all models mentioned above + deep learning model ``TemporalFusionTransformer``. Default setting that produces good forecasts with reasonable training time.
+            - ``"high_quality"``: All ML models available in AutoGluon + additional statistical models (``NPTS``, ``AutoETS``, ``AutoARIMA``, ``CrostonSBA``, ``DynamicOptimizedTheta``). Much more accurate than ``medium_quality``, but takes longer to train.
+            - ``"best_quality"``: Same models as in ``"high_quality"`, but performs validation with multiple backtests. Usually better than ``high_quality``, but takes even longer to train.
 
             Details for these presets can be found in ``autogluon/timeseries/configs/presets_configs.py``. If not
             provided, user-provided values for ``hyperparameters`` and ``hyperparameter_tune_kwargs`` will be used
             (defaulting to their default values specified below).
-        hyperparameters : str or dict, default = "medium_quality"
+        hyperparameters : str or dict, optional
             Determines what models are trained and what hyperparameters are used by each model.
 
-            If str is passed, will use a preset hyperparameter configuration defined in`
-            `autogluon/timeseries/trainer/models/presets.py``.
+            If str is passed, will use a preset hyperparameter configuration defined in
+            ``autogluon/timeseries/trainer/models/presets.py``. Supported values are ``"default"``, ``"light"`` and
+            ``"very_light"``.
 
             If dict is provided, the keys are strings or types that indicate which models to train. Each value is
             itself a dict containing hyperparameters for each of the trained models, or a list of such dicts. Any
@@ -491,7 +495,7 @@ class TimeSeriesPredictor:
             * ``Theta`` with additive seasonal decomposition (all other parameters set to their defaults)
             * ``Theta`` with seasonality disabled (all other parameters set to their defaults)
 
-            Full list of available models and their hyperparameters is provided in :ref:`forecasting_zoo`.
+            Full list of available models and their hyperparameters is provided in :ref:`Forecasting Time Series - Model Zoo <forecasting_model_zoo>`.
 
             The hyperparameters for each model can be fixed values (as shown above), or search spaces over which
             hyperparameter optimization is performed. A search space should only be provided when
@@ -589,7 +593,7 @@ class TimeSeriesPredictor:
         enable_ensemble : bool, default = True
             If True, the ``TimeSeriesPredictor`` will fit a simple weighted ensemble on top of the models specified via
             ``hyperparameters``.
-        random_seed : int, optional
+        random_seed : int or None, default = 123
             If provided, fixes the seed of the random number generator for all models. This guarantees reproducible
             results for most models (except those trained on GPU because of the non-determinism of GPU operations).
         verbosity : int, optional
@@ -601,6 +605,10 @@ class TimeSeriesPredictor:
         if self._learner.is_fit:
             raise AssertionError("Predictor is already fit! To fit additional models create a new `Predictor`.")
 
+        logger.info("Beginning AutoGluon training..." + (f" Time limit = {time_limit}s" if time_limit else ""))
+        logger.info(f"AutoGluon will save models to '{self.path}'")
+        logger.info(get_ag_system_info(path=self.path, include_gpu_count=True))
+
         if hyperparameters is None:
             hyperparameters = "default"
 
@@ -611,7 +619,9 @@ class TimeSeriesPredictor:
         fit_args = dict(
             prediction_length=self.prediction_length,
             target=self.target,
+            known_covariates_names=self.known_covariates_names,
             eval_metric=self.eval_metric,
+            eval_metric_seasonal_period=self.eval_metric_seasonal_period,
             quantile_levels=self.quantile_levels,
             freq=self.freq,
             time_limit=time_limit,
@@ -619,17 +629,17 @@ class TimeSeriesPredictor:
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             excluded_model_types=excluded_model_types,
             num_val_windows=num_val_windows,
+            val_step_size=val_step_size,
+            refit_every_n_windows=refit_every_n_windows,
             refit_full=refit_full,
             enable_ensemble=enable_ensemble,
             random_seed=random_seed,
             verbosity=verbosity,
         )
-        logger.info("================ TimeSeriesPredictor ================")
-        logger.info("TimeSeriesPredictor.fit() called")
         if presets is not None:
             logger.info(f"Setting presets to: {presets}")
-        logger.info("Fitting with arguments:")
-        logger.info(f"{pprint.pformat(fit_args)}\n")
+        logger.info("\nFitting with arguments:")
+        logger.info(f"{pprint.pformat({k: v for k, v in fit_args.items() if v is not None})}\n")
 
         train_data = self._check_and_prepare_data_frame(train_data, name="train_data")
         logger.info(f"Provided train_data has {self._get_dataset_stats(train_data)}")
@@ -664,8 +674,6 @@ class TimeSeriesPredictor:
             prediction_length=self.prediction_length, num_val_windows=num_val_windows, val_step_size=val_step_size
         )
 
-        logger.info("=====================================================\n")
-
         if random_seed is not None:
             seed_everything(random_seed)
 
@@ -691,7 +699,7 @@ class TimeSeriesPredictor:
         self.save()
         return self
 
-    def get_model_names(self) -> List[str]:
+    def model_names(self) -> List[str]:
         """Returns the list of model names trained by this predictor object."""
         return self._trainer.get_model_names()
 
@@ -780,6 +788,7 @@ class TimeSeriesPredictor:
         data: Union[TimeSeriesDataFrame, pd.DataFrame, str],
         model: Optional[str] = None,
         metrics: Optional[Union[str, TimeSeriesScorer, List[Union[str, TimeSeriesScorer]]]] = None,
+        display: bool = False,
         use_cache: bool = True,
     ) -> Dict[str, float]:
         """Evaluate the forecast accuracy for given dataset.
@@ -807,6 +816,8 @@ class TimeSeriesPredictor:
         metrics : str, TimeSeriesScorer or List[Union[str, TimeSeriesScorer]], optional
             Metric or a list of metrics to compute scores with. Defaults to ``self.eval_metric``. Supports both
             metric names as strings and custom metrics based on TimeSeriesScorer.
+        display : bool, default = False
+            If True, the scores will be printed.
         use_cache : bool, default = True
             If True, will attempt to use the cached predictions. If False, cached predictions will be ignored.
             This argument is ignored if ``cache_predictions`` was set to False when creating the ``TimeSeriesPredictor``.
@@ -820,7 +831,11 @@ class TimeSeriesPredictor:
         """
         data = self._check_and_prepare_data_frame(data)
         self._check_data_for_evaluation(data)
-        return self._learner.evaluate(data, model=model, metrics=metrics, use_cache=use_cache)
+        scores_dict = self._learner.evaluate(data, model=model, metrics=metrics, use_cache=use_cache)
+        if display:
+            logger.info("Evaluations on test data:")
+            logger.info(json.dumps(scores_dict, indent=4))
+        return scores_dict
 
     @classmethod
     def _load_version_file(cls, path: str) -> str:
@@ -899,7 +914,8 @@ class TimeSeriesPredictor:
         """Returns a dictionary of objects each describing an attribute of the training process and trained models."""
         return self._learner.get_info(include_model_info=True)
 
-    def get_model_best(self) -> str:
+    @property
+    def model_best(self) -> str:
         """Returns the name of the best model from trainer."""
         if self._trainer.model_best is not None:
             models = self._trainer.get_model_names()
@@ -910,8 +926,9 @@ class TimeSeriesPredictor:
     def leaderboard(
         self,
         data: Optional[Union[TimeSeriesDataFrame, pd.DataFrame, str]] = None,
-        silent: bool = False,
+        display: bool = False,
         use_cache: bool = True,
+        **kwargs,
     ) -> pd.DataFrame:
         """Return a leaderboard showing the performance of every trained model, the output is a
         pandas data frame with columns:
@@ -945,8 +962,8 @@ class TimeSeriesPredictor:
             If provided data is an instance of pandas DataFrame, AutoGluon will attempt to automatically convert it
             to a ``TimeSeriesDataFrame``.
 
-        silent : bool, default = False
-            If False, the leaderboard DataFrame will be printed.
+        display : bool, default = False
+            If True, the leaderboard DataFrame will be printed.
         use_cache : bool, default = True
             If True, will attempt to use the cached predictions. If False, cached predictions will be ignored.
             This argument is ignored if ``cache_predictions`` was set to False when creating the ``TimeSeriesPredictor``.
@@ -957,11 +974,19 @@ class TimeSeriesPredictor:
             The leaderboard containing information on all models and in order of best model to worst in terms of
             test performance.
         """
+        if "silent" in kwargs:
+            # keep `silent` logic for backwards compatibility
+            assert isinstance(kwargs["silent"], bool)
+            display = not kwargs.pop("silent")
+        if len(kwargs) > 0:
+            for key in kwargs:
+                raise TypeError(f"TimeSeriesPredictor.leaderboard() got an unexpected keyword argument '{key}'")
+
         if data is not None:
             data = self._check_and_prepare_data_frame(data)
             self._check_data_for_evaluation(data)
         leaderboard = self._learner.leaderboard(data, use_cache=use_cache)
-        if not silent:
+        if display:
             with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):
                 print(leaderboard)
         return leaderboard
@@ -999,7 +1024,7 @@ class TimeSeriesPredictor:
         }
         # get dict mapping model name to final hyperparameter values for each model:
         model_hyperparams = {}
-        for model_name in self.get_model_names():
+        for model_name in self.model_names():
             model_obj = self._trainer.load_model(model_name)
             model_hyperparams[model_name] = model_obj.params
 
@@ -1031,7 +1056,7 @@ class TimeSeriesPredictor:
         model : str, default = "all"
             Name of the model to refit.
             All ancestor models will also be refit in the case that the selected model is a weighted ensemble.
-            Valid models are listed in this ``predictor`` by calling :meth:`~autogluon.timeseries.TimeSeriesPredictor.get_model_names`.
+            Valid models are listed in this ``predictor`` by calling :meth:`~autogluon.timeseries.TimeSeriesPredictor.model_names`.
 
             * If "all" then all models are refitted.
             * If "best" then the model with the highest validation score is refit.
@@ -1051,7 +1076,7 @@ class TimeSeriesPredictor:
             "\tModels trained in this way will have the suffix '_FULL' and have NaN validation score.\n"
             "\tThis process is not bound by time_limit, but should take less time than the original `fit` call."
         )
-        model_best = self.get_model_best()
+        model_best = self.model_best
         refit_full_dict = self._learner.refit_full(model=model)
 
         if set_best_to_refit_full:
@@ -1080,10 +1105,17 @@ class TimeSeriesPredictor:
 
     def __dir__(self) -> List[str]:
         # This hides method from IPython autocomplete, but not VSCode autocomplete
-        deprecated = ["score"]
+        deprecated = ["score", "get_model_best", "get_model_names"]
         return [d for d in super().__dir__() if d not in deprecated]
 
+    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="evaluate")
     def score(self, *args, **kwargs):
-        raise ValueError(
-            "`TimeSeriesPredictor.score` has been deprecated. Please use `TimeSeriesPredictor.evaluate` instead."
-        )
+        return self.evaluate(*args, **kwargs)
+
+    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="model_best")
+    def get_model_best(self) -> str:
+        return self.model_best
+
+    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="model_names")
+    def get_model_names(self) -> List[str]:
+        return self.model_names()

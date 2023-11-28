@@ -1,5 +1,6 @@
 """Unit tests for predictors"""
 import copy
+import math
 import sys
 import tempfile
 from pathlib import Path
@@ -38,10 +39,10 @@ def test_when_predictor_called_then_training_is_performed(temp_model_path):
         hyperparameters={"SimpleFeedForward": {"epochs": 1}},
         tuning_data=DUMMY_TS_DATAFRAME,
     )
-    assert "SimpleFeedForward" in predictor.get_model_names()
+    assert "SimpleFeedForward" in predictor.model_names()
 
 
-@pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS + ["fast_training"])  # noqa
+@pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS + ["very_light"])  # noqa
 def test_given_hyperparameters_when_predictor_called_then_model_can_predict(temp_model_path, hyperparameters):
     predictor = TimeSeriesPredictor(path=temp_model_path, eval_metric="MAPE", prediction_length=3)
     predictor.fit(
@@ -71,7 +72,7 @@ def test_when_pathlib_path_provided_to_predictor_then_loaded_predictor_can_predi
     assert isinstance(predictions, TimeSeriesDataFrame)
 
 
-@pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS + ["fast_training"])  # noqa
+@pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS + ["very_light"])  # noqa
 def test_given_different_target_name_when_predictor_called_then_model_can_predict(temp_model_path, hyperparameters):
     df = TimeSeriesDataFrame(copy.copy(DUMMY_TS_DATAFRAME))
     df.rename(columns={"target": "mytarget"}, inplace=True)
@@ -181,7 +182,7 @@ def test_given_hyperparameters_when_predictor_called_and_loaded_back_then_all_mo
 
     loaded_predictor = TimeSeriesPredictor.load(temp_model_path)
 
-    for model_name in loaded_predictor.get_model_names():
+    for model_name in loaded_predictor.model_names():
         predictions = loaded_predictor.predict(DUMMY_TS_DATAFRAME, model=model_name)
 
         assert isinstance(predictions, TimeSeriesDataFrame)
@@ -231,9 +232,9 @@ def test_given_hp_spaces_and_custom_target_when_predictor_called_predictor_can_p
     predictor = TimeSeriesPredictor(**init_kwargs)
     predictor.fit(**fit_kwargs)
 
-    assert predictor.get_model_names()
+    assert predictor.model_names()
 
-    for model_name in predictor.get_model_names():
+    for model_name in predictor.model_names():
         predictions = predictor.predict(df, model=model_name)
 
         assert isinstance(predictions, TimeSeriesDataFrame)
@@ -281,7 +282,7 @@ def test_given_enable_ensemble_true_when_predictor_called_then_ensemble_is_fitte
             "DeepAR": {"epochs": 1},
         },
     )
-    assert any("ensemble" in n.lower() for n in predictor.get_model_names())
+    assert any("ensemble" in n.lower() for n in predictor.model_names())
 
 
 def test_given_enable_ensemble_true_and_only_one_model_when_predictor_called_then_ensemble_is_not_fitted(
@@ -295,7 +296,7 @@ def test_given_enable_ensemble_true_and_only_one_model_when_predictor_called_the
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters={"SimpleFeedForward": {"epochs": 1}},
     )
-    assert not any("ensemble" in n.lower() for n in predictor.get_model_names())
+    assert not any("ensemble" in n.lower() for n in predictor.model_names())
 
 
 def test_given_enable_ensemble_false_when_predictor_called_then_ensemble_is_not_fitted(temp_model_path):
@@ -308,7 +309,7 @@ def test_given_enable_ensemble_false_when_predictor_called_then_ensemble_is_not_
         hyperparameters={"SimpleFeedForward": {"epochs": 1}},
         enable_ensemble=False,
     )
-    assert not any("ensemble" in n.lower() for n in predictor.get_model_names())
+    assert not any("ensemble" in n.lower() for n in predictor.model_names())
 
 
 def test_given_model_fails_when_predictor_predicts_then_exception_is_raised(temp_model_path):
@@ -443,7 +444,7 @@ def test_when_train_data_contains_nans_then_predictor_can_fit(temp_model_path):
         df,
         hyperparameters=TEST_HYPERPARAMETER_SETTINGS[0],
     )
-    assert "SimpleFeedForward" in predictor.get_model_names()
+    assert "SimpleFeedForward" in predictor.model_names()
 
 
 def test_when_prediction_data_contains_nans_then_predictor_can_predict(temp_model_path):
@@ -567,9 +568,9 @@ def test_when_refit_full_called_then_best_model_is_updated(temp_model_path, set_
             "SimpleFeedForward": {"epochs": 1, "num_batches_per_epoch": 1},
         },
     )
-    model_best_before = predictor.get_model_best()
+    model_best_before = predictor.model_best
     model_refit_map = predictor.refit_full(set_best_to_refit_full=set_best_to_refit_full)
-    model_best_after = predictor.get_model_best()
+    model_best_after = predictor.model_best
     if set_best_to_refit_full:
         assert model_best_after == model_refit_map[model_best_before]
     else:
@@ -692,7 +693,7 @@ def test_given_irregular_time_series_when_predictor_called_with_freq_then_predic
     assert isinstance(df, TimeSeriesDataFrame)
     assert not np.any(np.isnan(predictions))
     assert all(len(predictions.loc[i]) == 1 for i in df.item_ids)
-    assert "SimpleFeedForward" in predictor.get_model_names()
+    assert "SimpleFeedForward" in predictor.model_names()
 
 
 def test_given_irregular_time_series_and_no_tuning_when_predictor_called_with_freq_then_predictor_can_predict(
@@ -711,7 +712,7 @@ def test_given_irregular_time_series_and_no_tuning_when_predictor_called_with_fr
     assert isinstance(df, TimeSeriesDataFrame)
     assert not np.any(np.isnan(predictions))
     assert all(len(predictions.loc[i]) == 1 for i in df.item_ids)
-    assert "SimpleFeedForward" in predictor.get_model_names()
+    assert "SimpleFeedForward" in predictor.model_names()
 
 
 @pytest.mark.parametrize("predictor_freq", ["H", "2H", "20T"])
@@ -889,19 +890,20 @@ def test_given_only_short_series_in_train_data_then_exception_is_raised(
 @pytest.mark.parametrize(
     "num_val_windows, refit_every_n_windows, expected_num_refits", [(5, None, 1), (7, 7, 1), (5, 1, 5), (6, 2, 3)]
 )
+@pytest.mark.parametrize("model_name", ["Naive", "RecursiveTabular"])
 def test_given_refit_every_n_windows_when_fit_then_model_is_fit_correct_number_of_times(
-    temp_model_path, num_val_windows, refit_every_n_windows, expected_num_refits
+    temp_model_path, num_val_windows, refit_every_n_windows, expected_num_refits, model_name
 ):
     predictor = TimeSeriesPredictor(path=temp_model_path)
     predictor.fit(
         DUMMY_TS_DATAFRAME,
         num_val_windows=num_val_windows,
         refit_every_n_windows=refit_every_n_windows,
-        hyperparameters={"Naive": {}},
+        hyperparameters={model_name: {}},
     )
-    models_info = predictor._trainer.get_models_info(["Naive"])
+    models_info = predictor._trainer.get_models_info([model_name])
     actual_num_refits = 0
-    for window_info in models_info["Naive"]["info_per_val_window"]:
+    for window_info in models_info[model_name]["info_per_val_window"]:
         actual_num_refits += window_info["refit_this_window"]
     assert actual_num_refits == expected_num_refits
 
@@ -971,3 +973,31 @@ def test_given_time_limit_is_not_none_then_first_model_doesnt_receive_full_time_
             enable_ensemble=enable_ensemble,
         )
         assert snaive_fit.call_args[1]["time_limit"] < expected_time_limit_for_first_model
+
+
+@pytest.mark.parametrize("num_val_windows", [1, 5])
+@pytest.mark.parametrize("refit_every_n_windows", [1, 2, 5, 6])
+@pytest.mark.parametrize("time_limit", [15, 60])
+@pytest.mark.parametrize("enable_ensemble", [True, False])
+def test_given_time_limit_is_not_none_then_time_is_distributed_across_windows_for_global_models(
+    temp_model_path, num_val_windows, time_limit, refit_every_n_windows, enable_ensemble
+):
+    data = get_data_frame_with_variable_lengths({"A": 100, "B": 100})
+    num_refits = math.ceil(num_val_windows / refit_every_n_windows)
+    expected_time_limit_for_first_model = 0.9 * time_limit / num_refits + 0.1
+
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=5)
+    with mock.patch("autogluon.timeseries.models.RecursiveTabularModel.fit") as mock_fit:
+        mock_fit.side_effect = RuntimeError("Numerical error")
+        try:
+            predictor.fit(
+                data,
+                time_limit=time_limit,
+                hyperparameters={"RecursiveTabular": {"tabular_hyperparameters": {"DUMMY": {}}}},
+                num_val_windows=num_val_windows,
+                refit_every_n_windows=refit_every_n_windows,
+                enable_ensemble=enable_ensemble,
+            )
+        except RuntimeError:
+            pass
+        assert mock_fit.call_args[1]["time_limit"] < expected_time_limit_for_first_model

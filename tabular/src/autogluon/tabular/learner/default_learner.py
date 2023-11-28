@@ -171,9 +171,12 @@ class DefaultLearner(AbstractTabularLearner):
                 f"\t\t{round(infer_limit_new_log, 3)}{time_unit_infer_limit_new} inference time budget remaining for models...",
             )
             if infer_limit_new <= 0:
-                raise AssertionError(
-                    "Impossible to satisfy inference constraint, budget is exceeded during data preprocessing!\n"
-                    "Consider using fewer features, relaxing the inference constraint, or simplifying the feature generator."
+                infer_limit_new = 0
+                logger.log(
+                    30,
+                    f"WARNING: Impossible to satisfy inference constraint, budget is exceeded during data preprocessing!\n"
+                    f"\tAutoGluon will be unable to satisfy the constraint, but will return the fastest model it can.\n"
+                    f"\tConsider using fewer features, relaxing the inference constraint, or simplifying the feature generator.",
                 )
             infer_limit = infer_limit_new
         return infer_limit
@@ -182,17 +185,18 @@ class DefaultLearner(AbstractTabularLearner):
     def general_data_processing(self, X: DataFrame, X_val: DataFrame, X_unlabeled: DataFrame, holdout_frac: float, num_bag_folds: int):
         """General data processing steps used for all models."""
         X = copy.deepcopy(X)
-
-        with pd.option_context("mode.use_inf_as_na", True):  # treat None, NaN, INF, NINF as NA
-            invalid_labels = X[self.label].isna()
+        # treat None, NaN, INF, NINF as NA
+        X[self.label].replace([np.inf, -np.inf], np.nan, inplace=True)
+        invalid_labels = X[self.label].isna()
         if invalid_labels.any():
             first_invalid_label_idx = invalid_labels.idxmax()
             raise ValueError(f"Label column cannot contain non-finite values (NaN, Inf, Ninf). First invalid label at idx: {first_invalid_label_idx}")
 
         holdout_frac_og = holdout_frac
         if X_val is not None and self.label in X_val.columns:
-            with pd.option_context("mode.use_inf_as_na", True):  # treat None, NaN, INF, NINF as NA
-                invalid_tuning_labels = X_val[self.label].isna()
+            # treat None, NaN, INF, NINF as NA
+            X_val[self.label].replace([np.inf, -np.inf], np.nan, inplace=True)
+            invalid_tuning_labels = X_val[self.label].isna()
             if invalid_tuning_labels.any():
                 first_invalid_label_idx = invalid_tuning_labels.idxmax()
                 raise ValueError(f"Label column cannot contain non-finite values (NaN, Inf, Ninf). First invalid label at idx: {first_invalid_label_idx}")

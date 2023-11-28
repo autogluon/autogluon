@@ -226,7 +226,11 @@ class LinearModel(AbstractModel):
                 if isinstance(model.n_iter_, int):
                     total_iter_used += model.n_iter_
                 else:
-                    total_iter_used += model.n_iter_[0]
+                    try:
+                        # FIXME: For some reason this crashes on regression with some versions of scikit-learn.
+                        total_iter_used += model.n_iter_[0]
+                    except:
+                        pass
             else:
                 total_iter_used += model.max_iter
             if early_stop:
