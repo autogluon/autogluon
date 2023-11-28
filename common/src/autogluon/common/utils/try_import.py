@@ -31,7 +31,7 @@ def try_import_mxboard():
 
 
 def try_import_ray() -> ModuleType:
-    RAY_MAX_VERSION = "2.7.0"  # sync with core/setup.py
+    RAY_MAX_VERSION = "2.8.0"  # sync with core/setup.py
     ray_max_version_os_map = dict(
         Darwin=RAY_MAX_VERSION,
         Windows=RAY_MAX_VERSION,
