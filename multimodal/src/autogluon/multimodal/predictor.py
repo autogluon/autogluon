@@ -40,13 +40,16 @@ logger = logging.getLogger(__name__)
 
 class MultiModalPredictor:
     """
-    MultiModalPredictor is a deep learning "model zoo" of model zoos. It can automatically build deep learning models that
-    are suitable for multimodal datasets. You will only need to preprocess the data in the multimodal dataframe format
-    and the MultiModalPredictor can predict the values of one column conditioned on the features from the other columns.
-
-    The prediction can be either classification or regression. The feature columns can contain
-    image paths, text, numerical, and categorical values.
-
+    AutoMM is designed to simplify the fine-tuning of foundation models
+    for downstream applications with just three lines of code.
+    AutoMM seamlessly integrates with popular model zoos such as
+    HuggingFace Transformers (https://github.com/huggingface/transformers),
+    TIMM (https://github.com/huggingface/pytorch-image-models),
+    and MMDetection (https://github.com/open-mmlab/mmdetection),
+    accommodating a diverse range of data modalities,
+    including image, text, tabular, and document data, whether used individually or in combination.
+    It offers support for an array of tasks, encompassing classification, regression,
+    object detection, named entity recognition, semantic matching, and image segmentation.
     """
 
     def __init__(
@@ -73,9 +76,9 @@ class MultiModalPredictor:
         Parameters
         ----------
         label
-            Name of the column that contains the target variable to predict.
+            Name of one pd.DataFrame column that contains the target variable to predict.
         problem_type
-            Type of the prediction problem. We support standard problems like
+            Type of problem. We support standard problems like
 
             - 'binary': Binary classification
             - 'multiclass': Multi-class classification
@@ -85,18 +88,19 @@ class MultiModalPredictor:
             In addition, we support advanced problems such as
 
             - 'object_detection': Object detection
-            - 'open_vocabulry_object_detection': Zero-shot object detection (only support inference for now, finetuning TBC)
+            - 'open_vocabulry_object_detection': Zero-shot object detection (only support inference)
             - 'ner' or 'named_entity_recognition': Named entity extraction
-            - 'text_similarity': Text-text similarity problem
-            - 'image_similarity': Image-image similarity problem
-            - 'image_text_similarity': Text-image similarity problem
+            - 'text_similarity': Text-text semantic matching
+            - 'image_similarity': Image-image semantic matching
+            - 'image_text_similarity': Text-image semantic matching
             - 'feature_extraction': Extracting feature (only support inference)
             - 'zero_shot_image_classification': Zero-shot image classification (only support inference)
             - 'few_shot_classification': Few-shot classification for image or text data.
+            - 'semantic_segmentation': Semantic segmentation with Segment Anything Model.
 
             For certain problem types, the default behavior is to load a pretrained model based on
-            the presets / hyperparameters and the predictor will support zero-shot inference
-            (running inference without .fit()). This includes the following
+            the presets / hyperparameters and the predictor can do zero-shot inference
+            (running inference without .fit()). Those include the following
             problem types:
 
             - 'object_detection'
@@ -106,23 +110,25 @@ class MultiModalPredictor:
             - 'image_text_similarity'
             - 'feature_extraction'
             - 'zero_shot_image_classification'
-            - 'few_shot_classification'
 
         query
-            Column names of query data (used for matching).
+            Name of one pd.DataFrame column that has the query data in semantic matching tasks.
         response
-            Column names of response data (used for matching). If no label column is provided,
-            query and response columns form positive pairs.
+            Name of one pd.DataFrame column that contains the response data in semantic matching tasks.
+            If no label column is provided, the query and response pairs in
+            one pd.DataFrame row are assumed to be positive pairs.
         match_label
-            The label class that indicates the <query, response> pair is counted as "match".
-            This is used when the problem_type is one of the matching problem types, and when the labels are binary.
-            For example, the label column can contain ["duplicate", "not duplicate"]. And match_label can be "duplicate".
-            If match_label is not provided, every sample is assumed to have a unique label.
+            The label class that indicates the <query, response> pair is counted as a "match".
+            This is used when the task belongs to semantic matching, and the labels are binary.
+            For example, the label column can contain ["duplicate", "not duplicate"] in a duplicate detection task.
+            The match_label should be "duplicate" since it means that two items match.
         presets
-            Presets regarding model quality, e.g., best_quality, high_quality, and medium_quality.
+            Presets regarding model quality, e.g., 'best_quality', 'high_quality' (default), and 'medium_quality'.
+            Each quality has its corresponding HPO presets: 'best_quality_hpo', 'high_quality_hpo', and 'medium_quality_hpo'.
         eval_metric
             Evaluation metric name. If `eval_metric = None`, it is automatically chosen based on `problem_type`.
-            Defaults to 'accuracy' for multiclass classification, `roc_auc` for binary classification, and 'root_mean_squared_error' for regression.
+            Defaults to 'accuracy' for multiclass classification, `roc_auc` for binary classification,
+            and 'root_mean_squared_error' for regression.
         hyperparameters
             This is to override some default configurations.
             For example, changing the text and image backbones can be done by formatting:
@@ -139,37 +145,34 @@ class MultiModalPredictor:
                             "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
                         }
         path
-            Path to directory where models and intermediate outputs should be saved.
+            Path to directory where models and related artifacts should be saved.
             If unspecified, a time-stamped folder called "AutogluonAutoMM/ag-[TIMESTAMP]"
-            will be created in the working directory to store all models.
+            will be created in the working directory.
             Note: To call `fit()` twice and save all results of each fit,
             you must specify different `path` locations or don't specify `path` at all.
-            Otherwise files from first `fit()` will be overwritten by second `fit()`.
         verbosity
-            Verbosity levels range from 0 to 4 and control how much information is printed.
-            Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
-            If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`,
-            where `L` ranges from 0 to 50
-            (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels)
+            Verbosity levels range from 0 to 4, controlling how much logging information is printed.
+            Higher levels correspond to more detailed print statements.
+            You can set verbosity = 0 to suppress warnings.
         num_classes
-            Number of classes. Used in classification task.
-            If this is specified and is different from the pretrained model's output,
+            Number of classes (used for object detection).
+            If this is specified and is different from the pretrained model's output shape,
             the model's head will be changed to have <num_classes> output.
         classes
-            All classes in this dataset.
+            All the classes (used for object detection).
         warn_if_exist
-            Whether to raise warning if the specified path already exists.
+            Whether to raise warning if the specified path already exists (Default True).
         enable_progress_bar
-            Whether to show progress bar. It will be True by default and will also be
+            Whether to show progress bar (default True). It would be
             disabled if the environment variable os.environ["AUTOMM_DISABLE_PROGRESS_BAR"] is set.
         pretrained
-            Whether to init model with pretrained weights. If False, it creates a model with random initialization.
+            Whether to initialize the model with pretrained weights (default True).
+            If False, it creates a model with random initialization.
         validation_metric
-            Validation metric name. If `validation_metric = None`, it is automatically chosen based on `problem_type`.
-            Defaults to 'accuracy' for multiclass classification, `roc_auc` for binary classification, and 'root_mean_squared_error' for regression.
+            Validation metric for selecting the best model and early-stopping during training.
+            If not provided, it would be automatically chosen based on the problem type.
         sample_data_path
-            This is used for automatically inference num_classes, classes, or label.
-
+            The path to sample data from which we can infer num_classes or classes used for object detection.
         """
         if problem_type is not None:
             problem_type = problem_type.lower()
@@ -232,54 +235,95 @@ class MultiModalPredictor:
 
     @property
     def path(self):
+        """
+        Path to directory where the model and related artifacts are stored.
+        """
         return self._learner.path
 
     @property
     def label(self):
+        """
+        Name of one pd.DataFrame column that contains the target variable to predict.
+        """
         return self._learner.label
 
     @property
     def query(self):
+        """
+        Name of one pd.DataFrame column that has the query data in semantic matching tasks.
+        """
         return self._learner.query
 
     @property
     def response(self):
+        """
+        Name of one pd.DataFrame column that contains the response data in semantic matching tasks.
+        """
         return self._learner.response
 
     @property
     def match_label(self):
+        """
+        The label class that indicates the <query, response> pair is counted as "match" in the semantic matching tasks.
+        """
         return self._learner.match_label
 
     @property
     def problem_type(self):
+        """
+        What type of prediction problem this predictor has been trained for.
+        """
         return self._learner.problem_type
 
     @property
     def problem_property(self):
+        """
+        Property of the problem, storing the problem type and its related properties.
+        """
         return self._learner.problem_property
 
     @property
     def column_types(self):
+        """
+        Column types in the pd.DataFrame.
+        """
         return self._learner.column_types
 
     @property
     def eval_metric(self):
+        """
+        What metric is used to evaluate predictive performance.
+        """
         return self._learner.eval_metric
 
     @property
     def validation_metric(self):
+        """
+        Validation metric for selecting the best model and early-stopping during training.
+        Note that the validation metric may be different from the evaluation metric.
+        """
         return self._learner.validation_metric
 
     @property
     def verbosity(self):
+        """
+        Verbosity levels range from 0 to 4 and control how much information is printed.
+        Higher levels correspond to more detailed print statements.
+        """
         return self._verbosity
 
     @property
     def total_parameters(self) -> int:
+        """
+        The number of model parameters.
+        """
         return self._learner.total_parameters
 
     @property
     def trainable_parameters(self) -> int:
+        """
+        The number of trainable model parameters, usually those with requires_grad=True.
+        """
         return self._learner.trainable_parameters
 
     @property
@@ -292,7 +336,7 @@ class MultiModalPredictor:
     @property
     def classes(self):
         """
-        Returns the classes of object detection.
+        Object classes for the object detection problem type.
         """
         return self._learner.classes
 
@@ -350,9 +394,15 @@ class MultiModalPredictor:
         # TODO: align verbosity2loglevel with https://huggingface.co/docs/transformers/main_classes/logging#transformers.utils.logging.get_verbosity
 
     def set_num_gpus(self, num_gpus):
+        """
+        Set the number of GPUs in config.
+        """
         self._learner.set_num_gpus(num_gpus)
 
     def get_num_gpus(self):
+        """
+        Get the number of GPUs from config.
+        """
         self._learner.get_num_gpus()
 
     def fit(
@@ -374,29 +424,28 @@ class MultiModalPredictor:
         clean_ckpts: Optional[bool] = True,
     ):
         """
-        Fit MultiModalPredictor predict label column of a dataframe based on the other columns,
-        which may contain image path, text, numeric, or categorical features.
+        Fit models to predict a column of a data table (label) based on the other columns (features).
 
         Parameters
         ----------
         train_data
-            A dataframe containing training data.
+            A pd.DataFrame containing training data.
         presets
             Presets regarding model quality, e.g., best_quality, high_quality, and medium_quality.
+            Each quality has its corresponding HPO presets: 'best_quality_hpo', 'high_quality_hpo', and 'medium_quality_hpo'.
         tuning_data
-            A dataframe containing validation data, which should have the same columns as the train_data.
-            If `tuning_data = None`, `fit()` will automatically
-            hold out some random validation examples from `train_data`.
+            A pd.DataFrame containing validation data, which should have the same columns as the train_data.
+            If `tuning_data = None`, `fit()` will automatically hold out some random validation data from `train_data`.
         max_num_tuning_data
-            The maximum number of tuning samples, which is only used in object detection.
+            The maximum number of tuning samples (used for object detection).
         id_mappings
-             Id-to-content mappings. The contents can be text, image, etc.
-             This is used when the dataframe contains the query/response identifiers instead of their contents.
+             Id-to-content mappings (used for semantic matching). The contents can be text, image, etc.
+             This is used when the pd.DataFrame contains the query/response identifiers instead of their contents.
         time_limit
             How long `fit()` should run for (wall clock time in seconds).
             If not specified, `fit()` will run until the model has completed training.
         save_path
-            Path to directory where models and intermediate outputs should be saved.
+            Path to directory where models and artifacts should be saved.
         hyperparameters
             This is to override some default configurations.
             For example, changing the text and image backbones can be done by formatting:
@@ -424,18 +473,17 @@ class MultiModalPredictor:
                 - "numerical": each row in this column contains a number.
                 - "categorical": each row in this column belongs to one of K categories.
         holdout_frac
-            Fraction of train_data to holdout as tuning_data for optimizing hyper-parameters or
+            Fraction of train_data to holdout as tuning_data for optimizing hyperparameters or
             early stopping (ignored unless `tuning_data = None`).
             Default value (if None) is selected based on the number of rows in the training data
-            and whether hyper-parameter-tuning is utilized.
+            and whether hyperparameter optimization is utilized.
         teacher_predictor
             The pre-trained teacher predictor or its saved path. If provided, `fit()` can distill its
             knowledge to a student predictor, i.e., the current predictor.
         seed
-            The random seed to use for this training run.
-            Defaults to 0
+            The random seed to be used for training (default 0).
         standalone
-            Whether to save the enire model for offline deployment or only trained parameters of parameter-efficient fine-tuning strategy.
+            Whether to save the entire model for offline deployment.
         hyperparameter_tune_kwargs
                 Hyperparameter tuning strategy and kwargs (for example, how many HPO trials to run).
                 If None, then hyperparameter tuning will not be performed.
@@ -454,7 +502,7 @@ class MultiModalPredictor:
                         If provided str to `searcher`, you can optionally provide custom init_args to the searcher
                         You don't need to worry about `metric` and `mode`. AutoGluon will figure it out by itself.
         clean_ckpts
-            Whether to clean the checkpoints of each validation step after training.
+            Whether to clean the intermediate checkpoints after training.
 
         Returns
         -------
@@ -503,12 +551,12 @@ class MultiModalPredictor:
         eval_tool: Optional[str] = None,
     ):
         """
-        Evaluate model on a test dataset.
+        Evaluate the model on a given dataset.
 
         Parameters
         ----------
         data
-            A dataframe, containing the same columns as the training data.
+            A pd.DataFrame, containing the same columns as the training data.
             Or a str, that is a path of the annotation file for detection.
         query_data
             Query data used for ranking.
@@ -541,7 +589,7 @@ class MultiModalPredictor:
         Returns
         -------
         A dictionary with the metric names and their corresponding scores.
-        Optionally return a dataframe of prediction results.
+        Optionally return a pd.DataFrame of prediction results.
         """
         return self._learner.evaluate(
             data=data,
@@ -568,7 +616,7 @@ class MultiModalPredictor:
         save_results: Optional[bool] = None,
     ):
         """
-        Predict values for the label column of new data.
+        Predict the label column values for new data.
 
         Parameters
         ----------
@@ -612,8 +660,9 @@ class MultiModalPredictor:
         realtime: Optional[bool] = False,
     ):
         """
-        Predict probabilities class probabilities rather than class labels.
-        This is only for the classification tasks. Calling it for a regression task will throw an exception.
+        Predict class probabilities rather than class labels.
+        Note that this is only for the classification tasks.
+        Calling it for a regression task will throw an exception.
 
         Parameters
         ----------
@@ -661,7 +710,7 @@ class MultiModalPredictor:
         signature: Optional[str] = None,
     ):
         """
-        Extract features for each sample, i.e., one row in the provided dataframe `data`.
+        Extract features for each sample, i.e., one row in the provided pd.DataFrame `data`.
 
         Parameters
         ----------
@@ -740,7 +789,8 @@ class MultiModalPredictor:
             broken during the middle, and we want to resume the training from the last saved checkpoint.
         verbosity
             Verbosity levels range from 0 to 4 and control how much information is printed.
-            Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
+            Higher levels correspond to more detailed print statements.
+            You can set verbosity = 0 to suppress warnings.
 
         Returns
         -------
@@ -771,9 +821,11 @@ class MultiModalPredictor:
 
     def dump_model(self, save_path: Optional[str] = None):
         """
-        Save model weights and config to local directory.
-        Model weights are saved in file `pytorch_model.bin` (timm, hf) or '<ckpt_name>.pth' (mmdet);
-        Configs are saved in file `config.json` (timm, hf) or  '<ckpt_name>.py' (mmdet).
+        Save model weights and config to a local directory.
+        Model weights are saved in the file `pytorch_model.bin` (for `timm_image` or `hf_text`)
+        or '<ckpt_name>.pth' (for `mmdet_image`).
+        Configs are saved in the file `config.json` (for `timm_image` or `hf_text`)
+        or  '<ckpt_name>.py' (for `mmdet_image`).
 
         Parameters
         ----------
@@ -792,7 +844,7 @@ class MultiModalPredictor:
         truncate_long_and_double: Optional[bool] = False,
     ):
         """
-        Export this predictor's model to ONNX file.
+        Export this predictor's model to an ONNX file.
 
         When `path` argument is not provided, the method would not save the model into disk.
         Instead, it would export the onnx model into BytesIO and return its binary as bytes.
@@ -845,9 +897,6 @@ class MultiModalPredictor:
 
         Parameters
         ----------
-        data
-            Raw data used to trace and export the model.
-            If this is None, will check if a processed batch is provided.
         providers : dict or str, default=None
             A list of execution providers for model prediction in onnxruntime.
 
@@ -865,7 +914,7 @@ class MultiModalPredictor:
 
     def fit_summary(self, verbosity=0, show_plot=False):
         """
-        Output summary of information about models produced during `fit()`.
+        Output the training summary information from `fit()`.
 
         Parameters
         ----------
@@ -885,8 +934,7 @@ class MultiModalPredictor:
 
     def list_supported_models(self, pretrained=True):
         """
-        List supported models for each problem_type to let users know
-        options of checkpoint name to choose during fit().
+        List supported models for each problem type.
 
         Parameters
         ----------

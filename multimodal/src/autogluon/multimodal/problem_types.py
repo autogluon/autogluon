@@ -47,8 +47,10 @@ PROBLEM_TYPES_REG = Registry("problem_type_properties")
 
 @dataclass
 class ProblemTypeProperty:
-    """Property of the problem. Stores the name of the problem
-    and its related properties. Some properties are used in the label / feature inference logic."""
+    """
+    Property of the problem. Stores the name of the problem
+    and its related properties. Some properties are used in the label / feature inference logic.
+    """
 
     name: str  # Name of the problem
     support_fit: bool = True  # Whether the problem type support `.fit()`
