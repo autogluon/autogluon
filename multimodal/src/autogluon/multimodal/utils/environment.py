@@ -238,15 +238,14 @@ def get_precision_context(precision: Union[int, str], device_type: Optional[str]
     -------
     A precision context manager.
     """
-    if precision == 32:
+    precision = infer_precision(num_gpus=1, precision=precision, as_torch=True)
+    if precision == torch.float32:
         assert torch.get_default_dtype() == torch.float32
         return contextlib.nullcontext()
-    elif precision in [16, "16", "16-mixed", "bf16", "bf16-mixed"]:
-        return torch.autocast(device_type=device_type, dtype=torch.bfloat16 if "bf16" in precision else torch.half)
-    elif precision == 64:
+    elif precision == torch.float64:
         return double_precision_context()
     else:
-        raise ValueError(f"Unknown precision: {precision}")
+        return torch.autocast(device_type=device_type, dtype=precision)
 
 
 def check_if_packages_installed(problem_type: str = None, package_names: List[str] = None):
