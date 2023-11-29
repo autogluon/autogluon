@@ -9,8 +9,6 @@ import torch
 
 from autogluon.common.utils.system_info import get_ag_system_info
 
-from .. import version as ag_version
-
 logger = logging.getLogger(__name__)
 
 

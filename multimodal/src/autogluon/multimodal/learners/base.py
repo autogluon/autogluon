@@ -295,6 +295,11 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         self._total_train_time = None
         self._best_score = None
 
+        self._log_filters = [
+            ".*does not have many workers.* in the `DataLoader` init to improve performance.*",
+            "Checkpoint directory .* exists and is not empty.",
+        ]
+
     @property
     def path(self):
         return self._save_path
@@ -1165,13 +1170,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         is_train=True,
     ):
         with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore",
-                ".*does not have many workers which may be a bottleneck. "
-                "Consider increasing the value of the `num_workers` argument` "
-                ".* in the `DataLoader` init to improve performance.*",
-            )
-            warnings.filterwarnings("ignore", "Checkpoint directory .* exists and is not empty.")
+            for filter in self._log_filters:
+                warnings.filterwarnings("ignore", filter)
             if is_train:
                 trainer.fit(
                     litmodule,

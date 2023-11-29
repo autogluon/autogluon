@@ -99,6 +99,10 @@ class ObjectDetectionLearner(BaseLearner):
         self._detection_anno_train = None
         self.detection_anno_train = None
 
+        self._log_filters += [
+            ".*Creating a tensor from a list of numpy.ndarrays is extremely slow..*",
+        ]
+
     @property
     def classes(self):
         """
