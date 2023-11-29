@@ -7,7 +7,6 @@ function setup_build_env {
     python3 -m pip install bandit
     python3 -m pip install packaging
     python3 -m pip install ruff
-    python3 -m pip install async-timeout
 }
 
 function setup_build_contrib_env {
