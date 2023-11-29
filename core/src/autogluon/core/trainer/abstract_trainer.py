@@ -2927,9 +2927,11 @@ class AbstractTrainer:
         for model_name in model_names:
             if set_refit_score_to_parent and (model_name in models_full_dict):
                 if models_full_dict[model_name] not in score_val_dict:
-                    raise AssertionError(f"Model parent is missing from leaderboard when `set_refit_score_to_parent=True`, "
-                                         f"this is invalid. The parent model may have been deleted. "
-                                         f"(model='{model_name}', parent='{models_full_dict[model_name]}')")
+                    raise AssertionError(
+                        f"Model parent is missing from leaderboard when `set_refit_score_to_parent=True`, "
+                        f"this is invalid. The parent model may have been deleted. "
+                        f"(model='{model_name}', parent='{models_full_dict[model_name]}')"
+                    )
                 score_val.append(score_val_dict[models_full_dict[model_name]])
             else:
                 score_val.append(score_val_dict[model_name])
