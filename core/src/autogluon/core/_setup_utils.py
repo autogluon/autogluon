@@ -99,6 +99,10 @@ def default_setup_args(*, version, submodule):
         name = PACKAGE_NAME
     else:
         name = f"{PACKAGE_NAME}.{submodule}"
+    if os.getenv("RELEASE"):
+        development_status = "Development Status :: 5 - Production/Stable"
+    else:
+        development_status = "Development Status :: 4 - Beta"
     setup_args = dict(
         name=name,
         version=version,
@@ -122,7 +126,7 @@ def default_setup_args(*, version, submodule):
             ]
         },
         classifiers=[
-            "Development Status :: 4 - Beta",
+            development_status,
             "Intended Audience :: Education",
             "Intended Audience :: Developers",
             "Intended Audience :: Science/Research",
