@@ -29,6 +29,7 @@ DEPENDENT_PACKAGES = {
     "torch": ">=2.0,<2.1",  # "<{N+1}" upper cap, sync with common/src/autogluon/common/utils/try_import.py
     "lightning": ">=2.0.0,<2.1",  # "<{N+1}" upper cap
     "pytorch_lightning": ">=2.0.0,<2.1",  # "<{N+1}" upper cap, capping `lightning` does not cap `pytorch_lightning`!
+    "async_timeout": ">=4.0,<5",  # Major version cap
 }
 if LITE_MODE:
     DEPENDENT_PACKAGES = {package: version for package, version in DEPENDENT_PACKAGES.items() if package not in ["psutil", "Pillow", "timm"]}

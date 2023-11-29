@@ -30,6 +30,7 @@ install_requires = (
         "requests",
         "matplotlib",
         "boto3",
+        "async-timeout",
         f"autogluon.common=={version}",
     ]
     if not ag.LITE_MODE
