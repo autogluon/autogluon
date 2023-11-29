@@ -30,7 +30,6 @@ install_requires = (
         "requests",
         "matplotlib",
         "boto3",
-        "async-timeout",
         f"autogluon.common=={version}",
     ]
     if not ag.LITE_MODE
@@ -49,6 +48,7 @@ install_requires = (
 extras_require = {
     "ray": [
         "ray[default]>=2.6.3,<2.7",
+        "async-timeout",
     ],
     "raytune": [
         "ray[default,tune]>=2.6.3,<2.7",
