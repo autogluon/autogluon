@@ -223,6 +223,10 @@ class MMDetAutoModelForObjectDetection(nn.Module):
                 "url": "https://download.openmmlab.com/mmdetection/v2.0/yolox/yolox_x_8x8_300e_coco/yolox_x_8x8_300e_coco_20211126_140254-1ef88d67.pth",
                 "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_x_8xb8-300e_coco.py"),
             },
+            "dino_swinl_tta": {
+                "url": "https://github.com/RistoranteRist/mmlab-weights/releases/download/dino-swinl/dino-5scale_swin-l_8xb2-36e_coco-5486e051.pth",
+                "config_file": os.path.join(mmdet_configs_dir, "dino", "dino_swinl_tta.py"),
+            },
         }
 
         if os.path.isfile(checkpoint_name):
