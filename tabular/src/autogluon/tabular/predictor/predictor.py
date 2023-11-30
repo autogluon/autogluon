@@ -1157,8 +1157,9 @@ class TabularPredictor:
         inner_ag_fit_kwargs = copy.deepcopy(ag_fit_kwargs)
         inner_ag_fit_kwargs["X_val"] = X_val
         inner_ag_fit_kwargs["X_unlabeled"] = X_unlabeled
-        inner_ag_fit_kwargs["keep_only_best"] = False  # Do not keep only best, otherwise it eliminates the purpose of the comparison
-        inner_ag_fit_kwargs["calibrate"] = False  # Do not calibrate as calibration is only applied to the model with the best validation score
+        inner_ag_post_fit_kwargs = copy.deepcopy(ag_post_fit_kwargs)
+        inner_ag_post_fit_kwargs["keep_only_best"] = False  # Do not keep only best, otherwise it eliminates the purpose of the comparison
+        inner_ag_post_fit_kwargs["calibrate"] = False  # Do not calibrate as calibration is only applied to the model with the best validation score
         # FIXME: Ensure all weighted ensembles have skip connections
 
         # Verify problem type is set
@@ -1187,7 +1188,7 @@ class TabularPredictor:
                 time_limit=time_limit,
                 ds_fit_kwargs=ds_fit_kwargs,
                 ag_fit_kwargs=inner_ag_fit_kwargs,
-                ag_post_fit_kwargs=ag_post_fit_kwargs,
+                ag_post_fit_kwargs=inner_ag_post_fit_kwargs,
                 holdout_data=holdout_data,
             )
         else:
@@ -1228,7 +1229,7 @@ class TabularPredictor:
                     time_limit=time_limit,
                     ds_fit_kwargs=ds_fit_kwargs,
                     ag_fit_kwargs=inner_ag_fit_kwargs,
-                    ag_post_fit_kwargs=ag_post_fit_kwargs,
+                    ag_post_fit_kwargs=inner_ag_post_fit_kwargs,
                     holdout_data=holdout_data,
                 )
                 if stacked_overfitting:
