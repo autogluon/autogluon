@@ -135,7 +135,7 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
     freq : str
         A pandas-compatible string describing the frequency of the time series. For example ``"D"`` for daily data,
         ``"H"`` for hourly data, etc. This attribute is determined automatically based on the timestamps. For the full
-        list of possible values, see [pandas documentation](https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases).
+        list of possible values, see `pandas documentation <https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases>`_.
     num_items : int
         Number of items (time series) in the data set.
     item_ids : pd.Index
@@ -390,8 +390,7 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
         """Construct a ``TimeSeriesDataFrame`` from an Iterable of dictionaries each of which
         represent a single time series.
 
-        This function also offers compatibility with GluonTS data sets, see
-        https://ts.gluon.ai/stable/api/gluonts/gluonts.dataset.common.html#gluonts.dataset.common.ListDataset.
+        This function also offers compatibility with GluonTS `ListDataset format <https://ts.gluon.ai/stable/api/gluonts/gluonts.dataset.common.html#gluonts.dataset.common.ListDataset>`_.
 
         Parameters
         ----------
@@ -517,7 +516,7 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
         references to the data and index are copied). Any changes to the data of the original will be reflected in the
         shallow copy (and vice versa).
 
-        For more details, see [pandas documentation](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.copy.html).
+        For more details, see `pandas documentation <https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.copy.html>`_.
         """
         obj = super().copy(deep=deep)
 
@@ -894,7 +893,7 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
         Parameters
         ----------
         freq : Union[str, pd.DateOffset]
-            Frequency to which the data should be converted. See [pandas frequency aliases](https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases)
+            Frequency to which the data should be converted. See `pandas frequency aliases <https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases>`_
             for supported values.
         agg_numeric : {"max", "min", "sum", "mean", "median", "first", "last"}, default = "mean"
             Aggregation method applied to numeric columns.

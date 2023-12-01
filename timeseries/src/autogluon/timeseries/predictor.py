@@ -953,7 +953,8 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         * ``score_test``: The test score of the model on ``data``, if provided. Computed according to ``eval_metric``.
         * ``score_val``: The validation score of the model using the internal validation data. Computed according to ``eval_metric``.
 
-            **NOTE:** Metrics scores are always shown in 'higher is better' format.
+        .. note::
+            Metrics scores are always shown in 'higher is better' format.
             This means that metrics such as MASE or MAPE will be multiplied by -1, so their values will be negative.
             This is necessary to avoid the user needing to know the metric to understand if higher is better when
             looking at leaderboard.
