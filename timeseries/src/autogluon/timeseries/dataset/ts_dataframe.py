@@ -63,7 +63,7 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
                 7        2 2019-01-02       7
                 8        2 2019-01-03       8
 
-            You can also use :meth:`~autogluon.timeseries.TimeSeriesDataFrame.from_data_frame` for loading data in such format.
+        You can also use :meth:`~autogluon.timeseries.TimeSeriesDataFrame.from_data_frame` for loading data in such format.
 
         2. Path to a data file in CSV or Parquet format. The file must contain columns ``item_id`` and ``timestamp``, as well as columns with time series values. This is similar to Option 1 above (pandas DataFrame format without multi-index). Both remote (e.g., S3) and local paths are accepted. You can also use :meth:`~autogluon.timeseries.TimeSeriesDataFrame.from_path` for loading data in such format.
 
@@ -89,7 +89,7 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
                     {"target": [6, 7, 8], "start": pd.Period("01-01-2019", freq='D')}
                 ]
 
-            You can also use :meth:`~autogluon.timeseries.TimeSeriesDataFrame.from_iterable_dataset` for loading data in such format.
+        You can also use :meth:`~autogluon.timeseries.TimeSeriesDataFrame.from_iterable_dataset` for loading data in such format.
 
     static_features : pd.DataFrame, str or pathlib.Path, optional
         An optional data frame describing the metadata of each individual time series that does not change with time.
@@ -135,8 +135,7 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
     freq : str
         A pandas-compatible string describing the frequency of the time series. For example ``"D"`` for daily data,
         ``"H"`` for hourly data, etc. This attribute is determined automatically based on the timestamps. For the full
-        list of possible values, see
-        https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases
+        list of possible values, see [pandas documentation](https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases).
     num_items : int
         Number of items (time series) in the data set.
     item_ids : pd.Index
@@ -509,6 +508,17 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
         return self.groupby(level=ITEMID, sort=False).size()
 
     def copy(self: TimeSeriesDataFrame, deep: bool = True) -> pd.DataFrame:  # noqa
+        """Make a copy of the TimeSeriesDataFrame.
+
+        When ``deep=True`` (default), a new object will be created with a copy of the calling object's data and
+        indices. Modifications to the data or indices of the copy will not be reflected in the original object.
+
+        When ``deep=False``, a new object will be created without copying the calling object's data or index (only
+        references to the data and index are copied). Any changes to the data of the original will be reflected in the
+        shallow copy (and vice versa).
+
+        For more details, see [pandas documentation](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.copy.html).
+        """
         obj = super().copy(deep=deep)
 
         # also perform a deep copy for static features
