@@ -26,7 +26,7 @@ from autogluon.timeseries.trainer import AbstractTimeSeriesTrainer
 logger = logging.getLogger(__name__)
 
 
-class TimeSeriresPredictorDeprecatedMixin:
+class TimeSeriesPredictorDeprecatedMixin:
     """Contains deprecated methods from TimeSeriesPredictor that shouldn't show up in API documentation."""
 
     @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="evaluate")
@@ -35,14 +35,14 @@ class TimeSeriresPredictorDeprecatedMixin:
 
     @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="model_best")
     def get_model_best(self) -> str:
-        return self.model_best()
+        return self.model_best
 
     @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="model_names")
     def get_model_names(self) -> str:
         return self.model_names()
 
 
-class TimeSeriesPredictor(TimeSeriresPredictorDeprecatedMixin):
+class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
     """AutoGluon ``TimeSeriesPredictor`` predicts future values of multiple related time series.
 
     ``TimeSeriesPredictor`` provides probabilistic (quantile) multi-step-ahead forecasts for univariate time series.
@@ -1123,15 +1123,3 @@ class TimeSeriesPredictor(TimeSeriresPredictorDeprecatedMixin):
         # This hides method from IPython autocomplete, but not VSCode autocomplete
         deprecated = ["score", "get_model_best", "get_model_names"]
         return [d for d in super().__dir__() if d not in deprecated]
-
-    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="evaluate")
-    def score(self, *args, **kwargs):
-        return self.evaluate(*args, **kwargs)
-
-    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="model_best")
-    def get_model_best(self) -> str:
-        return self.model_best
-
-    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="model_names")
-    def get_model_names(self) -> List[str]:
-        return self.model_names()

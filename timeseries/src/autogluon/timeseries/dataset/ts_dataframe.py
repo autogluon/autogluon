@@ -23,7 +23,7 @@ TIMESTAMP = "timestamp"
 IRREGULAR_TIME_INDEX_FREQSTR = "IRREG"
 
 
-class TimeSeriresDataFrameDeprecatedMixin:
+class TimeSeriesDataFrameDeprecatedMixin:
     """Contains deprecated methods from TimeSeriesDataFrame that shouldn't show up in API documentation."""
 
     def get_reindexed_view(self, *args, **kwargs) -> TimeSeriesDataFrame:
@@ -39,7 +39,7 @@ class TimeSeriresDataFrameDeprecatedMixin:
         )
 
 
-class TimeSeriesDataFrame(pd.DataFrame, TimeSeriresDataFrameDeprecatedMixin):
+class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
     """A collection of univariate time series, where each row is identified by an (``item_id``, ``timestamp``) pair.
 
     For example, a time series data frame could represent the daily sales of a collection of products, where each

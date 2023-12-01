@@ -4,6 +4,8 @@
 AutoGluon can generate **probabilistic** multi-step-ahead forecasts for one or multiple **univariate** time series.
 For example, you can use AutoGluon to forecast daily sales of multiple products over the next month.
 
+This setting should not be confused with multivariate time series forecasting (see [this SE answer](https://stats.stackexchange.com/a/365394/134754) about the difference between multivariate and multiple univariate time series).
+
 AutoGluon also supports additional information, such as time-independent static features (e.g., location of the store)
 and time-dependent covariates (e.g., price of the product each day).
 See the [In Depth Tutorial](forecasting-indepth.ipynb) for more details.
@@ -11,7 +13,9 @@ See the [In Depth Tutorial](forecasting-indepth.ipynb) for more details.
 Currently, AutoGluon does not support features such as hierarchical forecasting and forecast explainability.
 
 ## How can I get the most accurate forecasts?
-To maximize the forecast accuracy, set the `predictor.fit()` argument `presets="best_quality"` and provide a high `time_limit`.
+To maximize the forecast accuracy, set `presets="best_quality"` and provide a high `time_limit` when calling {py:meth}`~autogluon.timeseries.TimeSeriesPredictor.fit()`.
+
+For datasets with few (<50) time series, you can typically increase the forecast accuracy even further by increasing `num_val_windows` to 3-5 when inside `predictor.fit()`, but this will require an even longer training time.
 
 ## How should I choose the evaluation metric?
 See [Evaluation Metrics](forecasting-metrics.md)
