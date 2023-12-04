@@ -16,7 +16,6 @@ import pandas as pd
 
 from autogluon.common.loaders import load_json
 from autogluon.common.savers import save_json
-from autogluon.common.utils import Deprecated
 from autogluon.common.utils.file_utils import get_directory_size, get_directory_size_per_file
 from autogluon.common.utils.log_utils import add_log_to_file, set_logger_verbosity
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
@@ -57,6 +56,7 @@ from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
 from autogluon.core.utils.utils import CVSplitter, default_holdout_frac, generate_train_test_split_combined
 
+from ._deprecated_methods import TabularPredictorDeprecatedMixin
 from ..configs.feature_generator_presets import get_default_feature_generator
 from ..configs.hyperparameter_configs import get_hyperparameter_config
 from ..configs.presets_configs import tabular_presets_alias, tabular_presets_dict
@@ -74,7 +74,7 @@ logger = logging.getLogger(__name__)  # return autogluon root logger
 # TODO: consider adding kwarg option for data which has already been preprocessed by feature generator to skip feature generation.
 # TODO: Resolve raw text feature usage in default feature generator
 # TODO: num_bag_sets -> ag_args
-class TabularPredictor:
+class TabularPredictor(TabularPredictorDeprecatedMixin):
     """
     AutoGluon TabularPredictor predicts values in a column of a tabular dataset (classification or regression).
 
@@ -4740,61 +4740,6 @@ class TabularPredictor:
             else:
                 error_message = f"{error_message} `.{message_suffix}`."
             raise AssertionError(error_message)
-
-    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="persist")
-    def persist_models(self, *args, **kwargs) -> List[str]:
-        """Deprecated method. Use `persist` instead."""
-        return self.persist(*args, **kwargs)
-
-    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="unpersist")
-    def unpersist_models(self, *args, **kwargs) -> List[str]:
-        """Deprecated method. Use `unpersist` instead."""
-        return self.unpersist(*args, **kwargs)
-
-    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="model_names")
-    def get_model_names(self, *args, **kwargs) -> List[str]:
-        """Deprecated method. Use `model_names` instead."""
-        return self.model_names(*args, **kwargs)
-
-    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="model_best")
-    def get_model_best(self) -> str:
-        """Deprecated method. Use `model_best` instead."""
-        return self.model_best
-
-    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="predict_from_proba")
-    def get_pred_from_proba(self, *args, **kwargs) -> pd.Series | np.array:
-        """Deprecated method. Use `predict_from_proba` instead."""
-        return self.predict_from_proba(*args, **kwargs)
-
-    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="model_refit_map")
-    def get_model_full_dict(self, *args, **kwargs) -> Dict[str, str]:
-        """Deprecated method. Use `model_refit_map` instead."""
-        return self.model_refit_map(*args, **kwargs)
-
-    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="predict_proba_oof")
-    def get_oof_pred_proba(self, *args, **kwargs) -> pd.DataFrame | pd.Series:
-        """Deprecated method. Use `predict_proba_oof` instead."""
-        return self.predict_proba_oof(*args, **kwargs)
-
-    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="predict_oof")
-    def get_oof_pred(self, *args, **kwargs) -> pd.Series:
-        """Deprecated method. Use `predict_oof` instead."""
-        return self.predict_oof(*args, **kwargs)
-
-    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="disk_usage_per_file")
-    def get_size_disk_per_file(self, *args, **kwargs) -> pd.Series:
-        """Deprecated method. Use `disk_usage_per_file` instead."""
-        return self.disk_usage_per_file(*args, **kwargs)
-
-    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="disk_usage")
-    def get_size_disk(self) -> int:
-        """Deprecated method. Use `disk_usage` instead."""
-        return self.disk_usage()
-
-    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="model_names(persisted=True)")
-    def get_model_names_persisted(self) -> List[str]:
-        """Deprecated method. Use `model_names(persisted=True)` instead."""
-        return self.model_names(persisted=True)
 
 
 # Location to store WIP functionality that will be later added to TabularPredictor
