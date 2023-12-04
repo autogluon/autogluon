@@ -12,6 +12,7 @@ optimization:
   lr_mult: 1 # multiply lr for downstream heads
   patience: 10
   val_check_interval: 0.5 # Check validation score a fraction of epoch if float and every n steps if integer with n < total step in epoch.
+  num_sanity_val_steps: 2 # Sanity check runs n batches of val before starting the training routine. This catches any bugs in your validation without having to wait for the first validation check. The Trainer uses 2 steps by default. Turn it off or modify it here.
   check_val_every_n_epoch: 1 # Check validation score every n epochs.
   skip_final_val: False # Flag to skip the last validation
   gradient_clip_val: 1

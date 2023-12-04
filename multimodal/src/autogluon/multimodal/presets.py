@@ -402,7 +402,7 @@ def object_detection(presets: str = DEFAULT):
     elif presets == BEST_QUALITY:
         hyperparameters.update(
             {
-                "model.mmdet_image.checkpoint_name": "co_dino_r50",
+                "model.mmdet_image.checkpoint_name": "co_dino_o365",
                 "model.mmdet_image.frozen_layers": ["backbone", "model.level_embed"],
                 "env.per_gpu_batch_size": 1,  # Works on 32G GPU
                 "optimization.learning_rate": 1e-4,
@@ -410,6 +410,7 @@ def object_detection(presets: str = DEFAULT):
                 "optimization.patience": 20,
                 "optimization.max_epochs": 50,
                 "optimization.val_check_interval": 1.0,
+                "optimization.num_sanity_val_steps": 0,
                 "optimization.check_val_every_n_epoch": 1,
             }
         )

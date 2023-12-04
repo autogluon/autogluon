@@ -226,6 +226,10 @@ class MMDetAutoModelForObjectDetection(nn.Module):
                 "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_x_8xb8-300e_coco.py"),
             },
             "co_dino": {
+                "url": "https://download.openmmlab.com/mmdetection/v3.0/codetr/co_dino_5scale_swin_large_3x_coco-d7a6d8af.pth",
+                "config_file": os.path.join(mmdet_configs_dir, "co_dino", "co_dino_5scale_swin_l_16xb1_3x_coco.py"),
+            },
+            "co_dino_o365": {
                 "url": "https://download.openmmlab.com/mmdetection/v3.0/codetr/co_dino_5scale_swin_large_16e_o365tococo-614254c9.pth",
                 "config_file": os.path.join(mmdet_configs_dir, "co_dino", "co_dino_5scale_swin_l_16xb1_16e_o365tococo.py"),
             },
