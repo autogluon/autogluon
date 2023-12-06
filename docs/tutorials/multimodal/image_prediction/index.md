@@ -6,7 +6,7 @@
 :::{grid-item-card} AutoMM for Image Classification - Quick Start
   :link: beginner_image_cls.html
 
-  How to train image classification models with MultiModalPredictor.
+  How to train image classification models with AutoMM.
 :::
 
 :::{grid-item-card} Zero-Shot Image Classification with CLIP

@@ -140,11 +140,12 @@ class FitHelper:
         extra_metrics=None,
         expected_model_count=2,
         path_as_absolute=False,
-        compile_models=False,
+        compile=False,
         compiler_configs=None,
         allowed_dataset_features=None,
         expected_stacked_overfitting_at_test=None,
         expected_stacked_overfitting_at_val=None,
+        scikit_api=False,
     ):
         if compiler_configs is None:
             compiler_configs = {}
@@ -170,10 +171,10 @@ class FitHelper:
             init_args["path"] = PathConverter.to_absolute(path=init_args["path"])
             assert PathConverter._is_absolute(path=init_args["path"])
         save_path = init_args["path"]
-        predictor = FitHelper.fit_dataset(train_data=train_data, init_args=init_args, fit_args=fit_args, sample_size=sample_size)
-        if compile_models:
-            predictor.compile_models(models="all", compiler_configs=compiler_configs)
-            predictor.persist_models(models="all")
+        predictor = FitHelper.fit_dataset(train_data=train_data, init_args=init_args, fit_args=fit_args, sample_size=sample_size, scikit_api=scikit_api)
+        if compile:
+            predictor.compile(models="all", compiler_configs=compiler_configs)
+            predictor.persist(models="all")
         if sample_size is not None and sample_size < len(test_data):
             test_data = test_data.sample(n=sample_size, random_state=0)
         predictor.predict(test_data)
@@ -186,7 +187,7 @@ class FitHelper:
             with pytest.raises(AssertionError):
                 predictor.predict_proba(test_data)
 
-        model_names = predictor.get_model_names()
+        model_names = predictor.model_names()
         model_name = model_names[0]
         assert len(model_names) == expected_model_count
         if refit_full:
@@ -231,10 +232,28 @@ class FitHelper:
             shutil.rmtree(predictor.path, ignore_errors=True)  # Delete AutoGluon output directory to ensure runs' information has been removed.
 
     @staticmethod
-    def fit_dataset(train_data, init_args, fit_args, sample_size=None) -> TabularPredictor:
+    def fit_dataset(train_data, init_args, fit_args, sample_size=None, scikit_api=False) -> TabularPredictor:
         if sample_size is not None and sample_size < len(train_data):
             train_data = train_data.sample(n=sample_size, random_state=0)
-        return TabularPredictor(**init_args).fit(train_data, **fit_args)
+        if scikit_api:
+            from autogluon.tabular.experimental import TabularClassifier, TabularRegressor
+
+            if "problem_type" in init_args:
+                problem_type = init_args["problem_type"]
+            else:
+                problem_type = infer_problem_type(train_data[init_args["label"]])
+            X = train_data.drop(columns=[init_args["label"]])
+            y = train_data[init_args["label"]]
+            if problem_type in [REGRESSION]:
+                regressor = TabularRegressor(init_args=init_args, fit_args=fit_args)
+                regressor.fit(X, y)
+                return regressor.predictor_
+            else:
+                classifier = TabularClassifier(init_args=init_args, fit_args=fit_args)
+                classifier.fit(X, y)
+                return classifier.predictor_
+        else:
+            return TabularPredictor(**init_args).fit(train_data, **fit_args)
 
 
 # Helper functions for training models outside of predictors
@@ -303,14 +322,14 @@ class ModelFitHelper:
 @contextmanager
 def mock_system_resourcses(num_cpus=None, num_gpus=None):
     original_get_cpu_count = ResourceManager.get_cpu_count
-    original_get_gpu_count_all = ResourceManager.get_gpu_count_all
+    original_get_gpu_count = ResourceManager.get_gpu_count
     if num_cpus is not None:
         ResourceManager.get_cpu_count = lambda: num_cpus
     if num_gpus is not None:
-        ResourceManager.get_gpu_count_all = lambda: num_gpus
+        ResourceManager.get_gpu_count = lambda: num_gpus
     yield
     ResourceManager.get_cpu_count = original_get_cpu_count
-    ResourceManager.get_gpu_count_all = original_get_gpu_count_all
+    ResourceManager.get_gpu_count = original_get_gpu_count
 
 
 @pytest.fixture

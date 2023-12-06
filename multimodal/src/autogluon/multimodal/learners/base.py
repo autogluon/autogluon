@@ -108,8 +108,6 @@ from ..utils import (
     filter_hyperparameters,
     get_config,
     get_dir_ckpt_paths,
-    get_fit_complete_message,
-    get_fit_start_message,
     get_gpu_message,
     get_load_ckpt_paths,
     get_local_pretrained_config_paths,
@@ -129,6 +127,9 @@ from ..utils import (
     list_timm_models,
     load_text_tokenizers,
     logits_to_prob,
+    on_fit_end_message,
+    on_fit_per_run_start_message,
+    on_fit_start_message,
     run_ddp_only_once,
     save_pretrained_model_configs,
     save_text_tokenizers,
@@ -294,6 +295,11 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         self._total_train_time = None
         self._best_score = None
 
+        self._log_filters = [
+            ".*does not have many workers.* in the `DataLoader` init to improve performance.*",
+            "Checkpoint directory .* exists and is not empty.",
+        ]
+
     @property
     def path(self):
         return self._save_path
@@ -337,6 +343,9 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
     @property
     def model_size(self) -> float:
+        """
+        Returns the model size in Megabyte.
+        """
         model_size = sum(
             p.numel() * p.element_size() if not is_lazy_weight_tensor(p) else 0 for p in self._model.parameters()
         )
@@ -465,19 +474,21 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         if best_score:
             self._best_score = best_score
 
-    def infer_validation_metric(self):
+    def infer_validation_metric(self, is_matching: Optional[bool] = False):
         if self._fit_called:
             return
         self._validation_metric_name, self._eval_metric_name = infer_metrics(
             problem_type=self._problem_type,
-            eval_metric_name=self._eval_metric_name,
+            eval_metric=self._eval_metric_name if self._eval_metric_func is None else self._eval_metric_func,
             validation_metric_name=self._validation_metric_name,
+            is_matching=is_matching,
         )
         self._minmax_mode = get_minmax_mode(self._validation_metric_name)
         logger.debug(f"validation_metric_name: {self._validation_metric_name}")
         logger.debug(f"minmax_mode: {self._minmax_mode}")
 
     def update_hyperparameters(self, hyperparameters: Dict, hyperparameter_tune_kwargs: Dict):
+        problem_type = self._pipeline if hasattr(self, "_pipeline") else self._problem_type  # matching uses pipeline
         if self._hyperparameters and hyperparameters:
             self._hyperparameters.update(hyperparameters)
         elif hyperparameters:
@@ -489,7 +500,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             self._hyperparameter_tune_kwargs = hyperparameter_tune_kwargs
 
         self._hyperparameters, self._hyperparameter_tune_kwargs = update_hyperparameters(
-            problem_type=self._problem_type,
+            problem_type=problem_type,
             presets=self._presets,
             provided_hyperparameters=self._hyperparameters,
             provided_hyperparameter_tune_kwargs=self._hyperparameter_tune_kwargs,
@@ -508,7 +519,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
     def fit_sanity_check(self):
         assert not self._resume or not self._is_hpo, "You can not resume training with HPO."
-        if self._is_hpo and self._teacher_learner is not None:
+        if self._is_hpo and hasattr(self, "_teacher_learner") and self._teacher_learner is not None:
             assert isinstance(
                 self._teacher_learner, str
             ), "HPO with distillation only supports passing a path to the learner."
@@ -571,6 +582,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         if teacher_learner:
             self._teacher_learner = teacher_learner
 
+        logger.info(on_fit_start_message(path=self._save_path))
         training_start = time.time()
         return training_start
 
@@ -598,7 +610,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         training_end = time.time()
         self._total_train_time = training_end - training_start
         # TODO(?) We should have a separate "_post_training_event()" for logging messages.
-        logger.info(get_fit_complete_message(self._save_path))
+        logger.info(on_fit_end_message(self._save_path))
 
     def fit(
         self,
@@ -617,8 +629,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         clean_ckpts: Optional[bool] = True,
         **kwargs,
     ):
-        training_start = self.on_fit_start(presets=presets, teacher_learner=teacher_learner)
         self.setup_save_path(save_path=save_path)
+        training_start = self.on_fit_start(presets=presets, teacher_learner=teacher_learner)
         self.infer_problem_type(train_data=train_data)
         self.prepare_train_tuning_data(
             train_data=train_data,
@@ -715,7 +727,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                     column_types=column_types,
                     label_column=self._label_column,
                     train_df_x=data,
-                    train_df_y=data[self._label_column] if self._label_column else None,
+                    train_df_y=data[self._label_column] if self._label_column in data else None,
                 )
 
         return df_preprocessor
@@ -844,7 +856,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         predict_data=None,
         is_train=True,
     ):
-        if self._teacher_learner is not None:
+        if is_train and self._teacher_learner is not None:
             df_preprocessor = [df_preprocessor, self._teacher_learner._df_preprocessor]
             data_processors = [data_processors, self._teacher_learner._data_processors]
         datamodule_kwargs = dict(
@@ -1046,11 +1058,14 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             data = predict_data
             config = self._config
 
-        num_gpus = compute_num_gpus(config_num_gpus=config.env.num_gpus, strategy=config.env.strategy)
+        num_gpus = compute_num_gpus(
+            config_num_gpus=config.env.num_gpus,
+            accelerator=OmegaConf.select(config, "env.accelerator", default="auto"),
+        )
         num_gpus = self.update_num_gpus_by_data_size(num_gpus=num_gpus, data=data)
         strategy = self.get_strategy_per_run(num_gpus=num_gpus, config=config)
         strategy, num_gpus = self.update_strategy_and_num_gpus_for_hpo(strategy=strategy, num_gpus=num_gpus)
-        num_gpus, strategy = run_ddp_only_once(num_gpus, strategy)
+        num_gpus, strategy = run_ddp_only_once(num_gpus=num_gpus, strategy=strategy)
 
         if is_train:
             self.log_gpu_info(num_gpus=num_gpus, config=config)
@@ -1086,8 +1101,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             log_filter = LogFilter(blacklist_msgs)
             with apply_log_filter(log_filter):
                 trainer = pl.Trainer(
-                    accelerator="gpu" if num_gpus > 0 else "auto",
-                    devices=num_gpus,
+                    accelerator="gpu" if num_gpus > 0 else OmegaConf.select(config, "env.accelerator", default="auto"),
+                    devices=num_gpus if num_gpus > 0 else "auto",
                     num_nodes=config.env.num_nodes,
                     precision=precision,
                     strategy=strategy if strategy else "auto",
@@ -1129,8 +1144,10 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
             with apply_log_filter(log_filter):
                 trainer = pl.Trainer(
-                    accelerator="gpu" if num_gpus > 0 else "auto",
-                    devices=num_gpus,
+                    accelerator="gpu"
+                    if num_gpus > 0
+                    else OmegaConf.select(self._config, "env.accelerator", default="auto"),
+                    devices=num_gpus if num_gpus > 0 else "auto",
                     num_nodes=self._config.env.num_nodes,
                     precision=precision,
                     strategy=strategy,
@@ -1156,13 +1173,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         is_train=True,
     ):
         with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore",
-                ".*does not have many workers which may be a bottleneck. "
-                "Consider increasing the value of the `num_workers` argument` "
-                ".* in the `DataLoader` init to improve performance.*",
-            )
-            warnings.filterwarnings("ignore", "Checkpoint directory .* exists and is not empty.")
+            for filter in self._log_filters:
+                warnings.filterwarnings("ignore", filter)
             if is_train:
                 trainer.fit(
                     litmodule,
@@ -1184,9 +1196,9 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                 return outputs
 
     def on_fit_per_run_start(self, seed, save_path):
-        pl.seed_everything(seed, workers=True)
         # TODO(?) We should have a separate "_pre_training_event()" for logging messages.
-        logger.info(get_fit_start_message(save_path, self._validation_metric_name))
+        logger.info(on_fit_per_run_start_message(save_path, self._validation_metric_name))
+        pl.seed_everything(seed, workers=True)
 
     def on_fit_per_run_end(
         self,
@@ -1347,7 +1359,9 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         standalone=True,
         clean_ckpts=True,
     ):
-        minmax_mode = get_minmax_mode(self._eval_metric_name)
+        minmax_mode = get_minmax_mode(
+            self._eval_metric_name if self._eval_metric_func is None else self._eval_metric_func
+        )
         best_k_models_yaml_path = os.path.join(save_path, BEST_K_MODELS_FILE)
         if os.path.exists(best_k_models_yaml_path):
             with open(best_k_models_yaml_path, "r") as f:
@@ -1568,7 +1582,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         # realtime can initialize CUDA, which can cause failures when calling fit again in the interactive env.
         if is_interactive_strategy(strategy) and realtime:
             realtime = False
-            num_gpus = 1
+            num_gpus = min(1, num_gpus)
             barebones = True
 
         return realtime, num_gpus, barebones
@@ -1645,8 +1659,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
     def predict_per_run(
         self,
         data: Union[pd.DataFrame, dict, list],
+        realtime: Optional[bool],
         requires_label: Optional[bool] = False,
-        realtime: Optional[bool] = None,
         barebones: Optional[bool] = False,
     ) -> List[Dict]:
         """
@@ -1656,10 +1670,10 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         ----------
         data
             The data for inference.
-        requires_label
-            Whether uses label during inference.
         realtime
             Whether use realtime inference.
+        requires_label
+            Whether uses label during inference.
         barebones
             Whether to run in “barebones mode”, where all lightning's features that may impact raw speed are disabled.
 
@@ -1776,7 +1790,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         data: Union[pd.DataFrame, dict, list, str],
         metrics: Optional[Union[str, List[str]]] = None,
         return_pred: Optional[bool] = False,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         **kwargs,
     ):
         """
@@ -1786,15 +1800,14 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         ----------
         data
             A dataframe, containing the same columns as the training data.
-            Or a str, that is a path of the annotation file for detection.
         metrics
             A list of metric names to report.
             If None, we only return the score for the stored `_eval_metric_name`.
         return_pred
             Whether to return the prediction result of each row.
         realtime
-            Whether to do realtime inference, which is efficient for small data (default None).
-            If not specified, we would infer it on based on the data modalities
+            Whether to do realtime inference, which is efficient for small data (default False).
+            If provided None, we would infer it on based on the data modalities
             and sample number.
 
         Returns
@@ -1806,8 +1819,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         ret_type = LOGITS
         outputs = self.predict_per_run(
             data=data,
-            requires_label=True,
             realtime=realtime,
+            requires_label=True,
         )
         logits = extract_from_output(ret_type=ret_type, outputs=outputs)
         metric_data = {}
@@ -1884,7 +1897,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         data: Union[pd.DataFrame, dict, list, str],
         candidate_data: Optional[Union[pd.DataFrame, dict, list]] = None,
         as_pandas: Optional[bool] = None,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         **kwargs,
     ):
         """
@@ -1900,8 +1913,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         as_pandas
             Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
         realtime
-            Whether to do realtime inference, which is efficient for small data (default None).
-            If not specified, we would infer it on based on the data modalities
+            Whether to do realtime inference, which is efficient for small data (default False).
+            If provided None, we would infer it on based on the data modalities
             and sample number.
 
         Returns
@@ -1919,8 +1932,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         else:
             outputs = self.predict_per_run(
                 data=data,
-                requires_label=False,
                 realtime=realtime,
+                requires_label=False,
             )
             logits = extract_from_output(outputs=outputs, ret_type=ret_type)
 
@@ -1945,7 +1958,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         candidate_data: Optional[Union[pd.DataFrame, dict, list]] = None,
         as_pandas: Optional[bool] = None,
         as_multiclass: Optional[bool] = True,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         **kwargs,
     ):
         """
@@ -1965,8 +1978,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             Whether to return the probability of all labels or
             just return the probability of the positive class for binary classification problems.
         realtime
-            Whether to do realtime inference, which is efficient for small data (default None).
-            If not specified, we would infer it on based on the data modalities
+            Whether to do realtime inference, which is efficient for small data (default False).
+            If provided None, we would infer it on based on the data modalities
             and sample number.
 
         Returns
@@ -1989,8 +2002,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         else:
             outputs = self.predict_per_run(
                 data=data,
-                requires_label=False,
                 realtime=realtime,
+                requires_label=False,
             )
             logits = extract_from_output(outputs=outputs, ret_type=LOGITS)
             prob = logits_to_prob(logits)
@@ -2010,7 +2023,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         return_masks: Optional[bool] = False,
         as_tensor: Optional[bool] = False,
         as_pandas: Optional[bool] = False,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         **kwargs,
     ):
         """
@@ -2029,8 +2042,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         as_pandas
             Whether to return the output as a pandas DataFrame (True) or numpy array (False).
         realtime
-            Whether to do realtime inference, which is efficient for small data (default None).
-            If not specified, we would infer it on based on the data modalities
+            Whether to do realtime inference, which is efficient for small data (default False).
+            If provided None, we would infer it on based on the data modalities
             and sample number.
 
         Returns
@@ -2046,8 +2059,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         )
         outputs = self.predict_per_run(
             data=data,
-            requires_label=False,
             realtime=realtime,
+            requires_label=False,
         )
         if self._problem_type in [FEATURE_EXTRACTION, ZERO_SHOT_IMAGE_CLASSIFICATION]:
             features = extract_from_output(outputs=outputs, ret_type=COLUMN_FEATURES, as_ndarray=as_tensor is False)
@@ -2207,19 +2220,6 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             checkpoint = {"state_dict": {"model." + name: param for name, param in model.state_dict().items()}}
             torch.save(checkpoint, os.path.join(os.path.abspath(path), MODEL_CHECKPOINT))
 
-        # # In case that users save to a path, which is not the original save_path.
-        # if os.path.abspath(path) != os.path.abspath(self._save_path):
-        #     model_path = os.path.join(self._save_path, "model.ckpt")
-        #     if os.path.isfile(model_path):
-        #         shutil.copy(model_path, path)
-        #     else:
-        #         # FIXME(?) Fix the saving logic
-        #         RuntimeError(
-        #             f"Cannot find the model checkpoint in '{model_path}'. Have you removed the folder that "
-        #             f"is created in .fit()? Currently, .save() won't function appropriately if that folder is "
-        #             f"removed."
-        #         )
-
     @staticmethod
     def _load_metadata(
         learner: BaseLearner,
@@ -2377,6 +2377,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             mixup_active=False,
             loss_func_name=OmegaConf.select(learner._config, "optimization.loss_function"),
             config=learner._config.optimization,
+            num_classes=learner._output_shape,
         )
         model_postprocess_fn = get_model_postprocess_fn(
             problem_type=learner._problem_type,
@@ -2452,7 +2453,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         We do not recommend directly printing this dict as it may be very large.
         """
         if self._total_train_time is None:
-            logging.info("There is no `best_score` or `total_train_time`. Have you called `learner.fit()`?")
+            logging.info("There is no `best_score` or `total_train_time`. Have you called `predictor.fit()`?")
         else:
             logging.info(
                 f"Here's the model summary:"

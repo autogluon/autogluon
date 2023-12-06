@@ -7,6 +7,7 @@ docs:
 - microsoft/layoutlm-base-uncased
 - yolox_s
 - yolox_l
+- facebook/sam-vit-base
 others:
 - bert-base-chinese
 - bert-base-uncased

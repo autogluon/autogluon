@@ -84,7 +84,7 @@ def test_dynamic_stacking_hps(fit_helper, dataset_loader_helper, stacked_overfit
             predictor = fit_helper.fit_dataset(train_data=train_data, init_args=dict(label=label), fit_args=tmp_fit_args, sample_size=1000)
             if ("holdout_data" in ds_args_update) and (ds_args_update["holdout_data"] is not None):
                 n_expected = 1000 + n_test_data
-                assert len(predictor.get_oof_pred()) == n_expected, "Verify that holdout data was used for training"
+                assert len(predictor.predict_oof()) == n_expected, "Verify that holdout data was used for training"
             lb = predictor.leaderboard(test_data, extra_info=True)
             stacked_overfitting_assert_func(lb, predictor, False, False)
             shutil.rmtree(predictor.path)

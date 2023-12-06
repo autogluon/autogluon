@@ -1,6 +1,7 @@
 """Unit tests for trainers"""
 import copy
 import shutil
+import sys
 import tempfile
 from collections import defaultdict
 from unittest import mock
@@ -165,6 +166,7 @@ def test_given_hyperparameters_when_trainer_fit_then_freq_set_correctly(temp_mod
         assert model.freq == DUMMY_TS_DATAFRAME.freq
 
 
+@pytest.mark.skipif(sys.platform.startswith("win"), reason="HPO tests lead to known issues in Windows platform tests")
 @pytest.mark.parametrize("model_name", ["DeepAR", "SimpleFeedForward"])
 def test_given_hyperparameters_with_spaces_when_trainer_called_then_hpo_is_performed(temp_model_path, model_name):
     hyperparameters = {model_name: {"epochs": space.Int(1, 4)}}
@@ -419,7 +421,7 @@ def test_when_refit_full_called_then_all_models_are_retrained(trained_and_refit_
     leaderboard_refit = refit_trainer.leaderboard()
 
     expected_refit_full_dict = {name: name + ag.constants.REFIT_FULL_SUFFIX for name in trainer.get_model_names()}
-    assert dict_equal_primitive(refit_trainer.model_full_dict, expected_refit_full_dict)
+    assert dict_equal_primitive(refit_trainer.model_refit_map, expected_refit_full_dict)
     assert len(leaderboard_refit) == len(leaderboard_initial) + len(expected_refit_full_dict)
 
 
@@ -440,8 +442,8 @@ def test_when_refit_full_called_with_model_name_then_single_model_is_updated(tem
             "SimpleFeedForward": {"epochs": 1, "num_batches_per_epoch": 1},
         },
     )
-    model_full_dict = trainer.refit_full("DeepAR")
-    assert list(model_full_dict.values()) == ["DeepAR_FULL"]
+    model_refit_map = trainer.refit_full("DeepAR")
+    assert list(model_refit_map.values()) == ["DeepAR_FULL"]
 
 
 @pytest.mark.parametrize(

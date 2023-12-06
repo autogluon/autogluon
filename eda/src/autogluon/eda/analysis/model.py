@@ -188,7 +188,7 @@ class AutoGluonModelEvaluator(AbstractAnalysis):
 
         _data = test_data if test_data_present else val_data
         importance = predictor.feature_importance(_data.reset_index(drop=True), silent=True)
-        leaderboard = predictor.leaderboard(_data, silent=True)
+        leaderboard = predictor.leaderboard(_data)
 
         labels = predictor.class_labels
         s = {
@@ -201,7 +201,7 @@ class AutoGluonModelEvaluator(AbstractAnalysis):
         }
 
         try:
-            y_pred_train = args.model.get_oof_pred_proba()
+            y_pred_train = args.model.predict_proba_oof()
             s["y_true_train"] = args.train_data[args.label]
             s["y_pred_train"] = y_pred_train
         except AssertionError:

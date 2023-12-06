@@ -1,5 +1,7 @@
 import copy
 
+from .zeroshot.zeroshot_portfolio_2023 import hyperparameter_portfolio_zeroshot_2023
+
 # Dictionary of preset hyperparameter configurations.
 hyperparameter_config_dict = dict(
     # Default AutoGluon hyperparameters intended to maximize accuracy without significant regard to inference time or disk usage.
@@ -347,6 +349,7 @@ hyperparameter_config_dict = dict(
             {"weights": "distance", "ag_args": {"name_suffix": "Dist"}},
         ],
     },
+    zeroshot=hyperparameter_portfolio_zeroshot_2023,
 )
 
 # default_FTT is experimental

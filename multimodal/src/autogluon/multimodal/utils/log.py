@@ -1,15 +1,13 @@
 import datetime
 import logging
 import os
-import subprocess as sp
 from contextlib import contextmanager
 from typing import Dict, List, Optional, Tuple, Union
 
 import pytz
 import torch
 
-from .. import version as ag_version
-from .environment import is_interactive_strategy
+from autogluon.common.utils.system_info import get_ag_system_info
 
 logger = logging.getLogger(__name__)
 
@@ -143,47 +141,41 @@ def apply_log_filter(log_filter):
         remove_log_filter(logging.getLogger("lightning.pytorch"), log_filter)
 
 
-def get_fit_start_message(save_path, validation_metric_name):
+def on_fit_start_message(path: Optional[str] = None):
+    return get_ag_system_info(
+        path=path,
+        include_gpu_count=False,
+        include_pytorch=True,
+        include_cuda=True,
+    )
+
+
+def on_fit_per_run_start_message(save_path, validation_metric_name):
     return f"""\
-AutoMM starts to create your model. ✨
 
-- AutoGluon version is {ag_version.__version__}.
+AutoMM starts to create your model. ✨✨✨
 
-- Pytorch version is {torch.__version__}.
-
-- Model will be saved to "{save_path}".
-
-- Validation metric is "{validation_metric_name}".
-
-- To track the learning progress, you can open a terminal and launch Tensorboard:
+To track the learning progress, you can open a terminal and launch Tensorboard:
     ```shell
     # Assume you have installed tensorboard
     tensorboard --logdir {save_path}
     ```
-
-Enjoy your coffee, and let AutoMM do the job ☕☕☕ Learn more at https://auto.gluon.ai
 """
 
 
-def get_fit_complete_message(save_path):
+def on_fit_end_message(save_path):
     return f"""\
-AutoMM has created your model 🎉🎉🎉
+AutoMM has created your model. 🎉🎉🎉
 
-- To load the model, use the code below:
+To load the model, use the code below:
     ```python
     from autogluon.multimodal import MultiModalPredictor
     predictor = MultiModalPredictor.load("{save_path}")
     ```
 
-- You can open a terminal and launch Tensorboard to visualize the training log:
-    ```shell
-    # Assume you have installed tensorboard
-    tensorboard --logdir {save_path}
-    ```
-
-- If you are not satisfied with the model, try to increase the training time, 
+If you are not satisfied with the model, try to increase the training time, 
 adjust the hyperparameters (https://auto.gluon.ai/stable/tutorials/multimodal/advanced_topics/customization.html),
-or post issues on GitHub: https://github.com/autogluon/autogluon
+or post issues on GitHub (https://github.com/autogluon/autogluon/issues).
 
 """
 
@@ -203,24 +195,25 @@ def get_gpu_message(detected_num_gpus: int, used_num_gpus: int, strategy: str):
     -------
     A string with the GPU info.
     """
-    gpu_message = f"{detected_num_gpus} GPUs are detected, and {used_num_gpus} GPUs will be used.\n"
-    if not is_interactive_strategy(strategy):
-        free_memories_command = "nvidia-smi --query-gpu=memory.free --format=csv"
-        free_memories_info = sp.check_output(free_memories_command.split()).decode("ascii").split("\n")[:-1][1:]
-        free_memories = [int(x.split()[0]) for i, x in enumerate(free_memories_info)]
 
-        total_memories_command = "nvidia-smi --query-gpu=memory.total --format=csv"
-        total_memories_info = sp.check_output(total_memories_command.split()).decode("ascii").split("\n")[:-1][1:]
-        total_memories = [int(x.split()[0]) for i, x in enumerate(total_memories_info)]
+    def _bytes_to_gigabytes(bytes):
+        return round((bytes / 1024) / 1024 / 1024, 2)
 
-        for i in range(detected_num_gpus):
-            free_memory = free_memories[i]
-            total_memory = total_memories[i]
-            gpu_message += f"   - GPU {i} name: {torch.cuda.get_device_name(i)}\n"
-            gpu_message += (
-                f"   - GPU {i} memory: {free_memory * 1e-9:.2f}GB/{total_memory * 1e-9:.2f}GB (Free/Total)\n"
-            )
-    if torch.cuda.is_available():
-        gpu_message += f"CUDA version is {torch.version.cuda}.\n"
+    gpu_message = f"GPU Count: {detected_num_gpus}\nGPU Count to be Used: {used_num_gpus}\n"
+    try:
+        import nvidia_smi
+    except:
+        return gpu_message
+
+    for i in range(detected_num_gpus):
+        nvidia_smi.nvmlInit()
+        handle = nvidia_smi.nvmlDeviceGetHandleByIndex(i)
+        info = nvidia_smi.nvmlDeviceGetMemoryInfo(handle)
+
+        gpu_mem_used = _bytes_to_gigabytes(info.used)
+        gpu_mem_total = _bytes_to_gigabytes(info.total)
+        if torch.cuda.is_available():
+            gpu_message += f"GPU {i} Name: {torch.cuda.get_device_name(i)}\n"
+        gpu_message += f"GPU {i} Memory: {gpu_mem_used}GB/{gpu_mem_total}GB (Used/Total)\n"
 
     return gpu_message

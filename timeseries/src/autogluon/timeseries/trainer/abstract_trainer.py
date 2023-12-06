@@ -279,7 +279,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         # Dict of normal model -> FULL model. FULL models are produced by
         # self.refit_single_full() and self.refit_full().
-        self.model_full_dict = {}
+        self.model_refit_map = {}
 
         self.eval_metric: TimeSeriesScorer = check_get_evaluation_metric(eval_metric)
         self.eval_metric_seasonal_period = eval_metric_seasonal_period
@@ -558,54 +558,48 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         logger.info(f"Models that will be trained: {list(m.name for m in models)}")
 
-        time_limit_model_split = time_limit
-        if time_limit is not None and len(models) > 0:
-            time_limit_model_split /= len(models)
-
+        num_base_models = len(models)
         model_names_trained = []
         for i, model in enumerate(models):
-            if hyperparameter_tune_kwargs is not None:
-                time_left = time_limit_model_split
+            if time_limit is None:
+                time_left = None
+                time_left_for_model = None
+            else:
+                time_left = time_limit - (time.time() - time_start)
+                if num_base_models > 1 and self.enable_ensemble:
+                    time_reserved_for_ensemble = min(600.0, time_left / (num_base_models - i + 1))
+                    logger.debug(f"Reserving {time_reserved_for_ensemble:.1f}s for ensemble")
+                else:
+                    time_reserved_for_ensemble = 0.0
+                time_left_for_model = (time_left - time_reserved_for_ensemble) / (num_base_models - i)
+                if time_left <= 0:
+                    logger.info(f"Stopping training due to lack of time remaining. Time left: {time_left:.1f} seconds")
+                    break
 
-                fit_log_message = f"Hyperparameter tuning model: {model.name}. "
-                if time_limit is not None and time_limit_model_split is not None:
+            if contains_searchspace(model.get_user_params()):
+                fit_log_message = f"Hyperparameter tuning model {model.name}. "
+                if time_left is not None:
                     fit_log_message += (
-                        f"Tuning model for up to {time_limit_model_split:.2f}s " f"of the {time_limit:.2f}s remaining."
+                        f"Tuning model for up to {time_left_for_model:.1f}s of the {time_left:.1f}s remaining."
                     )
                 logger.info(fit_log_message)
-
-                if contains_searchspace(model.get_user_params()):
-                    with tqdm.external_write_mode():
-                        model_names_trained += self.tune_model_hyperparameters(
-                            model,
-                            time_limit=time_left,
-                            train_data=train_data,
-                            val_data=val_data,
-                            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-                        )
-                else:
-                    model_names_trained += self._train_and_save(
-                        train_data, model=model, val_data=val_data, time_limit=time_left
+                with tqdm.external_write_mode():
+                    model_names_trained += self.tune_model_hyperparameters(
+                        model,
+                        time_limit=time_left_for_model,
+                        train_data=train_data,
+                        val_data=val_data,
+                        hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
                     )
             else:
-                time_left = None
                 fit_log_message = f"Training timeseries model {model.name}. "
-                if time_limit is not None:
-                    time_start_model = time.time()
-                    time_left = time_limit - (time_start_model - time_start)
-                    if time_left <= 0:
-                        logger.info(
-                            f"Stopping training due to lack of time remaining. Time left: {time_left:.2f} seconds"
-                        )
-                        break
-
+                if time_left is not None:
                     fit_log_message += (
-                        f"Training for up to {time_left:.2f}s of " f"the {time_left:.2f}s of remaining time."
+                        f"Training for up to {time_left_for_model:.1f}s of the {time_left:.1f}s of remaining time."
                     )
-
                 logger.info(fit_log_message)
                 model_names_trained += self._train_and_save(
-                    train_data, model=model, val_data=val_data, time_limit=time_left
+                    train_data, model=model, val_data=val_data, time_limit=time_left_for_model
                 )
 
         if self.enable_ensemble:
@@ -618,7 +612,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             if time_left_for_ensemble is not None and time_left_for_ensemble <= 0:
                 logger.info(
                     "Not fitting ensemble due to lack of time remaining. "
-                    f"Time left: {time_left_for_ensemble:.2f} seconds"
+                    f"Time left: {time_left_for_ensemble:.1f} seconds"
                 )
             elif len(models_available_for_ensemble) <= 1:
                 logger.info(
@@ -694,7 +688,9 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             quantile_levels=self.quantile_levels,
             metadata=self.metadata,
         )
-        ensemble.fit_ensemble(model_preds, data_per_window=data_per_window, time_limit=time_limit)
+        ensemble.fit_ensemble(
+            model_preds, data_per_window=data_per_window, time_limit=time_limit, verbosity=self.verbosity
+        )
         ensemble.fit_time = time.time() - time_start
 
         predict_time = 0
@@ -1051,7 +1047,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         model_to_level = self._get_model_levels()
         models_sorted_by_level = sorted(models, key=model_to_level.get)
 
-        model_full_dict = {}
+        model_refit_map = {}
         models_trained_full = []
         for model in models_sorted_by_level:
             model = self.load_model(model)
@@ -1069,17 +1065,17 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 logger.info(f"Fitting model: {model_full.name} | Skipping fit via cloning parent ...")
                 models_trained = [model_full.name]
                 if isinstance(model_full, AbstractTimeSeriesEnsembleModel):
-                    model_full.remap_base_models(model_full_dict)
+                    model_full.remap_base_models(model_refit_map)
                     self._add_model(model_full, base_models=model_full.model_names)
                 else:
                     self._add_model(model_full)
                 self.save_model(model_full)
 
             if len(models_trained) == 1:
-                model_full_dict[model_name] = models_trained[0]
+                model_refit_map[model_name] = models_trained[0]
             models_trained_full += models_trained
 
-        self.model_full_dict.update(model_full_dict)
+        self.model_refit_map.update(model_refit_map)
         self.save()
         return models_trained_full
 
@@ -1095,10 +1091,10 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         valid_model_set = []
         for name in model_names:
-            if name in self.model_full_dict and self.model_full_dict[model] in existing_models:
+            if name in self.model_refit_map and self.model_refit_map[model] in existing_models:
                 logger.info(
                     f"Model '{name}' already has a refit _FULL model: "
-                    f"'{self.model_full_dict[model]}', skipping refit...",
+                    f"'{self.model_refit_map[model]}', skipping refit...",
                 )
             else:
                 valid_model_set.append(name)
@@ -1111,7 +1107,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         self.save()
         logger.info(f"Refit complete. Models trained: {models_trained_full}")
         logger.info(f"Total runtime: {time.time() - time_start:.2f} s")
-        return copy.deepcopy(self.model_full_dict)
+        return copy.deepcopy(self.model_refit_map)
 
     def construct_model_templates(
         self, hyperparameters: Union[str, Dict[str, Any]], multi_window: bool = False, **kwargs

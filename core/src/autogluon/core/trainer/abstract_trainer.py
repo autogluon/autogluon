@@ -76,6 +76,7 @@ logger = logging.getLogger(__name__)
 #  If kfold = 5, scores are 0.9, 0.85, 0.8, 0.75, and 0.7, the score is not 0.8! It is much lower because probs are combined together and AUC is recalculated
 #  Do we want this to happen? Should we calculate score by 5 separate scores and then averaging instead?
 
+
 # TODO: Dynamic model loading for ensemble models during prediction, only load more models if prediction is uncertain. This dynamically reduces inference time.
 # TODO: Try midstack Semi-Supervised. Just take final models and re-train them, use bagged preds for SS rows. This would be very cheap and easy to try.
 # TODO: Move to autogluon.core
@@ -1271,7 +1272,7 @@ class AbstractTrainer:
 
         levels = sorted(model_levels.keys())
         models_trained_full = []
-        model_full_dict = {}
+        model_refit_map = {}
         for level in levels:
             models_level = model_levels[level]
             for model in models_level:
@@ -1324,7 +1325,7 @@ class AbstractTrainer:
                         refit_full=True,
                     )
                 if len(models_trained) == 1:
-                    model_full_dict[model_name] = models_trained[0]
+                    model_refit_map[model_name] = models_trained[0]
                 for model_trained in models_trained:
                     self._update_model_attr(
                         model_trained,
@@ -1335,18 +1336,18 @@ class AbstractTrainer:
                 models_trained_full += models_trained
 
         keys_to_del = []
-        for model in model_full_dict.keys():
-            if model_full_dict[model] not in models_trained_full:
+        for model in model_refit_map.keys():
+            if model_refit_map[model] not in models_trained_full:
                 keys_to_del.append(model)
         for key in keys_to_del:
-            del model_full_dict[key]
+            del model_refit_map[key]
         self.save()  # TODO: This could be more efficient by passing in arg to not save if called by refit_ensemble_full since it saves anyways later.
         return models_trained_full
 
     # Fits _FULL models and links them in the stack so _FULL models only use other _FULL models as input during stacking
     # If model is specified, will fit all _FULL models that are ancestors of the provided model, automatically linking them.
     # If no model is specified, all models are refit and linked appropriately.
-    def refit_ensemble_full(self, model="all") -> dict:
+    def refit_ensemble_full(self, model: str | List[str] = "all") -> dict:
         if model == "all":
             ensemble_set = self.get_model_names()
         elif isinstance(model, list):
@@ -1357,10 +1358,10 @@ class AbstractTrainer:
             ensemble_set = self.get_minimum_model_set(model)
         existing_models = self.get_model_names()
         ensemble_set_valid = []
-        model_full_dict = self.get_model_full_dict()
+        model_refit_map = self.model_refit_map()
         for model in ensemble_set:
-            if model in model_full_dict and model_full_dict[model] in existing_models:
-                logger.log(20, f"Model '{model}' already has a refit _FULL model: '{model_full_dict[model]}', skipping refit...")
+            if model in model_refit_map and model_refit_map[model] in existing_models:
+                logger.log(20, f"Model '{model}' already has a refit _FULL model: '{model_refit_map[model]}', skipping refit...")
             else:
                 ensemble_set_valid.append(model)
         if ensemble_set_valid:
@@ -1368,7 +1369,7 @@ class AbstractTrainer:
         else:
             models_trained_full = []
 
-        model_full_dict = self.get_model_full_dict()
+        model_refit_map = self.model_refit_map()
         for model_full in models_trained_full:
             # TODO: Consider moving base model info to a separate pkl file so that it can be edited without having to load/save the model again
             #  Downside: Slower inference speed when models are not persisted in memory prior.
@@ -1376,7 +1377,7 @@ class AbstractTrainer:
             if isinstance(model_loaded, StackerEnsembleModel):
                 for stack_column_prefix in model_loaded.stack_column_prefix_lst:
                     base_model = model_loaded.stack_column_prefix_to_model_map[stack_column_prefix]
-                    new_base_model = model_full_dict[base_model]
+                    new_base_model = model_refit_map[base_model]
                     new_base_model_type = self.get_model_attribute(model=new_base_model, attribute="type")
                     new_base_model_path = self.get_model_attribute(model=new_base_model, attribute="path")
 
@@ -1396,7 +1397,7 @@ class AbstractTrainer:
                     self.model_graph.add_edge(base_model_name, model_loaded.name)
 
         self.save()
-        return self.get_model_full_dict()
+        return self.model_refit_map()
 
     def get_refit_full_parent(self, model: str) -> str:
         """Get refit full model's parent. If model does not have a parent, return `model`."""
@@ -1444,10 +1445,20 @@ class AbstractTrainer:
             else:
                 predict_1_time_attribute = "predict_1_time"
             models_predict_1_time = self.get_models_attribute_full(models=models, attribute=predict_1_time_attribute)
+            models_og = copy.deepcopy(models)
             for model_key in models_predict_1_time:
                 if models_predict_1_time[model_key] > infer_limit:
                     models.remove(model_key)
-                    logger.log(20, f"Removing {model_key}")
+            if models_og and not models:
+                # get the fastest model
+                models_predict_time_list = [models_predict_1_time[m] for m in models_og]
+                min_time = np.array(models_predict_time_list).min()
+                infer_limit_new = min_time * 1.2  # Give 20% lee-way
+                logger.log(30, f"WARNING: Impossible to satisfy infer_limit constraint. Relaxing constraint from {infer_limit} to {infer_limit_new} ...")
+                models = models_og
+                for model_key in models_predict_1_time:
+                    if models_predict_1_time[model_key] > infer_limit_new:
+                        models.remove(model_key)
         if not models:
             raise AssertionError(
                 f"Trainer has no fit models that can infer while satisfying the constraints: (infer_limit={infer_limit}, allow_full={allow_full})."
@@ -1486,7 +1497,7 @@ class AbstractTrainer:
         if self.low_memory:
             self.models = models
 
-    def compile_models(self, model_names="all", with_ancestors=False, compiler_configs=None) -> List[str]:
+    def compile(self, model_names="all", with_ancestors=False, compiler_configs=None) -> List[str]:
         """
         Compile a list of models for accelerated prediction.
 
@@ -1560,7 +1571,7 @@ class AbstractTrainer:
         self.save()
         return model_names
 
-    def persist_models(self, model_names="all", with_ancestors=False, max_memory=None) -> List[str]:
+    def persist(self, model_names="all", with_ancestors=False, max_memory=None) -> List[str]:
         if model_names == "all":
             model_names = self.get_model_names()
         elif model_names == "best":
@@ -1639,7 +1650,7 @@ class AbstractTrainer:
                 model_type = self.get_model_attribute(model=model_name, attribute="type")
             return model_type.load(path=os.path.join(self.path, path), reset_paths=self.reset_paths)
 
-    def unpersist_models(self, model_names="all") -> list:
+    def unpersist(self, model_names="all") -> list:
         if model_names == "all":
             model_names = list(self.models.keys())
         if not isinstance(model_names, list):
@@ -1778,6 +1789,11 @@ class AbstractTrainer:
                     return model_names_trained
                 if self._time_limit is not None and self._time_train_start is not None:
                     time_left_total = self._time_limit - (fit_start_time - self._time_train_start)
+                    # If only a very small amount of time remains, skip training
+                    min_time_required = min(self._time_limit * 0.01, 10)
+                    if (time_left_total < min_time_required) and (time_limit < min_time_required):
+                        logger.log(15, f"Skipping {model.name} due to lack of time remaining.")
+                        return model_names_trained
                 else:
                     time_left_total = time_limit
                 fit_log_message += f" Training model for up to {round(time_limit, 2)}s of the {round(time_left_total, 2)}s of remaining time."
@@ -1901,6 +1917,8 @@ class AbstractTrainer:
             predict_child_time=predict_child_time,
             predict_1_child_time=predict_1_child_time,
             val_score=model.val_score,
+            eval_metric=model.eval_metric.name,
+            stopping_metric=model.stopping_metric.name,
             path=os.path.relpath(model.path, self.path).split(os.sep),  # model's relative path to trainer
             type=type(model),  # Outer type, can be BaggedEnsemble, StackEnsemble (Type that is able to load the model)
             type_inner=type_inner,  # Inner type, if Ensemble then it is the type of the inner model (May not be able to load with this type)
@@ -1999,6 +2017,19 @@ class AbstractTrainer:
     def _log_model_stats(self, model, _is_refit=False):
         """Logs model fit time, val score, predict time, and predict_1_time"""
         model = self.load_model(model)
+        print_weights = model._get_tags().get("print_weights", False)
+
+        if print_weights:
+            model_weights = model._get_model_weights()
+            model_weights = {k: round(v, 3) for k, v in model_weights.items()}
+            msg_weights = ""
+            is_first = True
+            for key, value in sorted(model_weights.items(), key=lambda x: x[1], reverse=True):
+                if not is_first:
+                    msg_weights += ", "
+                msg_weights += f"'{key}': {value}"
+                is_first = False
+            logger.log(20, f"\tEnsemble Weights: {{{msg_weights}}}")
         if model.val_score is not None:
             if model.eval_metric.name != self.eval_metric.name:
                 logger.log(20, f"\tNote: model has different eval_metric than default.")
@@ -2797,16 +2828,16 @@ class AbstractTrainer:
         base_model_set = list(self.model_graph.predecessors(model))
         return base_model_set
 
-    def get_model_full_dict(self, inverse=False) -> Dict[str, str]:
+    def model_refit_map(self, inverse=False) -> Dict[str, str]:
         """
         Returns dict of parent model -> refit model
 
         If inverse=True, return dict of refit model -> parent model
         """
-        model_full_dict = self.get_models_attribute_dict(attribute="refit_full_parent")
+        model_refit_map = self.get_models_attribute_dict(attribute="refit_full_parent")
         if not inverse:
-            model_full_dict = {parent: refit for refit, parent in model_full_dict.items()}
-        return model_full_dict
+            model_refit_map = {parent: refit for refit, parent in model_refit_map.items()}
+        return model_refit_map
 
     def model_exists(self, model: str) -> bool:
         return model in self.get_model_names()
@@ -2867,9 +2898,17 @@ class AbstractTrainer:
             model_info_flat[key] = custom_info[key]
         return model_info_flat
 
-    def leaderboard(self, extra_info=False):
+    def leaderboard(self, extra_info=False, refit_full: bool = None, set_refit_score_to_parent: bool = False):
         model_names = self.get_model_names()
+        models_full_dict = self.get_models_attribute_dict(models=model_names, attribute="refit_full_parent")
+        if refit_full is not None:
+            if refit_full:
+                model_names = [model for model in model_names if model in models_full_dict]
+            else:
+                model_names = [model for model in model_names if model not in models_full_dict]
         score_val = []
+        eval_metric = []
+        stopping_metric = []
         fit_time_marginal = []
         pred_time_val_marginal = []
         stack_level = []
@@ -2878,13 +2917,26 @@ class AbstractTrainer:
         can_infer = []
         fit_order = list(range(1, len(model_names) + 1))
         score_val_dict = self.get_models_attribute_dict("val_score")
+        eval_metric_dict = self.get_models_attribute_dict("eval_metric")
+        stopping_metric_dict = self.get_models_attribute_dict("stopping_metric")
         fit_time_marginal_dict = self.get_models_attribute_dict("fit_time")
         predict_time_marginal_dict = self.get_models_attribute_dict("predict_time")
         fit_time_dict = self.get_models_attribute_full(attribute="fit_time", models=model_names, func=sum)
         pred_time_val_dict = self.get_models_attribute_full(attribute="predict_time", models=model_names, func=sum)
         can_infer_dict = self.get_models_attribute_full(attribute="can_infer", models=model_names, func=min)
         for model_name in model_names:
-            score_val.append(score_val_dict[model_name])
+            if set_refit_score_to_parent and (model_name in models_full_dict):
+                if models_full_dict[model_name] not in score_val_dict:
+                    raise AssertionError(
+                        f"Model parent is missing from leaderboard when `set_refit_score_to_parent=True`, "
+                        f"this is invalid. The parent model may have been deleted. "
+                        f"(model='{model_name}', parent='{models_full_dict[model_name]}')"
+                    )
+                score_val.append(score_val_dict[models_full_dict[model_name]])
+            else:
+                score_val.append(score_val_dict[model_name])
+            eval_metric.append(eval_metric_dict[model_name])
+            stopping_metric.append(stopping_metric_dict[model_name])
             fit_time_marginal.append(fit_time_marginal_dict[model_name])
             fit_time.append(fit_time_dict[model_name])
             pred_time_val_marginal.append(predict_time_marginal_dict[model_name])
@@ -2893,6 +2945,7 @@ class AbstractTrainer:
             can_infer.append(can_infer_dict[model_name])
 
         model_info_dict = defaultdict(list)
+        extra_info_dict = dict()
         if extra_info:
             # TODO: feature_metadata
             # TODO: disk size
@@ -2957,10 +3010,15 @@ class AbstractTrainer:
             model_info_dict["ancestors"] = ancestors
             model_info_dict["descendants"] = descendants
 
+            extra_info_dict = {
+                "stopping_metric": stopping_metric,
+            }
+
         df = pd.DataFrame(
             data={
                 "model": model_names,
                 "score_val": score_val,
+                "eval_metric": eval_metric,
                 "pred_time_val": pred_time_val,
                 "fit_time": fit_time,
                 "pred_time_val_marginal": pred_time_val_marginal,
@@ -2968,6 +3026,7 @@ class AbstractTrainer:
                 "stack_level": stack_level,
                 "can_infer": can_infer,
                 "fit_order": fit_order,
+                **extra_info_dict,
                 **model_info_dict,
             }
         )
@@ -2977,6 +3036,7 @@ class AbstractTrainer:
         explicit_order = [
             "model",
             "score_val",
+            "eval_metric",
             "pred_time_val",
             "fit_time",
             "pred_time_val_marginal",
@@ -3003,7 +3063,7 @@ class AbstractTrainer:
 
         return df_sorted
 
-    def get_model_failures(self) -> pd.DataFrame:
+    def model_failures(self) -> pd.DataFrame:
         """
         [Advanced] Get the model failures that occurred during the fitting of this predictor, in the form of a pandas DataFrame.
 
@@ -3644,9 +3704,9 @@ class AbstractTrainer:
             if model_name is None:
                 model_name = self.get_model_best(can_infer=can_infer)
 
-        model_full_dict = self.get_model_full_dict()
+        model_refit_map = self.model_refit_map()
         model_name_og = model_name
-        for m, m_full in model_full_dict.items():
+        for m, m_full in model_refit_map.items():
             if m_full == model_name:
                 model_name_og = m
                 break

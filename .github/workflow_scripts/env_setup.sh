@@ -2,7 +2,7 @@ function setup_build_env {
     python3 -m pip install --upgrade pip
     python3 -m pip install tox
     python3 -m pip install flake8
-    python3 -m pip install "black>=22.3,<23.0"
+    python3 -m pip install "black~=23.0"
     python3 -m pip install isort>=5.10
     python3 -m pip install bandit
     python3 -m pip install packaging
@@ -17,9 +17,7 @@ function setup_build_contrib_env {
 }
 
 function setup_benchmark_env {
-    # pip install -U autogluon.bench - revert back when latest update in PyPi
-    git clone https://github.com/autogluon/autogluon-bench.git
-    pip install -e ./autogluon-bench
+    pip install -U autogluon.bench
     git clone https://github.com/autogluon/autogluon-dashboard.git
     pip install -e ./autogluon-dashboard
     pip install yq

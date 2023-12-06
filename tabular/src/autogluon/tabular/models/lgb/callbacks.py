@@ -156,7 +156,11 @@ def early_stopping_custom(
             logger.warning(
                 "Warning: Early stopped GBM model prior to optimal result to avoid OOM error. Please increase available memory to avoid subpar model quality."
             )
-            logger.log(15, "Early stopping, best iteration is:\n[%d]\t%s" % (best_iter[0] + 1, "\t".join([_format_eval_result(x) for x in best_score_list[0]])))
+            logger.log(
+                15,
+                "Early stopping, best iteration is:\n[%d]\t%s"
+                % (best_iter[0] + 1, "\t".join([_format_eval_result(x, show_stdv=False) for x in best_score_list[0]])),
+            )
             raise EarlyStopException(best_iter[0], best_score_list[0])
 
     def _callback(env):
@@ -198,7 +202,9 @@ def early_stopping_custom(
             if early_stop:
                 if verbose:
                     logger.log(
-                        15, "Early stopping, best iteration is:\n[%d]\t%s" % (best_iter[i] + 1, "\t".join([_format_eval_result(x) for x in best_score_list[i]]))
+                        15,
+                        "Early stopping, best iteration is:\n[%d]\t%s"
+                        % (best_iter[i] + 1, "\t".join([_format_eval_result(x, show_stdv=False) for x in best_score_list[i]])),
                     )
                 raise EarlyStopException(best_iter[i], best_score_list[i])
             elif (max_diff is not None) and (abs(score - best_score[i]) > max_diff):
@@ -206,7 +212,9 @@ def early_stopping_custom(
                     logger.debug("max_diff breached!")
                     logger.debug(abs(score - best_score[i]))
                     logger.log(
-                        15, "Early stopping, best iteration is:\n[%d]\t%s" % (best_iter[i] + 1, "\t".join([_format_eval_result(x) for x in best_score_list[i]]))
+                        15,
+                        "Early stopping, best iteration is:\n[%d]\t%s"
+                        % (best_iter[i] + 1, "\t".join([_format_eval_result(x, show_stdv=False) for x in best_score_list[i]])),
                     )
                 raise EarlyStopException(best_iter[i], best_score_list[i])
             if env.iteration == env.end_iteration - 1:
@@ -214,7 +222,7 @@ def early_stopping_custom(
                     logger.log(
                         15,
                         "Did not meet early stopping criterion. Best iteration is:\n[%d]\t%s"
-                        % (best_iter[i] + 1, "\t".join([_format_eval_result(x) for x in best_score_list[i]])),
+                        % (best_iter[i] + 1, "\t".join([_format_eval_result(x, show_stdv=False) for x in best_score_list[i]])),
                     )
                 raise EarlyStopException(best_iter[i], best_score_list[i])
             if verbose:
@@ -225,7 +233,7 @@ def early_stopping_custom(
                 logger.log(
                     20,
                     "Found manual stop file, early stopping. Best iteration is:\n[%d]\t%s"
-                    % (best_iter[i] + 1, "\t".join([_format_eval_result(x) for x in best_score_list[i]])),
+                    % (best_iter[i] + 1, "\t".join([_format_eval_result(x, show_stdv=False) for x in best_score_list[i]])),
                 )
                 raise EarlyStopException(best_iter[i], best_score_list[i])
         if time_limit:
@@ -237,7 +245,7 @@ def early_stopping_custom(
                     20,
                     "\tRan out of time, early stopping on iteration "
                     + str(env.iteration + 1)
-                    + ". Best iteration is:\n\t[%d]\t%s" % (best_iter[i] + 1, "\t".join([_format_eval_result(x) for x in best_score_list[i]])),
+                    + ". Best iteration is:\n\t[%d]\t%s" % (best_iter[i] + 1, "\t".join([_format_eval_result(x, show_stdv=False) for x in best_score_list[i]])),
                 )
                 raise EarlyStopException(best_iter[i], best_score_list[i])
 

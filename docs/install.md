@@ -2,7 +2,7 @@
 
 :::{note} 
 
-AutoGluon requires Python version 3.8, 3.9, or 3.10 and is available on Linux, MacOS, and Windows.
+AutoGluon requires Python version 3.8, 3.9, 3.10, or 3.11 and is available on Linux, MacOS, and Windows.
 
 :::
 

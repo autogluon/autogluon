@@ -23,7 +23,7 @@ from ..constants import (
     QUERY,
     RESPONSE,
     SCORE,
-    SEMANTIC_SEGMENTATION,
+    SEMANTIC_MASK,
     TEXT,
     TOKEN_WORD_MAPPING,
     WORD_OFFSETS,
@@ -76,8 +76,10 @@ def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional
         for feature_name in feature_masks[0].keys():
             ret[feature_name] = torch.cat([ele[feature_name] for ele in feature_masks])
     elif ret_type == BBOX:
-        if isinstance(outputs, list) and len(outputs) == 1:
-            outputs = outputs[0]  # TODO: the output should be a dict, find the cause of this (should be in cache.py)
+        if isinstance(outputs, list) and isinstance(outputs[0], list) and len(outputs) == 1:
+            # TODO: the output should be a list of dict
+            # find the cause of this (should be in cache.py)
+            outputs = outputs[0]
         return [ele[BBOX] for ele in outputs]
     elif ret_type == OVD_RET:
         from .object_detection import bbox_ratio_xywh_to_index_xyxy
@@ -126,6 +128,9 @@ def extract_from_output(outputs: List[Dict], ret_type: str, as_ndarray: Optional
                         counter += 1
                 ner_pred.append((pred_one_sentence, word_offset, pred_proba))
         return ner_pred
+    elif ret_type == SEMANTIC_MASK:
+        masks = [ele[SEMANTIC_MASK] for ele in outputs]
+        ret = torch.cat(masks)
     else:
         raise ValueError(f"Unknown return type: {ret_type}")
 

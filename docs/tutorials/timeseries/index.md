@@ -33,6 +33,12 @@ Check out the [Quick Start Tutorial](forecasting-quick-start.ipynb) to learn how
   List of available forecasting models in AutoGluon-TimeSeries.
 :::
 
+:::{grid-item-card} Metrics
+  :link: forecasting-metrics.html
+
+  Evaluation metrics available in AutoGluon-TimeSeries.
+:::
+
 ::::
 
 ```{toctree}
@@ -44,4 +50,5 @@ hidden: true
 Quick Start <forecasting-quick-start>
 In Depth <forecasting-indepth>
 Model Zoo <forecasting-model-zoo>
+Metrics <forecasting-metrics>
 ```

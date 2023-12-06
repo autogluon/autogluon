@@ -93,7 +93,7 @@ class AutoTrainer(AbstractTrainer):
                 # TODO: User could be intending to blend instead. Add support for blend stacking.
                 #  This error message is necessary because when calculating out-of-fold predictions for user, we want to return them in the form given in train_data,
                 #  but if we merge train and val here, it becomes very confusing from a users perspective, especially because we reset index, making it impossible to match
-                #  the original train_data to the out-of-fold predictions from `predictor.get_oof_pred_proba()`.
+                #  the original train_data to the out-of-fold predictions from `predictor.predict_proba_oof()`.
                 raise AssertionError(
                     "X_val, y_val is not None, but bagged mode was specified. "
                     "If calling from `TabularPredictor.fit()`, `tuning_data` should be None.\n"
@@ -105,9 +105,20 @@ class AutoTrainer(AbstractTrainer):
                 )
 
         # Log the hyperparameters dictionary so it easy to edit if the user wants.
-        log_str = f"User-specified model hyperparameters to be fit:\n" "{\n"
-        for k in hyperparameters.keys():
-            log_str += f"\t'{k}': {hyperparameters[k]},\n"
+        n_configs = sum([len(hyperparameters[k]) for k in hyperparameters.keys()])
+        extra_log_str = ""
+        display_all = (n_configs < 20) or (self.verbosity >= 3)
+        if not display_all:
+            extra_log_str = (
+                f"Large model count detected ({n_configs} configs) ... " f"Only displaying the first 3 models of each family. To see all, set `verbosity=3`.\n"
+            )
+        log_str = f"{extra_log_str}User-specified model hyperparameters to be fit:\n" "{\n"
+        if display_all:
+            for k in hyperparameters.keys():
+                log_str += f"\t'{k}': {hyperparameters[k]},\n"
+        else:
+            for k in hyperparameters.keys():
+                log_str += f"\t'{k}': {hyperparameters[k][:3]},\n"
         log_str += "}"
         logger.log(20, log_str)
 
@@ -149,7 +160,7 @@ class AutoTrainer(AbstractTrainer):
     def _get_default_proxy_model_class(self):
         return LGBModel
 
-    def compile_models(self, model_names="all", with_ancestors=False, compiler_configs: dict = None) -> List[str]:
+    def compile(self, model_names="all", with_ancestors=False, compiler_configs: dict = None) -> List[str]:
         """Ensures that compiler_configs maps to the correct models if the user specified the same keys as in hyperparameters such as RT, XT, etc."""
         if compiler_configs is not None:
             model_types_map = self._get_model_types_map()
@@ -160,7 +171,7 @@ class AutoTrainer(AbstractTrainer):
                 else:
                     compiler_configs_new[k] = compiler_configs[k]
             compiler_configs = compiler_configs_new
-        return super().compile_models(model_names=model_names, with_ancestors=with_ancestors, compiler_configs=compiler_configs)
+        return super().compile(model_names=model_names, with_ancestors=with_ancestors, compiler_configs=compiler_configs)
 
     def _get_model_types_map(self) -> Dict[str, AbstractModel]:
         return MODEL_TYPES

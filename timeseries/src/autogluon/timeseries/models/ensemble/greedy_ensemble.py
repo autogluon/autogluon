@@ -1,10 +1,12 @@
 import copy
 import logging
+import pprint
 from typing import Dict, List, Optional
 
 import numpy as np
 
 import autogluon.core as ag
+from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.core.models.greedy_ensemble.ensemble_selection import EnsembleSelection
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer
@@ -110,8 +112,10 @@ class TimeSeriesGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
         predictions_per_window: Dict[str, List[TimeSeriesDataFrame]],
         data_per_window: List[TimeSeriesDataFrame],
         time_limit: Optional[int] = None,
+        verbosity: int = 2,
         **kwargs,
     ):
+        set_logger_verbosity(verbosity, logger=logger)
         if self.eval_metric_seasonal_period is None:
             self.eval_metric_seasonal_period = get_seasonality(self.freq)
         ensemble_selection = TimeSeriesEnsembleSelection(
@@ -130,6 +134,9 @@ class TimeSeriesGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
         for model_name, weight in zip(predictions_per_window.keys(), ensemble_selection.weights_):
             if weight != 0:
                 self.model_to_weight[model_name] = weight
+
+        weights_for_printing = {model: round(weight, 2) for model, weight in self.model_to_weight.items()}
+        logger.info(f"\tEnsemble weights: {pprint.pformat(weights_for_printing, width=200)}")
 
     @property
     def model_names(self) -> List[str]:
@@ -158,9 +165,9 @@ class TimeSeriesGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
         info["model_weights"] = self.model_to_weight
         return info
 
-    def remap_base_models(self, model_full_dict: Dict[str, str]) -> None:
+    def remap_base_models(self, model_refit_map: Dict[str, str]) -> None:
         updated_weights = {}
         for model, weight in self.model_to_weight.items():
-            model_full_name = model_full_dict.get(model, model)
+            model_full_name = model_refit_map.get(model, model)
             updated_weights[model_full_name] = weight
         self.model_to_weight = updated_weights

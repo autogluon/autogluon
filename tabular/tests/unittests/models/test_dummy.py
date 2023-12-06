@@ -20,16 +20,16 @@ def test_no_models(fit_helper, dataset_loader_helper):
 
     predictor = fit_helper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
 
-    assert not predictor.get_model_names()
+    assert not predictor.model_names()
     with pytest.raises(AssertionError):
         predictor.predict(test_data)
     assert len(predictor.leaderboard()) == 0
     assert len(predictor.leaderboard(test_data)) == 0
-    assert len(predictor.get_model_failures()) == 0
+    assert len(predictor.model_failures()) == 0
 
 
 def test_no_models_raise(fit_helper, dataset_loader_helper):
-    """Tests that logic works properly when no models are trained, and tests get_model_failures"""
+    """Tests that logic works properly when no models are trained, and tests predictor.model_failures()"""
 
     expected_exc_str = "Test Error Message"
 
@@ -44,13 +44,13 @@ def test_no_models_raise(fit_helper, dataset_loader_helper):
 
     predictor = fit_helper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
 
-    assert not predictor.get_model_names()
+    assert not predictor.model_names()
     with pytest.raises(AssertionError):
         predictor.predict(test_data)
     assert len(predictor.leaderboard()) == 0
     assert len(predictor.leaderboard(test_data)) == 0
 
-    model_failures = predictor.get_model_failures()
+    model_failures = predictor.model_failures()
     assert len(model_failures) == 1
     model_failures_dict = model_failures.iloc[0].to_dict()
     assert model_failures_dict["model"] == "DummyModel"

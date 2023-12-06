@@ -66,7 +66,10 @@ class KNNModel(AbstractModel):
     @classmethod
     def _get_default_ag_args(cls) -> dict:
         default_ag_args = super()._get_default_ag_args()
-        extra_ag_args = {"valid_stacker": False}
+        extra_ag_args = {
+            "valid_stacker": False,
+            "problem_types": [BINARY, MULTICLASS, REGRESSION],
+        }
         default_ag_args.update(extra_ag_args)
         return default_ag_args
 
@@ -110,9 +113,9 @@ class KNNModel(AbstractModel):
 
     # TODO: Won't work for RAPIDS without modification
     # TODO: Technically isn't OOF, but can be used inplace of OOF. Perhaps rename to something more accurate?
-    def get_oof_pred_proba(self, X, normalize=None, **kwargs):
+    def predict_proba_oof(self, X, normalize=None, **kwargs):
         """X should be the same X passed to `.fit`"""
-        y_oof_pred_proba = self._get_oof_pred_proba(X=X, **kwargs)
+        y_oof_pred_proba = self._predict_proba_oof(X=X, **kwargs)
         if normalize is None:
             normalize = self.normalize_pred_probas
         if normalize:
@@ -120,7 +123,7 @@ class KNNModel(AbstractModel):
         y_oof_pred_proba = y_oof_pred_proba.astype(np.float32)
         return y_oof_pred_proba
 
-    def _get_oof_pred_proba(self, X, **kwargs):
+    def _predict_proba_oof(self, X, **kwargs):
         from ._knn_loo_variants import KNeighborsClassifierLOOMixin, KNeighborsRegressorLOOMixin
 
         if self.problem_type in [BINARY, MULTICLASS]:

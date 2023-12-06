@@ -112,7 +112,6 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         self.id2label = dict(zip(range(self.num_classes), range(self.num_classes)))
 
     def _load_checkpoint(self, checkpoint_file):
-
         # build model and load pretrained weights
         from mmdet.utils import register_all_modules
 
@@ -155,7 +154,6 @@ class MMDetAutoModelForObjectDetection(nn.Module):
             self.data_preprocessor.to(self.device)
 
     def save(self, save_path: str = "./", tokenizers: Optional[dict] = None):
-
         weights_save_path = os.path.join(save_path, "model.pth")
         configs_save_path = os.path.join(save_path, "config.py")
 
@@ -231,11 +229,17 @@ class MMDetAutoModelForObjectDetection(nn.Module):
             },
             "co_dino_o365": {
                 "url": "https://download.openmmlab.com/mmdetection/v3.0/codetr/co_dino_5scale_swin_large_16e_o365tococo-614254c9.pth",
-                "config_file": os.path.join(mmdet_configs_dir, "co_dino", "co_dino_5scale_swin_l_16xb1_16e_o365tococo.py"),
+                "config_file": os.path.join(
+                    mmdet_configs_dir, "co_dino", "co_dino_5scale_swin_l_16xb1_16e_o365tococo.py"
+                ),
             },
             "co_dino_r50": {
                 "url": "https://download.openmmlab.com/mmdetection/v3.0/codetr/co_dino_5scale_r50_1x_coco-7481f903.pth",
                 "config_file": os.path.join(mmdet_configs_dir, "co_dino", "co_dino_5scale_r50_8xb2_1x_coco.py"),
+            },
+            "dino_swinl_tta": {
+                "url": "https://github.com/RistoranteRist/mmlab-weights/releases/download/dino-swinl/dino-5scale_swin-l_8xb2-36e_coco-5486e051.pth",
+                "config_file": os.path.join(mmdet_configs_dir, "dino", "dino_swinl_tta.py"),
             },
         }
 

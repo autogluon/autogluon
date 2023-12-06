@@ -1,6 +1,7 @@
 """Unit tests and utils common to all models"""
 import itertools
 import shutil
+import sys
 import tempfile
 from unittest import mock
 
@@ -10,6 +11,7 @@ import pytest
 from flaky import flaky
 
 from autogluon.common import space
+from autogluon.core.hpo.constants import RAY_BACKEND
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 from autogluon.timeseries.metrics import AVAILABLE_METRICS
@@ -137,6 +139,7 @@ def test_when_models_saved_then_they_can_be_loaded(model_class, trained_models, 
 
 
 @flaky
+@pytest.mark.skipif(sys.platform.startswith("win"), reason="HPO tests lead to known issues in Windows platform tests")
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct(model_class, temp_model_path):
     model = model_class(
@@ -396,7 +399,7 @@ def test_when_custom_metric_passed_to_model_then_model_can_score(model_class):
         eval_metric=CustomMetric(),
     )
     model.fit(train_data=DUMMY_TS_DATAFRAME)
-    score = model.score(DUMMY_TS_DATAFRAME)
+    score = model.score(DUMMY_TS_DATAFRAME.sort_index())
     assert isinstance(score, float)
 
 
@@ -412,10 +415,16 @@ def test_when_custom_metric_passed_to_model_then_model_can_hyperparameter_tune(m
         },
         eval_metric=CustomMetric(),
     )
+    backend = model._get_hpo_backend()
+    if backend is RAY_BACKEND:
+        # Ray has trouble keeping references to the custom metric in the test namespace. We therefore
+        # skip this test.
+        pytest.skip()
+
     if isinstance(model, MultiWindowBacktestingModel):
         val_data = None
     else:
-        val_data = DUMMY_TS_DATAFRAME
+        val_data = DUMMY_TS_DATAFRAME.sort_index()
 
     num_trials = 2
 
@@ -429,3 +438,41 @@ def test_when_custom_metric_passed_to_model_then_model_can_hyperparameter_tune(m
     for result in hpo_results.values():
         assert 1 <= result["hyperparameters"]["epochs"] <= 3
         assert np.isfinite(result["val_score"])
+
+
+@pytest.mark.parametrize("searcher", ["random", "bayes"])
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+def test_given_searcher_when_ray_backend_used_in_hpo_then_correct_searcher_used(model_class, searcher):
+    model = model_class(
+        prediction_length=3,
+        freq=DUMMY_TS_DATAFRAME.freq,
+        hyperparameters={
+            "epochs": space.Int(1, 3),
+            "num_batches_per_epoch": 1,
+            "use_fallback_model": False,
+        },
+        eval_metric="MASE",
+    )
+    backend = model._get_hpo_backend()
+    if backend is not RAY_BACKEND:
+        pytest.skip()
+
+    val_data = None if isinstance(model, MultiWindowBacktestingModel) else DUMMY_TS_DATAFRAME
+    num_trials = 2
+
+    with mock.patch("ray.tune.Tuner") as mock_tuner:
+        try:
+            _ = model.hyperparameter_tune(
+                hyperparameter_tune_kwargs={"num_trials": num_trials, "scheduler": "FIFO", "searcher": searcher},
+                time_limit=300,
+                train_data=DUMMY_TS_DATAFRAME,
+                val_data=val_data,
+            )
+        except:
+            pass
+
+        ray_searcher_class_name = mock_tuner.call_args[1]["tune_config"].search_alg.__class__.__name__
+        assert {
+            "bayes": "HyperOpt",
+            "random": "BasicVariant",
+        }.get(searcher) in ray_searcher_class_name

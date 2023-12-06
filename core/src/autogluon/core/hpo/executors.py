@@ -187,7 +187,7 @@ class HpoExecutor(ABC):
                 max_models = self.hyperparameter_tune_kwargs.get("num_trials", math.inf) * k_fold
                 num_jobs_in_parallel = min(num_jobs_in_parallel, max_models)
             system_num_cpu = ResourceManager.get_cpu_count()
-            system_num_gpu = ResourceManager.get_gpu_count_all()
+            system_num_gpu = ResourceManager.get_gpu_count()
             if model_base != initialized_model:
                 # bagged model
                 if num_jobs_in_parallel // k_fold < 1:
@@ -572,7 +572,6 @@ class CustomHpoExecutor(HpoExecutor):
 
 
 class HpoExecutorFactory:
-
     __supported_executors = [
         RayHpoExecutor,
         CustomHpoExecutor,

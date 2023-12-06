@@ -259,7 +259,7 @@ class MultiModalPredictorModel(AbstractModel):
         memory_size
             The total memory size in bytes.
         """
-        total_size = sum(param.numel() for param in self.model._model.parameters())
+        total_size = self.model.model_size * 1e6  # convert from megabytes to bytes
 
         return total_size
 

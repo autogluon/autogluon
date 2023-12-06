@@ -5,6 +5,7 @@ import itertools
 import logging
 import reprlib
 from collections.abc import Iterable
+from itertools import islice
 from pathlib import Path
 from typing import Any, List, Optional, Tuple, Type, Union
 
@@ -22,7 +23,23 @@ TIMESTAMP = "timestamp"
 IRREGULAR_TIME_INDEX_FREQSTR = "IRREG"
 
 
-class TimeSeriesDataFrame(pd.DataFrame):
+class TimeSeriesDataFrameDeprecatedMixin:
+    """Contains deprecated methods from TimeSeriesDataFrame that shouldn't show up in API documentation."""
+
+    def get_reindexed_view(self, *args, **kwargs) -> TimeSeriesDataFrame:
+        raise ValueError(
+            "`TimeSeriesDataFrame.get_reindexed_view` has been deprecated. If your data has irregular timestamps, "
+            "please convert it to a regular frequency with `convert_frequency`."
+        )
+
+    def to_regular_index(self, *args, **kwargs) -> TimeSeriesDataFrame:
+        raise ValueError(
+            "`TimeSeriesDataFrame.to_regular_index` has been deprecated. "
+            "Please use `TimeSeriesDataFrame.convert_frequency` instead."
+        )
+
+
+class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
     """A collection of univariate time series, where each row is identified by an (``item_id``, ``timestamp``) pair.
 
     For example, a time series data frame could represent the daily sales of a collection of products, where each
@@ -46,7 +63,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
                 7        2 2019-01-02       7
                 8        2 2019-01-03       8
 
-            You can also use :meth:`~autogluon.timeseries.TimeSeriesDataFrame.from_data_frame` for loading data in such format.
+        You can also use :meth:`~autogluon.timeseries.TimeSeriesDataFrame.from_data_frame` for loading data in such format.
 
         2. Path to a data file in CSV or Parquet format. The file must contain columns ``item_id`` and ``timestamp``, as well as columns with time series values. This is similar to Option 1 above (pandas DataFrame format without multi-index). Both remote (e.g., S3) and local paths are accepted. You can also use :meth:`~autogluon.timeseries.TimeSeriesDataFrame.from_path` for loading data in such format.
 
@@ -72,7 +89,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
                     {"target": [6, 7, 8], "start": pd.Period("01-01-2019", freq='D')}
                 ]
 
-            You can also use :meth:`~autogluon.timeseries.TimeSeriesDataFrame.from_iterable_dataset` for loading data in such format.
+        You can also use :meth:`~autogluon.timeseries.TimeSeriesDataFrame.from_iterable_dataset` for loading data in such format.
 
     static_features : pd.DataFrame, str or pathlib.Path, optional
         An optional data frame describing the metadata of each individual time series that does not change with time.
@@ -118,8 +135,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
     freq : str
         A pandas-compatible string describing the frequency of the time series. For example ``"D"`` for daily data,
         ``"H"`` for hourly data, etc. This attribute is determined automatically based on the timestamps. For the full
-        list of possible values, see
-        https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases
+        list of possible values, see `pandas documentation <https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases>`_.
     num_items : int
         Number of items (time series) in the data set.
     item_ids : pd.Index
@@ -374,8 +390,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         """Construct a ``TimeSeriesDataFrame`` from an Iterable of dictionaries each of which
         represent a single time series.
 
-        This function also offers compatibility with GluonTS data sets, see
-        https://ts.gluon.ai/stable/api/gluonts/gluonts.dataset.common.html#gluonts.dataset.common.ListDataset.
+        This function also offers compatibility with GluonTS `ListDataset format <https://ts.gluon.ai/stable/api/gluonts/gluonts.dataset.common.html#gluonts.dataset.common.ListDataset>`_.
 
         Parameters
         ----------
@@ -492,6 +507,17 @@ class TimeSeriesDataFrame(pd.DataFrame):
         return self.groupby(level=ITEMID, sort=False).size()
 
     def copy(self: TimeSeriesDataFrame, deep: bool = True) -> pd.DataFrame:  # noqa
+        """Make a copy of the TimeSeriesDataFrame.
+
+        When ``deep=True`` (default), a new object will be created with a copy of the calling object's data and
+        indices. Modifications to the data or indices of the copy will not be reflected in the original object.
+
+        When ``deep=False``, a new object will be created without copying the calling object's data or index (only
+        references to the data and index are copied). Any changes to the data of the original will be reflected in the
+        shallow copy (and vice versa).
+
+        For more details, see `pandas documentation <https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.copy.html>`_.
+        """
         obj = super().copy(deep=deep)
 
         # also perform a deep copy for static features
@@ -849,6 +875,8 @@ class TimeSeriesDataFrame(pd.DataFrame):
         freq: Union[str, pd.DateOffset],
         agg_numeric: str = "mean",
         agg_categorical: str = "first",
+        num_cpus: int = -1,
+        chunk_size: int = 100,
         **kwargs,
     ) -> TimeSeriesDataFrame:
         """Convert each time series in the data frame to the given frequency.
@@ -858,15 +886,23 @@ class TimeSeriesDataFrame(pd.DataFrame):
         1. Converting an irregularly-sampled time series to a regular time index.
         2. Aggregating time series data by downsampling (e.g., convert daily sales into weekly sales)
 
+        Standard ``df.groupby(...).resample(...)`` can be extremely slow for large datasets, so we parallelize this
+        operation across multiple CPU cores.
+
+
         Parameters
         ----------
         freq : Union[str, pd.DateOffset]
-            Frequency to which the data should be converted. See [pandas frequency aliases](https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases)
+            Frequency to which the data should be converted. See `pandas frequency aliases <https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases>`_
             for supported values.
         agg_numeric : {"max", "min", "sum", "mean", "median", "first", "last"}, default = "mean"
             Aggregation method applied to numeric columns.
         agg_categorical : {"first", "last"}, default = "first"
             Aggregation method applied to categorical columns.
+        num_cpus : int, default = -1
+            Number of CPU cores used when resampling in parallel. Set to -1 to use all cores.
+        chunk_size : int, default = 100
+            Number of time series in a chunk assigned to each parallel worker.
         **kwargs
             Additional keywords arguments that will be passed to ``pandas.DataFrameGroupBy.resample``.
 
@@ -928,7 +964,8 @@ class TimeSeriesDataFrame(pd.DataFrame):
         0       2020-12-31    10.0
                 2021-12-31    26.0
         """
-        if self.freq == pd.tseries.frequencies.to_offset(freq).freqstr:
+        offset = pd.tseries.frequencies.to_offset(freq)
+        if self.freq == offset.freqstr:
             return self
 
         # We need to aggregate categorical columns separately because .agg("mean") deletes all non-numeric columns
@@ -939,9 +976,23 @@ class TimeSeriesDataFrame(pd.DataFrame):
             else:
                 aggregation[col] = agg_categorical
 
-        resampled_df = TimeSeriesDataFrame(
-            self.groupby(level=ITEMID, sort=False).resample(freq, level=TIMESTAMP, **kwargs).agg(aggregation)
-        )
+        def split_into_chunks(iterable: Iterable, size: int) -> Iterable[Iterable]:
+            # Based on https://stackoverflow.com/a/22045226/5497447
+            iterable = iter(iterable)
+            return iter(lambda: tuple(islice(iterable, size)), ())
+
+        def resample_chunk(chunk: Iterable[Tuple[str, pd.DataFrame]]) -> pd.DataFrame:
+            resampled_dfs = []
+            for item_id, df in chunk:
+                resampled_df = df.resample(offset, level=TIMESTAMP, **kwargs).agg(aggregation)
+                resampled_dfs.append(pd.concat({item_id: resampled_df}, names=[ITEMID]))
+            return pd.concat(resampled_dfs)
+
+        # Resampling time for 1 item < overhead time for a single parallel job. Therefore, we group items into chunks
+        # so that the speedup from parallelization isn't dominated by the communication costs.
+        chunks = split_into_chunks(pd.DataFrame(self).groupby(level=ITEMID, sort=False), chunk_size)
+        resampled_chunks = Parallel(n_jobs=num_cpus)(delayed(resample_chunk)(chunk) for chunk in chunks)
+        resampled_df = TimeSeriesDataFrame(pd.concat(resampled_chunks))
         resampled_df.static_features = self.static_features
         return resampled_df
 
@@ -949,15 +1000,3 @@ class TimeSeriesDataFrame(pd.DataFrame):
         # This hides method from IPython autocomplete, but not VSCode autocomplete
         deprecated = ["get_reindexed_view", "to_regular_index"]
         return [d for d in super().__dir__() if d not in deprecated]
-
-    def get_reindexed_view(self, *args, **kwargs) -> TimeSeriesDataFrame:
-        raise ValueError(
-            "`TimeSeriesDataFrame.get_reindexed_view` has been deprecated. If your data has irregular timestamps, "
-            "please convert it to a regular frequency with `convert_frequency`."
-        )
-
-    def to_regular_index(self, *args, **kwargs) -> TimeSeriesDataFrame:
-        raise ValueError(
-            "`TimeSeriesDataFrame.to_regular_index` has been deprecated. "
-            "Please use `TimeSeriesDataFrame.convert_frequency` instead."
-        )

@@ -1,4 +1,4 @@
-# Document Data
+# Document Prediction
 
 ## Pre-requisite
 
@@ -36,19 +36,18 @@ For additional support, please refer to official instructions for [tesseract](ht
 :::{grid-item-card} AutoMM for Scanned Document Classification
   :link: document_classification.html
 
-  How to use MultiModalPredictor to build a scanned document classifier.
+  How to use AutoMM to build a scanned document classifier.
 :::
 
 :::{grid-item-card} Classifying PDF Documents with AutoMM
   :link: pdf_classification.html
 
-  How to use MultiModalPredictor to build a PDF document classifier.
+  How to use AutoMM to build a PDF document classifier.
 :::
 ::::
 
 ```{toctree}
 ---
-caption: Document Data
 maxdepth: 1
 hidden: true
 ---

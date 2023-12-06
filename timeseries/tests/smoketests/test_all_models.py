@@ -58,11 +58,15 @@ def generate_train_and_test_data(
 DUMMY_MODEL_HPARAMS = {"epochs": 1, "num_batches_per_epoch": 1, "use_fallback_model": False}
 
 ALL_MODELS = {
+    "ADIDA": DUMMY_MODEL_HPARAMS,
     "Average": DUMMY_MODEL_HPARAMS,
+    "AutoCES": DUMMY_MODEL_HPARAMS,
+    "CrostonSBA": DUMMY_MODEL_HPARAMS,
     "DLinear": DUMMY_MODEL_HPARAMS,
     "DeepAR": DUMMY_MODEL_HPARAMS,
     "DirectTabular": DUMMY_MODEL_HPARAMS,
     "DynamicOptimizedTheta": DUMMY_MODEL_HPARAMS,
+    "IMAPA": DUMMY_MODEL_HPARAMS,
     "ETS": DUMMY_MODEL_HPARAMS,
     "NPTS": DUMMY_MODEL_HPARAMS,
     "Naive": DUMMY_MODEL_HPARAMS,
@@ -74,6 +78,7 @@ ALL_MODELS = {
     "TemporalFusionTransformer": DUMMY_MODEL_HPARAMS,
     "Theta": DUMMY_MODEL_HPARAMS,
     "WaveNet": DUMMY_MODEL_HPARAMS,
+    "Zero": DUMMY_MODEL_HPARAMS,
     # Override default hyperparameters for faster training
     "AutoARIMA": {"max_p": 2, "use_fallback_model": False},
 }

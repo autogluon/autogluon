@@ -1,4 +1,5 @@
 """Storing the constants"""
+from autogluon.core.metrics import METRICS
 
 # Column/Label Types
 NULL = "null"
@@ -13,14 +14,16 @@ DOCUMENT = "document"
 DOCUMENT_IMAGE = "document_image"
 DOCUMENT_PDF = "document_pdf"
 
+# Scarcity modes
+FEW_SHOT = "few_shot"
+DEFAULT_SHOT = "default_shot"
+ZERO_SHOT = "zero_shot"
+
 # Problem types
 CLASSIFICATION = "classification"
 BINARY = "binary"
 MULTICLASS = "multiclass"
 REGRESSION = "regression"
-FEW_SHOT = "few_shot"
-DEFAULT_SHOT = "default_shot"
-ZERO_SHOT = "zero_shot"
 NER = "ner"
 NAMED_ENTITY_RECOGNITION = "named_entity_recognition"
 FEATURE_EXTRACTION = "feature_extraction"
@@ -119,6 +122,9 @@ CROSS_ENTROPY = "cross_entropy"
 COSINE_EMBEDDING_LOSS = "cosine_embedding_loss"
 F1 = "f1"
 OVERALL_F1 = "overall_f1"
+F1_MACRO = "f1_macro"
+F1_MICRO = "f1_micro"
+F1_WEIGHTED = "f1_weighted"
 NER_TOKEN_F1 = "ner_token_f1"
 DIRECT_LOSS = "direct_loss"
 HIT_RATE = "hit_rate"
@@ -130,10 +136,8 @@ SM = "sm"
 EM = "em"
 FM = "fm"
 MAE = "mae"
-BINARY_IOU = "binary_iou"
-BINARY_DICE = "binary_dice"
-BINARY_ACC = "binary_acc"
 BER = "ber"
+IOU = "iou"
 RETRIEVAL_METRICS = [NDCG, PRECISION, RECALL, MRR]
 METRIC_MODE_MAP = {
     ACC: MAX,
@@ -149,18 +153,25 @@ METRIC_MODE_MAP = {
     PEARSONR: MAX,
     SPEARMANR: MAX,
     F1: MAX,
+    F1_MACRO: MAX,
+    F1_MICRO: MAX,
+    F1_WEIGHTED: MAX,
     MAP: MAX,
     MEAN_AVERAGE_PRECISION: MAX,
     NER_TOKEN_F1: MAX,
     OVERALL_F1: MAX,
     RECALL: MAX,
     SM: MAX,
-    BINARY_IOU: MAX,
-    BINARY_DICE: MAX,
-    BINARY_ACC: MAX,
+    IOU: MAX,
     BER: MIN,
 }
-VALID_METRICS = METRIC_MODE_MAP.keys()
+
+MATCHING_METRICS = {
+    BINARY: [ROC_AUC, ROC_AUC],
+    MULTICLASS: [SPEARMANR, SPEARMANR],
+    REGRESSION: [SPEARMANR, SPEARMANR],
+}
+MATCHING_METRICS_WITHOUT_PROBLEM_TYPE = [RECALL, NDCG]
 
 # Training status
 TRAIN = "train"
@@ -308,6 +319,12 @@ BBOX_FORMATS = [XYWH, XYXY]
 # open vocabulary detection
 PROMPT = "prompt"
 OVD_RET = "ovd_ret"
+
+# sam (multi-class)
+CLASS_LOGITS = "class_logits"
+MASK_LABEL = "mask_label"
+CLASS_LABEL = "class_label"
+SEMANTIC_MASK = "semantic_mask"
 
 # presets
 DEFAULT = "default"
