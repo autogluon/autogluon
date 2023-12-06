@@ -1,12 +1,11 @@
 from typing import List
 
 import torch
-from torch import Tensor
-
 from mmdet.models.dense_heads import ATSSHead
 from mmdet.models.utils import images_to_levels, multi_apply
 from mmdet.registry import MODELS
 from mmdet.utils import InstanceList, OptInstanceList, reduce_mean
+from torch import Tensor
 
 
 @MODELS.register_module()
