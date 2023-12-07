@@ -232,6 +232,8 @@ class SemanticSegImageProcessor:
 
                 with PIL.Image.open(gt_feature) as gt:
                     gt = gt.convert(gt.mode)
+                if self.num_classes == 1:
+                    gt = gt.convert("L")
                 if self.num_classes > 1:
                     gt = np.array(gt).astype(
                         "float32"
