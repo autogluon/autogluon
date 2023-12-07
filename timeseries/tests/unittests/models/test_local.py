@@ -1,4 +1,5 @@
 import logging
+from typing import Dict
 
 import numpy as np
 import pandas as pd
@@ -6,17 +7,25 @@ import pytest
 
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.models.local import (
+    ADIDAModel,
     AutoARIMAModel,
+    AutoCESModel,
     AutoETSModel,
     AverageModel,
+    CrostonClassicModel,
+    CrostonOptimizedModel,
+    CrostonSBAModel,
     DynamicOptimizedThetaModel,
     ETSModel,
+    IMAPAModel,
     NaiveModel,
     NPTSModel,
     SeasonalAverageModel,
     SeasonalNaiveModel,
     ThetaModel,
+    ZeroModel,
 )
+from autogluon.timeseries.models.local.statsforecast import AbstractConformalizedStatsForecastModel
 
 from ..common import (
     DUMMY_TS_DATAFRAME,
@@ -25,9 +34,11 @@ from ..common import (
     get_data_frame_with_item_index,
 )
 
-TESTABLE_MODELS = [
+# models accepting seasonal_period
+SEASONAL_TESTABLE_MODELS = [
     AutoARIMAModel,
     AutoETSModel,
+    AutoCESModel,
     AverageModel,
     DynamicOptimizedThetaModel,
     ETSModel,
@@ -37,6 +48,16 @@ TESTABLE_MODELS = [
     SeasonalAverageModel,
     SeasonalNaiveModel,
 ]
+# intermittent demand models do not accept seasonal_period
+NONSEASONAL_TESTABLE_MODELS = [
+    ADIDAModel,
+    ZeroModel,
+    CrostonClassicModel,
+    CrostonSBAModel,
+    CrostonOptimizedModel,
+    IMAPAModel,
+]
+TESTABLE_MODELS = SEASONAL_TESTABLE_MODELS + NONSEASONAL_TESTABLE_MODELS
 
 
 # Restrict to single core for faster training on small datasets
@@ -85,13 +106,13 @@ def test_when_local_model_predicts_then_time_index_is_correct(model_class, predi
 
 
 def get_seasonal_period_from_fitted_local_model(model):
-    if model.name in ["ARIMA", "AutoETS", "AutoARIMA", "DynamicOptimizedTheta", "ETS", "Theta"]:
+    if model.name in ["ARIMA", "AutoETS", "AutoARIMA", "AutoCES", "DynamicOptimizedTheta", "ETS", "Theta"]:
         return model._local_model_args["season_length"]
     else:
         return model._local_model_args["seasonal_period"]
 
 
-@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+@pytest.mark.parametrize("model_class", SEASONAL_TESTABLE_MODELS)
 @pytest.mark.parametrize(
     "hyperparameters", [{**DEFAULT_HYPERPARAMETERS, "seasonal_period": None}, DEFAULT_HYPERPARAMETERS]
 )
@@ -120,7 +141,7 @@ def test_when_seasonal_period_is_set_to_none_then_inferred_period_is_used(
     assert get_seasonal_period_from_fitted_local_model(model) == expected_seasonal_period
 
 
-@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+@pytest.mark.parametrize("model_class", SEASONAL_TESTABLE_MODELS)
 @pytest.mark.parametrize(
     "freqstr, ts_length, provided_seasonal_period",
     [
@@ -266,3 +287,136 @@ def test_when_npts_fit_with_default_seasonal_features_then_predictions_match_glu
     assert (pred_gts.mean == pred_ag["mean"]).all()
     for q in npts_ag.quantile_levels:
         assert (pred_gts.quantile(str(q)) == pred_ag[str(q)]).all()
+
+
+class MockConformalModel(AbstractConformalizedStatsForecastModel):
+    def _get_point_forecast(self, time_series: pd.Series, local_model_args: Dict):
+        return np.ones(self.prediction_length)
+
+    def _get_nonconformity_scores(self, time_series: pd.Series, local_model_args: Dict):
+        scores = super()._get_nonconformity_scores(time_series, local_model_args)
+        self.returned_nonconformity_scores = scores
+        return scores
+
+
+@pytest.mark.parametrize(
+    "prediction_length, time_series_length, expected_num_windows",
+    [
+        (1, 100, 5),
+        (1, 10, 5),
+        (3, 100, 5),
+        (3, 10, 3),
+        (10, 40, 3),
+        (10, 41, 4),
+        (10, 100, 5),
+        (10, 11, 1),
+        (10, 10, 1),
+        (3, 3, 1),
+        (1, 1, 1),
+    ],
+)
+def test_when_conformalized_model_called_then_nonconformity_score_shapes_correct(
+    prediction_length, time_series_length, expected_num_windows
+):
+    model = MockConformalModel(
+        prediction_length=prediction_length, hyperparameters={"n_jobs": 1, "use_fallback_model": False}
+    )
+
+    data = get_data_frame_with_item_index(["A", "B", "C"], data_length=time_series_length)
+
+    model.fit(train_data=data)
+    _ = model.predict(data)
+
+    assert model.returned_nonconformity_scores.shape == (expected_num_windows, prediction_length)
+
+
+@pytest.mark.parametrize(
+    "prediction_length, time_series_length, expected_num_windows",
+    [
+        (1, 100, 5),
+        (1, 10, 5),
+        (3, 100, 5),
+        (3, 10, 3),
+        (10, 40, 3),
+        (10, 41, 4),
+        (10, 100, 5),
+        (10, 11, 1),
+        (10, 10, 1),
+        (3, 3, 1),
+        (1, 1, 1),
+    ],
+)
+def test_when_conformalized_model_called_then_nonconformity_score_values_correct(
+    prediction_length, time_series_length, expected_num_windows
+):
+    model = MockConformalModel(
+        prediction_length=prediction_length, hyperparameters={"n_jobs": 1, "use_fallback_model": False}
+    )
+
+    data = get_data_frame_with_item_index(["A"], data_length=time_series_length)
+    data["target"] = np.arange(time_series_length)
+
+    model.fit(train_data=data)
+    _ = model.predict(data)
+
+    test_length = expected_num_windows * prediction_length
+
+    expected_scores = np.abs(data.values.ravel()[-test_length:] - 1)
+    if time_series_length == prediction_length:
+        # conformalization will fall back to naive
+        expected_scores = np.abs(data.values.ravel()[-test_length + 1 :] - data.values.ravel()[0])
+        expected_scores = np.r_[expected_scores, expected_scores[-1]]
+    expected_scores = np.sort(expected_scores)
+
+    returned_scores = np.sort(model.returned_nonconformity_scores.ravel())
+
+    assert np.allclose(expected_scores, returned_scores)
+
+
+@pytest.mark.parametrize("model_class", NONSEASONAL_TESTABLE_MODELS)
+@pytest.mark.parametrize("prediction_length", [1, 3, 10])
+@pytest.mark.parametrize("positive_only", [True, False])
+def test_when_intermittent_models_fit_then_values_are_lower_bounded(
+    model_class, prediction_length, positive_only, temp_model_path
+):
+    data = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME
+    if positive_only:
+        data = data.clip(0, None)
+    else:
+        # make sure there are some negative values
+        for c in data.columns:
+            data[c] *= np.random.randn(*data[c].values.shape)
+
+    model = model_class(
+        path=temp_model_path,
+        prediction_length=prediction_length,
+        hyperparameters=DEFAULT_HYPERPARAMETERS,
+        freq=data.freq,
+    )
+    model.fit(train_data=data)
+    predictions = model.predict(data=data)
+
+    for item_id in data.index.levels[0]:
+        if positive_only:
+            predictions.loc[item_id].values.min() >= 0
+        else:
+            predictions.loc[item_id].values.min() >= data.loc[item_id].values.min()
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+@pytest.mark.parametrize("prediction_length", [1, 3])
+def test_when_local_models_fit_then_quantiles_are_present_and_ranked(model_class, prediction_length, temp_model_path):
+    data = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME
+    model = model_class(
+        path=temp_model_path,
+        prediction_length=prediction_length,
+        hyperparameters=DEFAULT_HYPERPARAMETERS,
+        freq=data.freq,
+    )
+    model.fit(train_data=data)
+    predictions = model.predict(data=data)
+
+    quantile_columns = sorted(list(set(predictions.columns) - {"mean"}))
+
+    assert set(model.quantile_levels) == set(float(q) for q in quantile_columns)
+    assert np.diff(predictions[quantile_columns].values, axis=1).min() >= 0

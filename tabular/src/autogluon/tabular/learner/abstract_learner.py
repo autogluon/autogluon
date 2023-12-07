@@ -446,7 +446,7 @@ class AbstractTabularLearner(AbstractLearner):
     # Fits _FULL models and links them in the stack so _FULL models only use other _FULL models as input during stacking
     # If model is specified, will fit all _FULL models that are ancestors of the provided model, automatically linking them.
     # If no model is specified, all models are refit and linked appropriately.
-    def refit_ensemble_full(self, model="all"):
+    def refit_ensemble_full(self, model: str | List[str] = "all"):
         return self.load_trainer().refit_ensemble_full(model=model)
 
     def fit_transform_features(self, X, y=None, **kwargs):
@@ -486,9 +486,9 @@ class AbstractTabularLearner(AbstractLearner):
 
     # Scores both learner and all individual models, along with computing the optimal ensemble score + weights (oracle)
     def score_debug(
-        self, X: DataFrame, y=None, extra_info=False, compute_oracle=False, extra_metrics=None, decision_threshold=None, skip_score=False, silent=False
+        self, X: DataFrame, y=None, extra_info=False, compute_oracle=False, extra_metrics=None, decision_threshold=None, skip_score=False, display=False
     ):
-        leaderboard_df = self.leaderboard(extra_info=extra_info, silent=silent)
+        leaderboard_df = self.leaderboard(extra_info=extra_info, display=display)
         if extra_metrics is None:
             extra_metrics = []
         if y is None:
@@ -608,6 +608,7 @@ class AbstractTabularLearner(AbstractLearner):
             explicit_order += extra_metrics_names
         explicit_order += [
             "score_val",
+            "eval_metric",
             "pred_time_test",
             "pred_time_val",
             "fit_time",
@@ -674,10 +675,10 @@ class AbstractTabularLearner(AbstractLearner):
                     f"Multiclass scoring with eval_metric='{self.eval_metric.name}' does not support unknown classes. Unknown classes: {unknown_classes}"
                 )
 
-    def evaluate_predictions(self, y_true, y_pred, sample_weight=None, decision_threshold=None, silent=False, auxiliary_metrics=True, detailed_report=False):
+    def evaluate_predictions(self, y_true, y_pred, sample_weight=None, decision_threshold=None, display=False, auxiliary_metrics=True, detailed_report=False):
         """Evaluate predictions. Does not support sample weights since this method reports a variety of metrics.
         Args:
-            silent (bool): Should we print which metric is being used as well as performance.
+            display (bool): Should we print which metric is being used as well as performance.
             auxiliary_metrics (bool): Should we compute other (problem_type specific) metrics in addition to the default metric?
             detailed_report (bool): Should we computed more-detailed versions of the auxiliary_metrics? (requires auxiliary_metrics=True).
 
@@ -777,7 +778,7 @@ class AbstractTabularLearner(AbstractLearner):
                     score = self._score_with_pred(y_pred_internal=y_pred_internal, metric=aux_metric, **scoring_args)
                 performance_dict[aux_metric.name] = score
 
-        if not silent:
+        if display:
             if self.eval_metric.name in performance_dict:
                 score_eval = performance_dict[self.eval_metric.name]
                 logger.log(20, f"Evaluation: {self.eval_metric.name} on test data: {score_eval}")
@@ -802,7 +803,7 @@ class AbstractTabularLearner(AbstractLearner):
                     performance_dict[metric_name] = cl_metric(y_true, y_pred)
                 except ValueError:
                     pass
-                if not silent and metric_name in performance_dict:
+                if display and metric_name in performance_dict:
                     logger.log(20, "Detailed (per-class) classification report:")
                     logger.log(20, json.dumps(performance_dict[metric_name], indent=4))
         return performance_dict
@@ -818,11 +819,21 @@ class AbstractTabularLearner(AbstractLearner):
         return X, y
 
     def leaderboard(
-        self, X=None, y=None, extra_info=False, extra_metrics=None, decision_threshold=None, only_pareto_frontier=False, skip_score=False, silent=False
+        self,
+        X=None,
+        y=None,
+        extra_info=False,
+        extra_metrics=None,
+        decision_threshold=None,
+        only_pareto_frontier=False,
+        skip_score=False,
+        score_format: str = "score",
+        display=False,
     ) -> pd.DataFrame:
+        assert score_format in ["score", "error"]
         if X is not None:
             leaderboard = self.score_debug(
-                X=X, y=y, extra_info=extra_info, extra_metrics=extra_metrics, decision_threshold=decision_threshold, skip_score=skip_score, silent=True
+                X=X, y=y, extra_info=extra_info, extra_metrics=extra_metrics, decision_threshold=decision_threshold, skip_score=skip_score, display=False
             )
         else:
             if extra_metrics:
@@ -837,7 +848,18 @@ class AbstractTabularLearner(AbstractLearner):
                 score_col = "score_val"
                 inference_time_col = "pred_time_val"
             leaderboard = get_leaderboard_pareto_frontier(leaderboard=leaderboard, score_col=score_col, inference_time_col=inference_time_col)
-        if not silent:
+        if score_format == "error":
+            leaderboard.rename(
+                columns={
+                    "score_test": "metric_error_test",
+                    "score_val": "metric_error_val",
+                },
+                inplace=True,
+            )
+            if "metric_error_test" in leaderboard:
+                leaderboard["metric_error_test"] = leaderboard["metric_error_test"].apply(self.eval_metric.convert_score_to_error)
+            leaderboard["metric_error_val"] = leaderboard["metric_error_val"].apply(self.eval_metric.convert_score_to_error)
+        if display:
             with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):
                 print(leaderboard)
         return leaderboard
@@ -911,7 +933,7 @@ class AbstractTabularLearner(AbstractLearner):
     def persist_trainer(self, low_memory=False, models="all", with_ancestors=False, max_memory=None) -> list:
         self.trainer = self.load_trainer()
         if not low_memory:
-            return self.trainer.persist_models(models, with_ancestors=with_ancestors, max_memory=max_memory)
+            return self.trainer.persist(models, with_ancestors=with_ancestors, max_memory=max_memory)
             # Warning: After calling this, it is not necessarily safe to save learner or trainer anymore
             #  If neural network is persisted and then trainer or learner is saved, there will be an exception thrown
         else:

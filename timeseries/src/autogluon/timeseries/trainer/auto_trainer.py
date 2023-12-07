@@ -37,7 +37,7 @@ class AutoTimeSeriesTrainer(AbstractTimeSeriesTrainer):
         val_data: Optional[TimeSeriesDataFrame] = None,
         hyperparameter_tune_kwargs: Optional[Union[str, Dict]] = None,
         excluded_model_types: Optional[List[str]] = None,
-        time_limit: float = None,
+        time_limit: Optional[float] = None,
     ):
         """
         Fit a set of timeseries models specified by the `hyperparameters`
@@ -50,7 +50,7 @@ class AutoTimeSeriesTrainer(AbstractTimeSeriesTrainer):
         hyperparameters: str or Dict
             A dictionary mapping selected model names, model classes or model factory to hyperparameter
             settings. Model names should be present in `trainer.presets.DEFAULT_MODEL_NAMES`. Optionally,
-            the user may provide one of "fast_training", "default", "default_hpo" to specify presets.
+            the user may provide one of "default", "light" and "very_light" to specify presets.
         val_data: TimeSeriesDataFrame
             Optional validation data set to report validation scores on.
         hyperparameter_tune_kwargs

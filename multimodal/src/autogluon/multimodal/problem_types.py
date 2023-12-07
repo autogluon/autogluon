@@ -1,26 +1,38 @@
 """Problem types supported in MultiModalPredictor"""
 
 from dataclasses import dataclass, field
-from typing import Optional, Set
+from typing import List, Optional, Set
+
+from autogluon.core.metrics import METRICS
 
 from .constants import (
+    ACCURACY,
     BINARY,
     CATEGORICAL,
     CLASSIFICATION,
+    DETECTION_METRICS,
+    DIRECT_LOSS,
     FEATURE_EXTRACTION,
     FEW_SHOT_CLASSIFICATION,
     IMAGE,
     IMAGE_BYTEARRAY,
     IMAGE_SIMILARITY,
     IMAGE_TEXT_SIMILARITY,
+    IOU,
+    MAP,
+    METRIC_MODE_MAP,
     MULTICLASS,
     NAMED_ENTITY_RECOGNITION,
     NER,
     NER_ANNOTATION,
+    NER_TOKEN_F1,
     NUMERICAL,
     OBJECT_DETECTION,
     OPEN_VOCABULARY_OBJECT_DETECTION,
+    OVERALL_F1,
     REGRESSION,
+    RMSE,
+    ROC_AUC,
     ROIS,
     SEMANTIC_SEGMENTATION,
     TEXT,
@@ -60,12 +72,56 @@ class ProblemTypeProperty:
     # The fallback label type of the problem
     _fallback_label_type: Optional[str] = None
 
+    # The evaluation metrics supported
+    # The FIRST metric is used as fallback by default
+    _supported_evaluation_metrics: Optional[List[str]] = None
+
+    # Overwrite the default setting (first in _supported_evaluation_metrics)
+    _fallback_evaluation_metric: Optional[str] = None
+
+    # The validation metric fallback
+    # It may be different from the evaluation metric
+    _fallback_validation_metric: Optional[str] = None
+
     @property
     def fallback_label_type(self):
         if self._fallback_label_type is None and len(self.supported_label_type) == 1:
             return next(iter(self.supported_label_type))
         else:
             return self._fallback_label_type
+
+    @property
+    def supported_evaluation_metrics(self):
+        if self._supported_evaluation_metrics:
+            return self._supported_evaluation_metrics
+        else:
+            return []
+
+    @property
+    def fallback_evaluation_metric(self):
+        if self._fallback_evaluation_metric:
+            return self._fallback_evaluation_metric
+        elif self._supported_evaluation_metrics:
+            return self._supported_evaluation_metrics[0]
+        else:
+            return None
+
+    @property
+    def supported_validation_metrics(self):
+        if self._supported_evaluation_metrics:
+            return [metric for metric in self._supported_evaluation_metrics if metric in METRIC_MODE_MAP.keys()] + [
+                DIRECT_LOSS
+            ]
+        else:
+            return []
+
+    @property
+    def fallback_validation_metric(self):
+        if self._fallback_validation_metric:
+            assert self._fallback_validation_metric in self.supported_validation_metrics
+            return self._fallback_validation_metric
+        else:
+            return None
 
 
 # Classification: Arbitrary combination of image, text, tabular data --> categorical value
@@ -85,6 +141,9 @@ PROBLEM_TYPES_REG.register(
         supported_modality_type={IMAGE, IMAGE_BYTEARRAY, TEXT, CATEGORICAL, NUMERICAL},
         supported_label_type={CATEGORICAL},
         is_classification=True,
+        _supported_evaluation_metrics=METRICS[BINARY].keys(),
+        _fallback_evaluation_metric=ROC_AUC,
+        _fallback_validation_metric=ROC_AUC,
     ),
 )
 PROBLEM_TYPES_REG.register(
@@ -94,6 +153,9 @@ PROBLEM_TYPES_REG.register(
         supported_modality_type={IMAGE, IMAGE_BYTEARRAY, TEXT, CATEGORICAL, NUMERICAL},
         supported_label_type={CATEGORICAL},
         is_classification=True,
+        _supported_evaluation_metrics=METRICS[MULTICLASS].keys(),
+        _fallback_evaluation_metric=ACCURACY,
+        _fallback_validation_metric=ACCURACY,
     ),
 )
 
@@ -104,6 +166,9 @@ PROBLEM_TYPES_REG.register(
         name=REGRESSION,
         supported_modality_type={IMAGE, IMAGE_BYTEARRAY, TEXT, CATEGORICAL, NUMERICAL},
         supported_label_type={NUMERICAL},
+        _supported_evaluation_metrics=METRICS[REGRESSION].keys(),
+        _fallback_evaluation_metric=RMSE,
+        _fallback_validation_metric=RMSE,
     ),
 )
 
@@ -116,6 +181,8 @@ PROBLEM_TYPES_REG.register(
         supported_modality_type={IMAGE},
         supported_label_type={ROIS},
         force_exist_modality={IMAGE},
+        _supported_evaluation_metrics=DETECTION_METRICS,
+        _fallback_validation_metric=MAP,
     ),
 )
 
@@ -129,6 +196,8 @@ PROBLEM_TYPES_REG.register(
         supported_modality_type={IMAGE, TEXT},
         supported_label_type={ROIS},
         force_exist_modality={IMAGE},
+        _supported_evaluation_metrics=DETECTION_METRICS,
+        _fallback_validation_metric=MAP,
     ),
 )
 
@@ -142,6 +211,9 @@ PROBLEM_TYPES_REG.register(
         supported_modality_type={IMAGE},
         supported_label_type={IMAGE},
         force_exist_modality={IMAGE},
+        _supported_evaluation_metrics=[IOU],
+        _fallback_evaluation_metric=IOU,
+        _fallback_validation_metric=IOU,
     ),
 )
 
@@ -186,6 +258,8 @@ _ner_property = ProblemTypeProperty(
     supported_modality_type={IMAGE, TEXT, CATEGORICAL, NUMERICAL, TEXT_NER},
     supported_label_type={NER_ANNOTATION},
     force_exist_modality={TEXT_NER},
+    _supported_evaluation_metrics=[OVERALL_F1, NER_TOKEN_F1],
+    _fallback_validation_metric=NER_TOKEN_F1,
 )
 PROBLEM_TYPES_REG.register(NER, _ner_property),
 PROBLEM_TYPES_REG.register(NAMED_ENTITY_RECOGNITION, _ner_property),
@@ -218,5 +292,8 @@ PROBLEM_TYPES_REG.register(
         support_zero_shot=False,
         supported_modality_type={IMAGE, TEXT},
         supported_label_type={CATEGORICAL},
+        _supported_evaluation_metrics=METRICS[MULTICLASS].keys(),
+        _fallback_evaluation_metric=ACCURACY,
+        _fallback_validation_metric=ACCURACY,
     ),
 )

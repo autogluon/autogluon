@@ -14,7 +14,26 @@ logger = logging.getLogger(__name__)
 
 
 class RMSE(TimeSeriesScorer):
-    """Root mean squared error."""
+    r"""Root mean squared error.
+
+    .. math::
+
+        \operatorname{RMSE} = \sqrt{\frac{1}{N} \frac{1}{H} \sum_{i=1}^{N}\sum_{t=T+1}^{T+H}  (y_{i,t} - f_{i,t})^2}
+
+
+    Properties:
+
+    - scale-dependent (time series with large absolute value contribute more to the loss)
+    - heavily penalizes models that cannot quickly adapt to abrupt changes in the time series
+    - sensitive to outliers
+    - prefers models that accurately estimate the mean (expected value)
+
+
+    References
+    ----------
+    - `Wikipedia <https://en.wikipedia.org/wiki/Root-mean-square_deviation>`_
+    - `Forecasting: Principles and Practice <https://otexts.com/fpp3/accuracy.html#scale-dependent-errors>`_
+    """
 
     equivalent_tabular_regression_metric = "root_mean_squared_error"
 
@@ -26,7 +45,26 @@ class RMSE(TimeSeriesScorer):
 
 
 class MSE(TimeSeriesScorer):
-    """Mean squared error."""
+    r"""Mean squared error.
+
+    Using this metric will lead to forecast of the mean.
+
+    .. math::
+
+        \operatorname{MSE} = \frac{1}{N} \frac{1}{H} \sum_{i=1}^{N}\sum_{t=T+1}^{T+H}  (y_{i,t} - f_{i,t})^2
+
+    Properties:
+
+    - scale-dependent (time series with large absolute value contribute more to the loss)
+    - heavily penalizes models that cannot quickly adapt to abrupt changes in the time series
+    - sensitive to outliers
+    - prefers models that accurately estimate the mean (expected value)
+
+    References
+    ----------
+    - `Wikipedia <https://en.wikipedia.org/wiki/Mean_squared_error>`_
+
+    """
 
     equivalent_tabular_regression_metric = "mean_squared_error"
 
@@ -38,7 +76,23 @@ class MSE(TimeSeriesScorer):
 
 
 class MAE(TimeSeriesScorer):
-    """Mean absolute error."""
+    r"""Mean absolute error.
+
+    .. math::
+
+        \operatorname{MAE} = \frac{1}{N} \frac{1}{H} \sum_{i=1}^{N}\sum_{t=T+1}^{T+H}  |y_{i,t} - f_{i,t}|
+
+    Properties:
+
+    - scale-dependent (time series with large absolute value contribute more to the loss)
+    - not sensitive to outliers
+    - prefers models that accurately estimate the median
+
+    References
+    ----------
+    - `Wikipedia <https://en.wikipedia.org/wiki/Mean_absolute_percentage_error#WMAPE>`_
+    - `Forecasting: Principles and Practice <https://otexts.com/fpp3/accuracy.html#scale-dependent-errors>`_
+    """
 
     optimized_by_median = True
     equivalent_tabular_regression_metric = "mean_absolute_error"
@@ -51,7 +105,25 @@ class MAE(TimeSeriesScorer):
 
 
 class WAPE(TimeSeriesScorer):
-    """Weighted absolute percentage error."""
+    r"""Weighted absolute percentage error.
+
+    Defined as sum of absolute errors divided by the sum of absolute time series values in the forecast horizon.
+
+    .. math::
+
+        \operatorname{WAPE} = \frac{1}{\sum_{i=1}^{N} \sum_{t=T+1}^{T+H} |y_{i, t}|} \sum_{i=1}^{N} \sum_{t=T+1}^{T+H}  |y_{i,t} - f_{i,t}|
+
+    Properties:
+
+    - scale-dependent (time series with large absolute value contribute more to the loss)
+    - not sensitive to outliers
+    - prefers models that accurately estimate the median
+
+
+    References
+    ----------
+    - `Wikipedia <https://en.wikipedia.org/wiki/Mean_absolute_percentage_error#WMAPE>`_
+    """
 
     optimized_by_median = True
     equivalent_tabular_regression_metric = "mean_absolute_error"
@@ -63,8 +135,24 @@ class WAPE(TimeSeriesScorer):
         return (y_true - y_pred).abs().sum() / y_true.abs().sum()
 
 
-class sMAPE(TimeSeriesScorer):
-    """Symmetric mean absolute percentage error."""
+class SMAPE(TimeSeriesScorer):
+    r"""Symmetric mean absolute percentage error.
+
+    .. math::
+
+        \operatorname{SMAPE} = 2 \frac{1}{N} \frac{1}{H} \sum_{i=1}^{N} \sum_{t=T+1}^{T+H} \frac{ |y_{i,t} - f_{i,t}|}{|y_{i,t}| + |f_{i,t}|}
+
+    Properties:
+
+    - should only be used if all time series have positive values
+    - poorly suited for sparse & intermittent time series that contain zero values
+    - penalizes overprediction more heavily than underprediction
+
+    References
+    ----------
+    - `Wikipedia <https://en.wikipedia.org/wiki/Symmetric_mean_absolute_percentage_error>`_
+    - `Forecasting: Principles and Practice <https://otexts.com/fpp3/accuracy.html#percentage-errors>`_
+    """
 
     optimized_by_median = True
     equivalent_tabular_regression_metric = "symmetric_mean_absolute_percentage_error"
@@ -77,7 +165,23 @@ class sMAPE(TimeSeriesScorer):
 
 
 class MAPE(TimeSeriesScorer):
-    """Mean Absolute Percentage Error."""
+    r"""Mean absolute percentage error.
+
+    .. math::
+
+        \operatorname{MAPE} = \frac{1}{N} \frac{1}{H} \sum_{i=1}^{N} \sum_{t=T+1}^{T+H} \frac{ |y_{i,t} - f_{i,t}|}{|y_{i,t}|}
+
+    Properties:
+
+    - should only be used if all time series have positive values
+    - undefined for time series that contain zero values
+    - penalizes overprediction more heavily than underprediction
+
+    References
+    ----------
+    - `Wikipedia <https://en.wikipedia.org/wiki/Mean_absolute_percentage_error>`_
+    - `Forecasting: Principles and Practice <https://otexts.com/fpp3/accuracy.html#percentage-errors>`_
+    """
 
     optimized_by_median = True
     equivalent_tabular_regression_metric = "mean_absolute_percentage_error"
@@ -90,7 +194,34 @@ class MAPE(TimeSeriesScorer):
 
 
 class MASE(TimeSeriesScorer):
-    """Mean absolute scaled error."""
+    r"""Mean absolute scaled error.
+
+    Normalizes the absolute error for each time series by the historic seasonal error of this time series.
+
+    .. math::
+
+        \operatorname{MASE} = \frac{1}{N} \frac{1}{H} \sum_{i=1}^{N} \frac{1}{a_i} \sum_{t=T+1}^{T+H} |y_{i,t} - f_{i,t}|
+
+    where :math:`a_i` is the historic absolute seasonal error defined as
+
+    .. math::
+
+        a_i = \frac{1}{T-m} \sum_{t=m+1}^T |y_{i,t} - y_{i,t-m}|
+
+    and :math:`m` is the seasonal period of the time series (``eval_metric_seasonal_period``).
+
+    Properties:
+
+    - scaled metric (normalizes the error for each time series by the scale of that time series)
+    - undefined for constant time series
+    - not sensitive to outliers
+    - prefers models that accurately estimate the median
+
+    References
+    ----------
+    - `Wikipedia <https://en.wikipedia.org/wiki/Mean_absolute_scaled_error>`_
+    - `Forecasting: Principles and Practice <https://otexts.com/fpp3/accuracy.html#scaled-errors>`_
+    """
 
     optimized_by_median = True
     equivalent_tabular_regression_metric = "mean_absolute_error"
@@ -120,7 +251,36 @@ class MASE(TimeSeriesScorer):
 
 
 class RMSSE(TimeSeriesScorer):
-    """Root mean squared scaled error."""
+    r"""Root mean squared scaled error.
+
+    Normalizes the absolute error for each time series by the historic seasonal error of this time series.
+
+    .. math::
+
+        \operatorname{RMSSE} = \sqrt{\frac{1}{N} \frac{1}{H} \sum_{i=1}^{N} \frac{1}{s_i} \sum_{t=T+1}^{T+H} (y_{i,t} - f_{i,t})^2}
+
+    where :math:`s_i` is the historic squared seasonal error defined as
+
+    .. math::
+
+        s_i = \frac{1}{T-m} \sum_{t=m+1}^T (y_{i,t} - y_{i,t-m})^2
+
+    and :math:`m` is the seasonal period of the time series (``eval_metric_seasonal_period``).
+
+
+    Properties:
+
+    - scaled metric (normalizes the error for each time series by the scale of that time series)
+    - undefined for constant time series
+    - heavily penalizes models that cannot quickly adapt to abrupt changes in the time series
+    - sensitive to outliers
+    - prefers models that accurately estimate the mean (expected value)
+
+
+    References
+    ----------
+    - `Forecasting: Principles and Practice <https://otexts.com/fpp3/accuracy.html#scaled-errors>`_
+    """
 
     equivalent_tabular_regression_metric = "root_mean_squared_error"
 

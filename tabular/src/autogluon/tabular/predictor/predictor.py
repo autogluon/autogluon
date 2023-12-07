@@ -8,8 +8,7 @@ import os
 import pprint
 import shutil
 import time
-import warnings
-from typing import List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import networkx as nx
 import numpy as np
@@ -17,6 +16,7 @@ import pandas as pd
 
 from autogluon.common.loaders import load_json
 from autogluon.common.savers import save_json
+from autogluon.common.utils import Deprecated
 from autogluon.common.utils.file_utils import get_directory_size, get_directory_size_per_file
 from autogluon.common.utils.log_utils import add_log_to_file, set_logger_verbosity
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
@@ -66,21 +66,14 @@ from ..trainer.model_presets.presets import MODEL_TYPES
 logger = logging.getLogger(__name__)  # return autogluon root logger
 
 
-# TODO: num_bag_sets -> ag_args
-
-# Extra TODOs (Stretch): Can occur post v0.1
+# Extra TODOs (Stretch): Can occur post v1.0
 # TODO: make core_kwargs a kwargs argument to predictor.fit
 # TODO: add aux_kwargs to predictor.fit
 # TODO: add pip freeze + python version output after fit + log file, validate that same pip freeze on load as cached
-# TODO: predictor.clone()
 # TODO: Add logging comments that models are serialized on disk after fit
 # TODO: consider adding kwarg option for data which has already been preprocessed by feature generator to skip feature generation.
 # TODO: Resolve raw text feature usage in default feature generator
-
-# Done for Tabular
-# TODO: Remove all `time_limits` in project, replace with `time_limit`
-
-
+# TODO: num_bag_sets -> ag_args
 class TabularPredictor:
     """
     AutoGluon TabularPredictor predicts values in a column of a tabular dataset (classification or regression).
@@ -273,20 +266,26 @@ class TabularPredictor:
             **learner_kwargs,
         )
         self._learner_type = type(self._learner)
-        self._trainer = None
+        self._trainer: AbstractTrainer = None
         self._sub_fits: List[str] = []
         self._stacked_overfitting_occurred: bool | None = None
 
     @property
-    def class_labels(self):
+    def classes_(self) -> list:
+        """Returns the class labels"""
         return self._learner.class_labels
 
     @property
-    def class_labels_internal(self):
+    def class_labels(self) -> list:
+        """Alias to self.classes_"""
+        return self.classes_
+
+    @property
+    def class_labels_internal(self) -> list:
         return self._learner.label_cleaner.ordered_class_labels_transformed
 
     @property
-    def class_labels_internal_map(self):
+    def class_labels_internal_map(self) -> dict:
         return self._learner.label_cleaner.inv_map
 
     @property
@@ -308,7 +307,7 @@ class TabularPredictor:
         return self._learner.problem_type
 
     @property
-    def decision_threshold(self) -> float:
+    def decision_threshold(self) -> float | None:
         """
         The decision threshold used to convert prediction probabilities to predictions.
         Only relevant for binary classification, otherwise the value will be None.
@@ -364,6 +363,14 @@ class TabularPredictor:
             return self.feature_metadata.get_features()
         else:
             raise ValueError(f"Unknown feature_stage: '{feature_stage}'. Must be one of {['original', 'transformed']}")
+
+    @property
+    def has_val(self) -> bool:
+        """
+        Return True if holdout validation data was used during fit, else return False.
+        """
+        self._assert_is_fit("has_val")
+        return self._trainer.has_val
 
     @property
     def feature_metadata(self):
@@ -629,7 +636,7 @@ class TabularPredictor:
             The inference time limit in seconds per row to adhere to during fit.
             If infer_limit=0.05 and infer_limit_batch_size=1000, AutoGluon will avoid training models that take longer than 50 ms/row to predict when given a batch of 1000 rows to predict (must predict 1000 rows in no more than 50 seconds).
             If bagging is enabled, the inference time limit will be respected based on estimated inference speed of `_FULL` models after refit_full is called, NOT on the inference speed of the bagged ensembles.
-            The inference times calculated for models are assuming `predictor.persist_models('all')` is called after fit.
+            The inference times calculated for models are assuming `predictor.persist('all')` is called after fit.
             If None, no limit is enforced.
             If it is impossible to satisfy the constraint, an exception will be raised.
         infer_limit_batch_size : int, default = None
@@ -1280,7 +1287,7 @@ class TabularPredictor:
                     num_cpus = ResourceManager.get_cpu_count()
 
                 if num_gpus == "auto":
-                    num_gpus = ResourceManager.get_gpu_count_all()
+                    num_gpus = ResourceManager.get_gpu_count()
 
                 # Handle expensive data via put
                 ag_fit_kwargs_ref = _ds_ray.put(ag_fit_kwargs)
@@ -1333,7 +1340,7 @@ class TabularPredictor:
         calibrate_decision_threshold=False,
         infer_limit=None,
     ):
-        if not self.get_model_names():
+        if not self.model_names():
             logger.log(30, "Warning: No models found, skipping post_fit logic...")
             return
 
@@ -1395,14 +1402,14 @@ class TabularPredictor:
     # TODO: Consider adding infer_limit to fit_extra
     def fit_extra(
         self,
-        hyperparameters,
-        time_limit=None,
-        base_model_names=None,
-        fit_weighted_ensemble=True,
-        fit_full_last_level_weighted_ensemble=True,
-        full_weighted_ensemble_additionally=False,
-        num_cpus="auto",
-        num_gpus="auto",
+        hyperparameters: str | Dict[str, Any],
+        time_limit: float = None,
+        base_model_names: List[str] = None,
+        fit_weighted_ensemble: bool = True,
+        fit_full_last_level_weighted_ensemble: bool = True,
+        full_weighted_ensemble_additionally: bool = False,
+        num_cpus: str | int = "auto",
+        num_gpus: str | int = "auto",
         **kwargs,
     ):
         """
@@ -1418,7 +1425,7 @@ class TabularPredictor:
             dictionary is relative, not absolute.
         time_limit : int, default = None
             Refer to argument documentation in :meth:`TabularPredictor.fit`.
-        base_model_names : list, default = None
+        base_model_names : List[str], default = None
             The names of the models to use as base models for this fit call.
             Base models will provide their out-of-fold predictions as additional features to the models in `hyperparameters`.
             If specified, all models trained will be stack ensembles.
@@ -1485,6 +1492,7 @@ class TabularPredictor:
         # labeled pseudo data has new labels unseen in the original train. Probably need to refit
         # data preprocessor if this is the case.
         if pseudo_data is not None:
+            assert isinstance(pseudo_data, pd.DataFrame)
             if self.label not in pseudo_data.columns:
                 raise ValueError("'pseudo_data' does not contain the labeled column.")
 
@@ -1659,6 +1667,7 @@ class TabularPredictor:
         """
         previous_score = self.info()["best_model_score_val"]
         y_pseudo_og = pd.Series()
+        y_pred_proba_og = None
         if return_pred_prob:
             if self.problem_type is REGRESSION:
                 y_pred_proba_og = pd.Series()
@@ -1880,7 +1889,7 @@ class TabularPredictor:
             If str is passed, `data` will be loaded using the str value as the file path.
         model : str (optional)
             The name of the model to get predictions from. Defaults to None, which uses the highest scoring model on the validation set.
-            Valid models are listed in this `predictor` by calling `predictor.get_model_names()`
+            Valid models are listed in this `predictor` by calling `predictor.model_names()`
         as_pandas : bool, default = True
             Whether to return the output as a :class:`pd.Series` (True) or :class:`np.ndarray` (False).
         transform_features : bool, default = True
@@ -1926,7 +1935,7 @@ class TabularPredictor:
             If str is passed, `data` will be loaded using the str value as the file path.
         model : str (optional)
             The name of the model to get prediction probabilities from. Defaults to None, which uses the highest scoring model on the validation set.
-            Valid models are listed in this `predictor` by calling `predictor.get_model_names()`.
+            Valid models are listed in this `predictor` by calling `predictor.model_names()`.
         as_pandas : bool, default = True
             Whether to return the output as a pandas object (True) or numpy array (False).
             Pandas object is a DataFrame if this is a multiclass problem or `as_multiclass=True`, otherwise it is a Series.
@@ -1958,7 +1967,7 @@ class TabularPredictor:
         data = self._get_dataset(data)
         return self._learner.predict_proba(X=data, model=model, as_pandas=as_pandas, as_multiclass=as_multiclass, transform_features=transform_features)
 
-    def get_pred_from_proba(self, y_pred_proba: pd.DataFrame | np.ndarray, decision_threshold: float | None = None) -> pd.Series | np.array:
+    def predict_from_proba(self, y_pred_proba: pd.DataFrame | np.ndarray, decision_threshold: float | None = None) -> pd.Series | np.array:
         """
         Given prediction probabilities, convert to predictions.
 
@@ -1988,10 +1997,10 @@ class TabularPredictor:
         >>>
         >>> # y_pred and y_pred_from_proba are identical
         >>> y_pred = predictor.predict('test.csv')
-        >>> y_pred_from_proba = predictor.get_pred_from_proba(y_pred_proba=y_pred_proba)
+        >>> y_pred_from_proba = predictor.predict_from_proba(y_pred_proba=y_pred_proba)
         """
         if not self.can_predict_proba:
-            raise AssertionError(f'`predictor.get_pred_from_proba` is not supported when problem_type="{self.problem_type}".')
+            raise AssertionError(f'`predictor.predict_from_proba` is not supported when problem_type="{self.problem_type}".')
         if decision_threshold is None:
             decision_threshold = self.decision_threshold
         return self._learner.get_pred_from_proba(y_pred_proba=y_pred_proba, decision_threshold=decision_threshold)
@@ -2005,7 +2014,7 @@ class TabularPredictor:
         self._assert_is_fit("can_predict_proba")
         return problem_type_info.can_predict_proba(problem_type=self.problem_type)
 
-    def evaluate(self, data, model=None, decision_threshold=None, silent=False, auxiliary_metrics=True, detailed_report=False) -> dict:
+    def evaluate(self, data, model=None, decision_threshold=None, display: bool = False, auxiliary_metrics=True, detailed_report=False, **kwargs) -> dict:
         """
         Report the predictive performance evaluated over a given dataset.
         This is basically a shortcut for: `pred_proba = predict_proba(data); evaluate_predictions(data[label], pred_proba)`.
@@ -2018,14 +2027,14 @@ class TabularPredictor:
             If `self.sample_weight` is set and `self.weight_evaluation==True`, then a column with the sample weight name is checked and used for weighted metric evaluation if it exists.
         model : str (optional)
             The name of the model to get prediction probabilities from. Defaults to None, which uses the highest scoring model on the validation set.
-            Valid models are listed in this `predictor` by calling `predictor.get_model_names()`.
+            Valid models are listed in this `predictor` by calling `predictor.model_names()`.
         decision_threshold : float, default = None
             The decision threshold to use when converting prediction probabilities to predictions.
             This will impact the scores of metrics such as `f1` and `accuracy`.
             If None, defaults to `predictor.decision_threshold`. Ignored unless `problem_type='binary'`.
             Refer to the `predictor.decision_threshold` docstring for more information.
-        silent : bool, default = False
-            If False, performance results are printed.
+        display : bool, default = False
+            If True, performance results are printed.
         auxiliary_metrics: bool, default = True
             Should we compute other (`problem_type` specific) metrics in addition to the default metric?
         detailed_report : bool, default = False
@@ -2037,6 +2046,13 @@ class TabularPredictor:
         NOTE: Metrics scores always show in higher is better form.
         This means that metrics such as log_loss and root_mean_squared_error will have their signs FLIPPED, and values will be negative.
         """
+        if "silent" in kwargs:
+            # keep `silent` logic for backwards compatibility
+            assert isinstance(kwargs["silent"], bool)
+            display = not kwargs.pop("silent")
+        if len(kwargs) > 0:
+            for key in kwargs:
+                raise TypeError(f"TabularPredictor.evaluate() got an unexpected keyword argument '{key}'")
         self._assert_is_fit("evaluate")
         data = self._get_dataset(data)
         if decision_threshold is None:
@@ -2054,13 +2070,13 @@ class TabularPredictor:
             y_pred=y_pred,
             sample_weight=sample_weight,
             decision_threshold=decision_threshold,
-            silent=silent,
+            display=display,
             auxiliary_metrics=auxiliary_metrics,
             detailed_report=detailed_report,
         )
 
     def evaluate_predictions(
-        self, y_true, y_pred, sample_weight=None, decision_threshold=None, silent=False, auxiliary_metrics=True, detailed_report=False
+        self, y_true, y_pred, sample_weight=None, decision_threshold=None, display: bool = False, auxiliary_metrics=True, detailed_report=False, **kwargs
     ) -> dict:
         """
         Evaluate the provided prediction probabilities against ground truth labels.
@@ -2081,8 +2097,8 @@ class TabularPredictor:
             This will impact the scores of metrics such as `f1` and `accuracy`.
             If None, defaults to `predictor.decision_threshold`. Ignored unless `problem_type='binary'`.
             Refer to the `predictor.decision_threshold` docstring for more information.
-        silent : bool, default = False
-            If False, performance results are printed.
+        display : bool, default = False
+            If True, performance results are printed.
         auxiliary_metrics: bool, default = True
             Should we compute other (`problem_type` specific) metrics in addition to the default metric?
         detailed_report : bool, default = False
@@ -2094,6 +2110,13 @@ class TabularPredictor:
         NOTE: Metrics scores always show in higher is better form.
         This means that metrics such as log_loss and root_mean_squared_error will have their signs FLIPPED, and values will be negative.
         """
+        if "silent" in kwargs:
+            # keep `silent` logic for backwards compatibility
+            assert isinstance(kwargs["silent"], bool)
+            display = not kwargs.pop("silent")
+        if len(kwargs) > 0:
+            for key in kwargs:
+                raise TypeError(f"TabularPredictor.evaluate_predictions() got an unexpected keyword argument '{key}'")
         if decision_threshold is None:
             decision_threshold = self.decision_threshold
         return self._learner.evaluate_predictions(
@@ -2101,7 +2124,7 @@ class TabularPredictor:
             y_pred=y_pred,
             sample_weight=sample_weight,
             decision_threshold=decision_threshold,
-            silent=silent,
+            display=display,
             auxiliary_metrics=auxiliary_metrics,
             detailed_report=detailed_report,
         )
@@ -2112,9 +2135,11 @@ class TabularPredictor:
         extra_info: bool = False,
         extra_metrics: list | None = None,
         decision_threshold: float | None = None,
+        score_format: str = "score",
         only_pareto_frontier: bool = False,
         skip_score: bool = False,
-        silent: bool = False,
+        display: bool = False,
+        **kwargs,
     ) -> pd.DataFrame:
         """
         Output summary of information about models produced during `fit()` as a :class:`pd.DataFrame`.
@@ -2126,6 +2151,8 @@ class TabularPredictor:
                 NOTE: Metrics scores always show in higher is better form.
                 This means that metrics such as log_loss and root_mean_squared_error will have their signs FLIPPED, and values will be negative.
                 This is necessary to avoid the user needing to know the metric to understand if higher is better when looking at leaderboard.
+            'eval_metric': The evaluation metric name used to calculate the scores.
+                This should be identical to `predictor.eval_metric.name`.
             'pred_time_val': The inference time required to compute predictions on the validation data end-to-end.
                 Equivalent to the sum of all 'pred_time_val_marginal' values for the model and all of its base models.
             'fit_time': The fit time required to train the model end-to-end (Including base models if the model is a stack ensemble).
@@ -2231,6 +2258,11 @@ class TabularPredictor:
             NOTE: `score_val` will not be impacted by this value in v0.8.
                 `score_val` will always show the validation scores achieved with a decision threshold of `0.5`.
                 Only test scores will be properly updated.
+        score_format : {'score', 'error'}
+            If "score", leaderboard is returned as normal.
+            If "error", the column "score_val" is converted to "metric_error_val", and "score_test" is converted to "metric_error_test".
+                "metric_error" is calculated by taking `predictor.eval_metric.convert_score_to_error(score)`.
+                This will result in errors where 0 is perfect and lower is better.
         only_pareto_frontier : bool, default = False
             If `True`, only return model information of models in the Pareto frontier of the accuracy/latency trade-off (models which achieve the highest score within their end-to-end inference time).
             At minimum this will include the model with the highest score and the model with the lowest inference time.
@@ -2240,13 +2272,20 @@ class TabularPredictor:
             [Advanced, primarily for developers]
             If `True`, will skip computing `score_test` if `data` is specified. `score_test` will be set to NaN for all models.
             `pred_time_test` and related columns will still be computed.
-        silent : bool, default = False
-            Should leaderboard DataFrame be printed?
+        display : bool, default = False
+            If True, the output DataFrame is printed to stdout.
 
         Returns
         -------
         :class:`pd.DataFrame` of model performance summary information.
         """
+        if "silent" in kwargs:
+            # keep `silent` logic for backwards compatibility
+            assert isinstance(kwargs["silent"], bool)
+            display = not kwargs.pop("silent")
+        if len(kwargs) > 0:
+            for key in kwargs:
+                raise TypeError(f"TabularPredictor.leaderboard() got an unexpected keyword argument '{key}'")
         self._assert_is_fit("leaderboard")
         data = self._get_dataset(data, allow_nan=True)
         if decision_threshold is None:
@@ -2257,11 +2296,12 @@ class TabularPredictor:
             extra_metrics=extra_metrics,
             decision_threshold=decision_threshold,
             only_pareto_frontier=only_pareto_frontier,
+            score_format=score_format,
             skip_score=skip_score,
-            silent=silent,
+            display=display,
         )
 
-    def get_model_failures(self, verbose: bool = False) -> pd.DataFrame:
+    def model_failures(self, verbose: bool = False) -> pd.DataFrame:
         """
         [Advanced] Get the model failures that occurred during the fitting of this model, in the form of a pandas DataFrame.
 
@@ -2300,8 +2340,8 @@ class TabularPredictor:
                 "exc_traceback": The full traceback message of the exception as a string
                 "exc_order": The order of the model failure (starting from 1)
         """
-        self._assert_is_fit("get_model_failures")
-        model_failures_df = self._trainer.get_model_failures()
+        self._assert_is_fit("model_failures")
+        model_failures_df = self._trainer.model_failures()
         if verbose:
             with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):
                 print(model_failures_df)
@@ -2335,7 +2375,7 @@ class TabularPredictor:
         data : str or DataFrame, default = None
             The data to predict on.
             If None:
-                If self.trainer.has_val, the validation data is used.
+                If self.has_val, the validation data is used.
                 Else, the out-of-fold prediction probabilities are used.
         models : List[str], default = None
             The list of models to get predictions for.
@@ -2403,7 +2443,7 @@ class TabularPredictor:
         data : DataFrame, default = None
             The data to predict on.
             If None:
-                If self.trainer.has_val, the validation data is used.
+                If self.has_val, the validation data is used.
                 Else, the out-of-fold prediction probabilities are used.
         models : List[str], default = None
             The list of models to get predictions for.
@@ -2509,7 +2549,7 @@ class TabularPredictor:
         if verbosity > 0:  # print stuff
             print("*** Summary of fit() ***")
             print("Estimated performance of each model:")
-            results["leaderboard"] = self._learner.leaderboard(silent=False)
+            results["leaderboard"] = self._learner.leaderboard(display=True)
             # self._summarize('model_performance', 'Validation performance of individual models', results)
             #  self._summarize('model_best', 'Best model (based on validation performance)', results)
             # self._summarize('hyperparameter_tune', 'Hyperparameter-tuning used', results)
@@ -2579,7 +2619,7 @@ class TabularPredictor:
             print("*** End of fit() summary ***")
         return results
 
-    def transform_features(self, data=None, model=None, base_models=None, return_original_features=True):
+    def transform_features(self, data=None, model: str = None, base_models: List[str] = None, return_original_features: bool = True) -> pd.DataFrame:
         """
         Transforms data features through the AutoGluon feature generator.
         This is useful to gain an understanding of how AutoGluon interprets the data features.
@@ -2592,7 +2632,7 @@ class TabularPredictor:
 
         Parameters
         ----------
-        data : str or :class:`TabularDataset` or :class:`pd.DataFrame` (optional)
+        data: str or :class:`TabularDataset` or :class:`pd.DataFrame` (optional)
             The data to apply feature transformation to.
             This data does not require the label column.
             If str is passed, `data` will be loaded using the str value as the file path.
@@ -2611,21 +2651,21 @@ class TabularPredictor:
                     `base_model` features generated in this instance will be from out-of-fold predictions.
                     Note that the training set may differ from the training set originally passed during fit(), as AutoGluon may choose to drop or duplicate rows during training.
                     Warning: Do not pass the original training set through `data` if `model` or `base_models` are set. This will result in overfit feature transformation. Instead set `data=None`.
-        model : str, default = None
+        model: str, default = None
             Model to generate input features for.
             The output data will be equivalent to the input data that would be sent into `model.predict_proba(data)`.
                 Note: This only applies to cases where `data` is not the training data.
             If `None`, then only return generically preprocessed features prior to any model fitting.
-            Valid models are listed in this `predictor` by calling `predictor.get_model_names()`.
+            Valid models are listed in this `predictor` by calling `predictor.model_names()`.
             Specifying a `refit_full` model will cause an exception if `data=None`.
             `base_models=None` is a requirement when specifying `model`.
-        base_models : list, default = None
+        base_models: List[str], default = None
             List of model names to use as base_models for a hypothetical stacker model when generating input features.
             If `None`, then only return generically preprocessed features prior to any model fitting.
-            Valid models are listed in this `predictor` by calling `predictor.get_model_names()`.
+            Valid models are listed in this `predictor` by calling `predictor.model_names()`.
             If a stacker model S exists with `base_models=M`, then setting `base_models=M` is equivalent to setting `model=S`.
             `model=None` is a requirement when specifying `base_models`.
-        return_original_features : bool, default = True
+        return_original_features: bool, default = True
             Whether to return the original features.
             If False, only returns the additional output columns from specifying `model` or `base_models`.
                 This is useful to set to False if the intent is to use the output as input to further stacker models without the original features.
@@ -2649,7 +2689,7 @@ class TabularPredictor:
         data = self._get_dataset(data, allow_nan=True)
         return self._learner.get_inputs_to_stacker(dataset=data, model=model, base_models=base_models, use_orig_features=return_original_features)
 
-    def transform_labels(self, labels, inverse=False, proba=False):
+    def transform_labels(self, labels: np.ndarray | pd.Series, inverse: bool = False, proba: bool = False) -> pd.Series | pd.DataFrame:
         """
         Transforms data labels to the internal label representation.
         This can be useful for training your own models on the same data label representation as AutoGluon.
@@ -2658,13 +2698,13 @@ class TabularPredictor:
 
         Parameters
         ----------
-        labels : :class:`np.ndarray` or :class:`pd.Series`
+        labels: :class:`np.ndarray` or :class:`pd.Series`
             Labels to transform.
             If `proba=False`, an example input would be the output of `predictor.predict(test_data)`.
             If `proba=True`, an example input would be the output of `predictor.predict_proba(test_data, as_multiclass=False)`.
-        inverse : boolean, default = False
+        inverse: bool, default = False
             When `True`, the input labels are treated as being in the internal representation and the original representation is outputted.
-        proba : boolean, default = False
+        proba: bool, default = False
             When `True`, the input labels are treated as probabilities and the output will be the internal representation of probabilities.
                 In this case, it is expected that `labels` be a :class:`pd.DataFrame` or :class:`np.ndarray`.
                 If the `problem_type` is multiclass:
@@ -2685,15 +2725,15 @@ class TabularPredictor:
     def feature_importance(
         self,
         data=None,
-        model=None,
-        features=None,
-        feature_stage="original",
-        subsample_size=5000,
-        time_limit=None,
-        num_shuffle_sets=None,
-        include_confidence_band=True,
-        confidence_level=0.99,
-        silent=False,
+        model: str = None,
+        features: list = None,
+        feature_stage: str = "original",
+        subsample_size: int = 5000,
+        time_limit: float = None,
+        num_shuffle_sets: int = None,
+        include_confidence_band: bool = True,
+        confidence_level: float = 0.99,
+        silent: bool = False,
     ):
         """
         Calculates feature importance scores for the given model via permutation importance. Refer to https://explained.ai/rf-importance/ for an explanation of permutation importance.
@@ -2717,7 +2757,7 @@ class TabularPredictor:
                 More accurate feature importances will be obtained from new data that was held-out during `fit()`.
         model : str, default = None
             Model to get feature importances for, if None the best model is chosen.
-            Valid models are listed in this `predictor` by calling `predictor.get_model_names()`
+            Valid models are listed in this `predictor` by calling `predictor.model_names()`
         features : list, default = None
             List of str feature names that feature importances are calculated for and returned, specify None to get all feature importances.
             If you only want to compute feature importances for some of the features, you can pass their names in as a list of str.
@@ -2836,7 +2876,7 @@ class TabularPredictor:
             fi_df[low_str] = pd.Series(ci_low_dict)
         return fi_df
 
-    def compile_models(self, models="best", with_ancestors=True, compiler_configs="auto"):
+    def compile(self, models="best", with_ancestors=True, compiler_configs="auto"):
         """
         Compile models for accelerated prediction.
         This can be helpful to reduce prediction latency and improve throughput.
@@ -2851,7 +2891,7 @@ class TabularPredictor:
             Model names of models to compile.
             If 'best' then the model with the highest validation score is compiled (this is the model used for prediction by default).
             If 'all' then all models are compiled.
-            Valid models are listed in this `predictor` by calling `predictor.get_model_names()`.
+            Valid models are listed in this `predictor` by calling `predictor.model_names()`.
         with_ancestors : bool, default = True
             If True, all ancestor models of the provided models will also be compiled.
         compiler_configs : dict or str, default = "auto"
@@ -2877,7 +2917,7 @@ class TabularPredictor:
                     Increasing batch size to a number that is larger than 1 would help increase the prediction throughput.
                     This comes with an expense of utilizing larger memory for prediction.
         """
-        self._assert_is_fit("compile_models")
+        self._assert_is_fit("compile")
         if isinstance(compiler_configs, str):
             if compiler_configs == "auto":
                 compiler_configs = {
@@ -2887,9 +2927,9 @@ class TabularPredictor:
                 }
             else:
                 raise ValueError(f'Unknown compiler_configs preset: "{compiler_configs}"')
-        self._trainer.compile_models(model_names=models, with_ancestors=with_ancestors, compiler_configs=compiler_configs)
+        self._trainer.compile(model_names=models, with_ancestors=with_ancestors, compiler_configs=compiler_configs)
 
-    def persist_models(self, models="best", with_ancestors=True, max_memory=0.4) -> list:
+    def persist(self, models="best", with_ancestors=True, max_memory=0.4) -> List[str]:
         """
         Persist models in memory for reduced inference latency. This is particularly important if the models are being used for online-inference where low latency is critical.
         If models are not persisted in memory, they are loaded from disk every time they are asked to make predictions.
@@ -2900,7 +2940,7 @@ class TabularPredictor:
             Model names of models to persist.
             If 'best' then the model with the highest validation score is persisted (this is the model used for prediction by default).
             If 'all' then all models are persisted.
-            Valid models are listed in this `predictor` by calling `predictor.get_model_names()`.
+            Valid models are listed in this `predictor` by calling `predictor.model_names()`.
         with_ancestors : bool, default = True
             If True, all ancestor models of the provided models will also be persisted.
             If False, stacker models will not have the models they depend on persisted unless those models were specified in `models`. This will slow down inference as the ancestor models will still need to be loaded from disk for each predict call.
@@ -2914,10 +2954,10 @@ class TabularPredictor:
         -------
         List of persisted model names.
         """
-        self._assert_is_fit("persist_models")
+        self._assert_is_fit("persist")
         return self._learner.persist_trainer(low_memory=False, models=models, with_ancestors=with_ancestors, max_memory=max_memory)
 
-    def unpersist_models(self, models="all") -> list:
+    def unpersist(self, models="all") -> List[str]:
         """
         Unpersist models in memory for reduced memory usage.
         If models are not persisted in memory, they are loaded from disk every time they are asked to make predictions.
@@ -2928,16 +2968,16 @@ class TabularPredictor:
         models : list of str or str, default = 'all'
             Model names of models to unpersist.
             If 'all' then all models are unpersisted.
-            Valid models are listed in this `predictor` by calling `predictor.get_model_names_persisted()`.
+            Valid models are listed in this `predictor` by calling `predictor.model_names(persisted=True)`.
 
         Returns
         -------
         List of unpersisted model names.
         """
-        self._assert_is_fit("unpersist_models")
-        return self._learner.load_trainer().unpersist_models(model_names=models)
+        self._assert_is_fit("unpersist")
+        return self._learner.load_trainer().unpersist(model_names=models)
 
-    def refit_full(self, model="all", set_best_to_refit_full=True):
+    def refit_full(self, model: str | List[str] = "all", set_best_to_refit_full: bool = True) -> Dict[str, str]:
         """
         Retrain model on all of the data (training + validation).
         For bagged models:
@@ -2961,12 +3001,12 @@ class TabularPredictor:
 
         Parameters
         ----------
-        model : str, default = 'all'
-            Model name of model to refit.
+        model : str | List[str], default = 'all'
+            Model name of model(s) to refit.
                 If 'all' then all models are refitted.
                 If 'best' then the model with the highest validation score is refit.
             All ancestor models will also be refit in the case that the selected model is a weighted or stacker ensemble.
-            Valid models are listed in this `predictor` by calling `predictor.get_model_names()`.
+            Valid models are listed in this `predictor` by calling `predictor.model_names()`.
         set_best_to_refit_full : bool | str, default = True
             If True, sets best model to the refit_full version of the prior best model.
             This means the model used when `predictor.predict(data)` is called will be the refit_full version instead of the original version of the model.
@@ -2979,7 +3019,7 @@ class TabularPredictor:
         """
         self._assert_is_fit("refit_full")
         ts = time.time()
-        model_best = self._get_model_best(can_infer=None)
+        model_best = self._model_best(can_infer=None)
         if model == "best":
             model = model_best
         logger.log(
@@ -2996,9 +3036,9 @@ class TabularPredictor:
                 model_to_set_best = set_best_to_refit_full
             else:
                 model_to_set_best = model_best
-            model_full_dict = self._trainer.get_model_full_dict()
-            if model_to_set_best in model_full_dict:
-                self._trainer.model_best = model_full_dict[model_to_set_best]
+            model_refit_map = self._trainer.model_refit_map()
+            if model_to_set_best in model_refit_map:
+                self._trainer.model_best = model_refit_map[model_to_set_best]
                 # Note: model_best will be overwritten if additional training is done with new models,
                 # since model_best will have validation score of None and any new model will have a better validation score.
                 # This has the side-effect of having the possibility of model_best being overwritten by a worse model than the original model_best.
@@ -3008,7 +3048,7 @@ class TabularPredictor:
                     f'Updated best model to "{self._trainer.model_best}" (Previously "{model_best}"). '
                     f'AutoGluon will default to using "{self._trainer.model_best}" for predict() and predict_proba().',
                 )
-            elif model_to_set_best in model_full_dict.values():
+            elif model_to_set_best in model_refit_map.values():
                 # Model best is already a refit full model
                 prev_best = self._trainer.model_best
                 self._trainer.model_best = model_to_set_best
@@ -3028,7 +3068,7 @@ class TabularPredictor:
         logger.log(20, f'Refit complete, total runtime = {round(te - ts, 2)}s ... Best model: "{self._trainer.model_best}"')
         return refit_full_dict
 
-    def get_model_best(self):
+    def model_best(self) -> str:
         """
         Returns the string model name of the best model by validation score that can infer.
         This is the same model used during inference when `predictor.predict` is called without specifying a model.
@@ -3038,10 +3078,10 @@ class TabularPredictor:
         -------
         String model name of the best model
         """
-        return self._get_model_best(can_infer=True)
+        return self._model_best(can_infer=True)
 
-    def _get_model_best(self, can_infer=None):
-        self._assert_is_fit("get_model_best")
+    def _model_best(self, can_infer=None) -> str:
+        self._assert_is_fit("model_best")
         # TODO: Set self._trainer.model_best to the best model at end of fit instead of best WeightedEnsemble.
         if self._trainer.model_best is not None:
             models = self._trainer.get_model_names(can_infer=can_infer)
@@ -3071,7 +3111,7 @@ class TabularPredictor:
         if save_trainer:
             self._trainer.save()
 
-    def get_model_full_dict(self, inverse=False):
+    def model_refit_map(self, inverse=False) -> Dict[str, str]:
         """
         Returns a dictionary of original model name -> refit full model name.
         Empty unless `refit_full=True` was set during fit or `predictor.refit_full()` was called.
@@ -3086,8 +3126,8 @@ class TabularPredictor:
         -------
         Dictionary of original model name -> refit full model name.
         """
-        self._assert_is_fit("get_model_full_dict")
-        return self._trainer.get_model_full_dict(inverse=inverse)
+        self._assert_is_fit("model_refit_map")
+        return self._trainer.model_refit_map(inverse=inverse)
 
     def info(self):
         """
@@ -3162,7 +3202,7 @@ class TabularPredictor:
         models = []
 
         if expand_pareto_frontier:
-            leaderboard = self.leaderboard(silent=True)
+            leaderboard = self.leaderboard()
             leaderboard = leaderboard[leaderboard["model"].isin(base_models)]
             leaderboard = leaderboard.sort_values(by="pred_time_val")
             models_to_check = leaderboard["model"].tolist()
@@ -3261,41 +3301,41 @@ class TabularPredictor:
         if metric is None:
             metric = self.eval_metric
         if model == "best":
-            model = self.get_model_best()
+            model = self.model_best()
 
         return self._learner.calibrate_decision_threshold(data=data, metric=metric, model=model, decision_thresholds=decision_thresholds, verbose=verbose)
 
-    def get_oof_pred(self, model: str = None, transformed=False, train_data=None, internal_oof=False, decision_threshold=None, can_infer=None) -> pd.Series:
+    def predict_oof(self, model: str = None, *, transformed=False, train_data=None, internal_oof=False, decision_threshold=None, can_infer=None) -> pd.Series:
         """
         Note: This is advanced functionality not intended for normal usage.
 
         Returns the out-of-fold (OOF) predictions for every row in the training data.
 
-        For more information, refer to `get_oof_pred_proba()` documentation.
+        For more information, refer to `predict_proba_oof()` documentation.
 
         Parameters
         ----------
         model : str (optional)
-            Refer to `get_oof_pred_proba()` documentation.
+            Refer to `predict_proba_oof()` documentation.
         transformed : bool, default = False
-            Refer to `get_oof_pred_proba()` documentation.
+            Refer to `predict_proba_oof()` documentation.
         train_data : pd.DataFrame, default = None
-            Refer to `get_oof_pred_proba()` documentation.
+            Refer to `predict_proba_oof()` documentation.
         internal_oof : bool, default = False
-            Refer to `get_oof_pred_proba()` documentation.
+            Refer to `predict_proba_oof()` documentation.
         decision_threshold : float, default = None
             Refer to `predict_multi` documentation.
         can_infer : bool, default = None
-            Refer to `get_oof_pred_proba()` documentation.
+            Refer to `predict_proba_oof()` documentation.
 
         Returns
         -------
         :class:`pd.Series` object of the out-of-fold training predictions of the model.
         """
-        self._assert_is_fit("get_oof_pred")
+        self._assert_is_fit("predict_oof")
         if decision_threshold is None:
             decision_threshold = self.decision_threshold
-        y_pred_proba_oof = self.get_oof_pred_proba(
+        y_pred_proba_oof = self.predict_proba_oof(
             model=model, transformed=transformed, as_multiclass=True, train_data=train_data, internal_oof=internal_oof, can_infer=can_infer
         )
         y_pred_oof = get_pred_from_proba_df(y_pred_proba_oof, problem_type=self.problem_type, decision_threshold=decision_threshold)
@@ -3306,9 +3346,9 @@ class TabularPredictor:
     # TODO: Improve error messages when trying to get oof from refit_full and distilled models.
     # TODO: v0.1 add tutorial related to this method, as it is very powerful.
     # TODO: Remove train_data argument once we start caching the raw original data: Can just load that instead.
-    def get_oof_pred_proba(
-        self, model: str = None, transformed=False, as_multiclass=True, train_data=None, internal_oof=False, can_infer=None
-    ) -> Union[pd.DataFrame, pd.Series]:
+    def predict_proba_oof(
+        self, model: str = None, *, transformed=False, as_multiclass=True, train_data=None, internal_oof=False, can_infer=None
+    ) -> pd.DataFrame | pd.Series:
         """
         Note: This is advanced functionality not intended for normal usage.
 
@@ -3329,7 +3369,7 @@ class TabularPredictor:
         ----------
         model : str (optional)
             The name of the model to get out-of-fold predictions from. Defaults to None, which uses the highest scoring model on the validation set.
-            Valid models are listed in this `predictor` by calling `predictor.get_model_names()`
+            Valid models are listed in this `predictor` by calling `predictor.model_names()`
         transformed : bool, default = False
             Whether the output values should be of the original label representation (False) or the internal label representation (True).
             The internal representation for binary and multiclass classification are integers numbering the k possible classes from 0 to k-1, while the original representation is identical to the label classes provided during fit.
@@ -3357,9 +3397,9 @@ class TabularPredictor:
         -------
         :class:`pd.Series` or :class:`pd.DataFrame` object of the out-of-fold training prediction probabilities of the model.
         """
-        self._assert_is_fit("get_oof_pred_proba")
+        self._assert_is_fit("predict_proba_oof")
         if model is None:
-            model = self._get_model_best(can_infer=can_infer)
+            model = self._model_best(can_infer=can_infer)
         if not self._trainer.bagged_mode:
             raise AssertionError("Predictor must be in bagged mode to get out-of-fold predictions.")
         if self._trainer.get_model_attribute(model=model, attribute="refit_full", default=False):
@@ -3390,8 +3430,8 @@ class TabularPredictor:
                         f"If attempting to get `oof_pred_proba`, DO NOT pass `train_data` into `predictor.predict_proba` or `predictor.transform_features`!\n"
                         f"Instead this can be done by the following "
                         f"(Ensure `train_data` is identical to when it was used in fit):\n"
-                        f"oof_pred_proba = predictor.get_oof_pred_proba(train_data=train_data)\n"
-                        f"oof_pred = predictor.get_oof_pred(train_data=train_data)\n"
+                        f"oof_pred_proba = predictor.predict_proba_oof(train_data=train_data)\n"
+                        f"oof_pred = predictor.predict_oof(train_data=train_data)\n"
                     )
                 else:
                     missing_idx = list(train_data.index.difference(y_pred_proba_oof_transformed.index))
@@ -3543,7 +3583,7 @@ class TabularPredictor:
             All models that are not specified and are also not required as a dependency of any model in `models_to_keep` will be deleted.
             Specify `models_to_keep='best'` to keep only the best model and its model dependencies.
             `models_to_delete` must be None if `models_to_keep` is set.
-            To see the list of possible model names, use: `predictor.get_model_names()` or `predictor.leaderboard()`.
+            To see the list of possible model names, use: `predictor.model_names()` or `predictor.leaderboard()`.
         models_to_delete : str or list, default = None
             Name of model or models to delete.
             All models that are not specified but depend on a model in `models_to_delete` will also be deleted.
@@ -3564,7 +3604,7 @@ class TabularPredictor:
         """
         self._assert_is_fit("delete_models")
         if models_to_keep == "best":
-            models_to_keep = self.get_model_best()
+            models_to_keep = self.model_best()
         self._trainer.delete_models(
             models_to_keep=models_to_keep,
             models_to_delete=models_to_delete,
@@ -3573,13 +3613,13 @@ class TabularPredictor:
             dry_run=dry_run,
         )
 
-    def get_size_disk(self) -> int:
+    def disk_usage(self) -> int:
         """
         Returns the combined size of all files under the `predictor.path` directory in bytes.
         """
         return get_directory_size(self.path)
 
-    def get_size_disk_per_file(self, *, sort_by: str = "size", include_path_in_name: bool = False) -> pd.Series:
+    def disk_usage_per_file(self, *, sort_by: str = "size", include_path_in_name: bool = False) -> pd.Series:
         """
         Returns the size of each file under the `predictor.path` directory in bytes.
 
@@ -3603,16 +3643,46 @@ class TabularPredictor:
         """
         return get_directory_size_per_file(self.path, sort_by=sort_by, include_path_in_name=include_path_in_name)
 
-    # TODO: v0.1 add documentation for arguments
-    def get_model_names(self, stack_name=None, level=None, can_infer: bool = None, models: list = None) -> list:
-        """Returns the list of model names trained in this `predictor` object."""
-        self._assert_is_fit("get_model_names")
-        return self._trainer.get_model_names(stack_name=stack_name, level=level, can_infer=can_infer, models=models)
+    def model_names(
+        self,
+        stack_name: str = None,
+        level: int = None,
+        can_infer: bool = None,
+        models: List[str] = None,
+        persisted: bool = None,
+    ) -> List[str]:
+        """
+        Returns the list of model names trained in this `predictor` object.
 
-    def get_model_names_persisted(self) -> list:
-        """Returns the list of model names which are persisted in memory."""
-        self._assert_is_fit("get_model_names_persisted")
-        return list(self._learner.load_trainer().models.keys())
+        Parameters
+        ----------
+        stack_name: str, default = None
+            If specified, returns only models under a given stack name.
+        level: int, default = None
+            If specified, returns only models at the given stack level.
+        can_infer: bool, default = None
+            If specified, returns only models that can/cannot infer on new data.
+        models: List[str], default = None
+            The list of model names to consider.
+            If None, considers all models.
+        persisted: bool, default = None
+            If None: no filtering will occur based on persisted status
+            If True: will return only the models that are persisted in memory via `predictor.persist()`
+            If False: will return only the models that are not persisted in memory via `predictor.persist()`
+
+        Returns
+        -------
+        List of model names
+        """
+        self._assert_is_fit("model_names")
+        model_names = self._trainer.get_model_names(stack_name=stack_name, level=level, can_infer=can_infer, models=models)
+        if persisted is not None:
+            persisted_model_names = list(self._trainer.models.keys())
+            if persisted:
+                model_names = [m for m in model_names if m in persisted_model_names]
+            else:
+                model_names = [m for m in model_names if m not in persisted_model_names]
+        return model_names
 
     def distill(
         self,
@@ -3629,6 +3699,7 @@ class TabularPredictor:
         verbosity=None,
     ):
         """
+        [EXPERIMENTAL]
         Distill AutoGluon's most accurate ensemble-predictor into single models which are simpler/faster and require less memory/compute.
         Distillation can produce a model that is more accurate than the same model fit directly on the original training data.
         After calling `distill()`, there will be more models available in this Predictor, which can be evaluated using `predictor.leaderboard(test_data)` and deployed with: `predictor.predict(test_data, model=MODEL_NAME)`.
@@ -3781,8 +3852,8 @@ class TabularPredictor:
 
         primary_model = model
         if primary_model == "best":
-            primary_model = self.get_model_best()
-        all_models = self.get_model_names()
+            primary_model = self.model_best()
+        all_models = self.model_names()
         assert primary_model in all_models, f'Unknown model "{primary_model}"! Valid models: {all_models}'
         if prune_unused_nodes == True:
             models_to_keep = self._trainer.get_minimum_model_set(model=primary_model)
@@ -4272,15 +4343,15 @@ class TabularPredictor:
 
         return kwargs_sanitized
 
-    def _prune_data_features(self, train_features: pd.DataFrame, other_features: pd.DataFrame, is_labeled: bool):
+    def _prune_data_features(self, train_features: list, other_features: list, is_labeled: bool):
         """
         Removes certain columns from the provided datasets that do not contain predictive features.
 
         Parameters
         ----------
-        train_features : pd.DataFrame
+        train_features : list
             The features/columns for the incoming training data
-        other_features : pd.DataFrame
+        other_features : list
             Features of other auxiliary data that contains the same covariates as the training data.
             Examples of this could be: tuning data, pseudo data
         is_labeled: bool
@@ -4509,12 +4580,12 @@ class TabularPredictor:
         """
         predictor_clone = self.clone(path=path, return_clone=True, dirs_exist_ok=dirs_exist_ok)
         if model == "best":
-            model = predictor_clone.get_model_best()
+            model = predictor_clone.model_best()
             logger.log(30, f"Clone: Keeping minimum set of models required to predict with best model '{model}'...")
         else:
             logger.log(30, f"Clone: Keeping minimum set of models required to predict with model '{model}'...")
         predictor_clone.delete_models(models_to_keep=model, dry_run=False)
-        if isinstance(model, str) and model in predictor_clone.get_model_names(can_infer=True):
+        if isinstance(model, str) and model in predictor_clone.model_names(can_infer=True):
             predictor_clone.set_model_best(model=model, save_trainer=True)
         logger.log(
             30,
@@ -4523,6 +4594,73 @@ class TabularPredictor:
         )
         predictor_clone.save_space()
         return predictor_clone if return_clone else predictor_clone.path
+
+    def simulation_artifact(self, test_data: pd.DataFrame = None) -> dict:
+        """
+        [Advanced] Computes and returns the necessary information to perform zeroshot HPO simulation.
+        For a usage example, refer to https://github.com/autogluon/tabrepo/blob/main/examples/run_quickstart_from_scratch.py
+
+        Parameters
+        ----------
+        test_data: pd.DataFrame, default = None
+            The test data to predict with.
+            If None, the keys `pred_proba_dict_test` and `y_test` will not be present in the output.
+
+        Returns
+        -------
+        simulation_dict: dict
+            The dictionary of information required for zeroshot HPO simulation.
+            Keys are as follows:
+                pred_proba_dict_val: Dictionary of model name to prediction probabilities (or predictions if regression) on the validation data
+                pred_proba_dict_test: Dictionary of model name to prediction probabilities (or predictions if regression) on the test data
+                y_val: Pandas Series of ground truth labels for the validation data (internal representation)
+                y_test: Pandas Series of ground truth labels for the test data (internal representation)
+                eval_metric: The string name of the evaluation metric (obtained via `predictor.eval_metric.name`)
+                problem_type: The problem type (obtained via `predictor.problem_type`)
+                problem_type_transform: The transformed (internal) problem type (obtained via `predictor._learner.label_cleaner.problem_type_transform,`)
+                ordered_class_labels: The original class labels (`predictor._learner.label_cleaner.ordered_class_labels`)
+                ordered_Class_labels_transformed: The transformed (internal) class labels (`predictor._learner.label_cleaner.ordered_class_labels_transformed`)
+                num_classes: The number of internal classes (`self._learner.label_cleaner.num_classes`)
+                label: The label column name (`predictor.label`)
+        """
+        models = self.model_names(can_infer=True)
+
+        pred_proba_dict_test = None
+        if self.can_predict_proba:
+            pred_proba_dict_val = self.predict_proba_multi(inverse_transform=False, as_multiclass=False, models=models)
+            if test_data is not None:
+                pred_proba_dict_test = self.predict_proba_multi(test_data, inverse_transform=False, as_multiclass=False, models=models)
+        else:
+            pred_proba_dict_val = self.predict_multi(inverse_transform=False, models=models)
+            if test_data is not None:
+                pred_proba_dict_test = self.predict_multi(test_data, inverse_transform=False, models=models)
+
+        val_data_source = "val" if self.has_val else "train"
+        _, y_val = self.load_data_internal(data=val_data_source, return_X=False, return_y=True)
+        if test_data is not None:
+            y_test = test_data[self.label]
+            y_test = self.transform_labels(y_test, inverse=False)
+            test_info = dict(
+                pred_proba_dict_test=pred_proba_dict_test,
+                y_test=y_test,
+            )
+        else:
+            test_info = dict()
+
+        simulation_dict = dict(
+            **test_info,
+            pred_proba_dict_val=pred_proba_dict_val,
+            y_val=y_val,
+            eval_metric=self.eval_metric.name,
+            problem_type=self.problem_type,
+            problem_type_transform=self._learner.label_cleaner.problem_type_transform,
+            ordered_class_labels=self._learner.label_cleaner.ordered_class_labels,
+            ordered_class_labels_transformed=self._learner.label_cleaner.ordered_class_labels_transformed,
+            num_classes=self._learner.label_cleaner.num_classes,
+            label=self.label,
+        )
+
+        return simulation_dict
 
     @staticmethod
     def _check_if_hyperparameters_handle_text(hyperparameters: dict) -> bool:
@@ -4565,6 +4703,61 @@ class TabularPredictor:
             else:
                 error_message = f"{error_message} `.{message_suffix}`."
             raise AssertionError(error_message)
+
+    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="persist")
+    def persist_models(self, *args, **kwargs) -> List[str]:
+        """Deprecated method. Use `persist` instead."""
+        return self.persist(*args, **kwargs)
+
+    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="unpersist")
+    def unpersist_models(self, *args, **kwargs) -> List[str]:
+        """Deprecated method. Use `unpersist` instead."""
+        return self.unpersist(*args, **kwargs)
+
+    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="model_names")
+    def get_model_names(self, *args, **kwargs) -> List[str]:
+        """Deprecated method. Use `model_names` instead."""
+        return self.model_names(*args, **kwargs)
+
+    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="model_best")
+    def get_model_best(self) -> str:
+        """Deprecated method. Use `model_best` instead."""
+        return self.model_best()
+
+    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="predict_from_proba")
+    def get_pred_from_proba(self, *args, **kwargs) -> pd.Series | np.array:
+        """Deprecated method. Use `predict_from_proba` instead."""
+        return self.predict_from_proba(*args, **kwargs)
+
+    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="model_refit_map")
+    def get_model_full_dict(self, *args, **kwargs) -> Dict[str, str]:
+        """Deprecated method. Use `model_refit_map` instead."""
+        return self.model_refit_map(*args, **kwargs)
+
+    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="predict_proba_oof")
+    def get_oof_pred_proba(self, *args, **kwargs) -> pd.DataFrame | pd.Series:
+        """Deprecated method. Use `predict_proba_oof` instead."""
+        return self.predict_proba_oof(*args, **kwargs)
+
+    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="predict_oof")
+    def get_oof_pred(self, *args, **kwargs) -> pd.Series:
+        """Deprecated method. Use `predict_oof` instead."""
+        return self.predict_oof(*args, **kwargs)
+
+    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="disk_usage_per_file")
+    def get_size_disk_per_file(self, *args, **kwargs) -> pd.Series:
+        """Deprecated method. Use `disk_usage_per_file` instead."""
+        return self.disk_usage_per_file(*args, **kwargs)
+
+    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="disk_usage")
+    def get_size_disk(self) -> int:
+        """Deprecated method. Use `disk_usage` instead."""
+        return self.disk_usage()
+
+    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="model_names(persisted=True)")
+    def get_model_names_persisted(self) -> List[str]:
+        """Deprecated method. Use `model_names(persisted=True)` instead."""
+        return self.model_names(persisted=True)
 
 
 # Location to store WIP functionality that will be later added to TabularPredictor
@@ -4666,12 +4859,12 @@ def _sub_fit(
     predictor._learner.set_contexts(path_context=ds_fit_context)
     predictor._fit(ag_fit_kwargs=ag_fit_kwargs, ag_post_fit_kwargs=ag_post_fit_kwargs)
 
-    if not predictor.get_model_names():
+    if not predictor.model_names():
         logger.info(f"Unable to determine stacked overfitting. AutoGluon's sub-fit did not successfully train any models!")
         stacked_overfitting = False
     else:
         # Determine stacked overfitting
-        ho_leaderboard = predictor.leaderboard(data=val_data, silent=True).reset_index(drop=True).sort_values(by="score_val")
+        ho_leaderboard = predictor.leaderboard(data=val_data).reset_index(drop=True).sort_values(by="score_val")
         stacked_overfitting = check_stacked_overfitting_from_leaderboard(ho_leaderboard)
         logger.info("Leaderboard on holdout data from dynamic stacking:")
         with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):

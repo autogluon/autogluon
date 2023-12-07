@@ -83,7 +83,7 @@ def test_train_classifier(selenium_standalone_micropip):
         y_pred = predictor.predict(test_data_nolab)
         print("Predictions:  \n", y_pred)
         perf = predictor.evaluate_predictions(y_true=y_test, y_pred=y_pred, auxiliary_metrics=True)
-        leaderboard = predictor.leaderboard(test_data, silent=True)
+        leaderboard = predictor.leaderboard(test_data)
         print(leaderboard[["model", "score_test", "score_val"]])
         trained_models = leaderboard[leaderboard.columns[0]]
         print(trained_models)

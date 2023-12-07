@@ -235,7 +235,6 @@ class HFAutoModelForNER(HFAutoModelForTextPrediction):
         return {self.prefix: ret}
 
     def get_layer_ids(self):
-
         """
         Assign an id to each layer. Layer ids will be used in layer-wise lr decay.
         Basically, id gradually increases when going from the output end to

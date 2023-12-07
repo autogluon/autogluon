@@ -221,15 +221,14 @@ model:
       - "numerical"
     embedding_arch:
       - 'linear'
-    d_token: 192
-    adapter_output_feature: 192
+    token_dim: 192
     hidden_size: 192
-    n_blocks: 3
+    num_blocks: 3
     attention_n_heads: 8
     attention_dropout: 0.2
     residual_dropout: 0.0
     ffn_dropout: 0.1
-    ffn_d_hidden: 192
+    ffn_hidden_size: 192
     ffn_activation: "geglu"
     head_activation: "relu"
     normalization: "layer_norm"
@@ -241,7 +240,6 @@ model:
 
   sam:
     checkpoint_name: "facebook/sam-vit-huge"
-    config_file: ""
     image_norm: "imagenet"
     data_types:
       - "semantic_segmentation_img"
@@ -254,3 +252,5 @@ model:
       - "resize_gt_to_square"
     max_img_num_per_col: 1
     frozen_layers: ["mask_decoder.iou_prediction_head", "prompt_encoder"]
+    num_mask_tokens: 1
+    ignore_label: 255

@@ -107,6 +107,7 @@ def setup_save_path(
             path=save_path,
             warn_if_exist=warn_if_exist,
         )
+        os.makedirs(save_path, exist_ok=True)  # setup_outputdir doesn't create dir if warn_if_exist==False
 
     save_path = os.path.abspath(os.path.expanduser(save_path))
     logger.debug(f"save path: {save_path}")

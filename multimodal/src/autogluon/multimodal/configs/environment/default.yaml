@@ -8,6 +8,7 @@ env:
   precision: "16-mixed"  # training precision. Refer to https://lightning.ai/docs/pytorch/stable/common/trainer.html#precision
   num_workers: 2  # pytorch training dataloader workers.
   num_workers_evaluation: 2  # pytorch prediction/test dataloader workers.
+  accelerator: "auto"  # "cpu", "gpu", or "auto"
   fast_dev_run: False
   deterministic: False
   auto_select_gpus: True

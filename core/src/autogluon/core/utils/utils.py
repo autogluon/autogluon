@@ -96,7 +96,7 @@ def setup_compute(nthreads_per_trial, ngpus_per_trial):
     if ngpus_per_trial is None:
         ngpus_per_trial = 0  # do not use GPU by default
     elif ngpus_per_trial == "all":
-        ngpus_per_trial = ResourceManager.get_gpu_count_all()
+        ngpus_per_trial = ResourceManager.get_gpu_count()
     if not isinstance(nthreads_per_trial, int) and nthreads_per_trial != "auto":
         raise ValueError(f'nthreads_per_trial must be an integer or "auto": nthreads_per_trial = {nthreads_per_trial}')
     if not isinstance(ngpus_per_trial, int) and ngpus_per_trial != "auto":
@@ -561,8 +561,9 @@ def infer_problem_type(y: Series, silent=False) -> str:
     """Identifies which type of prediction problem we are interested in (if user has not specified).
     Ie. binary classification, multi-class classification, or regression.
     """
-    with pd.option_context("mode.use_inf_as_na", True):  # treat None, NaN, INF, NINF as NA
-        y = y.dropna()
+    # treat None, NaN, INF, NINF as NA
+    y = y.replace([np.inf, -np.inf], np.nan, inplace=False)
+    y = y.dropna()
     num_rows = len(y)
 
     if num_rows == 0:

@@ -55,7 +55,7 @@ class InterpretableTabularPredictor(TabularPredictor):
             raise ValueError(f"{self.__class__.__name__} does not support `auto_stack`.")
         return kwargs
 
-    def leaderboard_interpretable(self, silent=False, **kwargs) -> pd.DataFrame:
+    def leaderboard_interpretable(self, verbose: bool = False, **kwargs) -> pd.DataFrame:
         """
         Leaderboard of fitted interpretable models along with their corresponding complexities.
         Identical to `.leaderboard`, but with an additional 'complexity' column indicating
@@ -63,7 +63,10 @@ class InterpretableTabularPredictor(TabularPredictor):
 
         Models which do not support calculating 'complexity' will be filtered from this result.
         """
-        leaderboard = self.leaderboard(silent=True, **kwargs)
+        silent = kwargs.pop("silent", None)
+        if silent is not None:
+            verbose = not silent
+        leaderboard = self.leaderboard(**kwargs)
 
         complexities = []
         info = self.info()
@@ -74,7 +77,7 @@ class InterpretableTabularPredictor(TabularPredictor):
         leaderboard = leaderboard[~pd.isna(leaderboard.complexity)]  # remove non-interpretable models
         score_col = "score_test" if "score_test" in leaderboard.columns else "score_val"
         leaderboard = leaderboard.sort_values(by=[score_col, "complexity"], ascending=[False, True], ignore_index=True)
-        if not silent:
+        if verbose:
             with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):
                 print(leaderboard)
         return leaderboard
@@ -92,7 +95,7 @@ class InterpretableTabularPredictor(TabularPredictor):
             Optionally print rules for a particular model, ignoring the complexity threshold.
         """
         if model_name is None:
-            summaries = self.leaderboard_interpretable(silent=True)
+            summaries = self.leaderboard_interpretable()
             summaries_filtered = summaries[summaries.complexity <= complexity_threshold]
             if summaries_filtered.shape[0] == 0:
                 summaries_filtered = summaries
@@ -114,7 +117,7 @@ class InterpretableTabularPredictor(TabularPredictor):
             If str is passed, `data` will be loaded using the str value as the file path.
         model : str (optional)
             The name of the model to get predictions from. Defaults to None, which uses the highest scoring model on the validation set.
-            Valid models are listed in this `predictor` by calling `predictor.get_model_names()`
+            Valid models are listed in this `predictor` by calling `predictor.model_names()`
         print_rules : bool, optional
             Whether to print the learned rules
 
@@ -126,7 +129,7 @@ class InterpretableTabularPredictor(TabularPredictor):
         import imodels
 
         if model is None:
-            model = self.get_model_best()
+            model = self.model_best()
         data = self._get_dataset(data)
         predictions = self.predict(data=data, model=model, as_pandas=True)
         labels = data[self.label]

@@ -14,7 +14,14 @@ import transformers
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
 from autogluon.core.metrics import Scorer
 
-from .constants import AUTOMM_TUTORIAL_MODE, FEW_SHOT_CLASSIFICATION, NER, OBJECT_DETECTION, SEMANTIC_SEGMENTATION
+from .constants import (
+    AUTOMM_TUTORIAL_MODE,
+    FEW_SHOT_CLASSIFICATION,
+    NER,
+    OBJECT_DETECTION,
+    OPEN_VOCABULARY_OBJECT_DETECTION,
+    SEMANTIC_SEGMENTATION,
+)
 from .learners import (
     BaseLearner,
     FewShotSVMLearner,
@@ -192,7 +199,7 @@ class MultiModalPredictor:
 
         if problem_property and problem_property.is_matching:
             learner_class = MultiModalMatcher
-        elif problem_type == OBJECT_DETECTION:
+        elif problem_type in [OBJECT_DETECTION, OPEN_VOCABULARY_OBJECT_DETECTION]:
             learner_class = ObjectDetectionLearner
         elif problem_type == NER:
             learner_class = NERLearner
@@ -277,12 +284,15 @@ class MultiModalPredictor:
 
     @property
     def model_size(self) -> float:
+        """
+        Returns the model size in Megabyte.
+        """
         return self._learner.model_size
 
     @property
     def classes(self):
         """
-        Return the classes of object detection.
+        Returns the classes of object detection.
         """
         return self._learner.classes
 
@@ -489,7 +499,7 @@ class MultiModalPredictor:
         cutoffs: Optional[List[int]] = [1, 5, 10],
         label: Optional[str] = None,
         return_pred: Optional[bool] = False,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         eval_tool: Optional[str] = None,
     ):
         """
@@ -522,8 +532,8 @@ class MultiModalPredictor:
         return_pred
             Whether to return the prediction result of each row.
         realtime
-            Whether to do realtime inference, which is efficient for small data (default None).
-            If not specified, we would infer it on based on the data modalities
+            Whether to do realtime inference, which is efficient for small data (default False).
+            If provided None, we would infer it on based on the data modalities
             and sample number.
         eval_tool
             The eval_tool for object detection. Could be "pycocotools" or "torchmetrics".
@@ -554,7 +564,7 @@ class MultiModalPredictor:
         candidate_data: Optional[Union[pd.DataFrame, dict, list]] = None,
         id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         as_pandas: Optional[bool] = None,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         save_results: Optional[bool] = None,
     ):
         """
@@ -573,8 +583,8 @@ class MultiModalPredictor:
         as_pandas
             Whether to return the output as a pandas DataFrame(Series) (True) or numpy array (False).
         realtime
-            Whether to do realtime inference, which is efficient for small data (default None).
-            If not specified, we would infer it on based on the data modalities
+            Whether to do realtime inference, which is efficient for small data (default False).
+            If provided None, we would infer it on based on the data modalities
             and sample number.
         save_results
             Whether to save the prediction results (only works for detection now)
@@ -599,7 +609,7 @@ class MultiModalPredictor:
         id_mappings: Optional[Union[Dict[str, Dict], Dict[str, pd.Series]]] = None,
         as_pandas: Optional[bool] = None,
         as_multiclass: Optional[bool] = True,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
     ):
         """
         Predict probabilities class probabilities rather than class labels.
@@ -621,8 +631,8 @@ class MultiModalPredictor:
             Whether to return the probability of all labels or
             just return the probability of the positive class for binary classification problems.
         realtime
-            Whether to do realtime inference, which is efficient for small data (default None).
-            If not specified, we would infer it on based on the data modalities
+            Whether to do realtime inference, which is efficient for small data (default False).
+            If provided None, we would infer it on based on the data modalities
             and sample number.
 
         Returns
@@ -647,7 +657,7 @@ class MultiModalPredictor:
         return_masks: Optional[bool] = False,
         as_tensor: Optional[bool] = False,
         as_pandas: Optional[bool] = False,
-        realtime: Optional[bool] = None,
+        realtime: Optional[bool] = False,
         signature: Optional[str] = None,
     ):
         """
@@ -669,8 +679,8 @@ class MultiModalPredictor:
         as_pandas
             Whether to return the output as a pandas DataFrame (True) or numpy array (False).
         realtime
-            Whether to do realtime inference, which is efficient for small data (default None).
-            If not specified, we would infer it on based on the data modalities
+            Whether to do realtime inference, which is efficient for small data (default False).
+            If provided None, we would infer it on based on the data modalities
             and sample number.
         signature
             When using matcher, it can be query or response.
@@ -745,7 +755,7 @@ class MultiModalPredictor:
             assets = json.load(fp)
         if "class_name" in assets and assets["class_name"] == "MultiModalMatcher":
             learner_class = MultiModalMatcher
-        elif assets["problem_type"] == OBJECT_DETECTION:
+        elif assets["problem_type"] in [OBJECT_DETECTION, OPEN_VOCABULARY_OBJECT_DETECTION]:
             learner_class = ObjectDetectionLearner
         elif assets["problem_type"] == NER:
             learner_class = NERLearner
@@ -810,6 +820,10 @@ class MultiModalPredictor:
             A string that indicates location of the exported onnx model, if `path` argument is provided.
             Otherwise, would return the onnx model as bytes.
         """
+
+        # Make sure _model is initialized
+        self._learner.on_predict_start()
+
         return self._learner.export_onnx(
             data=data,
             path=path,

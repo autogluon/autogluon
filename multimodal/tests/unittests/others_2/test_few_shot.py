@@ -1,7 +1,13 @@
+import os
+import shutil
+import tempfile
 import uuid
+from unittest import mock
 
+import numpy.testing as npt
 import pandas as pd
 import pytest
+import torch
 from omegaconf import OmegaConf
 
 from autogluon.multimodal import MultiModalPredictor
@@ -9,6 +15,7 @@ from autogluon.multimodal.constants import BINARY, FEW_SHOT_CLASSIFICATION, MULT
 from autogluon.multimodal.utils.misc import shopee_dataset
 
 from ..predictor.test_predictor import verify_predictor_save_load, verify_realtime_inference
+from ..utils.utils import get_home_dir
 
 
 def verify_predict_predict_proba(test_data, predictor):
@@ -190,3 +197,39 @@ def test_multi_columns_few_shot(column_features_pooling_mode):
     pred = predictor.predict(test_data.drop(columns=["label"], axis=1))
     proba = predictor.predict_proba(test_data.drop(columns=["label"], axis=1))
     embedding = predictor.extract_embedding(test_data.drop(columns=["label"], axis=1))
+
+
+def test_few_shot_standalone():  # test standalone feature in MultiModalPredictor.save()
+    requests_gag = mock.patch(
+        "requests.Session.request",
+        mock.Mock(side_effect=RuntimeError("Please use the `responses` library to mock HTTP in your tests.")),
+    )
+    download_dir = "./ag_automm_tutorial_imgcls"
+    train_data, test_data = shopee_dataset(download_dir)
+    predictor = MultiModalPredictor(
+        label="label",
+        problem_type=FEW_SHOT_CLASSIFICATION,
+        hyperparameters={
+            "model.clip.checkpoint_name": "openai/clip-vit-base-patch32",
+            "model.clip.image_size": 224,
+        },
+    )
+    save_path = os.path.join(get_home_dir(), "few_shot_standalone", "true")
+    if os.path.exists(save_path):
+        shutil.rmtree(save_path)
+    predictor.fit(
+        train_data=train_data,
+        save_path=save_path,
+        standalone=True,
+    )
+    predictions = predictor.predict(test_data, as_pandas=False)
+    torch.cuda.empty_cache()
+    # Check if the predictor can be loaded from an offline environment.
+    with requests_gag:
+        # No internet connection here. If any command require internet connection, a RuntimeError will be raised.
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            torch.hub.set_dir(tmpdirname)  # block reading files in `.cache`
+            loaded_offline_predictor = MultiModalPredictor.load(path=save_path)
+
+    offline_predictions = loaded_offline_predictor.predict(test_data, as_pandas=False)
+    npt.assert_equal(predictions, offline_predictions)

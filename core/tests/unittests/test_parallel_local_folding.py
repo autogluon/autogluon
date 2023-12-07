@@ -48,7 +48,7 @@ def _construct_dummy_fold_strategy(num_jobs, model_base_cls=AbstractModel, time_
         oof_pred_model_repeats=np.array([]),
         save_folds=True,
         num_cpus=ResourceManager.get_cpu_count(),
-        num_gpus=ResourceManager.get_gpu_count_all(),
+        num_gpus=ResourceManager.get_gpu_count(),
         num_jobs=num_jobs,
         num_folds_parallel=num_folds_parallel,
         time_limit_fold_ratio=1,
@@ -59,7 +59,7 @@ def _construct_dummy_fold_strategy(num_jobs, model_base_cls=AbstractModel, time_
 
 def _test_resource_allocation_and_time_limit(num_jobs, num_folds_parallel, time_limit):
     num_cpus = ResourceManager.get_cpu_count()
-    num_gpus = ResourceManager.get_gpu_count_all()
+    num_gpus = ResourceManager.get_gpu_count()
     time_start = time.time()
     fold_fitting_strategy = _construct_dummy_fold_strategy(num_jobs=num_jobs, time_limit=time_limit, num_folds_parallel=num_folds_parallel)
     for i in range(num_jobs):

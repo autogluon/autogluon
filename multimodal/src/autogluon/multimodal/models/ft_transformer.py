@@ -383,7 +383,6 @@ class NumEmbeddings(nn.Module):
             )
 
         for x in embedding_arch[1:]:
-
             layers.append(
                 nn.ReLU()
                 if x == "relu"
@@ -433,13 +432,13 @@ class FT_Transformer(nn.Module):
         num_numerical_columns: int,
         num_categories: List[int],
         embedding_arch: List[str],
-        d_token: int,
-        adapter_output_feature: Optional[int] = 192,
+        token_dim: int,
+        hidden_size: Optional[int] = 192,
         hidden_features: Optional[int] = 192,
         num_classes: Optional[int] = 0,
         token_bias: Optional[bool] = True,
         token_initialization: Optional[str] = "normal",
-        n_blocks: Optional[int] = 0,
+        num_blocks: Optional[int] = 0,
         attention_n_heads: Optional[int] = 8,
         attention_initialization: Optional[str] = "kaiming",
         attention_normalization: Optional[str] = "layer_norm",
@@ -447,7 +446,7 @@ class FT_Transformer(nn.Module):
         residual_dropout: Optional[str] = 0.0,
         ffn_activation: Optional[str] = "reglu",
         ffn_normalization: Optional[str] = "layer_norm",
-        ffn_d_hidden: Optional[str] = 6,
+        ffn_hidden_size: Optional[str] = 6,
         ffn_dropout: Optional[str] = 0.0,
         prenormalization: Optional[bool] = True,
         first_prenormalization: Optional[bool] = False,
@@ -466,8 +465,10 @@ class FT_Transformer(nn.Module):
             The model prefix.
         num_categories
             A list of integers. Each one is the number of categories in one categorical column.
-        d_token
-            The size of one token for `_CategoricalFeatureTokenizer`.
+        token_dim
+            The size of one token after categorical/numerical tokenizers.
+        hidden_size
+            The embedding dimension of the transformer backbone.
         out_features
             Dimension of output features.
         num_classes
@@ -478,7 +479,7 @@ class FT_Transformer(nn.Module):
         token_initialization
             Initialization policy for parameters in `_CategoricalFeatureTokenizer` and `_CLSToke`.
             Must be one of `['uniform', 'normal']`.
-        n_blocks
+        num_blocks
             Number of the `FT_Transformer` blocks, which should be non-negative.
         attention_n_heads
             Number of attention heads in each `FT_Transformer` block, which should be positive.
@@ -492,7 +493,7 @@ class FT_Transformer(nn.Module):
             Activation function type for the Feed-Forward Network module.
         ffn_normalization
             Normalization scheme of the Feed-Forward Network module.
-        ffn_d_hidden
+        ffn_hidden_size
             Number of the hidden nodes of the linear layers in the Feed-Forward Network module.
         ffn_dropout
             Dropout ratio of the hidden nodes of the linear layers in the Feed-Forward Network module.
@@ -524,13 +525,13 @@ class FT_Transformer(nn.Module):
         super().__init__()
 
         assert num_categories or num_numerical_columns > 0, "there must be categorical columns or numerical columns"
-        assert d_token > 0, "d_token must be positive"
-        assert n_blocks >= 0, "n_blocks must be non-negative"
+        assert token_dim > 0, "d_token must be positive"
+        assert num_blocks >= 0, "n_blocks must be non-negative"
         assert attention_n_heads > 0, "attention_n_heads must be positive"
         assert token_initialization in ["uniform", "normal"], "initialization must be uniform or normal"
 
         self.prefix = prefix
-        self.out_features = adapter_output_feature
+        self.out_features = hidden_size
         self.pooling_mode = pooling_mode
 
         self.categorical_feature_tokenizer = None
@@ -540,28 +541,28 @@ class FT_Transformer(nn.Module):
             self.num_categories = num_categories
             self.categorical_feature_tokenizer = CategoricalFeatureTokenizer(
                 num_categories=num_categories,
-                d_token=d_token,
+                d_token=token_dim,
                 bias=token_bias,
                 initialization=token_initialization,
             )
-            self.categorical_adapter = nn.Linear(d_token, adapter_output_feature)
+            self.categorical_adapter = nn.Linear(token_dim, hidden_size)
 
         if num_numerical_columns > 0:
             self.numerical_feature_tokenizer = NumEmbeddings(
                 in_features=num_numerical_columns,
-                d_embedding=d_token,
+                d_embedding=token_dim,
                 embedding_arch=embedding_arch,
             )
-            self.numerical_adapter = nn.Linear(d_token, adapter_output_feature)
+            self.numerical_adapter = nn.Linear(token_dim, hidden_size)
 
         self.transformer = Custom_Transformer(
-            d_token=adapter_output_feature,
-            n_blocks=n_blocks,
+            d_token=hidden_size,
+            n_blocks=num_blocks,
             attention_n_heads=attention_n_heads,
             attention_dropout=attention_dropout,
             attention_initialization=attention_initialization,
             attention_normalization=attention_normalization,
-            ffn_d_hidden=ffn_d_hidden,
+            ffn_d_hidden=ffn_hidden_size,
             ffn_dropout=ffn_dropout,
             ffn_activation=ffn_activation,
             ffn_normalization=ffn_normalization,
@@ -581,7 +582,7 @@ class FT_Transformer(nn.Module):
         )
 
         self.head = Custom_Transformer.Head(
-            d_in=adapter_output_feature,
+            d_in=hidden_size,
             d_out=num_classes,
             bias=True,
             activation=head_activation,
@@ -589,7 +590,7 @@ class FT_Transformer(nn.Module):
         )
 
         self.cls_token = CLSToken(
-            d_token=adapter_output_feature,
+            d_token=hidden_size,
             initialization="uniform",
         )
 
@@ -608,6 +609,15 @@ class FT_Transformer(nn.Module):
     @property
     def numerical_key(self):
         return f"{self.prefix}_{NUMERICAL}"
+
+    @property
+    def input_keys(self):
+        input_keys = []
+        if self.categorical_feature_tokenizer:
+            input_keys.append(self.categorical_key)
+        if self.numerical_feature_tokenizer:
+            input_keys.append(self.numerical_key)
+        return input_keys
 
     @property
     def label_key(self):

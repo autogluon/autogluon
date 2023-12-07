@@ -1,7 +1,6 @@
 import copy
 import logging
 import math
-import platform
 import time
 
 import numpy as np
@@ -9,7 +8,7 @@ import pandas as pd
 from pandas import DataFrame
 
 from autogluon.common.utils.log_utils import convert_time_in_s_to_log_friendly
-from autogluon.common.utils.resource_utils import ResourceManager
+from autogluon.common.utils.system_info import get_ag_system_info
 from autogluon.core.constants import AUTO_WEIGHT, BALANCE_WEIGHT, BINARY, MULTICLASS, QUANTILE, REGRESSION
 from autogluon.core.data import LabelCleaner
 from autogluon.core.data.cleaner import Cleaner
@@ -70,55 +69,27 @@ class DefaultLearner(AbstractTabularLearner):
         else:
             logger.log(20, "Beginning AutoGluon training ...")
         logger.log(20, f'AutoGluon will save models to "{self.path}"')
-        logger.log(20, f"AutoGluon Version:  {self.version}")
-        logger.log(20, f"Python Version:     {self._python_version}")
-        logger.log(20, f"Operating System:   {platform.system()}")
-        logger.log(20, f"Platform Machine:   {platform.machine()}")
-        logger.log(20, f"Platform Version:   {platform.version()}")
-        try:
-            # TODO: Make this logic smarter, incorporate training data size and potentially models to train into the logic to define the recommended disk space.
-            #  For example, `best_quality` will require more disk space than `medium_quality`, and HPO would require additional disk space.
-            disk_stats = ResourceManager.get_disk_usage(path=self.path)
-            disk_free_gb = disk_stats.free / 1e9
-            disk_total_gb = disk_stats.total / 1e9
-            disk_proportion_avail = disk_stats.free / disk_stats.total
-            disk_log_extra = ""
-            disk_free_gb_warning_threshold = 10
-            disk_verbosity = 20
-            if disk_free_gb <= disk_free_gb_warning_threshold:
-                disk_log_extra += (
-                    f"\n\tWARNING: Available disk space is low and there is a risk that "
-                    f"AutoGluon will run out of disk during fit, causing an exception. "
-                    f"\n\tWe recommend a minimum available disk space of {disk_free_gb_warning_threshold} GB, "
-                    f"and large datasets may require more."
-                )
-                disk_verbosity = 30
-            logger.log(
-                disk_verbosity, f"Disk Space Avail:   {disk_free_gb:.2f} GB / {disk_total_gb:.2f} GB " f"({disk_proportion_avail * 100:.1f}%){disk_log_extra}"
-            )
-        except Exception as e:
-            # Note: using a broad exception catch as it is unknown what scenarios an exception would be raised, and what exception type would be used.
-            #  The broad exception ensures that we don't completely break AutoGluon for users who may be running on strange hardware or environments.
-            logger.log(
-                30,
-                f"Disk Space Avail:   WARNING, an exception ({e.__class__.__name__}) occurred while attempting to get available disk space. "
-                f"Consider opening a GitHub Issue.",
-            )
+        include_gpu_count = False
+        if verbosity >= 3:
+            include_gpu_count = True
+        msg = get_ag_system_info(path=self.path, include_gpu_count=include_gpu_count)
+        logger.log(20, msg)
         logger.log(20, f"Train Data Rows:    {len(X)}")
         logger.log(20, f"Train Data Columns: {len([column for column in X.columns if column != self.label])}")
         if X_val is not None:
             logger.log(20, f"Tuning Data Rows:    {len(X_val)}")
             logger.log(20, f"Tuning Data Columns: {len([column for column in X_val.columns if column != self.label])}")
-        logger.log(20, f"Label Column: {self.label}")
+        logger.log(20, f"Label Column:       {self.label}")
         time_preprocessing_start = time.time()
-        logger.log(20, "Preprocessing data ...")
         self._pre_X_rows = len(X)
         if self.problem_type is None:
             self.problem_type = self.infer_problem_type(y=X[self.label])
+        logger.log(20, f"Problem Type:       {self.problem_type}")
         if self.groups is not None:
             num_bag_sets = 1
             num_bag_folds = len(X[self.groups].unique())
         X_og = None if infer_limit_batch_size is None else X
+        logger.log(20, "Preprocessing data ...")
         X, y, X_val, y_val, X_unlabeled, holdout_frac, num_bag_folds, groups = self.general_data_processing(X, X_val, X_unlabeled, holdout_frac, num_bag_folds)
         if X_og is not None:
             infer_limit = self._update_infer_limit(X=X_og, infer_limit_batch_size=infer_limit_batch_size, infer_limit=infer_limit)
@@ -211,17 +182,18 @@ class DefaultLearner(AbstractTabularLearner):
     def general_data_processing(self, X: DataFrame, X_val: DataFrame, X_unlabeled: DataFrame, holdout_frac: float, num_bag_folds: int):
         """General data processing steps used for all models."""
         X = copy.deepcopy(X)
-
-        with pd.option_context("mode.use_inf_as_na", True):  # treat None, NaN, INF, NINF as NA
-            invalid_labels = X[self.label].isna()
+        # treat None, NaN, INF, NINF as NA
+        X[self.label].replace([np.inf, -np.inf], np.nan, inplace=True)
+        invalid_labels = X[self.label].isna()
         if invalid_labels.any():
             first_invalid_label_idx = invalid_labels.idxmax()
             raise ValueError(f"Label column cannot contain non-finite values (NaN, Inf, Ninf). First invalid label at idx: {first_invalid_label_idx}")
 
         holdout_frac_og = holdout_frac
         if X_val is not None and self.label in X_val.columns:
-            with pd.option_context("mode.use_inf_as_na", True):  # treat None, NaN, INF, NINF as NA
-                invalid_tuning_labels = X_val[self.label].isna()
+            # treat None, NaN, INF, NINF as NA
+            X_val[self.label].replace([np.inf, -np.inf], np.nan, inplace=True)
+            invalid_tuning_labels = X_val[self.label].isna()
             if invalid_tuning_labels.any():
                 first_invalid_label_idx = invalid_tuning_labels.idxmax()
                 raise ValueError(f"Label column cannot contain non-finite values (NaN, Inf, Ninf). First invalid label at idx: {first_invalid_label_idx}")

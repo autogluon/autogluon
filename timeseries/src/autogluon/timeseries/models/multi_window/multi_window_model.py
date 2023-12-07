@@ -1,6 +1,7 @@
 import copy
 import inspect
 import logging
+import math
 import os
 import time
 from typing import Dict, Optional, Type, Union
@@ -58,6 +59,18 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         self.most_recent_model_folder: Optional[str] = None
         super().__init__(**kwargs)
 
+    def _get_model_base(self):
+        return self.model_base
+
+    def _get_hpo_backend(self) -> str:
+        return self._get_model_base()._get_hpo_backend()
+
+    def _is_gpu_available(self) -> bool:
+        return self._get_model_base()._is_gpu_available()
+
+    def get_minimum_resources(self, is_gpu_available: bool = False) -> bool:
+        return self._get_model_base().get_minimum_resources(is_gpu_available)
+
     def _fit(
         self,
         train_data: TimeSeriesDataFrame,
@@ -88,19 +101,33 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
             logger.debug(f"\tWindow {window_index}")
             # refit_this_window is always True for the 0th window
             refit_this_window = window_index % refit_every_n_windows == 0
-            # For local models we call `fit` for every window to ensure that the time_limit is respected
-            if refit_this_window or issubclass(self.model_base_type, AbstractLocalModel):
+            if time_limit is None:
+                time_left_for_window = None
+            else:
+                time_left = time_limit - (time.time() - global_fit_start_time)
+                if issubclass(self.model_base_type, AbstractLocalModel):
+                    # For local models we call `fit` for every window to ensure that the time_limit is respected.
+                    refit_this_window = True
+                    # Local models cannot early stop, we allocate all remaining time and hope that they finish in time
+                    time_left_for_window = time_left
+                else:
+                    num_refits_remaining = math.ceil(
+                        (val_splitter.num_val_windows - window_index) / refit_every_n_windows
+                    )
+                    # Reserve 10% of the remaining time for prediction, use 90% of time for training
+                    time_left_for_window = 0.9 * time_left / num_refits_remaining
+
+            if refit_this_window:
                 model = self.get_child_model(window_index)
                 model_fit_start_time = time.time()
                 model.fit(
                     train_data=train_fold,
                     val_data=val_fold,
-                    time_limit=None
-                    if time_limit is None
-                    else time_limit - (model_fit_start_time - global_fit_start_time),
+                    time_limit=time_left_for_window,
                     **kwargs,
                 )
                 model.fit_time = time.time() - model_fit_start_time
+                most_recent_refit_window = f"W{window_index}"
             model.score_and_cache_oof(val_fold, store_val_score=True, store_predict_time=True)
 
             oof_predictions_per_window.append(model.get_oof_predictions()[0])
@@ -109,7 +136,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
                 f"\t\t{model.val_score:<7.4f}".ljust(15) + f"= Validation score ({model.eval_metric.name_with_sign})"
             )
             logger.debug(f"\t\t{model.fit_time:<7.3f} s".ljust(15) + "= Training runtime")
-            logger.debug(f"\t\t{model.predict_time:<7.3f} s".ljust(15) + "= Training runtime")
+            logger.debug(f"\t\t{model.predict_time:<7.3f} s".ljust(15) + "= Prediction runtime")
 
             self.info_per_val_window.append(
                 {
@@ -123,7 +150,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
 
         # Only the model trained on most recent data is saved & used for prediction
         self.most_recent_model = model
-        self.most_recent_model_folder = f"W{window_index}"
+        self.most_recent_model_folder = most_recent_refit_window
         self.predict_time = self.most_recent_model.predict_time
         self.fit_time = time.time() - global_fit_start_time - self.predict_time
         self._oof_predictions = oof_predictions_per_window

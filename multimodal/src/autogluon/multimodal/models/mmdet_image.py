@@ -112,7 +112,6 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         self.id2label = dict(zip(range(self.num_classes), range(self.num_classes)))
 
     def _load_checkpoint(self, checkpoint_file):
-
         # build model and load pretrained weights
         from mmdet.utils import register_all_modules
 
@@ -155,7 +154,6 @@ class MMDetAutoModelForObjectDetection(nn.Module):
             self.data_preprocessor.to(self.device)
 
     def save(self, save_path: str = "./", tokenizers: Optional[dict] = None):
-
         weights_save_path = os.path.join(save_path, "model.pth")
         configs_save_path = os.path.join(save_path, "config.py")
 

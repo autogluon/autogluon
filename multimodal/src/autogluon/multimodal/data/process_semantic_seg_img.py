@@ -4,10 +4,11 @@ import warnings
 from io import BytesIO
 from typing import Dict, List, Optional, Union
 
+import numpy as np
 import PIL
 import torch
 from omegaconf import DictConfig
-from PIL import ImageFile
+from PIL import Image, ImageFile
 from torch import nn
 from torchvision import transforms
 
@@ -21,15 +22,17 @@ except ImportError:
     BICUBIC = PIL.Image.BICUBIC
 
 from ..constants import (
+    CLASS_LABEL,
     COLUMN,
     IMAGE,
     IMAGE_BYTEARRAY,
     IMAGE_VALID_NUM,
     LABEL,
+    MASK_LABEL,
     SEMANTIC_SEGMENTATION_GT,
     SEMANTIC_SEGMENTATION_IMG,
 )
-from .collator import PadCollator, StackCollator
+from .collator import ListCollator, PadCollator, StackCollator
 
 logger = logging.getLogger(__name__)
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -52,6 +55,7 @@ class SemanticSegImageProcessor:
         max_img_num_per_col: Optional[int] = 1,
         missing_value_strategy: Optional[str] = "skip",
         requires_column_info: bool = False,
+        ignore_label: int = 255,
     ):
         """
         Parameters
@@ -83,6 +87,8 @@ class SemanticSegImageProcessor:
                 Skip this sample
         requires_column_info
             Whether to require feature column information in dataloader.
+        ignore_label
+            Specifies a target value that is ignored and does not contribute to the training loss and metric calculation.
         """
 
         self.img_transforms, self.gt_transforms = img_transforms, gt_transforms
@@ -94,6 +100,8 @@ class SemanticSegImageProcessor:
         self.size = model.image_size
         self.mean, self.std = image_mean_std(norm_type)
         self.normalization = transforms.Normalize(self.mean, self.std)
+        self.num_classes = model.num_classes
+        self.ignore_label = ignore_label
 
         self.max_img_num_per_col = max_img_num_per_col
         if max_img_num_per_col <= 0:
@@ -126,6 +134,14 @@ class SemanticSegImageProcessor:
     def image_column_prefix(self):
         return f"{self.image_key}_{COLUMN}"
 
+    @property
+    def mask_label_key(self):
+        return f"{self.prefix}_{MASK_LABEL}"
+
+    @property
+    def class_label_key(self):
+        return f"{self.prefix}_{CLASS_LABEL}"
+
     def collate_fn(self, image_column_names: Optional[List] = None, per_gpu_batch_size: Optional[int] = None) -> Dict:
         """
         Collate images into a batch. Here it pads images since the image number may
@@ -145,10 +161,17 @@ class SemanticSegImageProcessor:
         fn.update(
             {
                 self.image_key: PadCollator(pad_val=0),
-                self.image_valid_num_key: StackCollator(),
                 self.label_key: PadCollator(pad_val=0),
             }
         )
+
+        if self.num_classes > 1:
+            fn.update(
+                {
+                    self.mask_label_key: ListCollator(),
+                    self.class_label_key: ListCollator(),
+                }
+            )
 
         return fn
 
@@ -160,8 +183,7 @@ class SemanticSegImageProcessor:
         image_mode: Optional[str] = "RGB",
     ) -> Dict:
         """
-        Read images, process them, and stack them. One sample can have multiple images,
-        resulting in a tensor of (n, 3, size, size), where n <= max_img_num_per_col is the available image number.
+        Read images, process them, and stack them for semantic segmentation.
 
         Parameters
         ----------
@@ -178,10 +200,14 @@ class SemanticSegImageProcessor:
 
         Returns
         -------
-        A dictionary containing one sample's images and their number.
+        A dictionary containing one sample's image, the valid number and the ground truth image label.
+        For multi-class semantic segmentation, the dictionary also includes information of per-category binary masks derived from the ground truth image. This logic follows the data processing of mask-based semantic segmentation.
         """
         images = []
         gts = []
+        if self.num_classes > 1:
+            gt_masks_per_category = []
+            gt_classes = []
 
         ret = {}
         annotation_column = None
@@ -203,9 +229,14 @@ class SemanticSegImageProcessor:
                 continue
             if annotation_column:
                 gt_feature = per_col_gt_features[idx]
-                with PIL.Image.open(gt_feature) as gt:
-                    gt = gt.convert("L")
 
+                with PIL.Image.open(gt_feature) as gt:
+                    gt = gt.convert(gt.mode)
+                if self.num_classes > 1:
+                    gt = np.array(gt).astype(
+                        "float32"
+                    )  # There may be issues with 'transforms.ToTensor()' without this line because 'transforms.ToTensor()' converts 'unit8' to values between 0 and 1.
+                    gt = Image.fromarray(gt)
             if is_training:
                 if random.random() < 0.5:
                     img = self.train_transforms(img)
@@ -221,14 +252,43 @@ class SemanticSegImageProcessor:
             if is_training or annotation_column is not None:
                 gts.append(gt)
 
+                if self.num_classes > 1:
+                    # Prepare per-category binary masks
+                    per_gt_masks_per_category, per_gt_classes = self.prepare_per_category_binary_masks(gt)
+                    gt_masks_per_category.append(per_gt_masks_per_category)
+                    gt_classes.append(per_gt_classes)
+
         ret.update(
             {
-                self.image_key: torch.cat(images, dim=0) if len(images) != 0 else torch.tensor([]),
-                self.image_valid_num_key: len(images),
-                self.label_key: torch.cat(gts, dim=0) if len(gts) != 0 else torch.tensor([]),
+                self.image_key: images[0] if len(images) != 0 else torch.tensor([]),
+                self.label_key: gts[0] if len(gts) != 0 else torch.tensor([]),
             }
         )
+        if self.num_classes > 1:
+            ret.update(
+                {
+                    self.mask_label_key: gt_masks_per_category[0] if len(gt_masks_per_category) != 0 else [],
+                    self.class_label_key: gt_classes[0] if len(gt_classes) != 0 else [],
+                }
+            )
         return ret
+
+    def prepare_per_category_binary_masks(self, gt):
+        gt = gt[0]
+        classes = torch.unique(gt)
+        # remove ignored region
+        gt_classes = classes[classes != self.ignore_label].to(torch.int64)
+
+        masks = []
+        for class_id in classes:
+            masks.append(gt == class_id)
+
+        if len(masks) == 0:
+            # Some image does not have annotation (all ignored)
+            gt_masks_per_category = torch.zeros((0, gt.shape[-2], gt.shape[-1]))
+        else:
+            gt_masks_per_category = torch.stack(masks)
+        return gt_masks_per_category, gt_classes
 
     def __call__(
         self,
@@ -253,7 +313,6 @@ class SemanticSegImageProcessor:
         A dictionary containing one sample's processed images and their number.
         """
         images = {k: [v] if isinstance(v, str) else v for k, v in images.items()}
-
         return self.process_one_sample(images, feature_modalities, is_training)
 
     def get_train_transforms(self, train_transforms):

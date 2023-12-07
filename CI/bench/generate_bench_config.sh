@@ -31,7 +31,48 @@ if [ $MODULE == "tabular" ] || [ $MODULE == "timeseries" ]; then
 else
     FRAMEWORK=AutoGluon_$PRESET
     aws s3 cp --recursive s3://autogluon-ci-benchmark/configs/$MODULE/$USER_DIR_S3_PREFIX/latest/ $(dirname "$0")/custom_user_dir/
-    DATASET_YAML_PATH="$(dirname "$0")/custom_user_dir/dataloaders/automm_cv_datasets.yaml"
+    dataloader_file=""
+    class_name=""
+    dataset_file=""
+    custom_dataloader_value=""
+    shot_value=0
+    seed_value=0
+    lang=""
+    custom_metrics_path=""
+    custom_function_name=""
+    optimum=0
+    if [ $BENCHMARK == "automm-image" ]; then
+        dataloader_file="vision_dataloader.py"
+        class_name="VisionDataLoader"
+        dataset_file="automm_cv_datasets.yaml"
+        custom_dataloader_value="dataloader_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataloader_file;class_name:$class_name;dataset_config_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataset_file"
+    elif [ $BENCHMARK == "automm-text-tabular" ]; then
+        dataloader_file="text_tabular_dataloader.py"
+        class_name="TextTabularDataLoader"
+        dataset_file="text_tabular_datasets.yaml"
+        custom_dataloader_value="dataloader_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataloader_file;class_name:$class_name;dataset_config_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataset_file"
+    elif [ $BENCHMARK == "automm-text" ]; then
+        dataloader_file="text_dataloader.py"
+        class_name="TextDataLoader"
+        dataset_file="text_datasets.yaml"
+        lang="en"
+        shot_value=500
+        seed_value=7
+        custom_dataloader_value="dataloader_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataloader_file;class_name:$class_name;dataset_config_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataset_file"
+    elif [ $BENCHMARK == "automm-text-tabular-image" ]; then
+        dataloader_file="text_tabular_image_dataloader.py"
+        class_name="TextTabularImageDataLoader"
+        dataset_file="text_tabular_image_datasets.yaml"
+        custom_dataloader_value="dataloader_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataloader_file;class_name:$class_name;dataset_config_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataset_file"
+        custom_metrics_path="$(dirname "$0")/custom_metrics/cpp_coverage.py"
+        custom_function_name="coverage"
+        optimum=1
+    else
+        echo "Error: Unsupported benchmark '$BENCHMARK'"
+        exit 1
+    fi
+
+    DATASET_YAML_PATH="$(dirname "$0")/custom_user_dir/dataloaders/$dataset_file"
     dataset_names=""
     # Use yq to extract the dataset names and concatenate them with commas
     for name in $(yq -r '. | keys[]' "$DATASET_YAML_PATH"); do
@@ -43,7 +84,8 @@ else
             fi
         fi
     done
-    agbench generate-cloud-config \
+
+    gen_bench_command="agbench generate-cloud-config \
     --prefix ag-bench \
     --module $MODULE \
     --cdk-deploy-account $CDK_DEPLOY_ACCOUNT \
@@ -55,5 +97,12 @@ else
     --constraint $TIME_LIMIT \
     --custom-resource-dir $(dirname "$0")/custom_user_dir \
     --dataset-names "$dataset_names" \
-    --custom-dataloader "dataloader_file:$(dirname "$0")/custom_user_dir/dataloaders/vision_dataloader.py;class_name:VisionDataLoader;dataset_config_file:$(dirname "$0")/custom_user_dir/dataloaders/automm_cv_datasets.yaml"
+    --custom-dataloader '$custom_dataloader_value'"
+
+    if [ $BENCHMARK == "automm-text" ]; then
+        gen_bench_command="$gen_bench_command --fewshot --shot $shot_value --lang $lang --seed $seed_value"
+    elif [ $BENCHMARK == "automm-text-tabular-image" ]; then
+        gen_bench_command="$gen_bench_command --custom-metrics --metrics-path $custom_metrics_path --function-name $custom_function_name --optimum $optimum --greater-is-better"
+    fi
+    eval "$gen_bench_command"
 fi

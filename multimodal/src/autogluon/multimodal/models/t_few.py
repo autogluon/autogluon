@@ -272,6 +272,10 @@ class TFewModel(nn.Module):
         # needed to ensure compatibility to encoder-only pipelines
         features = encoder_hidden_states_or[:, 0, :]
         logits = choices_scores
+
+        target_template_logits = target_template_logits.view(bs, num_choices, *target_template_logits.size()[1:])
+        lm_target = lm_target.view(bs, num_choices, *lm_target.size()[1:])
+
         if column_features == {} or column_feature_masks == {}:
             return features, logits, target_template_logits, lm_target
         else:

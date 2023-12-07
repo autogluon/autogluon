@@ -85,7 +85,7 @@ def init_df_preprocessor(
     -------
     Initialized dataframe preprocessor.
     """
-    if label_column is not None and column_types[label_column] == NER_ANNOTATION:
+    if label_column in column_types and column_types[label_column] == NER_ANNOTATION:
         label_generator = NerLabelEncoder(config)
     else:
         label_generator = None
@@ -210,6 +210,7 @@ def create_data_processor(
             train_transforms=model_config.train_transforms,
             val_transforms=model_config.val_transforms,
             norm_type=model_config.image_norm,
+            ignore_label=model_config.ignore_label,
         )
     else:
         raise ValueError(f"unknown data type: {data_type}")

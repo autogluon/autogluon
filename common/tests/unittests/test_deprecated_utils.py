@@ -13,6 +13,7 @@ def test_should_deprecate_warning(mock_version):
     with pytest.deprecated_call():
         Deprecated = construct_deprecated_wrapper(mock_version)
         Deprecated_args = construct_deprecated_args_wrapper(mock_version)
+
         # class and function definition needs to go inside the context manager because the decorator code runs at function definition time
         @Deprecated(min_version_to_warn="0.0", min_version_to_error="9999.0")
         class ShouldDeprecateButNoErrorClass:

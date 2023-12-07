@@ -35,6 +35,15 @@ DUMMY_HYPERPARAMETERS = {"epochs": 1, "num_batches_per_epoch": 1}
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+def test_when_context_length_is_not_set_then_default_context_length_is_used(model_class):
+    data = DUMMY_TS_DATAFRAME
+    model = model_class(freq=data.freq, hyperparameters=DUMMY_HYPERPARAMETERS)
+    model.fit(train_data=data)
+    estimator_init_args = model._get_estimator_init_args()
+    assert estimator_init_args["context_length"] == model.default_context_length
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 @pytest.mark.parametrize("time_limit", [10, None])
 def test_given_time_limit_when_fit_called_then_models_train_correctly(model_class, time_limit, temp_model_path):
     model = model_class(
