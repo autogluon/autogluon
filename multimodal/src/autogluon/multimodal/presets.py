@@ -374,7 +374,7 @@ def object_detection(presets: str = DEFAULT):
         hyperparameters.update(default_tunable_hyperparameters)
         hyperparameter_tune_kwargs.update(default_hyperparameter_tune_kwargs)
 
-    if presets == [DEFAULT, MEDIUM_QUALITY]:
+    if presets in [DEFAULT, MEDIUM_QUALITY]:
         hyperparameters.update(
             {
                 "model.mmdet_image.checkpoint_name": "yolox_l",
@@ -386,7 +386,7 @@ def object_detection(presets: str = DEFAULT):
                 "optimization.check_val_every_n_epoch": 3,
             }
         )
-    elif presets in HIGH_QUALITY:
+    elif presets == HIGH_QUALITY:
         hyperparameters.update(
             {
                 "model.mmdet_image.checkpoint_name": "dino-5scale_swin-l_8xb2-36e_coco",
