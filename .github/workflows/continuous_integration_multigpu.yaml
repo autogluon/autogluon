@@ -6,6 +6,13 @@ on:
       - 'multimodal/**'
       - 'docs/tutorials/multimodal/**'
 
+permissions:
+  id-token: write
+
+defaults:
+  run:
+    shell: bash
+
 jobs:
   branch_check:
     runs-on: ubuntu-latest
