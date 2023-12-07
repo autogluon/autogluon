@@ -221,6 +221,8 @@ class SemanticSegmentationLearner(BaseLearner):
         assert len(y_true) == len(y_pred)
 
         results = {}
+        if isinstance(metrics, str):
+            metrics = [metrics]
         for per_metric_name in metrics:
             per_metric = get_metric_predict(metric_name=per_metric_name.lower(), num_classes=self._output_shape)
             for y_p, y_t in zip(y_pred, y_true):
