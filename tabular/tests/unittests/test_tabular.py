@@ -18,7 +18,6 @@
     - classification w severe class imbalance
     - regression with severely skewed Y-values (eg. predicting count data)
     - text features in dataset
-    - test
 """
 import os
 import shutil
