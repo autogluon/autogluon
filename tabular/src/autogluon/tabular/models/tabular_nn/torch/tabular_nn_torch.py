@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 
 from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT, S_TEXT_AS_CATEGORY, S_TEXT_NGRAM
+from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_torch
 from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION, SOFTCLASS
@@ -561,6 +562,9 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
     def _get_default_stopping_metric(self):
         return self.eval_metric
+
+    def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
+        return 5 * get_approximate_df_mem_usage(X).sum()
 
     def _get_maximum_resources(self) -> Dict[str, Union[int, float]]:
         # torch model trains slower when utilizing virtual cores and this issue scale up when the number of cpu cores increases

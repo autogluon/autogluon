@@ -94,9 +94,6 @@ DEFAULT_SOFTCLASS_PRIORITY = dict(
 
 DEFAULT_CUSTOM_MODEL_PRIORITY = 0
 
-# FIXME: v0.7 : Remove this, it is a hack. Model classes should define what problem types they support instead of using this
-DEFAULT_QUANTILE_MODEL = ["DUMMY", "RF", "XT", "FASTAI", "NN_TORCH", "ENS_WEIGHTED", "CAT", "GBM"]  # TODO: OTHERS will be added
-
 MODEL_TYPES = dict(
     RF=RFModel,
     XT=XTModel,

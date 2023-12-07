@@ -85,7 +85,7 @@ class TabularPredictor:
     problem_type : str, default = None
         Type of prediction problem, i.e. is this a binary/multiclass classification or regression problem (options: 'binary', 'multiclass', 'regression', 'quantile').
         If `problem_type = None`, the prediction problem type is inferred based on the label-values in provided dataset.
-    eval_metric : function or str, default = None
+    eval_metric : str or Scorer, default = None
         Metric by which predictions will be ultimately evaluated on test data.
         AutoGluon tunes factors such as hyperparameters, early-stopping, ensemble-weights, etc. in order to improve this metric on validation data.
 
@@ -178,7 +178,7 @@ class TabularPredictor:
         Path to directory where all models used by this Predictor are stored.
     problem_type : str
         What type of prediction problem this Predictor has been trained for.
-    eval_metric : function or str
+    eval_metric : str or Scorer
         What metric is used to evaluate predictive performance.
     label : str
         Name of table column that contains data from the variable to predict (often referred to as: labels, response variable, target variable, dependent variable, Y, etc).
@@ -221,16 +221,16 @@ class TabularPredictor:
 
     def __init__(
         self,
-        label,
-        problem_type=None,
-        eval_metric=None,
-        path=None,
-        verbosity=2,
-        log_to_file=False,
-        log_file_path="auto",
-        sample_weight=None,
-        weight_evaluation=False,
-        groups=None,
+        label: str,
+        problem_type: str = None,
+        eval_metric: str | Scorer = None,
+        path: str = None,
+        verbosity: int = 2,
+        log_to_file: bool = False,
+        log_file_path: str = "auto",
+        sample_weight: str = None,
+        weight_evaluation: bool = False,
+        groups: str = None,
         **kwargs,
     ):
         self.verbosity = verbosity
@@ -289,11 +289,11 @@ class TabularPredictor:
         return self._learner.label_cleaner.inv_map
 
     @property
-    def quantile_levels(self):
+    def quantile_levels(self) -> List[float]:
         return self._learner.quantile_levels
 
     @property
-    def eval_metric(self):
+    def eval_metric(self) -> Scorer:
         return self._learner.eval_metric
 
     @property
@@ -303,7 +303,7 @@ class TabularPredictor:
         return self._learner.original_features
 
     @property
-    def problem_type(self):
+    def problem_type(self) -> str:
         return self._learner.problem_type
 
     @property
@@ -343,7 +343,7 @@ class TabularPredictor:
             )
         self._decision_threshold = decision_threshold
 
-    def features(self, feature_stage: str = "original"):
+    def features(self, feature_stage: str = "original") -> list:
         """
         Returns a list of feature names dependent on the value of feature_stage.
 
@@ -385,7 +385,7 @@ class TabularPredictor:
         return self._learner.label
 
     @property
-    def path(self):
+    def path(self) -> str:
         return self._learner.path
 
     @apply_presets(tabular_presets_dict, tabular_presets_alias)
@@ -393,17 +393,17 @@ class TabularPredictor:
         self,
         train_data,
         tuning_data=None,
-        time_limit=None,
-        presets=None,
-        hyperparameters=None,
+        time_limit: float = None,
+        presets: List[str] | str = None,
+        hyperparameters: dict | str = None,
         feature_metadata="infer",
-        infer_limit=None,
-        infer_limit_batch_size=None,
+        infer_limit: float = None,
+        infer_limit_batch_size: int = None,
         fit_weighted_ensemble: bool = True,
         fit_full_last_level_weighted_ensemble: bool = True,
         full_weighted_ensemble_additionally: bool = False,
         dynamic_stacking: bool = False,
-        calibrate_decision_threshold=False,
+        calibrate_decision_threshold: bool = False,
         num_cpus="auto",
         num_gpus="auto",
         **kwargs,
@@ -923,7 +923,7 @@ class TabularPredictor:
         >>> time_limit = 3600  # set as long as you are willing to wait (in sec)
         >>> predictor = TabularPredictor(label=label, eval_metric=eval_metric).fit(train_data, presets=['best_quality'], time_limit=time_limit)
         """
-        if self._learner.is_fit:
+        if self.is_fit:
             raise AssertionError("Predictor is already fit! To fit additional models, refer to `predictor.fit_extra`, or create a new `Predictor`.")
         kwargs_orig = kwargs.copy()
         kwargs = self._validate_fit_kwargs(kwargs)
@@ -935,6 +935,16 @@ class TabularPredictor:
             if not isinstance(presets, list):
                 presets = [presets]
             logger.log(20, f"Presets specified: {presets}")
+        else:
+            logger.log(
+                20,
+                "No presets specified! To achieve strong results with AutoGluon, it is recommended to use the available presets.\n"
+                "\tRecommended Presets (For more details refer to https://auto.gluon.ai/stable/tutorials/tabular/tabular-essentials.html#presets):\n"
+                "\tpresets='best_quality'   : Maximize accuracy. Default time_limit=3600.\n"
+                "\tpresets='high_quality'   : Strong accuracy with fast inference speed. Default time_limit=3600.\n"
+                "\tpresets='good_quality'   : Good accuracy with very fast inference speed. Default time_limit=3600.\n"
+                "\tpresets='medium_quality' : Fast training time, ideal for initial prototyping.",
+            )
 
         if verbosity >= 3:
             logger.log(20, "============ fit kwarg info ============")
@@ -1107,6 +1117,7 @@ class TabularPredictor:
         self._post_fit(**ag_post_fit_kwargs)
         self.save()
 
+    # TODO: When >2 layers, will only choose between using all layers or using only base models. Would be better to choose the optimal layer.
     def _dynamic_stacking(
         self,
         ag_fit_kwargs: dict,
@@ -1146,6 +1157,10 @@ class TabularPredictor:
         inner_ag_fit_kwargs = copy.deepcopy(ag_fit_kwargs)
         inner_ag_fit_kwargs["X_val"] = X_val
         inner_ag_fit_kwargs["X_unlabeled"] = X_unlabeled
+        inner_ag_post_fit_kwargs = copy.deepcopy(ag_post_fit_kwargs)
+        inner_ag_post_fit_kwargs["keep_only_best"] = False  # Do not keep only best, otherwise it eliminates the purpose of the comparison
+        inner_ag_post_fit_kwargs["calibrate"] = False  # Do not calibrate as calibration is only applied to the model with the best validation score
+        # FIXME: Ensure all weighted ensembles have skip connections
 
         # Verify problem type is set
         if self.problem_type is None:
@@ -1173,7 +1188,7 @@ class TabularPredictor:
                 time_limit=time_limit,
                 ds_fit_kwargs=ds_fit_kwargs,
                 ag_fit_kwargs=inner_ag_fit_kwargs,
-                ag_post_fit_kwargs=ag_post_fit_kwargs,
+                ag_post_fit_kwargs=inner_ag_post_fit_kwargs,
                 holdout_data=holdout_data,
             )
         else:
@@ -1214,7 +1229,7 @@ class TabularPredictor:
                     time_limit=time_limit,
                     ds_fit_kwargs=ds_fit_kwargs,
                     ag_fit_kwargs=inner_ag_fit_kwargs,
-                    ag_post_fit_kwargs=ag_post_fit_kwargs,
+                    ag_post_fit_kwargs=inner_ag_post_fit_kwargs,
                     holdout_data=holdout_data,
                 )
                 if stacked_overfitting:
@@ -1811,7 +1826,7 @@ class TabularPredictor:
 
         self._validate_unique_indices(pseudo_data, "pseudo_data")
 
-        if not self._learner.is_fit:
+        if not self.is_fit:
             if "train_data" not in kwargs.keys():
                 Exception(
                     "Autogluon is required to be fit or given 'train_data' in order to run 'fit_pseudolabel'."
@@ -1832,7 +1847,7 @@ class TabularPredictor:
 
         hyperparameters = kwargs.get("hyperparameters", None)
         if hyperparameters is None:
-            if self._learner.is_fit:
+            if self.is_fit:
                 hyperparameters = self.fit_hyperparameters_
         elif isinstance(hyperparameters, str):
             hyperparameters = get_hyperparameter_config(hyperparameters)
@@ -2014,6 +2029,13 @@ class TabularPredictor:
         self._assert_is_fit("can_predict_proba")
         return problem_type_info.can_predict_proba(problem_type=self.problem_type)
 
+    @property
+    def is_fit(self) -> bool:
+        """
+        Return True if `predictor.fit` has been called, otherwise return False.
+        """
+        return self._learner.is_fit
+
     def evaluate(self, data, model=None, decision_threshold=None, display: bool = False, auxiliary_metrics=True, detailed_report=False, **kwargs) -> dict:
         """
         Report the predictive performance evaluated over a given dataset.
@@ -2138,6 +2160,8 @@ class TabularPredictor:
         score_format: str = "score",
         only_pareto_frontier: bool = False,
         skip_score: bool = False,
+        refit_full: bool | None = None,
+        set_refit_score_to_parent: bool = False,
         display: bool = False,
         **kwargs,
     ) -> pd.DataFrame:
@@ -2272,6 +2296,13 @@ class TabularPredictor:
             [Advanced, primarily for developers]
             If `True`, will skip computing `score_test` if `data` is specified. `score_test` will be set to NaN for all models.
             `pred_time_test` and related columns will still be computed.
+        refit_full : bool, default = None
+            If True, will return only models that have been refit (ex: have `_FULL` in the name).
+            If False, will return only models that have not been refit.
+            If None, will return all models.
+        set_refit_score_to_parent : bool, default = False
+            If True, the `score_val` of refit models will be set to the `score_val` of their parent.
+            While this does not represent the genuine validation score of the refit model, it is a reasonable proxy.
         display : bool, default = False
             If True, the output DataFrame is printed to stdout.
 
@@ -2298,6 +2329,8 @@ class TabularPredictor:
             only_pareto_frontier=only_pareto_frontier,
             score_format=score_format,
             skip_score=skip_score,
+            refit_full=refit_full,
+            set_refit_score_to_parent=set_refit_score_to_parent,
             display=display,
         )
 
@@ -3068,6 +3101,7 @@ class TabularPredictor:
         logger.log(20, f'Refit complete, total runtime = {round(te - ts, 2)}s ... Best model: "{self._trainer.model_best}"')
         return refit_full_dict
 
+    @property
     def model_best(self) -> str:
         """
         Returns the string model name of the best model by validation score that can infer.
@@ -3266,7 +3300,7 @@ class TabularPredictor:
             If None, uses `predictor.eval_metric`.
         model : str, default = 'best'
             The model to use prediction probabilities of when calibrating the threshold.
-            If 'best', will use `predictor.get_model_best()`.
+            If 'best', will use `predictor.model_best`.
         decision_thresholds : Union[int, List[float]], default = 50
             The number of decision thresholds on either side of `0.5` to search.
             The default of 50 will result in 101 searched thresholds: [0.00, 0.01, 0.02, ..., 0.49, 0.50, 0.51, ..., 0.98, 0.99, 1.00]
@@ -3301,7 +3335,7 @@ class TabularPredictor:
         if metric is None:
             metric = self.eval_metric
         if model == "best":
-            model = self.model_best()
+            model = self.model_best
 
         return self._learner.calibrate_decision_threshold(data=data, metric=metric, model=model, decision_thresholds=decision_thresholds, verbose=verbose)
 
@@ -3604,7 +3638,7 @@ class TabularPredictor:
         """
         self._assert_is_fit("delete_models")
         if models_to_keep == "best":
-            models_to_keep = self.model_best()
+            models_to_keep = self.model_best
         self._trainer.delete_models(
             models_to_keep=models_to_keep,
             models_to_delete=models_to_delete,
@@ -3815,7 +3849,7 @@ class TabularPredictor:
         ----------
         model : str, default 'best'
             The model to highlight in golden orange, with all component models highlighted in yellow.
-            If 'best', will default to the best model returned from `self.get_model_best()`
+            If 'best', will default to the best model returned from `self.model_best`
         prune_unused_nodes : bool, default True
             If True, only plot the models that are components of the specified `model`.
             If False, will plot all models.
@@ -3852,7 +3886,7 @@ class TabularPredictor:
 
         primary_model = model
         if primary_model == "best":
-            primary_model = self.model_best()
+            primary_model = self.model_best
         all_models = self.model_names()
         assert primary_model in all_models, f'Unknown model "{primary_model}"! Valid models: {all_models}'
         if prune_unused_nodes == True:
@@ -4464,19 +4498,22 @@ class TabularPredictor:
             # TODO: What about datasets that are 100k+? At a certain point should we not bag?
             # TODO: What about time_limit? Metalearning can tell us expected runtime of each model, then we can select optimal folds + stack levels to fit time constraint
             if num_bag_folds is None:
-                num_bag_folds = min(8, max(5, math.floor(num_train_rows / 100)))
+                num_bag_folds = min(8, max(5, math.floor(num_train_rows / 10)))
             # TODO: Leverage use_bag_holdout when data is large to enable multi-layer stacking
             #  if num_train_rows >= 100000 and num_val_rows is None and use_bag_holdout is None:
             #      use_bag_holdout = True
             if num_stack_levels is None:
-                if problem_type == BINARY:
-                    # Disable multi-layer stacking to avoid stack info leakage
-                    num_stack_levels = 0
-                    # TODO:
-                    #  if use_bag_holdout:
-                    #      num_stack_levels = min(1, max(0, math.floor(num_train_rows / 750)))
+                if dynamic_stacking:
+                    num_stack_levels = 1
                 else:
-                    num_stack_levels = min(1, max(0, math.floor(num_train_rows / 750)))
+                    if problem_type == BINARY:
+                        # Disable multi-layer stacking to avoid stack info leakage
+                        num_stack_levels = 0
+                        # TODO:
+                        #  if use_bag_holdout:
+                        #      num_stack_levels = min(1, max(0, math.floor(num_train_rows / 750)))
+                    else:
+                        num_stack_levels = min(1, max(0, math.floor(num_train_rows / 750)))
         if num_bag_folds is None:
             num_bag_folds = 0
         if num_stack_levels is None:
@@ -4492,7 +4529,7 @@ class TabularPredictor:
         if num_bag_sets is None:
             if num_bag_folds >= 2:
                 if time_limit is not None:
-                    num_bag_sets = 20  # TODO: v0.1 Reduce to 5 or 3 as 20 is unnecessarily extreme as a default.
+                    num_bag_sets = 5
                 else:
                     num_bag_sets = 1
             else:
@@ -4580,7 +4617,7 @@ class TabularPredictor:
         """
         predictor_clone = self.clone(path=path, return_clone=True, dirs_exist_ok=dirs_exist_ok)
         if model == "best":
-            model = predictor_clone.model_best()
+            model = predictor_clone.model_best
             logger.log(30, f"Clone: Keeping minimum set of models required to predict with best model '{model}'...")
         else:
             logger.log(30, f"Clone: Keeping minimum set of models required to predict with model '{model}'...")
@@ -4696,7 +4733,7 @@ class TabularPredictor:
             return False
 
     def _assert_is_fit(self, message_suffix: str = None):
-        if not self._learner.is_fit:
+        if not self.is_fit:
             error_message = "Predictor is not fit. Call `.fit` before calling"
             if message_suffix is None:
                 error_message = f"{error_message} this method."
@@ -4722,7 +4759,7 @@ class TabularPredictor:
     @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="model_best")
     def get_model_best(self) -> str:
         """Deprecated method. Use `model_best` instead."""
-        return self.model_best()
+        return self.model_best
 
     @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="predict_from_proba")
     def get_pred_from_proba(self, *args, **kwargs) -> pd.Series | np.array:
@@ -4863,13 +4900,16 @@ def _sub_fit(
         logger.info(f"Unable to determine stacked overfitting. AutoGluon's sub-fit did not successfully train any models!")
         stacked_overfitting = False
     else:
+        leaderboard_kwargs = dict()
+        if predictor.model_best in predictor.model_refit_map(inverse=True):
+            leaderboard_kwargs = dict(refit_full=True, set_refit_score_to_parent=True)
         # Determine stacked overfitting
-        ho_leaderboard = predictor.leaderboard(data=val_data).reset_index(drop=True).sort_values(by="score_val")
-        stacked_overfitting = check_stacked_overfitting_from_leaderboard(ho_leaderboard)
+        ho_leaderboard = predictor.leaderboard(data=val_data, **leaderboard_kwargs).reset_index(drop=True)
         logger.info("Leaderboard on holdout data from dynamic stacking:")
         with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):
             # Rename to avoid confusion for the user
             logger.info(ho_leaderboard.rename({"score_test": "holdout_score"}, axis=1))
+        stacked_overfitting = check_stacked_overfitting_from_leaderboard(ho_leaderboard)
 
     logger.info(f"Stacked overfitting occurred: {stacked_overfitting}.")
     del predictor._learner

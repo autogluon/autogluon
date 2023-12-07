@@ -374,7 +374,7 @@ def object_detection(presets: str = DEFAULT):
         hyperparameters.update(default_tunable_hyperparameters)
         hyperparameter_tune_kwargs.update(default_hyperparameter_tune_kwargs)
 
-    if presets == MEDIUM_QUALITY:
+    if presets == [DEFAULT, MEDIUM_QUALITY]:
         hyperparameters.update(
             {
                 "model.mmdet_image.checkpoint_name": "yolox_l",
@@ -386,12 +386,12 @@ def object_detection(presets: str = DEFAULT):
                 "optimization.check_val_every_n_epoch": 3,
             }
         )
-    elif presets in [DEFAULT, HIGH_QUALITY]:
+    elif presets in HIGH_QUALITY:
         hyperparameters.update(
             {
                 "model.mmdet_image.checkpoint_name": "dino-5scale_swin-l_8xb2-36e_coco",
                 "model.mmdet_image.frozen_layers": ["backbone", "model.level_embed"],
-                "env.per_gpu_batch_size": 1,  # Works on 24G GPU
+                "env.per_gpu_batch_size": 1,  # Works on 32G GPU
                 "optimization.learning_rate": 1e-4,
                 "optimization.patience": 20,
                 "optimization.max_epochs": 50,
@@ -402,14 +402,16 @@ def object_detection(presets: str = DEFAULT):
     elif presets == BEST_QUALITY:
         hyperparameters.update(
             {
-                "model.mmdet_image.checkpoint_name": "co_dino_r50",
+                "model.mmdet_image.checkpoint_name": "co_dino",
                 "model.mmdet_image.frozen_layers": ["backbone", "model.level_embed"],
-                "env.per_gpu_batch_size": 1,  # Works on 32G GPU
+                "env.per_gpu_batch_size": 1,  # Works on 40G GPU
+                "optimization.lr_mult": 1,
                 "optimization.learning_rate": 1e-4,
                 "optimization.lr_choice": "single_stages",
-                "optimization.patience": 20,
-                "optimization.max_epochs": 50,
+                "optimization.patience": 30,
+                "optimization.max_epochs": 100,
                 "optimization.val_check_interval": 1.0,
+                "optimization.num_sanity_val_steps": 0,
                 "optimization.check_val_every_n_epoch": 1,
             }
         )

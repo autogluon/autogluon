@@ -940,7 +940,7 @@ def test_when_convert_frequency_called_then_static_features_are_kept():
 @pytest.mark.parametrize("freq", ["D", "M", "6H"])
 def test_given_index_is_regular_when_convert_frequency_is_called_then_new_index_has_desired_frequency(freq):
     start = "2020-05-01"
-    end = "2020-06-30"
+    end = "2020-07-31"
     timestamps_original = pd.date_range(start=start, end=end, freq="D")
     timestamps_resampled = pd.date_range(start=start, end=end, freq=freq)
     df = pd.DataFrame(

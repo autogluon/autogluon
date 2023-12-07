@@ -129,7 +129,7 @@ class InterpretableTabularPredictor(TabularPredictor):
         import imodels
 
         if model is None:
-            model = self.model_best()
+            model = self.model_best
         data = self._get_dataset(data)
         predictions = self.predict(data=data, model=model, as_pandas=True)
         labels = data[self.label]

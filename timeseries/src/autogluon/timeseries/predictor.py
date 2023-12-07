@@ -26,7 +26,23 @@ from autogluon.timeseries.trainer import AbstractTimeSeriesTrainer
 logger = logging.getLogger(__name__)
 
 
-class TimeSeriesPredictor:
+class TimeSeriesPredictorDeprecatedMixin:
+    """Contains deprecated methods from TimeSeriesPredictor that shouldn't show up in API documentation."""
+
+    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="evaluate")
+    def score(self, *args, **kwargs):
+        return self.evaluate(*args, **kwargs)
+
+    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="model_best")
+    def get_model_best(self) -> str:
+        return self.model_best
+
+    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="model_names")
+    def get_model_names(self) -> str:
+        return self.model_names()
+
+
+class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
     """AutoGluon ``TimeSeriesPredictor`` predicts future values of multiple related time series.
 
     ``TimeSeriesPredictor`` provides probabilistic (quantile) multi-step-ahead forecasts for univariate time series.
@@ -68,8 +84,8 @@ class TimeSeriesPredictor:
 
         Probabilistic forecast metrics (evaluated on quantile forecasts for the specified ``quantile_levels``):
 
-        - ``"SQL"``: scaled quantile loss, defined as average of quantile losses divided by the in-sample seasonal error
-        - ``"WQL"``: mean weighted quantile loss, defined as average of quantile losses divided by the sum of absolute time series values in the forecast horizon
+        - ``"SQL"``: scaled quantile loss
+        - ``"WQL"``: weighted quantile loss
 
         Point forecast metrics (these are always evaluated on the ``"mean"`` column of the predictions):
 
@@ -914,6 +930,7 @@ class TimeSeriesPredictor:
         """Returns a dictionary of objects each describing an attribute of the training process and trained models."""
         return self._learner.get_info(include_model_info=True)
 
+    @property
     def model_best(self) -> str:
         """Returns the name of the best model from trainer."""
         if self._trainer.model_best is not None:
@@ -936,7 +953,8 @@ class TimeSeriesPredictor:
         * ``score_test``: The test score of the model on ``data``, if provided. Computed according to ``eval_metric``.
         * ``score_val``: The validation score of the model using the internal validation data. Computed according to ``eval_metric``.
 
-            **NOTE:** Metrics scores are always shown in 'higher is better' format.
+        .. note::
+            Metrics scores are always shown in 'higher is better' format.
             This means that metrics such as MASE or MAPE will be multiplied by -1, so their values will be negative.
             This is necessary to avoid the user needing to know the metric to understand if higher is better when
             looking at leaderboard.
@@ -1075,7 +1093,7 @@ class TimeSeriesPredictor:
             "\tModels trained in this way will have the suffix '_FULL' and have NaN validation score.\n"
             "\tThis process is not bound by time_limit, but should take less time than the original `fit` call."
         )
-        model_best = self.model_best()
+        model_best = self.model_best
         refit_full_dict = self._learner.refit_full(model=model)
 
         if set_best_to_refit_full:
@@ -1106,15 +1124,3 @@ class TimeSeriesPredictor:
         # This hides method from IPython autocomplete, but not VSCode autocomplete
         deprecated = ["score", "get_model_best", "get_model_names"]
         return [d for d in super().__dir__() if d not in deprecated]
-
-    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="evaluate")
-    def score(self, *args, **kwargs):
-        return self.evaluate(*args, **kwargs)
-
-    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="model_best")
-    def get_model_best(self) -> str:
-        return self.model_best()
-
-    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="model_names")
-    def get_model_names(self) -> str:
-        return self.model_names()

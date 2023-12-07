@@ -48,6 +48,7 @@ install_requires = (
 extras_require = {
     "ray": [
         "ray[default]>=2.6.3,<2.7",
+        "async-timeout",
     ],
     "raytune": [
         "ray[default,tune]>=2.6.3,<2.7",

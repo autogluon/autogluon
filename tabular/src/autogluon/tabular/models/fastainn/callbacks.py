@@ -1,6 +1,7 @@
 import logging
 import time
 
+import numpy as np
 from fastai.callback.core import Callback, CancelFitException
 from fastai.callback.tracker import TrackerCallback
 from fastcore.basics import store_attr
@@ -56,6 +57,13 @@ class EarlyStoppingCallbackWithTimeLimit(TrackerCallback):
         if self.new_best:
             self.wait = 0
         else:
+            loss_val = self.recorder.values[-1][self.idx]
+            if np.isnan(loss_val):
+                if self.epoch == 0:
+                    raise AssertionError(f"WARNING: NaN loss encountered in epoch {self.epoch}!")
+                else:
+                    logger.log(30, f"WARNING: NaN loss encountered in epoch {self.epoch}: early stopping")
+                    raise CancelFitException()
             self.wait += 1
             if self.wait >= self.patience:
                 logger.log(20, f"No improvement since epoch {self.epoch - self.wait}: early stopping")
