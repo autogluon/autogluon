@@ -7,13 +7,15 @@ The diversity of data modalities, the multitude of available foundation models,
 and the considerable model sizes make this integration a nontrivial task.
 
 AutoMM is dedicated to breaking these barriers 
-by substantially reducing the engineering effort and manual intervention required in data preprocessing, model selection, and finetuning. 
-With AutoMM, users can effortlessly adapt foundation models (from popular model zoos like [TIMM](https://github.com/rwightman/pytorch-image-models),
-[huggingface/transformers](https://github.com/huggingface/transformers),
+by substantially reducing the engineering effort and manual intervention required in data preprocessing, model selection, and fine-tuning. 
+With AutoMM, users can effortlessly adapt foundation models (from popular model zoos like
+[HuggingFace](https://github.com/huggingface/transformers), [TIMM](https://github.com/rwightman/pytorch-image-models),
  [MMDetection](https://github.com/open-mmlab/mmdetection)) to their domain-specific data using just three lines of code. 
-Our toolkit accommodates various data types, including tabular, text, and image data, either individually or in combination. 
+Our toolkit accommodates various data types, including image, text, tabular, and document data, either individually or in combination. 
 It offers support for an array of tasks, encompassing classification, regression, object detection, named entity recognition, semantic matching, and image segmentation.
 AutoMM represents a state-of-the-art and user-friendly solution, empowering multimodal AutoML with foundation models.
+
+![AutoMM Introduction](https://automl-mm-bench.s3.amazonaws.com/figures/automm-intro.png)
 
 In the following, we decompose the functionalities of AutoMM and prepare step-by-step guide for each functionality.
 
@@ -137,7 +139,7 @@ In the following, we decompose the functionalities of AutoMM and prepare step-by
 ::::
 
 
-## Semantic Matching
+## Image / Text Data -- Semantic Matching
 
 ::::{grid} 2
   :gutter: 3
