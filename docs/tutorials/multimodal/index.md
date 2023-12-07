@@ -15,7 +15,7 @@ Our toolkit accommodates various data types, including image, text, tabular, and
 It offers support for an array of tasks, encompassing classification, regression, object detection, named entity recognition, semantic matching, and image segmentation.
 AutoMM represents a state-of-the-art and user-friendly solution, empowering multimodal AutoML with foundation models.
 
-![AutoMM highlights](https://automl-mm-bench.s3.amazonaws.com/figures/automm-intro.png)
+![AutoMM Introduction](https://automl-mm-bench.s3.amazonaws.com/figures/automm-intro.png)
 
 In the following, we decompose the functionalities of AutoMM and prepare step-by-step guide for each functionality.
 
