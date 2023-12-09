@@ -12,7 +12,7 @@ Looking for a different version? Refer to the [autogluon-doc-utils] repo to view
 
 ## Multimodal
 
-```{image} https://automl-mm-bench.s3-accelerate.amazonaws.com/cheatsheet/v0.7.0/AutoGluon_Multimodal_Cheatsheet_v0.7.0.png
+```{image} https://automl-mm-bench.s3-accelerate.amazonaws.com/cheatsheet/stable/automm.jpeg
 :width: 900
 ```
 
