@@ -7,6 +7,7 @@ from autogluon.core.metrics import METRICS
 
 from .constants import (
     ACCURACY,
+    BER,
     BINARY,
     CATEGORICAL,
     CLASSIFICATION,
@@ -35,6 +36,7 @@ from .constants import (
     ROC_AUC,
     ROIS,
     SEMANTIC_SEGMENTATION,
+    SM,
     TEXT,
     TEXT_NER,
     TEXT_SIMILARITY,
@@ -213,7 +215,7 @@ PROBLEM_TYPES_REG.register(
         supported_modality_type={IMAGE},
         supported_label_type={IMAGE},
         force_exist_modality={IMAGE},
-        _supported_evaluation_metrics=[IOU],
+        _supported_evaluation_metrics=[IOU, BER, SM],
         _fallback_evaluation_metric=IOU,
         _fallback_validation_metric=IOU,
     ),
