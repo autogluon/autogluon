@@ -37,7 +37,6 @@ jobs:
   benchmark-tabular:
     needs: generate_amlb_user_dir
     runs-on: ubuntu-latest
-    timeout-minutes: 480
     defaults:
       run:
         shell: bash
