@@ -139,6 +139,12 @@ def test_mmdet_object_detection_inference_basics(checkpoint_name):
     # Inference on data without annotations
     pred = predictor.predict(test_path_with_images_only)
 
+    # Save inference in COCO on data without annotations
+    pred = predictor.predict(test_path_with_images_only, save_result=True)
+
+    # Save inference in COCO on data without annotations
+    pred = predictor.predict(test_path_with_images_only, save_result=True, as_coco=False)
+
 
 # TODO: FIX DDP multi runs!
 @pytest.mark.single_gpu

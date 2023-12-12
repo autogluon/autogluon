@@ -82,6 +82,7 @@ from .object_detection import (
     bbox_xyxy_to_xywh,
     cocoeval,
     convert_pred_to_xywh,
+    convert_result_df,
     from_coco,
     from_coco_or_voc,
     from_dict,
@@ -90,7 +91,6 @@ from .object_detection import (
     object_detection_data_to_df,
     object_detection_df_to_coco,
     save_result_coco_format,
-    save_result_df,
     save_result_voc_format,
     visualize_detection,
 )

@@ -1497,7 +1497,7 @@ def get_color(idx):
     return color
 
 
-def save_result_df(
+def convert_result_df(
     pred: Iterable, data: Union[pd.DataFrame, Dict], detection_classes: List[str], result_path: Optional[str] = None
 ):
     """
@@ -1544,13 +1544,11 @@ def save_result_df(
     return result_df
 
 
-def save_result_coco_format(detection_data_path, pred, result_path, coco_root: Optional[str] = None):
-    coco_dataset = COCODataset(detection_data_path)
+def save_result_coco_format(data_path, pred, result_path, coco_root: Optional[str] = None):
+    coco_dataset = COCODataset(data_path)
     result_name, _ = os.path.splitext(result_path)
     result_path = result_name + ".json"
-    coco_dataset.save_result(
-        pred, from_coco_or_voc(detection_data_path, "test", coco_root=coco_root), save_path=result_path
-    )
+    coco_dataset.save_result(pred, from_coco_or_voc(data_path, "test", coco_root=coco_root), save_path=result_path)
     logger.info(25, f"Saved detection result to {result_path}")
 
 
