@@ -84,6 +84,8 @@ class ObjectDetectionLearner(BaseLearner):
         )
         check_if_packages_installed(problem_type=self._problem_type)
 
+        self._config = self.get_config_per_run(config=self._config, hyperparameters=hyperparameters)
+
         self._output_shape = num_classes
         self._classes = classes
         self._sample_data_path = sample_data_path
@@ -116,18 +118,14 @@ class ObjectDetectionLearner(BaseLearner):
             train_data = from_coco_or_voc(
                 train_data,
                 "train",
-                coco_root=self._hyperparameters["model.mmdet_image.coco_root"]
-                if "model.mmdet_image.coco_root" in self._hyperparameters
-                else None,
+                coco_root=self._config["model.mmdet_image.coco_root"],
             )  # TODO: Refactor to use convert_data_to_df
             if tuning_data is not None:
                 self.detection_anno_train = tuning_data
                 tuning_data = from_coco_or_voc(
                     tuning_data,
                     "val",
-                    coco_root=self._hyperparameters["model.mmdet_image.coco_root"]
-                    if "model.mmdet_image.coco_root" in self._hyperparameters
-                    else None,
+                    coco_root=self._config["model.mmdet_image.coco_root"],
                 )  # TODO: Refactor to use convert_data_to_df
                 if max_num_tuning_data is not None:
                     if len(tuning_data) > max_num_tuning_data:
@@ -139,17 +137,13 @@ class ObjectDetectionLearner(BaseLearner):
             # sanity check dataframe columns
             train_data = object_detection_data_to_df(
                 train_data,
-                coco_root=self._hyperparameters["model.mmdet_image.coco_root"]
-                if "model.mmdet_image.coco_root" in self._hyperparameters
-                else None,
+                coco_root=self._config["model.mmdet_image.coco_root"],
             )
             if tuning_data is not None:
                 self.detection_anno_train = tuning_data
                 tuning_data = object_detection_data_to_df(
                     tuning_data,
-                    coco_root=self._hyperparameters["model.mmdet_image.coco_root"]
-                    if "model.mmdet_image.coco_root" in self._hyperparameters
-                    else None,
+                    coco_root=self._config["model.mmdet_image.coco_root"],
                 )
                 if max_num_tuning_data is not None:
                     if len(tuning_data) > max_num_tuning_data:
@@ -594,9 +588,7 @@ class ObjectDetectionLearner(BaseLearner):
             data = from_coco_or_voc(
                 anno_file,
                 "test",
-                coco_root=self._hyperparameters["model.mmdet_image.coco_root"]
-                if "model.mmdet_image.coco_root" in self._hyperparameters
-                else None,
+                coco_root=self._config["model.mmdet_image.coco_root"],
             )  # TODO: maybe remove default splits hardcoding (only used in VOC)
             if os.path.isdir(anno_file):
                 eval_tool = "torchmetrics"  # we can only use torchmetrics for VOC format evaluation.
@@ -680,9 +672,7 @@ class ObjectDetectionLearner(BaseLearner):
         else:
             data = object_detection_data_to_df(
                 data,
-                coco_root=self._hyperparameters["model.mmdet_image.coco_root"]
-                if "model.mmdet_image.coco_root" in self._hyperparameters
-                else None,
+                coco_root=self._config["model.mmdet_image.coco_root"],
             )
             return self.evaluate_coco(
                 anno_file_or_df=data,
@@ -725,9 +715,7 @@ class ObjectDetectionLearner(BaseLearner):
         if self._problem_type == OBJECT_DETECTION:
             data = object_detection_data_to_df(
                 data,
-                coco_root=self._hyperparameters["model.mmdet_image.coco_root"]
-                if "model.mmdet_image.coco_root" in self._hyperparameters
-                else None,
+                coco_root=self._config["model.mmdet_image.coco_root"],
             )
             if self._label_column not in data:
                 self._label_column = None
