@@ -87,8 +87,6 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         self._update_classes(classes)
         self._load_checkpoint(self.checkpoint_file)
 
-        freeze_model_layers(self.model, self.frozen_layers)
-
     def _reset_classes(self, classes: list):
         temp_ckpt_file = f"temp_ckpt_{int(time.time()*1000)}.pth"
         self._save_weights(temp_ckpt_file)
@@ -146,6 +144,8 @@ class MMDetAutoModelForObjectDetection(nn.Module):
 
         self.name_to_id = self.get_layer_ids()
         self.head_layer_names = [n for n, layer_id in self.name_to_id.items() if layer_id <= 0]
+
+        freeze_model_layers(self.model, self.frozen_layers)
 
     def set_data_preprocessor_device(self):
         if not self.device:
