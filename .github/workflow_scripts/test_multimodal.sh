@@ -7,6 +7,7 @@ function test_multimodal {
     setup_build_env
     setup_hf_model_mirror "$SUB_FOLDER"
     # Use all available GPUs
+    # trial
     unset CUDA_VISIBLE_DEVICES
     install_local_packages "common/[tests]" "core/[all,tests]" "features/"
     install_multimodal "[tests]"
