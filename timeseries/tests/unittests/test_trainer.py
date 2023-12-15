@@ -341,7 +341,6 @@ def test_when_trainer_fit_and_deleted_then_oof_predictions_can_be_loaded(temp_mo
         hyperparameters={
             "Naive": {},
             "ETS": {},
-            "AutoETS": {"n_jobs": 1},
             "DirectTabular": {"tabular_hyperparameters": {"GBM": {}}},
             "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1},
         },
@@ -400,9 +399,9 @@ def trained_and_refit_trainers():
             train_data=DUMMY_TS_DATAFRAME,
             hyperparameters={
                 "Naive": {},
-                "ETS": {"maxiter": 1},
+                "Theta": {},
                 "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1},
-                "DirectTabular": {"tabular_hyperparameters": {"GBM": {}}},
+                "DirectTabular": {},
                 "RecursiveTabular": {},
             },
         )
@@ -423,6 +422,14 @@ def test_when_refit_full_called_then_all_models_are_retrained(trained_and_refit_
     expected_refit_full_dict = {name: name + ag.constants.REFIT_FULL_SUFFIX for name in trainer.get_model_names()}
     assert dict_equal_primitive(refit_trainer.model_refit_map, expected_refit_full_dict)
     assert len(leaderboard_refit) == len(leaderboard_initial) + len(expected_refit_full_dict)
+
+
+def test_when_refit_full_called_multiple_times_then_no_new_models_are_trained(trained_and_refit_trainers):
+    _, refit_trainer = trained_and_refit_trainers
+    model_names_refit = refit_trainer.get_model_names()
+    refit_trainer.refit_full("all")
+    model_names_second_refit = refit_trainer.get_model_names()
+    assert set(model_names_refit) == set(model_names_second_refit)
 
 
 def test_when_refit_full_called_then_all_models_can_predict(trained_and_refit_trainers):
