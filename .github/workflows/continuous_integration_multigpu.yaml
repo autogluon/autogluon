@@ -1,20 +1,30 @@
 name: Multi-GPU CI AutoMM
 
 on:
-  push: 
+  pull_request_target:
+    types: [labeled, synchronize, opened]
     paths:
       - 'multimodal/**'
-      - 'docs/tutorials/multimodal/**'
 
 permissions:
   id-token: write
+  pull-requests: write
 
 defaults:
   run:
     shell: bash
 
 jobs:
+  label_check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check model list
+        if: contains(github.event.pull_request.labels.*.name, 'run-multi-gpu') == false
+        run: |
+          echo It appears that you have modified contents of multimodal module. Please label this PR with \"run-multi-gpu\".
+          exit 1
   branch_check:
+    needs: label_check
     runs-on: ubuntu-latest
     steps:
       - name: Fail on restricted branch
