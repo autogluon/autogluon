@@ -1091,11 +1091,13 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         valid_model_set = []
         for name in model_names:
-            if name in self.model_refit_map and self.model_refit_map[model] in existing_models:
+            if name in self.model_refit_map and self.model_refit_map[name] in existing_models:
                 logger.info(
                     f"Model '{name}' already has a refit _FULL model: "
-                    f"'{self.model_refit_map[model]}', skipping refit...",
+                    f"'{self.model_refit_map[name]}', skipping refit..."
                 )
+            elif name in self.model_refit_map.values():
+                logger.debug(f"Model '{name}' is a refit _FULL model, skipping refit...")
             else:
                 valid_model_set.append(name)
 
