@@ -7,7 +7,7 @@ on:
 
 permissions:
   id-token: write
-  pull_request: write
+  pull-requests: write
 
 defaults:
   run:
