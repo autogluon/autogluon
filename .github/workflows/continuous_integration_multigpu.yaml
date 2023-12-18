@@ -2,7 +2,6 @@ name: Multi-GPU CI AutoMM
 
 on:
   pull_request:
-    types: [synchronize, opened]
     paths:
       - 'multimodal/**'
 
