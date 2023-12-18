@@ -9,7 +9,7 @@ USER_DIR_S3_PREFIX=$5  # where to find the pre-generated config. This will eithe
 CDK_DEPLOY_ACCOUNT=369469875935
 CDK_DEPLOY_REGION=us-east-1
 METRICS_BUCKET=autogluon-ci-benchmark
-MAX_MACHINE_NUM=200
+MAX_MACHINE_NUM=1040
 
 if [ $MODULE == "tabular" ] || [ $MODULE == "timeseries" ]; then
     FRAMEWORK=AutoGluon_$PRESET:benchmark
