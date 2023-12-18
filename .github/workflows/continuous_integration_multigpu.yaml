@@ -2,8 +2,7 @@ name: Multi-GPU CI AutoMM
 
 on:
   pull_request:
-    types:
-      - labeled
+    types: [labeled]
     paths:
       - 'multimodal/**'
 
@@ -25,7 +24,7 @@ jobs:
           echo It appears that you have modified contents of multimodal module. Please label this PR with \"run-multi-gpu\".
           exit 1
   branch_check:
-    needs: label-check
+    needs: label_check
     runs-on: ubuntu-latest
     steps:
       - name: Fail on restricted branch
