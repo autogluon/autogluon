@@ -1127,6 +1127,12 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
     def _simulation_artifact(self, test_data: TimeSeriesDataFrame) -> dict:
         """[Advanced] Computes and returns the necessary information to perform offline ensemble simulation."""
+
+        def select_target(ts_df: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
+            ts_df = ts_df.copy()
+            ts_df.static_features = None
+            return ts_df[[self.target]]
+
         test_data = self._check_and_prepare_data_frame(test_data)
         self._check_data_for_evaluation(test_data, name="test_data")
 
@@ -1146,9 +1152,9 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         )
 
         y_val: List[TimeSeriesDataFrame] = [
-            df[[self.target]] for df in trainer._get_ensemble_oof_data(train_data=train_data, val_data=val_data)
+            select_target(df) for df in trainer._get_ensemble_oof_data(train_data=train_data, val_data=val_data)
         ]
-        y_test: TimeSeriesDataFrame = test_data[[self.target]]
+        y_test: TimeSeriesDataFrame = select_target(test_data)
 
         simulation_dict = dict(
             pred_proba_dict_val=pred_proba_dict_val,
