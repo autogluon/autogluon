@@ -13,10 +13,10 @@ cd core/
 if [ "$OSTYPE" == "msys" ]
 then
     # to skip certain tests on Windows platform
-    python3 -m pytest --junitxml=results.xml --runslow tests
+    python -m pytest --junitxml=results.xml --runslow tests
 elif [ -n "$ADDITIONAL_TEST_ARGS" ]
 then
-    python3 -m pytest --junitxml=results.xml --runslow --runplatform "$ADDITIONAL_TEST_ARGS" tests
+    python -m pytest --junitxml=results.xml --runslow --runplatform "$ADDITIONAL_TEST_ARGS" tests
 else
-    python3 -m pytest --junitxml=results.xml --runslow --runplatform tests
+    python -m pytest --junitxml=results.xml --runslow --runplatform tests
 fi

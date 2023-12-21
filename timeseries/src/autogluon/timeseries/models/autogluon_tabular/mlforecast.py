@@ -359,6 +359,9 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             predictions[str(q)] = predictions["mean"] + norm.ppf(q) * std_per_timestep.to_numpy()
         return predictions
 
+    def _more_tags(self) -> dict:
+        return {"can_refit_full": True}
+
 
 class DirectTabularModel(AbstractMLForecastModel):
     """Predict all future time series values simultaneously using TabularPredictor from AutoGluon-Tabular.

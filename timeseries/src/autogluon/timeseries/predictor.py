@@ -1124,3 +1124,48 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         # This hides method from IPython autocomplete, but not VSCode autocomplete
         deprecated = ["score", "get_model_best", "get_model_names"]
         return [d for d in super().__dir__() if d not in deprecated]
+
+    def _simulation_artifact(self, test_data: TimeSeriesDataFrame) -> dict:
+        """[Advanced] Computes and returns the necessary information to perform offline ensemble simulation."""
+
+        def select_target(ts_df: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
+            ts_df = ts_df.copy()
+            ts_df.static_features = None
+            return ts_df[[self.target]]
+
+        test_data = self._check_and_prepare_data_frame(test_data)
+        self._check_data_for_evaluation(test_data, name="test_data")
+        test_data = self._learner.feature_generator.transform(test_data)
+
+        trainer = self._trainer
+        train_data = trainer.load_train_data()
+        val_data = trainer.load_val_data()
+        base_models = trainer.get_model_names(level=0)
+        pred_proba_dict_val: Dict[str, List[TimeSeriesDataFrame]] = {
+            model: trainer._get_model_oof_predictions(model) for model in base_models
+        }
+
+        past_data, known_covariates = test_data.get_model_inputs_for_scoring(
+            prediction_length=self.prediction_length, known_covariates_names=trainer.metadata.known_covariates_real
+        )
+        pred_proba_dict_test: Dict[str, TimeSeriesDataFrame] = trainer.get_model_pred_dict(
+            base_models, data=past_data, known_covariates=known_covariates
+        )
+
+        y_val: List[TimeSeriesDataFrame] = [
+            select_target(df) for df in trainer._get_ensemble_oof_data(train_data=train_data, val_data=val_data)
+        ]
+        y_test: TimeSeriesDataFrame = select_target(test_data)
+
+        simulation_dict = dict(
+            pred_proba_dict_val=pred_proba_dict_val,
+            pred_proba_dict_test=pred_proba_dict_test,
+            y_val=y_val,
+            y_test=y_test,
+            target=self.target,
+            prediction_length=self.prediction_length,
+            eval_metric=self.eval_metric.name,
+            eval_metric_seasonal_period=self.eval_metric_seasonal_period,
+            quantile_levels=self.quantile_levels,
+        )
+        return simulation_dict
