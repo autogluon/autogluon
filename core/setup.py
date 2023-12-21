@@ -47,11 +47,12 @@ install_requires = (
 
 extras_require = {
     "ray": [
-        "ray[default]>=2.6.3,<2.8",  # sync with common/src/autogluon/common/utils/try_import.py
+        "ray[default]>=2.6.3,<2.10",  # sync with common/src/autogluon/common/utils/try_import.py
         "async-timeout",  # https://github.com/ray-project/ray/issues/41267
     ],
     "raytune": [
-        "ray[default,tune]>=2.6.3,<2.8",  # sync with common/src/autogluon/common/utils/try_import.py
+        "ray[default,tune]>=2.6.3,<2.10",  # sync with common/src/autogluon/common/utils/try_import.py
+        "async-timeout",  # https://github.com/ray-project/ray/issues/41267
         # TODO: consider alternatives as hyperopt is not actively maintained.
         "hyperopt>=0.2.7,<0.2.8",  # This is needed for the bayes search to work.
         # 'GPy>=1.10.0,<1.11.0'  # TODO: Enable this once PBT/PB2 are supported by ray lightning
