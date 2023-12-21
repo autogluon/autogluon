@@ -136,6 +136,7 @@ def test_matcher_hpo_presets(presets):
     matcher_hpo("random", "FIFO", presets)
 
 
+@pytest.mark.single_gpu
 @pytest.mark.parametrize("searcher", list(SEARCHER_PRESETS.keys()))
 @pytest.mark.parametrize("scheduler", list(SCHEDULER_PRESETS.keys()))
 def test_hpo_distillation(searcher, scheduler):

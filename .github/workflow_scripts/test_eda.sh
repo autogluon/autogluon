@@ -11,10 +11,10 @@ export CUDA_VISIBLE_DEVICES=0
 install_local_packages "common/[tests]" "core/[all,tests]" "features/" "tabular/[all,tests]" "eda/[tests]"
 
 cd eda/
-python3 -m tox -e lint,typecheck,format,testenv
+python -m tox -e lint,typecheck,format,testenv
 if [ -n "$ADDITIONAL_TEST_ARGS" ]
 then
-    python3 -m pytest --junitxml=results.xml --runslow "$ADDITIONAL_TEST_ARGS" tests
+    python -m pytest --junitxml=results.xml --runslow "$ADDITIONAL_TEST_ARGS" tests
 else
-    python3 -m pytest --junitxml=results.xml --runslow tests
+    python -m pytest --junitxml=results.xml --runslow tests
 fi

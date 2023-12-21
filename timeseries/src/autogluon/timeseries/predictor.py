@@ -26,7 +26,23 @@ from autogluon.timeseries.trainer import AbstractTimeSeriesTrainer
 logger = logging.getLogger(__name__)
 
 
-class TimeSeriesPredictor:
+class TimeSeriesPredictorDeprecatedMixin:
+    """Contains deprecated methods from TimeSeriesPredictor that shouldn't show up in API documentation."""
+
+    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="evaluate")
+    def score(self, *args, **kwargs):
+        return self.evaluate(*args, **kwargs)
+
+    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="model_best")
+    def get_model_best(self) -> str:
+        return self.model_best
+
+    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="model_names")
+    def get_model_names(self) -> str:
+        return self.model_names()
+
+
+class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
     """AutoGluon ``TimeSeriesPredictor`` predicts future values of multiple related time series.
 
     ``TimeSeriesPredictor`` provides probabilistic (quantile) multi-step-ahead forecasts for univariate time series.
@@ -937,7 +953,8 @@ class TimeSeriesPredictor:
         * ``score_test``: The test score of the model on ``data``, if provided. Computed according to ``eval_metric``.
         * ``score_val``: The validation score of the model using the internal validation data. Computed according to ``eval_metric``.
 
-            **NOTE:** Metrics scores are always shown in 'higher is better' format.
+        .. note::
+            Metrics scores are always shown in 'higher is better' format.
             This means that metrics such as MASE or MAPE will be multiplied by -1, so their values will be negative.
             This is necessary to avoid the user needing to know the metric to understand if higher is better when
             looking at leaderboard.
@@ -1108,14 +1125,47 @@ class TimeSeriesPredictor:
         deprecated = ["score", "get_model_best", "get_model_names"]
         return [d for d in super().__dir__() if d not in deprecated]
 
-    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="evaluate")
-    def score(self, *args, **kwargs):
-        return self.evaluate(*args, **kwargs)
+    def _simulation_artifact(self, test_data: TimeSeriesDataFrame) -> dict:
+        """[Advanced] Computes and returns the necessary information to perform offline ensemble simulation."""
 
-    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="model_best")
-    def get_model_best(self) -> str:
-        return self.model_best
+        def select_target(ts_df: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
+            ts_df = ts_df.copy()
+            ts_df.static_features = None
+            return ts_df[[self.target]]
 
-    @Deprecated(min_version_to_warn="0.8.3", min_version_to_error="1.2", version_to_remove="1.2", new="model_names")
-    def get_model_names(self) -> List[str]:
-        return self.model_names()
+        test_data = self._check_and_prepare_data_frame(test_data)
+        self._check_data_for_evaluation(test_data, name="test_data")
+        test_data = self._learner.feature_generator.transform(test_data)
+
+        trainer = self._trainer
+        train_data = trainer.load_train_data()
+        val_data = trainer.load_val_data()
+        base_models = trainer.get_model_names(level=0)
+        pred_proba_dict_val: Dict[str, List[TimeSeriesDataFrame]] = {
+            model: trainer._get_model_oof_predictions(model) for model in base_models
+        }
+
+        past_data, known_covariates = test_data.get_model_inputs_for_scoring(
+            prediction_length=self.prediction_length, known_covariates_names=trainer.metadata.known_covariates_real
+        )
+        pred_proba_dict_test: Dict[str, TimeSeriesDataFrame] = trainer.get_model_pred_dict(
+            base_models, data=past_data, known_covariates=known_covariates
+        )
+
+        y_val: List[TimeSeriesDataFrame] = [
+            select_target(df) for df in trainer._get_ensemble_oof_data(train_data=train_data, val_data=val_data)
+        ]
+        y_test: TimeSeriesDataFrame = select_target(test_data)
+
+        simulation_dict = dict(
+            pred_proba_dict_val=pred_proba_dict_val,
+            pred_proba_dict_test=pred_proba_dict_test,
+            y_val=y_val,
+            y_test=y_test,
+            target=self.target,
+            prediction_length=self.prediction_length,
+            eval_metric=self.eval_metric.name,
+            eval_metric_seasonal_period=self.eval_metric_seasonal_period,
+            quantile_levels=self.quantile_levels,
+        )
+        return simulation_dict

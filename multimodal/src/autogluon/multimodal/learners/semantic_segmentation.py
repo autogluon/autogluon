@@ -97,15 +97,14 @@ class SemanticSegmentationLearner(BaseLearner):
             else:
                 mask = Image.open(sample_data_path)
                 mode = mask.mode
-                if mode == "L":
+
+                if mode == "1":
                     return 1
-                elif mode == "P":
-                    classes = np.unique(mask)
-                    return max(classes).item() + 1  # include background
-                else:
-                    NotImplementedError(
-                        f"Current image mode '{mode}' is not supported. 'P' (Palette) mode and 'L' (Luminance) mode are supported."
-                    )
+                classes = np.unique(mask)
+                if mode == "L" and np.array_equal(classes, np.array([0, 255])):
+                    return 1
+
+                return max(classes).item() + 1  # include background
 
         elif isinstance(sample_data_path, pd.DataFrame):
             num_classes = []
@@ -222,6 +221,8 @@ class SemanticSegmentationLearner(BaseLearner):
         assert len(y_true) == len(y_pred)
 
         results = {}
+        if isinstance(metrics, str):
+            metrics = [metrics]
         for per_metric_name in metrics:
             per_metric = get_metric_predict(metric_name=per_metric_name.lower(), num_classes=self._output_shape)
             for y_p, y_t in zip(y_pred, y_true):

@@ -858,12 +858,17 @@ class COD_Pred:
     def compute(self):
         pass
 
+    def reset(self):
+        self.logits = []
+        self.labels = []
+
 
 class SM_Pred(COD_Pred):
     def compute(self):
         logits = torch.cat(self.logits)
         labels = torch.cat(self.labels)
         assert logits.shape == labels.shape
+
         batchsize = labels.shape[0]
 
         metric_SM = Smeasure()
@@ -871,7 +876,7 @@ class SM_Pred(COD_Pred):
         for i in range(batchsize):
             true, pred = labels[i, 0].cpu().data.numpy() * 255, logits[i, 0].cpu().data.numpy() * 255
             metric_SM.step(pred=pred, gt=true)
-
+        self.reset()
         return torch.tensor(metric_SM.get_results()["sm"])
 
 
@@ -887,7 +892,7 @@ class FM_Pred(COD_Pred):
             true, pred = labels[i, 0].cpu().data.numpy() * 255, logits[i, 0].cpu().data.numpy() * 255
 
             metric_WFM.step(pred=pred, gt=true)
-
+        self.reset()
         return torch.tensor(metric_WFM.get_results()["wfm"])
 
 
@@ -904,7 +909,7 @@ class EM_Pred(COD_Pred):
             true, pred = labels[i, 0].cpu().data.numpy() * 255, logits[i, 0].cpu().data.numpy() * 255
 
             metric_EM.step(pred=pred, gt=true)
-
+        self.reset()
         return torch.tensor(metric_EM.get_results()["em"]["curve"].mean())
 
 
@@ -920,7 +925,7 @@ class MAE_Pred(COD_Pred):
             true, pred = labels[i, 0].cpu().data.numpy() * 255, logits[i, 0].cpu().data.numpy() * 255
 
             metric_MAE.step(pred=pred, gt=true)
-
+        self.reset()
         return torch.tensor(metric_MAE.get_results()["mae"])
 
 

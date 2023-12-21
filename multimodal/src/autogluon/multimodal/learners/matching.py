@@ -221,6 +221,11 @@ class MultiModalMatcher(BaseLearner):
         self._total_train_time = None
         self._best_score = None
 
+        self._log_filters = [
+            ".*does not have many workers.* in the `DataLoader` init to improve performance.*",
+            "Checkpoint directory .* exists and is not empty.",
+        ]
+
     @property
     def query(self):
         return self._query
