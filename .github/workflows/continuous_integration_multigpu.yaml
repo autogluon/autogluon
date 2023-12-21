@@ -1,4 +1,4 @@
-name: Multi-GPU CI AutoMM
+name: Continuous Integration Multi-GPU AutoMM
 
 on:
   pull_request_target:
@@ -18,7 +18,7 @@ jobs:
   label_check:
     runs-on: ubuntu-latest
     steps:
-      - name: Check model list
+      - name: Check Label
         if: contains(github.event.pull_request.labels.*.name, 'run-multi-gpu') == false
         run: |
           echo It appears that you have modified contents of multimodal module. Please label this PR with \"run-multi-gpu\".
