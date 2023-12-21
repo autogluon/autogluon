@@ -1135,6 +1135,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
         test_data = self._check_and_prepare_data_frame(test_data)
         self._check_data_for_evaluation(test_data, name="test_data")
+        test_data = self._learner.feature_generator.transform(test_data)
 
         trainer = self._trainer
         train_data = trainer.load_train_data()
