@@ -1,5 +1,6 @@
 import copy
 import logging
+import math
 import os
 import time
 import traceback
@@ -77,7 +78,7 @@ class SimpleAbstractTrainer:
         if not models:
             raise ValueError("Trainer has no fit models that can predict.")
         model_performances = self.get_models_attribute_dict(attribute="val_score")
-        performances_list = [(m, model_performances[m]) for m in models if model_performances[m] is not None]
+        performances_list = [(m, model_performances[m]) for m in models if model_performances[m]]
 
         if not performances_list:
             raise ValueError("No fitted models have validation scores computed.")
@@ -513,11 +514,11 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         fit_time: Optional[float] = None,
         predict_time: Optional[float] = None,
     ):
-        if val_score is not None:
+        if val_score is not None and not math.isnan(val_score):
             logger.info(f"\t{val_score:<7.4f}".ljust(15) + f"= Validation score ({self.eval_metric.name_with_sign})")
-        if fit_time is not None:
+        if fit_time is not None and not math.isnan(fit_time):
             logger.info(f"\t{fit_time:<7.2f} s".ljust(15) + "= Training runtime")
-        if predict_time is not None:
+        if predict_time is not None and not math.isnan(predict_time):
             logger.info(f"\t{predict_time:<7.2f} s".ljust(15) + "= Validation (prediction) runtime")
 
     def _train_multi(

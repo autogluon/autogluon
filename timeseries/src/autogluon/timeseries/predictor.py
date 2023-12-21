@@ -427,6 +427,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         enable_ensemble: bool = True,
         random_seed: Optional[int] = 123,
         verbosity: Optional[int] = None,
+        disable_length_check: bool = False,
     ) -> "TimeSeriesPredictor":
         """Fit probabilistic forecasting models to the given time series dataset.
 
@@ -636,6 +637,9 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         verbosity : int, optional
             If provided, overrides the ``verbosity`` value used when creating the ``TimeSeriesPredictor``. See
             documentation for :class:`~autogluon.timeseries.TimeSeriesPredictor` for more details.
+        disable_length_check: bool, default = False
+            If True, do NOT ensure that at least some series in `train_data` have length > 2 * prediction_length.
+            This option is for advanced users only and may result in errors inside the predictor.
 
         """
         time_start = time.time()
@@ -703,9 +707,10 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         if num_val_windows == 0 and tuning_data is None:
             raise ValueError("Please set num_val_windows >= 1 or provide custom tuning_data")
 
-        train_data = self._filter_short_series(
-            train_data, num_val_windows=num_val_windows, val_step_size=val_step_size
-        )
+        if not disable_length_check:
+            train_data = self._filter_short_series(
+                train_data, num_val_windows=num_val_windows, val_step_size=val_step_size
+            )
 
         val_splitter = ExpandingWindowSplitter(
             prediction_length=self.prediction_length, num_val_windows=num_val_windows, val_step_size=val_step_size

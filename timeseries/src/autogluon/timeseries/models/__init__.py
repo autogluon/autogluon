@@ -1,4 +1,5 @@
 from .autogluon_tabular import DirectTabularModel, RecursiveTabularModel
+from .chronos import ChronosModel
 from .gluonts import (
     DeepARModel,
     DLinearModel,
@@ -44,6 +45,7 @@ __all__ = [
     "DynamicOptimizedThetaModel",
     "ETSModel",
     "IMAPAModel",
+    "ChronosModel",
     "NPTSModel",
     "NaiveModel",
     "PatchTSTModel",
