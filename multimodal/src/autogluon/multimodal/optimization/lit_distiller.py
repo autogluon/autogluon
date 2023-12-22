@@ -339,7 +339,12 @@ class DistillerLitModule(pl.LightningModule):
         label: torch.Tensor,
     ):
         if isinstance(
-            metric, (torchmetrics.classification.BinaryAUROC, torchmetrics.classification.BinaryAveragePrecision)
+            metric,
+            (
+                torchmetrics.classification.BinaryAUROC,
+                torchmetrics.classification.BinaryAveragePrecision,
+                torchmetrics.classification.BinaryF1Score,
+            ),
         ):
             prob = F.softmax(logits.float(), dim=1)
             metric.update(preds=prob[:, 1], target=label)  # only for binary classification
