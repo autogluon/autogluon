@@ -1,8 +1,9 @@
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, call
 
 import numpy as np
 import pandas as pd
 import pytest
+from pandas import RangeIndex
 
 from autogluon.eda import AnalysisState
 from autogluon.eda.visualization import ExplainForcePlot, ExplainWaterfallPlot
@@ -75,8 +76,10 @@ def test_ExplainWaterfallPlot(display_rows, monkeypatch):
     }
     with monkeypatch.context() as m:
         call_shap_waterfall_plot = MagicMock()
+        call_shap_explanation = MagicMock(return_value="explanation_mock")
         call_display_obj = MagicMock()
-        m.setattr("shap.plots.waterfall", call_shap_waterfall_plot)
+        m.setattr("shap.waterfall_plot", call_shap_waterfall_plot)
+        m.setattr("shap.Explanation", call_shap_explanation)
         m.setattr(JupyterMixin, "display_obj", call_display_obj)
 
         ExplainWaterfallPlot(display_rows=display_rows, extra_arg="extra_arg").render(state)
@@ -86,10 +89,10 @@ def test_ExplainWaterfallPlot(display_rows, monkeypatch):
         else:
             call_display_obj.assert_not_called()
 
-        assert call_shap_waterfall_plot.call_args.args[0].__dict__ == {
-            "base_values": "expected_value",
-            "display_data": np.array([["features"]], dtype=object),
-            "feature_names": [0],
-            "values": "shap_values",
-        }
-        assert call_shap_waterfall_plot.call_args.kwargs == {"extra_arg": "extra_arg"}
+        call_shap_waterfall_plot.assert_called_with("explanation_mock")
+
+        assert call_shap_explanation.call_args.args == ("shap_values",)
+        kwargs = call_shap_explanation.call_args.kwargs
+        output_names = kwargs.pop("output_names")
+        assert output_names.equals(pd.DataFrame({"feature_names": ["features"]}))
+        assert kwargs == dict(base_values="expected_value", feature_names=RangeIndex(start=0, stop=1, step=1))

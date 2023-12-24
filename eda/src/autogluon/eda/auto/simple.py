@@ -1090,6 +1090,7 @@ def explain_rows(
     train_data: pd.DataFrame,
     model: TabularPredictor,
     rows: pd.DataFrame,
+    positive_class: Optional = None,
     display_rows: bool = False,
     plot: Optional[str] = "force",
     baseline_sample: int = 100,
@@ -1113,6 +1114,10 @@ def explain_rows(
         trained AutoGluon predictor
     rows: pd.DataFrame,
         rows to explain
+    positive_class: Optional
+        Optionally specify positive class to explain; if not provided, the value will be autodetected.
+        For binary it's derived from `model.positive_class`.
+        For multiclass it's the last column in prediction probabilities.
     display_rows: bool, default = False
         if `True` then display the row before the explanation chart
     plot: Optional[str], default = 'force'
@@ -1180,7 +1185,7 @@ def explain_rows(
         train_data=train_data[model.original_features],
         model=model,
         return_state=return_state,
-        anlz_facets=[ShapAnalysis(rows, baseline_sample=baseline_sample, **fit_args)],  # type: ignore
+        anlz_facets=[ShapAnalysis(rows, positive_class=positive_class, baseline_sample=baseline_sample, **fit_args)],  # type: ignore
         viz_facets=viz_facets,  # type: ignore
     )
 
