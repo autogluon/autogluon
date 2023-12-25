@@ -30,6 +30,7 @@ from ..constants import (
     NUMERICAL,
     NUMERICAL_MLP,
     OVD,
+    PEFT_ADDITIVE_STRATEGIES,
     SAM,
     SEMANTIC_SEGMENTATION_IMG,
     T_FEW,
@@ -453,8 +454,11 @@ def create_fusion_model(
             if (
                 OmegaConf.select(config, "optimization.efficient_finetune") is not None
                 and OmegaConf.select(config, "optimization.efficient_finetune") != "None"
+                and OmegaConf.select(config, "optimization.efficient_finetune") in PEFT_ADDITIVE_STRATEGIES
             ):
-                model = apply_model_adaptation(model, config)
+                model = apply_model_adaptation(
+                    model, config
+                )  # only for efficient tuning methods requiring extra parameters.
             single_models.append(model)
 
     if len(single_models) > 1:
