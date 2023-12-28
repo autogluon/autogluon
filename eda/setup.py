@@ -29,9 +29,9 @@ install_requires = [
     'phik>=0.12.2,<0.13',
     'seaborn>=0.12.0,<0.13',
     'ipywidgets>=7.7.1,<9.0',  # min versions guidance: 7.7.1 collab/kaggle
-    'shap>=0.41,<0.42',
+    'shap>=0.44,<0.45',
     'yellowbrick>=1.5,<1.6',
-    'pyod>=1.0,<1.1',
+    'pyod>=1.1,<1.2',
     'suod>=0.0.8,<0.1',
     'ipython>7.16,<8.13',  # IPython 8.13+ supports Python 3.9 and above; Python 3.7 is supported with IPython >7.16
     f'autogluon.core=={version}',
