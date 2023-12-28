@@ -30,7 +30,7 @@ AutoGluon requires Python version 3.8, 3.9, 3.10, or 3.11 and is available on Li
     ::::
     
     ::::{tab} GPU
-    ```{include} install-conda-full.md
+    ```{include} install-linux-conda-gpu.md
     ```
     ::::
   
