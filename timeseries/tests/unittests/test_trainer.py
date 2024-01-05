@@ -565,3 +565,23 @@ def test_given_cache_predictions_is_false_when_calling_get_model_pred_dict_then_
     assert not trainer._cached_predictions_path.exists()
     trainer.get_model_pred_dict(trainer.get_model_names(), data=DUMMY_TS_DATAFRAME)
     assert not trainer._cached_predictions_path.exists()
+
+
+@pytest.mark.parametrize("use_test_data", [True, False])
+def test_given_no_models_trained_during_fit_then_empty_leaderboard_returned(use_test_data, temp_model_path):
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path)
+    with mock.patch("autogluon.timeseries.models.local.naive.NaiveModel.fit") as naive_fit:
+        naive_fit.side_effect = RuntimeError()
+        trainer.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
+    assert len(trainer.get_model_names()) == 0
+
+    expected_columns = ["model", "score_val", "pred_time_val", "fit_time_marginal", "fit_order"]
+    if use_test_data:
+        expected_columns += ["score_test", "pred_time_test"]
+        test_data = DUMMY_TS_DATAFRAME
+    else:
+        test_data = None
+
+    leaderboard = trainer.leaderboard(data=test_data)
+    assert all(c in leaderboard.columns for c in expected_columns)
+    assert len(leaderboard) == 0
