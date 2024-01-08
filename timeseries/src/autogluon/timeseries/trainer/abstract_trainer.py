@@ -717,6 +717,9 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         logger.debug("Generating leaderboard for all models trained")
 
         model_names = self.get_model_names()
+        if len(model_names) == 0:
+            logger.warning("Warning: No models were trained during fit. Resulting leaderboard will be empty.")
+
         model_info = {}
         for ix, model_name in enumerate(model_names):
             model_info[model_name] = {
@@ -754,12 +757,6 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                     model_info[model_name]["score_test"] = self._score_with_predictions(data, model_preds)
                     model_info[model_name]["pred_time_test"] = pred_time_dict[model_name]
 
-        df = pd.DataFrame(model_info.values())
-
-        sort_column = "score_test" if "score_test" in df.columns else "score_val"
-        df.sort_values(by=[sort_column, "model"], ascending=[False, False], inplace=True)
-        df.reset_index(drop=True, inplace=True)
-
         explicit_column_order = [
             "model",
             "score_test",
@@ -769,9 +766,17 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             "fit_time_marginal",
             "fit_order",
         ]
-        explicit_column_order = [c for c in explicit_column_order if c in df.columns] + [
-            c for c in df.columns if c not in explicit_column_order
-        ]
+
+        df = pd.DataFrame(model_info.values(), columns=explicit_column_order)
+        if data is None:
+            explicit_column_order.remove("score_test")
+            explicit_column_order.remove("pred_time_test")
+            sort_column = "score_val"
+        else:
+            sort_column = "score_test"
+
+        df.sort_values(by=[sort_column, "model"], ascending=[False, False], inplace=True)
+        df.reset_index(drop=True, inplace=True)
 
         return df[explicit_column_order]
 
