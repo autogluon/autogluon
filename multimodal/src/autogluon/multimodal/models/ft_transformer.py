@@ -457,6 +457,7 @@ class FT_Transformer(nn.Module):
         additive_attention: Optional[bool] = False,
         share_qv_weights: Optional[bool] = False,
         pooling_mode: Optional[str] = "cls",
+        checkpoint_name: str = None,
     ) -> None:
         """
         Parameters
@@ -594,12 +595,17 @@ class FT_Transformer(nn.Module):
             initialization="uniform",
         )
 
-        # init weights
+        # init tokenizer and head weights
         if self.numerical_feature_tokenizer:
             self.numerical_adapter.apply(init_weights)
         if self.categorical_feature_tokenizer:
             self.categorical_adapter.apply(init_weights)
         self.head.apply(init_weights)
+        # init transformer backbone from provided checkpoint
+        if checkpoint_name:
+            ckpt = torch.load(checkpoint_name)
+            self.transformer.load_state_dict(ckpt['state_dict'])
+
         self.name_to_id = self.get_layer_ids()
 
     @property

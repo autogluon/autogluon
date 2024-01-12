@@ -372,6 +372,7 @@ def create_model(
             additive_attention=OmegaConf.select(model_config, "additive_attention", default=False),
             share_qv_weights=OmegaConf.select(model_config, "share_qv_weights", default=False),
             pooling_mode=OmegaConf.select(model_config, "pooling_mode", default="cls"),
+            checkpoint_name=model_config.checkpoint_name,
         )
     elif model_name.lower().startswith(SAM):
         model = SAMForSemanticSegmentation(
