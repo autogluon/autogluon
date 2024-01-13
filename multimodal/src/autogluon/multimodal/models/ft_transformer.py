@@ -604,7 +604,7 @@ class FT_Transformer(nn.Module):
         # init transformer backbone from provided checkpoint
         if checkpoint_name:
             ckpt = torch.load(checkpoint_name)
-            self.transformer.load_state_dict(ckpt['state_dict'])
+            self.transformer.load_state_dict(ckpt["state_dict"])
 
         self.name_to_id = self.get_layer_ids()
 
