@@ -276,3 +276,39 @@ def test_sam_semantic_segmentation_lora_insert(frozen_layers):
         for filter_layer in model.frozen_layers:
             if filter_layer in k:
                 assert "lora" not in k
+
+
+# TODO: Pytest does not support DDP
+@pytest.mark.single_gpu
+@pytest.mark.parametrize(
+    "peft_method",
+    [
+        "bit_fit",
+        "norm_fit",
+    ],
+)
+def test_sam_semantic_segmentation_non_additive_peft_methods(peft_method):
+    # Binary semantic segmentation
+    train_df, val_df, test_df = get_file_df_binary_semantic_seg(need_test_gt=True)
+
+    validation_metric = "iou"
+    predictor = MultiModalPredictor(
+        problem_type="semantic_segmentation",
+        validation_metric=validation_metric,
+        eval_metric=validation_metric,
+        hyperparameters={
+            "model.sam.checkpoint_name": "facebook/sam-vit-base",
+            "optimization.efficient_finetune": peft_method,
+        },
+        label="label",
+        sample_data_path=train_df,
+    )
+
+    # Fit
+    predictor.fit(train_data=train_df, tuning_data=val_df, time_limit=20)
+
+    # Evaluation
+    predictor.evaluate(test_df, metrics=[validation_metric])
+
+    # Predict, save and load
+    verify_predictor_save_load_for_semantic_seg(predictor, test_df, as_multiclass=False)
