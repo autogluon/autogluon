@@ -30,6 +30,7 @@ from ..constants import (
     NUMERICAL,
     NUMERICAL_MLP,
     OVD,
+    PEFT_ADDITIVE_STRATEGIES,
     SAM,
     SEMANTIC_SEGMENTATION_IMG,
     T_FEW,
@@ -477,16 +478,17 @@ def apply_model_adaptation(model: nn.Module, config: DictConfig) -> nn.Module:
     config:
         A DictConfig object. The optimization config should be accessible by "config.optimization".
     """
-    model = inject_adaptation_to_linear_layer(
-        model=model,
-        efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
-        lora_r=config.optimization.lora.r,
-        lora_alpha=config.optimization.lora.alpha,
-        module_filter=config.optimization.lora.module_filter,
-        filter=config.optimization.lora.filter,
-        extra_trainable_params=OmegaConf.select(config, "optimization.extra_trainable_params"),
-    )
-    model.name_to_id = model.get_layer_ids()  # Need to update name to id dictionary.
+    if OmegaConf.select(config, "optimization.efficient_finetune") in PEFT_ADDITIVE_STRATEGIES:
+        model = inject_adaptation_to_linear_layer(
+            model=model,
+            efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
+            lora_r=config.optimization.lora.r,
+            lora_alpha=config.optimization.lora.alpha,
+            module_filter=config.optimization.lora.module_filter,
+            filter=config.optimization.lora.filter,
+            extra_trainable_params=OmegaConf.select(config, "optimization.extra_trainable_params"),
+        )
+        model.name_to_id = model.get_layer_ids()  # Need to update name to id dictionary.
 
     return model
 

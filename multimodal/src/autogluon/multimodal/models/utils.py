@@ -19,6 +19,7 @@ from ..constants import (
     LOGITS,
     MASKS,
     OCR,
+    PEFT_ADDITIVE_STRATEGIES,
     REGRESSION,
     SEMANTIC_MASK,
     SEMANTIC_SEGMENTATION,
@@ -484,7 +485,7 @@ def create_adaptation(efficient_finetune: str, layer: nn.Module, lora_r: int, lo
         raise NotImplementedError(
             f"The efficient finetuning strategy '{efficient_finetune}'"
             f" is not supported. We only support"
-            f" {', '.join(PEFT_STRATEGIES)}."
+            f" {', '.join(PEFT_ADDITIVE_STRATEGIES)}."
         )
 
 
