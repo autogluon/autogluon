@@ -9,6 +9,7 @@ import pytest
 from omegaconf import OmegaConf
 from torch import nn
 
+from autogluon.common.loaders._utils import download
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.constants import (
     BEST,
@@ -675,6 +676,31 @@ def test_load_ckpt():
     predictions_prob = predictor.predict_proba(test_data, as_pandas=False)
     predictions2_prob = loaded_predictor.predict_proba(test_data, as_pandas=False)
     npt.assert_equal(predictions_prob, predictions2_prob)
+
+
+def test_fttransformer_load_ckpt():
+    download("s3://automl-mm-bench/ft_transformer_pretrained_ckpt/iter_2k.ckpt", "./")
+
+    dataset = ALL_DATASETS["petfinder"]
+    metric_name = dataset.metric
+
+    predictor = MultiModalPredictor(
+        label=dataset.label_columns[0],
+        problem_type=dataset.problem_type,
+        eval_metric=metric_name,
+    )
+    hyperparameters = {
+        "model.names": ["ft_transformer"],
+        "model.ft_transformer.checkpoint_name": "./iter_2k.ckpt",
+        "data.categorical.convert_to_text": False,  # ensure the categorical model is used.
+        "data.numerical.convert_to_text": False,  # ensure the numerical model is used.
+    }
+    predictor.fit(
+        dataset.train_df,
+        hyperparameters=hyperparameters,
+        time_limit=10,
+    )
+    predictor.evaluate(dataset.test_df)
 
 
 @pytest.mark.parametrize(
