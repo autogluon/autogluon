@@ -679,7 +679,7 @@ def test_load_ckpt():
 
 
 def test_fttransformer_load_ckpt():
-    download("s3://automl-mm-bench/ft_transformer_pretrained_ckpt/iter_2k.ckpt", "./")
+    download("https://automl-mm-bench.s3.amazonaws.com/ft_transformer_pretrained_ckpt/iter_2k.ckpt", "./")
 
     dataset = ALL_DATASETS["petfinder"]
     metric_name = dataset.metric
