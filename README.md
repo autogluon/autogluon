@@ -45,7 +45,7 @@ leaderboard = predictor.leaderboard(test_data)
 See the [AutoGluon Website](https://auto.gluon.ai/stable/index.html) for documentation and instructions on:
 - [Installing AutoGluon](https://auto.gluon.ai/stable/index.html#installation)
 - [Learning with tabular data](https://auto.gluon.ai/stable/tutorials/tabular/tabular-quick-start.html)
-  - [Tips to maximize accuracy](https://auto.gluon.ai/stable/tutorials/tabular/tabular-essentials.html#maximizing-predictive-performance) (if **benchmarking**, make sure to run `fit()` with argument `presets='best_quality'`).
+  - [Tips to maximize accuracy](https://auto.gluon.ai/stable/tutorials/tabular/tabular-essentials.html#maximizing-predictive-performance) (if **benchmarking**, make sure set the .fit() argument `presets='best_quality'`).
 
 - [Learning with multimodal data (image, text, etc.)](https://auto.gluon.ai/stable/tutorials/multimodal/multimodal_prediction/multimodal-quick-start.html)
 - [Learning with time series data](https://auto.gluon.ai/stable/tutorials/timeseries/forecasting-quick-start.html)
@@ -60,11 +60,11 @@ Refer to the [AutoGluon Roadmap](https://github.com/autogluon/autogluon/blob/mas
 - [The AutoML Revolution](https://www.youtube.com/watch?v=VAAITEds-28) (Fall AutoML School, 2022)
 
 ### Scientific Publications
-- [AutoGluon-Tabular: Robust and Accurate AutoML for Structured Data](https://arxiv.org/pdf/2003.06505.pdf) (*Arxiv*, 2020)
-- [Fast, Accurate, and Simple Models for Tabular Data via Augmented Distillation](https://proceedings.neurips.cc/paper/2020/hash/62d75fb2e3075506e8837d8f55021ab1-Abstract.html) (*NeurIPS*, 2020)
-- [Benchmarking Multimodal AutoML for Tabular Data with Text Fields](https://datasets-benchmarks-proceedings.neurips.cc/paper/2021/file/9bf31c7ff062936a96d3c8bd1f8f2ff3-Paper-round2.pdf) (*NeurIPS*, 2021)
+- [AutoGluon-Tabular: Robust and Accurate AutoML for Structured Data](https://arxiv.org/pdf/2003.06505.pdf) (*Arxiv*, 2020) ([BibTeX](CITING.md#general-usage--autogluontabular))
+- [Fast, Accurate, and Simple Models for Tabular Data via Augmented Distillation](https://proceedings.neurips.cc/paper/2020/hash/62d75fb2e3075506e8837d8f55021ab1-Abstract.html) (*NeurIPS*, 2020) ([BibTeX](CITING.md#tabular-distillation))
+- [Benchmarking Multimodal AutoML for Tabular Data with Text Fields](https://datasets-benchmarks-proceedings.neurips.cc/paper/2021/file/9bf31c7ff062936a96d3c8bd1f8f2ff3-Paper-round2.pdf) (*NeurIPS*, 2021) ([BibTeX](CITING.md#autogluonmultimodal))
 - [XTab: Cross-table Pretraining for Tabular Transformers](https://proceedings.mlr.press/v202/zhu23k/zhu23k.pdf) (*ICML*, 2023)
-- [AutoGluon-TimeSeries: AutoML for Probabilistic Time Series Forecasting](https://arxiv.org/abs/2308.05566) (*AutoML Conf*, 2023)
+- [AutoGluon-TimeSeries: AutoML for Probabilistic Time Series Forecasting](https://arxiv.org/abs/2308.05566) (*AutoML Conf*, 2023) ([BibTeX](CITING.md#autogluontimeseries))
 - [TabRepo: A Large Scale Repository of Tabular Model Evaluations and its AutoML Applications](https://arxiv.org/pdf/2311.02971.pdf) (*Under Review*, 2024)
 
 ### Articles
@@ -79,67 +79,13 @@ Refer to the [AutoGluon Roadmap](https://github.com/autogluon/autogluon/blob/mas
 - [AutoGluon Official Docker Container](https://hub.docker.com/r/autogluon/autogluon)
 - [AutoGluon-Tabular on AWS Marketplace](https://aws.amazon.com/marketplace/pp/prodview-n4zf5pmjt7ism) (Not maintained by us)
 
+## Citing AutoGluon
+
+If you use AutoGluon in a scientific publication, please follow our [citation guide](CITING.md) when referencing the project.
+
 ## Contributing to AutoGluon
 
 We are actively accepting code contributions to the AutoGluon project. If you are interested in contributing to AutoGluon, please read the [Contributing Guide](https://github.com/autogluon/autogluon/blob/master/CONTRIBUTING.md) to get started.
-
-## Citing AutoGluon
-
-If you use AutoGluon in a scientific publication, please cite the following paper:
-
-Erickson, Nick, et al. ["AutoGluon-Tabular: Robust and Accurate AutoML for Structured Data."](https://arxiv.org/abs/2003.06505) arXiv preprint arXiv:2003.06505 (2020).
-
-BibTeX entry:
-
-```bibtex
-@article{agtabular,
-  title={AutoGluon-Tabular: Robust and Accurate AutoML for Structured Data},
-  author={Erickson, Nick and Mueller, Jonas and Shirkov, Alexander and Zhang, Hang and Larroy, Pedro and Li, Mu and Smola, Alexander},
-  journal={arXiv preprint arXiv:2003.06505},
-  year={2020}
-}
-```
-
-If you are using AutoGluon Tabular's model distillation functionality, please cite the following paper:
-
-Fakoor, Rasool, et al. ["Fast, Accurate, and Simple Models for Tabular Data via Augmented Distillation."](https://proceedings.neurips.cc/paper/2020/hash/62d75fb2e3075506e8837d8f55021ab1-Abstract.html) Advances in Neural Information Processing Systems 33 (2020).
-
-BibTeX entry:
-
-```bibtex
-@article{agtabulardistill,
-  title={Fast, Accurate, and Simple Models for Tabular Data via Augmented Distillation},
-  author={Fakoor, Rasool and Mueller, Jonas W and Erickson, Nick and Chaudhari, Pratik and Smola, Alexander J},
-  journal={Advances in Neural Information Processing Systems},
-  volume={33},
-  year={2020}
-}
-```
-
-If you use AutoGluon's multimodal text+tabular functionality in a scientific publication, please cite the following paper:
-
-Shi, Xingjian, et al. ["Multimodal AutoML on Structured Tables with Text Fields."](https://openreview.net/forum?id=OHAIVOOl7Vl) 8th ICML Workshop on Automated Machine Learning (AutoML). 2021.
-
-BibTeX entry:
-
-```bibtex
-@inproceedings{agmultimodaltext,
-  title={Multimodal AutoML on Structured Tables with Text Fields},
-  author={Shi, Xingjian and Mueller, Jonas and Erickson, Nick and Li, Mu and Smola, Alex},
-  booktitle={8th ICML Workshop on Automated Machine Learning (AutoML)},
-  year={2021}
-}
-```
-
-If you use AutoGluon's time series forecasting functionality in a scientific publication, please cite the following paper:
-```bibtex
-@inproceedings{agtimeseries,
-  title={{AutoGluon-TimeSeries}: {AutoML} for Probabilistic Time Series Forecasting},
-  author={Shchur, Oleksandr and Turkmen, Caner and Erickson, Nick and Shen, Huibin and Shirkov, Alexander and Hu, Tony and Wang, Yuyang},
-  booktitle={International Conference on Automated Machine Learning},
-  year={2023}
-}
-```
 
 ## License
 
