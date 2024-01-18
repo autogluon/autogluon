@@ -1,9 +1,7 @@
 
 
-
-<div align="left">
-  <img src="https://user-images.githubusercontent.com/16392542/77208906-224aa500-6aba-11ea-96bd-e81806074030.png" width="350">
-</div>
+<div align="center">
+<img src="https://user-images.githubusercontent.com/16392542/77208906-224aa500-6aba-11ea-96bd-e81806074030.png" width="350">
 
 ## AutoML for Image, Text, Time Series, and Tabular Data
 
@@ -20,18 +18,24 @@
 [Install Instructions](https://auto.gluon.ai/stable/install.html) | [Documentation](https://auto.gluon.ai/stable/index.html) | [Release Notes](https://auto.gluon.ai/stable/whats_new/index.html)
 
 AutoGluon automates machine learning tasks enabling you to easily achieve strong predictive performance in your applications.  With just a few lines of code, you can train and deploy high-accuracy machine learning and deep learning models on image, text, time series, and tabular data.
+</div>
 
-## Example
+## Installation
+
+You can install AutoGluon with:
 
 ```python
-# First install package from terminal:
-# pip install autogluon
+pip install autogluon
+```
 
-from autogluon.tabular import TabularDataset, TabularPredictor
-train_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
-test_data = TabularDataset('https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
-predictor = TabularPredictor(label='class').fit(train_data, time_limit=120)  # Fit models for 120s
-leaderboard = predictor.leaderboard(test_data)
+Vist our [Installation Guide](https://auto.gluon.ai/stable/install.html) for detailed instructions.
+
+## Quickstart
+
+```python
+from autogluon.tabular import TabularPredictor
+predictor = TabularPredictor(label="class").fit("train.csv")
+predictions = predictor.predict("test.csv")
 ```
 
 | AutoGluon Task      |                                                                                Quickstart                                                                                |                                                                                API                                                                                |
