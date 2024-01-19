@@ -1290,20 +1290,6 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             if _ds_ray is not None:
                 logger.info(f"Running the sub-fit in a ray process to avoid memory leakage.")
 
-                # Handle resources
-                from autogluon.common.utils.resource_utils import ResourceManager
-
-                total_resources = ag_fit_kwargs["core_kwargs"]["total_resources"]
-
-                num_cpus = total_resources.get("num_cpus", "auto")
-                num_gpus = total_resources.get("num_gpus", "auto")
-
-                if num_cpus == "auto":
-                    num_cpus = ResourceManager.get_cpu_count()
-
-                if num_gpus == "auto":
-                    num_gpus = ResourceManager.get_gpu_count()
-
                 # Handle expensive data via put
                 ag_fit_kwargs_ref = _ds_ray.put(ag_fit_kwargs)
                 predictor_ref = _ds_ray.put(self)
@@ -1316,7 +1302,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
                 # Call sub fit in its own subprocess via ray
                 sub_fit_caller = _ds_ray.remote(max_calls=1)(_sub_fit)
-                ref = sub_fit_caller.options(num_cpus=num_cpus, num_gpus=num_gpus).remote(
+                ref = sub_fit_caller.options().remote(
                     predictor=predictor_ref,
                     train_data=train_data_ref,
                     time_limit=time_limit,
