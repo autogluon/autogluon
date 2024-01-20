@@ -68,6 +68,7 @@ def path_to_bytearray_expander(path, base_folder):
 def shopee_dataset(
     download_dir: str,
     is_bytearray=False,
+    is_base64str=False,
 ):
     """
     Download Shopee dataset for demo.
@@ -87,12 +88,16 @@ def shopee_dataset(
     load_zip.unzip(zip_file, unzip_dir=download_dir)
 
     dataset_path = os.path.join(download_dir, "shopee")
-    train_data = pd.read_csv(f"{dataset_path}/train.csv")
-    test_data = pd.read_csv(f"{dataset_path}/test.csv")
+    if is_base64str:
+        train_data = pd.read_csv(f"{dataset_path}/train_base64_str.csv")
+        test_data = pd.read_csv(f"{dataset_path}/test_base64_str.csv")
+    else:
+        train_data = pd.read_csv(f"{dataset_path}/train.csv")
+        test_data = pd.read_csv(f"{dataset_path}/test.csv")
 
-    expander = path_to_bytearray_expander if is_bytearray else path_expander
-    train_data["image"] = train_data["image"].apply(lambda ele: expander(ele, base_folder=dataset_path))
-    test_data["image"] = test_data["image"].apply(lambda ele: expander(ele, base_folder=dataset_path))
+        expander = path_to_bytearray_expander if is_bytearray else path_expander
+        train_data["image"] = train_data["image"].apply(lambda ele: expander(ele, base_folder=dataset_path))
+        test_data["image"] = test_data["image"].apply(lambda ele: expander(ele, base_folder=dataset_path))
     return train_data, test_data
 
 

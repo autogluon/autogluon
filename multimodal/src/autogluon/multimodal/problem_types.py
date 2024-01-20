@@ -16,6 +16,7 @@ from .constants import (
     FEATURE_EXTRACTION,
     FEW_SHOT_CLASSIFICATION,
     IMAGE,
+    IMAGE_BASE64_STR,
     IMAGE_BYTEARRAY,
     IMAGE_SIMILARITY,
     IMAGE_TEXT_SIMILARITY,
@@ -63,7 +64,7 @@ class ProblemTypeProperty:
 
     # The collection of modality types the problem supports.
     # Multiple column types may be parsed into the same modality. For example
-    #   IMAGE, IMAGE_PATH, IMAGE_BYTEARRAY --> IMAGE
+    #   IMAGE, IMAGE_PATH, IMAGE_BYTEARRAY, IMAGE_BASE64_STR --> IMAGE
     # It will be used to analyze the dataframe and detect the columns.
     supported_modality_type: Set[str] = field(default_factory=set)
 
@@ -133,7 +134,7 @@ PROBLEM_TYPES_REG.register(
     CLASSIFICATION,
     ProblemTypeProperty(
         name=CLASSIFICATION,
-        supported_modality_type={IMAGE, IMAGE_BYTEARRAY, TEXT, CATEGORICAL, NUMERICAL},
+        supported_modality_type={IMAGE, IMAGE_BYTEARRAY, IMAGE_BASE64_STR, TEXT, CATEGORICAL, NUMERICAL},
         supported_label_type={CATEGORICAL},
         is_classification=True,
     ),
@@ -142,7 +143,7 @@ PROBLEM_TYPES_REG.register(
     BINARY,
     ProblemTypeProperty(
         name=BINARY,
-        supported_modality_type={IMAGE, IMAGE_BYTEARRAY, TEXT, CATEGORICAL, NUMERICAL},
+        supported_modality_type={IMAGE, IMAGE_BYTEARRAY, IMAGE_BASE64_STR, TEXT, CATEGORICAL, NUMERICAL},
         supported_label_type={CATEGORICAL},
         is_classification=True,
         _supported_evaluation_metrics=METRICS[BINARY].keys(),
@@ -154,7 +155,7 @@ PROBLEM_TYPES_REG.register(
     MULTICLASS,
     ProblemTypeProperty(
         name=MULTICLASS,
-        supported_modality_type={IMAGE, IMAGE_BYTEARRAY, TEXT, CATEGORICAL, NUMERICAL},
+        supported_modality_type={IMAGE, IMAGE_BYTEARRAY, IMAGE_BASE64_STR, TEXT, CATEGORICAL, NUMERICAL},
         supported_label_type={CATEGORICAL},
         is_classification=True,
         _supported_evaluation_metrics=METRICS[MULTICLASS].keys(),
@@ -168,7 +169,7 @@ PROBLEM_TYPES_REG.register(
     REGRESSION,
     ProblemTypeProperty(
         name=REGRESSION,
-        supported_modality_type={IMAGE, IMAGE_BYTEARRAY, TEXT, CATEGORICAL, NUMERICAL},
+        supported_modality_type={IMAGE, IMAGE_BYTEARRAY, IMAGE_BASE64_STR, TEXT, CATEGORICAL, NUMERICAL},
         supported_label_type={NUMERICAL},
         _supported_evaluation_metrics=METRICS[REGRESSION].keys(),
         _fallback_evaluation_metric=RMSE,

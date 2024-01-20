@@ -1,3 +1,4 @@
+import base64
 import logging
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -19,6 +20,7 @@ from ..constants import (
     DOCUMENT_IMAGE,
     IDENTIFIER,
     IMAGE,
+    IMAGE_BASE64_STR,
     IMAGE_BYTEARRAY,
     IMAGE_PATH,
     LABEL,
@@ -165,6 +167,10 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
     @property
     def image_bytearray_names(self):
         return [col_name for col_name in self._image_feature_names if self._column_types[col_name] == IMAGE_BYTEARRAY]
+
+    @property
+    def image_base64_str_names(self):
+        return [col_name for col_name in self._image_feature_names if self._column_types[col_name] == IMAGE_BASE64_STR]
 
     @property
     def image_feature_names(self):
@@ -635,6 +641,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                 processed_data = col_value.apply(lambda ele: str(ele).split(";")).tolist()
             elif col_type == IMAGE_BYTEARRAY:
                 processed_data = col_value.apply(lambda ele: ele if isinstance(ele, list) else [ele]).tolist()
+            elif col_type == IMAGE_BASE64_STR:
+                processed_data = col_value.apply(lambda ele: [base64.b64decode(ele)]).tolist()
             elif col_type == f"{IMAGE}_{IDENTIFIER}":
                 processed_data = col_value
             else:
