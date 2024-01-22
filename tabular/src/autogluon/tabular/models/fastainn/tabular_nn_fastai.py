@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import logging
+import warnings
 import time
 from builtins import classmethod
 from functools import partial
@@ -197,7 +198,10 @@ class NNFastAiTabularModel(AbstractModel):
             column_fills = {k: self.columns_fills[k] for k in columns_to_fill}
             if column_fills:
                 # TODO: pandas==1.5.3 fillna is 10x+ slower than pandas==1.3.5 with large column count
-                df = df.fillna(column_fills, inplace=False, downcast=False)
+                # TODO: Remove warning later as a follow up to https://github.com/autogluon/autogluon/pull/3734
+                with warnings.catch_warnings():
+                    warnings.simplefilter(action="ignore", category=FutureWarning)
+                    df = df.fillna(column_fills, inplace=False, downcast=False)
             else:
                 df = df.copy()
         else:
