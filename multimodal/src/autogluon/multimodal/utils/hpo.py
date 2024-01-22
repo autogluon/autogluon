@@ -21,6 +21,7 @@ warnings.filterwarnings(
     category=DeprecationWarning,
 )
 
+
 def get_ray_tune_ckpt_callback():
     """
     This is a workaround for the issue caused by the mixed use of old and new lightning's import style.
