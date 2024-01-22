@@ -1,9 +1,12 @@
+import os
+import tempfile
 from typing import List, Optional
 
 import torch
 from torch import Tensor, nn
 
 from autogluon.common.loaders._utils import download
+from autogluon.common.utils.s3_utils import is_s3_url
 
 from ..constants import CATEGORICAL, FEATURES, LABEL, LOGITS, NUMERICAL
 from .custom_transformer import CLSToken, Custom_Transformer, _TokenInitialization
@@ -605,9 +608,11 @@ class FT_Transformer(nn.Module):
         self.head.apply(init_weights)
         # init transformer backbone from provided checkpoint
         if checkpoint_name:
-            if "https://" in checkpoint_name:
-                download(checkpoint_name, "./ft_transformer_pretrained.ckpt")
-                ckpt = torch.load("./ft_transformer_pretrained.ckpt")
+            if "https://" in checkpoint_name or is_s3_url(checkpoint_name):
+                with tempfile.TemporaryDirectory() as tmpdirname:
+                    checkpoint_path = os.path.join(tmpdirname, "./ft_transformer_pretrained.ckpt")
+                    download(checkpoint_name, checkpoint_path)
+                    ckpt = torch.load(checkpoint_path)
             else:
                 ckpt = torch.load(checkpoint_name)
             self.transformer.load_state_dict(ckpt["state_dict"])
