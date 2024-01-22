@@ -1,7 +1,8 @@
 import logging
 import reprlib
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List, Optional, Tuple
+from autogluon.common.features.feature_metadata import FeatureMetadata
 
 import numpy as np
 import pandas as pd
@@ -14,6 +15,7 @@ from autogluon.features.generators import (
     PipelineFeatureGenerator,
 )
 from autogluon.timeseries import TimeSeriesDataFrame
+from pandas import DataFrame
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +50,11 @@ class ContinuousAndCategoricalFeatureGenerator(PipelineFeatureGenerator):
             **kwargs,
         )
 
+    def fit_transform(self, X: pd.DataFrame, *args, **kwargs) -> pd.DataFrame:
+        if isinstance(X, TimeSeriesDataFrame):
+            X = pd.DataFrame(X)
+        return super().fit_transform(X, *args, **kwargs)
+
 
 class TimeSeriesFeatureGenerator:
     """Takes care of preprocessing for static_features and past/known covariates.
@@ -61,12 +68,37 @@ class TimeSeriesFeatureGenerator:
         self._is_fit = False
         self.known_covariates_names = list(known_covariates_names)
         self.past_covariates_names = []
+        self.known_covariates_pipeline = ContinuousAndCategoricalFeatureGenerator()
+        self.past_covariates_pipeline = ContinuousAndCategoricalFeatureGenerator()
         self.static_feature_pipeline = ContinuousAndCategoricalFeatureGenerator()
         self.covariate_metadata: CovariateMetadata = None
 
     @property
     def required_column_names(self) -> List[str]:
         return [self.target] + list(self.known_covariates_names) + list(self.past_covariates_names)
+
+    @staticmethod
+    def _detect_inferred_types(
+        transformed_df: pd.DataFrame, original_column_names: List[str]
+    ) -> Tuple[List[str], List[str]]:
+        """Return names of categorical and real-valued columns, and log the inferred column types."""
+        cat_column_names = []
+        real_column_names = []
+        unused_columns = transformed_df.columns.difference(original_column_names)
+        for column_name, column_dtype in transformed_df.dtypes.items():
+            if pd.api.types.is_categorical_dtype(column_dtype):
+                cat_column_names.append(column_name)
+            elif pd.api.types.is_numeric_dtype(column_dtype):
+                real_column_names.append(column_name)
+            else:
+                unused_columns.append(column_name)
+
+        logger.info("Inferred types of {name}:")
+        logger.info(f"\tcategorical:        {cat_column_names}")
+        logger.info(f"\tcontinuous (float): {real_column_names}")
+        if len(unused_columns) > 0:
+            logger.info(f"\t\tremoved (uninformative columns): {unused_columns}")
+        return cat_column_names, real_column_names
 
     @staticmethod
     def _convert_numerical_features_to_float(df: pd.DataFrame, float_dtype=np.float64) -> pd.DataFrame:
@@ -84,32 +116,38 @@ class TimeSeriesFeatureGenerator:
                 self.past_covariates_names.append(column)
 
         logger.info("\nProvided dataset contains following columns:")
-        logger.info(f"\ttarget:           '{self.target}'")
+        logger.info(f"\ntarget:           '{self.target}'")
         if len(self.known_covariates_names) > 0:
-            logger.info(f"\tknown covariates: {self.known_covariates_names}")
+            logger.info(f"\nknown covariates: {self.known_covariates_names}")
+            known_covariates_df = self.known_covariates_pipeline.fit_transform(data[self.known_covariates_names])
+            known_covariates_cat, known_covariates_real = self._detect_inferred_types(
+                known_covariates_df, original_column_names=self.known_covariates_names
+            )
+        else:
+            known_covariates_cat = []
+            known_covariates_real = []
+
         if len(self.past_covariates_names) > 0:
-            logger.info(f"\tpast covariates:  {self.past_covariates_names}")
+            logger.info(f"\npast covariates:  {self.past_covariates_names}")
+            past_covariates_df = self.past_covariates_pipeline.fit_transform(data[self.past_covariates_names])
+            past_covariates_cat, past_covariates_real = self._detect_inferred_types(
+                past_covariates_df, original_column_names=self.past_covariates_names
+            )
+        else:
+            past_covariates_cat = []
+            past_covariates_real = []
 
-        static_features_cat = []
-        static_features_real = []
         if data.static_features is not None:
-            static = self.static_feature_pipeline.fit_transform(data.static_features)
-            static = self._convert_numerical_features_to_float(static)
+            logger.info(f"\tstatic features:  {data.static_features.columns.to_list()}")
+            static_features_df = self.static_feature_pipeline.fit_transform(data.static_features)
+            static_features_cat, static_features_real = self._detect_inferred_types(
+                static_features_df, original_column_names=data.static_features.columns
+            )
+        else:
+            static_features_cat = []
+            static_features_real = []
 
-            unused = []
-            for col_name in data.static_features.columns:
-                if col_name in static.columns and static[col_name].dtype == "category":
-                    static_features_cat.append(col_name)
-                elif col_name in static.columns and static[col_name].dtype == np.float64:
-                    static_features_real.append(col_name)
-                else:
-                    unused.append(col_name)
-
-            logger.info("Following types of static features have been inferred:")
-            logger.info(f"\tcategorical:        {static_features_cat}")
-            logger.info(f"\tcontinuous (float): {static_features_real}")
-            if len(unused) > 0:
-                logger.info(f"\tremoved (uninformative columns): {unused}")
+        if len(data.columns) > 1 or data.static_features is not None:
             logger.info(
                 "To learn how to fix incorrectly inferred types, please see documentation for TimeSeriesPredictor.fit "
             )
@@ -117,11 +155,10 @@ class TimeSeriesFeatureGenerator:
         self.covariate_metadata = CovariateMetadata(
             static_features_cat=static_features_cat,
             static_features_real=static_features_real,
-            known_covariates_real=self.known_covariates_names,
-            past_covariates_real=self.past_covariates_names,
-            # TODO: Categorical time-varying covariates are not yet supported
-            known_covariates_cat=[],
-            past_covariates_cat=[],
+            known_covariates_real=known_covariates_real,
+            past_covariates_real=past_covariates_real,
+            known_covariates_cat=known_covariates_cat,
+            past_covariates_cat=past_covariates_cat,
         )
         self._is_fit = True
 
@@ -131,21 +168,13 @@ class TimeSeriesFeatureGenerator:
         required_column_names: List[str],
         data_frame_name: str,
     ) -> TimeSeriesDataFrame:
-        """Select the required dataframe columns and convert them to float64 dtype."""
+        """Select the required columns from the data frame."""
         missing_columns = pd.Index(required_column_names).difference(data.columns)
         if len(missing_columns) > 0:
             raise ValueError(
                 f"{len(missing_columns)} columns are missing from {data_frame_name}: {reprlib.repr(missing_columns.to_list())}"
             )
-        data = data[required_column_names]
-        try:
-            data = data.astype(np.float64)
-        except ValueError:
-            raise ValueError(
-                f"Columns in {data_frame_name} must all have numeric (float or int) dtypes, "
-                f"but in provided data they have dtypes {data.dtypes}"
-            )
-        return data
+        return data[required_column_names]
 
     def transform(self, data: TimeSeriesDataFrame, data_frame_name: str = "data") -> TimeSeriesDataFrame:
         """Transform static features and past/known covariates.
@@ -158,12 +187,18 @@ class TimeSeriesFeatureGenerator:
         assert self._is_fit, f"{self.__class__.__name__} has not been fit yet"
         # Avoid modifying inplace
         data = data.copy(deep=False)
-
         data = self._check_and_prepare_covariates(
-            data=data,
-            required_column_names=self.required_column_names,
-            data_frame_name=data_frame_name,
+            data, required_column_names=self.required_column_names, data_frame_name=data_frame_name
         )
+
+        if len(self.known_covariates_names) > 0:
+            data[self.known_covariates_names] = self.known_covariates_pipeline.transform(
+                data[self.known_covariates_names]
+            )
+        if len(self.past_covariates_names) > 0:
+            data[self.past_covariates_names] = self.past_covariates_pipeline.transform(
+                data[self.past_covariates_names]
+            )
 
         if self.static_feature_pipeline.is_fit():
             if data.static_features is None:
@@ -181,11 +216,12 @@ class TimeSeriesFeatureGenerator:
         assert self._is_fit, f"{self.__class__.__name__} has not been fit yet"
         if len(self.known_covariates_names) > 0:
             assert known_covariates is not None, "known_covariates must be provided at prediction time"
-            return self._check_and_prepare_covariates(
+            known_covariates = self._check_and_prepare_covariates(
                 known_covariates,
                 required_column_names=self.known_covariates_names,
                 data_frame_name="known_covariates",
             )
+            return self.known_covariates_pipeline.transform(known_covariates)
         else:
             return None
 
