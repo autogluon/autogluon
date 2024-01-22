@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import copy
 import logging
-import warnings
 import time
+import warnings
 from builtins import classmethod
 from functools import partial
 from pathlib import Path
