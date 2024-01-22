@@ -85,9 +85,9 @@ class TimeSeriesFeatureGenerator:
 
         logger.info(f"\nTarget column: '{self.target}'\n")
         if len(self.known_covariates_names) > 0:
-            logger.info("Inferred types of known_covariates:")
             known_covariates_df = self.known_covariates_pipeline.fit_transform(data[self.known_covariates_names])
-            known_covariates_cat, known_covariates_real = self._detect_inferred_types(
+            logger.info("Inferred types of known_covariates:")
+            known_covariates_cat, known_covariates_real = self._detect_and_log_column_types(
                 known_covariates_df, original_column_names=self.known_covariates_names
             )
         else:
@@ -95,9 +95,9 @@ class TimeSeriesFeatureGenerator:
             known_covariates_real = []
 
         if len(self.past_covariates_names) > 0:
-            logger.info("Inferred types of past_covariates")
             past_covariates_df = self.past_covariates_pipeline.fit_transform(data[self.past_covariates_names])
-            past_covariates_cat, past_covariates_real = self._detect_inferred_types(
+            logger.info("Inferred types of past_covariates")
+            past_covariates_cat, past_covariates_real = self._detect_and_log_column_types(
                 past_covariates_df, original_column_names=self.past_covariates_names
             )
         else:
@@ -105,9 +105,9 @@ class TimeSeriesFeatureGenerator:
             past_covariates_real = []
 
         if data.static_features is not None:
-            logger.info("Inferred types of static_features:")
             static_features_df = self.static_feature_pipeline.fit_transform(data.static_features)
-            static_features_cat, static_features_real = self._detect_inferred_types(
+            logger.info("Inferred types of static_features:")
+            static_features_cat, static_features_real = self._detect_and_log_column_types(
                 static_features_df, original_column_names=data.static_features.columns
             )
         else:
@@ -180,13 +180,13 @@ class TimeSeriesFeatureGenerator:
         return self.transform(data, data_frame_name=data_frame_name)
 
     @staticmethod
-    def _detect_inferred_types(
+    def _detect_and_log_column_types(
         transformed_df: pd.DataFrame, original_column_names: List[str]
     ) -> Tuple[List[str], List[str]]:
         """Return names of categorical and real-valued columns, and log the inferred column types."""
         cat_column_names = []
         real_column_names = []
-        unused_columns = pd.Index(original_column_names).difference(transformed_df.columns).tolist()
+        ignored_columns = pd.Index(original_column_names).difference(transformed_df.columns).tolist()
         for column_name, column_dtype in transformed_df.dtypes.items():
             if isinstance(column_dtype, pd.CategoricalDtype):
                 cat_column_names.append(column_name)
@@ -195,8 +195,8 @@ class TimeSeriesFeatureGenerator:
 
         logger.info(f"\tcategorical:        {reprlib.repr(cat_column_names)}")
         logger.info(f"\tcontinuous (float): {reprlib.repr(real_column_names)}")
-        if len(unused_columns) > 0:
-            logger.info(f"\tignored:            {reprlib.repr(unused_columns)}")
+        if len(ignored_columns) > 0:
+            logger.info(f"\tignored:            {reprlib.repr(ignored_columns)}")
         return cat_column_names, real_column_names
 
     def _convert_numerical_features_to_float(self, df: pd.DataFrame) -> pd.DataFrame:
