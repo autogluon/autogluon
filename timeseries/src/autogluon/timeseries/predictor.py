@@ -128,7 +128,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         debug messages from AutoGluon and all logging in dependencies (GluonTS, PyTorch Lightning, AutoGluon-Tabular, etc.)
     log_to_file: bool, default = True
         Whether to save the logs into a file for later reference
-    log_file_path: str, default = "auto"
+    log_file_path: Union[str, Path], default = "auto"
         File path to save the logs.
         If auto, logs will be saved under `predictor_path/logs/predictor_log.txt`.
         Will be ignored if `log_to_file` is set to False
@@ -157,7 +157,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         path: Optional[Union[str, Path]] = None,
         verbosity: int = 2,
         log_to_file: bool = True,
-        log_file_path: str = "auto",
+        log_file_path: Union[str, Path] = "auto",
         quantile_levels: Optional[List[float]] = None,
         cache_predictions: bool = True,
         learner_type: Optional[Type[AbstractLearner]] = None,
@@ -239,7 +239,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
     def _trainer(self) -> AbstractTimeSeriesTrainer:
         return self._learner.load_trainer()  # noqa
 
-    def _setup_log_to_file(self, log_to_file, log_file_path):
+    def _setup_log_to_file(self, log_to_file: bool, log_file_path: Union[str, Path]) -> None:
         if log_to_file:
             if log_file_path == "auto":
                 log_file_path = os.path.join(self.path, "logs", self._predictor_log_file_name)

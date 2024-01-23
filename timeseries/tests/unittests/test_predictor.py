@@ -1029,6 +1029,18 @@ def test_when_log_file_set_then_predictor_logs_to_custom_file(temp_model_path):
     assert "Naive" in log_text
 
 
+def test_when_log_file_set_with_pathlib_then_predictor_logs_to_custom_file(temp_model_path):
+    predictor = TimeSeriesPredictor(path=temp_model_path, log_to_file=True, log_file_path=Path(".") / "custom_log.txt")
+    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
+    log_path = Path(".") / "custom_log.txt"
+    assert Path.exists(log_path)
+
+    # check if the log contains text
+    with open(log_path, "r") as f:
+        log_text = f.read()
+    assert "Naive" in log_text
+
+
 def test_when_log_to_file_set_to_false_then_predictor_does_not_log_to_file(temp_model_path):
     predictor = TimeSeriesPredictor(path=temp_model_path, log_to_file=False)
     predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
