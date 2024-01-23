@@ -510,7 +510,7 @@ class BaseForestQuantileRegressor(ForestRegressor):
                 bootstrap_indices = np.arange(len(y))
 
             est_weights = np.bincount(bootstrap_indices, minlength=len(y))
-            y_train_leaves = est.tree_.apply(X)
+            y_train_leaves = est.y_train_leaves_
             # Normalize the bootstrap weights such that the total weight of each leaf sums up to 1
             # Relabel leaves starting from zero in order to efficiently count the total sum per leaf with bincount
             leaves_starting_from_zero = np.unique(y_train_leaves, return_inverse=True)[1]
