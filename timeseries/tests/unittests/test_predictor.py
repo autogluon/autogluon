@@ -12,13 +12,12 @@ import pandas as pd
 import pytest
 
 from autogluon.common import space
+from autogluon.common.utils.log_utils import verbosity2loglevel
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 from autogluon.timeseries.metrics import DEFAULT_METRIC_NAME
 from autogluon.timeseries.models import DeepARModel, SimpleFeedForwardModel
 from autogluon.timeseries.predictor import TimeSeriesPredictor
-
-from autogluon.common.utils.log_utils import verbosity2loglevel
 
 from .common import DUMMY_TS_DATAFRAME, CustomMetric, get_data_frame_with_variable_lengths
 
