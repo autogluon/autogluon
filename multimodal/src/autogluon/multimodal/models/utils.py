@@ -237,8 +237,11 @@ def group_param_names(
     # split blocks at the first level
     children_prefix = []
     for n in selected_names:
-        child_name = n[len(model_prefix) + 1 :].split(".")[0]
-        child_prefix = f"{model_prefix}.{child_name}"
+        if model_prefix is not None:
+            child_name = n[len(model_prefix) + 1 :].split(".")[0]
+            child_prefix = f"{model_prefix}.{child_name}"
+        else:
+            child_prefix = n.split(".")[0]
         if child_prefix not in children_prefix:
             children_prefix.append(child_prefix)
 
