@@ -272,14 +272,6 @@ def test_given_expected_known_covariates_missing_from_train_data_when_learner_fi
         learner.fit(train_data=train_data, hyperparameters=HYPERPARAMETERS_DUMMY)
 
 
-def test_given_known_covariates_have_non_numeric_dtypes_when_learner_fits_then_exception_is_raised(temp_model_path):
-    learner = TimeSeriesLearner(path_context=temp_model_path, known_covariates_names=["Y", "Z", "X"])
-    train_data = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, covariates_names=["X", "Z", "Y"])
-    train_data["Y"] = np.random.choice(["foo", "bar", "baz"], size=len(train_data)).astype("O")
-    with pytest.raises(ValueError, match="must all have numeric \(float or int\) dtypes"):
-        learner.fit(train_data=train_data, hyperparameters=HYPERPARAMETERS_DUMMY)
-
-
 def test_given_expected_known_covariates_missing_from_data_when_learner_predicts_then_exception_is_raised(
     temp_model_path,
 ):
