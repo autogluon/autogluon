@@ -1,13 +1,12 @@
+from typing import Dict, List, Optional
+
 import numpy as np
 import pandas as pd
 import pytest
 
-from typing import Dict, List, Optional
-
 from autogluon.timeseries.utils.features import TimeSeriesFeatureGenerator
 
 from .common import get_data_frame_with_variable_lengths
-
 
 ITEM_ID_TO_LENGTH = {1: 10, 5: 20, 2: 30}
 

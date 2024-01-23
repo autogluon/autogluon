@@ -136,7 +136,7 @@ class TimeSeriesFeatureGenerator:
             ignored_static_features = []
 
         if len(ignored_covariates) > 0 or len(ignored_static_features) > 0:
-            logger.info(f"\nAutoGluon will ignore following non-numeric/non-informative columns:")
+            logger.info("\nAutoGluon will ignore following non-numeric/non-informative columns:")
             if len(ignored_covariates) > 0:
                 logger.info(f"\tignored covariates:      {list(ignored_covariates)}")
             if len(ignored_static_features) > 0:
