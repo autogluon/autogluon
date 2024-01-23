@@ -18,7 +18,6 @@ from gluonts.model.predictor import Predictor as GluonTSPredictor
 from pandas.tseries.frequencies import to_offset
 
 from autogluon.common.loaders import load_pkl
-from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.core.hpo.constants import RAY_BACKEND
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
@@ -383,7 +382,6 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             if "lightning" in logger_name:
                 pl_logger = logging.getLogger(logger_name)
                 pl_logger.setLevel(logging.ERROR if verbosity <= 3 else logging.INFO)
-        set_logger_verbosity(verbosity, logger=logger)
         gts_logger.setLevel(logging.ERROR if verbosity <= 3 else logging.INFO)
 
         if verbosity > 3:
