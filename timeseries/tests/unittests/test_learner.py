@@ -243,9 +243,9 @@ def test_when_static_features_are_preprocessed_then_dtypes_are_correct(temp_mode
     )
     learner = TimeSeriesLearner(path_context=temp_model_path)
     train_data_processed = learner.feature_generator.fit_transform(train_data)
-    assert train_data_processed.static_features["f1"].dtype == np.float64
+    assert train_data_processed.static_features["f1"].dtype == np.float32
     assert train_data_processed.static_features["f2"].dtype == "category"
-    assert train_data_processed.static_features["f3"].dtype == np.float64
+    assert train_data_processed.static_features["f3"].dtype == np.float32
 
 
 def test_when_train_data_has_static_feat_but_pred_data_has_no_static_feat_then_exception_is_raised(temp_model_path):
