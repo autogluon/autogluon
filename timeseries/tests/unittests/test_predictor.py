@@ -1,5 +1,6 @@
 """Unit tests for predictors"""
 import copy
+import logging
 import math
 import sys
 import tempfile
@@ -16,6 +17,8 @@ from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 from autogluon.timeseries.metrics import DEFAULT_METRIC_NAME
 from autogluon.timeseries.models import DeepARModel, SimpleFeedForwardModel
 from autogluon.timeseries.predictor import TimeSeriesPredictor
+
+from autogluon.common.utils.log_utils import verbosity2loglevel
 
 from .common import DUMMY_TS_DATAFRAME, CustomMetric, get_data_frame_with_variable_lengths
 
@@ -1001,3 +1004,60 @@ def test_given_time_limit_is_not_none_then_time_is_distributed_across_windows_fo
         except RuntimeError:
             pass
         assert mock_fit.call_args[1]["time_limit"] < expected_time_limit_for_first_model
+
+
+def test_when_log_to_file_set_then_predictor_logs_to_file(temp_model_path):
+    predictor = TimeSeriesPredictor(path=temp_model_path, log_to_file=True)
+    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
+    log_path = Path(temp_model_path) / "logs/predictor_log.txt"
+    assert Path.exists(log_path)
+
+    # check if the log contains text
+    with open(log_path, "r") as f:
+        log_text = f.read()
+    assert "Naive" in log_text
+
+
+def test_when_log_file_set_then_predictor_logs_to_custom_file(temp_model_path):
+    predictor = TimeSeriesPredictor(path=temp_model_path, log_to_file=True, log_file_path="custom_log.txt")
+    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
+    log_path = Path(".") / "custom_log.txt"
+    assert Path.exists(log_path)
+
+    # check if the log contains text
+    with open(log_path, "r") as f:
+        log_text = f.read()
+    assert "Naive" in log_text
+
+
+def test_when_log_to_file_set_to_false_then_predictor_does_not_log_to_file(temp_model_path):
+    predictor = TimeSeriesPredictor(path=temp_model_path, log_to_file=False)
+    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
+    log_path = Path(temp_model_path) / "logs/predictor_log.txt"
+    assert not Path.exists(log_path)
+
+
+@pytest.mark.parametrize("verbosity", [-1, 0, 1, 2, 3, 4, 5])
+def test_when_predictor_init_with_verbosity_then_verbosity_propagates_to_all_loggers(temp_model_path, verbosity):
+    logger_suffixes = ["learner", "trainer", "abstract_local_model"]
+
+    predictor = TimeSeriesPredictor(path=temp_model_path, log_to_file=False, verbosity=verbosity)
+    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
+
+    for suffix in logger_suffixes:
+        level = logging.getLogger(f"autogluon.timeseries.{suffix}").getEffectiveLevel()
+        assert level == verbosity2loglevel(verbosity)
+
+
+@pytest.mark.parametrize("verbosity", [-1, 0, 1, 2, 3, 4, 5])
+def test_when_predictor_fit_with_verbosity_then_verbosity_overridden_and_propagates_to_all_loggers(
+    temp_model_path, verbosity
+):
+    logger_suffixes = ["learner", "trainer", "abstract_local_model"]
+
+    predictor = TimeSeriesPredictor(path=temp_model_path, log_to_file=False, verbosity=-1)
+    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}}, verbosity=verbosity)
+
+    for suffix in logger_suffixes:
+        level = logging.getLogger(f"autogluon.timeseries.{suffix}").getEffectiveLevel()
+        assert level == verbosity2loglevel(verbosity)

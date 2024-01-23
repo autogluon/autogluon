@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple, Type, Union
 import pandas as pd
 
 from autogluon.common.utils.deprecated_utils import Deprecated
-from autogluon.common.utils.log_utils import set_logger_verbosity
+from autogluon.common.utils.log_utils import add_log_to_file, set_logger_verbosity
 from autogluon.common.utils.system_info import get_ag_system_info
 from autogluon.common.utils.utils import check_saved_predictor_version, seed_everything, setup_outputdir
 from autogluon.core.utils.decorators import apply_presets
@@ -23,7 +23,7 @@ from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_
 from autogluon.timeseries.splitter import ExpandingWindowSplitter
 from autogluon.timeseries.trainer import AbstractTimeSeriesTrainer
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("autogluon.timeseries")
 
 
 class TimeSeriesPredictorDeprecatedMixin:
@@ -123,9 +123,15 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
     verbosity : int, default = 2
         Verbosity levels range from 0 to 4 and control how much information is printed to stdout. Higher levels
         correspond to more detailed print statements, and ``verbosity=0`` suppresses output including warnings.
-        If using ``logging``, you can alternatively control amount of information printed via ``logger.setLevel(L)``,
-        where ``L`` ranges from 0 to 50 (Note: higher values of ``L`` correspond to fewer print statements, opposite
-        of verbosity levels).
+        Verbosity 0 corresponds to Python's ERROR log level, where only error outputs will be logged. Verbosity 1 and 2
+        will additionally log warnings and info outputs, respectively. Verbosity 4 enables all logging output including
+        debug messages from AutoGluon and all logging in dependencies (GluonTS, PyTorch Lightning, AutoGluon-Tabular, etc.)
+    log_to_file: bool, default = True
+        Whether to save the logs into a file for later reference
+    log_file_path: str, default = "auto"
+        File path to save the logs.
+        If auto, logs will be saved under `predictor_path/logs/predictor_log.txt`.
+        Will be ignored if `log_to_file` is set to False
     cache_predictions : bool, default = True
         If True, the predictor will cache and reuse the predictions made by individual models whenever
         :meth:`~autogluon.timeseries.TimeSeriesPredictor.predict`, :meth:`~autogluon.timeseries.TimeSeriesPredictor.leaderboard`,
@@ -138,6 +144,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
     predictor_file_name = "predictor.pkl"
     _predictor_version_file_name = "__version__"
+    _predictor_log_file_name = "predictor_log.txt"
 
     def __init__(
         self,
@@ -149,6 +156,8 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         eval_metric_seasonal_period: Optional[int] = None,
         path: Optional[Union[str, Path]] = None,
         verbosity: int = 2,
+        log_to_file: bool = True,
+        log_file_path: str = "auto",
         quantile_levels: Optional[List[float]] = None,
         cache_predictions: bool = True,
         learner_type: Optional[Type[AbstractLearner]] = None,
@@ -159,6 +168,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         self.verbosity = verbosity
         set_logger_verbosity(self.verbosity, logger=logger)
         self.path = setup_outputdir(path)
+        self._setup_log_to_file(log_to_file=log_to_file, log_file_path=log_file_path)
 
         self.cache_predictions = cache_predictions
         if target is not None and label is not None:
@@ -228,6 +238,14 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
     @property
     def _trainer(self) -> AbstractTimeSeriesTrainer:
         return self._learner.load_trainer()  # noqa
+
+    def _setup_log_to_file(self, log_to_file, log_file_path):
+        if log_to_file:
+            if log_file_path == "auto":
+                log_file_path = os.path.join(self.path, "logs", self._predictor_log_file_name)
+            log_file_path = os.path.abspath(os.path.normpath(log_file_path))
+            os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
+            add_log_to_file(log_file_path)
 
     def _to_data_frame(
         self,
@@ -621,16 +639,16 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         if self._learner.is_fit:
             raise AssertionError("Predictor is already fit! To fit additional models create a new `Predictor`.")
 
+        if verbosity is None:
+            verbosity = self.verbosity
+        set_logger_verbosity(verbosity, logger=logger)
+
         logger.info("Beginning AutoGluon training..." + (f" Time limit = {time_limit}s" if time_limit else ""))
         logger.info(f"AutoGluon will save models to '{self.path}'")
         logger.info(get_ag_system_info(path=self.path, include_gpu_count=True))
 
         if hyperparameters is None:
             hyperparameters = "default"
-
-        if verbosity is None:
-            verbosity = self.verbosity
-        set_logger_verbosity(verbosity)
 
         fit_args = dict(
             prediction_length=self.prediction_length,

@@ -9,7 +9,6 @@ import pandas as pd
 from sklearn.base import BaseEstimator
 
 import autogluon.core as ag
-from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.tabular import TabularPredictor
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
@@ -249,7 +248,6 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         from mlforecast import MLForecast
 
         self._check_fit_params()
-        set_logger_verbosity(verbosity, logger=logger)
         fit_start_time = time.time()
         # TabularEstimator is passed to MLForecast later to include tuning_data
         model_params = self._get_model_params()
