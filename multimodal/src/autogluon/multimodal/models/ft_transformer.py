@@ -463,6 +463,7 @@ class FT_Transformer(nn.Module):
         share_qv_weights: Optional[bool] = False,
         pooling_mode: Optional[str] = "cls",
         checkpoint_name: str = None,
+        pretrained: bool = False,
     ) -> None:
         """
         Parameters
@@ -607,7 +608,7 @@ class FT_Transformer(nn.Module):
             self.categorical_adapter.apply(init_weights)
         self.head.apply(init_weights)
         # init transformer backbone from provided checkpoint
-        if checkpoint_name:
+        if pretrained and checkpoint_name:
             if "https://" in checkpoint_name or is_s3_url(checkpoint_name):
                 with tempfile.TemporaryDirectory() as tmpdirname:
                     checkpoint_path = os.path.join(tmpdirname, "./ft_transformer_pretrained.ckpt")

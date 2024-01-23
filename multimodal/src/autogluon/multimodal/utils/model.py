@@ -373,6 +373,7 @@ def create_model(
             share_qv_weights=OmegaConf.select(model_config, "share_qv_weights", default=False),
             pooling_mode=OmegaConf.select(model_config, "pooling_mode", default="cls"),
             checkpoint_name=model_config.checkpoint_name,
+            pretrained=pretrained,
         )
     elif model_name.lower().startswith(SAM):
         model = SAMForSemanticSegmentation(
