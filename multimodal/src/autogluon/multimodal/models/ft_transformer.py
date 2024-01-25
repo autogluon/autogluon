@@ -5,9 +5,6 @@ from typing import List, Optional
 import torch
 from torch import Tensor, nn
 
-from autogluon.common.loaders._utils import download
-from autogluon.common.utils.s3_utils import is_s3_url
-
 from ..constants import CATEGORICAL, FEATURES, LABEL, LOGITS, NUMERICAL
 from .custom_transformer import CLSToken, Custom_Transformer, _TokenInitialization
 from .utils import init_weights
@@ -608,14 +605,16 @@ class FT_Transformer(nn.Module):
             self.categorical_adapter.apply(init_weights)
         self.head.apply(init_weights)
         # init transformer backbone from provided checkpoint
+        from autogluon.multimodal.utils.download import download
+
         if pretrained and checkpoint_name:
-            if "https://" in checkpoint_name or is_s3_url(checkpoint_name):
+            if os.path.exists(checkpoint_name):
+                ckpt = torch.load(checkpoint_name)
+            else:
                 with tempfile.TemporaryDirectory() as tmpdirname:
                     checkpoint_path = os.path.join(tmpdirname, "./ft_transformer_pretrained.ckpt")
                     download(checkpoint_name, checkpoint_path)
                     ckpt = torch.load(checkpoint_path)
-            else:
-                ckpt = torch.load(checkpoint_name)
             self.transformer.load_state_dict(ckpt["state_dict"])
 
         self.name_to_id = self.get_layer_ids()

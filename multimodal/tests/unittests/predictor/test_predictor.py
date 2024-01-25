@@ -679,8 +679,6 @@ def test_load_ckpt():
 
 
 def test_fttransformer_load_ckpt():
-    download("https://automl-mm-bench.s3.amazonaws.com/ft_transformer_pretrained_ckpt/iter_2k.ckpt", "./")
-
     dataset = ALL_DATASETS["petfinder"]
     metric_name = dataset.metric
 
@@ -691,7 +689,7 @@ def test_fttransformer_load_ckpt():
     )
     hyperparameters = {
         "model.names": ["ft_transformer"],
-        "model.ft_transformer.checkpoint_name": "./iter_2k.ckpt",
+        "model.ft_transformer.checkpoint_name": "https://automl-mm-bench.s3.amazonaws.com/ft_transformer_pretrained_ckpt/iter_2k.ckpt",
         "data.categorical.convert_to_text": False,  # ensure the categorical model is used.
         "data.numerical.convert_to_text": False,  # ensure the numerical model is used.
     }
