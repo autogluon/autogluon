@@ -12,7 +12,6 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.utils import hash_pandas_df
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils.exceptions import TimeLimitExceeded
@@ -275,7 +274,6 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         self.ensemble_model_type = TimeSeriesGreedyEnsemble
 
         self.verbosity = verbosity
-        set_logger_verbosity(self.verbosity, logger=logger)
 
         # Dict of normal model -> FULL model. FULL models are produced by
         # self.refit_single_full() and self.refit_full().
@@ -688,9 +686,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             quantile_levels=self.quantile_levels,
             metadata=self.metadata,
         )
-        ensemble.fit_ensemble(
-            model_preds, data_per_window=data_per_window, time_limit=time_limit, verbosity=self.verbosity
-        )
+        ensemble.fit_ensemble(model_preds, data_per_window=data_per_window, time_limit=time_limit)
         ensemble.fit_time = time.time() - time_start
 
         predict_time = 0

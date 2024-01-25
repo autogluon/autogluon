@@ -1283,8 +1283,9 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             try:
                 _ds_ray = try_import_ray()
                 if not _ds_ray.is_initialized():
-                    _ds_ray.init(address="auto", logging_level=logging.ERROR, log_to_driver=False)
-            except:
+                    _ds_ray.init(logging_level=logging.ERROR, log_to_driver=False)
+            except Exception as e:
+                warnings.warn(f"Failed to use ray for memory safe fits. Falling back to normal fit. Error: {repr(e)}", stacklevel=2)
                 _ds_ray = None
 
             if _ds_ray is not None:
