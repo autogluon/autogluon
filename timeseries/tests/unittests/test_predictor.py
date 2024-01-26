@@ -1,4 +1,5 @@
 """Unit tests for predictors"""
+
 import copy
 import logging
 import math
@@ -7,6 +8,7 @@ import tempfile
 from pathlib import Path
 from unittest import mock
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pytest
@@ -20,7 +22,12 @@ from autogluon.timeseries.metrics import DEFAULT_METRIC_NAME
 from autogluon.timeseries.models import DeepARModel, SimpleFeedForwardModel
 from autogluon.timeseries.predictor import TimeSeriesPredictor
 
-from .common import DUMMY_TS_DATAFRAME, CustomMetric, get_data_frame_with_variable_lengths
+from .common import (
+    DUMMY_TS_DATAFRAME,
+    PREDICTIONS_FOR_DUMMY_TS_DATAFRAME,
+    CustomMetric,
+    get_data_frame_with_variable_lengths,
+)
 
 TEST_HYPERPARAMETER_SETTINGS = [
     {"SimpleFeedForward": {"epochs": 1, "num_batches_per_epoch": 1}},
@@ -1157,3 +1164,41 @@ def test_when_predictor_predict_called_with_random_seed_then_torch_seed_set_for_
         except RuntimeError:
             pass
         assert mock_predict_model.call_count == 1
+
+
+@pytest.mark.parametrize("predictions", [PREDICTIONS_FOR_DUMMY_TS_DATAFRAME, None])
+@pytest.mark.parametrize("quantile_levels", [[0.1, 0.7, 0.9], None])
+@pytest.mark.parametrize("max_history_length", [10, None])
+@pytest.mark.parametrize("random_item_ids", [True, False])
+@pytest.mark.parametrize("point_forecast_column", ["mean", "0.7", None])
+@pytest.mark.parametrize(
+    "max_num_item_ids, item_ids, expected_num_subplots",
+    [
+        (1, None, 1),
+        (8, DUMMY_TS_DATAFRAME.item_ids[:2], 2),
+        (3, DUMMY_TS_DATAFRAME.item_ids, 3),
+    ],
+)
+def test_when_plot_called_then_figure_contains_correct_number_of_subplots(
+    predictions,
+    quantile_levels,
+    item_ids,
+    random_item_ids,
+    max_num_item_ids,
+    max_history_length,
+    point_forecast_column,
+    expected_num_subplots,
+):
+    fig = TimeSeriesPredictor().plot(
+        DUMMY_TS_DATAFRAME,
+        predictions=predictions,
+        quantile_levels=quantile_levels,
+        item_ids=item_ids,
+        random_item_ids=random_item_ids,
+        max_num_item_ids=max_num_item_ids,
+        max_history_length=max_history_length,
+        point_forecast_column=point_forecast_column,
+    )
+    num_subplots = len([ax for ax in fig.axes if ax.get_title() != ""])
+    assert num_subplots == expected_num_subplots
+    plt.close(fig)
