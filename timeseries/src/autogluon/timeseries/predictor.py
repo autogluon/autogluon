@@ -1199,11 +1199,10 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         predictions: Optional[Union[TimeSeriesDataFrame, pd.DataFrame, str]] = None,
         quantile_levels: Optional[List[float]] = None,
         item_ids: Optional[List[Union[str, int]]] = None,
-        random_item_ids: bool = True,
         max_num_item_ids: int = 8,
         max_history_length: Optional[int] = None,
         point_forecast_column: Optional[str] = None,
-        plot_style: Optional[dict] = None,
+        matplotlib_rc_params: Optional[dict] = None,
     ):
         """Plot historic time series values and the forecasts.
 
@@ -1217,9 +1216,8 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             Quantile levels for which to plot the prediction intervals. Defaults to lowest & highest quantile levels
             available in ``predictions``.
         item_ids : List[Union[str, int]], optional
-            If provided, the plots will only be generated for time series with these item IDs.
-        random_item_ids : bool, default = True
-            If True, the method will plot random time series.
+            If provided, the plots will only be generated for time series with these item IDs. By default, selects
+            up to ``max_num_item_ids`` random item IDs from the dataset.
         max_num_item_ids : int, default = 8
             At most this many time series will be plotted by the method.
         max_history_length : int, optional
@@ -1227,7 +1225,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         point_forecast_column : str, optional
             Name of the column in ``predictions`` that will be plotted as the point forecast. Defaults to ``"0.5"``,
             if this column is present in ``predictions``, otherwise ``"mean"``.
-        plot_style : dict, optional
+        matplotlib_rc_params : dict, optional
             Dictionary describing the plot style that will be passed to [`matplotlib.pyplot.rc_context`](https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.rc_context.html).
             See [matplotlib documentation](https://matplotlib.org/stable/users/explain/customizing.html#the-default-matplotlibrc-file) for the list of available options.
         """
@@ -1235,12 +1233,9 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
         data = self._check_and_prepare_data_frame(data)
         if item_ids is None:
-            item_ids = data.item_ids
-        if len(item_ids) > max_num_item_ids:
-            if random_item_ids:
-                item_ids = np.random.choice(item_ids, size=max_num_item_ids, replace=False)
-            else:
-                item_ids = item_ids[:max_num_item_ids]
+            item_ids = list(np.random.choice(data.item_ids, size=min(max_num_item_ids, data.num_items), replace=False))
+        else:
+            item_ids = list(item_ids)[:max_num_item_ids]
 
         if predictions is not None:
             if point_forecast_column is None:
@@ -1260,16 +1255,16 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             ncols = 2
             nrows = math.ceil(len(item_ids) / ncols)
 
-        default_plot_style = {
+        rc_params = {
             "font.size": 10,
             "figure.figsize": [20, 3.5 * nrows],
             "figure.dpi": 100,
             "legend.loc": "upper center",
         }
-        if plot_style is not None:
-            default_plot_style.update(plot_style)
+        if matplotlib_rc_params is not None:
+            rc_params.update(matplotlib_rc_params)
 
-        with plt.rc_context(default_plot_style):
+        with plt.rc_context(rc_params):
             fig, axes = plt.subplots(ncols=ncols, nrows=nrows, squeeze=False)
             fig.tight_layout(h_pad=2.5, w_pad=0.5)
             axes = axes.ravel()

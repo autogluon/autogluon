@@ -1169,7 +1169,6 @@ def test_when_predictor_predict_called_with_random_seed_then_torch_seed_set_for_
 @pytest.mark.parametrize("predictions", [PREDICTIONS_FOR_DUMMY_TS_DATAFRAME, None])
 @pytest.mark.parametrize("quantile_levels", [[0.1, 0.7, 0.9], None])
 @pytest.mark.parametrize("max_history_length", [10, None])
-@pytest.mark.parametrize("random_item_ids", [True, False])
 @pytest.mark.parametrize("point_forecast_column", ["mean", "0.7", None])
 @pytest.mark.parametrize(
     "max_num_item_ids, item_ids, expected_num_subplots",
@@ -1183,7 +1182,6 @@ def test_when_plot_called_then_figure_contains_correct_number_of_subplots(
     predictions,
     quantile_levels,
     item_ids,
-    random_item_ids,
     max_num_item_ids,
     max_history_length,
     point_forecast_column,
@@ -1194,11 +1192,26 @@ def test_when_plot_called_then_figure_contains_correct_number_of_subplots(
         predictions=predictions,
         quantile_levels=quantile_levels,
         item_ids=item_ids,
-        random_item_ids=random_item_ids,
         max_num_item_ids=max_num_item_ids,
         max_history_length=max_history_length,
         point_forecast_column=point_forecast_column,
     )
     num_subplots = len([ax for ax in fig.axes if ax.get_title() != ""])
     assert num_subplots == expected_num_subplots
+    plt.close(fig)
+
+
+@pytest.mark.parametrize(
+    "selected_columns",
+    [["mean"], ["mean", "0.1"], ["mean", "0.5"], ["mean", "0.5", "0.8"], ["mean", "0.1", "0.2", "0.4"]],
+)
+def test_when_not_all_quantile_forecasts_available_then_predictor_can_plot(selected_columns):
+    max_num_item_ids = 3
+    fig = TimeSeriesPredictor().plot(
+        DUMMY_TS_DATAFRAME,
+        predictions=PREDICTIONS_FOR_DUMMY_TS_DATAFRAME[selected_columns],
+        max_num_item_ids=max_num_item_ids,
+    )
+    num_subplots = len([ax for ax in fig.axes if ax.get_title() != ""])
+    assert num_subplots == max_num_item_ids
     plt.close(fig)
