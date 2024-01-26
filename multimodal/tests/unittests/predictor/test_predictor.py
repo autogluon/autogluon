@@ -9,7 +9,6 @@ import pytest
 from omegaconf import OmegaConf
 from torch import nn
 
-from autogluon.common.loaders._utils import download
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.constants import (
     BEST,
