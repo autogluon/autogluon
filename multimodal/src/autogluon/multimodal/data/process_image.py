@@ -277,10 +277,7 @@ class ImageProcessor:
                     )
                     is_zero_img = False
                     try:
-                        if (
-                            feature_modalities.get(per_col_name) == IMAGE_BYTEARRAY
-                            or feature_modalities.get(per_col_name) == IMAGE_BASE64_STR
-                        ):
+                        if feature_modalities.get(per_col_name) in [IMAGE_BYTEARRAY, IMAGE_BASE64_STR]:
                             image_feature = BytesIO(img_feature)
                         else:
                             image_feature = img_feature

@@ -19,6 +19,8 @@ from autogluon.multimodal.constants import (
     ENVIRONMENT,
     GREEDY_SOUP,
     IA3,
+    IMAGE_BASE64_STR,
+    IMAGE_BYTEARRAY,
     LORA,
     LORA_BIAS,
     LORA_NORM,
@@ -599,60 +601,15 @@ def test_modifying_duplicate_model_names():
             assert per_processor.prefix in teacher_predictor._learner._config.model.names
 
 
-def test_image_bytearray():
+@pytest.mark.parametrize("image_type", [IMAGE_BYTEARRAY, IMAGE_BASE64_STR])
+def test_image_bytearray_or_base64_str(image_type):
     download_dir = "./"
     train_data_1, test_data_1 = shopee_dataset(download_dir=download_dir)
-    train_data_2, test_data_2 = shopee_dataset(download_dir=download_dir, is_bytearray=True)
-    predictor_1 = MultiModalPredictor(
-        label="label",
-    )
-    predictor_2 = MultiModalPredictor(
-        label="label",
-    )
-    model_names = ["timm_image"]
-    hyperparameters = {
-        "optimization.max_epochs": 2,
-        "model.names": model_names,
-        "model.timm_image.checkpoint_name": "swin_tiny_patch4_window7_224",
-    }
-    predictor_1.fit(
-        train_data=train_data_1,
-        hyperparameters=hyperparameters,
-        seed=42,
-    )
-    predictor_2.fit(
-        train_data=train_data_2,
-        hyperparameters=hyperparameters,
-        seed=42,
-    )
+    if image_type == IMAGE_BYTEARRAY:
+        train_data_2, test_data_2 = shopee_dataset(download_dir=download_dir, is_bytearray=True)
+    elif image_type == IMAGE_BASE64_STR:
+        train_data_2, test_data_2 = shopee_dataset(download_dir=download_dir, is_base64str=True)
 
-    score_1 = predictor_1.evaluate(test_data_1)
-    score_2 = predictor_2.evaluate(test_data_2)
-    # train and predict using different image types
-    score_3 = predictor_1.evaluate(test_data_2)
-    score_4 = predictor_2.evaluate(test_data_1)
-
-    prediction_1 = predictor_1.predict(test_data_1, as_pandas=False)
-    prediction_2 = predictor_2.predict(test_data_2, as_pandas=False)
-    prediction_3 = predictor_1.predict(test_data_2, as_pandas=False)
-    prediction_4 = predictor_2.predict(test_data_1, as_pandas=False)
-
-    prediction_prob_1 = predictor_1.predict_proba(test_data_1, as_pandas=False)
-    prediction_prob_2 = predictor_2.predict_proba(test_data_2, as_pandas=False)
-    prediction_prob_3 = predictor_1.predict_proba(test_data_2, as_pandas=False)
-    prediction_prob_4 = predictor_1.predict_proba(test_data_1, as_pandas=False)
-
-    npt.assert_array_equal([score_1, score_2, score_3, score_4], [score_1] * 4)
-    npt.assert_array_equal([prediction_1, prediction_2, prediction_3, prediction_4], [prediction_1] * 4)
-    npt.assert_array_equal(
-        [prediction_prob_1, prediction_prob_2, prediction_prob_3, prediction_prob_4], [prediction_prob_1] * 4
-    )
-
-
-def test_image_base64_str():
-    download_dir = "./"
-    train_data_1, test_data_1 = shopee_dataset(download_dir=download_dir)
-    train_data_2, test_data_2 = shopee_dataset(download_dir=download_dir, is_base64str=True)
     predictor_1 = MultiModalPredictor(
         label="label",
     )

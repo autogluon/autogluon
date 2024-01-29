@@ -198,7 +198,7 @@ def is_image_column(
     data = data.sample(n=sample_num, random_state=0)
     if image_type == IMAGE_PATH:
         data = data.apply(lambda ele: str(ele).split(";")).tolist()
-    elif image_type == IMAGE_BYTEARRAY or image_type == IMAGE_BASE64_STR:
+    elif image_type in [IMAGE_BYTEARRAY, IMAGE_BASE64_STR]:
         data = data.tolist()
     else:
         raise ValueError(f"Unsupported image type: {image_type}")
