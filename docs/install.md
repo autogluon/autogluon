@@ -4,6 +4,9 @@
 
 AutoGluon requires Python version 3.8, 3.9, 3.10, or 3.11 and is available on Linux, MacOS, and Windows.
 
+We recommend most users to install via pip. The pip install of AutoGluon is the version we actively benchmark and test on.
+The Conda install may have subtle differences in installed dependencies that could impact performance and stability, and we recommend trying pip if you run into issues with Conda. 
+
 :::
 
 ::::::{tab} Linux

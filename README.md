@@ -20,7 +20,7 @@
 AutoGluon automates machine learning tasks enabling you to easily achieve strong predictive performance in your applications.  With just a few lines of code, you can train and deploy high-accuracy machine learning and deep learning models on image, text, time series, and tabular data.
 </div>
 
-## Installation
+## 💾 Installation
 
 You can install AutoGluon with:
 
@@ -30,7 +30,9 @@ pip install autogluon
 
 Vist our [Installation Guide](https://auto.gluon.ai/stable/install.html) for detailed instructions.
 
-## Quickstart
+## :zap: Quickstart
+
+Solve ML tasks end-to-end in just 3 lines of code!
 
 ```python
 from autogluon.tabular import TabularPredictor
@@ -44,24 +46,17 @@ predictions = predictor.predict("test.csv")
 | MultiModalPredictor | [![Quick Start](https://img.shields.io/static/v1?label=&message=tutorial&color=grey)](https://auto.gluon.ai/stable/tutorials/multimodal/multimodal_prediction/multimodal-quick-start.html)            | [![API](https://img.shields.io/badge/api-reference-blue.svg)](https://auto.gluon.ai/stable/api/autogluon.multimodal.MultiModalPredictor.html) |
 | TimeSeriesPredictor | [![Quick Start](https://img.shields.io/static/v1?label=&message=tutorial&color=grey)](https://auto.gluon.ai/stable/tutorials/timeseries/forecasting-quick-start.html)            | [![API](https://img.shields.io/badge/api-reference-blue.svg)](https://auto.gluon.ai/stable/api/autogluon.timeseries.TimeSeriesPredictor.html) |
 
-## Resources
-
-See the [AutoGluon Website](https://auto.gluon.ai/stable/index.html) for documentation and instructions on:
-- [Installing AutoGluon](https://auto.gluon.ai/stable/index.html#installation)
-- [Learning with tabular data](https://auto.gluon.ai/stable/tutorials/tabular/tabular-quick-start.html)
-  - [Tips to maximize accuracy](https://auto.gluon.ai/stable/tutorials/tabular/tabular-essentials.html#maximizing-predictive-performance) (if **benchmarking**, set the .fit() argument `presets='best_quality'`).
-
-- [Learning with multimodal data (image, text, etc.)](https://auto.gluon.ai/stable/tutorials/multimodal/multimodal_prediction/multimodal-quick-start.html)
-- [Learning with time series data](https://auto.gluon.ai/stable/tutorials/timeseries/forecasting-quick-start.html)
-
-Refer to the [AutoGluon Roadmap](https://github.com/autogluon/autogluon/blob/master/ROADMAP.md) for details on upcoming features and releases.
+## :mag: Resources
 
 ### Hands-on Tutorials / Talks
-- [AutoGluon 1.0: Shattering the AutoML Ceiling with Zero Lines of Code](https://www.youtube.com/watch?v=5tvp_Ihgnuk) (AutoML Conf, 2023)
-- [AutoGluon: The Story](https://automlpodcast.com/episode/autogluon-the-story) (The AutoML Podcast, 2023)
-- [AutoGluon: AutoML for Tabular, Multimodal, and Time Series Data](https://youtu.be/Lwu15m5mmbs?si=jSaFJDqkTU27C0fa) (PyData Berlin, 2023)
-- [Solving Complex ML Problems in a few Lines of Code with AutoGluon](https://www.youtube.com/watch?v=J1UQUCPB88I) (PyData Seattle, 2023)
-- [The AutoML Revolution](https://www.youtube.com/watch?v=VAAITEds-28) (Fall AutoML School, 2022)
+
+| Title                                                                                                                    | Format   | Location                                                                         | Date       |
+|--------------------------------------------------------------------------------------------------------------------------|----------|----------------------------------------------------------------------------------|------------|
+| :tv: [AutoGluon 1.0: Shattering the AutoML Ceiling with Zero Lines of Code](https://www.youtube.com/watch?v=5tvp_Ihgnuk) | Tutorial | [AutoML Conf 2023](https://2023.automl.cc/)                                      | 2023/09/12 |
+| :sound: [AutoGluon: The Story](https://automlpodcast.com/episode/autogluon-the-story)                                    | Podcast  | [The AutoML Podcast](https://automlpodcast.com/)                                 | 2023/09/05 |
+| :tv: [AutoGluon: AutoML for Tabular, Multimodal, and Time Series Data](https://youtu.be/Lwu15m5mmbs?si=jSaFJDqkTU27C0fa) | Tutorial | PyData Berlin                                                                    | 2023/06/20 | 
+| :tv: [Solving Complex ML Problems in a few Lines of Code with AutoGluon](https://www.youtube.com/watch?v=J1UQUCPB88I)    | Tutorial | PyData Seattle                                                                   | 2023/06/20 | 
+| :tv: [The AutoML Revolution](https://www.youtube.com/watch?v=VAAITEds-28)                                                | Tutorial | [Fall AutoML School 2022](https://sites.google.com/view/automl-fall-school-2022) | 2022/10/18 |
 
 ### Scientific Publications
 - [AutoGluon-Tabular: Robust and Accurate AutoML for Structured Data](https://arxiv.org/pdf/2003.06505.pdf) (*Arxiv*, 2020) ([BibTeX](CITING.md#general-usage--autogluontabular))
@@ -72,6 +67,7 @@ Refer to the [AutoGluon Roadmap](https://github.com/autogluon/autogluon/blob/mas
 - [TabRepo: A Large Scale Repository of Tabular Model Evaluations and its AutoML Applications](https://arxiv.org/pdf/2311.02971.pdf) (*Under Review*, 2024)
 
 ### Articles
+- [AutoGluon-TimeSeries: Every Time Series Forecasting Model In One Library](https://towardsdatascience.com/autogluon-timeseries-every-time-series-forecasting-model-in-one-library-29a3bf6879db) (*Towards Data Science*, Jan 2024)
 - [AutoGluon for tabular data: 3 lines of code to achieve top 1% in Kaggle competitions](https://aws.amazon.com/blogs/opensource/machine-learning-with-autogluon-an-open-source-automl-library/) (*AWS Open Source Blog*, Mar 2020)
 - [AutoGluon overview & example applications](https://towardsdatascience.com/autogluon-deep-learning-automl-5cdb4e2388ec?source=friends_link&sk=e3d17d06880ac714e47f07f39178fdf2) (*Towards Data Science*, Dec 2019)
 
@@ -83,14 +79,14 @@ Refer to the [AutoGluon Roadmap](https://github.com/autogluon/autogluon/blob/mas
 - [AutoGluon Official Docker Container](https://hub.docker.com/r/autogluon/autogluon)
 - [AutoGluon-Tabular on AWS Marketplace](https://aws.amazon.com/marketplace/pp/prodview-n4zf5pmjt7ism) (Not maintained by us)
 
-## Citing AutoGluon
+## :pencil: Citing AutoGluon
 
 If you use AutoGluon in a scientific publication, please follow our [citation guide](CITING.md) when referencing the project.
 
-## Contributing to AutoGluon
+## :wave: How to get involved
 
 We are actively accepting code contributions to the AutoGluon project. If you are interested in contributing to AutoGluon, please read the [Contributing Guide](https://github.com/autogluon/autogluon/blob/master/CONTRIBUTING.md) to get started.
 
-## License
+## :classical_building: License
 
 This library is licensed under the Apache 2.0 License.
