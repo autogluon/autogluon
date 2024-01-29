@@ -52,6 +52,8 @@ predictions = predictor.predict("test.csv")
 
 ### Hands-on Tutorials / Talks
 
+Below is a curated list of recent tutorials and talks on AutoGluon. For a full list, refer to [here](AWESOME.md#full-talk-list).
+
 | Title                                                                                                                    | Format   | Location                                                                         | Date       |
 |--------------------------------------------------------------------------------------------------------------------------|----------|----------------------------------------------------------------------------------|------------|
 | :tv: [AutoGluon 1.0: Shattering the AutoML Ceiling with Zero Lines of Code](https://www.youtube.com/watch?v=5tvp_Ihgnuk) | Tutorial | [AutoML Conf 2023](https://2023.automl.cc/)                                      | 2023/09/12 |
