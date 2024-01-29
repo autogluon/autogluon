@@ -1238,9 +1238,14 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             item_ids = list(item_ids)[:max_num_item_ids]
 
         if predictions is not None:
+            if (
+                not isinstance(predictions, TimeSeriesDataFrame)
+                or "mean" not in predictions.columns
+                or predictions.index.nlevels != 2
+            ):
+                raise ValueError("predictions must be a TimeSeriesDataFrame produced by predictor.predict()")
             if point_forecast_column is None:
                 point_forecast_column = "0.5" if "0.5" in predictions.columns else "mean"
-
             if quantile_levels is None:
                 available_quantile_levels = [float(q) for q in predictions.columns if q != "mean"]
                 if len(available_quantile_levels) >= 2:

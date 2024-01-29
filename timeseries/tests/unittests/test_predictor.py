@@ -1215,3 +1215,16 @@ def test_when_not_all_quantile_forecasts_available_then_predictor_can_plot(selec
     num_subplots = len([ax for ax in fig.axes if ax.get_title() != ""])
     assert num_subplots == max_num_item_ids
     plt.close(fig)
+
+
+@pytest.mark.parametrize(
+    "predictions",
+    [
+        pd.DataFrame(PREDICTIONS_FOR_DUMMY_TS_DATAFRAME),
+        PREDICTIONS_FOR_DUMMY_TS_DATAFRAME.drop(columns="mean"),
+        PREDICTIONS_FOR_DUMMY_TS_DATAFRAME.loc[PREDICTIONS_FOR_DUMMY_TS_DATAFRAME.item_ids[0]],
+    ],
+)
+def test_when_predictions_for_plot_have_incorrect_format_then_exception_is_raised(predictions):
+    with pytest.raises(ValueError, match="predictions must be a TimeSeriesDataFrame"):
+        TimeSeriesPredictor().plot(DUMMY_TS_DATAFRAME, predictions=predictions)
