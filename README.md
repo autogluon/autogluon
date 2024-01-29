@@ -22,6 +22,8 @@ AutoGluon automates machine learning tasks enabling you to easily achieve strong
 
 ## 💾 Installation
 
+AutoGluon is supported on Python 3.8 - 3.11 and is available on Linux, MacOS, and Windows OS.
+
 You can install AutoGluon with:
 
 ```python
@@ -81,7 +83,7 @@ predictions = predictor.predict("test.csv")
 
 ## :pencil: Citing AutoGluon
 
-If you use AutoGluon in a scientific publication, please follow our [citation guide](CITING.md) when referencing the project.
+If you use AutoGluon in a scientific publication, please refer to our [citation guide](CITING.md).
 
 ## :wave: How to get involved
 
