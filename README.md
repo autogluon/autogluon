@@ -30,7 +30,7 @@ You can install AutoGluon with:
 pip install autogluon
 ```
 
-Vist our [Installation Guide](https://auto.gluon.ai/stable/install.html) for detailed instructions.
+Visit our [Installation Guide](https://auto.gluon.ai/stable/install.html) for detailed instructions.
 
 ## :zap: Quickstart
 
