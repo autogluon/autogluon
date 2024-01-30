@@ -1,3 +1,4 @@
+import base64
 import json
 import logging
 import os
@@ -65,6 +66,19 @@ def path_to_bytearray_expander(path, base_folder):
     return [_read_byte(os.path.abspath(os.path.join(base_folder, path))) for path in path_l]
 
 
+def _read_base64str(file):
+    with open(file, "rb") as image:
+        f = image.read()
+        image_base64 = base64.b64encode(f)
+        image_base64_str = image_base64.decode("utf-8")
+    return image_base64_str
+
+
+def path_to_base64str_expander(path, base_folder):
+    path_l = path.split(";")
+    return [_read_base64str(os.path.abspath(os.path.join(base_folder, path))) for path in path_l]
+
+
 def shopee_dataset(
     download_dir: str,
     is_bytearray=False,
@@ -88,16 +102,15 @@ def shopee_dataset(
     load_zip.unzip(zip_file, unzip_dir=download_dir)
 
     dataset_path = os.path.join(download_dir, "shopee")
-    if is_base64str:
-        train_data = pd.read_csv(f"{dataset_path}/train_base64_str.csv")
-        test_data = pd.read_csv(f"{dataset_path}/test_base64_str.csv")
-    else:
-        train_data = pd.read_csv(f"{dataset_path}/train.csv")
-        test_data = pd.read_csv(f"{dataset_path}/test.csv")
 
-        expander = path_to_bytearray_expander if is_bytearray else path_expander
-        train_data["image"] = train_data["image"].apply(lambda ele: expander(ele, base_folder=dataset_path))
-        test_data["image"] = test_data["image"].apply(lambda ele: expander(ele, base_folder=dataset_path))
+    train_data = pd.read_csv(f"{dataset_path}/train.csv")
+    test_data = pd.read_csv(f"{dataset_path}/test.csv")
+
+    expander = (
+        path_to_bytearray_expander if is_bytearray else (path_to_base64str_expander if is_base64str else path_expander)
+    )
+    train_data["image"] = train_data["image"].apply(lambda ele: expander(ele, base_folder=dataset_path))
+    test_data["image"] = test_data["image"].apply(lambda ele: expander(ele, base_folder=dataset_path))
     return train_data, test_data
 
 
