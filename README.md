@@ -22,7 +22,7 @@ AutoGluon automates machine learning tasks enabling you to easily achieve strong
 
 ## 💾 Installation
 
-AutoGluon is supported on Python 3.8 - 3.11 and is available on Linux, MacOS, and Windows OS.
+AutoGluon is supported on Python 3.8 - 3.11 and is available on Linux, MacOS, and Windows.
 
 You can install AutoGluon with:
 
@@ -30,11 +30,11 @@ You can install AutoGluon with:
 pip install autogluon
 ```
 
-Visit our [Installation Guide](https://auto.gluon.ai/stable/install.html) for detailed instructions.
+Visit our [Installation Guide](https://auto.gluon.ai/stable/install.html) for detailed instructions, including GPU support, Conda installs, and optional dependencies.
 
 ## :zap: Quickstart
 
-Solve ML tasks end-to-end in just 3 lines of code!
+Build accurate end-to-end ML models in just 3 lines of code!
 
 ```python
 from autogluon.tabular import TabularPredictor
@@ -52,7 +52,7 @@ predictions = predictor.predict("test.csv")
 
 ### Hands-on Tutorials / Talks
 
-Below is a curated list of recent tutorials and talks on AutoGluon. For a full list, refer to [here](AWESOME.md#full-talk-list).
+Below is a curated list of recent tutorials and talks on AutoGluon. A comprehensive list is available [here](AWESOME.md#videos--tutorials).
 
 | Title                                                                                                                    | Format   | Location                                                                         | Date       |
 |--------------------------------------------------------------------------------------------------------------------------|----------|----------------------------------------------------------------------------------|------------|
