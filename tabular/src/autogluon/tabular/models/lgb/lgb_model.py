@@ -256,7 +256,7 @@ class LGBModel(AbstractModel):
         X = self.preprocess(X, **kwargs)
 
         y_pred_proba = self.model.predict(X, num_threads=num_cpus)
-        if self.problem_type == REGRESSION:
+        if self.problem_type in [REGRESSION, QUANTILE, MULTICLASS]:
             return y_pred_proba
         elif self.problem_type == BINARY:
             if len(y_pred_proba.shape) == 1:
@@ -265,8 +265,6 @@ class LGBModel(AbstractModel):
                 return y_pred_proba[:, 1]
             else:
                 return y_pred_proba
-        elif self.problem_type == MULTICLASS:
-            return y_pred_proba
         elif self.problem_type == SOFTCLASS:  # apply softmax
             y_pred_proba = np.exp(y_pred_proba)
             y_pred_proba = np.multiply(y_pred_proba, 1 / np.sum(y_pred_proba, axis=1)[:, np.newaxis])
