@@ -126,6 +126,7 @@ class TimeSeriesLearner(AbstractLearner):
         self.save_trainer(trainer=self.trainer)
 
         self._time_fit_training = time.time() - time_start
+        self.save()
 
     def _align_covariates_with_forecast_index(
         self,

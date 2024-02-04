@@ -498,6 +498,16 @@ def test_given_data_is_in_dataframe_format_then_predictor_works(temp_model_path)
     predictions = predictor.predict(df)
     assert isinstance(predictions, TimeSeriesDataFrame)
 
+def test_load_predictor_then_info_works(temp_model_path):
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=2)
+    predictor.fit(
+        train_data=DUMMY_TS_DATAFRAME
+    )
+    predictor.save()
+    del predictor    
+    predictor = TimeSeriesPredictor.load(temp_model_path)
+    predictor.info()
+
 
 def test_given_data_is_in_str_format_then_predictor_works(temp_model_path):
     df = pd.DataFrame(DUMMY_TS_DATAFRAME.reset_index())
