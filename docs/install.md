@@ -4,7 +4,7 @@
 
 * AutoGluon requires Python version 3.8, 3.9, 3.10, or 3.11 and is available on Linux, MacOS, and Windows.
  
-* The AutoGluon library comes pre-installed in all releases of [Amazon SageMaker Distribution](https://github.com/aws/sagemaker-distribution), the docker environment for data science used as the default image of [JupyterLab](https://docs.aws.amazon.com/sagemaker/latest/dg/studio-updated-jl.html) notebook instances in [Amazon SageMaker Studio](https://docs.aws.amazon.com/sagemaker/latest/dg/studio-updated.html).  SageMaker Studio notebooks users can access AutoGluon's automation capabilities without needing to install or configure anything additional. To find the AutoGluon and PyTorch versions available in a SageMaker Distribution image, refer to the [RELEASE.md](https://github.com/aws/sagemaker-distribution/blob/main/build_artifacts/v1/v1.4/v1.4.2/RELEASE.md) file for your image version in the SageMaker Distribution GitHub repository. 
+* The AutoGluon library comes pre-installed in all releases of [Amazon SageMaker Distribution](https://github.com/aws/sagemaker-distribution). For more information, refer to the dropdown [AutoGluon in Amazon SageMaker Studio](#dropdown-sagemaker) in this page. 
 
 :::
 
@@ -167,9 +167,17 @@
 
 ```{include} install-modules.md
 ```
-
 :::
 
+<div id="dropdown-sagemaker"></div>
+
+:::{dropdown} AutoGluon in Amazon SageMaker Studio
+[Amazon SageMaker Distribution](https://github.com/aws/sagemaker-distribution) is the docker environment for data science used as the default image of [JupyterLab](https://docs.aws.amazon.com/sagemaker/latest/dg/studio-updated-jl.html) notebook instances and [Code Editor](https://docs.aws.amazon.com/sagemaker/latest/dg/code-editor.html) in [Amazon SageMaker Studio](https://docs.aws.amazon.com/sagemaker/latest/dg/studio-updated.html).  SageMaker Studio users can access AutoGluon's automation capabilities without needing to install anything additional. 
+
+
+To find the AutoGluon and PyTorch versions available in a SageMaker Distribution image, refer to the [RELEASE.md](https://github.com/aws/sagemaker-distribution/blob/main/build_artifacts/v1/v1.4/v1.4.2/RELEASE.md) file for your image version in the SageMaker Distribution GitHub repository. 
+
+:::
 
 :::{dropdown} Install from source for a specific pull-request
 
