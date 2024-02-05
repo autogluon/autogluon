@@ -172,7 +172,8 @@
 <div id="dropdown-sagemaker"></div>
 
 :::{dropdown} AutoGluon in Amazon SageMaker Studio
-[Amazon SageMaker Distribution](https://github.com/aws/sagemaker-distribution) is the docker environment for data science used as the default image of [JupyterLab](https://docs.aws.amazon.com/sagemaker/latest/dg/studio-updated-jl.html) notebook instances and [Code Editor](https://docs.aws.amazon.com/sagemaker/latest/dg/code-editor.html) in [Amazon SageMaker Studio](https://docs.aws.amazon.com/sagemaker/latest/dg/studio-updated.html).  SageMaker Studio users can access AutoGluon's automation capabilities without needing to install anything additional. 
+
+[Amazon SageMaker Distribution](https://github.com/aws/sagemaker-distribution) is the docker environment for data science used as the default image of [JupyterLab](https://docs.aws.amazon.com/sagemaker/latest/dg/studio-updated-jl.html) notebook instances and [Code Editor](https://docs.aws.amazon.com/sagemaker/latest/dg/code-editor.html) in [Amazon SageMaker Studio](https://docs.aws.amazon.com/sagemaker/latest/dg/studio-updated.html).  The AutoGluon library comes pre-installed in all releases of Amazon SageMaker Distribution. SageMaker Studio users can access AutoGluon's automation capabilities without needing to install anything additional. 
 
 
 To find the AutoGluon and PyTorch versions available in a SageMaker Distribution image, refer to the [RELEASE.md](https://github.com/aws/sagemaker-distribution/blob/main/build_artifacts/v1/v1.4/v1.4.2/RELEASE.md) file for your image version in the SageMaker Distribution GitHub repository. 
