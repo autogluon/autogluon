@@ -655,6 +655,7 @@ def test_pseudolabeling():
         num_bag_folds=2,
         num_bag_sets=1,
         ag_args_ensemble=dict(fold_fitting_strategy="sequential_local"),
+        dynamic_stacking=False,
     )
     for idx in range(len(datasets)):
         dataset = datasets[idx]
