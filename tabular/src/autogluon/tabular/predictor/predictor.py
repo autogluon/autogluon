@@ -1547,7 +1547,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             for key in hyperparameter_keys:
                 if isinstance(key, int):
                     highest_level = max(key, highest_level)
-            num_stack_levels = highest_level
+            num_stack_levels = highest_level - 1
 
         # TODO: make core_kwargs a kwargs argument to predictor.fit, add aux_kwargs to predictor.fit
         core_kwargs = {
@@ -1588,7 +1588,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             base_model_names=base_model_names,
             time_limit=time_limit,
             relative_stack=True,
-            level_end=num_stack_levels,
+            level_end=num_stack_levels + 1,
             core_kwargs=core_kwargs,
             aux_kwargs=aux_kwargs,
             name_suffix=name_suffix,
@@ -1641,6 +1641,23 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         else:
             logger.log(15, "Weighted ensemble was not the best model for current iteration of pseudo labeling")
 
+    def _predict_pseudo(self, X_test: pd.DataFrame, use_ensemble: bool):
+        if use_ensemble:
+            if self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
+                test_pseudo_idxes_true, y_pred_proba, y_pred = filter_ensemble_pseudo(predictor=self, unlabeled_data=X_test)
+            else:
+                test_pseudo_idxes_true, y_pred = filter_ensemble_pseudo(predictor=self, unlabeled_data=X_test)
+                y_pred_proba = y_pred.copy()
+        else:
+            if self.can_predict_proba:
+                y_pred_proba = self.predict_proba(data=X_test, as_multiclass=True)
+                y_pred = get_pred_from_proba_df(y_pred_proba, problem_type=self.problem_type)
+            else:
+                y_pred = self.predict(data=X_test)
+                y_pred_proba = y_pred
+            test_pseudo_idxes_true = filter_pseudo(y_pred_proba_og=y_pred_proba, problem_type=self.problem_type)
+        return y_pred, y_pred_proba, test_pseudo_idxes_true
+
     def _run_pseudolabeling(
         self,
         unlabeled_data: pd.DataFrame,
@@ -1682,7 +1699,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         --------
         self: TabularPredictor
         """
-        previous_score = self.info()["best_model_score_val"]
+        previous_score = self.leaderboard(set_refit_score_to_parent=True).set_index("model", drop=True).loc[self.model_best]["score_val"]
         y_pseudo_og = pd.Series()
         y_pred_proba_og = None
         if return_pred_prob:
@@ -1696,44 +1713,27 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             if len(X_test) == 0:
                 logger.log(20, f"No more unlabeled data to pseudolabel. Done with pseudolabeling...")
                 break
+            if i == 0:
+                y_pred, y_pred_proba, test_pseudo_idxes_true = self._predict_pseudo(X_test=X_test, use_ensemble=use_ensemble)
+                y_pred_proba_og = y_pred_proba
 
             iter_print = str(i + 1)
-            logger.log(20, f"Beginning iteration {iter_print} of pseudolabeling out of max: {max_iter}")
-
-            if use_ensemble:
-                if self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
-                    test_pseudo_idxes_true, y_pred_proba, y_pred = filter_ensemble_pseudo(predictor=self, unlabeled_data=X_test)
-                else:
-                    test_pseudo_idxes_true, y_pred = filter_ensemble_pseudo(predictor=self, unlabeled_data=X_test)
-                    y_pred_proba = y_pred.copy()
-            else:
-                if self.can_predict_proba:
-                    y_pred_proba = self.predict_proba(data=X_test, as_multiclass=True)
-                    y_pred = get_pred_from_proba_df(y_pred_proba, problem_type=self.problem_type)
-                else:
-                    y_pred = self.predict(data=X_test)
-                    y_pred_proba = y_pred
-                test_pseudo_idxes_true = filter_pseudo(y_pred_proba_og=y_pred_proba, problem_type=self.problem_type)
-
-            if return_pred_prob:
-                if i == 0:
-                    y_pred_proba_og = y_pred_proba
-                else:
-                    y_pred_proba_og.loc[test_pseudo_idxes_true.index] = y_pred_proba.loc[test_pseudo_idxes_true.index]
+            logger.log(20, f"Beginning iteration {iter_print} of pseudolabeling out of max {max_iter}")
 
             if len(test_pseudo_idxes_true) < 1:
                 logger.log(
-                    20, f"Could not confidently assign pseudolabels for any of the provided rows in iteration: {iter_print}. Done with pseudolabeling..."
+                    20, f"Could not confidently assign pseudolabels for any of the provided rows in iteration {iter_print}. Done with pseudolabeling..."
                 )
                 break
             else:
                 logger.log(
                     20,
-                    f"Pseudolabeling algorithm confidently assigned pseudolabels to: {len(test_pseudo_idxes_true)} rows of data"
-                    f"on iteration: {iter_print}. Adding to train data",
+                    f"Pseudolabeling algorithm confidently assigned pseudolabels to {len(test_pseudo_idxes_true)} rows of data "
+                    f"on iteration {iter_print}. Adding to train data",
                 )
 
             test_pseudo_idxes = pd.Series(data=False, index=y_pred_proba.index)
+            test_pseudo_idxes_false = test_pseudo_idxes[~test_pseudo_idxes.index.isin(test_pseudo_idxes_true.index)]
             test_pseudo_idxes[test_pseudo_idxes_true.index] = True
 
             y_pseudo_og = pd.concat([y_pseudo_og, y_pred.loc[test_pseudo_idxes_true.index]], verify_integrity=True)
@@ -1745,7 +1745,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             if fit_ensemble and fit_ensemble_every_iter:
                 self._fit_weighted_ensemble_pseudo()
 
-            current_score = self.info()["best_model_score_val"]
+            current_score = self.leaderboard(set_refit_score_to_parent=True).set_index("model", drop=True).loc[self.model_best]["score_val"]
             logger.log(
                 20,
                 f"Pseudolabeling algorithm changed validation score from: {previous_score}, to: {current_score}"
@@ -1753,24 +1753,35 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             )
 
             if previous_score >= current_score:
+                # No improvement from pseudo labelling this iteration, stop iterating
                 break
             else:
                 # Cut down X_test to not include pseudo labeled data
                 X_test = X_test.loc[test_pseudo_idxes[~test_pseudo_idxes].index]
                 previous_score = current_score
 
+                # Update y_pred_proba and test_pseudo_idxes_true based on the latest pseudolabelled iteration
+                y_pred, y_pred_proba, test_pseudo_idxes_true = self._predict_pseudo(X_test=X_test, use_ensemble=use_ensemble)
+                # Update the y_pred_proba_og variable if an improvement was achieved
+                if return_pred_prob and test_pseudo_idxes_false is not None:
+                    y_pred_proba_og.loc[test_pseudo_idxes_false.index] = y_pred_proba.loc[test_pseudo_idxes_false.index]
+
         if fit_ensemble and not fit_ensemble_every_iter:
             self._fit_weighted_ensemble_pseudo()
-            if self.can_predict_proba:
-                y_pred_proba_og = self.predict_proba(unlabeled_data)
-            else:
-                y_pred_proba_og = self.predict(unlabeled_data)
+            if return_pred_prob:
+                if self.can_predict_proba:
+                    y_pred_proba_og = self.predict_proba(unlabeled_data)
+                else:
+                    y_pred_proba_og = self.predict(unlabeled_data)
 
         if return_pred_prob:
             return self, y_pred_proba_og
         else:
             return self
 
+    # FIXME: `fit_ensemble` and `use_ensemble` seem redundant, and don't use calibration, making them worse than when they are disabled.
+    # FIXME: refit does not incorporate pseudolabels!
+    @apply_presets(tabular_presets_dict, tabular_presets_alias)
     def fit_pseudolabel(
         self,
         pseudo_data: pd.DataFrame,
@@ -1806,7 +1817,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         fit_ensemble: bool, default = False
             If True with fit weighted ensemble model using combination of best models.
             Fitting weighted ensemble will be done after fitting has
-            being completed unless otherwise specified. If False will not fit weighted ensemble
+            been completed unless otherwise specified. If False will not fit weighted ensemble
             over models trained with pseudo labeling and models trained without it.
         fit_ensemble_every_iter: bool, default = False
             If True fits weighted ensemble model for every iteration of pseudo labeling algorithm. If False
@@ -1828,7 +1839,8 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
         self._validate_unique_indices(pseudo_data, "pseudo_data")
 
-        if not self.is_fit:
+        was_fit = self.is_fit
+        if not was_fit:
             if "train_data" not in kwargs.keys():
                 Exception(
                     "Autogluon is required to be fit or given 'train_data' in order to run 'fit_pseudolabel'."
@@ -1857,6 +1869,14 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         kwargs["hyperparameters"] = hyperparameters
         fit_extra_args = self._get_all_fit_extra_args()
         fit_extra_kwargs = {key: value for key, value in kwargs.items() if key in fit_extra_args}
+
+        # If first fit was in this method call and `num_stack_levels` wasn't specified, re-use the number of stack levels used in the first fit.
+        # TODO: Consider making calculating this information easier, such as keeping track of meta-info from the latest/original fit call.
+        #  Currently we use `stack_name == core` to figure out the number of stack levels, but this is somewhat brittle.
+        if "num_stack_levels" not in fit_extra_kwargs and not was_fit:
+            models_core: List[str] = [m for m, stack_name in self._trainer.get_models_attribute_dict(attribute="stack_name").items() if stack_name == "core"]
+            num_stack_levels = max(self._trainer.get_models_attribute_dict(attribute="level", models=models_core).values()) - 1
+            fit_extra_kwargs["num_stack_levels"] = num_stack_levels
         if is_labeled:
             logger.log(20, "Fitting predictor using the provided pseudolabeled examples as extra training data...")
             self.fit_extra(pseudo_data=pseudo_data, name_suffix=PSEUDO_MODEL_SUFFIX.format(iter="")[:-1], **fit_extra_kwargs)
