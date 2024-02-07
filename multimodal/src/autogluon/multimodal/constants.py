@@ -9,6 +9,7 @@ TEXT_NER = "text_ner"  # Added for NER text column
 NUMERICAL = "numerical"
 IMAGE_PATH = "image_path"
 IMAGE_BYTEARRAY = "image_bytearray"
+IMAGE_BASE64_STR = "image_base64_str"
 IDENTIFIER = "identifier"
 DOCUMENT = "document"
 DOCUMENT_IMAGE = "document_image"

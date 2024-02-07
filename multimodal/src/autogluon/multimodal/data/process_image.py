@@ -28,6 +28,7 @@ from ..constants import (
     CLIP_IMAGE_STD,
     COLUMN,
     IMAGE,
+    IMAGE_BASE64_STR,
     IMAGE_BYTEARRAY,
     IMAGE_PATH,
     IMAGE_VALID_NUM,
@@ -276,7 +277,7 @@ class ImageProcessor:
                     )
                     is_zero_img = False
                     try:
-                        if feature_modalities.get(per_col_name) == IMAGE_BYTEARRAY:
+                        if feature_modalities.get(per_col_name) in [IMAGE_BYTEARRAY, IMAGE_BASE64_STR]:
                             image_feature = BytesIO(img_feature)
                         else:
                             image_feature = img_feature
