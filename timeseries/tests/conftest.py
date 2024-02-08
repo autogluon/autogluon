@@ -33,4 +33,8 @@ def temp_model_path():
     """Pytest fixture to save as model paths that clean up after themselves"""
     td = tempfile.mkdtemp()
     yield td
-    shutil.rmtree(td)
+    try:
+        shutil.rmtree(td)
+    except PermissionError:
+        # Windows won't allow to clean up the directory if logs are saved to it; skip deletion
+        pass
