@@ -6,6 +6,10 @@ on:
     paths:
       - 'multimodal/**'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.number || github.event.pull_request.head.sha }}
+  cancel-in-progress: true
+
 permissions:
   id-token: write
   pull-requests: write
