@@ -33,7 +33,7 @@ install_requires = [
 
 extras_require = {
     "lightgbm": [
-        "lightgbm>=3.3,<4.2",  # <{N+1} upper cap, where N is the latest released minor version
+        "lightgbm>=3.3,<4.4",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "catboost": [
         # CatBoost wheel build is not working correctly on darwin for CatBoost 1.2, so use old version in this case.
