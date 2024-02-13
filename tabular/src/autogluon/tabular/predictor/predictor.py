@@ -1137,7 +1137,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         time_start = time.time()
         time_limit_og = ag_fit_kwargs["time_limit"]
         org_num_stack_levels = ag_fit_kwargs["num_stack_levels"]
-        ds_fit_context = self._learner.path_context_og + os.path.sep + "ds_sub_fit"
+        ds_fit_context = os.path.join(self._learner.path_context_og, "ds_sub_fit")
         logger.info(
             "Detecting stacked overfitting by sub-fitting AutoGluon on the input data. "
             "That is, copies of AutoGluon will be sub-fit on subset(s) of the data. "
@@ -1175,11 +1175,11 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         # -- Validation Method
         if validation_procedure == "holdout":
             if holdout_data is None:
-                ds_fit_kwargs.update(dict(holdout_frac=holdout_frac, ds_fit_context=ds_fit_context + os.path.sep + "sub_fit_ho"))
+                ds_fit_kwargs.update(dict(holdout_frac=holdout_frac, ds_fit_context=os.path.join(ds_fit_context, "sub_fit_ho")))
                 logger.info(f"Starting holdout-based sub-fit for dynamic stacking. Context path is: {ds_fit_kwargs['ds_fit_context']}.")
             else:
                 _, holdout_data, _ = self._validate_fit_data(train_data=X, tuning_data=holdout_data)
-                ds_fit_kwargs["ds_fit_context"] = ds_fit_context + os.path.sep + "sub_fit_custom_ho"
+                ds_fit_kwargs["ds_fit_context"] = os.path.join(ds_fit_context, "sub_fit_custom_ho")
                 logger.info(
                     f"Starting holdout-based sub-fit for dynamic stacking with custom validation data. Context path is: {ds_fit_kwargs['ds_fit_context']}."
                 )
@@ -1219,7 +1219,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                     dict(
                         train_indices=train_indices,
                         val_indices=val_indices,
-                        ds_fit_context=ds_fit_context + os.path.sep + f"sub_fit_{split_index}",
+                        ds_fit_context=os.path.join(ds_fit_context, f"sub_fit_{split_index}"),
                     )
                 )
                 logger.info(
