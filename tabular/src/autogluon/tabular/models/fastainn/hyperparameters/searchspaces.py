@@ -44,5 +44,5 @@ def get_searchspace_quantile():
     spaces = get_searchspace_regression()
 
     # residual threshold parameter in HuberPinballLoss
-    spaces.update({"alpha": Categorical(0.001, 0.01, 0.1, 1.0)})
+    spaces.update({"alpha": space.Categorical(0.001, 0.01, 0.1, 1.0)})
     return spaces
