@@ -450,7 +450,7 @@ def test_when_predictor_is_loaded_then_info_works(temp_model_path):
     for key in EXPECTED_INFO_KEYS:
         assert key in info
 
-    assert len(info["model_info"]) == len(DUMMY_HYPERPARAMETERS)
+    assert len(info["model_info"]) == len(DUMMY_HYPERPARAMETERS) + 1  # + 1 for ensemble
 
 
 def test_when_train_data_contains_nans_then_predictor_can_fit(temp_model_path):
