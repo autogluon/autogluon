@@ -411,6 +411,18 @@ def test_when_fit_summary_is_called_then_all_keys_and_models_are_included(
             assert len(fit_summary[key]) == num_models
 
 
+EXPECTED_INFO_KEYS = [
+    "path",
+    "version",
+    "time_fit_training",
+    "time_limit",
+    "best_model",
+    "best_model_score_val",
+    "num_models_trained",
+    "model_info",
+]
+
+
 @pytest.mark.parametrize(
     "hyperparameters, num_models",
     [
@@ -421,21 +433,24 @@ def test_when_fit_summary_is_called_then_all_keys_and_models_are_included(
 def test_when_info_is_called_then_all_keys_and_models_are_included(temp_model_path, hyperparameters, num_models):
     predictor = TimeSeriesPredictor(path=temp_model_path)
     predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters=hyperparameters)
-    expected_keys = [
-        "path",
-        "version",
-        "time_fit_training",
-        "time_limit",
-        "best_model",
-        "best_model_score_val",
-        "num_models_trained",
-        "model_info",
-    ]
     info = predictor.info()
-    for key in expected_keys:
+    for key in EXPECTED_INFO_KEYS:
         assert key in info
 
     assert len(info["model_info"]) == num_models
+
+
+def test_when_predictor_is_loaded_then_info_works(temp_model_path):
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=2)
+    predictor.fit(train_data=DUMMY_TS_DATAFRAME, hyperparameters=DUMMY_HYPERPARAMETERS)
+    predictor.save()
+    del predictor
+    predictor = TimeSeriesPredictor.load(temp_model_path)
+    info = predictor.info()
+    for key in EXPECTED_INFO_KEYS:
+        assert key in info
+
+    assert len(info["model_info"]) == len(DUMMY_HYPERPARAMETERS) + 1  # + 1 for ensemble
 
 
 def test_when_train_data_contains_nans_then_predictor_can_fit(temp_model_path):

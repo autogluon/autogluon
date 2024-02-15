@@ -123,9 +123,9 @@ class TimeSeriesLearner(AbstractLearner):
             excluded_model_types=kwargs.get("excluded_model_types"),
             time_limit=time_limit,
         )
-        self.save_trainer(trainer=self.trainer)
 
         self._time_fit_training = time.time() - time_start
+        self.save()
 
     def _align_covariates_with_forecast_index(
         self,
