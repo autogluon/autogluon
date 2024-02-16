@@ -1356,7 +1356,10 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         calibrate=False,
         calibrate_decision_threshold=False,
         infer_limit=None,
+        refit_full_kwargs: dict = None,
     ):
+        if refit_full_kwargs is None:
+            refit_full_kwargs = {}
         if not self.model_names():
             logger.log(30, "Warning: No models found, skipping post_fit logic...")
             return
@@ -1383,9 +1386,9 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             else:
                 _set_best_to_refit_full = False
             if refit_full == "best":
-                self.refit_full(model=trainer_model_best, set_best_to_refit_full=_set_best_to_refit_full)
+                self.refit_full(model=trainer_model_best, set_best_to_refit_full=_set_best_to_refit_full, **refit_full_kwargs)
             else:
-                self.refit_full(model=refit_full, set_best_to_refit_full=_set_best_to_refit_full)
+                self.refit_full(model=refit_full, set_best_to_refit_full=_set_best_to_refit_full, **refit_full_kwargs)
 
         if calibrate == "auto":
             if self.problem_type in PROBLEM_TYPES_CLASSIFICATION and self.eval_metric.needs_proba:
@@ -1604,12 +1607,18 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 time_limit_weighted = None
             fit_models += self.fit_weighted_ensemble(time_limit=time_limit_weighted)
 
+        refit_full_kwargs = dict(
+            X_pseudo=X_pseudo,
+            y_pseudo=y_pseudo,
+        )
+
         self._post_fit(
             keep_only_best=kwargs["keep_only_best"],
             refit_full=kwargs["refit_full"],
             set_best_to_refit_full=kwargs["set_best_to_refit_full"],
             save_space=kwargs["save_space"],
             calibrate=kwargs["calibrate"],
+            refit_full_kwargs=refit_full_kwargs,
         )
         self.save()
         return self
@@ -1781,6 +1790,11 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
     # FIXME: `fit_ensemble` and `use_ensemble` seem redundant, and don't use calibration, making them worse than when they are disabled.
     # FIXME: refit does not incorporate pseudolabels!
+
+    # FIXME: Figure out what is happening in the L2 stackers, how does pseudo work???
+    #  Answer: Stacker columns are set to NaN for pseudo rows!!!! FIX THIS.
+    #  Either avoid passing pseudo data to L2+ or find a way to pass non-NaN.
+    #  Idea: What about the original fit pred_proba? Can we predict with the prior model stack as a substitute? Probably. Might be very complicated.
     @apply_presets(tabular_presets_dict, tabular_presets_alias)
     def fit_pseudolabel(
         self,
@@ -1822,7 +1836,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         fit_ensemble_every_iter: bool, default = False
             If True fits weighted ensemble model for every iteration of pseudo labeling algorithm. If False
             and fit_ensemble is True will fit after all pseudo labeling training is done.
-        kwargs: dict
+        **kwargs:
             If predictor is not already fit, then kwargs are for the functions 'fit' and 'fit_extra':
             Refer to parameters documentation in :meth:`TabularPredictor.fit`.
             Refer to parameters documentation in :meth:`TabularPredictor.fit_extra`.
@@ -3032,7 +3046,8 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         self._assert_is_fit("unpersist")
         return self._learner.load_trainer().unpersist(model_names=models)
 
-    def refit_full(self, model: str | List[str] = "all", set_best_to_refit_full: bool = True) -> Dict[str, str]:
+    # FIXME: `total_resources = None` during refit, fix this
+    def refit_full(self, model: str | List[str] = "all", set_best_to_refit_full: bool = True, **kwargs) -> Dict[str, str]:
         """
         Retrain model on all of the data (training + validation).
         For bagged models:
@@ -3084,7 +3099,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             "\tThis process is not bound by time_limit, but should take less time than the original `predictor.fit` call.\n"
             '\tTo learn more, refer to the `.refit_full` method docstring which explains how "_FULL" models differ from normal models.',
         )
-        refit_full_dict = self._learner.refit_ensemble_full(model=model)
+        refit_full_dict = self._learner.refit_ensemble_full(model=model, **kwargs)
 
         if set_best_to_refit_full:
             if isinstance(set_best_to_refit_full, str):
