@@ -79,7 +79,7 @@ class LGBModel(AbstractModel):
         data_mem_usage = get_approximate_df_mem_usage(X).sum()
         data_mem_usage_bytes = data_mem_usage * 5 + data_mem_usage / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
 
-        params = self._get_model_params()
+        params = self._get_model_params(convert_search_spaces_to_default=True)
         max_bins = params.get("max_bins", 255)
         num_leaves = params.get("num_leaves", 31)
         # Memory usage of histogram based on https://github.com/microsoft/LightGBM/issues/562#issuecomment-304524592
