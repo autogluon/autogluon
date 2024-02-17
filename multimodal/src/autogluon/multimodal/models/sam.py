@@ -8,10 +8,14 @@ import torch
 import torch.nn.functional as F
 from omegaconf import DictConfig
 from torch import nn
-from transformers import SamConfig, SamModel
-from transformers.models.sam.modeling_sam import SamImageSegmentationOutput
 
-from ..constants import CLASS_LABEL, CLASS_LOGITS, COLUMN, IMAGE, IMAGE_VALID_NUM, LABEL, LOGITS, MASK_LABEL
+# from transformers import SamConfig, SamModel
+# from transformers.models.sam.modeling_sam import SamImageSegmentationOutput
+from transformers import SamConfig
+
+from ..constants import CLASS_LABEL, CLASS_LOGITS, COLUMN, IMAGE, IMAGE_VALID_NUM, LABEL, LOGITS, MASK_LABEL, MOE_LOSS
+from .conv_lora.adaptation_layers import ConvLoRALinear
+from .conv_lora.modeling_sam import SamImageSegmentationOutput, SamModel
 from .utils import assign_layer_ids, freeze_model_layers
 
 logger = logging.getLogger(__name__)
@@ -133,6 +137,7 @@ def multi_class_sam_model_forward(
     target_embedding: Optional[torch.FloatTensor] = None,
     output_attentions: Optional[bool] = None,
     output_hidden_states: Optional[bool] = None,
+    output_moe_loss: Optional[bool] = None,  # MoE loss for Conv-LoRA
     return_dict=None,
     **kwargs,
 ) -> List[Dict[str, torch.Tensor]]:
@@ -180,12 +185,14 @@ def multi_class_sam_model_forward(
 
     vision_attentions = None
     vision_hidden_states = None
+    vision_moe_loss = None
 
     if pixel_values is not None:
         vision_outputs = self.vision_encoder(
             pixel_values,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
+            output_moe_loss=output_moe_loss,
             return_dict=return_dict,
         )
         image_embeddings = vision_outputs[0]
@@ -193,7 +200,10 @@ def multi_class_sam_model_forward(
         if output_hidden_states:
             vision_hidden_states = vision_outputs[1]
         if output_attentions:
-            vision_attentions = vision_outputs[-1]
+            # vision_attentions = vision_outputs[-1]
+            vision_attentions = vision_outputs[2]
+        if output_moe_loss:
+            vision_moe_loss = vision_outputs[-1]
 
     if input_points is not None and input_labels is None:
         input_labels = torch.ones_like(input_points[:, :, :, 0], dtype=torch.int, device=input_points.device)
@@ -226,12 +236,14 @@ def multi_class_sam_model_forward(
     )
 
     if not return_dict:
-        output = (iou_predictions, low_res_masks)
-        if output_hidden_states:
-            output = output + (vision_hidden_states,)
-
-        if output_attentions:
-            output = output + (vision_attentions, mask_decoder_attentions)
+        output = (
+            iou_predictions,
+            low_res_masks,
+            vision_hidden_states,
+            vision_attentions,
+            mask_decoder_attentions,
+            vision_moe_loss,
+        )
         return output
 
     return (
@@ -241,6 +253,7 @@ def multi_class_sam_model_forward(
             vision_hidden_states=vision_hidden_states,
             vision_attentions=vision_attentions,
             mask_decoder_attentions=mask_decoder_attentions,
+            vision_moe_loss=vision_moe_loss,
         ),
         ################ New added. Return class predictions as well.
         class_predictions,
@@ -320,6 +333,9 @@ class SAMForSemanticSegmentation(nn.Module):
             sam_model_forward = multi_class_sam_model_forward.__get__(self.model, self.model.__class__)
             setattr(self.model, "forward", sam_model_forward)
 
+        # for Conv-LoRA
+        self.output_moe_loss = False
+
     def _load_checkpoint(self, checkpoint_name):
         if self.pretrained:
             self.model = SamModel.from_pretrained(checkpoint_name)
@@ -359,6 +375,15 @@ class SAMForSemanticSegmentation(nn.Module):
     def class_label_key(self):
         return f"{self.prefix}_{CLASS_LABEL}"
 
+    def train(self, mode: bool = True):
+        super().train(mode)
+        for module in self.modules():
+            if isinstance(module, ConvLoRALinear):
+                self.output_moe_loss = True
+                return self
+
+        return self
+
     def forward(
         self,
         batch,
@@ -376,35 +401,37 @@ class SAMForSemanticSegmentation(nn.Module):
         """
         # binary
         if self.num_classes == 1:
-            rets = self.model(batch[self.image_key], multimask_output=False)
+            rets = self.model(batch[self.image_key], multimask_output=False, output_moe_loss=self.output_moe_loss)
             pred_masks = rets.pred_masks[:, 0, :, :, :]
             pred_masks = F.interpolate(
                 pred_masks, (self.image_size, self.image_size), mode="bilinear", align_corners=False
             )
             if self.training:
-                return {self.prefix: {LOGITS: pred_masks}}
+                rets_dict = {self.prefix: {LOGITS: pred_masks}}
             else:
-                return {self.prefix: {LOGITS: pred_masks, LABEL: batch[self.label_key]}}
-
+                rets_dict = {self.prefix: {LOGITS: pred_masks, LABEL: batch[self.label_key]}}
         # multi-class
         else:
-            rets, class_predictions = self.model(batch[self.image_key], multimask_output=False)
+            rets = self.model(batch[self.image_key], multimask_output=False, output_moe_loss=self.output_moe_loss)
+            rets, class_predictions = rets
             pred_masks = rets.pred_masks[:, 0, :, :, :]
             pred_classes = class_predictions[:, 0, :, :]
             pred_masks = F.interpolate(
                 pred_masks, (self.image_size, self.image_size), mode="bilinear", align_corners=False
             )
             if self.training:
-                return {self.prefix: {LOGITS: pred_masks, CLASS_LOGITS: pred_classes}}
-
+                rets_dict = {self.prefix: {LOGITS: pred_masks, CLASS_LOGITS: pred_classes}}
             else:
-                return {
+                rets_dict = {
                     self.prefix: {
                         LOGITS: pred_masks,
                         CLASS_LOGITS: pred_classes,
                         LABEL: batch[self.label_key],
                     }
                 }
+        if self.output_moe_loss:
+            rets_dict[self.prefix].update({MOE_LOSS: rets.vision_moe_loss})
+        return rets_dict
 
     def get_layer_ids(self):
         """

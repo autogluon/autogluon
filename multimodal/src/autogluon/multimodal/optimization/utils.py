@@ -25,6 +25,7 @@ from ..constants import (
     BIT_FIT,
     COLUMN_FEATURES,
     CONTRASTIVE_LOSS,
+    CONV_LORA,
     COSINE_EMBEDDING_LOSS,
     COSINE_SIMILARITY,
     CROSS_ENTROPY,
@@ -675,7 +676,7 @@ def get_trainable_params_efficient_finetune(
     elif efficient_finetune == NORM_FIT:
         trainable_param_names.append(".*bias*.")
         trainable_param_names += norm_param_names
-    elif efficient_finetune in [LORA, IA3, IA3_LORA]:
+    elif efficient_finetune in [LORA, IA3, IA3_LORA, CONV_LORA]:
         trainable_param_names.append(".*lora_*.")
     elif efficient_finetune in [LORA_BIAS, IA3_BIAS, IA3_LORA_BIAS]:
         trainable_param_names.append(".*lora_*.")

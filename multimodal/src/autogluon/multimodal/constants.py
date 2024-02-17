@@ -139,6 +139,7 @@ FM = "fm"
 MAE = "mae"
 BER = "ber"
 IOU = "iou"
+MOE_LOSS = "moe_loss"
 RETRIEVAL_METRICS = [NDCG, PRECISION, RECALL, MRR]
 METRIC_MODE_MAP = {
     ACC: MAX,
@@ -233,6 +234,7 @@ IA3_NORM = "ia3_norm"
 IA3_LORA = "ia3_lora"
 IA3_LORA_BIAS = "ia3_lora_bias"
 IA3_LORA_NORM = "Ia3_lora_norm"
+CONV_LORA = "conv_lora"
 PEFT_ADDITIVE_STRATEGIES = [
     LORA,
     LORA_BIAS,
@@ -243,6 +245,7 @@ PEFT_ADDITIVE_STRATEGIES = [
     IA3_LORA,
     IA3_LORA_BIAS,
     IA3_LORA_NORM,
+    CONV_LORA,
 ]
 PEFT_NON_ADDITIVE_STRATEGIES = [
     BIT_FIT,
