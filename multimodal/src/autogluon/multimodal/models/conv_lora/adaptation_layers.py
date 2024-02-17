@@ -101,7 +101,7 @@ class ConvLoRALinear(nn.Linear, LoRALayer):
             else:
                 H, W = lora_res.size()[1:3]
 
-            # Caculate the gating values.
+            # Calculate the gating values.
             lora_res = lora_res.permute(0, 3, 1, 2).contiguous()
             gates, moe_loss = self.lora_moe_gating(lora_res)
 

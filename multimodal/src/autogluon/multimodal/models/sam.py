@@ -1,16 +1,10 @@
 import logging
-import os
-import time
-import warnings
 from typing import Dict, List, Optional, Tuple
 
 import torch
 import torch.nn.functional as F
 from omegaconf import DictConfig
 from torch import nn
-
-# from transformers import SamConfig, SamModel
-# from transformers.models.sam.modeling_sam import SamImageSegmentationOutput
 from transformers import SamConfig
 
 from ..constants import CLASS_LABEL, CLASS_LOGITS, COLUMN, IMAGE, IMAGE_VALID_NUM, LABEL, LOGITS, MASK_LABEL, MOE_LOSS
