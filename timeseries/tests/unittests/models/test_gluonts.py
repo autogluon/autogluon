@@ -312,10 +312,17 @@ def test_when_custom_trainer_kwargs_given_then_trainer_receives_them():
         assert received_trainer_kwargs[k] == v
 
 
-@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+def test_when_model_finishes_training_then_logs_are_removed(temp_model_path):
+    model = TemporalFusionTransformerModel(
+        freq=DUMMY_TS_DATAFRAME.freq, path=temp_model_path, hyperparameters=DUMMY_HYPERPARAMETERS
+    )
+    model.fit(train_data=DUMMY_TS_DATAFRAME)
+    assert not (Path(model.path) / "lightning_logs").exists()
+
+
 @pytest.mark.parametrize("keep_lightning_logs", [True, False])
-def test_when_keep_lightning_logs_set_then_logs_are_not_removed(keep_lightning_logs, temp_model_path, model_class):
-    model = model_class(
+def test_when_keep_lightning_logs_set_then_logs_are_not_removed(keep_lightning_logs, temp_model_path):
+    model = DeepARModel(
         freq=DUMMY_TS_DATAFRAME.freq,
         path=temp_model_path,
         hyperparameters={"keep_lightning_logs": keep_lightning_logs, **DUMMY_HYPERPARAMETERS},
