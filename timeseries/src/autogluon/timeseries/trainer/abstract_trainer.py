@@ -806,6 +806,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
         use_cache: bool = True,
+        random_seed: Optional[int] = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
         model_name = self._get_model_for_prediction(model)
@@ -814,7 +815,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             data=data,
             known_covariates=known_covariates,
             use_cache=use_cache,
-            random_seed=kwargs.get("random_seed"),
+            random_seed=random_seed,
         )
         return model_pred_dict[model_name]
 
