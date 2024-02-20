@@ -336,3 +336,23 @@ class RMSLE(TimeSeriesScorer):
         y_pred = np.clip(y_pred, a_min=0.0, a_max=None)
 
         return np.sqrt(np.power(np.log1p(y_pred) - np.log1p(y_true), 2).mean())
+
+    def __call__(
+        self,
+        data: TimeSeriesDataFrame,
+        predictions: TimeSeriesDataFrame,
+        prediction_length: int = 1,
+        target: str = "target",
+        seasonal_period: Optional[int] = None,
+        **kwargs,
+    ) -> float:
+        if (data[target] < 0).any():
+            raise ValueError(f"{self.name} cannot be used if target time series contains negative values!")
+        return super().__call__(
+            data=data,
+            predictions=predictions,
+            prediction_length=prediction_length,
+            target=target,
+            seasonal_period=seasonal_period,
+            **kwargs,
+        )

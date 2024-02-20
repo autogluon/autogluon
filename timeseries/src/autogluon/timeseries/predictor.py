@@ -94,6 +94,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         - ``"MASE"``: mean absolute scaled error
         - ``"MSE"``: mean squared error
         - ``"RMSE"``: root mean squared error
+        - ``"RMSLE"``: root mean squared logarithmic error
         - ``"RMSSE"``: root mean squared scaled error
         - ``"SMAPE"``: "symmetric" mean absolute percentage error
         - ``"WAPE"``: weighted absolute percentage error
