@@ -77,6 +77,7 @@ class TimeSeriesLearner(AbstractLearner):
         time_limit: Optional[int] = None,
         val_splitter: Optional[AbstractWindowSplitter] = None,
         refit_every_n_windows: Optional[int] = 1,
+        random_seed: Optional[int] = None,
         **kwargs,
     ) -> None:
         self._time_limit = time_limit
@@ -122,6 +123,7 @@ class TimeSeriesLearner(AbstractLearner):
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             excluded_model_types=kwargs.get("excluded_model_types"),
             time_limit=time_limit,
+            random_seed=random_seed,
         )
 
         self._time_fit_training = time.time() - time_start
@@ -168,13 +170,19 @@ class TimeSeriesLearner(AbstractLearner):
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
         use_cache: bool = True,
+        random_seed: Optional[int] = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
         data = self.feature_generator.transform(data)
         known_covariates = self.feature_generator.transform_future_known_covariates(known_covariates)
         known_covariates = self._align_covariates_with_forecast_index(known_covariates=known_covariates, data=data)
         return self.load_trainer().predict(
-            data=data, known_covariates=known_covariates, model=model, use_cache=use_cache, **kwargs
+            data=data,
+            known_covariates=known_covariates,
+            model=model,
+            use_cache=use_cache,
+            random_seed=random_seed,
+            **kwargs,
         )
 
     def score(
