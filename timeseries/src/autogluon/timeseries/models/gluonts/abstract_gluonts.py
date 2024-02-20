@@ -393,6 +393,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         self._check_fit_params()
         # update auxiliary parameters
         init_args = self._get_estimator_init_args()
+        keep_lightning_logs = init_args.pop("keep_lightning_logs", False)
         callbacks = self._get_callbacks(
             time_limit=time_limit,
             early_stopping_patience=None if val_data is None else init_args["early_stopping_patience"],
@@ -411,7 +412,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                 self.gts_predictor.batch_size = init_args["predict_batch_size"]
 
         lightning_logs_dir = Path(self.path) / "lightning_logs"
-        if lightning_logs_dir.exists() and lightning_logs_dir.is_dir():
+        if not keep_lightning_logs and lightning_logs_dir.exists() and lightning_logs_dir.is_dir():
             logger.debug(f"Removing lightning_logs directory {lightning_logs_dir}")
             shutil.rmtree(lightning_logs_dir)
 
