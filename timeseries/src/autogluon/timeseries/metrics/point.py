@@ -306,3 +306,33 @@ class RMSSE(TimeSeriesScorer):
 
         mse_per_item = (y_true - y_pred).pow(2.0).groupby(level=ITEMID, sort=False).mean()
         return np.sqrt(self._safemean(mse_per_item / self._past_squared_seasonal_error))
+
+
+class RMSLE(TimeSeriesScorer):
+    r"""Root mean squared logarithmic error.
+
+    Applies a logarithmic transformation to the predictions before computing the root mean squared error. Assumes
+    both the ground truth and predictions are positive. If negative predictions are given, they will be clipped to zero.
+
+    .. math::
+
+        \operatorname{RMSLE} = \sqrt{\frac{1}{N} \frac{1}{H} \sum_{i=1}^{N} \sum_{t=T+1}^{T+H} (\ln(1 + y_{i,t}) - \ln(1 + f_{i,t}))^2}
+
+
+    Properties:
+
+    - undefined for time series with negative values
+    - penalizes models that underpredict more than models that overpredict
+    - insensitive to effects of outliers and scale, best when targets can vary or trend exponentially
+
+
+    References
+    ----------
+    - `Scikit-learn: <https://scikit-learn.org/stable/modules/model_evaluation.html#mean-squared-log-error>`_
+    """
+
+    def compute_metric(self, data_future, predictions, target, **kwargs):
+        y_true, y_pred = self._get_point_forecast_score_inputs(data_future, predictions, target=target)
+        y_pred = np.clip(y_pred, a_min=0.0, a_max=None)
+
+        return np.sqrt(np.power(np.log1p(y_pred) - np.log1p(y_true), 2).mean())
