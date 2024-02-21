@@ -238,6 +238,35 @@ def test_RMSSE(prediction_length, seasonal_period, expected_result):
     assert ag_value == expected_result
 
 
+@pytest.mark.parametrize(
+    "prediction_length, expected_result",
+    [
+        (3, 1.03952774131806),
+        (4, 1.11754262032011),
+        (5, 1.17302207173233),
+        (6, 1.21497832991862),
+    ],
+)
+def test_RMSLE(prediction_length, expected_result):
+    data = get_data_frame_with_item_index(
+        ["1"],
+        start_date="2022-01-01 00:00:00",
+        data_length=2 * prediction_length,
+        columns=["target"],
+        data_generation="sequential",
+    )
+    predictions = get_data_frame_with_item_index(
+        ["1"],
+        start_date=str(pd.Timestamp("2022-01-01 00:00:00") + pd.to_timedelta(prediction_length, unit="H")),
+        data_length=prediction_length,
+        columns=["mean"],
+        data_generation="sequential",
+    )
+    metric = check_get_evaluation_metric("RMSLE")
+    ag_value = metric.sign * metric(data, predictions, prediction_length=prediction_length)
+    assert np.isclose(ag_value, expected_result, atol=1e-5)
+
+
 @pytest.mark.parametrize("metric_name", AVAILABLE_METRICS)
 def test_given_metric_is_optimized_by_median_when_model_predicts_then_median_is_pasted_to_mean_forecast(metric_name):
     eval_metric = check_get_evaluation_metric(metric_name)
