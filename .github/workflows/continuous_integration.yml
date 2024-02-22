@@ -122,7 +122,7 @@ jobs:
             other_than_timeseries:
               - '!(timeseries/**)**'
       - name: Test Tabular on AWS Batch
-        if: steps.changes.outputs.other_than_docs == 'true' && steps.changes.outputs.exclude_timeseries == 'true'
+        if: steps.changes.outputs.other_than_docs == 'true' && steps.changes.outputs.other_than_timeseries == 'true'
         uses: ./.github/actions/submit-job
         with:
           job-type: CI-GPU
@@ -144,7 +144,7 @@ jobs:
             other_than_timeseries:
               - '!(timeseries/**)**'
       - name: Test AutoGluonLite package via Pyodide on AWS Batch
-        if: steps.changes.outputs.other_than_docs == 'true' && steps.changes.outputs.exclude_timeseries == 'true'
+        if: steps.changes.outputs.other_than_docs == 'true' && steps.changes.outputs.other_than_timeseries == 'true'
         uses: ./.github/actions/submit-job
         with:
           job-type: CI-WASM
@@ -186,7 +186,7 @@ jobs:
             other_than_timeseries:
               - '!(timeseries/**)**'
       - name: Test Multimodal Predictor on AWS Batch
-        if: steps.changes.outputs.other_than_docs == 'true' && steps.changes.outputs.exclude_timeseries == 'true'
+        if: steps.changes.outputs.other_than_docs == 'true' && steps.changes.outputs.other_than_timeseries == 'true'
         uses: ./.github/actions/submit-job
         with:
           job-type: CI-GPU
@@ -208,7 +208,7 @@ jobs:
             other_than_timeseries:
               - '!(timeseries/**)**'
       - name: Test Multimodal Others on AWS Batch
-        if: steps.changes.outputs.other_than_docs == 'true' && steps.changes.outputs.exclude_timeseries == 'true'
+        if: steps.changes.outputs.other_than_docs == 'true' && steps.changes.outputs.other_than_timeseries == 'true'
         uses: ./.github/actions/submit-job
         with:
           job-type: CI-GPU
@@ -230,7 +230,7 @@ jobs:
             other_than_timeseries:
               - '!(timeseries/**)**'
       - name: Test Multimodal Others 2 on AWS Batch
-        if: steps.changes.outputs.other_than_docs == 'true' && steps.changes.outputs.exclude_timeseries == 'true'
+        if: steps.changes.outputs.other_than_docs == 'true' && steps.changes.outputs.other_than_timeseries == 'true'
         uses: ./.github/actions/submit-job
         with:
           job-type: CI-GPU
