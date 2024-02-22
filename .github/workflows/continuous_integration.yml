@@ -119,8 +119,10 @@ jobs:
           filters: |
             other_than_docs:
               - '!(docs/**)**'
+            exclude_timeseries:
+              - '!(timeseries/**)**'
       - name: Test Tabular on AWS Batch
-        if: steps.changes.outputs.other_than_docs == 'true'
+        if: steps.changes.outputs.other_than_docs == 'true' && steps.changes.outputs.exclude_timeseries == 'true'
         uses: ./.github/actions/submit-job
         with:
           job-type: CI-GPU
@@ -139,8 +141,10 @@ jobs:
           filters: |
             other_than_docs:
               - '!(docs/**)**'
+            exclude_timeseries:
+              - '!(timeseries/**)**'
       - name: Test AutoGluonLite package via Pyodide on AWS Batch
-        if: steps.changes.outputs.other_than_docs == 'true'
+        if: steps.changes.outputs.other_than_docs == 'true' && steps.changes.outputs.exclude_timeseries == 'true'
         uses: ./.github/actions/submit-job
         with:
           job-type: CI-WASM
@@ -179,8 +183,10 @@ jobs:
           filters: |
             other_than_docs:
               - '!(docs/**)**'
+            exclude_timeseries:
+              - '!(timeseries/**)**'
       - name: Test Multimodal Predictor on AWS Batch
-        if: steps.changes.outputs.other_than_docs == 'true'
+        if: steps.changes.outputs.other_than_docs == 'true' && steps.changes.outputs.exclude_timeseries == 'true'
         uses: ./.github/actions/submit-job
         with:
           job-type: CI-GPU
@@ -199,8 +205,10 @@ jobs:
           filters: |
             other_than_docs:
               - '!(docs/**)**'
+            exclude_timeseries:
+              - '!(timeseries/**)**'
       - name: Test Multimodal Others on AWS Batch
-        if: steps.changes.outputs.other_than_docs == 'true'
+        if: steps.changes.outputs.other_than_docs == 'true' && steps.changes.outputs.exclude_timeseries == 'true'
         uses: ./.github/actions/submit-job
         with:
           job-type: CI-GPU
@@ -219,8 +227,10 @@ jobs:
           filters: |
             other_than_docs:
               - '!(docs/**)**'
+            exclude_timeseries:
+              - '!(timeseries/**)**'
       - name: Test Multimodal Others 2 on AWS Batch
-        if: steps.changes.outputs.other_than_docs == 'true'
+        if: steps.changes.outputs.other_than_docs == 'true' && steps.changes.outputs.exclude_timeseries == 'true'
         uses: ./.github/actions/submit-job
         with:
           job-type: CI-GPU
