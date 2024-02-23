@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
+from autogluon.common.space import Space
 from autogluon.common.utils.distribute_utils import DistributedContext
 from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.log_utils import DuplicateFilter
@@ -1945,9 +1946,27 @@ class AbstractModel:
         else:
             return dict()
 
-    def _get_model_params(self) -> dict:
-        """Gets params that are passed to the inner model."""
-        return self._get_params()
+    def _get_model_params(self, convert_search_spaces_to_default: bool = False) -> dict:
+        """
+        Gets params that are passed to the inner model.
+
+        Parameters
+        ----------
+        convert_search_spaces_to_default: bool, default = False
+            If True, search spaces are converted to the default value.
+            This is useful when having to estimate memory usage estimates prior to doing hyperparameter tuning.
+
+        Returns
+        -------
+        params: dict
+            Dictionary of model hyperparameters.
+        """
+        params = self._get_params()
+        if convert_search_spaces_to_default:
+            for param, val in params.items():
+                if isinstance(val, Space):
+                    params[param] = val.default
+        return params
 
     # TODO: Add documentation for valid args for each model. Currently only `early_stop`
     def _ag_params(self) -> set:
