@@ -1,6 +1,7 @@
 """
 Module including wrappers for PyTorch implementations of models in GluonTS
 """
+
 import logging
 from typing import Any, Dict, Type
 
@@ -78,6 +79,8 @@ class DeepARModel(AbstractGluonTSModel):
         Optional keyword arguments passed to ``lightning.Trainer``.
     early_stopping_patience : int or None, default = 20
         Early stop training if the validation loss doesn't improve for this many epochs.
+    keep_lightning_logs : bool, default = False
+        If True, ``lightning_logs`` directory will NOT be removed after the model finished training.
     """
 
     supports_known_covariates = True
@@ -131,6 +134,8 @@ class SimpleFeedForwardModel(AbstractGluonTSModel):
         Optional keyword arguments passed to ``lightning.Trainer``.
     early_stopping_patience : int or None, default = 20
         Early stop training if the validation loss doesn't improve for this many epochs.
+    keep_lightning_logs : bool, default = False
+        If True, ``lightning_logs`` directory will NOT be removed after the model finished training.
     """
 
     def _get_estimator_class(self) -> Type[GluonTSEstimator]:
@@ -188,6 +193,8 @@ class TemporalFusionTransformerModel(AbstractGluonTSModel):
         Optional keyword arguments passed to ``lightning.Trainer``.
     early_stopping_patience : int or None, default = 20
         Early stop training if the validation loss doesn't improve for this many epochs.
+    keep_lightning_logs : bool, default = False
+        If True, ``lightning_logs`` directory will NOT be removed after the model finished training.
     """
 
     supports_known_covariates = True
@@ -254,6 +261,8 @@ class DLinearModel(AbstractGluonTSModel):
         Early stop training if the validation loss doesn't improve for this many epochs.
     weight_decay : float, default = 1e-8
         Weight decay regularization parameter.
+    keep_lightning_logs : bool, default = False
+        If True, ``lightning_logs`` directory will NOT be removed after the model finished training.
     """
 
     @property
@@ -306,6 +315,8 @@ class PatchTSTModel(AbstractGluonTSModel):
         Learning rate used during training
     weight_decay : float, default = 1e-8
         Weight decay regularization parameter.
+    keep_lightning_logs : bool, default = False
+        If True, ``lightning_logs`` directory will NOT be removed after the model finished training.
     """
 
     @property
@@ -377,6 +388,8 @@ class WaveNetModel(AbstractGluonTSModel):
         Early stop training if the validation loss doesn't improve for this many epochs.
     weight_decay : float, default = 1e-8
         Weight decay regularization parameter.
+    keep_lightning_logs : bool, default = False
+        If True, ``lightning_logs`` directory will NOT be removed after the model finished training.
     """
 
     supports_known_covariates = True

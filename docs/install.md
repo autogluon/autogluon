@@ -78,7 +78,7 @@ The Conda install may have subtle differences in installed dependencies that cou
   :::::{tab} Conda
   
     ::::{tab} CPU
-    ```{include} install-conda-full.md
+    ```{include} install-mac-conda.md
     ```
     ::::
   

@@ -5,7 +5,7 @@ sys.path = ['.', '..'] + sys.path
 
 project = 'AutoGluon'
 release = '1.0.1'
-copyright = '2023, All authors. Licensed under Apache 2.0.'
+copyright = '2024, All authors. Licensed under Apache 2.0.'
 author = 'AutoGluon contributors'
 
 extensions = [
