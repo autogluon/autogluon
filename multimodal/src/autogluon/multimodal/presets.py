@@ -349,7 +349,7 @@ def object_detection(presets: str = DEFAULT):
         "model.names": ["mmdet_image"],
         "model.mmdet_image.checkpoint_name": "yolox_s",
         "env.eval_batch_size_ratio": 1,
-        "env.precision": 32,
+        #"env.precision": 32,
         "env.strategy": "ddp",
         "env.auto_select_gpus": True,  # Turn on for detection to return devices in a list, TODO: fix the extra GPU usage bug
         "env.num_gpus": -1,
@@ -378,9 +378,9 @@ def object_detection(presets: str = DEFAULT):
         hyperparameters.update(
             {
                 "model.mmdet_image.checkpoint_name": "yolox_l",
-                "env.per_gpu_batch_size": 2,  # Works on 8G GPU
+                "env.per_gpu_batch_size": 16,  # Works on 8G GPU
                 "optimization.learning_rate": 5e-5,
-                "optimization.patience": 3,
+                "optimization.patience": 5,
                 "optimization.max_epochs": 50,
                 "optimization.val_check_interval": 1.0,
                 "optimization.check_val_every_n_epoch": 3,
@@ -403,7 +403,7 @@ def object_detection(presets: str = DEFAULT):
         hyperparameters.update(
             {
                 "model.mmdet_image.checkpoint_name": "dino-5scale_swin-l_8xb2-36e_coco",
-                "model.mmdet_image.frozen_layers": ["backbone", "model.level_embed"],
+                #"model.mmdet_image.frozen_layers": ["backbone", "model.level_embed"],
                 "env.per_gpu_batch_size": 1,  # Works on 24G GPU
                 "optimization.learning_rate": 1e-4,
                 "optimization.patience": 20,

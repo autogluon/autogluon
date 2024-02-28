@@ -163,6 +163,8 @@ class MMDetLitModule(pl.LightningModule):
             mAPs["val_mAP"] = mAPs["val_map"]
             self.log_dict(mAPs, sync_dist=True)
         self.validation_metric.reset()
+        #middle_lr = self.trainer.lr_scheduler_configs[0].scheduler.optimizer.param_groups[0]["lr"]
+        #print('>>> middle_lr  ',middle_lr)
 
     def test_step(self, batch, batch_idx, dataloader_idx=0):
         raise NotImplementedError("test with lit_mmdet is not implemented yet.")
@@ -239,15 +241,17 @@ class MMDetLitModule(pl.LightningModule):
 
         logger.debug(f"warmup steps: {warmup_steps}")
         logger.debug(f"lr_schedule: {self.hparams.lr_schedule}")
-        scheduler = get_lr_scheduler(
-            optimizer=optimizer,
-            num_max_steps=max_steps,
-            num_warmup_steps=warmup_steps,
-            lr_schedule=self.hparams.lr_schedule,
-            end_lr=self.hparams.end_lr,
-        )
+        import torch
+        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=[30, 55], gamma=0.1)
+        #scheduler = get_lr_scheduler(
+        #    optimizer=optimizer,
+        #    num_max_steps=max_steps,
+        #    num_warmup_steps=warmup_steps,
+        #    lr_schedule=self.hparams.lr_schedule,
+        #    end_lr=self.hparams.end_lr,
+        #)
+        sched = {"scheduler": scheduler, "interval": "epoch"}
 
-        sched = {"scheduler": scheduler, "interval": "step"}
         logger.debug("done configuring optimizer and scheduler")
         return [optimizer], [sched]
 

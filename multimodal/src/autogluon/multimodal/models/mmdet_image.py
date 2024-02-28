@@ -341,8 +341,51 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         Basically, id gradually increases when going from the output end to
         the input end. The layers defined in this class, e.g., head, have id 0.
 
-        Setting all layers as the same id 0 for now.
-        TODO: Need to investigate mmdetection's model definitions
+        Returns
+        -------
+        A dictionary mapping the layer names (keys) to their ids (values).
+        """
+
+        # two stage lr: backbone v.s. else
+        # to use head v.s. else, call: get_layer_ids_by_head
+        return self.get_layer_ids_by_backbone()
+
+    def get_layer_ids_by_backbone(
+        self,
+    ):
+        """
+        Assign an id to each layer. Layer ids will be used in layer-wise lr decay.
+        Basically, id gradually increases when going from the output end to
+        the input end. The layers defined in this class, e.g., head, have id 0.
+
+        Currently only head to 0 others to 1.
+
+        Returns
+        -------
+        A dictionary mapping the layer names (keys) to their ids (values).
+        """
+        name_to_id = {}
+        backbones = [
+            "backbone",
+            #"model.level_embed",
+        ]
+
+        for n, _ in self.named_parameters():
+            name_to_id[n] = 0
+            for backbone in backbones:
+                if backbone in n:
+                    name_to_id[n] = 1
+
+        return name_to_id
+
+    def get_layer_ids_by_head(
+        self,
+    ):
+        """
+        Assign an id to each layer. Layer ids will be used in layer-wise lr decay.
+        Basically, id gradually increases when going from the output end to
+        the input end. The layers defined in this class, e.g., head, have id 0.
+
         Currently only head to 0 others to 1.
 
         Returns
