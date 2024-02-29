@@ -3,10 +3,10 @@
 # This code block is a HACK (!), but is necessary to avoid code duplication. Do NOT alter these lines.
 import importlib.util
 import os
+import platform
+import sys
 
 from setuptools import setup
-import sys
-import platform
 
 filepath = os.path.abspath(os.path.dirname(__file__))
 filepath_import = os.path.join(filepath, "..", "core", "src", "autogluon", "core", "_setup_utils.py")
