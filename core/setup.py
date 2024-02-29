@@ -5,6 +5,8 @@ import importlib.util
 import os
 
 from setuptools import setup
+import sys
+import platform
 
 filepath = os.path.abspath(os.path.dirname(__file__))
 filepath_import = os.path.join(filepath, "..", "core", "src", "autogluon", "core", "_setup_utils.py")
@@ -45,18 +47,23 @@ install_requires = (
     ]
 )
 
-extras_require = {
-    "ray": [
-        "ray[default]>=2.6.3,<2.7",
-        "async-timeout",
-    ],
-    "raytune": [
-        "ray[default,tune]>=2.6.3,<2.7",
-        # TODO: consider alternatives as hyperopt is not actively maintained.
-        "hyperopt>=0.2.7,<0.2.8",  # This is needed for the bayes search to work.
-        # 'GPy>=1.10.0,<1.11.0'  # TODO: Enable this once PBT/PB2 are supported by ray lightning
-    ],
-}
+# Check for Windows and Python 3.11
+is_windows_and_py311 = platform.system().lower() == "windows" and sys.version_info.major == 3 and sys.version_info.minor == 11
+if not is_windows_and_py311:
+    extras_require = {
+        "ray": [
+            "ray[default]>=2.6.3,<2.7",
+        ],
+        "raytune": [
+            "ray[default,tune]>=2.6.3,<2.7",
+            # TODO: consider alternatives as hyperopt is not actively maintained.
+            "hyperopt>=0.2.7,<0.2.8",  # This is needed for the bayes search to work.
+            # 'GPy>=1.10.0,<1.11.0'  # TODO: Enable this once PBT/PB2 are supported by ray lightning
+        ],
+    }
+else:
+    # we don't install ray and raytune on Windows with Python 3.11 due to issue https://github.com/autogluon/autogluon/issues/3807
+    extras_require = {}
 
 tests_require = [
     "pytest",
