@@ -1216,8 +1216,8 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             Quantile levels for which to plot the prediction intervals. Defaults to lowest & highest quantile levels
             available in ``predictions``.
         item_ids : List[Union[str, int]], optional
-            If provided, plots will only be generated for time series with these item IDs. By default (if set to 
-            ``None``), item IDs are selected randomly. In either case, plots are generated for at most 
+            If provided, plots will only be generated for time series with these item IDs. By default (if set to
+            ``None``), item IDs are selected randomly. In either case, plots are generated for at most
             ``max_num_item_ids`` time series.
         max_num_item_ids : int, default = 8
             At most this many time series will be plotted by the method.
