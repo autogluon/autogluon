@@ -75,7 +75,8 @@ tests_require = [
 all_requires = []
 
 for extra_package in ["ray", "raytune"]:
-    all_requires += extras_require[extra_package]
+    if extra_package in extras_require:
+        all_requires += extras_require[extra_package]
 tests_require = list(set(tests_require))
 all_requires = list(set(all_requires))
 extras_require["tests"] = tests_require
