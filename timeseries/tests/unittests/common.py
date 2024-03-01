@@ -6,8 +6,8 @@ import numpy as np
 import pandas as pd
 from gluonts.dataset.common import ListDataset
 
-from autogluon.timeseries.dataset import TimeSeriesDataFrame
-from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
+from autogluon.timeseries import TimeSeriesPredictor
+from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer
 
 # TODO: add larger unit test data sets to S3
@@ -183,3 +183,11 @@ class CustomMetric(TimeSeriesScorer):
 
     def clear_past_metrics(self) -> None:
         del self._past_target_mean
+
+
+def get_prediction_for_df(data):
+    predictor = TimeSeriesPredictor(prediction_length=5).fit(data, hyperparameters={"Naive": {}})
+    return predictor.predict(data)
+
+
+PREDICTIONS_FOR_DUMMY_TS_DATAFRAME = get_prediction_for_df(DUMMY_TS_DATAFRAME)

@@ -231,9 +231,6 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         if static_features is not None:
             df = pd.merge(df, static_features, how="left", on=ITEMID, suffixes=(None, "_static_feat"))
 
-        # Convert float64 to float32 to reduce memory usage
-        float64_cols = list(df.select_dtypes(include="float64"))
-        df[float64_cols] = df[float64_cols].astype("float32")
         # We assume that df is sorted by 'unique_id' inside `TimeSeriesPredictor._check_and_prepare_data_frame`
         return df.rename(columns=column_name_mapping)
 
