@@ -68,8 +68,7 @@ class ContinuousAndCategoricalFeatureGenerator(PipelineFeatureGenerator):
 class TimeSeriesFeatureGenerator:
     """Takes care of preprocessing for static_features and past/known covariates.
 
-    Covariates are all converted to float dtype. Static features, if present, are all converted to categorical & float
-    dtypes.
+    All covariates & static features are converted into either float32 or categorical dtype.
     """
 
     def __init__(self, target: str, known_covariates_names: List[str], float_dtype: str = "float32"):
