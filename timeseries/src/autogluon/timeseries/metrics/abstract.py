@@ -76,6 +76,7 @@ class TimeSeriesScorer:
         data_past = data.slice_by_timestep(None, -prediction_length)
         data_future = data.slice_by_timestep(-prediction_length, None)
 
+        assert not predictions.isna().any().any(), "Predictions contain NaN values."
         assert (predictions.num_timesteps_per_item() == prediction_length).all()
         assert data_future.index.equals(predictions.index), "Prediction and data indices do not match."
 

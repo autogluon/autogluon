@@ -246,8 +246,9 @@ class MASE(TimeSeriesScorer):
         if self._past_abs_seasonal_error is None:
             raise AssertionError("Call `save_past_metrics` before `compute_metric`")
 
-        mae_per_item = (y_true - y_pred).abs().groupby(level=ITEMID, sort=False).mean()
-        return self._safemean(mae_per_item / self._past_abs_seasonal_error)
+        num_items = len(self._past_abs_seasonal_error)
+        mae_per_item = np.abs(y_true.values - y_pred.values).reshape([num_items, -1])  # [num_items, prediction_length]
+        return np.nanmean(mae_per_item / self._past_abs_seasonal_error.values[:, None])
 
 
 class RMSSE(TimeSeriesScorer):
