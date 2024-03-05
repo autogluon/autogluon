@@ -99,11 +99,12 @@ class SQL(TimeSeriesScorer):
             raise AssertionError("Call `save_past_metrics` before `compute_metric`")
 
         y_true, q_pred, quantile_levels = self._get_quantile_forecast_score_inputs(data_future, predictions, target)
+        q_pred = q_pred.values
         values_true = y_true.values[:, None]  # shape [N, 1]
 
-        ql = ((q_pred - values_true) * ((values_true <= q_pred) - quantile_levels)).mean(axis=1).abs()
+        ql = np.abs((q_pred - values_true) * ((values_true <= q_pred) - quantile_levels)).mean(axis=1)
         num_items = len(self._past_abs_seasonal_error)
         # Reshape QL values into [num_items, prediction_length] to normalize per item without groupby
         ql_reshaped = ql.reshape([num_items, -1])
-        scaled_ql = ql_reshaped / self._past_abs_seasonal_error.values[:, None]
-        return 2 * np.nanmean(scaled_ql)
+        # We assume that items are in the same order in both arrays because predictor sorts by item_id
+        return 2 * self._safemean(ql_reshaped / self._past_abs_seasonal_error.values[:, None])

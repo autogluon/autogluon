@@ -249,9 +249,8 @@ class MASE(TimeSeriesScorer):
         num_items = len(self._past_abs_seasonal_error)
         # Reshape MAE values into [num_items, prediction_length] to normalize per item without groupby
         mae_reshaped = np.abs(y_true.values - y_pred.values).reshape([num_items, -1])
-        # We assume that items are in the same order in both arrays because predictor sorts item_ids
-        mase_per_item = mae_reshaped / self._past_abs_seasonal_error.values[:, None]
-        return np.nanmean(mase_per_item)
+        # We assume that items are in the same order in both arrays because predictor sorts by item_id
+        return self._safemean(mae_reshaped / self._past_abs_seasonal_error.values[:, None])
 
 
 class RMSSE(TimeSeriesScorer):
