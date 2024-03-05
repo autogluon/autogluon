@@ -199,7 +199,7 @@ class CustomMetric(TimeSeriesScorer):
 
 def get_prediction_for_df(data, prediction_length=5):
     forecast_index = get_forecast_horizon_index_ts_dataframe(data, prediction_length=prediction_length)
-    columns = ["mean", "0.1", "0.5", "0.9"]
+    columns = ["mean", "0.1", "0.2", "0.3", "0.4", "0.5", "0.6", "0.7", "0.8", "0.9"]
     return TimeSeriesDataFrame(
         pd.DataFrame(np.random.normal(size=[len(forecast_index), len(columns)]), index=forecast_index, columns=columns)
     )
