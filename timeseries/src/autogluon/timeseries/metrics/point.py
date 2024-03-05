@@ -5,7 +5,6 @@ import numpy as np
 import pandas as pd
 
 from autogluon.timeseries import TimeSeriesDataFrame
-from autogluon.timeseries.dataset.ts_dataframe import ITEMID
 
 from .abstract import TimeSeriesScorer
 from .utils import _in_sample_abs_seasonal_error, _in_sample_squared_seasonal_error
@@ -247,10 +246,10 @@ class MASE(TimeSeriesScorer):
             raise AssertionError("Call `save_past_metrics` before `compute_metric`")
 
         num_items = len(self._past_abs_seasonal_error)
-        # Reshape MAE values into [num_items, prediction_length] to normalize per item without groupby
-        mae_reshaped = np.abs(y_true.values - y_pred.values).reshape([num_items, -1])
+        # Reshape abs errors into [num_items, prediction_length] to normalize per item without groupby
+        abs_errors = np.abs(y_true.values - y_pred.values).reshape([num_items, -1])
         # We assume that items are in the same order in both arrays because predictor sorts by item_id
-        return self._safemean(mae_reshaped / self._past_abs_seasonal_error.values[:, None])
+        return self._safemean(abs_errors / self._past_abs_seasonal_error.values[:, None])
 
 
 class RMSSE(TimeSeriesScorer):
@@ -307,8 +306,11 @@ class RMSSE(TimeSeriesScorer):
         if self._past_squared_seasonal_error is None:
             raise AssertionError("Call `save_past_metrics` before `compute_metric`")
 
-        mse_per_item = (y_true - y_pred).pow(2.0).groupby(level=ITEMID, sort=False).mean()
-        return np.sqrt(self._safemean(mse_per_item / self._past_squared_seasonal_error))
+        num_items = len(self._past_abs_seasonal_error)
+        # Reshape squared errors into [num_items, prediction_length] to normalize per item without groupby
+        squared_errors = ((y_true.values - y_pred.values) ** 2.0).reshape([num_items, -1])
+        # We assume that items are in the same order in both arrays because predictor sorts by item_id
+        return np.sqrt(self._safemean(squared_errors / self._past_squared_seasonal_error.values[:, None]))
 
 
 class RMSLE(TimeSeriesScorer):

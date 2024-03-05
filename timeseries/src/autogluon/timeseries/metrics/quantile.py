@@ -3,7 +3,7 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 
-from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
+from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 
 from .abstract import TimeSeriesScorer
 from .utils import _in_sample_abs_seasonal_error
@@ -104,7 +104,7 @@ class SQL(TimeSeriesScorer):
 
         ql = np.abs((q_pred - values_true) * ((values_true <= q_pred) - quantile_levels)).mean(axis=1)
         num_items = len(self._past_abs_seasonal_error)
-        # Reshape QL values into [num_items, prediction_length] to normalize per item without groupby
-        ql_reshaped = ql.reshape([num_items, -1])
+        # Reshape quantile losses values into [num_items, prediction_length] to normalize per item without groupby
+        quantile_losses = ql.reshape([num_items, -1])
         # We assume that items are in the same order in both arrays because predictor sorts by item_id
-        return 2 * self._safemean(ql_reshaped / self._past_abs_seasonal_error.values[:, None])
+        return 2 * self._safemean(quantile_losses / self._past_abs_seasonal_error.values[:, None])
