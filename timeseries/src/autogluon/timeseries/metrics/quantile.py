@@ -102,6 +102,8 @@ class SQL(TimeSeriesScorer):
         values_true = y_true.values[:, None]  # shape [N, 1]
 
         ql = ((q_pred - values_true) * ((values_true <= q_pred) - quantile_levels)).mean(axis=1).abs()
-        # TODO: Speed up computation by using np.arrays & replace groupby with reshapes [-1, prediction_length]?
-        ql_per_item = ql.groupby(level=ITEMID, sort=False).mean()
-        return 2 * self._safemean(ql_per_item / self._past_abs_seasonal_error)
+        num_items = len(self._past_abs_seasonal_error)
+        # Reshape QL values into [num_items, prediction_length] to normalize per item without groupby
+        ql_reshaped = ql.reshape([num_items, -1])
+        scaled_ql = ql_reshaped / self._past_abs_seasonal_error.values[:, None]
+        return 2 * np.nanmean(scaled_ql)
