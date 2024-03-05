@@ -3,8 +3,6 @@
 # This code block is a HACK (!), but is necessary to avoid code duplication. Do NOT alter these lines.
 import importlib.util
 import os
-import platform
-import sys
 
 from setuptools import setup
 
