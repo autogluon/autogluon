@@ -312,8 +312,8 @@ def test_given_metric_is_optimized_by_median_when_model_predicts_then_median_is_
 def test_when_perfect_predictions_passed_to_metric_then_score_equals_optimum(metric_name):
     prediction_length = 5
     eval_metric = check_get_evaluation_metric(metric_name)
-    data = DUMMY_TS_DATAFRAME.copy()
-    predictions = data.slice_by_timestep(-prediction_length, None).rename(columns={"target": "mean"})
+    data = DUMMY_TS_DATAFRAME_WITH_MISSING.copy()
+    predictions = data.slice_by_timestep(-prediction_length, None).rename(columns={"target": "mean"}).fillna(0.0)
     for q in ["0.1", "0.4", "0.9"]:
         predictions[q] = predictions["mean"]
     score = eval_metric.score(data, predictions, prediction_length=prediction_length)
@@ -324,8 +324,8 @@ def test_when_perfect_predictions_passed_to_metric_then_score_equals_optimum(met
 def test_when_better_predictions_passed_to_metric_then_score_improves(metric_name):
     prediction_length = 5
     eval_metric = check_get_evaluation_metric(metric_name)
-    data = DUMMY_TS_DATAFRAME.copy()
-    predictions = data.slice_by_timestep(-prediction_length, None).rename(columns={"target": "mean"})
+    data = DUMMY_TS_DATAFRAME_WITH_MISSING.copy()
+    predictions = data.slice_by_timestep(-prediction_length, None).rename(columns={"target": "mean"}).fillna(0.0)
     for q in ["0.1", "0.4", "0.9"]:
         predictions[q] = predictions["mean"]
     good_score = eval_metric.score(data, predictions + 1, prediction_length=prediction_length)
