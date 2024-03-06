@@ -46,6 +46,44 @@ jobs:
           job-type: CI-CPU
           job-name: AutoGluon-LintCheck
           command: chmod +x ./.github/workflow_scripts/lint_check.sh && ./.github/workflow_scripts/lint_check.sh
+  package_diff:
+    needs: lint_check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v2.0.0
+        with:
+          activate-environment: autogluon_py3
+          environment-file: .github/workflows_env/unittest_env.yml
+          auto-update-conda: true
+          python-version: "3.10"
+      - name: Setup Env Vars
+        uses: ./.github/actions/setup-env-vars
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCiCopyDocs
+          role-duration-seconds: 3600
+          aws-region: us-east-1
+      - name: Install all dependencies
+        shell: bash -l {0}
+        run: |
+          chmod +x ./full_install.sh && ./full_install.sh
+      - name: Store package versions
+        run: |
+          cur_date=$(date +%Y-%m-%d-%H:%M:%S)
+          echo "Timestamp: $cur_date" > ./package_versions_${cur_date}.txt
+          echo "Package Versions:" >> ./package_versions_${cur_date}.txt
+          pip freeze >> ./package_versions_${cur_date}.txt
+      - name: Fetch previous version file and compare
+        run: |
+          /bin/bash ./.github/workflow_scripts/version_diff.sh
+        continue-on-error: true
+      - name: Upload the current package versions
+        run: |
+          aws s3 cp ./package_versions_* "s3://autogluon-ci/package_versions/"   
   test_common:
     needs: lint_check
     runs-on: ubuntu-latest
