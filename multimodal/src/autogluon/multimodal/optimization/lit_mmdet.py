@@ -164,8 +164,6 @@ class MMDetLitModule(pl.LightningModule):
             mAPs["val_mAP"] = mAPs["val_map"]
             self.log_dict(mAPs, sync_dist=True)
         self.validation_metric.reset()
-        #middle_lr = self.trainer.lr_scheduler_configs[0].scheduler.optimizer.param_groups[0]["lr"]
-        #print('>>> middle_lr  ',middle_lr)
 
     def test_step(self, batch, batch_idx, dataloader_idx=0):
         raise NotImplementedError("test with lit_mmdet is not implemented yet.")
