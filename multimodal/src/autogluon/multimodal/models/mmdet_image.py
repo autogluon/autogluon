@@ -68,7 +68,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         self.checkpoint_name = checkpoint_name
         self.config_file = config_file
         self.classes = classes
-        self.frozen_layers = frozen_layers
+        self.frozen_layers = []
 
         self.device = None
 
