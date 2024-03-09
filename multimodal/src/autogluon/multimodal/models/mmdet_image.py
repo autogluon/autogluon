@@ -68,7 +68,10 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         self.checkpoint_name = checkpoint_name
         self.config_file = config_file
         self.classes = classes
+        # Based on our offline benchmarking results, instead of freezing layers,
+        # Setting backbone to a smaller learning rate achieves better results,
         self.frozen_layers = []
+        self.backbone_layers = frozen_layers
 
         self.device = None
 
@@ -346,9 +349,11 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         A dictionary mapping the layer names (keys) to their ids (values).
         """
 
-        # two stage lr: backbone v.s. else
-        # to use head v.s. else, call: get_layer_ids_by_head
-        return self.get_layer_ids_by_backbone()
+        # two stage lr: backbone v.s. else, or head v.s. else
+        if self.backbone_layers:
+            return self.get_layer_ids_by_backbone()
+        else:
+            return self.get_layer_ids_by_head()
 
     def get_layer_ids_by_backbone(
         self,
@@ -365,10 +370,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         A dictionary mapping the layer names (keys) to their ids (values).
         """
         name_to_id = {}
-        backbones = [
-            "backbone",
-            #"model.level_embed",
-        ]
+        backbones = self.backbone_layers
 
         for n, _ in self.named_parameters():
             name_to_id[n] = 0

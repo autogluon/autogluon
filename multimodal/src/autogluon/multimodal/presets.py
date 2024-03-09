@@ -390,24 +390,8 @@ def object_detection(presets: str = DEFAULT):
         hyperparameters.update(
             {
                 "model.mmdet_image.checkpoint_name": "dino-4scale_r50_8xb2-12e_coco",
-                "model.mmdet_image.frozen_layers": ["backbone", "model.level_embed"],
-                "env.per_gpu_batch_size": 1,  # Works on 16G GPU
-                "optimization.learning_rate": 1e-4,
-                "optimization.patience": 20,
-                "optimization.max_epochs": 50,
-                "optimization.val_check_interval": 1.0,
-                "optimization.check_val_every_n_epoch": 1,
-            }
-        )
-    elif presets == BEST_QUALITY:
-        hyperparameters.update(
-            {
-                "model.mmdet_image.checkpoint_name": "dino-5scale_swin-l_8xb2-36e_coco",
                 "model.mmdet_image.frozen_layers": ["backbone"],
-                #"env.per_gpu_batch_size": 1,  # Works on 24G GPU
-                #"optimization.learning_rate": 1e-4,
                 "optimization.patience": 20,
-                #"optimization.max_epochs": 50,
                 "optimization.val_check_interval": 1.0,
                 "optimization.check_val_every_n_epoch": 1,
                 "env.batch_size": 32,
@@ -417,6 +401,27 @@ def object_detection(presets: str = DEFAULT):
                 "optimization.weight_decay": 1e-4,
                 "optimization.lr_mult": 10,
                 "optimization.lr_choice": "two_stages",  # TODO: changed
+                "optimization.lr_schedule": "multi_step",
+                "optimization.gradient_clip_val": 0.1,
+                "optimization.max_epochs": 60,
+            }
+        )
+    elif presets == BEST_QUALITY:
+        hyperparameters.update(
+            {
+                "model.mmdet_image.checkpoint_name": "dino-5scale_swin-l_8xb2-36e_coco",
+                "model.mmdet_image.frozen_layers": ["backbone"],
+                "optimization.patience": 20,
+                "optimization.val_check_interval": 1.0,
+                "optimization.check_val_every_n_epoch": 1,
+                "env.batch_size": 32,
+                "env.per_gpu_batch_size": 1,
+                "env.num_workers": 2,
+                "optimization.learning_rate": 1e-5,
+                "optimization.weight_decay": 1e-4,
+                "optimization.lr_mult": 10,
+                "optimization.lr_choice": "two_stages",  # TODO: changed
+                "optimization.lr_schedule": "multi_step",
                 "optimization.gradient_clip_val": 0.1,
                 "optimization.max_epochs": 60,
             }

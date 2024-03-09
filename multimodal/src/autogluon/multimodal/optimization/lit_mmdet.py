@@ -2,6 +2,7 @@ import logging
 from typing import Callable, Optional, Union
 
 import lightning.pytorch as pl
+import torch
 import torchmetrics
 from lightning.pytorch.utilities import grad_norm
 from torch.nn.modules.loss import _Loss
@@ -241,16 +242,20 @@ class MMDetLitModule(pl.LightningModule):
 
         logger.debug(f"warmup steps: {warmup_steps}")
         logger.debug(f"lr_schedule: {self.hparams.lr_schedule}")
-        import torch
-        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=[30, 55], gamma=0.1)
-        #scheduler = get_lr_scheduler(
-        #    optimizer=optimizer,
-        #    num_max_steps=max_steps,
-        #    num_warmup_steps=warmup_steps,
-        #    lr_schedule=self.hparams.lr_schedule,
-        #    end_lr=self.hparams.end_lr,
-        #)
-        sched = {"scheduler": scheduler, "interval": "epoch"}
+
+        # TODO: Integrate MultiStepLR into get_lr_scheduler and add milestones, gamma, and interval into hyperparameters
+        if self.hparams.lr_schedule == "multi_step":
+            scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=[30, 55], gamma=0.1)
+            sched = {"scheduler": scheduler, "interval": "epoch"}
+        else:
+            scheduler = get_lr_scheduler(
+                optimizer=optimizer,
+                num_max_steps=max_steps,
+                num_warmup_steps=warmup_steps,
+                lr_schedule=self.hparams.lr_schedule,
+                end_lr=self.hparams.end_lr,
+            )
+            sched = {"scheduler": scheduler, "interval": "step"}
 
         logger.debug("done configuring optimizer and scheduler")
         return [optimizer], [sched]
