@@ -7,8 +7,6 @@ from autogluon.multimodal import MultiModalPredictor
 
 
 def main(benchmark_root, dataset_name, presets, seed):
-
-
     train_path = os.path.join(benchmark_root, dataset_name, "annotations", "train_train.json")
     val_path = os.path.join(benchmark_root, dataset_name, "annotations", "train_val.json")
     if not os.path.exists(val_path):
