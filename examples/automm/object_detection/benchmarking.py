@@ -37,7 +37,7 @@ def main(benchmark_root, dataset_name, presets, seed):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-r", "--benchmark_root", default="/media/ag/data/AutoMLDetBench", type=str)
+    parser.add_argument("-r", "--benchmark_root", default="./data/AutoMLDetBench", type=str)
     parser.add_argument("-d", "--dataset_name", default=None, type=str)
     parser.add_argument("-p", "--presets", default="best_quality", type=str)
     parser.add_argument("-s", "--seed", default=0, type=int)
