@@ -72,6 +72,8 @@ jobs:
         run: |
           chmod +x ./full_install.sh && ./full_install.sh
       - name: Store package versions
+        # Keep shell open to pick pip from autogluon_py3
+        shell: bash -l {0}
         run: |
           cur_date=$(date +%Y-%m-%d-%H:%M:%S)
           echo "Timestamp: $cur_date" > ./package_versions_${cur_date}.txt
