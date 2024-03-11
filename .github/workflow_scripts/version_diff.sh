@@ -33,7 +33,45 @@ diff_exit_code=$?
 if [ $diff_exit_code -eq 0 ]; then
     echo "No difference"
 elif [ $diff_exit_code -eq 1 ]; then
-    echo "\nPackage Differences Below:\n"
+    echo -e "\nPackage Differences Below:\n"
+    # Create arrays to store Name:Version for ordering and matching
+    declare -A prev_packages
+    declare -A curr_packages
+
+    while IFS= read -r line; do 
+
+        if [[ $line == *"-e git+https:"* ]] && [[ $line == *"autogluon"* ]] || ! [[ $line =~ ^[\<\>] ]] || [[ $line == *"Timestamp:"* ]] ; then
+            continue
+        fi
+        
+        if [[ $line == \<* ]]; then
+            name=$(echo "$line" | cut -d= -f1 | cut -d' ' -f2)
+            version=$(echo "$line" | cut -d= -f2-)
+            curr_packages[$name]=$version
+        fi
+        
+        if [[ $line == \>* ]]; then
+            name=$(echo "$line" | cut -d= -f1 | cut -d' ' -f2)
+            version=$(echo "$line" | cut -d= -f2-)
+            prev_packages[$name]=$version
+        fi
+    done < ./diff_output.txt
+
+    # Create table
+    echo "| Previous CI Run | Current CI Run |" > table_output.txt
+    echo "| :---: | :---: |" >> table_output.txt
+    for key in "${!prev_packages[@]}" "${!curr_packages[@]}"; do
+        prev="${key}=${prev_packages[$key]}"
+        curr="${key}=${curr_packages[$key]}"
+        if [[ -z ${prev_packages[$key]} ]]; then
+            prev="-"
+        fi
+        if [[ -z ${curr_packages[$key]} ]]; then
+            curr="-"
+        fi
+        echo "| $prev | $curr |" >> table_output.txt
+    done
+
     cat ./diff_output.txt
 else
     echo "Error: diff command failed with exit code $diff_exit_code"

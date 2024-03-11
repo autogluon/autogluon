@@ -82,7 +82,17 @@ jobs:
       - name: Fetch previous version file and compare
         run: |
           /bin/bash ./.github/workflow_scripts/version_diff.sh
-        continue-on-error: true
+      - name: Update pull request with diff
+        env:
+          GH_TOKEN: ${{ secrets.PAT }}
+        run: |
+          pr_number=$(jq --raw-output .pull_request.number "$GITHUB_EVENT_PATH")
+          comment_body=$(jq -n --arg body "`cat ./table_output.txt`" '{body: $body}')
+          curl -X POST \
+            -H "Authorization: token $GH_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "$comment_body" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/issues/${pr_number}/comments" 
       - name: Upload the current package versions
         run: |
           aws s3 cp ./package_versions_* "s3://autogluon-ci/package_versions/"   
