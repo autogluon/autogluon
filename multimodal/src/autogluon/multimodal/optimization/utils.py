@@ -441,6 +441,9 @@ def get_lr_scheduler(
             num_warmup_steps=num_warmup_steps,
             num_training_steps=num_max_steps,
         )
+    elif lr_schedule == "multi_step":
+        # TODO: add milestones, gamma into hyperparameters
+        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=[30, 55], gamma=0.1)
     else:
         raise ValueError(f"unknown lr schedule: {lr_schedule}")
 

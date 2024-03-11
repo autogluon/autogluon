@@ -241,20 +241,21 @@ class MMDetLitModule(pl.LightningModule):
         logger.debug(f"warmup steps: {warmup_steps}")
         logger.debug(f"lr_schedule: {self.hparams.lr_schedule}")
 
-        # TODO: Integrate MultiStepLR into get_lr_scheduler and add milestones, gamma, and interval into hyperparameters
-        if self.hparams.lr_schedule == "multi_step":
-            scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=[30, 55], gamma=0.1)
-            sched = {"scheduler": scheduler, "interval": "epoch"}
-        else:
-            scheduler = get_lr_scheduler(
-                optimizer=optimizer,
-                num_max_steps=max_steps,
-                num_warmup_steps=warmup_steps,
-                lr_schedule=self.hparams.lr_schedule,
-                end_lr=self.hparams.end_lr,
-            )
-            sched = {"scheduler": scheduler, "interval": "step"}
+        scheduler = get_lr_scheduler(
+            optimizer=optimizer,
+            num_max_steps=max_steps,
+            num_warmup_steps=warmup_steps,
+            lr_schedule=self.hparams.lr_schedule,
+            end_lr=self.hparams.end_lr,
+        )
 
+        # TODO: add lr_interval into hyperparameters?
+        if self.hparams.lr_schedule == "multi_step":
+            lr_interval = "epoch"
+        else:
+            lr_interval = "step"
+
+        sched = {"scheduler": scheduler, "interval":lr_interval}
         logger.debug("done configuring optimizer and scheduler")
         return [optimizer], [sched]
 
