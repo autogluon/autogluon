@@ -26,7 +26,6 @@ from ..constants import (
     NER_ANNOTATION,
     NER_TEXT,
     NUMERICAL,
-    OVD,
     REGRESSION,
     ROIS,
     SAM,
@@ -46,7 +45,6 @@ from ..data import (
     NerLabelEncoder,
     NerProcessor,
     NumericalProcessor,
-    OVDProcessor,
     SemanticSegImageProcessor,
     TextProcessor,
 )
@@ -181,12 +179,6 @@ def create_data_processor(
             max_img_num_per_col=model_config.max_img_num_per_col,
             missing_value_strategy=config.data.image.missing_value_strategy,
         )
-    elif data_type == OVD:
-        data_processor = OVDProcessor(
-            model=model,
-            max_img_num_per_col=model_config.max_img_num_per_col,
-            missing_value_strategy=config.data.image.missing_value_strategy,
-        )
     elif data_type == DOCUMENT:
         train_transforms, val_transforms = get_image_transforms(
             model_config=model_config,
@@ -255,7 +247,6 @@ def create_fusion_data_processors(
         ROIS: [],
         TEXT_NER: [],
         DOCUMENT: [],
-        OVD: [],
         SEMANTIC_SEGMENTATION_IMG: [],
     }
 
@@ -297,17 +288,6 @@ def create_fusion_data_processors(
             )
             if data_types is not None and IMAGE in data_types:
                 data_types.remove(IMAGE)
-        elif per_name == OVD:
-            # create a multimodal processor for OVD.
-            data_processors[OVD].append(
-                create_data_processor(
-                    data_type=OVD,
-                    config=config,
-                    model=per_model,
-                )
-            )
-            if data_types is not None and IMAGE in data_types:
-                data_types.remove(IMAGE)
         elif per_name == SAM:
             data_processors[SEMANTIC_SEGMENTATION_IMG].append(
                 create_data_processor(
@@ -329,7 +309,7 @@ def create_fusion_data_processors(
             )
             data_processors[LABEL].append(label_processor)
 
-        if requires_data and data_types and per_name != OVD:  # currently OVD does not require additional processors
+        if requires_data and data_types:
             for data_type in data_types:
                 per_data_processor = create_data_processor(
                     data_type=data_type,

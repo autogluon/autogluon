@@ -57,7 +57,6 @@ from ..constants import (
     NER_TOKEN_F1,
     NORM_FIT,
     OBJECT_DETECTION,
-    OPEN_VOCABULARY_OBJECT_DETECTION,
     OVERALL_ACCURACY,
     PAIR_MARGIN_MINER,
     PEARSONR,
@@ -132,7 +131,7 @@ def get_loss_func(
             loss_func = nn.MSELoss()
     elif problem_type == NER:
         loss_func = nn.CrossEntropyLoss(ignore_index=0)
-    elif problem_type in [OBJECT_DETECTION, OPEN_VOCABULARY_OBJECT_DETECTION, FEW_SHOT_CLASSIFICATION]:
+    elif problem_type in [OBJECT_DETECTION, FEW_SHOT_CLASSIFICATION]:
         return None
     elif problem_type == SEMANTIC_SEGMENTATION:
         if "structure_loss" in loss_func_name.lower():
@@ -441,6 +440,9 @@ def get_lr_scheduler(
             num_warmup_steps=num_warmup_steps,
             num_training_steps=num_max_steps,
         )
+    elif lr_schedule == "multi_step":
+        # TODO: add milestones, gamma into hyperparameters
+        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=[30, 55], gamma=0.1)
     else:
         raise ValueError(f"unknown lr schedule: {lr_schedule}")
 

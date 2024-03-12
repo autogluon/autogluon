@@ -29,7 +29,6 @@ from ..constants import (
     NER_TEXT,
     NUMERICAL,
     NUMERICAL_MLP,
-    OVD,
     PEFT_ADDITIVE_STRATEGIES,
     SAM,
     SEMANTIC_SEGMENTATION_IMG,
@@ -54,7 +53,6 @@ from ..models import (
     MultimodalFusionNER,
     MultimodalFusionTransformer,
     NumericalMLP,
-    OVDModel,
     SAMForSemanticSegmentation,
     TFewModel,
     TimmAutoModelForImagePrediction,
@@ -275,12 +273,6 @@ def create_model(
             pretrained=pretrained,
             output_bbox_format=OmegaConf.select(model_config, "output_bbox_format", default=XYXY),
             frozen_layers=OmegaConf.select(model_config, "frozen_layers", default=None),
-        )
-    elif model_name.lower().startswith(OVD):
-        model = OVDModel(
-            prefix=model_name,
-            checkpoint_name=model_config.checkpoint_name,
-            pretrained=pretrained,
         )
     elif model_name.lower().startswith(MMOCR_TEXT_DET):
         model = MMOCRAutoModelForTextDetection(
