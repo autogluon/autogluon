@@ -3,17 +3,41 @@ tabular_presets_dict = dict(
     # Best predictive accuracy with little consideration to inference time or disk usage. Achieve even better results by specifying a large time_limit value.
     # Recommended for applications that benefit from the best possible model accuracy.
     # Aliases: best
-    best_quality={"auto_stack": True},
-    # High predictive accuracy with fast inference. ~10x-200x faster inference and ~10x-200x lower disk usage than `best_quality`.
-    # Recommended for applications that require reasonable inference speed and/or model size.
-    # Aliases: high, high_quality_fast_inference_only_refit
-    high_quality={"auto_stack": True, "refit_full": True, "set_best_to_refit_full": True, "_save_bag_folds": False},
-    # Good predictive accuracy with very fast inference. ~4x faster inference and ~4x lower disk usage than `high_quality`.
-    # Recommended for applications that require fast inference speed.
-    # Aliases: good, good_quality_faster_inference_only_refit
-    good_quality={"auto_stack": True, "refit_full": True, "set_best_to_refit_full": True, "_save_bag_folds": False, "hyperparameters": "light"},
+    best_quality={
+        "auto_stack": True,
+        "dynamic_stacking": True,
+        "num_bag_sets": 1,
+        "hyperparameters": "zeroshot",
+        "time_limit": 3600,
+    },
+    # High predictive accuracy with fast inference. ~8x faster inference and ~8x lower disk usage than `best_quality`.
+    # Recommended for applications that require fast inference speed and/or small model size.
+    # Aliases: high
+    high_quality={
+        "auto_stack": True,
+        "dynamic_stacking": True,
+        "num_bag_sets": 1,
+        "hyperparameters": "zeroshot",
+        "time_limit": 3600,
+        "refit_full": True,
+        "set_best_to_refit_full": True,
+        "_save_bag_folds": False,
+    },
+    # Good predictive accuracy with very fast inference. ~4x faster training, ~8x faster inference and ~8x lower disk usage than `high_quality`.
+    # Recommended for applications that require veru fast inference speed.
+    # Aliases: good
+    good_quality={
+        "auto_stack": True,
+        "dynamic_stacking": True,
+        "num_bag_sets": 1,
+        "hyperparameters": "light",
+        "time_limit": 3600,
+        "refit_full": True,
+        "set_best_to_refit_full": True,
+        "_save_bag_folds": False,
+    },
     # Medium predictive accuracy with very fast inference and very fast training time. ~20x faster training than `good_quality`.
-    # This is the default preset in AutoGluon, but should generally only be used for quick prototyping, as `good_quality` results in significantly better predictive accuracy and faster inference time.
+    # This is the default preset in AutoGluon, but should generally only be used for quick prototyping, as `good_quality` results in significantly better predictive accuracy with similar inference time.
     # Aliases: medium, medium_quality_faster_train
     medium_quality={"auto_stack": False},
     # Optimizes result immediately for deployment by deleting unused models and removing training artifacts.
@@ -26,6 +50,7 @@ tabular_presets_dict = dict(
     # Disables automated feature generation when text features are detected.
     # This is useful to determine how beneficial text features are to the end result, as well as to ensure features are not mistaken for text when they are not.
     ignore_text={"_feature_generator_kwargs": {"enable_text_ngram_features": False, "enable_text_special_features": False, "enable_raw_text_features": False}},
+    ignore_text_ngrams={"_feature_generator_kwargs": {"enable_text_ngram_features": False}},
     # Fit only interpretable models.
     interpretable={
         "auto_stack": False,
@@ -36,23 +61,23 @@ tabular_presets_dict = dict(
     },
     # ------------------------------------------
     # ------------------------------------------
+    # Legacy presets
+    # Best predictive accuracy with little consideration to inference time or disk usage. Achieve even better results by specifying a large time_limit value.
+    # Recommended for applications that benefit from the best possible model accuracy.
+    best_quality_v082={"auto_stack": True},
+    # High predictive accuracy with fast inference. ~10x-200x faster inference and ~10x-200x lower disk usage than `best_quality`.
+    # Recommended for applications that require reasonable inference speed and/or model size.
+    high_quality_v082={"auto_stack": True, "refit_full": True, "set_best_to_refit_full": True, "_save_bag_folds": False},
+    # Good predictive accuracy with very fast inference. ~4x faster inference and ~4x lower disk usage than `high_quality`.
+    # Recommended for applications that require fast inference speed.
+    good_quality_v082={"auto_stack": True, "refit_full": True, "set_best_to_refit_full": True, "_save_bag_folds": False, "hyperparameters": "light"},
     # ------------------------------------------
     # Experimental presets. Only use these presets if you are ok with unstable and potentially poor performing presets.
     #  Experimental presets can be removed or changed without warning.
-    # Best quality with an additional FTTransformer model, GPU is recommended.
-    experimental_best_quality={"auto_stack": True, "hyperparameters": "default_FTT"},
-    # Best quality with an additional FTTransformer and TabPFN model, GPU is recommended.
-    #  May have **extremely** slow inference speed, to a potentially unusable degree.
-    experimental_extreme_quality={"auto_stack": True, "hyperparameters": "extreme"},
-    # Experimental simulated model portfolio.
-    # Shown to achieve superior results compared to best_quality on OpenML datasets <5000 rows.
-    # Note that runtimes might be much longer than usual with this config.
-    experimental_zeroshot_hpo={"auto_stack": True, "hyperparameters": "zeroshot_hpo"},
-    experimental_zeroshot_hpo_hybrid={"auto_stack": True, "hyperparameters": "zeroshot_hpo_hybrid"},
+    # No Experimental Presets in v1.0
     # ------------------------------------------
     # ------------------------------------------
     # ------------------------------------------
-    # TODO: Consider HPO-enabled configs if training time doesn't matter but inference latency does.
 )
 
 
@@ -65,4 +90,8 @@ tabular_presets_alias = dict(
     good_quality_faster_inference_only_refit="good_quality",
     medium="medium_quality",
     medium_quality_faster_train="medium_quality",
+    bq="best_quality",
+    hq="high_quality",
+    gq="good_quality",
+    mq="medium_quality",
 )

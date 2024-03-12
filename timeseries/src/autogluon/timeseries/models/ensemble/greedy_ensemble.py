@@ -6,7 +6,6 @@ from typing import Dict, List, Optional
 import numpy as np
 
 import autogluon.core as ag
-from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.core.models.greedy_ensemble.ensemble_selection import EnsembleSelection
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer
@@ -112,10 +111,8 @@ class TimeSeriesGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
         predictions_per_window: Dict[str, List[TimeSeriesDataFrame]],
         data_per_window: List[TimeSeriesDataFrame],
         time_limit: Optional[int] = None,
-        verbosity: int = 2,
         **kwargs,
     ):
-        set_logger_verbosity(verbosity, logger=logger)
         if self.eval_metric_seasonal_period is None:
             self.eval_metric_seasonal_period = get_seasonality(self.freq)
         ensemble_selection = TimeSeriesEnsembleSelection(

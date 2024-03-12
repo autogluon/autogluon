@@ -28,15 +28,15 @@ def test_tabular_nn_regression(fit_helper):
     fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args)
 
 
-# Testing with good_quality to ensure tabularNN work well with ParallelLocalFoldFittingStrategy
-def test_tabular_nn_binary_good_quality(fit_helper):
+# Testing with bagging to ensure tabularNN work well with ParallelLocalFoldFittingStrategy
+def test_tabular_nn_binary_bagging(fit_helper):
     fit_args = dict(
         hyperparameters={TabularNeuralNetTorchModel: {}},
-        presets="good_quality",
         num_bag_folds=2,
+        num_bag_sets=1,
     )
     dataset_name = "adult"
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, expected_model_count=4, refit_full=False)
+    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, expected_model_count=2, refit_full=False)
 
 
 def test_tabular_nn_binary_compile_onnx(fit_helper):

@@ -9,7 +9,6 @@ import pandas as pd
 from sklearn.base import BaseEstimator
 
 import autogluon.core as ag
-from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.tabular import TabularPredictor
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
@@ -232,9 +231,6 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         if static_features is not None:
             df = pd.merge(df, static_features, how="left", on=ITEMID, suffixes=(None, "_static_feat"))
 
-        # Convert float64 to float32 to reduce memory usage
-        float64_cols = list(df.select_dtypes(include="float64"))
-        df[float64_cols] = df[float64_cols].astype("float32")
         # We assume that df is sorted by 'unique_id' inside `TimeSeriesPredictor._check_and_prepare_data_frame`
         return df.rename(columns=column_name_mapping)
 
@@ -249,7 +245,6 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         from mlforecast import MLForecast
 
         self._check_fit_params()
-        set_logger_verbosity(verbosity, logger=logger)
         fit_start_time = time.time()
         # TabularEstimator is passed to MLForecast later to include tuning_data
         model_params = self._get_model_params()
@@ -358,6 +353,9 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         for q in self.quantile_levels:
             predictions[str(q)] = predictions["mean"] + norm.ppf(q) * std_per_timestep.to_numpy()
         return predictions
+
+    def _more_tags(self) -> dict:
+        return {"can_refit_full": True}
 
 
 class DirectTabularModel(AbstractMLForecastModel):

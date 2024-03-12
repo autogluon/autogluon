@@ -8,7 +8,6 @@ import pandas as pd
 from joblib import Parallel, delayed
 from scipy.stats import norm
 
-from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
@@ -87,9 +86,8 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         self._seasonal_period: Optional[int] = None
         self.time_limit: Optional[float] = None
 
-    def _fit(self, train_data: TimeSeriesDataFrame, time_limit: Optional[int] = None, verbosity: int = 2, **kwargs):
+    def _fit(self, train_data: TimeSeriesDataFrame, time_limit: Optional[int] = None, **kwargs):
         self._check_fit_params()
-        set_logger_verbosity(verbosity, logger=logger)
 
         if time_limit is not None and time_limit < self.init_time_in_seconds:
             raise TimeLimitExceeded

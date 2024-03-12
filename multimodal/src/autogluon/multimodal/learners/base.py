@@ -45,6 +45,7 @@ from ..constants import (
     FEW_SHOT,
     FEW_SHOT_CLASSIFICATION,
     GREEDY_SOUP,
+    IMAGE_BASE64_STR,
     IMAGE_BYTEARRAY,
     IMAGE_PATH,
     LABEL,
@@ -294,6 +295,11 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         # Summary statistics used in fit summary. TODO: wrap it in a class.
         self._total_train_time = None
         self._best_score = None
+
+        self._log_filters = [
+            ".*does not have many workers.* in the `DataLoader` init to improve performance.*",
+            "Checkpoint directory .* exists and is not empty.",
+        ]
 
     @property
     def path(self):
@@ -1165,13 +1171,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         is_train=True,
     ):
         with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore",
-                ".*does not have many workers which may be a bottleneck. "
-                "Consider increasing the value of the `num_workers` argument` "
-                ".* in the `DataLoader` init to improve performance.*",
-            )
-            warnings.filterwarnings("ignore", "Checkpoint directory .* exists and is not empty.")
+            for filter in self._log_filters:
+                warnings.filterwarnings("ignore", filter)
             if is_train:
                 trainer.fit(
                     litmodule,
@@ -1543,7 +1544,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         column_types = self._column_types
         column_types_copy = copy.deepcopy(column_types)
         for col_name, col_type in column_types.items():
-            if col_type in [IMAGE_BYTEARRAY, IMAGE_PATH]:
+            if col_type in [IMAGE_BYTEARRAY, IMAGE_PATH, IMAGE_BASE64_STR]:
                 if is_image_column(data=data[col_name], col_name=col_name, image_type=IMAGE_PATH):
                     image_type = IMAGE_PATH
                 elif is_image_column(
@@ -1552,6 +1553,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                     image_type=IMAGE_BYTEARRAY,
                 ):
                     image_type = IMAGE_BYTEARRAY
+                elif is_image_column(data=data[col_name], col_name=col_name, image_type=IMAGE_BASE64_STR):
+                    image_type = IMAGE_BASE64_STR
                 else:
                     image_type = col_type
                 if col_type != image_type:

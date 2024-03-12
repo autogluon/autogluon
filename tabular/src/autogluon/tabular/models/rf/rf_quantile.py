@@ -334,7 +334,7 @@ class DecisionTreeQuantileRegressor(BaseTreeQuantileRegressor, DecisionTreeRegre
         )
 
 
-class ExtraTreeQuantileRegressor(ExtraTreeRegressor, BaseTreeQuantileRegressor):
+class ExtraTreeQuantileRegressor(BaseTreeQuantileRegressor, ExtraTreeRegressor):
     def __init__(
         self,
         criterion="squared_error",
@@ -342,7 +342,7 @@ class ExtraTreeQuantileRegressor(ExtraTreeRegressor, BaseTreeQuantileRegressor):
         max_depth=None,
         min_samples_split=2,
         min_samples_leaf=1,
-        max_features="auto",
+        max_features=1.0,
         random_state=None,
         max_leaf_nodes=None,
     ):
@@ -510,6 +510,10 @@ class BaseForestQuantileRegressor(ForestRegressor):
                 bootstrap_indices = np.arange(len(y))
 
             est_weights = np.bincount(bootstrap_indices, minlength=len(y))
+            # FIXME: When updating from scikit-learn 1.3.2 to 1.4.0, BaseTreeQuantileRegressor.fit is not called
+            # Re-calculating y_train_ and y_train_leaves_ to resolve this issue
+            est.y_train_ = y
+            est.y_train_leaves_ = est.tree_.apply(X)
             y_train_leaves = est.y_train_leaves_
             # Normalize the bootstrap weights such that the total weight of each leaf sums up to 1
             # Relabel leaves starting from zero in order to efficiently count the total sum per leaf with bincount
@@ -670,7 +674,7 @@ class RandomForestQuantileRegressor(BaseForestQuantileRegressor):
         max_depth=None,
         min_samples_split=2,
         min_samples_leaf=1,
-        max_features="auto",
+        max_features=1.0,
         max_leaf_nodes=None,
         bootstrap=True,
         oob_score=False,
@@ -822,7 +826,7 @@ class ExtraTreesQuantileRegressor(BaseForestQuantileRegressor):
         max_depth=None,
         min_samples_split=2,
         min_samples_leaf=1,
-        max_features="auto",
+        max_features=1.0,
         max_leaf_nodes=None,
         bootstrap=True,
         oob_score=False,

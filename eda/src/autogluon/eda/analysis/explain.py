@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import shap
 
-from autogluon.core.constants import REGRESSION
+from autogluon.core.constants import BINARY, REGRESSION
 from autogluon.eda import AnalysisState
 from autogluon.eda.analysis.base import AbstractAnalysis
 
@@ -94,12 +94,14 @@ class ShapAnalysis(AbstractAnalysis):
         children: Optional[List[AbstractAnalysis]] = None,
         state: Optional[AnalysisState] = None,
         random_state: int = 0,
+        positive_class: Optional = None,
         **kwargs,
     ) -> None:
         super().__init__(parent, children, state, **kwargs)
         self.rows = rows
         self.baseline_sample = baseline_sample
         self.random_state = random_state
+        self.positive_class = positive_class
 
     def can_handle(self, state: AnalysisState, args: AnalysisState) -> bool:
         return self.all_keys_must_be_present(args, "model", "train_data")
@@ -114,10 +116,16 @@ class ShapAnalysis(AbstractAnalysis):
         shap_data = []
         for _, row in self.rows.iterrows():
             _row = pd.DataFrame([row])
-            if args.model.problem_type == REGRESSION:
-                predicted_class = None
-            else:
-                predicted_class = args.model.predict(_row).iloc[0]
+            predicted_class = self.positive_class
+            if self.positive_class is None:
+                if args.model.problem_type == REGRESSION:
+                    predicted_class = None
+                elif args.model.problem_type == BINARY:
+                    predicted_class = args.model.positive_class
+                else:
+                    # use the last column in predict proba
+                    predicted_class = args.model.predict_proba(_row).columns[-1]
+            state.positive_class = predicted_class
             ag_wrapper = _ShapAutoGluonWrapper(args.model, args.train_data.columns, predicted_class)
             explainer = shap.KernelExplainer(ag_wrapper.predict_proba, baseline)
             with warnings.catch_warnings():

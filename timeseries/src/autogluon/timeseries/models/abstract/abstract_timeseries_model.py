@@ -227,11 +227,6 @@ class AbstractTimeSeriesModel(AbstractModel):
         verbosity : int, default = 2
             Verbosity levels range from 0 to 4 and control how much information is printed.
             Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
-            verbosity 4: logs every training iteration, and logs the most detailed information.
-            verbosity 3: logs training iterations periodically, and logs more detailed information.
-            verbosity 2: logs only important information.
-            verbosity 1: logs only warnings and exceptions.
-            verbosity 0: logs only exceptions.
         **kwargs :
             Any additional fit arguments a model supports.
 
@@ -427,7 +422,6 @@ class AbstractTimeSeriesModel(AbstractModel):
         hpo_executor: HpoExecutor,
         **kwargs,
     ):
-        # verbosity = kwargs.get('verbosity', 2)
         time_start = time.time()
         logger.debug(f"\tStarting AbstractTimeSeriesModel hyperparameter tuning for {self.name}")
         search_space = self._get_search_space()

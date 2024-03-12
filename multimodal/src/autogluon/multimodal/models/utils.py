@@ -19,6 +19,7 @@ from ..constants import (
     LOGITS,
     MASKS,
     OCR,
+    PEFT_ADDITIVE_STRATEGIES,
     REGRESSION,
     SEMANTIC_MASK,
     SEMANTIC_SEGMENTATION,
@@ -236,8 +237,11 @@ def group_param_names(
     # split blocks at the first level
     children_prefix = []
     for n in selected_names:
-        child_name = n[len(model_prefix) + 1 :].split(".")[0]
-        child_prefix = f"{model_prefix}.{child_name}"
+        if model_prefix is not None:
+            child_name = n[len(model_prefix) + 1 :].split(".")[0]
+            child_prefix = f"{model_prefix}.{child_name}"
+        else:
+            child_prefix = n.split(".")[0]
         if child_prefix not in children_prefix:
             children_prefix.append(child_prefix)
 
@@ -484,7 +488,7 @@ def create_adaptation(efficient_finetune: str, layer: nn.Module, lora_r: int, lo
         raise NotImplementedError(
             f"The efficient finetuning strategy '{efficient_finetune}'"
             f" is not supported. We only support"
-            f" {', '.join(PEFT_STRATEGIES)}."
+            f" {', '.join(PEFT_ADDITIVE_STRATEGIES)}."
         )
 
 

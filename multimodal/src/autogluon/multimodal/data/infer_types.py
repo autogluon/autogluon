@@ -1,3 +1,4 @@
+import base64
 import collections
 import json
 import logging
@@ -19,6 +20,7 @@ from ..constants import (
     DOCUMENT_PDF,
     IDENTIFIER,
     IMAGE,
+    IMAGE_BASE64_STR,
     IMAGE_BYTEARRAY,
     IMAGE_PATH,
     MULTICLASS,
@@ -196,7 +198,7 @@ def is_image_column(
     data = data.sample(n=sample_num, random_state=0)
     if image_type == IMAGE_PATH:
         data = data.apply(lambda ele: str(ele).split(";")).tolist()
-    elif image_type == IMAGE_BYTEARRAY:
+    elif image_type in [IMAGE_BYTEARRAY, IMAGE_BASE64_STR]:
         data = data.tolist()
     else:
         raise ValueError(f"Unsupported image type: {image_type}")
@@ -213,6 +215,9 @@ def is_image_column(
                         pass
                 elif image_type == IMAGE_BYTEARRAY:
                     with PIL.Image.open(BytesIO(per_image)) as img:
+                        pass
+                elif image_type == IMAGE_BASE64_STR:
+                    with PIL.Image.open(BytesIO(base64.b64decode(per_image))) as img:
                         pass
                 else:
                     raise ValueError(f"Unsupported image type: {image_type}")
@@ -452,6 +457,8 @@ def infer_id_mappings_types(id_mappings: Union[Dict[str, Dict], Dict[str, pd.Ser
             id_mappings_types[per_name] = TEXT
         elif is_image_column(per_id_mappings, col_name=per_name, image_type=IMAGE_BYTEARRAY):
             id_mappings_types[per_name] = IMAGE_BYTEARRAY
+        elif is_image_column(per_id_mappings, col_name=per_name, image_type=IMAGE_BASE64_STR):
+            id_mappings_types[per_name] = IMAGE_BASE64_STR
         else:
             raise ValueError(
                 f"{per_name} in the id_mappings has an invalid type. Currently, we only support image and text types."
@@ -561,6 +568,10 @@ def infer_column_types(
             data[col_name], col_name=col_name, image_type=IMAGE_BYTEARRAY
         ):  # Infer image-bytearray column
             column_types[col_name] = IMAGE_BYTEARRAY
+        elif is_image_column(
+            data[col_name], col_name=col_name, image_type=IMAGE_BASE64_STR
+        ):  # Infer image-base64str column
+            column_types[col_name] = IMAGE_BASE64_STR
         else:  # All the other columns are treated as categorical
             column_types[col_name] = CATEGORICAL
 

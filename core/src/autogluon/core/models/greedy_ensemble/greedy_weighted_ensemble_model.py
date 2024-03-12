@@ -103,7 +103,7 @@ class GreedyWeightedEnsembleModel(AbstractModel):
             base_model_names = stack_column_names
         return base_model_names
 
-    def _get_model_weights(self):
+    def _get_model_weights(self) -> dict:
         num_models = len(self.base_model_names)
         model_weight_dict = {self.base_model_names[i]: self.weights_[i] for i in range(num_models)}
         return model_weight_dict

@@ -376,13 +376,13 @@ def test_advanced_functionality_bagging():
         assert predict_proba_oof.equals(predict_proba_dict_oof[m])
 
     score_oof = predictor.evaluate_predictions(train_data[label], oof_pred_proba)
-    model_best = predictor.model_best()
+    model_best = predictor.model_best
 
     predictor.refit_full()
     assert len(predictor.model_refit_map()) == expected_num_models
     assert len(predictor.model_names()) == expected_num_models * 2
 
-    model_best_refit = predictor.model_best()
+    model_best_refit = predictor.model_best
     assert model_best != model_best_refit
 
     # assert that refit model uses original model's OOF predictions
@@ -655,6 +655,7 @@ def test_pseudolabeling():
         num_bag_folds=2,
         num_bag_sets=1,
         ag_args_ensemble=dict(fold_fitting_strategy="sequential_local"),
+        dynamic_stacking=False,
     )
     for idx in range(len(datasets)):
         dataset = datasets[idx]

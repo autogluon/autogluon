@@ -486,9 +486,19 @@ class AbstractTabularLearner(AbstractLearner):
 
     # Scores both learner and all individual models, along with computing the optimal ensemble score + weights (oracle)
     def score_debug(
-        self, X: DataFrame, y=None, extra_info=False, compute_oracle=False, extra_metrics=None, decision_threshold=None, skip_score=False, display=False
+        self,
+        X: DataFrame,
+        y=None,
+        extra_info=False,
+        compute_oracle=False,
+        extra_metrics=None,
+        decision_threshold=None,
+        skip_score=False,
+        refit_full=None,
+        set_refit_score_to_parent=False,
+        display=False,
     ):
-        leaderboard_df = self.leaderboard(extra_info=extra_info, display=display)
+        leaderboard_df = self.leaderboard(extra_info=extra_info, refit_full=refit_full, set_refit_score_to_parent=set_refit_score_to_parent, display=display)
         if extra_metrics is None:
             extra_metrics = []
         if y is None:
@@ -508,8 +518,10 @@ class AbstractTabularLearner(AbstractLearner):
 
         trainer = self.load_trainer()
         scores = {}
+        leaderboard_models = set(leaderboard_df["model"].tolist())
         all_trained_models = trainer.get_model_names()
-        all_trained_models_can_infer = trainer.get_model_names(can_infer=True)
+        all_trained_models = [m for m in all_trained_models if m in leaderboard_models]
+        all_trained_models_can_infer = trainer.get_model_names(models=all_trained_models, can_infer=True)
         all_trained_models_original = all_trained_models.copy()
         model_pred_proba_dict, pred_time_test_marginal = trainer.get_model_pred_proba_dict(X=X, models=all_trained_models_can_infer, record_pred_time=True)
 
@@ -828,18 +840,28 @@ class AbstractTabularLearner(AbstractLearner):
         only_pareto_frontier=False,
         skip_score=False,
         score_format: str = "score",
+        refit_full: bool = None,
+        set_refit_score_to_parent: bool = False,
         display=False,
     ) -> pd.DataFrame:
         assert score_format in ["score", "error"]
         if X is not None:
             leaderboard = self.score_debug(
-                X=X, y=y, extra_info=extra_info, extra_metrics=extra_metrics, decision_threshold=decision_threshold, skip_score=skip_score, display=False
+                X=X,
+                y=y,
+                extra_info=extra_info,
+                extra_metrics=extra_metrics,
+                decision_threshold=decision_threshold,
+                skip_score=skip_score,
+                refit_full=refit_full,
+                set_refit_score_to_parent=set_refit_score_to_parent,
+                display=False,
             )
         else:
             if extra_metrics:
                 raise AssertionError("`extra_metrics` is only valid when data is specified.")
             trainer = self.load_trainer()
-            leaderboard = trainer.leaderboard(extra_info=extra_info)
+            leaderboard = trainer.leaderboard(extra_info=extra_info, refit_full=refit_full, set_refit_score_to_parent=set_refit_score_to_parent)
         if only_pareto_frontier:
             if "score_test" in leaderboard.columns and "pred_time_test" in leaderboard.columns:
                 score_col = "score_test"

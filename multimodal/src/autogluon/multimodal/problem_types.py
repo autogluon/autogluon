@@ -7,6 +7,7 @@ from autogluon.core.metrics import METRICS
 
 from .constants import (
     ACCURACY,
+    BER,
     BINARY,
     CATEGORICAL,
     CLASSIFICATION,
@@ -15,6 +16,7 @@ from .constants import (
     FEATURE_EXTRACTION,
     FEW_SHOT_CLASSIFICATION,
     IMAGE,
+    IMAGE_BASE64_STR,
     IMAGE_BYTEARRAY,
     IMAGE_SIMILARITY,
     IMAGE_TEXT_SIMILARITY,
@@ -35,6 +37,7 @@ from .constants import (
     ROC_AUC,
     ROIS,
     SEMANTIC_SEGMENTATION,
+    SM,
     TEXT,
     TEXT_NER,
     TEXT_SIMILARITY,
@@ -47,8 +50,10 @@ PROBLEM_TYPES_REG = Registry("problem_type_properties")
 
 @dataclass
 class ProblemTypeProperty:
-    """Property of the problem. Stores the name of the problem
-    and its related properties. Some properties are used in the label / feature inference logic."""
+    """
+    Property of the problem. Stores the name of the problem
+    and its related properties. Some properties are used in the label / feature inference logic.
+    """
 
     name: str  # Name of the problem
     support_fit: bool = True  # Whether the problem type support `.fit()`
@@ -59,7 +64,7 @@ class ProblemTypeProperty:
 
     # The collection of modality types the problem supports.
     # Multiple column types may be parsed into the same modality. For example
-    #   IMAGE, IMAGE_PATH, IMAGE_BYTEARRAY --> IMAGE
+    #   IMAGE, IMAGE_PATH, IMAGE_BYTEARRAY, IMAGE_BASE64_STR --> IMAGE
     # It will be used to analyze the dataframe and detect the columns.
     supported_modality_type: Set[str] = field(default_factory=set)
 
@@ -129,7 +134,7 @@ PROBLEM_TYPES_REG.register(
     CLASSIFICATION,
     ProblemTypeProperty(
         name=CLASSIFICATION,
-        supported_modality_type={IMAGE, IMAGE_BYTEARRAY, TEXT, CATEGORICAL, NUMERICAL},
+        supported_modality_type={IMAGE, IMAGE_BYTEARRAY, IMAGE_BASE64_STR, TEXT, CATEGORICAL, NUMERICAL},
         supported_label_type={CATEGORICAL},
         is_classification=True,
     ),
@@ -138,7 +143,7 @@ PROBLEM_TYPES_REG.register(
     BINARY,
     ProblemTypeProperty(
         name=BINARY,
-        supported_modality_type={IMAGE, IMAGE_BYTEARRAY, TEXT, CATEGORICAL, NUMERICAL},
+        supported_modality_type={IMAGE, IMAGE_BYTEARRAY, IMAGE_BASE64_STR, TEXT, CATEGORICAL, NUMERICAL},
         supported_label_type={CATEGORICAL},
         is_classification=True,
         _supported_evaluation_metrics=METRICS[BINARY].keys(),
@@ -150,7 +155,7 @@ PROBLEM_TYPES_REG.register(
     MULTICLASS,
     ProblemTypeProperty(
         name=MULTICLASS,
-        supported_modality_type={IMAGE, IMAGE_BYTEARRAY, TEXT, CATEGORICAL, NUMERICAL},
+        supported_modality_type={IMAGE, IMAGE_BYTEARRAY, IMAGE_BASE64_STR, TEXT, CATEGORICAL, NUMERICAL},
         supported_label_type={CATEGORICAL},
         is_classification=True,
         _supported_evaluation_metrics=METRICS[MULTICLASS].keys(),
@@ -164,7 +169,7 @@ PROBLEM_TYPES_REG.register(
     REGRESSION,
     ProblemTypeProperty(
         name=REGRESSION,
-        supported_modality_type={IMAGE, IMAGE_BYTEARRAY, TEXT, CATEGORICAL, NUMERICAL},
+        supported_modality_type={IMAGE, IMAGE_BYTEARRAY, IMAGE_BASE64_STR, TEXT, CATEGORICAL, NUMERICAL},
         supported_label_type={NUMERICAL},
         _supported_evaluation_metrics=METRICS[REGRESSION].keys(),
         _fallback_evaluation_metric=RMSE,
@@ -211,7 +216,7 @@ PROBLEM_TYPES_REG.register(
         supported_modality_type={IMAGE},
         supported_label_type={IMAGE},
         force_exist_modality={IMAGE},
-        _supported_evaluation_metrics=[IOU],
+        _supported_evaluation_metrics=[IOU, BER, SM],
         _fallback_evaluation_metric=IOU,
         _fallback_validation_metric=IOU,
     ),
