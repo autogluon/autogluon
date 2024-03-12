@@ -347,24 +347,28 @@ def object_detection(presets: str = DEFAULT):
     """
     hyperparameters = {
         "model.names": ["mmdet_image"],
-        "model.mmdet_image.checkpoint_name": "yolox_s",
+        "model.mmdet_image.frozen_layers": [],
+        "optimization.patience": 20,
+        "optimization.val_check_interval": 1.0,
+        "optimization.check_val_every_n_epoch": 1,
+        "env.batch_size": 32,
+        "env.per_gpu_batch_size": 1,
+        "env.num_workers": 2,
+        "optimization.learning_rate": 1e-5,
+        "optimization.weight_decay": 1e-4,
+        "optimization.lr_mult": 10,
+        "optimization.lr_choice": "two_stages",
+        "optimization.lr_schedule": "multi_step",
+        "optimization.gradient_clip_val": 0.1,
+        "optimization.max_epochs": 60,
+        "optimization.warmup_steps": 0.0,
+        "optimization.top_k": 1,
+        "optimization.top_k_average_method": "best",
         "env.eval_batch_size_ratio": 1,
-        "env.precision": 32,
         "env.strategy": "ddp",
         "env.auto_select_gpus": True,  # Turn on for detection to return devices in a list, TODO: fix the extra GPU usage bug
         "env.num_gpus": -1,
-        "env.per_gpu_batch_size": 8,  # Works on 8G GPU
-        "env.num_workers": 2,
-        "optimization.learning_rate": 1e-4,
         "optimization.lr_decay": 0.9,
-        "optimization.lr_mult": 100,
-        "optimization.lr_choice": "two_stages",
-        "optimization.top_k": 1,
-        "optimization.top_k_average_method": "best",
-        "optimization.warmup_steps": 0.0,
-        "optimization.patience": 10,
-        "optimization.val_check_interval": 0.5,
-        "optimization.check_val_every_n_epoch": 1,
     }
     hyperparameter_tune_kwargs = {}
 
@@ -380,36 +384,26 @@ def object_detection(presets: str = DEFAULT):
                 "model.mmdet_image.checkpoint_name": "yolox_l",
                 "env.per_gpu_batch_size": 2,  # Works on 8G GPU
                 "optimization.learning_rate": 5e-5,
-                "optimization.patience": 3,
+                "optimization.patience": 5,
                 "optimization.max_epochs": 50,
                 "optimization.val_check_interval": 1.0,
                 "optimization.check_val_every_n_epoch": 3,
+                "optimization.lr_mult": 100,
+                "optimization.weight_decay": 1e-3,
+                "optimization.lr_schedule": "cosine_decay",
+                "optimization.gradient_clip_val": 1,
             }
         )
     elif presets in [DEFAULT, HIGH_QUALITY]:
         hyperparameters.update(
             {
                 "model.mmdet_image.checkpoint_name": "dino-4scale_r50_8xb2-12e_coco",
-                "model.mmdet_image.frozen_layers": ["backbone", "model.level_embed"],
-                "env.per_gpu_batch_size": 1,  # Works on 16G GPU
-                "optimization.learning_rate": 1e-4,
-                "optimization.patience": 20,
-                "optimization.max_epochs": 50,
-                "optimization.val_check_interval": 1.0,
-                "optimization.check_val_every_n_epoch": 1,
             }
         )
     elif presets == BEST_QUALITY:
         hyperparameters.update(
             {
                 "model.mmdet_image.checkpoint_name": "dino-5scale_swin-l_8xb2-36e_coco",
-                "model.mmdet_image.frozen_layers": ["backbone", "model.level_embed"],
-                "env.per_gpu_batch_size": 1,  # Works on 24G GPU
-                "optimization.learning_rate": 1e-4,
-                "optimization.patience": 20,
-                "optimization.max_epochs": 50,
-                "optimization.val_check_interval": 1.0,
-                "optimization.check_val_every_n_epoch": 1,
             }
         )
     else:
