@@ -14,13 +14,8 @@ import transformers
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
 from autogluon.core.metrics import Scorer
 
-from .constants import (
-    AUTOMM_TUTORIAL_MODE,
-    FEW_SHOT_CLASSIFICATION,
-    NER,
-    OBJECT_DETECTION,
-    SEMANTIC_SEGMENTATION,
-)
+from .constants import AUTOMM_TUTORIAL_MODE, FEW_SHOT_CLASSIFICATION, NER, OBJECT_DETECTION, SEMANTIC_SEGMENTATION
+
 from .learners import (
     BaseLearner,
     FewShotSVMLearner,

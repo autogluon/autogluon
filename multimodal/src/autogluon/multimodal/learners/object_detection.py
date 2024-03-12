@@ -8,14 +8,7 @@ import pandas as pd
 from omegaconf import DictConfig, OmegaConf
 from torch import nn
 
-from ..constants import (
-    BBOX,
-    DDP,
-    MAP,
-    MULTI_IMAGE_MIX_DATASET,
-    OBJECT_DETECTION,
-    XYWH,
-)
+from ..constants import BBOX, DDP, MAP, MULTI_IMAGE_MIX_DATASET, OBJECT_DETECTION, XYWH
 from ..data import BaseDataModule, MultiImageMixDataset, MultiModalFeaturePreprocessor, infer_rois_column_type
 from ..optimization import LitModule, MMDetLitModule
 from ..utils import (
