@@ -347,7 +347,7 @@ def object_detection(presets: str = DEFAULT):
     """
     hyperparameters = {
         "model.names": ["mmdet_image"],
-        "model.mmdet_image.frozen_layers": ["backbone"],
+        "model.mmdet_image.frozen_layers": [],
         "optimization.patience": 20,
         "optimization.val_check_interval": 1.0,
         "optimization.check_val_every_n_epoch": 1,
@@ -389,7 +389,6 @@ def object_detection(presets: str = DEFAULT):
                 "optimization.val_check_interval": 1.0,
                 "optimization.check_val_every_n_epoch": 3,
                 "optimization.lr_mult": 100,
-                "model.mmdet_image.frozen_layers": [],
                 "optimization.weight_decay": 1e-3,
                 "optimization.lr_schedule": "cosine_decay",
                 "optimization.gradient_clip_val": 1,
