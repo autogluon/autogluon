@@ -255,7 +255,7 @@ class MMDetLitModule(pl.LightningModule):
         else:
             lr_interval = "step"
 
-        sched = {"scheduler": scheduler, "interval":lr_interval}
+        sched = {"scheduler": scheduler, "interval": lr_interval}
         logger.debug("done configuring optimizer and scheduler")
         return [optimizer], [sched]
 
