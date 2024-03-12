@@ -29,7 +29,6 @@ from ..constants import (
     NULL,
     NUMERICAL,
     OBJECT_DETECTION,
-    OPEN_VOCABULARY_OBJECT_DETECTION,
     REGRESSION,
     ROIS,
     SEMANTIC_SEGMENTATION,
@@ -673,7 +672,7 @@ def infer_label_column_type_by_problem_type(
             column_types[col_name] = NUMERICAL
         elif problem_type == NER:
             column_types[col_name] = NER_ANNOTATION
-        elif problem_type in [OBJECT_DETECTION, OPEN_VOCABULARY_OBJECT_DETECTION]:
+        elif problem_type in OBJECT_DETECTION:
             column_types[col_name] = ROIS
         elif problem_type == SEMANTIC_SEGMENTATION:
             column_types[col_name] = SEMANTIC_SEGMENTATION_GT
@@ -773,7 +772,7 @@ def infer_output_shape(
             return 1
         else:
             return class_num
-    elif problem_type in [NER, OBJECT_DETECTION, OPEN_VOCABULARY_OBJECT_DETECTION, SEMANTIC_SEGMENTATION]:
+    elif problem_type in [NER, OBJECT_DETECTION, SEMANTIC_SEGMENTATION]:
         return None
     else:
         raise ValueError(
@@ -781,7 +780,7 @@ def infer_output_shape(
             f"for training. The supported problem types are"
             f" '{BINARY}', '{MULTICLASS}', '{REGRESSION}',"
             f" '{CLASSIFICATION}', '{NER}',"
-            f" '{OBJECT_DETECTION}', '{OPEN_VOCABULARY_OBJECT_DETECTION}',"
+            f" '{OBJECT_DETECTION}', "
             f" '{SEMANTIC_SEGMENTATION}"
         )
 
