@@ -21,10 +21,10 @@ tabular_presets_dict = dict(
         "time_limit": 3600,
         "refit_full": True,
         "set_best_to_refit_full": True,
-        "_save_bag_folds": False,
+        # "_save_bag_folds": False,
     },
     # Good predictive accuracy with very fast inference. ~4x faster training, ~8x faster inference and ~8x lower disk usage than `high_quality`.
-    # Recommended for applications that require veru fast inference speed.
+    # Recommended for applications that require very fast inference speed.
     # Aliases: good
     good_quality={
         "auto_stack": True,
@@ -34,7 +34,7 @@ tabular_presets_dict = dict(
         "time_limit": 3600,
         "refit_full": True,
         "set_best_to_refit_full": True,
-        "_save_bag_folds": False,
+        # "_save_bag_folds": False,
     },
     # Medium predictive accuracy with very fast inference and very fast training time. ~20x faster training than `good_quality`.
     # This is the default preset in AutoGluon, but should generally only be used for quick prototyping, as `good_quality` results in significantly better predictive accuracy with similar inference time.

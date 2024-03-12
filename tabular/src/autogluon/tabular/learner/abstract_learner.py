@@ -879,8 +879,16 @@ class AbstractTabularLearner(AbstractLearner):
                 inplace=True,
             )
             if "metric_error_test" in leaderboard:
-                leaderboard["metric_error_test"] = leaderboard["metric_error_test"].apply(self.eval_metric.convert_score_to_error)
-            leaderboard["metric_error_val"] = leaderboard["metric_error_val"].apply(self.eval_metric.convert_score_to_error)
+                leaderboard.loc[
+                    leaderboard["metric_error_test"].notnull(), "metric_error_test"
+                ] = leaderboard.loc[
+                    leaderboard["metric_error_test"].notnull(), "metric_error_test"
+                ].apply(self.eval_metric.convert_score_to_error)
+            leaderboard.loc[
+                leaderboard["metric_error_val"].notnull(), "metric_error_val"
+            ] = leaderboard.loc[
+                leaderboard["metric_error_val"].notnull(), "metric_error_val"
+            ].apply(self.eval_metric.convert_score_to_error)
         if display:
             with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):
                 print(leaderboard)
