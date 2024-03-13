@@ -252,12 +252,12 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
     def _to_data_frame(
         self,
-        data: Union[TimeSeriesDataFrame, pd.DataFrame, str],
+        data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
         name: str = "data",
     ) -> "TimeSeriesDataFrame":
         if isinstance(data, TimeSeriesDataFrame):
             return data
-        elif isinstance(data, (pd.DataFrame, str)):
+        elif isinstance(data, (pd.DataFrame, Path, str)):
             try:
                 data = TimeSeriesDataFrame(data)
             except:
@@ -267,13 +267,13 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             return data
         else:
             raise TypeError(
-                f"{name} must be a TimeSeriesDataFrame or pandas.DataFrame or string (path to data) "
+                f"{name} must be a TimeSeriesDataFrame, pandas.DataFrame, pathlib.Path or string (path to data) "
                 f"but received an object of type {type(data)}."
             )
 
     def _check_and_prepare_data_frame(
         self,
-        data: Union[TimeSeriesDataFrame, pd.DataFrame, str],
+        data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
         name: str = "data",
     ) -> TimeSeriesDataFrame:
         """Ensure that TimeSeriesDataFrame has a sorted index, valid frequency, and contains no missing values.
@@ -282,7 +282,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
         Parameters
         ----------
-        data : Union[TimeSeriesDataFrame, pd.DataFrame, str]
+        data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]
             Data as a data frame or path to file storing the data.
         name : str
             Name of the data that will be used in log messages (e.g., 'train_data', 'tuning_data', or 'data').
@@ -413,8 +413,8 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
     @apply_presets(TIMESERIES_PRESETS_CONFIGS)
     def fit(
         self,
-        train_data: Union[TimeSeriesDataFrame, pd.DataFrame, str],
-        tuning_data: Optional[Union[TimeSeriesDataFrame, pd.DataFrame, str]] = None,
+        train_data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
+        tuning_data: Optional[Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]] = None,
         time_limit: Optional[int] = None,
         presets: Optional[str] = None,
         hyperparameters: Dict[Union[str, Type], Any] = None,
@@ -432,7 +432,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
         Parameters
         ----------
-        train_data : Union[TimeSeriesDataFrame, pd.DataFrame, str]
+        train_data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]
             Training data in the :class:`~autogluon.timeseries.TimeSeriesDataFrame` format.
 
             Time series with length ``<= (num_val_windows + 1) * prediction_length`` will be ignored during training.
@@ -457,7 +457,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             If provided data is an instance of pandas DataFrame, AutoGluon will attempt to automatically convert it
             to a ``TimeSeriesDataFrame``.
 
-        tuning_data : Union[TimeSeriesDataFrame, pd.DataFrame, str], optional
+        tuning_data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str], optional
             Data reserved for model selection and hyperparameter tuning, rather than training individual models. Also
             used to compute the validation scores. Note that only the last ``prediction_length`` time steps of each
             time series are used for computing the validation score.
@@ -740,8 +740,8 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
     def predict(
         self,
-        data: Union[TimeSeriesDataFrame, pd.DataFrame, str],
-        known_covariates: Optional[Union[TimeSeriesDataFrame, pd.DataFrame, str]] = None,
+        data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
+        known_covariates: Optional[Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]] = None,
         model: Optional[str] = None,
         use_cache: bool = True,
         random_seed: Optional[int] = 123,
@@ -750,7 +750,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
         Parameters
         ----------
-        data : Union[TimeSeriesDataFrame, pd.DataFrame, str]
+        data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]
             Time series data to forecast with.
 
             If ``known_covariates_names`` were specified when creating the predictor, ``data`` must include the columns
@@ -761,7 +761,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
             If provided data is an instance of pandas DataFrame, AutoGluon will attempt to automatically convert it
             to a ``TimeSeriesDataFrame``.
-        known_covariates : Union[TimeSeriesDataFrame, pd.DataFrame, str], optional
+        known_covariates : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str], optional
             If ``known_covariates_names`` were specified when creating the predictor, it is necessary to provide the
             values of the known covariates for each time series during the forecast horizon. That is:
 
@@ -808,8 +808,9 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         B       2020-03-04    17.1
                 2020-03-05     8.3
         """
-        # Don't use data.item_ids in case data is not a TimeSeriesDataFrame
-        original_item_id_order = data.reset_index()[ITEMID].unique()
+        # Save original item_id order to return predictions in the same order as input data
+        data = self._to_data_frame(data)
+        original_item_id_order = data.item_ids
         data = self._check_and_prepare_data_frame(data)
         if known_covariates is not None:
             known_covariates = self._to_data_frame(known_covariates)
@@ -824,7 +825,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
     def evaluate(
         self,
-        data: Union[TimeSeriesDataFrame, pd.DataFrame, str],
+        data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
         model: Optional[str] = None,
         metrics: Optional[Union[str, TimeSeriesScorer, List[Union[str, TimeSeriesScorer]]]] = None,
         display: bool = False,
@@ -837,7 +838,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
         Parameters
         ----------
-        data : Union[TimeSeriesDataFrame, pd.DataFrame, str]
+        data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]
             The data to evaluate the best model on. The last ``prediction_length`` time steps of the data set, for each
             item, will be held out for prediction and forecast accuracy will be calculated on these time steps.
 
@@ -964,7 +965,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
     def leaderboard(
         self,
-        data: Optional[Union[TimeSeriesDataFrame, pd.DataFrame, str]] = None,
+        data: Optional[Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]] = None,
         display: bool = False,
         use_cache: bool = True,
         **kwargs,
@@ -989,7 +990,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
         Parameters
         ----------
-        data : Union[TimeSeriesDataFrame, pd.DataFrame, str], optional
+        data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str], optional
             dataset used for additional evaluation. If not provided, the validation set used during training will be
             used.
 
@@ -1195,8 +1196,8 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
     def plot(
         self,
-        data: Union[TimeSeriesDataFrame, pd.DataFrame, str],
-        predictions: Optional[Union[TimeSeriesDataFrame, pd.DataFrame, str]] = None,
+        data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
+        predictions: Optional[Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]] = None,
         quantile_levels: Optional[List[float]] = None,
         item_ids: Optional[List[Union[str, int]]] = None,
         max_num_item_ids: int = 8,
@@ -1208,7 +1209,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
         Parameters
         ----------
-        data : Union[TimeSeriesDataFrame, pd.DataFrame, str]
+        data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]
             Observed time series data.
         predictions : TimeSeriesDataFrame, optional
             Predictions generated by calling :meth:`~autogluon.timeseries.TimeSeriesPredictor.predict`.
