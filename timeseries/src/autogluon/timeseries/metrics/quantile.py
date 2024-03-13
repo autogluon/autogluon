@@ -106,5 +106,4 @@ class SQL(TimeSeriesScorer):
         num_items = len(self._past_abs_seasonal_error)
         # Reshape quantile losses values into [num_items, prediction_length] to normalize per item without groupby
         quantile_losses = ql.reshape([num_items, -1])
-        # We assume that items are in the same order in both arrays because predictor sorts by item_id
         return 2 * self._safemean(quantile_losses / self._past_abs_seasonal_error.values[:, None])

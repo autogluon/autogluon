@@ -115,10 +115,10 @@ class TimeSeriesScorer:
         ----------
         data_future : TimeSeriesDataFrame
             Actual values of the time series during the forecast horizon (``prediction_length`` values for each time
-            series in the dataset). This data frame is guaranteed to have the same index as ``predictions``.
+            series in the dataset). Must have the same index as ``predictions``.
         predictions : TimeSeriesDataFrame
             Data frame with predictions for the forecast horizon. Contain columns "mean" (point forecast) and the
-            columns corresponding to each of the quantile levels.
+            columns corresponding to each of the quantile levels. Must have the same index as ``data_future``.
         target : str, default = "target"
             Name of the column in ``data_future`` that contains the target time series.
 
