@@ -522,15 +522,17 @@ def test_given_data_is_in_dataframe_format_then_predictor_works(temp_model_path)
     assert isinstance(predictions, TimeSeriesDataFrame)
 
 
-def test_given_data_is_in_str_format_then_predictor_works(temp_model_path):
+@pytest.mark.parametrize("path_format", [str, Path])
+def test_given_data_is_in_str_format_then_predictor_works(temp_model_path, path_format):
     df = pd.DataFrame(DUMMY_TS_DATAFRAME.reset_index())
     with tempfile.NamedTemporaryFile("w") as data_path:
+        data_path = path_format(str(data_path))
         df.to_csv(data_path, index=False)
         predictor = TimeSeriesPredictor(path=temp_model_path)
-        predictor.fit(df, hyperparameters={"Naive": {}})
-        predictor.leaderboard(df)
-        predictor.evaluate(df)
-        predictions = predictor.predict(df)
+        predictor.fit(data_path, hyperparameters={"Naive": {}})
+        predictor.leaderboard(data_path)
+        predictor.evaluate(data_path)
+        predictions = predictor.predict(data_path)
         assert isinstance(predictions, TimeSeriesDataFrame)
 
 
