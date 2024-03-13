@@ -1197,7 +1197,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
     def plot(
         self,
         data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
-        predictions: Optional[Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]] = None,
+        predictions: Optional[TimeSeriesDataFrame] = None,
         quantile_levels: Optional[List[float]] = None,
         item_ids: Optional[List[Union[str, int]]] = None,
         max_num_item_ids: int = 8,
