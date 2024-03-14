@@ -204,7 +204,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             model = load_pkl.load(path=os.path.join(path, cls.model_file_name), verbose=verbose)
             if reset_paths:
                 model.set_contexts(path)
-            model.gts_predictor = PyTorchPredictor.deserialize(Path(path) / cls.gluonts_model_path)
+            model.gts_predictor = PyTorchPredictor.deserialize(Path(path) / cls.gluonts_model_path, device="auto")
         return model
 
     def _get_hpo_backend(self):
