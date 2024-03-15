@@ -30,8 +30,11 @@ DEPENDENT_PACKAGES = {
     "lightning": ">=2.1,<2.2",  # Major version cap
     "pytorch_lightning": ">=2.1,<2.2",  # Major version cap, capping `lightning` does not cap `pytorch_lightning`!
     "async_timeout": ">=4.0,<5",  # Major version cap
+<<<<<<< HEAD
     "transformers[sentencepiece]": ">=4.38.0,<4.39.0",
     "accelerate": ">=0.21.0,<0.22.0",
+=======
+>>>>>>> ea5d0682 (revert transformer version changes to multimodal)
 }
 if LITE_MODE:
     DEPENDENT_PACKAGES = {package: version for package, version in DEPENDENT_PACKAGES.items() if package not in ["psutil", "Pillow", "timm"]}
