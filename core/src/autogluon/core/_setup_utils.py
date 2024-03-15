@@ -28,7 +28,7 @@ DEPENDENT_PACKAGES = {
     "Pillow": ">=10.0.1,<11",  # Major version cap
     "torch": ">=2.0,<2.2",  # "<{N+2}" upper cap, sync with common/src/autogluon/common/utils/try_import.py
     "lightning": ">=2.0.0,<2.2",  # "<{N+2}" upper cap
-    "pytorch_lightning": ">=2.0.0,<2.2",  # "<{N+1}" upper cap, capping `lightning` does not cap `pytorch_lightning`!
+    "pytorch_lightning": ">=2.0.0,<2.2",  # "<{N+2}" upper cap, capping `lightning` does not cap `pytorch_lightning`!
     "async_timeout": ">=4.0,<5",  # Major version cap
 }
 if LITE_MODE:
