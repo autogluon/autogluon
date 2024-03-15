@@ -39,7 +39,7 @@ install_requires = [
     "torchvision>=0.15.0,<0.17.0",
     "scikit-image>=0.19.1,<0.21.0",
     "text-unidecode>=1.3,<1.4",
-    "torchmetrics>=1.0.0,<1.2.0",
+    "torchmetrics>=1.0.0,<1.3.0",
     "nptyping>=1.4.4,<2.5.0",
     "omegaconf>=2.1.1,<2.3.0",
     f"autogluon.core[raytune]=={version}",
