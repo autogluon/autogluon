@@ -225,7 +225,7 @@ class ChronosPretrainedModel(nn.Module):
 
         preds = self.model.generate(
             input_ids=input_ids,
-            attention_mask=attention_mask,
+            attention_mask=attention_mask.long(),  # int64 (long) type conversion needed for ONNX
             generation_config=GenerationConfig(
                 min_new_tokens=prediction_length,
                 max_new_tokens=prediction_length,

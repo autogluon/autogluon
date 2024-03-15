@@ -17,24 +17,45 @@ from ..common import (
 
 DATASETS = [DUMMY_TS_DATAFRAME, DATAFRAME_WITH_STATIC, DATAFRAME_WITH_COVARIATES]
 TESTABLE_MODELS = [ChronosModel]
-HYPERPARAMETER_SETS = []
 GPU_AVAILABLE = torch.cuda.is_available()
+HYPERPARAMETER_DICTS = [
+    {
+        "batch_size": 32,
+    },
+    {
+        "skip_validation": True,
+        "batch_size": 4,
+    },
+    {
+        "num_samples": 10,
+    },
+]
 
 
-@pytest.fixture(scope="module")
-def default_chronos_tiny_model() -> ChronosModel:
+@pytest.fixture(
+    scope="module",
+    params=[
+        {
+            "optimization_strategy": "onnx",
+        },
+        *HYPERPARAMETER_DICTS,
+    ],
+)
+def default_chronos_tiny_model(request) -> ChronosModel:
     model = ChronosModel(
         hyperparameters={
             "model_path": "amazon/chronos-t5-tiny",
+            "num_samples": 5,
             "device": "cpu",
+            **request.param,
         },
     )
     model.fit(train_data=None)
     return model
 
 
-@pytest.fixture(scope="module")
-def default_chronos_tiny_model_gpu() -> Optional[ChronosModel]:
+@pytest.fixture(scope="module", params=HYPERPARAMETER_DICTS)
+def default_chronos_tiny_model_gpu(request) -> Optional[ChronosModel]:
     if not GPU_AVAILABLE:
         return None
 
@@ -42,6 +63,7 @@ def default_chronos_tiny_model_gpu() -> Optional[ChronosModel]:
         hyperparameters={
             "model_path": "amazon/chronos-t5-tiny",
             "device": "cuda",
+            **request.param,
         },
     )
     model.fit(train_data=None)
@@ -157,7 +179,7 @@ def test_when_cpu_models_saved_then_models_can_be_loaded_and_inferred(data, defa
 def test_when_gpu_models_saved_then_models_can_be_loaded_and_inferred(data, default_chronos_tiny_model_gpu):
     default_chronos_tiny_model_gpu.save()
 
-    loaded_model = default_chronos_tiny_model_gpu.__class__.load(path=default_chronos_tiny_model.path)
+    loaded_model = default_chronos_tiny_model_gpu.__class__.load(path=default_chronos_tiny_model_gpu.path)
     assert loaded_model.model_pipeline is not None
 
     predictions = default_chronos_tiny_model_gpu.predict(data)

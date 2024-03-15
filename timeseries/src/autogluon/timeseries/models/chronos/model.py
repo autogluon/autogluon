@@ -34,7 +34,7 @@ MODEL_CONFIGS = {
 
 
 class ChronosInferenceDataset:
-    """Implements the ``torch.utils.data.Dataset`` interface"""
+    """A container for time series datasets that implements the ``torch.utils.data.Dataset`` interface"""
 
     def __init__(
         self,
@@ -94,6 +94,10 @@ class ChronosInferenceDataset:
 
 
 class OptimizedChronosPipeline(ChronosPipeline):
+    """A wrapper around the ChronosPipeline object for CPU-optimized model classes from
+    HuggingFace optimum.
+    """
+
     @classmethod
     def from_pretrained(cls, *args, **kwargs):
         """
@@ -120,9 +124,8 @@ class OptimizedChronosPipeline(ChronosPipeline):
                         "Huggingface Optimum library must be installed with ONNX for using the `onnx` strategy"
                     )
 
-                inner_model = ORTModelForSeq2SeqLM.from_pretrained(
-                    *args, **{**kwargs, "device_map": "cpu", "export": True}
-                )
+                assert kwargs.pop("device_map", "cpu") == "cpu", "ONNX mode only available on the CPU"
+                inner_model = ORTModelForSeq2SeqLM.from_pretrained(*args, **{**kwargs, "export": True})
             elif optimization_strategy == "ovm":
                 try:
                     from optimum.intel import OVModelForSeq2SeqLM
@@ -145,15 +148,21 @@ class OptimizedChronosPipeline(ChronosPipeline):
 
 
 class ChronosModel(AbstractTimeSeriesModel):
-    """Chronos pretrained time series forecasting models, based on `ChronosModel <https://github.com/amazon-science/chronos-forecasting>`.
+    """Chronos pretrained time series forecasting models, based on the original
+    `ChronosModel <https://github.com/amazon-science/chronos-forecasting>`_ implementation.
 
-    Chronos is a pretrained transformer-based model with number of parameters ranging between 8M and 710M. Also
-    see `huggingface <https://huggingface.co/amazon/chronos-t5-base>`. For Chronos small, base, and large variants a GPU
-    is required to perform inference efficiently.
+    Chronos is family of pretrained models, based on the T5 family, with number of parameters ranging between 8M and 710M.
+    The full collection of Chronos models is available on
+    `Hugging Face <https://huggingface.co/collections/amazon/chronos-models-65f1791d630a8d57cb718444>`_. For Chronos small,
+    base, and large variants a GPU is required to perform inference efficiently.
+
+    Chronos takes a minimalistic approach to pretraining time series models, by discretizing time series data directly into bins
+    which are treated as tokens, effectively performing regression by classification. This results in a simple and flexible framework
+    for using any language model in the context of time series forecasting. See [Ansari2024]_ for more information.
 
     References
     ----------
-    .. [Ansari2024] Ansari, Abdul Fatir, et al.
+    .. [Ansari2024] Ansari, Abdul Fatir, Stella, Lorenzo et al.
         "Chronos: Learning the Language of Time Series."
         http://arxiv.org/abs/2403.07815
 
