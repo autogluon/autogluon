@@ -29,12 +29,12 @@ install_requires = [
     "boto3",  # version range defined in `core/_setup_utils.py`
     "torch",  # version range defined in `core/_setup_utils.py`
     "lightning",  # version range defined in `core/_setup_utils.py`
+    "transformers[sentencepiece]",  # version range defined in `core/_setup_utils.py`
+    "accelerate",  # version range defined in `core/_setup_utils.py`
     "requests>=2.21,<3",
     "jsonschema>=4.14,<4.18",
     "seqeval>=1.2.2,<1.3.0",
     "evaluate>=0.4.0,<0.5.0",
-    "accelerate>=0.21.0,<0.22.0",
-    "transformers[sentencepiece]>=4.31.0,<4.32.0",
     "timm>=0.9.5,<0.10.0",
     "torchvision>=0.16.0,<0.17.0",
     "scikit-image>=0.19.1,<0.21.0",
