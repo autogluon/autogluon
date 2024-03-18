@@ -56,7 +56,11 @@ extras_require = {
         "black~=23.0",
     ],
     "chronos-cpu": [  # for faster CPU inference in pretrained models
+<<<<<<< HEAD
         "optimum[onnxruntime,openvino,nncf]>=1.17,<1.18",
+=======
+        "optimum[onnxruntime]>=1.17,<1.18",
+>>>>>>> ba840fb8 (black setup.py)
     ],
 }
 
