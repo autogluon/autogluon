@@ -110,13 +110,14 @@ class OptimizedChronosPipeline(ChronosPipeline):
             if optimization_strategy is None:
                 inner_model = AutoModelForSeq2SeqLM.from_pretrained(*args, **kwargs)
             else:
-                assert optimization_strategy in ["onnx", "ovm"], (
-                    "optimization_strategy not recognized. Please provide one of `onnx` or `ovm`"
-                )
+                assert optimization_strategy in [
+                    "onnx",
+                    "ovm",
+                ], "optimization_strategy not recognized. Please provide one of `onnx` or `ovm`"
                 torch_dtype = kwargs.pop("torch_dtype", "auto")
                 if torch_dtype != "auto":
                     logger.warning(f"`torch_dtype` will be ignored for optimization_strategy {optimization_strategy}")
-                
+
                 if optimization_strategy == "onnx":
                     try:
                         from optimum.onnxruntime import ORTModelForSeq2SeqLM
@@ -187,7 +188,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         If `onnx`, the model will be converted to ONNX and the inference will be performed using ONNX. If ``ovm``,
         inference will be performed with the model compiled to OpenVINO.
     torch_dtype : torch.dtype or str, default = "auto"
-        Torch data type for model weights, provided to ``from_pretrained`` method of Hugging Face AutoModels. 
+        Torch data type for model weights, provided to ``from_pretrained`` method of Hugging Face AutoModels.
     data_loader_num_workers : int, default = 1
         Number of worker processes to be used in the data loader. See documentation on ``torch.utils.data.DataLoader``
         for more information.
@@ -210,7 +211,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         **kwargs,  # noqa
     ):
         hyperparameters = hyperparameters if hyperparameters is not None else {}
-        
+
         # TODO: automatically determine batch size based on GPU / memory availability
         self.batch_size = hyperparameters.get("batch_size", self.default_batch_size)
         self.num_samples = hyperparameters.get("num_samples", self.default_num_samples)
@@ -360,9 +361,7 @@ class ChronosModel(AbstractTimeSeriesModel):
                 .detach()
                 .cpu()
                 .numpy()
-                for batch in self.get_inference_data_loader(
-                    data=data, num_workers=self.data_loader_num_workers
-                )
+                for batch in self.get_inference_data_loader(data=data, num_workers=self.data_loader_num_workers)
             )
 
         samples = np.concatenate([c.T for c in chain.from_iterable(prediction_samples)], axis=0)

@@ -191,12 +191,15 @@ def test_when_gpu_models_saved_then_models_can_be_loaded_and_inferred(data, defa
     )
 
 
-@pytest.mark.parametrize("dtype", [
-    torch.float16,
-    torch.bfloat16,
-    torch.float32,
-    torch.float64,
-])
+@pytest.mark.parametrize(
+    "dtype",
+    [
+        torch.float16,
+        torch.bfloat16,
+        torch.float32,
+        torch.float64,
+    ],
+)
 def test_when_torch_dtype_provided_then_parameters_loaded_in_torch_dtype(dtype):
     model = ChronosModel(
         hyperparameters={
