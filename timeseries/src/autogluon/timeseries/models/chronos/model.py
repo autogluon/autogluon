@@ -6,14 +6,11 @@ from typing import Any, Dict, Literal, Optional, Union
 
 import numpy as np
 import pandas as pd
-from transformers import AutoConfig, AutoModelForCausalLM, AutoModelForSeq2SeqLM
 
 from autogluon.common.loaders import load_pkl
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
-
-from .chronos import ChronosConfig, ChronosPipeline, ChronosPretrainedModel
 
 logger = logging.getLogger(__name__)
 
@@ -82,71 +79,6 @@ class ChronosInferenceDataset:
         end_idx = self.indptr[idx + 1]
 
         return self._get_context(self.target_array[start_idx:end_idx])
-
-
-class OptimizedChronosPipeline(ChronosPipeline):
-    """A wrapper around the ChronosPipeline object for CPU-optimized model classes from
-    HuggingFace optimum.
-    """
-
-    @classmethod
-    def from_pretrained(cls, *args, **kwargs):
-        """
-        Load the model, either from a local path or from the HuggingFace Hub.
-        Supports the same arguments as ``AutoConfig`` and ``AutoModel``
-        from ``transformers``.
-        """
-        optimization_strategy = kwargs.pop("optimization_strategy", None)
-        context_length = kwargs.pop("context_length", None)
-
-        config = AutoConfig.from_pretrained(*args, **kwargs)
-        assert hasattr(config, "chronos_config"), "Not a Chronos config file"
-
-        if context_length is not None:
-            config.chronos_config["context_length"] = context_length
-        chronos_config = ChronosConfig(**config.chronos_config)
-
-        if chronos_config.model_type == "seq2seq":
-            if optimization_strategy is None:
-                inner_model = AutoModelForSeq2SeqLM.from_pretrained(*args, **kwargs)
-            else:
-                assert optimization_strategy in [
-                    "onnx",
-                    "ovm",
-                ], "optimization_strategy not recognized. Please provide one of `onnx` or `ovm`"
-                torch_dtype = kwargs.pop("torch_dtype", "auto")
-                if torch_dtype != "auto":
-                    logger.warning(f"`torch_dtype` will be ignored for optimization_strategy {optimization_strategy}")
-
-                if optimization_strategy == "onnx":
-                    try:
-                        from optimum.onnxruntime import ORTModelForSeq2SeqLM
-                    except ImportError:
-                        raise ImportError(
-                            "Huggingface Optimum library must be installed with ONNX for using the `onnx` strategy"
-                        )
-
-                    assert kwargs.pop("device_map", "cpu") == "cpu", "ONNX mode only available on the CPU"
-                    inner_model = ORTModelForSeq2SeqLM.from_pretrained(*args, **{**kwargs, "export": True})
-                elif optimization_strategy == "ovm":
-                    try:
-                        from optimum.intel import OVModelForSeq2SeqLM
-                    except ImportError:
-                        raise ImportError(
-                            "Huggingface Optimum library must be installed with OpenVINO for using the `ovm` strategy"
-                        )
-
-                    inner_model = OVModelForSeq2SeqLM.from_pretrained(
-                        *args, **{**kwargs, "device_map": "cpu", "export": True}
-                    )
-        else:
-            assert config.model_type == "causal"
-            inner_model = AutoModelForCausalLM.from_pretrained(*args, **kwargs)
-
-        return cls(
-            tokenizer=chronos_config.create_tokenizer(),
-            model=ChronosPretrainedModel(config=chronos_config, model=inner_model),
-        )
 
 
 class ChronosModel(AbstractTimeSeriesModel):
@@ -238,7 +170,7 @@ class ChronosModel(AbstractTimeSeriesModel):
             **kwargs,
         )
 
-        self.model_pipeline: Optional[OptimizedChronosPipeline] = None
+        self.model_pipeline: Optional[Any] = None  # of type OptimizedChronosPipeline
 
     def save(self, path: str = None, verbose: bool = True) -> str:
         pipeline = self.model_pipeline
@@ -283,6 +215,8 @@ class ChronosModel(AbstractTimeSeriesModel):
         return minimum_resources
 
     def _get_model_pipeline(self):
+        from .chronos import OptimizedChronosPipeline
+
         gpu_available = self._is_gpu_available()
 
         assert self.model_path in MODEL_CONFIGS or Path.is_dir(
