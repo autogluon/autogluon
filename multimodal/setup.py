@@ -3,7 +3,6 @@
 # This code block is a HACK (!), but is necessary to avoid code duplication. Do NOT alter these lines.
 import importlib.util
 import os
-import torch
 
 from setuptools import setup
 
@@ -59,12 +58,6 @@ install_requires = [
 
 install_requires = ag.get_dependency_version_ranges(install_requires)
 
-cuda_version = float(torch.version.cuda)
-if cuda_version >= 12:
-    tensorrt_requirement = "tensorrt>=8.6.0,<8.6.2"
-else:
-    tensorrt_requirement = "tensorrt>=8.5.3.1,<8.5.4"
-
 tests_require = [
     "black~=23.0",
     "isort>=5.10",
@@ -72,7 +65,7 @@ tests_require = [
     "onnx>=1.13.0,<1.14.0",
     "onnxruntime>=1.15.0,<1.16.0;platform_system=='Darwin'",
     "onnxruntime-gpu>=1.15.0,<1.16.0;platform_system!='Darwin'",
-    f"{tensorrt_requirement};platform_system=='Linux' and python_version<'3.11'",  # tensorrt > 8.5.4 cause segfault when CUDA >= 12.1
+    "tensorrt>=8.6.0,<8.6.2;platform_system=='Linux' and python_version<'3.11'",
 ]
 
 extras_require = {
