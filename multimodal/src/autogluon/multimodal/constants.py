@@ -74,6 +74,9 @@ ROIS = "rois"
 SCORE = "score"
 LOGIT_SCALE = "logit_scale"
 
+# Loss
+MOE_LOSS = "moe_loss"
+
 # Metric for Object Detection
 MAP = "map"
 MEAN_AVERAGE_PRECISION = "mean_average_precision"
@@ -139,7 +142,6 @@ FM = "fm"
 MAE = "mae"
 BER = "ber"
 IOU = "iou"
-MOE_LOSS = "moe_loss"
 RETRIEVAL_METRICS = [NDCG, PRECISION, RECALL, MRR]
 METRIC_MODE_MAP = {
     ACC: MAX,

@@ -24,8 +24,7 @@ from ..constants import (
     SEMANTIC_MASK,
     SEMANTIC_SEGMENTATION,
 )
-from .adaptation_layers import IA3Linear, IA3LoRALinear, LoRALinear
-from .conv_lora.adaptation_layers import ConvLoRALinear
+from .adaptation_layers import ConvLoRALinear, IA3Linear, IA3LoRALinear, LoRALinear
 
 logger = logging.getLogger(__name__)
 

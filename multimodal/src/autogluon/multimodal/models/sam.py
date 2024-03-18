@@ -8,8 +8,8 @@ from torch import nn
 from transformers import SamConfig
 
 from ..constants import CLASS_LABEL, CLASS_LOGITS, COLUMN, IMAGE, IMAGE_VALID_NUM, LABEL, LOGITS, MASK_LABEL, MOE_LOSS
-from .conv_lora.adaptation_layers import ConvLoRALinear
-from .conv_lora.modeling_sam import SamImageSegmentationOutput, SamModel
+from .adaptation_layers import ConvLoRALinear
+from .custom_hf_models.modeling_sam_for_conv_lora import SamImageSegmentationOutput, SamModel
 from .utils import assign_layer_ids, freeze_model_layers
 
 logger = logging.getLogger(__name__)

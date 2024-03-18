@@ -35,17 +35,8 @@ from transformers.models.sam.configuration_sam import (
 )
 from transformers.utils import ModelOutput, add_start_docstrings, add_start_docstrings_to_model_forward, logging
 
-# from ...activations import ACT2FN
-# from ...modeling_outputs import BaseModelOutput
-# from ...modeling_utils import PreTrainedModel
-# from ...utils import ModelOutput, add_start_docstrings, add_start_docstrings_to_model_forward, logging
-# from .configuration_sam import SamConfig, SamMaskDecoderConfig, SamPromptEncoderConfig, SamVisionConfig
-
-
 logger = logging.get_logger(__name__)
 
-_CONFIG_FOR_DOC = "SamConfig"
-_CHECKPOINT_FOR_DOC = "facebook/sam-vit-huge"
 
 SAM_PRETRAINED_MODEL_ARCHIVE_LIST = [
     "facebook/sam-vit-huge",
