@@ -1,3 +1,4 @@
+from pathlib import Path
 from unittest import mock
 
 import numpy as np
@@ -309,3 +310,22 @@ def test_when_custom_trainer_kwargs_given_then_trainer_receives_them():
     received_trainer_kwargs = catch_trainer_kwargs(model)
     for k, v in trainer_kwargs.items():
         assert received_trainer_kwargs[k] == v
+
+
+def test_when_model_finishes_training_then_logs_are_removed(temp_model_path):
+    model = TemporalFusionTransformerModel(
+        freq=DUMMY_TS_DATAFRAME.freq, path=temp_model_path, hyperparameters=DUMMY_HYPERPARAMETERS
+    )
+    model.fit(train_data=DUMMY_TS_DATAFRAME)
+    assert not (Path(model.path) / "lightning_logs").exists()
+
+
+@pytest.mark.parametrize("keep_lightning_logs", [True, False])
+def test_when_keep_lightning_logs_set_then_logs_are_not_removed(keep_lightning_logs, temp_model_path):
+    model = DeepARModel(
+        freq=DUMMY_TS_DATAFRAME.freq,
+        path=temp_model_path,
+        hyperparameters={"keep_lightning_logs": keep_lightning_logs, **DUMMY_HYPERPARAMETERS},
+    )
+    model.fit(train_data=DUMMY_TS_DATAFRAME)
+    assert (Path(model.path) / "lightning_logs").exists() == keep_lightning_logs
