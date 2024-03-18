@@ -73,6 +73,9 @@ ROIS = "rois"
 SCORE = "score"
 LOGIT_SCALE = "logit_scale"
 
+# Loss
+MOE_LOSS = "moe_loss"
+
 # Metric for Object Detection
 MAP = "map"
 MEAN_AVERAGE_PRECISION = "mean_average_precision"
@@ -232,6 +235,7 @@ IA3_NORM = "ia3_norm"
 IA3_LORA = "ia3_lora"
 IA3_LORA_BIAS = "ia3_lora_bias"
 IA3_LORA_NORM = "Ia3_lora_norm"
+CONV_LORA = "conv_lora"
 PEFT_ADDITIVE_STRATEGIES = [
     LORA,
     LORA_BIAS,
@@ -242,6 +246,7 @@ PEFT_ADDITIVE_STRATEGIES = [
     IA3_LORA,
     IA3_LORA_BIAS,
     IA3_LORA_NORM,
+    CONV_LORA,
 ]
 PEFT_NON_ADDITIVE_STRATEGIES = [
     BIT_FIT,
