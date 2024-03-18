@@ -15,9 +15,6 @@ from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_da
 
 from .chronos import ChronosConfig, ChronosPipeline, ChronosPretrainedModel
 
-# NOTE: We avoid imports for torch and lightning.pytorch at the top level and hide them inside class methods.
-# This is done to skip these imports during multiprocessing (which may cause bugs)
-
 logger = logging.getLogger(__name__)
 
 
@@ -42,9 +39,7 @@ class ChronosInferenceDataset:
         context_length: int,
         target_column: str = "target",
     ):
-        assert target_df is not None
-        assert target_df.freq, "Initializing GluonTS data sets without freq is not allowed"
-
+        assert context_length > 0
         self.target_column = target_column
         self.context_length = context_length
         self.target_array = target_df[target_column].to_numpy(dtype=np.float32)
@@ -53,9 +48,6 @@ class ChronosInferenceDataset:
 
     def _set_indptr(self, target_df: TimeSeriesDataFrame):
         """Replace inefficient groupby ITEMID with indptr that stores start:end of each time series"""
-
-        # TODO: refactor into generic iterator
-
         item_id_index = target_df.index.get_level_values(ITEMID)
         indices_sizes = item_id_index.value_counts(sort=False)
         self.item_ids = indices_sizes.index  # shape [num_items]
@@ -68,7 +60,6 @@ class ChronosInferenceDataset:
         return len(self.indptr) - 1  # noqa
 
     def _get_context(self, a: np.ndarray, pad_value=np.nan):
-        assert self.context_length > 0
         a = a[-self.context_length :]
         pad_size = self.context_length - len(a)
         if pad_size > 0:
@@ -106,37 +97,47 @@ class OptimizedChronosPipeline(ChronosPipeline):
         from ``transformers``.
         """
         optimization_strategy = kwargs.pop("optimization_strategy", None)
+        context_length = kwargs.pop("context_length", None)
 
         config = AutoConfig.from_pretrained(*args, **kwargs)
         assert hasattr(config, "chronos_config"), "Not a Chronos config file"
 
+        if context_length is not None:
+            config.chronos_config["context_length"] = context_length
         chronos_config = ChronosConfig(**config.chronos_config)
 
         if chronos_config.model_type == "seq2seq":
             if optimization_strategy is None:
                 inner_model = AutoModelForSeq2SeqLM.from_pretrained(*args, **kwargs)
-
-            elif optimization_strategy == "onnx":
-                try:
-                    from optimum.onnxruntime import ORTModelForSeq2SeqLM
-                except ImportError:
-                    raise ImportError(
-                        "Huggingface Optimum library must be installed with ONNX for using the `onnx` strategy"
-                    )
-
-                assert kwargs.pop("device_map", "cpu") == "cpu", "ONNX mode only available on the CPU"
-                inner_model = ORTModelForSeq2SeqLM.from_pretrained(*args, **{**kwargs, "export": True})
-            elif optimization_strategy == "ovm":
-                try:
-                    from optimum.intel import OVModelForSeq2SeqLM
-                except ImportError:
-                    raise ImportError(
-                        "Huggingface Optimum library must be installed with OpenVINO for using the `ovm` strategy"
-                    )
-
-                inner_model = OVModelForSeq2SeqLM.from_pretrained(
-                    *args, **{**kwargs, "device_map": "cpu", "export": True}
+            else:
+                assert optimization_strategy in ["onnx", "ovm"], (
+                    "optimization_strategy not recognized. Please provide one of `onnx` or `ovm`"
                 )
+                torch_dtype = kwargs.pop("torch_dtype", "auto")
+                if torch_dtype != "auto":
+                    logger.warning(f"`torch_dtype` will be ignored for optimization_strategy {optimization_strategy}")
+                
+                if optimization_strategy == "onnx":
+                    try:
+                        from optimum.onnxruntime import ORTModelForSeq2SeqLM
+                    except ImportError:
+                        raise ImportError(
+                            "Huggingface Optimum library must be installed with ONNX for using the `onnx` strategy"
+                        )
+
+                    assert kwargs.pop("device_map", "cpu") == "cpu", "ONNX mode only available on the CPU"
+                    inner_model = ORTModelForSeq2SeqLM.from_pretrained(*args, **{**kwargs, "export": True})
+                elif optimization_strategy == "ovm":
+                    try:
+                        from optimum.intel import OVModelForSeq2SeqLM
+                    except ImportError:
+                        raise ImportError(
+                            "Huggingface Optimum library must be installed with OpenVINO for using the `ovm` strategy"
+                        )
+
+                    inner_model = OVModelForSeq2SeqLM.from_pretrained(
+                        *args, **{**kwargs, "device_map": "cpu", "export": True}
+                    )
         else:
             assert config.model_type == "causal"
             inner_model = AutoModelForCausalLM.from_pretrained(*args, **kwargs)
@@ -170,7 +171,7 @@ class ChronosModel(AbstractTimeSeriesModel):
     Other Parameters
     ----------------
     model_path: str, default = "amazon/chronos-t5-small"
-        Model path used for the model, i.e., a HuggingFace transformers `name_or_path`. Can be a
+        Model path used for the model, i.e., a HuggingFace transformers ``name_or_path``. Can be a
         compatible model name on HuggingFace Hub or a local path to a model directory.
     batch_size : int, default = 16
         Size of batches used during inference
@@ -181,17 +182,21 @@ class ChronosModel(AbstractTimeSeriesModel):
     device : str, default = None
         Device to use for inference. If None, model will use the GPU if available. For larger model sizes
         `small`, `base`, and `large`; inference will fail if no GPU is available.
-    optimization_strategy : str, default = None
+    optimization_strategy : {None, "onnx", "ovm"}, default = None
         Optimization strategy to use for inference on CPUs. If None, the model will use the default implementation.
-        If `onnx`, the model will be converted to ONNX and the inference will be performed using ONNX. If `ovm`,
+        If `onnx`, the model will be converted to ONNX and the inference will be performed using ONNX. If ``ovm``,
         inference will be performed with the model compiled to OpenVINO.
+    torch_dtype : torch.dtype or str, default = "auto"
+        Torch data type for model weights, provided to ``from_pretrained`` method of Hugging Face AutoModels. 
+    data_loader_num_workers : int, default = 1
+        Number of worker processes to be used in the data loader. See documentation on ``torch.utils.data.DataLoader``
+        for more information.
     """
 
     # default number of samples for prediction
     default_num_samples: int = 20
     default_batch_size: int = 16
     default_context_length: int = 512
-    bucket_name = "chronos-release"
     default_model_path = "amazon/chronos-t5-small"
 
     def __init__(
@@ -205,11 +210,15 @@ class ChronosModel(AbstractTimeSeriesModel):
         **kwargs,  # noqa
     ):
         hyperparameters = hyperparameters if hyperparameters is not None else {}
+        
+        # TODO: automatically determine batch size based on GPU / memory availability
         self.batch_size = hyperparameters.get("batch_size", self.default_batch_size)
         self.num_samples = hyperparameters.get("num_samples", self.default_num_samples)
         self.model_path = hyperparameters.get("model_path", self.default_model_path)
         self.skip_validation = hyperparameters.get("skip_validation", False)
-        self.device = hyperparameters.get("device", None)
+        self.device = hyperparameters.get("device")
+        self.torch_dtype = hyperparameters.get("torch_dtype", "auto")
+        self.data_loader_num_workers = hyperparameters.get("data_loader_num_workers", 1)
         self.optimization_strategy: Optional[Literal["onnx", "ovm"]] = hyperparameters.get(
             "optimization_strategy", None
         )
@@ -233,7 +242,7 @@ class ChronosModel(AbstractTimeSeriesModel):
     def save(self, path: str = None, verbose: bool = True) -> str:
         pipeline = self.model_pipeline
         self.model_pipeline = None
-        path = Path(super().save(path=path, verbose=verbose))
+        path = super().save(path=path, verbose=verbose)
         self.model_pipeline = pipeline
 
         return str(path)
@@ -292,6 +301,8 @@ class ChronosModel(AbstractTimeSeriesModel):
             self.model_path,
             device_map=device,
             optimization_strategy=self.optimization_strategy,
+            torch_dtype=self.torch_dtype,
+            context_length=self.context_length,
         )
 
         return pipeline
@@ -349,7 +360,9 @@ class ChronosModel(AbstractTimeSeriesModel):
                 .detach()
                 .cpu()
                 .numpy()
-                for batch in self.get_inference_data_loader(data=data)
+                for batch in self.get_inference_data_loader(
+                    data=data, num_workers=self.data_loader_num_workers
+                )
             )
 
         samples = np.concatenate([c.T for c in chain.from_iterable(prediction_samples)], axis=0)

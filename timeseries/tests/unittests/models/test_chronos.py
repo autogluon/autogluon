@@ -29,6 +29,9 @@ HYPERPARAMETER_DICTS = [
     {
         "num_samples": 10,
     },
+    {
+        "context_length": 64,
+    },
 ]
 
 
@@ -186,3 +189,23 @@ def test_when_gpu_models_saved_then_models_can_be_loaded_and_inferred(data, defa
     assert all(
         predictions.index.get_level_values("item_id").unique() == data.index.get_level_values("item_id").unique()
     )
+
+
+@pytest.mark.parametrize("dtype", [
+    torch.float16,
+    torch.bfloat16,
+    torch.float32,
+    torch.float64,
+])
+def test_when_torch_dtype_provided_then_parameters_loaded_in_torch_dtype(dtype):
+    model = ChronosModel(
+        hyperparameters={
+            "model_path": "amazon/chronos-t5-tiny",
+            "device": "cpu",
+            "torch_dtype": dtype,
+        },
+    )
+    model.fit(train_data=None)
+
+    embedding_matrix = next(iter(model.model_pipeline.model.model.shared.parameters()))
+    assert embedding_matrix.dtype is dtype
