@@ -1048,6 +1048,7 @@ class AbstractTabularLearner(AbstractLearner):
         model: str = "best",
         decision_thresholds: int | List[float] = 50,
         verbose: bool = True,
+        **kwargs,
     ) -> float:
         # TODO: docstring
         if metric is None:
@@ -1064,7 +1065,14 @@ class AbstractTabularLearner(AbstractLearner):
             y = self.transform_labels(y=data[self.label])
 
         return self.load_trainer().calibrate_decision_threshold(
-            X=X, y=y, metric=metric, model=model, weights=weights, decision_thresholds=decision_thresholds, verbose=verbose
+            X=X,
+            y=y,
+            metric=metric,
+            model=model,
+            weights=weights,
+            decision_thresholds=decision_thresholds,
+            verbose=verbose,
+            **kwargs,
         )
 
     # TODO: Add data info gathering at beginning of .fit() that is used by all learners to add to get_info output

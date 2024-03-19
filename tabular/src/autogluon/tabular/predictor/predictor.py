@@ -3346,6 +3346,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         metric: str | Scorer | None = None,
         model: str = "best",
         decision_thresholds: int | List[float] = 50,
+        subsample_size: int | None = 1000000,
         verbose: bool = True,
     ) -> float:
         """
@@ -3374,6 +3375,9 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             The number of decision thresholds on either side of `0.5` to search.
             The default of 50 will result in 101 searched thresholds: [0.00, 0.01, 0.02, ..., 0.49, 0.50, 0.51, ..., 0.98, 0.99, 1.00]
             Alternatively, a list of decision thresholds can be passed and only the thresholds in the list will be searched.
+        subsample_size : int | None, default = 1000000
+            When `subsample_size` is not None and `data` contains more rows than `subsample_size`, samples to `subsample_size` rows to speed up calibration.
+            Usually it is not necessary to use more than 1 million rows for calibration.
         verbose : bool, default = True
             If True, will log information about the calibration process.
 
@@ -3382,12 +3386,9 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         Decision Threshold: A float between 0 and 1 defining the decision boundary for predictions that
         maximizes the `metric` score on the `data` for the `model`.
         """
-        # TODO: v0.8
-        #  add tutorial section
-        #
-        # TODO: v0.9
+        # TODO: v1.2
         #  Calculate optimal threshold for each model separately when deciding best model
-        #  sampling/time limit
+        #  time limit
         #  update validation scores of models based on threshold
         #  speed up the logic / search for optimal threshold more efficiently
         #  make threshold calibration part of internal optimization, such as during fit_weighted_ensemble.
@@ -3406,7 +3407,14 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         if model == "best":
             model = self.model_best
 
-        return self._learner.calibrate_decision_threshold(data=data, metric=metric, model=model, decision_thresholds=decision_thresholds, verbose=verbose)
+        return self._learner.calibrate_decision_threshold(
+            data=data,
+            metric=metric,
+            model=model,
+            decision_thresholds=decision_thresholds,
+            subsample_size=subsample_size,
+            verbose=verbose,
+        )
 
     def predict_oof(self, model: str = None, *, transformed=False, train_data=None, internal_oof=False, decision_threshold=None, can_infer=None) -> pd.Series:
         """

@@ -1325,7 +1325,7 @@ class AbstractTrainer:
                             f"WARNING: Refit training failure detected for '{model_name}'... "
                             f"Falling back to using first fold to avoid downstream exception."
                             f"\n\tThis is likely due to an out-of-memory error or other memory related issue. "
-                            f"\n\tPlease create a GitHub issue if this was triggered from a non-memory related problem."
+                            f"\n\tPlease create a GitHub issue if this was triggered from a non-memory related problem.",
                         )
 
                 if reuse_first_fold:
@@ -3769,6 +3769,7 @@ class AbstractTrainer:
         weights=None,
         decision_thresholds: int | List[float] = 50,
         verbose: bool = True,
+        **kwargs,
     ) -> float:
         # TODO: Docstring
         assert self.problem_type == BINARY, f'calibrate_decision_threshold is only available for `problem_type="{BINARY}"`'
@@ -3827,4 +3828,5 @@ class AbstractTrainer:
             decision_thresholds=decision_thresholds,
             metric_name=metric.name,
             verbose=verbose,
+            **kwargs,
         )

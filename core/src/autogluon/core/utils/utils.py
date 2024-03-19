@@ -290,9 +290,9 @@ def get_pred_from_proba(y_pred_proba: np.ndarray, problem_type: str = BINARY, de
         if len(y_pred_proba.shape) == 2:
             assert y_pred_proba.shape[1] == 2
             # Assume positive class is in 2nd position
-            y_pred = [1 if pred > decision_threshold else 0 for pred in y_pred_proba[:, 1]]
+            y_pred = (y_pred_proba[:, 1] > decision_threshold).astype(int)
         else:
-            y_pred = [1 if pred > decision_threshold else 0 for pred in y_pred_proba]
+            y_pred = (y_pred_proba > decision_threshold).astype(int)
     elif problem_type == REGRESSION:
         y_pred = y_pred_proba
     elif problem_type == QUANTILE:
