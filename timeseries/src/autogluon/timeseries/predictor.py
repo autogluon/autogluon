@@ -427,7 +427,6 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         enable_ensemble: bool = True,
         random_seed: Optional[int] = 123,
         verbosity: Optional[int] = None,
-        disable_length_check: bool = False,
     ) -> "TimeSeriesPredictor":
         """Fit probabilistic forecasting models to the given time series dataset.
 
@@ -504,7 +503,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             - ``"high_quality"``: All ML models available in AutoGluon + additional statistical models (``NPTS``, ``AutoETS``, ``AutoARIMA``, ``CrostonSBA``,
               ``DynamicOptimizedTheta``). Much more accurate than ``medium_quality``, but takes longer to train.
             - ``"best_quality"``: Same models as in ``"high_quality"`, but performs validation with multiple backtests. Usually better than ``high_quality``, but takes even longer to train.
-            - ``"chronos_{model_size}"``: where model size is one of ``tiny,mini,small,base,large``. Uses the Chronos pretrained model for zero-shot forecasting. 
+            - ``"chronos_{model_size}"``: where model size is one of ``tiny,mini,small,base,large``. Uses the Chronos pretrained model for zero-shot forecasting.
               See the documentation for ``ChronosModel`` or see `Hugging Face <https://huggingface.co/collections/amazon/chronos-models-65f1791d630a8d57cb718444>`_ for more information.
               Note that a GPU is required for model sizes ``small``, ``base`` and ``large``.
             - ``"chronos"``: alias for ``"chronos_small"``.
@@ -646,9 +645,6 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         verbosity : int, optional
             If provided, overrides the ``verbosity`` value used when creating the ``TimeSeriesPredictor``. See
             documentation for :class:`~autogluon.timeseries.TimeSeriesPredictor` for more details.
-        disable_length_check: bool, default = False
-            If True, do NOT ensure that at least some series in `train_data` have length > 2 * prediction_length.
-            This option is for advanced users only and may result in errors inside the predictor.
 
         """
         time_start = time.time()
@@ -716,10 +712,9 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         if num_val_windows == 0 and tuning_data is None:
             raise ValueError("Please set num_val_windows >= 1 or provide custom tuning_data")
 
-        if not disable_length_check:
-            train_data = self._filter_short_series(
-                train_data, num_val_windows=num_val_windows, val_step_size=val_step_size
-            )
+        train_data = self._filter_short_series(
+            train_data, num_val_windows=num_val_windows, val_step_size=val_step_size
+        )
 
         val_splitter = ExpandingWindowSplitter(
             prediction_length=self.prediction_length, num_val_windows=num_val_windows, val_step_size=val_step_size

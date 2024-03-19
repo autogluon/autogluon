@@ -23,7 +23,6 @@ HYPERPARAMETER_DICTS = [
         "batch_size": 32,
     },
     {
-        "skip_validation": True,
         "batch_size": 4,
     },
     {
@@ -76,8 +75,7 @@ def default_chronos_tiny_model_gpu(request) -> Optional[ChronosModel]:
 @pytest.mark.parametrize("data", DATASETS)
 def test_when_on_cpu_then_chronos_model_can_score_and_cache_oof(data, default_chronos_tiny_model):
     default_chronos_tiny_model.score_and_cache_oof(data)
-    if not default_chronos_tiny_model.skip_validation:
-        assert default_chronos_tiny_model._oof_predictions is not None
+    assert default_chronos_tiny_model._oof_predictions is not None
 
 
 @pytest.mark.parametrize("data", DATASETS)
@@ -103,8 +101,7 @@ def test_given_nan_features_when_on_cpu_then_chronos_model_inferences_not_nan(de
 @pytest.mark.parametrize("data", DATASETS)
 def test_when_on_gpu_then_chronos_model_can_score_and_cache_oof(data, default_chronos_tiny_model_gpu):
     default_chronos_tiny_model_gpu.score_and_cache_oof(data)
-    if not default_chronos_tiny_model_gpu.skip_validation:
-        assert default_chronos_tiny_model_gpu._oof_predictions is not None
+    assert default_chronos_tiny_model_gpu._oof_predictions is not None
 
 
 @pytest.mark.skipif(not GPU_AVAILABLE, reason="Requires GPU")

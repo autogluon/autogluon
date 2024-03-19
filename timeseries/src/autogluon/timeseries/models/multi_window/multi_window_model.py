@@ -124,41 +124,33 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
                 )
                 model.fit_time = time.time() - model_fit_start_time
                 most_recent_refit_window = f"W{window_index}"
-
             model.score_and_cache_oof(val_fold, store_val_score=True, store_predict_time=True)
 
             oof_predictions_per_window.append(model.get_oof_predictions()[0])
 
-            info = {
-                "window_index": window_index,
-                "refit_this_window": refit_this_window,
-                "fit_time": model.fit_time if refit_this_window else float("nan"),
-                "val_score": model.val_score if model.val_score is not None else float("nan"),
-                "predict_time": model.predict_time if model.predict_time is not None else float("nan"),
-            }
-
             logger.debug(
-                f"\t\t{info['val_score']:<7.4f}".ljust(15) + f"= Validation score ({model.eval_metric.name_with_sign})"
+                f"\t\t{model.val_score:<7.4f}".ljust(15) + f"= Validation score ({model.eval_metric.name_with_sign})"
             )
-            logger.debug(f"\t\t{info['fit_time']:<7.3f} s".ljust(15) + "= Training runtime")
-            logger.debug(f"\t\t{info['predict_time']:<7.3f} s".ljust(15) + "= Prediction runtime")
+            logger.debug(f"\t\t{model.fit_time:<7.3f} s".ljust(15) + "= Training runtime")
+            logger.debug(f"\t\t{model.predict_time:<7.3f} s".ljust(15) + "= Prediction runtime")
 
-            self.info_per_val_window.append(info)
+            self.info_per_val_window.append(
+                {
+                    "window_index": window_index,
+                    "refit_this_window": refit_this_window,
+                    "fit_time": model.fit_time if refit_this_window else float("nan"),
+                    "val_score": model.val_score,
+                    "predict_time": model.predict_time,
+                }
+            )
 
-        self._oof_predictions = oof_predictions_per_window
         # Only the model trained on most recent data is saved & used for prediction
         self.most_recent_model = model
         self.most_recent_model_folder = most_recent_refit_window
-        # Do not set predict_time / fit_time / val_score if most recent model skipped validation
         self.predict_time = self.most_recent_model.predict_time
-        if self.predict_time is not None:
-            self.fit_time = time.time() - global_fit_start_time - self.predict_time
-        else:
-            self.predict_time = float("nan")
-        if self.most_recent_model.val_score is not None:
-            self.val_score = np.mean([info["val_score"] for info in self.info_per_val_window])
-        else:
-            self.val_score = float("nan")
+        self.fit_time = time.time() - global_fit_start_time - self.predict_time
+        self._oof_predictions = oof_predictions_per_window
+        self.val_score = np.mean([info["val_score"] for info in self.info_per_val_window])
 
     def get_info(self) -> dict:
         info = super().get_info()

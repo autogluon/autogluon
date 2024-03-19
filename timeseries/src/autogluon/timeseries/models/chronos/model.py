@@ -110,8 +110,6 @@ class ChronosModel(AbstractTimeSeriesModel):
         Size of batches used during inference
     num_samples : int, default = 20
         Number of samples used during inference
-    skip_validation : bool, default = False
-        If True, validation will be skipped during training
     device : str, default = None
         Device to use for inference. If None, model will use the GPU if available. For larger model sizes
         `small`, `base`, and `large`; inference will fail if no GPU is available.
@@ -148,7 +146,6 @@ class ChronosModel(AbstractTimeSeriesModel):
         self.batch_size = hyperparameters.get("batch_size", self.default_batch_size)
         self.num_samples = hyperparameters.get("num_samples", self.default_num_samples)
         self.model_path = hyperparameters.get("model_path", self.default_model_path)
-        self.skip_validation = hyperparameters.get("skip_validation", False)
         self.device = hyperparameters.get("device")
         self.torch_dtype = hyperparameters.get("torch_dtype", "auto")
         self.data_loader_num_workers = hyperparameters.get("data_loader_num_workers", 1)
@@ -194,13 +191,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         store_val_score: bool = False,
         store_predict_time: bool = False,
     ) -> None:
-        if self.skip_validation:
-            logger.info("\tSkipping validation for this model...")
-            self._oof_predictions = [None]
-            self.val_score = None
-            self.predict_time = None
-        else:
-            super().score_and_cache_oof(val_data, store_val_score, store_predict_time)
+        super().score_and_cache_oof(val_data, store_val_score, store_predict_time)
 
     def _is_gpu_available(self) -> bool:
         import torch.cuda
