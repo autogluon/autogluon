@@ -31,6 +31,9 @@ HYPERPARAMETER_DICTS = [
     {
         "context_length": 64,
     },
+    {
+        "model_path": "tiny",
+    },
 ]
 
 
@@ -49,6 +52,7 @@ def default_chronos_tiny_model(request) -> ChronosModel:
             "model_path": "amazon/chronos-t5-tiny",
             "num_samples": 5,
             "device": "cpu",
+            "context_length": 16,
             **request.param,
         },
     )

@@ -1,14 +1,13 @@
 import logging
 import os
 from itertools import chain
-from pathlib import Path
 from typing import Any, Dict, Literal, Optional, Union
 
 import numpy as np
 import pandas as pd
 
 from autogluon.common.loaders import load_pkl
-from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
+from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 
@@ -24,6 +23,15 @@ MODEL_CONFIGS = {
     "amazon/chronos-t5-small": {"num_gpus": 1},
     "amazon/chronos-t5-base": {"num_gpus": 1},
     "amazon/chronos-t5-large": {"num_gpus": 1},
+}
+
+
+MODEL_ALIASES = {
+    "tiny": "amazon/chronos-t5-tiny",
+    "mini": "amazon/chronos-t5-mini",
+    "small": "amazon/chronos-t5-small",
+    "base": "amazon/chronos-t5-base",
+    "large": "amazon/chronos-t5-large",
 }
 
 
@@ -89,7 +97,9 @@ class ChronosModel(AbstractTimeSeriesModel):
     ----------------
     model_path: str, default = "amazon/chronos-t5-small"
         Model path used for the model, i.e., a HuggingFace transformers ``name_or_path``. Can be a
-        compatible model name on HuggingFace Hub or a local path to a model directory.
+        compatible model name on HuggingFace Hub or a local path to a model directory. Original
+        Chronos models (i.e., ``amazon/chronos-t5-{model_size}``) can be specified with aliases
+        ``tiny``, ``mini`` , ``small``, ``base``, and ``large``.
     batch_size : int, default = 16
         Size of batches used during inference
     num_samples : int, default = 20
@@ -126,10 +136,12 @@ class ChronosModel(AbstractTimeSeriesModel):
     ):
         hyperparameters = hyperparameters if hyperparameters is not None else {}
 
+        model_path_input = hyperparameters.get("model_path", self.default_model_path)
+        self.model_path = MODEL_ALIASES.get(model_path_input, model_path_input)
+
         # TODO: automatically determine batch size based on GPU / memory availability
         self.batch_size = hyperparameters.get("batch_size", self.default_batch_size)
         self.num_samples = hyperparameters.get("num_samples", self.default_num_samples)
-        self.model_path = hyperparameters.get("model_path", self.default_model_path)
         self.device = hyperparameters.get("device")
         self.torch_dtype = hyperparameters.get("torch_dtype", "auto")
         self.data_loader_num_workers = hyperparameters.get("data_loader_num_workers", 1)
@@ -138,7 +150,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         )
         self.context_length = hyperparameters.get("context_length", self.default_context_length)
 
-        model_path_safe = str.replace(self.model_path, "/", "__")
+        model_path_safe = str.replace(model_path_input, "/", "__")
         name = (name if name is not None else "Chronos") + f"[{model_path_safe}]"
 
         super().__init__(
@@ -186,17 +198,13 @@ class ChronosModel(AbstractTimeSeriesModel):
         minimum_resources = {"num_cpus": 1}
         # if GPU is available, we train with 1 GPU per trial
         if is_gpu_available:
-            minimum_resources["num_gpus"] = MODEL_CONFIGS[self.model_path].get("num_gpus", 0)
+            minimum_resources["num_gpus"] = MODEL_CONFIGS.get(self.model_path, {}).get("num_gpus", 0)
         return minimum_resources
 
     def _get_model_pipeline(self):
         from .chronos import OptimizedChronosPipeline
 
         gpu_available = self._is_gpu_available()
-
-        assert self.model_path in MODEL_CONFIGS or Path.is_dir(
-            Path(self.model_path)
-        ), f"Model path {self.model_path} is not supported"
 
         if not gpu_available and MODEL_CONFIGS.get(self.model_path, {}).get("num_gpus", 0) > 0:
             raise RuntimeError(

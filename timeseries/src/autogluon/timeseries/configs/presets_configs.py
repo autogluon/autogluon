@@ -10,29 +10,29 @@ TIMESERIES_PRESETS_CONFIGS = dict(
     medium_quality={"hyperparameters": "light"},
     fast_training={"hyperparameters": "very_light"},
     chronos_tiny={
-        "hyperparameters": {"Chronos": {"model_path": "amazon/chronos-t5-tiny"}},
+        "hyperparameters": {"Chronos": {"model_path": "tiny"}},
     },
     chronos_mini={
-        "hyperparameters": {"Chronos": {"model_path": "amazon/chronos-t5-mini"}},
+        "hyperparameters": {"Chronos": {"model_path": "mini"}},
     },
     chronos_small={
-        "hyperparameters": {"Chronos": {"model_path": "amazon/chronos-t5-small"}},
+        "hyperparameters": {"Chronos": {"model_path": "small"}},
     },
     chronos_base={
-        "hyperparameters": {"Chronos": {"model_path": "amazon/chronos-t5-base"}},
+        "hyperparameters": {"Chronos": {"model_path": "base"}},
     },
     chronos_large={
-        "hyperparameters": {"Chronos": {"model_path": "amazon/chronos-t5-large", "batch_size": 8}},
+        "hyperparameters": {"Chronos": {"model_path": "large", "batch_size": 8}},
     },
     chronos_ensemble={
         "hyperparameters": {
-            **{"Chronos": {"model_path": "amazon/chronos-t5-small"}},
+            **{"Chronos": {"model_path": "small"}},
             **get_default_hps("default"),
         }
     },
     chronos_large_ensemble={
         "hyperparameters": {
-            **{"Chronos": {"model_path": "amazon/chronos-t5-large", "batch_size": 8}},
+            **{"Chronos": {"model_path": "large", "batch_size": 8}},
             **get_default_hps("default"),
         }
     },
