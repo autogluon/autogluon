@@ -31,17 +31,32 @@ TIMESERIES_PRESETS_CONFIGS = dict(
         },
         "disable_length_check": True,
     },
-    chronos_mini_ensemble={
-        "hyperparameters": {"Chronos": {"model_path": "amazon/chronos-t5-mini"}} | get_default_hps("default"),
-    },
-    chronos_small_ensemble={
-        "hyperparameters": {"Chronos": {"model_path": "amazon/chronos-t5-small"}} | get_default_hps("default"),
-    },
-    chronos_base_ensemble={
-        "hyperparameters": {"Chronos": {"model_path": "amazon/chronos-t5-base"}} | get_default_hps("default"),
+    chronos_ensemble={
+        "hyperparameters": {
+            **{"Chronos": {"model_path": "amazon/chronos-t5-small"}},
+            **get_default_hps("default"),
+        }
     },
     chronos_large_ensemble={
-        "hyperparameters": {"Chronos": {"model_path": "amazon/chronos-t5-large", "batch_size": 8}}
-        | get_default_hps("default"),
+        "hyperparameters": {
+            **{"Chronos": {"model_path": "amazon/chronos-t5-large", "batch_size": 8}},
+            **get_default_hps("default"),
+        }
     },
 )
+
+timeseries_presets_aliases = dict(
+    chronos="chronos_small",
+    best="best_quality",
+    high="high_quality",
+    medium="medium_quality",
+    bq="best_quality",
+    hq="high_quality",
+    mq="medium_quality",
+)
+
+# update with aliases
+TIMESERIES_PRESETS_CONFIGS = {
+    **TIMESERIES_PRESETS_CONFIGS,
+    **{k: TIMESERIES_PRESETS_CONFIGS[v].copy() for k, v in timeseries_presets_aliases.items()},
+}
