@@ -18,7 +18,10 @@ class GreedyWeightedEnsembleModel(AbstractModel):
         self.weights_ = None
 
     def _set_default_params(self):
-        default_params = {"ensemble_size": 100}
+        default_params = {
+            "ensemble_size": 25,  # TabRepo reports that values above 25 lead to no measurable improvement.
+            "subsample_size": 1000000,  # subsample to this many rows if training row count exceeds this value to speed up training
+        }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
 
