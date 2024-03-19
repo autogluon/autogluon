@@ -55,11 +55,12 @@ extras_require = {
         "isort>=5.10",
         "black~=23.0",
     ],
+    "chronos-cpu": [  # for faster CPU inference in pretrained models
+        "optimum[onnxruntime,openvino,nncf]>=1.17,<1.18",
+    ],
 }
 
-extras_require["all"] = [
-    "optimum[openvino,onnxruntime,nncf]>=1.17,<1.18",  # for faster CPU inference in pretrained models
-]
+extras_require["all"] = list(set.union(*(set(extras_require[extra]) for extra in ["chronos-cpu"])))
 
 install_requires = ag.get_dependency_version_ranges(install_requires)
 
