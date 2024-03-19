@@ -879,14 +879,10 @@ class AbstractTabularLearner(AbstractLearner):
                 inplace=True,
             )
             if "metric_error_test" in leaderboard:
-                leaderboard.loc[
-                    leaderboard["metric_error_test"].notnull(), "metric_error_test"
-                ] = leaderboard.loc[
+                leaderboard.loc[leaderboard["metric_error_test"].notnull(), "metric_error_test"] = leaderboard.loc[
                     leaderboard["metric_error_test"].notnull(), "metric_error_test"
                 ].apply(self.eval_metric.convert_score_to_error)
-            leaderboard.loc[
-                leaderboard["metric_error_val"].notnull(), "metric_error_val"
-            ] = leaderboard.loc[
+            leaderboard.loc[leaderboard["metric_error_val"].notnull(), "metric_error_val"] = leaderboard.loc[
                 leaderboard["metric_error_val"].notnull(), "metric_error_val"
             ].apply(self.eval_metric.convert_score_to_error)
         if display:
