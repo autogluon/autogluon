@@ -176,7 +176,7 @@ class ChronosModel(AbstractTimeSeriesModel):
     @classmethod
     def load(cls, path: str, reset_paths: bool = True, verbose: bool = True) -> "ChronosModel":
         model = load_pkl.load(path=os.path.join(path, cls.model_file_name), verbose=verbose)
-        model.model_pipeline = model._get_model_pipeline()
+        model.load_model_pipeline()
         if reset_paths:
             model.set_contexts(path)
         return model
@@ -201,7 +201,7 @@ class ChronosModel(AbstractTimeSeriesModel):
             minimum_resources["num_gpus"] = MODEL_CONFIGS.get(self.model_path, {}).get("num_gpus", 0)
         return minimum_resources
 
-    def _get_model_pipeline(self):
+    def load_model_pipeline(self):
         from .chronos import OptimizedChronosPipeline
 
         gpu_available = self._is_gpu_available()
@@ -223,7 +223,7 @@ class ChronosModel(AbstractTimeSeriesModel):
             context_length=self.context_length,
         )
 
-        return pipeline
+        self.model_pipeline = pipeline
 
     def _fit(
         self,
@@ -233,7 +233,6 @@ class ChronosModel(AbstractTimeSeriesModel):
         **kwargs,
     ) -> None:
         self._check_fit_params()
-        self.model_pipeline = self._get_model_pipeline()
 
     def get_inference_data_loader(
         self,
@@ -264,10 +263,10 @@ class ChronosModel(AbstractTimeSeriesModel):
         import torch
 
         if self.model_pipeline is None:
-            raise ValueError("Please fit the model before predicting.")
+            self.load_model_pipeline()
 
         self.model_pipeline.model.eval()
-        with torch.no_grad():
+        with torch.inference_mode():
             prediction_samples = (
                 self.model_pipeline.predict(
                     batch,

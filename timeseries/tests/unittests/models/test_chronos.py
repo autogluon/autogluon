@@ -73,6 +73,10 @@ def default_chronos_tiny_model_gpu(request) -> Optional[ChronosModel]:
         },
     )
     model.fit(train_data=None)
+
+    # load pipeline in fixture to speed up tests
+    model.load_model_pipeline()
+
     return model
 
 
@@ -165,6 +169,23 @@ def test_when_context_length_provided_then_padding_correct(context_length):
     assert not np.isnan(item[-1])  # padding left
 
 
+@pytest.mark.parametrize(
+    "item_id_to_length, expected_indptr",
+    [
+        ({"A": 20, "B": 12}, [0, 20, 32]),
+        ({"A": 20, "B": 12, "C": 1}, [0, 20, 32, 33]),
+        ({"A": 20}, [0, 20]),
+        ({"A": 1}, [0, 1]),
+        ({"B": 10, "A": 10}, [0, 10, 20]),
+    ],
+)
+def test_when_inference_dataset_initialized_then_indptr_set_correctly(item_id_to_length, expected_indptr):
+    dataset = get_data_frame_with_variable_lengths(item_id_to_length)
+    inference_dataset = ChronosInferenceDataset(dataset, context_length=5)
+
+    assert inference_dataset.indptr.tolist() == expected_indptr
+
+
 @pytest.mark.parametrize("data", DATASETS)
 def test_when_cpu_models_saved_then_models_can_be_loaded_and_inferred(data, default_chronos_tiny_model):
     default_chronos_tiny_model.save()
@@ -210,23 +231,7 @@ def test_when_torch_dtype_provided_then_parameters_loaded_in_torch_dtype(dtype):
         },
     )
     model.fit(train_data=None)
+    model.load_model_pipeline()
 
     embedding_matrix = next(iter(model.model_pipeline.model.model.shared.parameters()))
     assert embedding_matrix.dtype is dtype
-
-
-@pytest.mark.parametrize(
-    "item_id_to_length, expected_indptr",
-    [
-        ({"A": 20, "B": 12}, [0, 20, 32]),
-        ({"A": 20, "B": 12, "C": 1}, [0, 20, 32, 33]),
-        ({"A": 20}, [0, 20]),
-        ({"A": 1}, [0, 1]),
-        ({"B": 10, "A": 10}, [0, 10, 20]),
-    ],
-)
-def test_when_inference_dataset_initialized_then_indptr_set_correctly(item_id_to_length, expected_indptr):
-    dataset = get_data_frame_with_variable_lengths(item_id_to_length)
-    inference_dataset = ChronosInferenceDataset(dataset, context_length=5)
-
-    assert inference_dataset.indptr.tolist() == expected_indptr
