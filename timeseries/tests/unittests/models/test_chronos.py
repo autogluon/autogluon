@@ -32,6 +32,9 @@ HYPERPARAMETER_DICTS = [
         "context_length": 64,
     },
     {
+        "context_length": None,
+    },
+    {
         "model_path": "tiny",
     },
 ]
@@ -50,9 +53,9 @@ def default_chronos_tiny_model(request) -> ChronosModel:
     model = ChronosModel(
         hyperparameters={
             "model_path": "amazon/chronos-t5-tiny",
-            "num_samples": 5,
-            "device": "cpu",
+            "num_samples": 3,
             "context_length": 16,
+            "device": "cpu",
             **request.param,
         },
     )
@@ -73,10 +76,6 @@ def default_chronos_tiny_model_gpu(request) -> Optional[ChronosModel]:
         },
     )
     model.fit(train_data=None)
-
-    # load pipeline in fixture to speed up tests
-    model.load_model_pipeline()
-
     return model
 
 
@@ -141,10 +140,11 @@ def test_when_batch_size_provided_then_batch_size_used_to_infer(batch_size):
             "model_path": "amazon/chronos-t5-tiny",
             "device": "cpu",
             "batch_size": batch_size,
+            "context_length": 16,
         },
     )
     model.fit(train_data=None)
-    loader = model.get_inference_data_loader(data)
+    loader = model._get_inference_data_loader(data, context_length=16)
     batch = next(iter(loader))
 
     assert batch.shape[0] == batch_size
@@ -191,9 +191,8 @@ def test_when_cpu_models_saved_then_models_can_be_loaded_and_inferred(data, defa
     default_chronos_tiny_model.save()
 
     loaded_model = default_chronos_tiny_model.__class__.load(path=default_chronos_tiny_model.path)
-    assert loaded_model.model_pipeline is not None
 
-    predictions = default_chronos_tiny_model.predict(data)
+    predictions = loaded_model.predict(data)
     assert all(
         predictions.index.get_level_values("item_id").unique() == data.index.get_level_values("item_id").unique()
     )
@@ -205,12 +204,60 @@ def test_when_gpu_models_saved_then_models_can_be_loaded_and_inferred(data, defa
     default_chronos_tiny_model_gpu.save()
 
     loaded_model = default_chronos_tiny_model_gpu.__class__.load(path=default_chronos_tiny_model_gpu.path)
-    assert loaded_model.model_pipeline is not None
 
-    predictions = default_chronos_tiny_model_gpu.predict(data)
+    predictions = loaded_model.predict(data)
     assert all(
         predictions.index.get_level_values("item_id").unique() == data.index.get_level_values("item_id").unique()
     )
+
+
+@pytest.mark.parametrize(
+    "data_length, expected_context_length", [(5, 5), (7, 7), (1000, ChronosModel.maximum_context_length)]
+)
+def test_when_context_length_not_provided_then_context_length_set_to_dataset_length(
+    data_length, expected_context_length
+):
+    data = get_data_frame_with_item_index(list(range(3)), data_length=data_length)
+    model = ChronosModel(hyperparameters={"model_path": "tiny"})
+    model.fit(train_data=None)
+    model.predict(data)
+
+    assert model.model_pipeline.model.config.context_length == expected_context_length
+
+
+@pytest.mark.parametrize(
+    "init_context_length, data_length, expected_context_length",
+    [
+        (64, 5, 64),
+        (32, 7, 32),
+        (32, 64, 32),
+        (10000, 30, ChronosModel.maximum_context_length),
+        (10000, 1000, ChronosModel.maximum_context_length),
+    ],
+)
+def test_when_context_length_provided_then_context_length_set_to_capped_init_context_length(
+    init_context_length, data_length, expected_context_length
+):
+    data = get_data_frame_with_item_index(list(range(3)), data_length=data_length)
+    model = ChronosModel(hyperparameters={"model_path": "tiny", "context_length": init_context_length})
+    model.fit(train_data=None)
+    model.predict(data)
+
+    assert model.model_pipeline.model.config.context_length == expected_context_length
+
+
+@pytest.mark.parametrize(
+    "longest_data_length, expected_context_length", [(5, 5), (7, 7), (1000, ChronosModel.maximum_context_length)]
+)
+def test_given_variable_length_data_when_context_length_not_provided_then_context_length_set_to_max_data_length(
+    longest_data_length, expected_context_length
+):
+    data = get_data_frame_with_variable_lengths({"A": 3, "B": 3, "C": longest_data_length})
+    model = ChronosModel(hyperparameters={"model_path": "tiny"})
+    model.fit(train_data=None)
+    model.predict(data)
+
+    assert model.model_pipeline.model.config.context_length == expected_context_length
 
 
 @pytest.mark.parametrize(

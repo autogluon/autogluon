@@ -107,6 +107,10 @@ class ChronosModel(AbstractTimeSeriesModel):
     device : str, default = None
         Device to use for inference. If None, model will use the GPU if available. For larger model sizes
         `small`, `base`, and `large`; inference will fail if no GPU is available.
+    context_length : int or None, default = None
+        The context length to use in the model. Shorter context lengths will decrease model accuracy, but result
+        in faster inference. If None, the model will infer context length from the data set length at inference
+        time, but set it to a maximum of 512.
     optimization_strategy : {None, "onnx", "ovm"}, default = None
         Optimization strategy to use for inference on CPUs. If None, the model will use the default implementation.
         If `onnx`, the model will be converted to ONNX and the inference will be performed using ONNX. If ``ovm``,
@@ -121,8 +125,8 @@ class ChronosModel(AbstractTimeSeriesModel):
     # default number of samples for prediction
     default_num_samples: int = 20
     default_batch_size: int = 16
-    default_context_length: int = 512
     default_model_path = "amazon/chronos-t5-small"
+    maximum_context_length = 512
 
     def __init__(
         self,
@@ -148,7 +152,14 @@ class ChronosModel(AbstractTimeSeriesModel):
         self.optimization_strategy: Optional[Literal["onnx", "ovm"]] = hyperparameters.get(
             "optimization_strategy", None
         )
-        self.context_length = hyperparameters.get("context_length", self.default_context_length)
+        self.context_length = hyperparameters.get("context_length")
+
+        if self.context_length is not None and self.context_length > self.maximum_context_length:
+            logger.warning(
+                f"Context length {self.context_length} exceeds maximum context length {self.maximum_context_length}."
+                f"Context length will be set to {self.maximum_context_length}."
+            )
+            self.context_length = self.maximum_context_length
 
         model_path_safe = str.replace(model_path_input, "/", "__")
         name = (name if name is not None else "Chronos") + f"[{model_path_safe}]"
@@ -176,7 +187,6 @@ class ChronosModel(AbstractTimeSeriesModel):
     @classmethod
     def load(cls, path: str, reset_paths: bool = True, verbose: bool = True) -> "ChronosModel":
         model = load_pkl.load(path=os.path.join(path, cls.model_file_name), verbose=verbose)
-        model.load_model_pipeline()
         if reset_paths:
             model.set_contexts(path)
         return model
@@ -201,7 +211,7 @@ class ChronosModel(AbstractTimeSeriesModel):
             minimum_resources["num_gpus"] = MODEL_CONFIGS.get(self.model_path, {}).get("num_gpus", 0)
         return minimum_resources
 
-    def load_model_pipeline(self):
+    def load_model_pipeline(self, context_length: Optional[int] = None):
         from .chronos import OptimizedChronosPipeline
 
         gpu_available = self._is_gpu_available()
@@ -220,7 +230,7 @@ class ChronosModel(AbstractTimeSeriesModel):
             device_map=device,
             optimization_strategy=self.optimization_strategy,
             torch_dtype=self.torch_dtype,
-            context_length=self.context_length,
+            context_length=context_length or self.context_length,
         )
 
         self.model_pipeline = pipeline
@@ -234,9 +244,10 @@ class ChronosModel(AbstractTimeSeriesModel):
     ) -> None:
         self._check_fit_params()
 
-    def get_inference_data_loader(
+    def _get_inference_data_loader(
         self,
         data: TimeSeriesDataFrame,
+        context_length: int,
         num_workers: int = 1,
     ):
         import torch
@@ -244,7 +255,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         chronos_dataset = ChronosInferenceDataset(
             target_df=data,
             target_column=self.target,
-            context_length=self.context_length,
+            context_length=context_length,
         )
 
         return torch.utils.data.DataLoader(
@@ -262,8 +273,18 @@ class ChronosModel(AbstractTimeSeriesModel):
     ) -> TimeSeriesDataFrame:
         import torch
 
-        if self.model_pipeline is None:
-            self.load_model_pipeline()
+        # We defer initialization of the model pipeline. i.e., the model is only loaded to device memory
+        # during inference. We also infer the maximum length of the time series in the inference data set
+        # and use that to determine the context length of the model. If the context length is specified
+        # during initialization, this is always used. If not, the context length is set to the longest
+        # item length. The context length is always capped by self.maximum_context_length.
+        context_length = self.context_length or min(
+            data.index.get_level_values(ITEMID).value_counts(sort=False).max(),
+            self.maximum_context_length,
+        )
+
+        # load model pipeline to device memory
+        self.load_model_pipeline(context_length=context_length)
 
         self.model_pipeline.model.eval()
         with torch.inference_mode():
@@ -277,7 +298,11 @@ class ChronosModel(AbstractTimeSeriesModel):
                 .detach()
                 .cpu()
                 .numpy()
-                for batch in self.get_inference_data_loader(data=data, num_workers=self.data_loader_num_workers)
+                for batch in self._get_inference_data_loader(
+                    data=data,
+                    num_workers=self.data_loader_num_workers,
+                    context_length=context_length,
+                )
             )
 
         samples = np.concatenate([c.T for c in chain.from_iterable(prediction_samples)], axis=0)
