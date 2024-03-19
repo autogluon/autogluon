@@ -41,17 +41,11 @@ class ChronosInferenceDataset:
         self.context_length = context_length
         self.target_array = target_df[target_column].to_numpy(dtype=np.float32)
         self.freq = target_df.freq
-        self._set_indptr(target_df=target_df)
 
-    def _set_indptr(self, target_df: TimeSeriesDataFrame):
-        """Replace inefficient groupby ITEMID with indptr that stores start:end of each time series"""
-        item_id_index = target_df.index.get_level_values(ITEMID)
-        indices_sizes = item_id_index.value_counts(sort=False)
-        self.item_ids = indices_sizes.index  # shape [num_items]
+        # store pointer to start:end of each time series
+        indices_sizes = target_df.index.get_level_values(ITEMID).value_counts(sort=False)
         cum_sizes = indices_sizes.values.cumsum()
         self.indptr = np.append(0, cum_sizes).astype(np.int32)
-        self.start_timestamps = target_df.reset_index(TIMESTAMP).groupby(level=ITEMID, sort=False).first()[TIMESTAMP]
-        assert len(self.item_ids) == len(self.start_timestamps)
 
     def __len__(self):
         return len(self.indptr) - 1  # noqa
@@ -63,16 +57,6 @@ class ChronosInferenceDataset:
             pad = np.full(shape=(pad_size,), fill_value=pad_value)
             a = np.concatenate((pad, a))
         return a
-
-    def get_full_item(self, idx) -> Dict[str, Any]:
-        start_idx = self.indptr[idx]
-        end_idx = self.indptr[idx + 1]
-
-        return {
-            "item_id": str(self.item_ids[idx]),
-            "start": pd.Period(self.start_timestamps.iloc[idx], freq=self.freq),
-            "target": self.target_array[start_idx:end_idx],
-        }
 
     def __getitem__(self, idx) -> np.ndarray:
         start_idx = self.indptr[idx]
