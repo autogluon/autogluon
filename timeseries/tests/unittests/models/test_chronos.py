@@ -88,9 +88,7 @@ def test_when_on_cpu_then_chronos_model_can_score_and_cache_oof(data, default_ch
 @pytest.mark.parametrize("data", DATASETS)
 def test_when_on_cpu_then_chronos_model_can_infer(data, default_chronos_tiny_model):
     predictions = default_chronos_tiny_model.predict(data)
-    assert all(
-        predictions.index.get_level_values("item_id").unique() == data.index.get_level_values("item_id").unique()
-    )
+    assert all(predictions.item_ids == data.item_ids)
 
 
 def test_given_nan_features_when_on_cpu_then_chronos_model_inferences_not_nan(default_chronos_tiny_model):
@@ -98,9 +96,7 @@ def test_given_nan_features_when_on_cpu_then_chronos_model_inferences_not_nan(de
     data[["cov1", "cov2", "cov3"]] = np.nan
 
     predictions = default_chronos_tiny_model.predict(data)
-    assert all(
-        predictions.index.get_level_values("item_id").unique() == data.index.get_level_values("item_id").unique()
-    )
+    assert all(predictions.item_ids == data.item_ids)
     assert not any(predictions["mean"].isna())
 
 
@@ -115,9 +111,7 @@ def test_when_on_gpu_then_chronos_model_can_score_and_cache_oof(data, default_ch
 @pytest.mark.parametrize("data", DATASETS)
 def test_when_on_gpu_then_chronos_model_can_infer(data, default_chronos_tiny_model_gpu):
     predictions = default_chronos_tiny_model_gpu.predict(data)
-    assert all(
-        predictions.index.get_level_values("item_id").unique() == data.index.get_level_values("item_id").unique()
-    )
+    assert all(predictions.item_ids == data.item_ids)
 
 
 @pytest.mark.skipif(not GPU_AVAILABLE, reason="Requires GPU")
@@ -126,9 +120,7 @@ def test_given_nan_features_when_on_gpu_then_chronos_model_inferences_not_nan(de
     data[["cov1", "cov2", "cov3"]] = np.nan
 
     predictions = default_chronos_tiny_model_gpu.predict(data)
-    assert all(
-        predictions.index.get_level_values("item_id").unique() == data.index.get_level_values("item_id").unique()
-    )
+    assert all(predictions.item_ids == data.item_ids)
     assert not any(predictions["mean"].isna())
 
 
@@ -193,9 +185,7 @@ def test_when_cpu_models_saved_then_models_can_be_loaded_and_inferred(data, defa
     loaded_model = default_chronos_tiny_model.__class__.load(path=default_chronos_tiny_model.path)
 
     predictions = loaded_model.predict(data)
-    assert all(
-        predictions.index.get_level_values("item_id").unique() == data.index.get_level_values("item_id").unique()
-    )
+    assert all(predictions.item_ids == data.item_ids)
 
 
 @pytest.mark.skipif(not GPU_AVAILABLE, reason="Requires GPU")
@@ -206,9 +196,7 @@ def test_when_gpu_models_saved_then_models_can_be_loaded_and_inferred(data, defa
     loaded_model = default_chronos_tiny_model_gpu.__class__.load(path=default_chronos_tiny_model_gpu.path)
 
     predictions = loaded_model.predict(data)
-    assert all(
-        predictions.index.get_level_values("item_id").unique() == data.index.get_level_values("item_id").unique()
-    )
+    assert all(predictions.item_ids == data.item_ids)
 
 
 @pytest.mark.parametrize(

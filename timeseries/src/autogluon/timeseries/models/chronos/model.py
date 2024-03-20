@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 
 from autogluon.common.loaders import load_pkl
-from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
+from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 
@@ -45,14 +45,12 @@ class ChronosInferenceDataset:
         target_column: str = "target",
     ):
         assert context_length > 0
-        self.target_column = target_column
         self.context_length = context_length
         self.target_array = target_df[target_column].to_numpy(dtype=np.float32)
         self.freq = target_df.freq
 
         # store pointer to start:end of each time series
-        indices_sizes = target_df.index.get_level_values(ITEMID).value_counts(sort=False)
-        cum_sizes = indices_sizes.values.cumsum()
+        cum_sizes = target_df.num_timesteps_per_item().values.cumsum()
         self.indptr = np.append(0, cum_sizes).astype(np.int32)
 
     def __len__(self):
@@ -191,14 +189,6 @@ class ChronosModel(AbstractTimeSeriesModel):
             model.set_contexts(path)
         return model
 
-    def score_and_cache_oof(
-        self,
-        val_data: TimeSeriesDataFrame,
-        store_val_score: bool = False,
-        store_predict_time: bool = False,
-    ) -> None:
-        super().score_and_cache_oof(val_data, store_val_score, store_predict_time)
-
     def _is_gpu_available(self) -> bool:
         import torch.cuda
 
@@ -219,7 +209,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         if not gpu_available and MODEL_CONFIGS.get(self.model_path, {}).get("num_gpus", 0) > 0:
             raise RuntimeError(
                 f"{self.name} requires a GPU to run, but no GPU was detected. "
-                "Please make sure that you are using a GPU instance and "
+                "Please make sure that you are using a computer with a CUDA-compatible GPU and "
                 "`import torch; torch.cuda.is_available()` returns `True`."
             )
 
@@ -279,7 +269,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         # during initialization, this is always used. If not, the context length is set to the longest
         # item length. The context length is always capped by self.maximum_context_length.
         context_length = self.context_length or min(
-            data.index.get_level_values(ITEMID).value_counts(sort=False).max(),
+            data.num_timesteps_per_item().max(),
             self.maximum_context_length,
         )
 

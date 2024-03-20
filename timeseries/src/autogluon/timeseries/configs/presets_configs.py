@@ -26,19 +26,19 @@ TIMESERIES_PRESETS_CONFIGS = dict(
     },
     chronos_ensemble={
         "hyperparameters": {
-            **{"Chronos": {"model_path": "small"}},
+            "Chronos": {"model_path": "small"},
             **get_default_hps("default"),
         }
     },
     chronos_large_ensemble={
         "hyperparameters": {
-            **{"Chronos": {"model_path": "large", "batch_size": 8}},
+            "Chronos": {"model_path": "large", "batch_size": 8},
             **get_default_hps("default"),
         }
     },
 )
 
-timeseries_presets_aliases = dict(
+TIMESERIES_PRESETS_ALIASES = dict(
     chronos="chronos_small",
     best="best_quality",
     high="high_quality",
@@ -51,5 +51,5 @@ timeseries_presets_aliases = dict(
 # update with aliases
 TIMESERIES_PRESETS_CONFIGS = {
     **TIMESERIES_PRESETS_CONFIGS,
-    **{k: TIMESERIES_PRESETS_CONFIGS[v].copy() for k, v in timeseries_presets_aliases.items()},
+    **{k: TIMESERIES_PRESETS_CONFIGS[v].copy() for k, v in TIMESERIES_PRESETS_ALIASES.items()},
 }

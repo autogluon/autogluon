@@ -351,7 +351,7 @@ class ChronosPipeline:
             if limit_prediction_length:
                 msg += "You can turn off this check by setting `limit_prediction_length=False`."
                 raise ValueError(msg)
-            warnings.warn(msg)
+            warnings.warn(msg, stacklevel=2)
 
         predictions = []
         remaining = prediction_length

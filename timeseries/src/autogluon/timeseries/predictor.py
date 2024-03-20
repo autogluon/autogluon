@@ -503,6 +503,9 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             - ``"high_quality"``: All ML models available in AutoGluon + additional statistical models (``NPTS``, ``AutoETS``, ``AutoARIMA``, ``CrostonSBA``,
               ``DynamicOptimizedTheta``). Much more accurate than ``medium_quality``, but takes longer to train.
             - ``"best_quality"``: Same models as in ``"high_quality"`, but performs validation with multiple backtests. Usually better than ``high_quality``, but takes even longer to train.
+
+            Available presets with the `Chronos <https://github.com/amazon-science/chronos-forecasting>`_ model:
+
             - ``"chronos_{model_size}"``: where model size is one of ``tiny,mini,small,base,large``. Uses the Chronos pretrained model for zero-shot forecasting.
               See the documentation for ``ChronosModel`` or see `Hugging Face <https://huggingface.co/collections/amazon/chronos-models-65f1791d630a8d57cb718444>`_ for more information.
               Note that a GPU is required for model sizes ``small``, ``base`` and ``large``.
