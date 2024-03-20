@@ -212,9 +212,9 @@ class MatcherLitModule(pl.LightningModule):
             metric.update(custom_metric_func(query_embeddings, response_embeddings, label))
         elif isinstance(metric, CustomHitRate):
             metric.update(
-                batch_query_embeds=query_embeddings.cpu(),
-                batch_response_embeds=response_embeddings.cpu(),
-                logit_scale=logit_scale.cpu() if logit_scale else None,
+                batch_query_embeds=query_embeddings,
+                batch_response_embeds=response_embeddings,
+                logit_scale=logit_scale if logit_scale else None,
             )
         else:
             metric.update(
