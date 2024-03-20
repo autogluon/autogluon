@@ -273,6 +273,12 @@ class ChronosModel(AbstractTimeSeriesModel):
             self.maximum_context_length,
         )
 
+        verbosity = kwargs.get("verbosity", 2)
+        # for logger_name in logging.root.manager.loggerDict:
+        #     if "lightning" in logger_name:
+        #         pl_logger = logging.getLogger(logger_name)
+        #         pl_logger.setLevel(logging.ERROR if verbosity <= 3 else logging.INFO)
+
         # load model pipeline to device memory
         self.load_model_pipeline(context_length=context_length)
 
