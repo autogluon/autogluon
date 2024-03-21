@@ -548,3 +548,6 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
         forecast_df.index = forecast_index
         return TimeSeriesDataFrame(forecast_df)
+
+    def _more_tags(self) -> dict:
+        return {"allow_nan": True, "can_use_val_data": True}

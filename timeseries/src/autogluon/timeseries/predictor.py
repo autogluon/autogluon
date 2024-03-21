@@ -314,18 +314,6 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             if df.freq != self.freq:
                 logger.warning(f"{name} with frequency '{df.freq}' has been resampled to frequency '{self.freq}'.")
                 df = df.convert_frequency(freq=self.freq)
-
-        # Fill missing values
-        if df.isna().values.any():
-            # FIXME: Do not automatically fill NaNs here, handle missing values at the level of individual models.
-            # FIXME: Current solution leads to incorrect metric computation if missing values are present
-            logger.warning(
-                f"{name} contains missing values represented by NaN. "
-                f"They have been filled by carrying forward the last valid observation."
-            )
-            df = df.fill_missing_values()
-            if df.isna().values.any():
-                raise ValueError(f"Some time series in {name} consist completely of NaN values. Please remove them.")
         return df
 
     def _check_data_for_evaluation(self, data: TimeSeriesDataFrame, name: str = "data"):
@@ -337,14 +325,18 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
                 f"all time series have length > prediction_length (at least {self.prediction_length + 1})"
             )
 
-    @staticmethod
-    def _get_dataset_stats(data: TimeSeriesDataFrame) -> str:
+    def _get_dataset_stats(self, data: TimeSeriesDataFrame) -> str:
         ts_lengths = data.num_timesteps_per_item()
         median_length = int(ts_lengths.median())
         min_length = ts_lengths.min()
         max_length = ts_lengths.max()
+        missing_value_fraction = data[self.target].isna().mean()
+        if missing_value_fraction > 0:
+            missing_value_fraction_str = f" (NaN fraction={missing_value_fraction:.1%})"
+        else:
+            missing_value_fraction_str = ""
         return (
-            f"{len(data)} rows, {data.num_items} time series. "
+            f"{len(data)} rows{missing_value_fraction_str}, {data.num_items} time series. "
             f"Median time series length is {median_length} (min={min_length}, max={max_length}). "
         )
 
@@ -374,41 +366,45 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             )
         return new_num_val_windows
 
-    def _filter_short_series(
+    def _filter_useless_train_data(
         self,
         train_data: TimeSeriesDataFrame,
         num_val_windows: int,
         val_step_size: int,
     ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
-        """Remove time series from train_data that are too short for chosen prediction_length and validation settings.
+        """Remove time series from train_data that either contain all NaNs or are too short for chosen settings.
 
-        This method ensures that for each validation fold, all train series have length >= max(prediction_length + 1, 5).
+        This method ensures that for each validation fold, all train series 1) have length >= max(prediction_length + 1, 5),
+        and 2) do not consist of only NaN values.
 
         In other words, this method removes from train_data all time series with length less than
         min_train_length + prediction_length + (num_val_windows - 1) * val_step_size
         """
         min_length = self._min_train_length + self.prediction_length + (num_val_windows - 1) * val_step_size
-
         train_lengths = train_data.num_timesteps_per_item()
-        train_items_to_drop = train_lengths.index[train_lengths < min_length]
-        if len(train_items_to_drop) > 0:
+        too_short_items = train_lengths.index[train_lengths < min_length]
+
+        if len(too_short_items):
             logger.info(
-                f"\tRemoving {len(train_items_to_drop)} short time series from train_data. Only series with length "
+                f"\tRemoving {len(too_short_items)} short time series from train_data. Only series with length "
                 f">= {min_length} will be used for training."
             )
-            filtered_train_data = train_data.query("item_id not in @train_items_to_drop")
-            if len(filtered_train_data) == 0:
-                raise ValueError(
-                    f"At least some time series in train_data must have length >= {min_length}. Please provide longer "
-                    f"time series as train_data or reduce prediction_length, num_val_windows, or val_step_size."
-                )
-            logger.info(
-                f"\tAfter removing short series, train_data has {self._get_dataset_stats(filtered_train_data)}"
-            )
-        else:
-            filtered_train_data = train_data
+            train_data = train_data.query("item_id not in @too_short_items")
 
-        return filtered_train_data
+        all_nan_items = train_data.item_ids[train_data[self.target].isna().groupby(ITEMID, sort=False).all()]
+        if len(all_nan_items):
+            logger.info(f"\tRemoving {len(all_nan_items)} time series consisting of only NaN values from train_data.")
+            train_data = train_data.query("item_id not in @all_nan_items")
+
+        if len(train_data) == 0:
+            raise ValueError(
+                f"At least some time series in train_data must have >= {min_length} valid observations. Please provide "
+                f"longer time series as train_data or reduce prediction_length, num_val_windows, or val_step_size."
+            )
+
+        if len(too_short_items) or len(all_nan_items):
+            logger.info(f"\tAfter filtering, train_data has {self._get_dataset_stats(train_data)}")
+        return train_data
 
     @apply_presets(TIMESERIES_PRESETS_CONFIGS)
     def fit(
@@ -722,7 +718,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             raise ValueError("Please set num_val_windows >= 1 or provide custom tuning_data")
 
         if not skip_model_selection:
-            train_data = self._filter_short_series(
+            train_data = self._filter_useless_train_data(
                 train_data, num_val_windows=num_val_windows, val_step_size=val_step_size
             )
 

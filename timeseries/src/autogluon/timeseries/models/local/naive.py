@@ -1,9 +1,11 @@
-from typing import Callable
-
 import numpy as np
 import pandas as pd
 
-from autogluon.timeseries.models.local.abstract_local_model import AbstractLocalModel, seasonal_naive_forecast
+from autogluon.timeseries.models.local.abstract_local_model import (
+    AbstractLocalModel,
+    get_quantile_function,
+    seasonal_naive_forecast,
+)
 
 
 class NaiveModel(AbstractLocalModel):
@@ -35,6 +37,9 @@ class NaiveModel(AbstractLocalModel):
             quantile_levels=self.quantile_levels,
             seasonal_period=1,
         )
+
+    def _more_tags(self) -> dict:
+        return {"allow_nan": True}
 
 
 class SeasonalNaiveModel(AbstractLocalModel):
@@ -75,15 +80,8 @@ class SeasonalNaiveModel(AbstractLocalModel):
             seasonal_period=local_model_args["seasonal_period"],
         )
 
-
-def _get_quantile_function(q: float) -> Callable:
-    """Returns a function with name "q" that computes the q'th quantile of a pandas.Series."""
-
-    def quantile_fn(x: pd.Series) -> pd.Series:
-        return x.quantile(q)
-
-    quantile_fn.__name__ = str(q)
-    return quantile_fn
+    def _more_tags(self) -> dict:
+        return {"allow_nan": True}
 
 
 class AverageModel(AbstractLocalModel):
@@ -109,10 +107,13 @@ class AverageModel(AbstractLocalModel):
         time_series: pd.Series,
         local_model_args: dict,
     ) -> pd.DataFrame:
-        agg_functions = ["mean"] + [_get_quantile_function(q) for q in self.quantile_levels]
+        agg_functions = ["mean"] + [get_quantile_function(q) for q in self.quantile_levels]
         stats_marginal = time_series.agg(agg_functions)
         stats_repeated = np.tile(stats_marginal.values, [self.prediction_length, 1])
         return pd.DataFrame(stats_repeated, columns=stats_marginal.index)
+
+    def _more_tags(self) -> dict:
+        return {"allow_nan": True}
 
 
 class SeasonalAverageModel(AbstractLocalModel):
@@ -146,7 +147,7 @@ class SeasonalAverageModel(AbstractLocalModel):
         local_model_args: dict,
     ) -> pd.DataFrame:
         seasonal_period = local_model_args["seasonal_period"]
-        agg_functions = ["mean"] + [_get_quantile_function(q) for q in self.quantile_levels]
+        agg_functions = ["mean"] + [get_quantile_function(q) for q in self.quantile_levels]
 
         # Compute mean & quantiles for each season
         ts_df = time_series.reset_index(drop=True).to_frame()
@@ -162,3 +163,6 @@ class SeasonalAverageModel(AbstractLocalModel):
             stats_marginal = time_series.agg(agg_functions)
             result = result.fillna(stats_marginal)
         return result
+
+    def _more_tags(self) -> dict:
+        return {"allow_nan": True}
