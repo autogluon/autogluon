@@ -13,6 +13,8 @@ import torch
 import torch.nn as nn
 from transformers import AutoConfig, AutoModelForCausalLM, AutoModelForSeq2SeqLM, GenerationConfig, PreTrainedModel
 
+from autogluon.timeseries.utils.warning_filters import set_loggers_level
+
 logger = logging.getLogger(__name__)
 
 
@@ -437,7 +439,7 @@ class OptimizedChronosPipeline(ChronosPipeline):
                 ], "optimization_strategy not recognized. Please provide one of `onnx` or `openvino`"
                 torch_dtype = kwargs.pop("torch_dtype", "auto")
                 if torch_dtype != "auto":
-                    logger.warning(f"`torch_dtype` will be ignored for optimization_strategy {optimization_strategy}")
+                    logger.warning(f"\t`torch_dtype` will be ignored for optimization_strategy {optimization_strategy}")
 
                 if optimization_strategy == "onnx":
                     try:
@@ -447,8 +449,9 @@ class OptimizedChronosPipeline(ChronosPipeline):
                             "Huggingface Optimum library must be installed with ONNX for using the `onnx` strategy"
                         )
 
-                    assert kwargs.pop("device_map", "cpu") == "cpu", "ONNX mode only available on the CPU"
-                    inner_model = ORTModelForSeq2SeqLM.from_pretrained(*args, **{**kwargs, "export": True})
+                    assert kwargs.pop("device_map", "cpu") in ["cpu", "auto"], "ONNX mode only available on the CPU"
+                    with set_loggers_level(regex="^optimum.*", level=logging.ERROR): 
+                        inner_model = ORTModelForSeq2SeqLM.from_pretrained(*args, **{**kwargs, "export": True})
                 elif optimization_strategy == "openvino":
                     try:
                         from optimum.intel import OVModelForSeq2SeqLM
@@ -456,10 +459,10 @@ class OptimizedChronosPipeline(ChronosPipeline):
                         raise ImportError(
                             "Huggingface Optimum library must be installed with OpenVINO for using the `openvino` strategy"
                         )
-
-                    inner_model = OVModelForSeq2SeqLM.from_pretrained(
-                        *args, **{**kwargs, "device_map": "cpu", "export": True}
-                    )
+                    with set_loggers_level(regex="^optimum.*", level=logging.ERROR): 
+                        inner_model = OVModelForSeq2SeqLM.from_pretrained(
+                            *args, **{**kwargs, "device_map": "cpu", "export": True}
+                        )
         else:
             assert config.model_type == "causal"
             inner_model = AutoModelForCausalLM.from_pretrained(*args, **kwargs)

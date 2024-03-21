@@ -1,5 +1,6 @@
 import logging
 import os
+from contextlib import nullcontext
 from itertools import chain
 from typing import Any, Dict, Literal, Optional, Union
 
@@ -10,6 +11,7 @@ from autogluon.common.loaders import load_pkl
 from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
+from autogluon.timeseries.utils.warning_filters import disable_root_logger, set_loggers_level, warning_filter
 
 logger = logging.getLogger(__name__)
 
@@ -154,7 +156,7 @@ class ChronosModel(AbstractTimeSeriesModel):
 
         if self.context_length is not None and self.context_length > self.maximum_context_length:
             logger.warning(
-                f"Context length {self.context_length} exceeds maximum context length {self.maximum_context_length}."
+                f"\tContext length {self.context_length} exceeds maximum context length {self.maximum_context_length}."
                 f"Context length will be set to {self.maximum_context_length}."
             )
             self.context_length = self.maximum_context_length
@@ -261,8 +263,6 @@ class ChronosModel(AbstractTimeSeriesModel):
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
-        import torch
-
         # We defer initialization of the model pipeline. i.e., the model is only loaded to device memory
         # during inference. We also infer the maximum length of the time series in the inference data set
         # and use that to determine the context length of the model. If the context length is specified
@@ -273,33 +273,30 @@ class ChronosModel(AbstractTimeSeriesModel):
             self.maximum_context_length,
         )
 
-        # verbosity = kwargs.get("verbosity", 2)
-        # for logger_name in logging.root.manager.loggerDict:
-        #     if "lightning" in logger_name:
-        #         pl_logger = logging.getLogger(logger_name)
-        #         pl_logger.setLevel(logging.ERROR if verbosity <= 3 else logging.INFO)
+        with warning_filter(all_warnings=True):
+            import torch
+            
+            # load model pipeline to device memory
+            self.load_model_pipeline(context_length=context_length)
 
-        # load model pipeline to device memory
-        self.load_model_pipeline(context_length=context_length)
-
-        self.model_pipeline.model.eval()
-        with torch.inference_mode():
-            prediction_samples = (
-                self.model_pipeline.predict(
-                    batch,
-                    prediction_length=self.prediction_length,
-                    num_samples=self.num_samples,
-                    limit_prediction_length=False,
+            self.model_pipeline.model.eval()
+            with torch.inference_mode():
+                prediction_samples = (
+                    self.model_pipeline.predict(
+                        batch,
+                        prediction_length=self.prediction_length,
+                        num_samples=self.num_samples,
+                        limit_prediction_length=False,
+                    )
+                    .detach()
+                    .cpu()
+                    .numpy()
+                    for batch in self._get_inference_data_loader(
+                        data=data,
+                        num_workers=self.data_loader_num_workers,
+                        context_length=context_length,
+                    )
                 )
-                .detach()
-                .cpu()
-                .numpy()
-                for batch in self._get_inference_data_loader(
-                    data=data,
-                    num_workers=self.data_loader_num_workers,
-                    context_length=context_length,
-                )
-            )
 
         samples = np.concatenate([c.T for c in chain.from_iterable(prediction_samples)], axis=0)
 
