@@ -85,6 +85,21 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         self._scaler: Optional[BaseTargetTransform] = None
         self._residuals_std_per_item: Optional[pd.Series] = None
         self._avg_residuals_std: Optional[float] = None
+        self._train_target_median: Optional[float] = None
+
+    def preprocess(self, data: TimeSeriesDataFrame, is_train: bool = False, **kwargs) -> Any:
+        if is_train:
+            all_nan_items = data.item_ids[data[self.target].isna().groupby(ITEMID, sort=False).all()]
+            if len(all_nan_items):
+                data = data.query("item_id not in @all_nan_items")
+            # Missing values in train_data are handled inside _generate_train_val_dfs
+            return data
+        else:
+            data = data.fill_missing_values()
+            # Fill time series consisting of all NaNs with the median of target in train_data
+            if data.isna().any(axis=None):
+                data.fill_missing_values(method="constant", value=self._train_target_median)
+            return data
 
     def _get_extra_tabular_init_kwargs(self) -> dict:
         raise NotImplementedError
@@ -98,8 +113,6 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         return model_params
 
     def _get_mlforecast_init_args(self, train_data: TimeSeriesDataFrame, model_params: dict) -> dict:
-        # TODO: Support lag generation for all pandas frequencies
-        # TODO: Support date_feature generation for all pandas frequencies
         from mlforecast.target_transforms import Differences
 
         from .utils import MeanAbsScaler, StandardScaler
@@ -181,6 +194,10 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             items_to_keep = data.item_ids.to_series().sample(n=int(max_num_items))  # noqa: F841
             data = data.query("item_id in @items_to_keep")
 
+        # MLForecast.preprocess does not support missing values, but we will exclude them later from the training set
+        missing_entries = data.index[data[self.target].isna()]
+        data = data.fill_missing_values()
+
         num_items = data.num_items
         mlforecast_df = self._to_mlforecast_df(data, data.static_features)
 
@@ -196,6 +213,9 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         df = df.query("y.notnull()")
 
         df = self._mask_df(df)
+
+        if len(missing_entries):
+            df = df.set_index(["unique_id", "ds"]).drop(missing_entries).reset_index()
 
         if max_num_samples is not None and len(df) > max_num_samples:
             df = df.sample(n=max_num_samples)
@@ -246,6 +266,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
 
         self._check_fit_params()
         fit_start_time = time.time()
+        self._train_target_median = train_data[self.target].median()
         # TabularEstimator is passed to MLForecast later to include tuning_data
         model_params = self._get_model_params()
 
