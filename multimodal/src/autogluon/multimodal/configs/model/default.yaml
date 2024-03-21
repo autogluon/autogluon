@@ -115,6 +115,7 @@ model:
     max_img_num_per_col: 1
     output_bbox_format: "xyxy"  # now support xyxy or xywh, for bbox format details see https://keras.io/api/keras_cv/bounding_box/formats/
     frozen_layers: null
+    coco_root: null
 
   mmocr_text_detection:
     checkpoint_name: "TextSnake"

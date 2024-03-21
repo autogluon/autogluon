@@ -145,7 +145,9 @@ def object_detection_df_to_coco(data: pd.DataFrame, save_path: Optional[str] = N
     return output_json_dict
 
 
-def object_detection_data_to_df(data: Union[pd.DataFrame, dict, list, str]) -> pd.DataFrame:
+def object_detection_data_to_df(
+    data: Union[pd.DataFrame, dict, list, str], coco_root: Optional[str] = None
+) -> pd.DataFrame:
     """
     Construct a dataframe from a data dictionary, json file path (for COCO), folder path (for VOC),
     image path (for single image), list of image paths (for multiple images)
@@ -163,7 +165,7 @@ def object_detection_data_to_df(data: Union[pd.DataFrame, dict, list, str]) -> p
         return from_list(data)
     if isinstance(data, str):
         if os.path.isdir(data) or data.endswith(".json"):
-            return from_coco_or_voc(data)
+            return from_coco_or_voc(data, coco_root=coco_root)
         return from_str(data)
     if isinstance(data, pd.DataFrame):
         sanity_check_dataframe(data)
@@ -700,7 +702,7 @@ def _check_load_coco_bbox(
 
 def from_coco(
     anno_file: Optional[str],
-    root: Optional[str] = None,
+    coco_root: Optional[str] = None,
     min_object_area: Optional[Union[int, float]] = 0,
     use_crowd: Optional[bool] = False,
 ):
@@ -718,7 +720,7 @@ def from_coco(
     ----------
     anno_file
         The path to the annotation file.
-    root
+    coco_root
         Root of the COCO folder. The default relative root folder (if set to `None`) is `anno_file/../`.
     min_object_area
         Minimum object area to consider.
@@ -740,16 +742,19 @@ def from_coco(
     coco = COCO(anno_file)
 
     # get data root
-    if isinstance(root, Path):
-        root = str(root.expanduser().resolve())
-    elif isinstance(root, str):
-        root = os.path.abspath(os.path.expanduser(root))
-    elif root is None:
+    if isinstance(coco_root, Path):
+        coco_root = str(coco_root.expanduser().resolve())
+    elif isinstance(coco_root, str):
+        coco_root = os.path.abspath(os.path.expanduser(coco_root))
+    elif coco_root is None:
         # try to use the default coco structure
-        root = os.path.join(os.path.dirname(anno_file), "..")
-        logger.info(f"Using default root folder: {root}. Specify `root=...` if you feel it is wrong...")
+        coco_root = os.path.join(os.path.dirname(anno_file), "..")
+        logger.info(
+            f"Using default root folder: {coco_root}. "
+            "Specify `model.mmdet_image.coco_root=...` in hyperparameters if you think it is wrong."
+        )
     else:
-        raise ValueError("Unable to parse root: {}".format(root))
+        raise ValueError("Unable to parse coco_root: {}".format(coco_root))
 
     # support prediction using data with no annotations
     # note that data with annotation can be used for prediction without any changes
@@ -764,9 +769,9 @@ def from_coco(
     for entry in coco.loadImgs(image_ids):
         if "coco_url" in entry:
             dirname, filename = entry["coco_url"].split("/")[-2:]
-            abs_path = os.path.join(root, dirname, filename)
+            abs_path = os.path.join(coco_root, dirname, filename)
         else:
-            abs_path = os.path.join(root, entry["file_name"])
+            abs_path = os.path.join(coco_root, entry["file_name"])
         if not os.path.exists(abs_path):
             logger.warning(f"File skipped since not exists: {abs_path}.")
             continue
@@ -1146,7 +1151,7 @@ def process_voc_annotations(
         f.writelines("\n".join(xml_file_names))
 
 
-def from_coco_or_voc(file_path: str, splits: Optional[Union[str]] = None):
+def from_coco_or_voc(file_path: str, splits: Optional[Union[str]] = None, coco_root: Optional[str] = None):
     """
     Convert the data from coco or voc format to pandas Dataframe.
 
@@ -1167,7 +1172,7 @@ def from_coco_or_voc(file_path: str, splits: Optional[Union[str]] = None):
         # VOC use dir as input
         return from_voc(root=file_path, splits=splits)
     else:
-        return from_coco(file_path)
+        return from_coco(file_path, coco_root=coco_root)
 
 
 def get_coco_format_classes(sample_data_path: str):
@@ -1539,11 +1544,13 @@ def save_result_df(
     return result_df
 
 
-def save_result_coco_format(detection_data_path, pred, result_path):
+def save_result_coco_format(detection_data_path, pred, result_path, coco_root: Optional[str] = None):
     coco_dataset = COCODataset(detection_data_path)
     result_name, _ = os.path.splitext(result_path)
     result_path = result_name + ".json"
-    coco_dataset.save_result(pred, from_coco_or_voc(detection_data_path, "test"), save_path=result_path)
+    coco_dataset.save_result(
+        pred, from_coco_or_voc(detection_data_path, "test", coco_root=coco_root), save_path=result_path
+    )
     logger.info(25, f"Saved detection result to {result_path}")
 
 
