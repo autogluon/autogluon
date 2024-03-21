@@ -98,7 +98,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             data = data.fill_missing_values()
             # Fill time series consisting of all NaNs with the median of target in train_data
             if data.isna().any(axis=None):
-                data.fill_missing_values(method="constant", value=self._train_target_median)
+                data[self.target] = data[self.target].fillna(value=self._train_target_median)
             return data
 
     def _get_extra_tabular_init_kwargs(self) -> dict:
@@ -215,7 +215,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         df = self._mask_df(df)
 
         if len(missing_entries):
-            df = df.set_index(["unique_id", "ds"]).drop(missing_entries).reset_index()
+            df = df.set_index(["unique_id", "ds"]).drop(missing_entries, errors="ignore").reset_index()
 
         if max_num_samples is not None and len(df) > max_num_samples:
             df = df.sample(n=max_num_samples)
