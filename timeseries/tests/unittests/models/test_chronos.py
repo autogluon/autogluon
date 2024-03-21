@@ -46,6 +46,9 @@ HYPERPARAMETER_DICTS = [
         {
             "optimization_strategy": "onnx",
         },
+        {
+            "optimization_strategy": "openvino",
+        },
         *HYPERPARAMETER_DICTS,
     ],
 )

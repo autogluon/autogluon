@@ -109,9 +109,9 @@ class ChronosModel(AbstractTimeSeriesModel):
         The context length to use in the model. Shorter context lengths will decrease model accuracy, but result
         in faster inference. If None, the model will infer context length from the data set length at inference
         time, but set it to a maximum of 512.
-    optimization_strategy : {None, "onnx", "ovm"}, default = None
+    optimization_strategy : {None, "onnx", "openvino"}, default = None
         Optimization strategy to use for inference on CPUs. If None, the model will use the default implementation.
-        If `onnx`, the model will be converted to ONNX and the inference will be performed using ONNX. If ``ovm``,
+        If `onnx`, the model will be converted to ONNX and the inference will be performed using ONNX. If ``openvino``,
         inference will be performed with the model compiled to OpenVINO.
     torch_dtype : torch.dtype or str, default = "auto"
         Torch data type for model weights, provided to ``from_pretrained`` method of Hugging Face AutoModels.
@@ -147,7 +147,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         self.device = hyperparameters.get("device")
         self.torch_dtype = hyperparameters.get("torch_dtype", "auto")
         self.data_loader_num_workers = hyperparameters.get("data_loader_num_workers", 1)
-        self.optimization_strategy: Optional[Literal["onnx", "ovm"]] = hyperparameters.get(
+        self.optimization_strategy: Optional[Literal["onnx", "openvino"]] = hyperparameters.get(
             "optimization_strategy", None
         )
         self.context_length = hyperparameters.get("context_length")
@@ -273,7 +273,7 @@ class ChronosModel(AbstractTimeSeriesModel):
             self.maximum_context_length,
         )
 
-        verbosity = kwargs.get("verbosity", 2)
+        # verbosity = kwargs.get("verbosity", 2)
         # for logger_name in logging.root.manager.loggerDict:
         #     if "lightning" in logger_name:
         #         pl_logger = logging.getLogger(logger_name)

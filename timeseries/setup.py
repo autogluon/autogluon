@@ -55,16 +55,17 @@ extras_require = {
         "isort>=5.10",
         "black~=23.0",
     ],
-    "chronos-cpu": [  # for faster CPU inference in pretrained models
-<<<<<<< HEAD
-        "optimum[onnxruntime,openvino,nncf]>=1.17,<1.18",
-=======
+    "chronos-openvino": [  # for faster CPU inference in pretrained models with OpenVINO
+        "optimum[openvino,nncf]>=1.17,<1.18",
+    ],
+    "chronos-onnx": [  # for faster CPU inference in pretrained models with ONNX
         "optimum[onnxruntime]>=1.17,<1.18",
->>>>>>> ba840fb8 (black setup.py)
     ],
 }
 
-extras_require["all"] = list(set.union(*(set(extras_require[extra]) for extra in ["chronos-cpu"])))
+extras_require["all"] = list(
+    set.union(*(set(extras_require[extra]) for extra in ["chronos-onnx", "chronos-openvino"]))
+)
 
 install_requires = ag.get_dependency_version_ranges(install_requires)
 
