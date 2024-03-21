@@ -88,3 +88,6 @@ class NPTSModel(AbstractLocalModel):
         for q in self.quantile_levels:
             forecast_dict[str(q)] = forecast.quantile(q)
         return pd.DataFrame(forecast_dict)
+
+    def _more_tags(self) -> dict:
+        return {"allow_nan": True}

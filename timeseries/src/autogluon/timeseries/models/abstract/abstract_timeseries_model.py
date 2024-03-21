@@ -201,7 +201,9 @@ class AbstractTimeSeriesModel(AbstractModel):
         }
         return info
 
-    def fit(self, **kwargs) -> "AbstractTimeSeriesModel":
+    def fit(
+        self, train_data: TimeSeriesDataFrame, val_data: Optional[TimeSeriesDataFrame] = None, **kwargs
+    ) -> "AbstractTimeSeriesModel":
         """Fit timeseries model.
 
         Models should not override the `fit` method, but instead override the `_fit` method which
@@ -235,7 +237,10 @@ class AbstractTimeSeriesModel(AbstractModel):
         model: AbstractTimeSeriesModel
             The fitted model object
         """
-        return super().fit(**kwargs)
+        train_data = self.preprocess(train_data, is_train=True)
+        if self._get_tags()["can_use_val_data"] and val_data is not None:
+            val_data = self.preprocess(val_data, is_train=False)
+        return super().fit(train_data=train_data, val_data=val_data, **kwargs)
 
     def _fit(
         self,
@@ -290,6 +295,7 @@ class AbstractTimeSeriesModel(AbstractModel):
             data is given as a separate forecast item in the dictionary, keyed by the `item_id`s
             of input items.
         """
+        data = self.preprocess(data, is_train=False)
         predictions = self._predict(data=data, known_covariates=known_covariates, **kwargs)
         logger.debug(f"Predicting with model {self.name}")
         # "0.5" might be missing from the quantiles if self is a wrapper (MultiWindowBacktestingModel or ensemble)
@@ -488,7 +494,7 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         return hpo_models, analysis
 
-    def preprocess(self, data: Any, **kwargs) -> Any:
+    def preprocess(self, data: TimeSeriesDataFrame, is_train: bool = False, **kwargs) -> Any:
         return data
 
     def get_memory_size(self, **kwargs) -> Optional[int]:
@@ -506,3 +512,19 @@ class AbstractTimeSeriesModel(AbstractModel):
             return {}
         else:
             return self._user_params.copy()
+
+    def _more_tags(self) -> dict:
+        """Encode model properties using tags, similar to sklearn & autogluon.tabular.
+
+        For more details, see `autogluon.core.models.abstract.AbstractModel._get_tags()` and https://scikit-learn.org/stable/_sources/developers/develop.rst.txt.
+
+        List of currently supported tags:
+        - allow_nan: Can the model handle data with missing values represented by np.nan?
+        - can_refit_full: Can the model be retrained without validation data?
+        - can_use_val_data: Can model use val_data if it's provided to model.fit()?
+        """
+        return {
+            "allow_nan": False,
+            "can_refit_full": False,
+            "can_use_val_data": False,
+        }

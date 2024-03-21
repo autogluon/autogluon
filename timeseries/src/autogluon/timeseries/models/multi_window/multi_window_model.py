@@ -243,4 +243,4 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         return refit_model
 
     def _more_tags(self) -> dict:
-        return self.most_recent_model._get_tags()
+        return self.model_base._get_tags()
