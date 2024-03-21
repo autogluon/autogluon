@@ -1,7 +1,6 @@
 import logging
 import os
 import shutil
-import warnings
 
 import lightning.pytorch as pl
 import yaml
@@ -13,13 +12,6 @@ from .matcher import create_siamese_model
 from .model import create_fusion_model
 
 logger = logging.getLogger(__name__)
-
-# only for ray<2.10 ref https://github.com/ray-project/ray/issues/41562#issuecomment-1866702541
-warnings.filterwarnings(
-    action="ignore",
-    message=".*checkpoint_dir",
-    category=DeprecationWarning,
-)
 
 
 def get_ray_tune_ckpt_callback():
