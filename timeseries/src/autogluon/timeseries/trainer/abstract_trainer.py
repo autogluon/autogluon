@@ -881,7 +881,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         if isinstance(model, str):
             model = self.load_model(model)
         data = self._get_inputs_to_model(model=model, data=data, model_pred_dict=model_pred_dict)
-        return model.predict(data, known_covariates=known_covariates, verbosity=self.verbosity)
+        return model.predict(data, known_covariates=known_covariates)
 
     def _get_inputs_to_model(
         self,
@@ -1138,3 +1138,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         **kwargs,
     ) -> None:
         raise NotImplementedError
+
+    # TODO: def _filter_base_models_via_infer_limit
+
+    # TODO: persist and unpersist models
