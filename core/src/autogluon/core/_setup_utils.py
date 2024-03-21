@@ -19,17 +19,19 @@ DEPENDENT_PACKAGES = {
     "boto3": ">=1.10,<2",  # <2 because unlikely to introduce breaking changes in minor releases. >=1.10 because 1.10 is 3 years old, no need to support older
     "numpy": ">=1.21,<1.29",  # "<{N+3}" upper cap, where N is the latest released minor version, assuming no warnings using N
     "pandas": ">=2.0.0,<2.2.0",  # "<{N+1}" upper cap
-    "scikit-learn": ">=1.3.0,<1.5",  # "<{N+2}" upper cap
+    "scikit-learn": ">=1.3.0,<1.4.1",  # "<{N+1}" upper cap, capping to micro version as AutoMM HPO tests fail on upgrading to higher version
     "scipy": ">=1.5.4,<1.13",  # "<{N+2}" upper cap
     "psutil": ">=5.7.3,<6",  # Major version cap
     "s3fs": ">=2023.1,<2025",  # Yearly cap
     "networkx": ">=3.0,<4",  # Major version cap
     "tqdm": ">=4.38,<5",  # Major version cap
     "Pillow": ">=10.0.1,<11",  # Major version cap
-    "torch": ">=2.0,<2.1",  # "<{N+1}" upper cap, sync with common/src/autogluon/common/utils/try_import.py
-    "lightning": ">=2.0.0,<2.1",  # "<{N+1}" upper cap
-    "pytorch_lightning": ">=2.0.0,<2.1",  # "<{N+1}" upper cap, capping `lightning` does not cap `pytorch_lightning`!
+    "torch": ">=2.1,<2.2",  # Major version cap, sync with common/src/autogluon/common/utils/try_import.py
+    "lightning": ">=2.1,<2.2",  # Major version cap
+    "pytorch_lightning": ">=2.1,<2.2",  # Major version cap, capping `lightning` does not cap `pytorch_lightning`!
     "async_timeout": ">=4.0,<5",  # Major version cap
+    "transformers[sentencepiece]": ">=4.38.0,<4.39.0",
+    "accelerate": ">=0.21.0,<0.22.0",
 }
 if LITE_MODE:
     DEPENDENT_PACKAGES = {package: version for package, version in DEPENDENT_PACKAGES.items() if package not in ["psutil", "Pillow", "timm"]}
@@ -120,11 +122,7 @@ def default_setup_args(*, version, submodule):
         zip_safe=True,
         include_package_data=True,
         python_requires=PYTHON_REQUIRES,
-        package_data={
-            AUTOGLUON: [
-                "LICENSE",
-            ]
-        },
+        package_data={AUTOGLUON: ["LICENSE"]},
         classifiers=[
             development_status,
             "Intended Audience :: Education",

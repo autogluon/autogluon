@@ -46,6 +46,12 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
         #   NaN, empty string, datetime without timezone, and datetime with timezone, all as an object type, all being present in the same column.
         #   I don't know why, but in this specific situation (and not otherwise), NaN will be filled by .fillna, but empty string will be converted to NaT
         #   and refuses to be filled by .fillna, requiring a dedicated replace call. (NaT is filled by .fillna in every other situation...)
+        # Note: The below `pd.to_datetime` line can take a long time if the format is mixed.
+        #   For an example of this problem, refer to https://www.kaggle.com/code/kuldeepnpatel/to-datetime-is-too-slow-on-large-dataset
+        #   There does not appear to be a straightforward way to avoid this,
+        #   and the trick that was used in the above notebook was removed in Pandas 2.0 due to being unsafe.
+        #   Alternatives like Polars do not offer the same datetime conversion logic, and thus aren't valid to use.
+        #   The runtime is approximately 0.08 seconds per 1000 rows in worst case.
         series = pd.to_datetime(X[feature].copy(), utc=True, errors="coerce", format="mixed")
         broken_idx = series[(series == "NaT") | series.isna() | series.isnull()].index
         bad_rows = series.iloc[broken_idx]

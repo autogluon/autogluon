@@ -1,4 +1,5 @@
 """Common utils and data for all model tests"""
+
 import random
 from typing import Dict, List, Optional, Union
 
@@ -6,9 +7,9 @@ import numpy as np
 import pandas as pd
 from gluonts.dataset.common import ListDataset
 
-from autogluon.timeseries.dataset import TimeSeriesDataFrame
-from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
+from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer
+from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 
 # TODO: add larger unit test data sets to S3
 
@@ -103,6 +104,17 @@ def get_data_frame_with_item_index(
 DUMMY_TS_DATAFRAME = get_data_frame_with_item_index(["10", "A", "2", "1"])
 
 
+def get_dummy_ts_dataframe_with_missing():
+    data = DUMMY_TS_DATAFRAME.copy()
+    # Completely mask one item + some additional indexes
+    data.loc[data.item_ids[1]] = float("nan")
+    data.iloc[[0, 1, 2, 5, 15, 17, 18, 42, 53]] = float("nan")
+    return data
+
+
+DUMMY_TS_DATAFRAME_WITH_MISSING = get_dummy_ts_dataframe_with_missing()
+
+
 def get_data_frame_with_variable_lengths(
     item_id_to_length: Dict[str, int],
     static_features: Optional[pd.DataFrame] = None,
@@ -183,3 +195,14 @@ class CustomMetric(TimeSeriesScorer):
 
     def clear_past_metrics(self) -> None:
         del self._past_target_mean
+
+
+def get_prediction_for_df(data, prediction_length=5):
+    forecast_index = get_forecast_horizon_index_ts_dataframe(data, prediction_length=prediction_length)
+    columns = ["mean", "0.1", "0.2", "0.3", "0.4", "0.5", "0.6", "0.7", "0.8", "0.9"]
+    return TimeSeriesDataFrame(
+        pd.DataFrame(np.random.normal(size=[len(forecast_index), len(columns)]), index=forecast_index, columns=columns)
+    )
+
+
+PREDICTIONS_FOR_DUMMY_TS_DATAFRAME = get_prediction_for_df(DUMMY_TS_DATAFRAME)

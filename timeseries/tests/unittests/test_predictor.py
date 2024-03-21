@@ -1,23 +1,33 @@
 """Unit tests for predictors"""
+
 import copy
+import logging
 import math
 import sys
 import tempfile
 from pathlib import Path
 from unittest import mock
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pytest
 
 from autogluon.common import space
+from autogluon.common.utils.log_utils import verbosity2loglevel
+from autogluon.common.utils.utils import seed_everything
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 from autogluon.timeseries.metrics import DEFAULT_METRIC_NAME
 from autogluon.timeseries.models import DeepARModel, SimpleFeedForwardModel
 from autogluon.timeseries.predictor import TimeSeriesPredictor
 
-from .common import DUMMY_TS_DATAFRAME, CustomMetric, get_data_frame_with_variable_lengths
+from .common import (
+    DUMMY_TS_DATAFRAME,
+    PREDICTIONS_FOR_DUMMY_TS_DATAFRAME,
+    CustomMetric,
+    get_data_frame_with_variable_lengths,
+)
 
 TEST_HYPERPARAMETER_SETTINGS = [
     {"SimpleFeedForward": {"epochs": 1, "num_batches_per_epoch": 1}},
@@ -409,6 +419,18 @@ def test_when_fit_summary_is_called_then_all_keys_and_models_are_included(
             assert len(fit_summary[key]) == num_models
 
 
+EXPECTED_INFO_KEYS = [
+    "path",
+    "version",
+    "time_fit_training",
+    "time_limit",
+    "best_model",
+    "best_model_score_val",
+    "num_models_trained",
+    "model_info",
+]
+
+
 @pytest.mark.parametrize(
     "hyperparameters, num_models",
     [
@@ -419,21 +441,24 @@ def test_when_fit_summary_is_called_then_all_keys_and_models_are_included(
 def test_when_info_is_called_then_all_keys_and_models_are_included(temp_model_path, hyperparameters, num_models):
     predictor = TimeSeriesPredictor(path=temp_model_path)
     predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters=hyperparameters)
-    expected_keys = [
-        "path",
-        "version",
-        "time_fit_training",
-        "time_limit",
-        "best_model",
-        "best_model_score_val",
-        "num_models_trained",
-        "model_info",
-    ]
     info = predictor.info()
-    for key in expected_keys:
+    for key in EXPECTED_INFO_KEYS:
         assert key in info
 
     assert len(info["model_info"]) == num_models
+
+
+def test_when_predictor_is_loaded_then_info_works(temp_model_path):
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=2)
+    predictor.fit(train_data=DUMMY_TS_DATAFRAME, hyperparameters=DUMMY_HYPERPARAMETERS)
+    predictor.save()
+    del predictor
+    predictor = TimeSeriesPredictor.load(temp_model_path)
+    info = predictor.info()
+    for key in EXPECTED_INFO_KEYS:
+        assert key in info
+
+    assert len(info["model_info"]) == len(DUMMY_HYPERPARAMETERS) + 1  # + 1 for ensemble
 
 
 def test_when_train_data_contains_nans_then_predictor_can_fit(temp_model_path):
@@ -497,15 +522,17 @@ def test_given_data_is_in_dataframe_format_then_predictor_works(temp_model_path)
     assert isinstance(predictions, TimeSeriesDataFrame)
 
 
-def test_given_data_is_in_str_format_then_predictor_works(temp_model_path):
+@pytest.mark.parametrize("path_format", [str, Path])
+def test_given_data_is_in_str_format_then_predictor_works(temp_model_path, path_format):
     df = pd.DataFrame(DUMMY_TS_DATAFRAME.reset_index())
     with tempfile.NamedTemporaryFile("w") as data_path:
+        data_path = path_format(str(data_path))
         df.to_csv(data_path, index=False)
         predictor = TimeSeriesPredictor(path=temp_model_path)
-        predictor.fit(df, hyperparameters={"Naive": {}})
-        predictor.leaderboard(df)
-        predictor.evaluate(df)
-        predictions = predictor.predict(df)
+        predictor.fit(data_path, hyperparameters={"Naive": {}})
+        predictor.leaderboard(data_path)
+        predictor.evaluate(data_path)
+        predictions = predictor.predict(data_path)
         assert isinstance(predictions, TimeSeriesDataFrame)
 
 
@@ -1001,3 +1028,205 @@ def test_given_time_limit_is_not_none_then_time_is_distributed_across_windows_fo
         except RuntimeError:
             pass
         assert mock_fit.call_args[1]["time_limit"] < expected_time_limit_for_first_model
+
+
+def test_when_log_to_file_set_then_predictor_logs_to_file(temp_model_path):
+    predictor = TimeSeriesPredictor(path=temp_model_path, log_to_file=True)
+    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
+    log_path = Path(temp_model_path) / "logs/predictor_log.txt"
+    assert Path.exists(log_path)
+
+    # check if the log contains text
+    with open(log_path, "r") as f:
+        log_text = f.read()
+    assert "Naive" in log_text
+
+
+def test_when_log_file_set_then_predictor_logs_to_custom_file(temp_model_path):
+    predictor = TimeSeriesPredictor(path=temp_model_path, log_to_file=True, log_file_path="custom_log.txt")
+    log_path = Path(".") / "custom_log.txt"
+    try:
+        predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
+        assert Path.exists(log_path)
+
+        # check if the log contains text
+        with open(log_path, "r") as f:
+            log_text = f.read()
+        assert "Naive" in log_text
+    finally:
+        log_path.unlink(missing_ok=True)
+
+
+def test_when_log_file_set_with_pathlib_then_predictor_logs_to_custom_file(temp_model_path):
+    predictor = TimeSeriesPredictor(path=temp_model_path, log_to_file=True, log_file_path=Path(".") / "custom_log.txt")
+    log_path = Path(".") / "custom_log.txt"
+    try:
+        predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
+        assert Path.exists(log_path)
+
+        # check if the log contains text
+        with open(log_path, "r") as f:
+            log_text = f.read()
+        assert "Naive" in log_text
+    finally:
+        log_path.unlink(missing_ok=True)
+
+
+def test_when_log_to_file_set_to_false_then_predictor_does_not_log_to_file(temp_model_path):
+    predictor = TimeSeriesPredictor(path=temp_model_path, log_to_file=False)
+    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
+    log_path = Path(temp_model_path) / "logs/predictor_log.txt"
+    assert not Path.exists(log_path)
+
+
+@pytest.mark.parametrize("verbosity", [-1, 0, 1, 2, 3, 4, 5])
+def test_when_predictor_init_with_verbosity_then_verbosity_propagates_to_all_loggers(temp_model_path, verbosity):
+    logger_suffixes = ["learner", "trainer", "abstract_local_model"]
+
+    predictor = TimeSeriesPredictor(path=temp_model_path, log_to_file=False, verbosity=verbosity)
+    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
+
+    for suffix in logger_suffixes:
+        level = logging.getLogger(f"autogluon.timeseries.{suffix}").getEffectiveLevel()
+        assert level == verbosity2loglevel(verbosity)
+
+
+@pytest.mark.parametrize("verbosity", [-1, 0, 1, 2, 3, 4, 5])
+def test_when_predictor_fit_with_verbosity_then_verbosity_overridden_and_propagates_to_all_loggers(
+    temp_model_path, verbosity
+):
+    logger_suffixes = ["learner", "trainer", "abstract_local_model"]
+
+    predictor = TimeSeriesPredictor(path=temp_model_path, log_to_file=False, verbosity=-1)
+    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}}, verbosity=verbosity)
+
+    for suffix in logger_suffixes:
+        level = logging.getLogger(f"autogluon.timeseries.{suffix}").getEffectiveLevel()
+        assert level == verbosity2loglevel(verbosity)
+
+
+@pytest.mark.parametrize("random_seed", [123, 1, 42])
+def test_when_predictor_fit_with_random_seed_then_torch_seed_set_for_all_models(temp_model_path, random_seed):
+    predictor = TimeSeriesPredictor(path=temp_model_path)
+
+    import torch
+
+    def train_save_side_effect(self, *args, **kwargs):
+        assert torch.get_rng_state().numpy()[0] == random_seed
+
+        # mess with the seed
+        seed_everything(66)
+
+        return "mock_model"
+
+    with mock.patch("autogluon.timeseries.trainer.AbstractTimeSeriesTrainer._train_and_save") as mock_train_save:
+        mock_train_save.side_effect = train_save_side_effect
+        predictor.fit(
+            DUMMY_TS_DATAFRAME,
+            hyperparameters={
+                "SeasonalNaive": {},
+                "RecursiveTabular": {
+                    "tabular_hyperparameters": {"NN_TORCH": {"proc.impute_strategy": "constant", "num_epochs": 1}},
+                },
+                "TemporalFusionTransformer": {"epochs": 1},
+                "DeepAR": {"epochs": 1},
+            },
+            random_seed=random_seed,
+            enable_ensemble=False,
+        )
+        assert mock_train_save.call_count == 4
+
+
+@pytest.mark.parametrize("random_seed", [123, 42])
+def test_when_predictor_predict_called_with_random_seed_then_torch_seed_set_for_all_predictions(
+    temp_model_path, random_seed
+):
+    predictor = TimeSeriesPredictor(path=temp_model_path)
+
+    predictor.fit(
+        DUMMY_TS_DATAFRAME,
+        hyperparameters={
+            "SeasonalNaive": {},
+            "DeepAR": {"epochs": 1},
+        },
+        random_seed=random_seed,
+        enable_ensemble=False,
+    )
+
+    import torch
+
+    def predict_model_side_effect(*args, **kwargs):
+        assert torch.get_rng_state().numpy()[0] == random_seed
+        return DUMMY_TS_DATAFRAME
+
+    with mock.patch("autogluon.timeseries.trainer.AbstractTimeSeriesTrainer._predict_model") as mock_predict_model:
+        mock_predict_model.side_effect = predict_model_side_effect
+        try:
+            predictor.predict(DUMMY_TS_DATAFRAME, random_seed=random_seed)
+        except RuntimeError:
+            pass
+        assert mock_predict_model.call_count == 1
+
+
+@pytest.mark.parametrize("predictions", [PREDICTIONS_FOR_DUMMY_TS_DATAFRAME, None])
+@pytest.mark.parametrize("quantile_levels", [[0.1, 0.7, 0.9], None])
+@pytest.mark.parametrize("max_history_length", [10, None])
+@pytest.mark.parametrize("point_forecast_column", ["mean", "0.7", None])
+@pytest.mark.parametrize(
+    "max_num_item_ids, item_ids, expected_num_subplots",
+    [
+        (1, None, 1),
+        (8, DUMMY_TS_DATAFRAME.item_ids[:2], 2),
+        (3, DUMMY_TS_DATAFRAME.item_ids, 3),
+    ],
+)
+def test_when_plot_called_then_figure_contains_correct_number_of_subplots(
+    predictions,
+    quantile_levels,
+    item_ids,
+    max_num_item_ids,
+    max_history_length,
+    point_forecast_column,
+    expected_num_subplots,
+):
+    fig = TimeSeriesPredictor().plot(
+        DUMMY_TS_DATAFRAME,
+        predictions=predictions,
+        quantile_levels=quantile_levels,
+        item_ids=item_ids,
+        max_num_item_ids=max_num_item_ids,
+        max_history_length=max_history_length,
+        point_forecast_column=point_forecast_column,
+    )
+    num_subplots = len([ax for ax in fig.axes if ax.get_title() != ""])
+    assert num_subplots == expected_num_subplots
+    plt.close(fig)
+
+
+@pytest.mark.parametrize(
+    "selected_columns",
+    [["mean"], ["mean", "0.1"], ["mean", "0.5"], ["mean", "0.5", "0.8"], ["mean", "0.1", "0.2", "0.4"]],
+)
+def test_when_not_all_quantile_forecasts_available_then_predictor_can_plot(selected_columns):
+    max_num_item_ids = 3
+    fig = TimeSeriesPredictor().plot(
+        DUMMY_TS_DATAFRAME,
+        predictions=PREDICTIONS_FOR_DUMMY_TS_DATAFRAME[selected_columns],
+        max_num_item_ids=max_num_item_ids,
+    )
+    num_subplots = len([ax for ax in fig.axes if ax.get_title() != ""])
+    assert num_subplots == max_num_item_ids
+    plt.close(fig)
+
+
+@pytest.mark.parametrize(
+    "predictions",
+    [
+        pd.DataFrame(PREDICTIONS_FOR_DUMMY_TS_DATAFRAME),
+        PREDICTIONS_FOR_DUMMY_TS_DATAFRAME.drop(columns="mean"),
+        PREDICTIONS_FOR_DUMMY_TS_DATAFRAME.loc[PREDICTIONS_FOR_DUMMY_TS_DATAFRAME.item_ids[0]],
+    ],
+)
+def test_when_predictions_for_plot_have_incorrect_format_then_exception_is_raised(predictions):
+    with pytest.raises(ValueError, match="predictions must be a TimeSeriesDataFrame"):
+        TimeSeriesPredictor().plot(DUMMY_TS_DATAFRAME, predictions=predictions)

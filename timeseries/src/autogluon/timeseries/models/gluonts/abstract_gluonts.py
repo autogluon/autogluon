@@ -18,7 +18,6 @@ from gluonts.model.predictor import Predictor as GluonTSPredictor
 from pandas.tseries.frequencies import to_offset
 
 from autogluon.common.loaders import load_pkl
-from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.core.hpo.constants import RAY_BACKEND
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
@@ -205,7 +204,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             model = load_pkl.load(path=os.path.join(path, cls.model_file_name), verbose=verbose)
             if reset_paths:
                 model.set_contexts(path)
-            model.gts_predictor = PyTorchPredictor.deserialize(Path(path) / cls.gluonts_model_path)
+            model.gts_predictor = PyTorchPredictor.deserialize(Path(path) / cls.gluonts_model_path, device="auto")
         return model
 
     def _get_hpo_backend(self):
@@ -383,7 +382,6 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             if "lightning" in logger_name:
                 pl_logger = logging.getLogger(logger_name)
                 pl_logger.setLevel(logging.ERROR if verbosity <= 3 else logging.INFO)
-        set_logger_verbosity(verbosity, logger=logger)
         gts_logger.setLevel(logging.ERROR if verbosity <= 3 else logging.INFO)
 
         if verbosity > 3:
@@ -395,6 +393,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         self._check_fit_params()
         # update auxiliary parameters
         init_args = self._get_estimator_init_args()
+        keep_lightning_logs = init_args.pop("keep_lightning_logs", False)
         callbacks = self._get_callbacks(
             time_limit=time_limit,
             early_stopping_patience=None if val_data is None else init_args["early_stopping_patience"],
@@ -413,7 +412,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                 self.gts_predictor.batch_size = init_args["predict_batch_size"]
 
         lightning_logs_dir = Path(self.path) / "lightning_logs"
-        if lightning_logs_dir.exists() and lightning_logs_dir.is_dir():
+        if not keep_lightning_logs and lightning_logs_dir.exists() and lightning_logs_dir.is_dir():
             logger.debug(f"Removing lightning_logs directory {lightning_logs_dir}")
             shutil.rmtree(lightning_logs_dir)
 

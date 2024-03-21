@@ -1,4 +1,3 @@
-import ast
 import logging
 import warnings
 from io import BytesIO
@@ -7,7 +6,6 @@ from typing import Callable, Dict, List, Optional, Union
 import numpy as np
 import PIL
 import torch
-from omegaconf import ListConfig
 from PIL import ImageFile
 from torch import nn
 from torchvision import transforms
@@ -21,18 +19,8 @@ try:
 except ImportError:
     BICUBIC = PIL.Image.BICUBIC
 
-from ..constants import (
-    AUTOMM,
-    CLIP,
-    CLIP_IMAGE_MEAN,
-    CLIP_IMAGE_STD,
-    COLUMN,
-    IMAGE,
-    IMAGE_BYTEARRAY,
-    IMAGE_PATH,
-    IMAGE_VALID_NUM,
-    TIMM_IMAGE,
-)
+from ..constants import CLIP, COLUMN, IMAGE, IMAGE_BASE64_STR, IMAGE_BYTEARRAY, IMAGE_VALID_NUM, TIMM_IMAGE
+from ..models.clip import CLIPForImageText
 from ..models.timm_image import TimmAutoModelForImagePrediction
 from .collator import PadCollator, StackCollator
 from .utils import extract_value_from_config
@@ -100,9 +88,13 @@ class ImageProcessor:
         self.size = None
         self.mean = None
         self.std = None
+        if isinstance(model, CLIPForImageText):
+            config = model.model.vision_model.config
+        else:
+            config = model.config
 
         if model is not None:
-            self.size, self.mean, self.std = self.extract_default(model.config)
+            self.size, self.mean, self.std = self.extract_default(config)
             if isinstance(model, TimmAutoModelForImagePrediction):
                 if model.support_variable_input_size() and size is not None:
                     # We have detected that the model supports using an image size that is
@@ -111,7 +103,7 @@ class ImageProcessor:
                         logger.warning(
                             f"The provided image size={size} is smaller than the default size "
                             f"of the pretrained backbone, which is {self.size}. "
-                            f"Detailed configuration of the backbone is in {model.config}. "
+                            f"Detailed configuration of the backbone is in {config}. "
                             f"You may like to double check your configuration."
                         )
                     self.size = size
@@ -119,7 +111,7 @@ class ImageProcessor:
                 logger.warning(
                     f"The model does not support using an image size that is different from the default size. "
                     f"Provided image size={size}. Default size={self.size}. "
-                    f"Detailed model configuration={model.config}. We have ignored the provided image size."
+                    f"Detailed model configuration={config}. We have ignored the provided image size."
                 )
         if self.size is None:
             if size is not None:
@@ -276,7 +268,7 @@ class ImageProcessor:
                     )
                     is_zero_img = False
                     try:
-                        if feature_modalities.get(per_col_name) == IMAGE_BYTEARRAY:
+                        if feature_modalities.get(per_col_name) in [IMAGE_BYTEARRAY, IMAGE_BASE64_STR]:
                             image_feature = BytesIO(img_feature)
                         else:
                             image_feature = img_feature

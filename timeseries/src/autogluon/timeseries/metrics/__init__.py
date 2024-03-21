@@ -2,7 +2,7 @@ from pprint import pformat
 from typing import Type, Union
 
 from .abstract import TimeSeriesScorer
-from .point import MAE, MAPE, MASE, MSE, RMSE, RMSSE, SMAPE, WAPE
+from .point import MAE, MAPE, MASE, MSE, RMSE, RMSLE, RMSSE, SMAPE, WAPE
 from .quantile import SQL, WQL
 
 __all__ = [
@@ -12,6 +12,7 @@ __all__ = [
     "SMAPE",
     "MSE",
     "RMSE",
+    "RMSLE",
     "RMSSE",
     "SQL",
     "WAPE",
@@ -25,6 +26,7 @@ AVAILABLE_METRICS = {
     "MAPE": MAPE,
     "SMAPE": SMAPE,
     "RMSE": RMSE,
+    "RMSLE": RMSLE,
     "RMSSE": RMSSE,
     "WAPE": WAPE,
     "SQL": SQL,

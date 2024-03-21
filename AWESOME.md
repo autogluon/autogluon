@@ -8,8 +8,26 @@ We will be happy to add your success story using AutoGluon to this list.
 Send us a pull request if you want to include your case here.
 
 ## Videos & Tutorials
-* [AutoML Fall School 2022 - Hands-on tutorial AutoGluon](https://www.youtube.com/watch?v=VAAITEds-28)
-  * This is the most up-to-date indepth tutorial of AutoGluon, presented by @innixma
+
+To get started, we recommend watching [AutoGluon 1.0: Shattering the AutoML Ceiling with Zero Lines of Code](https://www.youtube.com/watch?v=5tvp_Ihgnuk), our recent talk at AutoML Conf 2023.
+
+### Full Talk List
+
+| Title                                                                                                                                                              | Format   | Location                                                                                                                           | Date       |
+|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|------------------------------------------------------------------------------------------------------------------------------------|------------|
+| [AutoGluon 1.0: AutoML at Your Fingertips](https://autogluon.github.io/neurips-autogluon-workshop/)                                                                | Tutorial | [NeurIPS 2023](https://neurips.cc/Expo/Conferences/2023/workshop/78401)                                                            | 2023/12/10 |
+| :tv: [Leveraging Text, Images, and the Kitchen Sink to solve complex ML problems in 1 line of code](https://www.youtube.com/watch?v=fdfGb2jq-_c)                   | Tutorial | [Fall AutoML School 2023](https://sites.google.com/view/automl-fall-school-2023/schedule/hands-on-autogluon?authuser=0)            | 2023/11/29 |
+| :tv: [AutoGluon 1.0: Shattering the AutoML Ceiling with Zero Lines of Code](https://www.youtube.com/watch?v=5tvp_Ihgnuk)                                           | Tutorial | [AutoML Conf 2023](https://2023.automl.cc/)                                                                                        | 2023/09/12 |
+| :sound: [AutoGluon: The Story](https://automlpodcast.com/episode/autogluon-the-story)                                                                              | Podcast  | [The AutoML Podcast](https://automlpodcast.com/)                                                                                   | 2023/09/05 |
+| :tv: [AutoGluon: AutoML for Tabular, Multimodal, and Time Series Data](https://youtu.be/Lwu15m5mmbs?si=jSaFJDqkTU27C0fa)                                           | Tutorial | PyData Berlin                                                                                                                      | 2023/06/20 | 
+| :tv: [Solving Complex ML Problems in a few Lines of Code with AutoGluon](https://www.youtube.com/watch?v=J1UQUCPB88I)                                              | Tutorial | PyData Seattle                                                                                                                     | 2023/06/20 | 
+| [AutoGluon: Empowering (Multimodal) AutoML for the Next 10 Million Users](https://autogluon.github.io/neurips2022-autogluon-workshop/)                             | Tutorial | [NeurIPS 2022](https://nips.cc/Expo/Conferences/2022/workshop/63089)                                                               | 2022/11/28 |
+| :tv: [The AutoML Revolution](https://www.youtube.com/watch?v=VAAITEds-28)                                                                                          | Tutorial | [Fall AutoML School 2022](https://sites.google.com/view/automl-fall-school-2022)                                                   | 2022/10/18 |
+| [Multimodal AutoML for Image, Text and Tabular Data](https://github.com/Innixma/kdd-2022-multimodal-automl-tutorial)                                               | Tutorial | [KDD 2022](https://kdd.org/kdd2022/lectureTutorial.html)                                                                           | 2022/08/14 |
+| :tv: [Automating Machine Learning for the Rest of Us](https://www.youtube.com/watch?v=x-EEDBSl3OM)                                                                 | Keynote  | [AutoML Conf 2022](https://2022.automl.cc/index.html)                                                                              | 2022/07/25 |
+| :tv: [AutoGluon: re:MARS 2022 Keynote](https://www.youtube.com/watch?v=_wd0IJBTwbY&t=1277s)                                                                        | Keynote  | [Amazon re:MARS 2022](https://icml.cc/virtual/2020/workshop/5725)                                                                  | 2022/06/24 |
+| [Advancing the State of the Art in AutoML](https://developer.nvidia.com/blog/advancing-the-state-of-the-art-in-automl-now-10x-faster-with-nvidia-gpus-and-rapids/) | Talk     | [GTC 2021](https://developer.nvidia.com/blog/advancing-the-state-of-the-art-in-automl-now-10x-faster-with-nvidia-gpus-and-rapids/) | 2021/06/09 |
+| :tv: [AutoGluon and Distillation](https://icml.cc/virtual/2020/7045)                                                                                               | Keynote  | [ICML 2020, AutoML Workshop](https://icml.cc/virtual/2020/workshop/5725)                                                           | 2020/07/18 |
 
 ## Competition Solutions using AutoGluon
 

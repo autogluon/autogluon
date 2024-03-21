@@ -208,7 +208,7 @@ class XGBoostModel(AbstractModel):
         data_mem_usage = get_approximate_df_mem_usage(X).sum()
         data_mem_usage_bytes = data_mem_usage * 7 + data_mem_usage / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
 
-        params = self._get_model_params()
+        params = self._get_model_params(convert_search_spaces_to_default=True)
         max_bin = params.get("max_bin", 256)
         max_depth = params.get("max_depth", 6)
         # Formula based on manual testing, aligns with LightGBM histogram sizes

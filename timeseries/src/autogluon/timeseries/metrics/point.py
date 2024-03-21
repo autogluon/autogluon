@@ -5,7 +5,6 @@ import numpy as np
 import pandas as pd
 
 from autogluon.timeseries import TimeSeriesDataFrame
-from autogluon.timeseries.dataset.ts_dataframe import ITEMID
 
 from .abstract import TimeSeriesScorer
 from .utils import _in_sample_abs_seasonal_error, _in_sample_squared_seasonal_error
@@ -246,8 +245,10 @@ class MASE(TimeSeriesScorer):
         if self._past_abs_seasonal_error is None:
             raise AssertionError("Call `save_past_metrics` before `compute_metric`")
 
-        mae_per_item = (y_true - y_pred).abs().groupby(level=ITEMID, sort=False).mean()
-        return self._safemean(mae_per_item / self._past_abs_seasonal_error)
+        num_items = len(self._past_abs_seasonal_error)
+        # Reshape abs errors into [num_items, prediction_length] to normalize per item without groupby
+        abs_errors = np.abs(y_true.values - y_pred.values).reshape([num_items, -1])
+        return self._safemean(abs_errors / self._past_abs_seasonal_error.values[:, None])
 
 
 class RMSSE(TimeSeriesScorer):
@@ -304,5 +305,57 @@ class RMSSE(TimeSeriesScorer):
         if self._past_squared_seasonal_error is None:
             raise AssertionError("Call `save_past_metrics` before `compute_metric`")
 
-        mse_per_item = (y_true - y_pred).pow(2.0).groupby(level=ITEMID, sort=False).mean()
-        return np.sqrt(self._safemean(mse_per_item / self._past_squared_seasonal_error))
+        num_items = len(self._past_squared_seasonal_error)
+        # Reshape squared errors into [num_items, prediction_length] to normalize per item without groupby
+        squared_errors = ((y_true.values - y_pred.values) ** 2.0).reshape([num_items, -1])
+        return np.sqrt(self._safemean(squared_errors / self._past_squared_seasonal_error.values[:, None]))
+
+
+class RMSLE(TimeSeriesScorer):
+    r"""Root mean squared logarithmic error.
+
+    Applies a logarithmic transformation to the predictions before computing the root mean squared error. Assumes
+    both the ground truth and predictions are positive. If negative predictions are given, they will be clipped to zero.
+
+    .. math::
+
+        \operatorname{RMSLE} = \sqrt{\frac{1}{N} \frac{1}{H} \sum_{i=1}^{N} \sum_{t=T+1}^{T+H} (\ln(1 + y_{i,t}) - \ln(1 + f_{i,t}))^2}
+
+
+    Properties:
+
+    - undefined for time series with negative values
+    - penalizes models that underpredict more than models that overpredict
+    - insensitive to effects of outliers and scale, best when targets can vary or trend exponentially
+
+
+    References
+    ----------
+    - `Scikit-learn: <https://scikit-learn.org/stable/modules/model_evaluation.html#mean-squared-log-error>`_
+    """
+
+    def compute_metric(self, data_future, predictions, target, **kwargs):
+        y_true, y_pred = self._get_point_forecast_score_inputs(data_future, predictions, target=target)
+        y_pred = np.clip(y_pred, a_min=0.0, a_max=None)
+
+        return np.sqrt(np.power(np.log1p(y_pred) - np.log1p(y_true), 2).mean())
+
+    def __call__(
+        self,
+        data: TimeSeriesDataFrame,
+        predictions: TimeSeriesDataFrame,
+        prediction_length: int = 1,
+        target: str = "target",
+        seasonal_period: Optional[int] = None,
+        **kwargs,
+    ) -> float:
+        if (data[target] < 0).any():
+            raise ValueError(f"{self.name} cannot be used if target time series contains negative values!")
+        return super().__call__(
+            data=data,
+            predictions=predictions,
+            prediction_length=prediction_length,
+            target=target,
+            seasonal_period=seasonal_period,
+            **kwargs,
+        )

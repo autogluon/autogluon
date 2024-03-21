@@ -9,7 +9,6 @@ from typing import Dict, Optional, Type, Union
 import numpy as np
 
 import autogluon.core as ag
-from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.local.abstract_local_model import AbstractLocalModel
@@ -82,9 +81,6 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
     ):
         # TODO: use incremental training for GluonTS models?
         # TODO: implement parallel fitting similar to ParallelLocalFoldFittingStrategy in tabular?
-        verbosity = kwargs.get("verbosity", 2)
-        set_logger_verbosity(verbosity, logger=logger)
-
         if val_data is not None:
             raise ValueError(f"val_data should not be passed to {self.name}.fit()")
         if val_splitter is None:

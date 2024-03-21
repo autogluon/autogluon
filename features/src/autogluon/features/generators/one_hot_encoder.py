@@ -127,7 +127,7 @@ class OneHotEncoderFeatureGenerator(AbstractFeatureGenerator):
         super().__init__(**kwargs)
         self.max_levels = max_levels
         self.sparse = sparse
-        self._ohe = OneHotEncoder(dtype=dtype, sparse=self.sparse, handle_unknown="ignore", drop=drop)
+        self._ohe = OneHotEncoder(dtype=dtype, sparse_output=self.sparse, handle_unknown="ignore", drop=drop)
         self._ohe_columns = None
         self._cat_feat_gen = None
 

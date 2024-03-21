@@ -1,4 +1,5 @@
 """Unit tests and utils common to all models"""
+
 import itertools
 import shutil
 import sys
@@ -112,8 +113,8 @@ def test_when_score_called_then_model_receives_truncated_data(model_class, predi
     with mock.patch.object(model, "predict") as patch_method:
         # Mock breaks the internals of the `score` method
         try:
-            _ = model.score(DUMMY_TS_DATAFRAME)
-        except AttributeError:
+            model.score(DUMMY_TS_DATAFRAME)
+        except AssertionError:
             pass
 
         (call_df,) = patch_method.call_args[0]

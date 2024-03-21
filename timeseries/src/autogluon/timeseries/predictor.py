@@ -1,17 +1,19 @@
 import json
 import logging
+import math
 import os
 import pprint
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
+import numpy as np
 import pandas as pd
 
 from autogluon.common.utils.deprecated_utils import Deprecated
-from autogluon.common.utils.log_utils import set_logger_verbosity
+from autogluon.common.utils.log_utils import add_log_to_file, set_logger_verbosity
 from autogluon.common.utils.system_info import get_ag_system_info
-from autogluon.common.utils.utils import check_saved_predictor_version, seed_everything, setup_outputdir
+from autogluon.common.utils.utils import check_saved_predictor_version, setup_outputdir
 from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
@@ -23,7 +25,7 @@ from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_
 from autogluon.timeseries.splitter import ExpandingWindowSplitter
 from autogluon.timeseries.trainer import AbstractTimeSeriesTrainer
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("autogluon.timeseries")
 
 
 class TimeSeriesPredictorDeprecatedMixin:
@@ -94,6 +96,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         - ``"MASE"``: mean absolute scaled error
         - ``"MSE"``: mean squared error
         - ``"RMSE"``: root mean squared error
+        - ``"RMSLE"``: root mean squared logarithmic error
         - ``"RMSSE"``: root mean squared scaled error
         - ``"SMAPE"``: "symmetric" mean absolute percentage error
         - ``"WAPE"``: weighted absolute percentage error
@@ -123,9 +126,15 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
     verbosity : int, default = 2
         Verbosity levels range from 0 to 4 and control how much information is printed to stdout. Higher levels
         correspond to more detailed print statements, and ``verbosity=0`` suppresses output including warnings.
-        If using ``logging``, you can alternatively control amount of information printed via ``logger.setLevel(L)``,
-        where ``L`` ranges from 0 to 50 (Note: higher values of ``L`` correspond to fewer print statements, opposite
-        of verbosity levels).
+        Verbosity 0 corresponds to Python's ERROR log level, where only error outputs will be logged. Verbosity 1 and 2
+        will additionally log warnings and info outputs, respectively. Verbosity 4 enables all logging output including
+        debug messages from AutoGluon and all logging in dependencies (GluonTS, PyTorch Lightning, AutoGluon-Tabular, etc.)
+    log_to_file: bool, default = True
+        Whether to save the logs into a file for later reference
+    log_file_path: Union[str, Path], default = "auto"
+        File path to save the logs.
+        If auto, logs will be saved under `predictor_path/logs/predictor_log.txt`.
+        Will be ignored if `log_to_file` is set to False
     cache_predictions : bool, default = True
         If True, the predictor will cache and reuse the predictions made by individual models whenever
         :meth:`~autogluon.timeseries.TimeSeriesPredictor.predict`, :meth:`~autogluon.timeseries.TimeSeriesPredictor.leaderboard`,
@@ -138,6 +147,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
     predictor_file_name = "predictor.pkl"
     _predictor_version_file_name = "__version__"
+    _predictor_log_file_name = "predictor_log.txt"
 
     def __init__(
         self,
@@ -149,6 +159,8 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         eval_metric_seasonal_period: Optional[int] = None,
         path: Optional[Union[str, Path]] = None,
         verbosity: int = 2,
+        log_to_file: bool = True,
+        log_file_path: Union[str, Path] = "auto",
         quantile_levels: Optional[List[float]] = None,
         cache_predictions: bool = True,
         learner_type: Optional[Type[AbstractLearner]] = None,
@@ -159,6 +171,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         self.verbosity = verbosity
         set_logger_verbosity(self.verbosity, logger=logger)
         self.path = setup_outputdir(path)
+        self._setup_log_to_file(log_to_file=log_to_file, log_file_path=log_file_path)
 
         self.cache_predictions = cache_predictions
         if target is not None and label is not None:
@@ -229,14 +242,22 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
     def _trainer(self) -> AbstractTimeSeriesTrainer:
         return self._learner.load_trainer()  # noqa
 
+    def _setup_log_to_file(self, log_to_file: bool, log_file_path: Union[str, Path]) -> None:
+        if log_to_file:
+            if log_file_path == "auto":
+                log_file_path = os.path.join(self.path, "logs", self._predictor_log_file_name)
+            log_file_path = os.path.abspath(os.path.normpath(log_file_path))
+            os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
+            add_log_to_file(log_file_path)
+
     def _to_data_frame(
         self,
-        data: Union[TimeSeriesDataFrame, pd.DataFrame, str],
+        data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
         name: str = "data",
     ) -> "TimeSeriesDataFrame":
         if isinstance(data, TimeSeriesDataFrame):
             return data
-        elif isinstance(data, (pd.DataFrame, str)):
+        elif isinstance(data, (pd.DataFrame, Path, str)):
             try:
                 data = TimeSeriesDataFrame(data)
             except:
@@ -246,13 +267,13 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             return data
         else:
             raise TypeError(
-                f"{name} must be a TimeSeriesDataFrame or pandas.DataFrame or string (path to data) "
+                f"{name} must be a TimeSeriesDataFrame, pandas.DataFrame, pathlib.Path or string (path to data) "
                 f"but received an object of type {type(data)}."
             )
 
     def _check_and_prepare_data_frame(
         self,
-        data: Union[TimeSeriesDataFrame, pd.DataFrame, str],
+        data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
         name: str = "data",
     ) -> TimeSeriesDataFrame:
         """Ensure that TimeSeriesDataFrame has a sorted index, valid frequency, and contains no missing values.
@@ -261,7 +282,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
         Parameters
         ----------
-        data : Union[TimeSeriesDataFrame, pd.DataFrame, str]
+        data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]
             Data as a data frame or path to file storing the data.
         name : str
             Name of the data that will be used in log messages (e.g., 'train_data', 'tuning_data', or 'data').
@@ -272,7 +293,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             Preprocessed data in TimeSeriesDataFrame format.
         """
         df = self._to_data_frame(data, name=name)
-        df = df.astype({self.target: float})
+        df = df.astype({self.target: "float32"})
         # MultiIndex.is_monotonic_increasing checks if index is sorted by ["item_id", "timestamp"]
         if not df.index.is_monotonic_increasing:
             df = df.sort_index()
@@ -392,8 +413,8 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
     @apply_presets(TIMESERIES_PRESETS_CONFIGS)
     def fit(
         self,
-        train_data: Union[TimeSeriesDataFrame, pd.DataFrame, str],
-        tuning_data: Optional[Union[TimeSeriesDataFrame, pd.DataFrame, str]] = None,
+        train_data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
+        tuning_data: Optional[Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]] = None,
         time_limit: Optional[int] = None,
         presets: Optional[str] = None,
         hyperparameters: Dict[Union[str, Type], Any] = None,
@@ -411,7 +432,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
         Parameters
         ----------
-        train_data : Union[TimeSeriesDataFrame, pd.DataFrame, str]
+        train_data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]
             Training data in the :class:`~autogluon.timeseries.TimeSeriesDataFrame` format.
 
             Time series with length ``<= (num_val_windows + 1) * prediction_length`` will be ignored during training.
@@ -436,7 +457,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             If provided data is an instance of pandas DataFrame, AutoGluon will attempt to automatically convert it
             to a ``TimeSeriesDataFrame``.
 
-        tuning_data : Union[TimeSeriesDataFrame, pd.DataFrame, str], optional
+        tuning_data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str], optional
             Data reserved for model selection and hyperparameter tuning, rather than training individual models. Also
             used to compute the validation scores. Note that only the last ``prediction_length`` time steps of each
             time series are used for computing the validation score.
@@ -621,16 +642,16 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         if self._learner.is_fit:
             raise AssertionError("Predictor is already fit! To fit additional models create a new `Predictor`.")
 
+        if verbosity is None:
+            verbosity = self.verbosity
+        set_logger_verbosity(verbosity, logger=logger)
+
         logger.info("Beginning AutoGluon training..." + (f" Time limit = {time_limit}s" if time_limit else ""))
         logger.info(f"AutoGluon will save models to '{self.path}'")
         logger.info(get_ag_system_info(path=self.path, include_gpu_count=True))
 
         if hyperparameters is None:
             hyperparameters = "default"
-
-        if verbosity is None:
-            verbosity = self.verbosity
-        set_logger_verbosity(verbosity)
 
         fit_args = dict(
             prediction_length=self.prediction_length,
@@ -690,9 +711,6 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             prediction_length=self.prediction_length, num_val_windows=num_val_windows, val_step_size=val_step_size
         )
 
-        if random_seed is not None:
-            seed_everything(random_seed)
-
         time_left = None if time_limit is None else time_limit - (time.time() - time_start)
         self._learner.fit(
             train_data=train_data,
@@ -705,6 +723,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             val_splitter=val_splitter,
             refit_every_n_windows=refit_every_n_windows,
             enable_ensemble=enable_ensemble,
+            random_seed=random_seed,
         )
         if refit_full:
             if tuning_data is None:
@@ -721,8 +740,8 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
     def predict(
         self,
-        data: Union[TimeSeriesDataFrame, pd.DataFrame, str],
-        known_covariates: Optional[Union[TimeSeriesDataFrame, pd.DataFrame, str]] = None,
+        data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
+        known_covariates: Optional[Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]] = None,
         model: Optional[str] = None,
         use_cache: bool = True,
         random_seed: Optional[int] = 123,
@@ -731,7 +750,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
         Parameters
         ----------
-        data : Union[TimeSeriesDataFrame, pd.DataFrame, str]
+        data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]
             Time series data to forecast with.
 
             If ``known_covariates_names`` were specified when creating the predictor, ``data`` must include the columns
@@ -742,7 +761,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
             If provided data is an instance of pandas DataFrame, AutoGluon will attempt to automatically convert it
             to a ``TimeSeriesDataFrame``.
-        known_covariates : Union[TimeSeriesDataFrame, pd.DataFrame, str], optional
+        known_covariates : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str], optional
             If ``known_covariates_names`` were specified when creating the predictor, it is necessary to provide the
             values of the known covariates for each time series during the forecast horizon. That is:
 
@@ -789,19 +808,24 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         B       2020-03-04    17.1
                 2020-03-05     8.3
         """
-        if random_seed is not None:
-            seed_everything(random_seed)
-        # Don't use data.item_ids in case data is not a TimeSeriesDataFrame
-        original_item_id_order = data.reset_index()[ITEMID].unique()
+        # Save original item_id order to return predictions in the same order as input data
+        data = self._to_data_frame(data)
+        original_item_id_order = data.item_ids
         data = self._check_and_prepare_data_frame(data)
         if known_covariates is not None:
             known_covariates = self._to_data_frame(known_covariates)
-        predictions = self._learner.predict(data, known_covariates=known_covariates, model=model, use_cache=use_cache)
+        predictions = self._learner.predict(
+            data,
+            known_covariates=known_covariates,
+            model=model,
+            use_cache=use_cache,
+            random_seed=random_seed,
+        )
         return predictions.reindex(original_item_id_order, level=ITEMID)
 
     def evaluate(
         self,
-        data: Union[TimeSeriesDataFrame, pd.DataFrame, str],
+        data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
         model: Optional[str] = None,
         metrics: Optional[Union[str, TimeSeriesScorer, List[Union[str, TimeSeriesScorer]]]] = None,
         display: bool = False,
@@ -814,7 +838,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
         Parameters
         ----------
-        data : Union[TimeSeriesDataFrame, pd.DataFrame, str]
+        data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]
             The data to evaluate the best model on. The last ``prediction_length`` time steps of the data set, for each
             item, will be held out for prediction and forecast accuracy will be calculated on these time steps.
 
@@ -941,7 +965,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
     def leaderboard(
         self,
-        data: Optional[Union[TimeSeriesDataFrame, pd.DataFrame, str]] = None,
+        data: Optional[Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]] = None,
         display: bool = False,
         use_cache: bool = True,
         **kwargs,
@@ -966,7 +990,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
         Parameters
         ----------
-        data : Union[TimeSeriesDataFrame, pd.DataFrame, str], optional
+        data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str], optional
             dataset used for additional evaluation. If not provided, the validation set used during training will be
             used.
 
@@ -1169,3 +1193,113 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             quantile_levels=self.quantile_levels,
         )
         return simulation_dict
+
+    def plot(
+        self,
+        data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
+        predictions: Optional[TimeSeriesDataFrame] = None,
+        quantile_levels: Optional[List[float]] = None,
+        item_ids: Optional[List[Union[str, int]]] = None,
+        max_num_item_ids: int = 8,
+        max_history_length: Optional[int] = None,
+        point_forecast_column: Optional[str] = None,
+        matplotlib_rc_params: Optional[dict] = None,
+    ):
+        """Plot historic time series values and the forecasts.
+
+        Parameters
+        ----------
+        data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]
+            Observed time series data.
+        predictions : TimeSeriesDataFrame, optional
+            Predictions generated by calling :meth:`~autogluon.timeseries.TimeSeriesPredictor.predict`.
+        quantile_levels : List[float], optional
+            Quantile levels for which to plot the prediction intervals. Defaults to lowest & highest quantile levels
+            available in ``predictions``.
+        item_ids : List[Union[str, int]], optional
+            If provided, plots will only be generated for time series with these item IDs. By default (if set to
+            ``None``), item IDs are selected randomly. In either case, plots are generated for at most
+            ``max_num_item_ids`` time series.
+        max_num_item_ids : int, default = 8
+            At most this many time series will be plotted by the method.
+        max_history_length : int, optional
+            If provided, at most this many time steps will be shown for each time series in ``data``.
+        point_forecast_column : str, optional
+            Name of the column in ``predictions`` that will be plotted as the point forecast. Defaults to ``"0.5"``,
+            if this column is present in ``predictions``, otherwise ``"mean"``.
+        matplotlib_rc_params : dict, optional
+            Dictionary describing the plot style that will be passed to [`matplotlib.pyplot.rc_context`](https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.rc_context.html).
+            See [matplotlib documentation](https://matplotlib.org/stable/users/explain/customizing.html#the-default-matplotlibrc-file) for the list of available options.
+        """
+        import matplotlib.pyplot as plt
+
+        data = self._check_and_prepare_data_frame(data)
+        if item_ids is None:
+            item_ids = list(np.random.choice(data.item_ids, size=min(max_num_item_ids, data.num_items), replace=False))
+        else:
+            item_ids = list(item_ids)[:max_num_item_ids]
+
+        if predictions is not None:
+            if (
+                not isinstance(predictions, TimeSeriesDataFrame)
+                or "mean" not in predictions.columns
+                or predictions.index.nlevels != 2
+            ):
+                raise ValueError("predictions must be a TimeSeriesDataFrame produced by predictor.predict()")
+            if point_forecast_column is None:
+                point_forecast_column = "0.5" if "0.5" in predictions.columns else "mean"
+            if quantile_levels is None:
+                available_quantile_levels = [float(q) for q in predictions.columns if q != "mean"]
+                if len(available_quantile_levels) >= 2:
+                    quantile_levels = [min(available_quantile_levels), max(available_quantile_levels)]
+                else:
+                    quantile_levels = []
+
+        if len(item_ids) == 1:
+            ncols = 1
+            nrows = 1
+        else:
+            ncols = 2
+            nrows = math.ceil(len(item_ids) / ncols)
+
+        rc_params = {
+            "font.size": 10,
+            "figure.figsize": [20, 3.5 * nrows],
+            "figure.dpi": 100,
+            "legend.loc": "upper center",
+        }
+        if matplotlib_rc_params is not None:
+            rc_params.update(matplotlib_rc_params)
+
+        with plt.rc_context(rc_params):
+            fig, axes = plt.subplots(ncols=ncols, nrows=nrows, squeeze=False)
+            fig.tight_layout(h_pad=2.5, w_pad=0.5)
+            axes = axes.ravel()
+
+            for i, (item_id, ax) in enumerate(zip(item_ids, axes)):
+                ax.set_title(item_id)
+                ax.grid()
+                # Label the x axis for subplots in the lowest row
+                if i // nrows == 1:
+                    ax.set_xlabel("Time")
+                # Label the y axis for subplots in the leftmost column
+                if i % ncols == 0:
+                    ax.set_ylabel(self.target)
+
+                ts = data.loc[item_id][self.target]
+                if max_history_length is not None:
+                    ts = ts.iloc[-max_history_length:]
+                ax.plot(ts, label="Observed", color="C0")
+
+                if predictions is not None:
+                    forecast = predictions.loc[item_id]
+                    point_forecast = forecast[point_forecast_column]
+                    ax.plot(point_forecast, color="C1", label="Forecast")
+                    if quantile_levels is not None:
+                        for q in quantile_levels:
+                            ax.fill_between(forecast.index, point_forecast, forecast[str(q)], color="C1", alpha=0.2)
+            if len(axes) > len(item_ids):
+                axes[len(item_ids)].set_axis_off()
+            handles, labels = axes[0].get_legend_handles_labels()
+            fig.legend(handles, labels, bbox_to_anchor=(0.5, 0.0), ncols=len(handles))
+        return fig

@@ -12,8 +12,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from autogluon.common.utils.log_utils import set_logger_verbosity
-from autogluon.common.utils.utils import hash_pandas_df
+from autogluon.common.utils.utils import hash_pandas_df, seed_everything
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.loaders import load_pkl
@@ -275,7 +274,6 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         self.ensemble_model_type = TimeSeriesGreedyEnsemble
 
         self.verbosity = verbosity
-        set_logger_verbosity(self.verbosity, logger=logger)
 
         # Dict of normal model -> FULL model. FULL models are produced by
         # self.refit_single_full() and self.refit_full().
@@ -531,6 +529,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         hyperparameter_tune_kwargs: Optional[Union[str, dict]] = None,
         excluded_model_types: Optional[List[str]] = None,
         time_limit: Optional[float] = None,
+        random_seed: Optional[int] = None,
     ) -> List[str]:
         logger.info(f"\nStarting training. Start time is {time.strftime('%Y-%m-%d %H:%M:%S')}")
 
@@ -575,6 +574,9 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 if time_left <= 0:
                     logger.info(f"Stopping training due to lack of time remaining. Time left: {time_left:.1f} seconds")
                     break
+
+            if random_seed is not None:
+                seed_everything(random_seed)
 
             if contains_searchspace(model.get_user_params()):
                 fit_log_message = f"Hyperparameter tuning model {model.name}. "
@@ -688,9 +690,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             quantile_levels=self.quantile_levels,
             metadata=self.metadata,
         )
-        ensemble.fit_ensemble(
-            model_preds, data_per_window=data_per_window, time_limit=time_limit, verbosity=self.verbosity
-        )
+        ensemble.fit_ensemble(model_preds, data_per_window=data_per_window, time_limit=time_limit)
         ensemble.fit_time = time.time() - time_start
 
         predict_time = 0
@@ -717,6 +717,9 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         logger.debug("Generating leaderboard for all models trained")
 
         model_names = self.get_model_names()
+        if len(model_names) == 0:
+            logger.warning("Warning: No models were trained during fit. Resulting leaderboard will be empty.")
+
         model_info = {}
         for ix, model_name in enumerate(model_names):
             model_info[model_name] = {
@@ -754,12 +757,6 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                     model_info[model_name]["score_test"] = self._score_with_predictions(data, model_preds)
                     model_info[model_name]["pred_time_test"] = pred_time_dict[model_name]
 
-        df = pd.DataFrame(model_info.values())
-
-        sort_column = "score_test" if "score_test" in df.columns else "score_val"
-        df.sort_values(by=[sort_column, "model"], ascending=[False, False], inplace=True)
-        df.reset_index(drop=True, inplace=True)
-
         explicit_column_order = [
             "model",
             "score_test",
@@ -769,9 +766,17 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             "fit_time_marginal",
             "fit_order",
         ]
-        explicit_column_order = [c for c in explicit_column_order if c in df.columns] + [
-            c for c in df.columns if c not in explicit_column_order
-        ]
+
+        df = pd.DataFrame(model_info.values(), columns=explicit_column_order)
+        if data is None:
+            explicit_column_order.remove("score_test")
+            explicit_column_order.remove("pred_time_test")
+            sort_column = "score_val"
+        else:
+            sort_column = "score_test"
+
+        df.sort_values(by=[sort_column, "model"], ascending=[False, False], inplace=True)
+        df.reset_index(drop=True, inplace=True)
 
         return df[explicit_column_order]
 
@@ -801,11 +806,16 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
         use_cache: bool = True,
+        random_seed: Optional[int] = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
         model_name = self._get_model_for_prediction(model)
         model_pred_dict = self.get_model_pred_dict(
-            model_names=[model_name], data=data, known_covariates=known_covariates, use_cache=use_cache
+            model_names=[model_name],
+            data=data,
+            known_covariates=known_covariates,
+            use_cache=use_cache,
+            random_seed=random_seed,
         )
         return model_pred_dict[model_name]
 
@@ -900,6 +910,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         record_pred_time: bool = False,
         raise_exception_if_failed: bool = True,
         use_cache: bool = True,
+        random_seed: Optional[int] = None,
     ) -> Union[Dict[str, TimeSeriesDataFrame], Tuple[Dict[str, TimeSeriesDataFrame], Dict[str, float]]]:
         """Return a dictionary with predictions of all models for the given dataset.
 
@@ -939,6 +950,8 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         failed_models = []
         for model_name in model_set:
             if model_name not in model_pred_dict:
+                if random_seed is not None:
+                    seed_everything(random_seed)
                 try:
                     predict_start_time = time.time()
                     model_pred_dict[model_name] = self._predict_model(
