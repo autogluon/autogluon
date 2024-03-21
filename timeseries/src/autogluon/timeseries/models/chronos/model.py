@@ -1,6 +1,5 @@
 import logging
 import os
-from contextlib import nullcontext
 from itertools import chain
 from typing import Any, Dict, Literal, Optional, Union
 
@@ -11,7 +10,7 @@ from autogluon.common.loaders import load_pkl
 from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
-from autogluon.timeseries.utils.warning_filters import disable_root_logger, set_loggers_level, warning_filter
+from autogluon.timeseries.utils.warning_filters import warning_filter
 
 logger = logging.getLogger(__name__)
 
@@ -275,7 +274,7 @@ class ChronosModel(AbstractTimeSeriesModel):
 
         with warning_filter(all_warnings=True):
             import torch
-            
+
             # load model pipeline to device memory
             self.load_model_pipeline(context_length=context_length)
 

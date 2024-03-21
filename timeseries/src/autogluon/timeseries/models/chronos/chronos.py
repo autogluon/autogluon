@@ -439,7 +439,9 @@ class OptimizedChronosPipeline(ChronosPipeline):
                 ], "optimization_strategy not recognized. Please provide one of `onnx` or `openvino`"
                 torch_dtype = kwargs.pop("torch_dtype", "auto")
                 if torch_dtype != "auto":
-                    logger.warning(f"\t`torch_dtype` will be ignored for optimization_strategy {optimization_strategy}")
+                    logger.warning(
+                        f"\t`torch_dtype` will be ignored for optimization_strategy {optimization_strategy}"
+                    )
 
                 if optimization_strategy == "onnx":
                     try:
@@ -450,7 +452,7 @@ class OptimizedChronosPipeline(ChronosPipeline):
                         )
 
                     assert kwargs.pop("device_map", "cpu") in ["cpu", "auto"], "ONNX mode only available on the CPU"
-                    with set_loggers_level(regex="^optimum.*", level=logging.ERROR): 
+                    with set_loggers_level(regex=r"^optimum.*", level=logging.ERROR):
                         inner_model = ORTModelForSeq2SeqLM.from_pretrained(*args, **{**kwargs, "export": True})
                 elif optimization_strategy == "openvino":
                     try:
@@ -459,7 +461,7 @@ class OptimizedChronosPipeline(ChronosPipeline):
                         raise ImportError(
                             "Huggingface Optimum library must be installed with OpenVINO for using the `openvino` strategy"
                         )
-                    with set_loggers_level(regex="^optimum.*", level=logging.ERROR): 
+                    with set_loggers_level(regex=r"^optimum.*", level=logging.ERROR):
                         inner_model = OVModelForSeq2SeqLM.from_pretrained(
                             *args, **{**kwargs, "device_map": "cpu", "export": True}
                         )

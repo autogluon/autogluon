@@ -1,8 +1,10 @@
 import contextlib
 import functools
+import io
 import logging
 import os
 import re
+import sys
 import warnings
 
 from statsmodels.tools.sm_exceptions import ConvergenceWarning, ValueWarning
@@ -12,12 +14,10 @@ __all__ = ["warning_filter", "disable_root_logger", "disable_tqdm"]
 
 @contextlib.contextmanager
 def warning_filter(all_warnings: bool = False):
+    categories = [RuntimeWarning, UserWarning, ConvergenceWarning, ValueWarning, FutureWarning]
+    if all_warnings:
+        categories.append(Warning)
     with warnings.catch_warnings():
-        
-        categories = [RuntimeWarning, UserWarning, ConvergenceWarning, ValueWarning, FutureWarning]
-        if all_warnings:
-            categories.append(Warning)
-        
         env_py_warnings = os.environ.get("PYTHONWARNINGS", "")
         for warning_category in categories:
             warnings.simplefilter("ignore", category=warning_category)
@@ -68,20 +68,7 @@ def disable_tqdm():
 
 @contextlib.contextmanager
 def disable_stdout():
-    with open(os.devnull, "w") as fp:
-        with contextlib.redirect_stdout(fp) as out:
-            yield out
-
-
-@contextlib.contextmanager
-def disable_stderr():
-    with open(os.devnull, "w") as fp:
-        with contextlib.redirect_stderr(fp) as err:
-            yield err
-
-
-@contextlib.contextmanager
-def disable_stdout_stderr():
-    with open(os.devnull, "w") as fp:
-        with contextlib.redirect_stderr(fp) as err, contextlib.redirect_stdout(fp) as out:
-            yield err, out
+    save_stdout = sys.stdout
+    sys.stdout = io.StringIO()
+    yield
+    sys.stdout = save_stdout
