@@ -88,7 +88,7 @@ if __name__ == "__main__":
 
     else:
         # Training
-        predictor.fit(train_data=train_df, tuning_data=val_df, seed=args.seed, time_limit=30)
+        predictor.fit(train_data=train_df, tuning_data=val_df, seed=args.seed)
 
     # Evaluation
     metric_file = os.path.join(args.output_dir, "metrics.txt")
