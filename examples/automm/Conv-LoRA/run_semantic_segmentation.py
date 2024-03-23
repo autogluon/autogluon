@@ -6,25 +6,34 @@ import pandas as pd
 from autogluon.multimodal import MultiModalPredictor
 
 
-def get_validation_metric(dataset_name):
-    if dataset_name == "isic2017":
-        validation_metric = "iou"
+def get_default_training_setting(dataset_name):
+    validation_metric = "iou"
+    loss = "structure_loss"
+    max_epoch = 30
+    lr = 1e-4
 
-    elif dataset_name == "SBU-shadow":
+    if dataset_name == "SBU-shadow":
         validation_metric = "ber"
+        loss = "balanced_bce"
+        max_epoch = 10
 
     elif dataset_name == "polyp":
         validation_metric = "sm"
 
     elif dataset_name == "camo_sem_seg":
         validation_metric = "sm"
+        max_epoch = 20
 
     elif dataset_name == "road_segmentation":
         validation_metric = "iou"
+        max_epoch = 20
+        lr = 3e-4
 
     elif dataset_name == "leaf_disease_segmentation":
         validation_metric = "iou"
-    return validation_metric
+        lr = 3e-4
+
+    return validation_metric, loss, max_epoch, lr
 
 
 def expand_path(df, dataset_dir):
@@ -59,7 +68,7 @@ if __name__ == "__main__":
     val_df = expand_path(pd.read_csv(os.path.join(dataset_dir, f"val.csv")), dataset_dir)
 
     # get the validation metric
-    validation_metric = get_validation_metric(dataset_name)
+    validation_metric, loss, max_epoch, lr = get_default_training_setting(dataset_name)
 
     hyperparameters = {}
     hyperparameters.update(
@@ -68,6 +77,9 @@ if __name__ == "__main__":
             "optimization.efficient_finetune": "conv_lora",
             "optimization.lora.conv_lora_expert_num": args.expert_num,
             "env.num_gpus": args.num_gpus,
+            "optimization.loss_function": loss,
+            "optimization.max_epochs": max_epoch,
+            "optimization.learning_rate": lr,
         }
     )
 
