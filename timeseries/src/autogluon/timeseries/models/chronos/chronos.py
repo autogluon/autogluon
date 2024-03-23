@@ -412,6 +412,12 @@ class OptimizedChronosPipeline(ChronosPipeline):
     HuggingFace optimum.
     """
 
+    dtypes = {
+        "bfloat16": torch.bfloat16,
+        "float32": torch.float32,
+        "float64": torch.float64,
+    }
+
     @classmethod
     def from_pretrained(cls, *args, **kwargs):
         """
@@ -419,6 +425,8 @@ class OptimizedChronosPipeline(ChronosPipeline):
         Supports the same arguments as ``AutoConfig`` and ``AutoModel``
         from ``transformers``.
         """
+        kwargs = kwargs.copy()
+
         optimization_strategy = kwargs.pop("optimization_strategy", None)
         context_length = kwargs.pop("context_length", None)
 
@@ -428,6 +436,10 @@ class OptimizedChronosPipeline(ChronosPipeline):
         if context_length is not None:
             config.chronos_config["context_length"] = context_length
         chronos_config = ChronosConfig(**config.chronos_config)
+
+        torch_dtype = kwargs.get("torch_dtype", "auto")
+        if torch_dtype != "auto" and isinstance(torch_dtype, str):
+            kwargs["torch_dtype"] = cls.dtypes[torch_dtype]
 
         if chronos_config.model_type == "seq2seq":
             if optimization_strategy is None:

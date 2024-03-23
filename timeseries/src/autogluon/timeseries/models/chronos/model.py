@@ -1,6 +1,5 @@
 import logging
 import os
-from itertools import chain
 from typing import Any, Dict, Literal, Optional, Union
 
 import numpy as np
@@ -114,9 +113,9 @@ class ChronosModel(AbstractTimeSeriesModel):
         Optimization strategy to use for inference on CPUs. If None, the model will use the default implementation.
         If `onnx`, the model will be converted to ONNX and the inference will be performed using ONNX. If ``openvino``,
         inference will be performed with the model compiled to OpenVINO.
-    torch_dtype : torch.dtype or str, default = "auto"
+    torch_dtype : torch.dtype or {"auto", "bfloat16", "float32", "float64"}, default = "auto"
         Torch data type for model weights, provided to ``from_pretrained`` method of Hugging Face AutoModels.
-    data_loader_num_workers : int, default = 1
+    data_loader_num_workers : int, default = 0
         Number of worker processes to be used in the data loader. See documentation on ``torch.utils.data.DataLoader``
         for more information.
     """
@@ -147,7 +146,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         self.num_samples = hyperparameters.get("num_samples", self.default_num_samples)
         self.device = hyperparameters.get("device")
         self.torch_dtype = hyperparameters.get("torch_dtype", "auto")
-        self.data_loader_num_workers = hyperparameters.get("data_loader_num_workers", 1)
+        self.data_loader_num_workers = hyperparameters.get("data_loader_num_workers", 0)
         self.optimization_strategy: Optional[Literal["onnx", "openvino"]] = hyperparameters.get(
             "optimization_strategy", None
         )
@@ -239,7 +238,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         self,
         data: TimeSeriesDataFrame,
         context_length: int,
-        num_workers: int = 1,
+        num_workers: int = 0,
     ):
         import torch
 
@@ -280,7 +279,7 @@ class ChronosModel(AbstractTimeSeriesModel):
 
             self.model_pipeline.model.eval()
             with torch.inference_mode():
-                prediction_samples = (
+                prediction_samples = [
                     self.model_pipeline.predict(
                         batch,
                         prediction_length=self.prediction_length,
@@ -295,9 +294,9 @@ class ChronosModel(AbstractTimeSeriesModel):
                         num_workers=self.data_loader_num_workers,
                         context_length=context_length,
                     )
-                )
+                ]
 
-        samples = np.concatenate([c.T for c in chain.from_iterable(prediction_samples)], axis=0)
+        samples = np.concatenate(prediction_samples, axis=0).swapaxes(1, 2).reshape(-1, self.num_samples)
 
         mean = samples.mean(axis=-1, keepdims=True)
         quantiles = np.quantile(samples, self.quantile_levels, axis=-1).T

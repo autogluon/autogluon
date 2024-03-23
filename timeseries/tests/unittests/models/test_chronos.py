@@ -252,24 +252,27 @@ def test_given_variable_length_data_when_context_length_not_provided_then_contex
 
 
 @pytest.mark.parametrize(
-    "dtype",
+    "dtype_arg, expected_dtype",
     [
-        torch.float16,
-        torch.bfloat16,
-        torch.float32,
-        torch.float64,
+        (torch.float16, torch.float16),
+        (torch.bfloat16, torch.bfloat16),
+        (torch.float32, torch.float32),
+        (torch.float64, torch.float64),
+        ("bfloat16", torch.bfloat16),
+        ("float32", torch.float32),
+        ("float64", torch.float64),
     ],
 )
-def test_when_torch_dtype_provided_then_parameters_loaded_in_torch_dtype(dtype):
+def test_when_torch_dtype_provided_then_parameters_loaded_in_torch_dtype(dtype_arg, expected_dtype):
     model = ChronosModel(
         hyperparameters={
             "model_path": "amazon/chronos-t5-tiny",
             "device": "cpu",
-            "torch_dtype": dtype,
+            "torch_dtype": dtype_arg,
         },
     )
     model.fit(train_data=None)
     model.load_model_pipeline()
 
     embedding_matrix = next(iter(model.model_pipeline.model.model.shared.parameters()))
-    assert embedding_matrix.dtype is dtype
+    assert embedding_matrix.dtype is expected_dtype
