@@ -91,9 +91,9 @@ if __name__ == "__main__":
     if dataset_name in ["isic2017", "SBU-shadow", "road_segmentation", "leaf_disease_segmentation"]:
         test_df = expand_path(pd.read_csv(os.path.join(dataset_dir, f"test.csv")), dataset_dir)
         if dataset_name == "SBU-shadow":
-            eval_metrics = metrics = ["ber"]
+            eval_metrics = ["ber"]
         else:
-            eval_metrics = metrics = ["iou"]
+            eval_metrics = ["iou"]
 
         res = predictor.evaluate(test_df, metrics=eval_metrics)
         print(f"Evaluation results for test dataset {dataset_name}: ", res)
