@@ -114,7 +114,9 @@ class ChronosModel(AbstractTimeSeriesModel):
         If `onnx`, the model will be converted to ONNX and the inference will be performed using ONNX. If ``openvino``,
         inference will be performed with the model compiled to OpenVINO.
     torch_dtype : torch.dtype or {"auto", "bfloat16", "float32", "float64"}, default = "auto"
-        Torch data type for model weights, provided to ``from_pretrained`` method of Hugging Face AutoModels.
+        Torch data type for model weights, provided to ``from_pretrained`` method of Hugging Face AutoModels. If
+        original Chronos models are specified and the model size is ``small``, ``base``, or ``large``, the
+        ``torch_dtype`` will be set to ``bfloat16`` to enable inference on GPUs.
     data_loader_num_workers : int, default = 0
         Number of worker processes to be used in the data loader. See documentation on ``torch.utils.data.DataLoader``
         for more information.
@@ -145,7 +147,10 @@ class ChronosModel(AbstractTimeSeriesModel):
         self.batch_size = hyperparameters.get("batch_size", self.default_batch_size)
         self.num_samples = hyperparameters.get("num_samples", self.default_num_samples)
         self.device = hyperparameters.get("device")
-        self.torch_dtype = hyperparameters.get("torch_dtype", "auto")
+
+        # if the model requires a GPU, set the torch dtype to bfloat16
+        self.torch_dtype = hyperparameters.get("torch_dtype", "auto" if self.min_num_gpus == 0 else "bfloat16")
+
         self.data_loader_num_workers = hyperparameters.get("data_loader_num_workers", 0)
         self.optimization_strategy: Optional[Literal["onnx", "openvino"]] = hyperparameters.get(
             "optimization_strategy", None
@@ -194,11 +199,15 @@ class ChronosModel(AbstractTimeSeriesModel):
 
         return torch.cuda.is_available()
 
+    @property
+    def min_num_gpus(self):
+        return MODEL_CONFIGS.get(self.model_path, {}).get("num_gpus", 0)
+
     def get_minimum_resources(self, is_gpu_available: bool = False) -> Dict[str, Union[int, float]]:
         minimum_resources = {"num_cpus": 1}
         # if GPU is available, we train with 1 GPU per trial
         if is_gpu_available:
-            minimum_resources["num_gpus"] = MODEL_CONFIGS.get(self.model_path, {}).get("num_gpus", 0)
+            minimum_resources["num_gpus"] = self.min_num_gpus
         return minimum_resources
 
     def load_model_pipeline(self, context_length: Optional[int] = None):
@@ -206,7 +215,7 @@ class ChronosModel(AbstractTimeSeriesModel):
 
         gpu_available = self._is_gpu_available()
 
-        if not gpu_available and MODEL_CONFIGS.get(self.model_path, {}).get("num_gpus", 0) > 0:
+        if not gpu_available and self.min_num_gpus > 0:
             raise RuntimeError(
                 f"{self.name} requires a GPU to run, but no GPU was detected. "
                 "Please make sure that you are using a computer with a CUDA-compatible GPU and "
