@@ -68,6 +68,7 @@ if __name__ == "__main__":
     hyperparameters.update(
         {
             "optimization.lora.r": args.rank,
+            "optimization.efficient_finetune": "conv_lora",
             "optimization.lora.conv_lora_expert_num": args.expert_num,
             "env.num_gpus": args.num_gpus,
         }
