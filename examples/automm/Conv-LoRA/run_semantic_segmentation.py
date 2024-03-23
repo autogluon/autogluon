@@ -58,10 +58,7 @@ if __name__ == "__main__":
     train_df = expand_path(pd.read_csv(os.path.join(dataset_dir, f"train.csv")), dataset_dir)
     val_df = expand_path(pd.read_csv(os.path.join(dataset_dir, f"val.csv")), dataset_dir)
 
-    if dataset_name not in ["polyp", "camo_sem_seg"]:  # have multiple test sets.
-        test_df = expand_path(pd.read_csv(os.path.join(dataset_dir, f"test.csv")), dataset_dir)
-
-    # validation metric for each dataset.
+    # get the validation metric
     validation_metric = get_validation_metric(dataset_name)
 
     hyperparameters = {}
@@ -74,7 +71,7 @@ if __name__ == "__main__":
         }
     )
 
-    # create predictor
+    # initialize a predictor
     predictor = MultiModalPredictor(
         problem_type="semantic_segmentation",
         validation_metric=validation_metric,
@@ -84,47 +81,37 @@ if __name__ == "__main__":
         label="label",
     )
 
-    if args.eval:
+    if args.eval:  # evaluation only
         predictor = predictor.load(args.ckpt_path)
-
-    else:
-        # Training
+    else:  # training
         predictor.fit(train_data=train_df, tuning_data=val_df, seed=args.seed)
 
-    # Evaluation
+    # evaluation
     metric_file = os.path.join(args.output_dir, "metrics.txt")
     f = open(metric_file, "a")
-    if dataset_name == "isic2017":
-        res = predictor.evaluate(
-            test_df,
-            metrics=[
-                "iou",
-            ],
-        )
-    elif dataset_name == "SBU-shadow":
-        res = predictor.evaluate(
-            test_df,
-            metrics=[
-                "ber",
-            ],
-        )
-    elif dataset_name == "polyp":
-        for test_dataset in ["CVC-ClinicDB", "Kvasir"]:
-            test_df = expand_path(pd.read_csv(os.path.join(dataset_dir, f"test_{test_dataset}.csv")), dataset_dir)
-            res = predictor.evaluate(test_df, metrics=["sm", "fm", "em", "mae"])
-            print(f"Evaluation results for test dataset {test_dataset}: ", res)
-            f.write(f"Evaluation results for test dataset {test_dataset}: {res} \n")
-    elif dataset_name == "camo_sem_seg":
-        for test_dataset in ["CAMO"]:
-            test_df = expand_path(pd.read_csv(os.path.join(dataset_dir, f"test_{test_dataset}.csv")), dataset_dir)
-            res = predictor.evaluate(test_df, metrics=["sm", "fm", "em", "mae"])
-            print(f"Evaluation results for test dataset {test_dataset}: ", res)
-            f.write(f"Evaluation results for test dataset {test_dataset}: {res} \n")
-    elif dataset_name == "road_segmentation":
-        res = predictor.evaluate(test_df, metrics=["iou"])
-    elif dataset_name == "leaf_disease_segmentation":
-        res = predictor.evaluate(test_df, metrics=["iou"])
-    if dataset_name not in ["polyp", "camo_sem_seg"]:
+    if dataset_name in ["isic2017", "SBU-shadow", "road_segmentation", "leaf_disease_segmentation"]:
+        test_df = expand_path(pd.read_csv(os.path.join(dataset_dir, f"test.csv")), dataset_dir)
+        if dataset_name == "SBU-shadow":
+            eval_metrics = ["ber"]
+        else:
+            eval_metrics = ["iou"]
+
+        res = predictor.evaluate(test_df, metrics=eval_metrics)
         print(f"Evaluation results for test dataset {dataset_name}: ", res)
         f.write(f"Evaluation results for test dataset {dataset_name}: {res} \n")
+    elif dataset_name in ["polyp", "camo_sem_seg"]:
+        if dataset_name == "polyp":
+            test_datasets = ["CVC-ClinicDB", "Kvasir"]
+        elif dataset_name == "camo_sem_seg":
+            test_datasets = ["CAMO"]
+        else:
+            raise ValueError(f"Unknown dataset name: {dataset_name}.")
+        for per_dataset in test_datasets:
+            test_df = expand_path(pd.read_csv(os.path.join(dataset_dir, f"test_{per_dataset}.csv")), dataset_dir)
+            res = predictor.evaluate(test_df, metrics=["sm", "fm", "em", "mae"])
+            print(f"Evaluation results for test dataset {per_dataset}: ", res)
+            f.write(f"Evaluation results for test dataset {per_dataset}: {res} \n")
+    else:
+        raise ValueError(f"Unknown dataset name: {dataset_name}.")
+
     f.close()
