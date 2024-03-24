@@ -83,19 +83,17 @@ if __name__ == "__main__":
         }
     )
 
-    # initialize a predictor
-    predictor = MultiModalPredictor(
-        problem_type="semantic_segmentation",
-        validation_metric=validation_metric,
-        eval_metric=validation_metric,
-        path=os.path.join(args.output_dir, "models"),
-        hyperparameters=hyperparameters,
-        label="label",
-    )
-
-    if args.eval:  # evaluation only
-        predictor = predictor.load(args.ckpt_path)
+    if args.eval:  # load a checkpoint for evaluation
+        predictor = MultiModalPredictor.load(args.ckpt_path)
     else:  # training
+        predictor = MultiModalPredictor(
+            problem_type="semantic_segmentation",
+            validation_metric=validation_metric,
+            eval_metric=validation_metric,
+            path=os.path.join(args.output_dir, "models"),
+            hyperparameters=hyperparameters,
+            label="label",
+        )
         predictor.fit(train_data=train_df, tuning_data=val_df, seed=args.seed)
 
     # evaluation
