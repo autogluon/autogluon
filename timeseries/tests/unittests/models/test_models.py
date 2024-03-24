@@ -20,7 +20,13 @@ from autogluon.timeseries.models import DeepARModel, ETSModel
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
 
-from ..common import DUMMY_TS_DATAFRAME, CustomMetric, dict_equal_primitive, get_data_frame_with_item_index
+from ..common import (
+    DUMMY_TS_DATAFRAME,
+    CustomMetric,
+    dict_equal_primitive,
+    get_data_frame_with_item_index,
+    DUMMY_TS_DATAFRAME_WITH_MISSING,
+)
 from .test_chronos import TESTABLE_MODELS as CHRONOS_TESTABLE_MODELS
 from .test_gluonts import TESTABLE_MODELS as GLUONTS_TESTABLE_MODELS
 from .test_local import TESTABLE_MODELS as LOCAL_TESTABLE_MODELS
@@ -475,3 +481,44 @@ def test_given_searcher_when_ray_backend_used_in_hpo_then_correct_searcher_used(
             "bayes": "HyperOpt",
             "random": "BasicVariant",
         }.get(searcher) in ray_searcher_class_name
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS[-3:-1])
+def test_when_data_contains_missing_values_then_model_can_fit_and_predict(temp_model_path, model_class):
+    data = DUMMY_TS_DATAFRAME_WITH_MISSING
+    prediction_length = 5
+    model = model_class(
+        freq=data.freq,
+        path=temp_model_path,
+        prediction_length=prediction_length,
+        hyperparameters=DUMMY_HYPERPARAMETERS,
+    )
+    model.fit(
+        train_data=data,
+        val_data=None if isinstance(model, MultiWindowBacktestingModel) else data,
+    )
+    predictions = model.predict(data)
+    assert not predictions.isna().any(axis=None)
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+def test_given_model_doesnt_support_nan_when_model_fits_then_nans_are_filled(temp_model_path, model_class):
+    data = DUMMY_TS_DATAFRAME_WITH_MISSING
+    prediction_length = 5
+    model = model_class(
+        freq=data.freq,
+        path=temp_model_path,
+        prediction_length=prediction_length,
+        hyperparameters=DUMMY_HYPERPARAMETERS,
+    )
+
+    with mock.patch.object(model, "_fit") as mock_fit:
+        model.fit(
+            train_data=data,
+            val_data=None if isinstance(model, MultiWindowBacktestingModel) else data,
+        )
+        fit_kwargs = mock_fit.call_args[1]
+
+    model_allows_nan = model._get_tags()["allow_nan"]
+    input_contains_nan = fit_kwargs["train_data"].isna().any(axis=None)
+    assert model_allows_nan == input_contains_nan
