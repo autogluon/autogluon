@@ -214,6 +214,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
 
         df = self._mask_df(df)
 
+        # We remove originally missing values filled via imputation from the training set
         if len(missing_entries):
             df = df.set_index(["unique_id", "ds"]).drop(missing_entries, errors="ignore").reset_index()
 
