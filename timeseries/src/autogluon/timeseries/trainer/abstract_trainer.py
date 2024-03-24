@@ -76,6 +76,8 @@ class SimpleAbstractTrainer:
         models = self.get_model_names()
         if not models:
             raise ValueError("Trainer has no fit models that can predict.")
+        if len(models) == 1:
+            return models[0]
         model_performances = self.get_models_attribute_dict(attribute="val_score")
         performances_list = [(m, model_performances[m]) for m in models if model_performances[m] is not None]
 
@@ -256,6 +258,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         eval_metric: Union[str, TimeSeriesScorer, None] = None,
         eval_metric_seasonal_period: Optional[int] = None,
         save_data: bool = True,
+        skip_model_selection: bool = False,
         enable_ensemble: bool = True,
         verbosity: int = 2,
         val_splitter: Optional[AbstractWindowSplitter] = None,
@@ -270,7 +273,9 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         self.target = kwargs.get("target", "target")
         self.metadata = kwargs.get("metadata", CovariateMetadata())
         self.is_data_saved = False
-        self.enable_ensemble = enable_ensemble
+        self.skip_model_selection = skip_model_selection
+        # Ensemble cannot be fit if val_scores are not computed
+        self.enable_ensemble = enable_ensemble and not skip_model_selection
         self.ensemble_model_type = TimeSeriesGreedyEnsemble
 
         self.verbosity = verbosity
@@ -487,7 +492,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             fit_end_time = time.time()
             model.fit_time = model.fit_time or (fit_end_time - fit_start_time)
 
-            if val_data is not None:
+            if val_data is not None and not self.skip_model_selection:
                 model.score_and_cache_oof(val_data, store_val_score=True, store_predict_time=True)
 
             self._log_scores_and_times(model.val_score, model.fit_time, model.predict_time)
@@ -556,6 +561,17 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             )
 
         logger.info(f"Models that will be trained: {list(m.name for m in models)}")
+
+        if self.skip_model_selection:
+            if len(models) > 1:
+                raise ValueError(
+                    "When `skip_model_selection=True`, only a single model must be provided via `hyperparameters` "
+                    f"but {len(models)} models were given"
+                )
+            if contains_searchspace(models[0].get_user_params()):
+                raise ValueError(
+                    "When `skip_model_selection=True`, model configuration should contain no search spaces."
+                )
 
         num_base_models = len(models)
         model_names_trained = []
@@ -646,7 +662,8 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         try:
             best_model = self.get_model_best()
             logger.info(f"Best model: {best_model}")
-            logger.info(f"Best model score: {self.get_model_attribute(best_model, 'val_score'):.4f}")
+            if not self.skip_model_selection:
+                logger.info(f"Best model score: {self.get_model_attribute(best_model, 'val_score'):.4f}")
         except ValueError as e:
             logger.error(str(e))
 

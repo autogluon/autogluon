@@ -1,4 +1,5 @@
 """Preset configurations for autogluon.timeseries Predictors"""
+
 from autogluon.timeseries.models.presets import get_default_hps
 
 # TODO: change default HPO settings when other HPO strategies (e.g., Ray tune) are available
@@ -11,18 +12,23 @@ TIMESERIES_PRESETS_CONFIGS = dict(
     fast_training={"hyperparameters": "very_light"},
     chronos_tiny={
         "hyperparameters": {"Chronos": {"model_path": "tiny"}},
+        "skip_model_selection": True,
     },
     chronos_mini={
         "hyperparameters": {"Chronos": {"model_path": "mini"}},
+        "skip_model_selection": True,
     },
     chronos_small={
         "hyperparameters": {"Chronos": {"model_path": "small"}},
+        "skip_model_selection": True,
     },
     chronos_base={
         "hyperparameters": {"Chronos": {"model_path": "base"}},
+        "skip_model_selection": True,
     },
     chronos_large={
         "hyperparameters": {"Chronos": {"model_path": "large", "batch_size": 8}},
+        "skip_model_selection": True,
     },
     chronos_ensemble={
         "hyperparameters": {

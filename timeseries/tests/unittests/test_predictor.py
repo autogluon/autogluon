@@ -397,6 +397,17 @@ def test_when_target_included_in_known_covariates_then_exception_is_raised(temp_
         )
 
 
+EXPECTED_FIT_SUMMARY_KEYS = [
+    "model_types",
+    "model_performance",
+    "model_best",
+    "model_paths",
+    "model_fit_times",
+    "model_pred_times",
+    "model_hyperparams",
+    "leaderboard",
+]
+
 @pytest.mark.parametrize(
     "hyperparameters, num_models",
     [
@@ -409,18 +420,8 @@ def test_when_fit_summary_is_called_then_all_keys_and_models_are_included(
 ):
     predictor = TimeSeriesPredictor(path=temp_model_path)
     predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters=hyperparameters)
-    expected_keys = [
-        "model_types",
-        "model_performance",
-        "model_best",
-        "model_paths",
-        "model_fit_times",
-        "model_pred_times",
-        "model_hyperparams",
-        "leaderboard",
-    ]
     fit_summary = predictor.fit_summary()
-    for key in expected_keys:
+    for key in EXPECTED_FIT_SUMMARY_KEYS:
         assert key in fit_summary
         # All keys except model_best return a dict with results per model
         if key != "model_best":
@@ -1238,3 +1239,52 @@ def test_when_not_all_quantile_forecasts_available_then_predictor_can_plot(selec
 def test_when_predictions_for_plot_have_incorrect_format_then_exception_is_raised(predictions):
     with pytest.raises(ValueError, match="predictions must be a TimeSeriesDataFrame"):
         TimeSeriesPredictor().plot(DUMMY_TS_DATAFRAME, predictions=predictions)
+
+
+def test_given_skip_model_selection_when_multiple_models_provided_then_exception_is_raised(temp_model_path):
+    with pytest.raises(ValueError, match="a single model must be provided"):
+        TimeSeriesPredictor(path=temp_model_path).fit(
+            DUMMY_TS_DATAFRAME, skip_model_selection=True, hyperparameters={"Naive": {}, "SeasonalNaive": {}}
+        )
+
+
+def test_given_skip_model_selection_when_search_space_provided_then_exception_is_raised(temp_model_path):
+    with pytest.raises(ValueError, match="should contain no search spaces"):
+        TimeSeriesPredictor(path=temp_model_path).fit(
+            DUMMY_TS_DATAFRAME,
+            skip_model_selection=True,
+            hyperparameters={"SeasonalNaive": {"seasonal_period": space.Categorical(1, 2)}},
+            hyperparameter_tune_kwargs="auto",
+        )
+
+
+@pytest.mark.parametrize("hyperparameters", [{"RecursiveTabular": {}}, {"Chronos": {"model_path": "tiny"}}])
+@pytest.mark.parametrize("tuning_data", [None, DUMMY_TS_DATAFRAME])
+def test_given_skip_model_selection_then_predictor_can_fit_predict(temp_model_path, hyperparameters, tuning_data):
+    predictor = TimeSeriesPredictor(prediction_length=10, path=temp_model_path).fit(
+        DUMMY_TS_DATAFRAME, tuning_data=tuning_data, skip_model_selection=True, hyperparameters=hyperparameters
+    )
+    predictions = predictor.predict(DUMMY_TS_DATAFRAME)
+    assert all(predictions.item_ids == DUMMY_TS_DATAFRAME.item_ids)
+
+
+@pytest.mark.parametrize("hyperparameters", [{"RecursiveTabular": {}}, {"Chronos": {"model_path": "tiny"}}])
+def test_given_skip_model_selection_then_all_predictor_methods_work(temp_model_path, hyperparameters):
+    predictor = TimeSeriesPredictor(prediction_length=10, path=temp_model_path).fit(
+        DUMMY_TS_DATAFRAME, skip_model_selection=True, hyperparameters=hyperparameters
+    )
+
+    assert predictor.model_best is not None
+    assert isinstance(predictor.leaderboard(DUMMY_TS_DATAFRAME), pd.DataFrame)
+
+    info = predictor.info()
+    for key in EXPECTED_INFO_KEYS:
+        assert key in info
+    assert len(info["model_info"]) == 1
+
+    fit_summary = predictor.fit_summary()
+    for key in EXPECTED_FIT_SUMMARY_KEYS:
+        assert key in fit_summary
+        # All keys except model_best return a dict with results per model
+        if key != "model_best":
+            assert len(fit_summary[key]) == 1
