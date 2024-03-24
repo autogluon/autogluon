@@ -408,6 +408,7 @@ EXPECTED_FIT_SUMMARY_KEYS = [
     "leaderboard",
 ]
 
+
 @pytest.mark.parametrize(
     "hyperparameters, num_models",
     [
