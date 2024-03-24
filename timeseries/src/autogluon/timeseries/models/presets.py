@@ -14,6 +14,7 @@ from . import (
     AutoCESModel,
     AutoETSModel,
     AverageModel,
+    ChronosModel,
     CrostonSBAModel,
     DeepARModel,
     DirectTabularModel,
@@ -68,6 +69,7 @@ MODEL_TYPES = dict(
     ADIDA=ADIDAModel,
     CrostonSBA=CrostonSBAModel,
     IMAPA=IMAPAModel,
+    Chronos=ChronosModel,
 )
 
 DEFAULT_MODEL_NAMES = {v: k for k, v in MODEL_TYPES.items()}
@@ -85,6 +87,7 @@ DEFAULT_MODEL_PRIORITY = dict(
     AutoETS=80,
     AutoARIMA=70,
     RecursiveTabular=60,
+    Chronos=50,
     DirectTabular=50,
     DeepAR=40,
     TemporalFusionTransformer=30,
