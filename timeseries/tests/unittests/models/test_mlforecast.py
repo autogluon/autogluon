@@ -14,6 +14,7 @@ from ..common import (
     DATAFRAME_WITH_STATIC,
     DUMMY_VARIABLE_LENGTH_TS_DATAFRAME,
     get_data_frame_with_variable_lengths,
+    DUMMY_TS_DATAFRAME_WITH_MISSING,
 )
 
 TESTABLE_MODELS = [
@@ -235,3 +236,18 @@ def test_when_mlf_model_is_used_then_predictions_have_correct_scale(temp_model_p
     model.fit(train_data=data)
     predictions = model.predict(data)
     assert np.all(np.abs(predictions.values - value) < value)
+
+
+@pytest.mark.parametrize("model_type", TESTABLE_MODELS)
+def test_given_train_data_has_nans_when_fit_called_then_nan_rows_removed_from_train_df(temp_model_path, model_type):
+    data = DUMMY_TS_DATAFRAME_WITH_MISSING.copy()
+    model = model_type(
+        path=temp_model_path,
+        freq=data.freq,
+        eval_metric="WAPE",
+        prediction_length=3,
+        hyperparameters={"differences": []},
+    )
+    model.fit(train_data=data)
+    train_df, val_df = model._generate_train_val_dfs(model.preprocess(data, is_train=True))
+    assert len(train_df) + len(val_df) == len(data.dropna())

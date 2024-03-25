@@ -483,7 +483,7 @@ def test_given_searcher_when_ray_backend_used_in_hpo_then_correct_searcher_used(
         }.get(searcher) in ray_searcher_class_name
 
 
-@pytest.mark.parametrize("model_class", TESTABLE_MODELS[-3:-1])
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 def test_when_data_contains_missing_values_then_model_can_fit_and_predict(temp_model_path, model_class):
     data = DUMMY_TS_DATAFRAME_WITH_MISSING
     prediction_length = 5
@@ -498,27 +498,50 @@ def test_when_data_contains_missing_values_then_model_can_fit_and_predict(temp_m
         val_data=None if isinstance(model, MultiWindowBacktestingModel) else data,
     )
     predictions = model.predict(data)
-    assert not predictions.isna().any(axis=None)
+    assert not predictions.isna().any(axis=None) and all(predictions.item_ids == data.item_ids)
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-def test_given_model_doesnt_support_nan_when_model_fits_then_nans_are_filled(temp_model_path, model_class):
-    data = DUMMY_TS_DATAFRAME_WITH_MISSING
-    prediction_length = 5
-    model = model_class(
-        freq=data.freq,
-        path=temp_model_path,
-        prediction_length=prediction_length,
-        hyperparameters=DUMMY_HYPERPARAMETERS,
-    )
-
-    with mock.patch.object(model, "_fit") as mock_fit:
-        model.fit(
-            train_data=data,
-            val_data=None if isinstance(model, MultiWindowBacktestingModel) else data,
-        )
+def test_when_fit_and_predict_called_then_train_val_and_test_data_is_preprocessed(temp_model_path, model_class):
+    train_data = DUMMY_TS_DATAFRAME_WITH_MISSING.copy()
+    model = model_class(freq=train_data.freq, path=temp_model_path, hyperparameters=DUMMY_HYPERPARAMETERS)
+    preprocessed_data = train_data + 5.0
+    if model._get_tags()["can_use_val_data"]:
+        expected_val_data = preprocessed_data
+    else:
+        expected_val_data = train_data
+    with (
+        mock.patch.object(model, "preprocess") as mock_preprocess,
+        mock.patch.object(model, "_fit") as mock_fit,
+        mock.patch.object(model, "_predict") as mock_predict,
+    ):
+        mock_preprocess.return_value = preprocessed_data
+        model.fit(train_data=train_data, val_data=train_data)
         fit_kwargs = mock_fit.call_args[1]
+        model_train_data = fit_kwargs["train_data"]
+        model_val_data = fit_kwargs["val_data"]
+        assert model_train_data.equals(preprocessed_data)
+        assert model_val_data.equals(expected_val_data)
 
-    model_allows_nan = model._get_tags()["allow_nan"]
-    input_contains_nan = fit_kwargs["train_data"].isna().any(axis=None)
-    assert model_allows_nan == input_contains_nan
+        model.predict(train_data)
+        model_predict_data = mock_predict.call_args[1]["data"]
+        assert model_predict_data.equals(preprocessed_data)
+
+
+EXPECTED_MODEL_TAGS = [
+    "allow_nan",
+    "can_refit_full",
+    "can_use_val_data",
+    # Tabular tags - not used by time series models
+    "valid_oof",
+    "handles_text",
+]
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+def test_when_model_created_then_model_has_all_required_tags(temp_model_path, model_class):
+    model = model_class(path=temp_model_path)
+    model_tags = model._get_tags()
+    for tag in EXPECTED_MODEL_TAGS:
+        assert tag in model_tags
+    assert len(model_tags) == len(EXPECTED_MODEL_TAGS)
