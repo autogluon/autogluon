@@ -327,7 +327,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
     def _get_dataset_stats(self, data: TimeSeriesDataFrame) -> str:
         ts_lengths = data.num_timesteps_per_item()
-        median_length = int(ts_lengths.median())
+        median_length = ts_lengths.median()
         min_length = ts_lengths.min()
         max_length = ts_lengths.max()
         missing_value_fraction = data[self.target].isna().mean()
@@ -337,7 +337,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             missing_value_fraction_str = ""
         return (
             f"{len(data)} rows{missing_value_fraction_str}, {data.num_items} time series. "
-            f"Median time series length is {median_length} (min={min_length}, max={max_length}). "
+            f"Median time series length is {median_length:.0f} (min={min_length}, max={max_length}). "
         )
 
     def _reduce_num_val_windows_if_necessary(
@@ -374,17 +374,17 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
     ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
         """Remove time series from train_data that either contain all NaNs or are too short for chosen settings.
 
-        This method ensures that for each validation fold, all train series 1) have length >= max(prediction_length + 1, 5),
-        and 2) do not consist of only NaN values.
+        This method ensures that 1) no time series consist of all NaN values and 2) for each validation fold, all train
+        series have length >= max(prediction_length + 1, 5).
 
-        In other words, this method removes from train_data all time series with length less than
+        In other words, this method removes from train_data all time series with only NaN values or length less than
         min_train_length + prediction_length + (num_val_windows - 1) * val_step_size
         """
         min_length = self._min_train_length + self.prediction_length + (num_val_windows - 1) * val_step_size
         train_lengths = train_data.num_timesteps_per_item()
         too_short_items = train_lengths.index[train_lengths < min_length]
 
-        if len(too_short_items):
+        if len(too_short_items) > 0:
             logger.info(
                 f"\tRemoving {len(too_short_items)} short time series from train_data. Only series with length "
                 f">= {min_length} will be used for training."
@@ -392,18 +392,18 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             train_data = train_data.query("item_id not in @too_short_items")
 
         all_nan_items = train_data.item_ids[train_data[self.target].isna().groupby(ITEMID, sort=False).all()]
-        if len(all_nan_items):
+        if len(all_nan_items) > 0:
             logger.info(f"\tRemoving {len(all_nan_items)} time series consisting of only NaN values from train_data.")
             train_data = train_data.query("item_id not in @all_nan_items")
 
-        if len(train_data) == 0:
-            raise ValueError(
-                f"At least some time series in train_data must have >= {min_length} valid observations. Please provide "
-                f"longer time series as train_data or reduce prediction_length, num_val_windows, or val_step_size."
-            )
-
         if len(too_short_items) or len(all_nan_items):
             logger.info(f"\tAfter filtering, train_data has {self._get_dataset_stats(train_data)}")
+
+        if len(train_data) == 0:
+            raise ValueError(
+                f"At least some time series in train_data must have >= {min_length} observations. Please provide "
+                f"longer time series as train_data or reduce prediction_length, num_val_windows, or val_step_size."
+            )
         return train_data
 
     @apply_presets(TIMESERIES_PRESETS_CONFIGS)

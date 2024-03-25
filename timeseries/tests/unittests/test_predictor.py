@@ -493,16 +493,35 @@ def test_when_prediction_data_contains_nans_then_predictor_can_predict(temp_mode
     assert not np.any(np.isnan(predictions))
 
 
-def test_when_some_time_series_contain_only_nans_then_exception_is_raised(temp_model_path):
+def test_when_some_train_time_series_contain_only_nans_then_they_are_removed_from_train_data(temp_model_path):
     predictor = TimeSeriesPredictor(path=temp_model_path)
-    df = TimeSeriesDataFrame.from_iterable_dataset(
+    train_data = TimeSeriesDataFrame.from_iterable_dataset(
         [
-            {"target": [float(5)] * 10, "start": pd.Period("2020-01-01", "D")},
             {"target": [float("nan")] * 10, "start": pd.Period("2020-01-01", "D")},
+            {"target": [float(5)] * 10, "start": pd.Period("2020-01-01", "D")},
         ]
     )
-    with pytest.raises(ValueError, match="consist completely of NaN values"):
-        predictor._check_and_prepare_data_frame(df)
+    with mock.patch("autogluon.timeseries.learner.TimeSeriesLearner.fit") as mock_learner_fit:
+        predictor.fit(train_data)
+        learner_train_data = mock_learner_fit.call_args[1]["train_data"]
+        assert all(learner_train_data.item_ids == [1])
+
+
+def test_when_all_train_time_series_contain_only_nans_then_exception_is_raised(temp_model_path):
+    predictor = TimeSeriesPredictor(path=temp_model_path)
+    train_data = DUMMY_TS_DATAFRAME.copy()
+    train_data["target"] = float("nan")
+    with pytest.raises(ValueError, match="At least some time series in train"):
+        predictor.fit(train_data)
+
+
+def test_when_all_nan_data_passed_to_predict_then_predictor_can_predict(temp_model_path):
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=3)
+    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters=DUMMY_HYPERPARAMETERS)
+    data = DUMMY_TS_DATAFRAME.copy()
+    data["target"] = float("nan")
+    predictions = predictor.predict(data)
+    assert not predictions.isna().any(axis=None) and all(predictions.item_ids == data.item_ids)
 
 
 @pytest.mark.parametrize("method", ["evaluate", "leaderboard"])
@@ -907,7 +926,7 @@ def test_given_only_short_series_in_train_data_when_fit_called_then_exception_is
         "short_series_3": 2,
     }
     data = get_data_frame_with_variable_lengths(item_id_to_length, freq="H")
-    with pytest.raises(ValueError, match="At least some time series in train\_data must have length"):
+    with pytest.raises(ValueError, match="Please provide longer time series as train"):
         predictor.fit(data, num_val_windows=num_val_windows, val_step_size=val_step_size)
 
 
@@ -925,7 +944,7 @@ def test_given_only_short_series_in_train_data_then_exception_is_raised(
         "short_series_3": 2,
     }
     data = get_data_frame_with_variable_lengths(item_id_to_length, freq="H")
-    with pytest.raises(ValueError, match="At least some time series in train\_data must have length"):
+    with pytest.raises(ValueError, match="Please provide longer time series as train"):
         predictor.fit(data, num_val_windows=num_val_windows, hyperparameters=TEST_HYPERPARAMETER_SETTINGS[0])
 
 
