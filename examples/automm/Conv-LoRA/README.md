@@ -8,7 +8,16 @@ The datasets will be downloaded in the "datasets" folder:
 
 `python prepare_semantic_segmentation_datasets.py`
 
-## 2. Training
+## 2. Installation
+```shell
+  conda create --name conv-lora python=3.10
+  conda activate conv-lora
+  pip install -U pip
+  pip install -U setuptools wheel
+  pip install autogluon.multimodal
+  ```
+
+## 3. Training
 
 `python run_semantic_segmentation.py --<flag> <value>`
 
@@ -19,9 +28,8 @@ The datasets will be downloaded in the "datasets" folder:
 - `num_gpus` determines the number of gpu used for training. Default is 1.
 - `output_dir` determines the path of output directory. Default is "outputs" folder.
 - `ckpt_path` determines the path of model for evaluation. Default is "outputs" folder.
-- `eval` if True, model will be loaded from `ckpt_path` for evaluation.
 
-## 3. Evaluation
+## 4. Evaluation
 
 After running the benchmark, the evaluation results of test set are stored in "{output_dir}/metrics.txt".
 
@@ -32,7 +40,7 @@ You can also run the following command to evaluate a checkpoint:
 
 ### Citation
 
-```sh
+```
 @article{zhong2024convolution,
   title={Convolution Meets LoRA: Parameter Efficient Finetuning for Segment Anything Model},
   author={Zhong, Zihan and Tang, Zhiqiang and He, Tong and Fang, Haoyang and Yuan, Chun},
