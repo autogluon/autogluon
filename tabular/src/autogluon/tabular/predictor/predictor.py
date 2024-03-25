@@ -1718,9 +1718,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             logger.log(20, f"Beginning iteration {iter_print} of pseudolabeling out of max {max_iter}")
 
             if len(test_pseudo_idxes_true) < 1:
-                logger.log(
-                    20, f"Could not confidently assign pseudolabels for any of the provided rows in iteration {iter_print}. Done with pseudolabeling..."
-                )
+                logger.log(20, f"Could not confidently assign pseudolabels for any of the provided rows in iteration {iter_print}. Done with pseudolabeling...")
                 break
             else:
                 logger.log(

@@ -532,7 +532,7 @@ class BaggedEnsembleModel(AbstractModel):
                 if model_base._get_tags().get("valid_oof", False):
                     # For models with the ability to produce their own OOF, such as RandomForest OOB and KNN-LOO,
                     # we get their OOF predictions on the full data, then limit to the original training data.
-                    self._oof_pred_proba = model_base.predict_proba_oof(X=X_fit, y=y_fit)[:len(X)]
+                    self._oof_pred_proba = model_base.predict_proba_oof(X=X_fit, y=y_fit)[: len(X)]
                 else:
                     logger.warning(
                         "\tWARNING: `use_child_oof` was specified but child model does not have a dedicated `predict_proba_oof` method. This model may have heavily overfit validation scores."

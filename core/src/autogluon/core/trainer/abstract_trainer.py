@@ -1819,7 +1819,7 @@ class AbstractTrainer:
             else:
                 if level > 1:
                     if X_pseudo is not None and y_pseudo is not None:
-                        logger.log(15, f'Dropping pseudo in stacking layer due to missing out-of-fold predictions')
+                        logger.log(15, f"Dropping pseudo in stacking layer due to missing out-of-fold predictions")
                     model_fit_kwargs.pop("X_pseudo", None)
                     model_fit_kwargs.pop("y_pseudo", None)
                 model = self._train_single(X, y, model, X_val, y_val, total_resources=total_resources, **model_fit_kwargs)
