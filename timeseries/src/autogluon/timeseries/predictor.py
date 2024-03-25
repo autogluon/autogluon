@@ -653,6 +653,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         verbosity : int, optional
             If provided, overrides the ``verbosity`` value used when creating the ``TimeSeriesPredictor``. See
             documentation for :class:`~autogluon.timeseries.TimeSeriesPredictor` for more details.
+
         """
         time_start = time.time()
         if self._learner.is_fit:
