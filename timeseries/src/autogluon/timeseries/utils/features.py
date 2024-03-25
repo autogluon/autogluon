@@ -1,9 +1,9 @@
 import logging
 import reprlib
-from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 
 import pandas as pd
+from pydantic import BaseModel
 
 from autogluon.common.features.types import R_FLOAT, R_INT
 from autogluon.features.generators import (
@@ -17,16 +17,27 @@ from autogluon.timeseries import TimeSeriesDataFrame
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class CovariateMetadata:
+class CovariateMetadata(BaseModel):
     """Provides mapping from different covariate types to columns in the dataset."""
 
-    static_features_cat: List[str] = field(default_factory=list)
-    static_features_real: List[str] = field(default_factory=list)
-    known_covariates_real: List[str] = field(default_factory=list)
-    known_covariates_cat: List[str] = field(default_factory=list)
-    past_covariates_real: List[str] = field(default_factory=list)
-    past_covariates_cat: List[str] = field(default_factory=list)
+    static_features_cat: List[str] = []
+    static_features_real: List[str] = []
+    known_covariates_real: List[str] = []
+    known_covariates_cat: List[str] = []
+    past_covariates_real: List[str] = []
+    past_covariates_cat: List[str] = []
+
+    @property
+    def known_covariates(self) -> List[str]:
+        return self.known_covariates_cat + self.known_covariates_real
+
+    @property
+    def past_covariates(self) -> List[str]:
+        return self.past_covariates_cat + self.past_covariates_real
+
+    @property
+    def covariates(self) -> List[str]:
+        return self.known_covariates + self.past_covariates
 
 
 class ContinuousAndCategoricalFeatureGenerator(PipelineFeatureGenerator):
@@ -183,7 +194,16 @@ class TimeSeriesFeatureGenerator:
         else:
             static_features = None
 
-        return TimeSeriesDataFrame(pd.concat(dfs, axis=1), static_features=static_features)
+        ts_df = TimeSeriesDataFrame(pd.concat(dfs, axis=1), static_features=static_features)
+
+        covariates_names = self.covariate_metadata.covariates
+        if len(covariates_names) > 0:
+            ts_df[covariates_names] = ts_df[covariates_names].fill_missing_values()
+            # If some series consist completely of NaNs, fill with median
+            if ts_df[covariates_names].isna().any(axis=None):
+                ts_df[covariates_names] = ts_df[covariates_names].fillna(ts_df[covariates_names].median())
+
+        return ts_df
 
     def transform_future_known_covariates(
         self, known_covariates: Optional[TimeSeriesDataFrame]
@@ -194,7 +214,9 @@ class TimeSeriesFeatureGenerator:
             self._check_required_columns_are_present(
                 known_covariates, required_column_names=self.known_covariates_names, data_frame_name="known_covariates"
             )
-            return TimeSeriesDataFrame(self.known_covariates_pipeline.transform(known_covariates))
+            return TimeSeriesDataFrame(
+                self.known_covariates_pipeline.transform(known_covariates)
+            ).fill_missing_values()
         else:
             return None
 
