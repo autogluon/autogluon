@@ -12,9 +12,9 @@ from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_da
 from ..common import (
     DATAFRAME_WITH_COVARIATES,
     DATAFRAME_WITH_STATIC,
+    DUMMY_TS_DATAFRAME_WITH_MISSING,
     DUMMY_VARIABLE_LENGTH_TS_DATAFRAME,
     get_data_frame_with_variable_lengths,
-    DUMMY_TS_DATAFRAME_WITH_MISSING,
 )
 
 TESTABLE_MODELS = [

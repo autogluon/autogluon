@@ -24,9 +24,9 @@ from autogluon.timeseries.models.ensemble.greedy_ensemble import TimeSeriesGreed
 from autogluon.timeseries.predictor import TimeSeriesPredictor
 
 from .common import (
+    DATAFRAME_WITH_COVARIATES,
     DUMMY_TS_DATAFRAME,
     PREDICTIONS_FOR_DUMMY_TS_DATAFRAME,
-    DATAFRAME_WITH_COVARIATES,
     CustomMetric,
     get_data_frame_with_variable_lengths,
 )

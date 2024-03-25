@@ -22,10 +22,10 @@ from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
 
 from ..common import (
     DUMMY_TS_DATAFRAME,
+    DUMMY_TS_DATAFRAME_WITH_MISSING,
     CustomMetric,
     dict_equal_primitive,
     get_data_frame_with_item_index,
-    DUMMY_TS_DATAFRAME_WITH_MISSING,
 )
 from .test_chronos import TESTABLE_MODELS as CHRONOS_TESTABLE_MODELS
 from .test_gluonts import TESTABLE_MODELS as GLUONTS_TESTABLE_MODELS
