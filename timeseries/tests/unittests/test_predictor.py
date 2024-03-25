@@ -26,6 +26,7 @@ from autogluon.timeseries.predictor import TimeSeriesPredictor
 from .common import (
     DUMMY_TS_DATAFRAME,
     PREDICTIONS_FOR_DUMMY_TS_DATAFRAME,
+    DATAFRAME_WITH_COVARIATES,
     CustomMetric,
     get_data_frame_with_variable_lengths,
 )
@@ -474,7 +475,7 @@ def test_when_predictor_is_loaded_then_info_works(temp_model_path):
 
 def test_when_train_data_contains_nans_then_predictor_can_fit(temp_model_path):
     predictor = TimeSeriesPredictor(path=temp_model_path)
-    df = DUMMY_TS_DATAFRAME.copy()
+    df = DATAFRAME_WITH_COVARIATES.copy()
     df.iloc[5] = np.nan
     predictor.fit(
         df,
@@ -486,7 +487,7 @@ def test_when_train_data_contains_nans_then_predictor_can_fit(temp_model_path):
 def test_when_prediction_data_contains_nans_then_predictor_can_predict(temp_model_path):
     predictor = TimeSeriesPredictor(path=temp_model_path)
     predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
-    df = DUMMY_TS_DATAFRAME.copy()
+    df = DATAFRAME_WITH_COVARIATES.copy()
     df.iloc[5] = np.nan
     predictions = predictor.predict(df)
     assert isinstance(predictions, TimeSeriesDataFrame)
