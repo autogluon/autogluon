@@ -1512,23 +1512,11 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         # labeled pseudo data has new labels unseen in the original train. Probably need to refit
         # data preprocessor if this is the case.
         if pseudo_data is not None:
-            assert isinstance(pseudo_data, pd.DataFrame)
-            if self.label not in pseudo_data.columns:
-                raise ValueError("'pseudo_data' does not contain the labeled column.")
-
-            if self.sample_weight is not None:
-                raise ValueError("Applying 'sample_weight' while calling 'fit_pseudolabel' is not supported")
-
-            X_pseudo = pseudo_data.drop(columns=[self.label])
-            y_pseudo_og = pseudo_data[self.label]
-            X_pseudo = self._learner.transform_features(X_pseudo)
-            y_pseudo = self._learner.label_cleaner.transform(y_pseudo_og)
-
-            if np.isnan(y_pseudo.unique()).any():
-                raise Exception("NaN was found in the label column for pseudo labeled data." "Please ensure no NaN values in target column")
+            X_pseudo, y_pseudo, y_pseudo_og = self._sanitize_pseudo_data(pseudo_data=pseudo_data)
         else:
             X_pseudo = None
             y_pseudo = None
+            y_pseudo_og = None
 
         if ag_args is None:
             ag_args = {}
@@ -1788,13 +1776,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         else:
             return self
 
-    # FIXME: `fit_ensemble` and `use_ensemble` seem redundant, and don't use calibration, making them worse than when they are disabled.
-    # FIXME: refit does not incorporate pseudolabels!
-
-    # FIXME: Figure out what is happening in the L2 stackers, how does pseudo work???
-    #  Answer: Stacker columns are set to NaN for pseudo rows!!!! FIX THIS.
-    #  Either avoid passing pseudo data to L2+ or find a way to pass non-NaN.
-    #  Idea: What about the original fit pred_proba? Can we predict with the prior model stack as a substitute? Probably. Might be very complicated.
+    # TODO: `fit_ensemble` and `use_ensemble` seem redundant, and don't use calibration, making them worse than when they are disabled.
     @apply_presets(tabular_presets_dict, tabular_presets_alias)
     def fit_pseudolabel(
         self,
@@ -1813,6 +1795,8 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         data that meets a criteria (For example all rows with predictive prob above 95%). If
         predictor is fit then will call fit_extra with added training data, if predictor
         is not fit then will fit model on train_data then run.
+
+        Note: pseudo_data is only used for L1 models. Support for L2+ models is not yet implemented.
 
         Parameters
         ----------
@@ -1884,7 +1868,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         fit_extra_args = self._get_all_fit_extra_args()
         fit_extra_kwargs = {key: value for key, value in kwargs.items() if key in fit_extra_args}
 
-        # If first fit was in this method call and `num_stack_levels` wasn't specified, re-use the number of stack levels used in the first fit.
+        # If first fit was in this method call and `num_stack_levels` wasn't specified, reuse the number of stack levels used in the first fit.
         # TODO: Consider making calculating this information easier, such as keeping track of meta-info from the latest/original fit call.
         #  Currently we use `stack_name == core` to figure out the number of stack levels, but this is somewhat brittle.
         if "num_stack_levels" not in fit_extra_kwargs and not was_fit:
@@ -3046,8 +3030,15 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         self._assert_is_fit("unpersist")
         return self._learner.load_trainer().unpersist(model_names=models)
 
-    # FIXME: `total_resources = None` during refit, fix this
-    def refit_full(self, model: str | List[str] = "all", set_best_to_refit_full: bool = True, **kwargs) -> Dict[str, str]:
+    # TODO: `total_resources = None` during refit, fix this.
+    #  refit_full doesn't account for user-specified resources at fit time, nor does it allow them to specify for refit.
+    def refit_full(
+        self,
+        model: str | List[str] = "all",
+        set_best_to_refit_full: bool = True,
+        train_data_extra: pd.DataFrame = None,
+        **kwargs,
+    ) -> Dict[str, str]:
         """
         Retrain model on all of the data (training + validation).
         For bagged models:
@@ -3082,6 +3073,11 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             This means the model used when `predictor.predict(data)` is called will be the refit_full version instead of the original version of the model.
             Ignored if `model` is not the best model.
             If str, interprets as a model name and sets best model to the refit_full version of the model `set_best_to_refit_full`.
+        train_data_extra : pd.DataFrame, default = None
+            If specified, will be used as additional rows of training data when refitting models.
+            Requires label column. Will only be used for L1 models.
+        **kwargs
+            [Advanced] Developer debugging arguments.
 
         Returns
         -------
@@ -3099,6 +3095,12 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             "\tThis process is not bound by time_limit, but should take less time than the original `predictor.fit` call.\n"
             '\tTo learn more, refer to the `.refit_full` method docstring which explains how "_FULL" models differ from normal models.',
         )
+        if train_data_extra is not None:
+            assert kwargs.get("X_pseudo", None) is None, f"Cannot pass both train_data_extra and X_pseudo arguments"
+            assert kwargs.get("y_pseudo", None) is None, f"Cannot pass both train_data_extra and y_pseudo arguments"
+            X_pseudo, y_pseudo, _ = self._sanitize_pseudo_data(pseudo_data=train_data_extra, name="train_data_extra")
+            kwargs["X_pseudo"] = X_pseudo
+            kwargs["y_pseudo"] = y_pseudo
         refit_full_dict = self._learner.refit_ensemble_full(model=model, **kwargs)
 
         if set_best_to_refit_full:
@@ -3111,7 +3113,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 self._trainer.model_best = model_refit_map[model_to_set_best]
                 # Note: model_best will be overwritten if additional training is done with new models,
                 # since model_best will have validation score of None and any new model will have a better validation score.
-                # This has the side-effect of having the possibility of model_best being overwritten by a worse model than the original model_best.
+                # This has the side effect of having the possibility of model_best being overwritten by a worse model than the original model_best.
                 self._trainer.save()
                 logger.log(
                     20,
@@ -4768,6 +4770,23 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             return True
         else:
             return False
+
+    def _sanitize_pseudo_data(self, pseudo_data: pd.DataFrame, name="pseudo_data") -> Tuple[pd.DataFrame, pd.Series, pd.Series]:
+        assert isinstance(pseudo_data, pd.DataFrame)
+        if self.label not in pseudo_data.columns:
+            raise ValueError(f"'{name}' does not contain the labeled column.")
+
+        if self.sample_weight is not None:
+            raise ValueError(f"Applying 'sample_weight' with {name} is not supported.")
+
+        X_pseudo = pseudo_data.drop(columns=[self.label])
+        y_pseudo_og = pseudo_data[self.label]
+        X_pseudo = self._learner.transform_features(X_pseudo)
+        y_pseudo = self._learner.label_cleaner.transform(y_pseudo_og)
+
+        if np.isnan(y_pseudo.unique()).any():
+            raise Exception(f"NaN was found in the label column for {name}." "Please ensure no NaN values in target column")
+        return X_pseudo, y_pseudo, y_pseudo_og
 
     def _assert_is_fit(self, message_suffix: str = None):
         if not self.is_fit:
