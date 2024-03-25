@@ -212,6 +212,11 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
             most_recent_model.save()
         return save_path
 
+    def persist(self):
+        if self.most_recent_model is None:
+            raise ValueError(f"{self.name} must be fit before persisting")
+        self.most_recent_model.persist()
+
     @classmethod
     def load(
         cls, path: str, reset_paths: bool = True, load_oof: bool = False, verbose: bool = True

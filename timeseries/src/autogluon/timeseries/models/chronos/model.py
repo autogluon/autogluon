@@ -234,6 +234,9 @@ class ChronosModel(AbstractTimeSeriesModel):
 
         self.model_pipeline = pipeline
 
+    def persist(self) -> None:
+        self.load_model_pipeline(context_length=self.context_length or self.maximum_context_length)
+
     def _fit(
         self,
         train_data: TimeSeriesDataFrame,
@@ -283,8 +286,9 @@ class ChronosModel(AbstractTimeSeriesModel):
         with warning_filter(all_warnings=True):
             import torch
 
-            # load model pipeline to device memory
-            self.load_model_pipeline(context_length=context_length)
+            if self.model_pipeline is None:
+                # load model pipeline to device memory
+                self.load_model_pipeline(context_length=context_length)
 
             self.model_pipeline.model.eval()
             with torch.inference_mode():

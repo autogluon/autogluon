@@ -653,7 +653,6 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         verbosity : int, optional
             If provided, overrides the ``verbosity`` value used when creating the ``TimeSeriesPredictor``. See
             documentation for :class:`~autogluon.timeseries.TimeSeriesPredictor` for more details.
-
         """
         time_start = time.time()
         if self._learner.is_fit:
@@ -982,6 +981,38 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             if self._trainer.model_best in models:
                 return self._trainer.model_best
         return self._trainer.get_model_best()
+
+    def persist(self, models="best", with_ancestors=True) -> List[str]:
+        """Persist models in memory for reduced inference latency. This is particularly important if the models are being used for online
+        inference where low latency is critical. If models are not persisted in memory, they are loaded from disk every time they are
+        asked to make predictions.
+
+        Parameters
+        ----------
+        models : list of str or str, default = 'best'
+            Model names of models to persist.
+            If 'best' then the model with the highest validation score is persisted (this is the model used for prediction by default).
+            If 'all' then all models are persisted.
+            Valid models are listed in this `predictor` by calling `predictor.model_names()`.
+        with_ancestors : bool, default = True
+            If True, all ancestor models of the provided models will also be persisted.
+            If False, stacker models will not have the models they depend on persisted unless those models were specified in `models`.
+            This will slow down inference as the ancestor models will still need to be loaded from disk for each predict call.
+            Only relevant for stacker models.
+
+        Returns
+        -------
+        List of persisted model names.
+        """
+        return self._learner.persist_trainer(models=models, with_ancestors=with_ancestors)
+
+    def unpersist(self) -> None:
+        """Unpersist models in memory for reduced memory usage.
+        If models are not persisted in memory, they are loaded from disk every time they are asked to make predictions.
+        Note: Another way to reset the predictor and unpersist models is to reload the predictor from disk
+        via `predictor = TabularPredictor.load(predictor.path)`.
+        """
+        self._learner.unpersist_trainer()
 
     def leaderboard(
         self,

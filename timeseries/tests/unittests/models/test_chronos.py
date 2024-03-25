@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 import torch
 
+from autogluon.timeseries import TimeSeriesPredictor
 from autogluon.timeseries.models import ChronosModel
 from autogluon.timeseries.models.chronos.model import ChronosInferenceDataset
 
@@ -251,18 +252,18 @@ def test_given_variable_length_data_when_context_length_not_provided_then_contex
     assert model.model_pipeline.model.config.context_length == expected_context_length
 
 
-@pytest.mark.parametrize(
-    "dtype_arg, expected_dtype",
-    [
-        (torch.float16, torch.float16),
-        (torch.bfloat16, torch.bfloat16),
-        (torch.float32, torch.float32),
-        (torch.float64, torch.float64),
-        ("bfloat16", torch.bfloat16),
-        ("float32", torch.float32),
-        ("float64", torch.float64),
-    ],
-)
+DTYPE_TEST_CASES = [  # dtype_arg, expected_dtype
+    (torch.float16, torch.float16),
+    (torch.bfloat16, torch.bfloat16),
+    (torch.float32, torch.float32),
+    (torch.float64, torch.float64),
+    ("bfloat16", torch.bfloat16),
+    ("float32", torch.float32),
+    ("float64", torch.float64),
+]
+
+
+@pytest.mark.parametrize("dtype_arg, expected_dtype", DTYPE_TEST_CASES)
 def test_when_torch_dtype_provided_then_parameters_loaded_in_torch_dtype(dtype_arg, expected_dtype):
     model = ChronosModel(
         hyperparameters={
@@ -276,3 +277,87 @@ def test_when_torch_dtype_provided_then_parameters_loaded_in_torch_dtype(dtype_a
 
     embedding_matrix = next(iter(model.model_pipeline.model.model.shared.parameters()))
     assert embedding_matrix.dtype is expected_dtype
+
+
+@pytest.mark.parametrize("dtype_arg, expected_dtype", DTYPE_TEST_CASES)
+def test_when_torch_dtype_provided_and_model_persisted_then_parameters_loaded_in_torch_dtype(
+    dtype_arg, expected_dtype
+):
+    model = ChronosModel(
+        hyperparameters={
+            "model_path": "amazon/chronos-t5-tiny",
+            "device": "cpu",
+            "torch_dtype": dtype_arg,
+        },
+    )
+    model.persist()
+
+    embedding_matrix = next(iter(model.model_pipeline.model.model.shared.parameters()))
+    assert embedding_matrix.dtype is expected_dtype
+
+
+def test_when_model_persisted_then_model_pipeline_can_infer():
+    model = ChronosModel(
+        hyperparameters={
+            "model_path": "amazon/chronos-t5-tiny",
+            "device": "cpu",
+        },
+    )
+    model.persist()
+    assert model.model_pipeline.predict(torch.tensor([[1, 2, 3]])) is not None
+
+
+def test_when_model_not_persisted_only_fit_then_model_pipeline_is_none():
+    model = ChronosModel(
+        hyperparameters={
+            "model_path": "amazon/chronos-t5-tiny",
+            "device": "cpu",
+        },
+    )
+    model._fit(DUMMY_TS_DATAFRAME)
+    assert model.model_pipeline is None
+
+
+def test_when_model_saved_loaded_and_persisted_then_model_pipeline_can_infer():
+    model = ChronosModel(
+        hyperparameters={
+            "model_path": "amazon/chronos-t5-tiny",
+            "device": "cpu",
+        },
+    )
+    path = model.save()
+    model = ChronosModel.load(path)
+
+    model.persist()
+    assert model.model_pipeline.predict(torch.tensor([[1, 2, 3]])) is not None
+
+
+def test_when_chronos_fit_in_standalone_through_predictor_and_persist_called_then_chronos_pipeline_is_persisted(
+    temp_model_path,
+):
+    predictor = TimeSeriesPredictor(path=temp_model_path).fit(
+        DUMMY_TS_DATAFRAME,
+        skip_model_selection=True,
+        hyperparameters={"Chronos": {"model_path": "tiny"}},
+        enable_ensemble=False,
+    )
+    predictor.persist()
+    name, model = next(iter(predictor._learner.trainer.models.items()))
+    assert "Chronos" in name
+    assert model.model_pipeline is not None
+
+
+def test_when_chronos_fit_with_validation_through_predictor_and_persist_called_then_chronos_pipeline_is_persisted(
+    temp_model_path,
+):
+    predictor = TimeSeriesPredictor(path=temp_model_path).fit(
+        DUMMY_TS_DATAFRAME,
+        hyperparameters={"Chronos": {"model_path": "tiny"}},
+        enable_ensemble=False,
+    )
+    predictor.persist()
+    name, model = next(iter(predictor._learner.trainer.models.items()))
+    assert "Chronos" in name
+
+    # model now wrapped in MultiWindowModel
+    assert model.most_recent_model.model_pipeline is not None

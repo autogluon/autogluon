@@ -1293,3 +1293,57 @@ def test_given_skip_model_selection_then_all_predictor_methods_work(temp_model_p
         # All keys except model_best return a dict with results per model
         if key != "model_best":
             assert len(fit_summary[key]) == 1
+
+
+@pytest.mark.parametrize("hyperparameters", [{"Naive": {}}, {"SeasonalNaive": {}}, {"Naive": {}, "SeasonalNaive": {}}])
+def test_when_persist_called_then_at_least_one_model_persisted(temp_model_path, hyperparameters):
+    predictor = TimeSeriesPredictor(path=temp_model_path).fit(
+        DUMMY_TS_DATAFRAME,
+        hyperparameters=hyperparameters,
+        enable_ensemble=False,
+    )
+    predictor.persist()
+
+    assert len(predictor._learner.trainer.models) > 0
+
+
+@pytest.mark.parametrize("hyperparameters", [{"Naive": {}}, {"SeasonalNaive": {}}, {"Naive": {}, "SeasonalNaive": {}}])
+def test_when_predictor_saved_loaded_and_persist_called_then_at_least_one_model_persisted(
+    temp_model_path, hyperparameters
+):
+    predictor = TimeSeriesPredictor(path=temp_model_path).fit(
+        DUMMY_TS_DATAFRAME,
+        hyperparameters=hyperparameters,
+        enable_ensemble=False,
+    )
+    path = predictor.path
+    predictor.save()
+    predictor = TimeSeriesPredictor.load(path)
+    predictor.persist()
+
+    assert len(predictor._learner.trainer.models) > 0
+
+
+@pytest.mark.parametrize("hyperparameters", [{"Naive": {}}, {"SeasonalNaive": {}}, {"Naive": {}, "SeasonalNaive": {}}])
+def test_when_persist_not_called_then_no_models_persisted(temp_model_path, hyperparameters):
+    predictor = TimeSeriesPredictor(path=temp_model_path).fit(
+        DUMMY_TS_DATAFRAME,
+        hyperparameters=hyperparameters,
+        enable_ensemble=False,
+    )
+
+    assert len(predictor._learner.trainer.models) == 0
+
+
+@pytest.mark.parametrize("hyperparameters", [{"Naive": {}}, {"SeasonalNaive": {}}, {"Naive": {}, "SeasonalNaive": {}}])
+def test_when_predictor_saved_loaded_and_persist_not_called_then_no_models_persisted(temp_model_path, hyperparameters):
+    predictor = TimeSeriesPredictor(path=temp_model_path).fit(
+        DUMMY_TS_DATAFRAME,
+        hyperparameters=hyperparameters,
+        enable_ensemble=False,
+    )
+    path = predictor.path
+    predictor.save()
+    predictor = TimeSeriesPredictor.load(path)
+
+    assert len(predictor._learner.load_trainer().models) == 0
