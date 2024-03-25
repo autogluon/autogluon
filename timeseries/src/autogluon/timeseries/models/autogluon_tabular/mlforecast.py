@@ -89,10 +89,10 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
 
     def preprocess(self, data: TimeSeriesDataFrame, is_train: bool = False, **kwargs) -> Any:
         if is_train:
+            # All-NaN series are removed; partially-NaN series in train_data are handled inside _generate_train_val_dfs
             all_nan_items = data.item_ids[data[self.target].isna().groupby(ITEMID, sort=False).all()]
             if len(all_nan_items):
                 data = data.query("item_id not in @all_nan_items")
-            # Missing values in train_data are handled inside _generate_train_val_dfs
             return data
         else:
             data = data.fill_missing_values()
@@ -377,7 +377,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         return predictions
 
     def _more_tags(self) -> dict:
-        return {"can_refit_full": True}
+        return {"allow_nan": True, "can_refit_full": True}
 
 
 class DirectTabularModel(AbstractMLForecastModel):

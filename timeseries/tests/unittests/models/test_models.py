@@ -528,6 +528,30 @@ def test_when_fit_and_predict_called_then_train_val_and_test_data_is_preprocesse
         assert model_predict_data.equals(preprocessed_data)
 
 
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+def test_given_model_doesnt_support_nan_when_model_fits_then_nans_are_filled(temp_model_path, model_class):
+    data = DUMMY_TS_DATAFRAME.copy()
+    data.iloc[[0, 1, 5, 10, 23, 26, 33, 60]] = float("nan")
+    prediction_length = 5
+    model = model_class(
+        freq=data.freq,
+        path=temp_model_path,
+        prediction_length=prediction_length,
+        hyperparameters=DUMMY_HYPERPARAMETERS,
+    )
+
+    with mock.patch.object(model, "_fit") as mock_fit:
+        model.fit(
+            train_data=data,
+            val_data=None if isinstance(model, MultiWindowBacktestingModel) else data,
+        )
+        fit_kwargs = mock_fit.call_args[1]
+
+    model_allows_nan = model._get_tags()["allow_nan"]
+    input_contains_nan = fit_kwargs["train_data"].isna().any(axis=None)
+    assert model_allows_nan == input_contains_nan
+
+
 EXPECTED_MODEL_TAGS = [
     "allow_nan",
     "can_refit_full",
