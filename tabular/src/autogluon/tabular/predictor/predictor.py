@@ -1775,11 +1775,13 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             return self
 
     # TODO: `fit_ensemble` and `use_ensemble` seem redundant, and don't use calibration, making them worse than when they are disabled.
+    # TODO: Supporting L2+ models is very complicated. It requires predicting with the original models via `predictor.predict_proba_multi` on `pseudo_data`,
+    #  then keeping track of these pred_proba and passing them to the appropriate models at fit time.
     @apply_presets(tabular_presets_dict, tabular_presets_alias)
     def fit_pseudolabel(
         self,
         pseudo_data: pd.DataFrame,
-        max_iter: int = 5,
+        max_iter: int = 3,
         return_pred_prob: bool = False,
         use_ensemble: bool = False,
         fit_ensemble: bool = False,
@@ -1787,23 +1789,53 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         **kwargs,
     ):
         """
-        If 'pseudo_data' is labeled then incorporates all test_data into train_data for
-        newly fit models. If 'pseudo_data' is unlabeled then 'fit_pseudolabel' will self label the
-        data and will augment the original training data by adding all the self labeled
-        data that meets a criteria (For example all rows with predictive prob above 95%). If
-        predictor is fit then will call fit_extra with added training data, if predictor
-        is not fit then will fit model on train_data then run.
+        [Advanced] Uses additional data (`pseudo_data`) to try to achieve better model quality.
+        Pseudo data can come either with or without the `label` column.
 
-        Note: pseudo_data is only used for L1 models. Support for L2+ models is not yet implemented.
+        If `pseudo_data` is labeled, then models will be refit using the `pseudo_data` as additional training data.
+        If bagging, each fold of the bagged ensemble will use all the `pseudo_data` as additional training data.
+        `pseudo_data` will never be used for validation/scoring.
+
+        If the data is unlabeled, such as providing the batched test data without ground truth available, then transductive learning is leveraged.
+        In transductive learning, the existing predictor will predict on `pseudo_data`
+        to identify the most confident rows (For example all rows with predictive probability above 95%).
+        These rows will then be pseudo-labelled, given the label of the most confident class.
+        The pseudo-labelled rows will then be used as additional training data when fitting the models.
+        Then, if `max_iter > 1`, this process can repeat itself, using the new models to predict on the unused `pseudo_data` rows
+        to see if any new rows should be used in the next iteration as training data.
+        We recommend specifying `return_pred_prob=True` if the data is unlabeled to get the correct prediction probabilities on the `pseudo_data`,
+        rather than calling `predictor.predict_proba(pseudo_data)`.
+
+        For example:
+            Original fit: 10000 `train_data` rows with 10-fold bagging
+                Bagged fold models will use 9000 `train_data` rows for training, and 1000 for validation.
+            `fit_pseudolabel` is called with 5000 row labelled `pseudo_data`.
+                Bagged fold models are then fit again with `_PSEUDO` suffix.
+                10000 train_data rows with 10-fold bagging + 5000 `pseudo_data` rows.
+                Bagged fold models will use 9000 `train_data` rows + 5000 `pseudo_data` rows = 14000 rows for training, and 1000 for validation.
+                    Note: The same validation rows will be used as was done in the original fit, so that validation scores are directly comparable.
+            Alternatively, `fit_pseduolabel` is called with 5000 rows unlabelled `pseudo_data`.
+                Predictor predicts on the `pseudo_data`, finds 965 rows with confident predictions.
+                Set the ground truth of those 965 rows as the most confident prediction.
+                Bagged fold models are then fit with `_PSEUDO` suffix.
+                10000 train_data rows with 10-fold bagging + 965 labelled `pseudo_data` rows.
+                Bagged fold models will use 9000 `train_data` rows + 965 `pseudo_data` rows = 9965 rows for training, and 1000 for validation.
+                    Note: The same validation rows will be used as was done in the original fit, so that validation scores are directly comparable.
+                Repeat the process using the new pseudo-labelled predictor on the remaining `pseudo_data`.
+                In the example, lets assume 188 new `pseudo_data` rows have confident predictions.
+                Now the total labelled `pseudo_data` rows is 965 + 188 = 1153.
+                Then repeat the process, up to `max_iter` times: ex 10000 train_data rows with 10-fold bagging + 1153 `pseudo_data` rows.
+                Early stopping will trigger if validation score improvement is not observed.
+
+        Note: pseudo_data is only used for L1 models. Support for L2+ models is not yet implemented. L2+ models will only use the original train_data.
 
         Parameters
         ----------
         pseudo_data : str or :class:`TabularDataset` or :class:`pd.DataFrame`
             Extra data to incorporate into training. Pre-labeled test data allowed. If no labels
-            then pseudolabeling algorithm will predict and filter out which rows to incorporate into
-            training
-        max_iter: int, default = 5
-            Maximum iterations of pseudolabeling allowed
+            then pseudo-labeling algorithm will predict and filter out which rows to incorporate into training
+        max_iter: int, default = 3
+            Maximum iterations of pseudo-labeling allowed
         return_pred_prob: bool, default = False
             Returns held-out predictive probabilities from pseudo-labeling. If test_data is labeled then
             returns model's predictive probabilities.
