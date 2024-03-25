@@ -425,6 +425,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         refit_every_n_windows: int = 1,
         refit_full: bool = False,
         enable_ensemble: bool = True,
+        skip_model_selection: bool = False,
         random_seed: Optional[int] = 123,
         verbosity: Optional[int] = None,
     ) -> "TimeSeriesPredictor":
@@ -642,6 +643,10 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         enable_ensemble : bool, default = True
             If True, the ``TimeSeriesPredictor`` will fit a simple weighted ensemble on top of the models specified via
             ``hyperparameters``.
+        skip_model_selection : bool, default = False
+            If True, predictor will not compute the validation score. For example, this argument is useful if we want
+            to use the predictor as a wrapper for a single pre-trained model. If set to True, then the ``hyperparameters``
+            dict must contain exactly one model without hyperparameter search spaces or an exception will be raised.
         random_seed : int or None, default = 123
             If provided, fixes the seed of the random number generator for all models. This guarantees reproducible
             results for most models (except those trained on GPU because of the non-determinism of GPU operations).
@@ -681,6 +686,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             val_step_size=val_step_size,
             refit_every_n_windows=refit_every_n_windows,
             refit_full=refit_full,
+            skip_model_selection=skip_model_selection,
             enable_ensemble=enable_ensemble,
             random_seed=random_seed,
             verbosity=verbosity,
@@ -715,9 +721,10 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         if num_val_windows == 0 and tuning_data is None:
             raise ValueError("Please set num_val_windows >= 1 or provide custom tuning_data")
 
-        train_data = self._filter_short_series(
-            train_data, num_val_windows=num_val_windows, val_step_size=val_step_size
-        )
+        if not skip_model_selection:
+            train_data = self._filter_short_series(
+                train_data, num_val_windows=num_val_windows, val_step_size=val_step_size
+            )
 
         val_splitter = ExpandingWindowSplitter(
             prediction_length=self.prediction_length, num_val_windows=num_val_windows, val_step_size=val_step_size
@@ -734,6 +741,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             verbosity=verbosity,
             val_splitter=val_splitter,
             refit_every_n_windows=refit_every_n_windows,
+            skip_model_selection=skip_model_selection,
             enable_ensemble=enable_ensemble,
             random_seed=random_seed,
         )

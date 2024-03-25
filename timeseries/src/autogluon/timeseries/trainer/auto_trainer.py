@@ -27,7 +27,8 @@ class AutoTimeSeriesTrainer(AbstractTimeSeriesTrainer):
             target=self.target,
             metadata=self.metadata,
             excluded_model_types=kwargs.get("excluded_model_types"),
-            multi_window=multi_window,
+            # if skip_model_selection = True, we skip backtesting
+            multi_window=multi_window and not self.skip_model_selection,
         )
 
     def fit(
