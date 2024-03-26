@@ -276,7 +276,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
         name: str = "data",
     ) -> TimeSeriesDataFrame:
-        """Ensure that TimeSeriesDataFrame has a sorted index, valid frequency, and contains no missing values.
+        """Ensure that TimeSeriesDataFrame has a sorted index and a valid frequency.
 
         If self.freq is None, then self.freq of the predictor will be set to the frequency of the data.
 

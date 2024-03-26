@@ -520,7 +520,8 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         List of currently supported tags:
         - allow_nan: Can the model handle data with missing values represented by np.nan?
-        - can_refit_full: Can the model be retrained without validation data?
+        - can_refit_full: Does it make sense to retrain the model without validation data? 
+            See `autogluon.core.models.abstract._tags._DEFAULT_TAGS` for more details.
         - can_use_val_data: Can model use val_data if it's provided to model.fit()?
         """
         return {
