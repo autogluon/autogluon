@@ -1,9 +1,9 @@
 import logging
 import reprlib
+from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 
 import pandas as pd
-from pydantic import BaseModel
 
 from autogluon.common.features.types import R_FLOAT, R_INT
 from autogluon.features.generators import (
@@ -17,15 +17,16 @@ from autogluon.timeseries import TimeSeriesDataFrame
 logger = logging.getLogger(__name__)
 
 
-class CovariateMetadata(BaseModel):
+@dataclass
+class CovariateMetadata:
     """Provides mapping from different covariate types to columns in the dataset."""
 
-    static_features_cat: List[str] = []
-    static_features_real: List[str] = []
-    known_covariates_real: List[str] = []
-    known_covariates_cat: List[str] = []
-    past_covariates_real: List[str] = []
-    past_covariates_cat: List[str] = []
+    static_features_cat: List[str] = field(default_factory=list)
+    static_features_real: List[str] = field(default_factory=list)
+    known_covariates_real: List[str] = field(default_factory=list)
+    known_covariates_cat: List[str] = field(default_factory=list)
+    past_covariates_real: List[str] = field(default_factory=list)
+    past_covariates_cat: List[str] = field(default_factory=list)
 
     @property
     def known_covariates(self) -> List[str]:
