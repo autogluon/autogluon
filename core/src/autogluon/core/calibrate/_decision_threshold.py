@@ -4,6 +4,7 @@ import logging
 from typing import Callable, List, Union
 
 import numpy as np
+import pandas as pd
 
 from ..constants import BINARY
 from ..metrics import Scorer
@@ -20,13 +21,29 @@ def calibrate_decision_threshold(
     metric: Union[Callable, Scorer],
     metric_kwargs: dict | None = None,
     decision_thresholds: Union[int, List[float]] = 50,
+    subsample_size: int | None = None,
+    seed: int = 0,
     metric_name: str | None = None,
     verbose: bool = True,
 ) -> float:
     problem_type = BINARY
+
+    if isinstance(y, pd.Series):
+        y = y.values
+    if isinstance(y_pred_proba, pd.Series):
+        y_pred_proba = y_pred_proba.values
     assert len(y_pred_proba.shape) == 1
     assert len(y.shape) == 1
-    assert len(y) == len(y_pred_proba)
+
+    num_samples_total = len(y)
+    assert num_samples_total == len(y_pred_proba)
+
+    if subsample_size is not None and subsample_size < num_samples_total:
+        logger.log(20, f"Subsampling y to {subsample_size} samples to speedup threshold calibration...")
+        rng = np.random.default_rng(seed=seed)
+        subsample_indices = rng.choice(num_samples_total, subsample_size, replace=False)
+        y = y[subsample_indices]
+        y_pred_proba = y_pred_proba[subsample_indices]
 
     if metric_kwargs is None:
         metric_kwargs = dict()

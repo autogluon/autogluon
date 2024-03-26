@@ -1,8 +1,12 @@
+from __future__ import annotations
+
 import logging
 import time
 from collections import Counter
+from typing import List
 
 import numpy as np
+import pandas as pd
 
 from ...constants import PROBLEM_TYPES
 from ...metrics import log_loss
@@ -35,6 +39,7 @@ class EnsembleSelection(AbstractWeightedEnsemble):
         sorted_initialization: bool = False,
         bagging: bool = False,
         tie_breaker: str = "random",
+        subsample_size: int | None = None,
         random_state: np.random.RandomState = None,
         **kwargs,
     ):
@@ -47,13 +52,14 @@ class EnsembleSelection(AbstractWeightedEnsemble):
         if tie_breaker not in ["random", "second_metric"]:
             raise ValueError(f"Unknown tie_breaker value: {tie_breaker}. Must be one of: ['random', 'second_metric']")
         self.tie_breaker = tie_breaker
+        self.subsample_size = subsample_size
         if random_state is not None:
             self.random_state = random_state
         else:
             self.random_state = np.random.RandomState(seed=0)
         self.quantile_levels = kwargs.get("quantile_levels", None)
 
-    def fit(self, predictions, labels, time_limit=None, identifiers=None, sample_weight=None):
+    def fit(self, predictions: List[np.ndarray], labels: np.ndarray, time_limit=None, identifiers=None, sample_weight=None):
         self.ensemble_size = int(self.ensemble_size)
         if self.ensemble_size < 1:
             raise ValueError("Ensemble size cannot be less than one!")
@@ -69,13 +75,23 @@ class EnsembleSelection(AbstractWeightedEnsemble):
         return self
 
     # TODO: Consider having a removal stage, remove each model and see if score is affected, if improves or not effected, remove it.
-    def _fit(self, predictions, labels, time_limit=None, sample_weight=None):
+    def _fit(self, predictions: List[np.ndarray], labels: np.ndarray, time_limit=None, sample_weight=None):
         ensemble_size = self.ensemble_size
+        if isinstance(labels, pd.Series):
+            labels = labels.values
         self.num_input_models_ = len(predictions)
         ensemble = []
         trajectory = []
         order = []
         used_models = set()
+        num_samples_total = len(labels)
+
+        if self.subsample_size is not None and self.subsample_size < num_samples_total:
+            logger.log(15, f"Subsampling to {self.subsample_size} samples to speedup ensemble selection...")
+            subsample_indices = self.random_state.choice(num_samples_total, self.subsample_size, replace=False)
+            labels = labels[subsample_indices]
+            for i in range(self.num_input_models_):
+                predictions[i] = predictions[i][subsample_indices]
 
         # if self.sorted_initialization:
         #     n_best = 20
@@ -190,7 +206,7 @@ class EnsembleSelection(AbstractWeightedEnsemble):
 
         logger.debug("Ensemble indices: " + str(self.indices_))
 
-    def _calculate_regret(self, y_true, y_pred_proba, metric, sample_weight=None):
+    def _calculate_regret(self, y_true: np.ndarray, y_pred_proba: np.ndarray, metric, sample_weight=None):
         if metric.needs_pred or metric.needs_quantile:
             preds = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
         else:

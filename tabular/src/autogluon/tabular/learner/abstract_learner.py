@@ -879,8 +879,12 @@ class AbstractTabularLearner(AbstractLearner):
                 inplace=True,
             )
             if "metric_error_test" in leaderboard:
-                leaderboard["metric_error_test"] = leaderboard["metric_error_test"].apply(self.eval_metric.convert_score_to_error)
-            leaderboard["metric_error_val"] = leaderboard["metric_error_val"].apply(self.eval_metric.convert_score_to_error)
+                leaderboard.loc[leaderboard["metric_error_test"].notnull(), "metric_error_test"] = leaderboard.loc[
+                    leaderboard["metric_error_test"].notnull(), "metric_error_test"
+                ].apply(self.eval_metric.convert_score_to_error)
+            leaderboard.loc[leaderboard["metric_error_val"].notnull(), "metric_error_val"] = leaderboard.loc[
+                leaderboard["metric_error_val"].notnull(), "metric_error_val"
+            ].apply(self.eval_metric.convert_score_to_error)
         if display:
             with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):
                 print(leaderboard)
@@ -1040,6 +1044,7 @@ class AbstractTabularLearner(AbstractLearner):
         model: str = "best",
         decision_thresholds: int | List[float] = 50,
         verbose: bool = True,
+        **kwargs,
     ) -> float:
         # TODO: docstring
         if metric is None:
@@ -1056,7 +1061,14 @@ class AbstractTabularLearner(AbstractLearner):
             y = self.transform_labels(y=data[self.label])
 
         return self.load_trainer().calibrate_decision_threshold(
-            X=X, y=y, metric=metric, model=model, weights=weights, decision_thresholds=decision_thresholds, verbose=verbose
+            X=X,
+            y=y,
+            metric=metric,
+            model=model,
+            weights=weights,
+            decision_thresholds=decision_thresholds,
+            verbose=verbose,
+            **kwargs,
         )
 
     # TODO: Add data info gathering at beginning of .fit() that is used by all learners to add to get_info output
