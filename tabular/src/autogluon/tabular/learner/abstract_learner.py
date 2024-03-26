@@ -446,8 +446,8 @@ class AbstractTabularLearner(AbstractLearner):
     # Fits _FULL models and links them in the stack so _FULL models only use other _FULL models as input during stacking
     # If model is specified, will fit all _FULL models that are ancestors of the provided model, automatically linking them.
     # If no model is specified, all models are refit and linked appropriately.
-    def refit_ensemble_full(self, model: str | List[str] = "all"):
-        return self.load_trainer().refit_ensemble_full(model=model)
+    def refit_ensemble_full(self, model: str | List[str] = "all", **kwargs):
+        return self.load_trainer().refit_ensemble_full(model=model, **kwargs)
 
     def fit_transform_features(self, X, y=None, **kwargs):
         if self.label in X:

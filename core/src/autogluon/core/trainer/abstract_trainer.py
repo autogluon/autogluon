@@ -46,6 +46,7 @@ from ..models import (
     StackerEnsembleModel,
     WeightedEnsembleModel,
 )
+from ..pseudolabeling.pseudolabeling import assert_pseudo_column_match
 from ..utils import (
     compute_permutation_feature_importance,
     compute_weighted_metric,
@@ -1245,7 +1246,7 @@ class AbstractTrainer:
 
     # You must have previously called fit() with cache_data=True
     # Fits _FULL versions of specified models, but does NOT link them (_FULL stackers will still use normal models as input)
-    def refit_single_full(self, X=None, y=None, X_val=None, y_val=None, X_unlabeled=None, models=None) -> List[str]:
+    def refit_single_full(self, X=None, y=None, X_val=None, y_val=None, X_unlabeled=None, models=None, **kwargs) -> List[str]:
         if X is None:
             X = self.load_X()
         if X_val is None:
@@ -1323,6 +1324,7 @@ class AbstractTrainer:
                         n_repeats=1,
                         ensemble_type=type(model),
                         refit_full=True,
+                        **kwargs,
                     )
                 if len(models_trained) == 1:
                     model_refit_map[model_name] = models_trained[0]
@@ -1347,7 +1349,7 @@ class AbstractTrainer:
     # Fits _FULL models and links them in the stack so _FULL models only use other _FULL models as input during stacking
     # If model is specified, will fit all _FULL models that are ancestors of the provided model, automatically linking them.
     # If no model is specified, all models are refit and linked appropriately.
-    def refit_ensemble_full(self, model: str | List[str] = "all") -> dict:
+    def refit_ensemble_full(self, model: str | List[str] = "all", **kwargs) -> dict:
         if model == "all":
             ensemble_set = self.get_model_names()
         elif isinstance(model, list):
@@ -1365,7 +1367,7 @@ class AbstractTrainer:
             else:
                 ensemble_set_valid.append(model)
         if ensemble_set_valid:
-            models_trained_full = self.refit_single_full(models=ensemble_set_valid)
+            models_trained_full = self.refit_single_full(models=ensemble_set_valid, **kwargs)
         else:
             models_trained_full = []
 
@@ -1807,6 +1809,7 @@ class AbstractTrainer:
             # Bagged model does validation on the fit level where as single models do it separately. Hence this if statement
             # is required
             if not isinstance(model, BaggedEnsembleModel) and X_pseudo is not None and y_pseudo is not None and X_pseudo.columns.equals(X.columns):
+                assert_pseudo_column_match(X=X, X_pseudo=X_pseudo)
                 X_w_pseudo = pd.concat([X, X_pseudo])
                 y_w_pseudo = pd.concat([y, y_pseudo])
                 model_fit_kwargs.pop("X_pseudo")
@@ -1814,6 +1817,11 @@ class AbstractTrainer:
                 logger.log(15, f"{len(X_pseudo)} extra rows of pseudolabeled data added to training set for {model.name}")
                 model = self._train_single(X_w_pseudo, y_w_pseudo, model, X_val, y_val, **model_fit_kwargs)
             else:
+                if level > 1:
+                    if X_pseudo is not None and y_pseudo is not None:
+                        logger.log(15, f"Dropping pseudo in stacking layer due to missing out-of-fold predictions")
+                    model_fit_kwargs.pop("X_pseudo", None)
+                    model_fit_kwargs.pop("y_pseudo", None)
                 model = self._train_single(X, y, model, X_val, y_val, total_resources=total_resources, **model_fit_kwargs)
 
             fit_end_time = time.time()

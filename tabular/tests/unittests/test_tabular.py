@@ -306,7 +306,18 @@ def test_advanced_functionality():
     predictor.delete_models(models_to_keep=[])  # Test that dry-run doesn't delete models
     assert len(predictor.model_names()) == num_models * 2
     predictor.predict(data=test_data)
-    predictor.delete_models(models_to_keep=[], dry_run=False)  # Test that dry-run deletes models
+
+    # Test refit_full with train_data_extra argument
+    refit_full_models = list(predictor.model_refit_map().values())
+    predictor.delete_models(models_to_delete=refit_full_models, dry_run=False)
+    assert len(predictor.model_names()) == num_models
+    assert predictor.model_refit_map() == dict()
+    predictor.refit_full(train_data_extra=test_data)  # train_data_extra argument
+    assert len(predictor.model_names()) == num_models * 2
+    assert len(predictor.model_refit_map()) == num_models
+    predictor.predict(data=test_data)
+
+    predictor.delete_models(models_to_keep=[], dry_run=False)  # Test that dry_run=False deletes models
     assert len(predictor.model_names()) == 0
     assert len(predictor.leaderboard()) == 0
     assert len(predictor.leaderboard(extra_info=True)) == 0

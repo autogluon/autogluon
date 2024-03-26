@@ -237,3 +237,25 @@ def filter_ensemble_classification(predictor, unlabeled_data: pd.DataFrame, lead
     test_pseudo_indices = sample_bins_uniformly(y_pred_proba=y_pred_proba_ensemble, df_indexes=pseudo_indexes)
 
     return test_pseudo_indices[test_pseudo_indices], y_pred_proba_ensemble, y_pred_ensemble
+
+
+def assert_pseudo_column_match(X: pd.DataFrame, X_pseudo: pd.DataFrame):
+    """
+    Raises an AssertionError if X and X_pseudo don't share the same columns.
+    Useful to call prior to concatenating the data together to avoid unexpected behavior.
+
+    Parameters
+    ----------
+    X: pd.DataFrame
+        The original training data
+    X_pseudo: pd.DataFrame
+        Additional training data with pseudo-labelled targets
+    """
+    if set(X.columns) != set(X_pseudo.columns):
+        X_unique_cols = sorted(set(X.columns).difference(X_pseudo.columns))
+        X_pseudo_unique_cols = sorted(set(X_pseudo.columns).difference(X.columns))
+        raise AssertionError(
+            f"X and X_pseudo columns are mismatched!\n"
+            f"\tUnexpected Columns in X_pseudo: {X_pseudo_unique_cols}\n"
+            f"\t   Missing Columns in X_pseudo: {X_unique_cols}"
+        )
