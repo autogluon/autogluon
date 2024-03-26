@@ -3,6 +3,7 @@
 Examples showing how to use `Conv-LoRA` for parameter efficient fine-tuning SAM.
 
 ## 1. Installation
+The installation may take a while since AutoGluon Multimodal has multiple dependencies.
 ```shell
   conda create --name conv-lora python=3.10
   conda activate conv-lora
