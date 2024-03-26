@@ -139,11 +139,12 @@ def test_when_bool_columns_provided_then_they_are_converted_to_cat():
     assert isinstance(data_transformed.static_features["static_bool"].dtype, pd.CategoricalDtype)
 
 
-def test_when_covariates_contain_missing_values_then_they_are_filled_during_transform():
+@pytest.mark.parametrize("known_covariates_names", [[], ["real_1", "cat_1"], ["real_1", "real_2", "cat_1", "cat_2"]])
+def test_when_covariates_contain_missing_values_then_they_are_filled_during_transform(known_covariates_names):
     prediction_length = 5
-    known_covariates_names = ["real_1", "cat_1"]
     data_full = get_data_frame_with_covariates(covariates_cat=["cat_1", "cat_2"], covariates_real=["real_1", "real_2"])
     data_full.iloc[[0, 1, 8, 9, 10, 12, 15, -2, -1]] = float("nan")
+    data_full.loc[data_full.item_ids[1]] = float("nan")
 
     data, known_covariates = data_full.get_model_inputs_for_scoring(prediction_length, known_covariates_names)
     feat_generator = TimeSeriesFeatureGenerator(target="target", known_covariates_names=known_covariates_names)
@@ -152,4 +153,18 @@ def test_when_covariates_contain_missing_values_then_they_are_filled_during_tran
     assert not data_transformed[feat_generator.covariate_metadata.covariates].isna().any(axis=None)
 
     known_covariates_transformed = feat_generator.transform_future_known_covariates(known_covariates)
-    assert not known_covariates_transformed[known_covariates_names].isna().any(axis=None)
+    if known_covariates_names == []:
+        assert known_covariates_transformed is None
+    else:
+        assert not known_covariates_transformed[known_covariates_names].isna().any(axis=None)
+
+
+def test_when_static_features_contain_missing_values_then_they_are_filled_during_transform():
+    data = get_data_frame_with_covariates(
+        static_features_cat=["cat_1", "cat_2"], static_features_real=["real_1", "real_2"]
+    )
+    data.static_features.iloc[[0], [1, 2]] = float("nan")
+    feat_generator = TimeSeriesFeatureGenerator(target="target", known_covariates_names=[])
+
+    data_transformed = feat_generator.fit_transform(data)
+    assert not data_transformed.static_features.isna().any(axis=None)
