@@ -151,6 +151,7 @@ def test_when_covariates_contain_missing_values_then_they_are_filled_during_tran
 
     data_transformed = feat_generator.fit_transform(data)
     assert not data_transformed[feat_generator.covariate_metadata.covariates].isna().any(axis=None)
+    assert data_transformed["target"].isna().any()
 
     known_covariates_transformed = feat_generator.transform_future_known_covariates(known_covariates)
     if known_covariates_names == []:
