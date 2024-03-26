@@ -1,4 +1,5 @@
 """Unit tests for trainers"""
+
 import copy
 import shutil
 import sys
@@ -585,3 +586,14 @@ def test_given_no_models_trained_during_fit_then_empty_leaderboard_returned(use_
     leaderboard = trainer.leaderboard(data=test_data)
     assert all(c in leaderboard.columns for c in expected_columns)
     assert len(leaderboard) == 0
+
+
+@pytest.mark.parametrize("skip_model_selection", [True, False])
+def test_given_skip_model_selection_when_trainer_fits_then_val_score_is_not_computed(
+    temp_model_path, skip_model_selection
+):
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path, skip_model_selection=skip_model_selection)
+    trainer.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
+
+    model = trainer.load_model("Naive")
+    assert (model.val_score is None) == skip_model_selection

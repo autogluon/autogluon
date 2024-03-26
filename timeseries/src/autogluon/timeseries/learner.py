@@ -97,6 +97,7 @@ class TimeSeriesLearner(AbstractLearner):
                 target=self.target,
                 quantile_levels=self.quantile_levels,
                 verbosity=kwargs.get("verbosity", 2),
+                skip_model_selection=kwargs.get("skip_model_selection", False),
                 enable_ensemble=kwargs.get("enable_ensemble", True),
                 metadata=self.feature_generator.covariate_metadata,
                 val_splitter=val_splitter,

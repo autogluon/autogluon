@@ -425,6 +425,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         refit_every_n_windows: int = 1,
         refit_full: bool = False,
         enable_ensemble: bool = True,
+        skip_model_selection: bool = False,
         random_seed: Optional[int] = 123,
         verbosity: Optional[int] = None,
     ) -> "TimeSeriesPredictor":
@@ -496,10 +497,22 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
             Available presets:
 
-            - ``"fast_training"``: fit simple statistical models (``ETS``, ``Theta``, ``Naive``, ``SeasonalNaive``) + fast tree-based models ``RecursiveTabular`` and ``DirectTabular``. These models are fast to train but may not be very accurate.
-            - ``"medium_quality"``: all models mentioned above + deep learning model ``TemporalFusionTransformer``. Default setting that produces good forecasts with reasonable training time.
-            - ``"high_quality"``: All ML models available in AutoGluon + additional statistical models (``NPTS``, ``AutoETS``, ``AutoARIMA``, ``CrostonSBA``, ``DynamicOptimizedTheta``). Much more accurate than ``medium_quality``, but takes longer to train.
+            - ``"fast_training"``: fit simple statistical models (``ETS``, ``Theta``, ``Naive``, ``SeasonalNaive``) + fast tree-based models ``RecursiveTabular``
+              and ``DirectTabular``. These models are fast to train but may not be very accurate.
+            - ``"medium_quality"``: all models mentioned above + deep learning model ``TemporalFusionTransformer``. Default setting that produces good forecasts
+              with reasonable training time.
+            - ``"high_quality"``: All ML models available in AutoGluon + additional statistical models (``NPTS``, ``AutoETS``, ``AutoARIMA``, ``CrostonSBA``,
+              ``DynamicOptimizedTheta``). Much more accurate than ``medium_quality``, but takes longer to train.
             - ``"best_quality"``: Same models as in ``"high_quality"`, but performs validation with multiple backtests. Usually better than ``high_quality``, but takes even longer to train.
+
+            Available presets with the `Chronos <https://github.com/amazon-science/chronos-forecasting>`_ model:
+
+            - ``"chronos_{model_size}"``: where model size is one of ``tiny,mini,small,base,large``. Uses the Chronos pretrained model for zero-shot forecasting.
+              See the documentation for ``ChronosModel`` or see `Hugging Face <https://huggingface.co/collections/amazon/chronos-models-65f1791d630a8d57cb718444>`_ for more information.
+              Note that a GPU is required for model sizes ``small``, ``base`` and ``large``.
+            - ``"chronos"``: alias for ``"chronos_small"``.
+            - ``"chronos_ensemble"``: builds an ensemble of the models specified in ``"high_quality"`` and ``"chronos_small"``.
+            - ``"chronos_large_ensemble"``: builds an ensemble of the models specified in ``"high_quality"`` and ``"chronos_large"``.
 
             Details for these presets can be found in ``autogluon/timeseries/configs/presets_configs.py``. If not
             provided, user-provided values for ``hyperparameters`` and ``hyperparameter_tune_kwargs`` will be used
@@ -630,6 +643,10 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         enable_ensemble : bool, default = True
             If True, the ``TimeSeriesPredictor`` will fit a simple weighted ensemble on top of the models specified via
             ``hyperparameters``.
+        skip_model_selection : bool, default = False
+            If True, predictor will not compute the validation score. For example, this argument is useful if we want
+            to use the predictor as a wrapper for a single pre-trained model. If set to True, then the ``hyperparameters``
+            dict must contain exactly one model without hyperparameter search spaces or an exception will be raised.
         random_seed : int or None, default = 123
             If provided, fixes the seed of the random number generator for all models. This guarantees reproducible
             results for most models (except those trained on GPU because of the non-determinism of GPU operations).
@@ -669,6 +686,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             val_step_size=val_step_size,
             refit_every_n_windows=refit_every_n_windows,
             refit_full=refit_full,
+            skip_model_selection=skip_model_selection,
             enable_ensemble=enable_ensemble,
             random_seed=random_seed,
             verbosity=verbosity,
@@ -703,9 +721,10 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         if num_val_windows == 0 and tuning_data is None:
             raise ValueError("Please set num_val_windows >= 1 or provide custom tuning_data")
 
-        train_data = self._filter_short_series(
-            train_data, num_val_windows=num_val_windows, val_step_size=val_step_size
-        )
+        if not skip_model_selection:
+            train_data = self._filter_short_series(
+                train_data, num_val_windows=num_val_windows, val_step_size=val_step_size
+            )
 
         val_splitter = ExpandingWindowSplitter(
             prediction_length=self.prediction_length, num_val_windows=num_val_windows, val_step_size=val_step_size
@@ -722,6 +741,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             verbosity=verbosity,
             val_splitter=val_splitter,
             refit_every_n_windows=refit_every_n_windows,
+            skip_model_selection=skip_model_selection,
             enable_ensemble=enable_ensemble,
             random_seed=random_seed,
         )

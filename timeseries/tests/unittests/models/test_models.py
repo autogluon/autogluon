@@ -21,13 +21,18 @@ from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
 
 from ..common import DUMMY_TS_DATAFRAME, CustomMetric, dict_equal_primitive, get_data_frame_with_item_index
+from .test_chronos import TESTABLE_MODELS as CHRONOS_TESTABLE_MODELS
 from .test_gluonts import TESTABLE_MODELS as GLUONTS_TESTABLE_MODELS
 from .test_local import TESTABLE_MODELS as LOCAL_TESTABLE_MODELS
 from .test_mlforecast import TESTABLE_MODELS as MLFORECAST_TESTABLE_MODELS
 from .test_multi_window_model import get_multi_window_deepar
 
 TESTABLE_MODELS = (
-    GLUONTS_TESTABLE_MODELS + LOCAL_TESTABLE_MODELS + MLFORECAST_TESTABLE_MODELS + [get_multi_window_deepar]
+    CHRONOS_TESTABLE_MODELS
+    + GLUONTS_TESTABLE_MODELS
+    + LOCAL_TESTABLE_MODELS
+    + MLFORECAST_TESTABLE_MODELS
+    + [get_multi_window_deepar]
 )
 
 DUMMY_HYPERPARAMETERS = {
@@ -36,6 +41,7 @@ DUMMY_HYPERPARAMETERS = {
     "maxiter": 1,
     "n_jobs": 1,
     "use_fallback_model": False,
+    "model_path": "amazon/chronos-t5-tiny",
 }
 TESTABLE_PREDICTION_LENGTHS = [1, 5]
 
@@ -147,11 +153,7 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct
         path=temp_model_path,
         freq="H",
         quantile_levels=[0.1, 0.9],
-        hyperparameters={
-            "epochs": space.Int(1, 3),
-            "num_batches_per_epoch": 1,
-            "use_fallback_model": False,
-        },
+        hyperparameters={**DUMMY_HYPERPARAMETERS, "epochs": space.Int(1, 3)},
     )
     if isinstance(model, MultiWindowBacktestingModel):
         val_data = None
@@ -409,11 +411,7 @@ def test_when_custom_metric_passed_to_model_then_model_can_hyperparameter_tune(m
     model = model_class(
         prediction_length=3,
         freq=DUMMY_TS_DATAFRAME.freq,
-        hyperparameters={
-            "epochs": space.Int(1, 3),
-            "num_batches_per_epoch": 1,
-            "use_fallback_model": False,
-        },
+        hyperparameters={**DUMMY_HYPERPARAMETERS, "epochs": space.Int(1, 3)},
         eval_metric=CustomMetric(),
     )
     backend = model._get_hpo_backend()

@@ -69,6 +69,7 @@ Note that some of the models' hyperparameters have names and default values that
    WaveNetModel
    DirectTabularModel
    RecursiveTabularModel
+   ChronosModel
 
 ```
 
@@ -250,6 +251,19 @@ Tabular models convert time series forecasting into a tabular regression problem
    :members: init
 
 ```
+
+
+## Pretrained models
+
+Deep learning models pretrained on large time series datasets, able to perform zero-shot forecasting.
+
+
+```{eval-rst}
+.. autoclass:: ChronosModel
+   :members: init
+
+```
+
 
 ## MXNet Models
 

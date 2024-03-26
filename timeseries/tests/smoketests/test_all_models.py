@@ -7,6 +7,7 @@ from pkg_resources import parse_version
 
 from autogluon.timeseries import TimeSeriesPredictor
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
+from autogluon.timeseries.models.presets import MODEL_TYPES
 from autogluon.timeseries.utils.datetime.seasonality import DEFAULT_SEASONALITIES
 
 TARGET_COLUMN = "custom_target"
@@ -61,6 +62,7 @@ ALL_MODELS = {
     "ADIDA": DUMMY_MODEL_HPARAMS,
     "Average": DUMMY_MODEL_HPARAMS,
     "AutoCES": DUMMY_MODEL_HPARAMS,
+    "Chronos": {"model_path": "amazon/chronos-t5-tiny"},
     "CrostonSBA": DUMMY_MODEL_HPARAMS,
     "DLinear": DUMMY_MODEL_HPARAMS,
     "DeepAR": DUMMY_MODEL_HPARAMS,
@@ -85,7 +87,7 @@ ALL_MODELS = {
 
 
 def assert_leaderboard_contains_all_models(leaderboard: pd.DataFrame, include_ensemble: bool = True):
-    expected_models = set(ALL_MODELS)
+    expected_models = set(MODEL_TYPES[m](hyperparameters=kwargs).name for m, kwargs in ALL_MODELS.items())
     if include_ensemble:
         expected_models = expected_models.union({"WeightedEnsemble"})
     failed_models = expected_models.difference(set(leaderboard["model"]))
