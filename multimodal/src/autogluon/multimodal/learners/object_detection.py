@@ -691,6 +691,7 @@ class ObjectDetectionLearner(BaseLearner):
                 pred = convert_pred_to_xywh(pred)
 
         if save_results and self._problem_type == OBJECT_DETECTION:
+            # TODO: it will create a new path if fit is called
             self._save_path = setup_save_path(
                 old_save_path=self._save_path,
                 warn_if_exist=False,
