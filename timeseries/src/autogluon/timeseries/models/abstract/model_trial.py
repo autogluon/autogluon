@@ -26,17 +26,17 @@ def model_trial(
     """Runs a single trial of a hyperparameter tuning. Replaces
     `core.models.abstract.model_trial.model_trial` for timeseries models.
     """
+    model = init_model(
+        args, model_cls, init_params, backend=hpo_executor.executor_type, is_bagged_model=is_bagged_model
+    )
+    model.set_contexts(path_context=os.path.join(model.path_root, model.name))
+
+    train_data = load_pkl.load(train_path)
+    val_data = load_pkl.load(val_path)
+
+    eval_metric = model.eval_metric
+
     try:
-        model = init_model(
-            args, model_cls, init_params, backend=hpo_executor.executor_type, is_bagged_model=is_bagged_model
-        )
-        model.set_contexts(path_context=os.path.join(model.path_root, model.name))
-
-        train_data = load_pkl.load(train_path)
-        val_data = load_pkl.load(val_path)
-
-        eval_metric = model.eval_metric
-
         model = fit_and_save_model(
             model,
             fit_kwargs,
@@ -46,7 +46,6 @@ def model_trial(
             time_start=time_start,
             time_limit=time_limit,
         )
-
     except Exception as err:
         if not isinstance(err, TimeLimitExceeded):
             logger.error(f"\tWarning: Exception caused {model.name} to fail during training... Skipping this model.")
