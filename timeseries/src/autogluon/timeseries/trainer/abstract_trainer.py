@@ -5,7 +5,7 @@ import time
 import traceback
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple, Type, Union
 
 import networkx as nx
 import numpy as np
@@ -70,21 +70,6 @@ class SimpleAbstractTrainer:
         for model in models:
             results[model] = self.model_graph.nodes[model][attribute]
         return results
-
-    def get_model_best(self) -> str:
-        """Return the name of the best model by model performance on the validation set."""
-        models = self.get_model_names()
-        if not models:
-            raise ValueError("Trainer has no fit models that can predict.")
-        if len(models) == 1:
-            return models[0]
-        model_performances = self.get_models_attribute_dict(attribute="val_score")
-        performances_list = [(m, model_performances[m]) for m in models if model_performances[m] is not None]
-
-        if not performances_list:
-            raise ValueError("No fitted models have validation scores computed.")
-
-        return max(performances_list, key=lambda i: i[1])[0]
 
     def get_model_attribute(self, model: Union[str, AbstractModel], attribute: str):
         """Get a member attribute for given model from the `model_graph`."""
@@ -174,9 +159,12 @@ class SimpleAbstractTrainer:
         raise NotImplementedError
 
     # FIXME: Copy pasted from Tabular
-    def get_minimum_model_set(self, model: Union[str, AbstractTimeSeriesModel], include_self: bool = True) -> list:
+    def get_minimum_model_set(
+        self, model: Union[str, AbstractTimeSeriesModel], include_self: bool = True
+    ) -> List[str]:
         """Gets the minimum set of models that the provided model depends on, including itself.
-        Returns a list of model names"""
+        Returns a list of model names
+        """
         if not isinstance(model, str):
             model = model.name
         minimum_model_set = list(nx.bfs_tree(self.model_graph, model, reverse=True))
@@ -218,6 +206,9 @@ class SimpleAbstractTrainer:
         save_pkl.save(path=os.path.join(self.path, self.trainer_info_name), object=info)
         save_json.save(path=os.path.join(self.path, self.trainer_info_json_name), obj=info)
         return info
+
+    def get_model_best(self, *args, **kwargs) -> AbstractModel:
+        raise NotImplementedError
 
     def get_info(self, include_model_info: bool = False) -> Dict[str, Any]:
         num_models_trained = len(self.get_model_names())
@@ -388,6 +379,29 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             levels[n] = max(paths_from[n].get(src, 0) for src in rootset)
 
         return levels
+
+    def get_model_best(self) -> str:
+        """Return the name of the best model by model performance on the validation set."""
+        models = self.get_model_names()
+        if not models:
+            raise ValueError("Trainer has no fit models that can predict.")
+        if len(models) == 1:
+            return models[0]
+        model_performances = self.get_models_attribute_dict(attribute="val_score")
+        model_levels = self._get_model_levels()
+        model_name_score_level_list = [
+            (m, model_performances[m], model_levels.get(m, 0)) for m in models if model_performances[m] is not None
+        ]
+
+        if not model_name_score_level_list:
+            raise ValueError("No fitted models have validation scores computed.")
+
+        # rank models in terms of validation score. if two models have the same validation score,
+        # rank them by their level in the model graph (lower level models are preferred).
+        return max(
+            model_name_score_level_list,
+            key=lambda mns: (mns[1], -mns[2]),  # (score, -level)
+        )[0]
 
     def get_model_names(self, level: Optional[int] = None, **kwargs) -> List[str]:
         """Get model names that are registered in the model graph"""
@@ -796,6 +810,44 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         df.reset_index(drop=True, inplace=True)
 
         return df[explicit_column_order]
+
+    def persist(
+        self, model_names: Union[Literal["all", "best"], List[str]] = "all", with_ancestors: bool = False, **kwargs
+    ) -> List[str]:
+        if model_names == "all":
+            model_names = self.get_model_names()
+        elif model_names == "best":
+            model_names = [self.get_model_best()]
+        if not isinstance(model_names, list):
+            raise ValueError(f"model_names must be a list of model names. Invalid value: {model_names}")
+
+        if with_ancestors:
+            models_with_ancestors = set()
+            for model_name in model_names:
+                models_with_ancestors = models_with_ancestors.union(self.get_minimum_model_set(model_name))
+            model_names = list(models_with_ancestors)
+
+        model_names_already_persisted = [model_name for model_name in model_names if model_name in self.models]
+        model_names = [model_name for model_name in model_names if model_name not in model_names_already_persisted]
+
+        for model_name in model_names:
+            model = self.load_model(model_name)
+            model.persist()
+            self.models[model.name] = model
+
+        return model_names
+
+    def unpersist(self, model_names: Union[Literal["all"], List[str]] = "all") -> List[str]:
+        if model_names == "all":
+            model_names = list(self.models.keys())
+        if not isinstance(model_names, list):
+            raise ValueError(f"model_names must be a list of model names. Invalid value: {model_names}")
+        unpersisted_models = []
+        for model in model_names:
+            if model in self.models:
+                self.models.pop(model)
+                unpersisted_models.append(model)
+        return unpersisted_models
 
     def _get_model_for_prediction(self, model: Optional[Union[str, AbstractTimeSeriesModel]] = None) -> str:
         """Given an optional identifier or model object, return the name of the model with which to predict.

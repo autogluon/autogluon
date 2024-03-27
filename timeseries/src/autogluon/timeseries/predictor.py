@@ -5,7 +5,7 @@ import os
 import pprint
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple, Type, Union
 
 import numpy as np
 import pandas as pd
@@ -982,6 +982,47 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             if self._trainer.model_best in models:
                 return self._trainer.model_best
         return self._trainer.get_model_best()
+
+    def persist(
+        self, models: Union[Literal["all", "best"], List[str]] = "best", with_ancestors: bool = True
+    ) -> List[str]:
+        """Persist models in memory for reduced inference latency. This is particularly important if the models are being used for online
+        inference where low latency is critical. If models are not persisted in memory, they are loaded from disk every time they are
+        asked to make predictions. This is especially cumbersome for large deep learning based models which have to be loaded into
+        accelerator (e.g., GPU) memory each time.
+
+        Parameters
+        ----------
+        models : list of str or str, default = 'best'
+            Model names of models to persist.
+            If 'best' then the model with the highest validation score is persisted (this is the model used for prediction by default).
+            If 'all' then all models are persisted. Valid models are listed in this `predictor` by calling `predictor.model_names()`.
+        with_ancestors : bool, default = True
+            If True, all ancestor models of the provided models will also be persisted.
+            If False, ensemble models will not have the models they depend on persisted unless those models were specified in `models`.
+            This will slow down inference as the ancestor models will still need to be loaded from disk for each predict call.
+            Only relevant for ensemble models.
+
+        Returns
+        -------
+        list_of_models : List[str]
+            List of persisted model names.
+        """
+        return self._learner.persist_trainer(models=models, with_ancestors=with_ancestors)
+
+    def unpersist(self) -> List[str]:
+        """Unpersist models in memory for reduced memory usage. If models are not persisted in memory, they are loaded from
+        disk every time they are asked to make predictions.
+
+        Note: Another way to reset the predictor and unpersist models is to reload the predictor from disk
+        via `predictor = TimeSeriesPredictor.load(predictor.path)`.
+
+        Returns
+        -------
+        list_of_models : List[str]
+            List of unpersisted model names.
+        """
+        return self._learner.unpersist_trainer()
 
     def leaderboard(
         self,
