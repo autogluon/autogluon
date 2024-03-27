@@ -251,7 +251,7 @@ class TimeSeriesLearner(AbstractLearner):
         list_of_models : List[str]
             List of models removed from memory
         """
-        unpersisted_models = self.trainer.unpersist()
+        unpersisted_models = self.load_trainer().unpersist()
         self.trainer = None
         return unpersisted_models
 
