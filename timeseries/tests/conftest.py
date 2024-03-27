@@ -1,5 +1,4 @@
-import shutil
-import tempfile
+from uuid import uuid4
 
 import pytest
 
@@ -28,13 +27,7 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(skip_slow)
 
 
-@pytest.fixture(scope="function")
-def temp_model_path():
-    """Pytest fixture to save as model paths that clean up after themselves"""
-    td = tempfile.mkdtemp()
-    yield td
-    try:
-        shutil.rmtree(td)
-    except PermissionError:
-        # Windows won't allow to clean up the directory if logs are saved to it; skip deletion
-        pass
+@pytest.fixture()
+def temp_model_path(tmp_path_factory):
+    fn = tmp_path_factory.mktemp(str(uuid4())[:6])
+    return str(fn)
