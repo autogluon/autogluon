@@ -234,8 +234,9 @@ class ChronosModel(AbstractTimeSeriesModel):
 
         self.model_pipeline = pipeline
 
-    def persist(self) -> None:
+    def persist(self) -> "ChronosModel":
         self.load_model_pipeline(context_length=self.context_length or self.maximum_context_length)
+        return self
 
     def _fit(
         self,

@@ -415,12 +415,12 @@ class AbstractTimeSeriesModel(AbstractModel):
         hpo_executor.register_resources(self, k_fold=1, **kwargs)
         return self._hyperparameter_tune(hpo_executor=hpo_executor, **kwargs)
 
-    def persist(self) -> None:
+    def persist(self) -> "AbstractTimeSeriesModel":
         """Ask the model to persist its assets in memory, i.e., to predict with low latency. In practice
         this is used for pretrained models that have to lazy-load model parameters to device memory at
         prediction time.
         """
-        return None
+        return self
 
     def _hyperparameter_tune(
         self,

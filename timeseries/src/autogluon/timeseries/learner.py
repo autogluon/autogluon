@@ -1,7 +1,7 @@
 import logging
 import reprlib
 import time
-from typing import Any, Dict, List, Optional, Type, Union
+from typing import Any, Dict, List, Literal, Optional, Type, Union
 
 import pandas as pd
 
@@ -228,14 +228,32 @@ class TimeSeriesLearner(AbstractLearner):
         learner_info.pop("random_state", None)
         return learner_info
 
-    def persist_trainer(self, models="all", with_ancestors=False, **kwargs) -> list:
-        """Loads models and trainer in memory so that they don't have to be loaded during predictions"""
-        self.trainer = self.load_trainer()
-        self.trainer.persist(models, with_ancestors=with_ancestors)
+    def persist_trainer(
+        self, models: Union[Literal["all", "best"], List[str]] = "all", with_ancestors: bool = False
+    ) -> List[str]:
+        """Loads models and trainer in memory so that they don't have to be
+        loaded during predictions
 
-    def unpersist_trainer(self):
-        self.trainer.unpersist()
+        Returns
+        -------
+        list_of_models : List[str]
+            List of models persisted in memory
+        """
+        self.trainer = self.load_trainer()
+        return self.trainer.persist(models, with_ancestors=with_ancestors)
+
+    def unpersist_trainer(self) -> List[str]:
+        """Unloads models and trainer from memory. Models will have to be reloaded from disk
+        when predicting.
+
+        Returns
+        -------
+        list_of_models : List[str]
+            List of models removed from memory
+        """
+        unpersisted_models = self.trainer.unpersist()
         self.trainer = None
+        return unpersisted_models
 
     def refit_full(self, model: str = "all") -> Dict[str, str]:
         return self.load_trainer().refit_full(model=model)

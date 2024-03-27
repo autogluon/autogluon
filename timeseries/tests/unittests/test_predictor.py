@@ -1347,3 +1347,23 @@ def test_when_predictor_saved_loaded_and_persist_not_called_then_no_models_persi
     predictor = TimeSeriesPredictor.load(path)
 
     assert len(predictor._learner.load_trainer().models) == 0
+
+
+@pytest.mark.parametrize("hyperparameters", [{"Naive": {}}, {"SeasonalNaive": {}}, {"Naive": {}, "SeasonalNaive": {}}])
+def test_when_predictor_persisted_saved_loaded_and_persist_not_called_then_no_models_persisted(
+    temp_model_path, hyperparameters
+):
+    predictor = TimeSeriesPredictor(path=temp_model_path).fit(
+        DUMMY_TS_DATAFRAME,
+        hyperparameters=hyperparameters,
+        enable_ensemble=False,
+    )
+    path = predictor.path
+    predictor.persist()
+
+    assert len(predictor._learner.load_trainer().models) > 0
+
+    predictor.save()
+    predictor = TimeSeriesPredictor.load(path)
+
+    assert len(predictor._learner.load_trainer().models) == 0

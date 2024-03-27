@@ -5,7 +5,7 @@ import time
 import traceback
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple, Type, Union
 
 import networkx as nx
 import numpy as np
@@ -159,9 +159,12 @@ class SimpleAbstractTrainer:
         raise NotImplementedError
 
     # FIXME: Copy pasted from Tabular
-    def get_minimum_model_set(self, model: Union[str, AbstractTimeSeriesModel], include_self: bool = True) -> list:
+    def get_minimum_model_set(
+        self, model: Union[str, AbstractTimeSeriesModel], include_self: bool = True
+    ) -> List[str]:
         """Gets the minimum set of models that the provided model depends on, including itself.
-        Returns a list of model names"""
+        Returns a list of model names
+        """
         if not isinstance(model, str):
             model = model.name
         minimum_model_set = list(nx.bfs_tree(self.model_graph, model, reverse=True))
@@ -386,43 +389,25 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             return models[0]
         model_performances = self.get_models_attribute_dict(attribute="val_score")
         model_levels = self._get_model_levels()
-        performances_list = [
+        model_name_score_level_list = [
             (m, model_performances[m], model_levels.get(m, 0)) for m in models if model_performances[m] is not None
         ]
 
-        if not performances_list:
+        if not model_name_score_level_list:
             raise ValueError("No fitted models have validation scores computed.")
 
         # rank models in terms of validation score. if two models have the same validation score,
         # rank them by their level in the model graph (lower level models are preferred).
-        return max(performances_list, key=lambda i: (i[1], -i[2]))[0]
+        return max(
+            model_name_score_level_list,
+            key=lambda mns: (mns[1], -mns[2]),  # (score, -level)
+        )[0]
 
     def get_model_names(self, level: Optional[int] = None, **kwargs) -> List[str]:
         """Get model names that are registered in the model graph"""
         if level is not None:
             return list(node for node, l in self._get_model_levels().items() if l == level)  # noqa: E741
         return list(self.model_graph.nodes)
-
-    # TODO: the following two methods are copied from tabular's AbstractTrainer.
-    def get_minimum_model_set(self, model, include_self=True) -> list:
-        """Gets the minimum set of models that the provided model depends on, including itself
-        Returns a list of model names
-        """
-        if not isinstance(model, str):
-            model = model.name
-        minimum_model_set = list(nx.bfs_tree(self.model_graph, model, reverse=True))
-        if not include_self:
-            minimum_model_set = [m for m in minimum_model_set if m != model]
-        return minimum_model_set
-
-    def get_minimum_models_set(self, models: list) -> list:
-        """Gets the minimum set of models that the provided models depend on, including themselves
-        Returns a list of model names
-        """
-        models_set = set()
-        for model in models:
-            models_set = models_set.union(self.get_minimum_model_set(model))
-        return list(models_set)
 
     def _train_single(
         self,
@@ -826,28 +811,33 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         return df[explicit_column_order]
 
-    def persist(self, model_names="all", with_ancestors=False, **kwargs) -> List[str]:
+    def persist(
+        self, model_names: Union[Literal["all", "best"], List[str]] = "all", with_ancestors: bool = False, **kwargs
+    ) -> List[str]:
         if model_names == "all":
             model_names = self.get_model_names()
         elif model_names == "best":
             model_names = [self.get_model_best()]
         if not isinstance(model_names, list):
             raise ValueError(f"model_names must be a list of model names. Invalid value: {model_names}")
+
         if with_ancestors:
-            model_names = self.get_minimum_models_set(model_names)
+            models_with_ancestors = set()
+            for model_name in model_names:
+                models_with_ancestors = models_with_ancestors.union(self.get_minimum_model_set(model_name))
+            model_names = list(models_with_ancestors)
+
         model_names_already_persisted = [model_name for model_name in model_names if model_name in self.models]
         model_names = [model_name for model_name in model_names if model_name not in model_names_already_persisted]
 
-        models = []
         for model_name in model_names:
             model = self.load_model(model_name)
             model.persist()
             self.models[model.name] = model
-            models.append(model)
 
         return model_names
 
-    def unpersist(self, model_names="all") -> list:
+    def unpersist(self, model_names: Union[Literal["all"], List[str]] = "all") -> List[str]:
         if model_names == "all":
             model_names = list(self.models.keys())
         if not isinstance(model_names, list):
