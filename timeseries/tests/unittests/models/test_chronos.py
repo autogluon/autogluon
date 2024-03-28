@@ -35,9 +35,6 @@ HYPERPARAMETER_DICTS = [
     {
         "context_length": None,
     },
-    {
-        "model_path": "tiny",
-    },
 ]
 
 
@@ -53,10 +50,10 @@ HYPERPARAMETER_DICTS = [
         *HYPERPARAMETER_DICTS,
     ],
 )
-def default_chronos_tiny_model(request) -> ChronosModel:
+def default_chronos_tiny_model(request, hf_model_path) -> ChronosModel:
     model = ChronosModel(
         hyperparameters={
-            "model_path": "amazon/chronos-t5-tiny",
+            "model_path": hf_model_path,
             "num_samples": 3,
             "context_length": 16,
             "device": "cpu",
@@ -68,13 +65,13 @@ def default_chronos_tiny_model(request) -> ChronosModel:
 
 
 @pytest.fixture(scope="module", params=HYPERPARAMETER_DICTS)
-def default_chronos_tiny_model_gpu(request) -> Optional[ChronosModel]:
+def default_chronos_tiny_model_gpu(request, hf_model_path) -> Optional[ChronosModel]:
     if not GPU_AVAILABLE:
         return None
 
     model = ChronosModel(
         hyperparameters={
-            "model_path": "amazon/chronos-t5-tiny",
+            "model_path": hf_model_path,
             "device": "cuda",
             **request.param,
         },
@@ -92,6 +89,17 @@ def test_when_on_cpu_then_chronos_model_can_score_and_cache_oof(data, default_ch
 @pytest.mark.parametrize("data", DATASETS)
 def test_when_on_cpu_then_chronos_model_can_infer(data, default_chronos_tiny_model):
     predictions = default_chronos_tiny_model.predict(data)
+    assert all(predictions.item_ids == data.item_ids)
+
+
+@pytest.mark.parametrize("data", DATASETS)
+def test_when_on_cpu_and_model_requested_from_hf_then_chronos_model_can_infer(data):
+    model = ChronosModel(
+        hyperparameters={"model_path": "tiny", "device": "cpu"},
+    )
+    model.fit(train_data=None)
+    predictions = model.predict(data)
+
     assert all(predictions.item_ids == data.item_ids)
 
 
@@ -129,11 +137,11 @@ def test_given_nan_features_when_on_gpu_then_chronos_model_inferences_not_nan(de
 
 
 @pytest.mark.parametrize("batch_size", [6, 12])
-def test_when_batch_size_provided_then_batch_size_used_to_infer(batch_size):
+def test_when_batch_size_provided_then_batch_size_used_to_infer(batch_size, hf_model_path):
     data = get_data_frame_with_item_index(list(range(20)))
     model = ChronosModel(
         hyperparameters={
-            "model_path": "amazon/chronos-t5-tiny",
+            "model_path": hf_model_path,
             "device": "cpu",
             "batch_size": batch_size,
             "context_length": 16,
@@ -207,10 +215,10 @@ def test_when_gpu_models_saved_then_models_can_be_loaded_and_inferred(data, defa
     "data_length, expected_context_length", [(5, 5), (7, 7), (1000, ChronosModel.maximum_context_length)]
 )
 def test_when_context_length_not_provided_then_context_length_set_to_dataset_length(
-    data_length, expected_context_length
+    hf_model_path, data_length, expected_context_length
 ):
     data = get_data_frame_with_item_index(list(range(3)), data_length=data_length)
-    model = ChronosModel(hyperparameters={"model_path": "tiny"})
+    model = ChronosModel(hyperparameters={"model_path": hf_model_path})
     model.fit(train_data=None)
     model.predict(data)
 
@@ -228,10 +236,10 @@ def test_when_context_length_not_provided_then_context_length_set_to_dataset_len
     ],
 )
 def test_when_context_length_provided_then_context_length_set_to_capped_init_context_length(
-    init_context_length, data_length, expected_context_length
+    hf_model_path, init_context_length, data_length, expected_context_length
 ):
     data = get_data_frame_with_item_index(list(range(3)), data_length=data_length)
-    model = ChronosModel(hyperparameters={"model_path": "tiny", "context_length": init_context_length})
+    model = ChronosModel(hyperparameters={"model_path": hf_model_path, "context_length": init_context_length})
     model.fit(train_data=None)
     model.predict(data)
 
@@ -242,10 +250,10 @@ def test_when_context_length_provided_then_context_length_set_to_capped_init_con
     "longest_data_length, expected_context_length", [(5, 5), (7, 7), (1000, ChronosModel.maximum_context_length)]
 )
 def test_given_variable_length_data_when_context_length_not_provided_then_context_length_set_to_max_data_length(
-    longest_data_length, expected_context_length
+    hf_model_path, longest_data_length, expected_context_length
 ):
     data = get_data_frame_with_variable_lengths({"A": 3, "B": 3, "C": longest_data_length})
-    model = ChronosModel(hyperparameters={"model_path": "tiny"})
+    model = ChronosModel(hyperparameters={"model_path": hf_model_path})
     model.fit(train_data=None)
     model.predict(data)
 
@@ -264,10 +272,10 @@ DTYPE_TEST_CASES = [  # dtype_arg, expected_dtype
 
 
 @pytest.mark.parametrize("dtype_arg, expected_dtype", DTYPE_TEST_CASES)
-def test_when_torch_dtype_provided_then_parameters_loaded_in_torch_dtype(dtype_arg, expected_dtype):
+def test_when_torch_dtype_provided_then_parameters_loaded_in_torch_dtype(hf_model_path, dtype_arg, expected_dtype):
     model = ChronosModel(
         hyperparameters={
-            "model_path": "amazon/chronos-t5-tiny",
+            "model_path": hf_model_path,
             "device": "cpu",
             "torch_dtype": dtype_arg,
         },
@@ -281,11 +289,11 @@ def test_when_torch_dtype_provided_then_parameters_loaded_in_torch_dtype(dtype_a
 
 @pytest.mark.parametrize("dtype_arg, expected_dtype", DTYPE_TEST_CASES)
 def test_when_torch_dtype_provided_and_model_persisted_then_parameters_loaded_in_torch_dtype(
-    dtype_arg, expected_dtype
+    hf_model_path, dtype_arg, expected_dtype
 ):
     model = ChronosModel(
         hyperparameters={
-            "model_path": "amazon/chronos-t5-tiny",
+            "model_path": hf_model_path,
             "device": "cpu",
             "torch_dtype": dtype_arg,
         },
@@ -296,10 +304,10 @@ def test_when_torch_dtype_provided_and_model_persisted_then_parameters_loaded_in
     assert embedding_matrix.dtype is expected_dtype
 
 
-def test_when_model_persisted_then_model_pipeline_can_infer():
+def test_when_model_persisted_then_model_pipeline_can_infer(hf_model_path):
     model = ChronosModel(
         hyperparameters={
-            "model_path": "amazon/chronos-t5-tiny",
+            "model_path": hf_model_path,
             "device": "cpu",
         },
     )
@@ -307,10 +315,10 @@ def test_when_model_persisted_then_model_pipeline_can_infer():
     assert model.model_pipeline.predict(torch.tensor([[1, 2, 3]])) is not None
 
 
-def test_when_model_not_persisted_only_fit_then_model_pipeline_is_none():
+def test_when_model_not_persisted_only_fit_then_model_pipeline_is_none(hf_model_path):
     model = ChronosModel(
         hyperparameters={
-            "model_path": "amazon/chronos-t5-tiny",
+            "model_path": hf_model_path,
             "device": "cpu",
         },
     )
@@ -318,10 +326,10 @@ def test_when_model_not_persisted_only_fit_then_model_pipeline_is_none():
     assert model.model_pipeline is None
 
 
-def test_when_model_saved_loaded_and_persisted_then_model_pipeline_can_infer():
+def test_when_model_saved_loaded_and_persisted_then_model_pipeline_can_infer(hf_model_path):
     model = ChronosModel(
         hyperparameters={
-            "model_path": "amazon/chronos-t5-tiny",
+            "model_path": hf_model_path,
             "device": "cpu",
         },
     )
@@ -333,12 +341,13 @@ def test_when_model_saved_loaded_and_persisted_then_model_pipeline_can_infer():
 
 
 def test_when_chronos_fit_in_standalone_through_predictor_and_persist_called_then_chronos_pipeline_is_persisted(
+    hf_model_path,
     temp_model_path,
 ):
     predictor = TimeSeriesPredictor(path=temp_model_path).fit(
         DUMMY_TS_DATAFRAME,
         skip_model_selection=True,
-        hyperparameters={"Chronos": {"model_path": "tiny"}},
+        hyperparameters={"Chronos": {"model_path": hf_model_path}},
         enable_ensemble=False,
     )
     predictor.persist()
@@ -348,11 +357,12 @@ def test_when_chronos_fit_in_standalone_through_predictor_and_persist_called_the
 
 
 def test_when_chronos_fit_with_validation_through_predictor_and_persist_called_then_chronos_pipeline_is_persisted(
+    hf_model_path,
     temp_model_path,
 ):
     predictor = TimeSeriesPredictor(path=temp_model_path).fit(
         DUMMY_TS_DATAFRAME,
-        hyperparameters={"Chronos": {"model_path": "tiny"}},
+        hyperparameters={"Chronos": {"model_path": hf_model_path}},
         enable_ensemble=False,
     )
     predictor.persist()
