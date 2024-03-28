@@ -1,5 +1,5 @@
 function setup_build_env {
-    python -m pip install --upgrade pip
+    python -m pip install pip==21.3.1 # Capping pip to prevent tensorrt install failure
     python -m pip install tox
     python -m pip install flake8
     python -m pip install "black~=23.0"
@@ -10,7 +10,7 @@ function setup_build_env {
 }
 
 function setup_build_contrib_env {
-    python -m pip install --upgrade pip
+    python -m pip install pip==21.3.1 # Capping pip to prevent tensorrt install failure
     python -m pip install -r $(dirname "$0")/../../docs/requirements_doc.txt
     export AG_DOCS=1
     export AUTOMM_TUTORIAL_MODE=1 # Disable progress bar in MultiModalPredictor
