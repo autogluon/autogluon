@@ -226,7 +226,7 @@ class ChronosModel(AbstractTimeSeriesModel):
     @property
     def min_num_gpus(self) -> int:
         """Minimum number of GPUs required for the model. For models not defined in AutoGluon,
-        this value defaults to 8.
+        this value defaults to 0.
         """
         return self.ag_default_config.get("num_gpus", 0)
 
