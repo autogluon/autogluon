@@ -524,7 +524,7 @@ def test_when_fit_and_predict_called_then_train_val_and_test_data_is_preprocesse
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 def test_given_model_doesnt_support_nan_when_model_fits_then_nans_are_filled(temp_model_path, model_class):
-    data = DUMMY_TS_DATAFRAME.copy()
+    data = get_data_frame_with_item_index(["B", "A", "C", "X"])
     data.iloc[[0, 1, 5, 10, 23, 26, 33, 60]] = float("nan")
     prediction_length = 5
     model = model_class(
