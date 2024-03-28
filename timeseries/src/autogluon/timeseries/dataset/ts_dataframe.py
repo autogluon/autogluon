@@ -765,11 +765,19 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
                 "(for example, using the `convert_frequency` method)."
             )
 
-        grouped_df = pd.DataFrame(self).groupby(level=ITEMID, sort=False, group_keys=False)
+        # Convert to pd.DataFrame for faster processing
+        df = pd.DataFrame(self)
+
+        # Skip filling if there are no NaNs
+        if not df.isna().any(axis=None):
+            return self
+
+        grouped_df = df.groupby(level=ITEMID, sort=False, group_keys=False)
         if method == "auto":
             filled_df = grouped_df.ffill()
-            # Fill missing values at the start of each time series with bfill
-            filled_df = filled_df.groupby(level=ITEMID, sort=False, group_keys=False).bfill()
+            # If necessary, fill missing values at the start of each time series with bfill
+            if filled_df.isna().any(axis=None):
+                filled_df = filled_df.groupby(level=ITEMID, sort=False, group_keys=False).bfill()
         elif method in ["ffill", "pad"]:
             filled_df = grouped_df.ffill()
         elif method in ["bfill", "backfill"]:
