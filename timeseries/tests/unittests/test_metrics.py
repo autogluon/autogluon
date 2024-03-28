@@ -26,7 +26,7 @@ from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTS
 
 from .common import (
     DUMMY_TS_DATAFRAME,
-    DUMMY_TS_DATAFRAME_WITH_MISSING,
+    DUMMY_TS_DATAFRAME,
     get_data_frame_with_item_index,
     get_prediction_for_df,
 )
@@ -172,7 +172,7 @@ def test_given_missing_target_values_when_metric_evaluated_then_output_equal_to_
     check_gluonts_parity(
         ag_metric_name,
         gts_metric,
-        data=DUMMY_TS_DATAFRAME_WITH_MISSING,
+        data=DUMMY_TS_DATAFRAME,
         model=deepar_trained,
     )
 
@@ -180,7 +180,7 @@ def test_given_missing_target_values_when_metric_evaluated_then_output_equal_to_
 @pytest.mark.parametrize("metric_cls", AVAILABLE_METRICS.values())
 def test_given_missing_target_values_when_metric_evaluated_then_metric_is_not_nan(metric_cls):
     prediction_length = 5
-    train, test = DUMMY_TS_DATAFRAME_WITH_MISSING.train_test_split(prediction_length)
+    train, test = DUMMY_TS_DATAFRAME.train_test_split(prediction_length)
     predictions = get_prediction_for_df(train, prediction_length)
     score = metric_cls()(data=test, predictions=predictions, prediction_length=prediction_length)
     assert not pd.isna(score)
@@ -189,7 +189,7 @@ def test_given_missing_target_values_when_metric_evaluated_then_metric_is_not_na
 @pytest.mark.parametrize("metric_cls", AVAILABLE_METRICS.values())
 def test_given_predictions_contain_nan_when_metric_evaluated_then_exception_is_raised(metric_cls):
     prediction_length = 5
-    train, test = DUMMY_TS_DATAFRAME_WITH_MISSING.train_test_split(prediction_length)
+    train, test = DUMMY_TS_DATAFRAME.train_test_split(prediction_length)
     predictions = get_prediction_for_df(train, prediction_length)
     predictions.iloc[[3, 5]] = float("nan")
     with pytest.raises(AssertionError, match="Predictions contain NaN values"):
@@ -312,7 +312,7 @@ def test_given_metric_is_optimized_by_median_when_model_predicts_then_median_is_
 def test_when_perfect_predictions_passed_to_metric_then_score_equals_optimum(metric_name):
     prediction_length = 5
     eval_metric = check_get_evaluation_metric(metric_name)
-    data = DUMMY_TS_DATAFRAME_WITH_MISSING.copy()
+    data = DUMMY_TS_DATAFRAME.copy()
     predictions = data.slice_by_timestep(-prediction_length, None).rename(columns={"target": "mean"}).fillna(0.0)
     for q in ["0.1", "0.4", "0.9"]:
         predictions[q] = predictions["mean"]
@@ -324,7 +324,7 @@ def test_when_perfect_predictions_passed_to_metric_then_score_equals_optimum(met
 def test_when_better_predictions_passed_to_metric_then_score_improves(metric_name):
     prediction_length = 5
     eval_metric = check_get_evaluation_metric(metric_name)
-    data = DUMMY_TS_DATAFRAME_WITH_MISSING.copy()
+    data = DUMMY_TS_DATAFRAME.copy()
     predictions = data.slice_by_timestep(-prediction_length, None).rename(columns={"target": "mean"}).fillna(0.0)
     for q in ["0.1", "0.4", "0.9"]:
         predictions[q] = predictions["mean"]
