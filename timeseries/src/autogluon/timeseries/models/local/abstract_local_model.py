@@ -225,6 +225,7 @@ def seasonal_naive_forecast(
         return arr[np.maximum.accumulate(idx)]
 
     forecast = {}
+    # Convert to float64 since std computation can be unstable in float32
     target = target.astype(np.float64)
     # At least seasonal_period + 2 values are required to compute sigma for seasonal naive
     if len(target) > seasonal_period + 1 and seasonal_period > 1:
@@ -240,11 +241,13 @@ def seasonal_naive_forecast(
         sigma_per_timestep = sigma * np.sqrt(num_full_seasons + 1)
     else:
         # Fall back to naive forecast
-        last_observed_value = target[~np.isnan(target)][-1]
+        last_observed_value = target[np.isfinite(target)][-1]
         forecast["mean"] = np.full(shape=[prediction_length], fill_value=last_observed_value)
         residuals = target[1:] - target[:-1]
 
         sigma = np.sqrt(np.nanmean(np.square(residuals)))
+        if np.isnan(sigma):  # happens if there are no two consecutive non-nan observations
+            sigma = 0.0
         sigma_per_timestep = sigma * np.sqrt(np.arange(1, prediction_length + 1))
 
     for q in quantile_levels:

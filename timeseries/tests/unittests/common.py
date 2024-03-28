@@ -102,10 +102,14 @@ def get_data_frame_with_item_index(
 
 
 def mask_entries(data: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
+    """Replace some values in a TimeSeriesDataFrame with NaNs"""
     data = data.copy()
-    # Completely mask one item + some additional indexes
+    # Mask all but the first entry for item #1
+    data.iloc[1 : data.num_timesteps_per_item()[data.item_ids[0]]] = float("nan")
+    # Completely mask item #2
     data.loc[data.item_ids[1]] = float("nan")
-    nan_idx = [0, 1, 2, 5, 15, 17, 18, 42, 53][: len(data)]
+    # Mask random indices for item #3
+    nan_idx = [42, 53, 58, 59][: len(data)]
     data.iloc[nan_idx] = float("nan")
     return data
 
