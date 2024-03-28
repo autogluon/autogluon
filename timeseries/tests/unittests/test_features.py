@@ -1,9 +1,9 @@
+import sys
 from typing import Dict, List, Optional
 
 import numpy as np
 import pandas as pd
 import pytest
-import sys
 
 from autogluon.timeseries.utils.features import TimeSeriesFeatureGenerator
 
