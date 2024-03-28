@@ -126,7 +126,7 @@ def test_when_score_called_then_model_receives_truncated_data(model_class, predi
         (call_df,) = patch_method.call_args[0]
 
         for j in DUMMY_TS_DATAFRAME.item_ids:
-            assert np.allclose(call_df.loc[j], DUMMY_TS_DATAFRAME.loc[j][:-prediction_length])
+            assert np.allclose(call_df.loc[j], DUMMY_TS_DATAFRAME.loc[j][:-prediction_length], equal_nan=True)
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
@@ -363,18 +363,19 @@ def test_when_get_info_is_called_then_all_keys_are_present(model_class, predicti
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 def test_when_median_not_in_quantile_levels_then_median_is_present_in_raw_predictions(model_class):
+    data = get_data_frame_with_item_index(["B", "A", "X", "C"])
     model = model_class(
         prediction_length=3,
         quantile_levels=[0.1, 0.15],
-        freq=DUMMY_TS_DATAFRAME.freq,
+        freq=data.freq,
         hyperparameters=DUMMY_HYPERPARAMETERS,
     )
     if isinstance(model, MultiWindowBacktestingModel):
         # Median is present in the predictions of the base model, but not in the MultiWindowBacktestingModel wrapper
         pytest.skip()
-    model.fit(train_data=DUMMY_TS_DATAFRAME)
+    model.fit(train_data=data)
 
-    raw_predictions = model._predict(DUMMY_TS_DATAFRAME)
+    raw_predictions = model._predict(data)
     assert "0.5" in raw_predictions.columns
 
 
