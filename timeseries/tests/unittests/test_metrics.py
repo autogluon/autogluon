@@ -24,12 +24,7 @@ from autogluon.timeseries.metrics import AVAILABLE_METRICS, DEFAULT_METRIC_NAME,
 from autogluon.timeseries.metrics.utils import _in_sample_abs_seasonal_error, _in_sample_squared_seasonal_error
 from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
 
-from .common import (
-    DUMMY_TS_DATAFRAME,
-    DUMMY_TS_DATAFRAME,
-    get_data_frame_with_item_index,
-    get_prediction_for_df,
-)
+from .common import DUMMY_TS_DATAFRAME, get_data_frame_with_item_index, get_prediction_for_df
 
 pytestmark = pytest.mark.filterwarnings("ignore")
 
