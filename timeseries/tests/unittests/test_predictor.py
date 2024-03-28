@@ -4,9 +4,9 @@ import copy
 import logging
 import math
 import sys
-import tempfile
 from pathlib import Path
 from unittest import mock
+from uuid import uuid4
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -556,15 +556,18 @@ def test_given_data_is_in_dataframe_format_then_predictor_works(temp_model_path)
 @pytest.mark.parametrize("path_format", [str, Path])
 def test_given_data_is_in_str_format_then_predictor_works(temp_model_path, tmp_path, path_format):
     df = pd.DataFrame(DUMMY_TS_DATAFRAME.reset_index())
-    with tempfile.NamedTemporaryFile("w") as data_path:
-        data_path = path_format(str(data_path))
-        df.to_csv(data_path, index=False)
-        predictor = TimeSeriesPredictor(path=temp_model_path)
-        predictor.fit(data_path, hyperparameters={"Naive": {}})
-        predictor.leaderboard(data_path)
-        predictor.evaluate(data_path)
-        predictions = predictor.predict(data_path)
-        assert isinstance(predictions, TimeSeriesDataFrame)
+    tmp_path_subdir = tmp_path / str(uuid4())[:4]
+    data_path = path_format(str(tmp_path_subdir))
+
+    df.to_csv(data_path, index=False)
+
+    predictor = TimeSeriesPredictor(path=temp_model_path)
+    predictor.fit(data_path, hyperparameters={"Naive": {}})
+    predictor.leaderboard(data_path)
+    predictor.evaluate(data_path)
+    predictions = predictor.predict(data_path)
+
+    assert isinstance(predictions, TimeSeriesDataFrame)
 
 
 @pytest.mark.parametrize("rename_columns", [{TIMESTAMP: "custom_timestamp"}, {ITEMID: "custom_item_id"}])
