@@ -22,7 +22,7 @@ from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
 
 from ..common import (
     DUMMY_TS_DATAFRAME,
-    DUMMY_TS_DATAFRAME_WITH_MISSING,
+    DUMMY_TS_DATAFRAME,
     CustomMetric,
     dict_equal_primitive,
     get_data_frame_with_item_index,
@@ -485,7 +485,7 @@ def test_given_searcher_when_ray_backend_used_in_hpo_then_correct_searcher_used(
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 def test_when_data_contains_missing_values_then_model_can_fit_and_predict(temp_model_path, model_class):
-    data = DUMMY_TS_DATAFRAME_WITH_MISSING
+    data = DUMMY_TS_DATAFRAME
     prediction_length = 5
     model = model_class(
         freq=data.freq,
@@ -503,7 +503,7 @@ def test_when_data_contains_missing_values_then_model_can_fit_and_predict(temp_m
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 def test_when_fit_and_predict_called_then_train_val_and_test_data_is_preprocessed(temp_model_path, model_class):
-    train_data = DUMMY_TS_DATAFRAME_WITH_MISSING.copy()
+    train_data = DUMMY_TS_DATAFRAME.copy()
     model = model_class(freq=train_data.freq, path=temp_model_path, hyperparameters=DUMMY_HYPERPARAMETERS)
     preprocessed_data = train_data + 5.0
     if model._get_tags()["can_use_val_data"]:

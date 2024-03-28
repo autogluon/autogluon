@@ -99,7 +99,7 @@ class TimeSeriesFeatureGenerator:
     Imputation logic is as follows:
     1. For all categorical columns (static, past, known), we fill missing values with the mode of the training set.
     2. For real static features, we impute missing values with the median of the training set.
-    3. For real covariates (past, known), we ffill +  bfill within each time series. If for some time series all
+    3. For real covariates (past, known), we ffill + bfill within each time series. If for some time series all
         covariate values are missing, we fill them with the median of the training set.
     """
 
