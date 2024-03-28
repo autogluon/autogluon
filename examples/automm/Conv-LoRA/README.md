@@ -2,13 +2,8 @@
 
 Examples showing how to use `Conv-LoRA` for parameter efficient fine-tuning SAM.
 
-## 1. Dataset
-
-The datasets will be downloaded in the "datasets" folder:
-
-`python prepare_semantic_segmentation_datasets.py`
-
-## 2. Installation
+## 1. Installation
+The installation may take a while since AutoGluon Multimodal has multiple dependencies.
 ```shell
   conda create --name conv-lora python=3.10
   conda activate conv-lora
@@ -16,6 +11,12 @@ The datasets will be downloaded in the "datasets" folder:
   pip install -U setuptools wheel
   pip install autogluon.multimodal
   ```
+
+## 2. Dataset
+
+The datasets will be downloaded in the "datasets" folder:
+
+`python prepare_semantic_segmentation_datasets.py`
 
 ## 3. Training
 

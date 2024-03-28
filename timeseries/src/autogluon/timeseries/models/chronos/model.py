@@ -18,11 +18,29 @@ logger = logging.getLogger(__name__)
 MODEL_CONFIGS = {
     "amazon/chronos-t5-tiny": {
         "num_gpus": 0,  # minimum number of required GPUs
+        "default_torch_dtype": "auto",
+        "default_batch_size": 16,
     },
-    "amazon/chronos-t5-mini": {"num_gpus": 0},
-    "amazon/chronos-t5-small": {"num_gpus": 1},
-    "amazon/chronos-t5-base": {"num_gpus": 1},
-    "amazon/chronos-t5-large": {"num_gpus": 1},
+    "amazon/chronos-t5-mini": {
+        "num_gpus": 0,
+        "default_torch_dtype": "auto",
+        "default_batch_size": 16,
+    },
+    "amazon/chronos-t5-small": {
+        "num_gpus": 1,
+        "default_torch_dtype": "bfloat16",
+        "default_batch_size": 16,
+    },
+    "amazon/chronos-t5-base": {
+        "num_gpus": 1,
+        "default_torch_dtype": "bfloat16",
+        "default_batch_size": 16,
+    },
+    "amazon/chronos-t5-large": {
+        "num_gpus": 1,
+        "default_torch_dtype": "bfloat16",
+        "default_batch_size": 8,
+    },
 }
 
 
@@ -124,7 +142,6 @@ class ChronosModel(AbstractTimeSeriesModel):
 
     # default number of samples for prediction
     default_num_samples: int = 20
-    default_batch_size: int = 16
     default_model_path = "amazon/chronos-t5-small"
     maximum_context_length = 512
 
@@ -149,7 +166,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         self.device = hyperparameters.get("device")
 
         # if the model requires a GPU, set the torch dtype to bfloat16
-        self.torch_dtype = hyperparameters.get("torch_dtype", "auto" if self.min_num_gpus == 0 else "bfloat16")
+        self.torch_dtype = hyperparameters.get("torch_dtype", self.default_torch_dtype)
 
         self.data_loader_num_workers = hyperparameters.get("data_loader_num_workers", 0)
         self.optimization_strategy: Optional[Literal["onnx", "openvino"]] = hyperparameters.get(
@@ -200,8 +217,32 @@ class ChronosModel(AbstractTimeSeriesModel):
         return torch.cuda.is_available()
 
     @property
-    def min_num_gpus(self):
-        return MODEL_CONFIGS.get(self.model_path, {}).get("num_gpus", 0)
+    def ag_default_config(self) -> Dict[str, Any]:
+        """The default configuration of the model used by AutoGluon if the model is one of those
+        defined in MODEL_CONFIGS. For now, these are ``amazon/chronos-t5-*`` family of models.
+        """
+        return MODEL_CONFIGS.get(self.model_path, {})
+
+    @property
+    def min_num_gpus(self) -> int:
+        """Minimum number of GPUs required for the model. For models not defined in AutoGluon,
+        this value defaults to 0.
+        """
+        return self.ag_default_config.get("num_gpus", 0)
+
+    @property
+    def default_batch_size(self) -> int:
+        """Default batch size used for the model. For models not defined in AutoGluon, this value
+        defaults to 8.
+        """
+        return self.ag_default_config.get("default_batch_size", 8)
+
+    @property
+    def default_torch_dtype(self) -> Any:
+        """Default torch data type used for the model. For models not defined in AutoGluon, this value
+        defaults to "auto".
+        """
+        return self.ag_default_config.get("default_torch_dtype", "auto")
 
     def get_minimum_resources(self, is_gpu_available: bool = False) -> Dict[str, Union[int, float]]:
         minimum_resources = {"num_cpus": 1}
@@ -211,7 +252,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         return minimum_resources
 
     def load_model_pipeline(self, context_length: Optional[int] = None):
-        from .chronos import OptimizedChronosPipeline
+        from .pipeline import OptimizedChronosPipeline
 
         gpu_available = self._is_gpu_available()
 
@@ -233,6 +274,10 @@ class ChronosModel(AbstractTimeSeriesModel):
         )
 
         self.model_pipeline = pipeline
+
+    def persist(self) -> "ChronosModel":
+        self.load_model_pipeline(context_length=self.context_length or self.maximum_context_length)
+        return self
 
     def _fit(
         self,
@@ -283,8 +328,9 @@ class ChronosModel(AbstractTimeSeriesModel):
         with warning_filter(all_warnings=True):
             import torch
 
-            # load model pipeline to device memory
-            self.load_model_pipeline(context_length=context_length)
+            if self.model_pipeline is None:
+                # load model pipeline to device memory
+                self.load_model_pipeline(context_length=context_length)
 
             self.model_pipeline.model.eval()
             with torch.inference_mode():
