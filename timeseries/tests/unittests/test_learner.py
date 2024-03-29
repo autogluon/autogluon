@@ -7,6 +7,7 @@ from collections import defaultdict
 from unittest import mock
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from autogluon.common import space
@@ -422,17 +423,21 @@ def test_when_features_are_all_nan_and_learner_is_loaded_then_mode_or_median_are
         imputed_known_covariates = trainer_predict_call_args["known_covariates"]
         imputed_static = imputed_data.static_features
 
+    def get_mode(series: pd.Series):
+        # series.mode() can result in ties. We copy tiebreaking logic from CategoryFeatureGenerator
+        return series.value_counts().sort_values().index[-1]
+
     for col in covariates_cat:
-        expected_impute_value = data_transformed[col].mode().iloc[0]
-        assert (imputed_data[col] == expected_impute_value).all()
+        column_mode_train = get_mode(data_transformed[col])
+        assert (imputed_data[col] == column_mode_train).all()
         if col in known_covariates_names:
-            assert (imputed_known_covariates[col] == expected_impute_value).all()
+            assert (imputed_known_covariates[col] == column_mode_train).all()
 
     for col in covariates_real:
-        expected_impute_value = data_transformed[col].median()
-        assert np.allclose(imputed_data[col], expected_impute_value)
+        column_median_train = data_transformed[col].median()
+        assert np.allclose(imputed_data[col], column_median_train)
         if col in known_covariates_names:
-            assert np.allclose(imputed_known_covariates[col], expected_impute_value)
+            assert np.allclose(imputed_known_covariates[col], column_median_train)
 
-    assert (imputed_static["static_cat"] == data_transformed.static_features["static_cat"].mode().iloc[0]).all()
+    assert (imputed_static["static_cat"] == get_mode(data_transformed.static_features["static_cat"])).all()
     assert np.allclose(imputed_static["static_real"], data_transformed.static_features["static_real"].median())

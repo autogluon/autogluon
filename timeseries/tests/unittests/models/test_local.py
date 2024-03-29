@@ -387,7 +387,7 @@ def test_when_intermittent_models_fit_then_values_are_lower_bounded(
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 @pytest.mark.parametrize("prediction_length", [1, 3])
 def test_when_local_models_fit_then_quantiles_are_present_and_ranked(model_class, prediction_length, temp_model_path):
-    data = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME
+    data = get_data_frame_with_item_index(["B", "A", "X"])
     model = model_class(
         path=temp_model_path,
         prediction_length=prediction_length,
