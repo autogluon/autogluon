@@ -1,4 +1,5 @@
 """Unit tests for learners"""
+
 import shutil
 import sys
 import tempfile
@@ -6,6 +7,7 @@ from collections import defaultdict
 from unittest import mock
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from autogluon.common import space
@@ -15,6 +17,7 @@ from autogluon.timeseries.models import DeepARModel, ETSModel
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_single_time_series
 
 from .common import DUMMY_TS_DATAFRAME, get_data_frame_with_variable_lengths, get_static_features
+from .test_features import get_data_frame_with_covariates
 
 TEST_HYPERPARAMETER_SETTINGS = [
     {"SimpleFeedForward": {"epochs": 1, "num_batches_per_epoch": 1}},
@@ -380,3 +383,61 @@ def test_when_train_data_has_static_or_dynamic_feat_then_leaderboard_works(
     leaderboard = learner.leaderboard(data=pred_data)
     assert len(leaderboard) > 0
     assert ("score_test" in leaderboard.columns) == pred_data_present
+
+
+def test_when_features_are_all_nan_and_learner_is_loaded_then_mode_or_median_are_imputed(temp_model_path):
+    covariates_cat = ["known_cat", "past_cat"]
+    covariates_real = ["known_real", "past_real"]
+    data = get_data_frame_with_covariates(
+        covariates_cat=covariates_cat,
+        covariates_real=covariates_real,
+        static_features_cat=["static_cat"],
+        static_features_real=["static_real"],
+    )
+    known_covariates_names = ["known_cat", "known_real"]
+    prediction_length = 3
+    learner = TimeSeriesLearner(
+        path_context=temp_model_path,
+        known_covariates_names=known_covariates_names,
+        prediction_length=prediction_length,
+    )
+    learner.fit(data, hyperparameters={"Naive": {}})
+    data_transformed = learner.feature_generator.transform(data)
+    learner.save()
+    del learner
+
+    loaded_learner = TimeSeriesLearner.load(temp_model_path)
+    data_with_nan = data.copy()
+    for col in data_with_nan.columns:
+        if col != "target":
+            data_with_nan[col] = float("nan")
+    for col in data_with_nan.static_features.columns:
+        data_with_nan.static_features[col] = float("nan")
+    data_with_nan, known_covariates_with_nan = data_with_nan.get_model_inputs_for_scoring(
+        prediction_length, known_covariates_names
+    )
+    with mock.patch("autogluon.timeseries.trainer.AbstractTimeSeriesTrainer.predict") as trainer_predict:
+        loaded_learner.predict(data_with_nan, known_covariates=known_covariates_with_nan)
+        trainer_predict_call_args = trainer_predict.call_args[1]
+        imputed_data = trainer_predict_call_args["data"]
+        imputed_known_covariates = trainer_predict_call_args["known_covariates"]
+        imputed_static = imputed_data.static_features
+
+    def get_mode(series: pd.Series):
+        # series.mode() can result in ties. We copy tiebreaking logic from CategoryFeatureGenerator
+        return series.value_counts().sort_values().index[-1]
+
+    for col in covariates_cat:
+        column_mode_train = get_mode(data_transformed[col])
+        assert (imputed_data[col] == column_mode_train).all()
+        if col in known_covariates_names:
+            assert (imputed_known_covariates[col] == column_mode_train).all()
+
+    for col in covariates_real:
+        column_median_train = data_transformed[col].median()
+        assert np.allclose(imputed_data[col], column_median_train)
+        if col in known_covariates_names:
+            assert np.allclose(imputed_known_covariates[col], column_median_train)
+
+    assert (imputed_static["static_cat"] == get_mode(data_transformed.static_features["static_cat"])).all()
+    assert np.allclose(imputed_static["static_real"], data_transformed.static_features["static_real"].median())

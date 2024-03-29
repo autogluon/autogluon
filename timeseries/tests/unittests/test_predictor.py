@@ -24,6 +24,7 @@ from autogluon.timeseries.models.ensemble.greedy_ensemble import TimeSeriesGreed
 from autogluon.timeseries.predictor import TimeSeriesPredictor
 
 from .common import (
+    DATAFRAME_WITH_COVARIATES,
     DUMMY_TS_DATAFRAME,
     PREDICTIONS_FOR_DUMMY_TS_DATAFRAME,
     CustomMetric,
@@ -217,8 +218,8 @@ def test_given_hyperparameters_when_predictor_called_and_loaded_back_then_all_mo
 @pytest.mark.parametrize(
     "hyperparameters",
     [
-        {"ETS": {"maxiter": 1}, "SimpleFeedForward": {"epochs": 1}},
-        {"ETS": {"maxiter": 1}, "SimpleFeedForward": {"epochs": space.Int(1, 3)}},
+        {"Naive": {"maxiter": 1}, "SimpleFeedForward": {"epochs": 1}},
+        {"Naive": {"maxiter": 1}, "SimpleFeedForward": {"epochs": space.Int(1, 3)}},
     ],
 )
 def test_given_hp_spaces_and_custom_target_when_predictor_called_predictor_can_predict(
@@ -474,7 +475,7 @@ def test_when_predictor_is_loaded_then_info_works(temp_model_path):
 
 def test_when_train_data_contains_nans_then_predictor_can_fit(temp_model_path):
     predictor = TimeSeriesPredictor(path=temp_model_path)
-    df = DUMMY_TS_DATAFRAME.copy()
+    df = DATAFRAME_WITH_COVARIATES.copy()
     df.iloc[5] = np.nan
     predictor.fit(
         df,
@@ -486,23 +487,42 @@ def test_when_train_data_contains_nans_then_predictor_can_fit(temp_model_path):
 def test_when_prediction_data_contains_nans_then_predictor_can_predict(temp_model_path):
     predictor = TimeSeriesPredictor(path=temp_model_path)
     predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
-    df = DUMMY_TS_DATAFRAME.copy()
+    df = DATAFRAME_WITH_COVARIATES.copy()
     df.iloc[5] = np.nan
     predictions = predictor.predict(df)
     assert isinstance(predictions, TimeSeriesDataFrame)
     assert not np.any(np.isnan(predictions))
 
 
-def test_when_some_time_series_contain_only_nans_then_exception_is_raised(temp_model_path):
+def test_when_some_train_time_series_contain_only_nans_then_they_are_removed_from_train_data(temp_model_path):
     predictor = TimeSeriesPredictor(path=temp_model_path)
-    df = TimeSeriesDataFrame.from_iterable_dataset(
+    train_data = TimeSeriesDataFrame.from_iterable_dataset(
         [
-            {"target": [float(5)] * 10, "start": pd.Period("2020-01-01", "D")},
             {"target": [float("nan")] * 10, "start": pd.Period("2020-01-01", "D")},
+            {"target": [float(5)] * 10, "start": pd.Period("2020-01-01", "D")},
         ]
     )
-    with pytest.raises(ValueError, match="consist completely of NaN values"):
-        predictor._check_and_prepare_data_frame(df)
+    with mock.patch("autogluon.timeseries.learner.TimeSeriesLearner.fit") as mock_learner_fit:
+        predictor.fit(train_data)
+        learner_train_data = mock_learner_fit.call_args[1]["train_data"]
+        assert all(learner_train_data.item_ids == [1])
+
+
+def test_when_all_train_time_series_contain_only_nans_then_exception_is_raised(temp_model_path):
+    predictor = TimeSeriesPredictor(path=temp_model_path)
+    train_data = DUMMY_TS_DATAFRAME.copy()
+    train_data["target"] = float("nan")
+    with pytest.raises(ValueError, match="At least some time series in train"):
+        predictor.fit(train_data)
+
+
+def test_when_all_nan_data_passed_to_predict_then_predictor_can_predict(temp_model_path):
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=3)
+    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters=DUMMY_HYPERPARAMETERS)
+    data = DUMMY_TS_DATAFRAME.copy()
+    data["target"] = float("nan")
+    predictions = predictor.predict(data)
+    assert not predictions.isna().any(axis=None) and all(predictions.item_ids == data.item_ids)
 
 
 @pytest.mark.parametrize("method", ["evaluate", "leaderboard"])
@@ -536,7 +556,6 @@ def test_given_data_is_in_dataframe_format_then_predictor_works(temp_model_path)
 @pytest.mark.parametrize("path_format", [str, Path])
 def test_given_data_is_in_str_format_then_predictor_works(temp_model_path, tmp_path, path_format):
     df = pd.DataFrame(DUMMY_TS_DATAFRAME.reset_index())
-
     tmp_path_subdir = tmp_path / str(uuid4())[:4]
     data_path = path_format(str(tmp_path_subdir))
 
@@ -907,7 +926,7 @@ def test_given_only_short_series_in_train_data_when_fit_called_then_exception_is
         "short_series_3": 2,
     }
     data = get_data_frame_with_variable_lengths(item_id_to_length, freq="H")
-    with pytest.raises(ValueError, match="At least some time series in train\_data must have length"):
+    with pytest.raises(ValueError, match="Please provide longer time series as train"):
         predictor.fit(data, num_val_windows=num_val_windows, val_step_size=val_step_size)
 
 
@@ -925,7 +944,7 @@ def test_given_only_short_series_in_train_data_then_exception_is_raised(
         "short_series_3": 2,
     }
     data = get_data_frame_with_variable_lengths(item_id_to_length, freq="H")
-    with pytest.raises(ValueError, match="At least some time series in train\_data must have length"):
+    with pytest.raises(ValueError, match="Please provide longer time series as train"):
         predictor.fit(data, num_val_windows=num_val_windows, hyperparameters=TEST_HYPERPARAMETER_SETTINGS[0])
 
 

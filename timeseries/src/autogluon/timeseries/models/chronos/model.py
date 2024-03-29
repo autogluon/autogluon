@@ -363,3 +363,6 @@ class ChronosModel(AbstractTimeSeriesModel):
         )
 
         return TimeSeriesDataFrame(df)
+
+    def _more_tags(self) -> Dict:
+        return {"allow_nan": True}
