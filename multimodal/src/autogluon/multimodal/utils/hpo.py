@@ -214,8 +214,8 @@ def hyperparameter_tune(hyperparameter_tune_kwargs, resources, is_matching=False
         best_trial_path = os.path.join(save_path, best_trial.trial_id)
 
         checkpoints_paths_and_scores = dict(
-            (os.path.join(checkpoint, RAY_TUNE_CHECKPOINT), score)
-            for checkpoint, score in analysis.get_trial_checkpoints_paths(best_trial, metric=metric)
+            (os.path.join(checkpoint.path, RAY_TUNE_CHECKPOINT), score)
+            for checkpoint, score in analysis._get_trial_checkpoints_with_metric(best_trial, metric=metric)
         )
         # write checkpoint paths and scores to yaml file so that top_k_average could read it
         best_k_model_path = os.path.join(best_trial_path, BEST_K_MODELS_FILE)
