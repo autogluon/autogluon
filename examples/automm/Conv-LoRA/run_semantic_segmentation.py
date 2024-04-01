@@ -56,6 +56,13 @@ if __name__ == "__main__":
     parser.add_argument("--num_gpus", type=int, default=1)
     parser.add_argument("--output_dir", type=str, default="outputs")
     parser.add_argument("--ckpt_path", type=str, default="outputs", help="Checkpoint path.")
+    parser.add_argument("--per_gpu_batch_size", type=int, default="8", help="The batch size for each GPU.")
+    parser.add_argument(
+        "--batch_size",
+        type=int,
+        default="128",
+        help="The effective batch size. If batch_size > per_gpu_batch_size * num_gpus, gradient accumulation would be used.",
+    )
     parser.add_argument("--eval", action="store_true")
     args = parser.parse_args()
 
@@ -80,6 +87,8 @@ if __name__ == "__main__":
             "optimization.loss_function": loss,
             "optimization.max_epochs": max_epoch,
             "optimization.learning_rate": lr,
+            "env.per_gpu_batch_size": args.per_gpu_batch_size,
+            "env.batch_size": args.batch_size,
         }
     )
 
@@ -90,7 +99,6 @@ if __name__ == "__main__":
             problem_type="semantic_segmentation",
             validation_metric=validation_metric,
             eval_metric=validation_metric,
-            path=os.path.join(args.output_dir, "models"),
             hyperparameters=hyperparameters,
             label="label",
         )

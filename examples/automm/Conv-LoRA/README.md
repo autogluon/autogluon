@@ -5,16 +5,17 @@ Examples showing how to use `Conv-LoRA` for parameter efficient fine-tuning SAM.
 ## 1. Installation
 The installation may take a while since AutoGluon Multimodal has multiple dependencies.
 ```shell
-  conda create --name conv-lora python=3.10
+  conda create -n conv-lora python=3.10
   conda activate conv-lora
   pip install -U pip
   pip install -U setuptools wheel
-  pip install autogluon.multimodal
+  git clone https://github.com/autogluon/autogluon
+  cd autogluon && pip install -e multimodal/[tests]
   ```
 
 ## 2. Dataset
 
-The datasets will be downloaded in the "datasets" folder:
+Enter the `autogluon/examples/automm/Conv-LoRA` directory and run the following script to download the datasets.
 
 `python prepare_semantic_segmentation_datasets.py`
 
@@ -22,13 +23,15 @@ The datasets will be downloaded in the "datasets" folder:
 
 `python run_semantic_segmentation.py --<flag> <value>`
 
-- `task` determines to run the experiments on which task, refers to [Dataset Section](##1-Datasets).
+- `task` refers to the dataset name, i.e., one of the datasets we have downloaded. Options are `polyp, leaf_disease_segmentation, camo_sem_seg, isic2017, road_segmentation, or SBU-shadow`.
 - `seed` determines the random seed.
 - `rank` determines the rank of Conv-LoRA. Default is 3.
 - `expert_num` determines the used expert number of Conv-LoRA. Default is 8.
 - `num_gpus` determines the number of gpu used for training. Default is 1.
 - `output_dir` determines the path of output directory. Default is "outputs" folder.
 - `ckpt_path` determines the path of model for evaluation. Default is "outputs" folder.
+- `per_gpu_batch_size` is the batch size for each GPU.
+- `batch_size` effective batch size. If batch_size > per_gpu_batch_size * num_gpus, gradient accumulation would be used.
 
 ## 4. Evaluation
 
