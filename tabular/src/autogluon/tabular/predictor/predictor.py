@@ -718,7 +718,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 Enable this if there is a large gap between score_val and score_test in stack models.
                 Note: If `tuning_data` was specified, `tuning_data` is used as the holdout data.
                 Disabled if not bagging.
-                If "auto", will be set to True if the training data has >= 100000 rows, else it will be set to False.
+                If "auto", will be set to True if the training data has >= 1000000 rows, else it will be set to False.
             hyperparameter_tune_kwargs : str or dict, default = None
                 Hyperparameter tuning strategy and kwargs (for example, how many HPO trials to run).
                 If None, then hyperparameter tuning will not be performed.
@@ -4584,7 +4584,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         dynamic_stacking: bool | str,
         use_bag_holdout: bool | str,
     ):
-        use_bag_holdout_auto_threshold = 100000
+        use_bag_holdout_auto_threshold = 1000000
         use_bag_holdout_was_auto = False
         dynamic_stacking_was_auto = False
         if isinstance(use_bag_holdout, str) and use_bag_holdout == "auto":
