@@ -600,8 +600,8 @@ class AbstractTabularLearner(AbstractLearner):
             data={
                 "model": model_names_final,
                 "score_test": list(scores.values()),
-                "pred_time_test": [pred_time_test[model] for model in model_names_final],
-                "pred_time_test_marginal": [pred_time_test_marginal[model] for model in model_names_final],
+                "pred_time_test": [pred_time_test.get(model, np.nan) for model in model_names_final],
+                "pred_time_test_marginal": [pred_time_test_marginal.get(model, np.nan) for model in model_names_final],
             }
         )
         if df_extra_scores is not None:
