@@ -1327,6 +1327,12 @@ class AbstractTrainer:
                             f"\n\tThis is likely due to an out-of-memory error or other memory related issue. "
                             f"\n\tPlease create a GitHub issue if this was triggered from a non-memory related problem.",
                         )
+                        if not model.params.get("save_bag_folds", True):
+                            raise AssertionError(
+                                f"Cannot avoid training failure during refit for '{model_name}' by falling back to "
+                                f"copying the first fold because it does not exist! (save_bag_folds=False)"
+                                f"\n\tPlease specify `save_bag_folds=True` in the `.fit` call to avoid this exception."
+                            )
 
                 if reuse_first_fold:
                     # Perform fallback black-box refit logic that doesn't retrain.
