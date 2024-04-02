@@ -30,8 +30,8 @@ Enter the `autogluon/examples/automm/Conv-LoRA` directory and run the following 
 - `num_gpus` determines the number of gpu used for training. Default is 1.
 - `output_dir` determines the path of output directory. Default is "outputs" folder.
 - `ckpt_path` determines the path of model for evaluation. Default is "outputs" folder.
-- `per_gpu_batch_size` is the batch size for each GPU.
-- `batch_size` effective batch size. If batch_size > per_gpu_batch_size * num_gpus, gradient accumulation would be used.
+- `per_gpu_batch_size` is the batch size for each GPU. Default is 1.
+- `batch_size` effective batch size. If batch_size > per_gpu_batch_size * num_gpus, gradient accumulation would be used. Default is 4.
 
 ## 4. Evaluation
 
