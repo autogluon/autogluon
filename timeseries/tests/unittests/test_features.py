@@ -5,7 +5,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from autogluon.timeseries.utils.features import TimeSeriesFeatureGenerator
+from autogluon.timeseries import TimeSeriesDataFrame
+from autogluon.timeseries.utils.features import (
+    ConstantReplacementFeatureImportanceTransform,
+    PermutationFeatureImportanceTransform,
+    TimeSeriesFeatureGenerator,
+)
 
 from .common import get_data_frame_with_variable_lengths
 
@@ -169,3 +174,299 @@ def test_when_static_features_contain_missing_values_then_they_are_filled_during
 
     data_transformed = feat_generator.fit_transform(data)
     assert not data_transformed.static_features.isna().any(axis=None)
+
+
+@pytest.mark.parametrize(
+    "item_id_to_length",
+    [
+        {"A": 10, "B": 15},
+        {"A": 10, "B": 10, "C": 10},
+    ],
+)
+@pytest.mark.parametrize("known_covariates_cat", [["known_cat_1"]])
+@pytest.mark.parametrize("known_covariates_real", [["known_real_1", "known_real_2"], []])
+@pytest.mark.parametrize("past_covariates_cat", [["past_cat_1", "past_cat_2"], []])
+@pytest.mark.parametrize("past_covariates_real", [["past_real_1"], []])
+@pytest.mark.parametrize("static_features_cat", [["static_cat_1"], []])
+@pytest.mark.parametrize("static_features_real", [["static_real_1", "static_real_2"], []])
+@pytest.mark.parametrize(
+    "importance_transform_class",
+    [ConstantReplacementFeatureImportanceTransform, PermutationFeatureImportanceTransform],
+)
+def test_when_feature_importance_transforms_called_then_they_can_transform_all_features(
+    item_id_to_length,
+    known_covariates_cat,
+    known_covariates_real,
+    past_covariates_cat,
+    past_covariates_real,
+    static_features_cat,
+    static_features_real,
+    importance_transform_class,
+):
+    known_covariates_names = known_covariates_cat + known_covariates_real
+    feat_generator = TimeSeriesFeatureGenerator(target="target", known_covariates_names=known_covariates_names)
+    data = get_data_frame_with_covariates(
+        item_id_to_length=item_id_to_length,
+        covariates_cat=known_covariates_cat + past_covariates_cat,
+        covariates_real=known_covariates_real + past_covariates_real,
+        static_features_cat=static_features_cat,
+        static_features_real=static_features_real,
+    )
+    feat_generator.fit(data)
+    metadata = feat_generator.covariate_metadata
+
+    transform = importance_transform_class(
+        covariate_metadata=metadata,
+        prediction_length=2,
+    )
+
+    for feature_name in metadata.all_features:
+        transformed_data = transform.transform(data, feature_name)
+        assert isinstance(transformed_data, TimeSeriesDataFrame)
+        assert len(transformed_data) == len(data)
+
+
+@pytest.mark.parametrize(
+    "item_id_to_length",
+    [
+        {"A": 10, "B": 15},
+        {"A": 10, "B": 10, "C": 10},
+    ],
+)
+@pytest.mark.parametrize("known_covariates_real", [["known_real_1", "known_real_2"], []])
+@pytest.mark.parametrize("past_covariates_cat", [["past_cat_1", "past_cat_2"], []])
+@pytest.mark.parametrize("past_covariates_real", [["past_real_1"]])
+@pytest.mark.parametrize("static_features_cat", [["static_cat_1"], []])
+@pytest.mark.parametrize("prediction_length", [2, 3])
+@pytest.mark.parametrize(
+    "importance_transform_class",
+    [ConstantReplacementFeatureImportanceTransform, PermutationFeatureImportanceTransform],
+)
+def test_given_past_features_when_feature_importance_transforms_called_then_they_dont_change_forecast_horizon(
+    item_id_to_length,
+    known_covariates_real,
+    past_covariates_cat,
+    past_covariates_real,
+    static_features_cat,
+    prediction_length,
+    importance_transform_class,
+):
+    known_covariates_names = known_covariates_real
+    feat_generator = TimeSeriesFeatureGenerator(target="target", known_covariates_names=known_covariates_names)
+    data = get_data_frame_with_covariates(
+        item_id_to_length=item_id_to_length,
+        covariates_cat=past_covariates_cat,
+        covariates_real=known_covariates_real + past_covariates_real,
+        static_features_cat=static_features_cat,
+    )
+    feat_generator.fit(data.copy())
+    metadata = feat_generator.covariate_metadata
+
+    transform = importance_transform_class(
+        covariate_metadata=metadata,
+        prediction_length=prediction_length,
+        random_seed=None,
+    )
+
+    for feature_name in metadata.past_covariates:
+        transformed_data = transform.transform(data, feature_name)
+        assert all(
+            x == y or np.isnan(x)
+            for x, y in zip(
+                data.slice_by_timestep(-prediction_length, None)[feature_name].values,
+                transformed_data.slice_by_timestep(-prediction_length, None)[feature_name].values,
+            )
+        )
+
+
+@pytest.mark.parametrize(
+    "item_id_to_length",
+    [
+        {"A": 10, "B": 15},
+        {"B": 10, "C": 10, "A": 10},
+    ],
+)
+@pytest.mark.parametrize("known_covariates_real", [["known_real_1", "known_real_2"], []])
+@pytest.mark.parametrize("past_covariates_cat", [["past_cat_1", "past_cat_2"], []])
+@pytest.mark.parametrize("past_covariates_real", [["past_real_1"]])
+@pytest.mark.parametrize("static_features_cat", [["static_cat_1"], []])
+@pytest.mark.parametrize("prediction_length", [2, 3])
+def test_given_past_features_when_permutation_transform_called_then_shuffled_values_are_same(
+    item_id_to_length,
+    known_covariates_real,
+    past_covariates_cat,
+    past_covariates_real,
+    static_features_cat,
+    prediction_length,
+):
+    known_covariates_names = known_covariates_real
+    feat_generator = TimeSeriesFeatureGenerator(target="target", known_covariates_names=known_covariates_names)
+    data = get_data_frame_with_covariates(
+        item_id_to_length=item_id_to_length,
+        covariates_cat=past_covariates_cat,
+        covariates_real=known_covariates_real + past_covariates_real,
+        static_features_cat=static_features_cat,
+    )
+    feat_generator.fit(data.copy())
+    metadata = feat_generator.covariate_metadata
+
+    transform = PermutationFeatureImportanceTransform(
+        covariate_metadata=metadata,
+        prediction_length=prediction_length,
+        random_seed=None,
+    )
+
+    for feature_name in metadata.covariates:
+        slice_to_permute = (None, -prediction_length) if feature_name in metadata.past_covariates else (None, None)
+
+        transformed_data = transform.transform(data, feature_name)
+        assert all(
+            (
+                set(data.slice_by_timestep(*slice_to_permute).loc[item_id][feature_name])
+                == set(transformed_data.slice_by_timestep(*slice_to_permute).loc[item_id][feature_name])
+            )
+            for item_id in data.item_ids
+        )
+
+    for feature_name in metadata.static_features:
+        transformed_data = transform.transform(data, feature_name)
+        assert set(data.static_features[feature_name]) == set(transformed_data.static_features[feature_name])
+
+
+@pytest.mark.parametrize(
+    "item_id_to_length",
+    [
+        {"A": 40, "B": 40},
+        {"B": 10, "C": 10, "A": 10},
+    ],
+)
+@pytest.mark.parametrize("known_covariates_real", [["known_real_1", "known_real_2"], []])
+@pytest.mark.parametrize("past_covariates_real", [["past_real_1"]])
+@pytest.mark.parametrize("prediction_length", [2, 3])
+@pytest.mark.parametrize("shuffle_type", ["naive", "itemwise"])
+def test_given_past_features_when_permutation_transform_called_then_values_change_order(
+    item_id_to_length,
+    known_covariates_real,
+    past_covariates_real,
+    prediction_length,
+    shuffle_type,
+):
+    known_covariates_names = known_covariates_real
+    feat_generator = TimeSeriesFeatureGenerator(target="target", known_covariates_names=known_covariates_names)
+    data = get_data_frame_with_covariates(
+        item_id_to_length=item_id_to_length,
+        covariates_real=known_covariates_real + past_covariates_real,
+    )
+    feat_generator.fit(data.copy())
+    metadata = feat_generator.covariate_metadata
+
+    transform = PermutationFeatureImportanceTransform(
+        covariate_metadata=metadata,
+        prediction_length=prediction_length,
+        shuffle_type=shuffle_type,
+        random_seed=None,
+    )
+
+    for feature_name in metadata.covariates:
+        slice_to_permute = (None, -prediction_length) if feature_name in metadata.past_covariates else (None, None)
+
+        transformed_data = transform.transform(data, feature_name)
+        assert not np.array_equal(
+            data.slice_by_timestep(*slice_to_permute)[feature_name].values,
+            transformed_data.slice_by_timestep(*slice_to_permute)[feature_name].values,
+        )
+
+
+@pytest.mark.parametrize(
+    "item_id_to_length",
+    [
+        {"A": 40, "B": 40},
+        {"B": 10, "C": 10, "A": 10},
+    ],
+)
+@pytest.mark.parametrize("known_covariates_real", [["known_real_1", "known_real_2"]])
+@pytest.mark.parametrize("static_features_cat", [["static_cat_1", "static_cat_2"]])
+@pytest.mark.parametrize("shuffle_type", ["naive", "itemwise"])
+def test_given_fixed_seed_when_permutation_transform_called_then_shuffle_indices_are_same(
+    item_id_to_length,
+    known_covariates_real,
+    static_features_cat,
+    shuffle_type,
+):
+    known_covariates_names = known_covariates_real
+    feat_generator = TimeSeriesFeatureGenerator(target="target", known_covariates_names=known_covariates_names)
+    data = get_data_frame_with_covariates(
+        item_id_to_length=item_id_to_length,
+        covariates_real=known_covariates_real,
+        static_features_cat=static_features_cat,
+    )
+    feat_generator.fit(data.copy())
+    metadata = feat_generator.covariate_metadata
+
+    transform = PermutationFeatureImportanceTransform(
+        covariate_metadata=metadata,
+        prediction_length=2,
+        shuffle_type=shuffle_type,
+        random_seed=1234,
+    )
+
+    for feature_name in metadata.covariates:
+        transformed_data_1 = transform.transform(data, feature_name)
+        transformed_data_2 = transform.transform(data, feature_name)
+        assert np.array_equal(
+            transformed_data_1[feature_name].values,
+            transformed_data_2[feature_name].values,
+        )
+
+
+@pytest.mark.parametrize(
+    "item_id_to_length",
+    [
+        {"A": 40, "B": 40},
+        {"B": 10, "C": 10, "A": 10},
+    ],
+)
+@pytest.mark.parametrize("known_covariates_real", [["known_real_1", "known_real_2"], []])
+@pytest.mark.parametrize("past_covariates_real", [["past_real_1"]])
+@pytest.mark.parametrize("past_covariates_cat", [["past_cat_1", "past_cat_2"], []])
+@pytest.mark.parametrize("static_features_cat", [["static_cat_1"], []])
+@pytest.mark.parametrize("prediction_length", [2, 3])
+@pytest.mark.parametrize("real_value_aggregation", ["mean", "median"])
+def test_given_past_features_when_constant_transform_called_then_values_all_equal(
+    item_id_to_length,
+    known_covariates_real,
+    past_covariates_real,
+    past_covariates_cat,
+    static_features_cat,
+    prediction_length,
+    real_value_aggregation,
+):
+    known_covariates_names = known_covariates_real
+    feat_generator = TimeSeriesFeatureGenerator(target="target", known_covariates_names=known_covariates_names)
+    data = get_data_frame_with_covariates(
+        item_id_to_length=item_id_to_length,
+        covariates_real=known_covariates_real + past_covariates_real,
+        static_features_cat=static_features_cat,
+        covariates_cat=past_covariates_cat,
+    )
+    feat_generator.fit(data.copy())
+    metadata = feat_generator.covariate_metadata
+
+    transform = ConstantReplacementFeatureImportanceTransform(
+        covariate_metadata=metadata,
+        prediction_length=prediction_length,
+        real_value_aggregation=real_value_aggregation,
+    )
+
+    for feature_name in metadata.covariates:
+        slice_to_permute = (None, -prediction_length) if feature_name in metadata.past_covariates else (None, None)
+
+        transformed_data = transform.transform(data, feature_name)
+        assert all(
+            (len(set(transformed_data.slice_by_timestep(*slice_to_permute).loc[item_id][feature_name])) == 1)
+            for item_id in data.item_ids
+        )
+
+    for feature_name in metadata.static_features:
+        transformed_data = transform.transform(data, feature_name)
+        assert len(set(transformed_data.static_features[feature_name])) == 1

@@ -570,7 +570,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             Valid preset values:
 
             * "auto": Performs HPO via bayesian optimization search on GluonTS-backed neural forecasting models and
-                random search on other models using local scheduler.
+              random search on other models using local scheduler.
             * "random": Performs HPO via random search.
 
             You can also provide a dict to specify searchers and schedulers
@@ -892,6 +892,137 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             logger.info("Evaluations on test data:")
             logger.info(json.dumps(scores_dict, indent=4))
         return scores_dict
+
+    def feature_importance(
+        self,
+        data: Optional[Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]] = None,
+        model: Optional[str] = None,
+        metric: Optional[Union[str, TimeSeriesScorer]] = None,
+        features: Optional[List[str]] = None,
+        time_limit: Optional[float] = None,
+        method: Literal["naive", "permutation"] = "permutation",
+        subsample_size: int = 50,
+        num_iterations: Optional[int] = None,
+        random_seed: Optional[int] = 123,
+        relative_scores: bool = False,
+        include_confidence_band: bool = True,
+        confidence_level: float = 0.99,
+    ):
+        """
+        Calculates feature importance scores for the given model via replacing each feature by a shuffled version of the same feature
+        (also known as permutation feature importance) or by assigning a constant value representing the median or mode of the feature,
+        and computing the relative decrease in the model's predictive performance.
+
+        A feature's importance score represents the performance drop that results when the model makes predictions on a perturbed copy
+        of the data where this feature's values have been randomly shuffled across rows. A feature score of 0.01 would indicate that the
+        predictive performance dropped by 0.01 when the feature was randomly shuffled or replaced. The higher the score a feature has,
+        the more important it is to the model's performance.
+
+        If a feature has a negative score, this means that the feature is likely harmful to the final model, and a model trained with
+        the feature removed would be expected to achieve a better predictive performance. Note that calculating feature importance can
+        be a computationally expensive process, particularly if the model uses many features. In many cases, this can take longer than
+        the original model training. Roughly, this will equal to the number of features in the data multiplied by ``num_iterations``
+        (or, 1 when ``method="naive"``) and time taken when ``evaluate()`` is called on a dataset with ``subsample_size``.
+
+        Parameters
+        ----------
+        data : TimeSeriesDataFrame, pd.DataFrame, Path or str, optional
+            The data to evaluate feature importances on. The last ``prediction_length`` time steps of the data set, for each
+            item, will be held out for prediction and forecast accuracy will be calculated on these time steps.
+            More accurate feature importances will be obtained from new data that was held-out during ``fit()``.
+
+            If ``known_covariates_names`` were specified when creating the predictor, ``data`` must include the columns
+            listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
+            This data must contain the label column with the same column name as specified during ``fit()``.
+
+            If ``train_data`` used to train the predictor contained past covariates or static features, then ``data``
+            must also include them (with same column names and dtypes).
+
+            If provided data is an instance of pandas DataFrame, AutoGluon will attempt to automatically convert it
+            to a ``TimeSeriesDataFrame``. If str or Path is passed, ``data`` will be loaded using the str value as the file path.
+
+            If ``data`` is not provided, then validation (tuning) data provided during training (or the held out data used for
+            validation if ``tuning_data`` was not explicitly provided ``fit()``) will be used.
+        model : str, optional
+            Name of the model that you would like to evaluate. By default, the best model during training
+            (with highest validation score) will be used.
+        metric : str or TimeSeriesScorer, optional
+            Metric to be used for computing feature importance. If None, the ``eval_metric`` specified during initialization of
+            the ``TimeSeriesPredictor`` will be used.
+        features : List[str], optional
+            List of feature names that feature importances are calculated for and returned. By default, all feature importances
+            will be returned.
+        method : {"permutation", "naive"}, default = "permutation"
+            Method to be used for computing feature importance.
+
+            * ``naive``: computes feature importance by replacing the values of each feature by a constant value and computing
+              feature importances as the relative improvement in the evaluation metric. The constant value is the median for
+              real-valued features and the mode for categorical features, for both covariates and static features, obtained from the
+              feature values in ``data`` provided.
+            * ``permutation``: computes feature importance by naively shuffling the values of the feature across different items
+              and time steps. Each feature is shuffled for ``num_iterations`` times and feature importances are computed as the
+              relative improvement in the evaluation metric. Refer to https://explained.ai/rf-importance/ for an explanation of
+              permutation importance.
+
+        subsample_size : int, default = 50
+            The number of items to sample from `data` when computing feature importance. Larger values increase the accuracy of
+            the feature importance scores. Runtime linearly scales with `subsample_size`.
+        time_limit : float, optional
+            Time in seconds to limit the calculation of feature importance. If None, feature importance will calculate without early stopping.
+            If ``method="permutation"``, a minimum of 1 full shuffle set will always be evaluated. If a shuffle set evaluation takes longer than
+            ``time_limit``, the method will take the length of a shuffle set evaluation to return regardless of the `time_limit`.
+        num_iterations : int, optional
+            The number of different iterations of the data that are evaluated. If ``method="permutation"``, this will be interpreted
+            as the number of shuffle sets (equivalent to ``num_shuffle_sets`` in :meth:`TabularPredictor.feature_importance`). If ``method="naive"``, the
+            constant replacement approach is repeated for ``num_iterations`` times, and a different subsample of data (of size ``subsample_size``) will
+            be taken in each iteration.
+            Default is 1 for ``method="naive"`` and 5 for ``method="permutation"``. The value will be ignored if ``method="naive"`` and the subsample
+            size is greater than the number of items in ``data`` as additional iterations will be redundant.
+            Larger values will increase the quality of the importance evaluation.
+            It is generally recommended to increase ``subsample_size`` before increasing ``num_iterations``.
+            Runtime scales linearly with ``num_iterations``.
+        random_seed : int or None, default = 123
+            If provided, fixes the seed of the random number generator for all models. This guarantees reproducible
+            results for feature importance.
+        relative_scores : bool, default = False
+            By default, this method will return expected average *absolute* improvement in the eval metric due to the feature. If True, then
+            the statistics will be computed over the *relative* (percentage) improvements.
+        include_confidence_band: bool, default = True
+            If True, returned DataFrame will include two additional columns specifying confidence interval for the true underlying importance value of
+            each feature. Increasing ``subsample_size`` and ``num_iterations`` will tighten the confidence interval.
+        confidence_level: float, default = 0.99
+            This argument is only considered when ``include_confidence_band=True``, and can be used to specify the confidence level used
+            for constructing confidence intervals. For example, if ``confidence_level`` is set to 0.99, then the returned DataFrame will include
+            columns ``p99_high`` and ``p99_low`` which indicates that the true feature importance will be between ``p99_high`` and ``p99_low`` 99% of
+            the time (99% confidence interval). More generally, if ``confidence_level`` = 0.XX, then the columns containing the XX% confidence interval
+            will be named ``pXX_high`` and ``pXX_low``.
+
+        Returns
+        -------
+        :class:`pd.DataFrame` of feature importance scores with 2 columns:
+            index: The feature name.
+            'importance': The estimated feature importance score.
+            'stddev': The standard deviation of the feature importance score. If NaN, then not enough ``num_iterations`` were used.
+        """
+        if data is not None:
+            data = self._check_and_prepare_data_frame(data)
+            self._check_data_for_evaluation(data)
+
+        fi_df = self._learner.get_feature_importance(
+            data=data,
+            model=model,
+            metric=metric,
+            features=features,
+            time_limit=time_limit,
+            method=method,
+            subsample_size=subsample_size,
+            num_iterations=num_iterations,
+            random_seed=random_seed,
+            relative_scores=relative_scores,
+            include_confidence_band=include_confidence_band,
+            confidence_level=confidence_level,
+        )
+        return fi_df
 
     @classmethod
     def _load_version_file(cls, path: str) -> str:

@@ -23,7 +23,11 @@ from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.ensemble import AbstractTimeSeriesEnsembleModel, TimeSeriesGreedyEnsemble
 from autogluon.timeseries.models.presets import contains_searchspace
 from autogluon.timeseries.splitter import AbstractWindowSplitter, ExpandingWindowSplitter
-from autogluon.timeseries.utils.features import CovariateMetadata
+from autogluon.timeseries.utils.features import (
+    ConstantReplacementFeatureImportanceTransform,
+    CovariateMetadata,
+    PermutationFeatureImportanceTransform,
+)
 from autogluon.timeseries.utils.warning_filters import disable_tqdm
 
 logger = logging.getLogger("autogluon.timeseries.trainer")
@@ -241,6 +245,9 @@ class SimpleAbstractTrainer:
 
 class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
     _cached_predictions_filename = "cached_predictions.pkl"
+
+    max_rel_importance_score: float = 1e5
+    eps_abs_importance_score: float = 1e-5
 
     def __init__(
         self,
@@ -849,7 +856,9 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 unpersisted_models.append(model)
         return unpersisted_models
 
-    def _get_model_for_prediction(self, model: Optional[Union[str, AbstractTimeSeriesModel]] = None) -> str:
+    def _get_model_for_prediction(
+        self, model: Optional[Union[str, AbstractTimeSeriesModel]] = None, verbose: bool = True
+    ) -> str:
         """Given an optional identifier or model object, return the name of the model with which to predict.
 
         If the model is not provided, this method will default to the best model according to the validation score.
@@ -858,10 +867,11 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             if self.model_best is None:
                 best_model_name: str = self.get_model_best()
                 self.model_best = best_model_name
-            logger.info(
-                f"Model not specified in predict, will default to the model with the "
-                f"best validation score: {self.model_best}",
-            )
+            if verbose:
+                logger.info(
+                    f"Model not specified in predict, will default to the model with the "
+                    f"best validation score: {self.model_best}",
+                )
             return self.model_best
         else:
             if isinstance(model, AbstractTimeSeriesModel):
@@ -935,6 +945,149 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 data=data, predictions=predictions, metric=eval_metric
             )
         return scores_dict
+
+    def get_feature_importance(
+        self,
+        data: TimeSeriesDataFrame,
+        features: List[str],
+        model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
+        metric: Optional[Union[str, TimeSeriesScorer]] = None,
+        time_limit: Optional[float] = None,
+        method: Literal["naive", "permutation"] = "permutation",
+        subsample_size: int = 50,
+        num_iterations: int = 1,
+        random_seed: Optional[int] = None,
+        relative_scores: bool = False,
+        include_confidence_band: bool = True,
+        confidence_level: float = 0.99,
+    ) -> pd.DataFrame:
+        assert method in ["naive", "permutation"], f"Invalid feature importance method {method}."
+        metric = check_get_evaluation_metric(metric) if metric is not None else self.eval_metric
+
+        logger.info("Computing feature importance")
+
+        # seed everything if random_seed is provided
+        if random_seed is not None:
+            seed_everything(random_seed)
+
+        # start timer and cap subsample size if it's greater than the number of items in the provided data set
+        time_start = time.time()
+        if subsample_size > data.num_items:
+            logger.info(
+                f"Subsample_size {subsample_size} is larger than the number of items in the data and will be ignored"
+            )
+            subsample_size = data.num_items
+
+        # set default number of iterations and cap iterations if the number of items in the data is smaller
+        # than the subsample size for the naive method
+        num_iterations = num_iterations or (5 if method == "permutation" else 1)
+        if method == "naive" and data.num_items <= subsample_size:
+            num_iterations = 1
+
+        # initialize the importance transform
+        importance_transform_type = {
+            "permutation": PermutationFeatureImportanceTransform,
+            "naive": ConstantReplacementFeatureImportanceTransform,
+        }.get(method)
+        importance_transform = importance_transform_type(
+            covariate_metadata=self.metadata,
+            prediction_length=self.prediction_length,
+            random_seed=random_seed,
+        )
+
+        # if model is not provided, use the best model according to the validation score
+        model = self._get_model_for_prediction(model, verbose=False)
+
+        # persist trainer to speed up repeated inference
+        persisted_models = self.persist(model_names=[model], with_ancestors=True)
+
+        importance_samples = defaultdict(list)
+        for n in range(num_iterations):
+            if subsample_size < data.num_items:
+                item_ids_sampled = data.item_ids.to_series().sample(subsample_size)  # noqa
+                data_sample = data.query("item_id in @item_ids_sampled")
+            else:
+                data_sample = data
+
+            base_score = self.evaluate(data=data_sample, model=model, metrics=metric, use_cache=False)[metric.name]
+
+            for feature in features:
+                # override importance for unused features
+                if not self._model_uses_feature(model, feature):
+                    continue
+                else:
+                    data_sample_replaced = importance_transform.transform(data_sample, feature_name=feature)
+                    score = self.evaluate(data=data_sample_replaced, model=model, metrics=metric, use_cache=False)[
+                        metric.name
+                    ]
+
+                    importance = base_score - score
+                    if relative_scores:
+                        importance /= np.abs(base_score - self.eps_abs_importance_score)
+                        importance = min(self.max_rel_importance_score, importance)
+
+                    importance_samples[feature].append(importance)
+
+            if time_limit is not None and time.time() - time_start > time_limit:
+                logger.info(f"Time limit reached, stopping feature importance computation after {n} iterations")
+                break
+
+        self.unpersist(model_names=persisted_models)
+
+        importance_df = (
+            (
+                pd.DataFrame(importance_samples)
+                .agg(["mean", "std", "count"])
+                .T.rename(columns={"mean": "importance", "std": "stdev", "count": "n"})
+            )
+            if len(importance_samples) > 0
+            else pd.DataFrame(columns=["importance", "stdev", "n"])
+        )
+
+        if include_confidence_band:
+            importance_df = self._add_ci_to_feature_importance(importance_df, confidence_level=confidence_level)
+
+        return importance_df
+
+    def _model_uses_feature(self, model: Optional[Union[str, AbstractTimeSeriesModel]], feature: str) -> bool:
+        """Check if the given model uses the given feature."""
+        models_with_ancestors = set(self.get_minimum_model_set(model))
+
+        if feature in self.metadata.static_features:
+            return any(self.load_model(m).supports_static_features for m in models_with_ancestors)
+        elif feature in self.metadata.known_covariates:
+            return any(self.load_model(m).supports_known_covariates for m in models_with_ancestors)
+        elif feature in self.metadata.past_covariates:
+            return any(self.load_model(m).supports_past_covariates for m in models_with_ancestors)
+
+        return False
+
+    def _add_ci_to_feature_importance(
+        self, importance_df: pd.DataFrame, confidence_level: float = 0.99
+    ) -> pd.DataFrame:
+        """Add confidence intervals to the feature importance."""
+        import scipy.stats
+
+        if confidence_level <= 0.5 or confidence_level >= 1.0:
+            raise ValueError("confidence_level must lie between 0.5 and 1.0")
+        ci_str = "{:.0f}".format(confidence_level * 100)
+
+        alpha = 1 - confidence_level
+        importance_df[f"p{ci_str}_low"] = np.nan
+        importance_df[f"p{ci_str}_high"] = np.nan
+
+        for i in importance_df.index:
+            r = importance_df.loc[i]
+            importance, stdev, n = r["importance"], r["stdev"], r["n"]
+            if np.isnan(importance) or np.isnan(stdev) or np.isnan(n) or n <= 1:
+                continue
+
+            t_crit = scipy.stats.t.ppf(1 - alpha / 2, df=n - 1)
+
+            importance_df.loc[i, f"p{ci_str}_low"] = importance - t_crit * stdev / np.sqrt(n)
+            importance_df.loc[i, f"p{ci_str}_high"] = importance + t_crit * stdev / np.sqrt(n)
+
+        return importance_df
 
     def _predict_model(
         self,
