@@ -56,11 +56,11 @@ if __name__ == "__main__":
     parser.add_argument("--num_gpus", type=int, default=1)
     parser.add_argument("--output_dir", type=str, default="outputs")
     parser.add_argument("--ckpt_path", type=str, default="outputs", help="Checkpoint path.")
-    parser.add_argument("--per_gpu_batch_size", type=int, default="8", help="The batch size for each GPU.")
+    parser.add_argument("--per_gpu_batch_size", type=int, default=1, help="The batch size for each GPU.")
     parser.add_argument(
         "--batch_size",
         type=int,
-        default="128",
+        default=4,
         help="The effective batch size. If batch_size > per_gpu_batch_size * num_gpus, gradient accumulation would be used.",
     )
     parser.add_argument("--eval", action="store_true")
