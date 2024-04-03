@@ -86,25 +86,6 @@ def test_when_local_model_saved_then_local_model_args_are_saved(model_class, hyp
     assert dict_equal_primitive(model._local_model_args, loaded_model._local_model_args)
 
 
-@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-@pytest.mark.parametrize("prediction_length", [1, 3, 10])
-def test_when_local_model_predicts_then_time_index_is_correct(model_class, prediction_length, temp_model_path):
-    data = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME
-    model = model_class(
-        path=temp_model_path,
-        prediction_length=prediction_length,
-        hyperparameters=DEFAULT_HYPERPARAMETERS,
-        freq=data.freq,
-    )
-    model.fit(train_data=data)
-    predictions = model.predict(data=data)
-    for item_id in data.item_ids:
-        cutoff = data.loc[item_id].index[-1]
-        start = cutoff + pd.tseries.frequencies.to_offset(data.freq)
-        expected_timestamps = pd.date_range(start, periods=prediction_length, freq=data.freq)
-        assert (predictions.loc[item_id].index == expected_timestamps).all()
-
-
 def get_seasonal_period_from_fitted_local_model(model):
     if model.name in ["ARIMA", "AutoETS", "AutoARIMA", "AutoCES", "DynamicOptimizedTheta", "ETS", "Theta"]:
         return model._local_model_args["season_length"]
@@ -406,7 +387,7 @@ def test_when_intermittent_models_fit_then_values_are_lower_bounded(
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 @pytest.mark.parametrize("prediction_length", [1, 3])
 def test_when_local_models_fit_then_quantiles_are_present_and_ranked(model_class, prediction_length, temp_model_path):
-    data = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME
+    data = get_data_frame_with_item_index(["B", "A", "X"])
     model = model_class(
         path=temp_model_path,
         prediction_length=prediction_length,

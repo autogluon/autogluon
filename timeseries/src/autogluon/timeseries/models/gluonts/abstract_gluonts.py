@@ -328,8 +328,6 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
             if self.num_feat_static_real > 0:
                 feat_static_real = time_series_df.static_features[self.metadata.static_features_real]
-                if feat_static_real.isna().values.any():
-                    feat_static_real = feat_static_real.fillna(feat_static_real.mean())
             else:
                 feat_static_real = None
 
@@ -548,3 +546,6 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
         forecast_df.index = forecast_index
         return TimeSeriesDataFrame(forecast_df)
+
+    def _more_tags(self) -> dict:
+        return {"allow_nan": True, "can_use_val_data": True}

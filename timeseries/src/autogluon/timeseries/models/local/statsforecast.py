@@ -204,6 +204,8 @@ class ARIMAModel(AbstractProbabilisticStatsForecastModel):
         This significantly speeds up fitting and usually leads to no change in accuracy.
     """
 
+    # TODO: This model requires statsforecast >= 1.5.0, so it will only be available after we upgrade the dependency
+
     allowed_local_model_args = [
         "order",
         "seasonal_order",

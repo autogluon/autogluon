@@ -5,7 +5,7 @@ import time
 import traceback
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple, Type, Union
 
 import networkx as nx
 import numpy as np
@@ -70,19 +70,6 @@ class SimpleAbstractTrainer:
         for model in models:
             results[model] = self.model_graph.nodes[model][attribute]
         return results
-
-    def get_model_best(self) -> str:
-        """Return the name of the best model by model performance on the validation set."""
-        models = self.get_model_names()
-        if not models:
-            raise ValueError("Trainer has no fit models that can predict.")
-        model_performances = self.get_models_attribute_dict(attribute="val_score")
-        performances_list = [(m, model_performances[m]) for m in models if model_performances[m] is not None]
-
-        if not performances_list:
-            raise ValueError("No fitted models have validation scores computed.")
-
-        return max(performances_list, key=lambda i: i[1])[0]
 
     def get_model_attribute(self, model: Union[str, AbstractModel], attribute: str):
         """Get a member attribute for given model from the `model_graph`."""
@@ -172,9 +159,12 @@ class SimpleAbstractTrainer:
         raise NotImplementedError
 
     # FIXME: Copy pasted from Tabular
-    def get_minimum_model_set(self, model: Union[str, AbstractTimeSeriesModel], include_self: bool = True) -> list:
+    def get_minimum_model_set(
+        self, model: Union[str, AbstractTimeSeriesModel], include_self: bool = True
+    ) -> List[str]:
         """Gets the minimum set of models that the provided model depends on, including itself.
-        Returns a list of model names"""
+        Returns a list of model names
+        """
         if not isinstance(model, str):
             model = model.name
         minimum_model_set = list(nx.bfs_tree(self.model_graph, model, reverse=True))
@@ -217,6 +207,9 @@ class SimpleAbstractTrainer:
         save_json.save(path=os.path.join(self.path, self.trainer_info_json_name), obj=info)
         return info
 
+    def get_model_best(self, *args, **kwargs) -> AbstractModel:
+        raise NotImplementedError
+
     def get_info(self, include_model_info: bool = False) -> Dict[str, Any]:
         num_models_trained = len(self.get_model_names())
         if self.model_best is not None:
@@ -256,6 +249,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         eval_metric: Union[str, TimeSeriesScorer, None] = None,
         eval_metric_seasonal_period: Optional[int] = None,
         save_data: bool = True,
+        skip_model_selection: bool = False,
         enable_ensemble: bool = True,
         verbosity: int = 2,
         val_splitter: Optional[AbstractWindowSplitter] = None,
@@ -270,7 +264,9 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         self.target = kwargs.get("target", "target")
         self.metadata = kwargs.get("metadata", CovariateMetadata())
         self.is_data_saved = False
-        self.enable_ensemble = enable_ensemble
+        self.skip_model_selection = skip_model_selection
+        # Ensemble cannot be fit if val_scores are not computed
+        self.enable_ensemble = enable_ensemble and not skip_model_selection
         self.ensemble_model_type = TimeSeriesGreedyEnsemble
 
         self.verbosity = verbosity
@@ -384,6 +380,29 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         return levels
 
+    def get_model_best(self) -> str:
+        """Return the name of the best model by model performance on the validation set."""
+        models = self.get_model_names()
+        if not models:
+            raise ValueError("Trainer has no fit models that can predict.")
+        if len(models) == 1:
+            return models[0]
+        model_performances = self.get_models_attribute_dict(attribute="val_score")
+        model_levels = self._get_model_levels()
+        model_name_score_level_list = [
+            (m, model_performances[m], model_levels.get(m, 0)) for m in models if model_performances[m] is not None
+        ]
+
+        if not model_name_score_level_list:
+            raise ValueError("No fitted models have validation scores computed.")
+
+        # rank models in terms of validation score. if two models have the same validation score,
+        # rank them by their level in the model graph (lower level models are preferred).
+        return max(
+            model_name_score_level_list,
+            key=lambda mns: (mns[1], -mns[2]),  # (score, -level)
+        )[0]
+
     def get_model_names(self, level: Optional[int] = None, **kwargs) -> List[str]:
         """Get model names that are registered in the model graph"""
         if level is not None:
@@ -487,7 +506,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             fit_end_time = time.time()
             model.fit_time = model.fit_time or (fit_end_time - fit_start_time)
 
-            if val_data is not None:
+            if val_data is not None and not self.skip_model_selection:
                 model.score_and_cache_oof(val_data, store_val_score=True, store_predict_time=True)
 
             self._log_scores_and_times(model.val_score, model.fit_time, model.predict_time)
@@ -556,6 +575,17 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             )
 
         logger.info(f"Models that will be trained: {list(m.name for m in models)}")
+
+        if self.skip_model_selection:
+            if len(models) > 1:
+                raise ValueError(
+                    "When `skip_model_selection=True`, only a single model must be provided via `hyperparameters` "
+                    f"but {len(models)} models were given"
+                )
+            if contains_searchspace(models[0].get_user_params()):
+                raise ValueError(
+                    "When `skip_model_selection=True`, model configuration should contain no search spaces."
+                )
 
         num_base_models = len(models)
         model_names_trained = []
@@ -646,7 +676,8 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         try:
             best_model = self.get_model_best()
             logger.info(f"Best model: {best_model}")
-            logger.info(f"Best model score: {self.get_model_attribute(best_model, 'val_score'):.4f}")
+            if not self.skip_model_selection:
+                logger.info(f"Best model score: {self.get_model_attribute(best_model, 'val_score'):.4f}")
         except ValueError as e:
             logger.error(str(e))
 
@@ -779,6 +810,44 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         df.reset_index(drop=True, inplace=True)
 
         return df[explicit_column_order]
+
+    def persist(
+        self, model_names: Union[Literal["all", "best"], List[str]] = "all", with_ancestors: bool = False, **kwargs
+    ) -> List[str]:
+        if model_names == "all":
+            model_names = self.get_model_names()
+        elif model_names == "best":
+            model_names = [self.get_model_best()]
+        if not isinstance(model_names, list):
+            raise ValueError(f"model_names must be a list of model names. Invalid value: {model_names}")
+
+        if with_ancestors:
+            models_with_ancestors = set()
+            for model_name in model_names:
+                models_with_ancestors = models_with_ancestors.union(self.get_minimum_model_set(model_name))
+            model_names = list(models_with_ancestors)
+
+        model_names_already_persisted = [model_name for model_name in model_names if model_name in self.models]
+        model_names = [model_name for model_name in model_names if model_name not in model_names_already_persisted]
+
+        for model_name in model_names:
+            model = self.load_model(model_name)
+            model.persist()
+            self.models[model.name] = model
+
+        return model_names
+
+    def unpersist(self, model_names: Union[Literal["all"], List[str]] = "all") -> List[str]:
+        if model_names == "all":
+            model_names = list(self.models.keys())
+        if not isinstance(model_names, list):
+            raise ValueError(f"model_names must be a list of model names. Invalid value: {model_names}")
+        unpersisted_models = []
+        for model in model_names:
+            if model in self.models:
+                self.models.pop(model)
+                unpersisted_models.append(model)
+        return unpersisted_models
 
     def _get_model_for_prediction(self, model: Optional[Union[str, AbstractTimeSeriesModel]] = None) -> str:
         """Given an optional identifier or model object, return the name of the model with which to predict.

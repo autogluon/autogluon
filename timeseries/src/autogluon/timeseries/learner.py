@@ -1,7 +1,7 @@
 import logging
 import reprlib
 import time
-from typing import Any, Dict, List, Optional, Type, Union
+from typing import Any, Dict, List, Literal, Optional, Type, Union
 
 import pandas as pd
 
@@ -97,6 +97,7 @@ class TimeSeriesLearner(AbstractLearner):
                 target=self.target,
                 quantile_levels=self.quantile_levels,
                 verbosity=kwargs.get("verbosity", 2),
+                skip_model_selection=kwargs.get("skip_model_selection", False),
                 enable_ensemble=kwargs.get("enable_ensemble", True),
                 metadata=self.feature_generator.covariate_metadata,
                 val_splitter=val_splitter,
@@ -226,6 +227,33 @@ class TimeSeriesLearner(AbstractLearner):
         # TODO: Report random seed passed to predictor.fit?
         learner_info.pop("random_state", None)
         return learner_info
+
+    def persist_trainer(
+        self, models: Union[Literal["all", "best"], List[str]] = "all", with_ancestors: bool = False
+    ) -> List[str]:
+        """Loads models and trainer in memory so that they don't have to be
+        loaded during predictions
+
+        Returns
+        -------
+        list_of_models : List[str]
+            List of models persisted in memory
+        """
+        self.trainer = self.load_trainer()
+        return self.trainer.persist(models, with_ancestors=with_ancestors)
+
+    def unpersist_trainer(self) -> List[str]:
+        """Unloads models and trainer from memory. Models will have to be reloaded from disk
+        when predicting.
+
+        Returns
+        -------
+        list_of_models : List[str]
+            List of models removed from memory
+        """
+        unpersisted_models = self.load_trainer().unpersist()
+        self.trainer = None
+        return unpersisted_models
 
     def refit_full(self, model: str = "all") -> Dict[str, str]:
         return self.load_trainer().refit_full(model=model)

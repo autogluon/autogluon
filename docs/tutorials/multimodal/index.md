@@ -28,7 +28,7 @@ In the following, we decompose the functionalities of AutoMM and prepare step-by
 :::{grid-item-card} AutoMM for Text Prediction - Quick Start
   :link: text_prediction/beginner_text.html
 
-  How to train high-quality text prediction models with MultiModalPredictor.
+  How to train high-quality text prediction models with AutoMM.
 :::
 
 :::{grid-item-card} AutoMM for Text Prediction - Multilingual Problems

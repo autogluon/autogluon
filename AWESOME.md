@@ -29,18 +29,42 @@ To get started, we recommend watching [AutoGluon 1.0: Shattering the AutoML Ceil
 | [Advancing the State of the Art in AutoML](https://developer.nvidia.com/blog/advancing-the-state-of-the-art-in-automl-now-10x-faster-with-nvidia-gpus-and-rapids/) | Talk     | [GTC 2021](https://developer.nvidia.com/blog/advancing-the-state-of-the-art-in-automl-now-10x-faster-with-nvidia-gpus-and-rapids/) | 2021/06/09 |
 | :tv: [AutoGluon and Distillation](https://icml.cc/virtual/2020/7045)                                                                                               | Keynote  | [ICML 2020, AutoML Workshop](https://icml.cc/virtual/2020/workshop/5725)                                                           | 2020/07/18 |
 
+### Articles
+- [AutoGluon-TimeSeries: Every Time Series Forecasting Model In One Library](https://towardsdatascience.com/autogluon-timeseries-every-time-series-forecasting-model-in-one-library-29a3bf6879db) (*Towards Data Science*, Jan 2024)
+- [AutoGluon-TimeSeries: Creating Powerful Ensemble Forecasts - Complete Tutorial](https://aihorizonforecast.substack.com/p/autogluon-timeseries-creating-powerful) (*AI Horizon Forecast*, Dec 2023)
+- [AutoGluon for tabular data: 3 lines of code to achieve top 1% in Kaggle competitions](https://aws.amazon.com/blogs/opensource/machine-learning-with-autogluon-an-open-source-automl-library/) (*AWS Open Source Blog*, Mar 2020)
+- [AutoGluon overview & example applications](https://towardsdatascience.com/autogluon-deep-learning-automl-5cdb4e2388ec?source=friends_link&sk=e3d17d06880ac714e47f07f39178fdf2) (*Towards Data Science*, Dec 2019)
+
 ## Competition Solutions using AutoGluon
+
+AutoGluon, especially since the 1.0 release, has seen [wide-spread usage](https://www.kaggle.com/search?q=autogluon) on ML competition sites such as Kaggle. 
+Below is a sampling of competition solutions that use AutoGluon to achieve strong results.
 
 ### Kaggle
 
-#### Tabular
+#### 2024
 
-1. (Live, 2023/01/09) Rank 1/689 : [Tabular Regression with the California Housing Dataset](https://www.kaggle.com/competitions/playground-series-s3e1/discussion/377137)
-2. (Live, 2023/02/20) Rank 9/703 : [Tabular Regression with a Paris Housing Price Dataset](https://www.kaggle.com/competitions/playground-series-s3e6/discussion/389151)
-3. (Live, 2023/03/06) Rank 6/734 : [Tabular Regression with a Gemstone Price Dataset](https://www.kaggle.com/competitions/playground-series-s3e8/discussion/392820)
-4. (Live, 2023/03/08) Rank 2/58 : [ML Olympiad - Water Quality Prediction](https://www.kaggle.com/competitions/ml-olympiad-waterqualityprediction/discussion/393393)
-5. (Live, 2023/03/11) Top 3% : [Titanic - Machine learning from Disaster](https://www.kaggle.com/competitions/titanic/discussion/394105#2178151)
-6. (Hist,  2022/03/22) Rank 24/3507 : [Otto Group Product Classification Challenge](https://www.kaggle.com/code/innixma/autogluon-rank-24-in-1-line-of-code)
+| Placement                                | Competition                                                                                                                                       | Author                                             | Date       | AutoGluon Details | Notes                          |
+|:-----------------------------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------|:---------------------------------------------------|:-----------|:------------------|:-------------------------------|
+| :3rd_place_medal: Rank 3/2303 (Top 0.1%) | [Steel Plate Defect Prediction](https://www.kaggle.com/competitions/playground-series-s4e3/discussion/488127)                                     | [Samvel Kocharyan](https://github.com/samvelkoch)  | 2024/03/31 | v1.0, Tabular     | Kaggle Playground Series S4E3  |
+| :2nd_place_medal: Rank 2/93 (Top 2%)     | [Prediction Interval Competition I: Birth Weight](https://www.kaggle.com/competitions/prediction-interval-competition-i-birth-weight/leaderboard) | [Oleksandr Shchur](https://shchur.github.io/)      | 2024/03/21 | v1.0, Tabular     |                                |
+| :2nd_place_medal: Rank 2/1542 (Top 0.1%) | [WiDS Datathon 2024 Challenge #1](https://www.kaggle.com/competitions/widsdatathon2024-challenge1/discussion/482285)                              | [lazy_panda](https://www.kaggle.com/byteliberator) | 2024/03/01 | v1.0, Tabular     |                                |
+| :2nd_place_medal: Rank 2/3746 (Top 0.1%) | [Multi-Class Prediction of Obesity Risk](https://www.kaggle.com/competitions/playground-series-s4e2/discussion/480939)                            | [Kirderf](https://twitter.com/kirderf9)            | 2024/02/29 | v1.0, Tabular     | Kaggle Playground Series S4E2  |
+| :2nd_place_medal: Rank 2/3777 (Top 0.1%) | [Binary Classification with a Bank Churn Dataset](https://www.kaggle.com/competitions/playground-series-s4e1/discussion/472496)                   | [lukaszl](https://www.kaggle.com/lukaszl)          | 2024/01/31 | v1.0, Tabular     | Kaggle Playground Series S4E1  |
+| Rank 4/1718 (Top 0.2%)                   | [Multi-Class Prediction of Cirrhosis Outcomes](https://www.kaggle.com/competitions/playground-series-s3e26/discussion/464863)                     | [Kirderf](https://twitter.com/kirderf9)            | 2024/01/01 | v1.0, Tabular     | Kaggle Playground Series S3E26 |
+
+#### Older Results
+
+| Placement                              | Competition                                                                                                                            | Author                                                 | Date       | AutoGluon Details | Notes                         |
+|:---------------------------------------|:---------------------------------------------------------------------------------------------------------------------------------------|:-------------------------------------------------------|:-----------|:------------------|:------------------------------|
+| :2nd_place_medal: Rank 2/58 (Top 4%)   | [ML Olympiad - Water Quality Prediction](https://www.kaggle.com/competitions/ml-olympiad-waterqualityprediction/discussion/393393)     | [Chris X](https://www.kaggle.com/docxian)              | 2023/03/11 | v0.6.2, Tabular   |                               |
+| Rank 6/734 (Top 1%)                    | [Tabular Regression with a Gemstone Price Dataset](https://www.kaggle.com/competitions/playground-series-s3e8/discussion/392820)       | [Kirderf](https://twitter.com/kirderf9)                | 2023/03/06 | v0.6.2, Tabular   | Kaggle Playground Series S3E8 |
+| Rank 9/703 (Top 1.3%)                  | [Tabular Regression with a Paris Housing Price Dataset](https://www.kaggle.com/competitions/playground-series-s3e6/discussion/389151)  | [Brendan Moore](https://www.kaggle.com/brendanmoore14) | 2023/02/20 | v0.6.2, Tabular   | Kaggle Playground Series S3E6 |
+| :1st_place_medal: Rank 1/689           | [Tabular Regression with the California Housing Dataset](https://www.kaggle.com/competitions/playground-series-s3e1/discussion/377137) | [Kirderf](https://twitter.com/kirderf9)                | 2023/01/09 | v0.6.1, Tabular   | Kaggle Playground Series S3E1 |
+
+## Research Papers
+
+To view a list of all AutoGluon research papers, please refer to our [citation guide](CITING.md).
 
 ## AutoML Benchmarks using AutoGluon
 * [AMLB: An AutoML Benchmark](https://openml.github.io/automlbenchmark/)
@@ -49,5 +73,8 @@ To get started, we recommend watching [AutoGluon 1.0: Shattering the AutoML Ceil
   * This is our preferred benchmark as it is widely accepted and trusted within the AutoML community.
 
 ## Papers using AutoGluon
+
+Below is a sampling of some interesting papers that have cited AutoGluon.
+
 * (2023/04/28) [Benchmarking Automated Machine Learning Methods for Price Forecasting Applications](https://arxiv.org/abs/2304.14735)
   * This paper compares various traditional and AutoML methods for price forecasting problems, with AutoGluon achieving the strongest results.

@@ -101,18 +101,20 @@ def get_data_frame_with_item_index(
     )
 
 
-DUMMY_TS_DATAFRAME = get_data_frame_with_item_index(["10", "A", "2", "1"])
-
-
-def get_dummy_ts_dataframe_with_missing():
-    data = DUMMY_TS_DATAFRAME.copy()
-    # Completely mask one item + some additional indexes
+def mask_entries(data: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
+    """Replace some values in a TimeSeriesDataFrame with NaNs"""
+    data = data.copy()
+    # Mask all but the first entry for item #1
+    data.iloc[1 : data.num_timesteps_per_item()[data.item_ids[0]]] = float("nan")
+    # Completely mask item #2
     data.loc[data.item_ids[1]] = float("nan")
-    data.iloc[[0, 1, 2, 5, 15, 17, 18, 42, 53]] = float("nan")
+    # Mask random indices for item #3
+    nan_idx = [42, 53, 58, 59][: len(data)]
+    data.iloc[nan_idx] = float("nan")
     return data
 
 
-DUMMY_TS_DATAFRAME_WITH_MISSING = get_dummy_ts_dataframe_with_missing()
+DUMMY_TS_DATAFRAME = mask_entries(get_data_frame_with_item_index(["10", "A", "2", "1"]))
 
 
 def get_data_frame_with_variable_lengths(
@@ -142,7 +144,7 @@ def get_data_frame_with_variable_lengths(
 
 
 ITEM_ID_TO_LENGTH = {"D": 22, "A": 50, "C": 10, "B": 17}
-DUMMY_VARIABLE_LENGTH_TS_DATAFRAME = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH)
+DUMMY_VARIABLE_LENGTH_TS_DATAFRAME = mask_entries(get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH))
 
 
 def get_static_features(item_ids: List[Union[str, int]], feature_names: List[str]):

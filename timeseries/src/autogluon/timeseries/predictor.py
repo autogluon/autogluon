@@ -5,7 +5,7 @@ import os
 import pprint
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple, Type, Union
 
 import numpy as np
 import pandas as pd
@@ -276,7 +276,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
         name: str = "data",
     ) -> TimeSeriesDataFrame:
-        """Ensure that TimeSeriesDataFrame has a sorted index, valid frequency, and contains no missing values.
+        """Ensure that TimeSeriesDataFrame has a sorted index and a valid frequency.
 
         If self.freq is None, then self.freq of the predictor will be set to the frequency of the data.
 
@@ -314,18 +314,6 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             if df.freq != self.freq:
                 logger.warning(f"{name} with frequency '{df.freq}' has been resampled to frequency '{self.freq}'.")
                 df = df.convert_frequency(freq=self.freq)
-
-        # Fill missing values
-        if df.isna().values.any():
-            # FIXME: Do not automatically fill NaNs here, handle missing values at the level of individual models.
-            # FIXME: Current solution leads to incorrect metric computation if missing values are present
-            logger.warning(
-                f"{name} contains missing values represented by NaN. "
-                f"They have been filled by carrying forward the last valid observation."
-            )
-            df = df.fill_missing_values()
-            if df.isna().values.any():
-                raise ValueError(f"Some time series in {name} consist completely of NaN values. Please remove them.")
         return df
 
     def _check_data_for_evaluation(self, data: TimeSeriesDataFrame, name: str = "data"):
@@ -337,15 +325,19 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
                 f"all time series have length > prediction_length (at least {self.prediction_length + 1})"
             )
 
-    @staticmethod
-    def _get_dataset_stats(data: TimeSeriesDataFrame) -> str:
+    def _get_dataset_stats(self, data: TimeSeriesDataFrame) -> str:
         ts_lengths = data.num_timesteps_per_item()
-        median_length = int(ts_lengths.median())
+        median_length = ts_lengths.median()
         min_length = ts_lengths.min()
         max_length = ts_lengths.max()
+        missing_value_fraction = data[self.target].isna().mean()
+        if missing_value_fraction > 0:
+            missing_value_fraction_str = f" (NaN fraction={missing_value_fraction:.1%})"
+        else:
+            missing_value_fraction_str = ""
         return (
-            f"{len(data)} rows, {data.num_items} time series. "
-            f"Median time series length is {median_length} (min={min_length}, max={max_length}). "
+            f"{len(data)} rows{missing_value_fraction_str}, {data.num_items} time series. "
+            f"Median time series length is {median_length:.0f} (min={min_length}, max={max_length}). "
         )
 
     def _reduce_num_val_windows_if_necessary(
@@ -374,41 +366,45 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             )
         return new_num_val_windows
 
-    def _filter_short_series(
+    def _filter_useless_train_data(
         self,
         train_data: TimeSeriesDataFrame,
         num_val_windows: int,
         val_step_size: int,
     ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
-        """Remove time series from train_data that are too short for chosen prediction_length and validation settings.
+        """Remove time series from train_data that either contain all NaNs or are too short for chosen settings.
 
-        This method ensures that for each validation fold, all train series have length >= max(prediction_length + 1, 5).
+        This method ensures that 1) no time series consist of all NaN values and 2) for each validation fold, all train
+        series have length >= max(prediction_length + 1, 5).
 
-        In other words, this method removes from train_data all time series with length less than
+        In other words, this method removes from train_data all time series with only NaN values or length less than
         min_train_length + prediction_length + (num_val_windows - 1) * val_step_size
         """
         min_length = self._min_train_length + self.prediction_length + (num_val_windows - 1) * val_step_size
-
         train_lengths = train_data.num_timesteps_per_item()
-        train_items_to_drop = train_lengths.index[train_lengths < min_length]
-        if len(train_items_to_drop) > 0:
+        too_short_items = train_lengths.index[train_lengths < min_length]
+
+        if len(too_short_items) > 0:
             logger.info(
-                f"\tRemoving {len(train_items_to_drop)} short time series from train_data. Only series with length "
+                f"\tRemoving {len(too_short_items)} short time series from train_data. Only series with length "
                 f">= {min_length} will be used for training."
             )
-            filtered_train_data = train_data.query("item_id not in @train_items_to_drop")
-            if len(filtered_train_data) == 0:
-                raise ValueError(
-                    f"At least some time series in train_data must have length >= {min_length}. Please provide longer "
-                    f"time series as train_data or reduce prediction_length, num_val_windows, or val_step_size."
-                )
-            logger.info(
-                f"\tAfter removing short series, train_data has {self._get_dataset_stats(filtered_train_data)}"
-            )
-        else:
-            filtered_train_data = train_data
+            train_data = train_data.query("item_id not in @too_short_items")
 
-        return filtered_train_data
+        all_nan_items = train_data.item_ids[train_data[self.target].isna().groupby(ITEMID, sort=False).all()]
+        if len(all_nan_items) > 0:
+            logger.info(f"\tRemoving {len(all_nan_items)} time series consisting of only NaN values from train_data.")
+            train_data = train_data.query("item_id not in @all_nan_items")
+
+        if len(too_short_items) or len(all_nan_items):
+            logger.info(f"\tAfter filtering, train_data has {self._get_dataset_stats(train_data)}")
+
+        if len(train_data) == 0:
+            raise ValueError(
+                f"At least some time series in train_data must have >= {min_length} observations. Please provide "
+                f"longer time series as train_data or reduce prediction_length, num_val_windows, or val_step_size."
+            )
+        return train_data
 
     @apply_presets(TIMESERIES_PRESETS_CONFIGS)
     def fit(
@@ -425,6 +421,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         refit_every_n_windows: int = 1,
         refit_full: bool = False,
         enable_ensemble: bool = True,
+        skip_model_selection: bool = False,
         random_seed: Optional[int] = 123,
         verbosity: Optional[int] = None,
     ) -> "TimeSeriesPredictor":
@@ -496,10 +493,22 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
             Available presets:
 
-            - ``"fast_training"``: fit simple statistical models (``ETS``, ``Theta``, ``Naive``, ``SeasonalNaive``) + fast tree-based models ``RecursiveTabular`` and ``DirectTabular``. These models are fast to train but may not be very accurate.
-            - ``"medium_quality"``: all models mentioned above + deep learning model ``TemporalFusionTransformer``. Default setting that produces good forecasts with reasonable training time.
-            - ``"high_quality"``: All ML models available in AutoGluon + additional statistical models (``NPTS``, ``AutoETS``, ``AutoARIMA``, ``CrostonSBA``, ``DynamicOptimizedTheta``). Much more accurate than ``medium_quality``, but takes longer to train.
+            - ``"fast_training"``: fit simple statistical models (``ETS``, ``Theta``, ``Naive``, ``SeasonalNaive``) + fast tree-based models ``RecursiveTabular``
+              and ``DirectTabular``. These models are fast to train but may not be very accurate.
+            - ``"medium_quality"``: all models mentioned above + deep learning model ``TemporalFusionTransformer``. Default setting that produces good forecasts
+              with reasonable training time.
+            - ``"high_quality"``: All ML models available in AutoGluon + additional statistical models (``NPTS``, ``AutoETS``, ``AutoARIMA``, ``CrostonSBA``,
+              ``DynamicOptimizedTheta``). Much more accurate than ``medium_quality``, but takes longer to train.
             - ``"best_quality"``: Same models as in ``"high_quality"`, but performs validation with multiple backtests. Usually better than ``high_quality``, but takes even longer to train.
+
+            Available presets with the `Chronos <https://github.com/amazon-science/chronos-forecasting>`_ model:
+
+            - ``"chronos_{model_size}"``: where model size is one of ``tiny,mini,small,base,large``. Uses the Chronos pretrained model for zero-shot forecasting.
+              See the documentation for ``ChronosModel`` or see `Hugging Face <https://huggingface.co/collections/amazon/chronos-models-65f1791d630a8d57cb718444>`_ for more information.
+              Note that a GPU is required for model sizes ``small``, ``base`` and ``large``.
+            - ``"chronos"``: alias for ``"chronos_small"``.
+            - ``"chronos_ensemble"``: builds an ensemble of the models specified in ``"high_quality"`` and ``"chronos_small"``.
+            - ``"chronos_large_ensemble"``: builds an ensemble of the models specified in ``"high_quality"`` and ``"chronos_large"``.
 
             Details for these presets can be found in ``autogluon/timeseries/configs/presets_configs.py``. If not
             provided, user-provided values for ``hyperparameters`` and ``hyperparameter_tune_kwargs`` will be used
@@ -630,6 +639,10 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         enable_ensemble : bool, default = True
             If True, the ``TimeSeriesPredictor`` will fit a simple weighted ensemble on top of the models specified via
             ``hyperparameters``.
+        skip_model_selection : bool, default = False
+            If True, predictor will not compute the validation score. For example, this argument is useful if we want
+            to use the predictor as a wrapper for a single pre-trained model. If set to True, then the ``hyperparameters``
+            dict must contain exactly one model without hyperparameter search spaces or an exception will be raised.
         random_seed : int or None, default = 123
             If provided, fixes the seed of the random number generator for all models. This guarantees reproducible
             results for most models (except those trained on GPU because of the non-determinism of GPU operations).
@@ -669,6 +682,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             val_step_size=val_step_size,
             refit_every_n_windows=refit_every_n_windows,
             refit_full=refit_full,
+            skip_model_selection=skip_model_selection,
             enable_ensemble=enable_ensemble,
             random_seed=random_seed,
             verbosity=verbosity,
@@ -703,9 +717,10 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         if num_val_windows == 0 and tuning_data is None:
             raise ValueError("Please set num_val_windows >= 1 or provide custom tuning_data")
 
-        train_data = self._filter_short_series(
-            train_data, num_val_windows=num_val_windows, val_step_size=val_step_size
-        )
+        if not skip_model_selection:
+            train_data = self._filter_useless_train_data(
+                train_data, num_val_windows=num_val_windows, val_step_size=val_step_size
+            )
 
         val_splitter = ExpandingWindowSplitter(
             prediction_length=self.prediction_length, num_val_windows=num_val_windows, val_step_size=val_step_size
@@ -722,6 +737,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             verbosity=verbosity,
             val_splitter=val_splitter,
             refit_every_n_windows=refit_every_n_windows,
+            skip_model_selection=skip_model_selection,
             enable_ensemble=enable_ensemble,
             random_seed=random_seed,
         )
@@ -962,6 +978,47 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             if self._trainer.model_best in models:
                 return self._trainer.model_best
         return self._trainer.get_model_best()
+
+    def persist(
+        self, models: Union[Literal["all", "best"], List[str]] = "best", with_ancestors: bool = True
+    ) -> List[str]:
+        """Persist models in memory for reduced inference latency. This is particularly important if the models are being used for online
+        inference where low latency is critical. If models are not persisted in memory, they are loaded from disk every time they are
+        asked to make predictions. This is especially cumbersome for large deep learning based models which have to be loaded into
+        accelerator (e.g., GPU) memory each time.
+
+        Parameters
+        ----------
+        models : list of str or str, default = 'best'
+            Model names of models to persist.
+            If 'best' then the model with the highest validation score is persisted (this is the model used for prediction by default).
+            If 'all' then all models are persisted. Valid models are listed in this `predictor` by calling `predictor.model_names()`.
+        with_ancestors : bool, default = True
+            If True, all ancestor models of the provided models will also be persisted.
+            If False, ensemble models will not have the models they depend on persisted unless those models were specified in `models`.
+            This will slow down inference as the ancestor models will still need to be loaded from disk for each predict call.
+            Only relevant for ensemble models.
+
+        Returns
+        -------
+        list_of_models : List[str]
+            List of persisted model names.
+        """
+        return self._learner.persist_trainer(models=models, with_ancestors=with_ancestors)
+
+    def unpersist(self) -> List[str]:
+        """Unpersist models in memory for reduced memory usage. If models are not persisted in memory, they are loaded from
+        disk every time they are asked to make predictions.
+
+        Note: Another way to reset the predictor and unpersist models is to reload the predictor from disk
+        via `predictor = TimeSeriesPredictor.load(predictor.path)`.
+
+        Returns
+        -------
+        list_of_models : List[str]
+            List of unpersisted model names.
+        """
+        return self._learner.unpersist_trainer()
 
     def leaderboard(
         self,

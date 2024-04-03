@@ -21,13 +21,18 @@ from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
 
 from ..common import DUMMY_TS_DATAFRAME, CustomMetric, dict_equal_primitive, get_data_frame_with_item_index
+from .test_chronos import TESTABLE_MODELS as CHRONOS_TESTABLE_MODELS
 from .test_gluonts import TESTABLE_MODELS as GLUONTS_TESTABLE_MODELS
 from .test_local import TESTABLE_MODELS as LOCAL_TESTABLE_MODELS
 from .test_mlforecast import TESTABLE_MODELS as MLFORECAST_TESTABLE_MODELS
 from .test_multi_window_model import get_multi_window_deepar
 
 TESTABLE_MODELS = (
-    GLUONTS_TESTABLE_MODELS + LOCAL_TESTABLE_MODELS + MLFORECAST_TESTABLE_MODELS + [get_multi_window_deepar]
+    CHRONOS_TESTABLE_MODELS
+    + GLUONTS_TESTABLE_MODELS
+    + LOCAL_TESTABLE_MODELS
+    + MLFORECAST_TESTABLE_MODELS
+    + [get_multi_window_deepar]
 )
 
 DUMMY_HYPERPARAMETERS = {
@@ -36,6 +41,7 @@ DUMMY_HYPERPARAMETERS = {
     "maxiter": 1,
     "n_jobs": 1,
     "use_fallback_model": False,
+    "model_path": "amazon/chronos-t5-tiny",
 }
 TESTABLE_PREDICTION_LENGTHS = [1, 5]
 
@@ -120,7 +126,7 @@ def test_when_score_called_then_model_receives_truncated_data(model_class, predi
         (call_df,) = patch_method.call_args[0]
 
         for j in DUMMY_TS_DATAFRAME.item_ids:
-            assert np.allclose(call_df.loc[j], DUMMY_TS_DATAFRAME.loc[j][:-prediction_length])
+            assert np.allclose(call_df.loc[j], DUMMY_TS_DATAFRAME.loc[j][:-prediction_length], equal_nan=True)
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
@@ -147,11 +153,7 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct
         path=temp_model_path,
         freq="H",
         quantile_levels=[0.1, 0.9],
-        hyperparameters={
-            "epochs": space.Int(1, 3),
-            "num_batches_per_epoch": 1,
-            "use_fallback_model": False,
-        },
+        hyperparameters={**DUMMY_HYPERPARAMETERS, "epochs": space.Int(1, 3)},
     )
     if isinstance(model, MultiWindowBacktestingModel):
         val_data = None
@@ -361,18 +363,19 @@ def test_when_get_info_is_called_then_all_keys_are_present(model_class, predicti
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 def test_when_median_not_in_quantile_levels_then_median_is_present_in_raw_predictions(model_class):
+    data = get_data_frame_with_item_index(["B", "A", "X", "C"])
     model = model_class(
         prediction_length=3,
         quantile_levels=[0.1, 0.15],
-        freq=DUMMY_TS_DATAFRAME.freq,
+        freq=data.freq,
         hyperparameters=DUMMY_HYPERPARAMETERS,
     )
     if isinstance(model, MultiWindowBacktestingModel):
         # Median is present in the predictions of the base model, but not in the MultiWindowBacktestingModel wrapper
         pytest.skip()
-    model.fit(train_data=DUMMY_TS_DATAFRAME)
+    model.fit(train_data=data)
 
-    raw_predictions = model._predict(DUMMY_TS_DATAFRAME)
+    raw_predictions = model._predict(data)
     assert "0.5" in raw_predictions.columns
 
 
@@ -409,11 +412,7 @@ def test_when_custom_metric_passed_to_model_then_model_can_hyperparameter_tune(m
     model = model_class(
         prediction_length=3,
         freq=DUMMY_TS_DATAFRAME.freq,
-        hyperparameters={
-            "epochs": space.Int(1, 3),
-            "num_batches_per_epoch": 1,
-            "use_fallback_model": False,
-        },
+        hyperparameters={**DUMMY_HYPERPARAMETERS, "epochs": space.Int(1, 3)},
         eval_metric=CustomMetric(),
     )
     backend = model._get_hpo_backend()
@@ -477,3 +476,91 @@ def test_given_searcher_when_ray_backend_used_in_hpo_then_correct_searcher_used(
             "bayes": "HyperOpt",
             "random": "BasicVariant",
         }.get(searcher) in ray_searcher_class_name
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+def test_when_data_contains_missing_values_then_model_can_fit_and_predict(temp_model_path, model_class):
+    data = DUMMY_TS_DATAFRAME
+    prediction_length = 5
+    model = model_class(
+        freq=data.freq,
+        path=temp_model_path,
+        prediction_length=prediction_length,
+        hyperparameters=DUMMY_HYPERPARAMETERS,
+    )
+    model.fit(
+        train_data=data,
+        val_data=None if isinstance(model, MultiWindowBacktestingModel) else data,
+    )
+    predictions = model.predict(data)
+    assert not predictions.isna().any(axis=None) and all(predictions.item_ids == data.item_ids)
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+def test_when_fit_and_predict_called_then_train_val_and_test_data_is_preprocessed(temp_model_path, model_class):
+    train_data = DUMMY_TS_DATAFRAME.copy()
+    model = model_class(freq=train_data.freq, path=temp_model_path, hyperparameters=DUMMY_HYPERPARAMETERS)
+    preprocessed_data = train_data + 5.0
+    if model._get_tags()["can_use_val_data"]:
+        expected_val_data = preprocessed_data
+    else:
+        expected_val_data = train_data
+    with (
+        mock.patch.object(model, "preprocess") as mock_preprocess,
+        mock.patch.object(model, "_fit") as mock_fit,
+        mock.patch.object(model, "_predict") as mock_predict,
+    ):
+        mock_preprocess.return_value = preprocessed_data
+        model.fit(train_data=train_data, val_data=train_data)
+        fit_kwargs = mock_fit.call_args[1]
+        model_train_data = fit_kwargs["train_data"]
+        model_val_data = fit_kwargs["val_data"]
+        assert model_train_data.equals(preprocessed_data)
+        assert model_val_data.equals(expected_val_data)
+
+        model.predict(train_data)
+        model_predict_data = mock_predict.call_args[1]["data"]
+        assert model_predict_data.equals(preprocessed_data)
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+def test_given_model_doesnt_support_nan_when_model_fits_then_nans_are_filled(temp_model_path, model_class):
+    data = get_data_frame_with_item_index(["B", "A", "C", "X"])
+    data.iloc[[0, 1, 5, 10, 23, 26, 33, 60]] = float("nan")
+    prediction_length = 5
+    model = model_class(
+        freq=data.freq,
+        path=temp_model_path,
+        prediction_length=prediction_length,
+        hyperparameters=DUMMY_HYPERPARAMETERS,
+    )
+
+    with mock.patch.object(model, "_fit") as mock_fit:
+        model.fit(
+            train_data=data,
+            val_data=None if isinstance(model, MultiWindowBacktestingModel) else data,
+        )
+        fit_kwargs = mock_fit.call_args[1]
+
+    model_allows_nan = model._get_tags()["allow_nan"]
+    input_contains_nan = fit_kwargs["train_data"].isna().any(axis=None)
+    assert model_allows_nan == input_contains_nan
+
+
+EXPECTED_MODEL_TAGS = [
+    "allow_nan",
+    "can_refit_full",
+    "can_use_val_data",
+    # Tabular tags - not used by time series models
+    "valid_oof",
+    "handles_text",
+]
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+def test_when_model_created_then_model_has_all_required_tags(temp_model_path, model_class):
+    model = model_class(path=temp_model_path)
+    model_tags = model._get_tags()
+    for tag in EXPECTED_MODEL_TAGS:
+        assert tag in model_tags
+    assert len(model_tags) == len(EXPECTED_MODEL_TAGS)
