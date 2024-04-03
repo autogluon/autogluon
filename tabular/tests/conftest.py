@@ -51,6 +51,14 @@ def pytest_collection_modifyitems(config, items):
         for marker in custom_markers:
             if marker in item.keywords:
                 item.add_marker(custom_markers[marker])
+    # Reordering logic to ensure tests under ./unittests/resource_allocation run last
+    # TODO: Fix this once resource_allocation tests are robost enough to run with other tests without ordering issues
+    resource_allocation_tests = [item for item in items if "unittests/resource_allocation" in str(item.fspath)]
+    other_tests = [item for item in items if "unittests/resource_allocation" not in str(item.fspath)]
+    
+    items.clear()
+    items.extend(other_tests)
+    items.extend(resource_allocation_tests)
 
 
 class DatasetLoaderHelper:
