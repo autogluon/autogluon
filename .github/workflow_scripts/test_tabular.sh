@@ -28,7 +28,9 @@ fi
 cd tabular/
 if [ -n "$ADDITIONAL_TEST_ARGS" ]
 then
-    python -m pytest --junitxml=results.xml --runslow "$ADDITIONAL_TEST_ARGS" tests
+    # TODO: Temporary re-arrangement of tests to unblock timeout on platform tests
+    python -m pytest --junitxml=results.xml --runslow "$ADDITIONAL_TEST_ARGS" tests/regressiontests tests/unittests/calibrate tests/unittests/configs tests/unittests/data tests/unittests/dynamic_stacking tests/unittests/edgecases tests/unittests/experimental tests/unittests/models tests/unittests/pseudolabel tests/unittests/test_tabular.py tests/test_check_style.py tests/unittests/resource_allocation
 else
-    python -m pytest --junitxml=results.xml --runslow tests
+    # TODO: Temporary re-arrangement of tests to unblock timeout on platform tests
+    python -m pytest --junitxml=results.xml --runslow tests/regressiontests tests/unittests/calibrate tests/unittests/configs tests/unittests/data tests/unittests/dynamic_stacking tests/unittests/edgecases tests/unittests/experimental tests/unittests/models tests/unittests/pseudolabel tests/unittests/test_tabular.py tests/test_check_style.py tests/unittests/resource_allocation
 fi
