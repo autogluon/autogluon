@@ -13,7 +13,7 @@ def test_when_splitter_splits_then_cached_freq_is_preserved():
 
 def test_when_splitter_splits_then_underlying_data_is_not_copied():
     splitter = ExpandingWindowSplitter(prediction_length=3, num_val_windows=2)
-    original_df = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME.copy()
+    original_df = DATAFRAME_WITH_STATIC.copy()
     for train_fold, val_fold in splitter.split(original_df):
         assert train_fold._is_view
         assert val_fold._is_view or val_fold.values.data == original_df.values.data
