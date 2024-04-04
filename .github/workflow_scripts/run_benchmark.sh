@@ -14,6 +14,8 @@ source $(dirname "$0")/env_setup.sh
 setup_benchmark_env
 
 /bin/bash CI/bench/generate_bench_config.sh $MODULE $PRESET $BENCHMARK $TIME_LIMIT $BRANCH_OR_PR_NUMBER
+echo "----Copying and Printing Cloud Configs----"
+cat $MODULE"_cloud_configs.yaml"
 agbench run $MODULE"_cloud_configs.yaml" --wait
 
 # If it is a PR, fetch the cleaned file of master-evaluation
@@ -32,7 +34,7 @@ if [ $BRANCH_OR_PR_NUMBER != "master" ]; then
     fi
 fi
 
-python CI/bench/evaluate.py --config_path ./ag_bench_runs/$MODULE/ --module_name $MODULE --time_limit $TIME_LIMIT --branch_name $BRANCH_OR_PR_NUMBER
+python CI/bench/evaluate.py --config_path ./ag_bench_runs/$MODULE/ --module_name $MODULE --time_limit $TIME_LIMIT --branch_name $BRANCH_OR_PR_NUMBER --benchmark_type $BENCHMARK
 
 for file in ./results/*; do
     CLEANED_PATH="s3://autogluon-ci-benchmark/cleaned/$MODULE"
@@ -46,7 +48,7 @@ for file in ./results/*; do
         CLEANED_PATH="$CLEANED_PATH/$BENCHMARK"
         EVALUATION_PATH="$EVALUATION_PATH/$BENCHMARK"
     fi
-
+ 
     aws s3 cp "$file" "$CLEANED_PATH/$BRANCH_NAME/$SHA/$(basename "$file")"
     aws s3 rm --recursive "$CLEANED_PATH/$BRANCH_NAME/latest/"
     aws s3 cp "$file" "$CLEANED_PATH/$BRANCH_NAME/latest/$(basename "$file")"

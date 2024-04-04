@@ -18,6 +18,7 @@ function setup_build_contrib_env {
 
 function setup_benchmark_env {
     pip install -U autogluon.bench
+    pip install pyarrow
     git clone https://github.com/autogluon/autogluon-dashboard.git
     pip install -e ./autogluon-dashboard
     pip install yq

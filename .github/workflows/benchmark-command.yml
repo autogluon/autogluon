@@ -28,7 +28,7 @@ on:
           - good
           - medium
           - dev
-          - master_medium
+          - master_best
       benchmark:
         description: 'Benchmark to run'
         required: true
