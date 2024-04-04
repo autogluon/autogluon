@@ -138,8 +138,11 @@ def get_data_frame_with_variable_lengths(
     df.freq  # compute _cached_freq
     df.static_features = static_features
     if covariates_names is not None:
-        for name in covariates_names:
-            df[name] = np.random.normal(size=len(df))
+        for i, name in enumerate(covariates_names):
+            if i % 2:
+                df[name] = np.random.normal(size=len(df))
+            else:
+                df[name] = np.random.choice(["foo", "bar"], size=len(df))
     return df
 
 
