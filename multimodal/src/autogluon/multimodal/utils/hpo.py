@@ -44,15 +44,16 @@ def hpo_trial(sampled_hyperparameters, learner, checkpoint_dir=None, **_fit_args
     _fit_args
         The keyword arguments for learner.fit_per_run().
     """
-    from ray import tune
+    from ray import train
 
-    resources = tune.get_trial_resources().required_resources
+    context = train.get_context()
+    resources = context.get_trial_resources().required_resources
     num_cpus = int(resources.get("CPU"))
 
     _fit_args[
         "hyperparameters"
     ] = sampled_hyperparameters  # The original hyperparameters is the search space, replace it with the hyperparameters sampled
-    _fit_args["save_path"] = tune.get_trial_dir()  # We want to save each trial to a separate directory
+    _fit_args["save_path"] = context.get_trial_dir()  # We want to save each trial to a separate directory
     logger.debug(f"hpo trial save_path: {_fit_args['save_path']}")
     if checkpoint_dir is not None:
         _fit_args["resume"] = True
@@ -213,8 +214,8 @@ def hyperparameter_tune(hyperparameter_tune_kwargs, resources, is_matching=False
         best_trial_path = os.path.join(save_path, best_trial.trial_id)
 
         checkpoints_paths_and_scores = dict(
-            (os.path.join(checkpoint, RAY_TUNE_CHECKPOINT), score)
-            for checkpoint, score in analysis.get_trial_checkpoints_paths(best_trial, metric=metric)
+            (os.path.join(checkpoint.path, RAY_TUNE_CHECKPOINT), score)
+            for checkpoint, score in analysis._get_trial_checkpoints_with_metric(best_trial, metric=metric)
         )
         # write checkpoint paths and scores to yaml file so that top_k_average could read it
         best_k_model_path = os.path.join(best_trial_path, BEST_K_MODELS_FILE)

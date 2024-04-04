@@ -159,7 +159,7 @@ class FitHelper:
         expected_stacked_overfitting_at_test=None,
         expected_stacked_overfitting_at_val=None,
         scikit_api=False,
-    ):
+    ) -> TabularPredictor:
         if compiler_configs is None:
             compiler_configs = {}
         directory_prefix = "./datasets/"
@@ -184,7 +184,9 @@ class FitHelper:
             init_args["path"] = PathConverter.to_absolute(path=init_args["path"])
             assert PathConverter._is_absolute(path=init_args["path"])
         save_path = init_args["path"]
-        predictor = FitHelper.fit_dataset(train_data=train_data, init_args=init_args, fit_args=fit_args, sample_size=sample_size, scikit_api=scikit_api)
+        predictor: TabularPredictor = FitHelper.fit_dataset(
+            train_data=train_data, init_args=init_args, fit_args=fit_args, sample_size=sample_size, scikit_api=scikit_api
+        )
         if compile:
             predictor.compile(models="all", compiler_configs=compiler_configs)
             predictor.persist(models="all")

@@ -403,7 +403,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         fit_weighted_ensemble: bool = True,
         fit_full_last_level_weighted_ensemble: bool = True,
         full_weighted_ensemble_additionally: bool = False,
-        dynamic_stacking: bool = False,
+        dynamic_stacking: bool | str = False,
         calibrate_decision_threshold: bool = False,
         num_cpus="auto",
         num_gpus="auto",
@@ -446,11 +446,11 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                     Best predictive accuracy with little consideration to inference time or disk usage. Achieve even better results by specifying a large time_limit value.
                     Recommended for applications that benefit from the best possible model accuracy.
 
-                high_quality={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, '_save_bag_folds': False}
+                high_quality={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, 'save_bag_folds': False}
                     High predictive accuracy with fast inference. ~10x-200x faster inference and ~10x-200x lower disk usage than `best_quality`.
                     Recommended for applications that require reasonable inference speed and/or model size.
 
-                good_quality={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, '_save_bag_folds': False, 'hyperparameters': 'light'}
+                good_quality={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, 'save_bag_folds': False, 'hyperparameters': 'light'}
                     Good predictive accuracy with very fast inference. ~4x faster inference and ~4x lower disk usage than `high_quality`.
                     Recommended for applications that require fast inference speed.
 
@@ -660,14 +660,16 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             If True, AutoGluon will fit two WeightedEnsembleModels after training all stacking levels. Setting this to True, simulates calling
             `fit_weighted_ensemble()` after calling `fit()`. Has no affect if `fit_full_last_level_weighted_ensemble` is False and does not fit an additional
             WeightedEnsembleModel if stacking is disabled.
-        dynamic_stacking: bool, default = False
+        dynamic_stacking: bool | str, default = False
             If True and `num_stack_levels` > 0, AutoGluon will dynamically determine whether to use stacking or not by first validating AutoGluon's stacking
             behavior. This is done to avoid so-called stacked overfitting that can make traditional multi-layer stacking, as used in AutoGluon, fail drastically
             and produce unreliable validation scores.
-            It is recommended to keep this value set to True when using stacking, as long as it is unknown whether the data is affected by stacked overfitting.
+            It is recommended to keep this value set to True or "auto" when using stacking,
+            as long as it is unknown whether the data is affected by stacked overfitting.
             If it is known that the data is unaffected by stacked overfitting, then setting this value to False is expected to maximize predictive quality.
             If enabled, by default, AutoGluon performs dynamic stacking by spending 25% of the provided time limit for detection and all remaining
             time for fitting AutoGluon. This can be adjusted by specifying `ds_args` with different parameters to `fit()`.
+            If "auto", will be set to `not use_bag_holdout`.
             See the documentation of `ds_args` for more information.
         calibrate_decision_threshold : bool, default = False
             [Experimental] This may be removed / changed without warning in a future release.
@@ -710,12 +712,13 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 Default value (if None) is selected based on the number of rows in the training data. Default values range from 0.2 at 2,500 rows to 0.01 at 250,000 rows.
                 Default value is doubled if `hyperparameter_tune_kwargs` is set, up to a maximum of 0.2.
                 Disabled if `num_bag_folds >= 2` unless `use_bag_holdout == True`.
-            use_bag_holdout : bool, default = False
+            use_bag_holdout : bool | str, default = False
                 If True, a `holdout_frac` portion of the data is held-out from model bagging.
                 This held-out data is only used to score models and determine weighted ensemble weights.
                 Enable this if there is a large gap between score_val and score_test in stack models.
                 Note: If `tuning_data` was specified, `tuning_data` is used as the holdout data.
                 Disabled if not bagging.
+                If "auto", will be set to True if the training data has >= 1000000 rows, else it will be set to False.
             hyperparameter_tune_kwargs : str or dict, default = None
                 Hyperparameter tuning strategy and kwargs (for example, how many HPO trials to run).
                 If None, then hyperparameter tuning will not be performed.
@@ -836,6 +839,16 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                     If the user does not have additional test data, they should reference the original model's score for an estimate of the performance of the refit_full model.
                         Warning: Be aware that utilizing refit_full models without separately verifying on test data means that the model is untested, and has no guarantee of being consistent with the original model.
                 The time taken by this process is not enforced by `time_limit`.
+            save_bag_folds : bool, default = True
+                If True, will save the bagged fold models to disk.
+                If False, will not save the bagged fold models, only keeping their metadata and out-of-fold predictions.
+                    Note: The bagged models will not be available for prediction, only use this if you intend to call `refit_full`.
+                    The purpose of setting it to False is that it greatly decreases the peak disk usage of the predictor during the fit call when bagging.
+                    Note that this makes refit_full slightly more likely to crash in scenarios where the dataset is large relative to available system memory.
+                    This is because by default, refit_full will fall back to cloning the first fold of the bagged model in case it lacks memory to refit.
+                    However, if `save_bag_folds=False`, this fallback isn't possible, as there is not fold model to clone because it wasn't saved.
+                    In this scenario, refit will raise an exception for `save_bag_folds=False`, but will succeed if `save_bag_folds=True`.
+                Final disk usage of predictor will be identical regardless of the setting after `predictor.delete_models(models_to_keep="best", dry_run=False)` is called post-fit.
             set_best_to_refit_full : bool, default = False
                 If True, will change the default model that Predictor uses for prediction when model is not specified to the refit_full version of the model that exhibited the highest validation score.
                 Only valid if `refit_full` is set.
@@ -986,8 +999,6 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         if isinstance(hyperparameters, str):
             hyperparameters = get_hyperparameter_config(hyperparameters)
 
-        # TODO: Hyperparam could have non-serializble objects. Save as pkl and loaded on demand
-        # in case the hyperprams are large in memory
         self.fit_hyperparameters_ = hyperparameters
 
         if "enable_raw_text_features" not in feature_generator_init_kwargs:
@@ -1003,7 +1014,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         else:
             inferred_problem_type = self._learner.infer_problem_type(y=train_data[self.label], silent=True)
 
-        num_bag_folds, num_bag_sets, num_stack_levels, dynamic_stacking = self._sanitize_stack_args(
+        num_bag_folds, num_bag_sets, num_stack_levels, dynamic_stacking, use_bag_holdout = self._sanitize_stack_args(
             num_bag_folds=num_bag_folds,
             num_bag_sets=num_bag_sets,
             num_stack_levels=num_stack_levels,
@@ -1012,6 +1023,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             num_train_rows=len(train_data),
             problem_type=inferred_problem_type,
             dynamic_stacking=dynamic_stacking,
+            use_bag_holdout=use_bag_holdout,
         )
         if auto_stack:
             logger.log(
@@ -1023,16 +1035,32 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         if holdout_frac is None:
             holdout_frac = default_holdout_frac(len(train_data), ag_args.get("hyperparameter_tune_kwargs", None) is not None)
 
-        if kwargs["_save_bag_folds"] is not None:
-            if use_bag_holdout and not kwargs["_save_bag_folds"]:
+        if kwargs["save_bag_folds"] is not None and kwargs["_save_bag_folds"] is not None:
+            raise ValueError(
+                f"Cannot specify both `save_bag_folds` and `_save_bag_folds` at the same time. "
+                f"(save_bag_folds={kwargs['save_bag_folds']}, _save_bag_folds={kwargs['_save_bag_folds']}"
+            )
+        elif kwargs["_save_bag_folds"] is not None:
+            kwargs["save_bag_folds"] = kwargs["_save_bag_folds"]
+
+        if kwargs["save_bag_folds"] is not None:
+            assert isinstance(kwargs["save_bag_folds"], bool), f"save_bag_folds must be a bool, found: {type(kwargs['save_bag_folds'])}"
+            if use_bag_holdout and not kwargs["save_bag_folds"]:
                 logger.log(
                     30,
                     f"WARNING: Attempted to disable saving of bagged fold models when `use_bag_holdout=True`. Forcing `save_bag_folds=True` to avoid errors.",
                 )
             else:
+                if num_bag_folds > 0 and not kwargs["save_bag_folds"]:
+                    logger.log(
+                        20,
+                        f"Note: `save_bag_folds=False`! This will greatly reduce peak disk usage during fit (by ~{num_bag_folds}x), "
+                        f"but runs the risk of an out-of-memory error during model refit if memory is small relative to the data size.\n"
+                        f"\tYou can avoid this risk by setting `save_bag_folds=True`.",
+                    )
                 if ag_args_ensemble is None:
                     ag_args_ensemble = {}
-                ag_args_ensemble["save_bag_folds"] = kwargs["_save_bag_folds"]
+                ag_args_ensemble["save_bag_folds"] = kwargs["save_bag_folds"]
 
         if time_limit is None:
             mb_mem_usage_train_data = get_approximate_df_mem_usage(train_data, sample_ratio=0.2).sum() / 1e6
@@ -3346,6 +3374,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         metric: str | Scorer | None = None,
         model: str = "best",
         decision_thresholds: int | List[float] = 50,
+        subsample_size: int | None = 1000000,
         verbose: bool = True,
     ) -> float:
         """
@@ -3374,6 +3403,9 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             The number of decision thresholds on either side of `0.5` to search.
             The default of 50 will result in 101 searched thresholds: [0.00, 0.01, 0.02, ..., 0.49, 0.50, 0.51, ..., 0.98, 0.99, 1.00]
             Alternatively, a list of decision thresholds can be passed and only the thresholds in the list will be searched.
+        subsample_size : int | None, default = 1000000
+            When `subsample_size` is not None and `data` contains more rows than `subsample_size`, samples to `subsample_size` rows to speed up calibration.
+            Usually it is not necessary to use more than 1 million rows for calibration.
         verbose : bool, default = True
             If True, will log information about the calibration process.
 
@@ -3382,12 +3414,9 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         Decision Threshold: A float between 0 and 1 defining the decision boundary for predictions that
         maximizes the `metric` score on the `data` for the `model`.
         """
-        # TODO: v0.8
-        #  add tutorial section
-        #
-        # TODO: v0.9
+        # TODO: v1.2
         #  Calculate optimal threshold for each model separately when deciding best model
-        #  sampling/time limit
+        #  time limit
         #  update validation scores of models based on threshold
         #  speed up the logic / search for optimal threshold more efficiently
         #  make threshold calibration part of internal optimization, such as during fit_weighted_ensemble.
@@ -3406,7 +3435,14 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         if model == "best":
             model = self.model_best
 
-        return self._learner.calibrate_decision_threshold(data=data, metric=metric, model=model, decision_thresholds=decision_thresholds, verbose=verbose)
+        return self._learner.calibrate_decision_threshold(
+            data=data,
+            metric=metric,
+            model=model,
+            decision_thresholds=decision_thresholds,
+            subsample_size=subsample_size,
+            verbose=verbose,
+        )
 
     def predict_oof(self, model: str = None, *, transformed=False, train_data=None, internal_oof=False, decision_threshold=None, can_infer=None) -> pd.Series:
         """
@@ -4354,6 +4390,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             keep_only_best=False,
             save_space=False,
             refit_full=False,
+            save_bag_folds=None,
             # other
             verbosity=self.verbosity,
             feature_prune_kwargs=None,
@@ -4562,27 +4599,42 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             feature_generator=feature_generator, feature_metadata=feature_metadata, init_kwargs=init_kwargs
         )
 
-    def _sanitize_stack_args(self, num_bag_folds, num_bag_sets, num_stack_levels, time_limit, auto_stack, num_train_rows, problem_type, dynamic_stacking):
+    def _sanitize_stack_args(
+        self,
+        num_bag_folds: int,
+        num_bag_sets: int,
+        num_stack_levels: int,
+        time_limit: float | None,
+        auto_stack: bool,
+        num_train_rows: int,
+        problem_type: str,
+        dynamic_stacking: bool | str,
+        use_bag_holdout: bool | str,
+    ):
+        use_bag_holdout_auto_threshold = 1000000
+        use_bag_holdout_was_auto = False
+        dynamic_stacking_was_auto = False
+        if isinstance(use_bag_holdout, str) and use_bag_holdout == "auto":
+            # Leverage use_bag_holdout when data is large to safeguard against stack leakage
+            use_bag_holdout = num_train_rows >= use_bag_holdout_auto_threshold
+            use_bag_holdout_was_auto = True
+        if isinstance(dynamic_stacking, str) and dynamic_stacking == "auto":
+            dynamic_stacking = not use_bag_holdout
+            dynamic_stacking_was_auto = True
         if auto_stack:
             # TODO: What about datasets that are 100k+? At a certain point should we not bag?
             # TODO: What about time_limit? Metalearning can tell us expected runtime of each model, then we can select optimal folds + stack levels to fit time constraint
             if num_bag_folds is None:
                 num_bag_folds = min(8, max(5, math.floor(num_train_rows / 10)))
-            # TODO: Leverage use_bag_holdout when data is large to enable multi-layer stacking
-            #  if num_train_rows >= 100000 and num_val_rows is None and use_bag_holdout is None:
-            #      use_bag_holdout = True
             if num_stack_levels is None:
                 if dynamic_stacking:
                     num_stack_levels = 1
                 else:
-                    if problem_type == BINARY:
+                    if use_bag_holdout or problem_type != BINARY:
+                        num_stack_levels = min(1, max(0, math.floor(num_train_rows / 750)))
+                    else:
                         # Disable multi-layer stacking to avoid stack info leakage
                         num_stack_levels = 0
-                        # TODO:
-                        #  if use_bag_holdout:
-                        #      num_stack_levels = min(1, max(0, math.floor(num_train_rows / 750)))
-                    else:
-                        num_stack_levels = min(1, max(0, math.floor(num_train_rows / 750)))
         if num_bag_folds is None:
             num_bag_folds = 0
         if num_stack_levels is None:
@@ -4605,11 +4657,31 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 num_bag_sets = 1
         if not isinstance(num_bag_sets, int):
             raise ValueError(f"num_bag_sets must be an integer. (num_bag_sets={num_bag_sets})")
+        if not isinstance(dynamic_stacking, bool):
+            raise ValueError(f"dynamic_stacking must be a bool. (dynamic_stacking={dynamic_stacking})")
+        if not isinstance(use_bag_holdout, bool):
+            raise ValueError(f"use_bag_holdout must be a bool. (use_bag_holdout={use_bag_holdout})")
 
+        if use_bag_holdout_was_auto and num_bag_folds != 0:
+            if use_bag_holdout:
+                log_extra = f"Reason: num_train_rows >= {use_bag_holdout_auto_threshold}. (num_train_rows={num_train_rows})"
+            else:
+                log_extra = f"Reason: num_train_rows < {use_bag_holdout_auto_threshold}. (num_train_rows={num_train_rows})"
+            logger.log(20, f"Setting use_bag_holdout from 'auto' to {use_bag_holdout}. {log_extra}")
+        log_extra_ds = None
         if dynamic_stacking and num_stack_levels < 1:
-            logger.log(20, "Dynamic stacking was enabled but stacking is disabled. Setting dynamic stacking to False.")
+            log_extra_ds = f"Reason: Stacking is not enabled. (num_stack_levels={num_stack_levels})"
+            if not dynamic_stacking_was_auto:
+                logger.log(20, f"Forcing dynamic_stacking to False. {log_extra_ds}")
             dynamic_stacking = False
-        return num_bag_folds, num_bag_sets, num_stack_levels, dynamic_stacking
+        elif dynamic_stacking_was_auto:
+            if dynamic_stacking:
+                log_extra_ds = f"Reason: Enable dynamic_stacking when use_bag_holdout is disabled. (use_bag_holdout={use_bag_holdout})"
+            else:
+                log_extra_ds = f"Reason: Skip dynamic_stacking when use_bag_holdout is enabled. (use_bag_holdout={use_bag_holdout})"
+            logger.log(20, f"Setting dynamic_stacking from 'auto' to {dynamic_stacking}. {log_extra_ds}")
+
+        return num_bag_folds, num_bag_sets, num_stack_levels, dynamic_stacking, use_bag_holdout
 
     # TODO: Add .delete() method to easily clean-up clones?
     #  Would need to be careful that user doesn't delete important things accidentally.
