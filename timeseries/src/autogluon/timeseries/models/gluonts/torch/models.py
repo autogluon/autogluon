@@ -199,6 +199,7 @@ class TemporalFusionTransformerModel(AbstractGluonTSModel):
 
     supports_known_covariates = True
     supports_past_covariates = True
+    supports_cat_covariates = True
 
     @property
     def default_context_length(self) -> int:
@@ -219,6 +220,7 @@ class TemporalFusionTransformerModel(AbstractGluonTSModel):
             init_kwargs["static_dims"] = [self.num_feat_static_real]
         if len(self.feat_static_cat_cardinality):
             init_kwargs["static_cardinalities"] = self.feat_static_cat_cardinality
+
         init_kwargs.setdefault("time_features", get_time_features_for_frequency(self.freq))
         return init_kwargs
 

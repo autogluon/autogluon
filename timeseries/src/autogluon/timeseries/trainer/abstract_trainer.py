@@ -763,7 +763,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         if data is not None:
             past_data, known_covariates = data.get_model_inputs_for_scoring(
-                prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates_real
+                prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates
             )
             logger.info(
                 "Additional data provided, testing on additional data. Resulting leaderboard "
@@ -923,7 +923,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         use_cache: bool = True,
     ) -> Dict[str, float]:
         past_data, known_covariates = data.get_model_inputs_for_scoring(
-            prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates_real
+            prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates
         )
         predictions = self.predict(data=past_data, known_covariates=known_covariates, model=model, use_cache=use_cache)
         if not isinstance(metrics, list):  # a single metric is provided
