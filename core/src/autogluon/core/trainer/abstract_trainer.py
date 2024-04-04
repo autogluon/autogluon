@@ -1290,15 +1290,7 @@ class AbstractTrainer:
                     else:
                         can_refit_full = model._get_tags().get("can_refit_full", False)
                     reuse_first_fold = not can_refit_full
-                if reuse_first_fold:
-                    # Perform fallback black-box refit logic that doesn't retrain.
-                    model_full = model.convert_to_refit_full_via_copy()
-                    # FIXME: validation time not correct for infer 1 batch time, needed to hack _is_refit=True to fix
-                    logger.log(20, f"Fitting model: {model_full.name} | Skipping fit via cloning parent ...")
-                    self._add_model(model_full, stack_name=REFIT_FULL_NAME, level=level, _is_refit=True)
-                    self.save_model(model_full)
-                    models_trained = [model_full.name]
-                else:
+                if not reuse_first_fold:
                     model_full = model.convert_to_refit_full_template()
                     # Mitigates situation where bagged models barely had enough memory and refit requires more. Worst case results in OOM, but this lowers chance of failure.
                     model_full._user_params_aux["max_memory_usage_ratio"] = model.params_aux["max_memory_usage_ratio"] * 1.15
@@ -1326,6 +1318,30 @@ class AbstractTrainer:
                         refit_full=True,
                         **kwargs,
                     )
+                    if len(models_trained) == 0:
+                        reuse_first_fold = True
+                        logger.log(
+                            30,
+                            f"WARNING: Refit training failure detected for '{model_name}'... "
+                            f"Falling back to using first fold to avoid downstream exception."
+                            f"\n\tThis is likely due to an out-of-memory error or other memory related issue. "
+                            f"\n\tPlease create a GitHub issue if this was triggered from a non-memory related problem.",
+                        )
+                        if not model.params.get("save_bag_folds", True):
+                            raise AssertionError(
+                                f"Cannot avoid training failure during refit for '{model_name}' by falling back to "
+                                f"copying the first fold because it does not exist! (save_bag_folds=False)"
+                                f"\n\tPlease specify `save_bag_folds=True` in the `.fit` call to avoid this exception."
+                            )
+
+                if reuse_first_fold:
+                    # Perform fallback black-box refit logic that doesn't retrain.
+                    model_full = model.convert_to_refit_full_via_copy()
+                    # FIXME: validation time not correct for infer 1 batch time, needed to hack _is_refit=True to fix
+                    logger.log(20, f"Fitting model: {model_full.name} | Skipping fit via cloning parent ...")
+                    self._add_model(model_full, stack_name=REFIT_FULL_NAME, level=level, _is_refit=True)
+                    self.save_model(model_full)
+                    models_trained = [model_full.name]
                 if len(models_trained) == 1:
                     model_refit_map[model_name] = models_trained[0]
                 for model_trained in models_trained:
@@ -3759,6 +3775,7 @@ class AbstractTrainer:
         weights=None,
         decision_thresholds: int | List[float] = 50,
         verbose: bool = True,
+        **kwargs,
     ) -> float:
         # TODO: Docstring
         assert self.problem_type == BINARY, f'calibrate_decision_threshold is only available for `problem_type="{BINARY}"`'
@@ -3817,4 +3834,5 @@ class AbstractTrainer:
             decision_thresholds=decision_thresholds,
             metric_name=metric.name,
             verbose=verbose,
+            **kwargs,
         )
