@@ -188,7 +188,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         self._ohe_generator_known: Optional[OneHotEncoder] = None
         self._ohe_generator_past: Optional[OneHotEncoder] = None
         self.callbacks = []
-        # Following attributes may be overriden during fit() based on train_data & model parameters
+        # Following attributes may be overridden during fit() based on train_data & model parameters
         self.num_feat_static_cat = 0
         self.num_feat_static_real = 0
         self.num_feat_dynamic_cat = 0

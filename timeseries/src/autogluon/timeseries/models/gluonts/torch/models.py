@@ -220,6 +220,10 @@ class TemporalFusionTransformerModel(AbstractGluonTSModel):
             init_kwargs["static_dims"] = [self.num_feat_static_real]
         if len(self.feat_static_cat_cardinality):
             init_kwargs["static_cardinalities"] = self.feat_static_cat_cardinality
+        if len(self.feat_dynamic_cat_cardinality):
+            init_kwargs["dynamic_cardinalities"] = self.feat_dynamic_cat_cardinality
+        if len(self.past_feat_dynamic_cat_cardinality):
+            init_kwargs["past_dynamic_cardinalities"] = self.past_feat_dynamic_cat_cardinality
 
         init_kwargs.setdefault("time_features", get_time_features_for_frequency(self.freq))
         return init_kwargs
