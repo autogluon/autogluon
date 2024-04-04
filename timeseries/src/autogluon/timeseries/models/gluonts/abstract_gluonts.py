@@ -57,7 +57,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
         assert target_df is not None
         assert target_df.freq, "Initializing GluonTS data sets without freq is not allowed"
         # Convert TimeSeriesDataFrame to pd.Series for faster processing
-        self.target_array = self._astype(target_df[target_column], dtype=np.float32)
+        self.target_array = target_df[target_column].to_numpy(np.float32)
         self.feat_static_cat = self._astype(feat_static_cat, dtype=np.int64)
         self.feat_static_real = self._astype(feat_static_real, dtype=np.float32)
         self.feat_dynamic_cat = self._astype(feat_dynamic_cat, dtype=np.int64)
