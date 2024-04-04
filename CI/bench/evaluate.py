@@ -30,7 +30,6 @@ def process_results(eval_flag: bool):
             
         paths = modified_list_paths
         frameworks = modified_list_frameworks
-        print("\nPre-Evaluation Frameworks: ", frameworks)
         subprocess.run(
             [
                 "agbench",
@@ -70,8 +69,6 @@ def process_results(eval_flag: bool):
                         unique_framework[key] = f'AutoGluon_PR_{index}'
                     else:
                         unique_framework[key] = f'AutoGluon_master_branch'
-
-        print("\nUnique Frameworks Post Eval Formatting: ", unique_framework)
 
         df['framework'] = df['framework'].map(unique_framework)
         df.to_csv(file_path, index=False)
@@ -146,15 +143,6 @@ def main():
                 f"results_automlbenchmark_{time_limit}",
                 "--benchmark-name-in-input-path",
                 "--results-dir-output",
-                "./results",
-            ],
-            check=True,
-        )
-
-        print("\nPrinting Contents of Results post cleaning")
-        subprocess.run(
-            [
-                "ls",
                 "./results",
             ],
             check=True,
