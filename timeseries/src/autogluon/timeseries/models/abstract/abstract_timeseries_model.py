@@ -76,7 +76,6 @@ class AbstractTimeSeriesModel(AbstractModel):
 
     supports_known_covariates: bool = False
     supports_past_covariates: bool = False
-    supports_cat_covariates: bool = False
     supports_static_features: bool = False
 
     def __init__(
