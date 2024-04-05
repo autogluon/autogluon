@@ -2,6 +2,7 @@ from pathlib import Path
 from unittest import mock
 
 import numpy as np
+import pandas as pd
 import pytest
 from gluonts.model.predictor import Predictor as GluonTSPredictor
 
@@ -16,6 +17,7 @@ from autogluon.timeseries.models.gluonts import (
 from autogluon.timeseries.utils.features import TimeSeriesFeatureGenerator
 
 from ..common import DATAFRAME_WITH_COVARIATES, DATAFRAME_WITH_STATIC, DUMMY_TS_DATAFRAME
+from ..test_features import get_data_frame_with_covariates
 
 MODELS_WITH_STATIC_FEATURES = [DeepARModel, TemporalFusionTransformerModel, WaveNetModel]
 MODELS_WITH_KNOWN_COVARIATES = [DeepARModel, TemporalFusionTransformerModel, WaveNetModel]
@@ -335,3 +337,59 @@ def test_when_keep_lightning_logs_set_then_logs_are_not_removed(keep_lightning_l
     )
     model.fit(train_data=DUMMY_TS_DATAFRAME)
     assert (Path(model.path) / "lightning_logs").exists() == keep_lightning_logs
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+@pytest.mark.parametrize("known_covariates_real", [["known_real_1", "known_real_2"], []])
+@pytest.mark.parametrize("past_covariates_real", [["past_real_1"], []])
+@pytest.mark.parametrize("static_features_real", [["static_real_1", "static_real_2"], []])
+def test_given_features_present_when_model_is_fit_then_feature_transformer_is_present(
+    model_class, temp_model_path, known_covariates_real, past_covariates_real, static_features_real
+):
+    known_covariates_names = known_covariates_real + ["known_cat_1"]
+    feat_generator = TimeSeriesFeatureGenerator(target="target", known_covariates_names=known_covariates_names)
+    data = get_data_frame_with_covariates(
+        covariates_cat=["known_cat_1"],
+        covariates_real=known_covariates_real + past_covariates_real,
+        static_features_real=static_features_real,
+        static_features_cat=["static_cat_1"],
+    )
+    data = feat_generator.fit_transform(data)
+    model = model_class(
+        freq=data.freq,
+        hyperparameters=DUMMY_HYPERPARAMETERS,
+        path=temp_model_path,
+        metadata=feat_generator.covariate_metadata,
+    )
+    model.fit(train_data=data, val_data=data)
+    if len(known_covariates_real) > 0 and model.supports_known_covariates:
+        assert len(model._real_column_transformers["known"].feature_names_in_) > 0
+    else:
+        assert "known" not in model._real_column_transformers
+
+    if len(past_covariates_real) > 0 and model.supports_past_covariates:
+        assert len(model._real_column_transformers["past"].feature_names_in_) > 0
+    else:
+        assert "past" not in model._real_column_transformers
+
+    # TODO: Add check for model.supports_static_features after rebasing on feature importance
+    if len(static_features_real) > 0:
+        assert len(model._real_column_transformers["static"].feature_names_in_) > 0
+    else:
+        assert "static" not in model._real_column_transformers
+
+
+def test_when_covariates_are_preprocessed_then_correct_transform_type_is_used():
+    model = TemporalFusionTransformerModel()
+    N = 500
+    df = pd.DataFrame(
+        {
+            "bool": np.random.choice([0, 1], size=N).astype(float),
+            "skewed": np.random.exponential(size=N),
+            "normal": np.random.normal(size=N),
+        }
+    )
+    pipeline = model._get_transformer_for_columns(df, df.columns)
+    normal_pipeline, skewed_pipeline = pipeline.transformers
+    assert normal_pipeline[-1] == ["normal"]
+    assert skewed_pipeline[-1] == ["skewed"]
