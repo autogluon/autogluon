@@ -505,11 +505,10 @@ def test_when_fit_and_predict_called_then_train_val_and_test_data_is_preprocesse
         expected_val_data = preprocessed_data
     else:
         expected_val_data = train_data
-    with (
-        mock.patch.object(model, "preprocess") as mock_preprocess,
-        mock.patch.object(model, "_fit") as mock_fit,
-        mock.patch.object(model, "_predict") as mock_predict,
-    ):
+    # We need the ugly line break because Python <3.10 does not support parentheses for context managers
+    with mock.patch.object(model, "preprocess") as mock_preprocess, mock.patch.object(
+        model, "_fit"
+    ) as mock_fit, mock.patch.object(model, "_predict") as mock_predict:
         mock_preprocess.return_value = preprocessed_data
         model.fit(train_data=train_data, val_data=train_data)
         fit_kwargs = mock_fit.call_args[1]
