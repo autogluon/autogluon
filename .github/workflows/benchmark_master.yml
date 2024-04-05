@@ -2,8 +2,10 @@
 name: Benchmark Master Branch
 on:
   workflow_dispatch:
+    branches:
+      - master
   push:
-    branches: ["master","test_bench_report","report_gen"]  # Uncomment post v1.0
+    branches: ["master","refactor_report"]  # Uncomment post v1.0
   # schedule:
   #   - cron: '00 09 * * SUN' #  UTC 9:00(2:00 PST Time) every Sunday
 
@@ -74,7 +76,7 @@ jobs:
         run: |
           nvm install 20
           npm install -g aws-cdk
-          /bin/bash ./.github/workflow_scripts/run_benchmark.sh tabular best tabular_full 1h8c ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
+          /bin/bash ./.github/workflow_scripts/run_benchmark.sh tabular tabular_best tabular_full 1h8c ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
       - name: Upload evaluation results as artifact
         uses: actions/upload-artifact@v2
         with:
@@ -120,7 +122,7 @@ jobs:
         run: |
           nvm install 20
           npm install -g aws-cdk
-          /bin/bash ./.github/workflow_scripts/run_benchmark.sh timeseries dev timeseries_small 10m4c ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
+          /bin/bash ./.github/workflow_scripts/run_benchmark.sh timeseries timeseries_best timeseries_small 10m4c ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
       - name: Upload evaluation results as artifact
         uses: actions/upload-artifact@v2
         with:
@@ -166,7 +168,7 @@ jobs:
         run: |
           nvm install 20
           npm install -g aws-cdk
-          /bin/bash ./.github/workflow_scripts/run_benchmark.sh multimodal master_best automm-text g4_12x ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
+          /bin/bash ./.github/workflow_scripts/run_benchmark.sh multimodal multimodal_best automm-text g4_12x ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
       - name: Upload evaluation results as artifact
         uses: actions/upload-artifact@v2
         with:
@@ -212,7 +214,7 @@ jobs:
         run: |
           nvm install 20
           npm install -g aws-cdk
-          /bin/bash ./.github/workflow_scripts/run_benchmark.sh multimodal master_best automm-text-tabular g4_12x ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
+          /bin/bash ./.github/workflow_scripts/run_benchmark.sh multimodal multimodal_best automm-text-tabular g4_12x ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
       - name: Upload evaluation results as artifact
         uses: actions/upload-artifact@v2
         with:
@@ -258,7 +260,7 @@ jobs:
         run: |
           nvm install 20
           npm install -g aws-cdk
-          /bin/bash ./.github/workflow_scripts/run_benchmark.sh multimodal master_best automm-image g4_12x ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
+          /bin/bash ./.github/workflow_scripts/run_benchmark.sh multimodal multimodal_best automm-image g4_12x ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
       - name: Upload evaluation results as artifact
         uses: actions/upload-artifact@v2
         with:

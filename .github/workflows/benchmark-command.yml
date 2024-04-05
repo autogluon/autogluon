@@ -23,12 +23,12 @@ on:
         description: 'Preset to run for tabular/timeseries/multimodal'
         required: true
         options:
-          - best
-          - high
-          - good
-          - medium
-          - dev
-          - master_best
+          - tabular_best
+          - tabular_high
+          - tabular_good
+          - tabular_medium
+          - timeseries_best
+          - multimodal_best
       benchmark:
         description: 'Benchmark to run'
         required: true
@@ -36,7 +36,7 @@ on:
           - tabular_full
           - tabular_test
           - tabular_small
-          - timeseries_test
+          - timeseries_small
           - automm-image
           - automm-text
           - automm-text-tabular
