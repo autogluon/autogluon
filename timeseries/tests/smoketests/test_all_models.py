@@ -138,6 +138,7 @@ def test_all_models_can_handle_all_covariates(
 
 
 @pytest.mark.parametrize("freq", DEFAULT_SEASONALITIES.keys())
+@pytest.mark.skipif(parse_version(pd.__version__) < parse_version("2.1"), reason="Skipping test for pandas < 2.1")
 def test_all_models_handle_all_pandas_frequencies(freq):
     if parse_version(pd.__version__) < parse_version("2.1") and freq == "SM":
         pytest.skip("'SM' frequency inference not supported by pandas < 2.1")

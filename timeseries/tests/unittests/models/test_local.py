@@ -1,3 +1,4 @@
+import sys
 import logging
 from typing import Dict
 
@@ -357,6 +358,7 @@ def test_when_conformalized_model_called_then_nonconformity_score_values_correct
 @pytest.mark.parametrize("model_class", NONSEASONAL_TESTABLE_MODELS)
 @pytest.mark.parametrize("prediction_length", [1, 3, 10])
 @pytest.mark.parametrize("positive_only", [True, False])
+@pytest.mark.skipif(sys.version_info[:2] == (3, 8), reason="np.dtypes not available in Python 3.8")
 def test_when_intermittent_models_fit_then_values_are_lower_bounded(
     model_class, prediction_length, positive_only, temp_model_path
 ):
