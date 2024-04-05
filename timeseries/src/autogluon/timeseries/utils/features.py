@@ -1,8 +1,9 @@
 import logging
 import reprlib
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
+from typing import Any, List, Literal, Optional, Tuple
 
+import numpy as np
 import pandas as pd
 
 from autogluon.common.features.types import R_FLOAT, R_INT
@@ -12,7 +13,7 @@ from autogluon.features.generators import (
     IdentityFeatureGenerator,
     PipelineFeatureGenerator,
 )
-from autogluon.timeseries import TimeSeriesDataFrame
+from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,10 @@ class CovariateMetadata:
     known_covariates_cat: List[str] = field(default_factory=list)
     past_covariates_real: List[str] = field(default_factory=list)
     past_covariates_cat: List[str] = field(default_factory=list)
+
+    @property
+    def static_features(self) -> List[str]:
+        return self.static_features_cat + self.static_features_real
 
     @property
     def known_covariates(self) -> List[str]:
@@ -47,6 +52,18 @@ class CovariateMetadata:
     @property
     def covariates_cat(self) -> List[str]:
         return self.known_covariates_cat + self.past_covariates_cat
+
+    @property
+    def real_features(self) -> List[str]:
+        return self.static_features_real + self.covariates_real
+
+    @property
+    def cat_features(self) -> List[str]:
+        return self.static_features_cat + self.covariates_cat
+
+    @property
+    def all_features(self) -> List[str]:
+        return self.static_features + self.covariates
 
 
 class ContinuousAndCategoricalFeatureGenerator(PipelineFeatureGenerator):
@@ -284,3 +301,102 @@ class TimeSeriesFeatureGenerator:
             raise ValueError(
                 f"{len(missing_columns)} columns are missing from {data_frame_name}: {reprlib.repr(missing_columns.to_list())}"
             )
+
+
+class AbstractFeatureImportanceTransform:
+    """Abstract class for transforms that replace a given feature with dummy or shuffled values,
+    for use in feature importance operations.
+    """
+
+    def __init__(
+        self,
+        covariate_metadata: CovariateMetadata,
+        prediction_length: int,
+        **kwargs,
+    ):
+        self.covariate_metadata: CovariateMetadata = covariate_metadata
+        self.prediction_length: int = prediction_length
+
+    def _transform_series(self, data: pd.Series, is_categorical: bool, **kwargs) -> TimeSeriesDataFrame:
+        """Transforms a series with the same index as the pandas DataFrame"""
+        raise NotImplementedError
+
+    def transform(self, data: TimeSeriesDataFrame, feature_name: str, **kwargs) -> TimeSeriesDataFrame:
+        if feature_name not in self.covariate_metadata.all_features:
+            raise ValueError(f"Target feature {feature_name} not found in covariate metadata")
+
+        # feature transform works on a shallow copy of the main time series data frame
+        # but a deep copy of the static features.
+        data = data.copy(deep=False)
+
+        is_categorical = feature_name in self.covariate_metadata.cat_features
+
+        if feature_name in self.covariate_metadata.past_covariates:
+            # we'll have to work on the history of the data alone
+            data[feature_name] = data[feature_name].copy()
+            feature_data = data[feature_name].groupby(level=ITEMID, sort=False).head(-self.prediction_length)
+            data[feature_name].update(self._transform_series(feature_data, is_categorical=is_categorical))
+        elif feature_name in self.covariate_metadata.static_features:
+            feature_data = data.static_features[feature_name].copy()
+            feature_data.reset_index(drop=True, inplace=True)
+            data.static_features[feature_name] = self._transform_static_series(
+                feature_data, is_categorical=is_categorical
+            )
+        else:  # known covariates
+            data[feature_name] = self._transform_series(data[feature_name], is_categorical=is_categorical)
+
+        return data
+
+
+class PermutationFeatureImportanceTransform(AbstractFeatureImportanceTransform):
+    """Naively shuffles a given feature."""
+
+    def __init__(
+        self,
+        covariate_metadata: CovariateMetadata,
+        prediction_length: int,
+        random_seed: Optional[int] = None,
+        shuffle_type: Literal["itemwise", "naive"] = "itemwise",
+        **kwargs,
+    ):
+        super().__init__(covariate_metadata, prediction_length, **kwargs)
+        self.shuffle_type = shuffle_type
+        self.random_seed = random_seed
+
+    def _transform_static_series(self, feature_data: pd.Series, is_categorical: bool) -> Any:
+        return feature_data.sample(frac=1, random_state=self.random_seed).values
+
+    def _transform_series(self, feature_data: pd.Series, is_categorical: bool) -> pd.Series:
+        # set random state once to shuffle 'independently' for different items
+        rng = np.random.RandomState(self.random_seed)
+
+        if self.shuffle_type == "itemwise":
+            return feature_data.groupby(level=ITEMID, sort=False).transform(
+                lambda x: x.sample(frac=1, random_state=rng).values
+            )
+        elif self.shuffle_type == "naive":
+            return pd.Series(feature_data.sample(frac=1, random_state=rng).values, index=feature_data.index)
+
+
+class ConstantReplacementFeatureImportanceTransform(AbstractFeatureImportanceTransform):
+    """Replaces a target feature with the median if it's a real-valued feature, and the mode if it's a
+    categorical feature."""
+
+    def __init__(
+        self,
+        covariate_metadata: CovariateMetadata,
+        prediction_length: int,
+        real_value_aggregation: Literal["mean", "median"] = "mean",
+        **kwargs,
+    ):
+        super().__init__(covariate_metadata, prediction_length, **kwargs)
+        self.real_value_aggregation = real_value_aggregation
+
+    def _transform_static_series(self, feature_data: pd.Series, is_categorical: bool) -> Any:
+        return feature_data.mode()[0] if is_categorical else feature_data.agg(self.real_value_aggregation)
+
+    def _transform_series(self, feature_data: pd.Series, is_categorical: bool) -> pd.Series:
+        if is_categorical:
+            return feature_data.groupby(level=ITEMID, sort=False).transform(lambda x: x.mode()[0])
+        else:
+            return feature_data.groupby(level=ITEMID, sort=False).transform(self.real_value_aggregation)

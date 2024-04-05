@@ -597,3 +597,38 @@ def test_given_skip_model_selection_when_trainer_fits_then_val_score_is_not_comp
 
     model = trainer.load_model("Naive")
     assert (model.val_score is None) == skip_model_selection
+
+
+@pytest.mark.parametrize("confidence_level", [0.55, 0.65, 0.95, 0.99])
+def test_when_add_ci_to_feature_importance_called_then_confidence_bands_correct(temp_model_path, confidence_level):
+    import scipy.stats as sst
+
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path)
+    feature_importance = pd.DataFrame(
+        {
+            "importance": [10.0, 0.1, 0.2, 0.3, -0.5, np.nan, 0.2, 0.1, 55.0],
+            "stdev": [0.1, 0.5, 3.0, 1.0, 1.5, 0.1, np.nan, 0.1, 0.1],
+            "n": [3, 4, 5, 6, 2, 5, 5, np.nan, 1],
+        },
+        index=["a", "b", "c", "d", "e", "f", "g", "h", "i"],
+    )
+
+    feature_importance = trainer._add_ci_to_feature_importance(feature_importance, confidence_level)
+    lower_ci_name, upper_ci_name = [f"p{confidence_level*100:.0f}_{k}" for k in ["low", "high"]]
+    assert lower_ci_name in feature_importance.columns
+    assert upper_ci_name in feature_importance.columns
+
+    alpha = 1 - confidence_level
+
+    for i, r in feature_importance.iterrows():
+        if np.isnan(r["stdev"]) or np.isnan(r["n"]) or np.isnan(r["importance"]) or r["n"] == 1:
+            assert np.isnan(r[lower_ci_name])
+            assert np.isnan(r[upper_ci_name])
+        else:
+            t_critical = sst.t.ppf(1 - alpha / 2, df=r["n"] - 1)
+
+            expected_lower = r["importance"] - t_critical * r["stdev"] / np.sqrt(r["n"])
+            expected_upper = r["importance"] + t_critical * r["stdev"] / np.sqrt(r["n"])
+
+            assert np.isclose(r[lower_ci_name], expected_lower)
+            assert np.isclose(r[upper_ci_name], expected_upper)

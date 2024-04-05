@@ -29,6 +29,7 @@ from .common import (
     PREDICTIONS_FOR_DUMMY_TS_DATAFRAME,
     CustomMetric,
     get_data_frame_with_variable_lengths,
+    get_static_features,
 )
 
 TEST_HYPERPARAMETER_SETTINGS = [
@@ -1569,3 +1570,191 @@ def test_given_multiple_models_with_ensemble_when_single_model_persisted_then_si
 
     predictor.unpersist()
     assert len(predictor._learner.load_trainer().models) == 0
+
+
+@pytest.fixture(
+    scope="session",
+    params=[
+        {"A": 10, "B": 15},
+        {"A": 10, "C": 20, "B": 5},
+        {"A": 10, "C": 10, "B": 10},
+    ],
+)
+def importance_dataset_and_predictors(request, tmp_path_factory):
+    item_id_to_length = request.param
+
+    df = get_data_frame_with_variable_lengths(
+        item_id_to_length,
+        static_features=get_static_features(item_id_to_length.keys(), ["feat1", "feat2", "feat3"]),
+        covariates_names=["cov1", "cov2", "cov3"],
+    )
+
+    prediction_length = 2
+    df_train = df.slice_by_timestep(None, -prediction_length)
+
+    hyperparameter_map = {
+        "no_features": {"Naive": {}},
+        "known_and_categorical_only": {"DeepAR": {"epochs": 1}},
+        "all_features": {"TemporalFusionTransformer": {"epochs": 1}},
+    }
+
+    predictors = {}
+
+    for name, hyperparameters in hyperparameter_map.items():
+        predictor = TimeSeriesPredictor(
+            path=tmp_path_factory.mktemp(str(uuid4())[:6]),
+            prediction_length=prediction_length,
+            eval_metric="MAPE",
+            known_covariates_names=["cov1", "cov2"],  # cov3 is past covariate
+        )
+        predictor.fit(
+            df_train,
+            hyperparameters=hyperparameters,
+            enable_ensemble=False,
+        )
+        predictors[name] = predictor
+
+    return df_train, predictors
+
+
+@pytest.mark.parametrize("num_iterations", [1, 2, 5])
+@pytest.mark.parametrize("relative_scores", [True, False])
+@pytest.mark.parametrize("method", ["naive", "permutation"])
+@pytest.mark.parametrize(
+    "features, scores_returned, expected_absolute_importances",
+    [
+        (["cov1"], [-0.22, -0.26], [0.04]),
+        (["cov2"], [-0.22, -0.26], [0.04]),
+        (["cov1", "cov2"], [-0.22, -0.26, -0.30], [0.04, 0.08]),
+        (["cov1", "feat1"], [-0.22, -0.26, -0.30], [0.04, 0.08]),
+        (
+            None,  # all features
+            [-0.22, -0.26, -0.30, -0.20, -0.27, -0.29, -0.19],
+            [0.04, 0.08, -0.02, 0.05, 0.07, -0.03],
+        ),
+    ],
+)
+def test_when_feature_importance_called_with_improvements_then_improvements_are_correct(
+    num_iterations,
+    relative_scores,
+    method,
+    features,
+    scores_returned,
+    expected_absolute_importances,
+    importance_dataset_and_predictors,
+):
+    df_train, predictors = importance_dataset_and_predictors
+    predictor = predictors["all_features"]
+
+    with mock.patch(
+        "autogluon.timeseries.trainer.abstract_trainer.AbstractTimeSeriesTrainer.evaluate"
+    ) as mock_evaluate:
+        mock_evaluate.side_effect = [{"MAPE": v} for v in scores_returned] * num_iterations  # baseline, feature
+
+        feature_importance = predictor.feature_importance(
+            df_train,
+            num_iterations=num_iterations,
+            method=method,
+            features=features,
+            relative_scores=relative_scores,
+        )
+        expected_score = np.array(expected_absolute_importances)
+        if relative_scores:
+            expected_score /= 0.22
+
+        assert mock_evaluate.call_count == len(scores_returned) * (num_iterations if method == "permutation" else 1)
+        assert np.allclose(feature_importance["importance"], expected_score, atol=1e-3)
+
+
+@pytest.mark.parametrize("num_iterations", [1, 2, 5])
+@pytest.mark.parametrize("relative_scores", [True, False])
+@pytest.mark.parametrize("method", ["naive", "permutation"])
+@pytest.mark.parametrize(
+    "features, scores_returned",
+    [
+        (["cov1"], [-0.22, -0.26]),
+        (["cov2"], [-0.22, -0.26]),
+        (["cov1", "cov2"], [-0.22, -0.26, -0.30]),
+        (["cov1", "feat1"], [-0.22, -0.26, -0.30]),
+        (
+            None,  # all features
+            [-0.22, -0.26, -0.30, -0.20, -0.27, -0.29, -0.19],
+        ),
+    ],
+)
+def test_given_predictor_takes_no_features_when_feature_importance_called_with_improvements_then_improvements_are_zero(
+    num_iterations,
+    relative_scores,
+    method,
+    features,
+    scores_returned,
+    importance_dataset_and_predictors,
+):
+    df_train, predictors = importance_dataset_and_predictors
+    predictor = predictors["no_features"]
+
+    with mock.patch(
+        "autogluon.timeseries.trainer.abstract_trainer.AbstractTimeSeriesTrainer.evaluate"
+    ) as mock_evaluate:
+        mock_evaluate.side_effect = [
+            {"MAPE": v} for v in scores_returned
+        ] * num_iterations  # baseline, feature taken out
+
+        feature_importance = predictor.feature_importance(
+            df_train,
+            num_iterations=num_iterations,
+            method=method,
+            features=features,
+            relative_scores=relative_scores,
+        )
+
+        assert np.allclose(feature_importance["importance"], 0, atol=1e-8)
+
+
+@pytest.mark.parametrize("num_iterations", [1, 2, 5])
+@pytest.mark.parametrize("relative_scores", [True, False])
+@pytest.mark.parametrize("method", ["naive", "permutation"])
+@pytest.mark.parametrize(
+    "features, scores_returned",
+    [
+        (["cov1"], [-0.22, -0.26]),
+        (["cov2"], [-0.22, -0.26]),
+        (["cov1", "cov2"], [-0.22, -0.26, -0.30]),
+        (["cov1", "feat1"], [-0.22, -0.26, -0.30]),
+        (
+            None,  # all features
+            [-0.22, -0.26, -0.30, -0.20, -0.27, -0.29, -0.19],
+        ),
+    ],
+)
+def test_given_predictor_takes_known_only_when_feature_importance_called_with_improvements_then_past_and_static_improvements_are_zero(
+    num_iterations,
+    relative_scores,
+    method,
+    features,
+    scores_returned,
+    importance_dataset_and_predictors,
+):
+    df_train, predictors = importance_dataset_and_predictors
+    predictor = predictors["no_features"]
+
+    with mock.patch(
+        "autogluon.timeseries.trainer.abstract_trainer.AbstractTimeSeriesTrainer.evaluate"
+    ) as mock_evaluate:
+        mock_evaluate.side_effect = [
+            {"MAPE": v} for v in scores_returned
+        ] * num_iterations  # baseline, feature taken out
+
+        feature_importance = predictor.feature_importance(
+            df_train,
+            num_iterations=num_iterations,
+            method=method,
+            features=features,
+            relative_scores=relative_scores,
+        )
+
+        for i, importance in feature_importance["importance"].items():
+            if i in ["feat1", "feat2", "feat3", "cov3"]:
+                assert np.allclose(importance, 0, atol=1e-8)
+            else:
+                assert np.isfinite(importance)

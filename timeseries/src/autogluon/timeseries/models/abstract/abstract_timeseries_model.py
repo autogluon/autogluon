@@ -74,6 +74,10 @@ class AbstractTimeSeriesModel(AbstractModel):
     _preprocess_nonadaptive = None
     _preprocess_set_features = None
 
+    supports_known_covariates: bool = False
+    supports_past_covariates: bool = False
+    supports_static_features: bool = False
+
     def __init__(
         self,
         freq: Optional[str] = None,

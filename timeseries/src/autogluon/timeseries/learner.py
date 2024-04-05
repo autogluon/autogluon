@@ -198,13 +198,82 @@ class TimeSeriesLearner(AbstractLearner):
 
     def evaluate(
         self,
-        data: Union[TimeSeriesDataFrame, pd.DataFrame, str],
+        data: TimeSeriesDataFrame,
         model: Optional[str] = None,
         metrics: Optional[Union[str, TimeSeriesScorer, List[Union[str, TimeSeriesScorer]]]] = None,
         use_cache: bool = True,
     ) -> Dict[str, float]:
         data = self.feature_generator.transform(data)
         return self.load_trainer().evaluate(data=data, model=model, metrics=metrics, use_cache=use_cache)
+
+    def get_feature_importance(
+        self,
+        data: Optional[TimeSeriesDataFrame] = None,
+        model: Optional[str] = None,
+        metric: Optional[Union[str, TimeSeriesScorer]] = None,
+        features: Optional[List[str]] = None,
+        time_limit: Optional[float] = None,
+        method: Literal["naive", "permutation"] = "permutation",
+        subsample_size: int = 50,
+        num_iterations: int = 1,
+        random_seed: Optional[int] = None,
+        relative_scores: bool = False,
+        include_confidence_band: bool = True,
+        confidence_level: float = 0.99,
+    ) -> pd.DataFrame:
+        trainer = self.load_trainer()
+        if data is None:
+            data = trainer.load_val_data() or trainer.load_train_data()
+
+        # if features are provided in the dataframe, check that they are valid features in the covariate metadata
+        provided_static_columns = [] if data.static_features is None else data.static_features.columns
+        unused_features = [
+            f
+            for f in set(provided_static_columns).union(set(data.columns) - {self.target})
+            if f not in self.feature_generator.covariate_metadata.all_features
+        ]
+
+        if features is None:
+            features = self.feature_generator.covariate_metadata.all_features
+        else:
+            if len(features) == 0:
+                raise ValueError(
+                    "No features provided to compute feature importance. At least some valid features should be provided."
+                )
+            for fn in features:
+                if fn not in self.feature_generator.covariate_metadata.all_features and fn not in unused_features:
+                    raise ValueError(f"Feature {fn} not found in covariate metadata or the dataset.")
+
+        if len(set(features)) < len(features):
+            logger.warning(
+                "Duplicate feature names provided to compute feature importance. This will lead to unexpected behavior. "
+                "Please provide unique feature names across both static features and covariates."
+            )
+
+        data = self.feature_generator.transform(data)
+
+        importance_df = trainer.get_feature_importance(
+            data=data,
+            features=features,
+            model=model,
+            metric=metric,
+            time_limit=time_limit,
+            method=method,
+            subsample_size=subsample_size,
+            num_iterations=num_iterations,
+            random_seed=random_seed,
+            relative_scores=relative_scores,
+            include_confidence_band=include_confidence_band,
+            confidence_level=confidence_level,
+        )
+
+        for feature in set(features).union(unused_features):
+            if feature not in importance_df.index:
+                importance_df.loc[feature] = (
+                    [0, 0, 0] if not include_confidence_band else [0, 0, 0, float("nan"), float("nan")]
+                )
+
+        return importance_df
 
     def leaderboard(self, data: Optional[TimeSeriesDataFrame] = None, use_cache: bool = True) -> pd.DataFrame:
         if data is not None:

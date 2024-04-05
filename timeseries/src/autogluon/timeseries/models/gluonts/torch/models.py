@@ -86,6 +86,7 @@ class DeepARModel(AbstractGluonTSModel):
     """
 
     supports_known_covariates = True
+    supports_static_features = True
 
     def _get_estimator_class(self) -> Type[GluonTSEstimator]:
         from gluonts.torch.model.deepar import DeepAREstimator
@@ -202,6 +203,7 @@ class TemporalFusionTransformerModel(AbstractGluonTSModel):
     supports_known_covariates = True
     supports_past_covariates = True
     supports_cat_covariates = True
+    supports_static_features = True
 
     @property
     def default_context_length(self) -> int:
@@ -403,6 +405,7 @@ class WaveNetModel(AbstractGluonTSModel):
     """
 
     supports_known_covariates = True
+    supports_static_features = True
     default_num_samples: int = 100
 
     def _get_estimator_class(self) -> Type[GluonTSEstimator]:

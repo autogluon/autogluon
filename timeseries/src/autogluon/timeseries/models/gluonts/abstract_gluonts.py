@@ -161,8 +161,6 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
     gluonts_model_path = "gluon_ts"
     # default number of samples for prediction
     default_num_samples: int = 250
-    supports_known_covariates: bool = False
-    supports_past_covariates: bool = False
     supports_cat_covariates: bool = False
 
     def __init__(
