@@ -110,7 +110,7 @@ class AbstractTrainer:
         FeatureMetadata for X. Sent to each model during fit.
     eval_metric : Scorer, default = None
         Metric to optimize. If None, a default metric is used depending on the problem_type.
-    quantile_levels : List[float], default = None
+    quantile_levels : List[float] | np.ndarray, default = None
         # TODO: Add documentation, not documented in Predictor.
         Only used when problem_type=quantile
     low_memory : bool, default = True
@@ -155,7 +155,7 @@ class AbstractTrainer:
         num_classes: int = None,
         feature_metadata: FeatureMetadata = None,
         eval_metric: Scorer = None,
-        quantile_levels: List[float] = None,
+        quantile_levels: List[float] | np.ndarray = None,
         low_memory: bool = True,
         k_fold: int = 0,
         n_repeats: int = 1,
@@ -3912,10 +3912,10 @@ class AbstractTrainer:
             raise AssertionError(f"Unknown problem_type: '{problem_type}'. Valid problem types: {[BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE]}")
 
     @staticmethod
-    def _validate_quantile_levels(quantile_levels: List[float], problem_type: str):
+    def _validate_quantile_levels(quantile_levels: List[float] | np.array, problem_type: str):
         if problem_type == QUANTILE:
             assert quantile_levels is not None, f"quantile_levels must not be None when problem_type='{problem_type}' (quantile_levels={quantile_levels})"
-            assert isinstance(quantile_levels, list), f"quantile_levels must be a list (quantile_levels={quantile_levels})"
+            assert isinstance(quantile_levels, (list, np.ndarray)), f"quantile_levels must be a list or np.ndarray (quantile_levels={quantile_levels})"
             assert len(quantile_levels) > 0, f"quantile_levels must not be an empty list (quantile_levels={quantile_levels})"
         else:
             assert quantile_levels is None, f"quantile_levels must be None when problem_type='{problem_type}' (quantile_levels={quantile_levels})"
