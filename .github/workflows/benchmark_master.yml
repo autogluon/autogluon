@@ -74,6 +74,11 @@ jobs:
           nvm install 20
           npm install -g aws-cdk
           /bin/bash ./.github/workflow_scripts/run_benchmark.sh tabular best tabular_full 1h8c ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
+      - name: Upload evaluation results as artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: upload-evaluation-results-tabular
+          path: report_results.csv
 
   benchmark-timeseries:
     needs: benchmark-tabular
@@ -115,6 +120,11 @@ jobs:
           nvm install 20
           npm install -g aws-cdk
           /bin/bash ./.github/workflow_scripts/run_benchmark.sh timeseries dev timeseries_small 10m4c ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
+      - name: Upload evaluation results as artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: upload-evaluation-results-timeseries
+          path: report_results.csv
 
   benchmark-multimodal-text:
     needs: benchmark-timeseries
@@ -155,7 +165,12 @@ jobs:
         run: |
           nvm install 20
           npm install -g aws-cdk
-          /bin/bash ./.github/workflow_scripts/run_benchmark.sh multimodal master_medium automm-text g4_12x ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
+          /bin/bash ./.github/workflow_scripts/run_benchmark.sh multimodal master_best automm-text g4_12x ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
+      - name: Upload evaluation results as artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: upload-evaluation-results-automm-text
+          path: report_results.csv
 
   benchmark-multimodal-text-tabular:
     needs: benchmark-multimodal-text
@@ -196,7 +211,12 @@ jobs:
         run: |
           nvm install 20
           npm install -g aws-cdk
-          /bin/bash ./.github/workflow_scripts/run_benchmark.sh multimodal master_medium automm-text-tabular g4_12x ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
+          /bin/bash ./.github/workflow_scripts/run_benchmark.sh multimodal master_best automm-text-tabular g4_12x ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
+      - name: Upload evaluation results as artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: upload-evaluation-results-automm-text-tabular
+          path: report_results.csv
 
   benchmark-multimodal-image:
     needs: benchmark-multimodal-text-tabular
@@ -237,4 +257,9 @@ jobs:
         run: |
           nvm install 20
           npm install -g aws-cdk
-          /bin/bash ./.github/workflow_scripts/run_benchmark.sh multimodal master_medium automm-image g4_12x ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
+          /bin/bash ./.github/workflow_scripts/run_benchmark.sh multimodal master_best automm-image g4_12x ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
+      - name: Upload evaluation results as artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: upload-evaluation-results-automm-image
+          path: report_results.csv
