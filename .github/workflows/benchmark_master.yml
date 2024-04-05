@@ -4,10 +4,8 @@ on:
   workflow_dispatch:
     branches:
       - master
-  push:
-    branches: ["master","refactor_report"]  # Uncomment post v1.0
-  # schedule:
-  #   - cron: '00 09 * * SUN' #  UTC 9:00(2:00 PST Time) every Sunday
+  schedule:
+    - cron: '00 09 * * SUN' #  UTC 9:00(2:00 PST Time) every Sunday
 
 env:
   AG_BRANCH_NAME: master
