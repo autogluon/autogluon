@@ -313,8 +313,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             assert "past" in self._real_column_transformers, "Preprocessing pipeline must be fit first"
             data[columns] = self._real_column_transformers["past"].transform(data[columns])
 
-        # TODO: self.supports_static_features
-        if len(self.metadata.static_features_real) > 0:
+        if self.supports_static_features and len(self.metadata.static_features_real) > 0:
             columns = self.metadata.static_features_real
             if is_train:
                 self._real_column_transformers["static"] = self._get_transformer_for_columns(

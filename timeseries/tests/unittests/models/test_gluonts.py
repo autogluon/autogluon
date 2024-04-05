@@ -372,8 +372,7 @@ def test_given_features_present_when_model_is_fit_then_feature_transformer_is_pr
     else:
         assert "past" not in model._real_column_transformers
 
-    # TODO: Add check for model.supports_static_features after rebasing on feature importance
-    if len(static_features_real) > 0:
+    if len(static_features_real) > 0 and model.supports_static_features:
         assert len(model._real_column_transformers["static"].feature_names_in_) > 0
     else:
         assert "static" not in model._real_column_transformers
