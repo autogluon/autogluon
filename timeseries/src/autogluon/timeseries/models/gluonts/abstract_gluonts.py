@@ -16,8 +16,8 @@ from gluonts.model.estimator import Estimator as GluonTSEstimator
 from gluonts.model.forecast import Forecast, QuantileForecast, SampleForecast
 from gluonts.model.predictor import Predictor as GluonTSPredictor
 from pandas.tseries.frequencies import to_offset
-from sklearn.preprocessing import StandardScaler, QuantileTransformer
 from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import QuantileTransformer, StandardScaler
 
 from autogluon.common.loaders import load_pkl
 from autogluon.core.hpo.constants import RAY_BACKEND
