@@ -61,6 +61,8 @@ class DeepARModel(AbstractGluonTSModel):
     embedding_dimension : int, optional
         Dimension of the embeddings for categorical features
         (if None, defaults to [min(50, (cat+1)//2) for cat in cardinality])
+    max_cat_cardinality : int, default = 100
+        Maximum number of dimensions to use when one-hot-encoding categorical known_covariates.
     distr_output : gluonts.torch.distributions.DistributionOutput, default = StudentTOutput()
         Distribution to use to evaluate observations and sample predictions
     scaling: bool, default = True
@@ -378,6 +380,8 @@ class WaveNetModel(AbstractGluonTSModel):
         If True, logarithm of the scale of the past data will be used as an additional static feature.
     negative_data : bool, default = True
         Flag indicating whether the time series take negative values.
+    max_cat_cardinality : int, default = 100
+        Maximum number of dimensions to use when one-hot-encoding categorical known_covariates.
     max_epochs : int, default = 100
         Number of epochs the model will be trained for
     batch_size : int, default = 64
