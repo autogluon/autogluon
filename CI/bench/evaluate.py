@@ -11,7 +11,7 @@ def process_results(eval_flag: bool):
         paths = []
         frameworks = []
         for file in os.listdir("./results"):
-            if file.endswith(".csv") and not file.endswith("_min.csv") and not file.endswith(".parquet"):
+            if file.endswith(".csv") and not file.endswith("_min.csv"):
                 file = os.path.join("./results", file)
                 df = pd.read_csv(file)
                 paths.append(os.path.basename(file))
@@ -190,7 +190,7 @@ def main():
                 for file in files:
                     if file.endswith("results_ranked_valid.csv"):
                         file_path = os.path.join("./evaluate", file)
-                        df1 = pd.read_csv(file_path, usecols=["time_train_s", "time_infer_s"])
+                        df1 = pd.read_csv(file_path, usecols=["time_train_s", "time_infer_s","rank"])
 
                     if file.startswith("AutoGluon") and file.endswith(".csv") and "pairwise" in root:
                         file_path = os.path.join(root, file)
@@ -198,7 +198,7 @@ def main():
                         df1 = df1.assign(Winrate=None, framework=None)
                         df1["Winrate"] = df2["Winrate"]
                         df1["framework"] = df2["framework"]
-                        df1 = df1.reindex(columns=["framework", "Winrate", "time_train_s", "time_infer_s"])
+                        df1 = df1.reindex(columns=["framework", "Winrate", "rank", "time_train_s", "time_infer_s"])
 
             df1.to_csv("./report_results.csv", index=False, mode='w')
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -233,11 +233,11 @@ def main():
             master_win_rate = 0
             for _, row in df.iterrows():
                 if "master" in row['framework']:
-                    master_win_rate = row['winrate']
+                    master_win_rate = row['Winrate']
 
             pr_comment = f"\nBenchmark Test Result - Pass\nEvaluation Results Path: s3://autogluon-ci-benchmark/evaluation/{module_name}/{branch_name}\n"
             for _, row in df.iterrows():
-                if ("master" not in row['framework']) and (master_win_rate >= row['winrate']):
+                if ("master" not in row['framework']) and (master_win_rate >= row['Winrate']):
                     pr_comment = ""
                     pr_comment = f"\nBenchmark Test Result - Fail\nEvaluation Results Path: s3://autogluon-ci-benchmark/evaluation/{module_name}/{branch_name}\n"
 
