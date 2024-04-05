@@ -2,8 +2,10 @@
 name: Benchmark Master Branch
 on:
   workflow_dispatch:
+    branches:
+      - master
   push:
-    branches: ["master","test_bench_report","report_gen"]  # Uncomment post v1.0
+    branches: ["master","test_bench_report","refactor_report"]  # Uncomment post v1.0
   # schedule:
   #   - cron: '00 09 * * SUN' #  UTC 9:00(2:00 PST Time) every Sunday
 
