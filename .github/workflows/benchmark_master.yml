@@ -1,6 +1,7 @@
 # Workflow to trigger/schedule benchmarking, cleaning, aggregating on master branch only and storing results in S3
 name: Benchmark Master Branch
 on:
+  workflow_dispatch:
   push:
     branches: ["master","test_bench_report","report_gen"]  # Uncomment post v1.0
   # schedule:
