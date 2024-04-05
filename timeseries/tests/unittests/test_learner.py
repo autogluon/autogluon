@@ -302,7 +302,7 @@ def test_given_extra_covariates_are_present_in_dataframe_when_learner_predicts_t
     train_data = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, covariates_names=["Y", "X"])
     learner.fit(train_data=train_data, hyperparameters=HYPERPARAMETERS_DUMMY)
 
-    data = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, covariates_names=["Z", "Y", "X"])
+    data = get_data_frame_with_variable_lengths(ITEM_ID_TO_LENGTH, covariates_names=["Y", "X", "Z"])
     pred_data = data.slice_by_timestep(None, -prediction_length)
     known_covariates = data.slice_by_timestep(-prediction_length, None).drop("target", axis=1)
     with mock.patch("autogluon.timeseries.trainer.auto_trainer.AutoTimeSeriesTrainer.predict") as mock_predict:

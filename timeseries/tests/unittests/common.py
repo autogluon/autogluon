@@ -139,6 +139,7 @@ def get_data_frame_with_variable_lengths(
     df.static_features = static_features
     if covariates_names is not None:
         for i, name in enumerate(covariates_names):
+            # Make every second feature categorical
             if i % 2:
                 df[name] = np.random.normal(size=len(df))
             else:

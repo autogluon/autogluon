@@ -84,7 +84,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
         if array is None:
             return None
         else:
-            return array.astype(dtype=dtype)
+            return array.astype(dtype)
 
     @staticmethod
     def _to_gluonts_freq(freq: str) -> str:
@@ -256,12 +256,13 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             if self.num_feat_dynamic_cat > 0:
                 feat_dynamic_cat = dataset[self.metadata.known_covariates_cat]
                 if self.supports_cat_covariates:
-                    self.feat_static_cat_cardinality = feat_dynamic_cat.nunique().tolist()
+                    self.feat_dynamic_cat_cardinality = feat_dynamic_cat.nunique().tolist()
                 else:
                     # If model doesn't support categorical covariates, convert them to real via one hot encoding
                     self._ohe_generator_known = OneHotEncoder(
                         max_levels=model_params.get("max_cat_cardinality", 100),
                         sparse=False,
+                        dtype="float32",
                     )
                     feat_dynamic_cat_ohe = self._ohe_generator_known.fit_transform(pd.DataFrame(feat_dynamic_cat))
                     self.num_feat_dynamic_cat = 0
@@ -274,12 +275,13 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             if self.num_past_feat_dynamic_cat > 0:
                 past_feat_dynamic_cat = dataset[self.metadata.past_covariates_cat]
                 if self.supports_cat_covariates:
-                    self.past_feat_static_cat_cardinality = past_feat_dynamic_cat.nunique().tolist()
+                    self.past_feat_dynamic_cat_cardinality = past_feat_dynamic_cat.nunique().tolist()
                 else:
                     # If model doesn't support categorical covariates, convert them to real via one hot encoding
                     self._ohe_generator_past = OneHotEncoder(
                         max_levels=model_params.get("max_cat_cardinality", 100),
                         sparse=False,
+                        dtype="float32",
                     )
                     past_feat_dynamic_cat_ohe = self._ohe_generator_past.fit_transform(
                         pd.DataFrame(past_feat_dynamic_cat)
@@ -394,7 +396,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                 feat_dynamic_cat = None
 
             if self.num_feat_dynamic_real > 0:
-                feat_dynamic_real = df[self.metadata.known_covariates_real]
+                feat_dynamic_real = df[self.metadata.known_covariates_real].to_numpy()
                 # Append future values of known covariates
                 if known_covariates is not None:
                     feat_dynamic_real = np.concatenate(

@@ -129,8 +129,8 @@ def test_when_static_features_present_then_they_are_passed_to_dataset(model_clas
             call_kwargs = patch_dataset.call_args[1]
             feat_static_cat = call_kwargs["feat_static_cat"]
             feat_static_real = call_kwargs["feat_static_real"]
-            assert (feat_static_cat.dtypes == "category").all()
-            assert (feat_static_real.dtypes == "float32").all()
+            assert feat_static_cat.dtype == "int64"
+            assert feat_static_real.dtype == "float32"
 
 
 @pytest.mark.parametrize("model_class", MODELS_WITH_STATIC_FEATURES)
@@ -197,7 +197,7 @@ def test_when_known_covariates_present_then_they_are_passed_to_dataset(model_cla
         finally:
             call_kwargs = patch_dataset.call_args[1]
             feat_dynamic_real = call_kwargs["feat_dynamic_real"]
-            assert (feat_dynamic_real.dtypes == "float32").all()
+            assert feat_dynamic_real.dtype == "float32"
 
 
 @pytest.mark.parametrize("model_class", MODELS_WITH_KNOWN_COVARIATES)
@@ -212,14 +212,20 @@ def test_when_known_covariates_present_then_model_attributes_set_correctly(model
 def test_when_known_covariates_present_for_predict_then_covariates_have_correct_shape(model_class, df_with_covariates):
     df, metadata = df_with_covariates
     prediction_length = 5
-    past_data, known_covariates = df.get_model_inputs_for_scoring(prediction_length, metadata.known_covariates_real)
+    past_data, known_covariates = df.get_model_inputs_for_scoring(prediction_length, metadata.known_covariates)
     model = model_class(
         hyperparameters=DUMMY_HYPERPARAMETERS, metadata=metadata, freq=df.freq, prediction_length=prediction_length
     )
     model.fit(train_data=past_data)
     for ts in model._to_gluonts_dataset(past_data, known_covariates=known_covariates):
         expected_length = len(ts["target"]) + prediction_length
-        assert ts["feat_dynamic_real"].shape == (len(metadata.known_covariates_real), expected_length)
+        if model.supports_cat_covariates:
+            assert ts["feat_dynamic_cat"].shape == (len(metadata.known_covariates_cat), expected_length)
+            assert ts["feat_dynamic_real"].shape == (len(metadata.known_covariates_real), expected_length)
+        else:
+            num_onehot_columns = past_data[metadata.known_covariates_cat].nunique().sum()
+            expected_num_feat_dynamic_real = len(metadata.known_covariates_real) + num_onehot_columns
+            assert ts["feat_dynamic_real"].shape == (expected_num_feat_dynamic_real, expected_length)
 
 
 @pytest.mark.parametrize("model_class", MODELS_WITH_KNOWN_COVARIATES)
@@ -237,8 +243,8 @@ def test_when_disable_known_covariates_set_to_true_then_known_covariates_are_not
             pass
         finally:
             call_kwargs = patch_dataset.call_args[1]
-            feat_dynamic_real = call_kwargs["feat_dynamic_real"]
-            assert feat_dynamic_real is None
+            assert call_kwargs["feat_dynamic_real"] is None
+            assert call_kwargs["feat_dynamic_cat"] is None
 
 
 @pytest.mark.parametrize("model_class", MODELS_WITH_STATIC_FEATURES_AND_KNOWN_COVARIATES)
