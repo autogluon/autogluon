@@ -3364,7 +3364,8 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         )
 
         if refit_full:
-            models += self.refit_full(model=models)
+            refit_models_dict = self.refit_full(model=models)
+            models += [refit_models_dict[m] for m in models]
 
         return models
 
