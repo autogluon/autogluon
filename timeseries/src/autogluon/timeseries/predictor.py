@@ -1227,7 +1227,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         }
 
         past_data, known_covariates = test_data.get_model_inputs_for_scoring(
-            prediction_length=self.prediction_length, known_covariates_names=trainer.metadata.known_covariates_real
+            prediction_length=self.prediction_length, known_covariates_names=trainer.metadata.known_covariates
         )
         pred_proba_dict_test: Dict[str, TimeSeriesDataFrame] = trainer.get_model_pred_dict(
             base_models, data=past_data, known_covariates=known_covariates

@@ -32,10 +32,10 @@ def generate_train_and_test_data(
         index = pd.MultiIndex.from_product([(item_id,), timestamps], names=[ITEMID, TIMESTAMP])
         columns = {TARGET_COLUMN: np.random.normal(size=length)}
         if use_known_covariates:
-            columns["known_A"] = np.random.randint(0, 10, size=length)
+            columns["known_A"] = np.random.choice(["foo", "bar", "baz"], size=length)
             columns["known_B"] = np.random.normal(size=length)
         if use_past_covariates:
-            columns["past_A"] = np.random.randint(0, 10, size=length)
+            columns["past_A"] = np.random.choice(["foo", "bar", "baz"], size=length)
             columns["past_B"] = np.random.normal(size=length)
             columns["past_C"] = np.random.normal(size=length)
         df_per_item.append(pd.DataFrame(columns, index=index))
@@ -45,7 +45,7 @@ def generate_train_and_test_data(
     if use_static_features_categorical or use_static_features_continuous:
         static_columns = {}
         if use_static_features_categorical:
-            static_columns["static_A"] = np.random.choice(["foo", "bar", "bazz"], size=len(ITEM_IDS))
+            static_columns["static_A"] = np.random.choice(["foo", "bar", "baz"], size=len(ITEM_IDS))
         if use_static_features_continuous:
             static_columns["static_B"] = np.random.normal(size=len(ITEM_IDS))
         static_df = pd.DataFrame(static_columns, index=ITEM_IDS)

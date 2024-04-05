@@ -242,7 +242,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         Each row contains unique_id, ds, y, and (optionally) known covariates & static features.
         """
         # TODO: Add support for past_covariates
-        selected_columns = self.metadata.known_covariates_real.copy()
+        selected_columns = self.metadata.known_covariates.copy()
         column_name_mapping = {ITEMID: MLF_ITEMID, TIMESTAMP: MLF_TIMESTAMP}
         if include_target:
             selected_columns += [self.target]

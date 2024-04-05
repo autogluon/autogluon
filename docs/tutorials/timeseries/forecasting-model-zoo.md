@@ -280,25 +280,21 @@ Models not included in this table currently do not support any additional featur
    :header-rows: 1
    :stub-columns: 1
    :align: center
-   :widths: 40 15 15 15 15
+   :widths: 55 15 15 15
 
    * - Model
-     - Static features (continuous)
-     - Static features (categorical)
-     - Known covariates (continuous)
-     - Past covariates (continuous)
+     - Static features (continuous + categorical)
+     - Known covariates (continuous + categorical)
+     - Past covariates (continuous + categorical)
    * - :class:`~autogluon.timeseries.models.DirectTabularModel`
-     - ✅
      - ✅
      - ✅
      -
    * - :class:`~autogluon.timeseries.models.RecursiveTabularModel`
      - ✅
      - ✅
-     - ✅
      -
    * - :class:`~autogluon.timeseries.models.DeepARModel`
-     - ✅
      - ✅
      - ✅
      -
@@ -306,10 +302,8 @@ Models not included in this table currently do not support any additional featur
      - ✅
      - ✅
      - ✅
-     - ✅
    * - :class:`~autogluon.timeseries.models.WaveNetModel`
      - ✅
      - ✅
-     - ✅
-     - 
+     -
 ```

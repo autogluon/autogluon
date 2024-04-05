@@ -3,7 +3,7 @@ import os
 import re
 import time
 from contextlib import nullcontext
-from typing import Any, Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 from autogluon.common import space
 from autogluon.common.loaders import load_pkl
@@ -296,6 +296,7 @@ class AbstractTimeSeriesModel(AbstractModel):
             of input items.
         """
         data = self.preprocess(data, is_train=False)
+        known_covariates = self.preprocess_known_covariates(known_covariates)
         predictions = self._predict(data=data, known_covariates=known_covariates, **kwargs)
         logger.debug(f"Predicting with model {self.name}")
         # "0.5" might be missing from the quantiles if self is a wrapper (MultiWindowBacktestingModel or ensemble)
@@ -358,7 +359,7 @@ class AbstractTimeSeriesModel(AbstractModel):
             time steps of each time series.
         """
         past_data, known_covariates = data.get_model_inputs_for_scoring(
-            prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates_real
+            prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates
         )
         predictions = self.predict(past_data, known_covariates=known_covariates)
         return self._score_with_predictions(data=data, predictions=predictions, metric=metric)
@@ -371,7 +372,7 @@ class AbstractTimeSeriesModel(AbstractModel):
     ) -> None:
         """Compute val_score, predict_time and cache out-of-fold (OOF) predictions."""
         past_data, known_covariates = val_data.get_model_inputs_for_scoring(
-            prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates_real
+            prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates
         )
         predict_start_time = time.time()
         oof_predictions = self.predict(past_data, known_covariates=known_covariates)
@@ -494,8 +495,13 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         return hpo_models, analysis
 
-    def preprocess(self, data: TimeSeriesDataFrame, is_train: bool = False, **kwargs) -> Any:
+    def preprocess(self, data: TimeSeriesDataFrame, is_train: bool = False, **kwargs) -> TimeSeriesDataFrame:
         return data
+
+    def preprocess_known_covariates(
+        self, known_covariates: Optional[TimeSeriesDataFrame]
+    ) -> Optional[TimeSeriesDataFrame]:
+        return known_covariates
 
     def get_memory_size(self, **kwargs) -> Optional[int]:
         return None

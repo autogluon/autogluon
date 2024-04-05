@@ -19,6 +19,9 @@ from pandas.tseries.frequencies import to_offset
 
 from autogluon.common.loaders import load_pkl
 from autogluon.core.hpo.constants import RAY_BACKEND
+from autogluon.tabular.models.tabular_nn.utils.categorical_encoders import (
+    OneHotMergeRaresHandleUnknownEncoder as OneHotEncoder,
+)
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.datetime import norm_freq_str
@@ -42,21 +45,25 @@ class SimpleGluonTSDataset(GluonTSDataset):
         self,
         target_df: TimeSeriesDataFrame,
         target_column: str = "target",
-        feat_static_cat: Optional[pd.DataFrame] = None,
-        feat_static_real: Optional[pd.DataFrame] = None,
-        feat_dynamic_real: Optional[pd.DataFrame] = None,
-        past_feat_dynamic_real: Optional[pd.DataFrame] = None,
+        feat_static_cat: Optional[np.ndarray] = None,
+        feat_static_real: Optional[np.ndarray] = None,
+        feat_dynamic_cat: Optional[np.ndarray] = None,
+        feat_dynamic_real: Optional[np.ndarray] = None,
+        past_feat_dynamic_cat: Optional[np.ndarray] = None,
+        past_feat_dynamic_real: Optional[np.ndarray] = None,
         includes_future: bool = False,
         prediction_length: int = None,
     ):
         assert target_df is not None
         assert target_df.freq, "Initializing GluonTS data sets without freq is not allowed"
         # Convert TimeSeriesDataFrame to pd.Series for faster processing
-        self.target_array = self._to_array(target_df[target_column], dtype=np.float32)
-        self.feat_static_cat = self._to_array(feat_static_cat, dtype=np.int64)
-        self.feat_static_real = self._to_array(feat_static_real, dtype=np.float32)
-        self.feat_dynamic_real = self._to_array(feat_dynamic_real, dtype=np.float32)
-        self.past_feat_dynamic_real = self._to_array(past_feat_dynamic_real, dtype=np.float32)
+        self.target_array = target_df[target_column].to_numpy(np.float32)
+        self.feat_static_cat = self._astype(feat_static_cat, dtype=np.int64)
+        self.feat_static_real = self._astype(feat_static_real, dtype=np.float32)
+        self.feat_dynamic_cat = self._astype(feat_dynamic_cat, dtype=np.int64)
+        self.feat_dynamic_real = self._astype(feat_dynamic_real, dtype=np.float32)
+        self.past_feat_dynamic_cat = self._astype(past_feat_dynamic_cat, dtype=np.int64)
+        self.past_feat_dynamic_real = self._astype(past_feat_dynamic_real, dtype=np.float32)
         self.freq = self._to_gluonts_freq(target_df.freq)
 
         # Necessary to compute indptr for known_covariates at prediction time
@@ -73,11 +80,11 @@ class SimpleGluonTSDataset(GluonTSDataset):
         assert len(self.item_ids) == len(self.start_timestamps)
 
     @staticmethod
-    def _to_array(df: Optional[pd.DataFrame], dtype: np.dtype) -> Optional[np.ndarray]:
-        if df is None:
+    def _astype(array: Optional[np.ndarray], dtype: np.dtype) -> Optional[np.ndarray]:
+        if array is None:
             return None
         else:
-            return df.to_numpy(dtype=dtype)
+            return array.astype(dtype)
 
     @staticmethod
     def _to_gluonts_freq(freq: str) -> str:
@@ -111,12 +118,18 @@ class SimpleGluonTSDataset(GluonTSDataset):
                 ts[FieldName.FEAT_STATIC_CAT] = self.feat_static_cat[j]
             if self.feat_static_real is not None:
                 ts[FieldName.FEAT_STATIC_REAL] = self.feat_static_real[j]
+            if self.past_feat_dynamic_cat is not None:
+                ts[FieldName.PAST_FEAT_DYNAMIC_CAT] = self.past_feat_dynamic_cat[start_idx:end_idx].T
             if self.past_feat_dynamic_real is not None:
                 ts[FieldName.PAST_FEAT_DYNAMIC_REAL] = self.past_feat_dynamic_real[start_idx:end_idx].T
+
+            # Dynamic features that may extend into the future
+            if self.includes_future:
+                start_idx = start_idx + j * self.prediction_length
+                end_idx = end_idx + (j + 1) * self.prediction_length
+            if self.feat_dynamic_cat is not None:
+                ts[FieldName.FEAT_DYNAMIC_CAT] = self.feat_dynamic_cat[start_idx:end_idx].T
             if self.feat_dynamic_real is not None:
-                if self.includes_future:
-                    start_idx = start_idx + j * self.prediction_length
-                    end_idx = end_idx + (j + 1) * self.prediction_length
                 ts[FieldName.FEAT_DYNAMIC_REAL] = self.feat_dynamic_real[start_idx:end_idx].T
             yield ts
 
@@ -150,6 +163,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
     default_num_samples: int = 250
     supports_known_covariates: bool = False
     supports_past_covariates: bool = False
+    supports_cat_covariates: bool = False
 
     def __init__(
         self,
@@ -171,12 +185,19 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             **kwargs,
         )
         self.gts_predictor: Optional[GluonTSPredictor] = None
+        self._ohe_generator_known: Optional[OneHotEncoder] = None
+        self._ohe_generator_past: Optional[OneHotEncoder] = None
         self.callbacks = []
+        # Following attributes may be overridden during fit() based on train_data & model parameters
         self.num_feat_static_cat = 0
         self.num_feat_static_real = 0
+        self.num_feat_dynamic_cat = 0
         self.num_feat_dynamic_real = 0
+        self.num_past_feat_dynamic_cat = 0
         self.num_past_feat_dynamic_real = 0
         self.feat_static_cat_cardinality: List[int] = []
+        self.feat_dynamic_cat_cardinality: List[int] = []
+        self.past_feat_dynamic_cat_cardinality: List[int] = []
         self.negative_data = True
 
     def save(self, path: str = None, verbose: bool = True) -> str:
@@ -210,37 +231,65 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
     def _get_hpo_backend(self):
         return RAY_BACKEND
 
-    def _deferred_init_params_aux(self, **kwargs) -> None:
-        """Update GluonTS specific parameters with information available
-        only at training time.
-        """
-        if "dataset" in kwargs:
-            ds = kwargs.get("dataset")
-            self.freq = ds.freq or self.freq
-            if not self.freq:
-                raise ValueError(
-                    "Dataset frequency not provided in the dataset, fit arguments or "
-                    "during initialization. Please provide a `freq` string to `fit`."
-                )
+    def _deferred_init_params_aux(self, dataset: TimeSeriesDataFrame) -> None:
+        """Update GluonTS specific parameters with information available only at training time."""
+        self.freq = dataset.freq or self.freq
+        if not self.freq:
+            raise ValueError(
+                "Dataset frequency not provided in the dataset, fit arguments or "
+                "during initialization. Please provide a `freq` string to `fit`."
+            )
 
-            model_params = self._get_model_params()
-            disable_static_features = model_params.get("disable_static_features", False)
-            if not disable_static_features:
-                self.num_feat_static_cat = len(self.metadata.static_features_cat)
-                self.num_feat_static_real = len(self.metadata.static_features_real)
-                if self.num_feat_static_cat > 0:
-                    feat_static_cat = ds.static_features[self.metadata.static_features_cat]
-                    self.feat_static_cat_cardinality = feat_static_cat.nunique().tolist()
-            disable_known_covariates = model_params.get("disable_known_covariates", False)
-            if not disable_known_covariates and self.supports_known_covariates:
-                self.num_feat_dynamic_real = len(self.metadata.known_covariates_real)
-            disable_past_covariates = model_params.get("disable_past_covariates", False)
-            if not disable_past_covariates and self.supports_past_covariates:
-                self.num_past_feat_dynamic_real = len(self.metadata.past_covariates_real)
-            self.negative_data = (ds[self.target] < 0).any()
+        model_params = self._get_model_params()
+        disable_static_features = model_params.get("disable_static_features", False)
+        if not disable_static_features:
+            self.num_feat_static_cat = len(self.metadata.static_features_cat)
+            self.num_feat_static_real = len(self.metadata.static_features_real)
+            if self.num_feat_static_cat > 0:
+                feat_static_cat = dataset.static_features[self.metadata.static_features_cat]
+                self.feat_static_cat_cardinality = feat_static_cat.nunique().tolist()
 
-        if "callbacks" in kwargs:
-            self.callbacks += kwargs["callbacks"]
+        disable_known_covariates = model_params.get("disable_known_covariates", False)
+        if not disable_known_covariates and self.supports_known_covariates:
+            self.num_feat_dynamic_cat = len(self.metadata.known_covariates_cat)
+            self.num_feat_dynamic_real = len(self.metadata.known_covariates_real)
+            if self.num_feat_dynamic_cat > 0:
+                feat_dynamic_cat = dataset[self.metadata.known_covariates_cat]
+                if self.supports_cat_covariates:
+                    self.feat_dynamic_cat_cardinality = feat_dynamic_cat.nunique().tolist()
+                else:
+                    # If model doesn't support categorical covariates, convert them to real via one hot encoding
+                    self._ohe_generator_known = OneHotEncoder(
+                        max_levels=model_params.get("max_cat_cardinality", 100),
+                        sparse=False,
+                        dtype="float32",
+                    )
+                    feat_dynamic_cat_ohe = self._ohe_generator_known.fit_transform(pd.DataFrame(feat_dynamic_cat))
+                    self.num_feat_dynamic_cat = 0
+                    self.num_feat_dynamic_real += feat_dynamic_cat_ohe.shape[1]
+
+        disable_past_covariates = model_params.get("disable_past_covariates", False)
+        if not disable_past_covariates and self.supports_past_covariates:
+            self.num_past_feat_dynamic_cat = len(self.metadata.past_covariates_cat)
+            self.num_past_feat_dynamic_real = len(self.metadata.past_covariates_real)
+            if self.num_past_feat_dynamic_cat > 0:
+                past_feat_dynamic_cat = dataset[self.metadata.past_covariates_cat]
+                if self.supports_cat_covariates:
+                    self.past_feat_dynamic_cat_cardinality = past_feat_dynamic_cat.nunique().tolist()
+                else:
+                    # If model doesn't support categorical covariates, convert them to real via one hot encoding
+                    self._ohe_generator_past = OneHotEncoder(
+                        max_levels=model_params.get("max_cat_cardinality", 100),
+                        sparse=False,
+                        dtype="float32",
+                    )
+                    past_feat_dynamic_cat_ohe = self._ohe_generator_past.fit_transform(
+                        pd.DataFrame(past_feat_dynamic_cat)
+                    )
+                    self.num_past_feat_dynamic_cat = 0
+                    self.num_past_feat_dynamic_real += past_feat_dynamic_cat_ohe.shape[1]
+
+        self.negative_data = (dataset[self.target] < 0).any()
 
     @property
     def default_context_length(self) -> int:
@@ -322,42 +371,76 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         if time_series_df is not None:
             # TODO: Preprocess real-valued features with StdScaler?
             if self.num_feat_static_cat > 0:
-                feat_static_cat = time_series_df.static_features[self.metadata.static_features_cat]
+                feat_static_cat = time_series_df.static_features[self.metadata.static_features_cat].to_numpy()
             else:
                 feat_static_cat = None
 
             if self.num_feat_static_real > 0:
-                feat_static_real = time_series_df.static_features[self.metadata.static_features_real]
+                feat_static_real = time_series_df.static_features[self.metadata.static_features_real].to_numpy()
             else:
                 feat_static_real = None
 
+            expected_known_covariates_len = len(time_series_df) + self.prediction_length * time_series_df.num_items
+            # Convert TSDF -> DF to avoid overhead / input validation
+            df = pd.DataFrame(time_series_df)
+            if known_covariates is not None:
+                known_covariates = pd.DataFrame(known_covariates)
+            if self.num_feat_dynamic_cat > 0:
+                feat_dynamic_cat = df[self.metadata.known_covariates_cat].to_numpy()
+                if known_covariates is not None:
+                    feat_dynamic_cat = np.concatenate(
+                        [feat_dynamic_cat, known_covariates[self.metadata.known_covariates_cat].to_numpy()]
+                    )
+                    assert len(feat_dynamic_cat) == expected_known_covariates_len
+            else:
+                feat_dynamic_cat = None
+
             if self.num_feat_dynamic_real > 0:
-                # Convert TSDF -> DF to avoid overhead / input validation
-                feat_dynamic_real = pd.DataFrame(time_series_df[self.metadata.known_covariates_real])
+                feat_dynamic_real = df[self.metadata.known_covariates_real].to_numpy()
                 # Append future values of known covariates
                 if known_covariates is not None:
-                    feat_dynamic_real = pd.concat([feat_dynamic_real, known_covariates], axis=0)
-                    expected_length = len(time_series_df) + self.prediction_length * time_series_df.num_items
-                    if len(feat_dynamic_real) != expected_length:
-                        raise ValueError(
-                            f"known_covariates must contain values for the next prediction_length = "
-                            f"{self.prediction_length} time steps in each time series."
+                    feat_dynamic_real = np.concatenate(
+                        [feat_dynamic_real, known_covariates[self.metadata.known_covariates_real].to_numpy()]
+                    )
+                    assert len(feat_dynamic_real) == expected_known_covariates_len
+                # Categorical covariates are one-hot-encoded as real
+                if self._ohe_generator_known is not None:
+                    feat_dynamic_cat_ohe = self._ohe_generator_known.transform(df[self.metadata.known_covariates_cat])
+                    if known_covariates is not None:
+                        future_dynamic_cat_ohe = self._ohe_generator_known.transform(
+                            known_covariates[self.metadata.known_covariates_cat]
                         )
+                        feat_dynamic_cat_ohe = np.concatenate([feat_dynamic_cat_ohe, future_dynamic_cat_ohe])
+                        assert len(feat_dynamic_cat_ohe) == expected_known_covariates_len
+                    feat_dynamic_real = np.concatenate([feat_dynamic_real, feat_dynamic_cat_ohe], axis=1)
             else:
                 feat_dynamic_real = None
 
+            if self.num_past_feat_dynamic_cat > 0:
+                past_feat_dynamic_cat = df[self.metadata.past_covariates_cat].to_numpy()
+            else:
+                past_feat_dynamic_cat = None
+
             if self.num_past_feat_dynamic_real > 0:
-                # Convert TSDF -> DF to avoid overhead / input validation
-                past_feat_dynamic_real = pd.DataFrame(time_series_df[self.metadata.past_covariates_real])
+                past_feat_dynamic_real = df[self.metadata.past_covariates_real].to_numpy()
+                if self._ohe_generator_past is not None:
+                    past_feat_dynamic_cat_ohe = self._ohe_generator_past.transform(
+                        df[self.metadata.past_covariates_cat]
+                    )
+                    past_feat_dynamic_real = np.concatenate(
+                        [past_feat_dynamic_real, past_feat_dynamic_cat_ohe], axis=1
+                    )
             else:
                 past_feat_dynamic_real = None
 
             return SimpleGluonTSDataset(
-                target_df=time_series_df,
+                target_df=time_series_df[[self.target]],
                 target_column=self.target,
                 feat_static_cat=feat_static_cat,
                 feat_static_real=feat_static_real,
+                feat_dynamic_cat=feat_dynamic_cat,
                 feat_dynamic_real=feat_dynamic_real,
+                past_feat_dynamic_cat=past_feat_dynamic_cat,
                 past_feat_dynamic_real=past_feat_dynamic_real,
                 includes_future=known_covariates is not None,
                 prediction_length=self.prediction_length,
@@ -392,11 +475,11 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         # update auxiliary parameters
         init_args = self._get_estimator_init_args()
         keep_lightning_logs = init_args.pop("keep_lightning_logs", False)
-        callbacks = self._get_callbacks(
+        self.callbacks = self._get_callbacks(
             time_limit=time_limit,
             early_stopping_patience=None if val_data is None else init_args["early_stopping_patience"],
         )
-        self._deferred_init_params_aux(dataset=train_data, callbacks=callbacks)
+        self._deferred_init_params_aux(train_data)
 
         estimator = self._get_estimator()
         with warning_filter(), disable_root_logger(), gluonts.core.settings.let(gluonts.env.env, use_tqdm=False):
