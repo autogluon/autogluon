@@ -90,11 +90,12 @@ def _assert_predict_dict_identical_to_predict(predictor: TabularPredictor, data)
                 else:
                     model_pred = predictor.predict(data, model=m, as_pandas=as_pandas)
                 if as_pandas:
-                    if model_pred.dtype == "object":
-                        assert model_pred.equals(predict_dict[m])
-                    else:
-                        # pandas default int type on Windows is int64, while on Linux it is int32
+                    # pandas default int type on Windows is int64, while on Linux it is int32
+                    if model_pred.dtype in ["int64", "int32"]:
+                        assert predict_dict[m].dtype in ["int64", "int32"]
                         assert model_pred.astype("int64").equals(predict_dict[m].astype("int64"))
+                    else:
+                        assert model_pred.equals(predict_dict[m])
                 else:
                     assert np.array_equal(model_pred, predict_dict[m])
 
