@@ -195,7 +195,7 @@ def main():
                     if file.startswith("AutoGluon") and file.endswith(".csv") and "pairwise" in root:
                         file_path = os.path.join(root, file)
                         df2 = pd.read_csv(file_path, usecols=["framework", "Winrate"])
-                        df1 = df1.assign(Winrate=None, framework=None, rank=None)
+                        df1 = df1.assign(Winrate=None, framework=None)
                         df1["Winrate"] = df2["Winrate"]
                         df1["framework"] = df2["framework"]
                         df1 = df1.reindex(columns=["framework", "Winrate", "rank", "time_train_s", "time_infer_s"])
