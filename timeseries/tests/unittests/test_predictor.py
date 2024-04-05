@@ -1088,7 +1088,13 @@ def test_when_log_file_set_then_predictor_logs_to_custom_file(temp_model_path):
             log_text = f.read()
         assert "Naive" in log_text
     finally:
-        log_path.unlink(missing_ok=True)
+        try:
+            log_path.unlink(missing_ok=True)
+        except PermissionError:
+            # Windows won't allow to clean up the directory if logs are saved to it;
+            # Permission Error: The process can't access the file since it is being used by another process
+            # skip deletion
+            pass
 
 
 def test_when_log_file_set_with_pathlib_then_predictor_logs_to_custom_file(temp_model_path):
@@ -1103,7 +1109,13 @@ def test_when_log_file_set_with_pathlib_then_predictor_logs_to_custom_file(temp_
             log_text = f.read()
         assert "Naive" in log_text
     finally:
-        log_path.unlink(missing_ok=True)
+        try:
+            log_path.unlink(missing_ok=True)
+        except PermissionError:
+            # Windows won't allow to clean up the directory if logs are saved to it;
+            # Permission Error: The process can't access the file since it is being used by another process
+            # skip deletion
+            pass
 
 
 def test_when_log_to_file_set_to_false_then_predictor_does_not_log_to_file(temp_model_path):
