@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 import torch
 
+from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.timeseries import TimeSeriesPredictor
 from autogluon.timeseries.models import ChronosModel
 from autogluon.timeseries.models.chronos.model import ChronosInferenceDataset
@@ -371,3 +372,18 @@ def test_when_chronos_fit_with_validation_through_predictor_and_persist_called_t
 
     # model now wrapped in MultiWindowModel
     assert model.most_recent_model.model_pipeline is not None
+
+
+@pytest.mark.parametrize("data_loader_num_workers", [0, 1, 2])
+def test_when_chronos_scores_oof_and_time_limit_is_exceeded_then_exception_is_raised(
+    hf_model_path, temp_model_path, data_loader_num_workers
+):
+    data = get_data_frame_with_item_index(item_list=list(range(1000)), data_length=50)
+    model = ChronosModel(
+        prediction_length=20,
+        path=temp_model_path,
+        hyperparameters={"model_path": hf_model_path, "data_loader_num_workers": data_loader_num_workers},
+    )
+    model.fit(data, time_limit=1.0)
+    with pytest.raises(TimeLimitExceeded):
+        model.score_and_cache_oof(data)

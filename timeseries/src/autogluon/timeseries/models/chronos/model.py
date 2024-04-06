@@ -1,11 +1,13 @@
 import logging
 import os
+import time
 from typing import Any, Dict, Literal, Optional, Union
 
 import numpy as np
 import pandas as pd
 
 from autogluon.common.loaders import load_pkl
+from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
@@ -61,11 +63,14 @@ class ChronosInferenceDataset:
         target_df: TimeSeriesDataFrame,
         context_length: int,
         target_column: str = "target",
+        time_limit: Optional[float] = None,
     ):
         assert context_length > 0
         self.context_length = context_length
         self.target_array = target_df[target_column].to_numpy(dtype=np.float32)
         self.freq = target_df.freq
+        self.creation_time = time.time()
+        self.time_limit = time_limit
 
         # store pointer to start:end of each time series
         cum_sizes = target_df.num_timesteps_per_item().values.cumsum()
@@ -83,6 +88,9 @@ class ChronosInferenceDataset:
         return a
 
     def __getitem__(self, idx) -> np.ndarray:
+        if self.time_limit is not None and time.time() - self.creation_time > self.time_limit:
+            raise TimeLimitExceeded
+
         start_idx = self.indptr[idx]
         end_idx = self.indptr[idx + 1]
 
@@ -196,6 +204,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         )
 
         self.model_pipeline: Optional[Any] = None  # of type OptimizedChronosPipeline
+        self.time_limit: Optional[float] = None
 
     def save(self, path: str = None, verbose: bool = True) -> str:
         pipeline = self.model_pipeline
@@ -288,12 +297,14 @@ class ChronosModel(AbstractTimeSeriesModel):
         **kwargs,
     ) -> None:
         self._check_fit_params()
+        self.time_limit = time_limit
 
     def _get_inference_data_loader(
         self,
         data: TimeSeriesDataFrame,
         context_length: int,
         num_workers: int = 0,
+        time_limit: Optional[float] = None,
     ):
         import torch
 
@@ -301,6 +312,7 @@ class ChronosModel(AbstractTimeSeriesModel):
             target_df=data,
             target_column=self.target,
             context_length=context_length,
+            time_limit=time_limit,
         )
 
         return torch.utils.data.DataLoader(
@@ -333,6 +345,12 @@ class ChronosModel(AbstractTimeSeriesModel):
                 # load model pipeline to device memory
                 self.load_model_pipeline(context_length=context_length)
 
+            inference_data_loader = self._get_inference_data_loader(
+                data=data,
+                num_workers=self.data_loader_num_workers,
+                context_length=context_length,
+                time_limit=kwargs.get("time_limit"),
+            )
             self.model_pipeline.model.eval()
             with torch.inference_mode():
                 prediction_samples = [
@@ -345,11 +363,7 @@ class ChronosModel(AbstractTimeSeriesModel):
                     .detach()
                     .cpu()
                     .numpy()
-                    for batch in self._get_inference_data_loader(
-                        data=data,
-                        num_workers=self.data_loader_num_workers,
-                        context_length=context_length,
-                    )
+                    for batch in inference_data_loader
                 ]
 
         samples = np.concatenate(prediction_samples, axis=0).swapaxes(1, 2).reshape(-1, self.num_samples)
@@ -367,3 +381,15 @@ class ChronosModel(AbstractTimeSeriesModel):
 
     def _more_tags(self) -> Dict:
         return {"allow_nan": True}
+
+    def score_and_cache_oof(
+        self,
+        val_data: TimeSeriesDataFrame,
+        store_val_score: bool = False,
+        store_predict_time: bool = False,
+        **predict_kwargs,
+    ) -> None:
+        # All computation happens during inference, so we provide the time_limit at prediction time
+        super().score_and_cache_oof(
+            val_data, store_val_score, store_predict_time, time_limit=self.time_limit, **predict_kwargs
+        )

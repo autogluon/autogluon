@@ -373,13 +373,14 @@ class AbstractTimeSeriesModel(AbstractModel):
         val_data: TimeSeriesDataFrame,
         store_val_score: bool = False,
         store_predict_time: bool = False,
+        **predict_kwargs,
     ) -> None:
         """Compute val_score, predict_time and cache out-of-fold (OOF) predictions."""
         past_data, known_covariates = val_data.get_model_inputs_for_scoring(
             prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates
         )
         predict_start_time = time.time()
-        oof_predictions = self.predict(past_data, known_covariates=known_covariates)
+        oof_predictions = self.predict(past_data, known_covariates=known_covariates, **predict_kwargs)
         self._oof_predictions = [oof_predictions]
         if store_predict_time:
             self.predict_time = time.time() - predict_start_time

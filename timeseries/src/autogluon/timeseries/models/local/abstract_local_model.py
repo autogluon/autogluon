@@ -144,9 +144,10 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
 
         # timeout ensures that no individual job takes longer than time_limit
         # TODO: a job started late may still exceed time_limit - how to prevent that?
-        timeout = None if self.n_jobs == 1 else self.time_limit
+        time_limit = kwargs.get("time_limit")
+        timeout = None if self.n_jobs == 1 else time_limit
         # end_time ensures that no new jobs are started after time_limit is exceeded
-        end_time = None if self.time_limit is None else time.time() + self.time_limit
+        end_time = None if time_limit is None else time.time() + time_limit
         executor = Parallel(self.n_jobs, timeout=timeout)
 
         try:
@@ -169,11 +170,16 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         return TimeSeriesDataFrame(predictions_df)
 
     def score_and_cache_oof(
-        self, val_data: TimeSeriesDataFrame, store_val_score: bool = False, store_predict_time: bool = False
+        self,
+        val_data: TimeSeriesDataFrame,
+        store_val_score: bool = False,
+        store_predict_time: bool = False,
+        **predict_kwargs,
     ) -> None:
-        super().score_and_cache_oof(val_data, store_val_score, store_predict_time)
-        # Remove time_limit for future predictions
-        self.time_limit = None
+        # All computation happens during inference, so we provide the time_limit at prediction time
+        super().score_and_cache_oof(
+            val_data, store_val_score, store_predict_time, time_limit=self.time_limit, **predict_kwargs
+        )
 
     def _predict_wrapper(self, time_series: pd.Series, end_time: Optional[float] = None) -> Tuple[pd.DataFrame, bool]:
         if end_time is not None and time.time() >= end_time:
