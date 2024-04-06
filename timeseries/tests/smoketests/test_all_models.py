@@ -140,7 +140,7 @@ def test_all_models_can_handle_all_covariates(
 @pytest.mark.parametrize("freq", DEFAULT_SEASONALITIES.keys())
 def test_all_models_handle_all_pandas_frequencies(freq):
     if parse_version(pd.__version__) < parse_version("2.1") and freq in ["SM", "B", "BH"]:
-        pytest.skip("'SM' frequency inference not supported by pandas < 2.1")
+        pytest.skip(f"'{freq}' frequency inference not supported by pandas < 2.1")
 
     prediction_length = 5
 
