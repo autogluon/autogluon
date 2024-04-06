@@ -7,7 +7,6 @@ from pkg_resources import parse_version
 
 from autogluon.timeseries import TimeSeriesPredictor
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
-from autogluon.timeseries.models.presets import MODEL_TYPES
 from autogluon.timeseries.utils.datetime.seasonality import DEFAULT_SEASONALITIES
 
 TARGET_COLUMN = "custom_target"
