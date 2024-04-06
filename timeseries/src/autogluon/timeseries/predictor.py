@@ -451,8 +451,8 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
                 data.static_features["store_id"] = data.static_features["store_id"].astype("category")
 
-            If provided data is an instance of pandas DataFrame, AutoGluon will attempt to automatically convert it
-            to a ``TimeSeriesDataFrame``.
+            If provided data is a path or a pandas.DataFrame, AutoGluon will attempt to automatically convert it to a
+            ``TimeSeriesDataFrame``.
 
         tuning_data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str], optional
             Data reserved for model selection and hyperparameter tuning, rather than training individual models. Also
@@ -472,8 +472,8 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             If ``train_data`` has past covariates or static features, ``tuning_data`` must have also include them (with
             same columns names and dtypes).
 
-            If provided data is an instance of pandas DataFrame, AutoGluon will attempt to automatically convert it
-            to a ``TimeSeriesDataFrame``.
+            If provided data is a path or a pandas.DataFrame, AutoGluon will attempt to automatically convert it to a
+            ``TimeSeriesDataFrame``.
 
         time_limit : int, optional
             Approximately how long :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit` will run (wall-clock time in
@@ -855,8 +855,11 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         Parameters
         ----------
         data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]
-            The data to evaluate the best model on. The last ``prediction_length`` time steps of the data set, for each
-            item, will be held out for prediction and forecast accuracy will be calculated on these time steps.
+            The data to evaluate the best model on. The last ``prediction_length`` time steps of each time series in
+            ``data`` will be held out for prediction and forecast accuracy will be calculated on these time steps.
+
+            Must include both historic and future data (i.e., length of all time series in ``data`` must be at least
+            ``prediction_length + 1``).
 
             If ``known_covariates_names`` were specified when creating the predictor, ``data`` must include the columns
             listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
@@ -1179,8 +1182,8 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         Parameters
         ----------
         data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str], optional
-            dataset used for additional evaluation. If not provided, the validation set used during training will be
-            used.
+            dataset used for additional evaluation. Must include both historic and future data (i.e., length of all
+            time series in ``data`` must be at least ``prediction_length + 1``).
 
             If ``known_covariates_names`` were specified when creating the predictor, ``data`` must include the columns
             listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
@@ -1188,8 +1191,8 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             If ``train_data`` used to train the predictor contained past covariates or static features, then ``data``
             must also include them (with same column names and dtypes).
 
-            If provided data is an instance of pandas DataFrame, AutoGluon will attempt to automatically convert it
-            to a ``TimeSeriesDataFrame``.
+            If provided data is a path or a pandas.DataFrame, AutoGluon will attempt to automatically convert it to a
+            ``TimeSeriesDataFrame``.
 
         display : bool, default = False
             If True, the leaderboard DataFrame will be printed.
