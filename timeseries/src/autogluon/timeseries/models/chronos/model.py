@@ -182,7 +182,7 @@ class ChronosModel(AbstractTimeSeriesModel):
             self.context_length = self.maximum_context_length
 
         # we truncate the name to avoid long path errors on Windows
-        model_path_safe = model_path_input.replace("/", "__").replace(os.path.sep, "__")[-50:]
+        model_path_safe = str(model_path_input).replace("/", "__").replace(os.path.sep, "__")[-50:]
         name = (name if name is not None else "Chronos") + f"[{model_path_safe}]"
 
         super().__init__(
