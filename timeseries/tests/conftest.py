@@ -35,8 +35,8 @@ def temp_model_path(tmp_path_factory):
 
 @pytest.fixture(scope="session")
 def hf_model_path(tmp_path_factory):
-    """Force HuggingFace to cache the model config once and reuse it from a temporary cache directory.
-    This prevents inflating HuggingFace download numbers as an HTTP request is sent every time
+    """Force Hugging Face to cache the model config once and reuse it from a temporary cache directory.
+    This prevents inflating Hugging Face download numbers as an HTTP request is sent every time
     ``ChronosPipeline.from_pretrained`` is called.
     """
     model_hub_id = "amazon/chronos-t5-tiny"
@@ -57,4 +57,7 @@ def hf_model_path(tmp_path_factory):
 
         yield str(snapshot_dir)
     except:
+        import warnings
+
+        warnings.warn("Could not cache Chronos for test session. Will call Hugging Face directly.")
         yield model_hub_id  # fallback to hub id if no snapshots found
