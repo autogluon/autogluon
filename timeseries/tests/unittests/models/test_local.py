@@ -362,7 +362,7 @@ def test_when_intermittent_models_fit_then_values_are_lower_bounded(
 ):
     data = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME
     if positive_only:
-        data = data.clip(0, None)
+        data[data < 0] = 0.0
     else:
         # make sure there are some negative values
         for c in data.columns:
