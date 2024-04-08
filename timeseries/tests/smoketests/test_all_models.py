@@ -7,7 +7,6 @@ from pkg_resources import parse_version
 
 from autogluon.timeseries import TimeSeriesPredictor
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
-from autogluon.timeseries.models.presets import MODEL_TYPES
 from autogluon.timeseries.utils.datetime.seasonality import DEFAULT_SEASONALITIES
 
 TARGET_COLUMN = "custom_target"
@@ -62,7 +61,7 @@ ALL_MODELS = {
     "ADIDA": DUMMY_MODEL_HPARAMS,
     "Average": DUMMY_MODEL_HPARAMS,
     "AutoCES": DUMMY_MODEL_HPARAMS,
-    "Chronos": {"model_path": "amazon/chronos-t5-tiny"},
+    "Chronos": {},
     "CrostonSBA": DUMMY_MODEL_HPARAMS,
     "DLinear": DUMMY_MODEL_HPARAMS,
     "DeepAR": DUMMY_MODEL_HPARAMS,
@@ -86,11 +85,28 @@ ALL_MODELS = {
 }
 
 
+# we wrap ALL_MODELS in a fixture in order to reuse the hf_model_path fixture, which
+# prevents polling Hugging Face during testing
+@pytest.fixture(scope="session")
+def all_model_hyperparams(hf_model_path):
+    return {
+        **ALL_MODELS,
+        "Chronos": {"model_path": hf_model_path},
+    }
+
+
 def assert_leaderboard_contains_all_models(leaderboard: pd.DataFrame, include_ensemble: bool = True):
-    expected_models = set(MODEL_TYPES[m](hyperparameters=kwargs).name for m, kwargs in ALL_MODELS.items())
+    expected_models = set(ALL_MODELS.keys())
     if include_ensemble:
         expected_models = expected_models.union({"WeightedEnsemble"})
-    failed_models = expected_models.difference(set(leaderboard["model"]))
+
+    failed_models = [
+        model
+        for model in expected_models
+        if not any(
+            fitted.startswith(model) for fitted in leaderboard["model"]  # Chronos appends more information to name
+        )
+    ]
     assert len(failed_models) == 0, f"Failed models: {failed_models}"
 
 
@@ -105,6 +121,7 @@ def test_all_models_can_handle_all_covariates(
     use_static_features_continuous,
     use_static_features_categorical,
     eval_metric,
+    all_model_hyperparams,
 ):
     prediction_length = 5
     train_data, test_data = generate_train_and_test_data(
@@ -123,7 +140,7 @@ def test_all_models_can_handle_all_covariates(
         known_covariates_names=known_covariates_names if len(known_covariates_names) > 0 else None,
         eval_metric=eval_metric,
     )
-    predictor.fit(train_data, hyperparameters=ALL_MODELS)
+    predictor.fit(train_data, hyperparameters=all_model_hyperparams)
     predictor.evaluate(test_data)
     leaderboard = predictor.leaderboard(test_data)
 
@@ -138,7 +155,7 @@ def test_all_models_can_handle_all_covariates(
 
 
 @pytest.mark.parametrize("freq", DEFAULT_SEASONALITIES.keys())
-def test_all_models_handle_all_pandas_frequencies(freq):
+def test_all_models_handle_all_pandas_frequencies(freq, all_model_hyperparams):
     if parse_version(pd.__version__) < parse_version("2.1") and freq in ["SM", "B", "BH"]:
         pytest.skip(f"'{freq}' frequency inference not supported by pandas < 2.1")
 
@@ -158,7 +175,7 @@ def test_all_models_handle_all_pandas_frequencies(freq):
         prediction_length=prediction_length,
         known_covariates_names=known_covariates_names if len(known_covariates_names) > 0 else None,
     )
-    predictor.fit(train_data, hyperparameters=ALL_MODELS)
+    predictor.fit(train_data, hyperparameters=all_model_hyperparams)
     predictor.evaluate(test_data)
     leaderboard = predictor.leaderboard(test_data)
 
