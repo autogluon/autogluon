@@ -346,6 +346,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         **predict_kwargs,
     ) -> None:
         # All computation happens during inference, so we provide the time_limit at prediction time
+        # TODO: Once custom predict_kwargs is allowed, make sure that `time_limit` is not among the keys
         super().score_and_cache_oof(
             val_data, store_val_score, store_predict_time, time_limit=self.time_limit, **predict_kwargs
         )
