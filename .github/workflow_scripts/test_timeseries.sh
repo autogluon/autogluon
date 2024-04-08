@@ -8,7 +8,7 @@ source $(dirname "$0")/env_setup.sh
 
 setup_build_env
 export CUDA_VISIBLE_DEVICES=0
-install_local_packages "common/[tests]" "core/[all,tests]" "features/" "tabular/[all,tests]" "timeseries/[all,tests]"
+install_local_packages "common/[tests]" "core/[all,tests]" "features/" "tabular/[all,tests]" "timeseries/[tests]"
 
 cd timeseries/
 if [ -n "$ADDITIONAL_TEST_ARGS" ]
