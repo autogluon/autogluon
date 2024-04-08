@@ -1,5 +1,5 @@
 import time
-from typing import Callable
+from typing import Callable, Optional
 
 import numpy as np
 import torch
@@ -55,12 +55,12 @@ class ChronosInferenceDataLoader(torch.utils.data.DataLoader):
             self.callback()
 
 
-def timeout_callback(seconds: float) -> Callable:
+def timeout_callback(seconds: Optional[float]) -> Callable:
     """Return a callback object that raises an exception if time limit is exceeded."""
     start_time = time.time()
 
     def callback() -> None:
-        if time.time() - start_time > seconds:
+        if seconds is not None and time.time() - start_time > seconds:
             raise TimeLimitExceeded
 
     return callback
