@@ -43,7 +43,6 @@ def dummy_hyperparameters(hf_model_path):
     return {
         "epochs": 1,
         "num_batches_per_epoch": 1,
-        "maxiter": 1,
         "n_jobs": 1,
         "use_fallback_model": False,
         "model_path": hf_model_path,
