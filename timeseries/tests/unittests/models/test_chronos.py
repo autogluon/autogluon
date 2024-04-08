@@ -44,9 +44,10 @@ HYPERPARAMETER_DICTS = [
         {
             "optimization_strategy": "onnx",
         },
-        {
-            "optimization_strategy": "openvino",
-        },
+        # add openvino tests when they are in core requirements
+        # {
+        #     "optimization_strategy": "openvino",
+        # },
         *HYPERPARAMETER_DICTS,
     ],
 )
