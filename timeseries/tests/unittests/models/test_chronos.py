@@ -7,7 +7,11 @@ import torch
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.timeseries import TimeSeriesPredictor
 from autogluon.timeseries.models import ChronosModel
-from autogluon.timeseries.models.chronos.model import ChronosInferenceDataset
+from autogluon.timeseries.models.chronos.utils import (
+    ChronosInferenceDataLoader,
+    ChronosInferenceDataset,
+    timeout_callback,
+)
 
 from ..common import (
     DATAFRAME_WITH_COVARIATES,
@@ -387,3 +391,19 @@ def test_when_chronos_scores_oof_and_time_limit_is_exceeded_then_exception_is_ra
     model.fit(data, time_limit=1.0)
     with pytest.raises(TimeLimitExceeded):
         model.score_and_cache_oof(data)
+
+
+@pytest.mark.parametrize("data_loader_num_workers", [0, 1, 2])
+def test_when_chronos_inference_dataloader_used_and_time_limit_exceeded_then_exception_is_raised(
+    data_loader_num_workers,
+):
+    data_loader = ChronosInferenceDataLoader(
+        range(100_000_000),
+        batch_size=2,
+        num_workers=data_loader_num_workers,
+        on_batch=timeout_callback(seconds=0.5),
+    )
+
+    with pytest.raises(TimeLimitExceeded):
+        for _ in data_loader:
+            pass
