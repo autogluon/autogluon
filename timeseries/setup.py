@@ -56,16 +56,17 @@ extras_require = {
         "black~=23.0",
     ],
     "chronos-openvino": [  # for faster CPU inference in pretrained models with OpenVINO
-        "optimum-intel[openvino,nncf]>=1.16,<1.17",
-        "optimum[openvino,nncf]>=1.18,<1.19",
+        "optimum-intel[openvino,nncf]>=1.15,<1.17",
+        "optimum[openvino,nncf]>=1.17,<1.19",
     ],
     "chronos-onnx": [  # for faster CPU inference in pretrained models with ONNX
-        "optimum[onnxruntime]>=1.18,<1.19",
+        "optimum[onnxruntime]>=1.17,<1.19",
     ],
 }
 
+# TODO: add openvino back to "all" after dependency versions are relaxed
 extras_require["all"] = list(
-    set.union(*(set(extras_require[extra]) for extra in ["chronos-onnx", "chronos-openvino"]))
+    set.union(*(set(extras_require[extra]) for extra in ["chronos-onnx"]))
 )
 
 install_requires = ag.get_dependency_version_ranges(install_requires)
