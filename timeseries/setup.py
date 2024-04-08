@@ -56,10 +56,11 @@ extras_require = {
         "black~=23.0",
     ],
     "chronos-openvino": [  # for faster CPU inference in pretrained models with OpenVINO
-        "optimum[openvino,nncf]>=1.17,<1.18",
+        "optimum-intel[openvino,nncf]>=1.16,<1.17",
+        "optimum[openvino,nncf]>=1.18,<1.19",
     ],
     "chronos-onnx": [  # for faster CPU inference in pretrained models with ONNX
-        "optimum[onnxruntime]>=1.17,<1.18",
+        "optimum[onnxruntime]>=1.18,<1.19",
     ],
 }
 
