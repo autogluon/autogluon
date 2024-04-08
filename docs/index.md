@@ -27,7 +27,7 @@ hide-toc: true
 :child-align: justify
 :class: sd-text-white sd-fs-3
 
-AutoML for Image, Text, Time Series, and Tabular Data
+Fast and Accurate ML in 3 Lines of Code
 
 ```{button-link} tutorials/tabular/tabular-quick-start.html
 :outline:
