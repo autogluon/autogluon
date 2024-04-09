@@ -176,6 +176,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
 
     def _add_scale_as_static_feature(self, data: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
         """Add mean/std of the target column for each series as a static feature."""
+        data = data.copy(deep=False)
         scale_features = (
             data[self.target]
             .groupby(ITEMID, sort=False)
@@ -484,6 +485,7 @@ class DirectTabularModel(AbstractMLForecastModel):
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
+        data = self._add_scale_as_static_feature(data)
         original_item_id_order = data.item_ids
         data, known_covariates, forecast_for_short_series = self._remove_short_ts_and_generate_fallback_forecast(
             data=data, known_covariates=known_covariates
@@ -500,7 +502,6 @@ class DirectTabularModel(AbstractMLForecastModel):
         # MLForecast raises exception of target contains NaN. We use inf as placeholder, replace them by NaN afterwards
         data_future[self.target] = float("inf")
         data_extended = pd.concat([data, data_future])
-        data_extended = self._add_scale_as_static_feature(data_extended)
         mlforecast_df = self._to_mlforecast_df(data_extended, data_extended.static_features)
         if self._max_ts_length is not None:
             # We appended `prediction_length` time steps to each series, so increase length
