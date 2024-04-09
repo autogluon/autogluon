@@ -315,7 +315,10 @@ def test_when_early_stopping_patience_provided_then_early_stopping_callback_crea
 def test_when_early_stopping_patience_is_none_then_early_stopping_callback_not_created():
     from lightning.pytorch.callbacks import EarlyStopping
 
-    model = SimpleFeedForwardModel(hyperparameters={"early_stopping_patience": None, **DUMMY_HYPERPARAMETERS})
+    model = SimpleFeedForwardModel(
+        hyperparameters={"early_stopping_patience": None, **DUMMY_HYPERPARAMETERS},
+        freq=DUMMY_TS_DATAFRAME.freq,
+    )
     received_trainer_kwargs = catch_trainer_kwargs(model)
     es_callbacks = [cb for cb in received_trainer_kwargs["callbacks"] if isinstance(cb, EarlyStopping)]
     assert len(es_callbacks) == 0
