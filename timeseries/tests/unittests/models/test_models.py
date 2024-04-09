@@ -591,3 +591,21 @@ def test_when_inference_only_model_scores_oof_then_time_limit_is_passed_to_predi
     with mock.patch.object(model, "_predict") as mock_predict:
         model.score_and_cache_oof(data)
         assert mock_predict.call_args[1]["time_limit"] == time_limit
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+@pytest.mark.parametrize("prediction_length", [1, 5])
+def test_given_context_has_1_observation_when_model_predicts_then_model_can_predict(
+    model_class, prediction_length, trained_models
+):
+    from autogluon.timeseries.models.local.statsforecast import AbstractProbabilisticStatsForecastModel
+
+    if isinstance(model_class, type) and issubclass(model_class, AbstractProbabilisticStatsForecastModel):
+        pytest.skip("StatsForecast models will use fallback model if history has 1 observation")
+
+    model = trained_models[(prediction_length, repr(model_class))]
+    data = TimeSeriesDataFrame.from_iterable_dataset(
+        [{"target": [1], "start": pd.Period("2020-01-01", freq="D")} for _ in range(5)]
+    )
+    predictions = model.predict(data)
+    assert len(predictions) == data.num_items * prediction_length
