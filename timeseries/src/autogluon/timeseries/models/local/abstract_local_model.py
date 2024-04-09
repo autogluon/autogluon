@@ -185,9 +185,9 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         if end_time is not None and time.time() >= end_time:
             raise TimeLimitExceeded
 
+        model_failed = False
         if time_series.isna().all():
             result = self._dummy_forecast.copy()
-            model_failed = True
         else:
             try:
                 result = self._predict_with_local_model(
@@ -196,7 +196,6 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
                 )
                 if not np.isfinite(result.values).all():
                     raise RuntimeError("Forecast contains NaN or Inf values.")
-                model_failed = False
             except Exception:
                 if self.use_fallback_model:
                     result = seasonal_naive_forecast(
