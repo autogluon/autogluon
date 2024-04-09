@@ -441,7 +441,7 @@ jobs:
           ./.github/workflow_scripts/copy_docs.sh "$branch" '${{ github.event.pull_request.head.repo.full_name }}' '${{ env.SHORT_SHA }}' PR-'${{ github.event.number }}'
       - name: Comment on PR
         if: ${{ github.event_name == 'pull_request_target' }}
-        uses: peter-evans/create-or-update-comment@v2.0.0
+        uses: peter-evans/create-or-update-comment@v4
         with:
           issue-number: ${{ github.event.number }}
           body: |
