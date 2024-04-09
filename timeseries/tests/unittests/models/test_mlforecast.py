@@ -49,7 +49,7 @@ def test_when_covariates_and_features_present_then_train_and_val_dfs_have_correc
     )
     # Initialize model._target_lags and model._date_features from freq
     model.fit(train_data=data, time_limit=3)
-    train_df, val_df = model._generate_train_val_dfs(data)
+    train_df, val_df = model._generate_train_val_dfs(model._add_scale_as_static_feature(data))
     expected_num_features = (
         len(lags)
         + len(known_covariates_names)
