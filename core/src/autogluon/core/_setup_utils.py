@@ -110,7 +110,7 @@ def default_setup_args(*, version, submodule):
         version=version,
         author="AutoGluon Community",
         url="https://github.com/autogluon/autogluon",
-        description="AutoML for Image, Text, and Tabular Data",
+        description="Fast and Accurate ML in 3 Lines of Code",
         long_description=long_description,
         long_description_content_type="text/markdown",
         license="Apache-2.0",
