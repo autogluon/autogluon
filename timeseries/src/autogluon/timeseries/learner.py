@@ -43,6 +43,7 @@ class TimeSeriesLearner(AbstractLearner):
         self.prediction_length = prediction_length
         self.quantile_levels = kwargs.get("quantile_levels", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
         self.cache_predictions = cache_predictions
+        self.freq: Optional[str] = None
 
         self.feature_generator = TimeSeriesFeatureGenerator(
             target=self.target, known_covariates_names=self.known_covariates_names
@@ -86,6 +87,8 @@ class TimeSeriesLearner(AbstractLearner):
         train_data = self.feature_generator.fit_transform(train_data, data_frame_name="train_data")
         if val_data is not None:
             val_data = self.feature_generator.transform(val_data, data_frame_name="tuning_data")
+
+        self.freq = train_data.freq
 
         trainer_init_kwargs = kwargs.copy()
         trainer_init_kwargs.update(
@@ -155,7 +158,9 @@ class TimeSeriesLearner(AbstractLearner):
                 f"known_covariates are missing information for the following item_ids: {reprlib.repr(missing_item_ids.to_list())}."
             )
 
-        forecast_index = get_forecast_horizon_index_ts_dataframe(data, prediction_length=self.prediction_length)
+        forecast_index = get_forecast_horizon_index_ts_dataframe(
+            data, prediction_length=self.prediction_length, freq=self.freq
+        )
         try:
             known_covariates = known_covariates.loc[forecast_index]
         except KeyError:

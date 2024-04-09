@@ -592,7 +592,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             predicted_targets = self._predict_gluonts_forecasts(data, known_covariates=known_covariates, **kwargs)
             df = self._gluonts_forecasts_to_data_frame(
                 predicted_targets,
-                forecast_index=get_forecast_horizon_index_ts_dataframe(data, self.prediction_length),
+                forecast_index=get_forecast_horizon_index_ts_dataframe(data, self.prediction_length, freq=self.freq),
             )
         return df
 
