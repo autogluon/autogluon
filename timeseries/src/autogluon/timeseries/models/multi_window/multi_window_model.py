@@ -189,6 +189,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         val_data: TimeSeriesDataFrame,
         store_val_score: bool = False,
         store_predict_time: bool = False,
+        **predict_kwargs,
     ) -> None:
         # self.val_score, self.predict_time, self._oof_predictions already saved during _fit()
         assert self._oof_predictions is not None

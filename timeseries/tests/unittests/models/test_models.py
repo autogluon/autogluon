@@ -580,3 +580,14 @@ def test_when_model_created_then_model_has_all_required_tags(temp_model_path, mo
     for tag in EXPECTED_MODEL_TAGS:
         assert tag in model_tags
     assert len(model_tags) == len(EXPECTED_MODEL_TAGS)
+
+
+@pytest.mark.parametrize("model_class", CHRONOS_TESTABLE_MODELS + LOCAL_TESTABLE_MODELS)
+def test_when_inference_only_model_scores_oof_then_time_limit_is_passed_to_predict(model_class, dummy_hyperparameters):
+    data = DUMMY_TS_DATAFRAME
+    model = model_class(freq=data.freq, hyperparameters=dummy_hyperparameters)
+    time_limit = 94.4
+    model.fit(train_data=data, time_limit=time_limit)
+    with mock.patch.object(model, "_predict") as mock_predict:
+        model.score_and_cache_oof(data)
+        assert mock_predict.call_args[1]["time_limit"] == time_limit

@@ -53,42 +53,6 @@ MODEL_ALIASES = {
 }
 
 
-class ChronosInferenceDataset:
-    """A container for time series datasets that implements the ``torch.utils.data.Dataset`` interface"""
-
-    def __init__(
-        self,
-        target_df: TimeSeriesDataFrame,
-        context_length: int,
-        target_column: str = "target",
-    ):
-        assert context_length > 0
-        self.context_length = context_length
-        self.target_array = target_df[target_column].to_numpy(dtype=np.float32)
-        self.freq = target_df.freq
-
-        # store pointer to start:end of each time series
-        cum_sizes = target_df.num_timesteps_per_item().values.cumsum()
-        self.indptr = np.append(0, cum_sizes).astype(np.int32)
-
-    def __len__(self):
-        return len(self.indptr) - 1  # noqa
-
-    def _get_context(self, a: np.ndarray, pad_value=np.nan):
-        a = a[-self.context_length :]
-        pad_size = self.context_length - len(a)
-        if pad_size > 0:
-            pad = np.full(shape=(pad_size,), fill_value=pad_value)
-            a = np.concatenate((pad, a))
-        return a
-
-    def __getitem__(self, idx) -> np.ndarray:
-        start_idx = self.indptr[idx]
-        end_idx = self.indptr[idx + 1]
-
-        return self._get_context(self.target_array[start_idx:end_idx])
-
-
 class ChronosModel(AbstractTimeSeriesModel):
     """Chronos pretrained time series forecasting models, based on the original
     `ChronosModel <https://github.com/amazon-science/chronos-forecasting>`_ implementation.
@@ -196,6 +160,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         )
 
         self.model_pipeline: Optional[Any] = None  # of type OptimizedChronosPipeline
+        self.time_limit: Optional[float] = None
 
     def save(self, path: str = None, verbose: bool = True) -> str:
         pipeline = self.model_pipeline
@@ -288,14 +253,16 @@ class ChronosModel(AbstractTimeSeriesModel):
         **kwargs,
     ) -> None:
         self._check_fit_params()
+        self.time_limit = time_limit
 
     def _get_inference_data_loader(
         self,
         data: TimeSeriesDataFrame,
         context_length: int,
         num_workers: int = 0,
+        time_limit: Optional[float] = None,
     ):
-        import torch
+        from .utils import ChronosInferenceDataLoader, ChronosInferenceDataset, timeout_callback
 
         chronos_dataset = ChronosInferenceDataset(
             target_df=data,
@@ -303,11 +270,12 @@ class ChronosModel(AbstractTimeSeriesModel):
             context_length=context_length,
         )
 
-        return torch.utils.data.DataLoader(
+        return ChronosInferenceDataLoader(
             chronos_dataset,
             batch_size=self.batch_size,
             shuffle=False,
             num_workers=num_workers,
+            on_batch=timeout_callback(seconds=time_limit),
         )
 
     def _predict(
@@ -333,6 +301,12 @@ class ChronosModel(AbstractTimeSeriesModel):
                 # load model pipeline to device memory
                 self.load_model_pipeline(context_length=context_length)
 
+            inference_data_loader = self._get_inference_data_loader(
+                data=data,
+                num_workers=self.data_loader_num_workers,
+                context_length=context_length,
+                time_limit=kwargs.get("time_limit"),
+            )
             self.model_pipeline.model.eval()
             with torch.inference_mode():
                 prediction_samples = [
@@ -345,11 +319,7 @@ class ChronosModel(AbstractTimeSeriesModel):
                     .detach()
                     .cpu()
                     .numpy()
-                    for batch in self._get_inference_data_loader(
-                        data=data,
-                        num_workers=self.data_loader_num_workers,
-                        context_length=context_length,
-                    )
+                    for batch in inference_data_loader
                 ]
 
         samples = np.concatenate(prediction_samples, axis=0).swapaxes(1, 2).reshape(-1, self.num_samples)
@@ -367,3 +337,16 @@ class ChronosModel(AbstractTimeSeriesModel):
 
     def _more_tags(self) -> Dict:
         return {"allow_nan": True}
+
+    def score_and_cache_oof(
+        self,
+        val_data: TimeSeriesDataFrame,
+        store_val_score: bool = False,
+        store_predict_time: bool = False,
+        **predict_kwargs,
+    ) -> None:
+        # All computation happens during inference, so we provide the time_limit at prediction time
+        # TODO: Once custom predict_kwargs is allowed, make sure that `time_limit` is not among the keys
+        super().score_and_cache_oof(
+            val_data, store_val_score, store_predict_time, time_limit=self.time_limit, **predict_kwargs
+        )
