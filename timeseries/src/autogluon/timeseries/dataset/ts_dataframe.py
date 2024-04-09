@@ -759,10 +759,10 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
                 2019-02-07     4.0
 
         """
-        if not self.index.is_monotonic_increasing:
-            logger.warning(
-                "Trying to fill missing values in an unsorted dataframe. "
-                "It is highly recommended to call `ts_df.sort_index()` before calling `ts_df.fill_missing_values()`"
+        if self.freq is None:
+            raise ValueError(
+                "Please make sure that all time series have a regular index before calling `fill_missing_values`"
+                "(for example, using the `convert_frequency` method)."
             )
 
         # Convert to pd.DataFrame for faster processing
