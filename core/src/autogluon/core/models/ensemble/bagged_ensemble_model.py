@@ -1393,7 +1393,7 @@ class BaggedEnsembleModel(AbstractModel):
             minimum_gpu_per_trial=minimum_gpu_per_fold,
             model_estimate_memory_usage=None,  # Not needed as we've already calculated it above
             adapter_type="tabular",
-            trainable_is_parallel=True
+            trainable_is_parallel=True,
         )
 
         hpo_results = hpo_executor.get_hpo_results(
