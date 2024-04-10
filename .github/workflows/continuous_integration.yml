@@ -306,6 +306,26 @@ jobs:
           job-type: CI-GPU
           job-name: AutoGluon-Forecasting
           command: chmod +x ./.github/workflow_scripts/test_timeseries.sh && ./.github/workflow_scripts/test_timeseries.sh
+  test_timeseries_pandas_21:
+    needs: lint_check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Check if changes beside docs
+        uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            other_than_docs:
+              - '!(docs/**)**'
+      - name: Test Timeseries on AWS Batch
+        if: steps.changes.outputs.other_than_docs == 'true'
+        uses: ./.github/actions/submit-job
+        with:
+          job-type: CI-GPU
+          job-name: AutoGluon-Forecasting
+          command: chmod +x ./.github/workflow_scripts/test_timeseries_pandas_21.sh && ./.github/workflow_scripts/test_timeseries_pandas_21.sh
   test_install:
     needs: lint_check
     runs-on: ubuntu-latest
