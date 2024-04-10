@@ -47,6 +47,9 @@ def norm_freq_str(offset: pd.DateOffset) -> str:
 
     "Non-standard" frequencies are converted to their "standard" counterparts. For example, MS (month start) is mapped
     to ME (month end) since both correspond to the same seasonality, lags and time features.
+
+    The frequencies are always mapped to the new non-deprecated aliases (pandas>=2.2), e.g., "H" is mapped to "h". The
+    downstream functions like `get_seasonality` handle the new aliases even if older version of pandas is used.
     """
     base_freq = offset.name.split("-")[0]
     return TO_MAJOR_FREQ.get(base_freq, base_freq)
