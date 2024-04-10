@@ -100,11 +100,11 @@ def get_seasonal_period_from_fitted_local_model(model):
 @pytest.mark.parametrize(
     "freqstr, ts_length, expected_seasonal_period",
     [
-        ("H", 100, 24),
-        ("2H", 100, 12),
+        ("h", 100, 24),
+        ("2h", 100, 12),
         ("B", 100, 5),
         ("D", 100, 7),
-        ("M", 100, 12),
+        ("ME", 100, 12),
     ],
 )
 def test_when_seasonal_period_is_set_to_none_then_inferred_period_is_used(
@@ -126,11 +126,11 @@ def test_when_seasonal_period_is_set_to_none_then_inferred_period_is_used(
 @pytest.mark.parametrize(
     "freqstr, ts_length, provided_seasonal_period",
     [
-        ("H", 100, 12),
-        ("2H", 100, 5),
+        ("h", 100, 12),
+        ("2h", 100, 5),
         ("B", 100, 10),
         ("D", 100, 8),
-        ("M", 100, 24),
+        ("ME", 100, 24),
     ],
 )
 def test_when_seasonal_period_is_provided_then_inferred_period_is_overridden(
@@ -245,7 +245,7 @@ def test_when_data_shorter_than_seasonal_period_then_average_forecast_is_used():
     assert np.allclose(predictions_avg.values, predictions_seasonal_avg.values)
 
 
-@pytest.mark.parametrize("freq", ["H", "W", "D", "T", "S", "B", "Q", "M", "A"])
+@pytest.mark.parametrize("freq", ["h", "W", "D", "min", "s", "B", "QE", "ME", "YE"])
 def test_when_npts_fit_with_default_seasonal_features_then_predictions_match_gluonts(freq):
     from gluonts.model.npts import NPTSPredictor
 

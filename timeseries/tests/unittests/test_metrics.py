@@ -250,7 +250,7 @@ def test_RMSSE(prediction_length, seasonal_period, expected_result):
     )
     predictions = get_data_frame_with_item_index(
         ["1"],
-        start_date=str(pd.Timestamp("2022-01-01 00:00:00") + pd.to_timedelta(prediction_length, unit="H")),
+        start_date=str(pd.Timestamp("2022-01-01 00:00:00") + pd.to_timedelta(prediction_length, unit="h")),
         data_length=prediction_length,
         columns=["mean"],
         data_generation="sequential",
@@ -281,7 +281,7 @@ def test_RMSLE(prediction_length, expected_result):
     )
     predictions = get_data_frame_with_item_index(
         ["1"],
-        start_date=str(pd.Timestamp("2022-01-01 00:00:00") + pd.to_timedelta(prediction_length, unit="H")),
+        start_date=str(pd.Timestamp("2022-01-01 00:00:00") + pd.to_timedelta(prediction_length, unit="h")),
         data_length=prediction_length,
         columns=["mean"],
         data_generation="sequential",
