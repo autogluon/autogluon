@@ -92,7 +92,7 @@ ALL_PANDAS_FREQUENCIES = get_all_pandas_frequencies()
 def to_supported_pandas_freq(freq: str) -> str:
     """If necessary, convert pandas 2.2+ freq strings to an alias supported by currently installed pandas version."""
     if Version(pd.__version__) < Version("2.2"):
-        return {"ME": "M", "QE": "Q", "YE": "Y", "SME": "SM"}.get(freq, freq)
+        return {"ME": "M", "QE": "Q", "YE": "Y", "SME": "SM", "h": "H", "min": "T"}.get(freq, freq)
     else:
         return freq
 

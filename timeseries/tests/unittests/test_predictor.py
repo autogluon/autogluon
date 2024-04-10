@@ -30,6 +30,7 @@ from .common import (
     CustomMetric,
     get_data_frame_with_variable_lengths,
     get_static_features,
+    to_supported_pandas_freq,
 )
 
 TEST_HYPERPARAMETER_SETTINGS = [
@@ -781,6 +782,7 @@ def test_given_irregular_time_series_and_no_tuning_when_predictor_called_with_fr
 def test_given_regular_time_series_when_predictor_called_with_freq_then_predictions_have_predictor_freq(
     temp_model_path, predictor_freq
 ):
+    predictor_freq = to_supported_pandas_freq(predictor_freq)
     df = DUMMY_TS_DATAFRAME.copy()
     predictor = TimeSeriesPredictor(
         path=temp_model_path,

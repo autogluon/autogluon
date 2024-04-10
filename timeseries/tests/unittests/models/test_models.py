@@ -20,7 +20,13 @@ from autogluon.timeseries.models import DeepARModel, ETSModel
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
 
-from ..common import DUMMY_TS_DATAFRAME, CustomMetric, dict_equal_primitive, get_data_frame_with_item_index
+from ..common import (
+    DUMMY_TS_DATAFRAME,
+    CustomMetric,
+    dict_equal_primitive,
+    get_data_frame_with_item_index,
+    to_supported_pandas_freq,
+)
 from .test_chronos import TESTABLE_MODELS as CHRONOS_TESTABLE_MODELS
 from .test_gluonts import TESTABLE_MODELS as GLUONTS_TESTABLE_MODELS
 from .test_local import TESTABLE_MODELS as LOCAL_TESTABLE_MODELS
@@ -274,6 +280,7 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_alig
 def test_when_predict_called_then_predicted_timestamps_align_with_time(
     model_class, freq, temp_model_path, dummy_hyperparameters
 ):
+    freq = to_supported_pandas_freq(freq)
     prediction_length = 4
     train_length = 20
     item_id = "A"
