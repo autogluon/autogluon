@@ -32,6 +32,7 @@ from ..common import (
     DUMMY_VARIABLE_LENGTH_TS_DATAFRAME,
     dict_equal_primitive,
     get_data_frame_with_item_index,
+    to_supported_pandas_freq,
 )
 
 # models accepting seasonal_period
@@ -249,6 +250,7 @@ def test_when_data_shorter_than_seasonal_period_then_average_forecast_is_used():
 def test_when_npts_fit_with_default_seasonal_features_then_predictions_match_gluonts(freq):
     from gluonts.model.npts import NPTSPredictor
 
+    freq = to_supported_pandas_freq(freq)
     item_id = "A"
     prediction_length = 9
     data = get_data_frame_with_item_index([item_id], freq=freq, data_length=100)
@@ -266,7 +268,8 @@ def test_when_npts_fit_with_default_seasonal_features_then_predictions_match_glu
 
     np.random.seed(123)
     ts = data.loc[item_id]["target"]
-    ts.index = ts.index.to_period(freq=freq)
+    freq_for_period = {"ME": "M", "YE": "Y", "QE": "Q"}.get(freq, freq)
+    ts.index = ts.index.to_period(freq=freq_for_period)
     pred_gts = npts_gts.predict_time_series(ts, num_samples=100)
 
     assert (pred_gts.mean == pred_ag["mean"]).all()

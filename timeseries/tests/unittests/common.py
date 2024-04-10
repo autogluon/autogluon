@@ -5,7 +5,6 @@ from typing import Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
-from gluonts.dataset.common import ListDataset
 from packaging.version import Version
 
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
@@ -89,21 +88,13 @@ def get_all_pandas_frequencies():
 
 ALL_PANDAS_FREQUENCIES = get_all_pandas_frequencies()
 
-DUMMY_DATASET = ListDataset(
-    [
-        {
-            "target": [random.random() for _ in range(10)],
-            "start": pd.Timestamp("2022-01-01 00:00:00"),  # noqa
-            "item_id": 0,
-        },
-        {
-            "target": [random.random() for _ in range(10)],
-            "start": pd.Timestamp("2022-01-01 00:00:00"),  # noqa
-            "item_id": 1,
-        },
-    ],
-    freq="h",
-)
+
+def to_supported_pandas_freq(freq: str) -> str:
+    """If necessary, convert pandas 2.2+ freq strings to an alias supported by currently installed pandas version."""
+    if Version(pd.__version__) < Version("2.2"):
+        return {"ME": "M", "QE": "Q", "YE": "Y", "SME": "SM"}.get(freq, freq)
+    else:
+        return freq
 
 
 def get_data_frame_with_item_index(
@@ -127,7 +118,7 @@ def get_data_frame_with_item_index(
                     item_list,
                     pd.date_range(
                         pd.Timestamp(start_date),  # noqa
-                        freq=freq,
+                        freq=to_supported_pandas_freq(freq),
                         periods=data_length,
                     ),
                 ],
