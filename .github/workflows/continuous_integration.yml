@@ -304,7 +304,7 @@ jobs:
         uses: ./.github/actions/submit-job
         with:
           job-type: CI-GPU
-          job-name: AutoGluon-Forecasting
+          job-name: AutoGluon-TimeSeries
           command: chmod +x ./.github/workflow_scripts/test_timeseries.sh && ./.github/workflow_scripts/test_timeseries.sh
   test_timeseries_pandas_21:
     needs: lint_check
@@ -324,7 +324,7 @@ jobs:
         uses: ./.github/actions/submit-job
         with:
           job-type: CI-GPU
-          job-name: AutoGluon-Forecasting
+          job-name: AutoGluon-TimeSeries-Pandas21
           command: chmod +x ./.github/workflow_scripts/test_timeseries_pandas_21.sh && ./.github/workflow_scripts/test_timeseries_pandas_21.sh
   test_install:
     needs: lint_check
