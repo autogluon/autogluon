@@ -126,7 +126,7 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
                 X_category = DataFrame(X_category, index=X.index)
                 if self._fillna_map is not None:
                     for column, column_map in self._fillna_map.items():
-                        X_category[column].fillna(column_map, inplace=True)
+                        X_category[column] = X_category[column].fillna(column_map)
         else:
             X_category = DataFrame(index=X.index)
         return X_category
