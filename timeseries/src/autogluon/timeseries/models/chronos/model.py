@@ -330,7 +330,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         df = pd.DataFrame(
             np.concatenate([mean, quantiles], axis=1),
             columns=["mean"] + [str(q) for q in self.quantile_levels],
-            index=get_forecast_horizon_index_ts_dataframe(data, self.prediction_length),
+            index=get_forecast_horizon_index_ts_dataframe(data, self.prediction_length, freq=self.freq),
         )
 
         return TimeSeriesDataFrame(df)

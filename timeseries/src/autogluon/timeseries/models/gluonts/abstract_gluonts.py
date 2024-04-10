@@ -46,6 +46,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
     def __init__(
         self,
         target_df: TimeSeriesDataFrame,
+        freq: str,
         target_column: str = "target",
         feat_static_cat: Optional[np.ndarray] = None,
         feat_static_real: Optional[np.ndarray] = None,
@@ -57,7 +58,6 @@ class SimpleGluonTSDataset(GluonTSDataset):
         prediction_length: int = None,
     ):
         assert target_df is not None
-        assert target_df.freq, "Initializing GluonTS data sets without freq is not allowed"
         # Convert TimeSeriesDataFrame to pd.Series for faster processing
         self.target_array = target_df[target_column].to_numpy(np.float32)
         self.feat_static_cat = self._astype(feat_static_cat, dtype=np.int64)
@@ -66,7 +66,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
         self.feat_dynamic_real = self._astype(feat_dynamic_real, dtype=np.float32)
         self.past_feat_dynamic_cat = self._astype(past_feat_dynamic_cat, dtype=np.int64)
         self.past_feat_dynamic_real = self._astype(past_feat_dynamic_real, dtype=np.float32)
-        self.freq = self._to_gluonts_freq(target_df.freq)
+        self.freq = self._to_gluonts_freq(freq)
 
         # Necessary to compute indptr for known_covariates at prediction time
         self.includes_future = includes_future
@@ -234,13 +234,6 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
     def _deferred_init_params_aux(self, dataset: TimeSeriesDataFrame) -> None:
         """Update GluonTS specific parameters with information available only at training time."""
-        self.freq = dataset.freq or self.freq
-        if not self.freq:
-            raise ValueError(
-                "Dataset frequency not provided in the dataset, fit arguments or "
-                "during initialization. Please provide a `freq` string to `fit`."
-            )
-
         model_params = self._get_model_params()
         disable_static_features = model_params.get("disable_static_features", False)
         if not disable_static_features:
@@ -502,6 +495,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
             return SimpleGluonTSDataset(
                 target_df=time_series_df[[self.target]],
+                freq=self.freq,
                 target_column=self.target,
                 feat_static_cat=feat_static_cat,
                 feat_static_real=feat_static_real,
@@ -592,7 +586,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             predicted_targets = self._predict_gluonts_forecasts(data, known_covariates=known_covariates, **kwargs)
             df = self._gluonts_forecasts_to_data_frame(
                 predicted_targets,
-                forecast_index=get_forecast_horizon_index_ts_dataframe(data, self.prediction_length),
+                forecast_index=get_forecast_horizon_index_ts_dataframe(data, self.prediction_length, freq=self.freq),
             )
         return df
 

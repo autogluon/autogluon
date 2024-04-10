@@ -166,7 +166,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
                 f"({fraction_failed_models:.1%}). Fallback model SeasonalNaive was used for these time series."
             )
         predictions_df = pd.concat([pred for pred, _ in predictions_with_flags])
-        predictions_df.index = get_forecast_horizon_index_ts_dataframe(data, self.prediction_length)
+        predictions_df.index = get_forecast_horizon_index_ts_dataframe(data, self.prediction_length, freq=self.freq)
         return TimeSeriesDataFrame(predictions_df)
 
     def score_and_cache_oof(

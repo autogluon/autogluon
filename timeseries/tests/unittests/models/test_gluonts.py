@@ -268,7 +268,10 @@ def test_when_static_and_dynamic_covariates_present_then_model_trains_normally(m
 
 @pytest.mark.parametrize("predict_batch_size", [30, 200])
 def test_given_custom_predict_batch_size_then_predictor_uses_correct_batch_size(predict_batch_size):
-    model = PatchTSTModel(hyperparameters={"predict_batch_size": predict_batch_size, **DUMMY_HYPERPARAMETERS})
+    model = PatchTSTModel(
+        hyperparameters={"predict_batch_size": predict_batch_size, **DUMMY_HYPERPARAMETERS},
+        freq=DUMMY_TS_DATAFRAME.freq,
+    )
     model.fit(train_data=DUMMY_TS_DATAFRAME)
     assert model.gts_predictor.batch_size == predict_batch_size
 
@@ -287,7 +290,10 @@ def test_when_custom_callbacks_passed_via_trainer_kwargs_then_trainer_receives_t
     from lightning.pytorch.callbacks import RichModelSummary
 
     callback = RichModelSummary()
-    model = DLinearModel(hyperparameters={"trainer_kwargs": {"callbacks": [callback]}, **DUMMY_HYPERPARAMETERS})
+    model = DLinearModel(
+        hyperparameters={"trainer_kwargs": {"callbacks": [callback]}, **DUMMY_HYPERPARAMETERS},
+        freq=DUMMY_TS_DATAFRAME.freq,
+    )
     received_trainer_kwargs = catch_trainer_kwargs(model)
     assert any(isinstance(cb, RichModelSummary) for cb in received_trainer_kwargs["callbacks"])
 
@@ -296,7 +302,10 @@ def test_when_early_stopping_patience_provided_then_early_stopping_callback_crea
     from lightning.pytorch.callbacks import EarlyStopping
 
     patience = 7
-    model = SimpleFeedForwardModel(hyperparameters={"early_stopping_patience": patience, **DUMMY_HYPERPARAMETERS})
+    model = SimpleFeedForwardModel(
+        hyperparameters={"early_stopping_patience": patience, **DUMMY_HYPERPARAMETERS},
+        freq=DUMMY_TS_DATAFRAME.freq,
+    )
     received_trainer_kwargs = catch_trainer_kwargs(model)
     es_callbacks = [cb for cb in received_trainer_kwargs["callbacks"] if isinstance(cb, EarlyStopping)]
     assert len(es_callbacks) == 1
@@ -306,7 +315,10 @@ def test_when_early_stopping_patience_provided_then_early_stopping_callback_crea
 def test_when_early_stopping_patience_is_none_then_early_stopping_callback_not_created():
     from lightning.pytorch.callbacks import EarlyStopping
 
-    model = SimpleFeedForwardModel(hyperparameters={"early_stopping_patience": None, **DUMMY_HYPERPARAMETERS})
+    model = SimpleFeedForwardModel(
+        hyperparameters={"early_stopping_patience": None, **DUMMY_HYPERPARAMETERS},
+        freq=DUMMY_TS_DATAFRAME.freq,
+    )
     received_trainer_kwargs = catch_trainer_kwargs(model)
     es_callbacks = [cb for cb in received_trainer_kwargs["callbacks"] if isinstance(cb, EarlyStopping)]
     assert len(es_callbacks) == 0
@@ -314,7 +326,10 @@ def test_when_early_stopping_patience_is_none_then_early_stopping_callback_not_c
 
 def test_when_custom_trainer_kwargs_given_then_trainer_receives_them():
     trainer_kwargs = {"max_epochs": 5, "limit_train_batches": 100}
-    model = PatchTSTModel(hyperparameters={"trainer_kwargs": trainer_kwargs, **DUMMY_HYPERPARAMETERS})
+    model = PatchTSTModel(
+        hyperparameters={"trainer_kwargs": trainer_kwargs, **DUMMY_HYPERPARAMETERS},
+        freq=DUMMY_TS_DATAFRAME.freq,
+    )
     received_trainer_kwargs = catch_trainer_kwargs(model)
     for k, v in trainer_kwargs.items():
         assert received_trainer_kwargs[k] == v

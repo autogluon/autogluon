@@ -179,7 +179,9 @@ def failing_predict(*args, **kwargs):
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 def test_when_fallback_model_disabled_and_model_fails_then_exception_is_raised(temp_model_path, model_class):
-    model = model_class(temp_model_path, hyperparameters={"use_fallback_model": False, "n_jobs": 1})
+    model = model_class(
+        path=temp_model_path, hyperparameters={"use_fallback_model": False, "n_jobs": 1}, freq=DUMMY_TS_DATAFRAME.freq
+    )
     model.fit(train_data=DUMMY_TS_DATAFRAME)
     model._predict_with_local_model = failing_predict
     with pytest.raises(RuntimeError, match="Custom error message"):
@@ -188,7 +190,9 @@ def test_when_fallback_model_disabled_and_model_fails_then_exception_is_raised(t
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 def test_when_fallback_model_enabled_and_model_fails_then_no_exception_is_raised(temp_model_path, model_class):
-    model = model_class(temp_model_path, hyperparameters={"use_fallback_model": True, "n_jobs": 1})
+    model = model_class(
+        path=temp_model_path, hyperparameters={"use_fallback_model": True, "n_jobs": 1}, freq=DUMMY_TS_DATAFRAME.freq
+    )
     model.fit(train_data=DUMMY_TS_DATAFRAME)
     model._predict_with_local_model = failing_predict
     predictions = model.predict(DUMMY_TS_DATAFRAME)
