@@ -243,7 +243,7 @@ jobs:
         if: matrix.os == 'macos-latest'
         shell: bash -l {0}
         run: |
-          wget https://raw.githubusercontent.com/Homebrew/homebrew-core/fb8323f2b170bd4ae97e1bac9bf3e2983af3fdb0/Formula/libomp.rb
+          wget https://raw.githubusercontent.com/Homebrew/homebrew-core/9fab537098b1ee8dc7f4fe10bcbad3305d9e029a/Formula/lib/libomp.rb  # libomp v18.1
           brew unlink libomp
           brew install libomp.rb
           rm libomp.rb
