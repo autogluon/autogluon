@@ -1,12 +1,12 @@
 """Common utils and data for all model tests"""
 
 import random
-from packaging.version import Version
 from typing import Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
 from gluonts.dataset.common import ListDataset
+from packaging.version import Version
 
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer
