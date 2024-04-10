@@ -1,7 +1,6 @@
-from typing import Dict, Union
+from typing import Union
 
 import pandas as pd
-from packaging.version import Version
 
 from .base import norm_freq_str
 

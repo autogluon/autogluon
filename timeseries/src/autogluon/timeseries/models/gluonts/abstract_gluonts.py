@@ -15,7 +15,6 @@ from gluonts.dataset.field_names import FieldName
 from gluonts.model.estimator import Estimator as GluonTSEstimator
 from gluonts.model.forecast import Forecast, QuantileForecast, SampleForecast
 from gluonts.model.predictor import Predictor as GluonTSPredictor
-from pandas.tseries.frequencies import to_offset
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import QuantileTransformer, StandardScaler
 
