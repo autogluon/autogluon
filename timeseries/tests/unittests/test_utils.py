@@ -9,12 +9,13 @@ from autogluon.timeseries.utils.datetime import get_lags_for_frequency, get_time
 from autogluon.timeseries.utils.datetime.seasonality import DEFAULT_SEASONALITIES
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 
-from .common import ALL_PANDAS_FREQUENCIES
+from .common import ALL_PANDAS_FREQUENCIES, to_supported_pandas_freq
 
 
 @pytest.mark.parametrize("freq", ["D", "W", "ME", "QE", "YE", "h", "min", "s", "30min", "2h", "17s"])
 @pytest.mark.parametrize("prediction_length", [1, 7])
 def test_when_start_times_dont_match_freq_then_forecast_timestamps_are_correct(freq, prediction_length):
+    freq = to_supported_pandas_freq(freq)
     item_ids_to_length = {"B": 14, "A": 12, "1": 7}
     start_timestamps = {
         "B": pd.Timestamp("2020-01-05 12:05:01"),
