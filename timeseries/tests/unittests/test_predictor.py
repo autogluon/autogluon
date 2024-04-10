@@ -777,7 +777,7 @@ def test_given_irregular_time_series_and_no_tuning_when_predictor_called_with_fr
     assert "SimpleFeedForward" in predictor.model_names()
 
 
-@pytest.mark.parametrize("predictor_freq", ["H", "2H", "20T"])
+@pytest.mark.parametrize("predictor_freq", ["h", "2h", "20min"])
 def test_given_regular_time_series_when_predictor_called_with_freq_then_predictions_have_predictor_freq(
     temp_model_path, predictor_freq
 ):
@@ -845,7 +845,7 @@ def test_given_regular_time_series_when_predictor_loaded_from_disk_then_inferred
 def test_given_short_and_long_series_in_train_data_when_fit_called_then_trainer_receives_only_long_series(
     temp_model_path, prediction_length, num_val_windows, val_step_size
 ):
-    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length, freq="H")
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length, freq="h")
     min_train_length = predictor._min_train_length
     min_val_length = min_train_length + prediction_length + (num_val_windows - 1) * val_step_size
 
@@ -858,7 +858,7 @@ def test_given_short_and_long_series_in_train_data_when_fit_called_then_trainer_
         "short_series_2": min_train_length + 1,
         "short_series_3": 2,
     }
-    data = get_data_frame_with_variable_lengths(item_id_to_length, freq="H")
+    data = get_data_frame_with_variable_lengths(item_id_to_length, freq="h")
     with mock.patch("autogluon.timeseries.learner.TimeSeriesLearner.fit") as learner_fit:
         predictor.fit(data, num_val_windows=num_val_windows, val_step_size=val_step_size)
         learner_fit_kwargs = learner_fit.call_args[1]
@@ -872,7 +872,7 @@ def test_given_short_and_long_series_in_train_data_when_fit_called_then_trainer_
 def test_given_short_and_long_series_in_train_data_and_tuning_data_when_fit_called_then_trainer_receives_only_long_series(
     temp_model_path, prediction_length
 ):
-    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length, freq="H")
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length, freq="h")
     min_train_length = predictor._min_train_length
 
     item_id_to_length = {
@@ -880,7 +880,7 @@ def test_given_short_and_long_series_in_train_data_and_tuning_data_when_fit_call
         "short_series_1": min_train_length - 1,
         "short_series_2": 2,
     }
-    data = get_data_frame_with_variable_lengths(item_id_to_length, freq="H")
+    data = get_data_frame_with_variable_lengths(item_id_to_length, freq="h")
     with mock.patch("autogluon.timeseries.learner.TimeSeriesLearner.fit") as learner_fit:
         predictor.fit(data, tuning_data=DUMMY_TS_DATAFRAME)
         learner_fit_kwargs = learner_fit.call_args[1]
@@ -918,7 +918,7 @@ def test_given_num_val_windows_too_high_for_given_data_then_num_val_windows_is_r
 def test_given_only_short_series_in_train_data_when_fit_called_then_exception_is_raised(
     temp_model_path, prediction_length, num_val_windows, val_step_size
 ):
-    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length, freq="H")
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length, freq="h")
     min_train_length = predictor._min_train_length
 
     item_id_to_length = {
@@ -926,7 +926,7 @@ def test_given_only_short_series_in_train_data_when_fit_called_then_exception_is
         "short_series_2": min_train_length,
         "short_series_3": 2,
     }
-    data = get_data_frame_with_variable_lengths(item_id_to_length, freq="H")
+    data = get_data_frame_with_variable_lengths(item_id_to_length, freq="h")
     with pytest.raises(ValueError, match="Please provide longer time series as train"):
         predictor.fit(data, num_val_windows=num_val_windows, val_step_size=val_step_size)
 
@@ -936,7 +936,7 @@ def test_given_only_short_series_in_train_data_when_fit_called_then_exception_is
 def test_given_only_short_series_in_train_data_then_exception_is_raised(
     temp_model_path, prediction_length, num_val_windows
 ):
-    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length, freq="H")
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length, freq="h")
     min_train_length = predictor._min_train_length
 
     item_id_to_length = {
@@ -944,7 +944,7 @@ def test_given_only_short_series_in_train_data_then_exception_is_raised(
         "short_series_2": min_train_length,
         "short_series_3": 2,
     }
-    data = get_data_frame_with_variable_lengths(item_id_to_length, freq="H")
+    data = get_data_frame_with_variable_lengths(item_id_to_length, freq="h")
     with pytest.raises(ValueError, match="Please provide longer time series as train"):
         predictor.fit(data, num_val_windows=num_val_windows, hyperparameters=TEST_HYPERPARAMETER_SETTINGS[0])
 

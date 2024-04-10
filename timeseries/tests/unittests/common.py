@@ -102,14 +102,14 @@ DUMMY_DATASET = ListDataset(
             "item_id": 1,
         },
     ],
-    freq="H",
+    freq="h",
 )
 
 
 def get_data_frame_with_item_index(
     item_list: List[Union[str, int]],
     data_length: int = 20,
-    freq: str = "H",
+    freq: str = "h",
     start_date: str = "2022-01-01",
     columns: List[str] = ["target"],
     data_generation: str = "random",

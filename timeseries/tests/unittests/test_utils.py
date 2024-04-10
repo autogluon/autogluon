@@ -12,7 +12,7 @@ from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_da
 from .common import ALL_PANDAS_FREQUENCIES
 
 
-@pytest.mark.parametrize("freq", ["H", "min", "S", "D", "W", "M", "Q", "Y", "3H", "17S"])
+@pytest.mark.parametrize("freq", ["D", "W", "ME", "QE", "YE", "h", "min", "s", "30min", "2h", "17s"])
 @pytest.mark.parametrize("prediction_length", [1, 7])
 def test_when_start_times_dont_match_freq_then_forecast_timestamps_are_correct(freq, prediction_length):
     item_ids_to_length = {"B": 14, "A": 12, "1": 7}

@@ -15,7 +15,7 @@ ITEM_IDS = ["Z", "A", "1", "C"]
 
 def generate_train_and_test_data(
     prediction_length: int = 1,
-    freq: str = "H",
+    freq: str = "h",
     start_time: pd.Timestamp = "2020-01-05 15:37",
     use_known_covariates: bool = False,
     use_past_covariates: bool = False,

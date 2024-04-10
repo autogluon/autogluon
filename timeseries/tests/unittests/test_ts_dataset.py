@@ -221,8 +221,8 @@ def test_slice_by_time(start_timestamp, end_timestamp, item_ids, datetimes, targ
     [
         (["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:00"], "D"),
         (["2020-01-01 00:00:00", "2020-01-03 00:00:00", "2020-01-05 00:00:00"], "2D"),
-        (["2020-01-01 00:00:00", "2020-01-01 00:01:00", "2020-01-01 00:02:00"], "T"),
-        (["2020-01-01 00:00:00", "2020-01-01 01:00:00", "2020-01-01 02:00:00"], "H"),
+        (["2020-01-01 00:00:00", "2020-01-01 00:01:00", "2020-01-01 00:02:00"], "min"),
+        (["2020-01-01 00:00:00", "2020-01-01 01:00:00", "2020-01-01 02:00:00"], "h"),
     ],
 )
 def test_when_dataset_constructed_from_dataframe_without_freq_then_freq_is_inferred(timestamps, expected_freq):
@@ -242,10 +242,10 @@ FREQ_TEST_CASES = [
     ("2020-01-01 00:00:00", "D"),
     ("2020-01-01", "D"),
     ("2020-01-01 00:00:00", "2D"),
-    ("2020-01-01 00:00:00", "T"),
-    ("2020-01-01 00:00:00", "H"),
-    ("2020-01-31 00:00:00", "M"),
-    ("2020-01-31", "M"),
+    ("2020-01-01 00:00:00", "min"),
+    ("2020-01-01 00:00:00", "h"),
+    ("2020-01-31 00:00:00", "ME"),
+    ("2020-01-31", "ME"),
 ]
 
 
@@ -889,7 +889,7 @@ def test_when_data_contains_timestamp_column_that_is_unused_then_column_is_renam
     assert f"__{TIMESTAMP}" in ts_df.columns
 
 
-@pytest.mark.parametrize("freq", ["D", "W", "M", "Q", "A", "Y", "H", "T", "min", "S", "30T", "2H", "17S"])
+@pytest.mark.parametrize("freq", ["D", "W", "ME", "QE", "YE", "h", "min", "s", "30min", "2h", "17s"])
 def test_given_index_is_irregular_when_convert_frequency_called_then_result_has_regular_index(freq):
     df_original = get_data_frame_with_variable_lengths({"B": 15, "A": 20}, freq=freq, covariates_names=["Y", "X"])
 
@@ -904,7 +904,7 @@ def test_given_index_is_irregular_when_convert_frequency_called_then_result_has_
             assert value.isna().all()
 
 
-@pytest.mark.parametrize("freq", ["D", "W", "M", "Q", "A", "Y", "H", "T", "min", "S", "30T", "2H", "17S"])
+@pytest.mark.parametrize("freq", ["D", "W", "ME", "QE", "YE", "h", "min", "s", "30min", "2h", "17s"])
 def test_given_index_is_irregular_when_convert_frequency_called_then_new_index_has_desired_frequency(freq):
     df_original = get_data_frame_with_variable_lengths({"B": 15, "A": 20}, freq=freq, covariates_names=["Y", "X"])
 
@@ -924,7 +924,7 @@ def test_given_index_is_regular_when_convert_frequency_called_then_original_df_i
 def test_when_convert_frequency_called_with_different_freq_then_original_df_is_not_modified():
     df = SAMPLE_TS_DATAFRAME.copy()
     original_freq = df.freq
-    df_resampled = df.convert_frequency(freq="H")
+    df_resampled = df.convert_frequency(freq="h")
     assert df_resampled.freq != original_freq
     assert df.equals(SAMPLE_TS_DATAFRAME)
     assert df.freq == original_freq
