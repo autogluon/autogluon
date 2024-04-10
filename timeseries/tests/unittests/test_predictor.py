@@ -794,7 +794,7 @@ def test_given_regular_time_series_when_predictor_called_with_freq_then_predicti
         hyperparameters=TEST_HYPERPARAMETER_SETTINGS[0],
     )
     predictions = predictor.predict(df)
-    assert predictions.freq == predictor_freq
+    assert pd.tseries.frequencies.to_offset(predictions.freq) == pd.tseries.frequencies.to_offset(predictor_freq)
 
 
 def test_given_irregular_time_series_when_predictor_called_without_freq_then_training_fails(
