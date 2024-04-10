@@ -31,7 +31,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         If None, a new unique time-stamped directory is chosen.
     freq: str
         Frequency string (cf. gluonts frequency strings) describing the frequency
-        of the time series data. For example, "H" for hourly or "D" for daily data.
+        of the time series data. For example, "h" for hourly or "D" for daily data.
     prediction_length: int
         Length of the prediction horizon, i.e., the number of time steps the model
         is fit to forecast.
