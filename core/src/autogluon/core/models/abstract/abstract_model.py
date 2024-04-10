@@ -1530,6 +1530,10 @@ class AbstractModel:
         if self.estimate_memory_usage is not None:
             model_estimate_memory_usage = self.estimate_memory_usage(X=X, **kwargs)
         minimum_resources = self.get_minimum_resources(is_gpu_available=(hpo_executor.resources.get("num_gpus", 0) > 0))
+        # This explicitly tells ray.Tune to not change the working directory
+        # to the trial directory, giving access to paths relative to
+        # the original working directory.
+        os.environ["RAY_CHDIR_TO_TRIAL_DIR"] = "0"
         hpo_executor.execute(
             model_trial=model_trial,
             train_fn_kwargs=train_fn_kwargs,
@@ -1537,8 +1541,7 @@ class AbstractModel:
             minimum_cpu_per_trial=minimum_resources.get("num_cpus", 1),
             minimum_gpu_per_trial=minimum_resources.get("num_gpus", 0),
             model_estimate_memory_usage=model_estimate_memory_usage,
-            adapter_type="tabular",
-            tune_config_kwargs={"chdir_to_trial_dir": False},
+            adapter_type="tabular"
         )
 
         hpo_results = hpo_executor.get_hpo_results(
