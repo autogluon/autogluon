@@ -484,7 +484,7 @@ class DirectTabularModel(AbstractMLForecastModel):
         # MLForecast raises exception of target contains NaN. We use inf as placeholder, replace them by NaN afterwards
         data_future[self.target] = float("inf")
         data_extended = pd.concat([data, data_future])
-        mlforecast_df = self._to_mlforecast_df(data_extended, data_extended.static_features)
+        mlforecast_df = self._to_mlforecast_df(data_extended, data.static_features)
         if self._max_ts_length is not None:
             # We appended `prediction_length` time steps to each series, so increase length
             mlforecast_df = self._shorten_all_series(mlforecast_df, self._max_ts_length + self.prediction_length)
