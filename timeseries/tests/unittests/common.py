@@ -1,6 +1,7 @@
 """Common utils and data for all model tests"""
 
 import random
+from packaging.version import Version
 from typing import Dict, List, Optional, Union
 
 import numpy as np
@@ -13,43 +14,80 @@ from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_da
 
 # TODO: add larger unit test data sets to S3
 
-# List of all supported pandas frequencies, based on https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases
-ALL_PANDAS_FREQUENCIES = {
-    "B",
-    "C",
-    "D",
-    "W",
-    "M",
-    "SM",
-    "BM",
-    "CBM",
-    "MS",
-    "SMS",
-    "BMS",
-    "CBMS",
-    "Q",
-    "BQ",
-    "QS",
-    "BQS",
-    "A",
-    "Y",
-    "BA",
-    "BY",
-    "AS",
-    "YS",
-    "BAS",
-    "BYS",
-    "BH",
-    "H",
-    "T",
-    "min",
-    "S",
-    "L",
-    "ms",
-    "U",
-    "us",
-    "N",
-}
+
+# List of all non-deprecated pandas frequencies, based on https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases
+def get_all_pandas_frequencies():
+    if Version(pd.__version__) >= Version("2.2"):
+        return {
+            "B",
+            "C",
+            "D",
+            "W",
+            "ME",
+            "SME",
+            "BME",
+            "CBME",
+            "MS",
+            "SMS",
+            "BMS",
+            "CBMS",
+            "QE",
+            "BQE",
+            "QS",
+            "BQS",
+            "YE",
+            "BYE",
+            "YS",
+            "BYS",
+            "h",
+            "bh",
+            "cbh",
+            "min",
+            "s",
+            "ms",
+            "us",
+            "ns",
+        }
+    else:
+        return {
+            "B",
+            "C",
+            "D",
+            "W",
+            "M",
+            "SM",
+            "BM",
+            "CBM",
+            "MS",
+            "SMS",
+            "BMS",
+            "CBMS",
+            "Q",
+            "BQ",
+            "QS",
+            "BQS",
+            "A",
+            "Y",
+            "BA",
+            "BY",
+            "AS",
+            "YS",
+            "BAS",
+            "BYS",
+            "BH",
+            "H",
+            "T",
+            "min",
+            "S",
+            "L",
+            "ms",
+            "U",
+            "us",
+            "N",
+        }
+
+
+ALL_PANDAS_FREQUENCIES = get_all_pandas_frequencies()
 
 DUMMY_DATASET = ListDataset(
     [

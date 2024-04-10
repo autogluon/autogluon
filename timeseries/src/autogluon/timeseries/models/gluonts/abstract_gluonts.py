@@ -26,7 +26,6 @@ from autogluon.tabular.models.tabular_nn.utils.categorical_encoders import (
 )
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
-from autogluon.timeseries.utils.datetime import norm_freq_str
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 from autogluon.timeseries.utils.warning_filters import disable_root_logger, warning_filter
 
@@ -37,16 +36,14 @@ logger = logging.getLogger(__name__)
 gts_logger = logging.getLogger(gluonts.__name__)
 
 
-GLUONTS_SUPPORTED_OFFSETS = ["Y", "Q", "M", "W", "D", "B", "H", "T", "min", "S"]
-
-
 class SimpleGluonTSDataset(GluonTSDataset):
     """Wrapper for TimeSeriesDataFrame that is compatible with the GluonTS Dataset API."""
+
+    _dummy_gluonts_freq = "D"
 
     def __init__(
         self,
         target_df: TimeSeriesDataFrame,
-        freq: str,
         target_column: str = "target",
         feat_static_cat: Optional[np.ndarray] = None,
         feat_static_real: Optional[np.ndarray] = None,
@@ -66,7 +63,6 @@ class SimpleGluonTSDataset(GluonTSDataset):
         self.feat_dynamic_real = self._astype(feat_dynamic_real, dtype=np.float32)
         self.past_feat_dynamic_cat = self._astype(past_feat_dynamic_cat, dtype=np.int64)
         self.past_feat_dynamic_real = self._astype(past_feat_dynamic_real, dtype=np.float32)
-        self.freq = self._to_gluonts_freq(freq)
 
         # Necessary to compute indptr for known_covariates at prediction time
         self.includes_future = includes_future
@@ -88,21 +84,6 @@ class SimpleGluonTSDataset(GluonTSDataset):
         else:
             return array.astype(dtype)
 
-    @staticmethod
-    def _to_gluonts_freq(freq: str) -> str:
-        # FIXME: GluonTS expects a frequency string, but only supports a limited number of such strings
-        # for feature generation. If the frequency string doesn't match or is not provided, it raises an exception.
-        # Here we bypass this by issuing a default "yearly" frequency, tricking it into not producing
-        # any lags or features.
-        pd_offset = to_offset(freq)
-
-        # normalize freq str to handle peculiarities such as W-SUN
-        offset_base_alias = norm_freq_str(pd_offset)
-        if offset_base_alias not in GLUONTS_SUPPORTED_OFFSETS:
-            return "A"
-        else:
-            return f"{pd_offset.n}{offset_base_alias}"
-
     def __len__(self):
         return len(self.indptr) - 1  # noqa
 
@@ -113,7 +94,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
             # GluonTS expects item_id to be a string
             ts = {
                 FieldName.ITEM_ID: str(self.item_ids[j]),
-                FieldName.START: pd.Period(self.start_timestamps.iloc[j], freq=self.freq),
+                FieldName.START: pd.Period(self.start_timestamps.iloc[j], freq=self._dummy_gluonts_freq),
                 FieldName.TARGET: self.target_array[start_idx:end_idx],
             }
             if self.feat_static_cat is not None:
@@ -495,7 +476,6 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
             return SimpleGluonTSDataset(
                 target_df=time_series_df[[self.target]],
-                freq=self.freq,
                 target_column=self.target,
                 feat_static_cat=feat_static_cat,
                 feat_static_real=feat_static_real,

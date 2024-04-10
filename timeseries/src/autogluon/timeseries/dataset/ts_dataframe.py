@@ -134,7 +134,7 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
     ----------
     freq : str
         A pandas-compatible string describing the frequency of the time series. For example ``"D"`` for daily data,
-        ``"H"`` for hourly data, etc. This attribute is determined automatically based on the timestamps. For the full
+        ``"h"`` for hourly data, etc. This attribute is determined automatically based on the timestamps. For the full
         list of possible values, see `pandas documentation <https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases>`_.
     num_items : int
         Number of items (time series) in the data set.

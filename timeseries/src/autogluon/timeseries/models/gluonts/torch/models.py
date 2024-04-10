@@ -424,5 +424,5 @@ class WaveNetModel(AbstractGluonTSModel):
         init_kwargs.setdefault("time_features", get_time_features_for_frequency(self.freq))
         init_kwargs.setdefault("num_parallel_samples", self.default_num_samples)
         # WaveNet model fails if an unsupported frequency such as "SM" is provided. We provide a dummy freq instead
-        init_kwargs["freq"] = "H"
+        init_kwargs["freq"] = "D"
         return init_kwargs
