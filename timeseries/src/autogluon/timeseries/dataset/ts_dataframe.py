@@ -961,12 +961,12 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
                 2021-06-30     6.0
                 2021-09-30     7.0
                 2021-12-31     8.0
-        >>> ts_df.convert_frequency("Y")
+        >>> ts_df.convert_frequency("YE")
                             target
         item_id timestamp
         0       2020-12-31     2.5
                 2021-12-31     6.5
-        >>> ts_df.convert_frequency("Y", agg_numeric="sum")
+        >>> ts_df.convert_frequency("YE", agg_numeric="sum")
                             target
         item_id timestamp
         0       2020-12-31    10.0

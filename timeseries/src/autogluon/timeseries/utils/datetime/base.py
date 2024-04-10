@@ -2,8 +2,10 @@ import pandas as pd
 
 TO_MAJOR_FREQ = {
     # sub-daily
-    "BH": "bh",
     "H": "h",
+    "BH": "bh",
+    "cbh": "bh",
+    "CBH": "bh",
     "T": "min",
     "S": "s",
     "L": "ms",

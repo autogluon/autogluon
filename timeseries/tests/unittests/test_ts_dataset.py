@@ -263,8 +263,10 @@ def test_when_dataset_constructed_from_iterable_with_freq_then_freq_is_inferred(
 
 @pytest.mark.parametrize("start_time, freq", FREQ_TEST_CASES)
 def test_when_dataset_constructed_via_constructor_with_freq_then_freq_is_inferred(start_time, freq):
+    # Period requires freq=M for ME frequency
+    start_period = pd.Period(start_time, freq={"ME": "M"}.get(freq))
     item_list = ListDataset(
-        [{"target": [1, 2, 3], "start": pd.Period(start_time, freq=freq)} for _ in range(3)],  # type: ignore
+        [{"target": [1, 2, 3], "start": start_period} for _ in range(3)],  # type: ignore
         freq=freq,
     )
 
@@ -277,8 +279,9 @@ def test_when_dataset_constructed_via_constructor_with_freq_then_freq_is_inferre
 def test_when_dataset_constructed_via_constructor_with_freq_and_persisted_then_cached_freq_is_persisted(
     start_time, freq
 ):
+    start_period = pd.Period(start_time, freq={"ME": "M"}.get(freq))
     item_list = ListDataset(
-        [{"target": [1, 2, 3], "start": pd.Period(start_time, freq=freq)} for _ in range(3)],  # type: ignore
+        [{"target": [1, 2, 3], "start": start_period} for _ in range(3)],  # type: ignore
         freq=freq,
     )
 
@@ -937,7 +940,7 @@ def test_when_convert_frequency_called_then_static_features_are_kept():
     assert df_resampled.static_features.equals(df.static_features)
 
 
-@pytest.mark.parametrize("freq", ["D", "M", "6H"])
+@pytest.mark.parametrize("freq", ["D", "ME", "6h"])
 def test_given_index_is_regular_when_convert_frequency_is_called_then_new_index_has_desired_frequency(freq):
     start = "2020-05-01"
     end = "2020-07-31"
@@ -953,7 +956,7 @@ def test_given_index_is_regular_when_convert_frequency_is_called_then_new_index_
     ts_df = TimeSeriesDataFrame(df)
     ts_df_resampled = ts_df.convert_frequency(freq=freq)
     assert (ts_df_resampled.index.get_level_values(TIMESTAMP) == timestamps_resampled).all()
-    assert ts_df_resampled.freq == freq
+    assert pd.tseries.frequencies.to_offset(ts_df_resampled.freq) == pd.tseries.frequencies.to_offset(freq)
 
 
 @pytest.mark.parametrize(
@@ -981,7 +984,7 @@ def test_when_aggregation_method_is_changed_then_aggregated_result_is_correct(ag
     assert np.all(aggregated.values.ravel() == np.array(values_after_aggregation))
 
 
-@pytest.mark.parametrize("freq", ["D", "W", "M", "Q", "A", "Y", "H", "T", "min", "S", "30T", "2H", "17S"])
+@pytest.mark.parametrize("freq", ["D", "W", "ME", "QE", "YE", "h", "min", "s", "30min", "2h", "17s"])
 def test_when_convert_frequency_called_then_categorical_columns_are_preserved(freq):
     df_original = get_data_frame_with_variable_lengths({"B": 15, "A": 20}, freq=freq, covariates_names=["Y", "X"])
     cat_columns = ["cat_1", "cat_2"]
