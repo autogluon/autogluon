@@ -174,21 +174,6 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         """
         return df
 
-    def _add_scale_as_static_feature(self, data: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
-        """Add mean/std of the target column for each series as a static feature."""
-        data = data.copy(deep=False)
-        scale_features = (
-            data[self.target]
-            .groupby(ITEMID, sort=False)
-            .agg(["mean", "std"])
-            .rename(columns={"mean": "__target_mean", "std": "__target_scale"})
-        )
-        if data.static_features is None:
-            data.static_features = scale_features
-        else:
-            data.static_features = pd.concat([data.static_features, scale_features], axis=1)
-        return data
-
     @staticmethod
     def _shorten_all_series(mlforecast_df: pd.DataFrame, max_length: int):
         logger.debug(f"Shortening all series to at most {max_length}")
@@ -284,8 +269,6 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         **kwargs,
     ) -> None:
         from mlforecast import MLForecast
-
-        train_data = self._add_scale_as_static_feature(train_data)
 
         self._check_fit_params()
         fit_start_time = time.time()
@@ -485,7 +468,6 @@ class DirectTabularModel(AbstractMLForecastModel):
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
-        data = self._add_scale_as_static_feature(data)
         original_item_id_order = data.item_ids
         data, known_covariates, forecast_for_short_series = self._remove_short_ts_and_generate_fallback_forecast(
             data=data, known_covariates=known_covariates
@@ -502,7 +484,7 @@ class DirectTabularModel(AbstractMLForecastModel):
         # MLForecast raises exception of target contains NaN. We use inf as placeholder, replace them by NaN afterwards
         data_future[self.target] = float("inf")
         data_extended = pd.concat([data, data_future])
-        mlforecast_df = self._to_mlforecast_df(data_extended, data_extended.static_features)
+        mlforecast_df = self._to_mlforecast_df(data_extended, data.static_features)
         if self._max_ts_length is not None:
             # We appended `prediction_length` time steps to each series, so increase length
             mlforecast_df = self._shorten_all_series(mlforecast_df, self._max_ts_length + self.prediction_length)
@@ -617,7 +599,6 @@ class RecursiveTabularModel(AbstractMLForecastModel):
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
-        data = self._add_scale_as_static_feature(data)
         original_item_id_order = data.item_ids
         data, known_covariates, forecast_for_short_series = self._remove_short_ts_and_generate_fallback_forecast(
             data=data, known_covariates=known_covariates
