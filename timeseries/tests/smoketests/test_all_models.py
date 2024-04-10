@@ -9,8 +9,6 @@ from autogluon.timeseries import TimeSeriesPredictor
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.utils.datetime.seasonality import DEFAULT_SEASONALITIES
 
-from ..unittests.common import to_supported_pandas_freq
-
 TARGET_COLUMN = "custom_target"
 ITEM_IDS = ["Z", "A", "1", "C"]
 
@@ -160,7 +158,9 @@ def test_all_models_can_handle_all_covariates(
 def test_all_models_handle_all_pandas_frequencies(freq, all_model_hyperparams):
     if Version(pd.__version__) < Version("2.1") and freq in ["SME", "B", "bh"]:
         pytest.skip(f"'{freq}' frequency inference not supported by pandas < 2.1")
-    freq = to_supported_pandas_freq(freq)
+    if Version(pd.__version__) < Version("2.2"):
+        # If necessary, convert pandas 2.2+ freq strings to an alias supported by currently installed pandas version
+        freq = {"ME": "M", "QE": "Q", "YE": "Y", "SME": "SM"}.get(freq, freq)
 
     prediction_length = 5
 
