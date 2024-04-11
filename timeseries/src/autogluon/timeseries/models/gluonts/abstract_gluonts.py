@@ -296,37 +296,36 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         is_train: bool = False,
         **kwargs,
     ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
-        # Copy data to avoid SettingWithCopyWarning from pandas
-        data = data.copy()
-        if self.supports_known_covariates and len(self.metadata.known_covariates_real) > 0:
-            columns = self.metadata.known_covariates_real
-            if is_train:
-                self._real_column_transformers["known"] = self._get_transformer_for_columns(data, columns=columns)
-            assert "known" in self._real_column_transformers, "Preprocessing pipeline must be fit first"
-            data[columns] = self._real_column_transformers["known"].transform(data[columns])
+        with pd.option_context("mode.chained_assignment", None):
+            if self.supports_known_covariates and len(self.metadata.known_covariates_real) > 0:
+                columns = self.metadata.known_covariates_real
+                if is_train:
+                    self._real_column_transformers["known"] = self._get_transformer_for_columns(data, columns=columns)
+                assert "known" in self._real_column_transformers, "Preprocessing pipeline must be fit first"
+                data[columns] = self._real_column_transformers["known"].transform(data[columns])
 
-            if known_covariates is not None:
-                known_covariates[columns] = self._real_column_transformers["known"].transform(
-                    known_covariates[columns]
+                if known_covariates is not None:
+                    known_covariates[columns] = self._real_column_transformers["known"].transform(
+                        known_covariates[columns]
+                    )
+
+            if self.supports_past_covariates and len(self.metadata.past_covariates_real) > 0:
+                columns = self.metadata.past_covariates_real
+                if is_train:
+                    self._real_column_transformers["past"] = self._get_transformer_for_columns(data, columns=columns)
+                assert "past" in self._real_column_transformers, "Preprocessing pipeline must be fit first"
+                data[columns] = self._real_column_transformers["past"].transform(data[columns])
+
+            if self.supports_static_features and len(self.metadata.static_features_real) > 0:
+                columns = self.metadata.static_features_real
+                if is_train:
+                    self._real_column_transformers["static"] = self._get_transformer_for_columns(
+                        data.static_features, columns=columns
+                    )
+                assert "static" in self._real_column_transformers, "Preprocessing pipeline must be fit first"
+                data.static_features[columns] = self._real_column_transformers["static"].transform(
+                    data.static_features[columns]
                 )
-
-        if self.supports_past_covariates and len(self.metadata.past_covariates_real) > 0:
-            columns = self.metadata.past_covariates_real
-            if is_train:
-                self._real_column_transformers["past"] = self._get_transformer_for_columns(data, columns=columns)
-            assert "past" in self._real_column_transformers, "Preprocessing pipeline must be fit first"
-            data[columns] = self._real_column_transformers["past"].transform(data[columns])
-
-        if self.supports_static_features and len(self.metadata.static_features_real) > 0:
-            columns = self.metadata.static_features_real
-            if is_train:
-                self._real_column_transformers["static"] = self._get_transformer_for_columns(
-                    data.static_features, columns=columns
-                )
-            assert "static" in self._real_column_transformers, "Preprocessing pipeline must be fit first"
-            data.static_features[columns] = self._real_column_transformers["static"].transform(
-                data.static_features[columns]
-            )
         return data
 
     def _get_transformer_for_columns(self, df: pd.DataFrame, columns: List[str]) -> Dict[str, str]:

@@ -106,18 +106,20 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             if data.isna().any(axis=None):
                 data[self.target] = data[self.target].fillna(value=self._train_target_median)
 
-        for col in self.metadata.known_covariates_real:
-            # Normalize non-boolean features using mean_abs scaling
-            if not data[col].isin([0, 1]).all():
-                covariate_scales = data[col].abs().groupby(level=ITEMID, sort=False).mean()
+        with pd.option_context("mode.chained_assignment", None):
+            pd.options.mode.chained_assignment
+            for col in self.metadata.known_covariates_real:
+                # Normalize non-boolean features using mean_abs scaling
+                if not data[col].isin([0, 1]).all():
+                    covariate_scales = data[col].abs().groupby(level=ITEMID, sort=False).mean()
 
-                scaled_col = f"__scaled_{col}"
-                data[scaled_col] = data[col] / covariate_scales
-                if known_covariates is not None:
-                    known_covariates[scaled_col] = known_covariates[col] / covariate_scales
+                    scaled_col = f"__scaled_{col}"
+                    data[scaled_col] = data[col] / covariate_scales
+                    if known_covariates is not None:
+                        known_covariates[scaled_col] = known_covariates[col] / covariate_scales
 
-                if is_train:
-                    self._extra_covariates_columns.append(scaled_col)
+                    if is_train:
+                        self._extra_covariates_columns.append(scaled_col)
 
         return data, known_covariates
 
