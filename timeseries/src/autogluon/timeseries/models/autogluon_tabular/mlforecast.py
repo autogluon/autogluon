@@ -107,7 +107,6 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
                 data[self.target] = data[self.target].fillna(value=self._train_target_median)
 
         with pd.option_context("mode.chained_assignment", None):
-            pd.options.mode.chained_assignment
             for col in self.metadata.known_covariates_real:
                 # Normalize non-boolean features using mean_abs scaling
                 if not data[col].isin([0, 1]).all():
