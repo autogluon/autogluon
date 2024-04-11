@@ -326,7 +326,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                 data.static_features[columns] = self._real_column_transformers["static"].transform(
                     data.static_features[columns]
                 )
-        return data
+        return data, known_covariates
 
     def _get_transformer_for_columns(self, df: pd.DataFrame, columns: List[str]) -> Dict[str, str]:
         """Passthrough bool features, use QuantileTransform for skewed features, and use StandardScaler for the rest.
