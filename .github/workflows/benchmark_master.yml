@@ -4,7 +4,6 @@ on:
   workflow_dispatch:
     branches:
       - master
-      - report_full
   schedule:
     - cron: '00 09 * * SUN' #  UTC 9:00(2:00 PST Time) every Sunday
 
@@ -36,54 +35,54 @@ jobs:
         run: |
           /bin/bash CI/bench/generate_amlb_user_dir.sh ${{ matrix.AG_MODULE }} ${{ github.repository }} ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
 
-  # benchmark-tabular:
-  #   needs: generate_amlb_user_dir
-  #   runs-on: ubuntu-latest
-  #   defaults:
-  #     run:
-  #       shell: bash
-  #   steps:
-  #     - name: Free Disk Space (Ubuntu)
-  #       # uses: jlumbroso/free-disk-space@v1.2.0
-  #       uses: hirnidrin/free-disk-space@main  # revert back once fix in https://github.com/jlumbroso/free-disk-space/pull/11
-  #       with:
-  #         tool-cache: false
-  #         android: true
-  #         dotnet: true
-  #         haskell: true
-  #         large-packages: true
-  #         docker-images: true
-  #         swap-storage: true
-  #     - name: Checkout repository for PR
-  #       uses: actions/checkout@v2
-  #     - name: Setup Python
-  #       uses: actions/setup-python@v1
-  #       with:
-  #         python-version: '3.9'
-  #     - name: Setup npm
-  #       uses: actions/setup-node@v3
-  #       with:
-  #         node-version: 'latest'
-  #     - name: Configure AWS Credentials
-  #       uses: aws-actions/configure-aws-credentials@v1
-  #       with:
-  #         role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
-  #         role-duration-seconds: 36000
-  #         aws-region: us-east-1
-  #     - name: Run benchmark - Tabular
-  #       shell: bash -l {0}
-  #       run: |
-  #         nvm install 20
-  #         npm install -g aws-cdk
-  #         /bin/bash ./.github/workflow_scripts/run_benchmark.sh tabular tabular_best tabular_full 1h8c ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
-  #     - name: Upload evaluation results as artifact
-  #       uses: actions/upload-artifact@v2
-  #       with:
-  #         name: upload-evaluation-results-tabular
-  #         path: evaluate
+  benchmark-tabular:
+    needs: generate_amlb_user_dir
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Free Disk Space (Ubuntu)
+        # uses: jlumbroso/free-disk-space@v1.2.0
+        uses: hirnidrin/free-disk-space@main  # revert back once fix in https://github.com/jlumbroso/free-disk-space/pull/11
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+      - name: Checkout repository for PR
+        uses: actions/checkout@v2
+      - name: Setup Python
+        uses: actions/setup-python@v1
+        with:
+          python-version: '3.9'
+      - name: Setup npm
+        uses: actions/setup-node@v3
+        with:
+          node-version: 'latest'
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
+          role-duration-seconds: 36000
+          aws-region: us-east-1
+      - name: Run benchmark - Tabular
+        shell: bash -l {0}
+        run: |
+          nvm install 20
+          npm install -g aws-cdk
+          /bin/bash ./.github/workflow_scripts/run_benchmark.sh tabular tabular_best tabular_full 1h8c ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
+      - name: Upload evaluation results as artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: upload-evaluation-results-tabular
+          path: evaluate
 
   benchmark-timeseries:
-    needs: generate_amlb_user_dir
+    needs: benchmark-tabular
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -128,140 +127,140 @@ jobs:
           name: upload-evaluation-results-timeseries
           path: evaluate
 
-  # benchmark-multimodal-text:
-  #   needs: benchmark-timeseries
-  #   runs-on: ubuntu-latest
-  #   defaults:
-  #     run:
-  #       shell: bash
-  #   steps:
-  #     - name: Free Disk Space (Ubuntu)
-  #       # uses: jlumbroso/free-disk-space@v1.2.0
-  #       uses: hirnidrin/free-disk-space@main  # revert back once fix in https://github.com/jlumbroso/free-disk-space/pull/11
-  #       with:
-  #         tool-cache: false
-  #         android: true
-  #         dotnet: true
-  #         haskell: true
-  #         large-packages: true
-  #         docker-images: true
-  #         swap-storage: true
-  #     - name: Checkout repository for PR
-  #       uses: actions/checkout@v2
-  #     - name: Setup Python
-  #       uses: actions/setup-python@v1
-  #       with:
-  #         python-version: '3.9'
-  #     - name: Setup npm
-  #       uses: actions/setup-node@v3
-  #       with:
-  #         node-version: 'latest'
-  #     - name: Configure AWS Credentials
-  #       uses: aws-actions/configure-aws-credentials@v1
-  #       with:
-  #         role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
-  #         role-duration-seconds: 36000
-  #         aws-region: us-east-1
-  #     - name: Run benchmark - Multimodal
-  #       shell: bash -l {0}
-  #       run: |
-  #         nvm install 20
-  #         npm install -g aws-cdk
-  #         /bin/bash ./.github/workflow_scripts/run_benchmark.sh multimodal multimodal_best automm-text g4_12x ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
-  #     - name: Upload evaluation results as artifact
-  #       uses: actions/upload-artifact@v2
-  #       with:
-  #         name: upload-evaluation-results-automm-text
-  #         path: evaluate
+  benchmark-multimodal-text:
+    needs: benchmark-timeseries
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Free Disk Space (Ubuntu)
+        # uses: jlumbroso/free-disk-space@v1.2.0
+        uses: hirnidrin/free-disk-space@main  # revert back once fix in https://github.com/jlumbroso/free-disk-space/pull/11
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+      - name: Checkout repository for PR
+        uses: actions/checkout@v2
+      - name: Setup Python
+        uses: actions/setup-python@v1
+        with:
+          python-version: '3.9'
+      - name: Setup npm
+        uses: actions/setup-node@v3
+        with:
+          node-version: 'latest'
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
+          role-duration-seconds: 36000
+          aws-region: us-east-1
+      - name: Run benchmark - Multimodal
+        shell: bash -l {0}
+        run: |
+          nvm install 20
+          npm install -g aws-cdk
+          /bin/bash ./.github/workflow_scripts/run_benchmark.sh multimodal multimodal_best automm-text g4_12x ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
+      - name: Upload evaluation results as artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: upload-evaluation-results-automm-text
+          path: evaluate
 
-  # benchmark-multimodal-text-tabular:
-  #   needs: benchmark-multimodal-text
-  #   runs-on: ubuntu-latest
-  #   defaults:
-  #     run:
-  #       shell: bash
-  #   steps:
-  #     - name: Free Disk Space (Ubuntu)
-  #       # uses: jlumbroso/free-disk-space@v1.2.0
-  #       uses: hirnidrin/free-disk-space@main  # revert back once fix in https://github.com/jlumbroso/free-disk-space/pull/11
-  #       with:
-  #         tool-cache: false
-  #         android: true
-  #         dotnet: true
-  #         haskell: true
-  #         large-packages: true
-  #         docker-images: true
-  #         swap-storage: true
-  #     - name: Checkout repository for PR
-  #       uses: actions/checkout@v2
-  #     - name: Setup Python
-  #       uses: actions/setup-python@v1
-  #       with:
-  #         python-version: '3.9'
-  #     - name: Setup npm
-  #       uses: actions/setup-node@v3
-  #       with:
-  #         node-version: 'latest'
-  #     - name: Configure AWS Credentials
-  #       uses: aws-actions/configure-aws-credentials@v1
-  #       with:
-  #         role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
-  #         role-duration-seconds: 36000
-  #         aws-region: us-east-1
-  #     - name: Run benchmark - Multimodal
-  #       shell: bash -l {0}
-  #       run: |
-  #         nvm install 20
-  #         npm install -g aws-cdk
-  #         /bin/bash ./.github/workflow_scripts/run_benchmark.sh multimodal multimodal_best automm-text-tabular g4_12x ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
-  #     - name: Upload evaluation results as artifact
-  #       uses: actions/upload-artifact@v2
-  #       with:
-  #         name: upload-evaluation-results-automm-text-tabular
-  #         path: evaluate
+  benchmark-multimodal-text-tabular:
+    needs: benchmark-multimodal-text
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Free Disk Space (Ubuntu)
+        # uses: jlumbroso/free-disk-space@v1.2.0
+        uses: hirnidrin/free-disk-space@main  # revert back once fix in https://github.com/jlumbroso/free-disk-space/pull/11
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+      - name: Checkout repository for PR
+        uses: actions/checkout@v2
+      - name: Setup Python
+        uses: actions/setup-python@v1
+        with:
+          python-version: '3.9'
+      - name: Setup npm
+        uses: actions/setup-node@v3
+        with:
+          node-version: 'latest'
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
+          role-duration-seconds: 36000
+          aws-region: us-east-1
+      - name: Run benchmark - Multimodal
+        shell: bash -l {0}
+        run: |
+          nvm install 20
+          npm install -g aws-cdk
+          /bin/bash ./.github/workflow_scripts/run_benchmark.sh multimodal multimodal_best automm-text-tabular g4_12x ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
+      - name: Upload evaluation results as artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: upload-evaluation-results-automm-text-tabular
+          path: evaluate
 
-  # benchmark-multimodal-image:
-  #   needs: benchmark-multimodal-text-tabular
-  #   runs-on: ubuntu-latest
-  #   defaults:
-  #     run:
-  #       shell: bash
-  #   steps:
-  #     - name: Free Disk Space (Ubuntu)
-  #       # uses: jlumbroso/free-disk-space@v1.2.0
-  #       uses: hirnidrin/free-disk-space@main  # revert back once fix in https://github.com/jlumbroso/free-disk-space/pull/11
-  #       with:
-  #         tool-cache: false
-  #         android: true
-  #         dotnet: true
-  #         haskell: true
-  #         large-packages: true
-  #         docker-images: true
-  #         swap-storage: true
-  #     - name: Checkout repository for PR
-  #       uses: actions/checkout@v2
-  #     - name: Setup Python
-  #       uses: actions/setup-python@v1
-  #       with:
-  #         python-version: '3.9'
-  #     - name: Setup npm
-  #       uses: actions/setup-node@v3
-  #       with:
-  #         node-version: 'latest'
-  #     - name: Configure AWS Credentials
-  #       uses: aws-actions/configure-aws-credentials@v1
-  #       with:
-  #         role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
-  #         role-duration-seconds: 36000
-  #         aws-region: us-east-1
-  #     - name: Run benchmark - Multimodal
-  #       shell: bash -l {0}
-  #       run: |
-  #         nvm install 20
-  #         npm install -g aws-cdk
-  #         /bin/bash ./.github/workflow_scripts/run_benchmark.sh multimodal multimodal_best automm-image g4_12x ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
-  #     - name: Upload evaluation results as artifact
-  #       uses: actions/upload-artifact@v2
-  #       with:
-  #         name: upload-evaluation-results-automm-image
-  #         path: evaluate
+  benchmark-multimodal-image:
+    needs: benchmark-multimodal-text-tabular
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Free Disk Space (Ubuntu)
+        # uses: jlumbroso/free-disk-space@v1.2.0
+        uses: hirnidrin/free-disk-space@main  # revert back once fix in https://github.com/jlumbroso/free-disk-space/pull/11
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+      - name: Checkout repository for PR
+        uses: actions/checkout@v2
+      - name: Setup Python
+        uses: actions/setup-python@v1
+        with:
+          python-version: '3.9'
+      - name: Setup npm
+        uses: actions/setup-node@v3
+        with:
+          node-version: 'latest'
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
+          role-duration-seconds: 36000
+          aws-region: us-east-1
+      - name: Run benchmark - Multimodal
+        shell: bash -l {0}
+        run: |
+          nvm install 20
+          npm install -g aws-cdk
+          /bin/bash ./.github/workflow_scripts/run_benchmark.sh multimodal multimodal_best automm-image g4_12x ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
+      - name: Upload evaluation results as artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: upload-evaluation-results-automm-image
+          path: evaluate
