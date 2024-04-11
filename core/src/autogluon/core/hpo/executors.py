@@ -396,9 +396,9 @@ class RayHpoExecutor(HpoExecutor):
         trainable_is_parallel
             Whether the trainable itself will use ray to run parallel job or not.
         tune_config_kwargs
-            Additional args being passed to tune.TuneConfig https://docs.ray.io/en/latest/ray-air/package-ref.html#ray.tune.tune_config.TuneConfig
+            Additional args being passed to tune.TuneConfig https://docs.ray.io/en/latest/tune/api/doc/ray.tune.TuneConfig.html#ray-tune-tuneconfig
         run_config_kwargs
-            Additional args being passed to air.RunConfig https://docs.ray.io/en/latest/ray-air/package-ref.html#ray.air.config.RunConfig
+            Additional args being passed to air.RunConfig https://docs.ray.io/en/latest/train/api/doc/ray.train.RunConfig.html#ray.train.RunConfig
         """
         from .ray_hpo import RayTuneAdapterFactory, run
 
