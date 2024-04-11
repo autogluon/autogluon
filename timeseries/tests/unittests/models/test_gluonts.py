@@ -51,7 +51,7 @@ def test_when_context_length_is_not_set_then_default_context_length_is_used(mode
 def test_given_time_limit_when_fit_called_then_models_train_correctly(model_class, time_limit, temp_model_path):
     model = model_class(
         path=temp_model_path,
-        freq="H",
+        freq="h",
         prediction_length=5,
         hyperparameters={"epochs": 2},
     )
@@ -70,7 +70,7 @@ def test_given_low_time_limit_when_fit_called_then_model_training_does_not_excee
 ):
     model = model_class(
         path=temp_model_path,
-        freq="H",
+        freq="h",
         prediction_length=5,
         hyperparameters={"epochs": 20000},
     )
@@ -84,7 +84,7 @@ def test_given_low_time_limit_when_fit_called_then_model_training_does_not_excee
 def test_when_models_saved_then_gluonts_predictors_can_be_loaded(model_class, temp_model_path):
     model = model_class(
         path=temp_model_path,
-        freq="H",
+        freq="h",
         quantile_levels=[0.1, 0.9],
         hyperparameters=DUMMY_HYPERPARAMETERS,
     )

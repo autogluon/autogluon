@@ -5,7 +5,7 @@ from typing import Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
-from gluonts.dataset.common import ListDataset
+from packaging.version import Version
 
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer
@@ -13,65 +13,94 @@ from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_da
 
 # TODO: add larger unit test data sets to S3
 
-# List of all supported pandas frequencies, based on https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases
-ALL_PANDAS_FREQUENCIES = {
-    "B",
-    "C",
-    "D",
-    "W",
-    "M",
-    "SM",
-    "BM",
-    "CBM",
-    "MS",
-    "SMS",
-    "BMS",
-    "CBMS",
-    "Q",
-    "BQ",
-    "QS",
-    "BQS",
-    "A",
-    "Y",
-    "BA",
-    "BY",
-    "AS",
-    "YS",
-    "BAS",
-    "BYS",
-    "BH",
-    "H",
-    "T",
-    "min",
-    "S",
-    "L",
-    "ms",
-    "U",
-    "us",
-    "N",
-}
 
-DUMMY_DATASET = ListDataset(
-    [
-        {
-            "target": [random.random() for _ in range(10)],
-            "start": pd.Timestamp("2022-01-01 00:00:00"),  # noqa
-            "item_id": 0,
-        },
-        {
-            "target": [random.random() for _ in range(10)],
-            "start": pd.Timestamp("2022-01-01 00:00:00"),  # noqa
-            "item_id": 1,
-        },
-    ],
-    freq="H",
-)
+# List of all non-deprecated pandas frequencies, based on https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases
+def get_all_pandas_frequencies():
+    if Version(pd.__version__) >= Version("2.2"):
+        return {
+            "B",
+            "C",
+            "D",
+            "W",
+            "ME",
+            "SME",
+            "BME",
+            "CBME",
+            "MS",
+            "SMS",
+            "BMS",
+            "CBMS",
+            "QE",
+            "BQE",
+            "QS",
+            "BQS",
+            "YE",
+            "BYE",
+            "YS",
+            "BYS",
+            "h",
+            "bh",
+            "cbh",
+            "min",
+            "s",
+            "ms",
+            "us",
+            "ns",
+        }
+    else:
+        return {
+            "B",
+            "C",
+            "D",
+            "W",
+            "M",
+            "SM",
+            "BM",
+            "CBM",
+            "MS",
+            "SMS",
+            "BMS",
+            "CBMS",
+            "Q",
+            "BQ",
+            "QS",
+            "BQS",
+            "A",
+            "Y",
+            "BA",
+            "BY",
+            "AS",
+            "YS",
+            "BAS",
+            "BYS",
+            "BH",
+            "H",
+            "T",
+            "min",
+            "S",
+            "L",
+            "ms",
+            "U",
+            "us",
+            "N",
+        }
+
+
+ALL_PANDAS_FREQUENCIES = get_all_pandas_frequencies()
+
+
+def to_supported_pandas_freq(freq: str) -> str:
+    """If necessary, convert pandas 2.2+ freq strings to an alias supported by currently installed pandas version."""
+    if Version(pd.__version__) < Version("2.2"):
+        return {"ME": "M", "QE": "Q", "YE": "Y", "SME": "SM", "h": "H", "min": "T"}.get(freq, freq)
+    else:
+        return freq
 
 
 def get_data_frame_with_item_index(
     item_list: List[Union[str, int]],
     data_length: int = 20,
-    freq: str = "H",
+    freq: str = "h",
     start_date: str = "2022-01-01",
     columns: List[str] = ["target"],
     data_generation: str = "random",
@@ -89,7 +118,7 @@ def get_data_frame_with_item_index(
                     item_list,
                     pd.date_range(
                         pd.Timestamp(start_date),  # noqa
-                        freq=freq,
+                        freq=to_supported_pandas_freq(freq),
                         periods=data_length,
                     ),
                 ],

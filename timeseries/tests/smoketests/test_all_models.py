@@ -3,7 +3,7 @@ from typing import Tuple
 import numpy as np
 import pandas as pd
 import pytest
-from pkg_resources import parse_version
+from packaging.version import Version
 
 from autogluon.timeseries import TimeSeriesPredictor
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
@@ -15,7 +15,7 @@ ITEM_IDS = ["Z", "A", "1", "C"]
 
 def generate_train_and_test_data(
     prediction_length: int = 1,
-    freq: str = "H",
+    freq: str = "h",
     start_time: pd.Timestamp = "2020-01-05 15:37",
     use_known_covariates: bool = False,
     use_past_covariates: bool = False,
@@ -156,8 +156,11 @@ def test_all_models_can_handle_all_covariates(
 
 @pytest.mark.parametrize("freq", DEFAULT_SEASONALITIES.keys())
 def test_all_models_handle_all_pandas_frequencies(freq, all_model_hyperparams):
-    if parse_version(pd.__version__) < parse_version("2.1") and freq in ["SM", "B", "BH"]:
+    if Version(pd.__version__) < Version("2.1") and freq in ["SME", "B", "bh"]:
         pytest.skip(f"'{freq}' frequency inference not supported by pandas < 2.1")
+    if Version(pd.__version__) < Version("2.2"):
+        # If necessary, convert pandas 2.2+ freq strings to an alias supported by currently installed pandas version
+        freq = {"ME": "M", "QE": "Q", "YE": "Y", "SME": "SM"}.get(freq, freq)
 
     prediction_length = 5
 

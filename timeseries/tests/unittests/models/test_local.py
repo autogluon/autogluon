@@ -32,6 +32,7 @@ from ..common import (
     DUMMY_VARIABLE_LENGTH_TS_DATAFRAME,
     dict_equal_primitive,
     get_data_frame_with_item_index,
+    to_supported_pandas_freq,
 )
 
 # models accepting seasonal_period
@@ -100,11 +101,11 @@ def get_seasonal_period_from_fitted_local_model(model):
 @pytest.mark.parametrize(
     "freqstr, ts_length, expected_seasonal_period",
     [
-        ("H", 100, 24),
-        ("2H", 100, 12),
+        ("h", 100, 24),
+        ("2h", 100, 12),
         ("B", 100, 5),
         ("D", 100, 7),
-        ("M", 100, 12),
+        ("ME", 100, 12),
     ],
 )
 def test_when_seasonal_period_is_set_to_none_then_inferred_period_is_used(
@@ -126,11 +127,11 @@ def test_when_seasonal_period_is_set_to_none_then_inferred_period_is_used(
 @pytest.mark.parametrize(
     "freqstr, ts_length, provided_seasonal_period",
     [
-        ("H", 100, 12),
-        ("2H", 100, 5),
+        ("h", 100, 12),
+        ("2h", 100, 5),
         ("B", 100, 10),
         ("D", 100, 8),
-        ("M", 100, 24),
+        ("ME", 100, 24),
     ],
 )
 def test_when_seasonal_period_is_provided_then_inferred_period_is_overridden(
@@ -245,10 +246,11 @@ def test_when_data_shorter_than_seasonal_period_then_average_forecast_is_used():
     assert np.allclose(predictions_avg.values, predictions_seasonal_avg.values)
 
 
-@pytest.mark.parametrize("freq", ["H", "W", "D", "T", "S", "B", "Q", "M", "A"])
+@pytest.mark.parametrize("freq", ["h", "W", "D", "min", "s", "B", "QE", "ME", "YE"])
 def test_when_npts_fit_with_default_seasonal_features_then_predictions_match_gluonts(freq):
     from gluonts.model.npts import NPTSPredictor
 
+    freq = to_supported_pandas_freq(freq)
     item_id = "A"
     prediction_length = 9
     data = get_data_frame_with_item_index([item_id], freq=freq, data_length=100)
@@ -266,7 +268,8 @@ def test_when_npts_fit_with_default_seasonal_features_then_predictions_match_glu
 
     np.random.seed(123)
     ts = data.loc[item_id]["target"]
-    ts.index = ts.index.to_period(freq=freq)
+    freq_for_period = {"ME": "M", "YE": "Y", "QE": "Q"}.get(freq, freq)
+    ts.index = ts.index.to_period(freq=freq_for_period)
     pred_gts = npts_gts.predict_time_series(ts, num_samples=100)
 
     assert (pred_gts.mean == pred_ag["mean"]).all()

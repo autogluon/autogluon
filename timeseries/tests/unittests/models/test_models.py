@@ -20,7 +20,13 @@ from autogluon.timeseries.models import DeepARModel, ETSModel
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
 
-from ..common import DUMMY_TS_DATAFRAME, CustomMetric, dict_equal_primitive, get_data_frame_with_item_index
+from ..common import (
+    DUMMY_TS_DATAFRAME,
+    CustomMetric,
+    dict_equal_primitive,
+    get_data_frame_with_item_index,
+    to_supported_pandas_freq,
+)
 from .test_chronos import TESTABLE_MODELS as CHRONOS_TESTABLE_MODELS
 from .test_gluonts import TESTABLE_MODELS as GLUONTS_TESTABLE_MODELS
 from .test_local import TESTABLE_MODELS as LOCAL_TESTABLE_MODELS
@@ -57,7 +63,7 @@ def trained_models(dummy_hyperparameters):
         temp_model_path = tempfile.mkdtemp()
         model = model_class(
             path=temp_model_path,
-            freq="H",
+            freq="h",
             prediction_length=prediction_length,
             hyperparameters=dummy_hyperparameters,
         )
@@ -75,7 +81,7 @@ def trained_models(dummy_hyperparameters):
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 def test_models_can_be_initialized(model_class, temp_model_path):
-    model = model_class(path=temp_model_path, freq="H", prediction_length=24)
+    model = model_class(path=temp_model_path, freq="h", prediction_length=24)
     assert isinstance(model, AbstractTimeSeriesModel)
 
 
@@ -156,7 +162,7 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct
 ):
     model = model_class(
         path=temp_model_path,
-        freq="H",
+        freq="h",
         quantile_levels=[0.1, 0.9],
         hyperparameters={**dummy_hyperparameters, "epochs": space.Int(1, 3)},
     )
@@ -182,7 +188,7 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct
 def test_given_hyperparameter_spaces_to_init_when_fit_called_then_error_is_raised(model_class, temp_model_path):
     model = model_class(
         path=temp_model_path,
-        freq="H",
+        freq="h",
         quantile_levels=[0.1, 0.9],
         hyperparameters={
             "epochs": space.Int(3, 4),
@@ -207,7 +213,7 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_has_
 ):
     model = model_class(
         path=temp_model_path,
-        freq="H",
+        freq="h",
         prediction_length=3,
         quantile_levels=quantile_levels,
         hyperparameters=dummy_hyperparameters,
@@ -255,7 +261,7 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_alig
 
     model = model_class(
         path=temp_model_path,
-        freq="H",
+        freq="h",
         prediction_length=prediction_length,
         hyperparameters=dummy_hyperparameters,
     )
@@ -269,11 +275,12 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_alig
     assert min_hour_in_pred == max_hour_in_test + 1
 
 
-@pytest.mark.parametrize("freq", ["D", "H", "S", "M"])
+@pytest.mark.parametrize("freq", ["D", "h", "s", "ME"])
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 def test_when_predict_called_then_predicted_timestamps_align_with_time(
     model_class, freq, temp_model_path, dummy_hyperparameters
 ):
+    freq = to_supported_pandas_freq(freq)
     prediction_length = 4
     train_length = 20
     item_id = "A"
@@ -329,7 +336,7 @@ def test_when_predict_called_with_test_data_then_predictor_inference_correct(
     prediction_length = 5
     model = model_class(
         path=temp_model_path,
-        freq="H",
+        freq="h",
         prediction_length=prediction_length,
         hyperparameters=dummy_hyperparameters,
     )

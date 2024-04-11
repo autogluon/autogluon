@@ -132,6 +132,7 @@ class DropDuplicatesFeatureGenerator(AbstractFeatureGenerator):
             # Converts [5, 'a', np.nan, 5] to [0, 1, 2, 0], these would be considered duplicates since they carry the same information.
 
             # Have to convert to object dtype because category dtype for unknown reasons will refuse to replace NaNs.
+            # TODO: Fix FutureWarning
             X_cur = X[features_to_check].astype("object").replace(mapping_features_val_dict_cur).astype(np.int64)
             features_to_remove += cls._drop_duplicate_features_numeric(X=X_cur, keep=keep)
 
