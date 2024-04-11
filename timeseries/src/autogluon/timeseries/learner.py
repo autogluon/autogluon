@@ -250,8 +250,8 @@ class TimeSeriesLearner(AbstractLearner):
                     raise ValueError(f"Feature {fn} not found in covariate metadata or the dataset.")
 
         if len(set(features)) < len(features):
-            logger.warning(
-                "Duplicate feature names provided to compute feature importance. This will lead to unexpected behavior. "
+            raise ValueError(
+                "Duplicate feature names provided to compute feature importance. "
                 "Please provide unique feature names across both static features and covariates."
             )
 
