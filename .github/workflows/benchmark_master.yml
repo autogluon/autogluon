@@ -79,7 +79,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: upload-evaluation-results-tabular
-          path: report_results.csv
+          path: evaluate
 
   benchmark-timeseries:
     needs: benchmark-tabular
@@ -125,7 +125,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: upload-evaluation-results-timeseries
-          path: report_results.csv
+          path: evaluate
 
   benchmark-multimodal-text:
     needs: benchmark-timeseries
@@ -171,7 +171,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: upload-evaluation-results-automm-text
-          path: report_results.csv
+          path: evaluate
 
   benchmark-multimodal-text-tabular:
     needs: benchmark-multimodal-text
@@ -217,7 +217,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: upload-evaluation-results-automm-text-tabular
-          path: report_results.csv
+          path: evaluate
 
   benchmark-multimodal-image:
     needs: benchmark-multimodal-text-tabular
@@ -263,4 +263,4 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: upload-evaluation-results-automm-image
-          path: report_results.csv
+          path: evaluate
