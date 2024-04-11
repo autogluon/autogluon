@@ -118,7 +118,7 @@ def test_given_long_time_series_passed_to_model_then_preprocess_receives_shorten
 ):
     max_num_samples = 1000
     prediction_length = 17
-    data = get_data_frame_with_variable_lengths({"A": 1_000_000}, freq="T")
+    data = get_data_frame_with_variable_lengths({"A": 1_000_000}, freq="min")
     model = model_type(
         path=temp_model_path,
         freq=data.freq,

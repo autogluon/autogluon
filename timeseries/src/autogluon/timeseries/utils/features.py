@@ -14,6 +14,7 @@ from autogluon.features.generators import (
     PipelineFeatureGenerator,
 )
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
+from autogluon.timeseries.utils.warning_filters import warning_filter
 
 logger = logging.getLogger(__name__)
 
@@ -335,7 +336,9 @@ class AbstractFeatureImportanceTransform:
             # we'll have to work on the history of the data alone
             data[feature_name] = data[feature_name].copy()
             feature_data = data[feature_name].groupby(level=ITEMID, sort=False).head(-self.prediction_length)
-            data[feature_name].update(self._transform_series(feature_data, is_categorical=is_categorical))
+            # Silence spurious FutureWarning raised by DataFrame.update https://github.com/pandas-dev/pandas/issues/57124
+            with warning_filter():
+                data[feature_name].update(self._transform_series(feature_data, is_categorical=is_categorical))
         elif feature_name in self.covariate_metadata.static_features:
             feature_data = data.static_features[feature_name].copy()
             feature_data.reset_index(drop=True, inplace=True)
