@@ -3,7 +3,7 @@ import os
 import shutil
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterator, List, Literal, Optional, Type, Union
+from typing import Any, Callable, Dict, Iterator, List, Literal, Optional, Tuple, Type, Union
 
 import gluonts
 import gluonts.core.settings
@@ -289,7 +289,13 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
     def default_context_length(self) -> int:
         return min(512, max(10, 2 * self.prediction_length))
 
-    def preprocess(self, data: TimeSeriesDataFrame, is_train: bool = False, **kwargs) -> TimeSeriesDataFrame:
+    def preprocess(
+        self,
+        data: TimeSeriesDataFrame,
+        known_covariates: Optional[TimeSeriesDataFrame] = None,
+        is_train: bool = False,
+        **kwargs,
+    ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
         # Copy data to avoid SettingWithCopyWarning from pandas
         data = data.copy()
         if self.supports_known_covariates and len(self.metadata.known_covariates_real) > 0:
@@ -298,6 +304,11 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
                 self._real_column_transformers["known"] = self._get_transformer_for_columns(data, columns=columns)
             assert "known" in self._real_column_transformers, "Preprocessing pipeline must be fit first"
             data[columns] = self._real_column_transformers["known"].transform(data[columns])
+
+            if known_covariates is not None:
+                known_covariates[columns] = self._real_column_transformers["known"].transform(
+                    known_covariates[columns]
+                )
 
         if self.supports_past_covariates and len(self.metadata.past_covariates_real) > 0:
             columns = self.metadata.past_covariates_real
@@ -345,15 +356,6 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         with warning_filter():
             column_transformer = ColumnTransformer(transformers=transformers, remainder="passthrough").fit(df[columns])
         return column_transformer
-
-    def preprocess_known_covariates(
-        self, known_covariates: Optional[TimeSeriesDataFrame]
-    ) -> Optional[TimeSeriesDataFrame]:
-        columns = self.metadata.known_covariates_real
-        if self.supports_known_covariates and len(columns) > 0:
-            assert "known" in self._real_column_transformers, "Preprocessing pipeline must be fit first"
-            known_covariates[columns] = self._real_column_transformers["known"].transform(known_covariates[columns])
-        return known_covariates
 
     def _get_model_params(self) -> dict:
         """Gets params that are passed to the inner model."""

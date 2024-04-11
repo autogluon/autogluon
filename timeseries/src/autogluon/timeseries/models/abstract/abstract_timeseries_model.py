@@ -3,7 +3,7 @@ import os
 import re
 import time
 from contextlib import nullcontext
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 from autogluon.common import space
 from autogluon.common.loaders import load_pkl
@@ -241,9 +241,9 @@ class AbstractTimeSeriesModel(AbstractModel):
         model: AbstractTimeSeriesModel
             The fitted model object
         """
-        train_data = self.preprocess(train_data, is_train=True)
+        train_data, _ = self.preprocess(train_data, is_train=True)
         if self._get_tags()["can_use_val_data"] and val_data is not None:
-            val_data = self.preprocess(val_data, is_train=False)
+            val_data, _ = self.preprocess(val_data, is_train=False)
         return super().fit(train_data=train_data, val_data=val_data, **kwargs)
 
     def _fit(
@@ -299,8 +299,7 @@ class AbstractTimeSeriesModel(AbstractModel):
             data is given as a separate forecast item in the dictionary, keyed by the `item_id`s
             of input items.
         """
-        data = self.preprocess(data, is_train=False)
-        known_covariates = self.preprocess_known_covariates(known_covariates)
+        data, known_covariates = self.preprocess(data, known_covariates=known_covariates, is_train=False)
         predictions = self._predict(data=data, known_covariates=known_covariates, **kwargs)
         logger.debug(f"Predicting with model {self.name}")
         # "0.5" might be missing from the quantiles if self is a wrapper (MultiWindowBacktestingModel or ensemble)
@@ -500,13 +499,14 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         return hpo_models, analysis
 
-    def preprocess(self, data: TimeSeriesDataFrame, is_train: bool = False, **kwargs) -> TimeSeriesDataFrame:
-        return data
-
-    def preprocess_known_covariates(
-        self, known_covariates: Optional[TimeSeriesDataFrame]
-    ) -> Optional[TimeSeriesDataFrame]:
-        return known_covariates
+    def preprocess(
+        self,
+        data: TimeSeriesDataFrame,
+        known_covariates: Optional[TimeSeriesDataFrame] = None,
+        is_train: bool = False,
+        **kwargs,
+    ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
+        return data, known_covariates
 
     def get_memory_size(self, **kwargs) -> Optional[int]:
         return None

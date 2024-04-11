@@ -86,20 +86,40 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         self._residuals_std_per_item: Optional[pd.Series] = None
         self._avg_residuals_std: Optional[float] = None
         self._train_target_median: Optional[float] = None
+        self._extra_covariates_columns: List[str] = []
 
-    def preprocess(self, data: TimeSeriesDataFrame, is_train: bool = False, **kwargs) -> Any:
+    def preprocess(
+        self,
+        data: TimeSeriesDataFrame,
+        known_covariates: Optional[TimeSeriesDataFrame] = None,
+        is_train: bool = False,
+        **kwargs,
+    ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
         if is_train:
             # All-NaN series are removed; partially-NaN series in train_data are handled inside _generate_train_val_dfs
             all_nan_items = data.item_ids[data[self.target].isna().groupby(ITEMID, sort=False).all()]
             if len(all_nan_items):
                 data = data.query("item_id not in @all_nan_items")
-            return data
         else:
             data = data.fill_missing_values()
             # Fill time series consisting of all NaNs with the median of target in train_data
             if data.isna().any(axis=None):
                 data[self.target] = data[self.target].fillna(value=self._train_target_median)
-            return data
+
+        for col in self.metadata.known_covariates_real:
+            # Normalize non-boolean features using mean_abs scaling
+            if not data[col].isin([0, 1]).all():
+                covariate_scales = data[col].abs().groupby(level=ITEMID, sort=False).mean()
+
+                scaled_col = f"__scaled_{col}"
+                data[scaled_col] = data[col] / covariate_scales
+                if known_covariates is not None:
+                    known_covariates[scaled_col] = known_covariates[col] / covariate_scales
+
+                if is_train:
+                    self._extra_covariates_columns.append(scaled_col)
+
+        return data, known_covariates
 
     def _get_extra_tabular_init_kwargs(self) -> dict:
         raise NotImplementedError
@@ -242,7 +262,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         Each row contains unique_id, ds, y, and (optionally) known covariates & static features.
         """
         # TODO: Add support for past_covariates
-        selected_columns = self.metadata.known_covariates.copy()
+        selected_columns = self.metadata.known_covariates.copy() + self._extra_covariates_columns
         column_name_mapping = {ITEMID: MLF_ITEMID, TIMESTAMP: MLF_TIMESTAMP}
         if include_target:
             selected_columns += [self.target]
@@ -251,11 +271,6 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         df = pd.DataFrame(data)[selected_columns].reset_index()
         if static_features is not None:
             df = pd.merge(df, static_features, how="left", on=ITEMID, suffixes=(None, "_static_feat"))
-
-        for col in self.metadata.known_covariates_real:
-            # Normalize non-boolean features using mean_abs scaling
-            if not df[col].isin([0, 1]).all():
-                df[f"__scaled_{col}"] = df[col] / df[col].abs().groupby(df[ITEMID]).mean().reindex(df[ITEMID]).values
 
         # We assume that df is sorted by 'unique_id' inside `TimeSeriesPredictor._check_and_prepare_data_frame`
         return df.rename(columns=column_name_mapping)
