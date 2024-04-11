@@ -186,20 +186,26 @@ class DefaultLearner(AbstractTabularLearner):
         """General data processing steps used for all models."""
         X = copy.deepcopy(X)
         # treat None, NaN, INF, NINF as NA
-        X[self.label].replace([np.inf, -np.inf], np.nan, inplace=True)
+        X[self.label] = X[self.label].replace([np.inf, -np.inf], np.nan)
         invalid_labels = X[self.label].isna()
         if invalid_labels.any():
             first_invalid_label_idx = invalid_labels.idxmax()
-            raise ValueError(f"Label column cannot contain non-finite values (NaN, Inf, Ninf). First invalid label at idx: {first_invalid_label_idx}")
+            raise ValueError(
+                f"Label column cannot contain non-finite values (NaN, Inf, Ninf). First invalid label at train_data idx: {first_invalid_label_idx}"
+            )
 
         holdout_frac_og = holdout_frac
         if X_val is not None and self.label in X_val.columns:
+            X_val = copy.deepcopy(X_val)
+
             # treat None, NaN, INF, NINF as NA
-            X_val[self.label].replace([np.inf, -np.inf], np.nan, inplace=True)
+            X_val[self.label] = X_val[self.label].replace([np.inf, -np.inf], np.nan)
             invalid_tuning_labels = X_val[self.label].isna()
             if invalid_tuning_labels.any():
                 first_invalid_label_idx = invalid_tuning_labels.idxmax()
-                raise ValueError(f"Label column cannot contain non-finite values (NaN, Inf, Ninf). First invalid label at idx: {first_invalid_label_idx}")
+                raise ValueError(
+                    f"Label column cannot contain non-finite values (NaN, Inf, Ninf). First invalid label at tuning_data idx: {first_invalid_label_idx}"
+                )
 
             holdout_frac = 1
 
