@@ -68,17 +68,7 @@ tests_require = [
     "tensorrt>=8.6.0,<8.6.2;platform_system=='Linux' and python_version<'3.11'",
 ]
 
-extras_require = {
-    "PyMuPDF": [
-        "PyMuPDF<=1.21.1",
-    ]
-}
-
-for test_package in ["PyMuPDF"]:
-    tests_require += extras_require[test_package]
-
-extras_require["tests"] = tests_require
-
+extras_require = {"tests": tests_require}
 
 if __name__ == "__main__":
     ag.create_version_file(version=version, submodule=submodule)

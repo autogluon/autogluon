@@ -68,6 +68,7 @@ def test_doc_classification(checkpoint_name):
     feature = predictor.extract_embedding({DOC_PATH_COL: [doc_path]})
 
 
+@pytest.skip("Need to install 'PyMuPDF<=1.21.1' to process pdf data.")
 @pytest.mark.parametrize(
     "checkpoint_name",
     [("google/electra-small-discriminator"), ("microsoft/layoutlmv3-base")],
