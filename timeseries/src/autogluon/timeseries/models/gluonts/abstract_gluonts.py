@@ -92,8 +92,15 @@ class SimpleGluonTSDataset(GluonTSDataset):
         """
         offset = pd.tseries.frequencies.to_offset(freq)
         freq_name = norm_freq_str(offset)
-        freq_name_for_period = {"YE": "Y", "QE": "Q", "ME": "M", "SME": "SM"}.get(freq_name, freq_name)
-        return f"{offset.n}{freq_name_for_period}"
+        if freq_name == "SME":
+            # Replace unsupported frequency "SME" with "2W"
+            return "2W"
+        elif freq_name == "bh":
+            # Replace unsupported frequency "bh" with dummy value "Y"
+            return "Y"
+        else:
+            freq_name_for_period = {"YE": "Y", "QE": "Q", "ME": "M"}.get(freq_name, freq_name)
+            return f"{offset.n}{freq_name_for_period}"
 
     def __len__(self):
         return len(self.indptr) - 1  # noqa
