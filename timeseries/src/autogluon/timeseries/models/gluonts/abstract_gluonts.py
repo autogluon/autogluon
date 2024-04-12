@@ -35,10 +35,11 @@ logger = logging.getLogger(__name__)
 gts_logger = logging.getLogger(gluonts.__name__)
 
 
+DUMMY_GLUONTS_FREQ = "D"
+
+
 class SimpleGluonTSDataset(GluonTSDataset):
     """Wrapper for TimeSeriesDataFrame that is compatible with the GluonTS Dataset API."""
-
-    _dummy_gluonts_freq = "D"
 
     def __init__(
         self,
@@ -93,7 +94,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
             # GluonTS expects item_id to be a string
             ts = {
                 FieldName.ITEM_ID: str(self.item_ids[j]),
-                FieldName.START: pd.Period(self.start_timestamps.iloc[j], freq=self._dummy_gluonts_freq),
+                FieldName.START: pd.Period(self.start_timestamps.iloc[j], freq=DUMMY_GLUONTS_FREQ),
                 FieldName.TARGET: self.target_array[start_idx:end_idx],
             }
             if self.feat_static_cat is not None:
@@ -344,7 +345,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         init_args.setdefault("early_stopping_patience", 20)
         init_args.update(
             dict(
-                freq=self.freq,
+                freq=DUMMY_GLUONTS_FREQ,
                 prediction_length=self.prediction_length,
                 quantiles=self.quantile_levels,
                 callbacks=self.callbacks,
