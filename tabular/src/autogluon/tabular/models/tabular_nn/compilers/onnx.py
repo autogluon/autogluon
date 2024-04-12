@@ -253,7 +253,7 @@ class TabularNeuralNetTorchOnnxTransformer:
             self.input_names = [onnx_to_raw[oname] for oname in self.onnx_input_names]
 
         input_dict = {}
-        input_arr = X[self.input_names].to_numpy().astype(np.float32)
+        input_arr = X[self.input_names].astype(np.float32).to_numpy()
         input_size = input_arr.shape[0]
         inputs = []
         if input_size > self.batch_size:
