@@ -1724,21 +1724,15 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         """
         previous_score = self.leaderboard(set_refit_score_to_parent=True).set_index("model", drop=True).loc[self.model_best]["score_val"]
         y_pseudo_og = pd.Series()
-        y_pred_proba_og = None
-        if return_pred_prob:
-            if self.problem_type is REGRESSION:
-                y_pred_proba_og = pd.Series()
-            else:
-                y_pred_proba_og = pd.DataFrame()
         X_test = unlabeled_data.copy()
+
+        y_pred, y_pred_proba, test_pseudo_idxes_true = self._predict_pseudo(X_test=X_test, use_ensemble=use_ensemble)
+        y_pred_proba_og = y_pred_proba
 
         for i in range(max_iter):
             if len(X_test) == 0:
                 logger.log(20, f"No more unlabeled data to pseudolabel. Done with pseudolabeling...")
                 break
-            if i == 0:
-                y_pred, y_pred_proba, test_pseudo_idxes_true = self._predict_pseudo(X_test=X_test, use_ensemble=use_ensemble)
-                y_pred_proba_og = y_pred_proba
 
             iter_print = str(i + 1)
             logger.log(20, f"Beginning iteration {iter_print} of pseudolabeling out of max {max_iter}")
@@ -1757,7 +1751,11 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             test_pseudo_idxes_false = test_pseudo_idxes[~test_pseudo_idxes.index.isin(test_pseudo_idxes_true.index)]
             test_pseudo_idxes[test_pseudo_idxes_true.index] = True
 
-            y_pseudo_og = pd.concat([y_pseudo_og, y_pred.loc[test_pseudo_idxes_true.index]], verify_integrity=True)
+            if len(test_pseudo_idxes_true) != 0:
+                if len(y_pseudo_og) == 0:
+                    y_pseudo_og = y_pred.loc[test_pseudo_idxes_true.index].copy()
+                else:
+                    y_pseudo_og = pd.concat([y_pseudo_og, y_pred.loc[test_pseudo_idxes_true.index]], verify_integrity=True)
 
             pseudo_data = unlabeled_data.loc[y_pseudo_og.index]
             pseudo_data[self.label] = y_pseudo_og
