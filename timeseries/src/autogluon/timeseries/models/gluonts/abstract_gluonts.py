@@ -25,6 +25,7 @@ from autogluon.tabular.models.tabular_nn.utils.categorical_encoders import (
 )
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
+from autogluon.timeseries.utils.datetime import norm_freq_str
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 from autogluon.timeseries.utils.warning_filters import disable_root_logger, warning_filter
 
@@ -38,11 +39,10 @@ gts_logger = logging.getLogger(gluonts.__name__)
 class SimpleGluonTSDataset(GluonTSDataset):
     """Wrapper for TimeSeriesDataFrame that is compatible with the GluonTS Dataset API."""
 
-    _dummy_gluonts_freq = "D"
-
     def __init__(
         self,
         target_df: TimeSeriesDataFrame,
+        freq: str,
         target_column: str = "target",
         feat_static_cat: Optional[np.ndarray] = None,
         feat_static_real: Optional[np.ndarray] = None,
@@ -62,6 +62,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
         self.feat_dynamic_real = self._astype(feat_dynamic_real, dtype=np.float32)
         self.past_feat_dynamic_cat = self._astype(past_feat_dynamic_cat, dtype=np.int64)
         self.past_feat_dynamic_real = self._astype(past_feat_dynamic_real, dtype=np.float32)
+        self.freq = self._get_freq_for_period(freq)
 
         # Necessary to compute indptr for known_covariates at prediction time
         self.includes_future = includes_future
@@ -83,6 +84,24 @@ class SimpleGluonTSDataset(GluonTSDataset):
         else:
             return array.astype(dtype)
 
+    @staticmethod
+    def _get_freq_for_period(freq: str) -> str:
+        """Convert freq to format compatible with pd.Period.
+
+        For example, ME freq must be converted to M when creating a pd.Period.
+        """
+        offset = pd.tseries.frequencies.to_offset(freq)
+        freq_name = norm_freq_str(offset)
+        if freq_name == "SME":
+            # Replace unsupported frequency "SME" with "2W"
+            return "2W"
+        elif freq_name == "bh":
+            # Replace unsupported frequency "bh" with dummy value "Y"
+            return "Y"
+        else:
+            freq_name_for_period = {"YE": "Y", "QE": "Q", "ME": "M"}.get(freq_name, freq_name)
+            return f"{offset.n}{freq_name_for_period}"
+
     def __len__(self):
         return len(self.indptr) - 1  # noqa
 
@@ -93,7 +112,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
             # GluonTS expects item_id to be a string
             ts = {
                 FieldName.ITEM_ID: str(self.item_ids[j]),
-                FieldName.START: pd.Period(self.start_timestamps.iloc[j], freq=self._dummy_gluonts_freq),
+                FieldName.START: pd.Period(self.start_timestamps.iloc[j], freq=self.freq),
                 FieldName.TARGET: self.target_array[start_idx:end_idx],
             }
             if self.feat_static_cat is not None:
@@ -141,6 +160,8 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
     """
 
     gluonts_model_path = "gluon_ts"
+    # we pass dummy freq compatible with pandas 2.1 & 2.2 to GluonTS models
+    _dummy_gluonts_freq = "D"
     # default number of samples for prediction
     default_num_samples: int = 250
     supports_cat_covariates: bool = False
@@ -344,7 +365,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         init_args.setdefault("early_stopping_patience", 20)
         init_args.update(
             dict(
-                freq=self.freq,
+                freq=self._dummy_gluonts_freq,
                 prediction_length=self.prediction_length,
                 quantiles=self.quantile_levels,
                 callbacks=self.callbacks,
@@ -475,6 +496,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
             return SimpleGluonTSDataset(
                 target_df=time_series_df[[self.target]],
+                freq=self.freq,
                 target_column=self.target,
                 feat_static_cat=feat_static_cat,
                 feat_static_real=feat_static_real,
