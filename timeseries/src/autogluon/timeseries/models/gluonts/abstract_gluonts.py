@@ -25,6 +25,7 @@ from autogluon.tabular.models.tabular_nn.utils.categorical_encoders import (
 )
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
+from autogluon.timeseries.utils.datetime import norm_freq_str
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 from autogluon.timeseries.utils.warning_filters import disable_root_logger, warning_filter
 
@@ -44,6 +45,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
     def __init__(
         self,
         target_df: TimeSeriesDataFrame,
+        freq: str,
         target_column: str = "target",
         feat_static_cat: Optional[np.ndarray] = None,
         feat_static_real: Optional[np.ndarray] = None,
@@ -63,6 +65,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
         self.feat_dynamic_real = self._astype(feat_dynamic_real, dtype=np.float32)
         self.past_feat_dynamic_cat = self._astype(past_feat_dynamic_cat, dtype=np.int64)
         self.past_feat_dynamic_real = self._astype(past_feat_dynamic_real, dtype=np.float32)
+        self.freq = self._get_freq_for_period(freq)
 
         # Necessary to compute indptr for known_covariates at prediction time
         self.includes_future = includes_future
@@ -84,6 +87,14 @@ class SimpleGluonTSDataset(GluonTSDataset):
         else:
             return array.astype(dtype)
 
+    @staticmethod
+    def _get_freq_for_period(freq: str) -> str:
+        """freq must be converted to a format pd.Period requires different freq string"""
+        offset = pd.tseries.frequencies.to_offset(freq)
+        freq_name = norm_freq_str(offset)
+        freq_name_for_period = {"YE": "Y", "QE": "Q", "ME": "M", "SME": "SM"}.get(freq_name, freq_name)
+        return f"{offset.n}{freq_name_for_period}"
+
     def __len__(self):
         return len(self.indptr) - 1  # noqa
 
@@ -94,7 +105,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
             # GluonTS expects item_id to be a string
             ts = {
                 FieldName.ITEM_ID: str(self.item_ids[j]),
-                FieldName.START: pd.Period(self.start_timestamps.iloc[j], freq=DUMMY_GLUONTS_FREQ),
+                FieldName.START: pd.Period(self.start_timestamps.iloc[j], freq=self.freq),
                 FieldName.TARGET: self.target_array[start_idx:end_idx],
             }
             if self.feat_static_cat is not None:
@@ -476,6 +487,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
             return SimpleGluonTSDataset(
                 target_df=time_series_df[[self.target]],
+                freq=self.freq,
                 target_column=self.target,
                 feat_static_cat=feat_static_cat,
                 feat_static_real=feat_static_real,
