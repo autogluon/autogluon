@@ -134,7 +134,7 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
     ----------
     freq : str
         A pandas-compatible string describing the frequency of the time series. For example ``"D"`` for daily data,
-        ``"H"`` for hourly data, etc. This attribute is determined automatically based on the timestamps. For the full
+        ``"h"`` for hourly data, etc. This attribute is determined automatically based on the timestamps. For the full
         list of possible values, see `pandas documentation <https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases>`_.
     num_items : int
         Number of items (time series) in the data set.
@@ -759,17 +759,25 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
                 2019-02-07     4.0
 
         """
-        if self.freq is None:
-            raise ValueError(
-                "Please make sure that all time series have a regular index before calling `fill_missing_values`"
-                "(for example, using the `convert_frequency` method)."
+        # Convert to pd.DataFrame for faster processing
+        df = pd.DataFrame(self)
+
+        # Skip filling if there are no NaNs
+        if not df.isna().any(axis=None):
+            return self
+
+        if not self.index.is_monotonic_increasing:
+            logger.warning(
+                "Trying to fill missing values in an unsorted dataframe. "
+                "It is highly recommended to call `ts_df.sort_index()` before calling `ts_df.fill_missing_values()`"
             )
 
-        grouped_df = pd.DataFrame(self).groupby(level=ITEMID, sort=False, group_keys=False)
+        grouped_df = df.groupby(level=ITEMID, sort=False, group_keys=False)
         if method == "auto":
             filled_df = grouped_df.ffill()
-            # Fill missing values at the start of each time series with bfill
-            filled_df = filled_df.groupby(level=ITEMID, sort=False, group_keys=False).bfill()
+            # If necessary, fill missing values at the start of each time series with bfill
+            if filled_df.isna().any(axis=None):
+                filled_df = filled_df.groupby(level=ITEMID, sort=False, group_keys=False).bfill()
         elif method in ["ffill", "pad"]:
             filled_df = grouped_df.ffill()
         elif method in ["bfill", "backfill"]:
@@ -953,12 +961,12 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
                 2021-06-30     6.0
                 2021-09-30     7.0
                 2021-12-31     8.0
-        >>> ts_df.convert_frequency("Y")
+        >>> ts_df.convert_frequency("YE")
                             target
         item_id timestamp
         0       2020-12-31     2.5
                 2021-12-31     6.5
-        >>> ts_df.convert_frequency("Y", agg_numeric="sum")
+        >>> ts_df.convert_frequency("YE", agg_numeric="sum")
                             target
         item_id timestamp
         0       2020-12-31    10.0

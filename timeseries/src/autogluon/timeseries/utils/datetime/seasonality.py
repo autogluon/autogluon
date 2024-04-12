@@ -5,20 +5,20 @@ import pandas as pd
 from .base import norm_freq_str
 
 DEFAULT_SEASONALITIES = {
-    "A": 1,
-    "Q": 4,
-    "M": 12,
-    "SM": 24,
+    "YE": 1,
+    "QE": 4,
+    "ME": 12,
+    "SME": 24,
     "W": 1,
     "D": 7,
     "B": 5,
-    "BH": 9,
-    "H": 24,
-    "T": 60 * 24,
-    "S": 1,
-    "L": 1,
-    "U": 1,
-    "N": 1,
+    "bh": 9,
+    "h": 24,
+    "min": 60 * 24,
+    "s": 1,
+    "ms": 1,
+    "us": 1,
+    "ns": 1,
 }
 
 

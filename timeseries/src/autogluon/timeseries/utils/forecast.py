@@ -1,4 +1,5 @@
 import warnings
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -15,7 +16,9 @@ def get_forecast_horizon_index_single_time_series(
 
 
 def get_forecast_horizon_index_ts_dataframe(
-    ts_dataframe: TimeSeriesDataFrame, prediction_length: int
+    ts_dataframe: TimeSeriesDataFrame,
+    prediction_length: int,
+    freq: Optional[str] = None,
 ) -> pd.MultiIndex:
     """For each item in the dataframe, get timestamps for the next prediction_length many time steps into the future.
 
@@ -26,7 +29,9 @@ def get_forecast_horizon_index_ts_dataframe(
     last = ts_dataframe.reset_index()[[ITEMID, TIMESTAMP]].groupby(by=ITEMID, sort=False, as_index=False).last()
     item_ids = np.repeat(last[ITEMID], prediction_length)
 
-    offset = pd.tseries.frequencies.to_offset(ts_dataframe.freq)
+    if freq is None:
+        freq = ts_dataframe.freq
+    offset = pd.tseries.frequencies.to_offset(freq)
     last_ts = pd.DatetimeIndex(last[TIMESTAMP])
     # Non-vectorized offsets like BusinessDay may produce a PerformanceWarning - we filter them
     with warnings.catch_warnings():

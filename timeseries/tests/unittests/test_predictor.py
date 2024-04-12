@@ -1,29 +1,47 @@
 """Unit tests for predictors"""
+
 import copy
+import logging
 import math
 import sys
-import tempfile
 from pathlib import Path
 from unittest import mock
+from uuid import uuid4
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pytest
 
 from autogluon.common import space
+from autogluon.common.utils.log_utils import verbosity2loglevel
+from autogluon.common.utils.utils import seed_everything
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 from autogluon.timeseries.metrics import DEFAULT_METRIC_NAME
 from autogluon.timeseries.models import DeepARModel, SimpleFeedForwardModel
+from autogluon.timeseries.models.ensemble.greedy_ensemble import TimeSeriesGreedyEnsemble
 from autogluon.timeseries.predictor import TimeSeriesPredictor
 
-from .common import DUMMY_TS_DATAFRAME, CustomMetric, get_data_frame_with_variable_lengths
+from .common import (
+    DATAFRAME_WITH_COVARIATES,
+    DUMMY_TS_DATAFRAME,
+    PREDICTIONS_FOR_DUMMY_TS_DATAFRAME,
+    CustomMetric,
+    get_data_frame_with_variable_lengths,
+    get_static_features,
+    to_supported_pandas_freq,
+)
 
 TEST_HYPERPARAMETER_SETTINGS = [
     {"SimpleFeedForward": {"epochs": 1, "num_batches_per_epoch": 1}},
     {"ETS": {"maxiter": 1}, "SimpleFeedForward": {"epochs": 1, "num_batches_per_epoch": 1}},
 ]
 DUMMY_HYPERPARAMETERS = {"SeasonalNaive": {"n_jobs": 1}, "Average": {"n_jobs": 1}}
+CHRONOS_HYPERPARAMETER_SETTINGS = [
+    {"Chronos": {"model_path": "tiny", "context_length": 16}},
+    {"Chronos": {"model_path": "tiny", "context_length": 16}, "SeasonalNaive": {"n_jobs": 1}},
+]
 
 
 def test_predictor_can_be_initialized(temp_model_path):
@@ -42,7 +60,9 @@ def test_when_predictor_called_then_training_is_performed(temp_model_path):
     assert "SimpleFeedForward" in predictor.model_names()
 
 
-@pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS + ["very_light"])  # noqa
+@pytest.mark.parametrize(
+    "hyperparameters", TEST_HYPERPARAMETER_SETTINGS + CHRONOS_HYPERPARAMETER_SETTINGS + ["very_light"]
+)
 def test_given_hyperparameters_when_predictor_called_then_model_can_predict(temp_model_path, hyperparameters):
     predictor = TimeSeriesPredictor(path=temp_model_path, eval_metric="MAPE", prediction_length=3)
     predictor.fit(
@@ -72,7 +92,9 @@ def test_when_pathlib_path_provided_to_predictor_then_loaded_predictor_can_predi
     assert isinstance(predictions, TimeSeriesDataFrame)
 
 
-@pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS + ["very_light"])  # noqa
+@pytest.mark.parametrize(
+    "hyperparameters", TEST_HYPERPARAMETER_SETTINGS + CHRONOS_HYPERPARAMETER_SETTINGS + ["very_light"]
+)
 def test_given_different_target_name_when_predictor_called_then_model_can_predict(temp_model_path, hyperparameters):
     df = TimeSeriesDataFrame(copy.copy(DUMMY_TS_DATAFRAME))
     df.rename(columns={"target": "mytarget"}, inplace=True)
@@ -97,7 +119,7 @@ def test_given_different_target_name_when_predictor_called_then_model_can_predic
     assert not np.any(np.isnan(predictions))
 
 
-@pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS)
+@pytest.mark.parametrize("hyperparameters", TEST_HYPERPARAMETER_SETTINGS + CHRONOS_HYPERPARAMETER_SETTINGS)
 def test_given_no_tuning_data_when_predictor_called_then_model_can_predict(temp_model_path, hyperparameters):
     predictor = TimeSeriesPredictor(path=temp_model_path, eval_metric="MAPE", prediction_length=3)
     predictor.fit(
@@ -198,8 +220,8 @@ def test_given_hyperparameters_when_predictor_called_and_loaded_back_then_all_mo
 @pytest.mark.parametrize(
     "hyperparameters",
     [
-        {"ETS": {"maxiter": 1}, "SimpleFeedForward": {"epochs": 1}},
-        {"ETS": {"maxiter": 1}, "SimpleFeedForward": {"epochs": space.Int(1, 3)}},
+        {"Naive": {"maxiter": 1}, "SimpleFeedForward": {"epochs": 1}},
+        {"Naive": {"maxiter": 1}, "SimpleFeedForward": {"epochs": space.Int(1, 3)}},
     ],
 )
 def test_given_hp_spaces_and_custom_target_when_predictor_called_predictor_can_predict(
@@ -379,6 +401,18 @@ def test_when_target_included_in_known_covariates_then_exception_is_raised(temp_
         )
 
 
+EXPECTED_FIT_SUMMARY_KEYS = [
+    "model_types",
+    "model_performance",
+    "model_best",
+    "model_paths",
+    "model_fit_times",
+    "model_pred_times",
+    "model_hyperparams",
+    "leaderboard",
+]
+
+
 @pytest.mark.parametrize(
     "hyperparameters, num_models",
     [
@@ -391,22 +425,24 @@ def test_when_fit_summary_is_called_then_all_keys_and_models_are_included(
 ):
     predictor = TimeSeriesPredictor(path=temp_model_path)
     predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters=hyperparameters)
-    expected_keys = [
-        "model_types",
-        "model_performance",
-        "model_best",
-        "model_paths",
-        "model_fit_times",
-        "model_pred_times",
-        "model_hyperparams",
-        "leaderboard",
-    ]
     fit_summary = predictor.fit_summary()
-    for key in expected_keys:
+    for key in EXPECTED_FIT_SUMMARY_KEYS:
         assert key in fit_summary
         # All keys except model_best return a dict with results per model
         if key != "model_best":
             assert len(fit_summary[key]) == num_models
+
+
+EXPECTED_INFO_KEYS = [
+    "path",
+    "version",
+    "time_fit_training",
+    "time_limit",
+    "best_model",
+    "best_model_score_val",
+    "num_models_trained",
+    "model_info",
+]
 
 
 @pytest.mark.parametrize(
@@ -419,26 +455,29 @@ def test_when_fit_summary_is_called_then_all_keys_and_models_are_included(
 def test_when_info_is_called_then_all_keys_and_models_are_included(temp_model_path, hyperparameters, num_models):
     predictor = TimeSeriesPredictor(path=temp_model_path)
     predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters=hyperparameters)
-    expected_keys = [
-        "path",
-        "version",
-        "time_fit_training",
-        "time_limit",
-        "best_model",
-        "best_model_score_val",
-        "num_models_trained",
-        "model_info",
-    ]
     info = predictor.info()
-    for key in expected_keys:
+    for key in EXPECTED_INFO_KEYS:
         assert key in info
 
     assert len(info["model_info"]) == num_models
 
 
+def test_when_predictor_is_loaded_then_info_works(temp_model_path):
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=2)
+    predictor.fit(train_data=DUMMY_TS_DATAFRAME, hyperparameters=DUMMY_HYPERPARAMETERS)
+    predictor.save()
+    del predictor
+    predictor = TimeSeriesPredictor.load(temp_model_path)
+    info = predictor.info()
+    for key in EXPECTED_INFO_KEYS:
+        assert key in info
+
+    assert len(info["model_info"]) == len(DUMMY_HYPERPARAMETERS) + 1  # + 1 for ensemble
+
+
 def test_when_train_data_contains_nans_then_predictor_can_fit(temp_model_path):
     predictor = TimeSeriesPredictor(path=temp_model_path)
-    df = DUMMY_TS_DATAFRAME.copy()
+    df = DATAFRAME_WITH_COVARIATES.copy()
     df.iloc[5] = np.nan
     predictor.fit(
         df,
@@ -450,23 +489,42 @@ def test_when_train_data_contains_nans_then_predictor_can_fit(temp_model_path):
 def test_when_prediction_data_contains_nans_then_predictor_can_predict(temp_model_path):
     predictor = TimeSeriesPredictor(path=temp_model_path)
     predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
-    df = DUMMY_TS_DATAFRAME.copy()
+    df = DATAFRAME_WITH_COVARIATES.copy()
     df.iloc[5] = np.nan
     predictions = predictor.predict(df)
     assert isinstance(predictions, TimeSeriesDataFrame)
     assert not np.any(np.isnan(predictions))
 
 
-def test_when_some_time_series_contain_only_nans_then_exception_is_raised(temp_model_path):
+def test_when_some_train_time_series_contain_only_nans_then_they_are_removed_from_train_data(temp_model_path):
     predictor = TimeSeriesPredictor(path=temp_model_path)
-    df = TimeSeriesDataFrame.from_iterable_dataset(
+    train_data = TimeSeriesDataFrame.from_iterable_dataset(
         [
-            {"target": [float(5)] * 10, "start": pd.Period("2020-01-01", "D")},
             {"target": [float("nan")] * 10, "start": pd.Period("2020-01-01", "D")},
+            {"target": [float(5)] * 10, "start": pd.Period("2020-01-01", "D")},
         ]
     )
-    with pytest.raises(ValueError, match="consist completely of NaN values"):
-        predictor._check_and_prepare_data_frame(df)
+    with mock.patch("autogluon.timeseries.learner.TimeSeriesLearner.fit") as mock_learner_fit:
+        predictor.fit(train_data)
+        learner_train_data = mock_learner_fit.call_args[1]["train_data"]
+        assert all(learner_train_data.item_ids == [1])
+
+
+def test_when_all_train_time_series_contain_only_nans_then_exception_is_raised(temp_model_path):
+    predictor = TimeSeriesPredictor(path=temp_model_path)
+    train_data = DUMMY_TS_DATAFRAME.copy()
+    train_data["target"] = float("nan")
+    with pytest.raises(ValueError, match="At least some time series in train"):
+        predictor.fit(train_data)
+
+
+def test_when_all_nan_data_passed_to_predict_then_predictor_can_predict(temp_model_path):
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=3)
+    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters=DUMMY_HYPERPARAMETERS)
+    data = DUMMY_TS_DATAFRAME.copy()
+    data["target"] = float("nan")
+    predictions = predictor.predict(data)
+    assert not predictions.isna().any(axis=None) and all(predictions.item_ids == data.item_ids)
 
 
 @pytest.mark.parametrize("method", ["evaluate", "leaderboard"])
@@ -497,16 +555,21 @@ def test_given_data_is_in_dataframe_format_then_predictor_works(temp_model_path)
     assert isinstance(predictions, TimeSeriesDataFrame)
 
 
-def test_given_data_is_in_str_format_then_predictor_works(temp_model_path):
+@pytest.mark.parametrize("path_format", [str, Path])
+def test_given_data_is_in_str_format_then_predictor_works(temp_model_path, tmp_path, path_format):
     df = pd.DataFrame(DUMMY_TS_DATAFRAME.reset_index())
-    with tempfile.NamedTemporaryFile("w") as data_path:
-        df.to_csv(data_path, index=False)
-        predictor = TimeSeriesPredictor(path=temp_model_path)
-        predictor.fit(df, hyperparameters={"Naive": {}})
-        predictor.leaderboard(df)
-        predictor.evaluate(df)
-        predictions = predictor.predict(df)
-        assert isinstance(predictions, TimeSeriesDataFrame)
+    tmp_path_subdir = tmp_path / str(uuid4())[:4]
+    data_path = path_format(str(tmp_path_subdir))
+
+    df.to_csv(data_path, index=False)
+
+    predictor = TimeSeriesPredictor(path=temp_model_path)
+    predictor.fit(data_path, hyperparameters={"Naive": {}})
+    predictor.leaderboard(data_path)
+    predictor.evaluate(data_path)
+    predictions = predictor.predict(data_path)
+
+    assert isinstance(predictions, TimeSeriesDataFrame)
 
 
 @pytest.mark.parametrize("rename_columns", [{TIMESTAMP: "custom_timestamp"}, {ITEMID: "custom_item_id"}])
@@ -715,10 +778,11 @@ def test_given_irregular_time_series_and_no_tuning_when_predictor_called_with_fr
     assert "SimpleFeedForward" in predictor.model_names()
 
 
-@pytest.mark.parametrize("predictor_freq", ["H", "2H", "20T"])
+@pytest.mark.parametrize("predictor_freq", ["h", "2h", "20min"])
 def test_given_regular_time_series_when_predictor_called_with_freq_then_predictions_have_predictor_freq(
     temp_model_path, predictor_freq
 ):
+    predictor_freq = to_supported_pandas_freq(predictor_freq)
     df = DUMMY_TS_DATAFRAME.copy()
     predictor = TimeSeriesPredictor(
         path=temp_model_path,
@@ -730,7 +794,7 @@ def test_given_regular_time_series_when_predictor_called_with_freq_then_predicti
         hyperparameters=TEST_HYPERPARAMETER_SETTINGS[0],
     )
     predictions = predictor.predict(df)
-    assert predictions.freq == predictor_freq
+    assert pd.tseries.frequencies.to_offset(predictions.freq) == pd.tseries.frequencies.to_offset(predictor_freq)
 
 
 def test_given_irregular_time_series_when_predictor_called_without_freq_then_training_fails(
@@ -783,7 +847,7 @@ def test_given_regular_time_series_when_predictor_loaded_from_disk_then_inferred
 def test_given_short_and_long_series_in_train_data_when_fit_called_then_trainer_receives_only_long_series(
     temp_model_path, prediction_length, num_val_windows, val_step_size
 ):
-    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length, freq="H")
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length, freq="h")
     min_train_length = predictor._min_train_length
     min_val_length = min_train_length + prediction_length + (num_val_windows - 1) * val_step_size
 
@@ -796,7 +860,7 @@ def test_given_short_and_long_series_in_train_data_when_fit_called_then_trainer_
         "short_series_2": min_train_length + 1,
         "short_series_3": 2,
     }
-    data = get_data_frame_with_variable_lengths(item_id_to_length, freq="H")
+    data = get_data_frame_with_variable_lengths(item_id_to_length, freq="h")
     with mock.patch("autogluon.timeseries.learner.TimeSeriesLearner.fit") as learner_fit:
         predictor.fit(data, num_val_windows=num_val_windows, val_step_size=val_step_size)
         learner_fit_kwargs = learner_fit.call_args[1]
@@ -810,7 +874,7 @@ def test_given_short_and_long_series_in_train_data_when_fit_called_then_trainer_
 def test_given_short_and_long_series_in_train_data_and_tuning_data_when_fit_called_then_trainer_receives_only_long_series(
     temp_model_path, prediction_length
 ):
-    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length, freq="H")
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length, freq="h")
     min_train_length = predictor._min_train_length
 
     item_id_to_length = {
@@ -818,7 +882,7 @@ def test_given_short_and_long_series_in_train_data_and_tuning_data_when_fit_call
         "short_series_1": min_train_length - 1,
         "short_series_2": 2,
     }
-    data = get_data_frame_with_variable_lengths(item_id_to_length, freq="H")
+    data = get_data_frame_with_variable_lengths(item_id_to_length, freq="h")
     with mock.patch("autogluon.timeseries.learner.TimeSeriesLearner.fit") as learner_fit:
         predictor.fit(data, tuning_data=DUMMY_TS_DATAFRAME)
         learner_fit_kwargs = learner_fit.call_args[1]
@@ -856,7 +920,7 @@ def test_given_num_val_windows_too_high_for_given_data_then_num_val_windows_is_r
 def test_given_only_short_series_in_train_data_when_fit_called_then_exception_is_raised(
     temp_model_path, prediction_length, num_val_windows, val_step_size
 ):
-    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length, freq="H")
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length, freq="h")
     min_train_length = predictor._min_train_length
 
     item_id_to_length = {
@@ -864,8 +928,8 @@ def test_given_only_short_series_in_train_data_when_fit_called_then_exception_is
         "short_series_2": min_train_length,
         "short_series_3": 2,
     }
-    data = get_data_frame_with_variable_lengths(item_id_to_length, freq="H")
-    with pytest.raises(ValueError, match="At least some time series in train\_data must have length"):
+    data = get_data_frame_with_variable_lengths(item_id_to_length, freq="h")
+    with pytest.raises(ValueError, match="Please provide longer time series as train"):
         predictor.fit(data, num_val_windows=num_val_windows, val_step_size=val_step_size)
 
 
@@ -874,7 +938,7 @@ def test_given_only_short_series_in_train_data_when_fit_called_then_exception_is
 def test_given_only_short_series_in_train_data_then_exception_is_raised(
     temp_model_path, prediction_length, num_val_windows
 ):
-    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length, freq="H")
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=prediction_length, freq="h")
     min_train_length = predictor._min_train_length
 
     item_id_to_length = {
@@ -882,8 +946,8 @@ def test_given_only_short_series_in_train_data_then_exception_is_raised(
         "short_series_2": min_train_length,
         "short_series_3": 2,
     }
-    data = get_data_frame_with_variable_lengths(item_id_to_length, freq="H")
-    with pytest.raises(ValueError, match="At least some time series in train\_data must have length"):
+    data = get_data_frame_with_variable_lengths(item_id_to_length, freq="h")
+    with pytest.raises(ValueError, match="Please provide longer time series as train"):
         predictor.fit(data, num_val_windows=num_val_windows, hyperparameters=TEST_HYPERPARAMETER_SETTINGS[0])
 
 
@@ -1001,3 +1065,698 @@ def test_given_time_limit_is_not_none_then_time_is_distributed_across_windows_fo
         except RuntimeError:
             pass
         assert mock_fit.call_args[1]["time_limit"] < expected_time_limit_for_first_model
+
+
+def test_when_log_to_file_set_then_predictor_logs_to_file(temp_model_path):
+    predictor = TimeSeriesPredictor(path=temp_model_path, log_to_file=True)
+    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
+    log_path = Path(temp_model_path) / "logs/predictor_log.txt"
+    assert Path.exists(log_path)
+
+    # check if the log contains text
+    with open(log_path, "r") as f:
+        log_text = f.read()
+    assert "Naive" in log_text
+
+
+def test_when_log_file_set_then_predictor_logs_to_custom_file(temp_model_path):
+    predictor = TimeSeriesPredictor(path=temp_model_path, log_to_file=True, log_file_path="custom_log.txt")
+    log_path = Path(".") / "custom_log.txt"
+    try:
+        predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
+        assert Path.exists(log_path)
+
+        # check if the log contains text
+        with open(log_path, "r") as f:
+            log_text = f.read()
+        assert "Naive" in log_text
+    finally:
+        try:
+            log_path.unlink(missing_ok=True)
+        except PermissionError:
+            # Windows won't allow to clean up the directory if logs are saved to it;
+            # Permission Error: The process can't access the file since it is being used by another process
+            # skip deletion
+            pass
+
+
+def test_when_log_file_set_with_pathlib_then_predictor_logs_to_custom_file(temp_model_path):
+    predictor = TimeSeriesPredictor(path=temp_model_path, log_to_file=True, log_file_path=Path(".") / "custom_log.txt")
+    log_path = Path(".") / "custom_log.txt"
+    try:
+        predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
+        assert Path.exists(log_path)
+
+        # check if the log contains text
+        with open(log_path, "r") as f:
+            log_text = f.read()
+        assert "Naive" in log_text
+    finally:
+        try:
+            log_path.unlink(missing_ok=True)
+        except PermissionError:
+            # Windows won't allow to clean up the directory if logs are saved to it;
+            # Permission Error: The process can't access the file since it is being used by another process
+            # skip deletion
+            pass
+
+
+def test_when_log_to_file_set_to_false_then_predictor_does_not_log_to_file(temp_model_path):
+    predictor = TimeSeriesPredictor(path=temp_model_path, log_to_file=False)
+    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
+    log_path = Path(temp_model_path) / "logs/predictor_log.txt"
+    assert not Path.exists(log_path)
+
+
+@pytest.mark.parametrize("verbosity", [-1, 0, 1, 2, 3, 4, 5])
+def test_when_predictor_init_with_verbosity_then_verbosity_propagates_to_all_loggers(temp_model_path, verbosity):
+    logger_suffixes = ["learner", "trainer", "abstract_local_model"]
+
+    predictor = TimeSeriesPredictor(path=temp_model_path, log_to_file=False, verbosity=verbosity)
+    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
+
+    for suffix in logger_suffixes:
+        level = logging.getLogger(f"autogluon.timeseries.{suffix}").getEffectiveLevel()
+        assert level == verbosity2loglevel(verbosity)
+
+
+@pytest.mark.parametrize("verbosity", [-1, 0, 1, 2, 3, 4, 5])
+def test_when_predictor_fit_with_verbosity_then_verbosity_overridden_and_propagates_to_all_loggers(
+    temp_model_path, verbosity
+):
+    logger_suffixes = ["learner", "trainer", "abstract_local_model"]
+
+    predictor = TimeSeriesPredictor(path=temp_model_path, log_to_file=False, verbosity=-1)
+    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}}, verbosity=verbosity)
+
+    for suffix in logger_suffixes:
+        level = logging.getLogger(f"autogluon.timeseries.{suffix}").getEffectiveLevel()
+        assert level == verbosity2loglevel(verbosity)
+
+
+@pytest.mark.parametrize("random_seed", [123, 1, 42])
+def test_when_predictor_fit_with_random_seed_then_torch_seed_set_for_all_models(temp_model_path, random_seed):
+    predictor = TimeSeriesPredictor(path=temp_model_path)
+
+    import torch
+
+    def train_save_side_effect(self, *args, **kwargs):
+        assert torch.get_rng_state().numpy()[0] == random_seed
+
+        # mess with the seed
+        seed_everything(66)
+
+        return "mock_model"
+
+    with mock.patch("autogluon.timeseries.trainer.AbstractTimeSeriesTrainer._train_and_save") as mock_train_save:
+        mock_train_save.side_effect = train_save_side_effect
+        predictor.fit(
+            DUMMY_TS_DATAFRAME,
+            hyperparameters={
+                "SeasonalNaive": {},
+                "RecursiveTabular": {
+                    "tabular_hyperparameters": {"NN_TORCH": {"proc.impute_strategy": "constant", "num_epochs": 1}},
+                },
+                "TemporalFusionTransformer": {"epochs": 1},
+                "DeepAR": {"epochs": 1},
+            },
+            random_seed=random_seed,
+            enable_ensemble=False,
+        )
+        assert mock_train_save.call_count == 4
+
+
+@pytest.mark.parametrize("random_seed", [123, 42])
+def test_when_predictor_predict_called_with_random_seed_then_torch_seed_set_for_all_predictions(
+    temp_model_path, random_seed
+):
+    predictor = TimeSeriesPredictor(path=temp_model_path)
+
+    predictor.fit(
+        DUMMY_TS_DATAFRAME,
+        hyperparameters={
+            "SeasonalNaive": {},
+            "DeepAR": {"epochs": 1},
+        },
+        random_seed=random_seed,
+        enable_ensemble=False,
+    )
+
+    import torch
+
+    def predict_model_side_effect(*args, **kwargs):
+        assert torch.get_rng_state().numpy()[0] == random_seed
+        return DUMMY_TS_DATAFRAME
+
+    with mock.patch("autogluon.timeseries.trainer.AbstractTimeSeriesTrainer._predict_model") as mock_predict_model:
+        mock_predict_model.side_effect = predict_model_side_effect
+        try:
+            predictor.predict(DUMMY_TS_DATAFRAME, random_seed=random_seed)
+        except RuntimeError:
+            pass
+        assert mock_predict_model.call_count == 1
+
+
+@pytest.mark.parametrize("predictions", [PREDICTIONS_FOR_DUMMY_TS_DATAFRAME, None])
+@pytest.mark.parametrize("quantile_levels", [[0.1, 0.7, 0.9], None])
+@pytest.mark.parametrize("max_history_length", [10, None])
+@pytest.mark.parametrize("point_forecast_column", ["mean", "0.7", None])
+@pytest.mark.parametrize(
+    "max_num_item_ids, item_ids, expected_num_subplots",
+    [
+        (1, None, 1),
+        (8, DUMMY_TS_DATAFRAME.item_ids[:2], 2),
+        (3, DUMMY_TS_DATAFRAME.item_ids, 3),
+    ],
+)
+def test_when_plot_called_then_figure_contains_correct_number_of_subplots(
+    predictions,
+    quantile_levels,
+    item_ids,
+    max_num_item_ids,
+    max_history_length,
+    point_forecast_column,
+    expected_num_subplots,
+):
+    fig = TimeSeriesPredictor().plot(
+        DUMMY_TS_DATAFRAME,
+        predictions=predictions,
+        quantile_levels=quantile_levels,
+        item_ids=item_ids,
+        max_num_item_ids=max_num_item_ids,
+        max_history_length=max_history_length,
+        point_forecast_column=point_forecast_column,
+    )
+    num_subplots = len([ax for ax in fig.axes if ax.get_title() != ""])
+    assert num_subplots == expected_num_subplots
+    plt.close(fig)
+
+
+@pytest.mark.parametrize(
+    "selected_columns",
+    [["mean"], ["mean", "0.1"], ["mean", "0.5"], ["mean", "0.5", "0.8"], ["mean", "0.1", "0.2", "0.4"]],
+)
+def test_when_not_all_quantile_forecasts_available_then_predictor_can_plot(selected_columns):
+    max_num_item_ids = 3
+    fig = TimeSeriesPredictor().plot(
+        DUMMY_TS_DATAFRAME,
+        predictions=PREDICTIONS_FOR_DUMMY_TS_DATAFRAME[selected_columns],
+        max_num_item_ids=max_num_item_ids,
+    )
+    num_subplots = len([ax for ax in fig.axes if ax.get_title() != ""])
+    assert num_subplots == max_num_item_ids
+    plt.close(fig)
+
+
+@pytest.mark.parametrize(
+    "predictions",
+    [
+        pd.DataFrame(PREDICTIONS_FOR_DUMMY_TS_DATAFRAME),
+        PREDICTIONS_FOR_DUMMY_TS_DATAFRAME.drop(columns="mean"),
+        PREDICTIONS_FOR_DUMMY_TS_DATAFRAME.loc[PREDICTIONS_FOR_DUMMY_TS_DATAFRAME.item_ids[0]],
+    ],
+)
+def test_when_predictions_for_plot_have_incorrect_format_then_exception_is_raised(predictions):
+    with pytest.raises(ValueError, match="predictions must be a TimeSeriesDataFrame"):
+        TimeSeriesPredictor().plot(DUMMY_TS_DATAFRAME, predictions=predictions)
+
+
+def test_given_skip_model_selection_when_multiple_models_provided_then_exception_is_raised(temp_model_path):
+    with pytest.raises(ValueError, match="a single model must be provided"):
+        TimeSeriesPredictor(path=temp_model_path).fit(
+            DUMMY_TS_DATAFRAME, skip_model_selection=True, hyperparameters={"Naive": {}, "SeasonalNaive": {}}
+        )
+
+
+def test_given_skip_model_selection_when_search_space_provided_then_exception_is_raised(temp_model_path):
+    with pytest.raises(ValueError, match="should contain no search spaces"):
+        TimeSeriesPredictor(path=temp_model_path).fit(
+            DUMMY_TS_DATAFRAME,
+            skip_model_selection=True,
+            hyperparameters={"SeasonalNaive": {"seasonal_period": space.Categorical(1, 2)}},
+            hyperparameter_tune_kwargs="auto",
+        )
+
+
+@pytest.mark.parametrize("hyperparameters", [{"RecursiveTabular": {}}, {"Chronos": {"model_path": "tiny"}}])
+@pytest.mark.parametrize("tuning_data", [None, DUMMY_TS_DATAFRAME])
+def test_given_skip_model_selection_then_predictor_can_fit_predict(temp_model_path, hyperparameters, tuning_data):
+    predictor = TimeSeriesPredictor(prediction_length=10, path=temp_model_path).fit(
+        DUMMY_TS_DATAFRAME, tuning_data=tuning_data, skip_model_selection=True, hyperparameters=hyperparameters
+    )
+    predictions = predictor.predict(DUMMY_TS_DATAFRAME)
+    assert all(predictions.item_ids == DUMMY_TS_DATAFRAME.item_ids)
+
+
+@pytest.mark.parametrize("hyperparameters", [{"RecursiveTabular": {}}, {"Chronos": {"model_path": "tiny"}}])
+def test_given_skip_model_selection_then_all_predictor_methods_work(temp_model_path, hyperparameters):
+    predictor = TimeSeriesPredictor(prediction_length=10, path=temp_model_path).fit(
+        DUMMY_TS_DATAFRAME, skip_model_selection=True, hyperparameters=hyperparameters
+    )
+
+    assert predictor.model_best is not None
+    assert isinstance(predictor.leaderboard(DUMMY_TS_DATAFRAME), pd.DataFrame)
+
+    info = predictor.info()
+    for key in EXPECTED_INFO_KEYS:
+        assert key in info
+    assert len(info["model_info"]) == 1
+
+    fit_summary = predictor.fit_summary()
+    for key in EXPECTED_FIT_SUMMARY_KEYS:
+        assert key in fit_summary
+        # All keys except model_best return a dict with results per model
+        if key != "model_best":
+            assert len(fit_summary[key]) == 1
+
+
+@pytest.mark.parametrize("hyperparameters", [{"Naive": {}}, {"SeasonalNaive": {}}, {"Naive": {}, "SeasonalNaive": {}}])
+def test_when_persist_called_then_at_least_one_model_persisted(temp_model_path, hyperparameters):
+    predictor = TimeSeriesPredictor(path=temp_model_path).fit(
+        DUMMY_TS_DATAFRAME,
+        hyperparameters=hyperparameters,
+        enable_ensemble=False,
+    )
+    predictor.persist()
+
+    assert len(predictor._learner.trainer.models) > 0
+
+
+@pytest.mark.parametrize("hyperparameters", [{"Naive": {}}, {"SeasonalNaive": {}}, {"Naive": {}, "SeasonalNaive": {}}])
+def test_when_predictor_saved_loaded_and_persist_called_then_at_least_one_model_persisted(
+    temp_model_path, hyperparameters
+):
+    predictor = TimeSeriesPredictor(path=temp_model_path).fit(
+        DUMMY_TS_DATAFRAME,
+        hyperparameters=hyperparameters,
+        enable_ensemble=False,
+    )
+    path = predictor.path
+    predictor.save()
+    predictor = TimeSeriesPredictor.load(path)
+    predictor.persist()
+
+    assert len(predictor._learner.trainer.models) > 0
+
+
+@pytest.mark.parametrize("hyperparameters", [{"Naive": {}}, {"SeasonalNaive": {}}, {"Naive": {}, "SeasonalNaive": {}}])
+def test_when_persist_not_called_then_no_models_persisted(temp_model_path, hyperparameters):
+    predictor = TimeSeriesPredictor(path=temp_model_path).fit(
+        DUMMY_TS_DATAFRAME,
+        hyperparameters=hyperparameters,
+        enable_ensemble=False,
+    )
+
+    assert len(predictor._learner.trainer.models) == 0
+
+
+@pytest.mark.parametrize("hyperparameters", [{"Naive": {}}, {"SeasonalNaive": {}}, {"Naive": {}, "SeasonalNaive": {}}])
+def test_when_predictor_saved_loaded_and_persist_not_called_then_no_models_persisted(temp_model_path, hyperparameters):
+    predictor = TimeSeriesPredictor(path=temp_model_path).fit(
+        DUMMY_TS_DATAFRAME,
+        hyperparameters=hyperparameters,
+        enable_ensemble=False,
+    )
+    path = predictor.path
+    predictor.save()
+    predictor = TimeSeriesPredictor.load(path)
+
+    assert len(predictor._learner.load_trainer().models) == 0
+
+
+@pytest.mark.parametrize("hyperparameters", [{"Naive": {}}, {"SeasonalNaive": {}}, {"Naive": {}, "SeasonalNaive": {}}])
+def test_when_predictor_persisted_saved_loaded_and_persist_not_called_then_no_models_persisted(
+    temp_model_path, hyperparameters
+):
+    predictor = TimeSeriesPredictor(path=temp_model_path).fit(
+        DUMMY_TS_DATAFRAME,
+        hyperparameters=hyperparameters,
+        enable_ensemble=False,
+    )
+    path = predictor.path
+    predictor.persist()
+
+    assert len(predictor._learner.load_trainer().models) > 0
+
+    predictor.save()
+    predictor = TimeSeriesPredictor.load(path)
+
+    assert len(predictor._learner.load_trainer().models) == 0
+
+
+@pytest.mark.parametrize("hyperparameters", [{"Naive": {}}, {"SeasonalNaive": {}}, {"Naive": {}, "SeasonalNaive": {}}])
+def test_when_persist_called_then_persisted_models_names_are_returned(temp_model_path, hyperparameters):
+    predictor = TimeSeriesPredictor(path=temp_model_path).fit(
+        DUMMY_TS_DATAFRAME,
+        hyperparameters=hyperparameters,
+        enable_ensemble=False,
+    )
+    persisted_models = predictor.persist()
+
+    assert set(persisted_models).issubset(set(hyperparameters.keys()))
+
+
+@pytest.mark.parametrize("hyperparameters", [{"Naive": {}}, {"SeasonalNaive": {}}, {"Naive": {}, "SeasonalNaive": {}}])
+def test_when_persist_and_unpersisted_called_then_persisted_and_unpersisted_models_names_are_returned(
+    temp_model_path, hyperparameters
+):
+    predictor = TimeSeriesPredictor(path=temp_model_path).fit(
+        DUMMY_TS_DATAFRAME,
+        hyperparameters=hyperparameters,
+        enable_ensemble=False,
+    )
+    persisted_models = predictor.persist()
+
+    assert set(persisted_models).issubset(set(hyperparameters.keys()))
+
+    unpersisted_models = predictor.unpersist()
+
+    assert set(unpersisted_models) == set(persisted_models)
+    assert len(predictor._learner.load_trainer().models) == 0
+
+
+def _add_ensemble_to_predictor(predictor, hyperparameters, make_best_model=True):
+    trainer = predictor._learner.load_trainer()
+
+    # Manually add ensemble to ensure that both models have non-zero weight
+    ensemble = TimeSeriesGreedyEnsemble(name="WeightedEnsemble", path=trainer.path)
+    ensemble.model_to_weight = {k: 1 / len(hyperparameters) for k in hyperparameters.keys()}
+    if make_best_model:
+        ensemble.val_score = 0  # make the ensemble the best model
+
+    trainer._add_model(model=ensemble, base_models=hyperparameters.keys())
+    trainer.save_model(model=ensemble)
+    predictor._learner.save()
+
+    return predictor
+
+
+@pytest.mark.parametrize("hyperparameters", [{"Naive": {}}, {"SeasonalNaive": {}}])
+def test_given_single_model_with_ensemble_when_predictor_persisted_then_only_one_model_persisted(
+    temp_model_path, hyperparameters
+):
+    predictor = TimeSeriesPredictor(path=temp_model_path).fit(
+        DUMMY_TS_DATAFRAME,
+        hyperparameters=hyperparameters,
+        enable_ensemble=False,
+    )
+    predictor = _add_ensemble_to_predictor(predictor, hyperparameters, make_best_model=False)
+
+    predictor.persist()
+    assert len(predictor._learner.load_trainer().models) == 1
+
+    predictor.unpersist()
+    assert len(predictor._learner.load_trainer().models) == 0
+
+
+@pytest.mark.parametrize(
+    "hyperparameters",
+    [
+        {"Naive": {}, "SeasonalNaive": {}},
+        {"Naive": {}, "DeepAR": {"max_epochs": 1}},
+    ],
+)
+def test_given_multiple_models_with_ensemble_when_predictor_all_persisted_then_all_models_persisted(
+    temp_model_path, hyperparameters
+):
+    predictor = TimeSeriesPredictor(path=temp_model_path).fit(
+        DUMMY_TS_DATAFRAME,
+        hyperparameters=hyperparameters,
+        enable_ensemble=False,
+    )
+    predictor = _add_ensemble_to_predictor(predictor, hyperparameters)
+
+    print(predictor._learner.load_trainer().get_model_names())
+    persisted_models = predictor.persist("all")
+    assert len(predictor._learner.load_trainer().models) == len(hyperparameters) + 1
+    assert any(m == "WeightedEnsemble" for m in persisted_models)
+
+    predictor.unpersist()
+    assert len(predictor._learner.load_trainer().models) == 0
+
+
+def test_given_multiple_models_with_ensemble_when_predictor_persisted_then_ensemble_and_dependencies_persisted(
+    temp_model_path,
+):
+    hyperparameters = {"Naive": {}, "SeasonalNaive": {}}
+    predictor = TimeSeriesPredictor(path=temp_model_path).fit(
+        DUMMY_TS_DATAFRAME,
+        hyperparameters=hyperparameters,
+        enable_ensemble=False,
+    )
+    predictor = _add_ensemble_to_predictor(predictor, hyperparameters)
+
+    persisted_models = predictor.persist()
+    assert len(predictor._learner.load_trainer().models) == len(hyperparameters) + 1
+    assert any(m == "WeightedEnsemble" for m in persisted_models)
+
+    predictor.unpersist()
+    assert len(predictor._learner.load_trainer().models) == 0
+
+
+@pytest.mark.parametrize("with_ancestors", [True, False])
+def test_given_multiple_models_with_ensemble_when_ensemble_persisted_then_persist_obeys_with_ancestors(
+    temp_model_path, with_ancestors
+):
+    hyperparameters = {"Naive": {}, "SeasonalNaive": {}}
+    predictor = TimeSeriesPredictor(path=temp_model_path).fit(
+        DUMMY_TS_DATAFRAME,
+        hyperparameters=hyperparameters,
+        enable_ensemble=False,
+    )
+    predictor = _add_ensemble_to_predictor(predictor, hyperparameters)
+
+    persisted_models = predictor.persist(with_ancestors=with_ancestors)
+    assert len(predictor._learner.load_trainer().models) == 1 + (2 if with_ancestors else 0)
+    assert any(m == "WeightedEnsemble" for m in persisted_models)
+
+    predictor.unpersist()
+    assert len(predictor._learner.load_trainer().models) == 0
+
+
+def test_given_multiple_models_with_ensemble_when_predictor_persisted_saved_loaded_then_ensemble_and_dependencies_persisted(
+    temp_model_path,
+):
+    hyperparameters = {"Naive": {}, "SeasonalNaive": {}}
+    predictor = TimeSeriesPredictor(path=temp_model_path).fit(
+        DUMMY_TS_DATAFRAME,
+        hyperparameters=hyperparameters,
+        enable_ensemble=False,
+    )
+    predictor = _add_ensemble_to_predictor(predictor, hyperparameters)
+    predictor.save()
+
+    path = predictor.path
+    predictor = TimeSeriesPredictor.load(path)
+
+    persisted_models = predictor.persist()
+    assert len(predictor._learner.load_trainer().models) == len(hyperparameters) + 1
+    assert any(m == "WeightedEnsemble" for m in persisted_models)
+
+    predictor.unpersist()
+    assert len(predictor._learner.load_trainer().models) == 0
+
+
+def test_given_multiple_models_with_ensemble_when_single_model_persisted_then_single_model_persisted(temp_model_path):
+    hyperparameters = {"Naive": {}, "SeasonalNaive": {}}
+    predictor = TimeSeriesPredictor(path=temp_model_path).fit(
+        DUMMY_TS_DATAFRAME,
+        hyperparameters=hyperparameters,
+        enable_ensemble=False,
+    )
+    predictor = _add_ensemble_to_predictor(predictor, hyperparameters)
+
+    persisted_models = predictor.persist(["Naive"])
+    assert len(predictor._learner.load_trainer().models) == 1
+    assert persisted_models[0] == "Naive"
+
+    predictor.unpersist()
+    assert len(predictor._learner.load_trainer().models) == 0
+
+
+@pytest.fixture(
+    scope="session",
+    params=[
+        {"A": 10, "B": 15},
+        {"A": 10, "C": 20, "B": 5},
+        {"A": 10, "C": 10, "B": 10},
+    ],
+)
+def importance_dataset_and_predictors(request, tmp_path_factory):
+    item_id_to_length = request.param
+
+    df = get_data_frame_with_variable_lengths(
+        item_id_to_length,
+        static_features=get_static_features(item_id_to_length.keys(), ["feat1", "feat2", "feat3"]),
+        covariates_names=["cov1", "cov2", "cov3"],
+    )
+
+    prediction_length = 2
+    df_train = df.slice_by_timestep(None, -prediction_length)
+
+    hyperparameter_map = {
+        "no_features": {"Naive": {}},
+        "known_and_categorical_only": {"DeepAR": {"epochs": 1}},
+        "all_features": {"TemporalFusionTransformer": {"epochs": 1}},
+    }
+
+    predictors = {}
+
+    for name, hyperparameters in hyperparameter_map.items():
+        predictor = TimeSeriesPredictor(
+            path=tmp_path_factory.mktemp(str(uuid4())[:6]),
+            prediction_length=prediction_length,
+            eval_metric="MAPE",
+            known_covariates_names=["cov1", "cov2"],  # cov3 is past covariate
+        )
+        predictor.fit(
+            df_train,
+            hyperparameters=hyperparameters,
+            enable_ensemble=False,
+        )
+        predictors[name] = predictor
+
+    return df_train, predictors
+
+
+@pytest.mark.parametrize("num_iterations", [1, 2, 5])
+@pytest.mark.parametrize("relative_scores", [True, False])
+@pytest.mark.parametrize("method", ["naive", "permutation"])
+@pytest.mark.parametrize(
+    "features, scores_returned, expected_absolute_importances",
+    [
+        (["cov1"], [-0.22, -0.26], [0.04]),
+        (["cov2"], [-0.22, -0.26], [0.04]),
+        (["cov1", "cov2"], [-0.22, -0.26, -0.30], [0.04, 0.08]),
+        (["cov1", "feat1"], [-0.22, -0.26, -0.30], [0.04, 0.08]),
+        (
+            None,  # all features
+            [-0.22, -0.26, -0.30, -0.20, -0.27, -0.29, -0.19],
+            [0.04, 0.08, -0.02, 0.05, 0.07, -0.03],
+        ),
+    ],
+)
+def test_when_feature_importance_called_with_improvements_then_improvements_are_correct(
+    num_iterations,
+    relative_scores,
+    method,
+    features,
+    scores_returned,
+    expected_absolute_importances,
+    importance_dataset_and_predictors,
+):
+    df_train, predictors = importance_dataset_and_predictors
+    predictor = predictors["all_features"]
+
+    with mock.patch(
+        "autogluon.timeseries.trainer.abstract_trainer.AbstractTimeSeriesTrainer.evaluate"
+    ) as mock_evaluate:
+        mock_evaluate.side_effect = [{"MAPE": v} for v in scores_returned] * num_iterations  # baseline, feature
+
+        feature_importance = predictor.feature_importance(
+            df_train,
+            num_iterations=num_iterations,
+            method=method,
+            features=features,
+            relative_scores=relative_scores,
+        )
+        expected_score = np.array(expected_absolute_importances)
+        if relative_scores:
+            expected_score /= 0.22
+
+        assert mock_evaluate.call_count == len(scores_returned) * (num_iterations if method == "permutation" else 1)
+        assert np.allclose(feature_importance["importance"], expected_score, atol=1e-3)
+
+
+@pytest.mark.parametrize("num_iterations", [1, 2, 5])
+@pytest.mark.parametrize("relative_scores", [True, False])
+@pytest.mark.parametrize("method", ["naive", "permutation"])
+@pytest.mark.parametrize(
+    "features, scores_returned",
+    [
+        (["cov1"], [-0.22, -0.26]),
+        (["cov2"], [-0.22, -0.26]),
+        (["cov1", "cov2"], [-0.22, -0.26, -0.30]),
+        (["cov1", "feat1"], [-0.22, -0.26, -0.30]),
+        (
+            None,  # all features
+            [-0.22, -0.26, -0.30, -0.20, -0.27, -0.29, -0.19],
+        ),
+    ],
+)
+def test_given_predictor_takes_no_features_when_feature_importance_called_with_improvements_then_improvements_are_zero(
+    num_iterations,
+    relative_scores,
+    method,
+    features,
+    scores_returned,
+    importance_dataset_and_predictors,
+):
+    df_train, predictors = importance_dataset_and_predictors
+    predictor = predictors["no_features"]
+
+    with mock.patch(
+        "autogluon.timeseries.trainer.abstract_trainer.AbstractTimeSeriesTrainer.evaluate"
+    ) as mock_evaluate:
+        mock_evaluate.side_effect = [
+            {"MAPE": v} for v in scores_returned
+        ] * num_iterations  # baseline, feature taken out
+
+        feature_importance = predictor.feature_importance(
+            df_train,
+            num_iterations=num_iterations,
+            method=method,
+            features=features,
+            relative_scores=relative_scores,
+        )
+
+        assert np.allclose(feature_importance["importance"], 0, atol=1e-8)
+
+
+@pytest.mark.parametrize("num_iterations", [1, 2, 5])
+@pytest.mark.parametrize("relative_scores", [True, False])
+@pytest.mark.parametrize("method", ["naive", "permutation"])
+@pytest.mark.parametrize(
+    "features, scores_returned",
+    [
+        (["cov1"], [-0.22, -0.26]),
+        (["cov2"], [-0.22, -0.26]),
+        (["cov1", "cov2"], [-0.22, -0.26, -0.30]),
+        (["cov1", "feat1"], [-0.22, -0.26, -0.30]),
+        (
+            None,  # all features
+            [-0.22, -0.26, -0.30, -0.20, -0.27, -0.29, -0.19],
+        ),
+    ],
+)
+def test_given_predictor_takes_known_only_when_feature_importance_called_with_improvements_then_past_and_static_improvements_are_zero(
+    num_iterations,
+    relative_scores,
+    method,
+    features,
+    scores_returned,
+    importance_dataset_and_predictors,
+):
+    df_train, predictors = importance_dataset_and_predictors
+    predictor = predictors["no_features"]
+
+    with mock.patch(
+        "autogluon.timeseries.trainer.abstract_trainer.AbstractTimeSeriesTrainer.evaluate"
+    ) as mock_evaluate:
+        mock_evaluate.side_effect = [
+            {"MAPE": v} for v in scores_returned
+        ] * num_iterations  # baseline, feature taken out
+
+        feature_importance = predictor.feature_importance(
+            df_train,
+            num_iterations=num_iterations,
+            method=method,
+            features=features,
+            relative_scores=relative_scores,
+        )
+
+        for i, importance in feature_importance["importance"].items():
+            if i in ["feat1", "feat2", "feat3", "cov3"]:
+                assert np.allclose(importance, 0, atol=1e-8)
+            else:
+                assert np.isfinite(importance)

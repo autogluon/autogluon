@@ -52,6 +52,19 @@ def pytest_collection_modifyitems(config, items):
             if marker in item.keywords:
                 item.add_marker(custom_markers[marker])
 
+    # Normalize the file paths and use a consistent comparison method
+    normalized_path = lambda p: os.path.normpath(str(p))
+    resource_allocation_path = normalized_path("tests/unittests/resource_allocation")
+
+    # Reordering logic to ensure tests under ./unittests/resource_allocation run last
+    # TODO: Fix this once resource_allocation tests are robost enough to run with other tests without ordering issues
+    resource_allocation_tests = [item for item in items if resource_allocation_path in normalized_path(item.fspath)]
+    other_tests = [item for item in items if resource_allocation_path not in normalized_path(item.fspath)]
+
+    items.clear()
+    items.extend(other_tests)
+    items.extend(resource_allocation_tests)
+
 
 class DatasetLoaderHelper:
     dataset_info_dict = dict(
@@ -146,7 +159,7 @@ class FitHelper:
         expected_stacked_overfitting_at_test=None,
         expected_stacked_overfitting_at_val=None,
         scikit_api=False,
-    ):
+    ) -> TabularPredictor:
         if compiler_configs is None:
             compiler_configs = {}
         directory_prefix = "./datasets/"
@@ -171,7 +184,9 @@ class FitHelper:
             init_args["path"] = PathConverter.to_absolute(path=init_args["path"])
             assert PathConverter._is_absolute(path=init_args["path"])
         save_path = init_args["path"]
-        predictor = FitHelper.fit_dataset(train_data=train_data, init_args=init_args, fit_args=fit_args, sample_size=sample_size, scikit_api=scikit_api)
+        predictor: TabularPredictor = FitHelper.fit_dataset(
+            train_data=train_data, init_args=init_args, fit_args=fit_args, sample_size=sample_size, scikit_api=scikit_api
+        )
         if compile:
             predictor.compile(models="all", compiler_configs=compiler_configs)
             predictor.persist(models="all")

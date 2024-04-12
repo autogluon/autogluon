@@ -20,6 +20,7 @@ from autogluon.common.utils.try_import import try_import_ray
 
 from ...constants import MULTICLASS, QUANTILE, REFIT_FULL_SUFFIX, REGRESSION, SOFTCLASS
 from ...hpo.exceptions import EmptySearchSpace
+from ...pseudolabeling.pseudolabeling import assert_pseudo_column_match
 from ...utils.exceptions import TimeLimitExceeded
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_pkl
@@ -144,12 +145,12 @@ class BaggedEnsembleModel(AbstractModel):
     def is_valid_oof(self):
         return self.is_fit() and (self._child_oof or self._bagged_mode)
 
-    def predict_proba_oof(self, **kwargs):
+    def predict_proba_oof(self, **kwargs) -> np.array:
         # TODO: Require is_valid == True (add option param to ignore is_valid)
         return self._predict_proba_oof(self._oof_pred_proba, self._oof_pred_model_repeats)
 
     @staticmethod
-    def _predict_proba_oof(oof_pred_proba, oof_pred_model_repeats, return_type=np.float32):
+    def _predict_proba_oof(oof_pred_proba, oof_pred_model_repeats, return_type=np.float32) -> np.array:
         oof_pred_model_repeats_without_0 = np.where(oof_pred_model_repeats == 0, 1, oof_pred_model_repeats)
         if oof_pred_proba.ndim == 2:
             oof_pred_model_repeats_without_0 = oof_pred_model_repeats_without_0[:, None]
@@ -254,7 +255,16 @@ class BaggedEnsembleModel(AbstractModel):
 
         save_bag_folds = self.params.get("save_bag_folds", True)
         if k_fold == 1:
-            self._fit_single(X=X, y=y, model_base=model_base, use_child_oof=use_child_oof, skip_oof=_skip_oof, **kwargs)
+            self._fit_single(
+                X=X,
+                y=y,
+                X_pseudo=X_pseudo,
+                y_pseudo=y_pseudo,
+                model_base=model_base,
+                use_child_oof=use_child_oof,
+                skip_oof=_skip_oof,
+                **kwargs,
+            )
             return self
         else:
             refit_folds = self.params.get("refit_folds", False)
@@ -463,7 +473,7 @@ class BaggedEnsembleModel(AbstractModel):
             sample_weight = sample_weight[valid_indices]
         return self.score_with_y_pred_proba(y=y, y_pred_proba=y_pred_proba, sample_weight=sample_weight)
 
-    def _fit_single(self, X, y, model_base, use_child_oof, time_limit=None, skip_oof=False, **kwargs):
+    def _fit_single(self, X, y, model_base, use_child_oof, time_limit=None, skip_oof=False, X_pseudo=None, y_pseudo=None, **kwargs):
         if self.is_fit():
             raise AssertionError("Model is already fit.")
         if self._n_repeats != 0:
@@ -471,7 +481,20 @@ class BaggedEnsembleModel(AbstractModel):
         model_base.name = f"{model_base.name}S1F1"
         model_base.set_contexts(path_context=os.path.join(self.path, model_base.name))
         time_start_fit = time.time()
-        model_base.fit(X=X, y=y, time_limit=time_limit, **kwargs)
+
+        is_pseudo = X_pseudo is not None and y_pseudo is not None
+        # FIXME: This can lead to poor performance. Probably not bugged, but rather all pseudolabels can come from the same class...
+        #  Consider pseudolabelling to respect the original distribution
+        if is_pseudo:
+            # FIXME: Consider use_child_oof with pseudo labels! Need to keep track of indices
+            logger.log(15, f"{len(X_pseudo)} extra rows of pseudolabeled data added to training set for {self.name}")
+            assert_pseudo_column_match(X=X, X_pseudo=X_pseudo)
+            X_fit = pd.concat([X, X_pseudo], axis=0, ignore_index=True)
+            y_fit = pd.concat([y, y_pseudo], axis=0, ignore_index=True)
+        else:
+            X_fit = X
+            y_fit = y
+        model_base.fit(X=X_fit, y=y_fit, time_limit=time_limit, **kwargs)
         model_base.fit_time = time.time() - time_start_fit
         model_base.predict_time = None
         if not skip_oof:
@@ -507,7 +530,9 @@ class BaggedEnsembleModel(AbstractModel):
                 )
                 time_start_predict = time.time()
                 if model_base._get_tags().get("valid_oof", False):
-                    self._oof_pred_proba = model_base.predict_proba_oof(X=X, y=y)
+                    # For models with the ability to produce their own OOF, such as RandomForest OOB and KNN-LOO,
+                    # we get their OOF predictions on the full data, then limit to the original training data.
+                    self._oof_pred_proba = model_base.predict_proba_oof(X=X_fit, y=y_fit)[: len(X)]
                 else:
                     logger.warning(
                         "\tWARNING: `use_child_oof` was specified but child model does not have a dedicated `predict_proba_oof` method. This model may have heavily overfit validation scores."
@@ -1356,6 +1381,10 @@ class BaggedEnsembleModel(AbstractModel):
         minimum_cpu_per_fold = minimum_resources_per_fold.get("num_cpus", 1)
         minimum_gpu_per_fold = minimum_resources_per_fold.get("num_gpus", 0)
 
+        # This explicitly tells ray.Tune to not change the working directory
+        # to the trial directory, giving access to paths relative to
+        # the original working directory.
+        os.environ["RAY_CHDIR_TO_TRIAL_DIR"] = "0"
         hpo_executor.execute(
             model_trial=model_trial,
             train_fn_kwargs=train_fn_kwargs,
@@ -1365,7 +1394,6 @@ class BaggedEnsembleModel(AbstractModel):
             model_estimate_memory_usage=None,  # Not needed as we've already calculated it above
             adapter_type="tabular",
             trainable_is_parallel=True,
-            tune_config_kwargs={"chdir_to_trial_dir": False},
         )
 
         hpo_results = hpo_executor.get_hpo_results(

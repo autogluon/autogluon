@@ -206,9 +206,9 @@ def run(
     verbose
         0 = silent, 1 = only status updates, 2 = status and brief trial results, 3 = status and detailed trial results.
     tune_config_kwargs
-        Additional args being passed to tune.TuneConfig https://docs.ray.io/en/latest/ray-air/package-ref.html#ray.tune.tune_config.TuneConfig
+        Additional args being passed to tune.TuneConfig  https://docs.ray.io/en/latest/tune/api/doc/ray.tune.TuneConfig.html#ray-tune-tuneconfig
     run_config_kwargs
-        Additional args being passed to air.RunConfig https://docs.ray.io/en/latest/ray-air/package-ref.html#ray.air.config.RunConfig
+        Additional args being passed to air.RunConfig https://docs.ray.io/en/latest/train/api/doc/ray.train.RunConfig.html#ray.train.RunConfig
     """
     assert mode in [MIN, MAX], f"mode {mode} is not a valid option. Options are {[MIN, MAX]}"
     if isinstance(hyperparameter_tune_kwargs, str):
@@ -270,7 +270,7 @@ def run(
         tune_config=tune.TuneConfig(
             num_samples=num_samples, search_alg=searcher, scheduler=scheduler, metric=metric, mode=mode, time_budget_s=time_budget_s, **tune_config_kwargs
         ),
-        run_config=air.RunConfig(name=os.path.basename(save_dir), local_dir=os.path.dirname(save_dir), verbose=verbose, **run_config_kwargs),
+        run_config=air.RunConfig(name=os.path.basename(save_dir), storage_path=os.path.dirname(save_dir), verbose=verbose, **run_config_kwargs),
         _tuner_kwargs={"trial_name_creator": _trial_name_creator, "trial_dirname_creator": _trial_dirname_creator},
     )
     results = tuner.fit()

@@ -32,6 +32,7 @@ from ..common import (
     DUMMY_VARIABLE_LENGTH_TS_DATAFRAME,
     dict_equal_primitive,
     get_data_frame_with_item_index,
+    to_supported_pandas_freq,
 )
 
 # models accepting seasonal_period
@@ -86,25 +87,6 @@ def test_when_local_model_saved_then_local_model_args_are_saved(model_class, hyp
     assert dict_equal_primitive(model._local_model_args, loaded_model._local_model_args)
 
 
-@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-@pytest.mark.parametrize("prediction_length", [1, 3, 10])
-def test_when_local_model_predicts_then_time_index_is_correct(model_class, prediction_length, temp_model_path):
-    data = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME
-    model = model_class(
-        path=temp_model_path,
-        prediction_length=prediction_length,
-        hyperparameters=DEFAULT_HYPERPARAMETERS,
-        freq=data.freq,
-    )
-    model.fit(train_data=data)
-    predictions = model.predict(data=data)
-    for item_id in data.item_ids:
-        cutoff = data.loc[item_id].index[-1]
-        start = cutoff + pd.tseries.frequencies.to_offset(data.freq)
-        expected_timestamps = pd.date_range(start, periods=prediction_length, freq=data.freq)
-        assert (predictions.loc[item_id].index == expected_timestamps).all()
-
-
 def get_seasonal_period_from_fitted_local_model(model):
     if model.name in ["ARIMA", "AutoETS", "AutoARIMA", "AutoCES", "DynamicOptimizedTheta", "ETS", "Theta"]:
         return model._local_model_args["season_length"]
@@ -119,11 +101,11 @@ def get_seasonal_period_from_fitted_local_model(model):
 @pytest.mark.parametrize(
     "freqstr, ts_length, expected_seasonal_period",
     [
-        ("H", 100, 24),
-        ("2H", 100, 12),
+        ("h", 100, 24),
+        ("2h", 100, 12),
         ("B", 100, 5),
         ("D", 100, 7),
-        ("M", 100, 12),
+        ("ME", 100, 12),
     ],
 )
 def test_when_seasonal_period_is_set_to_none_then_inferred_period_is_used(
@@ -145,11 +127,11 @@ def test_when_seasonal_period_is_set_to_none_then_inferred_period_is_used(
 @pytest.mark.parametrize(
     "freqstr, ts_length, provided_seasonal_period",
     [
-        ("H", 100, 12),
-        ("2H", 100, 5),
+        ("h", 100, 12),
+        ("2h", 100, 5),
         ("B", 100, 10),
         ("D", 100, 8),
-        ("M", 100, 24),
+        ("ME", 100, 24),
     ],
 )
 def test_when_seasonal_period_is_provided_then_inferred_period_is_overridden(
@@ -198,7 +180,9 @@ def failing_predict(*args, **kwargs):
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 def test_when_fallback_model_disabled_and_model_fails_then_exception_is_raised(temp_model_path, model_class):
-    model = model_class(temp_model_path, hyperparameters={"use_fallback_model": False, "n_jobs": 1})
+    model = model_class(
+        path=temp_model_path, hyperparameters={"use_fallback_model": False, "n_jobs": 1}, freq=DUMMY_TS_DATAFRAME.freq
+    )
     model.fit(train_data=DUMMY_TS_DATAFRAME)
     model._predict_with_local_model = failing_predict
     with pytest.raises(RuntimeError, match="Custom error message"):
@@ -207,7 +191,9 @@ def test_when_fallback_model_disabled_and_model_fails_then_exception_is_raised(t
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 def test_when_fallback_model_enabled_and_model_fails_then_no_exception_is_raised(temp_model_path, model_class):
-    model = model_class(temp_model_path, hyperparameters={"use_fallback_model": True, "n_jobs": 1})
+    model = model_class(
+        path=temp_model_path, hyperparameters={"use_fallback_model": True, "n_jobs": 1}, freq=DUMMY_TS_DATAFRAME.freq
+    )
     model.fit(train_data=DUMMY_TS_DATAFRAME)
     model._predict_with_local_model = failing_predict
     predictions = model.predict(DUMMY_TS_DATAFRAME)
@@ -260,10 +246,11 @@ def test_when_data_shorter_than_seasonal_period_then_average_forecast_is_used():
     assert np.allclose(predictions_avg.values, predictions_seasonal_avg.values)
 
 
-@pytest.mark.parametrize("freq", ["H", "W", "D", "T", "S", "B", "Q", "M", "A"])
+@pytest.mark.parametrize("freq", ["h", "W", "D", "min", "s", "B", "QE", "ME", "YE"])
 def test_when_npts_fit_with_default_seasonal_features_then_predictions_match_gluonts(freq):
     from gluonts.model.npts import NPTSPredictor
 
+    freq = to_supported_pandas_freq(freq)
     item_id = "A"
     prediction_length = 9
     data = get_data_frame_with_item_index([item_id], freq=freq, data_length=100)
@@ -281,7 +268,8 @@ def test_when_npts_fit_with_default_seasonal_features_then_predictions_match_glu
 
     np.random.seed(123)
     ts = data.loc[item_id]["target"]
-    ts.index = ts.index.to_period(freq=freq)
+    freq_for_period = {"ME": "M", "YE": "Y", "QE": "Q"}.get(freq, freq)
+    ts.index = ts.index.to_period(freq=freq_for_period)
     pred_gts = npts_gts.predict_time_series(ts, num_samples=100)
 
     assert (pred_gts.mean == pred_ag["mean"]).all()
@@ -381,7 +369,7 @@ def test_when_intermittent_models_fit_then_values_are_lower_bounded(
 ):
     data = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME
     if positive_only:
-        data = data.clip(0, None)
+        data[data < 0] = 0.0
     else:
         # make sure there are some negative values
         for c in data.columns:
@@ -406,7 +394,7 @@ def test_when_intermittent_models_fit_then_values_are_lower_bounded(
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 @pytest.mark.parametrize("prediction_length", [1, 3])
 def test_when_local_models_fit_then_quantiles_are_present_and_ranked(model_class, prediction_length, temp_model_path):
-    data = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME
+    data = get_data_frame_with_item_index(["B", "A", "X"])
     model = model_class(
         path=temp_model_path,
         prediction_length=prediction_length,

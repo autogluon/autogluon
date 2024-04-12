@@ -31,13 +31,13 @@ def try_import_mxboard():
 
 
 def try_import_ray() -> ModuleType:
-    RAY_MAX_VERSION = "2.7.0"  # sync with core/setup.py
+    RAY_MAX_VERSION = "2.11.0"  # sync with core/setup.py
     ray_max_version_os_map = dict(
         Darwin=RAY_MAX_VERSION,
         Windows=RAY_MAX_VERSION,
         Linux=RAY_MAX_VERSION,
     )
-    ray_min_version = "2.6.3"
+    ray_min_version = "2.10.0"
     current_os = platform.system()
     ray_max_version = ray_max_version_os_map.get(current_os, RAY_MAX_VERSION)
     try:
@@ -130,7 +130,7 @@ def try_import_torch():
         raise ImportError(
             "Unable to import dependency torch\n"
             "A quick tip is to install via `pip install torch`.\n"
-            "The minimum torch version is currently 2.0."  # sync with core/_setup_utils.py
+            "The minimum torch version is currently 2.1."  # sync with core/_setup_utils.py
         )
 
 
@@ -175,10 +175,10 @@ def try_import_vowpalwabbit():
 
         vowpalwabbit_version = parse_version(vowpalwabbit.__version__)
         assert vowpalwabbit_version >= parse_version("9.0.0") and vowpalwabbit_version < parse_version(
-            "9.9.0"
-        ), f"Currently, we only support vowpalwabbit version >=9.0 and <9.9. Found vowpalwabbit version: {vowpalwabbit_version}"
+            "9.10.0"
+        ), f"Currently, we only support vowpalwabbit version >=9.0 and <9.10. Found vowpalwabbit version: {vowpalwabbit_version}"
     except ImportError:
-        raise ImportError("`import vowpalwabbit` failed.\n" "A quick tip is to install via `pip install vowpalwabbit>=9,<9.9")
+        raise ImportError("`import vowpalwabbit` failed.\n" "A quick tip is to install via `pip install vowpalwabbit>=9,<9.10")
 
 
 def try_import_fasttext():

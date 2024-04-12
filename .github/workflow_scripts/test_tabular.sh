@@ -19,7 +19,7 @@ install_local_packages "common/[tests]" "core/[all,tests]" "features/"
 if [ "$IS_PLATFORM_TEST" = "true" ]
 then
     install_tabular_platforms "[all,tests]"
-    install_multimodal_no_groundingdino "[tests]"
+    install_multimodal "[tests]"
 else
     install_tabular "[all,tests]"
     install_multimodal "[tests]"

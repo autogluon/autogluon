@@ -23,12 +23,12 @@ on:
         description: 'Preset to run for tabular/timeseries/multimodal'
         required: true
         options:
-          - best
-          - high
-          - good
-          - medium
-          - dev
-          - master_medium
+          - tabular_best
+          - tabular_high
+          - tabular_good
+          - tabular_medium
+          - timeseries_best
+          - multimodal_best
       benchmark:
         description: 'Benchmark to run'
         required: true
@@ -36,7 +36,7 @@ on:
           - tabular_full
           - tabular_test
           - tabular_small
-          - timeseries_test
+          - timeseries_small
           - automm-image
           - automm-text
           - automm-text-tabular
@@ -77,7 +77,7 @@ jobs:
 
       - name: Create comment
         if: (github.event_name == 'workflow_dispatch')
-        uses: peter-evans/create-or-update-comment@v1
+        uses: peter-evans/create-or-update-comment@v4
         with:
           token: ${{ secrets.PAT }}
           repository: ${{ github.event.inputs.repository }}
@@ -195,7 +195,7 @@ jobs:
           body="$(cat final_eval.txt)"
           echo ::set-output name=body::$body
       - name: Comment Evaluation Result of PR with Master
-        uses: peter-evans/create-or-update-comment@v2.0.0
+        uses: peter-evans/create-or-update-comment@v4
         with:
           token: ${{ secrets.PAT }}
           repository: ${{ github.event.inputs.repository }}
@@ -211,7 +211,7 @@ jobs:
           body="$(cat website.txt)"
           echo ::set-output name=body::$body
       - name: Comment Dashboard Website Link on PR
-        uses: peter-evans/create-or-update-comment@v2.0.0
+        uses: peter-evans/create-or-update-comment@v4
         with:
           token: ${{ secrets.PAT }}
           repository: ${{ github.event.inputs.repository }}

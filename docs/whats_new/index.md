@@ -21,3 +21,32 @@ v0.4.2
 v0.4.1
 v0.4.0
 ```
+
+:::{dropdown} v1.0.0
+:open:
+
+```{include} v1.0.0.md
+```
+
+:::
+
+:::{dropdown} v0.8.2
+
+```{include} v0.8.2.md
+```
+
+:::
+
+:::{dropdown} v0.8.1
+
+```{include} v0.8.1.md
+```
+
+:::
+
+:::{dropdown} v0.8.0
+
+```{include} v0.8.0.md
+```
+
+:::

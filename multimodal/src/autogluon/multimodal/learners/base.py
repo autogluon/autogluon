@@ -45,6 +45,7 @@ from ..constants import (
     FEW_SHOT,
     FEW_SHOT_CLASSIFICATION,
     GREEDY_SOUP,
+    IMAGE_BASE64_STR,
     IMAGE_BYTEARRAY,
     IMAGE_PATH,
     LABEL,
@@ -184,7 +185,6 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             In addition, we support advanced problems such as
 
             - 'object_detection': Object detection
-            - 'open_vocabulry_object_detection': Zero-shot object detection (only support inference for now, finetuning TBC)
             - 'ner' or 'named_entity_recognition': Named entity extraction
             - 'text_similarity': Text-text similarity problem
             - 'image_similarity': Image-image similarity problem
@@ -199,7 +199,6 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             problem types:
 
             - 'object_detection'
-            - 'open_vocabulry_object_detection'
             - 'text_similarity'
             - 'image_similarity'
             - 'image_text_similarity'
@@ -1543,7 +1542,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         column_types = self._column_types
         column_types_copy = copy.deepcopy(column_types)
         for col_name, col_type in column_types.items():
-            if col_type in [IMAGE_BYTEARRAY, IMAGE_PATH]:
+            if col_type in [IMAGE_BYTEARRAY, IMAGE_PATH, IMAGE_BASE64_STR]:
                 if is_image_column(data=data[col_name], col_name=col_name, image_type=IMAGE_PATH):
                     image_type = IMAGE_PATH
                 elif is_image_column(
@@ -1552,6 +1551,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                     image_type=IMAGE_BYTEARRAY,
                 ):
                     image_type = IMAGE_BYTEARRAY
+                elif is_image_column(data=data[col_name], col_name=col_name, image_type=IMAGE_BASE64_STR):
+                    image_type = IMAGE_BASE64_STR
                 else:
                     image_type = col_type
                 if col_type != image_type:

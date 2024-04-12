@@ -1,3 +1,4 @@
+import base64
 import logging
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -19,6 +20,7 @@ from ..constants import (
     DOCUMENT_IMAGE,
     IDENTIFIER,
     IMAGE,
+    IMAGE_BASE64_STR,
     IMAGE_BYTEARRAY,
     IMAGE_PATH,
     LABEL,
@@ -26,7 +28,6 @@ from ..constants import (
     NER_ANNOTATION,
     NULL,
     NUMERICAL,
-    OVD,
     ROIS,
     SEMANTIC_SEGMENTATION,
     SEMANTIC_SEGMENTATION_GT,
@@ -167,6 +168,10 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         return [col_name for col_name in self._image_feature_names if self._column_types[col_name] == IMAGE_BYTEARRAY]
 
     @property
+    def image_base64_str_names(self):
+        return [col_name for col_name in self._image_feature_names if self._column_types[col_name] == IMAGE_BASE64_STR]
+
+    @property
     def image_feature_names(self):
         return self._image_path_names if hasattr(self, "_image_path_names") else self._image_feature_names
 
@@ -267,11 +272,6 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                 return self._image_path_names
             else:
                 return self._image_feature_names
-        elif modality == OVD:
-            if hasattr(self, "_image_path_names"):
-                return self._image_path_names + self._text_feature_names
-            else:
-                return self._image_feature_names + self._text_feature_names
         elif modality == ROIS:
             return self._rois_feature_names
         elif modality == TEXT:
@@ -555,50 +555,6 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                 ret_type.update(y[1])
         return ret_data, ret_type
 
-    def transform_ovd(
-        self,
-        df: pd.DataFrame,
-    ) -> Tuple[Dict[str, List[List[str]]], Dict[str, str]]:
-        """
-        Preprocess image + prompt data.
-        For image data we preprocess them by collecting their paths together. If one sample has multiple images
-        in an image column, assume that their image paths are separated by ";".
-        For rois data we simply convert them from a column of pandas dataframe to a list.
-        This function needs to be called preceding the rois processor in "process_rois.py".
-
-        Parameters
-        ----------
-        df
-            The multimodal pd.DataFrame.
-
-        Returns
-        -------
-        image_features
-            All the image data stored in a dictionary.
-        image_types
-            The column types of these image data, e.g., image_path or image_identifier.
-        """
-        assert (
-            self._fit_called or self._fit_x_called
-        ), "You will need to first call preprocessor.fit_x() before calling preprocessor.transform_ovd."
-
-        x = self.transform_image(df)
-        ret_data = x[0]
-        ret_type = x[1]
-
-        for col_name in self._text_feature_names:
-            col_type = self._column_types[col_name]
-
-            if col_type == TEXT:
-                processed_data = df[col_name].tolist()
-            else:
-                raise ValueError(f"Unknown text type {col_type} for column {col_name}")
-
-            ret_data[col_name] = processed_data
-            ret_type[col_name] = self._column_types[col_name]
-
-        return ret_data, ret_type
-
     def transform_image(
         self,
         df: pd.DataFrame,
@@ -635,6 +591,12 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
                 processed_data = col_value.apply(lambda ele: str(ele).split(";")).tolist()
             elif col_type == IMAGE_BYTEARRAY:
                 processed_data = col_value.apply(lambda ele: ele if isinstance(ele, list) else [ele]).tolist()
+            elif col_type == IMAGE_BASE64_STR:
+                processed_data = col_value.apply(
+                    lambda ele: [base64.b64decode(e) for e in ele]
+                    if isinstance(ele, list)
+                    else [base64.b64decode(ele)]
+                ).tolist()
             elif col_type == f"{IMAGE}_{IDENTIFIER}":
                 processed_data = col_value
             else:

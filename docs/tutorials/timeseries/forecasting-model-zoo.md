@@ -69,6 +69,7 @@ Note that some of the models' hyperparameters have names and default values that
    WaveNetModel
    DirectTabularModel
    RecursiveTabularModel
+   ChronosModel
 
 ```
 
@@ -251,6 +252,19 @@ Tabular models convert time series forecasting into a tabular regression problem
 
 ```
 
+
+## Pretrained models
+
+Deep learning models pretrained on large time series datasets, able to perform zero-shot forecasting.
+
+
+```{eval-rst}
+.. autoclass:: ChronosModel
+   :members: init
+
+```
+
+
 ## MXNet Models
 
 MXNet models from GluonTS have been deprecated because of dependency conflicts caused by MXNet.
@@ -266,25 +280,21 @@ Models not included in this table currently do not support any additional featur
    :header-rows: 1
    :stub-columns: 1
    :align: center
-   :widths: 40 15 15 15 15
+   :widths: 55 15 15 15
 
    * - Model
-     - Static features (continuous)
-     - Static features (categorical)
-     - Known covariates (continuous)
-     - Past covariates (continuous)
+     - Static features (continuous + categorical)
+     - Known covariates (continuous + categorical)
+     - Past covariates (continuous + categorical)
    * - :class:`~autogluon.timeseries.models.DirectTabularModel`
-     - ✅
      - ✅
      - ✅
      -
    * - :class:`~autogluon.timeseries.models.RecursiveTabularModel`
      - ✅
      - ✅
-     - ✅
      -
    * - :class:`~autogluon.timeseries.models.DeepARModel`
-     - ✅
      - ✅
      - ✅
      -
@@ -292,10 +302,8 @@ Models not included in this table currently do not support any additional featur
      - ✅
      - ✅
      - ✅
-     - ✅
    * - :class:`~autogluon.timeseries.models.WaveNetModel`
      - ✅
      - ✅
-     - ✅
-     - 
+     -
 ```

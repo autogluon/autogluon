@@ -34,6 +34,7 @@ optimization:
       - "^o$"
     r: 8
     alpha: 8
+    conv_lora_expert_num: 8 # default setting for Conv-LoRA
   loss_function:
     "auto" # The replaced loss for regression. Can only support loss function in torch.nn.
     # example

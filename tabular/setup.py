@@ -33,7 +33,7 @@ install_requires = [
 
 extras_require = {
     "lightgbm": [
-        "lightgbm>=3.3,<4.2",  # <{N+1} upper cap, where N is the latest released minor version
+        "lightgbm>=3.3,<4.4",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "catboost": [
         # CatBoost wheel build is not working correctly on darwin for CatBoost 1.2, so use old version in this case.
@@ -59,7 +59,7 @@ extras_require = {
         f"{ag.PACKAGE_NAME}.core[all]=={version}",
     ],
     "skex": [
-        "scikit-learn-intelex>=2023.0,<2024.1",  # <{N+1} upper cap, where N is the latest released minor version
+        "scikit-learn-intelex>=2023.0,<2024.3",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "imodels": [
         "imodels>=1.3.10,<1.4.0",  # 1.3.8/1.3.9 either remove/renamed attribute `complexity_` causing failures. https://github.com/csinva/imodels/issues/147
@@ -67,16 +67,16 @@ extras_require = {
     "vowpalwabbit": [
         # FIXME: 9.5+ causes VW to save an empty model which always predicts 0. Confirmed on MacOS (Intel CPU). Unknown how to fix.
         # No vowpalwabbit wheel for python 3.11 or above yet
-        "vowpalwabbit>=9,<9.9; python_version < '3.11'",
+        "vowpalwabbit>=9,<9.10; python_version < '3.11'",
     ],
     "skl2onnx": [
-        "skl2onnx>=1.15.0,<1.16.0",
+        "skl2onnx>=1.15.0,<1.17.0",
         # For macOS, there isn't a onnxruntime-gpu package installed with skl2onnx.
         # Therefore, we install onnxruntime explicitly here just for macOS.
-        "onnxruntime>=1.15.0,<1.16.0",
+        "onnxruntime>=1.15.0,<1.18.0",
     ]
     if sys.platform == "darwin"
-    else ["skl2onnx>=1.15.0,<1.16.0", "onnxruntime-gpu>=1.15.0,<1.16.0"],
+    else ["skl2onnx>=1.15.0,<1.17.0", "onnxruntime-gpu>=1.15.0,<1.18.0"],
 }
 
 # TODO: v1.0: Rename `all` to `core`, make `all` contain everything.

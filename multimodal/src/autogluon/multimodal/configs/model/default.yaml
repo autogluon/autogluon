@@ -116,15 +116,6 @@ model:
     output_bbox_format: "xyxy"  # now support xyxy or xywh, for bbox format details see https://keras.io/api/keras_cv/bounding_box/formats/
     frozen_layers: null
 
-  ovd:
-    checkpoint_name: "GroundingDINO_SwinB"
-    config_file: ""
-    data_types:
-      - "image"
-      - "text"
-    max_img_num_per_col: 1
-    output_bbox_format: "xyxy"  # TODO: # only support xyxy output now, for bbox format details see https://keras.io/api/keras_cv/bounding_box/formats/
-
   mmocr_text_detection:
     checkpoint_name: "TextSnake"
     data_types:
@@ -237,6 +228,7 @@ model:
     additive_attention: False # Whether to use lightweight additive attention, can be True, False or "auto"
     share_qv_weights: False # Whether to share weight for query and value, can be True, False or "auto"
     pooling_mode: "cls"
+    checkpoint_name: null
 
   sam:
     checkpoint_name: "facebook/sam-vit-huge"

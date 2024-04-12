@@ -90,7 +90,12 @@ def _assert_predict_dict_identical_to_predict(predictor: TabularPredictor, data)
                 else:
                     model_pred = predictor.predict(data, model=m, as_pandas=as_pandas)
                 if as_pandas:
-                    assert model_pred.equals(predict_dict[m])
+                    # pandas default int type on Windows is int64, while on Linux it is int32
+                    if model_pred.dtype in ["int64", "int32"]:
+                        assert predict_dict[m].dtype in ["int64", "int32"]
+                        assert model_pred.astype("int64").equals(predict_dict[m].astype("int64"))
+                    else:
+                        assert model_pred.equals(predict_dict[m])
                 else:
                     assert np.array_equal(model_pred, predict_dict[m])
 
@@ -306,7 +311,18 @@ def test_advanced_functionality():
     predictor.delete_models(models_to_keep=[])  # Test that dry-run doesn't delete models
     assert len(predictor.model_names()) == num_models * 2
     predictor.predict(data=test_data)
-    predictor.delete_models(models_to_keep=[], dry_run=False)  # Test that dry-run deletes models
+
+    # Test refit_full with train_data_extra argument
+    refit_full_models = list(predictor.model_refit_map().values())
+    predictor.delete_models(models_to_delete=refit_full_models, dry_run=False)
+    assert len(predictor.model_names()) == num_models
+    assert predictor.model_refit_map() == dict()
+    predictor.refit_full(train_data_extra=test_data)  # train_data_extra argument
+    assert len(predictor.model_names()) == num_models * 2
+    assert len(predictor.model_refit_map()) == num_models
+    predictor.predict(data=test_data)
+
+    predictor.delete_models(models_to_keep=[], dry_run=False)  # Test that dry_run=False deletes models
     assert len(predictor.model_names()) == 0
     assert len(predictor.leaderboard()) == 0
     assert len(predictor.leaderboard(extra_info=True)) == 0
@@ -655,6 +671,7 @@ def test_pseudolabeling():
         num_bag_folds=2,
         num_bag_sets=1,
         ag_args_ensemble=dict(fold_fitting_strategy="sequential_local"),
+        dynamic_stacking=False,
     )
     for idx in range(len(datasets)):
         dataset = datasets[idx]

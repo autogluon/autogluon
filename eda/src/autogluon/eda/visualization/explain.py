@@ -26,11 +26,16 @@ class _AbstractExplainPlot(AbstractVisualization, JupyterMixin, ABC):
             if self.display_rows:
                 self.display_obj(s.row)
             self._render_internal(
-                s.expected_value, s.shap_values, s.features, feature_names=s.feature_names, **self._kwargs
+                s.expected_value,
+                s.shap_values,
+                s.features,
+                explainer=s.explainer,
+                feature_names=s.feature_names,
+                **self._kwargs,
             )
 
     @abstractmethod
-    def _render_internal(self, expected_value, shap_values, features, feature_names, **kwargs):
+    def _render_internal(self, expected_value, shap_values, features, explainer, feature_names, **kwargs):
         raise NotImplementedError  # pragma: no cover
 
 
@@ -71,7 +76,7 @@ class ExplainForcePlot(_AbstractExplainPlot):
     :py:class:`~autogluon.eda.analysis.explain.ShapAnalysis`
     """
 
-    def _render_internal(self, expected_value, shap_values, features, feature_names, **kwargs):
+    def _render_internal(self, expected_value, shap_values, features, explainer, feature_names, **kwargs):
         _kwargs = {**dict(text_rotation=45, matplotlib=True), **kwargs}
         shap.force_plot(expected_value, shap_values, features, feature_names=feature_names, **_kwargs)
 
@@ -113,13 +118,9 @@ class ExplainWaterfallPlot(_AbstractExplainPlot):
     :py:class:`~autogluon.eda.analysis.explain.ShapAnalysis`
     """
 
-    def _render_internal(self, expected_value, shap_values, features, feature_names, **kwargs):
-        shap.plots.waterfall(_ShapInput(expected_value, shap_values, features, feat_names=features.index), **kwargs)
-
-
-class _ShapInput(object):
-    def __init__(self, expectation, shap_values, features, feat_names):
-        self.base_values = expectation
-        self.values = shap_values
-        self.display_data = features.values
-        self.feature_names = list(feat_names)
+    def _render_internal(self, expected_value, shap_values, features, explainer, feature_names, **kwargs):
+        shap.waterfall_plot(
+            shap.Explanation(
+                shap_values, base_values=expected_value, output_names=features, feature_names=features.index
+            )
+        )

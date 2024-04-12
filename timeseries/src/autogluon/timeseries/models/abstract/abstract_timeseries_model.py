@@ -3,7 +3,7 @@ import os
 import re
 import time
 from contextlib import nullcontext
-from typing import Any, Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 from autogluon.common import space
 from autogluon.common.loaders import load_pkl
@@ -31,7 +31,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         If None, a new unique time-stamped directory is chosen.
     freq: str
         Frequency string (cf. gluonts frequency strings) describing the frequency
-        of the time series data. For example, "H" for hourly or "D" for daily data.
+        of the time series data. For example, "h" for hourly or "D" for daily data.
     prediction_length: int
         Length of the prediction horizon, i.e., the number of time steps the model
         is fit to forecast.
@@ -73,6 +73,10 @@ class AbstractTimeSeriesModel(AbstractModel):
     _preprocess = None
     _preprocess_nonadaptive = None
     _preprocess_set_features = None
+
+    supports_known_covariates: bool = False
+    supports_past_covariates: bool = False
+    supports_static_features: bool = False
 
     def __init__(
         self,
@@ -201,7 +205,9 @@ class AbstractTimeSeriesModel(AbstractModel):
         }
         return info
 
-    def fit(self, **kwargs) -> "AbstractTimeSeriesModel":
+    def fit(
+        self, train_data: TimeSeriesDataFrame, val_data: Optional[TimeSeriesDataFrame] = None, **kwargs
+    ) -> "AbstractTimeSeriesModel":
         """Fit timeseries model.
 
         Models should not override the `fit` method, but instead override the `_fit` method which
@@ -227,11 +233,6 @@ class AbstractTimeSeriesModel(AbstractModel):
         verbosity : int, default = 2
             Verbosity levels range from 0 to 4 and control how much information is printed.
             Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
-            verbosity 4: logs every training iteration, and logs the most detailed information.
-            verbosity 3: logs training iterations periodically, and logs more detailed information.
-            verbosity 2: logs only important information.
-            verbosity 1: logs only warnings and exceptions.
-            verbosity 0: logs only exceptions.
         **kwargs :
             Any additional fit arguments a model supports.
 
@@ -240,7 +241,10 @@ class AbstractTimeSeriesModel(AbstractModel):
         model: AbstractTimeSeriesModel
             The fitted model object
         """
-        return super().fit(**kwargs)
+        train_data = self.preprocess(train_data, is_train=True)
+        if self._get_tags()["can_use_val_data"] and val_data is not None:
+            val_data = self.preprocess(val_data, is_train=False)
+        return super().fit(train_data=train_data, val_data=val_data, **kwargs)
 
     def _fit(
         self,
@@ -295,6 +299,8 @@ class AbstractTimeSeriesModel(AbstractModel):
             data is given as a separate forecast item in the dictionary, keyed by the `item_id`s
             of input items.
         """
+        data = self.preprocess(data, is_train=False)
+        known_covariates = self.preprocess_known_covariates(known_covariates)
         predictions = self._predict(data=data, known_covariates=known_covariates, **kwargs)
         logger.debug(f"Predicting with model {self.name}")
         # "0.5" might be missing from the quantiles if self is a wrapper (MultiWindowBacktestingModel or ensemble)
@@ -357,7 +363,7 @@ class AbstractTimeSeriesModel(AbstractModel):
             time steps of each time series.
         """
         past_data, known_covariates = data.get_model_inputs_for_scoring(
-            prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates_real
+            prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates
         )
         predictions = self.predict(past_data, known_covariates=known_covariates)
         return self._score_with_predictions(data=data, predictions=predictions, metric=metric)
@@ -367,13 +373,14 @@ class AbstractTimeSeriesModel(AbstractModel):
         val_data: TimeSeriesDataFrame,
         store_val_score: bool = False,
         store_predict_time: bool = False,
+        **predict_kwargs,
     ) -> None:
         """Compute val_score, predict_time and cache out-of-fold (OOF) predictions."""
         past_data, known_covariates = val_data.get_model_inputs_for_scoring(
-            prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates_real
+            prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates
         )
         predict_start_time = time.time()
-        oof_predictions = self.predict(past_data, known_covariates=known_covariates)
+        oof_predictions = self.predict(past_data, known_covariates=known_covariates, **predict_kwargs)
         self._oof_predictions = [oof_predictions]
         if store_predict_time:
             self.predict_time = time.time() - predict_start_time
@@ -420,6 +427,13 @@ class AbstractTimeSeriesModel(AbstractModel):
         hpo_executor.register_resources(self, k_fold=1, **kwargs)
         return self._hyperparameter_tune(hpo_executor=hpo_executor, **kwargs)
 
+    def persist(self) -> "AbstractTimeSeriesModel":
+        """Ask the model to persist its assets in memory, i.e., to predict with low latency. In practice
+        this is used for pretrained models that have to lazy-load model parameters to device memory at
+        prediction time.
+        """
+        return self
+
     def _hyperparameter_tune(
         self,
         train_data: TimeSeriesDataFrame,
@@ -427,7 +441,6 @@ class AbstractTimeSeriesModel(AbstractModel):
         hpo_executor: HpoExecutor,
         **kwargs,
     ):
-        # verbosity = kwargs.get('verbosity', 2)
         time_start = time.time()
         logger.debug(f"\tStarting AbstractTimeSeriesModel hyperparameter tuning for {self.name}")
         search_space = self._get_search_space()
@@ -487,8 +500,13 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         return hpo_models, analysis
 
-    def preprocess(self, data: Any, **kwargs) -> Any:
+    def preprocess(self, data: TimeSeriesDataFrame, is_train: bool = False, **kwargs) -> TimeSeriesDataFrame:
         return data
+
+    def preprocess_known_covariates(
+        self, known_covariates: Optional[TimeSeriesDataFrame]
+    ) -> Optional[TimeSeriesDataFrame]:
+        return known_covariates
 
     def get_memory_size(self, **kwargs) -> Optional[int]:
         return None
@@ -505,3 +523,20 @@ class AbstractTimeSeriesModel(AbstractModel):
             return {}
         else:
             return self._user_params.copy()
+
+    def _more_tags(self) -> dict:
+        """Encode model properties using tags, similar to sklearn & autogluon.tabular.
+
+        For more details, see `autogluon.core.models.abstract.AbstractModel._get_tags()` and https://scikit-learn.org/stable/_sources/developers/develop.rst.txt.
+
+        List of currently supported tags:
+        - allow_nan: Can the model handle data with missing values represented by np.nan?
+        - can_refit_full: Does it make sense to retrain the model without validation data?
+            See `autogluon.core.models.abstract._tags._DEFAULT_TAGS` for more details.
+        - can_use_val_data: Can model use val_data if it's provided to model.fit()?
+        """
+        return {
+            "allow_nan": False,
+            "can_refit_full": False,
+            "can_use_val_data": False,
+        }

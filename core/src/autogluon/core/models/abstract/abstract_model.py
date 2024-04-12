@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
+from autogluon.common.space import Space
 from autogluon.common.utils.distribute_utils import DistributedContext
 from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.log_utils import DuplicateFilter
@@ -84,9 +85,9 @@ class AbstractModel:
         If `eval_metric = None`, it is automatically chosen based on `problem_type`.
         Defaults to 'accuracy' for binary and multiclass classification and 'root_mean_squared_error' for regression.
         Otherwise, options for classification:
-            ['accuracy', 'balanced_accuracy', 'f1', 'f1_macro', 'f1_micro', 'f1_weighted',
-            'roc_auc', 'roc_auc_ovo_macro', 'average_precision', 'precision', 'precision_macro', 'precision_micro',
-            'precision_weighted', 'recall', 'recall_macro', 'recall_micro', 'recall_weighted', 'log_loss', 'pac_score']
+            ['accuracy', 'balanced_accuracy', 'f1', 'f1_macro', 'f1_micro', 'f1_weighted', 'roc_auc', 'roc_auc_ovo_macro',
+            'average_precision', 'precision', 'precision_macro', 'precision_micro', 'precision_weighted', 'recall',
+            'recall_macro', 'recall_micro', 'recall_weighted', 'log_loss', 'pac_score', 'quadratic_kappa']
         Options for regression:
             ['root_mean_squared_error', 'mean_squared_error', 'mean_absolute_error', 'median_absolute_error', 'r2']
         Options for quantile regression:
@@ -1529,6 +1530,10 @@ class AbstractModel:
         if self.estimate_memory_usage is not None:
             model_estimate_memory_usage = self.estimate_memory_usage(X=X, **kwargs)
         minimum_resources = self.get_minimum_resources(is_gpu_available=(hpo_executor.resources.get("num_gpus", 0) > 0))
+        # This explicitly tells ray.Tune to not change the working directory
+        # to the trial directory, giving access to paths relative to
+        # the original working directory.
+        os.environ["RAY_CHDIR_TO_TRIAL_DIR"] = "0"
         hpo_executor.execute(
             model_trial=model_trial,
             train_fn_kwargs=train_fn_kwargs,
@@ -1537,7 +1542,6 @@ class AbstractModel:
             minimum_gpu_per_trial=minimum_resources.get("num_gpus", 0),
             model_estimate_memory_usage=model_estimate_memory_usage,
             adapter_type="tabular",
-            tune_config_kwargs={"chdir_to_trial_dir": False},
         )
 
         hpo_results = hpo_executor.get_hpo_results(
@@ -1945,9 +1949,27 @@ class AbstractModel:
         else:
             return dict()
 
-    def _get_model_params(self) -> dict:
-        """Gets params that are passed to the inner model."""
-        return self._get_params()
+    def _get_model_params(self, convert_search_spaces_to_default: bool = False) -> dict:
+        """
+        Gets params that are passed to the inner model.
+
+        Parameters
+        ----------
+        convert_search_spaces_to_default: bool, default = False
+            If True, search spaces are converted to the default value.
+            This is useful when having to estimate memory usage estimates prior to doing hyperparameter tuning.
+
+        Returns
+        -------
+        params: dict
+            Dictionary of model hyperparameters.
+        """
+        params = self._get_params()
+        if convert_search_spaces_to_default:
+            for param, val in params.items():
+                if isinstance(val, Space):
+                    params[param] = val.default
+        return params
 
     # TODO: Add documentation for valid args for each model. Currently only `early_stop`
     def _ag_params(self) -> set:

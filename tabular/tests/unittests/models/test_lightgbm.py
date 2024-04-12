@@ -1,5 +1,6 @@
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.metrics import METRICS
+from autogluon.tabular import TabularPredictor
 from autogluon.tabular.models.lgb.lgb_model import LGBModel
 
 
@@ -70,7 +71,7 @@ def test_lightgbm_binary_with_calibrate_decision_threshold(fit_helper):
     )
     dataset_name = "adult"
 
-    predictor = fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, delete_directory=False, refit_full=False)
+    predictor: TabularPredictor = fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, delete_directory=False, refit_full=False)
 
     for metric in [None, "f1", "balanced_accuracy", "mcc", "recall", "precision"]:
         decision_threshold = predictor.calibrate_decision_threshold(metric=metric)
@@ -119,7 +120,9 @@ def test_lightgbm_binary_with_calibrate_decision_threshold_bagged_refit(fit_help
     directory_prefix = "./datasets/"
     train_data, test_data, dataset_info = dataset_loader_helper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
     label = dataset_info["label"]
-    predictor = fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, init_args=init_args, fit_args=fit_args, delete_directory=False, refit_full=True)
+    predictor: TabularPredictor = fit_helper.fit_and_validate_dataset(
+        dataset_name=dataset_name, init_args=init_args, fit_args=fit_args, delete_directory=False, refit_full=True
+    )
 
     assert predictor._decision_threshold is not None
     assert predictor.decision_threshold == predictor._decision_threshold

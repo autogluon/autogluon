@@ -24,24 +24,24 @@ from autogluon.timeseries.metrics import AVAILABLE_METRICS, DEFAULT_METRIC_NAME,
 from autogluon.timeseries.metrics.utils import _in_sample_abs_seasonal_error, _in_sample_squared_seasonal_error
 from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
 
-from .common import DUMMY_TS_DATAFRAME, get_data_frame_with_item_index
+from .common import DUMMY_TS_DATAFRAME, get_data_frame_with_item_index, get_prediction_for_df
 
 pytestmark = pytest.mark.filterwarnings("ignore")
 
 
-def get_ag_and_gts_metrics() -> List[Tuple[str, str, GluonTSMetric]]:
-    # Each entry is a tuple (ag_metric_name, gts_metric_name, gts_metric_object)
+def get_ag_and_gts_metrics() -> List[Tuple[str, GluonTSMetric]]:
+    # Each entry is a tuple (ag_metric_name, gts_metric_object)
     default_quantile_levels = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
     # Metric that have different names in AutoGluon and GluonTS
     ag_and_gts_metrics = [
-        ("WQL", "mean_weighted_sum_quantile_loss", MeanWeightedSumQuantileLoss(default_quantile_levels)),
-        ("SQL", "average_mean_scaled_quantile_loss", AverageMeanScaledQuantileLoss(default_quantile_levels)),
-        ("WAPE", "ND[mean]", ND("mean")),
+        ("WQL", MeanWeightedSumQuantileLoss(default_quantile_levels)),
+        ("SQL", AverageMeanScaledQuantileLoss(default_quantile_levels)),
+        ("WAPE", ND("mean")),
     ]
     # Metric that have same names in AutoGluon and GluonTS
     for point_metric_cls in [MAPE, SMAPE, MSE, RMSE, MASE, MAE]:
         name = str(point_metric_cls.__name__)
-        ag_and_gts_metrics.append((name, f"{name}[mean]", point_metric_cls("mean")))
+        ag_and_gts_metrics.append((name, point_metric_cls("mean")))
     return ag_and_gts_metrics
 
 
@@ -100,9 +100,7 @@ def to_gluonts_test_set(data, prediction_length):
     return test_template.generate_instances(prediction_length, windows=1)
 
 
-def check_gluonts_parity(
-    ag_metric_name, gts_metric_name, gts_metric, data, model, zero_forecast=False, equal_nan=False
-):
+def check_gluonts_parity(ag_metric_name, gts_metric, data, model, zero_forecast=False, equal_nan=False):
     data_train, data_test = data.train_test_split(model.prediction_length)
     forecast_df = model.predict(data_train)
     forecast_df["mean"] = forecast_df["0.5"]
@@ -126,26 +124,22 @@ def check_gluonts_parity(
     assert np.isclose(gts_value, ag_value, atol=1e-5, equal_nan=equal_nan)
 
 
-@pytest.mark.parametrize("ag_metric_name, gts_metric_name, gts_metric", AG_AND_GTS_METRICS)
-def test_when_metric_evaluated_then_output_equal_to_gluonts(
-    ag_metric_name, gts_metric_name, gts_metric, deepar_trained
-):
+@pytest.mark.parametrize("ag_metric_name, gts_metric", AG_AND_GTS_METRICS)
+def test_when_metric_evaluated_then_output_equal_to_gluonts(ag_metric_name, gts_metric, deepar_trained):
     check_gluonts_parity(
         ag_metric_name,
-        gts_metric_name,
         gts_metric,
         data=DUMMY_TS_DATAFRAME,
         model=deepar_trained,
     )
 
 
-@pytest.mark.parametrize("ag_metric_name, gts_metric_name, gts_metric", AG_AND_GTS_METRICS)
+@pytest.mark.parametrize("ag_metric_name, gts_metric", AG_AND_GTS_METRICS)
 def test_given_all_zero_data_when_metric_evaluated_then_output_equal_to_gluonts(
-    ag_metric_name, gts_metric_name, gts_metric, deepar_trained_zero_data
+    ag_metric_name, gts_metric, deepar_trained_zero_data
 ):
     check_gluonts_parity(
         ag_metric_name,
-        gts_metric_name,
         gts_metric,
         data=DUMMY_TS_DATAFRAME.copy() * 0,
         model=deepar_trained_zero_data,
@@ -153,18 +147,48 @@ def test_given_all_zero_data_when_metric_evaluated_then_output_equal_to_gluonts(
     )
 
 
-@pytest.mark.parametrize("ag_metric_name, gts_metric_name, gts_metric", AG_AND_GTS_METRICS)
+@pytest.mark.parametrize("ag_metric_name, gts_metric", AG_AND_GTS_METRICS)
 def test_given_zero_forecasts_when_metric_evaluated_then_output_equal_to_gluonts(
-    ag_metric_name, gts_metric_name, gts_metric, deepar_trained
+    ag_metric_name, gts_metric, deepar_trained
 ):
     check_gluonts_parity(
         ag_metric_name,
-        gts_metric_name,
         gts_metric,
         data=DUMMY_TS_DATAFRAME,
         model=deepar_trained,
         zero_forecast=True,
     )
+
+
+@pytest.mark.parametrize("ag_metric_name, gts_metric", AG_AND_GTS_METRICS)
+def test_given_missing_target_values_when_metric_evaluated_then_output_equal_to_gluonts(
+    ag_metric_name, gts_metric, deepar_trained
+):
+    check_gluonts_parity(
+        ag_metric_name,
+        gts_metric,
+        data=DUMMY_TS_DATAFRAME,
+        model=deepar_trained,
+    )
+
+
+@pytest.mark.parametrize("metric_cls", AVAILABLE_METRICS.values())
+def test_given_missing_target_values_when_metric_evaluated_then_metric_is_not_nan(metric_cls):
+    prediction_length = 5
+    train, test = DUMMY_TS_DATAFRAME.train_test_split(prediction_length)
+    predictions = get_prediction_for_df(train, prediction_length)
+    score = metric_cls()(data=test, predictions=predictions, prediction_length=prediction_length)
+    assert not pd.isna(score)
+
+
+@pytest.mark.parametrize("metric_cls", AVAILABLE_METRICS.values())
+def test_given_predictions_contain_nan_when_metric_evaluated_then_exception_is_raised(metric_cls):
+    prediction_length = 5
+    train, test = DUMMY_TS_DATAFRAME.train_test_split(prediction_length)
+    predictions = get_prediction_for_df(train, prediction_length)
+    predictions.iloc[[3, 5]] = float("nan")
+    with pytest.raises(AssertionError, match="Predictions contain NaN values"):
+        metric_cls()(data=test, predictions=predictions, prediction_length=prediction_length)
 
 
 def test_available_metrics_have_coefficients():
@@ -226,7 +250,7 @@ def test_RMSSE(prediction_length, seasonal_period, expected_result):
     )
     predictions = get_data_frame_with_item_index(
         ["1"],
-        start_date=str(pd.Timestamp("2022-01-01 00:00:00") + pd.to_timedelta(prediction_length, unit="H")),
+        start_date=str(pd.Timestamp("2022-01-01 00:00:00") + pd.to_timedelta(prediction_length, unit="h")),
         data_length=prediction_length,
         columns=["mean"],
         data_generation="sequential",
@@ -236,6 +260,35 @@ def test_RMSSE(prediction_length, seasonal_period, expected_result):
         data, predictions, prediction_length=prediction_length, seasonal_period=seasonal_period
     )
     assert ag_value == expected_result
+
+
+@pytest.mark.parametrize(
+    "prediction_length, expected_result",
+    [
+        (3, 1.03952774131806),
+        (4, 1.11754262032011),
+        (5, 1.17302207173233),
+        (6, 1.21497832991862),
+    ],
+)
+def test_RMSLE(prediction_length, expected_result):
+    data = get_data_frame_with_item_index(
+        ["1"],
+        start_date="2022-01-01 00:00:00",
+        data_length=2 * prediction_length,
+        columns=["target"],
+        data_generation="sequential",
+    )
+    predictions = get_data_frame_with_item_index(
+        ["1"],
+        start_date=str(pd.Timestamp("2022-01-01 00:00:00") + pd.to_timedelta(prediction_length, unit="h")),
+        data_length=prediction_length,
+        columns=["mean"],
+        data_generation="sequential",
+    )
+    metric = check_get_evaluation_metric("RMSLE")
+    ag_value = metric.sign * metric(data, predictions, prediction_length=prediction_length)
+    assert np.isclose(ag_value, expected_result, atol=1e-5)
 
 
 @pytest.mark.parametrize("metric_name", AVAILABLE_METRICS)
@@ -255,7 +308,7 @@ def test_when_perfect_predictions_passed_to_metric_then_score_equals_optimum(met
     prediction_length = 5
     eval_metric = check_get_evaluation_metric(metric_name)
     data = DUMMY_TS_DATAFRAME.copy()
-    predictions = data.slice_by_timestep(-prediction_length, None).rename(columns={"target": "mean"})
+    predictions = data.slice_by_timestep(-prediction_length, None).rename(columns={"target": "mean"}).fillna(0.0)
     for q in ["0.1", "0.4", "0.9"]:
         predictions[q] = predictions["mean"]
     score = eval_metric.score(data, predictions, prediction_length=prediction_length)
@@ -267,7 +320,7 @@ def test_when_better_predictions_passed_to_metric_then_score_improves(metric_nam
     prediction_length = 5
     eval_metric = check_get_evaluation_metric(metric_name)
     data = DUMMY_TS_DATAFRAME.copy()
-    predictions = data.slice_by_timestep(-prediction_length, None).rename(columns={"target": "mean"})
+    predictions = data.slice_by_timestep(-prediction_length, None).rename(columns={"target": "mean"}).fillna(0.0)
     for q in ["0.1", "0.4", "0.9"]:
         predictions[q] = predictions["mean"]
     good_score = eval_metric.score(data, predictions + 1, prediction_length=prediction_length)

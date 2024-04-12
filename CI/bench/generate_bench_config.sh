@@ -35,9 +35,6 @@ else
     class_name=""
     dataset_file=""
     custom_dataloader_value=""
-    shot_value=0
-    seed_value=0
-    lang=""
     custom_metrics_path=""
     custom_function_name=""
     optimum=0
@@ -55,9 +52,6 @@ else
         dataloader_file="text_dataloader.py"
         class_name="TextDataLoader"
         dataset_file="text_datasets.yaml"
-        lang="en"
-        shot_value=500
-        seed_value=7
         custom_dataloader_value="dataloader_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataloader_file;class_name:$class_name;dataset_config_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataset_file"
     elif [ $BENCHMARK == "automm-text-tabular-image" ]; then
         dataloader_file="text_tabular_image_dataloader.py"
@@ -100,7 +94,7 @@ else
     --custom-dataloader '$custom_dataloader_value'"
 
     if [ $BENCHMARK == "automm-text" ]; then
-        gen_bench_command="$gen_bench_command --fewshot --shot $shot_value --lang $lang --seed $seed_value"
+        gen_bench_command="$gen_bench_command"
     elif [ $BENCHMARK == "automm-text-tabular-image" ]; then
         gen_bench_command="$gen_bench_command --custom-metrics --metrics-path $custom_metrics_path --function-name $custom_function_name --optimum $optimum --greater-is-better"
     fi

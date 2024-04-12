@@ -9,7 +9,6 @@ import pandas as pd
 from sklearn.base import BaseEstimator
 
 import autogluon.core as ag
-from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.tabular import TabularPredictor
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
@@ -86,6 +85,21 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         self._scaler: Optional[BaseTargetTransform] = None
         self._residuals_std_per_item: Optional[pd.Series] = None
         self._avg_residuals_std: Optional[float] = None
+        self._train_target_median: Optional[float] = None
+
+    def preprocess(self, data: TimeSeriesDataFrame, is_train: bool = False, **kwargs) -> Any:
+        if is_train:
+            # All-NaN series are removed; partially-NaN series in train_data are handled inside _generate_train_val_dfs
+            all_nan_items = data.item_ids[data[self.target].isna().groupby(ITEMID, sort=False).all()]
+            if len(all_nan_items):
+                data = data.query("item_id not in @all_nan_items")
+            return data
+        else:
+            data = data.fill_missing_values()
+            # Fill time series consisting of all NaNs with the median of target in train_data
+            if data.isna().any(axis=None):
+                data[self.target] = data[self.target].fillna(value=self._train_target_median)
+            return data
 
     def _get_extra_tabular_init_kwargs(self) -> dict:
         raise NotImplementedError
@@ -99,8 +113,6 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         return model_params
 
     def _get_mlforecast_init_args(self, train_data: TimeSeriesDataFrame, model_params: dict) -> dict:
-        # TODO: Support lag generation for all pandas frequencies
-        # TODO: Support date_feature generation for all pandas frequencies
         from mlforecast.target_transforms import Differences
 
         from .utils import MeanAbsScaler, StandardScaler
@@ -182,6 +194,10 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             items_to_keep = data.item_ids.to_series().sample(n=int(max_num_items))  # noqa: F841
             data = data.query("item_id in @items_to_keep")
 
+        # MLForecast.preprocess does not support missing values, but we will exclude them later from the training set
+        missing_entries = data.index[data[self.target].isna()]
+        data = data.fill_missing_values()
+
         num_items = data.num_items
         mlforecast_df = self._to_mlforecast_df(data, data.static_features)
 
@@ -197,6 +213,10 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         df = df.query("y.notnull()")
 
         df = self._mask_df(df)
+
+        # We remove originally missing values filled via imputation from the training set
+        if len(missing_entries):
+            df = df.set_index(["unique_id", "ds"]).drop(missing_entries, errors="ignore").reset_index()
 
         if max_num_samples is not None and len(df) > max_num_samples:
             df = df.sample(n=max_num_samples)
@@ -222,7 +242,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         Each row contains unique_id, ds, y, and (optionally) known covariates & static features.
         """
         # TODO: Add support for past_covariates
-        selected_columns = self.metadata.known_covariates_real.copy()
+        selected_columns = self.metadata.known_covariates.copy()
         column_name_mapping = {ITEMID: MLF_ITEMID, TIMESTAMP: MLF_TIMESTAMP}
         if include_target:
             selected_columns += [self.target]
@@ -232,9 +252,11 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         if static_features is not None:
             df = pd.merge(df, static_features, how="left", on=ITEMID, suffixes=(None, "_static_feat"))
 
-        # Convert float64 to float32 to reduce memory usage
-        float64_cols = list(df.select_dtypes(include="float64"))
-        df[float64_cols] = df[float64_cols].astype("float32")
+        for col in self.metadata.known_covariates_real:
+            # Normalize non-boolean features using mean_abs scaling
+            if not df[col].isin([0, 1]).all():
+                df[f"__scaled_{col}"] = df[col] / df[col].abs().groupby(df[ITEMID]).mean().reindex(df[ITEMID]).values
+
         # We assume that df is sorted by 'unique_id' inside `TimeSeriesPredictor._check_and_prepare_data_frame`
         return df.rename(columns=column_name_mapping)
 
@@ -249,8 +271,8 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         from mlforecast import MLForecast
 
         self._check_fit_params()
-        set_logger_verbosity(verbosity, logger=logger)
         fit_start_time = time.time()
+        self._train_target_median = train_data[self.target].median()
         # TabularEstimator is passed to MLForecast later to include tuning_data
         model_params = self._get_model_params()
 
@@ -315,7 +337,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             Seasonal naive forecast for short series, if there are any in the dataset.
         """
         ts_lengths = data.num_timesteps_per_item()
-        short_series = ts_lengths.index[ts_lengths <= self._sum_of_differences]
+        short_series = ts_lengths.index[ts_lengths <= self._sum_of_differences + 1]
         if len(short_series) > 0:
             logger.warning(
                 f"Warning: {len(short_series)} time series ({len(short_series) / len(ts_lengths):.1%}) are shorter "
@@ -360,7 +382,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         return predictions
 
     def _more_tags(self) -> dict:
-        return {"can_refit_full": True}
+        return {"allow_nan": True, "can_refit_full": True}
 
 
 class DirectTabularModel(AbstractMLForecastModel):
@@ -408,6 +430,9 @@ class DirectTabularModel(AbstractMLForecastModel):
         end of each time series).
     """
 
+    supports_known_covariates = True
+    supports_static_features = True
+
     @property
     def is_quantile_model(self) -> bool:
         return self.eval_metric.needs_quantile
@@ -454,7 +479,7 @@ class DirectTabularModel(AbstractMLForecastModel):
         if known_covariates is not None:
             data_future = known_covariates.copy()
         else:
-            future_index = get_forecast_horizon_index_ts_dataframe(data, self.prediction_length)
+            future_index = get_forecast_horizon_index_ts_dataframe(data, self.prediction_length, freq=self.freq)
             data_future = pd.DataFrame(columns=[self.target], index=future_index, dtype="float32")
         # MLForecast raises exception of target contains NaN. We use inf as placeholder, replace them by NaN afterwards
         data_future[self.target] = float("inf")
@@ -559,6 +584,9 @@ class RecursiveTabularModel(AbstractMLForecastModel):
         end of each time series).
     """
 
+    supports_known_covariates = True
+    supports_static_features = True
+
     def _get_model_params(self) -> dict:
         model_params = super()._get_model_params()
         model_params.setdefault("scaler", "standard")
@@ -583,7 +611,7 @@ class RecursiveTabularModel(AbstractMLForecastModel):
         if self._max_ts_length is not None:
             new_df = self._shorten_all_series(new_df, self._max_ts_length)
         if known_covariates is None:
-            future_index = get_forecast_horizon_index_ts_dataframe(data, self.prediction_length)
+            future_index = get_forecast_horizon_index_ts_dataframe(data, self.prediction_length, freq=self.freq)
             known_covariates = pd.DataFrame(columns=[self.target], index=future_index, dtype="float32")
         X_df = self._to_mlforecast_df(known_covariates, data.static_features, include_target=False)
         # If both covariates & static features are missing, set X_df = None to avoid exception from MLForecast

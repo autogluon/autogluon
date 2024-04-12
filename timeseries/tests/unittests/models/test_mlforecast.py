@@ -12,6 +12,7 @@ from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_da
 from ..common import (
     DATAFRAME_WITH_COVARIATES,
     DATAFRAME_WITH_STATIC,
+    DUMMY_TS_DATAFRAME,
     DUMMY_VARIABLE_LENGTH_TS_DATAFRAME,
     get_data_frame_with_variable_lengths,
 )
@@ -52,6 +53,7 @@ def test_when_covariates_and_features_present_then_train_and_val_dfs_have_correc
     expected_num_features = (
         len(lags)
         + len(known_covariates_names)
+        + len(model.metadata.known_covariates_real)  # item-normalized version of each real covariate
         + len(static_features_names)
         + len(model._date_features)
         + 2  # target, item_id
@@ -116,7 +118,7 @@ def test_given_long_time_series_passed_to_model_then_preprocess_receives_shorten
 ):
     max_num_samples = 1000
     prediction_length = 17
-    data = get_data_frame_with_variable_lengths({"A": 1_000_000}, freq="T")
+    data = get_data_frame_with_variable_lengths({"A": 1_000_000}, freq="min")
     model = model_type(
         path=temp_model_path,
         freq=data.freq,
@@ -195,7 +197,7 @@ def test_given_some_time_series_are_too_short_then_seasonal_naive_forecast_is_us
 def test_when_point_forecast_metric_is_used_then_per_item_residuals_are_used_for_prediction(
     temp_model_path, model_type
 ):
-    data = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME.sort_index()
+    data = get_data_frame_with_variable_lengths({"A": 20, "B": 30, "C": 15})
     prediction_length = 5
     model = model_type(
         path=temp_model_path,
@@ -235,3 +237,18 @@ def test_when_mlf_model_is_used_then_predictions_have_correct_scale(temp_model_p
     model.fit(train_data=data)
     predictions = model.predict(data)
     assert np.all(np.abs(predictions.values - value) < value)
+
+
+@pytest.mark.parametrize("model_type", TESTABLE_MODELS)
+def test_given_train_data_has_nans_when_fit_called_then_nan_rows_removed_from_train_df(temp_model_path, model_type):
+    data = DUMMY_TS_DATAFRAME.copy()
+    model = model_type(
+        path=temp_model_path,
+        freq=data.freq,
+        eval_metric="WAPE",
+        prediction_length=3,
+        hyperparameters={"differences": []},
+    )
+    model.fit(train_data=data)
+    train_df, val_df = model._generate_train_val_dfs(model.preprocess(data, is_train=True))
+    assert len(train_df) + len(val_df) == len(data.dropna())

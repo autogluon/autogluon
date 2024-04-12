@@ -3,7 +3,7 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 
-from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
+from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 
 from .abstract import TimeSeriesScorer
 from .utils import _in_sample_abs_seasonal_error
@@ -41,8 +41,8 @@ class WQL(TimeSeriesScorer):
         values_pred = q_pred.values  # shape [N, len(quantile_levels)]
 
         return 2 * np.mean(
-            np.abs((values_true - values_pred) * ((values_true <= values_pred) - quantile_levels)).sum(axis=0)
-            / np.abs(values_true).sum()
+            np.nansum(np.abs((values_true - values_pred) * ((values_true <= values_pred) - quantile_levels)), axis=0)
+            / np.nansum(np.abs(values_true))
         )
 
 
@@ -99,9 +99,11 @@ class SQL(TimeSeriesScorer):
             raise AssertionError("Call `save_past_metrics` before `compute_metric`")
 
         y_true, q_pred, quantile_levels = self._get_quantile_forecast_score_inputs(data_future, predictions, target)
+        q_pred = q_pred.values
         values_true = y_true.values[:, None]  # shape [N, 1]
 
-        ql = ((q_pred - values_true) * ((values_true <= q_pred) - quantile_levels)).mean(axis=1).abs()
-        # TODO: Speed up computation by using np.arrays & replace groupby with reshapes [-1, prediction_length]?
-        ql_per_item = ql.groupby(level=ITEMID, sort=False).mean()
-        return 2 * self._safemean(ql_per_item / self._past_abs_seasonal_error)
+        ql = np.abs((q_pred - values_true) * ((values_true <= q_pred) - quantile_levels)).mean(axis=1)
+        num_items = len(self._past_abs_seasonal_error)
+        # Reshape quantile losses values into [num_items, prediction_length] to normalize per item without groupby
+        quantile_losses = ql.reshape([num_items, -1])
+        return 2 * self._safemean(quantile_losses / self._past_abs_seasonal_error.values[:, None])
