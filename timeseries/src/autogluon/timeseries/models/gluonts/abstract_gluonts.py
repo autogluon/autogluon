@@ -86,7 +86,10 @@ class SimpleGluonTSDataset(GluonTSDataset):
 
     @staticmethod
     def _get_freq_for_period(freq: str) -> str:
-        """freq must be converted to a format pd.Period requires different freq string"""
+        """Convert freq to format compatible with pd.Period.
+
+        For example, ME freq must be converted to M when creating a pd.Period.
+        """
         offset = pd.tseries.frequencies.to_offset(freq)
         freq_name = norm_freq_str(offset)
         freq_name_for_period = {"YE": "Y", "QE": "Q", "ME": "M", "SME": "SM"}.get(freq_name, freq_name)
