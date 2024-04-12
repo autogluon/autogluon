@@ -36,9 +36,6 @@ logger = logging.getLogger(__name__)
 gts_logger = logging.getLogger(gluonts.__name__)
 
 
-DUMMY_GLUONTS_FREQ = "D"
-
-
 class SimpleGluonTSDataset(GluonTSDataset):
     """Wrapper for TimeSeriesDataFrame that is compatible with the GluonTS Dataset API."""
 
@@ -153,6 +150,8 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
     """
 
     gluonts_model_path = "gluon_ts"
+    # we pass dummy freq compatible with pandas 2.1 & 2.2 to GluonTS models
+    _dummy_gluonts_freq = "D"
     # default number of samples for prediction
     default_num_samples: int = 250
     supports_cat_covariates: bool = False
@@ -356,7 +355,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         init_args.setdefault("early_stopping_patience", 20)
         init_args.update(
             dict(
-                freq=DUMMY_GLUONTS_FREQ,
+                freq=self._dummy_gluonts_freq,
                 prediction_length=self.prediction_length,
                 quantiles=self.quantile_levels,
                 callbacks=self.callbacks,
