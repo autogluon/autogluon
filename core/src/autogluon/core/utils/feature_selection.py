@@ -76,7 +76,10 @@ def merge_importance_dfs(df_old: pd.DataFrame, df_new: pd.DataFrame, using_prev_
     evaluated_both_rows["n"] = n_old + n_new
     # remove features evaluated in df_new from using_prev_fit_fi if they exist
     using_prev_fit_fi.difference_update(evaluated_new_rows.index.tolist())
-    result = pd.concat([evaluated_both_rows, evaluated_new_only_rows, evaluated_old_only_rows, evaluated_neither_rows]).sort_values("importance")
+
+    df_to_concat = [evaluated_both_rows, evaluated_new_only_rows, evaluated_old_only_rows, evaluated_neither_rows]
+    df_to_concat = [df for df in df_to_concat if len(df) > 0]
+    result = pd.concat(df_to_concat).sort_values("importance")
     assert len(result) == len(df_new), "Length of the updated DataFrame must be equal to the inputted DataFrame."
     return result
 
@@ -410,7 +413,10 @@ class FeatureSelector:
             evaluated_df["n"] = (evaluated_df["n"] // len(model.models)).clip(lower=1)
 
         # if we could not compute feature importance for all features and previous feature importance estimates exist, use them
-        importance_df = pd.concat([evaluated_df, unevaluated_fi_df_template(unevaluated_features)])
+        if unevaluated_features:
+            importance_df = pd.concat([evaluated_df, unevaluated_fi_df_template(unevaluated_features)])
+        else:
+            importance_df = evaluated_df
         importance_df = merge_importance_dfs(prev_importance_df, importance_df, using_prev_fit_fi)
 
         # if using noise threshold, threshold is the mean of noise column importance score

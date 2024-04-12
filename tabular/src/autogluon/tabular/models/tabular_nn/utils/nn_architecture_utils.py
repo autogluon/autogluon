@@ -21,8 +21,8 @@ def get_embed_sizes(train_dataset, params, num_categs_per_feature):
 
 def infer_y_range(y_vals, y_range_extend):
     """Infers good output range for neural network when used for regression."""
-    min_y = float(min(y_vals))
-    max_y = float(max(y_vals))
+    min_y = float(y_vals.min())
+    max_y = float(y_vals.max())
     std_y = np.std(y_vals)
     y_ext = y_range_extend * std_y
     if min_y >= 0:  # infer y must be nonnegative

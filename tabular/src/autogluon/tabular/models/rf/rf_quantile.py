@@ -555,7 +555,7 @@ class BaseForestQuantileRegressor(ForestRegressor):
         samples_with_weighted_neighbors = get_weighted_neighbors_dataframe(
             X_leaves=X_leaves, y_train_leaves=self.y_train_leaves_, y_train=self.y_train_, y_weights=self.y_weights_
         )
-        quantile_preds = samples_with_weighted_neighbors.groupby("item_id").apply(partial(get_quantiles, quantile_levels=quantile_levels))
+        quantile_preds = samples_with_weighted_neighbors.groupby("item_id").apply(partial(get_quantiles, quantile_levels=quantile_levels), include_groups=False)
         return np.stack(quantile_preds.values.tolist())
 
 

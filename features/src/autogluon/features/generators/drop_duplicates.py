@@ -3,6 +3,7 @@ from collections import defaultdict
 from typing import Union
 
 import numpy as np
+import pandas as pd
 from pandas import DataFrame
 
 from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT
@@ -132,8 +133,15 @@ class DropDuplicatesFeatureGenerator(AbstractFeatureGenerator):
             # Converts [5, 'a', np.nan, 5] to [0, 1, 2, 0], these would be considered duplicates since they carry the same information.
 
             # Have to convert to object dtype because category dtype for unknown reasons will refuse to replace NaNs.
-            # TODO: Fix FutureWarning
-            X_cur = X[features_to_check].astype("object").replace(mapping_features_val_dict_cur).astype(np.int64)
+            try:
+                # verify that the option exists (pandas >2.1)
+                pd.get_option("future.no_silent_downcasting")
+            except pd.errors.OptionError:
+                X_cur = X[features_to_check].astype("object").replace(mapping_features_val_dict_cur).astype(np.int64)
+            else:
+                # refer to https://pandas.pydata.org/docs/whatsnew/v2.2.0.html#deprecated-automatic-downcasting
+                with pd.option_context("future.no_silent_downcasting", True):
+                    X_cur = X[features_to_check].astype("object").replace(mapping_features_val_dict_cur).astype(np.int64)
             features_to_remove += cls._drop_duplicate_features_numeric(X=X_cur, keep=keep)
 
         return features_to_remove
