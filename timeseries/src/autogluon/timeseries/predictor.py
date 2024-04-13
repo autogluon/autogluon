@@ -631,7 +631,11 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             This argument has no effect if ``tuning_data`` is provided.
         refit_every_n_windows: int or None, default = 1
             When performing cross validation, each model will be retrained every ``refit_every_n_windows`` validation
-            windows. If set to ``None``, model will only be fit once for the first validation window.
+            windows, where the number of validation windows is specified by `num_val_windows`. Note that in the
+            default setting where `num_val_windows=1`, this argument has no effect.
+
+            If set to ``None``, model will only be fit once for the first validation window. By default,
+            `refit_every_n_windows=`, i.e., models will be refit for all validation windows.
         refit_full : bool, default = False
             If True, after training is complete, AutoGluon will attempt to re-train all models using all of training
             data (including the data initially reserved for validation). This argument has no effect if ``tuning_data``
@@ -716,6 +720,12 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
         if num_val_windows == 0 and tuning_data is None:
             raise ValueError("Please set num_val_windows >= 1 or provide custom tuning_data")
+
+        if num_val_windows <= 1 and refit_every_n_windows > 1:
+            logger.warning(
+                f"\trefit_every_n_windows provided as {refit_every_n_windows} but num_val_windows is set to {num_val_windows}."
+                " Refit_every_n_windows will have no effect."
+            )
 
         if not skip_model_selection:
             train_data = self._filter_useless_train_data(

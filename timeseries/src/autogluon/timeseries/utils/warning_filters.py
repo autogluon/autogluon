@@ -7,14 +7,12 @@ import re
 import sys
 import warnings
 
-from statsmodels.tools.sm_exceptions import ConvergenceWarning, ValueWarning
-
 __all__ = ["warning_filter", "disable_root_logger", "disable_tqdm"]
 
 
 @contextlib.contextmanager
 def warning_filter(all_warnings: bool = False):
-    categories = [RuntimeWarning, UserWarning, ConvergenceWarning, ValueWarning, FutureWarning]
+    categories = [RuntimeWarning, UserWarning, FutureWarning]
     if all_warnings:
         categories.append(Warning)
     with warnings.catch_warnings():
