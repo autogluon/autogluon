@@ -634,7 +634,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             windows, where the number of validation windows is specified by `num_val_windows`. Note that in the
             default setting where `num_val_windows=1`, this argument has no effect.
 
-            If set to ``None``, model will only be fit once for the first validation window. By default,
+            If set to ``None``, models will only be fit once for the first (oldest) validation window. By default,
             `refit_every_n_windows=`, i.e., models will be refit for all validation windows.
         refit_full : bool, default = False
             If True, after training is complete, AutoGluon will attempt to re-train all models using all of training
