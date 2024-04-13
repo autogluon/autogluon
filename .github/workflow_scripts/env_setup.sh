@@ -54,7 +54,6 @@ function install_multimodal {
     python -m pip install --upgrade pytest-xdist
     install_local_packages "multimodal/$1"
     setup_mmcv
-    python -m pip install "PyMuPDF<=1.21.1"
 }
 
 function install_all {
