@@ -89,11 +89,11 @@ DEFAULT_MODEL_PRIORITY = dict(
     RecursiveTabular=60,
     DirectTabular=50,
     DeepAR=40,
-    TemporalFusionTransformer=30,
+    TemporalFusionTransformer=40,
+    Chronos=35,
     PatchTST=30,
-    WaveNet=25,
-    Chronos=15,
     # Models below are not included in any presets
+    WaveNet=25,
     AutoCES=10,
     ARIMA=10,
     ADIDA=10,
@@ -143,7 +143,7 @@ def get_default_hps(key):
             "TemporalFusionTransformer": {},
             "PatchTST": {},
             "DeepAR": {},
-            "Chronos": {"model_path": "large", "batch_size": 8},
+            "Chronos": {"model_path": "base"},
         },
     }
     return default_model_hps[key]
