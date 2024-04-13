@@ -291,7 +291,9 @@ class DocumentProcessor:
                         doc_image = doc_image.convert(image_mode)
                         words, normalized_word_boxes = self.get_ocr_features(per_col_image_features[0], doc_image)
             except ImportError as e:
-                raise e
+                raise RuntimeError(
+                    "Please install PyMuPDF to process PDF data. Run the command ` pip install 'PyMuPDF<=1.21.1' `."
+                )
             except Exception as e:
                 if self.missing_value_strategy.lower() == "zero":
                     logger.debug(f"Using a zero image due to '{e}'")
