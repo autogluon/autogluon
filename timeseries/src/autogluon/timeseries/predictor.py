@@ -635,7 +635,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             default setting where `num_val_windows=1`, this argument has no effect.
 
             If set to ``None``, models will only be fit once for the first (oldest) validation window. By default,
-            `refit_every_n_windows=`, i.e., models will be refit for all validation windows.
+            `refit_every_n_windows=1`, i.e., all models will be refit for each validation windows.
         refit_full : bool, default = False
             If True, after training is complete, AutoGluon will attempt to re-train all models using all of training
             data (including the data initially reserved for validation). This argument has no effect if ``tuning_data``
