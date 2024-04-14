@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from autogluon.common.utils.utils import hash_pandas_df, seed_everything
+from autogluon.common.utils.utils import hash_pandas_df
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.loaders import load_pkl
@@ -555,7 +555,6 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         hyperparameter_tune_kwargs: Optional[Union[str, dict]] = None,
         excluded_model_types: Optional[List[str]] = None,
         time_limit: Optional[float] = None,
-        random_seed: Optional[int] = None,
     ) -> List[str]:
         logger.info(f"\nStarting training. Start time is {time.strftime('%Y-%m-%d %H:%M:%S')}")
 
@@ -611,9 +610,6 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 if time_left <= 0:
                     logger.info(f"Stopping training due to lack of time remaining. Time left: {time_left:.1f} seconds")
                     break
-
-            if random_seed is not None:
-                seed_everything(random_seed)
 
             if contains_searchspace(model.get_user_params()):
                 fit_log_message = f"Hyperparameter tuning model {model.name}. "
@@ -885,16 +881,11 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
         use_cache: bool = True,
-        random_seed: Optional[int] = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
         model_name = self._get_model_for_prediction(model)
         model_pred_dict = self.get_model_pred_dict(
-            model_names=[model_name],
-            data=data,
-            known_covariates=known_covariates,
-            use_cache=use_cache,
-            random_seed=random_seed,
+            model_names=[model_name], data=data, known_covariates=known_covariates, use_cache=use_cache
         )
         return model_pred_dict[model_name]
 
@@ -1132,7 +1123,6 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         record_pred_time: bool = False,
         raise_exception_if_failed: bool = True,
         use_cache: bool = True,
-        random_seed: Optional[int] = None,
     ) -> Union[Dict[str, TimeSeriesDataFrame], Tuple[Dict[str, TimeSeriesDataFrame], Dict[str, float]]]:
         """Return a dictionary with predictions of all models for the given dataset.
 
@@ -1172,8 +1162,6 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         failed_models = []
         for model_name in model_set:
             if model_name not in model_pred_dict:
-                if random_seed is not None:
-                    seed_everything(random_seed)
                 try:
                     predict_start_time = time.time()
                     model_pred_dict[model_name] = self._predict_model(

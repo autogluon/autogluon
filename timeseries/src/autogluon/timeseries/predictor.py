@@ -13,7 +13,7 @@ import pandas as pd
 from autogluon.common.utils.deprecated_utils import Deprecated
 from autogluon.common.utils.log_utils import add_log_to_file, set_logger_verbosity
 from autogluon.common.utils.system_info import get_ag_system_info
-from autogluon.common.utils.utils import check_saved_predictor_version, setup_outputdir
+from autogluon.common.utils.utils import check_saved_predictor_version, seed_everything, setup_outputdir
 from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
@@ -738,6 +738,9 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             prediction_length=self.prediction_length, num_val_windows=num_val_windows, val_step_size=val_step_size
         )
 
+        if random_seed is not None:
+            seed_everything(random_seed)
+
         time_left = None if time_limit is None else time_limit - (time.time() - time_start)
         self._learner.fit(
             train_data=train_data,
@@ -751,7 +754,6 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             refit_every_n_windows=refit_every_n_windows,
             skip_model_selection=skip_model_selection,
             enable_ensemble=enable_ensemble,
-            random_seed=random_seed,
         )
         if refit_full:
             if tuning_data is None:
@@ -836,19 +838,16 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         B       2020-03-04    17.1
                 2020-03-05     8.3
         """
+        if random_seed is not None:
+            seed_everything(random_seed)
+        
         # Save original item_id order to return predictions in the same order as input data
         data = self._to_data_frame(data)
         original_item_id_order = data.item_ids
         data = self._check_and_prepare_data_frame(data)
         if known_covariates is not None:
             known_covariates = self._to_data_frame(known_covariates)
-        predictions = self._learner.predict(
-            data,
-            known_covariates=known_covariates,
-            model=model,
-            use_cache=use_cache,
-            random_seed=random_seed,
-        )
+        predictions = self._learner.predict(data, known_covariates=known_covariates, model=model, use_cache=use_cache)
         return predictions.reindex(original_item_id_order, level=ITEMID)
 
     def evaluate(
