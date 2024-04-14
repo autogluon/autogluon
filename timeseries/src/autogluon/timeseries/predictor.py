@@ -840,7 +840,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         """
         if random_seed is not None:
             seed_everything(random_seed)
-        
+
         # Save original item_id order to return predictions in the same order as input data
         data = self._to_data_frame(data)
         original_item_id_order = data.item_ids

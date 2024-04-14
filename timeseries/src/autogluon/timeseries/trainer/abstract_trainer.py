@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from autogluon.common.utils.utils import hash_pandas_df
+from autogluon.common.utils.utils import hash_pandas_df, seed_everything
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.loaders import load_pkl
