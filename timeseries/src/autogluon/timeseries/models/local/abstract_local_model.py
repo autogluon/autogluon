@@ -140,7 +140,8 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
             data = data.groupby(level=ITEMID, sort=False).tail(self.max_ts_length)
 
         df = pd.DataFrame(data).reset_index(level=ITEMID)
-        all_series = (ts for _, ts in df.groupby(by=ITEMID, as_index=False, sort=False)[self.target])
+        # Statistical models lose accuracy if float32 dtype is used
+        all_series = (ts.astype("float64") for _, ts in df.groupby(by=ITEMID, as_index=False, sort=False)[self.target])
 
         # timeout ensures that no individual job takes longer than time_limit
         # TODO: a job started late may still exceed time_limit - how to prevent that?
@@ -230,8 +231,6 @@ def seasonal_naive_forecast(
         return arr[np.maximum.accumulate(idx)]
 
     forecast = {}
-    # Convert to float64 since std computation can be unstable in float32
-    target = target.astype(np.float64)
     # At least seasonal_period + 2 values are required to compute sigma for seasonal naive
     if len(target) > seasonal_period + 1 and seasonal_period > 1:
         if np.isnan(target[-(seasonal_period + 2) :]).any():
