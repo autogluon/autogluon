@@ -87,10 +87,10 @@ DEFAULT_MODEL_PRIORITY = dict(
     AutoETS=80,
     AutoARIMA=70,
     RecursiveTabular=60,
-    Chronos=45,
     DeepAR=40,
     TemporalFusionTransformer=40,
     DirectTabular=40,
+    Chronos=35,
     PatchTST=30,
     # Models below are not included in any presets
     WaveNet=25,
