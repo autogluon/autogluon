@@ -9,6 +9,7 @@ import PIL
 import shutil
 import re
 import subprocess
+import importlib.util
 import pytesseract
 import torch
 from nptyping import NDArray
@@ -278,11 +279,10 @@ class DocumentProcessor:
             try:
                 # Process PDF documents.
                 if feature_modalities[per_col_name] == DOCUMENT_PDF:
-                    # Check if poppler-utils is installed and if so, use it convert images to pdfs
+                    # Check if poppler-utils and pdf2image is installed. If so, use to convert image to PDF.
                     # (preferable to fitz for image conversion due to licensing)
-                    if shutil.which("pdftoppm") and shutil.which("pdfimages"):
+                    if shutil.which("pdftoppm") and shutil.which("pdfimages") and importlib.util.find_spec("pdf2image"):
                         import pdf2image
-                        import subprocess
 
                         def get_dpi_poppler(path: str, default: int = 300) -> int:
                             # Command setup for pdfimages -list to get dpi for the first page
@@ -313,16 +313,16 @@ class DocumentProcessor:
 
                         dpi = get_dpi_poppler(per_col_image_features[0])
                         doc_image = pdf2image.convert_from_path(per_col_image_features[0], dpi=dpi)[0]
-                    else:
-                        import fitz
+                    # else:
+                    #     import fitz
 
-                        # Load the pdf file.
-                        pdf_doc = fitz.open(per_col_image_features[0])
-                        first_page = pdf_doc.load_page(0)
-                        pix = first_page.get_pixmap(matrix=fitz.Matrix(1, 1))
-                        # Convert pdf into PIL images.
-                        with PIL.Image.frombytes(image_mode, [pix.width, pix.height], pix.samples) as doc_image:
-                            doc_image = doc_image.convert(image_mode)
+                    #     # Load the pdf file.
+                    #     pdf_doc = fitz.open(per_col_image_features[0])
+                    #     first_page = pdf_doc.load_page(0)
+                    #     pix = first_page.get_pixmap(matrix=fitz.Matrix(1, 1))
+                    #     # Convert pdf into PIL images.
+                    #     with PIL.Image.frombytes(image_mode, [pix.width, pix.height], pix.samples) as doc_image:
+                    #         doc_image = doc_image.convert(image_mode)
 
                     words, normalized_word_boxes = self.get_ocr_features(per_col_image_features[0], doc_image)
                 else:
