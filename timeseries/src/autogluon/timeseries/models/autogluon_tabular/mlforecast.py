@@ -257,6 +257,10 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             if not df[col].isin([0, 1]).all():
                 df[f"__scaled_{col}"] = df[col] / df[col].abs().groupby(df[ITEMID]).mean().reindex(df[ITEMID]).values
 
+        # Convert float64 to float32 to reduce memory usage
+        float64_cols = list(df.select_dtypes(include="float64"))
+        df[float64_cols] = df[float64_cols].astype("float32")
+
         # We assume that df is sorted by 'unique_id' inside `TimeSeriesPredictor._check_and_prepare_data_frame`
         return df.rename(columns=column_name_mapping)
 
