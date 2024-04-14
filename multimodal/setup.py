@@ -71,10 +71,13 @@ tests_require = [
 extras_require = {
     "PyMuPDF": [
         "PyMuPDF<=1.21.1",
-    ]
+    ],
+    "pdf2image": [
+        "pdf2image<=1.17.0",
+    ],
 }
 
-for test_package in ["PyMuPDF"]:
+for test_package in ["PyMuPDF", "pdf2image"]:
     tests_require += extras_require[test_package]
 
 extras_require["tests"] = tests_require

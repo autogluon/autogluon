@@ -6,6 +6,9 @@ from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import PIL
+import shutil
+import re
+import subprocess
 import pytesseract
 import torch
 from nptyping import NDArray
@@ -275,16 +278,53 @@ class DocumentProcessor:
             try:
                 # Process PDF documents.
                 if feature_modalities[per_col_name] == DOCUMENT_PDF:
-                    import fitz
+                    # Check if poppler-utils is installed and if so, use it convert images to pdfs
+                    # (preferable to fitz for image conversion due to licensing)
+                    if shutil.which("pdftoppm") and shutil.which("pdfimages"):
+                        import pdf2image
+                        import subprocess
 
-                    # Load the pdf file.
-                    pdf_doc = fitz.open(per_col_image_features[0])
-                    first_page = pdf_doc.load_page(0)
-                    pix = first_page.get_pixmap(matrix=fitz.Matrix(1, 1))
-                    # Convert pdf into PIL images.
-                    with PIL.Image.frombytes(image_mode, [pix.width, pix.height], pix.samples) as doc_image:
-                        doc_image = doc_image.convert(image_mode)
-                        words, normalized_word_boxes = self.get_ocr_features(per_col_image_features[0], doc_image)
+                        def get_dpi_poppler(path: str, default: int = 300) -> int:
+                            # Command setup for pdfimages -list to get dpi for the first page
+                            cmd = ["pdfimages", "-list", path]
+                            try:
+                                # Execute the command and capture the output
+                                result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                                if result.returncode != 0:
+                                    logger.warning(
+                                        f"Failed to capture dpi for {path}: {result.stderr}, using default={default}"
+                                    )
+                                    return default
+
+                                # Process the output lines to find dpi
+                                lines = result.stdout.splitlines()
+                                for line in lines:
+                                    if "image" in line:
+                                        cols = re.split(r"\s+", line.strip())
+                                        if len(cols) >= 14:
+                                            dpi = (float(cols[12]) + float(cols[13])) / 2
+                                            return int(dpi)
+                            except Exception as e:
+                                logger.warning(f"Failed to capture dpi for {path}: {e}, using default={default}")
+                                return default
+                            else:
+                                logger.warning(f"Failed to capture dpi for {path}, using default={default}")
+                                return default
+
+                        dpi = get_dpi_poppler(per_col_image_features[0])
+                        doc_image = pdf2image.convert_from_path(per_col_image_features[0], dpi=dpi)[0]
+                    else:
+                        import fitz
+
+                        # Load the pdf file.
+                        pdf_doc = fitz.open(per_col_image_features[0])
+                        first_page = pdf_doc.load_page(0)
+                        pix = first_page.get_pixmap(matrix=fitz.Matrix(1, 1))
+                        # Convert pdf into PIL images.
+                        with PIL.Image.frombytes(image_mode, [pix.width, pix.height], pix.samples) as doc_image:
+                            doc_image = doc_image.convert(image_mode)
+
+                    words, normalized_word_boxes = self.get_ocr_features(per_col_image_features[0], doc_image)
                 else:
                     # Process document image.
                     with PIL.Image.open(per_col_image_features[0]) as doc_image:
