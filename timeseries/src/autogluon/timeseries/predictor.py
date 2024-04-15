@@ -507,9 +507,9 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
               See the documentation for ``ChronosModel`` or see `Hugging Face <https://huggingface.co/collections/amazon/chronos-models-65f1791d630a8d57cb718444>`_ for more information.
               Note that a GPU is required for model sizes ``small``, ``base`` and ``large``.
             - ``"chronos"``: alias for ``"chronos_small"``.
-            - ``"chronos_ensemble"``: builds an ensemble of seasonal naive, tree-based and deep learning models with fast inference 
+            - ``"chronos_ensemble"``: builds an ensemble of seasonal naive, tree-based and deep learning models with fast inference
               and ``"chronos_small"``.
-            - ``"chronos_large_ensemble"``: builds an ensemble of seasonal naive, tree-based and deep learning models 
+            - ``"chronos_large_ensemble"``: builds an ensemble of seasonal naive, tree-based and deep learning models
               with fast inference and ``"chronos_large"``.
 
             Details for these presets can be found in ``autogluon/timeseries/configs/presets_configs.py``. If not
