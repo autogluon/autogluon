@@ -130,6 +130,13 @@ def get_default_hps(key):
             "DirectTabular": {},
             "TemporalFusionTransformer": {},
         },
+        "light_inference": {
+            "SeasonalNaive": {},
+            "DirectTabular": {},
+            "RecursiveTabular": {},
+            "TemporalFusionTransformer": {},
+            "PatchTST": {},
+        },
         "default": {
             "SeasonalNaive": {},
             "CrostonSBA": {},
