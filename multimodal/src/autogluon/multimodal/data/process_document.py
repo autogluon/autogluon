@@ -1,5 +1,9 @@
+import importlib.util
 import logging
 import os
+import re
+import shutil
+import subprocess
 import warnings
 from io import BytesIO
 from typing import Any, Dict, List, Optional, Union
@@ -275,16 +279,15 @@ class DocumentProcessor:
             try:
                 # Process PDF documents.
                 if feature_modalities[per_col_name] == DOCUMENT_PDF:
-                    import fitz
+                    from pdf2image import convert_from_path
 
-                    # Load the pdf file.
-                    pdf_doc = fitz.open(per_col_image_features[0])
-                    first_page = pdf_doc.load_page(0)
-                    pix = first_page.get_pixmap(matrix=fitz.Matrix(1, 1))
-                    # Convert pdf into PIL images.
-                    with PIL.Image.frombytes(image_mode, [pix.width, pix.height], pix.samples) as doc_image:
-                        doc_image = doc_image.convert(image_mode)
+                    # Convert PDF to PIL images.
+                    doc_images = convert_from_path(per_col_image_features[0])
+                    if doc_images:
+                        doc_image = doc_images[0].convert(image_mode)
                         words, normalized_word_boxes = self.get_ocr_features(per_col_image_features[0], doc_image)
+                    else:
+                        raise ValueError("Failed to convert PDF to images.")
                 else:
                     # Process document image.
                     with PIL.Image.open(per_col_image_features[0]) as doc_image:
