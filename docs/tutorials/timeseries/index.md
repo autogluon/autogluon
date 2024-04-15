@@ -29,7 +29,7 @@ Check out the [Quick Start Tutorial](forecasting-quick-start.ipynb) to learn how
 :::{grid-item-card} Running Chronos on AutoGluon TimeSeries
   :link: forecasting-chronos.html
 
-  Zero-shot forecasting with Chronos, pretrained time series models, in AutoGluon.
+  Zero-shot forecasting with pretrained Chronos time series models in AutoGluon.
 :::
 
 :::{grid-item-card} Model Zoo
