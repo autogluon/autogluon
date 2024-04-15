@@ -613,7 +613,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                     break
 
             if random_seed is not None:
-                seed_everything(random_seed)
+                seed_everything(random_seed + i)
 
             if contains_searchspace(model.get_user_params()):
                 fit_log_message = f"Hyperparameter tuning model {model.name}. "
