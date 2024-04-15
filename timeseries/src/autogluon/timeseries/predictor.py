@@ -499,7 +499,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
               with reasonable training time.
             - ``"high_quality"``: All ML models available in AutoGluon + additional statistical models (``NPTS``, ``AutoETS``, ``AutoARIMA``, ``CrostonSBA``,
               ``DynamicOptimizedTheta``). Much more accurate than ``medium_quality``, but takes longer to train.
-            - ``"best_quality"``: Same models as in ``"high_quality"`, but performs validation with multiple backtests. Usually better than ``high_quality``, but takes even longer to train.
+            - ``"best_quality"``: Same models as in ``"high_quality"``, but performs validation with multiple backtests. Usually better than ``high_quality``, but takes even longer to train.
 
             Available presets with the `Chronos <https://github.com/amazon-science/chronos-forecasting>`_ model:
 
