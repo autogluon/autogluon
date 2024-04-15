@@ -1,15 +1,15 @@
+import importlib.util
 import logging
 import os
+import re
+import shutil
+import subprocess
 import warnings
 from io import BytesIO
 from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import PIL
-import shutil
-import re
-import subprocess
-import importlib.util
 import pytesseract
 import torch
 from nptyping import NDArray

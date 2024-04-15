@@ -54,6 +54,7 @@ install_requires = [
     "tensorboard>=2.9,<3",
     "pytesseract>=0.3.9,<0.3.11",
     "nvidia-ml-py3==7.352.0",
+    "pdf2image>=1.17.0,<1.19",
 ]
 
 install_requires = ag.get_dependency_version_ranges(install_requires)
@@ -68,19 +69,7 @@ tests_require = [
     "tensorrt>=8.6.0,<8.6.2;platform_system=='Linux' and python_version<'3.11'",
 ]
 
-extras_require = {
-    "PyMuPDF": [
-        "PyMuPDF<=1.21.1",
-    ],
-    "pdf2image": [
-        "pdf2image<=1.17.0",
-    ],
-}
-
-for test_package in ["PyMuPDF", "pdf2image"]:
-    tests_require += extras_require[test_package]
-
-extras_require["tests"] = tests_require
+extras_require = {"tests": tests_require}
 
 
 if __name__ == "__main__":
