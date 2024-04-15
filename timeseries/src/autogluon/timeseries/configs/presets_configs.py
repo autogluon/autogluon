@@ -33,13 +33,13 @@ TIMESERIES_PRESETS_CONFIGS = dict(
     chronos_ensemble={
         "hyperparameters": {
             "Chronos": {"model_path": "small"},
-            **get_default_hps("default"),
+            **get_default_hps("light_inference"),
         }
     },
     chronos_large_ensemble={
         "hyperparameters": {
             "Chronos": {"model_path": "large", "batch_size": 8},
-            **get_default_hps("default"),
+            **get_default_hps("light_inference"),
         }
     },
 )

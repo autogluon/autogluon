@@ -73,7 +73,7 @@ class ContinuousAndCategoricalFeatureGenerator(PipelineFeatureGenerator):
     Imputes missing categorical features with the most frequent value in the training set.
     """
 
-    def __init__(self, verbosity: int = 0, minimum_cat_count=2, float_dtype: str = "float32", **kwargs):
+    def __init__(self, verbosity: int = 0, minimum_cat_count=2, float_dtype: str = "float64", **kwargs):
         generators = [
             CategoryFeatureGenerator(minimum_cat_count=minimum_cat_count, fillna="mode"),
             IdentityFeatureGenerator(infer_features_in_args={"valid_raw_types": [R_INT, R_FLOAT]}),
@@ -111,7 +111,7 @@ class ContinuousAndCategoricalFeatureGenerator(PipelineFeatureGenerator):
 class TimeSeriesFeatureGenerator:
     """Takes care of preprocessing for static_features and past/known covariates.
 
-    All covariates & static features are converted into either float32 or categorical dtype.
+    All covariates & static features are converted into either float64 or categorical dtype.
 
     Missing values in the target column are left as-is but missing values in static features & covariates are imputed.
     Imputation logic is as follows:
@@ -121,16 +121,18 @@ class TimeSeriesFeatureGenerator:
         covariate values are missing, we fill them with the median of the training set.
     """
 
-    def __init__(self, target: str, known_covariates_names: List[str], float_dtype: str = "float32"):
+    def __init__(self, target: str, known_covariates_names: List[str], float_dtype: str = "float64"):
         self.target = target
         self.float_dtype = float_dtype
         self._is_fit = False
         self.known_covariates_names = list(known_covariates_names)
         self.past_covariates_names = []
-        self.known_covariates_pipeline = ContinuousAndCategoricalFeatureGenerator()
-        self.past_covariates_pipeline = ContinuousAndCategoricalFeatureGenerator()
+        self.known_covariates_pipeline = ContinuousAndCategoricalFeatureGenerator(float_dtype=float_dtype)
+        self.past_covariates_pipeline = ContinuousAndCategoricalFeatureGenerator(float_dtype=float_dtype)
         # Cat features with cat_count=1 are fine in static_features since they are repeated for all time steps in a TS
-        self.static_feature_pipeline = ContinuousAndCategoricalFeatureGenerator(minimum_cat_count=1)
+        self.static_feature_pipeline = ContinuousAndCategoricalFeatureGenerator(
+            minimum_cat_count=1, float_dtype=float_dtype
+        )
         self.covariate_metadata: CovariateMetadata = None
         self._train_covariates_real_median: Optional[pd.Series] = None
         self._train_static_real_median: Optional[pd.Series] = None

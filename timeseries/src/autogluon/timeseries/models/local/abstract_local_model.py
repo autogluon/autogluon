@@ -230,8 +230,6 @@ def seasonal_naive_forecast(
         return arr[np.maximum.accumulate(idx)]
 
     forecast = {}
-    # Convert to float64 since std computation can be unstable in float32
-    target = target.astype(np.float64)
     # At least seasonal_period + 2 values are required to compute sigma for seasonal naive
     if len(target) > seasonal_period + 1 and seasonal_period > 1:
         if np.isnan(target[-(seasonal_period + 2) :]).any():

@@ -132,7 +132,7 @@ def test_when_static_features_present_then_they_are_passed_to_dataset(model_clas
             feat_static_cat = call_kwargs["feat_static_cat"]
             feat_static_real = call_kwargs["feat_static_real"]
             assert feat_static_cat.dtype == "int64"
-            assert feat_static_real.dtype == "float32"
+            assert feat_static_real.dtype == "float64"
 
 
 @pytest.mark.parametrize("model_class", MODELS_WITH_STATIC_FEATURES)
@@ -199,7 +199,7 @@ def test_when_known_covariates_present_then_they_are_passed_to_dataset(model_cla
         finally:
             call_kwargs = patch_dataset.call_args[1]
             feat_dynamic_real = call_kwargs["feat_dynamic_real"]
-            assert feat_dynamic_real.dtype == "float32"
+            assert feat_dynamic_real.dtype == "float64"
 
 
 @pytest.mark.parametrize("model_class", MODELS_WITH_KNOWN_COVARIATES)
