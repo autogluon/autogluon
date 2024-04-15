@@ -15,7 +15,6 @@ import pytest
 
 from autogluon.common import space
 from autogluon.common.utils.log_utils import verbosity2loglevel
-from autogluon.common.utils.utils import seed_everything
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 from autogluon.timeseries.metrics import DEFAULT_METRIC_NAME
