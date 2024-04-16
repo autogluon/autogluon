@@ -28,7 +28,7 @@ It will generate a `submission.csv` file and you can try to submit that to the c
 Here, we provide the example that shows how to use AutoGluon to achieve top performance in MachineHack Book Price Prediction Hackathon.
 To join the hackathon, you can first go to [MachineHack Website](https://www.machinehack.com/hackathon) and switch to "Active" and 
 go to "Predict The Price Of Books".
-This will bring you to the [link](https://www.machinehack.com/hackathons/predict_the_price_of_books/overview)
+This will bring you to the [link](https://machinehack.com/hackathons/predict_the_price_of_books/overview)
 
 !IMPORTANT, you can not directly access the link and will have to follow the previous steps.
 
