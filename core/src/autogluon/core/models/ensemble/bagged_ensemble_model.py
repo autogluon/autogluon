@@ -449,9 +449,6 @@ class BaggedEnsembleModel(AbstractModel):
         return pred_children
 
     def predict_proba(self, X, normalize=None, **kwargs):
-        # pred_proba_children = self.predict_proba_children(X=X, normalize=normalize, **kwargs)
-        # pred_proba = np.median(np.stack(pred_proba_children), axis=0)
-        # return pred_proba
         model = self.load_child(self.models[0])
         X = self.preprocess(X, model=model, **kwargs)
         pred_proba = model.predict_proba(X=X, preprocess_nonadaptive=False, normalize=normalize)
