@@ -197,6 +197,9 @@ class BaggedEnsembleModel(AbstractModel):
         **kwargs,
     ):
         use_child_oof = self.params.get("use_child_oof", False)
+        if use_child_oof and groups is not None:
+            logger.log(20, f"\tForcing `use_child_oof=False` because `groups` is specified")
+            use_child_oof = False
         if use_child_oof:
             if self.is_fit():
                 # TODO: We may want to throw an exception instead and avoid calling fit more than once
@@ -446,6 +449,9 @@ class BaggedEnsembleModel(AbstractModel):
         return pred_children
 
     def predict_proba(self, X, normalize=None, **kwargs):
+        # pred_proba_children = self.predict_proba_children(X=X, normalize=normalize, **kwargs)
+        # pred_proba = np.median(np.stack(pred_proba_children), axis=0)
+        # return pred_proba
         model = self.load_child(self.models[0])
         X = self.preprocess(X, model=model, **kwargs)
         pred_proba = model.predict_proba(X=X, preprocess_nonadaptive=False, normalize=normalize)
