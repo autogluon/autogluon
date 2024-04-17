@@ -197,6 +197,9 @@ class BaggedEnsembleModel(AbstractModel):
         **kwargs,
     ):
         use_child_oof = self.params.get("use_child_oof", False)
+        if use_child_oof and groups is not None:
+            logger.log(20, f"\tForcing `use_child_oof=False` because `groups` is specified")
+            use_child_oof = False
         if use_child_oof:
             if self.is_fit():
                 # TODO: We may want to throw an exception instead and avoid calling fit more than once
