@@ -1042,7 +1042,8 @@ class AbstractTabularLearner(AbstractLearner):
         data: pd.DataFrame | None = None,
         metric: str | Scorer | None = None,
         model: str = "best",
-        decision_thresholds: int | List[float] = 50,
+        decision_thresholds: int | List[float] = 25,
+        secondary_decision_thresholds: int | None = 19,
         verbose: bool = True,
         **kwargs,
     ) -> float:
@@ -1067,6 +1068,7 @@ class AbstractTabularLearner(AbstractLearner):
             model=model,
             weights=weights,
             decision_thresholds=decision_thresholds,
+            secondary_decision_thresholds=secondary_decision_thresholds,
             verbose=verbose,
             **kwargs,
         )
