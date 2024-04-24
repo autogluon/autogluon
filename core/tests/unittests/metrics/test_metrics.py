@@ -179,7 +179,7 @@ def _assert_valid_scorer_regressor(scorer: Scorer):
 def _assert_valid_scorer(scorer: Scorer):
     if scorer.needs_class and not scorer.needs_pred:
         raise AssertionError(
-            f"Invaid Scorer definition! If `needs_class=True`, then `needs_pred` must also be True. "
+            f"Invalid Scorer definition! If `needs_class=True`, then `needs_pred` must also be True. "
             f"(name={scorer.name}, needs_class={scorer.needs_class}, needs_pred={scorer.needs_pred})"
         )
 
