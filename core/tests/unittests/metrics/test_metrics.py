@@ -5,7 +5,7 @@ import pytest
 import sklearn
 
 from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION
-from autogluon.core.metrics import METRICS, Scorer, rmse_func
+from autogluon.core.metrics import METRICS, Scorer, make_scorer, rmse_func
 
 BINARY_METRICS = list(METRICS[BINARY].keys())
 MULTICLASS_METRICS = list(METRICS[MULTICLASS].keys())
@@ -125,16 +125,19 @@ def test_metric_exists(metrics: dict, expected_metrics_and_aliases: set):
 
 @pytest.mark.parametrize("metric", BINARY_METRICS, ids=BINARY_METRICS)  # noqa
 def test_metrics_perfect_binary(metric: str):
+    _assert_valid_scorer_classifier(scorer=METRICS[BINARY][metric])
     _assert_perfect_score(scorer=METRICS[BINARY][metric])
 
 
 @pytest.mark.parametrize("metric", MULTICLASS_METRICS, ids=MULTICLASS_METRICS)  # noqa
 def test_metrics_perfect_multiclass(metric: str):
+    _assert_valid_scorer_classifier(scorer=METRICS[MULTICLASS][metric])
     _assert_perfect_score(scorer=METRICS[MULTICLASS][metric])
 
 
 @pytest.mark.parametrize("metric", REGRESSION_METRICS, ids=REGRESSION_METRICS)  # noqa
 def test_metrics_perfect_regression(metric: str):
+    _assert_valid_scorer_regressor(scorer=METRICS[REGRESSION][metric])
     _assert_perfect_score(scorer=METRICS[REGRESSION][metric])
 
 
@@ -151,6 +154,34 @@ def test_metrics_imperfect_multiclass(metric: str):
 @pytest.mark.parametrize("metric", REGRESSION_METRICS, ids=REGRESSION_METRICS)  # noqa
 def test_metrics_imperfect_regression(metric: str):
     _assert_imperfect_score(scorer=METRICS[REGRESSION][metric])
+
+
+def _assert_valid_scorer_classifier(scorer: Scorer):
+    _assert_valid_scorer(scorer=scorer)
+    num_true = sum([1 if needs else 0 for needs in [scorer.needs_proba, scorer.needs_threshold, scorer.needs_class]])
+    if num_true != 1:
+        raise AssertionError(
+            f"Classification scorer '{scorer.name}' (class={scorer.__class__.__name__}) has invalid needs (exactly 1 must be True): "
+            f"(needs_proba={scorer.needs_proba}, needs_threshold={scorer.needs_threshold}, needs_class={scorer.needs_class})"
+        )
+
+
+def _assert_valid_scorer_regressor(scorer: Scorer):
+    _assert_valid_scorer(scorer=scorer)
+    num_true = sum([1 if needs else 0 for needs in [scorer.needs_pred, scorer.needs_quantile]])
+    if num_true != 1:
+        raise AssertionError(
+            f"Regression scorer '{scorer.name}' (class={scorer.__class__.__name__}) has invalid needs (exactly 1 must be True): "
+            f"(needs_pred={scorer.needs_pred}, needs_quantile={scorer.needs_quantile})"
+        )
+
+
+def _assert_valid_scorer(scorer: Scorer):
+    if scorer.needs_class and not scorer.needs_pred:
+        raise AssertionError(
+            f"Invaid Scorer definition! If `needs_class=True`, then `needs_pred` must also be True. "
+            f"(name={scorer.name}, needs_class={scorer.needs_class}, needs_pred={scorer.needs_pred})"
+        )
 
 
 def _assert_perfect_score(scorer: Scorer, abs_tol=1e-5):
@@ -204,3 +235,27 @@ def test_rmse_with_sklearn(sample_weight):
     computed_rmse = rmse_func(**kwargs)
 
     assert np.isclose(computed_rmse, expected_rmse)
+
+
+def test_invalid_scorer():
+    """
+    Ensure various edge-cases are appropriately handled when Scorers are created incorrectly
+    """
+    with pytest.raises(ValueError):
+        # Invalid: Specifying multiple needs_*
+        make_scorer("dummy", score_func=sklearn.metrics.accuracy_score, needs_proba=True, needs_class=True)
+
+    with pytest.raises(ValueError):
+        # Invalid: Specifying False for all needs_*
+        make_scorer("dummy", score_func=sklearn.metrics.accuracy_score, needs_pred=False)
+
+    with pytest.raises(ValueError):
+        # Invalid: Specifying needs_pred=False when needs_class=True
+        make_scorer("dummy", score_func=sklearn.metrics.accuracy_score, needs_pred=False, needs_class=True)
+
+    # Valid
+    make_scorer("dummy", score_func=sklearn.metrics.accuracy_score, needs_pred=True, needs_class=True)
+
+    with pytest.raises(ValueError):
+        # Invalid: Specifying needs_pred=True when needs_proba=True
+        make_scorer("dummy", score_func=sklearn.metrics.accuracy_score, needs_pred=True, needs_proba=True)

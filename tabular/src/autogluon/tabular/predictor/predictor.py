@@ -402,9 +402,9 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         fit_full_last_level_weighted_ensemble: bool = True,
         full_weighted_ensemble_additionally: bool = False,
         dynamic_stacking: bool | str = False,
-        calibrate_decision_threshold: bool = False,
-        num_cpus="auto",
-        num_gpus="auto",
+        calibrate_decision_threshold: bool | str = False,
+        num_cpus: int | str = "auto",
+        num_gpus: int | str = "auto",
         **kwargs,
     ):
         """
@@ -669,17 +669,18 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             time for fitting AutoGluon. This can be adjusted by specifying `ds_args` with different parameters to `fit()`.
             If "auto", will be set to `not use_bag_holdout`.
             See the documentation of `ds_args` for more information.
-        calibrate_decision_threshold : bool, default = False
+        calibrate_decision_threshold : bool | str, default = False
             [Experimental] This may be removed / changed without warning in a future release.
             If True, will automatically calibrate the decision threshold at the end of fit for calls to `.predict` based on the evaluation metric.
+            If "auto", will be set to True if `eval_metric.needs_class=True` and `problem_type="binary"`.
             By default, the decision threshold is `0.5`, however for some metrics such as `f1` and `balanced_accuracy`,
             scores can be significantly improved by choosing a threshold other than `0.5`.
             Only valid for `problem_type='binary'`. Ignored for all other problem types.
-        num_cpus: int, default = "auto"
+        num_cpus: int | str, default = "auto"
             The total amount of cpus you want AutoGluon predictor to use.
             Auto means AutoGluon will make the decision based on the total number of cpus available and the model requirement for best performance.
             Users generally don't need to set this value
-        num_gpus: int, default = "auto"
+        num_gpus: int | str, default = "auto"
             The total amount of gpus you want AutoGluon predictor to use.
             Auto means AutoGluon will make the decision based on the total number of gpus available and the model requirement for best performance.
             Users generally don't need to set this value
@@ -937,8 +938,6 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         """
         if self.is_fit:
             raise AssertionError("Predictor is already fit! To fit additional models, refer to `predictor.fit_extra`, or create a new `Predictor`.")
-        kwargs_orig = kwargs.copy()
-        kwargs = self._validate_fit_kwargs(kwargs)
 
         verbosity = kwargs.get("verbosity", self.verbosity)
         set_logger_verbosity(verbosity)
@@ -958,13 +957,21 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 "\tpresets='medium_quality' : Fast training time, ideal for initial prototyping.",
             )
 
+        kwargs_orig = kwargs.copy()
+
         if verbosity >= 3:
             logger.log(20, "============ fit kwarg info ============")
             logger.log(20, "User Specified kwargs:")
             logger.log(20, f"{pprint.pformat(kwargs_orig)}")
+
+        kwargs = self._validate_fit_kwargs(kwargs=kwargs)
+
+        if verbosity >= 3:
             logger.log(20, "Full kwargs:")
             logger.log(20, f"{pprint.pformat(kwargs)}")
             logger.log(20, "========================================")
+
+        self._validate_calibrate_decision_threshold(calibrate_decision_threshold=calibrate_decision_threshold)
 
         holdout_frac = kwargs["holdout_frac"]
         num_bag_folds = kwargs["num_bag_folds"]
@@ -1384,6 +1391,8 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         infer_limit=None,
         refit_full_kwargs: dict = None,
     ):
+        self._validate_calibrate_decision_threshold(calibrate_decision_threshold=calibrate_decision_threshold)
+
         if refit_full_kwargs is None:
             refit_full_kwargs = {}
         if not self.model_names():
@@ -1432,6 +1441,19 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             else:
                 logger.log(30, "WARNING: `calibrate=True` is only applicable to classification or quantile regression problems. Skipping calibration...")
 
+        if isinstance(calibrate_decision_threshold, str) and calibrate_decision_threshold == "auto":
+            calibrate_decision_threshold = self._can_calibrate_decision_threshold()
+            if calibrate_decision_threshold and self.eval_metric.name == "precision":
+                # precision becomes undefined when no true positives exist.
+                # This interacts weirdly with threshold calibration where val score will be 1.0, but test score can be 0.0 due to being undefined.
+                calibrate_decision_threshold = False
+                logger.log(
+                    30,
+                    f"Disabling decision threshold calibration for metric `precision` to avoid undefined results. "
+                    f"Force calibration via specifying `calibrate_decision_threshold=True`.",
+                )
+            elif calibrate_decision_threshold:
+                logger.log(20, f"Enabling decision threshold calibration (calibrate_decision_threshold='auto', metric is valid, problem_type is 'binary')")
         if calibrate_decision_threshold:
             if self.problem_type != BINARY:
                 logger.log(30, "WARNING: `calibrate_decision_threshold=True` is only applicable to binary classification. Skipping calibration...")
@@ -1444,6 +1466,9 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
         if save_space:
             self.save_space()
+
+    def _can_calibrate_decision_threshold(self) -> bool:
+        return self.eval_metric.needs_class and self.problem_type == BINARY
 
     # TODO: Consider adding infer_limit to fit_extra
     def fit_extra(
@@ -4332,7 +4357,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         if invalid_keys:
             raise ValueError(f"Invalid kwargs passed: {invalid_keys}\nValid kwargs: {list(valid_kwargs)}")
 
-    def _validate_fit_kwargs(self, kwargs) -> dict:
+    def _validate_fit_kwargs(self, *, kwargs: dict) -> dict:
         # TODO:
         #  Valid core_kwargs values:
         #  ag_args, ag_args_fit, ag_args_ensemble, stack_name, ensemble_type, name_suffix, time_limit
@@ -4359,6 +4384,13 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         kwargs_sanitized.update(kwargs)
 
         return kwargs_sanitized
+
+    def _validate_calibrate_decision_threshold(self, calibrate_decision_threshold):
+        valid_calibrate_decision_threshold_options = [True, False, "auto"]
+        if calibrate_decision_threshold not in valid_calibrate_decision_threshold_options:
+            raise ValueError(
+                f"`calibrate_decision_threshold` must be a value in " f"{valid_calibrate_decision_threshold_options}, but is: {calibrate_decision_threshold}"
+            )
 
     def _fit_extra_kwargs_dict(self):
         """
