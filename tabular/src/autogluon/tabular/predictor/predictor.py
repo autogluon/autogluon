@@ -3370,7 +3370,8 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         data: str | TabularDataset | pd.DataFrame | None = None,
         metric: str | Scorer | None = None,
         model: str = "best",
-        decision_thresholds: int | List[float] = 50,
+        decision_thresholds: int | List[float] = 25,
+        secondary_decision_thresholds: int | None = 19,
         subsample_size: int | None = 1000000,
         verbose: bool = True,
     ) -> float:
@@ -3396,10 +3397,16 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         model : str, default = 'best'
             The model to use prediction probabilities of when calibrating the threshold.
             If 'best', will use `predictor.model_best`.
-        decision_thresholds : Union[int, List[float]], default = 50
+        decision_thresholds : int | List[float], default = 25
             The number of decision thresholds on either side of `0.5` to search.
-            The default of 50 will result in 101 searched thresholds: [0.00, 0.01, 0.02, ..., 0.49, 0.50, 0.51, ..., 0.98, 0.99, 1.00]
+            The default of 25 will result in 51 searched thresholds: [0.00, 0.02, 0.04, ..., 0.48, 0.50, 0.52, ..., 0.96, 0.98, 1.00]
             Alternatively, a list of decision thresholds can be passed and only the thresholds in the list will be searched.
+        secondary_decision_thresholds : int | None, default = 19
+            The number of secondary decision thresholds to check on either side of the threshold identified in the first phase.
+            Skipped if None.
+            For example, if decision_thresholds=50 and 0.14 was identified as the optimal threshold, while secondary_decision_threshold=9,
+                Then the following additional thresholds are checked:
+                    [0.131, 0.132, 0.133, 0.134, 0.135, 0.136, 0.137, 0.138, 0.139, 0.141, 0.142, 0.143, 0.144, 0.145, 0.146, 0.147, 0.148, 0.149]
         subsample_size : int | None, default = 1000000
             When `subsample_size` is not None and `data` contains more rows than `subsample_size`, samples to `subsample_size` rows to speed up calibration.
             Usually it is not necessary to use more than 1 million rows for calibration.
@@ -3437,6 +3444,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             metric=metric,
             model=model,
             decision_thresholds=decision_thresholds,
+            secondary_decision_thresholds=secondary_decision_thresholds,
             subsample_size=subsample_size,
             verbose=verbose,
         )
