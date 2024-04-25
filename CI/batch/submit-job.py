@@ -12,7 +12,7 @@ from botocore.config import Config
 
 job_type_info = {
     'CI-CPU': {
-        'job_definition': 'autogluon-ci-0-8-2-cpu:3',
+        'job_definition': 'autogluon-ci-0-8-2-cpu:3', # 
         'job_queue': 'CI-CPU'
     },
     'CI-GPU': {
