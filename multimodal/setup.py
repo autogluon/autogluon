@@ -39,7 +39,7 @@ install_requires = [
     "pytorch-lightning>=1.9.0,<1.10.0",
     "text-unidecode>=1.3,<1.4",
     "torchmetrics>=0.11.0,<0.12.0",
-    "transformers[sentencepiece]>=4.23.0,<4.27.0",
+    "transformers[sentencepiece]>=4.36.0,<4.41.0",
     "nptyping>=1.4.4,<2.5.0",
     "omegaconf>=2.1.1,<2.3.0",
     f"autogluon.core[raytune]=={version}",
