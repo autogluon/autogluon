@@ -3836,7 +3836,8 @@ class AbstractTrainer:
         metric: str | Scorer | None = None,
         model: str = "best",
         weights=None,
-        decision_thresholds: int | List[float] = 50,
+        decision_thresholds: int | List[float] = 25,
+        secondary_decision_thresholds: int | None = 19,
         verbose: bool = True,
         **kwargs,
     ) -> float:
@@ -3895,6 +3896,7 @@ class AbstractTrainer:
             y_pred_proba=y_pred_proba,
             metric=lambda y, y_pred: self._score_with_y_pred(y=y, y_pred=y_pred, weights=weights, metric=metric),
             decision_thresholds=decision_thresholds,
+            secondary_decision_thresholds=secondary_decision_thresholds,
             metric_name=metric.name,
             verbose=verbose,
             **kwargs,

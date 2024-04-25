@@ -35,15 +35,24 @@ def test_calibrate_decision_threshold():
         y=y,
         y_pred_proba=y_pred_proba,
         metric=f1,
+        decision_thresholds=50,
+        secondary_decision_thresholds=None,
     )
     assert decision_threshold == 0.24
 
     decision_threshold = calibrate_decision_threshold(
         y=y,
         y_pred_proba=y_pred_proba,
+        metric=f1,
+    )
+    assert decision_threshold == 0.249
+
+    decision_threshold = calibrate_decision_threshold(
+        y=y,
+        y_pred_proba=y_pred_proba,
         metric=balanced_accuracy,
     )
-    assert decision_threshold == 0.24
+    assert decision_threshold == 0.249
 
     decision_threshold = calibrate_decision_threshold(
         y=y,
@@ -70,6 +79,7 @@ def test_calibrate_decision_threshold_select_closer_to_0_5():
         y_pred_proba=y_pred_proba,
         metric=balanced_accuracy,
         decision_thresholds=[0.5, 0.244, 0.247],
+        secondary_decision_thresholds=None,
     )
     assert decision_threshold == 0.247
 
@@ -78,6 +88,7 @@ def test_calibrate_decision_threshold_select_closer_to_0_5():
         y_pred_proba=y_pred_proba,
         metric=balanced_accuracy,
         decision_thresholds=[0.5, 0.247, 0.244],
+        secondary_decision_thresholds=None,
     )
     assert decision_threshold == 0.247
 
@@ -115,4 +126,36 @@ def test_calibrate_decision_threshold_out_of_bounds():
             y_pred_proba=y_pred_proba,
             metric=balanced_accuracy,
             decision_thresholds=[-0.01, 0.5],
+        )
+
+
+def test_calibrate_decision_threshold_invalid_args():
+    y, y_pred_proba = _get_sample_data()
+    with pytest.raises(AssertionError):
+        calibrate_decision_threshold(
+            y=y,
+            y_pred_proba=y_pred_proba,
+            metric=balanced_accuracy,
+            decision_thresholds="invalid",
+        )
+    with pytest.raises(AssertionError):
+        calibrate_decision_threshold(
+            y=y,
+            y_pred_proba=y_pred_proba,
+            metric=balanced_accuracy,
+            decision_thresholds=0.01,
+        )
+    with pytest.raises(AssertionError):
+        calibrate_decision_threshold(
+            y=y,
+            y_pred_proba=y_pred_proba,
+            metric=balanced_accuracy,
+            decision_thresholds=None,
+        )
+    with pytest.raises(AssertionError):
+        calibrate_decision_threshold(
+            y=y,
+            y_pred_proba=y_pred_proba,
+            metric=balanced_accuracy,
+            secondary_decision_thresholds=[0.2, 0.4],
         )
