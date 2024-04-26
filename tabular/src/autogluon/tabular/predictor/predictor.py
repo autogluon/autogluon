@@ -1391,7 +1391,6 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         infer_limit=None,
         refit_full_kwargs: dict = None,
     ):
-        self._validate_calibrate_decision_threshold(calibrate_decision_threshold=calibrate_decision_threshold)
 
         if refit_full_kwargs is None:
             refit_full_kwargs = {}
