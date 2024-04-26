@@ -1391,7 +1391,6 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         infer_limit=None,
         refit_full_kwargs: dict = None,
     ):
-
         if refit_full_kwargs is None:
             refit_full_kwargs = {}
         if not self.model_names():
