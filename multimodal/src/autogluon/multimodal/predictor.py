@@ -2442,6 +2442,13 @@ class MultiModalPredictor(ExportMixin):
             else:
                 state_dict = torch.load(path, map_location=torch.device("cpu"))["state_dict"]
         state_dict = {k.partition(prefix)[2]: v for k, v in state_dict.items() if k.startswith(prefix)}
+
+        # Some buffers like `position_ids` are registered as persistent=False since transformers 4.31.0
+        # Refer to https://github.com/huggingface/transformers/pull/24505/files
+        buffer_names = [k for k, v in model.named_buffers()]
+        buffer_names_to_filter = [k for k in buffer_names if k not in model.state_dict().keys()]
+        state_dict = {k: v for k, v in state_dict.items() if k not in buffer_names_to_filter}
+
         load_result = model.load_state_dict(state_dict, strict=strict)
         assert (
             len(load_result.unexpected_keys) == 0
