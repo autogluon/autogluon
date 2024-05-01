@@ -84,7 +84,7 @@ class BaggedEnsembleModel(AbstractModel):
         self._bagged_mode = None
         # _child_oof currently is only set to True for KNN models, that are capable of LOO prediction generation to avoid needing bagging.
         # TODO: Consider moving `_child_oof` logic to a separate class / refactor OOF logic.
-        # FIXME: Avoid unnecessary refit during refit_full on `_child_oof=True` models, just re-use the original model.
+        # FIXME: Avoid unnecessary refit during refit_full on `_child_oof=True` models, just reuse the original model.
         self._child_oof = False  # Whether the OOF preds were taken from a single child model (Assumes child can produce OOF preds without bagging).
         self._cv_splitters = []  # Keeps track of the CV splitter used for each bagged repeat.
         self._params_aux_child = None  # aux params of child model
