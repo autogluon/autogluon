@@ -112,7 +112,7 @@ class AnomalyDetector:
         # Can't go beyond 4 - SUOD is throwing errors
         num_cpus = min(ResourceManager.get_cpu_count(), 4)
 
-        suod_defaults = dict(base_estimators=self.detector_list, n_jobs=num_cpus, combination="average", verbose=False)
+        suod_defaults = dict(base_estimators=self.detector_list, n_jobs=num_cpus, combination="average", bps_flag=False, verbose=False)
         self._suod_kwargs = {**suod_defaults, **detector_kwargs}
         self._detectors: Optional[List[BaseDetector]] = None
         self._train_index_to_detector: Optional[Dict[int, Any]] = None
