@@ -9,7 +9,7 @@ def test_auto_ml_pipeline_feature_generator(generator_helper, data_helper):
     # Given
     input_data = data_helper.generate_multi_feature_full()
 
-    toy_vectorizer = CountVectorizer(min_df=2, ngram_range=(1, 3), max_features=10, dtype=np.uint8)
+    toy_vectorizer = CountVectorizer(min_df=2, ngram_range=(1, 3), max_features=1000, dtype=np.uint8)
 
     with pytest.raises(KeyError):
         # generators is an invalid argument
@@ -56,7 +56,7 @@ def test_auto_ml_pipeline_feature_generator(generator_helper, data_helper):
     ]
 
     expected_output_data_feat_lower_ratio = [3, 2, 0, 3, 3, 3, 3, 3, 1]
-    expected_output_data_feat_total = [1, 3, 0, 0, 7, 1, 3, 7, 3]
+    expected_output_data_feat_total = [1, 3, 0, 0, 9, 1, 3, 9, 3]
 
     # When
     output_data = generator_helper.fit_transform_assert(
@@ -88,7 +88,7 @@ def test_auto_ml_pipeline_feature_generator_raw_text(generator_helper, data_help
     # Given
     input_data = data_helper.generate_multi_feature_full()
 
-    toy_vectorizer = CountVectorizer(min_df=2, ngram_range=(1, 3), max_features=10, dtype=np.uint8)
+    toy_vectorizer = CountVectorizer(min_df=2, ngram_range=(1, 3), max_features=1000, dtype=np.uint8)
 
     generator = AutoMLPipelineFeatureGenerator(enable_raw_text_features=True, vectorizer=toy_vectorizer)
 
@@ -139,7 +139,7 @@ def test_auto_ml_pipeline_feature_generator_only_raw_text(generator_helper, data
     # Given
     input_data = data_helper.generate_text_feature().to_frame("text")
 
-    toy_vectorizer = CountVectorizer(min_df=2, ngram_range=(1, 3), max_features=10, dtype=np.uint8)
+    toy_vectorizer = CountVectorizer(min_df=2, ngram_range=(1, 3), max_features=1000, dtype=np.uint8)
 
     generator = AutoMLPipelineFeatureGenerator(enable_raw_text_features=True, vectorizer=toy_vectorizer)
 
@@ -176,7 +176,7 @@ def test_auto_ml_pipeline_feature_generator_duplicates(generator_helper, data_he
     # Given
     input_data = data_helper.generate_duplicate()
 
-    toy_vectorizer = CountVectorizer(min_df=2, ngram_range=(1, 3), max_features=10, dtype=np.uint8)
+    toy_vectorizer = CountVectorizer(min_df=2, ngram_range=(1, 3), max_features=1000, dtype=np.uint8)
 
     with pytest.raises(KeyError):
         # generators is an invalid argument
@@ -229,7 +229,7 @@ def test_auto_ml_pipeline_feature_generator_duplicates(generator_helper, data_he
     ]
 
     expected_output_data_feat_lower_ratio = [3, 2, 0, 3, 3, 3, 3, 3, 1]
-    expected_output_data_feat_total = [1, 3, 0, 0, 7, 1, 3, 7, 3]
+    expected_output_data_feat_total = [1, 3, 0, 0, 9, 1, 3, 9, 3]
 
     # When
     output_data = generator_helper.fit_transform_assert(
@@ -267,7 +267,7 @@ def test_auto_ml_pipeline_feature_generator_duplicates_without_dedupe(generator_
     # Given
     input_data = data_helper.generate_duplicate()
 
-    toy_vectorizer = CountVectorizer(min_df=2, ngram_range=(1, 3), max_features=10, dtype=np.uint8)
+    toy_vectorizer = CountVectorizer(min_df=2, ngram_range=(1, 3), max_features=1000, dtype=np.uint8)
 
     with pytest.raises(KeyError):
         # generators is an invalid argument
@@ -362,10 +362,12 @@ def test_auto_ml_pipeline_feature_generator_duplicates_without_dedupe(generator_
             "__nlp__.end of",
             "__nlp__.end of the",
             "__nlp__.of",
+            "__nlp__.of the",
             "__nlp__.sentence",
             "__nlp__.sentence breaks",
             "__nlp__.the",
             "__nlp__.the end",
+            "__nlp__.the end of",
             "__nlp__.world",
             "__nlp__._total_",
         ],
@@ -384,7 +386,7 @@ def test_auto_ml_pipeline_feature_generator_duplicates_without_dedupe(generator_
     ]
 
     expected_output_data_feat_lower_ratio = [3, 2, 0, 3, 3, 3, 3, 3, 1]
-    expected_output_data_feat_total = [1, 3, 0, 0, 7, 1, 3, 7, 3]
+    expected_output_data_feat_total = [1, 3, 0, 0, 9, 1, 3, 9, 3]
 
     # When
     output_data = generator_helper.fit_transform_assert(
