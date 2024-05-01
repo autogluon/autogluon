@@ -23,7 +23,6 @@ from autogluon.multimodal.constants import (
     NER_ANNOTATION,
     NUMERICAL,
     OBJECT_DETECTION,
-    OPEN_VOCABULARY_OBJECT_DETECTION,
     OPTIMIZATION,
     REGRESSION,
     TEXT,
@@ -516,7 +515,6 @@ def test_infer_ner_column_type(column_types, gt_column_types):
         (pd.Series(["0", "1", "2", 3, 4, 5, 5, 5, 0]), None, MULTICLASS),
         (None, NER, NER),
         (None, OBJECT_DETECTION, OBJECT_DETECTION),
-        (None, OPEN_VOCABULARY_OBJECT_DETECTION, OPEN_VOCABULARY_OBJECT_DETECTION),
     ],
 )
 def test_infer_problem_type(y_data, provided_problem_type, gt_problem_type):

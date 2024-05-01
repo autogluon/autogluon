@@ -46,7 +46,6 @@ from ..data import (
     NerLabelEncoder,
     NerProcessor,
     NumericalProcessor,
-    OVDProcessor,
     TextProcessor,
 )
 from ..data.infer_types import is_image_column
@@ -177,12 +176,6 @@ def create_data_processor(
         )
     elif data_type == ROIS:
         data_processor = MMDetProcessor(
-            model=model,
-            max_img_num_per_col=model_config.max_img_num_per_col,
-            missing_value_strategy=config.data.image.missing_value_strategy,
-        )
-    elif data_type == OVD:
-        data_processor = OVDProcessor(
             model=model,
             max_img_num_per_col=model_config.max_img_num_per_col,
             missing_value_strategy=config.data.image.missing_value_strategy,
