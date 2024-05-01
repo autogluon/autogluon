@@ -7,7 +7,8 @@ Below you can find a list of our published work relating to AutoGluon along with
 - [Benchmarking Multimodal AutoML for Tabular Data with Text Fields](https://datasets-benchmarks-proceedings.neurips.cc/paper/2021/file/9bf31c7ff062936a96d3c8bd1f8f2ff3-Paper-round2.pdf) (*NeurIPS*, 2021) ([BibTeX](#autogluonmultimodal))
 - [XTab: Cross-table Pretraining for Tabular Transformers](https://proceedings.mlr.press/v202/zhu23k/zhu23k.pdf) (*ICML*, 2023)
 - [AutoGluon-TimeSeries: AutoML for Probabilistic Time Series Forecasting](https://arxiv.org/abs/2308.05566) (*AutoML Conf*, 2023) ([BibTeX](#autogluontimeseries))
-- [TabRepo: A Large Scale Repository of Tabular Model Evaluations and its AutoML Applications](https://arxiv.org/pdf/2311.02971.pdf) (*Under Review*, 2024)
+- [TabRepo: A Large Scale Repository of Tabular Model Evaluations and its AutoML Applications](https://arxiv.org/pdf/2311.02971.pdf) (*AutoML Conf*, 2024)
+- [AutoGluon-Multimodal (AutoMM): Supercharging Multimodal AutoML with Foundation Models](https://arxiv.org/pdf/2404.16233) (*AutoML Conf*, 2024) ([BibTeX](#autogluonmultimodal))
 
 ## Citing AutoGluon
 
@@ -33,17 +34,16 @@ BibTeX entry:
 
 If you use AutoGluon's multimodal functionality in a scientific publication, please cite the following paper:
 
-Shi, Xingjian, et al. ["Benchmarking Multimodal AutoML for Tabular Data with Text Fields."](https://datasets-benchmarks-proceedings.neurips.cc/paper/2021/file/9bf31c7ff062936a96d3c8bd1f8f2ff3-Paper-round2.pdf) Advances in Neural Information Processing Systems 35, Datasets and Benchmarks Track (2021).
+Zhiqiang, Tang, et al. ["AutoGluon-Multimodal (AutoMM): Supercharging Multimodal AutoML with Foundation Models"](https://arxiv.org/pdf/2404.16233), The International Conference on Automated Machine Learning (AutoML), 2024.
 
 BibTeX entry:
 
 ```bibtex
-@inproceedings{agmultimodaltext,
-  title={Benchmarking Multimodal AutoML for Tabular Data with Text Fields},
-  author={Shi, Xingjian and Mueller, Jonas and Erickson, Nick and Li, Mu and Smola, Alexander J},
-  journal={Advances in Neural Information Processing Systems Datasets and Benchmarks Track},
-  volume={35},
-  year={2021}
+@article{tang2024autogluon,
+  title={AutoGluon-Multimodal (AutoMM): Supercharging Multimodal AutoML with Foundation Models},
+  author={Tang, Zhiqiang and Fang, Haoyang and Zhou, Su and Yang, Taojiannan and Zhong, Zihan and Hu, Tony and Kirchhoff, Katrin and Karypis, George},
+  journal={arXiv preprint arXiv:2404.16233},
+  year={2024}
 }
 ```
 
