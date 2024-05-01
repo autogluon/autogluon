@@ -20,12 +20,12 @@ DEPENDENT_PACKAGES = {
     "boto3": ">=1.10,<2",  # <2 because unlikely to introduce breaking changes in minor releases. >=1.10 because 1.10 is 3 years old, no need to support older
     "numpy": ">=1.21,<1.27",  # "<{N+3}" upper cap, where N is the latest released minor version, assuming no warnings using N
     "pandas": ">=1.4.1,<1.6",  # "<{N+1}" upper cap
-    "scikit-learn": ">=1.0,<1.3",  # "<{N+1}" upper cap
+    "scikit-learn": ">=1.1,<1.4.1",  # "<{N+1}" upper cap
     "scipy": ">=1.5.4,<1.12",  # "<{N+2}" upper cap
     "psutil": ">=5.7.3,<6",  # Major version cap
     "networkx": ">=3.0,<4",  # Major version cap
     "tqdm": ">=4.38,<5",  # Major version cap
-    "Pillow": ">=9.3,<9.6",  # "<{N+2}" upper cap
+    "Pillow": ">=10.2,<11",  # "<{N+2}" upper cap
 }
 if LITE_MODE:
     DEPENDENT_PACKAGES = {package: version for package, version in DEPENDENT_PACKAGES.items() if package not in ["psutil", "Pillow", "timm"]}
