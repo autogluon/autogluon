@@ -190,7 +190,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             raise ValueError(f"Target column {self.target} cannot be one of the known covariates.")
         self.known_covariates_names = list(known_covariates_names)
 
-        self.prediction_length = prediction_length
+        self.prediction_length = int(prediction_length)
         # For each validation fold, all time series in training set must have length >= _min_train_length
         self._min_train_length = max(self.prediction_length + 1, 5)
         self.freq = freq
