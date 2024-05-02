@@ -47,6 +47,20 @@ BibTeX entry:
 }
 ```
 
+If you use AutoGluon's TextPredictor, please cite the following paper:
+
+Shi, Xingjian, et al. ["Benchmarking Multimodal AutoML for Tabular Data with Text Fields."](https://datasets-benchmarks-proceedings.neurips.cc/paper/2021/file/9bf31c7ff062936a96d3c8bd1f8f2ff3-Paper-round2.pdf) Advances in Neural Information Processing Systems 35, Datasets and Benchmarks Track (2021).
+
+```bibtex
+@inproceedings{agmultimodaltext,
+  title={Benchmarking Multimodal AutoML for Tabular Data with Text Fields},
+  author={Shi, Xingjian and Mueller, Jonas and Erickson, Nick and Li, Mu and Smola, Alexander J},
+  journal={Advances in Neural Information Processing Systems Datasets and Benchmarks Track},
+  volume={35},
+  year={2021}
+}
+```
+
 ### autogluon.timeseries
 
 If you use AutoGluon's time series forecasting functionality in a scientific publication, please cite the following paper:
