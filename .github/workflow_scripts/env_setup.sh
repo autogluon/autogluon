@@ -57,28 +57,14 @@ function install_tabular_platforms {
     install_local_packages "tabular/$1"
 }
 
-function install_multimodal_no_groundingdino {
-    # groundingdino has issue when installing on Windows
-    # https://github.com/IDEA-Research/GroundingDINO/issues/57
-    source $(dirname "$0")/setup_mmcv.sh
-    
-    # launch different process for each test to make sure memory is released
-    python3 -m pip install --upgrade pytest-xdist
-    install_local_packages "multimodal/$1"
-    setup_mmcv
-    # python3 -m pip install --upgrade "mmocr<1.0"  # not compatible with mmcv 2.0
-}
-
 function install_multimodal {
     source $(dirname "$0")/setup_mmcv.sh
-    source $(dirname "$0")/setup_groundingdino.sh
     
     # launch different process for each test to make sure memory is released
     python3 -m pip install --upgrade pytest-xdist
     install_local_packages "multimodal/$1"
     setup_mmcv
     # python3 -m pip install --upgrade "mmocr<1.0"  # not compatible with mmcv 2.0
-    setup_groundingdino
 }
 
 function install_all {
@@ -89,7 +75,7 @@ function install_all {
 
 function install_all_windows {
     install_local_packages "common/[tests]" "core/[all]" "features/" "tabular/[all,tests]" "timeseries/[all,tests]" "eda/[tests]"
-    install_multimodal_no_groundingdino "[tests]"
+    install_multimodal "[tests]"
     install_local_packages "autogluon/"
 }
 

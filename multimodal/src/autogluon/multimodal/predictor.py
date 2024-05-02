@@ -69,8 +69,6 @@ from .constants import (
     OBJECT_DETECTION,
     OCR_TEXT_DETECTION,
     OCR_TEXT_RECOGNITION,
-    OPEN_VOCABULARY_OBJECT_DETECTION,
-    OVD_RET,
     OVERALL_F1,
     RAY_TUNE_CHECKPOINT,
     REGRESSION,
@@ -1995,8 +1993,6 @@ class MultiModalPredictor(ExportMixin):
 
         if self._problem_type == NER:
             ret_type = NER_RET
-        elif self._problem_type == OPEN_VOCABULARY_OBJECT_DETECTION:
-            ret_type = OVD_RET
         else:
             ret_type = LOGITS
 
@@ -2170,9 +2166,6 @@ class MultiModalPredictor(ExportMixin):
         if self._problem_type == NER:
             ret_type = NER_RET
 
-        if self._problem_type == OPEN_VOCABULARY_OBJECT_DETECTION:
-            ret_type = OVD_RET
-
         if candidate_data:
             pred = self._match_queries_and_candidates(
                 query_data=data,
@@ -2242,14 +2235,6 @@ class MultiModalPredictor(ExportMixin):
                     pred=pred,
                     data=data,
                     detection_classes=self._model.model.CLASSES,
-                    result_path=None,
-                )
-            elif (
-                self._problem_type == OPEN_VOCABULARY_OBJECT_DETECTION
-            ):  # TODO: refactor and merge with OBJECT DETECTION
-                pred = save_ovd_result_df(
-                    pred=pred,
-                    data=data,
                     result_path=None,
                 )
             else:
@@ -2457,6 +2442,13 @@ class MultiModalPredictor(ExportMixin):
             else:
                 state_dict = torch.load(path, map_location=torch.device("cpu"))["state_dict"]
         state_dict = {k.partition(prefix)[2]: v for k, v in state_dict.items() if k.startswith(prefix)}
+
+        # Some buffers like `position_ids` are registered as persistent=False since transformers 4.31.0
+        # Refer to https://github.com/huggingface/transformers/pull/24505/files
+        buffer_names = [k for k, v in model.named_buffers()]
+        buffer_names_to_filter = [k for k in buffer_names if k not in model.state_dict().keys()]
+        state_dict = {k: v for k, v in state_dict.items() if k not in buffer_names_to_filter}
+
         load_result = model.load_state_dict(state_dict, strict=strict)
         assert (
             len(load_result.unexpected_keys) == 0

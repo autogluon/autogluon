@@ -579,7 +579,7 @@ class OneHotMergeRaresHandleUnknownEncoder(_BaseEncoder):
             raise ValueError(msg.format(n_transformed_features, X.shape[1]))
 
         # create resulting array of appropriate dtype
-        dt = np.find_common_type([cat.dtype for cat in self.categories_], [])
+        dt = np.result_type(values.dtype, comps_array.dtype)
         X_tr = np.empty((n_samples, n_features), dtype=dt)
         j = 0
         found_unknown = {}
@@ -787,7 +787,7 @@ class OrdinalMergeRaresHandleUnknownEncoder(_BaseEncoder):
             raise ValueError(msg.format(n_features, X.shape[1]))
 
         # create resulting array of appropriate dtype
-        dt = np.find_common_type([cat.dtype for cat in self.categories_], [])
+        dt = np.result_type(values.dtype, comps_array.dtype)
         X_tr = np.empty((n_samples, n_features), dtype=dt)
 
         for i in range(n_features):

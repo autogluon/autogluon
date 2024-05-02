@@ -1251,7 +1251,7 @@ class AbstractTrainer:
                 model_name = model.name
                 reuse_first_fold = False
                 if isinstance(model, BaggedEnsembleModel):
-                    # Re-use if model is already _FULL and no X_val
+                    # Reuse if model is already _FULL and no X_val
                     if X_val is None:
                         reuse_first_fold = not model._bagged_mode
                 if not reuse_first_fold:

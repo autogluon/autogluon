@@ -334,7 +334,7 @@ class DecisionTreeQuantileRegressor(DecisionTreeRegressor, BaseTreeQuantileRegre
         )
 
 
-class ExtraTreeQuantileRegressor(ExtraTreeRegressor, BaseTreeQuantileRegressor):
+class ExtraTreeQuantileRegressor(BaseTreeQuantileRegressor, ExtraTreeRegressor):
     def __init__(
         self,
         criterion="squared_error",

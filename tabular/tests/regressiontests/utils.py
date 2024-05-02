@@ -42,7 +42,7 @@ tests = [
         "n_categorical": 0,
         "dataset_hash": "5850a1c21a",
         "params": [
-            {"predict": {}, "fit": {}},  # All of the followiing params should return same results because they're defaults
+            {"predict": {}, "fit": {}},  # All of the following params should return same results because they're defaults
             {"predict": {}, "fit": {"presets": "medium_quality_faster_train"}},
             {"predict": {}, "fit": {"presets": "ignore_text"}},
             {"predict": {}, "fit": {"hyperparameters": "default"}},
@@ -250,7 +250,7 @@ tests = [
         "n_categorical": 0,
         "dataset_hash": "be1f16df80",
         "params": [
-            {"predict": {}, "fit": {}},  # All of the followiing params should return same results
+            {"predict": {}, "fit": {}},  # All of the following params should return same results
             {"predict": {}, "fit": {"presets": "medium_quality_faster_train"}},
             {"predict": {}, "fit": {"presets": "ignore_text"}},
             {"predict": {}, "fit": {"hyperparameters": "default"}},
@@ -283,7 +283,7 @@ tests = [
         "n_categorical": 0,
         "dataset_hash": "79e634aac3",
         "params": [
-            {"predict": {}, "fit": {}},  # All of the followiing params should return same results
+            {"predict": {}, "fit": {}},  # All of the following params should return same results
             {"predict": {"eval_metric": "accuracy"}, "fit": {}},
         ],
         "expected_score_range": {

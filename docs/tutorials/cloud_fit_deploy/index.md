@@ -39,7 +39,7 @@ hidden: true
 
 AutoGluon Cloud <autogluon-cloud>
 AutoGluon Tabular on SageMaker AutoPilot <autopilot-autogluon>
-Deploy AutoGluon Models on Severless Templates <cloud-aws-lambda-deployment>
+Deploy AutoGluon Models on Serverless Templates <cloud-aws-lambda-deployment>
 Cloud Training and Deployment with Amazon SageMaker <cloud-aws-sagemaker-train-deploy>
 ```
 

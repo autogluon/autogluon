@@ -21,7 +21,6 @@ from .constants import (
     OBJECT_DETECTION,
     OCR_TEXT_DETECTION,
     OCR_TEXT_RECOGNITION,
-    OPEN_VOCABULARY_OBJECT_DETECTION,
     REGRESSION,
     ROIS,
     TEXT,
@@ -115,19 +114,6 @@ PROBLEM_TYPES_REG.register(
         name=OBJECT_DETECTION,
         support_zero_shot=True,
         supported_modality_type={IMAGE},
-        supported_label_type={ROIS},
-        force_exist_modality={IMAGE},
-    ),
-)
-
-# Open Vocabulary Object detection: image --> bounding boxes
-PROBLEM_TYPES_REG.register(
-    OPEN_VOCABULARY_OBJECT_DETECTION,
-    ProblemTypeProperty(
-        name=OPEN_VOCABULARY_OBJECT_DETECTION,
-        support_zero_shot=True,
-        support_fit=False,  # TODO: future work
-        supported_modality_type={IMAGE, TEXT},
         supported_label_type={ROIS},
         force_exist_modality={IMAGE},
     ),

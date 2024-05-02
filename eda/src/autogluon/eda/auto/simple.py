@@ -395,10 +395,10 @@ def quick_fit(
     fit_args: Optional[Dict[str, Dict[str, Any]]], default = None,
         kwargs to pass into `TabularPredictor` fit.
     fig_args: Optional[Dict[str, Any]], default = None,
-        figures args for vizualizations; key == component; value = dict of kwargs for component figure. The args are supporting nested
+        figures args for visualizations; key == component; value = dict of kwargs for component figure. The args are supporting nested
         dot syntax: 'a.b.c'.
     chart_args: Optional[Dict[str, Any]], default = None,
-        figures args for vizualizations; key == component; value = dict of kwargs for component chart. The args are supporting nested
+        figures args for visualizations; key == component; value = dict of kwargs for component chart. The args are supporting nested
         dot syntax: 'a.b.c'.
     render_analysis: bool, default = True
         if `False`, then don't render any visualizations; this can be used if user just needs to train a model. It is recommended to use this option
@@ -564,9 +564,9 @@ def dataset_overview(
         `None` means no sampling
         See also :func:`autogluon.eda.analysis.dataset.Sampler`
     fig_args: Optional[Dict[str, Any]], default = None,
-        figures args for vizualizations; key == component; value = dict of kwargs for component figure
+        figures args for visualizations; key == component; value = dict of kwargs for component figure
     chart_args: Optional[Dict[str, Any]], default = None,
-        figures args for vizualizations; key == component; value = dict of kwargs for component chart
+        figures args for visualizations; key == component; value = dict of kwargs for component chart
 
     Examples
     --------
@@ -698,11 +698,11 @@ def covariate_shift_detection(
     fit_args
         kwargs to pass into `TabularPredictor` fit
     fig_args: Optional[Dict[str, Any]], default = None,
-        figures args for vizualizations; key == component; value = dict of kwargs for component figure. The args are supporting nested
+        figures args for visualizations; key == component; value = dict of kwargs for component figure. The args are supporting nested
         dot syntax: 'a.b.c'. Charts args are following the convention of `<variable_name>.<param>`
         (i.e. `chart.PassengerId.figsize` will result in setting `figsize` on `PassengerId` figure.
     chart_args: Optional[Dict[str, Any]], default = None,
-        figures args for vizualizations; key == component; value = dict of kwargs for component chart. The args are supporting nested
+        figures args for visualizations; key == component; value = dict of kwargs for component chart. The args are supporting nested
         dot syntax: 'a.b.c'. Charts args are following the convention of `<variable_name>.<param>`
         (i.e. `chart.PassengerId.fill` will result in setting `fill` on `PassengerId` chart.
 
@@ -855,11 +855,11 @@ def target_analysis(
     return_state: bool, default = False
         return state if `True`
     fig_args: Optional[Dict[str, Any]], default = None,
-        figures args for vizualizations; key == component; value = dict of kwargs for component figure. The args are supporting nested
+        figures args for visualizations; key == component; value = dict of kwargs for component figure. The args are supporting nested
         dot syntax: 'a.b.c'. Charts args are following the convention of `<variable_name>.<param>`
         (i.e. `chart.PassengerId.figsize` will result in setting `figsize` on `<target>`/`PassengerId` figure.
     chart_args: Optional[Dict[str, Any]], default = None,
-        figures args for vizualizations; key == component; value = dict of kwargs for component chart. The args are supporting nested
+        figures args for visualizations; key == component; value = dict of kwargs for component chart. The args are supporting nested
         dot syntax: 'a.b.c'. Charts args are following the convention of `<variable_name>.<param>`
         (i.e. `chart.PassengerId.fill` will result in setting `fill` on `<target>`/`PassengerId` chart.
 

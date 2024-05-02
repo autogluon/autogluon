@@ -6,7 +6,7 @@ from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_xgboost
-from autogluon.core.constants import MULTICLASS, PROBLEM_TYPES_CLASSIFICATION, REGRESSION, SOFTCLASS
+from autogluon.core.constants import BINARY, MULTICLASS, PROBLEM_TYPES_CLASSIFICATION, REGRESSION, SOFTCLASS
 from autogluon.core.models import AbstractModel
 from autogluon.core.models._utils import get_early_stopping_rounds
 
@@ -37,6 +37,15 @@ class XGBoostModel(AbstractModel):
 
     def _get_default_searchspace(self):
         return get_default_searchspace(problem_type=self.problem_type, num_classes=self.num_classes)
+
+    @classmethod
+    def _get_default_ag_args(cls) -> dict:
+        default_ag_args = super()._get_default_ag_args()
+        extra_ag_args = {
+            "problem_types": [BINARY, MULTICLASS, REGRESSION, SOFTCLASS],
+        }
+        default_ag_args.update(extra_ag_args)
+        return default_ag_args
 
     def _get_default_auxiliary_params(self) -> dict:
         default_auxiliary_params = super()._get_default_auxiliary_params()
