@@ -173,6 +173,33 @@ model:
       # - "random_delete(0.05)"        # less than 0.1 based on eda paper
       # - "syn_replacement(0.05)"  # less than 0.1 based on eda paper
       # - "insert_punc(0.05)"
+  clip_fusion_mlp:
+    checkpoint_name: "openai/clip-vit-base-patch32"
+    data_types:
+      - "image"
+      - "text"
+    train_transforms:
+      - "resize_shorter_side"
+      - "center_crop"
+      # - "trivial_augment" # no augmentation default
+    val_transforms:
+      - "resize_shorter_side"
+      - "center_crop"
+    image_norm: "clip"
+    image_size: 224
+    max_img_num_per_col: 2
+    tokenizer_name: "clip"
+    max_text_len: 77  # The maximum possible length.
+    insert_sep: False
+    text_segment_num: 1
+    stochastic_chunk: False
+    text_aug_detect_length: 10                     # We perform text augmentation only if a text has more than text_detection_length words. It is used to differentiate text columns versus tabular columns that are treated as text.
+    text_trivial_aug_maxscale: 0.0                      # scale randomly drawn from [0, text_trivial_aug_maxscale]
+    text_train_augment_types:        # specify augmentation space manually, will randomly select one from the following and identity
+      # - "random_swap(0.05)"          # less than 0.1 based on eda paper
+      # - "random_delete(0.05)"        # less than 0.1 based on eda paper
+      # - "syn_replacement(0.05)"  # less than 0.1 based on eda paper
+      # - "insert_punc(0.05)"
   fusion_mlp:
     weight: 0.1
     adapt_in_features: "max"

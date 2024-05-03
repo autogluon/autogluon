@@ -262,6 +262,7 @@ DEEPSPEED_MIN_PL_VERSION = "1.7.1"
 
 # registered model keys. TODO: document how to add new models.
 CLIP = "clip"
+CLIP_FUSION_MLP = "clip_fusion_mlp"
 TIMM_IMAGE = "timm_image"
 HF_TEXT = "hf_text"
 T_FEW = "t_few"
