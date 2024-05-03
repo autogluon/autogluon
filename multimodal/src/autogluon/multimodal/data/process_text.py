@@ -310,10 +310,11 @@ class TextProcessor:
                         # After text augmentation, "col_text" may become a list. An error will be raised when calling "tokenizer.encode".
                         if type(col_text) == list and len(col_text) == 1:
                             col_text = col_text[0]
-                        if is_training and self.modality_drop_rate > 0.0:
-                            dropout_probs = torch.empty(1).uniform_()
-                            if dropout_probs[0] <= self.modality_drop_rate:
-                                col_text = ""
+
+                if self.modality_drop_rate > 0.0:
+                    dropout_probs = torch.empty(1).uniform_()
+                    if dropout_probs[0] <= self.modality_drop_rate:
+                        col_text = ""
 
             if col_name == CHOICES_IDS:
                 answer_ids = self.tokenizer(
