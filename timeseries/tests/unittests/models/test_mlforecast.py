@@ -1,3 +1,6 @@
+import os
+import shutil
+import tempfile
 from unittest import mock
 
 import numpy as np
@@ -252,3 +255,26 @@ def test_given_train_data_has_nans_when_fit_called_then_nan_rows_removed_from_tr
     model.fit(train_data=data)
     train_df, val_df = model._generate_train_val_dfs(model.preprocess(data, is_train=True))
     assert len(train_df) + len(val_df) == len(data.dropna())
+
+
+@pytest.mark.parametrize("model_type", TESTABLE_MODELS)
+@pytest.mark.parametrize("eval_metric", ["WAPE", "WQL"])
+def test_when_trained_model_moved_to_different_folder_then_loaded_model_can_predict(model_type, eval_metric):
+    data = DUMMY_TS_DATAFRAME.copy().sort_index()
+    old_model_dir = tempfile.mkdtemp()
+    model = model_type(
+        path=old_model_dir,
+        freq=data.freq,
+        eval_metric=eval_metric,
+        quantile_levels=[0.1, 0.5, 0.9],
+        prediction_length=3,
+        hyperparameters={"differences": []},
+    )
+    model.fit(train_data=data)
+    model.save()
+    del model
+    new_model_dir = tempfile.mkdtemp()
+    shutil.move(model.path, new_model_dir)
+    loaded_model = model_type.load(os.path.join(new_model_dir, model.name))
+    predictions = loaded_model.predict(data)
+    assert isinstance(predictions, TimeSeriesDataFrame)
