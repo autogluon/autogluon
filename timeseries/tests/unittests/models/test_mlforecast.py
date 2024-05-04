@@ -272,7 +272,6 @@ def test_when_trained_model_moved_to_different_folder_then_loaded_model_can_pred
     )
     model.fit(train_data=data)
     model.save()
-    del model
     new_model_dir = tempfile.mkdtemp()
     shutil.move(model.path, new_model_dir)
     loaded_model = model_type.load(os.path.join(new_model_dir, model.name))
