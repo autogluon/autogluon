@@ -53,6 +53,13 @@ class TabularEstimator(BaseEstimator):
         assert isinstance(X, pd.DataFrame)
         return self.predictor.predict(X).values
 
+    @classmethod
+    def load(cls, path: str) -> "TabularEstimator":
+        # There is no need to pass init & fit kwargs since predictor is already trained
+        estimator = TabularEstimator()
+        estimator.predictor = TabularPredictor.load(path)
+        return estimator
+
 
 class AbstractMLForecastModel(AbstractTimeSeriesModel):
     def __init__(
@@ -87,6 +94,26 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         self._avg_residuals_std: Optional[float] = None
         self._train_target_median: Optional[float] = None
         self._non_boolean_real_covariates: List[str] = []
+
+    @property
+    def tabular_predictor_path(self) -> str:
+        return os.path.join(self.path, "tabular_predictor")
+
+    def save(self, path: str = None, verbose: bool = True) -> str:
+        trained_models = self._mlf.models_
+        self._mlf.models_ = None
+        save_path = super().save(path=path, verbose=verbose)
+        self._mlf.models_ = trained_models
+        return save_path
+
+    @classmethod
+    def load(
+        cls, path: str, reset_paths: bool = True, load_oof: bool = False, verbose: bool = True
+    ) -> "AbstractTimeSeriesModel":
+        model = super().load(path=path, reset_paths=reset_paths, load_oof=load_oof, verbose=verbose)
+        # Assumes that model was fit before saving and tabular_predictor_path exists
+        model._mlf.models_ = {"mean": TabularEstimator.load(model.tabular_predictor_path)}
+        return model
 
     def preprocess(self, data: TimeSeriesDataFrame, is_train: bool = False, **kwargs) -> Any:
         if is_train:
@@ -295,7 +322,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
 
         estimator = TabularEstimator(
             predictor_init_kwargs={
-                "path": os.path.join(self.path, "tabular_predictor"),
+                "path": self.tabular_predictor_path,
                 "verbosity": verbosity - 2,
                 "label": MLF_TARGET,
                 **self._get_extra_tabular_init_kwargs(),
