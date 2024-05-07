@@ -56,7 +56,7 @@ class TabularEstimator(BaseEstimator):
     @classmethod
     def load(cls, path: str) -> "TabularEstimator":
         # There is no need to pass init & fit kwargs since predictor is already trained
-        estimator = TabularEstimator()
+        estimator = cls()
         estimator.predictor = TabularPredictor.load(path)
         return estimator
 
