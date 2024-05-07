@@ -88,6 +88,27 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         self._train_target_median: Optional[float] = None
         self._non_boolean_real_covariates: List[str] = []
 
+    @property
+    def tabular_predictor_path(self) -> str:
+        return os.path.join(self.path, "tabular_predictor")
+
+    def save(self, path: str = None, verbose: bool = True) -> str:
+        assert "mean" in self._mlf.models_, "TabularPredictor must be trained before saving"
+        tabular_predictor = self._mlf.models_["mean"].predictor
+        self._mlf.models_["mean"].predictor = None
+        save_path = super().save(path=path, verbose=verbose)
+        self._mlf.models_["mean"].predictor = tabular_predictor
+        return save_path
+
+    @classmethod
+    def load(
+        cls, path: str, reset_paths: bool = True, load_oof: bool = False, verbose: bool = True
+    ) -> "AbstractTimeSeriesModel":
+        model = super().load(path=path, reset_paths=reset_paths, load_oof=load_oof, verbose=verbose)
+        assert "mean" in model._mlf.models_, "Loaded model doesn't have a trained TabularPredictor"
+        model._mlf.models_["mean"].predictor = TabularPredictor.load(model.tabular_predictor_path)
+        return model
+
     def preprocess(self, data: TimeSeriesDataFrame, is_train: bool = False, **kwargs) -> Any:
         if is_train:
             # All-NaN series are removed; partially-NaN series in train_data are handled inside _generate_train_val_dfs
@@ -295,7 +316,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
 
         estimator = TabularEstimator(
             predictor_init_kwargs={
-                "path": os.path.join(self.path, "tabular_predictor"),
+                "path": self.tabular_predictor_path,
                 "verbosity": verbosity - 2,
                 "label": MLF_TARGET,
                 **self._get_extra_tabular_init_kwargs(),
