@@ -53,13 +53,6 @@ class TabularEstimator(BaseEstimator):
         assert isinstance(X, pd.DataFrame)
         return self.predictor.predict(X).values
 
-    @classmethod
-    def load(cls, path: str) -> "TabularEstimator":
-        # There is no need to pass init & fit kwargs since predictor is already trained
-        estimator = cls()
-        estimator.predictor = TabularPredictor.load(path)
-        return estimator
-
 
 class AbstractMLForecastModel(AbstractTimeSeriesModel):
     def __init__(
@@ -100,10 +93,11 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         return os.path.join(self.path, "tabular_predictor")
 
     def save(self, path: str = None, verbose: bool = True) -> str:
-        trained_models = self._mlf.models_
-        self._mlf.models_ = None
+        assert "mean" in self._mlf.models_, "TabularPredictor must be trained before saving"
+        tabular_predictor = self._mlf.models_["mean"].predictor
+        self._mlf.models_["mean"].predictor = None
         save_path = super().save(path=path, verbose=verbose)
-        self._mlf.models_ = trained_models
+        self._mlf.models_["mean"].predictor = tabular_predictor
         return save_path
 
     @classmethod
@@ -111,8 +105,8 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         cls, path: str, reset_paths: bool = True, load_oof: bool = False, verbose: bool = True
     ) -> "AbstractTimeSeriesModel":
         model = super().load(path=path, reset_paths=reset_paths, load_oof=load_oof, verbose=verbose)
-        # Assumes that model was fit before saving and tabular_predictor_path exists
-        model._mlf.models_ = {"mean": TabularEstimator.load(model.tabular_predictor_path)}
+        assert "mean" in model._mlf.models_, "Loaded model doesn't have a trained TabularPredictor"
+        model._mlf.models_["mean"].predictor = TabularPredictor.load(model.tabular_predictor_path)
         return model
 
     def preprocess(self, data: TimeSeriesDataFrame, is_train: bool = False, **kwargs) -> Any:
