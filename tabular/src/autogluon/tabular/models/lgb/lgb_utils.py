@@ -43,6 +43,7 @@ def func_generator(metric, is_higher_better, needs_pred_proba, problem_type):
         def function_template(y_hat, data):
             y_true = data.get_label()
             return metric.name, metric(y_true, y_hat), is_higher_better
+
     elif needs_pred_proba:
         if problem_type == MULTICLASS:
 
