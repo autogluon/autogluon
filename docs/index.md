@@ -209,7 +209,7 @@ pip install autogluon
 
 AutoGluon supports Linux, MacOS, and Windows. See {doc}`./install` for detailed instructions.
 
-## {octicon}`cloud` Managed Service
+## Managed Service
 
 Looking for a managed AutoML service? We highly recommend checking out [Amazon SageMaker Canvas](https://aws.amazon.com/sagemaker/canvas/)! Powered by AutoGluon, it allows you to create highly accurate machine learning models without any machine learning experience or writing a single line of code.
 
