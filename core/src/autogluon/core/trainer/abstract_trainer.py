@@ -2515,6 +2515,7 @@ class AbstractTrainer:
         n_repeats=None,
         n_repeat_start=0,
         time_limit=None,
+        force_full_repeated_cross_validation: bool = False,
         **kwargs,
     ) -> List[str]:
         """
@@ -2531,7 +2532,7 @@ class AbstractTrainer:
             n_repeats = self.n_repeats
         if (k_fold == 0) and (n_repeats != 1):
             raise ValueError(f"n_repeats must be 1 when k_fold is 0, values: ({n_repeats}, {k_fold})")
-        if time_limit is None and feature_prune_kwargs is None:
+        if (time_limit is None and feature_prune_kwargs is None) or force_full_repeated_cross_validation:
             n_repeats_initial = n_repeats
         else:
             n_repeats_initial = 1
