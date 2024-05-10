@@ -1,6 +1,6 @@
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS, MAX_NUMBER_OF_ITERATIONS
 
-DEFAULT_NUM_BOOST_ROUND = 10000
+DEFAULT_NUM_BOOST_ROUND = MAX_NUMBER_OF_ITERATIONS
 MAX_CATEGORY_LEVELS = 100  # maximum number of allowed levels per categorical feature
 # Options: [10, 100, 200, 300, 400, 500, 1000, 10000]
 
