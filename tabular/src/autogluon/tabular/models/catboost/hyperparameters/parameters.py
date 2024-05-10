@@ -1,6 +1,6 @@
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS, MAX_NUMBER_OF_ITERATIONS
 
-DEFAULT_ITERATIONS = 10000
+DEFAULT_ITERATIONS = MAX_NUMBER_OF_ITERATIONS
 
 
 def get_param_baseline(problem_type, num_classes=None):

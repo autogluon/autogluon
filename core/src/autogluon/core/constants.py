@@ -34,6 +34,9 @@ LARGE_DATA_THRESHOLD = 1000
 REGRESS_THRESHOLD_LARGE_DATA = 0.05
 REGRESS_THRESHOLD_SMALL_DATA = 0.1
 
+# Parameter constants
+MAX_NUMBER_OF_ITERATIONS = 50000
+
 # TODO: Add docs to dedicated page, or should it live in AbstractModel?
 # TODO: How to reference correct version of docs?
 # TODO: Add error in AG_ARGS if unknown key present

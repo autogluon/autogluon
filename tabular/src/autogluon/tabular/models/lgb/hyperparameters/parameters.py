@@ -1,8 +1,8 @@
 """ Default (fixed) hyperparameter values used in Gradient Boosting model. """
 
-from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION, SOFTCLASS
+from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION, SOFTCLASS, MAX_NUMBER_OF_ITERATIONS
 
-DEFAULT_NUM_BOOST_ROUND = 10000  # default for single training run
+DEFAULT_NUM_BOOST_ROUND = MAX_NUMBER_OF_ITERATIONS  # default for single training run
 
 
 def get_lgb_objective(problem_type):
