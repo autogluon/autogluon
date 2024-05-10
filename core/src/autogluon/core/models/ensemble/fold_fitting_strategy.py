@@ -11,6 +11,7 @@ import pandas as pd
 from numpy import ndarray
 from pandas import DataFrame, Series
 
+from autogluon.common.utils.distribute_utils import DistributedContext
 from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
@@ -912,9 +913,15 @@ class ParallelLocalFoldFittingStrategy(ParallelFoldFittingStrategy):
 class ParallelDistributedFoldFittingStrategy(ParallelFoldFittingStrategy):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        # Append bag model name in the path
-        self.model_sync_path = self.model_sync_path + os.path.basename(os.path.normpath(self.bagged_ensemble_model.path)) + "/"
+
+        # Append bag model name in the path, only use when sync path is required.
+        if not DistributedContext.is_shared_network_file_system():
+            self.model_sync_path = self.model_sync_path + os.path.basename(os.path.normpath(self.bagged_ensemble_model.path)) + "/"
 
     def _sync_model_artifact(self, local_path, model_sync_path):
+        if DistributedContext.is_shared_network_file_system():
+            # Not need to sync model artifacts in a shared file system.
+            return
+
         bucket, path = s3_path_to_bucket_prefix(model_sync_path)
         download_s3_folder(bucket=bucket, prefix=path, local_path=local_path, error_if_exists=False, verbose=False)
