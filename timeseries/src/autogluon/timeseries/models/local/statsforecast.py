@@ -204,8 +204,6 @@ class ARIMAModel(AbstractProbabilisticStatsForecastModel):
         This significantly speeds up fitting and usually leads to no change in accuracy.
     """
 
-    # TODO: This model requires statsforecast >= 1.5.0, so it will only be available after we upgrade the dependency
-
     allowed_local_model_args = [
         "order",
         "seasonal_order",
@@ -491,8 +489,7 @@ class AbstractConformalizedStatsForecastModel(AbstractStatsForecastModel):
         return pd.DataFrame(predictions)
 
 
-# TODO: Starting from StatsForecast v1.5.0, AutoCES can inherit from AbstractProbabilisticStatsForecastModel
-class AutoCESModel(AbstractConformalizedStatsForecastModel):
+class AutoCESModel(AbstractProbabilisticStatsForecastModel):
     """Forecasting with an Complex Exponential Smoothing model where the model selection is performed using the
     Akaike Information Criterion.
 
@@ -541,16 +538,6 @@ class AutoCESModel(AbstractConformalizedStatsForecastModel):
         local_model_args = super()._update_local_model_args(local_model_args)
         local_model_args.setdefault("model", "Z")
         return local_model_args
-
-    def _get_point_forecast(self, time_series: pd.Series, local_model_args: Dict):
-        # Disable seasonality if time series too short for chosen season_length or season_length == 1,
-        # otherwise model will crash
-        if len(time_series) < 5:
-            # AutoCES does not handle "tiny" datasets, fall back to naive
-            return np.full(self.prediction_length, time_series.values[-1])
-        if len(time_series) < 2 * local_model_args["season_length"] + 1 or local_model_args["season_length"] == 1:
-            local_model_args["model"] = "N"
-        return super()._get_point_forecast(time_series, local_model_args)
 
 
 class AbstractStatsForecastIntermittentDemandModel(AbstractConformalizedStatsForecastModel):

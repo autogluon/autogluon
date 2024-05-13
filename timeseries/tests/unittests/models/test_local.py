@@ -8,6 +8,7 @@ import pytest
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.models.local import (
     ADIDAModel,
+    ARIMAModel,
     AutoARIMAModel,
     AutoCESModel,
     AutoETSModel,
@@ -37,6 +38,7 @@ from ..common import (
 
 # models accepting seasonal_period
 SEASONAL_TESTABLE_MODELS = [
+    ARIMAModel,
     AutoARIMAModel,
     AutoETSModel,
     AutoCESModel,
