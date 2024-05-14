@@ -58,7 +58,7 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
         if is_fit:
             good_rows = series[~series.isin(bad_rows)].astype(np.int64)
             self._fillna_map[feature] = pd.to_datetime(int(good_rows.mean()), utc=True, format="mixed")
-        series[broken_idx] = self._fillna_map[feature]
+        series[broken_idx] = pd.to_datetime(self._fillna_map[feature], utc=True)
         return series
 
     # TODO: Improve handling of missing datetimes
