@@ -539,6 +539,16 @@ class AutoCESModel(AbstractProbabilisticStatsForecastModel):
         local_model_args.setdefault("model", "Z")
         return local_model_args
 
+    def _get_point_forecast(self, time_series: pd.Series, local_model_args: Dict):
+        # Disable seasonality if time series too short for chosen season_length or season_length == 1,
+        # otherwise model will crash
+        if len(time_series) < 5:
+            # AutoCES does not handle "tiny" datasets, fall back to naive
+            return np.full(self.prediction_length, time_series.values[-1])
+        if len(time_series) < 2 * local_model_args["season_length"] + 1 or local_model_args["season_length"] == 1:
+            local_model_args["model"] = "N"
+        return super()._get_point_forecast(time_series, local_model_args)
+
 
 class AbstractStatsForecastIntermittentDemandModel(AbstractConformalizedStatsForecastModel):
     def _update_local_model_args(self, local_model_args: Dict[str, Any]) -> Dict[str, Any]:

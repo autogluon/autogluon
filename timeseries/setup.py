@@ -34,6 +34,8 @@ install_requires = [
     "networkx",  # version range defined in `core/_setup_utils.py`
     "statsforecast>=1.7.0,<1.8",
     "mlforecast>=0.10.0,<0.10.1",
+    "utilsforecast<=0.1.9",  # to prevent breaking changes that propagate through mlforecast's dependency
+    "fugue>=0.9.0",  # prevent dependency clash with omegaconf
     "tqdm",  # version range defined in `core/_setup_utils.py`
     "orjson~=3.9",  # use faster JSON implementation in GluonTS
     # TODO v1.1: use lightning[pytorch-extra] instead of explicitly installing tensorboard
