@@ -151,6 +151,7 @@ class AbstractModel:
 
         self.fit_time = None  # Time taken to fit in seconds (Training data)
         self.predict_time = None  # Time taken to predict in seconds (Validation data)
+        self._predict_n_size = None  # Batch size used to calculate predict_time
         self.predict_1_time = None  # Time taken to predict 1 row of data in seconds (with batch size `predict_1_batch_size` in params_aux)
         self.compile_time = None  # Time taken to compile the model in seconds
         self.val_score = None  # Score with eval_metric (Validation data)
@@ -931,31 +932,57 @@ class AbstractModel:
     def predict(self, X, **kwargs) -> np.ndarray:
         """
         Returns class predictions of X.
-        For binary and multiclass problems, this returns the predicted class labels as a Series.
-        For regression problems, this returns the predicted values as a Series.
+        For binary and multiclass problems, this returns the predicted class labels as a 1d numpy array.
+        For regression problems, this returns the predicted values as a 1d numpy array.
         """
         y_pred_proba = self.predict_proba(X, **kwargs)
         y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
         return y_pred
 
-    def predict_proba(self, X, normalize=None, **kwargs) -> np.ndarray:
+    def predict_proba(self, X, *, normalize: bool | None = None, record_time: bool = False, **kwargs) -> np.ndarray:
         """
         Returns class prediction probabilities of X.
-        For binary problems, this returns the positive class label probability as a Series.
-        For multiclass problems, this returns the class label probabilities of each class as a DataFrame.
-        For regression problems, this returns the predicted values as a Series.
+        For binary problems, this returns the positive class label probability as a 1d numpy array.
+        For multiclass problems, this returns the class label probabilities of each class as a 2d numpy array.
+        For regression problems, this returns the predicted values as a 1d numpy array.
+
+        Parameters
+        ----------
+        X
+            The data used for prediction.
+        normalize: bool | None, default = None
+            Whether to normalize the predictions prior to returning.
+            If None, will default to `self.normalize_pred_probas`.
+        record_time: bool, default = False
+            If True, will record the time taken for prediction in `self.predict_time` and the number of rows of X in `self.predict_n_size`.
+        kwargs
+            Keyword arguments to pass into `self._predict_proba`.
+
+        Returns
+        -------
+        y_pred_proba : np.ndarray
+            The prediction probabilities
         """
+        time_start = time.time() if record_time else None
+
+        y_pred_proba = self._predict_proba_internal(X=X, normalize=normalize, **kwargs)
+
+        if self.params_aux.get("temperature_scalar", None) is not None:
+            y_pred_proba = self._apply_temperature_scaling(y_pred_proba)
+        elif self.conformalize is not None:
+            y_pred_proba = self._apply_conformalization(y_pred_proba)
+        if record_time:
+            self.predict_time = time.time() - time_start
+            self.record_predict_info(X=X)
+        return y_pred_proba
+
+    def _predict_proba_internal(self, X, *, normalize: bool | None = None, **kwargs):
         if normalize is None:
             normalize = self.normalize_pred_probas
         y_pred_proba = self._predict_proba(X=X, **kwargs)
         if normalize:
             y_pred_proba = normalize_pred_probas(y_pred_proba, self.problem_type)
         y_pred_proba = y_pred_proba.astype(np.float32)
-
-        if self.params_aux.get("temperature_scalar", None) is not None:
-            y_pred_proba = self._apply_temperature_scaling(y_pred_proba)
-        elif self.conformalize is not None:
-            y_pred_proba = self._apply_conformalization(y_pred_proba)
         return y_pred_proba
 
     def predict_from_proba(self, y_pred_proba: np.ndarray) -> np.ndarray:
@@ -1877,6 +1904,34 @@ class AbstractModel:
         json_path = os.path.join(self.path, self.model_info_json_name)
         save_json.save(path=json_path, obj=info)
         return info
+
+    @property
+    def predict_n_size(self) -> int | None:
+        """
+        The number of rows in the data used when calculating `self.predict_time`.
+        """
+        return self._predict_n_size
+
+    @property
+    def predict_n_time_per_row(self) -> float | None:
+        """
+        The time in seconds required to predict 1 row of data given a batch size of `self.predict_n_size`.
+        Returns None if either `self.predict_time` or `self.predict_n_size` are None.
+        """
+        if self.predict_time is None or self.predict_n_size is None:
+            return None
+        return self.predict_time / self.predict_n_size
+
+    def record_predict_info(self, X: pd.DataFrame):
+        """
+        Records the necessary information to compute `self.predict_n_time_per_row`.
+
+        Parameters
+        ----------
+        X: pd.DataFrame
+            The data used to predict on when calculating `self.predict_time`.
+        """
+        self._predict_n_size = len(X)
 
     def _get_maximum_resources(self) -> Dict[str, Union[int, float]]:
         """

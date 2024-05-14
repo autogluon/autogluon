@@ -632,8 +632,8 @@ def infer_problem_type(y: Series, silent=False) -> str:
 
         logger.log(
             25,
-            f"\tIf '{problem_type}' is not the correct problem_type, please manually specify the problem_type parameter during predictor init "
-            f"(You may specify problem_type as one of: {[BINARY, MULTICLASS, REGRESSION]})",
+            f"\tIf '{problem_type}' is not the correct problem_type, please manually specify the problem_type parameter during Predictor init "
+            f"(You may specify problem_type as one of: {[BINARY, MULTICLASS, REGRESSION, QUANTILE]})",
         )
     return problem_type
 

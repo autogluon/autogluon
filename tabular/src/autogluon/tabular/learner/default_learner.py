@@ -142,7 +142,15 @@ class DefaultLearner(AbstractTabularLearner):
         time_end = time.time()
         self._time_fit_training = time_end - time_preprocessing_end
         self._time_fit_total = time_end - time_preprocessing_start
-        logger.log(20, f'AutoGluon training complete, total runtime = {round(self._time_fit_total, 2)}s ... Best model: "{trainer.model_best}"')
+        predict_n_time_per_row = trainer.get_model_attribute_full(model=trainer.model_best, attribute="predict_n_time_per_row")
+        predict_n_size = trainer.get_model_attribute_full(model=trainer.model_best, attribute="predict_n_size", func=min)
+        if predict_n_time_per_row is not None and predict_n_size is not None:
+            log_throughput = f" | Estimated inference throughput: {(1/predict_n_time_per_row):.1f} rows/s ({int(predict_n_size)} batch size)"
+        else:
+            log_throughput = ""
+        logger.log(
+            20, f"AutoGluon training complete, total runtime = {round(self._time_fit_total, 2)}s ... Best model: {trainer.model_best}" f"{log_throughput}"
+        )
 
     def _update_infer_limit(self, X: DataFrame, *, infer_limit_batch_size: int, infer_limit: float = None):
         """
