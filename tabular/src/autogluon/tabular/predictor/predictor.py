@@ -4439,6 +4439,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             # other
             verbosity=self.verbosity,
             feature_prune_kwargs=None,
+            force_full_repeated_cross_validation=False,
             # private
             _save_bag_folds=None,
             calibrate="auto",
