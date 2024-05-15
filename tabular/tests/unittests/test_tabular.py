@@ -35,7 +35,7 @@ from autogluon.common import space
 from autogluon.common.utils.simulation_utils import convert_simulation_artifacts_to_tabular_predictions_dict
 from autogluon.core.constants import BINARY, MULTICLASS, PROBLEM_TYPES_CLASSIFICATION, QUANTILE, REGRESSION
 from autogluon.core.utils import download, unzip
-from autogluon.tabular import TabularDataset, TabularPredictor
+from autogluon.tabular import TabularDataset, TabularPredictor, __version__
 from autogluon.tabular.configs.hyperparameter_configs import get_hyperparameter_config
 
 PARALLEL_LOCAL_BAGGING = "parallel_local"
@@ -149,6 +149,10 @@ def test_advanced_functionality():
     shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
     savedir_predictor_original = savedir + "predictor/"
     predictor: TabularPredictor = TabularPredictor(label=label, path=savedir_predictor_original).fit(train_data)
+
+    version_in_file = predictor._load_version_file(path=predictor.path)
+    assert version_in_file == __version__
+
     leaderboard = predictor.leaderboard(data=test_data)
 
     # test metric_error leaderboard
