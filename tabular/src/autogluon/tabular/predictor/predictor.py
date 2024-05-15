@@ -214,7 +214,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
     Dataset = TabularDataset
     predictor_file_name = "predictor.pkl"
-    _predictor_version_file_name = "__version__"
+    _predictor_version_file_name = "version.txt"
     _predictor_metadata_file_name = "metadata.json"
     _predictor_log_file_name = "predictor_log.txt"
 
@@ -4153,6 +4153,16 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         return version
 
     @classmethod
+    def _load_version_file_old(cls, path) -> str:
+        """
+        Loads the old version file used in `autogluon.tabular<=1.1.0`, named `__version__`.
+        This file name was changed because Kaggle does not allow uploading files named `__version__`.
+        """
+        version_file_path = os.path.join(path, "__version__")
+        version = load_str.load(path=version_file_path)
+        return version
+
+    @classmethod
     def _load_metadata_file(cls, path: str, silent=True):
         metadata_file_path = os.path.join(path, cls._predictor_metadata_file_name)
         return load_json.load(path=metadata_file_path, verbose=not silent)
@@ -4257,11 +4267,15 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         try:
             version_saved = cls._load_version_file(path=path)
         except:
-            logger.warning(
-                f'WARNING: Could not find version file at "{os.path.join(path, cls._predictor_version_file_name)}".\n'
-                f"This means that the predictor was fit in a version `<=0.3.1`."
-            )
-            version_saved = None
+            try:
+                # Try to see if a version file in the old format prior to v1.1.1 exists
+                version_saved = cls._load_version_file_old(path=path)
+            except:
+                logger.warning(
+                    f'WARNING: Could not find version file at "{os.path.join(path, cls._predictor_version_file_name)}".\n'
+                    f"This means that the predictor was fit in an AutoGluon version `<=0.3.1`."
+                )
+                version_saved = None
 
         if version_saved is None:
             predictor = cls._load(path=path)
