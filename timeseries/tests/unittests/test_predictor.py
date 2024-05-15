@@ -1727,3 +1727,12 @@ def test_given_predictor_takes_known_only_when_feature_importance_called_with_im
                 assert np.allclose(importance, 0, atol=1e-8)
             else:
                 assert np.isfinite(importance)
+
+
+def test_when_predictor_saved_to_same_directory_then_models_can_predict(temp_model_path):
+    data = DUMMY_TS_DATAFRAME
+    old_predictor = TimeSeriesPredictor(path=temp_model_path).fit(data, hyperparameters={"Naive": {}})
+    old_predictor.leaderboard(data)
+
+    new_predictor = TimeSeriesPredictor(path=temp_model_path).fit(data, hyperparameters={"Average": {}})
+    new_predictor.leaderboard(data)
