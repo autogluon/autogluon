@@ -406,7 +406,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         num_cpus: int | str = "auto",
         num_gpus: int | str = "auto",
         **kwargs,
-    ):
+    ) -> "TabularPredictor":
         """
         Fit models to predict a column of a data table (label) based on the other columns (features).
 
@@ -4147,34 +4147,44 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             self._trainer: AbstractTrainer = self._learner.load_trainer()  # Trainer object
 
     @classmethod
-    def _load_version_file(cls, path) -> str:
+    def _load_version_file(cls, path: str) -> str:
+        """
+        Loads the version file that is part of the saved predictor artifact.
+        The version file contains a string matching `predictor._learner.version`.
+
+        Parameters
+        ----------
+        path: str
+            The path that would be used to load the predictor via `predictor.load(path)`
+
+        Returns
+        -------
+        The version of AutoGluon used to fit the predictor, as a string.
+
+        """
         version_file_path = os.path.join(path, cls._predictor_version_file_name)
-        version = load_str.load(path=version_file_path)
+        try:
+            version = load_str.load(path=version_file_path)
+        except:
+            # Loads the old version file used in `autogluon.tabular<=1.1.0`, named `__version__`.
+            # This file name was changed because Kaggle does not allow uploading files named `__version__`.
+            version_file_path = os.path.join(path, "__version__")
+            version = load_str.load(path=version_file_path)
         return version
 
     @classmethod
-    def _load_version_file_old(cls, path) -> str:
-        """
-        Loads the old version file used in `autogluon.tabular<=1.1.0`, named `__version__`.
-        This file name was changed because Kaggle does not allow uploading files named `__version__`.
-        """
-        version_file_path = os.path.join(path, "__version__")
-        version = load_str.load(path=version_file_path)
-        return version
-
-    @classmethod
-    def _load_metadata_file(cls, path: str, silent=True):
+    def _load_metadata_file(cls, path: str, silent: bool = True):
         metadata_file_path = os.path.join(path, cls._predictor_metadata_file_name)
         return load_json.load(path=metadata_file_path, verbose=not silent)
 
-    def _save_version_file(self, silent=False):
+    def _save_version_file(self, silent: bool = False):
         from ..version import __version__
 
         version_file_contents = f"{__version__}"
         version_file_path = os.path.join(self.path, self._predictor_version_file_name)
         save_str.save(path=version_file_path, data=version_file_contents, verbose=not silent)
 
-    def _save_metadata_file(self, silent=False):
+    def _save_metadata_file(self, silent: bool = False):
         """
         Save metadata json file to disk containing information such as
         python version, autogluon version, installed packages, operating system, etc.
@@ -4187,7 +4197,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         if not silent:
             logger.log(15, f"Saving {metadata_file_path}")
 
-    def save(self, silent=False):
+    def save(self, silent: bool = False):
         """
         Save this Predictor to file in directory specified by this Predictor's `path`.
         Note that :meth:`TabularPredictor.fit` already saves the predictor object automatically
@@ -4216,7 +4226,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             logger.log(20, f'TabularPredictor saved. To load, use: predictor = TabularPredictor.load("{self.path}")')
 
     @classmethod
-    def _load(cls, path: str):
+    def _load(cls, path: str) -> "TabularPredictor":
         """
         Inner load method, called in `load`.
         """
@@ -4226,7 +4236,14 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         return predictor
 
     @classmethod
-    def load(cls, path: str, verbosity: int = None, require_version_match: bool = True, require_py_version_match: bool = True, check_packages: bool = False):
+    def load(
+        cls,
+        path: str,
+        verbosity: int = None,
+        require_version_match: bool = True,
+        require_py_version_match: bool = True,
+        check_packages: bool = False,
+    ) -> "TabularPredictor":
         """
         Load a TabularPredictor object previously produced by `fit()` from file and returns this object. It is highly recommended the predictor be loaded with the exact AutoGluon version it was fit with.
 
@@ -4250,6 +4267,15 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         check_packages : bool, default = False
             If True, checks package versions of the loaded predictor against the package versions of the current environment.
             Warnings will be logged for each mismatch of package version.
+
+        Returns
+        -------
+        predictor : TabularPredictor
+
+        Examples
+        --------
+        >>> predictor = TabularPredictor.load(path_to_predictor)
+
         """
         if verbosity is not None:
             set_logger_verbosity(verbosity)  # Reset logging after load (may be in new Python session)
@@ -4267,15 +4293,11 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         try:
             version_saved = cls._load_version_file(path=path)
         except:
-            try:
-                # Try to see if a version file in the old format prior to v1.1.1 exists
-                version_saved = cls._load_version_file_old(path=path)
-            except:
-                logger.warning(
-                    f'WARNING: Could not find version file at "{os.path.join(path, cls._predictor_version_file_name)}".\n'
-                    f"This means that the predictor was fit in an AutoGluon version `<=0.3.1`."
-                )
-                version_saved = None
+            logger.warning(
+                f'WARNING: Could not find version file at "{os.path.join(path, cls._predictor_version_file_name)}".\n'
+                f"This means that the predictor was fit in an AutoGluon version `<=0.3.1`."
+            )
+            version_saved = None
 
         if version_saved is None:
             predictor = cls._load(path=path)
@@ -4340,8 +4362,8 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             If you specified a `log_file_path` while initializing the predictor, you should use `log_file_path` to load the log file instead.
             At least one of `predictor_path` or `log_file_path` must to be specified
 
-        Return
-        ------
+        Returns
+        -------
         List[str]
             A list containing lines of the log file
         """
@@ -4735,7 +4757,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
     # TODO: Add .delete() method to easily clean-up clones?
     #  Would need to be careful that user doesn't delete important things accidentally.
     # TODO: Add .save_zip() and load_zip() methods to pack and unpack artifacts into a single file to simplify deployment code?
-    def clone(self, path: str, *, return_clone: bool = False, dirs_exist_ok: bool = False):
+    def clone(self, path: str, *, return_clone: bool = False, dirs_exist_ok: bool = False) -> str | "TabularPredictor":
         """
         Clone the predictor and all of its artifacts to a new location on local disk.
         This is ideal for use-cases where saving a snapshot of the predictor is desired before performing
@@ -4767,7 +4789,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         )
         return self.__class__.load(path=path_clone) if return_clone else path_clone
 
-    def clone_for_deployment(self, path: str, *, model: str = "best", return_clone: bool = False, dirs_exist_ok: bool = False):
+    def clone_for_deployment(self, path: str, *, model: str = "best", return_clone: bool = False, dirs_exist_ok: bool = False) -> str | "TabularPredictor":
         """
         Clone the predictor and all of its artifacts to a new location on local disk,
         then delete the clones artifacts unnecessary during prediction.
