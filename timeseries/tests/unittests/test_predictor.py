@@ -1729,10 +1729,25 @@ def test_given_predictor_takes_known_only_when_feature_importance_called_with_im
                 assert np.isfinite(importance)
 
 
-def test_when_predictor_saved_to_same_directory_then_models_can_predict(temp_model_path):
+def test_when_predictor_saved_to_same_directory_then_leaderboard_works(temp_model_path):
     data = DUMMY_TS_DATAFRAME
     old_predictor = TimeSeriesPredictor(path=temp_model_path).fit(data, hyperparameters={"Naive": {}})
     old_predictor.leaderboard(data)
 
     new_predictor = TimeSeriesPredictor(path=temp_model_path).fit(data, hyperparameters={"Average": {}})
-    new_predictor.leaderboard(data)
+    assert len(new_predictor.leaderboard(data)) == 1
+
+
+def test_when_predictor_saved_to_same_directory_and_loaded_then_number_of_models_matches(temp_model_path):
+    data = DUMMY_TS_DATAFRAME
+    old_predictor = TimeSeriesPredictor(path=temp_model_path).fit(data, hyperparameters={"Naive": {}, "Average": {}})
+    old_predictor.leaderboard(data)
+
+    hyperparameters = {"SeasonalNaive": {}, "SeasonalAverage": {}}
+    new_predictor = TimeSeriesPredictor(path=temp_model_path).fit(data, hyperparameters=hyperparameters)
+    loaded_predictor = TimeSeriesPredictor.load(temp_model_path)
+    assert (
+        set(new_predictor.model_names())
+        == set(loaded_predictor.model_names())
+        == set(hyperparameters).union({"WeightedEnsemble"})
+    )
