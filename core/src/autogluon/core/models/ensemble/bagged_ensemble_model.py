@@ -92,6 +92,8 @@ class BaggedEnsembleModel(AbstractModel):
         self._cv_splitters = []  # Keeps track of the CV splitter used for each bagged repeat.
         self._params_aux_child = None  # aux params of child model
 
+        self._predict_n_size_lst = None  # A list of the predict row count for each child, useful to calculate the expected inference throughput of the bag.
+
         super().__init__(problem_type=self.model_base.problem_type, eval_metric=self.model_base.eval_metric, **kwargs)
 
     def _set_default_params(self):
@@ -448,23 +450,17 @@ class BaggedEnsembleModel(AbstractModel):
             pred_children.append(model.predict(X=X, preprocess_nonadaptive=False, normalize=normalize))
         return pred_children
 
-    def predict_proba(self, X, normalize=None, **kwargs):
+    def _predict_proba_internal(self, X, *, normalize: bool | None = None, **kwargs):
         model = self.load_child(self.models[0])
         X = self.preprocess(X, model=model, **kwargs)
-        pred_proba = model.predict_proba(X=X, preprocess_nonadaptive=False, normalize=normalize)
+        y_pred_proba = model.predict_proba(X=X, preprocess_nonadaptive=False, normalize=normalize)
         for model in self.models[1:]:
             model = self.load_child(model)
-            pred_proba += model.predict_proba(X=X, preprocess_nonadaptive=False, normalize=normalize)
-        pred_proba = pred_proba / self.n_children
+            y_pred_proba += model.predict_proba(X=X, preprocess_nonadaptive=False, normalize=normalize)
+        y_pred_proba = y_pred_proba / self.n_children
+        return y_pred_proba
 
-        if self.params_aux.get("temperature_scalar", None) is not None:
-            pred_proba = self._apply_temperature_scaling(pred_proba)
-        elif self.conformalize is not None:
-            pred_proba = self._apply_conformalization(pred_proba)
-
-        return pred_proba
-
-    def _predict_proba(self, X, normalize=False, **kwargs):
+    def _predict_proba(self, X, normalize=False, **kwargs) -> np.ndarray:
         return self.predict_proba(X=X, normalize=normalize, **kwargs)
 
     def score_with_oof(self, y, sample_weight=None):
@@ -557,6 +553,7 @@ class BaggedEnsembleModel(AbstractModel):
                     )
                 self._oof_pred_proba = model_base.predict_proba(X=X)  # TODO: Cheater value, will be overfit to valid set
             self._oof_pred_model_repeats = np.ones(shape=len(X), dtype=np.uint8)
+        model_base.record_predict_info(X=X)
         model_base.reduce_memory_size(remove_fit=True, remove_info=False, requires_save=True)
         if not self.params.get("save_bag_folds", True):
             model_base.model = None
@@ -1075,22 +1072,11 @@ class BaggedEnsembleModel(AbstractModel):
             return self.model_base
 
     def _add_child_times_to_bag(self, model):
-        if self.fit_time is None:
-            self.fit_time = model.fit_time
-        else:
-            self.fit_time += model.fit_time
+        self._add_parallel_child_times(fit_time=model.fit_time, predict_time=model.predict_time, predict_1_time=model.predict_1_time)
+        assert model.predict_n_size is not None
+        self._add_predict_n_size(predict_n_size_lst=[model.predict_n_size])
 
-        if self.predict_time is None:
-            self.predict_time = model.predict_time
-        else:
-            self.predict_time += model.predict_time
-
-        if self.predict_1_time is None:
-            self.predict_1_time = model.predict_1_time
-        else:
-            self.predict_1_time += model.predict_1_time
-
-    def _add_parallel_child_times(self, fit_time, predict_time, predict_1_time):
+    def _add_parallel_child_times(self, fit_time: float, predict_time: float, predict_1_time: float):
         if self.fit_time is None:
             self.fit_time = fit_time
         else:
@@ -1105,6 +1091,19 @@ class BaggedEnsembleModel(AbstractModel):
             self.predict_1_time = predict_1_time
         else:
             self.predict_1_time += predict_1_time
+
+    def _add_predict_n_size(self, predict_n_size_lst: List[float]):
+        if self._predict_n_size_lst is None:
+            self._predict_n_size_lst = []
+        self._predict_n_size_lst += predict_n_size_lst
+
+    @property
+    def predict_n_size(self) -> float | None:
+        if self._predict_n_size is not None:
+            return self._predict_n_size
+        if not self._predict_n_size_lst:
+            return None
+        return np.ceil(np.mean(self._predict_n_size_lst))
 
     @classmethod
     def load(cls, path: str, reset_paths=True, low_memory=True, load_oof=False, verbose=True):

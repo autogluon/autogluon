@@ -86,6 +86,28 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         self._residuals_std_per_item: Optional[pd.Series] = None
         self._avg_residuals_std: Optional[float] = None
         self._train_target_median: Optional[float] = None
+        self._non_boolean_real_covariates: List[str] = []
+
+    @property
+    def tabular_predictor_path(self) -> str:
+        return os.path.join(self.path, "tabular_predictor")
+
+    def save(self, path: str = None, verbose: bool = True) -> str:
+        assert "mean" in self._mlf.models_, "TabularPredictor must be trained before saving"
+        tabular_predictor = self._mlf.models_["mean"].predictor
+        self._mlf.models_["mean"].predictor = None
+        save_path = super().save(path=path, verbose=verbose)
+        self._mlf.models_["mean"].predictor = tabular_predictor
+        return save_path
+
+    @classmethod
+    def load(
+        cls, path: str, reset_paths: bool = True, load_oof: bool = False, verbose: bool = True
+    ) -> "AbstractTimeSeriesModel":
+        model = super().load(path=path, reset_paths=reset_paths, load_oof=load_oof, verbose=verbose)
+        assert "mean" in model._mlf.models_, "Loaded model doesn't have a trained TabularPredictor"
+        model._mlf.models_["mean"].predictor = TabularPredictor.load(model.tabular_predictor_path)
+        return model
 
     def preprocess(self, data: TimeSeriesDataFrame, is_train: bool = False, **kwargs) -> Any:
         if is_train:
@@ -252,10 +274,9 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         if static_features is not None:
             df = pd.merge(df, static_features, how="left", on=ITEMID, suffixes=(None, "_static_feat"))
 
-        for col in self.metadata.known_covariates_real:
+        for col in self._non_boolean_real_covariates:
             # Normalize non-boolean features using mean_abs scaling
-            if not df[col].isin([0, 1]).all():
-                df[f"__scaled_{col}"] = df[col] / df[col].abs().groupby(df[ITEMID]).mean().reindex(df[ITEMID]).values
+            df[f"__scaled_{col}"] = df[col] / df[col].abs().groupby(df[ITEMID]).mean().reindex(df[ITEMID]).values
 
         # Convert float64 to float32 to reduce memory usage
         float64_cols = list(df.select_dtypes(include="float64"))
@@ -277,6 +298,9 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         self._check_fit_params()
         fit_start_time = time.time()
         self._train_target_median = train_data[self.target].median()
+        for col in self.metadata.known_covariates_real:
+            if not train_data[col].isin([0, 1]).all():
+                self._non_boolean_real_covariates.append(col)
         # TabularEstimator is passed to MLForecast later to include tuning_data
         model_params = self._get_model_params()
 
@@ -292,7 +316,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
 
         estimator = TabularEstimator(
             predictor_init_kwargs={
-                "path": os.path.join(self.path, "tabular_predictor"),
+                "path": self.tabular_predictor_path,
                 "verbosity": verbosity - 2,
                 "label": MLF_TARGET,
                 **self._get_extra_tabular_init_kwargs(),

@@ -1913,28 +1913,21 @@ class AbstractTrainer:
             if not compute_score:
                 score = None
                 model.predict_time = None
+            elif X_val is not None and y_val is not None:
+                y_pred_proba_val = model.predict_proba(X_val, record_time=True)
+                score = model.score_with_y_pred_proba(y=y_val, y_pred_proba=y_pred_proba_val, sample_weight=w_val)
             elif isinstance(model, BaggedEnsembleModel):
-                if X_val is not None and y_val is not None:
-                    y_pred_proba_val = model.predict_proba(X_val)
-                    score = model.score_with_y_pred_proba(y=y_val, y_pred_proba=y_pred_proba_val, sample_weight=w_val)
-                elif model.is_valid_oof() or isinstance(model, WeightedEnsembleModel):
+                if model.is_valid_oof() or isinstance(model, WeightedEnsembleModel):
                     score = model.score_with_oof(y=y, sample_weight=w)
                 else:
                     score = None
             else:
-                if X_val is not None and y_val is not None:
-                    y_pred_proba_val = model.predict_proba(X_val)
-                    score = model.score_with_y_pred_proba(y=y_val, y_pred_proba=y_pred_proba_val, sample_weight=w_val)
-                else:
-                    score = None
+                score = None
             pred_end_time = time.time()
             if model.fit_time is None:
                 model.fit_time = fit_end_time - fit_start_time
-            if model.predict_time is None:
-                if score is None:
-                    model.predict_time = None
-                else:
-                    model.predict_time = pred_end_time - fit_end_time
+            if model.predict_time is None and score is not None:
+                model.predict_time = pred_end_time - fit_end_time
             model.val_score = score
             # TODO: Add recursive=True to avoid repeatedly loading models each time this is called for bagged ensembles (especially during repeated bagging)
             self.save_model(model=model)
@@ -2003,6 +1996,8 @@ class AbstractTrainer:
             predict_1_time=model.predict_1_time,
             predict_child_time=predict_child_time,
             predict_1_child_time=predict_1_child_time,
+            predict_n_time_per_row=model.predict_n_time_per_row,
+            predict_n_size=model.predict_n_size,
             val_score=model.val_score,
             eval_metric=model.eval_metric.name,
             stopping_metric=model.stopping_metric.name,
@@ -2129,6 +2124,10 @@ class AbstractTrainer:
             logger.log(20, f"\t{round(model.fit_time, 2)}s\t = Training   runtime")
         if model.predict_time is not None:
             logger.log(20, f"\t{round(model.predict_time, 2)}s\t = Validation runtime")
+        predict_n_time_per_row = self.get_model_attribute_full(model=model.name, attribute="predict_n_time_per_row")
+        predict_n_size = self.get_model_attribute_full(model=model.name, attribute="predict_n_size", func=min)
+        if predict_n_time_per_row is not None and predict_n_time_per_row != 0 and predict_n_size is not None:
+            logger.log(30, f"\t{round(1 / predict_n_time_per_row, 1)}\t = Inference  throughput (rows/s | {int(predict_n_size)} batch size)")
         if model.predict_1_time is not None:
             fit_metadata = model.get_fit_metadata()
             predict_1_batch_size = fit_metadata.get("predict_1_batch_size", None)
@@ -3836,7 +3835,8 @@ class AbstractTrainer:
         metric: str | Scorer | None = None,
         model: str = "best",
         weights=None,
-        decision_thresholds: int | List[float] = 50,
+        decision_thresholds: int | List[float] = 25,
+        secondary_decision_thresholds: int | None = 19,
         verbose: bool = True,
         **kwargs,
     ) -> float:
@@ -3895,6 +3895,7 @@ class AbstractTrainer:
             y_pred_proba=y_pred_proba,
             metric=lambda y, y_pred: self._score_with_y_pred(y=y, y_pred=y_pred, weights=weights, metric=metric),
             decision_thresholds=decision_thresholds,
+            secondary_decision_thresholds=secondary_decision_thresholds,
             metric_name=metric.name,
             verbose=verbose,
             **kwargs,

@@ -214,7 +214,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
     Dataset = TabularDataset
     predictor_file_name = "predictor.pkl"
-    _predictor_version_file_name = "__version__"
+    _predictor_version_file_name = "version.txt"
     _predictor_metadata_file_name = "metadata.json"
     _predictor_log_file_name = "predictor_log.txt"
 
@@ -402,11 +402,11 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         fit_full_last_level_weighted_ensemble: bool = True,
         full_weighted_ensemble_additionally: bool = False,
         dynamic_stacking: bool | str = False,
-        calibrate_decision_threshold: bool = False,
-        num_cpus="auto",
-        num_gpus="auto",
+        calibrate_decision_threshold: bool | str = False,
+        num_cpus: int | str = "auto",
+        num_gpus: int | str = "auto",
         **kwargs,
-    ):
+    ) -> "TabularPredictor":
         """
         Fit models to predict a column of a data table (label) based on the other columns (features).
 
@@ -669,17 +669,18 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             time for fitting AutoGluon. This can be adjusted by specifying `ds_args` with different parameters to `fit()`.
             If "auto", will be set to `not use_bag_holdout`.
             See the documentation of `ds_args` for more information.
-        calibrate_decision_threshold : bool, default = False
+        calibrate_decision_threshold : bool | str, default = False
             [Experimental] This may be removed / changed without warning in a future release.
             If True, will automatically calibrate the decision threshold at the end of fit for calls to `.predict` based on the evaluation metric.
+            If "auto", will be set to True if `eval_metric.needs_class=True` and `problem_type="binary"`.
             By default, the decision threshold is `0.5`, however for some metrics such as `f1` and `balanced_accuracy`,
             scores can be significantly improved by choosing a threshold other than `0.5`.
             Only valid for `problem_type='binary'`. Ignored for all other problem types.
-        num_cpus: int, default = "auto"
+        num_cpus: int | str, default = "auto"
             The total amount of cpus you want AutoGluon predictor to use.
             Auto means AutoGluon will make the decision based on the total number of cpus available and the model requirement for best performance.
             Users generally don't need to set this value
-        num_gpus: int, default = "auto"
+        num_gpus: int | str, default = "auto"
             The total amount of gpus you want AutoGluon predictor to use.
             Auto means AutoGluon will make the decision based on the total number of gpus available and the model requirement for best performance.
             Users generally don't need to set this value
@@ -937,8 +938,6 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         """
         if self.is_fit:
             raise AssertionError("Predictor is already fit! To fit additional models, refer to `predictor.fit_extra`, or create a new `Predictor`.")
-        kwargs_orig = kwargs.copy()
-        kwargs = self._validate_fit_kwargs(kwargs)
 
         verbosity = kwargs.get("verbosity", self.verbosity)
         set_logger_verbosity(verbosity)
@@ -958,13 +957,21 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 "\tpresets='medium_quality' : Fast training time, ideal for initial prototyping.",
             )
 
+        kwargs_orig = kwargs.copy()
+
         if verbosity >= 3:
             logger.log(20, "============ fit kwarg info ============")
             logger.log(20, "User Specified kwargs:")
             logger.log(20, f"{pprint.pformat(kwargs_orig)}")
+
+        kwargs = self._validate_fit_kwargs(kwargs=kwargs)
+
+        if verbosity >= 3:
             logger.log(20, "Full kwargs:")
             logger.log(20, f"{pprint.pformat(kwargs)}")
             logger.log(20, "========================================")
+
+        self._validate_calibrate_decision_threshold(calibrate_decision_threshold=calibrate_decision_threshold)
 
         holdout_frac = kwargs["holdout_frac"]
         num_bag_folds = kwargs["num_bag_folds"]
@@ -1432,6 +1439,19 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             else:
                 logger.log(30, "WARNING: `calibrate=True` is only applicable to classification or quantile regression problems. Skipping calibration...")
 
+        if isinstance(calibrate_decision_threshold, str) and calibrate_decision_threshold == "auto":
+            calibrate_decision_threshold = self._can_calibrate_decision_threshold()
+            if calibrate_decision_threshold and self.eval_metric.name == "precision":
+                # precision becomes undefined when no true positives exist.
+                # This interacts weirdly with threshold calibration where val score will be 1.0, but test score can be 0.0 due to being undefined.
+                calibrate_decision_threshold = False
+                logger.log(
+                    30,
+                    f"Disabling decision threshold calibration for metric `precision` to avoid undefined results. "
+                    f"Force calibration via specifying `calibrate_decision_threshold=True`.",
+                )
+            elif calibrate_decision_threshold:
+                logger.log(20, f"Enabling decision threshold calibration (calibrate_decision_threshold='auto', metric is valid, problem_type is 'binary')")
         if calibrate_decision_threshold:
             if self.problem_type != BINARY:
                 logger.log(30, "WARNING: `calibrate_decision_threshold=True` is only applicable to binary classification. Skipping calibration...")
@@ -1444,6 +1464,9 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
         if save_space:
             self.save_space()
+
+    def _can_calibrate_decision_threshold(self) -> bool:
+        return self.eval_metric.needs_class and self.problem_type == BINARY
 
     # TODO: Consider adding infer_limit to fit_extra
     def fit_extra(
@@ -3370,7 +3393,8 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         data: str | TabularDataset | pd.DataFrame | None = None,
         metric: str | Scorer | None = None,
         model: str = "best",
-        decision_thresholds: int | List[float] = 50,
+        decision_thresholds: int | List[float] = 25,
+        secondary_decision_thresholds: int | None = 19,
         subsample_size: int | None = 1000000,
         verbose: bool = True,
     ) -> float:
@@ -3396,10 +3420,16 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         model : str, default = 'best'
             The model to use prediction probabilities of when calibrating the threshold.
             If 'best', will use `predictor.model_best`.
-        decision_thresholds : Union[int, List[float]], default = 50
+        decision_thresholds : int | List[float], default = 25
             The number of decision thresholds on either side of `0.5` to search.
-            The default of 50 will result in 101 searched thresholds: [0.00, 0.01, 0.02, ..., 0.49, 0.50, 0.51, ..., 0.98, 0.99, 1.00]
+            The default of 25 will result in 51 searched thresholds: [0.00, 0.02, 0.04, ..., 0.48, 0.50, 0.52, ..., 0.96, 0.98, 1.00]
             Alternatively, a list of decision thresholds can be passed and only the thresholds in the list will be searched.
+        secondary_decision_thresholds : int | None, default = 19
+            The number of secondary decision thresholds to check on either side of the threshold identified in the first phase.
+            Skipped if None.
+            For example, if decision_thresholds=50 and 0.14 was identified as the optimal threshold, while secondary_decision_threshold=9,
+                Then the following additional thresholds are checked:
+                    [0.131, 0.132, 0.133, 0.134, 0.135, 0.136, 0.137, 0.138, 0.139, 0.141, 0.142, 0.143, 0.144, 0.145, 0.146, 0.147, 0.148, 0.149]
         subsample_size : int | None, default = 1000000
             When `subsample_size` is not None and `data` contains more rows than `subsample_size`, samples to `subsample_size` rows to speed up calibration.
             Usually it is not necessary to use more than 1 million rows for calibration.
@@ -3437,6 +3467,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             metric=metric,
             model=model,
             decision_thresholds=decision_thresholds,
+            secondary_decision_thresholds=secondary_decision_thresholds,
             subsample_size=subsample_size,
             verbose=verbose,
         )
@@ -4116,24 +4147,44 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             self._trainer: AbstractTrainer = self._learner.load_trainer()  # Trainer object
 
     @classmethod
-    def _load_version_file(cls, path) -> str:
+    def _load_version_file(cls, path: str) -> str:
+        """
+        Loads the version file that is part of the saved predictor artifact.
+        The version file contains a string matching `predictor._learner.version`.
+
+        Parameters
+        ----------
+        path: str
+            The path that would be used to load the predictor via `predictor.load(path)`
+
+        Returns
+        -------
+        The version of AutoGluon used to fit the predictor, as a string.
+
+        """
         version_file_path = os.path.join(path, cls._predictor_version_file_name)
-        version = load_str.load(path=version_file_path)
+        try:
+            version = load_str.load(path=version_file_path)
+        except:
+            # Loads the old version file used in `autogluon.tabular<=1.1.0`, named `__version__`.
+            # This file name was changed because Kaggle does not allow uploading files named `__version__`.
+            version_file_path = os.path.join(path, "__version__")
+            version = load_str.load(path=version_file_path)
         return version
 
     @classmethod
-    def _load_metadata_file(cls, path: str, silent=True):
+    def _load_metadata_file(cls, path: str, silent: bool = True):
         metadata_file_path = os.path.join(path, cls._predictor_metadata_file_name)
         return load_json.load(path=metadata_file_path, verbose=not silent)
 
-    def _save_version_file(self, silent=False):
+    def _save_version_file(self, silent: bool = False):
         from ..version import __version__
 
         version_file_contents = f"{__version__}"
         version_file_path = os.path.join(self.path, self._predictor_version_file_name)
         save_str.save(path=version_file_path, data=version_file_contents, verbose=not silent)
 
-    def _save_metadata_file(self, silent=False):
+    def _save_metadata_file(self, silent: bool = False):
         """
         Save metadata json file to disk containing information such as
         python version, autogluon version, installed packages, operating system, etc.
@@ -4146,7 +4197,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         if not silent:
             logger.log(15, f"Saving {metadata_file_path}")
 
-    def save(self, silent=False):
+    def save(self, silent: bool = False):
         """
         Save this Predictor to file in directory specified by this Predictor's `path`.
         Note that :meth:`TabularPredictor.fit` already saves the predictor object automatically
@@ -4175,7 +4226,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             logger.log(20, f'TabularPredictor saved. To load, use: predictor = TabularPredictor.load("{self.path}")')
 
     @classmethod
-    def _load(cls, path: str):
+    def _load(cls, path: str) -> "TabularPredictor":
         """
         Inner load method, called in `load`.
         """
@@ -4185,7 +4236,14 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         return predictor
 
     @classmethod
-    def load(cls, path: str, verbosity: int = None, require_version_match: bool = True, require_py_version_match: bool = True, check_packages: bool = False):
+    def load(
+        cls,
+        path: str,
+        verbosity: int = None,
+        require_version_match: bool = True,
+        require_py_version_match: bool = True,
+        check_packages: bool = False,
+    ) -> "TabularPredictor":
         """
         Load a TabularPredictor object previously produced by `fit()` from file and returns this object. It is highly recommended the predictor be loaded with the exact AutoGluon version it was fit with.
 
@@ -4209,6 +4267,15 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         check_packages : bool, default = False
             If True, checks package versions of the loaded predictor against the package versions of the current environment.
             Warnings will be logged for each mismatch of package version.
+
+        Returns
+        -------
+        predictor : TabularPredictor
+
+        Examples
+        --------
+        >>> predictor = TabularPredictor.load(path_to_predictor)
+
         """
         if verbosity is not None:
             set_logger_verbosity(verbosity)  # Reset logging after load (may be in new Python session)
@@ -4228,7 +4295,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         except:
             logger.warning(
                 f'WARNING: Could not find version file at "{os.path.join(path, cls._predictor_version_file_name)}".\n'
-                f"This means that the predictor was fit in a version `<=0.3.1`."
+                f"This means that the predictor was fit in an AutoGluon version `<=0.3.1`."
             )
             version_saved = None
 
@@ -4295,8 +4362,8 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             If you specified a `log_file_path` while initializing the predictor, you should use `log_file_path` to load the log file instead.
             At least one of `predictor_path` or `log_file_path` must to be specified
 
-        Return
-        ------
+        Returns
+        -------
         List[str]
             A list containing lines of the log file
         """
@@ -4332,7 +4399,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         if invalid_keys:
             raise ValueError(f"Invalid kwargs passed: {invalid_keys}\nValid kwargs: {list(valid_kwargs)}")
 
-    def _validate_fit_kwargs(self, kwargs) -> dict:
+    def _validate_fit_kwargs(self, *, kwargs: dict) -> dict:
         # TODO:
         #  Valid core_kwargs values:
         #  ag_args, ag_args_fit, ag_args_ensemble, stack_name, ensemble_type, name_suffix, time_limit
@@ -4359,6 +4426,13 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         kwargs_sanitized.update(kwargs)
 
         return kwargs_sanitized
+
+    def _validate_calibrate_decision_threshold(self, calibrate_decision_threshold):
+        valid_calibrate_decision_threshold_options = [True, False, "auto"]
+        if calibrate_decision_threshold not in valid_calibrate_decision_threshold_options:
+            raise ValueError(
+                f"`calibrate_decision_threshold` must be a value in " f"{valid_calibrate_decision_threshold_options}, but is: {calibrate_decision_threshold}"
+            )
 
     def _fit_extra_kwargs_dict(self):
         """
@@ -4683,7 +4757,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
     # TODO: Add .delete() method to easily clean-up clones?
     #  Would need to be careful that user doesn't delete important things accidentally.
     # TODO: Add .save_zip() and load_zip() methods to pack and unpack artifacts into a single file to simplify deployment code?
-    def clone(self, path: str, *, return_clone: bool = False, dirs_exist_ok: bool = False):
+    def clone(self, path: str, *, return_clone: bool = False, dirs_exist_ok: bool = False) -> str | "TabularPredictor":
         """
         Clone the predictor and all of its artifacts to a new location on local disk.
         This is ideal for use-cases where saving a snapshot of the predictor is desired before performing
@@ -4715,7 +4789,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         )
         return self.__class__.load(path=path_clone) if return_clone else path_clone
 
-    def clone_for_deployment(self, path: str, *, model: str = "best", return_clone: bool = False, dirs_exist_ok: bool = False):
+    def clone_for_deployment(self, path: str, *, model: str = "best", return_clone: bool = False, dirs_exist_ok: bool = False) -> str | "TabularPredictor":
         """
         Clone the predictor and all of its artifacts to a new location on local disk,
         then delete the clones artifacts unnecessary during prediction.
