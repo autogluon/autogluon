@@ -440,15 +440,15 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             It is recommended to only use one `quality` based preset in a given call to `fit()` as they alter many of the same arguments and are not compatible with each-other.
 
             In-depth Preset Info:
-                best_quality={'auto_stack': True}
+                best_quality={'auto_stack': True, 'dynamic_stacking': 'auto', 'hyperparameters': 'zeroshot'}
                     Best predictive accuracy with little consideration to inference time or disk usage. Achieve even better results by specifying a large time_limit value.
                     Recommended for applications that benefit from the best possible model accuracy.
 
-                high_quality={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, 'save_bag_folds': False}
-                    High predictive accuracy with fast inference. ~10x-200x faster inference and ~10x-200x lower disk usage than `best_quality`.
+                high_quality={'auto_stack': True, 'dynamic_stacking': 'auto', 'hyperparameters': 'zeroshot', 'refit_full': True, 'set_best_to_refit_full': True, 'save_bag_folds': False}
+                    High predictive accuracy with fast inference. ~8x faster inference and ~8x lower disk usage than `best_quality`.
                     Recommended for applications that require reasonable inference speed and/or model size.
 
-                good_quality={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, 'save_bag_folds': False, 'hyperparameters': 'light'}
+                good_quality={'auto_stack': True, 'dynamic_stacking': 'auto', 'hyperparameters': 'light', 'refit_full': True, 'set_best_to_refit_full': True, 'save_bag_folds': False}
                     Good predictive accuracy with very fast inference. ~4x faster inference and ~4x lower disk usage than `high_quality`.
                     Recommended for applications that require fast inference speed.
 
@@ -478,9 +478,10 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         hyperparameters : str or dict, default = 'default'
             Determines the hyperparameters used by the models.
             If `str` is passed, will use a preset hyperparameter configuration.
-                Valid `str` options: ['default', 'light', 'very_light', 'toy', 'multimodal']
-                    'default': Default AutoGluon hyperparameters intended to maximize accuracy without significant regard to inference time or disk usage.
-                    'light': Results in smaller models. Generally will make inference speed much faster and disk usage much lower, but with worse accuracy.
+                Valid `str` options: ['default', 'zeroshot', 'light', 'very_light', 'toy', 'multimodal']
+                    'default': Default AutoGluon hyperparameters intended to get strong accuracy with reasonable disk usage and inference time. Used in the 'medium_quality' preset.
+                    'zeroshot': A powerful model portfolio learned from TabRepo's ensemble simulation on 200 datasets. Contains ~100 models and is used in 'best_quality' and 'high_quality' presets.
+                    'light': Results in smaller models. Generally will make inference speed much faster and disk usage much lower, but with worse accuracy. Used in the 'good_quality' preset.
                     'very_light': Results in much smaller models. Behaves similarly to 'light', but in many cases with over 10x less disk usage and a further reduction in accuracy.
                     'toy': Results in extremely small models. Only use this when prototyping, as the model quality will be severely reduced.
                     'multimodal': [EXPERIMENTAL] Trains a multimodal transformer model alongside tabular models. Requires that some text columns appear in the data and GPU.
@@ -500,8 +501,9 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                     'AG_AUTOMM' (`MultimodalPredictor` from `autogluon.multimodal`. Supports Tabular, Text, and Image modalities. GPU is required.)
                 Experimental model options include:
                     'FT_TRANSFORMER' (Tabular Transformer, GPU is recommended. Does not scale well to >100 features.)
-                    'FASTTEXT' (FastText)
-                    'VW' (VowpalWabbit)
+                    'FASTTEXT' (FastText. Note: Has not been tested for a long time.)
+                    'TABPFN' (TabPFN. Does not scale well to >100 features or >1000 rows, and does not support regression. Extremely slow inference speed.)
+                    'VW' (VowpalWabbit. Note: Has not been tested for a long time.)
                     'AG_TEXT_NN' (Multimodal Text+Tabular model, GPU is required. Recommended to instead use its successor, 'AG_AUTOMM'.)
                     'AG_IMAGE_NN' (Image model, GPU is required. Recommended to instead use its successor, 'AG_AUTOMM'.)
                 If a certain key is missing from hyperparameters, then `fit()` will not train any models of that type. Omitting a model key from hyperparameters is equivalent to including this model key in `excluded_model_types`.
@@ -1127,14 +1129,20 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         if dynamic_stacking:
             logger.log(
                 20,
-                f"Dynamic stacking is enabled (dynamic_stacking={dynamic_stacking}). "
+                f"DyStack is enabled (dynamic_stacking={dynamic_stacking}). "
                 "AutoGluon will try to determine whether the input data is affected by stacked overfitting and enable or disable stacking as a consequence.",
             )
             num_stack_levels, time_limit = self._dynamic_stacking(**ds_args, ag_fit_kwargs=ag_fit_kwargs, ag_post_fit_kwargs=ag_post_fit_kwargs)
+            logger.info(
+                f"Starting full fit now with num_stack_levels={num_stack_levels}.\n"
+                f"\tFor future fit calls on this dataset, you can skip dynamic stacking to save time: "
+                f"`predictor.fit(..., dynamic_stacking=False, num_stack_levels={num_stack_levels})`"
+            )
 
             if (time_limit is not None) and (time_limit <= 0):
                 raise ValueError(
-                    f"Not enough time left to train models for the full fit. Consider specifying a larger time_limit. Time remaining: {time_limit}s"
+                    f"Not enough time left to train models for the full fit. "
+                    f"Consider specifying a larger time_limit or setting `dynamic_stacking=False`. Time remaining: {time_limit}s"
                 )
 
             ag_fit_kwargs["num_stack_levels"] = num_stack_levels
@@ -1172,16 +1180,17 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         org_num_stack_levels = ag_fit_kwargs["num_stack_levels"]
         ds_fit_context = os.path.join(self._learner.path_context_og, "ds_sub_fit")
         logger.info(
-            "Detecting stacked overfitting by sub-fitting AutoGluon on the input data. "
-            "That is, copies of AutoGluon will be sub-fit on subset(s) of the data. "
-            "Then, the holdout validation data is used to detect stacked overfitting."
+            "Detecting stacked overfitting via DyStack.\n"
+            "\tThis is used to identify the optimal `num_stack_levels` value. "
+            "Copies of AutoGluon will be fit on subsets of the data. "
+            "Then holdout validation data is used to detect stacked overfitting."
         )
 
         if time_limit_og is not None:
-            logger.info(f"Sub-fit(s) time limit is: {time_limit_og} seconds.")
             time_limit = int(time_limit_og * detection_time_frac)
+            logger.info(f"\tRunning DyStack for up to {time_limit}s of the {time_limit_og}s of remaining time.")
         else:
-            logger.info(f"No time limit provided.")
+            logger.info(f"\tWarning: No time limit provided for DyStack. This could take awhile.")
             time_limit = None
 
         # -- Avoid copying data
@@ -1209,12 +1218,12 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         if validation_procedure == "holdout":
             if holdout_data is None:
                 ds_fit_kwargs.update(dict(holdout_frac=holdout_frac, ds_fit_context=os.path.join(ds_fit_context, "sub_fit_ho")))
-                logger.info(f"Starting holdout-based sub-fit for dynamic stacking. Context path is: {ds_fit_kwargs['ds_fit_context']}.")
+                logger.info(f"\tStarting holdout-based sub-fit for dynamic stacking. Context path is: {ds_fit_kwargs['ds_fit_context']}.")
             else:
                 _, holdout_data, _ = self._validate_fit_data(train_data=X, tuning_data=holdout_data)
                 ds_fit_kwargs["ds_fit_context"] = os.path.join(ds_fit_context, "sub_fit_custom_ho")
                 logger.info(
-                    f"Starting holdout-based sub-fit for dynamic stacking with custom validation data. Context path is: {ds_fit_kwargs['ds_fit_context']}."
+                    f"\tStarting holdout-based sub-fit for dynamic stacking with custom validation data. Context path is: {ds_fit_kwargs['ds_fit_context']}."
                 )
 
             stacked_overfitting = self._sub_fit_memory_save_wrapper(
@@ -1234,7 +1243,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             )
             n_splits = len(splits)
             logger.info(
-                f"Starting (repeated-)cross-validation-based sub-fits for dynamic stacking. Context path is: {ds_fit_context}. "
+                f"\tStarting (repeated-)cross-validation-based sub-fits for dynamic stacking. Context path is: {ds_fit_context}. "
                 f"Run at most {n_splits} sub-fits based on {n_repeats}-repeated {n_folds}-fold cross-validation."
             )
             np.random.RandomState(42).shuffle(splits)  # shuffle splits to mix up order such that if only one of the repeats shows leakage we might stop early.
@@ -1246,7 +1255,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                     rest_time = time_limit - time_spend_sub_fits_so_far
                     sub_fit_time = int(1 / (n_splits - split_index) * rest_time)  # if we are faster, give more time to rest of the folds.
                     if sub_fit_time <= 0:
-                        logger.info(f"Stop cross-validation during dynamic stacking early as no more time left. Consider specifying a larger time_limit.")
+                        logger.info(f"\tStop cross-validation during dynamic stacking early as no more time left. Consider specifying a larger time_limit.")
                         break
                 ds_fit_kwargs.update(
                     dict(
@@ -1256,7 +1265,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                     )
                 )
                 logger.info(
-                    f"Starting sub-fit {split_index + 1}. Time limit for the sub-fit of this split is: {'unlimited' if sub_fit_time is None else sub_fit_time}."
+                    f"\tStarting sub-fit {split_index + 1}. Time limit for the sub-fit of this split is: {'unlimited' if sub_fit_time is None else sub_fit_time}."
                 )
                 stacked_overfitting = self._sub_fit_memory_save_wrapper(
                     train_data=X,
@@ -1275,29 +1284,31 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             shutil.rmtree(path=ds_fit_context)
 
         # -- Determine rest time and new num_stack_levels
-        time_spend_sub_fits = int(time.time() - time_start)
-        logger.info(f"Spend {time_spend_sub_fits} seconds for the sub-fit(s) during dynamic stacking.")
+        time_spend_sub_fits = time.time() - time_start
+        num_stack_levels = 0 if stacked_overfitting else org_num_stack_levels
+        self._stacked_overfitting_occurred = stacked_overfitting
+
+        # logger.info(f"\tSpent {time_spend_sub_fits}s for the sub-fit(s) during dynamic stacking.")
+
+        logger.info(f"\t\t{num_stack_levels}\t = Optimal   num_stack_levels (Stacked Overfitting Occurred: {self._stacked_overfitting_occurred})")
+        logger.info(f"\t\t{round(time_spend_sub_fits)}s\t = DyStack   runtime")
         if time_limit_og is None:
             time_limit_fit_full = None
         else:
-            time_limit_fit_full = int(time_limit_og - time_spend_sub_fits)
-            logger.info(f"Time left for full fit of AutoGluon: {time_limit_fit_full} seconds.")
-
-        num_stack_levels = 0 if stacked_overfitting else org_num_stack_levels
-        self._stacked_overfitting_occurred = stacked_overfitting
+            time_limit_fit_full = time_limit_og - time_spend_sub_fits
+            logger.info(f"\t\t{round(time_limit_fit_full)}s\t = Remaining runtime")
 
         # -- Revert back
         del inner_ag_fit_kwargs
         if holdout_data is None:
             ag_fit_kwargs["X"] = X
         else:
-            logger.log(20, "Concatenating holdout data from dynamic stacking to the training data for the full fit (and reset the index).")
+            logger.log(20, "\tConcatenating holdout data from dynamic stacking to the training data for the full fit (and reset the index).")
             ag_fit_kwargs["X"] = pd.concat([X, holdout_data], ignore_index=True)
 
         ag_fit_kwargs["X_val"] = X_val
         ag_fit_kwargs["X_unlabeled"] = X_unlabeled
 
-        logger.info(f"Starting full fit now with num_stack_levels {num_stack_levels}.")
         return num_stack_levels, time_limit_fit_full
 
     def _sub_fit_memory_save_wrapper(
