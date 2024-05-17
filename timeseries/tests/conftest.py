@@ -39,7 +39,7 @@ def hf_model_path(tmp_path_factory):
     This prevents inflating Hugging Face download numbers as an HTTP request is sent every time
     ``ChronosPipeline.from_pretrained`` is called.
     """
-    model_hub_id = "amazon/chronos-t5-tiny"
+    model_hub_id = "autogluon/chronos-t5-tiny"
     # get cache path for huggingface model
     cache_path = tmp_path_factory.mktemp("hf_hub_cache")
 
