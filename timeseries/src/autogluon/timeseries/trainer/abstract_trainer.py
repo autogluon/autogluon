@@ -292,6 +292,10 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         self.cache_predictions = cache_predictions
         self.hpo_results = {}
 
+        if self._cached_predictions_path.exists():
+            logger.debug(f"Removing existing cached predictions file {self._cached_predictions_path}")
+            self._cached_predictions_path.unlink()
+
     def save_train_data(self, data: TimeSeriesDataFrame, verbose: bool = True) -> None:
         path = os.path.join(self.path_data, "train.pkl")
         save_pkl.save(path=path, object=data, verbose=verbose)

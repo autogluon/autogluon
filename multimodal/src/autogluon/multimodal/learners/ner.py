@@ -50,6 +50,12 @@ class NERLearner(BaseLearner):
             pretrained=pretrained,
             validation_metric=validation_metric,
         )
+        # set the convert_to_text=True assuming there are no categorical data in NER
+        convert_to_text = {"data.categorical.convert_to_text": True}
+        if self._hyperparameters:
+            self._hyperparameters.update(convert_to_text)
+        else:
+            self._hyperparameters = convert_to_text
 
     def infer_problem_type(self, train_data: pd.DataFrame):
         return  # problem type should be provided in learner initialization

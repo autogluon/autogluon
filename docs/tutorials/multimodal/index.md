@@ -13,7 +13,12 @@ With AutoMM, users can effortlessly adapt foundation models (from popular model 
  [MMDetection](https://github.com/open-mmlab/mmdetection)) to their domain-specific data using just three lines of code. 
 Our toolkit accommodates various data types, including image, text, tabular, and document data, either individually or in combination. 
 It offers support for an array of tasks, encompassing classification, regression, object detection, named entity recognition, semantic matching, and image segmentation.
-AutoMM represents a state-of-the-art and user-friendly solution, empowering multimodal AutoML with foundation models.
+AutoMM represents a state-of-the-art and user-friendly solution, empowering multimodal AutoML with foundation models. For more details, refer to the paper below:
+
+
+Zhiqiang, Tang, Haoyang Fang, Su Zhou, Taojiannan Yang, Zihan Zhong, Tony Hu, Katrin Kirchhoff, George Karypis
+. ["AutoGluon-Multimodal (AutoMM): Supercharging Multimodal AutoML with Foundation Models"](https://arxiv.org/pdf/2404.16233), The International Conference on Automated Machine Learning (AutoML), 2024.
+
 
 ![AutoMM Introduction](https://automl-mm-bench.s3.amazonaws.com/figures/automm-intro.png)
 
