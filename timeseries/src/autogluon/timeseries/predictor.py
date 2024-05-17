@@ -146,7 +146,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
     """
 
     predictor_file_name = "predictor.pkl"
-    _predictor_version_file_name = "__version__"
+    _predictor_version_file_name = "version.txt"
     _predictor_log_file_name = "predictor_log.txt"
 
     def __init__(
@@ -1041,8 +1041,27 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
     @classmethod
     def _load_version_file(cls, path: str) -> str:
+        """
+        Loads the version file that is part of the saved predictor artifact.
+
+        Parameters
+        ----------
+        path: str
+            The path that would be used to load the predictor via `predictor.load(path)`
+
+        Returns
+        -------
+        The version of AutoGluon used to fit the predictor, as a string.
+
+        """
         version_file_path = os.path.join(path, cls._predictor_version_file_name)
-        version = load_str.load(path=version_file_path)
+        try:
+            version = load_str.load(path=version_file_path)
+        except:
+            # Loads the old version file used in `autogluon.timeseries<=1.1.0`, named `__version__`.
+            # This file name was changed because Kaggle does not allow uploading files named `__version__`.
+            version_file_path = os.path.join(path, "__version__")
+            version = load_str.load(path=version_file_path)
         return version
 
     @classmethod
@@ -1077,7 +1096,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         except:
             logger.warning(
                 f'WARNING: Could not find version file at "{os.path.join(path, cls._predictor_version_file_name)}".\n'
-                f"This means that the predictor was fit in a version `<=0.7.0`."
+                f"This means that the predictor was fit in an AutoGluon version `<=0.7.0`."
             )
             version_saved = "Unknown (Likely <=0.7.0)"
 
