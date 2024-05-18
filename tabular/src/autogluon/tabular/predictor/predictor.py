@@ -1451,7 +1451,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             logger.log(20, "Leaderboard on holdout data from dynamic stacking:")
             with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):
                 # Rename to avoid confusion for the user
-                logger.log(20, ho_leaderboard.rename({"score_test": "holdout_score"}, axis=1))
+                logger.log(20, ho_leaderboard.rename({"score_test": "score_holdout"}, axis=1))
 
         return stacked_overfitting
 
