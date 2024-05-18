@@ -5082,7 +5082,7 @@ def _sub_fit(
         logger.info("Leaderboard on holdout data from dynamic stacking:")
         with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):
             # Rename to avoid confusion for the user
-            logger.info(ho_leaderboard.rename({"score_test": "holdout_score"}, axis=1))
+            logger.info(ho_leaderboard.rename({"score_test": "score_holdout"}, axis=1))
         stacked_overfitting = check_stacked_overfitting_from_leaderboard(ho_leaderboard)
 
     logger.info(f"Stacked overfitting occurred: {stacked_overfitting}.")
