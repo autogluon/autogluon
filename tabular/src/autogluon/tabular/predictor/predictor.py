@@ -1259,7 +1259,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             )
             n_splits = len(splits)
             logger.info(
-                f"\tStarting (repeated-)cross-validation-based sub-fits for dynamic stacking. Context path is: {ds_fit_context}. "
+                f"\tStarting (repeated-)cross-validation-based sub-fits for dynamic stacking. Context path: \"{ds_fit_context}\""
                 f"Run at most {n_splits} sub-fits based on {n_repeats}-repeated {n_folds}-fold cross-validation."
             )
             np.random.RandomState(42).shuffle(splits)  # shuffle splits to mix up order such that if only one of the repeats shows leakage we might stop early.
@@ -1380,9 +1380,9 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                     return False
 
             if holdout_data is None:
-                logger.info(f"\t\tContext path: {ds_fit_kwargs['ds_fit_context']}.")
+                logger.info(f"\t\tContext path: \"{ds_fit_kwargs['ds_fit_context']}\"")
             else:
-                logger.info(f"\t\tRunning DyStack holdout-based sub-fit with custom validation data. Context path: {ds_fit_kwargs['ds_fit_context']}.")
+                logger.info(f"\t\tRunning DyStack holdout-based sub-fit with custom validation data. Context path: \"{ds_fit_kwargs['ds_fit_context']}\"")
 
             if _ds_ray is not None:
                 # Handle resources
