@@ -1158,9 +1158,9 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             )
 
             if (time_limit is not None) and (time_limit <= 0):
-                raise ValueError(
+                raise AssertionError(
                     f"Not enough time left to train models for the full fit. "
-                    f"Consider specifying a larger time_limit or setting `dynamic_stacking=False`. Time remaining: {time_limit}s"
+                    f"Consider specifying a larger time_limit or setting `dynamic_stacking=False`. Time remaining: {time_limit:.2f}s"
                 )
 
             ag_fit_kwargs["num_stack_levels"] = num_stack_levels
@@ -1298,7 +1298,10 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             del splits
 
         if clean_up_fits:
-            shutil.rmtree(path=ds_fit_context)
+            try:
+                shutil.rmtree(path=ds_fit_context)
+            except FileNotFoundError as e:
+                pass
 
         # -- Determine rest time and new num_stack_levels
         time_spend_sub_fits = time.time() - time_start
@@ -1418,7 +1421,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                     holdout_data=holdout_data_ref,
                 )
                 finished, unfinished = _ds_ray.wait([ref], num_returns=1)
-                stacked_overfitting, ho_leaderboard = _ds_ray.get(finished[0])
+                stacked_overfitting, ho_leaderboard, exception = _ds_ray.get(finished[0])
 
                 # FIXME: Add logic that does the following to switch ray's logging verbosity without adding a 5+ second overhead from shutting down the cluster.
                 # _ds_ray.shutdown()
@@ -1432,7 +1435,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             normal_fit = True
 
         if normal_fit:
-            stacked_overfitting, ho_leaderboard = _sub_fit(
+            stacked_overfitting, ho_leaderboard, exception = _sub_fit(
                 predictor=self,
                 train_data=train_data,
                 time_limit=time_limit,
@@ -1442,6 +1445,8 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 holdout_data=holdout_data,
             )
 
+        if exception is not None:
+            logger.log(40, f"Warning: Exception encountered during DyStack sub-fit:\n\t{exception}")
         if ho_leaderboard is not None:
             logger.log(20, "Leaderboard on holdout data from dynamic stacking:")
             with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):
@@ -5145,7 +5150,10 @@ def _sub_fit(
 
     predictor._learner.set_contexts(path_context=ds_fit_context)
     logger.log(20, f"Running DyStack sub-fit ...")
-    predictor._fit(ag_fit_kwargs=ag_fit_kwargs, ag_post_fit_kwargs=ag_post_fit_kwargs)
+    try:
+        predictor._fit(ag_fit_kwargs=ag_fit_kwargs, ag_post_fit_kwargs=ag_post_fit_kwargs)
+    except Exception as e:
+        return False, None, e
 
     if clean_up_fits:
         logger.log(20, f"Deleting DyStack predictor artifacts (clean_up_fits={clean_up_fits}) ...")
@@ -5169,4 +5177,4 @@ def _sub_fit(
     else:
         predictor._sub_fits.append(ds_fit_context)
 
-    return stacked_overfitting, ho_leaderboard
+    return stacked_overfitting, ho_leaderboard, None
