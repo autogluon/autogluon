@@ -1259,7 +1259,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             )
             n_splits = len(splits)
             logger.info(
-                f"\tStarting (repeated-)cross-validation-based sub-fits for dynamic stacking. Context path: \"{ds_fit_context}\""
+                f'\tStarting (repeated-)cross-validation-based sub-fits for dynamic stacking. Context path: "{ds_fit_context}"'
                 f"Run at most {n_splits} sub-fits based on {n_repeats}-repeated {n_folds}-fold cross-validation."
             )
             np.random.RandomState(42).shuffle(splits)  # shuffle splits to mix up order such that if only one of the repeats shows leakage we might stop early.
