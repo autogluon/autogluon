@@ -20,6 +20,7 @@ from autogluon.common.savers import save_json
 from autogluon.common.utils.file_utils import get_directory_size, get_directory_size_per_file
 from autogluon.common.utils.log_utils import add_log_to_file, set_logger_verbosity
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
+from autogluon.common.utils.system_info import get_ag_system_info
 from autogluon.common.utils.try_import import try_import_ray
 from autogluon.common.utils.utils import (
     check_saved_predictor_version,
@@ -943,6 +944,20 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
         verbosity = kwargs.get("verbosity", self.verbosity)
         set_logger_verbosity(verbosity)
+
+        if verbosity >= 2:
+            if verbosity == 2:
+                logger.log(20, f"Verbosity: 2 (Standard Logging)")
+            elif verbosity == 3:
+                logger.log(20, f"Verbosity: 3 (Detailed Logging)")
+            elif verbosity >= 4:
+                logger.log(20, f"Verbosity: {verbosity} (Maximum Logging)")
+
+        include_gpu_count = False
+        if verbosity >= 3:
+            include_gpu_count = True
+        sys_msg = get_ag_system_info(path=self.path, include_gpu_count=include_gpu_count)
+        logger.log(20, sys_msg)
 
         if presets:
             if not isinstance(presets, list):
