@@ -956,9 +956,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             elif verbosity >= 4:
                 logger.log(20, f"Verbosity: {verbosity} (Maximum Logging)")
 
-        include_gpu_count = False
-        if verbosity >= 3:
-            include_gpu_count = True
+        include_gpu_count = (verbosity >= 3)
         sys_msg = get_ag_system_info(path=self.path, include_gpu_count=include_gpu_count)
         logger.log(20, sys_msg)
 
@@ -1307,8 +1305,6 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         time_spend_sub_fits = time.time() - time_start
         num_stack_levels = 0 if stacked_overfitting else org_num_stack_levels
         self._stacked_overfitting_occurred = stacked_overfitting
-
-        # logger.info(f"\tSpent {time_spend_sub_fits}s for the sub-fit(s) during dynamic stacking.")
 
         logger.info(f"\t{num_stack_levels}\t = Optimal   num_stack_levels (Stacked Overfitting Occurred: {self._stacked_overfitting_occurred})")
         log_str = f"\t{round(time_spend_sub_fits)}s\t = DyStack   runtime"
