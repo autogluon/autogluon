@@ -30,7 +30,7 @@ def download_sample_dataset():
 
 
 # TODO: Pytest does not support DDP
-@pytest.mark.single_gpu
+@pytest.mark.torch_mmdet
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -89,7 +89,7 @@ def test_mmdet_object_detection_fit_basics(checkpoint_name):
 
 
 # TODO: Pytest does not support DDP
-@pytest.mark.single_gpu
+@pytest.mark.torch_mmdet
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -141,7 +141,7 @@ def test_mmdet_object_detection_inference_basics(checkpoint_name):
 
 
 # TODO: FIX DDP multi runs!
-@pytest.mark.single_gpu
+@pytest.mark.torch_mmdet
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -185,7 +185,7 @@ def test_mmdet_object_detection_inference_xywh_output(checkpoint_name):
 
 
 # TODO: FIX DDP multi runs!
-@pytest.mark.single_gpu
+@pytest.mark.torch_mmdet
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -222,7 +222,7 @@ def test_mmdet_object_detection_save_and_load(checkpoint_name):
 
 
 # TODO: FIX DDP multi runs!
-@pytest.mark.single_gpu
+@pytest.mark.torch_mmdet
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -260,7 +260,7 @@ def test_mmdet_object_detection_fit_eval_predict_df(checkpoint_name):
 
 
 # TODO: Pytest does not support DDP
-@pytest.mark.single_gpu
+@pytest.mark.torch_mmdet
 @pytest.mark.parametrize(
     "checkpoint_name",
     [
@@ -295,7 +295,7 @@ def test_mmdet_object_detection_fit_with_freeze_backbone(checkpoint_name):
 
 
 # TODO: FIX DDP multi runs!
-@pytest.mark.single_gpu
+@pytest.mark.torch_mmdet
 def test_detector_hyperparameters_consistency():
     data_dir = download_sample_dataset()
 
