@@ -1355,6 +1355,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 #  For `num_gpus`, the process will reserve the capacity and is unable to share it to child ray processes, causing a deadlock.
                 #  For `num_cpus`, the value is completely ignored by children, and they can even use more num_cpus than the parent.
                 #  Because of this, num_gpus is set to 0 here to avoid a deadlock, but num_cpus does not need to be changed.
+                #  For more info, refer to Ray documentation: https://docs.ray.io/en/latest/ray-core/tasks/nested-tasks.html#yielding-resources-while-blocked
                 ref = sub_fit_caller.options(num_cpus=num_cpus, num_gpus=0).remote(
                     predictor=predictor_ref,
                     train_data=train_data_ref,
