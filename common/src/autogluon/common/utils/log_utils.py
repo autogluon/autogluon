@@ -137,7 +137,7 @@ def fix_sklearnex_logging_if_kaggle():
     """
     global __FIXED_SKLEARNEX_LOGGING
     if (not __FIXED_SKLEARNEX_LOGGING) and _check_if_kaggle():
-        logging.getLogger('sklearnex').setLevel("WARNING")
+        logging.getLogger("sklearnex").setLevel("WARNING")
     # After the fix is performed, no need to fix again.
     __FIXED_SKLEARNEX_LOGGING = True
 

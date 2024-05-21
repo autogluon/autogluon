@@ -30,6 +30,7 @@ class KNNModel(AbstractModel):
         if self.params_aux.get("use_daal", True):
             try:
                 from sklearnex.neighbors import KNeighborsClassifier, KNeighborsRegressor
+
                 fix_sklearnex_logging_if_kaggle()  # Fix logging verbosity if in Kaggle notebook environment
 
                 # sklearnex backend for KNN seems to be 20-40x+ faster than native sklearn with no downsides.

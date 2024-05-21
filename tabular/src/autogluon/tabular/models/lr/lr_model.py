@@ -47,6 +47,7 @@ class LinearModel(AbstractModel):
             # Appears to give 20x training speedup when enabled
             try:
                 from sklearnex.linear_model import Lasso, LogisticRegression, Ridge
+
                 fix_sklearnex_logging_if_kaggle()  # Fix logging verbosity if in Kaggle notebook environment
 
                 logger.log(15, "\tUsing sklearnex LR backend...")
