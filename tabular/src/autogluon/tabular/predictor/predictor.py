@@ -956,7 +956,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             elif verbosity >= 4:
                 logger.log(20, f"Verbosity: {verbosity} (Maximum Logging)")
 
-        include_gpu_count = (verbosity >= 3)
+        include_gpu_count = verbosity >= 3
         sys_msg = get_ag_system_info(path=self.path, include_gpu_count=include_gpu_count)
         logger.log(20, sys_msg)
 
