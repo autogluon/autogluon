@@ -59,7 +59,7 @@ extras_require = {
         f"{ag.PACKAGE_NAME}.core[all]=={version}",
     ],
     "skex": [
-        "scikit-learn-intelex>=2023.0,<2024.3",  # <{N+1} upper cap, where N is the latest released minor version
+        "scikit-learn-intelex>=2023.0,<2024.5",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "imodels": [
         "imodels>=1.3.10,<1.4.0",  # 1.3.8/1.3.9 either remove/renamed attribute `complexity_` causing failures. https://github.com/csinva/imodels/issues/147
