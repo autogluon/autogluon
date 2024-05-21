@@ -1351,7 +1351,11 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
                 # Call sub fit in its own subprocess via ray
                 sub_fit_caller = _ds_ray.remote(max_calls=1)(_sub_fit)
-                ref = sub_fit_caller.options(num_cpus=num_cpus, num_gpus=num_gpus).remote(
+                # FIXME: For some reason ray does not treat `num_cpus` and `num_gpus` the same.
+                #  For `num_gpus`, the process will reserve the capacity and is unable to share it to child ray processes, causing a deadlock.
+                #  For `num_cpus`, the value is completely ignored by children, and they can even use more num_cpus than the parent.
+                #  Because of this, num_gpus is set to 0 here to avoid a deadlock, but num_cpus does not need to be changed.
+                ref = sub_fit_caller.options(num_cpus=num_cpus, num_gpus=0).remote(
                     predictor=predictor_ref,
                     train_data=train_data_ref,
                     time_limit=time_limit,
