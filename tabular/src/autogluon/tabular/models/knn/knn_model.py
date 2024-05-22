@@ -6,6 +6,7 @@ from typing import Dict, Union
 import numpy as np
 
 from autogluon.common.features.types import R_FLOAT, R_INT, S_BOOL
+from autogluon.common.utils.log_utils import fix_sklearnex_logging_if_kaggle
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.models import AbstractModel
@@ -28,8 +29,9 @@ class KNNModel(AbstractModel):
     def _get_model_type(self):
         if self.params_aux.get("use_daal", True):
             try:
-                # TODO: Add more granular switch, currently this affects all future KNN models even if they had `use_daal=False`
                 from sklearnex.neighbors import KNeighborsClassifier, KNeighborsRegressor
+
+                fix_sklearnex_logging_if_kaggle()  # Fix logging verbosity if in Kaggle notebook environment
 
                 # sklearnex backend for KNN seems to be 20-40x+ faster than native sklearn with no downsides.
                 logger.log(15, "\tUsing sklearnex KNN backend...")
