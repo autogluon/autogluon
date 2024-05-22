@@ -372,11 +372,13 @@ def _get_mmlab_installation_guide(package_name):
     if package_name == "mmdet":
         err_msg = 'Please install MMDetection by: pip install "mmdet==3.2.0".'
     elif package_name == "mmcv":
-        err_msg = 'Please install MMCV by: mim install "mmcv==2.1.0"'
+        err_msg = 'Please install MMCV by: mim install "mmcv==2.1.0".'
     elif package_name == "mmengine":
-        err_msg = 'Please install MMEngine by: mim install "mmengine<0.8"'
+        err_msg = 'Please install MMEngine by: mim install "mmengine<0.8".'
     else:
         raise ValueError("Available package_name are: mmdet, mmcv, mmengine.")
+    
+    err_msg += " Pytorch version larger than 2.1.0 is not supported yet. To use Autogluon for object detection, please downgrade PyTorch version to <=2.1.0."
 
     return err_msg
 
