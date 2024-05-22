@@ -129,7 +129,7 @@ def fix_sklearnex_logging_if_kaggle():
     """
     Fixes logging verbosity for sklearnex when in a Kaggle notebook.
     By default, sklearnex verbosity is set to `info` in Kaggle, which results in unintended logging spam.
-    This corrects this by detected if we are in a Kaggle environemnt and then setting the logger verbosity back to WARNING.
+    This corrects this by detected if we are in a Kaggle environment and then setting the logger verbosity back to WARNING.
 
     For more details, refer to the following:
         1. https://github.com/intel/scikit-learn-intelex/issues/1695#issuecomment-1948647937
