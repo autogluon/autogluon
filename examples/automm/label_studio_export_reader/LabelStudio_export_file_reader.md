@@ -101,7 +101,7 @@ The params of `from_image_classification` are as follows:
 | :-----------: | :-------: | :------: | :----------------------------------------------------------: |
 |     path      |    Str    |          |                 the path of the export file                  |
 |  ls_host_on   |  Boolean  |          | Whether user need to access some files through label-studio host. |
-| data_columns  | List[Str] |    √     | the key or column name(s) of the data.By default we use the given name from the image classfication template.If users change the name in the template, they should provide the data column names here |
+| data_columns  | List[Str] |    √     | the key or column name(s) of the data.By default we use the given name from the image classification template.If users change the name in the template, they should provide the data column names here |
 | label_columns | List[Str] |    √     | the key or column name(s) of the label, similar to the situation for data_columns |
 
 
@@ -156,7 +156,7 @@ Since there're no potential URL issues, the `ls_host_on` param is removed in cas
 |     Param     |   Type    | Optional |                         Description                          |
 | :-----------: | :-------: | :------: | :----------------------------------------------------------: |
 |     path      |    Str    |          |                 the path of the export file                  |
-| data_columns  | List[Str] |    √     | the key or column name(s) of the data.By default we use the given name from the image classfication template.If users change the name in the template, they should provide the data column names here |
+| data_columns  | List[Str] |    √     | the key or column name(s) of the data.By default we use the given name from the image classification template.If users change the name in the template, they should provide the data column names here |
 | label_columns | List[Str] |    √     | the key or column name(s) of the label, similar to the situation for data_columns |
 
 
