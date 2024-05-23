@@ -9,6 +9,7 @@ from sklearn.preprocessing import OneHotEncoder
 from autogluon.common.features.types import R_CATEGORY, R_INT, S_BOOL, S_SPARSE
 
 from .abstract import AbstractFeatureGenerator
+from .label_encoder import LabelEncoderFeatureGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,7 @@ class CatToInt:
         self.cats = dict()
         self.num_cols = None
         self._dtype = None
+        self._label_encoder = None
 
     def fit(self, X: DataFrame):
         # dtype_buffer=2 is required to avoid edge case errors with invalid self.infrequent_val in 'na+1' mode.
@@ -48,6 +50,8 @@ class CatToInt:
         elif self.infrequent_val == "na+1":
             self.infrequent_val = self.fillna_val + 1
 
+        self._label_encoder = LabelEncoderFeatureGenerator(verbosity=0)
+        self._label_encoder.fit(X=X)
         X = self.pd_to_np(X)
         self.num_cols = X.shape[1]
         for col in range(self.num_cols):
@@ -70,7 +74,19 @@ class CatToInt:
         return X
 
     def pd_to_np(self, X: DataFrame) -> np.ndarray:
-        return X.to_numpy(dtype=self._dtype, na_value=self.fillna_val, copy=True)
+        """
+        Converts pandas categoricals to a numpy ndarray of the codes of the categories.
+
+        This logic is ~1.5x slower than the identical code below:
+            return X.to_numpy(dtype=self._dtype, na_value=self.fillna_val, copy=True)
+        However, the commented out code logs RuntimeWarnings in pandas for unknown reasons, so we use the variant that doesn't trigger warnings.
+        """
+
+        X_codes = self._label_encoder.transform(X)
+
+        # codes of -1 are NaN categories
+        X_codes.replace({-1: self.fillna_val}, inplace=True)
+        return X_codes.to_numpy(dtype=self._dtype, na_value=self.fillna_val, copy=True)
 
     def _get_dtype_and_fillna(self, X: DataFrame, dtype_buffer=2):
         assert dtype_buffer >= 1, "dtype_buffer must be >= 1 or else fillna_val could be invalid."
