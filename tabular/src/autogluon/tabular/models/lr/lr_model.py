@@ -297,3 +297,7 @@ class LinearModel(AbstractModel):
         )
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
+
+    def _more_tags(self):
+        # `can_refit_full=True` because validation data isn't used during fit.
+        return {"can_refit_full": True}
