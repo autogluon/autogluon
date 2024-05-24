@@ -580,7 +580,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
             * "num_trials": How many HPO trials to run
             * "scheduler": Which scheduler to use. Valid values:
-                * "local": Local shceduler that schedules trials FIFO
+                * "local": Local scheduler that schedules trials FIFO
             * "searcher": Which searching algorithm to use. Valid values:
                 * "local_random": Uses the "random" searcher
                 * "random": Perform random search

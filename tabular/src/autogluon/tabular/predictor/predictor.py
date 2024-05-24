@@ -733,7 +733,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                         'num_trials': How many HPO trials to run
                         'scheduler': Which scheduler to use
                             Valid values:
-                                'local': Local shceduler that schedule trials FIFO
+                                'local': Local scheduler that schedule trials FIFO
                         'searcher': Which searching algorithm to use
                             'local_random': Uses the 'random' searcher
                             'random': Perform random search
