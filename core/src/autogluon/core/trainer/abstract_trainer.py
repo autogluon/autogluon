@@ -2127,7 +2127,7 @@ class AbstractTrainer:
         predict_n_time_per_row = self.get_model_attribute_full(model=model.name, attribute="predict_n_time_per_row")
         predict_n_size = self.get_model_attribute_full(model=model.name, attribute="predict_n_size", func=min)
         if predict_n_time_per_row is not None and predict_n_time_per_row != 0 and predict_n_size is not None:
-            logger.log(30, f"\t{round(1 / predict_n_time_per_row, 1)}\t = Inference  throughput (rows/s | {int(predict_n_size)} batch size)")
+            logger.log(15, f"\t{round(1 / predict_n_time_per_row, 1)}\t = Inference  throughput (rows/s | {int(predict_n_size)} batch size)")
         if model.predict_1_time is not None:
             fit_metadata = model.get_fit_metadata()
             predict_1_batch_size = fit_metadata.get("predict_1_batch_size", None)
