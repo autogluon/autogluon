@@ -786,6 +786,7 @@ class AbstractTrainer:
         use_val_cache=True,
         fit_weighted_ensemble: bool = True,
         name_extra: str | None = None,
+        calibrate_decision_threshold: str | bool | None = None,
     ) -> List[str]:
         """
         Trains auxiliary models (currently a single weighted ensemble) using the provided base models.
@@ -815,6 +816,11 @@ class AbstractTrainer:
         child_hyperparameters = None
         if name_extra is not None:
             child_hyperparameters = {"ag_args": {"name_suffix": name_extra}}
+        if calibrate_decision_threshold is not None:
+            if child_hyperparameters is None:
+                child_hyperparameters = {"calibrate_decision_threshold": calibrate_decision_threshold}
+            else:
+                child_hyperparameters["calibrate_decision_threshold"] = calibrate_decision_threshold
         return self.generate_weighted_ensemble(
             X=X_stack_preds,
             y=y,
