@@ -40,7 +40,7 @@ def test_dump_timm_image():
 
 def test_dump_hf_text():
     model_dump_path = "./hf_text_test"
-    base_model_name = "nlpaueb/legal-bert-small-uncased"
+    base_model_name = "prajjwal1/bert-tiny"
     dataset = ALL_DATASETS["ae"]
     predictor_1 = MultiModalPredictor(
         label=dataset.label_columns[0], problem_type=dataset.problem_type, eval_metric=dataset.metric
