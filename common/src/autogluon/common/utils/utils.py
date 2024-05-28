@@ -151,7 +151,7 @@ def check_saved_predictor_version(
         logger.warning(
             "WARNING: AutoGluon version differs from the version used to create the predictor! "
             "This may lead to instability and it is highly recommended the predictor be loaded "
-            "with the exact AutoGluon version it was created with."
+            "with the exact AutoGluon version it was created with. AutoGluon does not support backwards compatibility."
         )
         logger.warning(f"\tPredictor Version: {version_saved}")
         logger.warning(f"\tCurrent Version:   {version_current}")
@@ -162,7 +162,9 @@ def check_saved_predictor_version(
             raise AssertionError(
                 f"Predictor was created on version {version_saved} but is being loaded with version {version_current}. "
                 f"Please ensure the versions match to avoid instability. While it is NOT recommended, "
-                f"this error can be bypassed by specifying `require_version_match=False`."
+                f"this error can be bypassed by specifying `require_version_match=False`. "
+                f"Exceptions encountered after setting `require_version_match=False` may be very cryptic, "
+                f"and in most cases mean that the predictor is fully incompatible with the installed version."
             )
 
 
