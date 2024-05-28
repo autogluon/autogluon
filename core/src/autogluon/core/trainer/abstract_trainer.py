@@ -2019,7 +2019,7 @@ class AbstractTrainer:
         )
         return model_metadata
 
-    def _add_model(self, model: AbstractModel, stack_name: str = "core", level: int = 1, y_pred_proba_val=None, _is_refit=False) -> bool:
+    def _add_model(self, model: AbstractModel, stack_name: str = "core", level: int = 1, y_pred_proba_val=None, _is_refit=False, force_del_model=False) -> bool:
         """
         Registers the fit model in the Trainer object. Stores information such as model performance, save path, model type, and more.
         To use a model in Trainer, self._add_model must be called.
@@ -2072,7 +2072,7 @@ class AbstractTrainer:
                     )
                 self.model_graph.add_edge(base_model_name, model.name)
         self._log_model_stats(model, _is_refit=_is_refit)
-        if self.low_memory:
+        if self.low_memory or force_del_model:
             del model
         return True
 
@@ -2476,32 +2476,106 @@ class AbstractTrainer:
             time_limit_model_split = time_limit / len(models)
         else:
             time_limit_model_split = time_limit
-        for i, model in enumerate(models):
-            if isinstance(model, str):
-                model = self.load_model(model)
-            elif self.low_memory:
-                model = copy.deepcopy(model)
-            if hyperparameter_tune_kwargs is not None and isinstance(hyperparameter_tune_kwargs, dict):
-                hyperparameter_tune_kwargs_model = hyperparameter_tune_kwargs.get(model.name, None)
-            else:
-                hyperparameter_tune_kwargs_model = None
-            # TODO: Only update scores when finished, only update model as part of final models if finished!
-            if time_split:
-                time_left = time_limit_model_split
-            else:
-                if time_limit is None:
-                    time_left = None
+
+        fit_models_parallel = os.environ.get("AG_DISTRIBUTED_FIT_MODELS_PARALLEL", False)
+        if kwargs["stack_name"] != "core":
+            fit_models_parallel = False
+
+        if not fit_models_parallel:
+            for i, model in enumerate(models):
+                if isinstance(model, str):
+                    model = self.load_model(model)
+                elif self.low_memory:
+                    model = copy.deepcopy(model)
+                if hyperparameter_tune_kwargs is not None and isinstance(hyperparameter_tune_kwargs, dict):
+                    hyperparameter_tune_kwargs_model = hyperparameter_tune_kwargs.get(model.name, None)
                 else:
-                    time_start_model = time.time()
-                    time_left = time_limit - (time_start_model - time_start)
-            model_name_trained_lst = self._train_single_full(
-                X, y, model, time_limit=time_left, hyperparameter_tune_kwargs=hyperparameter_tune_kwargs_model, **kwargs
+                    hyperparameter_tune_kwargs_model = None
+                # TODO: Only update scores when finished, only update model as part of final models if finished!
+                if time_split:
+                    time_left = time_limit_model_split
+                else:
+                    if time_limit is None:
+                        time_left = None
+                    else:
+                        time_start_model = time.time()
+                        time_left = time_limit - (time_start_model - time_start)
+                model_name_trained_lst = self._train_single_full(
+                    X, y, model, time_limit=time_left, hyperparameter_tune_kwargs=hyperparameter_tune_kwargs_model,
+                    **kwargs)
+                if self.low_memory:
+                    del model
+                models_valid += model_name_trained_lst
+            return models_valid
+
+        import ray
+
+        remote_p = ray.remote(max_calls=1)(_remote_train_multi_fold)
+        ag_ray_workers = int(os.environ.get("AG_DISTRIBUTED_N_RAY_WORKERS", 1))
+        self_ref = ray.put(self)
+        X_ref = ray.put(X)
+        y_ref = ray.put(y)
+        kwargs_ref = ray.put(kwargs)
+        hyperparameter_tune_kwargs_ref = ray.put(hyperparameter_tune_kwargs)
+        job_refs = []
+
+        # Start initial jobs
+        logger.log(20, f"Scheduling work for {ag_ray_workers} many workers...")
+        for model in models[:ag_ray_workers]:
+            logger.log(20, f"Schedule model training for {model.name}")
+            result_ref = remote_p.options(num_cpus=1, num_gpus=0).remote(
+                _self=self_ref,
+                model=ray.put(model),
+                X=X_ref,
+                y=y_ref,
+                hyperparameter_tune_kwargs=hyperparameter_tune_kwargs_ref,
+                time_split=time_split,
+                time_limit_model_split=time_limit_model_split,
+                time_limit=time_limit,
+                time_start=time_start,
+                kwargs=kwargs_ref,
             )
+            job_refs.append(result_ref)
+            time.sleep(2)
 
-            if self.low_memory:
-                del model
-            models_valid += model_name_trained_lst
+        unfinished_models = models[ag_ray_workers:]
+        unfinished = job_refs
+        while unfinished:
+            # Get results - only 1 at a time
+            finished, unfinished = ray.wait(unfinished, num_returns=1)
+            model_name, model_path, model_type = ray.get(finished[0])
+            logger.log(20, f"Finished all jobs for {model_name}.")
+            # Self object is not mutated during worker execution, so no need to add model to self (again)
+            self._add_model(model_type.load(path=os.path.join(self.path, model_path), reset_paths=self.reset_paths),
+                            stack_name=kwargs["stack_name"], level=kwargs["level"], force_del_model=True)
+            models_valid += [model_name]
 
+            # Stop due to time limit
+            if (time.time() - time_start) > time_limit:
+                logger.log(20, "Time limit reached for this stacking layer. Stopping model training and cancel pending tasks.")
+                for f in unfinished:
+                    ray.cancel(f)
+                break
+
+            # Re-schedule workers
+            while (len(unfinished) < ag_ray_workers) and unfinished_models:
+                logger.log(20, f"Schedule model training for {model.name}")
+                result_ref = remote_p.options(num_cpus=1, num_gpus=0).remote(
+                    _self=self_ref,
+                    model=ray.put(unfinished_models[0]),
+                    X=X_ref,
+                    y=y_ref,
+                    hyperparameter_tune_kwargs=hyperparameter_tune_kwargs_ref,
+                    time_split=time_split,
+                    time_limit_model_split=time_limit_model_split,
+                    time_limit=time_limit,
+                    time_start=time_start,
+                    kwargs=kwargs_ref,
+                )
+                unfinished.append(result_ref)
+                unfinished_models = unfinished_models[1:]
+
+        logger.log(20, "Finished all work this stacking layer.")
         return models_valid
 
     def _train_multi(
@@ -3922,3 +3996,30 @@ class AbstractTrainer:
             assert len(quantile_levels) > 0, f"quantile_levels must not be an empty list (quantile_levels={quantile_levels})"
         else:
             assert quantile_levels is None, f"quantile_levels must be None when problem_type='{problem_type}' (quantile_levels={quantile_levels})"
+
+def _remote_train_multi_fold(*, _self, model, X, y, hyperparameter_tune_kwargs, time_split, time_limit_model_split, time_limit, time_start, kwargs):
+    if isinstance(model, str):
+        model = _self.load_model(model)
+    elif _self.low_memory:
+        model = copy.deepcopy(model)
+    if hyperparameter_tune_kwargs is not None and isinstance(hyperparameter_tune_kwargs, dict):
+        hyperparameter_tune_kwargs_model = hyperparameter_tune_kwargs.get(model.name, None)
+    else:
+        hyperparameter_tune_kwargs_model = None
+    # TODO: Only update scores when finished, only update model as part of final models if finished!
+    if time_split:
+        time_left = time_limit_model_split
+    else:
+        if time_limit is None:
+            time_left = None
+        else:
+            time_start_model = time.time()
+            time_left = time_limit - (time_start_model - time_start)
+    model_name = _self._train_single_full(
+        X, y, model, time_limit=time_left, hyperparameter_tune_kwargs=hyperparameter_tune_kwargs_model, **kwargs
+    )[0]
+
+    if _self.low_memory:
+        del model
+
+    return model_name, _self.get_model_attribute(model=model_name, attribute="path"), _self.get_model_attribute(model=model_name, attribute="type")
