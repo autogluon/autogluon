@@ -8,6 +8,7 @@ from autogluon.common.utils.try_import import try_import_ray
 
 try_import_ray()  # try import ray before importing the remaining contents so we can give proper error messages
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Callable, List, Optional, Union
 
 import ray
@@ -264,13 +265,17 @@ def run(
         tune_config_kwargs = dict()
     if run_config_kwargs is None:
         run_config_kwargs = dict()
+
+    # storage_path needs to be an absolute path starting in Ray 2.7+
+    #  https://github.com/ultralytics/ultralytics/issues/4980#issuecomment-1741684208
+    storage_path = str(Path(os.path.dirname(save_dir)).resolve())
     tuner = tune.Tuner(
         tune.with_resources(tune.with_parameters(trainable, **trainable_args), resources_per_trial),
         param_space=search_space,
         tune_config=tune.TuneConfig(
             num_samples=num_samples, search_alg=searcher, scheduler=scheduler, metric=metric, mode=mode, time_budget_s=time_budget_s, **tune_config_kwargs
         ),
-        run_config=air.RunConfig(name=os.path.basename(save_dir), storage_path=os.path.dirname(save_dir), verbose=verbose, **run_config_kwargs),
+        run_config=air.RunConfig(name=os.path.basename(save_dir), storage_path=storage_path, verbose=verbose, **run_config_kwargs),
         _tuner_kwargs={"trial_name_creator": _trial_name_creator, "trial_dirname_creator": _trial_dirname_creator},
     )
     results = tuner.fit()
