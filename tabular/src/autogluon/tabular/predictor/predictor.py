@@ -4323,6 +4323,9 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         """
         Load a TabularPredictor object previously produced by `fit()` from file and returns this object. It is highly recommended the predictor be loaded with the exact AutoGluon version it was fit with.
 
+        `TabularPredictor.load()` uses the `pickle` module implicitly, which is known to be insecure. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling.
+        Never load data that could have come from an untrusted source, or that could have been tampered with. **Only load data you trust.**
+
         Parameters
         ----------
         path : str
@@ -4354,7 +4357,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
         """
         if verbosity is not None:
-            set_logger_verbosity(verbosity)  # Reset logging after load (may be in new Python session)
+            set_logger_verbosity(verbosity)  # Reset logging after load (could be in new Python session)
         if path is None:
             raise ValueError("path cannot be None in load()")
 
