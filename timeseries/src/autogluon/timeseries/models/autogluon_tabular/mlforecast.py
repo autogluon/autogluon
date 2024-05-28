@@ -373,7 +373,12 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
                 "Fallback model SeasonalNaive is used for these time series."
             )
             data_short = data.query("item_id in @short_series")
-            seasonal_naive = SeasonalNaiveModel(freq=self.freq, prediction_length=self.prediction_length)
+            seasonal_naive = SeasonalNaiveModel(
+                freq=self.freq,
+                prediction_length=self.prediction_length,
+                target=self.target,
+                quantile_levels=self.quantile_levels,
+            )
             seasonal_naive.fit(train_data=data_short)
             forecast_for_short_series = seasonal_naive.predict(data_short)
 
