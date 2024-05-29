@@ -2551,7 +2551,7 @@ class AbstractTrainer:
             models_valid += [model_name]
 
             # Stop due to time limit
-            if (time.time() - time_start) > time_limit:
+            if (time_limit is not None) and ((time.time() - time_start) > time_limit):
                 logger.log(20, "Time limit reached for this stacking layer. Stopping model training and cancel pending tasks.")
                 for f in unfinished:
                     ray.cancel(f)
