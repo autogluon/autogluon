@@ -17,6 +17,7 @@ except:
 from ..constants import BINARY, MULTICLASS, QUANTILE, REGRESSION, SOFTCLASS
 from . import classification_metrics, quantile_metrics
 from .classification_metrics import confusion_matrix
+from ..opt.calibrate_f1 import calibrate_decision_threshold_f1
 
 
 class Scorer(object, metaclass=ABCMeta):
@@ -43,12 +44,17 @@ class Scorer(object, metaclass=ABCMeta):
         The sign of the metric to ensure greater_is_better.
         For score metrics such as accuracy and r2, the sign should be 1.
         For error metrics such as log_loss and mean_squared_error, the sign should be -1.
+    calibration_func : callable, default = None
+        [Advanced] A function that takes as input (y_true, y_pred, **kwargs) and returns a decision_threshold that maximizes the metric score.
+        This will be the function called in `Scorer.calibrate_decision_threshold`.
+        Only applicable to binary classification metrics that care about thresholds, such as `f1`, `balanced_accuracy`, `accuracy`, etc.
+        If not specified, a generic unoptimized calibration method will be used that performs a 2-stage grid-search over candidate thresholds.
     kwargs : dict, optional
         kwargs to pass to score_func when called.
         For example, kwargs = {"beta": 2} when using sklearn.metrics.fbeta_score where beta is a required argument.
     """
 
-    def __init__(self, name: str, score_func: callable, optimum: float, sign: int, kwargs: dict = None):
+    def __init__(self, name: str, score_func: callable, optimum: float, sign: int, calibration_func: callable = None, kwargs: dict = None):
         self.name = name
         if kwargs is None:
             kwargs = dict()
@@ -58,6 +64,7 @@ class Scorer(object, metaclass=ABCMeta):
         if sign != 1 and sign != -1:
             raise ValueError(f"sign must be one of [1, -1], but was instead {sign}")
         self._sign = sign
+        self._calibration_func = calibration_func
         self.alias = set()
 
     def __call__(self, y_true, y_pred, sample_weight=None, **kwargs) -> float:
@@ -202,6 +209,13 @@ class Scorer(object, metaclass=ABCMeta):
     def needs_quantile(self) -> bool:
         raise NotImplementedError
 
+    def calibrate_decision_threshold(self, y_true: np.ndarray, y_pred: np.ndarray, **kwargs) -> float:
+        """
+        Given y_true and y_pred, calculates the optimal decision threshold.
+        Only valid for binary classification metrics that are sensitive to decision thresholds.
+        """
+        raise NotImplementedError
+
     score = __call__
 
 
@@ -267,6 +281,17 @@ class _ClassScorer(Scorer):
             else:
                 raise ValueError(type_true)
         return y_true, y_pred, kwargs
+
+    def calibrate_decision_threshold(self, y_true: np.ndarray, y_pred: np.ndarray, **kwargs) -> float:
+        if self._calibration_func is None:
+            return self._calibrate_decision_threshold_default(y_true=y_true, y_pred=y_pred, **kwargs)
+        else:
+            return self._calibration_func(y_true, y_pred, **kwargs)
+
+    def _calibrate_decision_threshold_default(self, y_true: np.ndarray, y_pred: np.ndarray, **kwargs):
+        from ..calibrate._decision_threshold import calibrate_decision_threshold
+        decision_threshold = calibrate_decision_threshold(y_true, y_pred, metric=self, **kwargs)
+        return decision_threshold
 
     @property
     def needs_pred(self):
@@ -413,6 +438,7 @@ def make_scorer(
     needs_class: bool = False,
     needs_threshold: bool = False,
     needs_quantile: bool = False,
+    calibration_func: callable = None,
     metric_kwargs: dict = None,
     **kwargs,
 ) -> Scorer:
@@ -468,6 +494,12 @@ def make_scorer(
         This only works for quantile regression.
         Examples: ["pinball_loss"]
 
+    calibration_func : callable, default = None
+        [Advanced] A function that takes as input (y_true, y_pred, **kwargs) and returns a decision_threshold that maximizes the metric score.
+        This will be the function called in `Scorer.calibrate_decision_threshold`.
+        Only applicable to binary classification metrics that care about thresholds, such as `f1`, `balanced_accuracy`, `accuracy`, etc.
+        If not specified, a generic unoptimized calibration method will be used that performs a 2-stage grid-search over candidate thresholds.
+
     metric_kwargs : dict
         Additional parameters to be passed to score_func, merged with kwargs if both are present.
         metric_kwargs keys will override kwargs keys if keys are shared between them.
@@ -513,6 +545,7 @@ def make_scorer(
         score_func=score_func,
         optimum=optimum,
         sign=sign,
+        calibration_func=calibration_func,
         kwargs=kwargs,
     )
 
@@ -584,7 +617,7 @@ accuracy = make_scorer("accuracy", sklearn.metrics.accuracy_score, needs_class=T
 accuracy.add_alias("acc")
 
 balanced_accuracy = make_scorer("balanced_accuracy", classification_metrics.balanced_accuracy, needs_class=True)
-f1 = make_scorer("f1", sklearn.metrics.f1_score, needs_class=True)
+f1 = make_scorer("f1", sklearn.metrics.f1_score, needs_class=True, calibration_func=calibrate_decision_threshold_f1)
 mcc = make_scorer("mcc", sklearn.metrics.matthews_corrcoef, needs_class=True)
 
 # Score functions that need decision values
@@ -686,7 +719,10 @@ for scorer in [
 
 
 for name, metric in [("precision", sklearn.metrics.precision_score), ("recall", sklearn.metrics.recall_score), ("f1", sklearn.metrics.f1_score)]:
-    globals()[name] = make_scorer(name, metric, needs_class=True)
+    kwargs = dict()
+    if name == "f1":
+        kwargs["calibration_func"] = calibrate_decision_threshold_f1
+    globals()[name] = make_scorer(name, metric, needs_class=True, **kwargs)
     _add_scorer_to_metric_dict(metric_dict=BINARY_METRICS, scorer=globals()[name])
     for average in ["macro", "micro", "weighted"]:
         qualified_name = "{0}_{1}".format(name, average)

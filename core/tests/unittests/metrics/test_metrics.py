@@ -1,4 +1,5 @@
 from math import isclose
+from typing import Tuple
 
 import numpy as np
 import pytest
@@ -6,6 +7,7 @@ import sklearn
 
 from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION
 from autogluon.core.metrics import METRICS, Scorer, make_scorer, rmse_func
+from autogluon.core.utils import get_pred_from_proba
 
 BINARY_METRICS = list(METRICS[BINARY].keys())
 MULTICLASS_METRICS = list(METRICS[MULTICLASS].keys())
@@ -161,6 +163,31 @@ def test_metrics_imperfect_regression(metric: str):
     _assert_imperfect_score(scorer=METRICS[REGRESSION][metric])
 
 
+@pytest.mark.parametrize("metric", BINARY_METRICS, ids=BINARY_METRICS)  # noqa
+def test_metrics_calibrate_decision_threshold_custom(metric: str):
+    y_true, y_pred_proba = fetch_example_y_pred_proba_binary()
+    metric = METRICS[BINARY][metric]
+    if metric._calibration_func is None:
+        return
+
+    threshold = metric.calibrate_decision_threshold(y_true, y_pred_proba)
+    threshold_naive = metric._calibrate_decision_threshold_default(y_true, y_pred_proba)
+
+    y_pred_threshold = get_pred_from_proba(
+        y_pred_proba=y_pred_proba,
+        problem_type=BINARY,
+        decision_threshold=threshold,
+    )
+    y_pred_threshold_naive = get_pred_from_proba(
+        y_pred_proba=y_pred_proba,
+        problem_type=BINARY,
+        decision_threshold=threshold_naive,
+    )
+    score_threshold = metric.score(y_true=y_true, y_pred=y_pred_threshold)
+    score_threshold_naive = metric.score(y_true=y_true, y_pred=y_pred_threshold_naive)
+    assert score_threshold >= score_threshold_naive, f"Custom threshold logic underperformed naive threshold logic for {metric.name}! This should never happen."
+
+
 def _assert_valid_scorer_classifier(scorer: Scorer):
     _assert_valid_scorer(scorer=scorer)
     num_true = sum([1 if needs else 0 for needs in [scorer.needs_proba, scorer.needs_threshold, scorer.needs_class]])
@@ -264,3 +291,215 @@ def test_invalid_scorer():
     with pytest.raises(ValueError):
         # Invalid: Specifying needs_pred=True when needs_proba=True
         make_scorer("dummy", score_func=sklearn.metrics.accuracy_score, needs_pred=True, needs_proba=True)
+
+
+def fetch_example_y_pred_proba_binary() -> Tuple[np.ndarray, np.ndarray]:
+    y_true = np.array(
+        [
+            0,
+            0,
+            1,
+            0,
+            0,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            1,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            1,
+            0,
+            1,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            0,
+            1,
+            1,
+        ]
+    )
+    y_pred_proba = np.array(
+        [
+            0.09988541,
+            0.0009847643,
+            0.9885485,
+            0.002805695,
+            0.00066008844,
+            0.8613145,
+            0.9982843,
+            0.4091767,
+            0.0015445104,
+            0.0538882,
+            0.028213877,
+            0.002600598,
+            0.01051364,
+            0.47404587,
+            0.04643202,
+            0.2615043,
+            0.4132154,
+            0.8364282,
+            0.8728589,
+            0.000566786,
+            0.29402304,
+            0.0005646895,
+            0.07163984,
+            0.002832665,
+            0.05579408,
+            0.03324698,
+            0.020024087,
+            0.017691828,
+            0.3144096,
+            0.0026646908,
+            0.0074746087,
+            0.0026268153,
+            0.15745641,
+            0.043211184,
+            0.2892855,
+            0.57701963,
+            0.042080633,
+            0.0003402038,
+            0.11204968,
+            0.18905386,
+            0.0027627628,
+            0.023044664,
+            0.10830529,
+            0.4354616,
+            0.029509429,
+            0.0006289021,
+            0.15105118,
+            0.0026147524,
+            0.054255098,
+            0.010514567,
+            0.17059574,
+            0.0005426764,
+            0.12966208,
+            0.54238737,
+            0.0025665036,
+            0.7208377,
+            0.99421173,
+            0.0067156744,
+            0.0029254658,
+            0.00041716083,
+            0.098347634,
+            0.36101213,
+            0.13895252,
+            0.9962068,
+            0.18807508,
+            0.16711129,
+            0.9966102,
+            0.0136143975,
+            0.01868336,
+            0.24376073,
+            0.022078237,
+            0.06165174,
+            0.0746088,
+            0.04368908,
+            0.0013534917,
+            0.0069359792,
+            0.014623916,
+            0.03306944,
+            0.9356479,
+            0.0004658401,
+            0.009022627,
+            0.9867372,
+            0.008184292,
+            0.9969599,
+            0.07384454,
+            0.8396382,
+            0.043205388,
+            0.7896248,
+            0.11838616,
+            0.005467606,
+            0.0017219092,
+            0.0048511866,
+            0.23898569,
+            0.027551392,
+            0.016499963,
+            0.26120213,
+            0.9600574,
+            0.0053676404,
+            0.11447967,
+            0.15039557,
+        ]
+    )
+    return y_true, y_pred_proba
