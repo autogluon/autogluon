@@ -2561,7 +2561,7 @@ class AbstractTrainer:
 
         import ray
 
-        remote_p = ray.remote(max_calls=1)(_remote_train_multi_fold)
+        remote_p = ray.remote(max_calls=1, max_retries=0, retry_exceptions=False)(_remote_train_multi_fold)
         ag_ray_workers = int(os.environ.get("AG_DISTRIBUTED_N_RAY_WORKERS", 1))
         self_ref = ray.put(self)
         X_ref = ray.put(X)
@@ -2595,11 +2595,15 @@ class AbstractTrainer:
             # Get results - only 1 at a time
             finished, unfinished = ray.wait(unfinished, num_returns=1)
             model_name, model_path, model_type = ray.get(finished[0])
-            logger.log(20, f"Finished all jobs for {model_name}.")
-            # Self object is not mutated during worker execution, so no need to add model to self (again)
-            self._add_model(model_type.load(path=os.path.join(self.path, model_path), reset_paths=self.reset_paths),
-                            stack_name=kwargs["stack_name"], level=kwargs["level"], force_del_model=True)
-            models_valid += [model_name]
+
+            if model_path is None:
+                logger.log(20, f"Model training failed for {model_name}.")
+            else:
+                logger.log(20, f"Finished all jobs for {model_name}.")
+                # Self object is not mutated during worker execution, so no need to add model to self (again)
+                self._add_model(model_type.load(path=os.path.join(self.path, model_path), reset_paths=self.reset_paths),
+                                stack_name=kwargs["stack_name"], level=kwargs["level"], force_del_model=True)
+                models_valid += [model_name]
 
             # Stop due to time limit
             if (time_limit is not None) and ((time.time() - time_start) > time_limit):
@@ -4037,6 +4041,7 @@ class AbstractTrainer:
             assert quantile_levels is None, f"quantile_levels must be None when problem_type='{problem_type}' (quantile_levels={quantile_levels})"
 
 def _remote_train_multi_fold(*, _self, model, X, y, hyperparameter_tune_kwargs, time_split, time_limit_model_split, time_limit, time_start, kwargs):
+    org_model_name = model
     if isinstance(model, str):
         model = _self.load_model(model)
     elif _self.low_memory:
@@ -4054,9 +4059,13 @@ def _remote_train_multi_fold(*, _self, model, X, y, hyperparameter_tune_kwargs, 
         else:
             time_start_model = time.time()
             time_left = time_limit - (time_start_model - time_start)
-    model_name = _self._train_single_full(
+    model_name_list = _self._train_single_full(
         X, y, model, time_limit=time_left, hyperparameter_tune_kwargs=hyperparameter_tune_kwargs_model, **kwargs
-    )[0]
+    )
+
+    if not model_name_list:
+        return org_model_name, None, None
+    model_name = model_name_list[0]
 
     if _self.low_memory:
         del model
