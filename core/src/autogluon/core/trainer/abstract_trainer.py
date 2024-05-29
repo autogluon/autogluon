@@ -2477,9 +2477,11 @@ class AbstractTrainer:
         else:
             time_limit_model_split = time_limit
 
-        fit_models_parallel = os.environ.get("AG_DISTRIBUTED_FIT_MODELS_PARALLEL", False)
+        fit_models_parallel = os.environ.get("AG_DISTRIBUTED_FIT_MODELS_PARALLEL", "False") == "True"
         if kwargs["stack_name"] != "core":
             fit_models_parallel = False
+        if os.environ.get("TMP_DISABLED_AG_DISTRIBUTED_FIT_MODELS_PARALLEL", "False") == "True":
+            fit_models_parallel=False
 
         if not fit_models_parallel:
             for i, model in enumerate(models):
@@ -2510,7 +2512,7 @@ class AbstractTrainer:
 
         import ray
 
-        remote_p = ray.remote(max_calls=1, max_retries=0, retry_exceptions=False)(_remote_train_multi_fold)
+        remote_p = ray.remote(max_calls=1, max_retries=0, retry_exceptions=False, scheduling_strategy="SPREAD")(_remote_train_multi_fold)
         ag_ray_workers = int(os.environ.get("AG_DISTRIBUTED_N_RAY_WORKERS", 1))
         self_ref = ray.put(self)
         X_ref = ray.put(X)
@@ -2536,7 +2538,7 @@ class AbstractTrainer:
                 kwargs=kwargs_ref,
             )
             job_refs.append(result_ref)
-            time.sleep(2)
+            time.sleep(0.5)
 
         unfinished_models = models[ag_ray_workers:]
         unfinished = job_refs
