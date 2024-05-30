@@ -2564,7 +2564,7 @@ class AbstractTrainer:
         import ray
 
         remote_p = ray.remote(max_calls=1, max_retries=0, retry_exceptions=False, scheduling_strategy="SPREAD")(_remote_train_multi_fold)
-        ag_ray_workers = int(os.environ.get("AG_DISTRIBUTED_N_RAY_WORKERS", 1))
+        ag_ray_workers = min(int(os.environ.get("AG_DISTRIBUTED_N_RAY_WORKERS", 1)), len(models))
         self_ref = ray.put(self)
         X_ref = ray.put(X)
         y_ref = ray.put(y)
