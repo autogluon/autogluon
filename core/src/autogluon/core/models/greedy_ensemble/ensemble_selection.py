@@ -8,7 +8,6 @@ from typing import List
 import numpy as np
 import pandas as pd
 
-from ...calibrate import calibrate_decision_threshold as _calibrate_decision_threshold
 from ...constants import PROBLEM_TYPES
 from ...metrics import log_loss, Scorer
 from ...utils import compute_weighted_metric, get_pred_from_proba
@@ -151,15 +150,13 @@ class EnsembleSelection(AbstractWeightedEnsemble):
                     # Renormalize
                     fant_ensemble_prediction[:] = fant_ensemble_prediction / fant_ensemble_prediction.sum(axis=1)[:, np.newaxis]
                 if self.calibrate_decision_threshold:
-                    threshold_optimal = _calibrate_decision_threshold(
-                        y=labels,
-                        y_pred_proba=fant_ensemble_prediction,
-                        metric=self.metric,
+                    calibrate_decision_threshold_kwargs = dict(
                         metric_kwargs=dict(sample_weight=sample_weight),
                         decision_thresholds=10,
                         secondary_decision_thresholds=4,
-                        verbose=True,
+                        verbose=False,
                     )
+                    threshold_optimal = self.metric.calibrate_decision_threshold(labels, fant_ensemble_prediction, **calibrate_decision_threshold_kwargs)
                     decision_thresholds[j] = threshold_optimal
                 else:
                     threshold_optimal = None

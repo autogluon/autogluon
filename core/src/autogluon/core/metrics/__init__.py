@@ -17,6 +17,7 @@ except:
 from ..constants import BINARY, MULTICLASS, QUANTILE, REGRESSION, SOFTCLASS
 from . import classification_metrics, quantile_metrics
 from .classification_metrics import confusion_matrix
+from ..opt.calibrate_accuracy import calibrate_decision_threshold_accuracy, calibrate_decision_threshold_balanced_accuracy
 from ..opt.calibrate_f1 import calibrate_decision_threshold_f1
 
 
@@ -214,7 +215,17 @@ class Scorer(object, metaclass=ABCMeta):
         Given y_true and y_pred, calculates the optimal decision threshold.
         Only valid for binary classification metrics that are sensitive to decision thresholds.
         """
-        raise NotImplementedError
+        if not self.needs_class:
+            raise AssertionError(f"Metric '{self.name}' does not support decision threshold calibration.")
+        if self._calibration_func is None:
+            return self._calibrate_decision_threshold_default(y_true=y_true, y_pred=y_pred, **kwargs)
+        else:
+            return self._calibration_func(y_true, y_pred, **kwargs)
+
+    def _calibrate_decision_threshold_default(self, y_true: np.ndarray, y_pred: np.ndarray, **kwargs):
+        from ..calibrate._decision_threshold import calibrate_decision_threshold
+        decision_threshold = calibrate_decision_threshold(y_true, y_pred, metric=self, **kwargs)
+        return decision_threshold
 
     score = __call__
 
@@ -281,17 +292,6 @@ class _ClassScorer(Scorer):
             else:
                 raise ValueError(type_true)
         return y_true, y_pred, kwargs
-
-    def calibrate_decision_threshold(self, y_true: np.ndarray, y_pred: np.ndarray, **kwargs) -> float:
-        if self._calibration_func is None:
-            return self._calibrate_decision_threshold_default(y_true=y_true, y_pred=y_pred, **kwargs)
-        else:
-            return self._calibration_func(y_true, y_pred, **kwargs)
-
-    def _calibrate_decision_threshold_default(self, y_true: np.ndarray, y_pred: np.ndarray, **kwargs):
-        from ..calibrate._decision_threshold import calibrate_decision_threshold
-        decision_threshold = calibrate_decision_threshold(y_true, y_pred, metric=self, **kwargs)
-        return decision_threshold
 
     @property
     def needs_pred(self):
@@ -613,10 +613,15 @@ pinball_loss.add_alias("pinball")
 
 
 # Standard Classification Scores
-accuracy = make_scorer("accuracy", sklearn.metrics.accuracy_score, needs_class=True)
+accuracy = make_scorer("accuracy", sklearn.metrics.accuracy_score, needs_class=True, calibration_func=calibrate_decision_threshold_accuracy)
 accuracy.add_alias("acc")
 
-balanced_accuracy = make_scorer("balanced_accuracy", classification_metrics.balanced_accuracy, needs_class=True)
+balanced_accuracy = make_scorer(
+    "balanced_accuracy",
+    classification_metrics.balanced_accuracy,
+    needs_class=True,
+    calibration_func=calibrate_decision_threshold_balanced_accuracy,
+)
 f1 = make_scorer("f1", sklearn.metrics.f1_score, needs_class=True, calibration_func=calibrate_decision_threshold_f1)
 mcc = make_scorer("mcc", sklearn.metrics.matthews_corrcoef, needs_class=True)
 
