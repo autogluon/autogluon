@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 
 from ...constants import PROBLEM_TYPES
-from ...metrics import log_loss, Scorer
+from ...metrics import Scorer, log_loss
 from ...utils import compute_weighted_metric, get_pred_from_proba
 
 logger = logging.getLogger(__name__)

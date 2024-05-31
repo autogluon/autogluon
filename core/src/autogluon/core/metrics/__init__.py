@@ -15,10 +15,13 @@ except:
     from sklearn.metrics.classification import _check_targets, type_of_target
 
 from ..constants import BINARY, MULTICLASS, QUANTILE, REGRESSION, SOFTCLASS
+from ..opt.calibrate_accuracy import (
+    calibrate_decision_threshold_accuracy,
+    calibrate_decision_threshold_balanced_accuracy,
+)
+from ..opt.calibrate_f1 import calibrate_decision_threshold_f1
 from . import classification_metrics, quantile_metrics
 from .classification_metrics import confusion_matrix
-from ..opt.calibrate_accuracy import calibrate_decision_threshold_accuracy, calibrate_decision_threshold_balanced_accuracy
-from ..opt.calibrate_f1 import calibrate_decision_threshold_f1
 
 
 class Scorer(object, metaclass=ABCMeta):
