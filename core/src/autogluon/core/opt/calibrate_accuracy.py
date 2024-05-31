@@ -64,7 +64,7 @@ def _calibrate_weighted_accuracy(y_true_sorted: np.ndarray, y_pred_sorted: np.nd
         # Edge case where the best score is achieved by always predicting class 1.
         threshold_opt = 0
     else:
-        # Set the threshold to a value inbetween the edge of the optimal threshold value and the previous threshold
+        # Set the threshold to a value between the edge of the optimal threshold value and the previous threshold
         # for slightly better expected generalization performance on future y_pred values between the two observed thresholds.
         # For example, if we only observe thresholds 0.5 and 0.9, and 0.9 is the best threshold, we set the threshold to 0.7,
         # anticipating that it is more likely that 0.7 threshold will get a better test score than 0.9 threshold.
