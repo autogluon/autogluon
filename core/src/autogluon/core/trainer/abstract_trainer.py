@@ -2597,11 +2597,11 @@ class AbstractTrainer:
             # Get results - only 1 at a time
             finished, unfinished = ray.wait(unfinished, num_returns=1)
             model_name, model_path, model_type = ray.get(finished[0])
-
             if model_path is None:
                 logger.log(20, f"Model training failed for {model_name}.")
             else:
-                logger.log(20, f"Finished all jobs for {model_name}.")
+                logger.log(20, f"Finished all jobs for {model_name}. "
+                               f"Time remaining for this layer {int(time.time() - time_start)}s...")
                 # Self object is not mutated during worker execution, so no need to add model to self (again)
                 self._add_model(model_type.load(path=os.path.join(self.path, model_path), reset_paths=self.reset_paths),
                                 stack_name=kwargs["stack_name"], level=kwargs["level"], force_del_model=True)
