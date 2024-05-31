@@ -220,6 +220,7 @@ class Scorer(object, metaclass=ABCMeta):
         if self._calibration_func is None:
             return self._calibrate_decision_threshold_default(y_true=y_true, y_pred=y_pred, **kwargs)
         else:
+            # FIXME: sample_weight
             return self._calibration_func(y_true, y_pred, **kwargs)
 
     def _calibrate_decision_threshold_default(self, y_true: np.ndarray, y_pred: np.ndarray, **kwargs):
