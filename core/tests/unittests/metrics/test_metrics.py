@@ -1,5 +1,4 @@
 from math import isclose
-from typing import Tuple
 
 import numpy as np
 import pytest
@@ -7,7 +6,6 @@ import sklearn
 
 from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION
 from autogluon.core.metrics import METRICS, Scorer, make_scorer, rmse_func
-from autogluon.core.utils import get_pred_from_proba
 
 BINARY_METRICS = list(METRICS[BINARY].keys())
 MULTICLASS_METRICS = list(METRICS[MULTICLASS].keys())

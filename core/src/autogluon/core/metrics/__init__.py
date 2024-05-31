@@ -225,6 +225,7 @@ class Scorer(object, metaclass=ABCMeta):
 
     def _calibrate_decision_threshold_default(self, y_true: np.ndarray, y_pred: np.ndarray, **kwargs):
         from ..calibrate._decision_threshold import calibrate_decision_threshold
+
         decision_threshold = calibrate_decision_threshold(y_true, y_pred, metric=self, **kwargs)
         return decision_threshold
 

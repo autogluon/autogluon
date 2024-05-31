@@ -392,7 +392,6 @@ def fetch_example_y_pred_proba_binary_only_neg(reverse: bool = False) -> Tuple[n
     return y_true, y_pred_proba
 
 
-
 def fetch_example_y_pred_proba_binary_with_duplicates_v1(reverse: bool = False) -> Tuple[np.ndarray, np.ndarray]:
     """
     Duplicate y_pred_proba edge case where majority of duplicates are class 0 and duplicate y_pred_proba starts with class 1

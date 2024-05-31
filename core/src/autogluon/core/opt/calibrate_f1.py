@@ -30,5 +30,5 @@ def calibrate_decision_threshold_f1(
         # for slightly better expected generalization performance on future y_pred values between the two observed thresholds.
         # For example, if we only observe thresholds 0.5 and 0.9, and 0.9 is the best threshold, we set the threshold to 0.7,
         # anticipating that it is more likely that 0.7 threshold will get a better test score than 0.9 threshold.
-        threshold_opt += (thresholds[threshold_opt_idx-1] - threshold_opt) / 2
+        threshold_opt += (thresholds[threshold_opt_idx - 1] - threshold_opt) / 2
     return threshold_opt
