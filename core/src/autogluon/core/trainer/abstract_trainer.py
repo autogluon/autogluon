@@ -2550,7 +2550,7 @@ class AbstractTrainer:
                 logger.log(20, f"Model training failed for {model_name}.")
             else:
                 logger.log(20, f"Finished all jobs for {model_name}. "
-                               f"Time remaining for this layer {int(time.time() - time_start)}s...")
+                               f"Time remaining for this layer {int(time_limit - (time.time() - time_start))}s...")
                 # Self object is not mutated during worker execution, so no need to add model to self (again)
                 self._add_model(model_type.load(path=os.path.join(self.path, model_path), reset_paths=self.reset_paths),
                                 stack_name=kwargs["stack_name"], level=kwargs["level"], force_del_model=True)
@@ -2565,7 +2565,7 @@ class AbstractTrainer:
 
             # Re-schedule workers
             while (len(unfinished) < ag_ray_workers) and unfinished_models:
-                logger.log(20, f"Schedule model training for {model.name}")
+                logger.log(20, f"Schedule model training for {unfinished_models[0]}")
                 result_ref = remote_p.options(num_cpus=1, num_gpus=0).remote(
                     _self=self_ref,
                     model=ray.put(unfinished_models[0]),
