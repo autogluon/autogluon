@@ -30,8 +30,8 @@ from . import (
     SeasonalNaiveModel,
     SimpleFeedForwardModel,
     TemporalFusionTransformerModel,
-    TiDEModel,
     ThetaModel,
+    TiDEModel,
     WaveNetModel,
     ZeroModel,
 )
