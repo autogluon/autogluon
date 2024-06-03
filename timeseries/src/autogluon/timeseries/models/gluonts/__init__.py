@@ -4,6 +4,7 @@ from .torch.models import (
     PatchTSTModel,
     SimpleFeedForwardModel,
     TemporalFusionTransformerModel,
+    TiDEModel,
     WaveNetModel,
 )
 
@@ -13,5 +14,6 @@ __all__ = [
     "PatchTSTModel",
     "SimpleFeedForwardModel",
     "TemporalFusionTransformerModel",
+    "TiDEModel",
     "WaveNetModel",
 ]

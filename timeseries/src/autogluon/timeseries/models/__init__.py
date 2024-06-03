@@ -6,6 +6,7 @@ from .gluonts import (
     PatchTSTModel,
     SimpleFeedForwardModel,
     TemporalFusionTransformerModel,
+    TiDEModel,
     WaveNetModel,
 )
 from .local import (
@@ -55,6 +56,7 @@ __all__ = [
     "SimpleFeedForwardModel",
     "TemporalFusionTransformerModel",
     "ThetaModel",
+    "TiDEModel",
     "WaveNetModel",
     "ZeroModel",
 ]
