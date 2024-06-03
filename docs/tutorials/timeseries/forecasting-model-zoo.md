@@ -66,6 +66,7 @@ Note that some of the models' hyperparameters have names and default values that
    PatchTSTModel
    SimpleFeedForwardModel
    TemporalFusionTransformerModel
+   TiDEModel
    WaveNetModel
    DirectTabularModel
    RecursiveTabularModel
@@ -228,6 +229,14 @@ Deep learning models use neural networks to capture complex patterns in the data
 
 
 ```{eval-rst}
+.. autoclass:: TiDEModel
+   :members: init
+
+
+```
+
+
+```{eval-rst}
 .. autoclass:: WaveNetModel
    :members: init
 
@@ -302,6 +311,10 @@ Models not included in this table currently do not support any additional featur
      - ✅
      - ✅
      - ✅
+   * - :class:`~autogluon.timeseries.models.TiDEModel`
+     - ✅
+     - ✅
+     - 
    * - :class:`~autogluon.timeseries.models.WaveNetModel`
      - ✅
      - ✅
