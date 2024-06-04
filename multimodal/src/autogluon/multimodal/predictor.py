@@ -771,6 +771,13 @@ class MultiModalPredictor:
         collapses in the middle, it can load the `last.ckpt` checkpoint by setting `resume=True`.
         It also supports loading one specific checkpoint given its path.
 
+        .. warning::
+
+            :meth:`autogluon.multimodal.MultiModalPredictor.load` uses `pickle` module implicitly, which is known to
+            be unsecure. It is possible to construct malicious pickle data which will execute arbitrary code during
+            unpickling. Never load data that could have come from an untrusted source, or that could have been tampered
+            with. **Only load data you trust.**
+
         Parameters
         ----------
         path

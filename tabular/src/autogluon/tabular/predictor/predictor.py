@@ -4323,8 +4323,12 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         """
         Load a TabularPredictor object previously produced by `fit()` from file and returns this object. It is highly recommended the predictor be loaded with the exact AutoGluon version it was fit with.
 
-        `TabularPredictor.load()` uses the `pickle` module implicitly, which is known to be insecure. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling.
-        Never load data that could have come from an untrusted source, or that could have been tampered with. **Only load data you trust.**
+        .. warning::
+
+            :meth:`autogluon.tabular.TabularPredictor.load` uses `pickle` module implicitly, which is known to
+            be unsecure. It is possible to construct malicious pickle data which will execute arbitrary code during
+            unpickling. Never load data that could have come from an untrusted source, or that could have been tampered
+            with. **Only load data you trust.**
 
         Parameters
         ----------

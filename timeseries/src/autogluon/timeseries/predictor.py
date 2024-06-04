@@ -1068,6 +1068,13 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
     def load(cls, path: Union[str, Path], require_version_match: bool = True) -> "TimeSeriesPredictor":
         """Load an existing ``TimeSeriesPredictor`` from given ``path``.
 
+        .. warning::
+
+            :meth:`autogluon.timeseries.TimeSeriesPredictor.load` uses `pickle` module implicitly, which is known to
+            be unsecure. It is possible to construct malicious pickle data which will execute arbitrary code during
+            unpickling. Never load data that could have come from an untrusted source, or that could have been tampered
+            with. **Only load data you trust.**
+
         Parameters
         ----------
         path : str or pathlib.Path
