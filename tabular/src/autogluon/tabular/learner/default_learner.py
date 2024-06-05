@@ -79,6 +79,9 @@ class DefaultLearner(AbstractTabularLearner):
         if self.problem_type is None:
             self.problem_type = self.infer_problem_type(y=X[self.label])
         logger.log(20, f"Problem Type:       {self.problem_type}")
+        if self._eval_metric_was_str:
+            # Ensure that the eval_metric is valid for the problem_type
+            self._verify_metric(eval_metric=self.eval_metric, problem_type=self.problem_type)
         if self.groups is not None:
             num_bag_sets = 1
             num_bag_folds = len(X[self.groups].unique())

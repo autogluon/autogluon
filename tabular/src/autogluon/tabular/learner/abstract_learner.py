@@ -61,6 +61,7 @@ class AbstractTabularLearner(AbstractLearner):
             self.ignored_columns = []
         self.threshold = label_count_threshold
         self.problem_type = problem_type
+        self._eval_metric_was_str = (eval_metric is not None and isinstance(eval_metric, str))
         self.eval_metric = get_metric(eval_metric, self.problem_type, "eval_metric")
 
         if self.problem_type == QUANTILE and quantile_levels is None:
@@ -1072,6 +1073,12 @@ class AbstractTabularLearner(AbstractLearner):
             verbose=verbose,
             **kwargs,
         )
+
+    def _verify_metric(self, eval_metric: Scorer, problem_type: str):
+        """
+        Raises an exception if the eval_metric does not exist in the default metrics list for the problem type
+        """
+        get_metric(metric=eval_metric.name, problem_type=problem_type, metric_type="eval_metric")
 
     # TODO: Add data info gathering at beginning of .fit() that is used by all learners to add to get_info output
     # TODO: Add feature inference / feature engineering info to get_info output

@@ -35,7 +35,6 @@ EXPECTED_BINARY_METRICS = {
     "recall_micro",
     "recall_weighted",
     "roc_auc",
-    "roc_auc_ovo_macro",
 }
 
 EXPECTED_MULTICLASS_METRICS = {
@@ -57,7 +56,14 @@ EXPECTED_MULTICLASS_METRICS = {
     "recall_macro",
     "recall_micro",
     "recall_weighted",
+    "roc_auc_ovo",
     "roc_auc_ovo_macro",
+    "roc_auc_ovo_micro",
+    "roc_auc_ovo_weighted",
+    "roc_auc_ovr",
+    "roc_auc_ovr_macro",
+    "roc_auc_ovr_micro",
+    "roc_auc_ovr_weighted",
 }
 
 EXPECTED_REGRESSION_METRICS = {

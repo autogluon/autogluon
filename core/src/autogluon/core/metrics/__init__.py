@@ -449,7 +449,7 @@ def make_scorer(
     needs_proba : bool, default=False
         Whether score_func requires predict_proba to get probability estimates out of a classifier.
         These scorers can benefit from calibration methods such as temperature scaling.
-        Examples: ["log_loss", "roc_auc_ovo_macro", "pac"]
+        Examples: ["log_loss", "roc_auc_ovo", "roc_auc_ovr", "pac"]
 
     needs_class : bool, default=False
         Whether score_func requires class predictions (classification only).
@@ -587,13 +587,8 @@ balanced_accuracy = make_scorer("balanced_accuracy", classification_metrics.bala
 f1 = make_scorer("f1", sklearn.metrics.f1_score, needs_class=True)
 mcc = make_scorer("mcc", sklearn.metrics.matthews_corrcoef, needs_class=True)
 
-
 # Score functions that need decision values
 roc_auc = make_scorer("roc_auc", classification_metrics.customized_binary_roc_auc_score, greater_is_better=True, needs_threshold=True)
-
-roc_auc_ovo_macro = make_scorer(
-    "roc_auc_ovo_macro", sklearn.metrics.roc_auc_score, multi_class="ovo", average="macro", greater_is_better=True, needs_proba=True, needs_threshold=False
-)
 
 average_precision = make_scorer("average_precision", sklearn.metrics.average_precision_score, needs_threshold=True)
 precision = make_scorer("precision", sklearn.metrics.precision_score, needs_class=True)
@@ -665,7 +660,6 @@ for scorer in [
     accuracy,
     balanced_accuracy,
     mcc,
-    roc_auc_ovo_macro,
     log_loss,
     pac,
     quadratic_kappa,
@@ -688,6 +682,22 @@ for name, metric in [("precision", sklearn.metrics.precision_score), ("recall", 
         globals()[qualified_name] = make_scorer(qualified_name, partial(metric, pos_label=None, average=average), needs_class=True)
         _add_scorer_to_metric_dict(metric_dict=BINARY_METRICS, scorer=globals()[qualified_name])
         _add_scorer_to_metric_dict(metric_dict=MULTICLASS_METRICS, scorer=globals()[qualified_name])
+
+
+for name, metric, kwargs in [
+    ("roc_auc_ovo", sklearn.metrics.roc_auc_score, dict(multi_class="ovo")),
+    ("roc_auc_ovr", sklearn.metrics.roc_auc_score, dict(multi_class="ovr")),
+]:
+    scorer_kwargs = dict(greater_is_better=True, needs_proba=True, needs_threshold=False)
+    globals()[name] = make_scorer(name, partial(metric, average=average, **kwargs), **scorer_kwargs)
+    macro_name = "{0}_{1}".format(name, "macro")
+    globals()[name].add_alias(macro_name)
+    _add_scorer_to_metric_dict(metric_dict=MULTICLASS_METRICS, scorer=globals()[name])
+    for average in ["micro", "weighted"]:
+        qualified_name = "{0}_{1}".format(name, average)
+        globals()[qualified_name] = make_scorer(qualified_name, partial(metric, average=average, **kwargs), **scorer_kwargs)
+        _add_scorer_to_metric_dict(metric_dict=MULTICLASS_METRICS, scorer=globals()[qualified_name])
+
 
 METRICS = {
     BINARY: BINARY_METRICS,
@@ -723,11 +733,13 @@ def get_metric(metric, problem_type=None, metric_type=None) -> Scorer:
                 valid_problem_types = _get_valid_metric_problem_types(metric)
                 if valid_problem_types:
                     raise ValueError(
-                        f"{metric_type}='{metric}' is not a valid metric for problem_type='{problem_type}'. Valid problem_types for this metric: {valid_problem_types}"
+                        f"{metric_type}='{metric}' is not a valid metric for problem_type='{problem_type}'. "
+                        f"Valid problem_types for this metric: {valid_problem_types}"
+                        f"\nValid metrics for problem_type='{problem_type}':\n{list(METRICS[problem_type].keys())}"
                     )
                 else:
                     raise ValueError(
-                        f"Unknown metric '{metric}'. " f"Valid metrics for problem_type='{problem_type}':\n" f"{list(METRICS[problem_type].keys())}"
+                        f"Unknown {metric_type} '{metric}'. Valid metrics for problem_type='{problem_type}':\n{list(METRICS[problem_type].keys())}"
                     )
             return METRICS[problem_type][metric]
         for pt in METRICS:
