@@ -61,7 +61,7 @@ class AbstractTabularLearner(AbstractLearner):
             self.ignored_columns = []
         self.threshold = label_count_threshold
         self.problem_type = problem_type
-        self._eval_metric_was_str = (eval_metric is not None and isinstance(eval_metric, str))
+        self._eval_metric_was_str = eval_metric is not None and isinstance(eval_metric, str)
         self.eval_metric = get_metric(eval_metric, self.problem_type, "eval_metric")
 
         if self.problem_type == QUANTILE and quantile_levels is None:
