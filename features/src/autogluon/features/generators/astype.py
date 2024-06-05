@@ -171,7 +171,7 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
         logger.log(
             40,
             f"Exception encountered in {self.__class__.__name__} ... "
-            f"Please check if feature data types differ between train and test (via df.dtypes).\nException breakdown by feature:"
+            f"Please check if feature data types differ between train and test (via df.dtypes).\nException breakdown by feature:",
         )
         for f in self._type_map_real_opt.keys():
             f_type_out = self._type_map_real_opt[f]
