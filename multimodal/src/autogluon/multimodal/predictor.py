@@ -774,7 +774,7 @@ class MultiModalPredictor:
         .. warning::
 
             :meth:`autogluon.multimodal.MultiModalPredictor.load` uses `pickle` module implicitly, which is known to
-            be unsecure. It is possible to construct malicious pickle data which will execute arbitrary code during
+            be insecure. It is possible to construct malicious pickle data which will execute arbitrary code during
             unpickling. Never load data that could have come from an untrusted source, or that could have been tampered
             with. **Only load data you trust.**
 
