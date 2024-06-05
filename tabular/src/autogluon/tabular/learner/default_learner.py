@@ -214,7 +214,8 @@ class DefaultLearner(AbstractTabularLearner):
 
             holdout_frac = 1
 
-        if (self.eval_metric is not None) and (self.eval_metric.name in ["log_loss", "pac_score"]) and (self.problem_type == MULTICLASS):
+        if self.eval_metric is not None and self.eval_metric.needs_proba and self.problem_type == MULTICLASS:
+            # Metric requires all classes present in training to be able to compute a score
             if num_bag_folds > 0:
                 self.threshold = 2
                 if self.groups is None:

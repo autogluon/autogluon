@@ -629,6 +629,17 @@ def customized_log_loss(y_true, y_pred, eps=1e-15):
         return sklearn.metrics.log_loss(y_true.astype(np.int32), y_pred, labels=labels)
 
 
+def customized_roc_auc(y_true, y_pred, **kwargs):
+    assert y_true.ndim == 1
+    if y_pred.ndim == 1 or "labels" in kwargs:
+        return sklearn.metrics.roc_auc_score(y_true, y_pred, **kwargs)
+    else:
+        # Avoid exception if not all classes are present in y_true
+        assert y_pred.ndim == 2, "Only ndim=2 is supported"
+        labels = np.arange(y_pred.shape[1], dtype=np.int32)
+        return sklearn.metrics.roc_auc_score(y_true.astype(np.int32), y_pred, labels=labels, **kwargs)
+
+
 # Score function for probabilistic classification
 log_loss = make_scorer("log_loss", customized_log_loss, optimum=0, greater_is_better=False, needs_proba=True)
 log_loss.add_alias("nll")
@@ -685,8 +696,8 @@ for name, metric in [("precision", sklearn.metrics.precision_score), ("recall", 
 
 
 for name, metric, kwargs in [
-    ("roc_auc_ovo", sklearn.metrics.roc_auc_score, dict(multi_class="ovo")),
-    ("roc_auc_ovr", sklearn.metrics.roc_auc_score, dict(multi_class="ovr")),
+    ("roc_auc_ovo", customized_roc_auc, dict(multi_class="ovo")),
+    ("roc_auc_ovr", customized_roc_auc, dict(multi_class="ovr")),
 ]:
     scorer_kwargs = dict(greater_is_better=True, needs_proba=True, needs_threshold=False)
     globals()[name] = make_scorer(name, partial(metric, average=average, **kwargs), **scorer_kwargs)
