@@ -156,7 +156,7 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
                 #  https://stackoverflow.com/questions/49256211/how-to-set-unexpected-data-type-to-na?noredirect=1&lq=1
                 try:
                     X = X.astype(self._type_map_real_opt)
-                except ValueError as e:
+                except Exception as e:
                     self._log_invalid_dtypes(X=X)
                     raise e
         return X
