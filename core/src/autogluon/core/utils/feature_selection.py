@@ -110,7 +110,7 @@ def sort_features_by_priority(features: List[str], prev_importance_df: pd.DataFr
 
 
 class FeatureSelector:
-    def __init__(self, proxy_model, time_limit: float, problem_type: str, seed: int = 0, raise_exception=False) -> None:
+    def __init__(self, proxy_model, time_limit: float, problem_type: str, seed: int = 0, raise_exception=False, use_cross_validation: bool = False) -> None:
         """
         Parameters
         ----------
@@ -129,6 +129,7 @@ class FeatureSelector:
         assert time_limit is not None, "Time limit cannot be unspecified."
         self.is_bagged = True  # isinstance(model, BaggedEnsembleModel)
         self.proxy_model = proxy_model
+        self.use_cross_validation = use_cross_validation
         # self.model_class = model.__class__
         # self.model_params = model.get_params()
         # self.model_name = "FeatureSelector_" + self.model_params["name"]
@@ -229,6 +230,7 @@ class FeatureSelector:
         from pathlib import Path
         from copy import deepcopy
         blanket_proxy_model = deepcopy(self.proxy_model)
+        print(self.use_cross_validation)
         try:
             index = 1
             candidate_features = X.columns.tolist()
@@ -236,13 +238,13 @@ class FeatureSelector:
             self.proxy_model.set_output_path(str(Path(self.proxy_model.output_path) / "best"))
             score, fit_score_time, model_predict_time = self.proxy_model.proxy_data(
                 X_train=X, y_train=y, X_for_score=X_val, y_for_score=y_val,
-                return_funcs=["test", "fit_score_time", "predict_time"],
+                return_funcs=["val" if self.use_cross_validation else "test", "fit_score_time", "predict_time"],
                 clean_up_disk=False,
             )
             self.model_predict_time = model_predict_time
             self.fit_score_time = fit_score_time
             best_info["score"] = score
-
+            print(score)
             logger.log(
                 20,
                 f"\tRound 1 of feature pruning model fit ({round(fit_score_time, 2)}s):\n"
@@ -277,8 +279,8 @@ class FeatureSelector:
                 contender_proxy_model = deepcopy(blanket_proxy_model)
                 contender_proxy_model.set_output_path(str(Path(contender_proxy_model.output_path) / f"contender_{index}"))
                 score, fit_score_time, model_predict_time = contender_proxy_model.proxy_data(
-                    X_train=X, y_train=y, X_for_score=X_val, y_for_score=y_val,
-                    return_funcs=["test", "fit_score_time", "predict_time"],
+                    X_train= X[candidate_features], y_train=y, X_for_score=X_val[candidate_features], y_for_score=y_val,
+                    return_funcs=["val" if self.use_cross_validation else "test", "fit_score_time", "predict_time"],
                     clean_up_disk=False,
                 )
 
@@ -288,20 +290,20 @@ class FeatureSelector:
                     logger.log(
                         20,
                         f"\tRound {index} of feature pruning model fit ({round(fit_score_time, 2)}s):\n"
-                        f"\t\tValidation score of the current model fit on {new_feature_count} features ({round(score, 4)}) is better than "
-                        f"validation score of the best model fit on {prev_feature_count} features ({round(best_info['score'], 4)}). Updating model.",
+                        f"\t\tValidation score of the current model fit on {new_feature_count} features ({round(score, 6)}) is better than "
+                        f"validation score of the best model fit on {prev_feature_count} features ({round(best_info['score'], 6)}). Updating model.",
                     )
                     self.proxy_model.clean_up()
                     self.proxy_model = contender_proxy_model
                     self.model_predict_time = model_predict_time
                     self.fit_score_time = fit_score_time
-                    best_info = {"features": candidate_features, "score": score, "index": index}
+                    best_info = {"features": candidate_features, "score": score, "index": index, "model": None}
                 else:
                     logger.log(
                         20,
                         f"\tRound {index} of feature pruning model fit ({round(fit_score_time, 2)}s):\n"
-                        f"\t\tValidation score of the current model fit on {new_feature_count} features ({round(score, 4)}) is not better than "
-                        f"validation score of the best model fit on {prev_feature_count} features ({round(best_info['score'], 4)}). Retrying.",
+                        f"\t\tValidation score of the current model fit on {new_feature_count} features ({round(score, 6)}) is not better than "
+                        f"validation score of the best model fit on {prev_feature_count} features ({round(best_info['score'], 6)}). Retrying.",
                     )
 
                 time_remaining = self.time_limit - (time.time() - self.time_start)
@@ -585,5 +587,5 @@ class FeatureSelector:
                 X_val, _ = add_noise_column(X=X_val, rng=self.rng, noise_columns=noise_columns)
         else:
             assert isinstance(prune_threshold, float), "prune_threshold must be float, 'noise', or 'none'."
-        X_fi, y_fi = X_val, y_val
+        X_fi, y_fi = (X_train, y_train) if self.use_cross_validation else (X_val, y_val)
         return X_train, y_train, X_val, y_val, X_fi, y_fi, prune_threshold, noise_columns, feature_metadata
