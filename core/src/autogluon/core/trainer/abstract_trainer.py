@@ -2544,16 +2544,21 @@ class AbstractTrainer:
         unfinished = job_refs
         while unfinished:
             # Get results - only 1 at a time
-            finished, unfinished = ray.wait(unfinished, num_returns=1)
+            finished, unfinished = ray.wait(unfinished, num_returns=1, timeout=int(time_limit - (time.time() - time_start)) if time_limit is not None else None)
+            if not finished:
+                logger.log(20, "Ran into timeout while waiting for model training to finish. Stopping now.")
+                for f in unfinished:
+                    ray.cancel(f)
+                break
             model_name, model_path, model_type = ray.get(finished[0])
             if model_path is None:
-                logger.log(20, f"Model training failed for {model_name}.")
+                logger.log(20, f"Model training failed for {model_name if isinstance(model_name, str) else model_name.name}.")
             else:
                 logger.log(20, f"Finished all jobs for {model_name}. "
-                               f"Time remaining for this layer {int(time_limit - (time.time() - time_start))}s...")
+                               f"Time remaining for this layer {int(time_limit - (time.time() - time_start)) if time_limit is not None else -1}s...")
                 # Self object is not mutated during worker execution, so no need to add model to self (again)
                 self._add_model(model_type.load(path=os.path.join(self.path, model_path), reset_paths=self.reset_paths),
-                                stack_name=kwargs["stack_name"], level=kwargs["level"], force_del_model=True)
+                                stack_name=kwargs["stack_name"], level=kwargs["level"], force_del_model=False)
                 models_valid += [model_name]
 
             # Stop due to time limit
@@ -2565,7 +2570,7 @@ class AbstractTrainer:
 
             # Re-schedule workers
             while (len(unfinished) < ag_ray_workers) and unfinished_models:
-                logger.log(20, f"Schedule model training for {unfinished_models[0]}")
+                logger.log(20, f"Schedule model training for {unfinished_models[0].name}")
                 result_ref = remote_p.options(num_cpus=1, num_gpus=0).remote(
                     _self=self_ref,
                     model=ray.put(unfinished_models[0]),
