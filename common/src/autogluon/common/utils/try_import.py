@@ -130,7 +130,7 @@ def try_import_torch():
         raise ImportError(
             "Unable to import dependency torch\n"
             "A quick tip is to install via `pip install torch`.\n"
-            "The minimum torch version is currently 2.1."  # sync with core/_setup_utils.py
+            "The minimum torch version is currently 2.3."  # sync with core/_setup_utils.py
         )
 
 
