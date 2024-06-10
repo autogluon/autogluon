@@ -2524,7 +2524,6 @@ class AbstractTrainer:
         # Start initial jobs
         logger.log(20, f"Scheduling work for {ag_ray_workers} many workers...")
         for model in models[:ag_ray_workers]:
-            logger.log(20, f"Schedule model training for {model.name}")
             result_ref = remote_p.options(num_cpus=1, num_gpus=0).remote(
                 _self=self_ref,
                 model=ray.put(model),
@@ -2537,6 +2536,7 @@ class AbstractTrainer:
                 time_start=time_start,
                 kwargs=kwargs_ref,
             )
+            logger.log(20, f"Scheduled model training for {model.name}\n\t{result_ref}")
             job_refs.append(result_ref)
             time.sleep(0.5)
 
@@ -2570,7 +2570,6 @@ class AbstractTrainer:
 
             # Re-schedule workers
             while (len(unfinished) < ag_ray_workers) and unfinished_models:
-                logger.log(20, f"Schedule model training for {unfinished_models[0].name}")
                 result_ref = remote_p.options(num_cpus=1, num_gpus=0).remote(
                     _self=self_ref,
                     model=ray.put(unfinished_models[0]),
@@ -2583,6 +2582,7 @@ class AbstractTrainer:
                     time_start=time_start,
                     kwargs=kwargs_ref,
                 )
+                logger.log(20, f"Scheduled model training for {unfinished_models[0].name}\n\t{result_ref}")
                 unfinished.append(result_ref)
                 unfinished_models = unfinished_models[1:]
 
