@@ -5059,17 +5059,19 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             for model_type in params:
                 if not isinstance(params[model_type], valid_types):
                     if isinstance(params[model_type], str) and params[model_type] == "GBMLarge":
-                        extra_msg = (f"\nAttempted to specify 'GBMLarge' model preset in hyperparameters. "
-                                     f"Support for hyperparameter shorthands via strings was removed in `autogluon==1.2.0`"
-                                     f"\nYou can still train the desired 'GBMLarge' model "
-                                     f"by editing your hyperparameters dictionary, replacing 'GBMLarge' with the following:\n"
-                                     """{
+                        extra_msg = (
+                            f"\nAttempted to specify 'GBMLarge' model preset in hyperparameters. "
+                            f"Support for hyperparameter shorthands via strings was removed in `autogluon==1.2.0`"
+                            f"\nYou can still train the desired 'GBMLarge' model "
+                            f"by editing your hyperparameters dictionary, replacing 'GBMLarge' with the following:\n"
+                            """{
     "learning_rate": 0.03,
     "num_leaves": 128,
     "feature_fraction": 0.9,
     "min_data_in_leaf": 3,
     "ag_args": {"name_suffix": "Large", "priority": 0, "hyperparameter_tune_kwargs": None}
-}""")
+}"""
+                        )
                     else:
                         extra_msg = ""
                     raise AssertionError(
@@ -5080,6 +5082,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                         f"\n\tactual value: {params[model_type]}"
                         f"{extra_msg}"
                     )
+
         advanced_hyperparameter_format = is_advanced_hyperparameter_format(hyperparameters=hyperparameters)
         if advanced_hyperparameter_format:
             for stack_level in hyperparameters:

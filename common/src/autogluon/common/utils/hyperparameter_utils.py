@@ -1,5 +1,3 @@
-
-
 def is_advanced_hyperparameter_format(hyperparameters: dict) -> bool:
     """
     Returns True if hyperparameters are stack-level formatted.
