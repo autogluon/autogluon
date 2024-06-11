@@ -47,7 +47,6 @@ from ...models import (
     XTModel,
 )
 from ...models.tab_transformer.tab_transformer_model import TabTransformerModel
-from .presets_custom import get_preset_custom
 
 logger = logging.getLogger(__name__)
 
@@ -235,13 +234,7 @@ def get_preset_models(
             models_of_type = [models_of_type]
         model_cfgs_to_process = []
         for model_cfg in models_of_type:
-            if isinstance(model_cfg, str):
-                if model_type == "AG_TEXT_NN" or model_type == "AG_AUTOMM":
-                    model_cfgs_to_process.append({})
-                else:
-                    model_cfgs_to_process += get_preset_custom(name=model_cfg, problem_type=problem_type)
-            else:
-                model_cfgs_to_process.append(model_cfg)
+            model_cfgs_to_process.append(model_cfg)
         for model_cfg in model_cfgs_to_process:
             model_cfg = clean_model_cfg(
                 model_cfg=model_cfg,
@@ -290,6 +283,7 @@ def get_preset_models(
 
 
 def clean_model_cfg(model_cfg: dict, model_type=None, ag_args=None, ag_args_ensemble=None, ag_args_fit=None, problem_type=None):
+    assert isinstance(model_cfg, dict), f"Invalid model hyperparameters, expecting dict, but found {type(model_cfg)}! Value: {model_cfg}"
     model_cfg = copy.deepcopy(model_cfg)
     if AG_ARGS not in model_cfg:
         model_cfg[AG_ARGS] = dict()
