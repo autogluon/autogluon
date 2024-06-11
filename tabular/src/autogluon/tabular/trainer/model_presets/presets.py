@@ -293,6 +293,8 @@ def clean_model_cfg(model_cfg: dict, model_type=None, ag_args=None, ag_args_ense
         raise AssertionError(f"model_type was not specified for model! Model: {model_cfg}")
     model_type = model_cfg[AG_ARGS]["model_type"]
     if not inspect.isclass(model_type):
+        if model_type not in MODEL_TYPES:
+            raise AssertionError(f"Unknown model type specified in hyperparameters: '{model_type}'. Valid model types: {list(MODEL_TYPES.keys())}")
         model_type = MODEL_TYPES[model_type]
     elif not issubclass(model_type, AbstractModel):
         logger.warning(
