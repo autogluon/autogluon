@@ -626,6 +626,7 @@ def customized_log_loss(y_true, y_pred, eps=1e-15):
     else:
         assert y_pred.ndim == 2, "Only ndim=2 is supported"
         labels = np.arange(y_pred.shape[1], dtype=np.int32)
+        # FIXME: -1 used for something, why log_loss works? This is super bugged...
         return sklearn.metrics.log_loss(y_true.astype(np.int32), y_pred, labels=labels)
 
 
@@ -636,6 +637,7 @@ def customized_roc_auc(y_true, y_pred, **kwargs):
     else:
         # Avoid exception if not all classes are present in y_true
         assert y_pred.ndim == 2, "Only ndim=2 is supported"
+        # FIXME: -1 used for something, why log_loss works?
         labels = np.arange(y_pred.shape[1], dtype=np.int32)
         return sklearn.metrics.roc_auc_score(y_true.astype(np.int32), y_pred, labels=labels, **kwargs)
 
