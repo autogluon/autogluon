@@ -374,7 +374,7 @@ def _get_mmlab_installation_guide(package_name):
     elif package_name == "mmcv":
         err_msg = 'Please install MMCV by: mim install "mmcv==2.1.0"'
     elif package_name == "mmengine":
-        err_msg = 'Please install MMEngine by: mim install mmengine'
+        err_msg = "Please install MMEngine by: mim install mmengine"
     else:
         raise ValueError("Available package_name are: mmdet, mmcv, mmengine.")
 
