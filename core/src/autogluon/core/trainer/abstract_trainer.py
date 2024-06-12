@@ -1075,78 +1075,162 @@ class AbstractTrainer:
         cascade_order: List[str] = []
 
         # Compute model predictions in topological order
-        for model_name in model_pred_order:
-            if record_pred_time:
-                time_start = time.time()
+        # TODO: likely need to change this
+        parallel_predict = os.environ.get("AG_DISTRIBUTED_PREDICT_MODELS_PARALLEL", "False") == "True"
 
-            if cascade:
-                # Keep track of the iloc index of the current model for the rows that are predicted on.
-                #  iloc is used because it is a very compute efficient way to track the location of rows.
-                iloc_model_dict[model_name] = unconfident_idx
-            model = self.load_model(model_name=model_name)
-            if isinstance(model, StackerEnsembleModel):
+        if not parallel_predict:
+            for model_name in model_pred_order:
+                if record_pred_time:
+                    time_start = time.time()
+
                 if cascade:
-                    # Need to predict only on the unconfident rows that remain.
-                    #  This requires getting the correct indices from the dependent models' prior predictions.
-                    #  Because the length of predictions in prior models differs due to early exiting,
-                    #  this logic fetches the correct indices via the iloc_model_dict.
-                    cascade_dict = dict()
-                    for m in model_pred_proba_dict_cascade:
-                        # TODO: Can probably be done faster, unsure how expensive this is.
-                        cascade_dict[m] = model_pred_proba_dict_cascade[m][iloc_model_dict[model_name]]
-                    preprocess_kwargs = dict(infer=False, model_pred_proba_dict=cascade_dict)
+                    # Keep track of the iloc index of the current model for the rows that are predicted on.
+                    #  iloc is used because it is a very compute efficient way to track the location of rows.
+                    iloc_model_dict[model_name] = unconfident_idx
+                model = self.load_model(model_name=model_name)
+                if isinstance(model, StackerEnsembleModel):
+                    if cascade:
+                        # Need to predict only on the unconfident rows that remain.
+                        #  This requires getting the correct indices from the dependent models' prior predictions.
+                        #  Because the length of predictions in prior models differs due to early exiting,
+                        #  this logic fetches the correct indices via the iloc_model_dict.
+                        cascade_dict = dict()
+                        for m in model_pred_proba_dict_cascade:
+                            # TODO: Can probably be done faster, unsure how expensive this is.
+                            cascade_dict[m] = model_pred_proba_dict_cascade[m][iloc_model_dict[model_name]]
+                        preprocess_kwargs = dict(infer=False, model_pred_proba_dict=cascade_dict)
+                    else:
+                        preprocess_kwargs = dict(infer=False, model_pred_proba_dict=model_pred_proba_dict)
+                    model_pred_proba_dict[model_name] = model.predict_proba(X, **preprocess_kwargs)
                 else:
-                    preprocess_kwargs = dict(infer=False, model_pred_proba_dict=model_pred_proba_dict)
-                model_pred_proba_dict[model_name] = model.predict_proba(X, **preprocess_kwargs)
-            else:
-                model_pred_proba_dict[model_name] = model.predict_proba(X)
+                    model_pred_proba_dict[model_name] = model.predict_proba(X)
 
-            if record_pred_time:
-                time_end = time.time()
-                model_pred_time_dict[model_name] = time_end - time_start
+                if record_pred_time:
+                    time_end = time.time()
+                    model_pred_time_dict[model_name] = time_end - time_start
+
+                if cascade:
+                    if model_name in models:
+                        cascade_order.append(model_name)
+                    if self.problem_type == BINARY:
+                        tmp = np.zeros(num_rows, dtype="float32")
+                    else:
+                        tmp = np.zeros((num_rows, self.num_classes), dtype="float32")
+                    tmp[iloc_model_dict[model_name]] = model_pred_proba_dict[model_name]
+                    model_pred_proba_dict_cascade[model_name] = tmp
+                    # If model is part of cascade, keep the predictions that are confident and don't predict on these rows with further models.
+                    if model_name in models and model_name != models[-1]:
+                        pred_proba = model_pred_proba_dict[model_name]
+                        # Calculate confident predictions based on cascade threshold
+                        # TODO: Support more sophisticated methods of calculating whether to keep a prediction
+                        # TODO: Support per-model confidence specification
+                        if self.problem_type == BINARY:
+                            confident = (pred_proba >= cascade_threshold) | (pred_proba <= (1 - cascade_threshold))
+                        elif self.problem_type == MULTICLASS:
+                            confident = (pred_proba >= cascade_threshold).any(axis=1)
+                        else:
+                            raise AssertionError(f"Invalid cascade problem_type: {self.problem_type}")
+                        unconfident_cur = ~confident
+                        # Shrink X to only contain the remaining unconfident rows
+                        X = X.iloc[unconfident_cur]
+                        unconfident_idx = unconfident_idx[unconfident_cur]
+                        # If no rows remain that are unconfident, exit cascade logic early.
+                        if len(X) == 0:
+                            break
 
             if cascade:
-                if model_name in models:
-                    cascade_order.append(model_name)
+                # TODO: How should this be output?
                 if self.problem_type == BINARY:
-                    tmp = np.zeros(num_rows, dtype="float32")
+                    cascade_pred_proba = np.zeros(num_rows, dtype="float32")
                 else:
-                    tmp = np.zeros((num_rows, self.num_classes), dtype="float32")
-                tmp[iloc_model_dict[model_name]] = model_pred_proba_dict[model_name]
-                model_pred_proba_dict_cascade[model_name] = tmp
-                # If model is part of cascade, keep the predictions that are confident and don't predict on these rows with further models.
-                if model_name in models and model_name != models[-1]:
-                    pred_proba = model_pred_proba_dict[model_name]
-                    # Calculate confident predictions based on cascade threshold
-                    # TODO: Support more sophisticated methods of calculating whether to keep a prediction
-                    # TODO: Support per-model confidence specification
-                    if self.problem_type == BINARY:
-                        confident = (pred_proba >= cascade_threshold) | (pred_proba <= (1 - cascade_threshold))
-                    elif self.problem_type == MULTICLASS:
-                        confident = (pred_proba >= cascade_threshold).any(axis=1)
-                    else:
-                        raise AssertionError(f"Invalid cascade problem_type: {self.problem_type}")
-                    unconfident_cur = ~confident
-                    # Shrink X to only contain the remaining unconfident rows
-                    X = X.iloc[unconfident_cur]
-                    unconfident_idx = unconfident_idx[unconfident_cur]
-                    # If no rows remain that are unconfident, exit cascade logic early.
-                    if len(X) == 0:
-                        break
+                    cascade_pred_proba = np.zeros((num_rows, self.num_classes), dtype="float32")
+                # For each model in the cascade early exit logic from first to final, update cascade_pred_proba
+                #  with the pred_proba from that model of the rows it predicted on.
+                #  This will result in the final pred_proba of the cascade at the end of the for-loop.
+                for m in cascade_order:
+                    cascade_pred_proba[iloc_model_dict[m]] = model_pred_proba_dict[m]
+                # FIXME: Temp overwrite, unsure how we want to vend cascade results? In future maybe under its own model name.
+                model_pred_proba_dict[models[-1]] = cascade_pred_proba
+        else:
+            if cascade:
+                raise NotImplementedError("Cascade is not yet implemented for parallel predict.")
 
-        if cascade:
-            # TODO: How should this be output?
-            if self.problem_type == BINARY:
-                cascade_pred_proba = np.zeros(num_rows, dtype="float32")
-            else:
-                cascade_pred_proba = np.zeros((num_rows, self.num_classes), dtype="float32")
-            # For each model in the cascade early exit logic from first to final, update cascade_pred_proba
-            #  with the pred_proba from that model of the rows it predicted on.
-            #  This will result in the final pred_proba of the cascade at the end of the for-loop.
-            for m in cascade_order:
-                cascade_pred_proba[iloc_model_dict[m]] = model_pred_proba_dict[m]
-            # FIXME: Temp overwrite, unsure how we want to vend cascade results? In future maybe under its own model name.
-            model_pred_proba_dict[models[-1]] = cascade_pred_proba
+            # -- Init info
+            import ray
+
+            ag_ray_workers = min(int(os.environ.get("AG_DISTRIBUTED_N_RAY_WORKERS", 1)), len(model_pred_order))
+
+            # --- Get Batches
+            model_batches = {}
+            for model in model_pred_order:
+                min_models_set = self.get_minimum_model_set(model)
+                min_models_set.remove(model)
+                min_models_set = set(min_models_set)
+                model_batches[model] = hash("".join(min_models_set))
+
+            batch_hash_order = []
+            for i in [model_batches[m] for m in model_pred_order]:
+                if i in batch_hash_order:
+                    continue
+                batch_hash_order.append(i)
+
+            batches = []
+            for batch_hash in batch_hash_order:
+                batch = []
+                for model, model_batch_hash in model_batches.items():
+                    if model_batch_hash == batch_hash:
+                        batch.append(model)
+                batches.append(batch)
+
+            # -- Parallel Predict
+            remote_func = ray.remote(num_cpus=1,num_gpus=0, max_calls=50, max_retries=0, retry_exceptions=False,
+                scheduling_strategy="SPREAD")(_remote_predict)
+            self_ref = ray.put(self)
+            X_ref = ray.put(X)
+
+            for model_batch in batches:
+                job_refs = []
+                model_pred_proba_dict_ref = ray.put(model_pred_proba_dict)
+
+                for model in model_batch[:ag_ray_workers]:
+                    result_ref = remote_func.remote(
+                        _self=self_ref,
+                        model_name=model,
+                        X=X_ref,
+                        model_pred_proba_dict=model_pred_proba_dict_ref,
+                        record_pred_time=record_pred_time,
+                    )
+                    logger.log(20, f"Scheduled predicting with model for {model}\n\t{result_ref}")
+                    job_refs.append(result_ref)
+
+                unfinished_models = model_batch[ag_ray_workers:]
+                unfinished = job_refs
+                while unfinished:
+                    finished, unfinished = ray.wait(unfinished, num_returns=1)
+                    model_name, result = ray.get(finished[0])
+                    logger.log(20, f"Finished predicting with model for {model_name}")
+
+                    if record_pred_time:
+                        model_pred_proba_dict[model_name], model_pred_time_dict[model_name] = result
+                    else:
+                        model_pred_proba_dict[model_name] = result
+
+                    # Re-schedule workers
+                    while (len(unfinished) < ag_ray_workers) and unfinished_models:
+                        result_ref = remote_func.remote(
+                            _self=self_ref,
+                            model_name=unfinished_models[0],
+                            X=X_ref,
+                            model_pred_proba_dict=model_pred_proba_dict_ref,
+                            record_pred_time=record_pred_time,
+                        )
+                        logger.log(20, f"Scheduled predicting with model for {unfinished_models[0]}\n\t{result_ref}")
+                        unfinished.append(result_ref)
+                        unfinished_models = unfinished_models[1:]
+
+            # Clean up ray
+            ray.internal.free(object_refs=[self_ref, X_ref, model_pred_proba_dict_ref])
+            del self_ref, X_ref, model_pred_proba_dict_ref
 
         if record_pred_time:
             return model_pred_proba_dict, model_pred_time_dict
@@ -2481,7 +2565,7 @@ class AbstractTrainer:
         if kwargs["stack_name"] != "core":
             fit_models_parallel = False
         if os.environ.get("TMP_DISABLED_AG_DISTRIBUTED_FIT_MODELS_PARALLEL", "False") == "True":
-            fit_models_parallel=False
+            fit_models_parallel = False
 
         if not fit_models_parallel:
             for i, model in enumerate(models):
@@ -2585,6 +2669,10 @@ class AbstractTrainer:
                 logger.log(20, f"Scheduled model training for {unfinished_models[0].name}\n\t{result_ref}")
                 unfinished.append(result_ref)
                 unfinished_models = unfinished_models[1:]
+
+        # Clean up ray
+        ray.internal.free(object_refs=[self_ref, X_ref, y_ref, kwargs_ref, hyperparameter_tune_kwargs_ref])
+        del self_ref, X_ref, y_ref, kwargs_ref, hyperparameter_tune_kwargs_ref
 
         logger.log(20, "Finished all work this stacking layer.")
         return models_valid
@@ -4039,3 +4127,24 @@ def _remote_train_multi_fold(*, _self, model, X, y, hyperparameter_tune_kwargs, 
         del model
 
     return model_name, _self.get_model_attribute(model=model_name, attribute="path"), _self.get_model_attribute(model=model_name, attribute="type")
+
+
+def _remote_predict(*, _self, model_name, X, model_pred_proba_dict, record_pred_time) -> tuple[str, pd.DataFrame] | tuple[str, tuple[pd.DataFrame, float]]:
+    if record_pred_time:
+        time_start = time.time()
+
+    model = _self.load_model(model_name=model_name)
+
+    if isinstance(model, StackerEnsembleModel):
+        preprocess_kwargs = dict(infer=False, model_pred_proba_dict=model_pred_proba_dict)
+        predictions = model.parallel_remote_predict_proba(X, **preprocess_kwargs)
+    else:
+        predictions = model.parallel_remote_predict_proba(X)
+
+    if record_pred_time:
+        time_end = time.time()
+        pred_time = time_end - time_start
+
+        return model_name, (predictions, pred_time)
+
+    return  model_name, predictions
