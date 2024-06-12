@@ -460,7 +460,51 @@ class BaggedEnsembleModel(AbstractModel):
         y_pred_proba = y_pred_proba / self.n_children
         return y_pred_proba
 
-    def _predict_proba(self, X, normalize=False, **kwargs) -> np.ndarray:
+    def parallel_remote_predict_proba(self, X, normalize=False, **kwargs):
+        # FIXME: This will cause non-deterministic numerical behavior due to random order of
+        #  adding models to proba can be fixed but not that important for now.
+
+        import ray
+        X_ref = ray.put(self.preprocess(X, model=self.load_child(self.models[0]), **kwargs))
+        self_ref = ray.put(self)
+
+        remote_func = ray.remote(
+            num_cpus=self._params_aux_child.get("num_cpus", 1),
+            num_gpus=self._params_aux_child.get("num_gpus", 0),
+            max_calls=self.n_children, max_retries=0, retry_exceptions=False)(
+            _func_remote_pred_proba
+        )
+        unfinished = []
+        for model in self.models:
+            result_ref = remote_func.remote(
+                _self=self_ref,
+                model_name=model,
+                X=X_ref,
+                normalize=normalize,
+            )
+            unfinished.append(result_ref)
+
+        pred_proba = None
+        while unfinished:
+            finished, unfinished = ray.wait(unfinished, num_returns=1)
+            if pred_proba is None:
+                pred_proba = ray.get(finished[0]).copy()
+            else:
+                pred_proba += ray.get(finished[0])
+
+        pred_proba = pred_proba / self.n_children
+
+        ray.internal.free(object_refs=[self_ref, X_ref])
+        del self_ref, X_ref
+
+        # if self.params_aux.get("temperature_scalar", None) is not None:
+        #     pred_proba = self._apply_temperature_scaling(pred_proba)
+        # elif self.conformalize is not None:
+        #     pred_proba = self._apply_conformalization(pred_proba)
+
+        return pred_proba
+
+    def _predict_proba(self, X, normalize=False, **kwargs):
         return self.predict_proba(X=X, normalize=normalize, **kwargs)
 
     def score_with_oof(self, y, sample_weight=None):
@@ -1415,3 +1459,8 @@ class BaggedEnsembleModel(AbstractModel):
     def _get_tags_child(self):
         """Gets the tags of the child model."""
         return self._get_model_base()._get_tags()
+
+
+def _func_remote_pred_proba(*, _self, model_name, X, normalize):
+    model = _self.load_child(model_name)
+    return model.predict_proba(X=X, preprocess_nonadaptive=False, normalize=normalize)
