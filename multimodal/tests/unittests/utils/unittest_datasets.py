@@ -450,6 +450,14 @@ class AmazonReviewSentimentCrossLingualDataset:
     def test_df(self):
         return self._test_en_df
 
+    @property
+    def problem_type(self):
+        return BINARY
+
+    @property
+    def metric(self):
+        return "roc_auc"
+
 
 class IDChangeDetectionDataset:
     def __init__(self):

@@ -8,9 +8,12 @@ from autogluon.core.utils.loaders import load_zip
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.utils.misc import shopee_dataset
 
-from ..utils.unittest_datasets import AEDataset, PetFinderDataset
+from ..utils.unittest_datasets import AmazonReviewSentimentCrossLingualDataset, PetFinderDataset
 
-ALL_DATASETS = {"petfinder": PetFinderDataset(), "ae": AEDataset()}
+ALL_DATASETS = {
+    "petfinder": PetFinderDataset(),
+    "amazon": AmazonReviewSentimentCrossLingualDataset(),
+}
 
 
 def test_dump_timm_image():
@@ -41,7 +44,7 @@ def test_dump_timm_image():
 def test_dump_hf_text():
     model_dump_path = "./hf_text_test"
     base_model_name = "prajjwal1/bert-tiny"
-    dataset = ALL_DATASETS["ae"]
+    dataset = ALL_DATASETS["amazon"]
     predictor_1 = MultiModalPredictor(
         label=dataset.label_columns[0], problem_type=dataset.problem_type, eval_metric=dataset.metric
     )
