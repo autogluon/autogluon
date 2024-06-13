@@ -1350,15 +1350,14 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                     if force_ray_logging:
                         logger.info(
                             f"\tRunning DyStack sub-fit in a ray process to avoid memory leakage. "
-                            "Force enabling ray logging (force_ray_logging=True). "
-                            "This may lead to unwanted logging post-DyStack due to a limitation in ray."
+                            "Enabling ray logging (force_ray_logging=True)."
                         )
                         _ds_ray.init()  # TODO: This will propagate to the main fit call too, which isn't ideal.
                     else:
                         logger.info(
                             f"\tRunning DyStack sub-fit in a ray process to avoid memory leakage. "
                             "Logs will not be shown until this process is complete, due to a limitation in ray. "
-                            "You can force logging by specifying `ds_args={'force_ray_logging': True}`."
+                            "You can experimentally enable logging by specifying `ds_args={'force_ray_logging': True}`."
                         )
                         _ds_ray.init(
                             logging_level=logging.ERROR,
@@ -1453,6 +1452,20 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):
                 # Rename to avoid confusion for the user
                 logger.log(20, ho_leaderboard.rename({"score_test": "score_holdout"}, axis=1))
+
+        if not normal_fit and force_ray_logging:
+            try:
+                # Disables ray logging to avoid log spam in main process after DyStack completes
+                # This is somewhat of a hack, and needs to use private APIs of ray. It is unclear how to do this in a different way.
+                # Note: Once this is done, it cannot be undone,
+                # and the only known way to re-enable ray logging in the process is to call `ray.shutdown()` and `ray.init()`
+                _ds_ray._private.ray_logging.global_worker_stdstream_dispatcher.remove_handler("ray_print_logs")
+            except Exception as e:
+                logger.log(
+                    40,
+                    f"WARNING: ray logging verbosity fix raised an exception. Ray might give overly verbose logging output. "
+                    f"Please open a GitHub issue to notify the developers of this issue. Exception detailed below:\n{e}"
+                )
 
         return stacked_overfitting
 
@@ -5163,8 +5176,6 @@ def _sub_fit(
     except Exception as e:
         return False, None, e
 
-    if clean_up_fits:
-        logger.log(20, f"Deleting DyStack predictor artifacts (clean_up_fits={clean_up_fits}) ...")
     if not predictor.model_names():
         logger.log(20, f"Unable to determine stacked overfitting. AutoGluon's sub-fit did not successfully train any models!")
         stacked_overfitting = False
@@ -5181,6 +5192,7 @@ def _sub_fit(
     predictor._learner = learner_og
 
     if clean_up_fits:
+        logger.log(20, f"Deleting DyStack predictor artifacts (clean_up_fits={clean_up_fits}) ...")
         shutil.rmtree(path=ds_fit_context)
     else:
         predictor._sub_fits.append(ds_fit_context)
