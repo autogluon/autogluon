@@ -1466,7 +1466,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                     "WARNING: ray logging verbosity fix raised an exception. Ray might give overly verbose logging output. "
                     "Please open a GitHub issue to notify the AutoGluon developers of this issue. "
                     "You can avoid this issue by specifying `ds_args={'enable_ray_logging': False}`. Exception detailed below:"
-                    f"\n{e}"
+                    f"\n{e}",
                 )
 
         return stacked_overfitting
