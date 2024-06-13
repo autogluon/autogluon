@@ -1341,7 +1341,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         """Tries to run the sub-fit in a subprocess (managed by ray). Similar to AutoGluon's parallel fold fitting strategies,
         this code does not shut down ray after usage. Otherwise, we would also kill outer-scope ray usage."""
         memory_safe_fits = ds_fit_kwargs.get("memory_safe_fits", True)
-        enable_ray_logging = ds_fit_kwargs.get("enable_ray_logging", False)
+        enable_ray_logging = ds_fit_kwargs.get("enable_ray_logging", True)
         normal_fit = False
         if memory_safe_fits:
             try:
