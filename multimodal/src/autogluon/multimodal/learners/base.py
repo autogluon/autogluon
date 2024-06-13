@@ -27,6 +27,7 @@ from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_ray
 from autogluon.core.metrics import Scorer
 from autogluon.core.utils.loaders import load_pd
+from autogluon.multimodal.utils.load import load_config_with_retry
 
 from .. import version as ag_version
 from ..constants import (
@@ -2227,7 +2228,9 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
     ):
         path = os.path.abspath(os.path.expanduser(path))
         assert os.path.isdir(path), f"'{path}' must be an existing directory."
-        config = OmegaConf.load(os.path.join(path, "config.yaml"))
+
+        config_path = os.path.join(path, "config.yaml")
+        config = load_config_with_retry(file_path=config_path)
 
         config = get_local_pretrained_config_paths(
             config=config, path=path

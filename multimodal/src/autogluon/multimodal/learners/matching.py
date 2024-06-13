@@ -21,6 +21,7 @@ from torch import nn
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.resource_utils import ResourceManager
+from autogluon.multimodal.utils.load import load_config_with_retry
 
 from .. import version as ag_version
 from ..constants import (
@@ -1997,7 +1998,8 @@ class MultiModalMatcher(BaseLearner):
     ):
         path = os.path.abspath(os.path.expanduser(path))
         assert os.path.isdir(path), f"'{path}' must be an existing directory."
-        config = OmegaConf.load(os.path.join(path, "config.yaml"))
+        config_path = os.path.join(path, "config.yaml")
+        config = load_config_with_retry(file_path=config_path)
         query_config = config[QUERY]
         response_config = config[RESPONSE]
         config = config["generic"]

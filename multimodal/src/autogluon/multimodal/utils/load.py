@@ -1,7 +1,10 @@
 import logging
 import os
 import pickle
+import time
 from typing import Dict, List, Optional, Tuple, Union
+
+from omegaconf import OmegaConf
 
 from ..constants import LAST_CHECKPOINT, MODEL_CHECKPOINT
 from ..data import DocumentProcessor, NerProcessor, TextProcessor
@@ -138,3 +141,16 @@ def get_load_ckpt_paths(ckpt_path: str, dir_path: str, resume: bool):
             ckpt_path = None  # must set None since we do not resume training
 
     return load_path, ckpt_path
+
+
+def load_config_with_retry(file_path, retries=3, delay=2):
+    for attempt in range(retries):
+        try:
+            if os.path.exists(file_path):
+                return OmegaConf.load(file_path)
+            else:
+                print(f"Attempt {attempt+1}/{retries}: File {file_path} does not exist yet.")
+        except FileNotFoundError as e:
+            print(f"Attempt {attempt+1}/{retries}: FileNotFoundError: {e}")
+        time.sleep(delay)
+    raise FileNotFoundError(f"File {file_path} not found after {retries} retries.")
