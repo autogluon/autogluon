@@ -1423,6 +1423,10 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 )
                 finished, unfinished = _ds_ray.wait([ref], num_returns=1)
                 stacked_overfitting, ho_leaderboard, exception = _ds_ray.get(finished[0])
+
+                # TODO: This is present to ensure worker logs are properly logged and don't get skipped / printed out of order.
+                #  Ideally find a faster way to do this that doesn't introduce a 100 ms overhead.
+                time.sleep(0.1)
             else:
                 normal_fit = True
         else:
