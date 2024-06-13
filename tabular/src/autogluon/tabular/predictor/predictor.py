@@ -1386,13 +1386,14 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 total_resources = ag_fit_kwargs["core_kwargs"]["total_resources"]
 
                 num_cpus = total_resources.get("num_cpus", "auto")
-                num_gpus = total_resources.get("num_gpus", "auto")
 
                 if num_cpus == "auto":
                     num_cpus = ResourceManager.get_cpu_count()
 
-                if num_gpus == "auto":
-                    num_gpus = ResourceManager.get_gpu_count()
+                # num_gpus is treated oddly in ray, commented out until we find a better solution
+                # num_gpus = total_resources.get("num_gpus", "auto")
+                # if num_gpus == "auto":
+                #     num_gpus = ResourceManager.get_gpu_count()
 
                 # Handle expensive data via put
                 ag_fit_kwargs_ref = _ds_ray.put(ag_fit_kwargs)
@@ -1422,13 +1423,6 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 )
                 finished, unfinished = _ds_ray.wait([ref], num_returns=1)
                 stacked_overfitting, ho_leaderboard, exception = _ds_ray.get(finished[0])
-
-                # FIXME: Add logic that does the following to switch ray's logging verbosity without adding a 5+ second overhead from shutting down the cluster.
-                # _ds_ray.shutdown()
-                # _ds_ray.init(
-                #     logging_level=logging.ERROR,
-                #     log_to_driver=False,
-                # )
             else:
                 normal_fit = True
         else:
