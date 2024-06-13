@@ -168,8 +168,6 @@ def test_hpo_distillation(searcher, scheduler):
     teacher_save_path = os.path.join(
         get_home_dir(), "hpo_distillation_teacher", f"_{searcher}_{scheduler}_{unique_id}"
     )
-    if os.path.exists(teacher_save_path):
-        shutil.rmtree(teacher_save_path)
 
     teacher_predictor.fit(
         train_data=dataset.train_df,
@@ -196,8 +194,6 @@ def test_hpo_distillation(searcher, scheduler):
     student_save_path = os.path.join(
         get_home_dir(), "hpo_distillation_student", f"_{searcher}_{scheduler}_{unique_id}"
     )
-    if os.path.exists(student_save_path):
-        shutil.rmtree(student_save_path)
 
     predictor.fit(
         train_data=dataset.train_df,
