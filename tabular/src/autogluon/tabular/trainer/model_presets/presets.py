@@ -2,8 +2,10 @@ import copy
 import inspect
 import logging
 from collections import defaultdict
+from packaging import version
 
 from autogluon.common.model_filter import ModelFilter
+from autogluon.common.utils.hyperparameter_utils import get_deprecated_lightgbm_large_hyperparameters, get_hyperparameter_str_deprecation_msg
 from autogluon.core.constants import (
     AG_ARGS,
     AG_ARGS_ENSEMBLE,
@@ -23,6 +25,7 @@ from autogluon.core.models import (
 )
 from autogluon.core.trainer.utils import process_hyperparameters
 
+from ...version import __version__
 from ...models import (
     BoostedRulesModel,
     CatBoostModel,
@@ -283,7 +286,7 @@ def get_preset_models(
 
 
 def clean_model_cfg(model_cfg: dict, model_type=None, ag_args=None, ag_args_ensemble=None, ag_args_fit=None, problem_type=None):
-    assert isinstance(model_cfg, dict), f"Invalid model hyperparameters, expecting dict, but found {type(model_cfg)}! Value: {model_cfg}"
+    model_cfg = _verify_model_cfg(model_cfg=model_cfg)
     model_cfg = copy.deepcopy(model_cfg)
     if AG_ARGS not in model_cfg:
         model_cfg[AG_ARGS] = dict()
@@ -328,6 +331,32 @@ def clean_model_cfg(model_cfg: dict, model_type=None, ag_args=None, ag_args_ense
     if default_ag_args_ensemble is not None:
         default_ag_args_ensemble.update(model_cfg.get(AG_ARGS_ENSEMBLE, dict()))
         model_cfg[AG_ARGS_ENSEMBLE] = default_ag_args_ensemble
+    return model_cfg
+
+
+def _verify_model_cfg(model_cfg) -> dict:
+    """
+    Ensures that model_cfg is of the correct type, or else raises an exception.
+    Returns model_cfg
+    """
+    if not isinstance(model_cfg, dict):
+        extra_msg = ""
+        error = True
+        if isinstance(model_cfg, str) and model_cfg == "GBMLarge":
+            extra_msg = get_hyperparameter_str_deprecation_msg()
+            if version.parse(__version__) >= version.parse("1.3.0"):
+                error = True
+                extra_msg = "\n" + extra_msg
+            else:
+                error = False
+                model_cfg = get_deprecated_lightgbm_large_hyperparameters()
+                logger.warning(
+                    f"#######################################################"
+                    f"\nWARNING: {extra_msg}"
+                    f"\n#######################################################"
+                )
+        if error:
+            raise AssertionError(f"Invalid model hyperparameters, expecting dict, but found {type(model_cfg)}! Value: {model_cfg}{extra_msg}")
     return model_cfg
 
 

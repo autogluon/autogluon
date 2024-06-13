@@ -9,6 +9,7 @@ import pprint
 import shutil
 import time
 import warnings
+from packaging import version
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import networkx as nx
@@ -18,7 +19,7 @@ import pandas as pd
 from autogluon.common.loaders import load_json
 from autogluon.common.savers import save_json
 from autogluon.common.utils.file_utils import get_directory_size, get_directory_size_per_file
-from autogluon.common.utils.hyperparameter_utils import is_advanced_hyperparameter_format
+from autogluon.common.utils.hyperparameter_utils import get_hyperparameter_str_deprecation_msg, is_advanced_hyperparameter_format
 from autogluon.common.utils.log_utils import add_log_to_file, set_logger_verbosity
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.system_info import get_ag_system_info
@@ -64,6 +65,7 @@ from ..configs.hyperparameter_configs import get_hyperparameter_config
 from ..configs.presets_configs import tabular_presets_alias, tabular_presets_dict
 from ..learner import AbstractTabularLearner, DefaultLearner
 from ..trainer.model_presets.presets import MODEL_TYPES
+from ..version import __version__
 from ._deprecated_methods import TabularPredictorDeprecatedMixin
 
 logger = logging.getLogger(__name__)  # return autogluon root logger
@@ -4272,8 +4274,6 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         return load_json.load(path=metadata_file_path, verbose=not silent)
 
     def _save_version_file(self, silent: bool = False):
-        from ..version import __version__
-
         version_file_contents = f"{__version__}"
         version_file_path = os.path.join(self.path, self._predictor_version_file_name)
         save_str.save(path=version_file_path, data=version_file_contents, verbose=not silent)
@@ -5058,22 +5058,13 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             assert isinstance(params, dict), f"`hyperparameters` must be a dict, but found: {type(params)}"
             for model_type in params:
                 if not isinstance(params[model_type], valid_types):
+                    extra_msg = ""
                     if isinstance(params[model_type], str) and params[model_type] == "GBMLarge":
-                        extra_msg = (
-                            f"\nAttempted to specify 'GBMLarge' model preset in hyperparameters. "
-                            f"Support for hyperparameter shorthands via strings was removed in `autogluon==1.2.0`"
-                            f"\nYou can still train the desired 'GBMLarge' model "
-                            f"by editing your hyperparameters dictionary, replacing 'GBMLarge' with the following:\n"
-                            """{
-    "learning_rate": 0.03,
-    "num_leaves": 128,
-    "feature_fraction": 0.9,
-    "min_data_in_leaf": 3,
-    "ag_args": {"name_suffix": "Large", "priority": 0, "hyperparameter_tune_kwargs": None}
-}"""
-                        )
-                    else:
-                        extra_msg = ""
+                        if version.parse(__version__) >= version.parse("1.3.0"):
+                            extra_msg = "\n" + get_hyperparameter_str_deprecation_msg()
+                        else:
+                            # Will log a deprecation warning downstream in trainer
+                            continue
                     raise AssertionError(
                         f"Hyperparameters are incorrectly formatted, refer to the documentation for examples. "
                         f"`hyperparameters` key '{model_type}' has an unexpected value type."
