@@ -1,6 +1,7 @@
 # What's New
 
 Here you can find the release notes for current and past releases of AutoGluon.
+For release notes prior to v0.4, refer to https://github.com/autogluon/autogluon/releases.
 
 ```{toctree}
 :hidden: true
