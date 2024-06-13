@@ -9,6 +9,7 @@ Here you can find the release notes for current and past releases of AutoGluon.
 v1.1.1
 v1.1.0
 v1.0.0
+v0.8.3
 v0.8.2
 v0.8.1
 v0.8.0
@@ -42,6 +43,13 @@ v0.4.0
 :::{dropdown} v1.0.0
 
 ```{include} v1.0.0.md
+```
+
+:::
+
+:::{dropdown} v0.8.3
+
+```{include} v0.8.3.md
 ```
 
 :::
