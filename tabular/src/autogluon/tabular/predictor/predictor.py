@@ -798,7 +798,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                         If True, AutoGluon will remove all saved information from sub-fits from disk.
                         If False, the sub-fits are kept on disk and `self._sub_fits` will store paths to the sub-fits, which can be loaded just like any other
                         predictor from disk using `TabularPredictor.load()`.
-                    `force_ray_logging` : bool, default = False
+                    `enable_ray_logging` : bool, default = True
                         If True, will log the dynamic stacking sub-fit when ray is used (`memory_safe_fits=True`).
                         Note that because of how ray works, this may cause extra unwanted logging in the main fit process after dynamic stacking completes.
                     `holdout_data`: str or :class:`TabularDataset` or :class:`pd.DataFrame`, default = None
@@ -1151,7 +1151,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             num_stack_levels, time_limit = self._dynamic_stacking(**ds_args, ag_fit_kwargs=ag_fit_kwargs, ag_post_fit_kwargs=ag_post_fit_kwargs)
             logger.info(
                 f"Starting main fit with num_stack_levels={num_stack_levels}.\n"
-                f"\tFor future fit calls on this dataset, you can skip dynamic stacking to save time: "
+                f"\tFor future fit calls on this dataset, you can skip DyStack to save time: "
                 f"`predictor.fit(..., dynamic_stacking=False, num_stack_levels={num_stack_levels})`"
             )
 
@@ -1187,7 +1187,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         n_repeats: int,
         memory_safe_fits: bool,
         clean_up_fits: bool,
-        force_ray_logging: bool,
+        enable_ray_logging: bool,
         holdout_data: Optional[Union[str, pd.DataFrame, None]] = None,
     ):
         """Dynamically determines if stacking is used or not by validating the behavior of a sub-fit of AutoGluon that uses stacking on held out data.
@@ -1228,7 +1228,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         ds_fit_kwargs = dict(
             clean_up_fits=clean_up_fits,
             memory_safe_fits=memory_safe_fits,
-            force_ray_logging=force_ray_logging,
+            enable_ray_logging=enable_ray_logging,
         )
 
         # -- Validation Method
@@ -1341,24 +1341,23 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         """Tries to run the sub-fit in a subprocess (managed by ray). Similar to AutoGluon's parallel fold fitting strategies,
         this code does not shut down ray after usage. Otherwise, we would also kill outer-scope ray usage."""
         memory_safe_fits = ds_fit_kwargs.get("memory_safe_fits", True)
-        force_ray_logging = ds_fit_kwargs.get("force_ray_logging", False)
+        enable_ray_logging = ds_fit_kwargs.get("enable_ray_logging", True)
         normal_fit = False
         if memory_safe_fits:
             try:
                 _ds_ray = try_import_ray()
                 if not _ds_ray.is_initialized():
-                    if force_ray_logging:
+                    if enable_ray_logging:
                         logger.info(
                             f"\tRunning DyStack sub-fit in a ray process to avoid memory leakage. "
-                            "Force enabling ray logging (force_ray_logging=True). "
-                            "This may lead to unwanted logging post-DyStack due to a limitation in ray."
+                            "Enabling ray logging (enable_ray_logging=True). Specify `ds_args={'enable_ray_logging': False}` if you experience logging issues."
                         )
-                        _ds_ray.init()  # TODO: This will propagate to the main fit call too, which isn't ideal.
+                        _ds_ray.init()
                     else:
                         logger.info(
                             f"\tRunning DyStack sub-fit in a ray process to avoid memory leakage. "
-                            "Logs will not be shown until this process is complete, due to a limitation in ray. "
-                            "You can force logging by specifying `ds_args={'force_ray_logging': True}`."
+                            "Logs will not be shown until this process is complete (enable_ray_logging=False). "
+                            "You can experimentally enable logging by specifying `ds_args={'enable_ray_logging': True}`."
                         )
                         _ds_ray.init(
                             logging_level=logging.ERROR,
@@ -1387,13 +1386,14 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 total_resources = ag_fit_kwargs["core_kwargs"]["total_resources"]
 
                 num_cpus = total_resources.get("num_cpus", "auto")
-                num_gpus = total_resources.get("num_gpus", "auto")
 
                 if num_cpus == "auto":
                     num_cpus = ResourceManager.get_cpu_count()
 
-                if num_gpus == "auto":
-                    num_gpus = ResourceManager.get_gpu_count()
+                # num_gpus is treated oddly in ray, commented out until we find a better solution
+                # num_gpus = total_resources.get("num_gpus", "auto")
+                # if num_gpus == "auto":
+                #     num_gpus = ResourceManager.get_gpu_count()
 
                 # Handle expensive data via put
                 ag_fit_kwargs_ref = _ds_ray.put(ag_fit_kwargs)
@@ -1406,7 +1406,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                     holdout_data_ref = None
 
                 # Call sub fit in its own subprocess via ray
-                sub_fit_caller = _ds_ray.remote(max_calls=1)(_sub_fit)
+                sub_fit_caller = _ds_ray.remote(max_calls=1)(_dystack)
                 # FIXME: For some reason ray does not treat `num_cpus` and `num_gpus` the same.
                 #  For `num_gpus`, the process will reserve the capacity and is unable to share it to child ray processes, causing a deadlock.
                 #  For `num_cpus`, the value is completely ignored by children, and they can even use more num_cpus than the parent.
@@ -1424,19 +1424,16 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 finished, unfinished = _ds_ray.wait([ref], num_returns=1)
                 stacked_overfitting, ho_leaderboard, exception = _ds_ray.get(finished[0])
 
-                # FIXME: Add logic that does the following to switch ray's logging verbosity without adding a 5+ second overhead from shutting down the cluster.
-                # _ds_ray.shutdown()
-                # _ds_ray.init(
-                #     logging_level=logging.ERROR,
-                #     log_to_driver=False,
-                # )
+                # TODO: This is present to ensure worker logs are properly logged and don't get skipped / printed out of order.
+                #  Ideally find a faster way to do this that doesn't introduce a 100 ms overhead.
+                time.sleep(0.1)
             else:
                 normal_fit = True
         else:
             normal_fit = True
 
         if normal_fit:
-            stacked_overfitting, ho_leaderboard, exception = _sub_fit(
+            stacked_overfitting, ho_leaderboard, exception = _dystack(
                 predictor=self,
                 train_data=train_data,
                 time_limit=time_limit,
@@ -1449,10 +1446,26 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         if exception is not None:
             logger.log(40, f"Warning: Exception encountered during DyStack sub-fit:\n\t{exception}")
         if ho_leaderboard is not None:
-            logger.log(20, "Leaderboard on holdout data from dynamic stacking:")
+            logger.log(20, "Leaderboard on holdout data (DyStack):")
             with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):
                 # Rename to avoid confusion for the user
                 logger.log(20, ho_leaderboard.rename({"score_test": "score_holdout"}, axis=1))
+
+        if not normal_fit and enable_ray_logging:
+            try:
+                # Disables ray logging to avoid log spam in main process after DyStack completes
+                # This is somewhat of a hack, and needs to use private APIs of ray. It is unclear how to do this in a different way.
+                # Note: Once this is done, it cannot be undone,
+                # and the only known way to re-enable ray logging in the process is to call `ray.shutdown()` and `ray.init()`
+                _ds_ray._private.ray_logging.global_worker_stdstream_dispatcher.remove_handler("ray_print_logs")
+            except Exception as e:
+                logger.log(
+                    40,
+                    "WARNING: ray logging verbosity fix raised an exception. Ray might give overly verbose logging output. "
+                    "Please open a GitHub issue to notify the AutoGluon developers of this issue. "
+                    "You can avoid this issue by specifying `ds_args={'enable_ray_logging': False}`. Exception detailed below:"
+                    f"\n{e}",
+                )
 
         return stacked_overfitting
 
@@ -4568,7 +4581,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             memory_safe_fits=True,
             clean_up_fits=True,
             holdout_data=None,
-            force_ray_logging=False,
+            enable_ray_logging=True,
         )
         allowed_kes = set(ds_args.keys())
 
@@ -4583,7 +4596,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             (not isinstance(ds_args["validation_procedure"], str)) or (ds_args["validation_procedure"] not in ["holdout", "cv"])
         ):
             raise ValueError("`validation_procedure` in `ds_args` must be str in {'holdout','cv'}. " + f"Got: {ds_args['validation_procedure']}")
-        for arg_name in ["memory_safe_fits", "clean_up_fits", "force_ray_logging"]:
+        for arg_name in ["memory_safe_fits", "clean_up_fits", "enable_ray_logging"]:
             if (arg_name in ds_args) and (not isinstance(ds_args[arg_name], bool)):
                 raise ValueError(f"`{arg_name}` in `ds_args` must be bool.  Got: {type(ds_args[arg_name])}")
         for arg_name in ["detection_time_frac", "holdout_frac"]:
@@ -5116,7 +5129,7 @@ class _TabularPredictorExperimental(TabularPredictor):
         return predictor
 
 
-def _sub_fit(
+def _dystack(
     predictor: TabularPredictor,
     train_data: Union[str, pd.DataFrame],
     time_limit: int,
@@ -5163,8 +5176,6 @@ def _sub_fit(
     except Exception as e:
         return False, None, e
 
-    if clean_up_fits:
-        logger.log(20, f"Deleting DyStack predictor artifacts (clean_up_fits={clean_up_fits}) ...")
     if not predictor.model_names():
         logger.log(20, f"Unable to determine stacked overfitting. AutoGluon's sub-fit did not successfully train any models!")
         stacked_overfitting = False
@@ -5181,6 +5192,7 @@ def _sub_fit(
     predictor._learner = learner_og
 
     if clean_up_fits:
+        logger.log(20, f"Deleting DyStack predictor artifacts (clean_up_fits={clean_up_fits}) ...")
         shutil.rmtree(path=ds_fit_context)
     else:
         predictor._sub_fits.append(ds_fit_context)
