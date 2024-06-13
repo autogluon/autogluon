@@ -798,7 +798,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                         If True, AutoGluon will remove all saved information from sub-fits from disk.
                         If False, the sub-fits are kept on disk and `self._sub_fits` will store paths to the sub-fits, which can be loaded just like any other
                         predictor from disk using `TabularPredictor.load()`.
-                    `enable_ray_logging` : bool, default = False
+                    `enable_ray_logging` : bool, default = True
                         If True, will log the dynamic stacking sub-fit when ray is used (`memory_safe_fits=True`).
                         Note that because of how ray works, this may cause extra unwanted logging in the main fit process after dynamic stacking completes.
                     `holdout_data`: str or :class:`TabularDataset` or :class:`pd.DataFrame`, default = None
@@ -1350,13 +1350,13 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                     if enable_ray_logging:
                         logger.info(
                             f"\tRunning DyStack sub-fit in a ray process to avoid memory leakage. "
-                            "Enabling ray logging (enable_ray_logging=True)."
+                            "Enabling ray logging (enable_ray_logging=True). Specify `ds_args={'enable_ray_logging': False}` if you experience logging issues."
                         )
-                        _ds_ray.init()  # TODO: This will propagate to the main fit call too, which isn't ideal.
+                        _ds_ray.init()
                     else:
                         logger.info(
                             f"\tRunning DyStack sub-fit in a ray process to avoid memory leakage. "
-                            "Logs will not be shown until this process is complete, due to a limitation in ray. "
+                            "Logs will not be shown until this process is complete (enable_ray_logging=False). "
                             "You can experimentally enable logging by specifying `ds_args={'enable_ray_logging': True}`."
                         )
                         _ds_ray.init(
@@ -1405,7 +1405,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                     holdout_data_ref = None
 
                 # Call sub fit in its own subprocess via ray
-                sub_fit_caller = _ds_ray.remote(max_calls=1)(_sub_fit)
+                sub_fit_caller = _ds_ray.remote(max_calls=1)(_dystack)
                 # FIXME: For some reason ray does not treat `num_cpus` and `num_gpus` the same.
                 #  For `num_gpus`, the process will reserve the capacity and is unable to share it to child ray processes, causing a deadlock.
                 #  For `num_cpus`, the value is completely ignored by children, and they can even use more num_cpus than the parent.
@@ -1435,7 +1435,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             normal_fit = True
 
         if normal_fit:
-            stacked_overfitting, ho_leaderboard, exception = _sub_fit(
+            stacked_overfitting, ho_leaderboard, exception = _dystack(
                 predictor=self,
                 train_data=train_data,
                 time_limit=time_limit,
@@ -1463,8 +1463,10 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             except Exception as e:
                 logger.log(
                     40,
-                    f"WARNING: ray logging verbosity fix raised an exception. Ray might give overly verbose logging output. "
-                    f"Please open a GitHub issue to notify the developers of this issue. Exception detailed below:\n{e}"
+                    "WARNING: ray logging verbosity fix raised an exception. Ray might give overly verbose logging output. "
+                    "Please open a GitHub issue to notify the AutoGluon developers of this issue. "
+                    "You can avoid this issue by specifying `ds_args={'enable_ray_logging': False}`. Exception detailed below:"
+                    f"\n{e}"
                 )
 
         return stacked_overfitting
@@ -4581,7 +4583,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             memory_safe_fits=True,
             clean_up_fits=True,
             holdout_data=None,
-            enable_ray_logging=False,
+            enable_ray_logging=True,
         )
         allowed_kes = set(ds_args.keys())
 
@@ -5129,7 +5131,7 @@ class _TabularPredictorExperimental(TabularPredictor):
         return predictor
 
 
-def _sub_fit(
+def _dystack(
     predictor: TabularPredictor,
     train_data: Union[str, pd.DataFrame],
     time_limit: int,
