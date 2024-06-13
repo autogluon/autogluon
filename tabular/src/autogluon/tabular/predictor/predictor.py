@@ -1151,7 +1151,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             num_stack_levels, time_limit = self._dynamic_stacking(**ds_args, ag_fit_kwargs=ag_fit_kwargs, ag_post_fit_kwargs=ag_post_fit_kwargs)
             logger.info(
                 f"Starting main fit with num_stack_levels={num_stack_levels}.\n"
-                f"\tFor future fit calls on this dataset, you can skip dynamic stacking to save time: "
+                f"\tFor future fit calls on this dataset, you can skip DyStack to save time: "
                 f"`predictor.fit(..., dynamic_stacking=False, num_stack_levels={num_stack_levels})`"
             )
 
@@ -1448,7 +1448,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         if exception is not None:
             logger.log(40, f"Warning: Exception encountered during DyStack sub-fit:\n\t{exception}")
         if ho_leaderboard is not None:
-            logger.log(20, "Leaderboard on holdout data from dynamic stacking:")
+            logger.log(20, "Leaderboard on holdout data (DyStack):")
             with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):
                 # Rename to avoid confusion for the user
                 logger.log(20, ho_leaderboard.rename({"score_test": "score_holdout"}, axis=1))
