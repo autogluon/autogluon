@@ -798,7 +798,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                         If True, AutoGluon will remove all saved information from sub-fits from disk.
                         If False, the sub-fits are kept on disk and `self._sub_fits` will store paths to the sub-fits, which can be loaded just like any other
                         predictor from disk using `TabularPredictor.load()`.
-                    `force_ray_logging` : bool, default = False
+                    `enable_ray_logging` : bool, default = False
                         If True, will log the dynamic stacking sub-fit when ray is used (`memory_safe_fits=True`).
                         Note that because of how ray works, this may cause extra unwanted logging in the main fit process after dynamic stacking completes.
                     `holdout_data`: str or :class:`TabularDataset` or :class:`pd.DataFrame`, default = None
@@ -1187,7 +1187,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         n_repeats: int,
         memory_safe_fits: bool,
         clean_up_fits: bool,
-        force_ray_logging: bool,
+        enable_ray_logging: bool,
         holdout_data: Optional[Union[str, pd.DataFrame, None]] = None,
     ):
         """Dynamically determines if stacking is used or not by validating the behavior of a sub-fit of AutoGluon that uses stacking on held out data.
@@ -1228,7 +1228,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         ds_fit_kwargs = dict(
             clean_up_fits=clean_up_fits,
             memory_safe_fits=memory_safe_fits,
-            force_ray_logging=force_ray_logging,
+            enable_ray_logging=enable_ray_logging,
         )
 
         # -- Validation Method
@@ -1341,23 +1341,23 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         """Tries to run the sub-fit in a subprocess (managed by ray). Similar to AutoGluon's parallel fold fitting strategies,
         this code does not shut down ray after usage. Otherwise, we would also kill outer-scope ray usage."""
         memory_safe_fits = ds_fit_kwargs.get("memory_safe_fits", True)
-        force_ray_logging = ds_fit_kwargs.get("force_ray_logging", False)
+        enable_ray_logging = ds_fit_kwargs.get("enable_ray_logging", False)
         normal_fit = False
         if memory_safe_fits:
             try:
                 _ds_ray = try_import_ray()
                 if not _ds_ray.is_initialized():
-                    if force_ray_logging:
+                    if enable_ray_logging:
                         logger.info(
                             f"\tRunning DyStack sub-fit in a ray process to avoid memory leakage. "
-                            "Enabling ray logging (force_ray_logging=True)."
+                            "Enabling ray logging (enable_ray_logging=True)."
                         )
                         _ds_ray.init()  # TODO: This will propagate to the main fit call too, which isn't ideal.
                     else:
                         logger.info(
                             f"\tRunning DyStack sub-fit in a ray process to avoid memory leakage. "
                             "Logs will not be shown until this process is complete, due to a limitation in ray. "
-                            "You can experimentally enable logging by specifying `ds_args={'force_ray_logging': True}`."
+                            "You can experimentally enable logging by specifying `ds_args={'enable_ray_logging': True}`."
                         )
                         _ds_ray.init(
                             logging_level=logging.ERROR,
@@ -1453,7 +1453,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 # Rename to avoid confusion for the user
                 logger.log(20, ho_leaderboard.rename({"score_test": "score_holdout"}, axis=1))
 
-        if not normal_fit and force_ray_logging:
+        if not normal_fit and enable_ray_logging:
             try:
                 # Disables ray logging to avoid log spam in main process after DyStack completes
                 # This is somewhat of a hack, and needs to use private APIs of ray. It is unclear how to do this in a different way.
@@ -4581,7 +4581,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             memory_safe_fits=True,
             clean_up_fits=True,
             holdout_data=None,
-            force_ray_logging=False,
+            enable_ray_logging=False,
         )
         allowed_kes = set(ds_args.keys())
 
@@ -4596,7 +4596,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             (not isinstance(ds_args["validation_procedure"], str)) or (ds_args["validation_procedure"] not in ["holdout", "cv"])
         ):
             raise ValueError("`validation_procedure` in `ds_args` must be str in {'holdout','cv'}. " + f"Got: {ds_args['validation_procedure']}")
-        for arg_name in ["memory_safe_fits", "clean_up_fits", "force_ray_logging"]:
+        for arg_name in ["memory_safe_fits", "clean_up_fits", "enable_ray_logging"]:
             if (arg_name in ds_args) and (not isinstance(ds_args[arg_name], bool)):
                 raise ValueError(f"`{arg_name}` in `ds_args` must be bool.  Got: {type(ds_args[arg_name])}")
         for arg_name in ["detection_time_frac", "holdout_frac"]:
