@@ -252,10 +252,13 @@ class LGBModel(AbstractModel):
         else:
             self.params_trained["num_boost_round"] = self.model.current_iteration()
 
-    def _predict_proba(self, X, num_cpus=0, **kwargs):
+    def _predict_proba(self, X, num_cpus=0, **kwargs) -> np.ndarray:
         X = self.preprocess(X, **kwargs)
 
         y_pred_proba = self.model.predict(X, num_threads=num_cpus)
+        if self.problem_type == QUANTILE:
+            # y_pred_proba is a pd.DataFrame, need to convert
+            y_pred_proba = y_pred_proba.to_numpy()
         if self.problem_type in [REGRESSION, QUANTILE, MULTICLASS]:
             return y_pred_proba
         elif self.problem_type == BINARY:
