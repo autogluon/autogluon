@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import gc
 import inspect
+import json
 import logging
 import math
 import os
@@ -1096,6 +1097,61 @@ class AbstractModel:
         save_pkl.save(path=file_path, object=self, verbose=verbose)
         self.model = _model
         return path
+
+
+    def save_curves(self, model, metric, training_curve, validation_curve, path: str = None):
+        """
+        Saves learning curves to disk.
+
+        Parameters
+        ----------
+        model : str
+            Name of the iterative model that generated the curves
+        metric : str
+            Name of the evaluation metric used at each iteration of the curve
+        training_curve : list(float)
+            List of evaluation metrics computed at each iteration on the training dataset
+        validation_curve : list(float)
+            List of evaluation metrics computed at each iteration on the validation dataset
+        path : str, default None
+            Path to the saved learning curves, minus the file name.
+            This should generally be a directory path ending with a '/' character (or appropriate path separator value depending on OS).
+            If None, self.path is used.
+            The final curve file is typically saved to os.path.join(path, learning_curve_{MODELNAME}.json).
+
+        Returns
+        -------
+        path : str
+            Path to the saved model, minus the file name.
+        """
+
+        if path is None:
+            path = self.path
+
+        os.makedirs(path, exist_ok=True)
+        file_path = os.path.join(path, f"learning_curves_{model}.json")
+
+        curves = {
+            model : {
+                # iteration data goes here
+            }
+        }
+
+        for i in range(len(training_curve)):
+            curves[model][i] = {
+                metric : {
+                    "train": training_curve[i],
+                    "val": validation_curve[i],
+                    # "test": training_curve[i], # TODO: implement test curve data
+                }
+            }
+
+        with open(file_path, 'w') as json_file:
+            json.dump(curves, json_file, indent=4)
+
+        return curves
+
+
 
     @classmethod
     def load(cls, path: str, reset_paths: bool = True, verbose: bool = True):

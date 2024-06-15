@@ -296,6 +296,10 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             time_limit = time_limit - (start_fit_time - start_time)
             if time_limit <= 0:
                 raise TimeLimitExceeded
+        generate_learning_curves = True
+        if generate_learning_curves:
+            train_learning_curve = []
+            validation_learning_curve = []
         while do_update:
             time_start_epoch = time.time()
             time_cur = time_start_epoch
@@ -368,6 +372,12 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                     torch.save(self.model, net_filename)
                     best_epoch = epoch
                     best_val_update = total_updates
+                
+                # update learning curve
+                if generate_learning_curves:
+                    train_learning_curve.append(total_train_loss / total_train_size, 4)
+                    validation_learning_curve.append(-val_metric, 4)
+
                 if verbose_eval:
                     logger.log(
                         15,
@@ -403,6 +413,9 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
         if epoch == 0:
             raise AssertionError("0 epochs trained!")
+
+        if generate_learning_curves:
+            self.save_curves(self.__class__.__name__, self.eval_metric.name, train_learning_curve, validation_learning_curve)
 
         # revert back to best model
         if val_dataset is not None:

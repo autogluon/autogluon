@@ -117,6 +117,7 @@ class XGBoostModel(AbstractModel):
             eval_set = None
         else:
             X_val = self.preprocess(X_val, is_train=False)
+            eval_set.append((X, y))
             eval_set.append((X_val, y_val))
             early_stopping_rounds = ag_params.get("early_stop", "adaptive")
             if isinstance(early_stopping_rounds, (str, tuple, list)):
@@ -151,6 +152,14 @@ class XGBoostModel(AbstractModel):
             # FIXME: v1.1: Upgrade XGBoost to 2.0.1+ to avoid deprecation warnings from Pandas 2.1+ during XGBoost fit.
             warnings.simplefilter(action="ignore", category=FutureWarning)
             self.model.fit(X=X, y=y, eval_set=eval_set, verbose=False, sample_weight=sample_weight)
+
+        generate_learning_curves = True
+        if generate_learning_curves:
+            eval_results = self.model.evals_result()
+            metric = params["eval_metric"]
+            train_learning_curve = eval_results["validation_0"][metric]
+            validation_learning_curve = eval_results['validation_1'][metric]
+            self.save_curves(self.__class__.__name__, metric, train_learning_curve, validation_learning_curve)
 
         bst = self.model.get_booster()
         # TODO: Investigate speed-ups from GPU inference
