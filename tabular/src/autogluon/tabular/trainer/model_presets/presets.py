@@ -286,7 +286,7 @@ def get_preset_models(
 
 
 def clean_model_cfg(model_cfg: dict, model_type=None, ag_args=None, ag_args_ensemble=None, ag_args_fit=None, problem_type=None):
-    model_cfg = _verify_model_cfg(model_cfg=model_cfg)
+    model_cfg = _verify_model_cfg(model_cfg=model_cfg, model_type=model_type)
     model_cfg = copy.deepcopy(model_cfg)
     if AG_ARGS not in model_cfg:
         model_cfg[AG_ARGS] = dict()
@@ -334,7 +334,7 @@ def clean_model_cfg(model_cfg: dict, model_type=None, ag_args=None, ag_args_ense
     return model_cfg
 
 
-def _verify_model_cfg(model_cfg) -> dict:
+def _verify_model_cfg(model_cfg, model_type) -> dict:
     """
     Ensures that model_cfg is of the correct type, or else raises an exception.
     Returns model_cfg
@@ -356,7 +356,9 @@ def _verify_model_cfg(model_cfg) -> dict:
                     f"\n#######################################################"
                 )
         if error:
-            raise AssertionError(f"Invalid model hyperparameters, expecting dict, but found {type(model_cfg)}! Value: {model_cfg}{extra_msg}")
+            raise AssertionError(
+                f"Invalid model hyperparameters, expecting dict, but found {type(model_cfg)}! Model Type: {model_type} | Value: {model_cfg}{extra_msg}"
+            )
     return model_cfg
 
 
