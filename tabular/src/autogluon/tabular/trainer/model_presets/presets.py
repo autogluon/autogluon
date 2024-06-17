@@ -2,10 +2,14 @@ import copy
 import inspect
 import logging
 from collections import defaultdict
+
 from packaging import version
 
 from autogluon.common.model_filter import ModelFilter
-from autogluon.common.utils.hyperparameter_utils import get_deprecated_lightgbm_large_hyperparameters, get_hyperparameter_str_deprecation_msg
+from autogluon.common.utils.hyperparameter_utils import (
+    get_deprecated_lightgbm_large_hyperparameters,
+    get_hyperparameter_str_deprecation_msg,
+)
 from autogluon.core.constants import (
     AG_ARGS,
     AG_ARGS_ENSEMBLE,
@@ -25,7 +29,6 @@ from autogluon.core.models import (
 )
 from autogluon.core.trainer.utils import process_hyperparameters
 
-from ...version import __version__
 from ...models import (
     BoostedRulesModel,
     CatBoostModel,
@@ -50,6 +53,7 @@ from ...models import (
     XTModel,
 )
 from ...models.tab_transformer.tab_transformer_model import TabTransformerModel
+from ...version import __version__
 
 logger = logging.getLogger(__name__)
 
