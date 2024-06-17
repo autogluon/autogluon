@@ -157,6 +157,8 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
         self.num_gpus = num_gpus
         logger.debug(f"Upper level total_num_cpus, num_gpus {self.num_cpus} | {self.num_gpus}")
         self._validate_user_specified_resources()
+        if not isinstance(self.num_cpus, int):
+            raise TypeError(f"`num_cpus` must be an int! Found: {type(num_cpus)} | Value: {self.num_cpus}")
 
     def schedule_fold_model_fit(self, fold_ctx):
         raise NotImplementedError
