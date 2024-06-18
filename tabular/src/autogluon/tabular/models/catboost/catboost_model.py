@@ -90,7 +90,7 @@ class CatBoostModel(AbstractModel):
 
     # TODO: Use Pool in preprocess, optimize bagging to do Pool.split() to avoid re-computing pool for each fold! Requires stateful + y
     #  Pool is much more memory efficient, avoids copying data twice in memory
-    def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, num_gpus=0, num_cpus=-1, sample_weight=None, sample_weight_val=None, **kwargs):
+    def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, num_gpus=0, num_cpus=-1, sample_weight=None, sample_weight_val=None, generate_curves=False, **kwargs):
         time_start = time.time()
         try_import_catboost()
         from catboost import CatBoostClassifier, CatBoostRegressor, Pool
@@ -123,7 +123,7 @@ class CatBoostModel(AbstractModel):
         else:
             X_val = self.preprocess(X_val)
             X_val = Pool(data=X_val, label=y_val, cat_features=cat_features, weight=sample_weight_val)
-            eval_set = X_val
+            eval_set = [X_val, X] # validation set MUST be listed FIRST before other datasets
             early_stopping_rounds = ag_params.get("early_stop", "adaptive")
             if isinstance(early_stopping_rounds, (str, tuple, list)):
                 early_stopping_rounds = self._get_early_stopping_rounds(num_rows_train=num_rows_train, strategy=early_stopping_rounds)
@@ -215,6 +215,13 @@ class CatBoostModel(AbstractModel):
                     extra_fit_kwargs["early_stopping_rounds"] = early_stopping_rounds
                 elif isinstance(early_stopping_rounds, tuple):
                     extra_fit_kwargs["early_stopping_rounds"] = 50
+
+        params["custom_metric"] = [
+            "Precision",
+            "Recall",
+            "F1"
+        ]
+
         self.model = model_type(**params)
 
         # TODO: Custom metrics don't seem to work anymore
@@ -230,6 +237,13 @@ class CatBoostModel(AbstractModel):
             fit_final_kwargs["use_best_model"] = True
 
         self.model.fit(X, **fit_final_kwargs)
+
+        if generate_curves:
+            eval_results = self.model.get_evals_result()
+            metrics = [params["eval_metric"]] + params["custom_metric"]
+            train_curves = eval_results["validation_1"]
+            val_curves = eval_results['validation_0']
+            self.save_curves(metrics, train_curves, val_curves)
 
         self.params_trained["iterations"] = self.model.tree_count_
 

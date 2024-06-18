@@ -147,6 +147,11 @@ class EarlyStoppingCallback:
 
     def after_iteration(self, info):
         is_best_iter = False
+        # when calculating metrics for multiple "validation" datasets in CatBoost, validation is not
+        # a valid key, validation keys are named validation_0, validation_1, ...
+        if self.compare_key not in info.metrics:
+            self.compare_key = "validation_0"
+
         if self.is_quantile:
             # FIXME: CatBoost adds extra ',' in the metric name if quantile levels are not balanced
             # e.g., 'MultiQuantile:alpha=0.1,0.25,0.5,0.95' becomes 'MultiQuantile:alpha=0.1,,0.25,0.5,0.95'
