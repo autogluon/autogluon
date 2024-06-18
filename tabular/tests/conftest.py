@@ -289,8 +289,11 @@ class ModelFitHelper:
         X_test = test_data.drop(columns=[label])
         X_test = feature_generator.transform(X_test)
 
-        model.predict(X_test)
+        y_pred = model.predict(X_test)
+        assert isinstance(y_pred, np.ndarray), f"Expected np.ndarray as model.predict(X_test) output. Got: {y_pred.__class__}"
+
         y_pred_proba = model.predict_proba(X_test)
+        assert isinstance(y_pred_proba, np.ndarray), f"Expected np.ndarray as model.predict_proba(X_test) output. Got: {y_pred.__class__}"
         model.get_info()
 
         if check_predict_children:
