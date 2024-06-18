@@ -1099,52 +1099,62 @@ class AbstractModel:
         return path
 
 
-    def save_curves(self, model, metric, training_curve, validation_curve, path: str = None):
+    def save_curves(self, metrics, train_curves, val_curves, path: str = None):
         """
         Saves learning curves to disk.
 
         Parameters
         ----------
-        model : str
-            Name of the iterative model that generated the curves
-        metric : str
-            Name of the evaluation metric used at each iteration of the curve
-        training_curve : list(float)
-            List of evaluation metrics computed at each iteration on the training dataset
-        validation_curve : list(float)
-            List of evaluation metrics computed at each iteration on the validation dataset
+        metrics : list(str)
+            List of all evaluation metrics computed at each iteration of the curve
+        training_curve : dict(str : list(float))
+            Dictionary of evaluation metrics computed at each iteration on the training dataset
+        validation_curve : dict(str : list(float))
+            Dictionary of evaluation metrics computed at each iteration on the validation dataset
+
+        e.g.
+                {
+                    'logloss': [0.693147, 0.690162, ...],
+                    'accuracy': [0.500000, 0.400000, ...],
+                    'f1': [0.693147, 0.690162, ...]
+                }
+
         path : str, default None
-            Path to the saved learning curves, minus the file name.
+            Path where the learning curves are saved, minus the file name.
             This should generally be a directory path ending with a '/' character (or appropriate path separator value depending on OS).
             If None, self.path is used.
-            The final curve file is typically saved to os.path.join(path, learning_curve_{MODELNAME}.json).
+            The final curve file is typically saved to os.path.join(path, curves.json).
 
         Returns
         -------
         path : str
             Path to the saved model, minus the file name.
         """
-
         if path is None:
             path = self.path
 
         os.makedirs(path, exist_ok=True)
-        file_path = os.path.join(path, f"learning_curves_{model}.json")
+        file_path = os.path.join(path, f"curves.json")
 
-        curves = {
-            model : {
+        curves = [
+            [ metrics ],
+            [
                 # iteration data goes here
-            }
-        }
+            ]
+        ]
 
-        for i in range(len(training_curve)):
-            curves[model][i] = {
-                metric : {
-                    "train": training_curve[i],
-                    "val": validation_curve[i],
-                    # "test": training_curve[i], # TODO: implement test curve data
-                }
-            }
+        iterations = 0
+        if len(metrics) > 0:
+            iterations = len(train_curves[metrics[0]])
+
+        for i in range(iterations):
+            curves[1].append([])
+            for metric in metrics:
+                curves[1][i].append([
+                        train_curves[metric][i], # "train": 
+                        val_curves[metric][i], # "val": 
+                        # "test": test_curves[metric][i], # TODO: implement test curve data
+                    ])
 
         with open(file_path, 'w') as json_file:
             json.dump(curves, json_file, indent=4)

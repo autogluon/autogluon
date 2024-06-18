@@ -77,7 +77,7 @@ class XGBoostModel(AbstractModel):
 
         return X
 
-    def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, num_gpus=0, num_cpus=None, sample_weight=None, sample_weight_val=None, verbosity=2, **kwargs):
+    def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, num_gpus=0, num_cpus=None, sample_weight=None, sample_weight_val=None, verbosity=2, generate_curves=False, **kwargs):
         # TODO: utilize sample_weight_val in early-stopping if provided
         start_time = time.time()
         ag_params = self._get_ag_params()
@@ -142,6 +142,15 @@ class XGBoostModel(AbstractModel):
             callbacks.append(EarlyStoppingCustom(early_stopping_rounds, start_time=start_time, time_limit=time_limit, verbose=verbose))
             params["callbacks"] = callbacks
 
+        # if eval_metric has multiple metrics listed, XGB will use the last one listed
+        # for internal use, i.e. to determine when to stop, etc. 
+        # So, put specified metric last and add others
+        if generate_curves and params["eval_metric"] is not None:
+            main = params["eval_metric"]
+            params["eval_metric"] = ['error', 'auc']
+            params["eval_metric"].remove(main)
+            params["eval_metric"].append(main)
+
         from xgboost import XGBClassifier, XGBRegressor
 
         model_type = XGBClassifier if self.problem_type in PROBLEM_TYPES_CLASSIFICATION else XGBRegressor
@@ -153,13 +162,12 @@ class XGBoostModel(AbstractModel):
             warnings.simplefilter(action="ignore", category=FutureWarning)
             self.model.fit(X=X, y=y, eval_set=eval_set, verbose=False, sample_weight=sample_weight)
 
-        generate_learning_curves = True
-        if generate_learning_curves:
+        if generate_curves:
             eval_results = self.model.evals_result()
-            metric = params["eval_metric"]
-            train_learning_curve = eval_results["validation_0"][metric]
-            validation_learning_curve = eval_results['validation_1'][metric]
-            self.save_curves(self.__class__.__name__, metric, train_learning_curve, validation_learning_curve)
+            metrics = params["eval_metric"]
+            train_curves = eval_results["validation_0"]
+            val_curves = eval_results['validation_1']
+            self.save_curves(metrics, train_curves, val_curves)
 
         bst = self.model.get_booster()
         # TODO: Investigate speed-ups from GPU inference
