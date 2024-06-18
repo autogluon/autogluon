@@ -18,6 +18,7 @@ from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP
 from autogluon.timeseries.metrics import AVAILABLE_METRICS
 from autogluon.timeseries.models import DeepARModel, ETSModel
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
+from autogluon.timeseries.models.chronos_augmented_generation import ChronosAugmentedGeneration
 from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
 
 from ..common import (
@@ -33,6 +34,7 @@ from .test_local import TESTABLE_MODELS as LOCAL_TESTABLE_MODELS
 from .test_mlforecast import TESTABLE_MODELS as MLFORECAST_TESTABLE_MODELS
 from .test_multi_window_model import get_multi_window_deepar
 
+
 TESTABLE_MODELS = (
     CHRONOS_TESTABLE_MODELS
     + GLUONTS_TESTABLE_MODELS
@@ -40,6 +42,8 @@ TESTABLE_MODELS = (
     + MLFORECAST_TESTABLE_MODELS
     + [get_multi_window_deepar]
 )
+
+TESTABLE_MODELS = [ChronosAugmentedGeneration]
 
 TESTABLE_PREDICTION_LENGTHS = [1, 5]
 
