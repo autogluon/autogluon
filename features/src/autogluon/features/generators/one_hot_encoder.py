@@ -9,7 +9,6 @@ from sklearn.preprocessing import OneHotEncoder
 from autogluon.common.features.types import R_CATEGORY, R_INT, S_BOOL, S_SPARSE
 
 from .abstract import AbstractFeatureGenerator
-from .label_encoder import LabelEncoderFeatureGenerator
 
 logger = logging.getLogger(__name__)
 
