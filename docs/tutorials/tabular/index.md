@@ -17,6 +17,12 @@ For standard datasets that are represented as tables (stored as CSV file, parque
   Essential information about the most important settings for tabular prediction.
 :::
 
+:::{grid-item-card} How It Works
+  :link: tabular-how-it-works.html
+
+  A deep dive of how AutoGluon works under-the-hood.
+:::
+
 :::{grid-item-card} In-depth
   :link: tabular-indepth.html
 
@@ -86,6 +92,7 @@ hidden: true
 ---
 
 Essentials <tabular-essentials>
+How It Works <tabular-how-it-works>
 In Depth <tabular-indepth>
 Feature Engineering <tabular-feature-engineering>
 Tabular + Text + Images <tabular-multimodal>
