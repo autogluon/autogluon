@@ -112,4 +112,7 @@ After release is published, on the mainline branch:
 
 Conda-Forge releases are mutable and can be changed post-release to fix breaking bugs without releasing a new version.
 
-* [TODO] Add Conda-Forge post-release patching guidelines.
+* Create a new branch in your forked `autogluon.{module}-feedstock` repo
+* Make necessary updates on packages for patching
+* Increment the `number` field under `build` by 1 and keep the rest of `package` and `source` information unchanged
+* Refer to [conda release instructions](https://github.com/autogluon/autogluon/blob/master/release_instructions/update-conda-recipes.md) for more details
