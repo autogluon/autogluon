@@ -86,7 +86,7 @@
 ## Conda-Forge Release
 
 After GitHub & PyPi release, conduct release on Conda-Forge
-* [TODO] Add Conda-Forge release steps.
+* Please refer to [conda release instructions](https://github.com/autogluon/autogluon/blob/master/release_instructions/update-conda-recipes.md) for details.
 
 ## Release Cheatsheet
 
