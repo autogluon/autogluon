@@ -86,7 +86,7 @@
 ## Conda-Forge Release
 
 After GitHub & PyPi release, conduct release on Conda-Forge
-* Please refer to [conda release instructions](https://github.com/autogluon/autogluon/blob/master/release_instructions/update-conda-recipes.md) for details.
+* Please refer to [conda release instructions](update-conda-recipes.md) for details.
 
 ## Release Cheatsheet
 
@@ -115,4 +115,4 @@ Conda-Forge releases are mutable and can be changed post-release to fix breaking
 * Create a new branch in your forked `autogluon.{module}-feedstock` repo
 * Make necessary updates on packages for patching
 * Increment the `number` field under `build` by 1 and keep the rest of `package` and `source` information unchanged
-* Refer to [conda release instructions](https://github.com/autogluon/autogluon/blob/master/release_instructions/update-conda-recipes.md) for more details
+* Refer to [conda release instructions](update-conda-recipes.md) for more details
