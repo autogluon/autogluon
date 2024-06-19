@@ -18,7 +18,7 @@ For standard datasets that are represented as tables (stored as CSV file, parque
 :::
 
 :::{grid-item-card} How It Works
-  :link: tabular-how-it-works.html
+  :link: how-it-works.html
 
   A deep dive of how AutoGluon works under-the-hood.
 :::
@@ -92,8 +92,8 @@ hidden: true
 ---
 
 Essentials <tabular-essentials>
-How It Works <tabular-how-it-works>
 In Depth <tabular-indepth>
+How It Works <how-it-works>
 Feature Engineering <tabular-feature-engineering>
 Tabular + Text + Images <tabular-multimodal>
 Advanced <advanced/index>
