@@ -148,7 +148,8 @@ class XGBoostModel(AbstractModel):
         if generate_curves and params["eval_metric"] is not None:
             main = params["eval_metric"]
             params["eval_metric"] = ['error', 'auc']
-            params["eval_metric"].remove(main)
+            if main in params["eval_metric"]:
+                params["eval_metric"].remove(main)
             params["eval_metric"].append(main)
 
         from xgboost import XGBClassifier, XGBRegressor

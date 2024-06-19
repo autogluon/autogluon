@@ -1137,7 +1137,7 @@ class AbstractModel:
         file_path = os.path.join(path, f"curves.json")
 
         curves = [
-            [ metrics ],
+            metrics,
             [
                 # iteration data goes here
             ]

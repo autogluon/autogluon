@@ -94,7 +94,7 @@ class LGBModel(AbstractModel):
         approx_mem_size_req = data_mem_usage_bytes + histogram_mem_usage_bytes
         return approx_mem_size_req
 
-    def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, num_gpus=0, num_cpus=0, sample_weight=None, sample_weight_val=None, verbosity=2, **kwargs):
+    def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, num_gpus=0, num_cpus=0, sample_weight=None, sample_weight_val=None, verbosity=2, generate_curves=False, **kwargs):
         try_import_lightgbm()  # raise helpful error message if LightGBM isn't installed
         start_time = time.time()
         ag_params = self._get_ag_params()
@@ -177,7 +177,8 @@ class LGBModel(AbstractModel):
             valid_sets = [dataset_val] + valid_sets
         else:
             early_stopping_callback_kwargs = None
-        from lightgbm.callback import log_evaluation
+
+        from lightgbm.callback import log_evaluation, record_evaluation
 
         if log_period is not None:
             callbacks.append(log_evaluation(period=log_period))
@@ -187,10 +188,26 @@ class LGBModel(AbstractModel):
             "params": params,
             "train_set": dataset_train,
             "num_boost_round": num_boost_round,
-            "valid_sets": valid_sets,
-            "valid_names": valid_names,
             "callbacks": callbacks,
+            "keep_training_booster": generate_curves,
         }
+
+        if generate_curves:
+            eval_results = {}
+            eval_metrics = ["binary_logloss", "auc"]
+            valid_names = ["train_set"] + valid_names
+            valid_sets = [dataset_train] + valid_sets
+
+            if "metric" not in train_params["params"]:
+                train_params["params"]["metric"] = ','.join(eval_metrics)
+            else:
+                train_params["params"]["metric"] += ','.join(eval_metrics)
+
+            train_params["callbacks"].append(record_evaluation(eval_results))
+
+        train_params["valid_names"] = valid_names
+        train_params["valid_sets"] = valid_sets
+
         if not isinstance(stopping_metric, str):
             train_params["feval"] = stopping_metric
         else:
@@ -208,6 +225,7 @@ class LGBModel(AbstractModel):
             np.random.seed(seed_val)
 
         # Train LightGBM model:
+        # Note that self.model returns a <class 'lightgbm.basic.Booster'> not a LightBGMClassifier or LightGBMRegressor object
         from lightgbm.basic import LightGBMError
 
         with warnings.catch_warnings():
@@ -246,6 +264,23 @@ class LGBModel(AbstractModel):
                         self.model = train_lgb_model(**train_params)
                     else:
                         logger.log(15, f"Not enough time to retrain LGB model ('dart' mode)...")
+    
+        # eval results format: 
+        # {
+        #     "dataset_name1" : {
+        #         metric1 : curve,
+        #         metric2 : curve
+        #     }
+            
+        #     "dataset_name2" : {
+        #         metric1 : curve,
+        #         metric2 : curve
+        #     }
+        # }
+        if generate_curves:
+            train_curves = eval_results["train_set"]
+            val_curves = eval_results["valid_set"]
+            self.save_curves(eval_metrics, train_curves, val_curves)
 
         if dataset_val is not None and not retrain:
             self.params_trained["num_boost_round"] = self.model.best_iteration
