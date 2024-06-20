@@ -260,6 +260,16 @@ class AbstractModel:
         self._set_default_auxiliary_params()
         if hyperparameters_aux is not None:
             self.params_aux.update(hyperparameters_aux)
+        self._validate_params_aux()
+
+    def _validate_params_aux(self):
+        """
+        Verify correctness of self.params_aux
+        """
+        if "num_cpus" in self.params_aux:
+            num_cpus = self.params_aux["num_cpus"]
+            if num_cpus is not None and not isinstance(num_cpus, int):
+                raise TypeError(f"`num_cpus` must be an int or None. Found: {type(num_cpus)} | Value: {num_cpus}")
 
     @property
     def path_suffix(self) -> str:
@@ -586,6 +596,10 @@ class AbstractModel:
 
         # retrieve model level requirement when self is bagged model
         user_specified_model_level_resource = self._get_child_aux_val(key=resource_type, default=None)
+        if user_specified_model_level_resource is not None and not isinstance(user_specified_model_level_resource, (int, float)):
+            raise TypeError(
+                f"{resource_type} must be int or float. Found: {type(user_specified_model_level_resource)} | Value: {user_specified_model_level_resource}"
+            )
         if user_specified_model_level_resource is not None:
             assert user_specified_model_level_resource <= system_resource, f"Specified {resource_type} per model base is more than the total: {system_resource}"
         user_specified_lower_level_resource = user_specified_ensemble_resource
@@ -711,6 +725,9 @@ class AbstractModel:
         assert (
             num_gpus >= minimum_model_num_gpus
         ), f"Specified num_gpus={num_gpus} per {self.__class__.__name__} is less than minimum num_gpus={minimum_model_num_gpus}"
+
+        if not isinstance(num_cpus, int):
+            raise TypeError(f"`num_cpus` must be an int. Found: {type(num_cpus)} | Value: {num_cpus}")
 
         kwargs["num_cpus"] = num_cpus
         kwargs["num_gpus"] = num_gpus

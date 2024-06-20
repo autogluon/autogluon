@@ -1,5 +1,7 @@
 import shutil
 
+import pytest
+
 from autogluon.core.constants import BINARY
 from autogluon.core.metrics import METRICS
 
@@ -203,3 +205,42 @@ def test_num_folds_parallel(fit_helper, capsys):
     leaderboard = predictor.leaderboard(extra_info=True)
     assert leaderboard.iloc[0]["num_models"] == 2
     shutil.rmtree(predictor.path, ignore_errors=True)
+
+
+def test_raises_num_cpus_float(fit_helper):
+    """Tests that num_cpus specified as a float raises a TypeError"""
+    fit_args = dict(num_cpus=1.0)
+    dataset_name = "adult"
+    with pytest.raises(TypeError, match=r"`num_cpus` must be an int or 'auto'. Found: .*"):
+        fit_helper.fit_and_validate_dataset(
+            dataset_name=dataset_name,
+            fit_args=fit_args,
+            expected_model_count=None,
+            delete_directory=True,
+        )
+
+
+def test_raises_num_cpus_zero(fit_helper):
+    """Tests that num_cpus=0 raises a ValueError"""
+    fit_args = dict(num_cpus=0)
+    dataset_name = "adult"
+    with pytest.raises(ValueError, match=r"`num_cpus` must be greater than or equal to 1. .*"):
+        fit_helper.fit_and_validate_dataset(
+            dataset_name=dataset_name,
+            fit_args=fit_args,
+            expected_model_count=None,
+            delete_directory=True,
+        )
+
+
+def test_raises_num_gpus_neg(fit_helper):
+    """Tests that num_gpus<0 raises a ValueError"""
+    fit_args = dict(num_gpus=-1)
+    dataset_name = "adult"
+    with pytest.raises(ValueError, match=r"`num_gpus` must be greater than or equal to 0. .*"):
+        fit_helper.fit_and_validate_dataset(
+            dataset_name=dataset_name,
+            fit_args=fit_args,
+            expected_model_count=None,
+            delete_directory=True,
+        )
