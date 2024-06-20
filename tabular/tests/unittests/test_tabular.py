@@ -1101,7 +1101,16 @@ def test_tabular_bagstack():
     if fast_benchmark:
         subsample_size = 105
         nn_options = {"num_epochs": 2}
-        gbm_options = [{"num_boost_round": 40}, "GBMLarge"]
+        gbm_options = [
+            {"num_boost_round": 40},
+            {
+                "learning_rate": 0.03,
+                "num_leaves": 128,
+                "feature_fraction": 0.9,
+                "min_data_in_leaf": 3,
+                "ag_args": {"name_suffix": "Large", "priority": 0, "hyperparameter_tune_kwargs": None},
+            },
+        ]
         hyperparameters = {"GBM": gbm_options, "NN_TORCH": nn_options}
         time_limit = 60
 
@@ -1144,7 +1153,16 @@ def test_tabular_bagstack_use_bag_holdout():
     if fast_benchmark:
         subsample_size = 105
         nn_options = {"num_epochs": 2}
-        gbm_options = [{"num_boost_round": 40}, "GBMLarge"]
+        gbm_options = [
+            {"num_boost_round": 40},
+            {
+                "learning_rate": 0.03,
+                "num_leaves": 128,
+                "feature_fraction": 0.9,
+                "min_data_in_leaf": 3,
+                "ag_args": {"name_suffix": "Large", "priority": 0, "hyperparameter_tune_kwargs": None},
+            },
+        ]
         hyperparameters = {"GBM": gbm_options, "NN_TORCH": nn_options}
         time_limit = 60
 
