@@ -107,6 +107,12 @@ def test_label_cleaner_multiclass():
     output_labels_with_shifted_index_inverse = label_cleaner.inverse_transform(output_labels_with_shifted_index)
     output_labels_new_inverse = label_cleaner.inverse_transform(output_labels_new)
 
+    output_labels_uncleaned = label_cleaner.transform_pred_uncleaned(y=input_labels)
+    output_labels_uncleaned_inverse = label_cleaner.inverse_transform_pred_uncleaned(y=output_labels_uncleaned)
+
+    output_labels_uncleaned_new = label_cleaner.transform_pred_uncleaned(y=input_labels_new)
+    output_labels_uncleaned_new_inverse = label_cleaner.inverse_transform_pred_uncleaned(y=output_labels_uncleaned_new)
+
     assert expected_output_labels.equals(output_labels)
     assert expected_output_labels.equals(output_labels_with_numpy)
     assert expected_output_labels.equals(output_labels_category)
@@ -118,6 +124,8 @@ def test_label_cleaner_multiclass():
     assert input_labels.equals(output_labels_inverse)
     assert input_labels_with_shifted_index.equals(output_labels_with_shifted_index_inverse)
     assert expected_output_labels_new_inverse.equals(output_labels_new_inverse)
+    assert input_labels.equals(output_labels_uncleaned_inverse)
+    assert expected_output_labels_new_inverse.equals(output_labels_uncleaned_new_inverse)
 
 
 def test_label_cleaner_multiclass_to_binary():
@@ -129,7 +137,8 @@ def test_label_cleaner_multiclass_to_binary():
     input_labels_category = input_labels.astype("category")
     input_labels_with_shifted_index = input_labels.copy()
     input_labels_with_shifted_index.index += 5
-    input_labels_new = np.array(["l0", "l1", "l2"])
+    input_labels_new = pd.Series(["l0", "l1", "l2"])
+    input_labels_new_with_unknown = pd.Series(["l0", "l1", "l2", "UNKNOWN_1", "l4", "UNKNOWN_2"])
     input_labels_proba_transformed = pd.Series([0.7, 0.2, 0.5], index=[5, 2, 8])
     expected_output_labels = pd.Series([0, 1, 1, 0, 0, 1], dtype="uint8")
     expected_output_labels_new = pd.Series([np.nan, 0, 1])
@@ -137,6 +146,8 @@ def test_label_cleaner_multiclass_to_binary():
     expected_output_labels_proba_transformed_inverse = pd.DataFrame(
         data=[[0, 0.3, 0.7, 0, 0], [0, 0.8, 0.2, 0, 0], [0, 0.5, 0.5, 0, 0]], index=[5, 2, 8], columns=["l0", "l1", "l2", "l3", "l4"], dtype=np.float32
     )
+    expected_output_labels_new_with_unknown = pd.Series([0, 1, 2, np.nan, 4, np.nan])
+    expected_output_labels_new_with_unknown_inverse = pd.Series(["l0", "l1", "l2", np.nan, "l4", np.nan])
 
     # When
     label_cleaner = LabelCleaner.construct(problem_type=problem_type, y=input_labels, y_uncleaned=input_labels_uncleaned)
@@ -156,6 +167,15 @@ def test_label_cleaner_multiclass_to_binary():
     output_labels_with_shifted_index_inverse = label_cleaner.inverse_transform(output_labels_with_shifted_index)
     output_labels_new_inverse = label_cleaner.inverse_transform(output_labels_new)
 
+    output_labels_uncleaned = label_cleaner.transform_pred_uncleaned(y=input_labels)
+    output_labels_uncleaned_inverse = label_cleaner.inverse_transform_pred_uncleaned(y=output_labels_uncleaned)
+
+    output_labels_uncleaned_new = label_cleaner.transform_pred_uncleaned(y=input_labels_new)
+    output_labels_uncleaned_new_inverse = label_cleaner.inverse_transform_pred_uncleaned(y=output_labels_uncleaned_new)
+
+    output_labels_uncleaned_new_with_unknown = label_cleaner.transform_pred_uncleaned(y=input_labels_new_with_unknown)
+    output_labels_uncleaned_new_with_unknown_inverse = label_cleaner.inverse_transform_pred_uncleaned(y=output_labels_uncleaned_new_with_unknown)
+
     assert expected_output_labels.equals(output_labels)
     assert expected_output_labels.equals(output_labels_with_numpy)
     assert expected_output_labels.equals(output_labels_category)
@@ -167,6 +187,12 @@ def test_label_cleaner_multiclass_to_binary():
     assert input_labels.equals(output_labels_inverse)
     assert input_labels_with_shifted_index.equals(output_labels_with_shifted_index_inverse)
     assert expected_output_labels_new_inverse.equals(output_labels_new_inverse)
+
+    assert input_labels.equals(output_labels_uncleaned_inverse)
+    assert input_labels_new.equals(output_labels_uncleaned_new_inverse)
+
+    assert expected_output_labels_new_with_unknown.equals(output_labels_uncleaned_new_with_unknown)
+    assert expected_output_labels_new_with_unknown_inverse.equals(output_labels_uncleaned_new_with_unknown_inverse)
 
     output_labels_proba_transformed_inverse = label_cleaner.inverse_transform_proba(input_labels_proba_transformed, as_pandas=True)
 
