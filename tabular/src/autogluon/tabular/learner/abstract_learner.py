@@ -656,8 +656,9 @@ class AbstractTabularLearner(AbstractLearner):
         else:
             y_pred = self.label_cleaner.inverse_transform_proba(y_pred_proba_internal, as_pred=False)
             if isinstance(self.label_cleaner, LabelCleanerMulticlass):
-                # Ensures that logic works even when y contains previously dropped classes during fit
-                # Note: If y contains never before seen classes, might still behave incorrectly.
+                # Ensures that logic works even when y contains previously dropped classes during fit.
+                # If y contains never before seen classes, this will raise a ValueError in `self._validate_class_labels`.
+                self._validate_class_labels(y=y, eval_metric=metric)
                 y_tmp = self.label_cleaner.transform_pred_uncleaned(y)
             else:
                 y_tmp = y_internal
@@ -676,11 +677,13 @@ class AbstractTabularLearner(AbstractLearner):
             y_tmp = y
         return compute_weighted_metric(y_tmp, y_pred, metric, weights=sample_weight, weight_evaluation=weight_evaluation, quantile_levels=self.quantile_levels)
 
-    def _validate_class_labels(self, y: Series):
+    def _validate_class_labels(self, y: Series, eval_metric: Scorer = None):
         null_count = y.isnull().sum()
         if null_count:
             raise ValueError(f"Labels cannot contain missing (nan) values. Found {null_count} missing label values.")
-        if self.problem_type == MULTICLASS and not self.eval_metric.needs_pred:
+        if eval_metric is None:
+            eval_metric = self.eval_metric
+        if self.problem_type == MULTICLASS and not eval_metric.needs_pred:
             y_unique = np.unique(y)
             valid_class_set = set(self.class_labels)
             unknown_classes = []
@@ -690,7 +693,10 @@ class AbstractTabularLearner(AbstractLearner):
             if unknown_classes:
                 # log_loss / pac_score
                 raise ValueError(
-                    f"Multiclass scoring with eval_metric='{self.eval_metric.name}' does not support unknown classes. Unknown classes: {unknown_classes}"
+                    f"Multiclass scoring with eval_metric='{eval_metric.name}' does not support unknown classes. "
+                    f"Please ensure the classes you wish to evaluate are present in the training data, otherwise they cannot be scored with this metric."
+                    f"\n\tUnknown classes: {unknown_classes}"
+                    f"\n\t  Known classes: {self.class_labels}"
                 )
 
     def evaluate_predictions(self, y_true, y_pred, sample_weight=None, decision_threshold=None, display=False, auxiliary_metrics=True, detailed_report=False):
