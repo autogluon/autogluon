@@ -29,7 +29,6 @@ from random import seed
 import numpy as np
 import pandas as pd
 import pytest
-from networkx.exception import NetworkXError
 
 from autogluon.common import space
 from autogluon.common.utils.simulation_utils import convert_simulation_artifacts_to_tabular_predictions_dict
@@ -251,7 +250,7 @@ def test_advanced_functionality():
     assert predictor.model_names(persisted=True) == []  # Assert that all models were unpersisted
 
     # Raise exception
-    with pytest.raises(NetworkXError):
+    with pytest.raises(ValueError):
         predictor.persist(models=["UNKNOWN_MODEL_1", "UNKNOWN_MODEL_2"])
 
     assert predictor.model_names(persisted=True) == []

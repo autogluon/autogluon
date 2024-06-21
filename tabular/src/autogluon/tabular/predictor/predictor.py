@@ -3189,7 +3189,15 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         List of persisted model names.
         """
         self._assert_is_fit("persist")
-        return self._learner.persist_trainer(low_memory=False, models=models, with_ancestors=with_ancestors, max_memory=max_memory)
+        try:
+            return self._learner.persist_trainer(low_memory=False, models=models, with_ancestors=with_ancestors, max_memory=max_memory)
+        except Exception as e:
+            valid_models = self.model_names()
+            if isinstance(models, list):
+                invalid_models = [m for m in models if m not in valid_models]
+                if invalid_models:
+                    raise ValueError(f"Invalid models specified. The following models do not exist:\n\t{invalid_models}\nValid models:\n\t{valid_models}")
+            raise e
 
     def unpersist(self, models="all") -> List[str]:
         """
