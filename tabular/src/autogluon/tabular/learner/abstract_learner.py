@@ -13,7 +13,7 @@ from pandas import DataFrame, Series
 from sklearn.metrics import classification_report
 
 from autogluon.core.constants import AUTO_WEIGHT, BALANCE_WEIGHT, BINARY, MULTICLASS, QUANTILE, REGRESSION
-from autogluon.core.data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
+from autogluon.core.data.label_cleaner import LabelCleaner, LabelCleanerMulticlass, LabelCleanerMulticlassToBinary
 from autogluon.core.learner import AbstractLearner
 from autogluon.core.metrics import Scorer, confusion_matrix, get_metric
 from autogluon.core.models.greedy_ensemble.ensemble_selection import EnsembleSelection
@@ -655,7 +655,12 @@ class AbstractTabularLearner(AbstractLearner):
             y_tmp = y
         else:
             y_pred = self.label_cleaner.inverse_transform_proba(y_pred_proba_internal, as_pred=False)
-            y_tmp = y_internal
+            if isinstance(self.label_cleaner, LabelCleanerMulticlass):
+                # Ensures that logic works even when y contains previously dropped classes during fit
+                # Note: If y contains never before seen classes, might still behave incorrectly.
+                y_tmp = self.label_cleaner.transform_pred_uncleaned(y)
+            else:
+                y_tmp = y_internal
         return compute_weighted_metric(y_tmp, y_pred, metric, weights=sample_weight, weight_evaluation=weight_evaluation, quantile_levels=self.quantile_levels)
 
     def _score_with_pred(self, y, y_internal, y_pred_internal, metric, sample_weight=None, weight_evaluation=None):

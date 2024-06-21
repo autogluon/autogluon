@@ -58,7 +58,6 @@ EXPECTED_MULTICLASS_METRICS = {
     "recall_weighted",
     "roc_auc_ovo",
     "roc_auc_ovo_macro",
-    "roc_auc_ovo_micro",
     "roc_auc_ovo_weighted",
     "roc_auc_ovr",
     "roc_auc_ovr_macro",
