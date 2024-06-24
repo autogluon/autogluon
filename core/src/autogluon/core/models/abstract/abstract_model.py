@@ -454,9 +454,10 @@ class AbstractModel:
             self.features = list(X.columns)
         # TODO: Consider changing how this works or where it is done
         if feature_metadata is None:
-            feature_metadata = FeatureMetadata.from_df(X)
+            feature_metadata = self._infer_feature_metadata(X=X)
         else:
             feature_metadata = copy.deepcopy(feature_metadata)
+        feature_metadata = self._update_feature_metadata(feature_metadata=feature_metadata)
         get_features_kwargs = self.params_aux.get("get_features_kwargs", None)
         if get_features_kwargs is not None:
             valid_features = feature_metadata.get_features(**get_features_kwargs)
@@ -503,6 +504,16 @@ class AbstractModel:
             self._is_features_in_same_as_ex = True
         if error_if_no_features and not self._features_internal:
             raise NoValidFeatures
+
+    def _update_feature_metadata(self, feature_metadata: FeatureMetadata) -> FeatureMetadata:
+        """
+        [Advanced] Method that performs updates to feature_metadata during initialization.
+        Primarily present for use in stacker models.
+        """
+        return feature_metadata
+
+    def _infer_feature_metadata(self, X: pd.DataFrame) -> FeatureMetadata:
+        return FeatureMetadata.from_df(X)
 
     def _preprocess_fit_args(self, **kwargs) -> dict:
         sample_weight = kwargs.get("sample_weight", None)
@@ -562,10 +573,10 @@ class AbstractModel:
 
         self._init_misc(X=X, y=y, feature_metadata=feature_metadata, num_classes=num_classes, **kwargs)
 
+        self._init_params()
+
         if X is not None:
             self._preprocess_set_features(X=X, feature_metadata=feature_metadata)
-
-        self._init_params()
 
     def _init_misc(self, **kwargs):
         """Initialize parameters that depend on self.params_aux being initialized"""

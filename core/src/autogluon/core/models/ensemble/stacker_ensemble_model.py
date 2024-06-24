@@ -1,16 +1,17 @@
+from __future__ import annotations
+
 import copy
 import logging
 import os
 import time
 from collections import defaultdict
-from typing import Dict
+from typing import Dict, List
 
 import numpy as np
 import pandas as pd
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.features.types import R_FLOAT, S_STACK
-from autogluon.common.utils.path_converter import PathConverter
 
 from ...constants import MULTICLASS, QUANTILE, SOFTCLASS
 from ..abstract.abstract_model import AbstractModel
@@ -35,12 +36,12 @@ class StackerEnsembleModel(BaggedEnsembleModel):
 
     def __init__(
         self,
-        base_model_names=None,
-        base_models_dict=None,
-        base_model_paths_dict=None,
-        base_model_types_dict=None,
-        base_model_types_inner_dict=None,
-        base_model_performances_dict=None,
+        base_model_names: List[str] | None = None,
+        base_models_dict: Dict[str, AbstractModel] | None = None,
+        base_model_paths_dict: Dict[str, str] = None,
+        base_model_types_dict: dict | None = None,
+        base_model_types_inner_dict: dict | None = None,
+        base_model_performances_dict: Dict[str, float] | None = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -61,8 +62,10 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         self._base_model_performances_dict = base_model_performances_dict
         self._base_model_types_inner_dict = base_model_types_inner_dict
 
-    def _initialize(self, **kwargs):
-        super()._initialize(**kwargs)
+    def _update_feature_metadata(self, feature_metadata: FeatureMetadata) -> FeatureMetadata:
+        """
+        Updates base_model_names and feature_metadata to reflect the used base models.
+        """
         base_model_performances_dict = self._base_model_performances_dict
         base_model_types_inner_dict = self._base_model_types_inner_dict
         if (base_model_performances_dict is not None) and (base_model_types_inner_dict is not None):
@@ -88,7 +91,21 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             stack_column_prefix: self.base_model_names[i] for i, stack_column_prefix in enumerate(self.stack_column_prefix_lst)
         }
 
-        self._add_stack_to_feature_metadata()
+        feature_metadata = self._remove_unused_stack_in_feature_metadata(feature_metadata=feature_metadata)
+        return feature_metadata
+
+    def _infer_feature_metadata(self, X: pd.DataFrame) -> FeatureMetadata:
+        """
+        Additionally adds the stack feature special types to the inferred feature_metadata.
+        """
+        feature_metadata = super()._infer_feature_metadata(X=X)
+        stack_column_prefix_lst = copy.deepcopy(self.base_model_names)
+        stack_columns, num_pred_cols_per_model = self.set_stack_columns(stack_column_prefix_lst=stack_column_prefix_lst)
+        type_map_raw = {column: R_FLOAT for column in stack_columns}
+        type_group_map_special = {S_STACK: stack_columns}
+        stacker_feature_metadata = FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_group_map_special)
+        feature_metadata = feature_metadata.add_special_types(stacker_feature_metadata.get_type_map_special())
+        return feature_metadata
 
     @staticmethod
     def limit_models_per_type(models, model_types, model_scores, max_base_models_per_type):
@@ -215,19 +232,19 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         info["children_info"] = children_info  # Ensure children_info is last in order
         return info
 
-    def _add_stack_to_feature_metadata(self):
-        if len(self.models) == 0:
-            type_map_raw = {column: R_FLOAT for column in self.stack_columns}
-            type_group_map_special = {S_STACK: self.stack_columns}
-            stacker_feature_metadata = FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_group_map_special)
-            if self.feature_metadata is None:  # TODO: This is probably not the best way to do this
-                self.feature_metadata = stacker_feature_metadata
-            else:
-                # FIXME: This is a hack, stack feature special types should be already present in feature_metadata, not added here
-                existing_stack_features = self.feature_metadata.get_features(required_special_types=[S_STACK])
-                # HACK: Currently AutoGluon auto-adds all base learner prediction features into self.feature_metadata.
-                # The two lines below are here because if feature pruning would crash if it prunes a base learner prediction feature.
-                existing_features = self.feature_metadata.get_features()
-                stacker_feature_metadata = stacker_feature_metadata.keep_features([feature for feature in existing_features if feature in type_map_raw])
-                if set(stacker_feature_metadata.get_features()) != set(existing_stack_features):
-                    self.feature_metadata = self.feature_metadata.add_special_types(stacker_feature_metadata.get_type_map_special())
+    def _remove_unused_stack_in_feature_metadata(self, feature_metadata: FeatureMetadata) -> FeatureMetadata:
+        """
+        Updates `self.feature_metadata` to only contain stack features specified in `self.stack_columns`.
+        """
+        assert feature_metadata is not None, f"feature_metadata must be specified prior to adding stack feature information."
+        # Trust feature metadata
+        original_stack_features = feature_metadata.get_features(required_special_types=[S_STACK])
+        current_stack_features = self.stack_columns
+        for stack_feature in current_stack_features:
+            assert stack_feature in original_stack_features, (
+                f"Missing expected stack feature '{stack_feature}' in original feature_metadata. "
+                f"Stack features in feature_metadata: {original_stack_features}"
+            )
+        stack_features_to_remove = [stack_feature for stack_feature in original_stack_features if stack_feature not in current_stack_features]
+        feature_metadata = feature_metadata.remove_features(features=stack_features_to_remove)
+        return feature_metadata

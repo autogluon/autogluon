@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
+from autogluon.common.features.types import R_FLOAT, S_STACK
 from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.log_utils import convert_time_in_s_to_log_friendly
 from autogluon.common.utils.path_converter import PathConverter
@@ -694,6 +695,8 @@ class AbstractTrainer:
                     "base_model_names": base_model_names,
                     "base_model_paths_dict": base_model_paths,
                     "base_model_types_dict": base_model_types,
+                    "base_model_types_inner_dict": self.get_models_attribute_dict(attribute="type_inner", models=base_model_names),
+                    "base_model_performances_dict": self.get_models_attribute_dict(attribute="val_score", models=base_model_names),
                     "random_state": level + self.random_state,
                 }
                 get_models_kwargs.update(
@@ -713,6 +716,7 @@ class AbstractTrainer:
                 kwargs["hyperparameter_tune_kwargs"] = hyperparameter_tune_kwargs
         logger.log(20, f"Fitting {len(models)} L{level} models ...")
         X_init = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=True)
+        feature_metadata = self.get_feature_metadata(use_orig_features=True, base_models=base_model_names)
         if X_val is not None:
             X_val = self.get_inputs_to_stacker(X_val, base_models=base_model_names, fit=False, use_val_cache=True)
         compute_score = not refit_full
@@ -724,7 +728,10 @@ class AbstractTrainer:
         if X_unlabeled is not None:
             X_unlabeled = self.get_inputs_to_stacker(X_unlabeled, base_models=base_model_names, fit=False)
 
-        fit_kwargs = dict(num_classes=self.num_classes)
+        fit_kwargs = dict(
+            num_classes=self.num_classes,
+            feature_metadata=feature_metadata,
+        )
 
         # FIXME: TODO: v0.1 X_unlabeled isn't cached so it won't be available during refit_full or fit_extra.
         return self._train_multi(
@@ -1291,6 +1298,28 @@ class AbstractTrainer:
             X = X_stacker
         return X
 
+    def get_feature_metadata(self, use_orig_features: bool = True, model: str | None = None, base_models: List[str] | None = None) -> FeatureMetadata:
+        if model is not None and base_models is not None:
+            raise AssertionError("Only one of `model`, `base_models` is allowed to be set.")
+        if model is not None and base_models is None:
+            base_models = self.get_base_model_names(model)
+
+        feature_metadata = None
+        if use_orig_features:
+            feature_metadata = self.feature_metadata
+        if base_models:
+            stack_column_names, _ = self._get_stack_column_names(models=base_models)
+            stacker_type_map_raw = {column: R_FLOAT for column in stack_column_names}
+            stacker_type_group_map_special = {S_STACK: stack_column_names}
+            stacker_feature_metadata = FeatureMetadata(type_map_raw=stacker_type_map_raw, type_group_map_special=stacker_type_group_map_special)
+            if feature_metadata is not None:
+                feature_metadata = feature_metadata.join_metadata(stacker_feature_metadata)
+            else:
+                feature_metadata = stacker_feature_metadata
+        if feature_metadata is None:
+            feature_metadata = FeatureMetadata(type_map_raw={})
+        return feature_metadata
+
     def _get_stack_column_names(self, models: List[str]) -> Tuple[List[str], int]:
         """
         Get the stack column names generated when the provided models are used as base models in a stack ensemble.
@@ -1781,6 +1810,8 @@ class AbstractTrainer:
             else:
                 save_bag_folds = True
 
+        feature_metadata = self.get_feature_metadata(use_orig_features=False, base_models=base_model_names)
+
         base_model_paths_dict = self.get_models_attribute_dict(attribute="path", models=base_model_names)
         base_model_paths_dict = {key: os.path.join(self.path, val) for key, val in base_model_paths_dict.items()}
         weighted_ensemble_model, _ = get_models_func(
@@ -1822,7 +1853,7 @@ class AbstractTrainer:
             level=level,
             time_limit=time_limit,
             ens_sample_weight=w,
-            fit_kwargs=dict(num_classes=self.num_classes, groups=None),  # FIXME: Is this the right way to do this?
+            fit_kwargs=dict(feature_metadata=feature_metadata, num_classes=self.num_classes, groups=None),  # FIXME: Is this the right way to do this?
         )
         for weighted_ensemble_model_name in models:
             if check_if_best and weighted_ensemble_model_name in self.get_model_names():
@@ -3688,21 +3719,9 @@ class AbstractTrainer:
             if k_fold == self.k_fold:  # don't do this on refit full
                 model_fit_kwargs["groups"] = self._groups
 
-        #######################
-        # FIXME: This section is a hack, compute genuine feature_metadata for each stack level instead
-        #  Don't do this here, do this upstream so it isn't recomputed for each model
-        #  Add feature_metadata to model_fit_kwargs
         # FIXME: Sample weight `extract_column` is a hack, have to compute feature_metadata here because sample weight column could be in X upstream, extract sample weight column upstream instead.
-        # FIXME: This doesn't assign proper special types to stack features, relying on a hack in StackerEnsembleModel to assign S_STACK to feature metadata, don't do this.
-        #  Remove hack in StackerEnsembleModel
-        feature_metadata = self.feature_metadata
-        features_base = self.feature_metadata.get_features()
-        features_new = [feature for feature in X.columns if feature not in features_base]
-        if features_new:
-            feature_metadata_new = FeatureMetadata.from_df(X[features_new])
-            feature_metadata = feature_metadata.join_metadata(feature_metadata_new).keep_features(list(X.columns))
-        model_fit_kwargs["feature_metadata"] = feature_metadata
-        #######################
+        if "feature_metadata" not in model_fit_kwargs:
+            raise AssertionError(f"Missing expected parameter 'feature_metadata'.")
         return model_fit_kwargs
 
     def _get_bagged_model_fit_kwargs(self, k_fold: int, k_fold_start: int, k_fold_end: int, n_repeats: int, n_repeat_start: int) -> dict:
