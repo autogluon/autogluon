@@ -125,7 +125,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         return self.limit_models_per_type(models=models, model_types=model_types, model_scores=model_scores, max_base_models_per_type=max_base_models)
 
     def _set_default_params(self):
-        default_params = {"use_orig_features": True, "max_base_models": 25, "max_base_models_per_type": 5}
+        default_params = {"use_orig_features": True, "max_base_models": 50, "max_base_models_per_type": 5}
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
         super()._set_default_params()
