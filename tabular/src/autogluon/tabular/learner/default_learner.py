@@ -79,6 +79,9 @@ class DefaultLearner(AbstractTabularLearner):
         if self.problem_type is None:
             self.problem_type = self.infer_problem_type(y=X[self.label])
         logger.log(20, f"Problem Type:       {self.problem_type}")
+        if self._eval_metric_was_str:
+            # Ensure that the eval_metric is valid for the problem_type
+            self._verify_metric(eval_metric=self.eval_metric, problem_type=self.problem_type)
         if self.groups is not None:
             num_bag_sets = 1
             num_bag_folds = len(X[self.groups].unique())
@@ -211,7 +214,8 @@ class DefaultLearner(AbstractTabularLearner):
 
             holdout_frac = 1
 
-        if (self.eval_metric is not None) and (self.eval_metric.name in ["log_loss", "pac_score"]) and (self.problem_type == MULTICLASS):
+        if self.eval_metric is not None and self.eval_metric.needs_proba and self.problem_type == MULTICLASS:
+            # Metric requires all classes present in training to be able to compute a score
             if num_bag_folds > 0:
                 self.threshold = 2
                 if self.groups is None:

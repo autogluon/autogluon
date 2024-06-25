@@ -85,7 +85,7 @@ class AbstractModel:
         If `eval_metric = None`, it is automatically chosen based on `problem_type`.
         Defaults to 'accuracy' for binary and multiclass classification and 'root_mean_squared_error' for regression.
         Otherwise, options for classification:
-            ['accuracy', 'balanced_accuracy', 'f1', 'f1_macro', 'f1_micro', 'f1_weighted', 'roc_auc', 'roc_auc_ovo_macro',
+            ['accuracy', 'balanced_accuracy', 'f1', 'f1_macro', 'f1_micro', 'f1_weighted', 'roc_auc', 'roc_auc_ovo', 'roc_auc_ovr',
             'average_precision', 'precision', 'precision_macro', 'precision_micro', 'precision_weighted', 'recall',
             'recall_macro', 'recall_micro', 'recall_weighted', 'log_loss', 'pac_score', 'quadratic_kappa']
         Options for regression:
