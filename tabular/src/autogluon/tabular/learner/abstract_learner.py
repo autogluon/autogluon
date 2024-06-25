@@ -371,11 +371,17 @@ class AbstractTabularLearner(AbstractLearner):
         return y_pred
 
     def _validate_fit_input(self, X: DataFrame, **kwargs):
-        if self.label not in X.columns:
-            raise KeyError(f"Label column '{self.label}' is missing from training data. Training data columns: {list(X.columns)}")
+        self.validate_label(X=X)
         X_val = kwargs.get("X_val", None)
         self._validate_sample_weight(X, X_val)
         self._validate_groups(X, X_val)
+
+    def validate_label(self, X: DataFrame):
+        """
+        Ensure that the label column is present in the training data
+        """
+        if self.label not in X.columns:
+            raise KeyError(f"Label column '{self.label}' is missing from training data. Training data columns: {list(X.columns)}")
 
     def _validate_sample_weight(self, X, X_val):
         if self.sample_weight is not None:

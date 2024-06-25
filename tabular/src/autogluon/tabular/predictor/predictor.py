@@ -1048,6 +1048,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         if self.problem_type is not None:
             inferred_problem_type = self.problem_type
         else:
+            self._learner.validate_label(X=train_data)
             inferred_problem_type = self._learner.infer_problem_type(y=train_data[self.label], silent=True)
 
         num_bag_folds, num_bag_sets, num_stack_levels, dynamic_stacking, use_bag_holdout = self._sanitize_stack_args(
