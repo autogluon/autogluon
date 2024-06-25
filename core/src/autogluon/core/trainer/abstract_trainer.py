@@ -1246,6 +1246,7 @@ class AbstractTrainer:
     ) -> pd.DataFrame:
         """
         Returns the valid X input for a stacker model with base models equal to `base_models`.
+        Pairs with `feature_metadata = self.get_feature_metadata(...)`. The contents of the returned `X` should reflect `feature_metadata`.
 
         Parameters
         ----------
@@ -1299,6 +1300,26 @@ class AbstractTrainer:
         return X
 
     def get_feature_metadata(self, use_orig_features: bool = True, model: str | None = None, base_models: List[str] | None = None) -> FeatureMetadata:
+        """
+        Returns the FeatureMetadata input to a `model.fit` call.
+        Pairs with `X = self.get_inputs_to_stacker(...)`. The returned FeatureMetadata should reflect the contents of `X`.
+
+        Parameters
+        ----------
+        use_orig_features : bool, default = True
+            If True, will include the original features in the FeatureMetadata.
+            If False, will only include the stack features in the FeatureMetadata.
+        model : str, default = None
+            If specified, it must be an already existing model.
+            `base_models` will be set to the base models of `model`.
+        base_models : List[str], default = None
+            If specified, will add the stack features of the `base_models` to FeatureMetadata.
+
+        Returns
+        -------
+        FeatureMetadata
+            The FeatureMetadata that should be passed into a `model.fit` call.
+        """
         if model is not None and base_models is not None:
             raise AssertionError("Only one of `model`, `base_models` is allowed to be set.")
         if model is not None and base_models is None:
