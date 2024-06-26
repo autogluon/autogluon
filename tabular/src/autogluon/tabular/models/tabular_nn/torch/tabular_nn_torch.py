@@ -284,7 +284,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         logger.log(15, f"Training tabular neural network for up to {num_epochs} epochs...")
         total_updates = 0
         num_updates_per_epoch = max(round(len(train_dataset) / batch_size) + 1, 1)
-        update_to_check_time = min(10, max(1, int(num_updates_per_epoch / 10)))
+        update_to_check_time = min(10, max(1, int(num_updates_per_epoch / 5)))
         do_update = True
         epoch = 0
         best_epoch = 0
@@ -298,6 +298,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                 raise TimeLimitExceeded
         while do_update:
             time_start_epoch = time.time()
+            time_cur = time_start_epoch
             total_train_loss = 0.0
             total_train_size = 0.0
             for batch_idx, data_batch in enumerate(train_dataloader):
@@ -314,11 +315,18 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
                 # time limit
                 if time_limit is not None:
-                    time_cur = time.time()
+                    time_cur_tmp = time.time()
+                    time_elapsed_batch = time_cur_tmp - time_cur
+                    time_cur = time_cur_tmp
                     update_cur = batch_idx + 1
                     if epoch == 0 and update_cur == update_to_check_time:
                         time_elapsed_epoch = time_cur - time_start_epoch
-                        estimated_time = time_elapsed_epoch / update_cur * num_updates_per_epoch
+
+                        # v1 estimate is sensitive to fixed cost overhead at the start of training, such as torch initialization.
+                        # v2 fixes this, but we keep both and take the min to avoid potential cases where v2 is inaccurate due to an overly slow batch.
+                        estimated_time_v1 = time_elapsed_epoch / update_cur * num_updates_per_epoch  # Less accurate than v2, but never underestimates time
+                        estimated_time_v2 = time_elapsed_epoch + time_elapsed_batch * (num_updates_per_epoch - update_cur)  # Less likely to overestimate time
+                        estimated_time = min(estimated_time_v1, estimated_time_v2)
                         if estimated_time > time_limit:
                             logger.log(
                                 30,

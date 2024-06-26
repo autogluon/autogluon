@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import logging
+import os
 import time
 import warnings
 from builtins import classmethod
@@ -513,7 +514,7 @@ class NNFastAiTabularModel(AbstractModel):
         self.model = __model
         # Export model
         if self._load_model:
-            save_pkl.save_with_fn(f"{path}{self.model_internals_file_name}", self.model, pickle_fn=lambda m, buffer: export(m, buffer), verbose=verbose)
+            save_pkl.save_with_fn(self._model_internals_path, self.model, pickle_fn=lambda m, buffer: export(m, buffer), verbose=verbose)
         self._load_model = None
         return path
 
@@ -533,11 +534,17 @@ class NNFastAiTabularModel(AbstractModel):
             if plt != "Windows":
                 og_windows_path = pathlib.WindowsPath
                 pathlib.WindowsPath = pathlib.PosixPath
-            model.model = load_pkl.load_with_fn(f"{model.path}{model.model_internals_file_name}", lambda p: load_learner(p), verbose=verbose)
+            model_internals_path = os.path.join(path, model.model_internals_file_name)
+            model.model = load_pkl.load_with_fn(model_internals_path, lambda p: load_learner(p), verbose=verbose)
             if og_windows_path is not None:
                 pathlib.WindowsPath = og_windows_path
         model._load_model = None
         return model
+
+    @property
+    def _model_internals_path(self) -> str:
+        """Path to model-internals.pkl"""
+        return os.path.join(self.path, self.model_internals_file_name)
 
     def _set_default_params(self):
         """Specifies hyperparameter values to use by default"""

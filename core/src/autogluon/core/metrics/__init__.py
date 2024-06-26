@@ -449,7 +449,7 @@ def make_scorer(
     needs_proba : bool, default=False
         Whether score_func requires predict_proba to get probability estimates out of a classifier.
         These scorers can benefit from calibration methods such as temperature scaling.
-        Examples: ["log_loss", "roc_auc_ovo_macro", "pac"]
+        Examples: ["log_loss", "roc_auc_ovo", "roc_auc_ovr", "pac"]
 
     needs_class : bool, default=False
         Whether score_func requires class predictions (classification only).
@@ -634,6 +634,17 @@ def customized_log_loss(y_true, y_pred, eps=1e-15):
         return sklearn.metrics.log_loss(y_true.astype(np.int32), y_pred, labels=labels)
 
 
+def customized_roc_auc(y_true, y_pred, **kwargs):
+    assert y_true.ndim == 1
+    if y_pred.ndim == 1 or "labels" in kwargs:
+        return sklearn.metrics.roc_auc_score(y_true, y_pred, **kwargs)
+    else:
+        # Avoid exception if not all classes are present in y_true
+        assert y_pred.ndim == 2, "Only ndim=2 is supported"
+        labels = np.arange(y_pred.shape[1], dtype=np.int32)
+        return sklearn.metrics.roc_auc_score(y_true.astype(np.int32), y_pred, labels=labels, **kwargs)
+
+
 # Score function for probabilistic classification
 log_loss = make_scorer("log_loss", customized_log_loss, optimum=0, greater_is_better=False, needs_proba=True)
 log_loss.add_alias("nll")
@@ -695,6 +706,26 @@ for name, metric in [("precision", sklearn.metrics.precision_score), ("recall", 
         _add_scorer_to_metric_dict(metric_dict=BINARY_METRICS, scorer=globals()[qualified_name])
         _add_scorer_to_metric_dict(metric_dict=MULTICLASS_METRICS, scorer=globals()[qualified_name])
 
+
+for name, metric, kwargs in [
+    ("roc_auc_ovo", customized_roc_auc, dict(multi_class="ovo")),
+    ("roc_auc_ovr", customized_roc_auc, dict(multi_class="ovr")),
+]:
+    scorer_kwargs = dict(greater_is_better=True, needs_proba=True, needs_threshold=False)
+    globals()[name] = make_scorer(name, partial(metric, average=average, **kwargs), **scorer_kwargs)
+    macro_name = "{0}_{1}".format(name, "macro")
+    globals()[name].add_alias(macro_name)
+    _add_scorer_to_metric_dict(metric_dict=MULTICLASS_METRICS, scorer=globals()[name])
+    if name == "roc_auc_ovo":
+        averages = ["weighted"]
+    else:
+        averages = ["micro", "weighted"]
+    for average in averages:
+        qualified_name = "{0}_{1}".format(name, average)
+        globals()[qualified_name] = make_scorer(qualified_name, partial(metric, average=average, **kwargs), **scorer_kwargs)
+        _add_scorer_to_metric_dict(metric_dict=MULTICLASS_METRICS, scorer=globals()[qualified_name])
+
+
 METRICS = {
     BINARY: BINARY_METRICS,
     MULTICLASS: MULTICLASS_METRICS,
@@ -729,11 +760,13 @@ def get_metric(metric, problem_type=None, metric_type=None) -> Scorer:
                 valid_problem_types = _get_valid_metric_problem_types(metric)
                 if valid_problem_types:
                     raise ValueError(
-                        f"{metric_type}='{metric}' is not a valid metric for problem_type='{problem_type}'. Valid problem_types for this metric: {valid_problem_types}"
+                        f"{metric_type}='{metric}' is not a valid metric for problem_type='{problem_type}'. "
+                        f"Valid problem_types for this metric: {valid_problem_types}"
+                        f"\nValid metrics for problem_type='{problem_type}':\n{list(METRICS[problem_type].keys())}"
                     )
                 else:
                     raise ValueError(
-                        f"Unknown metric '{metric}'. " f"Valid metrics for problem_type='{problem_type}':\n" f"{list(METRICS[problem_type].keys())}"
+                        f"Unknown {metric_type} '{metric}'. Valid metrics for problem_type='{problem_type}':\n{list(METRICS[problem_type].keys())}"
                     )
             return METRICS[problem_type][metric]
         for pt in METRICS:

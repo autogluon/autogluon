@@ -154,8 +154,41 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
                 # TODO: Confirm this works with sparse and other feature types!
                 # FIXME: Address situation where test-time invalid type values cause crash:
                 #  https://stackoverflow.com/questions/49256211/how-to-set-unexpected-data-type-to-na?noredirect=1&lq=1
-                X = X.astype(self._type_map_real_opt)
+                try:
+                    X = X.astype(self._type_map_real_opt)
+                except Exception as e:
+                    self._log_invalid_dtypes(X=X)
+                    raise e
         return X
+
+    def _log_invalid_dtypes(self, X: pd.DataFrame):
+        """
+        Logs detailed information on all feature transformations, including exceptions that occur.
+        """
+        pd_cols = ["feature", "status", "dtype_input", "dtype_to_convert_to", "exception"]
+        rows = []
+
+        logger.log(
+            40,
+            f"Exception encountered in {self.__class__.__name__} ... "
+            f"Please check if feature data types differ between train and test (via df.dtypes).\nException breakdown by feature:",
+        )
+        for f in self._type_map_real_opt.keys():
+            f_type_out = self._type_map_real_opt[f]
+            f_type_in = X[f].dtype
+            try:
+                X[f].astype(f_type_out)
+            except Exception as e:
+                status = f"{e.__class__.__name__}"
+                exception = e
+            else:
+                status = "Success"
+                exception = None
+            row = [f, status, f_type_in, f_type_out, exception]
+            rows.append(row)
+        df_debug = pd.DataFrame(rows, columns=pd_cols)
+        with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):
+            logger.log(40, df_debug)
 
     def _convert_to_bool(self, X: DataFrame) -> DataFrame:
         if self._use_fast_bool_method:

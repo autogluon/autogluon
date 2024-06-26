@@ -13,7 +13,6 @@ __all__ = [
     "try_import_faiss",
     "try_import_fastai",
     "try_import_torch",
-    "try_import_d8",
     "try_import_autogluon_multimodal",
     "try_import_rapids_cuml",
     "try_import_imodels",
@@ -130,15 +129,8 @@ def try_import_torch():
         raise ImportError(
             "Unable to import dependency torch\n"
             "A quick tip is to install via `pip install torch`.\n"
-            "The minimum torch version is currently 2.1."  # sync with core/_setup_utils.py
+            "The minimum torch version is currently 2.2."  # sync with core/_setup_utils.py
         )
-
-
-def try_import_d8():
-    try:
-        import d8
-    except ImportError as e:
-        raise ImportError("`import d8` failed. d8 is an optional dependency.\n" "A quick tip is to install via `pip install d8`.\n")
 
 
 def try_import_autogluon_multimodal():

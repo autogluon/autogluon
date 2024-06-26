@@ -78,6 +78,7 @@ ALL_MODELS = {
     "SimpleFeedForward": DUMMY_MODEL_HPARAMS,
     "TemporalFusionTransformer": DUMMY_MODEL_HPARAMS,
     "Theta": DUMMY_MODEL_HPARAMS,
+    "TiDE": DUMMY_MODEL_HPARAMS,
     "WaveNet": DUMMY_MODEL_HPARAMS,
     "Zero": DUMMY_MODEL_HPARAMS,
     # Override default hyperparameters for faster training

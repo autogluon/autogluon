@@ -424,3 +424,94 @@ class WaveNetModel(AbstractGluonTSModel):
         init_kwargs.setdefault("time_features", get_time_features_for_frequency(self.freq))
         init_kwargs.setdefault("num_parallel_samples", self.default_num_samples)
         return init_kwargs
+
+
+class TiDEModel(AbstractGluonTSModel):
+    """Time series dense encoder model from [Das2023]_.
+
+    Based on `gluonts.torch.model.tide.TiDEEstimator <https://ts.gluon.ai/stable/api/gluonts/gluonts.torch.model.tide.html>`_.
+    See GluonTS documentation for additional hyperparameters.
+
+
+    References
+    ----------
+    .. [Das2023] Das, Abhimanyu, et al.
+        "Long-term Forecasting with TiDE: Time-series Dense Encoder."
+        Transactions of Machine Learning Research. 2023.
+
+    Other Parameters
+    ----------------
+    context_length : int, default = max(64, 2 * prediction_length)
+        Number of past values used for prediction.
+    disable_static_features : bool, default = False
+        If True, static features won't be used by the model even if they are present in the dataset.
+        If False, static features will be used by the model if they are present in the dataset.
+    disable_known_covariates : bool, default = False
+        If True, known covariates won't be used by the model even if they are present in the dataset.
+        If False, known covariates will be used by the model if they are present in the dataset.
+    disable_past_covariates : bool, default = False
+        If True, past covariates won't be used by the model even if they are present in the dataset.
+        If False, past covariates will be used by the model if they are present in the dataset.
+    feat_proj_hidden_dim : int, default = 4
+        Size of the feature projection layer.
+    encoder_hidden_dim : int, default = 4
+        Size of the dense encoder layer.
+    decoder_hidden_dim : int, default = 4
+        Size of the dense decoder layer.
+    temporal_hidden_dim : int, default = 4
+        Size of the temporal decoder layer.
+    distr_hidden_dim : int, default = 4
+        Size of the distribution projection layer.
+    num_layers_encoder : int, default = 1
+        Number of layers in dense encoder.
+    num_layers_decoder : int, default = 1
+        Number of layers in dense decoder.
+    decoder_output_dim : int, default = 4
+        Output size of the dense decoder.
+    dropout_rate : float, default = 0.3
+        Dropout regularization parameter.
+    num_feat_dynamic_proj : int, default = 2
+        Output size of feature projection layer.
+    embedding_dimension : int, default = [16] * num_feat_static_cat
+        Dimension of the embeddings for categorical features
+    layer_norm : bool, default = False
+        Should layer normalization be enabled?
+    scaling : {"mean", "std", None}, default = "mean"
+        Scaling applied to the inputs. One of ``"mean"`` (mean absolute scaling), ``"std"`` (standardization), ``None`` (no scaling).
+    max_epochs : int, default = 100
+        Number of epochs the model will be trained for
+    batch_size : int, default = 64
+        Size of batches used during training
+    predict_batch_size : int, default = 500
+        Size of batches used during prediction.
+    num_batches_per_epoch : int, default = 50
+        Number of batches processed every epoch
+    lr : float, default = 1e-3,
+        Learning rate used during training
+    trainer_kwargs : dict, optional
+        Optional keyword arguments passed to ``lightning.Trainer``.
+    early_stopping_patience : int or None, default = 20
+        Early stop training if the validation loss doesn't improve for this many epochs.
+    keep_lightning_logs : bool, default = False
+        If True, ``lightning_logs`` directory will NOT be removed after the model finished training.
+    """
+
+    supports_known_covariates = True
+    supports_static_features = True
+
+    @property
+    def default_context_length(self) -> int:
+        return min(512, max(64, 2 * self.prediction_length))
+
+    def _get_estimator_class(self) -> Type[GluonTSEstimator]:
+        from gluonts.torch.model.tide import TiDEEstimator
+
+        return TiDEEstimator
+
+    def _get_estimator_init_args(self) -> Dict[str, Any]:
+        init_kwargs = super()._get_estimator_init_args()
+        init_kwargs["num_feat_static_cat"] = self.num_feat_static_cat
+        init_kwargs["num_feat_static_real"] = self.num_feat_static_real
+        init_kwargs["cardinality"] = self.feat_static_cat_cardinality
+        init_kwargs["num_feat_dynamic_real"] = self.num_feat_dynamic_real
+        return init_kwargs

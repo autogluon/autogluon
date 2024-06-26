@@ -14,12 +14,18 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import networkx as nx
 import numpy as np
 import pandas as pd
+from packaging import version
 
 from autogluon.common.loaders import load_json
 from autogluon.common.savers import save_json
 from autogluon.common.utils.file_utils import get_directory_size, get_directory_size_per_file
+from autogluon.common.utils.hyperparameter_utils import (
+    get_hyperparameter_str_deprecation_msg,
+    is_advanced_hyperparameter_format,
+)
 from autogluon.common.utils.log_utils import add_log_to_file, set_logger_verbosity
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
+from autogluon.common.utils.system_info import get_ag_system_info
 from autogluon.common.utils.try_import import try_import_ray
 from autogluon.common.utils.utils import (
     check_saved_predictor_version,
@@ -62,6 +68,7 @@ from ..configs.hyperparameter_configs import get_hyperparameter_config
 from ..configs.presets_configs import tabular_presets_alias, tabular_presets_dict
 from ..learner import AbstractTabularLearner, DefaultLearner
 from ..trainer.model_presets.presets import MODEL_TYPES
+from ..version import __version__
 from ._deprecated_methods import TabularPredictorDeprecatedMixin
 
 logger = logging.getLogger(__name__)  # return autogluon root logger
@@ -93,8 +100,9 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
         Otherwise, options for classification:
             ['accuracy', 'balanced_accuracy', 'f1', 'f1_macro', 'f1_micro', 'f1_weighted',
-            'roc_auc', 'roc_auc_ovo_macro', 'average_precision', 'precision', 'precision_macro', 'precision_micro',
-            'precision_weighted', 'recall', 'recall_macro', 'recall_micro', 'recall_weighted', 'log_loss', 'pac_score']
+            'roc_auc', 'roc_auc_ovo', 'roc_auc_ovo_macro', 'roc_auc_ovo_weighted', 'roc_auc_ovr', 'roc_auc_ovr_macro', 'roc_auc_ovr_micro',
+            'roc_auc_ovr_weighted', 'average_precision', 'precision', 'precision_macro', 'precision_micro', 'precision_weighted',
+            'recall', 'recall_macro', 'recall_micro', 'recall_weighted', 'log_loss', 'pac_score']
         Options for regression:
             ['root_mean_squared_error', 'mean_squared_error', 'mean_absolute_error', 'median_absolute_error', 'mean_absolute_percentage_error', 'r2', 'symmetric_mean_absolute_percentage_error']
         For more information on these options, see `sklearn.metrics`: https://scikit-learn.org/stable/modules/classes.html#sklearn-metrics-metrics
@@ -214,7 +222,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
     Dataset = TabularDataset
     predictor_file_name = "predictor.pkl"
-    _predictor_version_file_name = "__version__"
+    _predictor_version_file_name = "version.txt"
     _predictor_metadata_file_name = "metadata.json"
     _predictor_log_file_name = "predictor_log.txt"
 
@@ -406,7 +414,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         num_cpus: int | str = "auto",
         num_gpus: int | str = "auto",
         **kwargs,
-    ):
+    ) -> "TabularPredictor":
         """
         Fit models to predict a column of a data table (label) based on the other columns (features).
 
@@ -440,15 +448,15 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             It is recommended to only use one `quality` based preset in a given call to `fit()` as they alter many of the same arguments and are not compatible with each-other.
 
             In-depth Preset Info:
-                best_quality={'auto_stack': True}
+                best_quality={'auto_stack': True, 'dynamic_stacking': 'auto', 'hyperparameters': 'zeroshot'}
                     Best predictive accuracy with little consideration to inference time or disk usage. Achieve even better results by specifying a large time_limit value.
                     Recommended for applications that benefit from the best possible model accuracy.
 
-                high_quality={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, 'save_bag_folds': False}
-                    High predictive accuracy with fast inference. ~10x-200x faster inference and ~10x-200x lower disk usage than `best_quality`.
+                high_quality={'auto_stack': True, 'dynamic_stacking': 'auto', 'hyperparameters': 'zeroshot', 'refit_full': True, 'set_best_to_refit_full': True, 'save_bag_folds': False}
+                    High predictive accuracy with fast inference. ~8x faster inference and ~8x lower disk usage than `best_quality`.
                     Recommended for applications that require reasonable inference speed and/or model size.
 
-                good_quality={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, 'save_bag_folds': False, 'hyperparameters': 'light'}
+                good_quality={'auto_stack': True, 'dynamic_stacking': 'auto', 'hyperparameters': 'light', 'refit_full': True, 'set_best_to_refit_full': True, 'save_bag_folds': False}
                     Good predictive accuracy with very fast inference. ~4x faster inference and ~4x lower disk usage than `high_quality`.
                     Recommended for applications that require fast inference speed.
 
@@ -478,9 +486,10 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         hyperparameters : str or dict, default = 'default'
             Determines the hyperparameters used by the models.
             If `str` is passed, will use a preset hyperparameter configuration.
-                Valid `str` options: ['default', 'light', 'very_light', 'toy', 'multimodal']
-                    'default': Default AutoGluon hyperparameters intended to maximize accuracy without significant regard to inference time or disk usage.
-                    'light': Results in smaller models. Generally will make inference speed much faster and disk usage much lower, but with worse accuracy.
+                Valid `str` options: ['default', 'zeroshot', 'light', 'very_light', 'toy', 'multimodal']
+                    'default': Default AutoGluon hyperparameters intended to get strong accuracy with reasonable disk usage and inference time. Used in the 'medium_quality' preset.
+                    'zeroshot': A powerful model portfolio learned from TabRepo's ensemble simulation on 200 datasets. Contains ~100 models and is used in 'best_quality' and 'high_quality' presets.
+                    'light': Results in smaller models. Generally will make inference speed much faster and disk usage much lower, but with worse accuracy. Used in the 'good_quality' preset.
                     'very_light': Results in much smaller models. Behaves similarly to 'light', but in many cases with over 10x less disk usage and a further reduction in accuracy.
                     'toy': Results in extremely small models. Only use this when prototyping, as the model quality will be severely reduced.
                     'multimodal': [EXPERIMENTAL] Trains a multimodal transformer model alongside tabular models. Requires that some text columns appear in the data and GPU.
@@ -500,8 +509,9 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                     'AG_AUTOMM' (`MultimodalPredictor` from `autogluon.multimodal`. Supports Tabular, Text, and Image modalities. GPU is required.)
                 Experimental model options include:
                     'FT_TRANSFORMER' (Tabular Transformer, GPU is recommended. Does not scale well to >100 features.)
-                    'FASTTEXT' (FastText)
-                    'VW' (VowpalWabbit)
+                    'FASTTEXT' (FastText. Note: Has not been tested for a long time.)
+                    'TABPFN' (TabPFN. Does not scale well to >100 features or >1000 rows, and does not support regression. Extremely slow inference speed.)
+                    'VW' (VowpalWabbit. Note: Has not been tested for a long time.)
                     'AG_TEXT_NN' (Multimodal Text+Tabular model, GPU is required. Recommended to instead use its successor, 'AG_AUTOMM'.)
                     'AG_IMAGE_NN' (Image model, GPU is required. Recommended to instead use its successor, 'AG_AUTOMM'.)
                 If a certain key is missing from hyperparameters, then `fit()` will not train any models of that type. Omitting a model key from hyperparameters is equivalent to including this model key in `excluded_model_types`.
@@ -512,8 +522,6 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 Caution: Any provided search spaces will error if `hyperparameter_tune_kwargs=None` (Default).
                 To train multiple models of a given type, set the value to a list of hyperparameter dictionaries.
                     For example, `hyperparameters = {'RF': [{'criterion': 'gini'}, {'criterion': 'entropy'}]}` will result in 2 random forest models being trained with separate hyperparameters.
-                Some model types have preset hyperparameter configs keyed under strings as shorthand for a complex model hyperparameter configuration known to work well:
-                    'GBM': ['GBMLarge']
             Advanced functionality: Bring your own model / Custom model support
                 AutoGluon fully supports custom models. For a detailed tutorial on creating and using custom models with AutoGluon, refer to https://auto.gluon.ai/stable/tutorials/tabular/advanced/tabular-custom-model.html
             Advanced functionality: Custom stack levels
@@ -529,7 +537,13 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                     'GBM': [
                         {'extra_trees': True, 'ag_args': {'name_suffix': 'XT'}},
                         {},
-                        'GBMLarge',
+                        {
+                            "learning_rate": 0.03,
+                            "num_leaves": 128,
+                            "feature_fraction": 0.9,
+                            "min_data_in_leaf": 3,
+                            "ag_args": {"name_suffix": "Large", "priority": 0, "hyperparameter_tune_kwargs": None},
+                        },
                     ],
                     'CAT': {},
                     'XGB': {},
@@ -738,7 +752,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                         'num_trials': How many HPO trials to run
                         'scheduler': Which scheduler to use
                             Valid values:
-                                'local': Local shceduler that schedule trials FIFO
+                                'local': Local scheduler that schedule trials FIFO
                         'searcher': Which searching algorithm to use
                             'local_random': Uses the 'random' searcher
                             'random': Perform random search
@@ -803,6 +817,9 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                         If True, AutoGluon will remove all saved information from sub-fits from disk.
                         If False, the sub-fits are kept on disk and `self._sub_fits` will store paths to the sub-fits, which can be loaded just like any other
                         predictor from disk using `TabularPredictor.load()`.
+                    `enable_ray_logging` : bool, default = True
+                        If True, will log the dynamic stacking sub-fit when ray is used (`memory_safe_fits=True`).
+                        Note that because of how ray works, this may cause extra unwanted logging in the main fit process after dynamic stacking completes.
                     `holdout_data`: str or :class:`TabularDataset` or :class:`pd.DataFrame`, default = None
                         Another dataset containing validation data reserved for detecting stacked overfitting. This dataset should be in the same format as
                         `train_data`. If str is passed, `holdout_data` will be loaded using the str value as the file path.
@@ -950,6 +967,18 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         verbosity = kwargs.get("verbosity", self.verbosity)
         set_logger_verbosity(verbosity)
 
+        if verbosity >= 2:
+            if verbosity == 2:
+                logger.log(20, f"Verbosity: 2 (Standard Logging)")
+            elif verbosity == 3:
+                logger.log(20, f"Verbosity: 3 (Detailed Logging)")
+            elif verbosity >= 4:
+                logger.log(20, f"Verbosity: {verbosity} (Maximum Logging)")
+
+        include_gpu_count = verbosity >= 3
+        sys_msg = get_ag_system_info(path=self.path, include_gpu_count=include_gpu_count)
+        logger.log(20, sys_msg)
+
         if presets:
             if not isinstance(presets, list):
                 presets = [presets]
@@ -979,6 +1008,8 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             logger.log(20, f"{pprint.pformat(kwargs)}")
             logger.log(20, "========================================")
 
+        self._validate_num_cpus(num_cpus=num_cpus)
+        self._validate_num_gpus(num_gpus=num_gpus)
         self._validate_calibrate_decision_threshold(calibrate_decision_threshold=calibrate_decision_threshold)
 
         holdout_frac = kwargs["holdout_frac"]
@@ -1012,7 +1043,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             hyperparameters = "default"
         if isinstance(hyperparameters, str):
             hyperparameters = get_hyperparameter_config(hyperparameters)
-
+        self._validate_hyperparameters(hyperparameters=hyperparameters)
         self.fit_hyperparameters_ = hyperparameters
 
         if "enable_raw_text_features" not in feature_generator_init_kwargs:
@@ -1026,6 +1057,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         if self.problem_type is not None:
             inferred_problem_type = self.problem_type
         else:
+            self._learner.validate_label(X=train_data)
             inferred_problem_type = self._learner.infer_problem_type(y=train_data[self.label], silent=True)
 
         num_bag_folds, num_bag_sets, num_stack_levels, dynamic_stacking, use_bag_holdout = self._sanitize_stack_args(
@@ -1137,14 +1169,20 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         if dynamic_stacking:
             logger.log(
                 20,
-                f"Dynamic stacking is enabled (dynamic_stacking={dynamic_stacking}). "
+                f"DyStack is enabled (dynamic_stacking={dynamic_stacking}). "
                 "AutoGluon will try to determine whether the input data is affected by stacked overfitting and enable or disable stacking as a consequence.",
             )
             num_stack_levels, time_limit = self._dynamic_stacking(**ds_args, ag_fit_kwargs=ag_fit_kwargs, ag_post_fit_kwargs=ag_post_fit_kwargs)
+            logger.info(
+                f"Starting main fit with num_stack_levels={num_stack_levels}.\n"
+                f"\tFor future fit calls on this dataset, you can skip DyStack to save time: "
+                f"`predictor.fit(..., dynamic_stacking=False, num_stack_levels={num_stack_levels})`"
+            )
 
             if (time_limit is not None) and (time_limit <= 0):
-                raise ValueError(
-                    f"Not enough time left to train models for the full fit. Consider specifying a larger time_limit. Time remaining: {time_limit}s"
+                raise AssertionError(
+                    f"Not enough time left to train models for the full fit. "
+                    f"Consider specifying a larger time_limit or setting `dynamic_stacking=False`. Time remaining: {time_limit:.2f}s"
                 )
 
             ag_fit_kwargs["num_stack_levels"] = num_stack_levels
@@ -1173,6 +1211,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         n_repeats: int,
         memory_safe_fits: bool,
         clean_up_fits: bool,
+        enable_ray_logging: bool,
         holdout_data: Optional[Union[str, pd.DataFrame, None]] = None,
     ):
         """Dynamically determines if stacking is used or not by validating the behavior of a sub-fit of AutoGluon that uses stacking on held out data.
@@ -1182,16 +1221,16 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         org_num_stack_levels = ag_fit_kwargs["num_stack_levels"]
         ds_fit_context = os.path.join(self._learner.path_context_og, "ds_sub_fit")
         logger.info(
-            "Detecting stacked overfitting by sub-fitting AutoGluon on the input data. "
-            "That is, copies of AutoGluon will be sub-fit on subset(s) of the data. "
-            "Then, the holdout validation data is used to detect stacked overfitting."
+            "\tThis is used to identify the optimal `num_stack_levels` value. "
+            "Copies of AutoGluon will be fit on subsets of the data. "
+            "Then holdout validation data is used to detect stacked overfitting."
         )
 
         if time_limit_og is not None:
-            logger.info(f"Sub-fit(s) time limit is: {time_limit_og} seconds.")
             time_limit = int(time_limit_og * detection_time_frac)
+            logger.info(f"\tRunning DyStack for up to {time_limit}s of the {time_limit_og}s of remaining time ({detection_time_frac*100:.0f}%).")
         else:
-            logger.info(f"No time limit provided.")
+            logger.info(f"\tWarning: No time limit provided for DyStack. This could take awhile.")
             time_limit = None
 
         # -- Avoid copying data
@@ -1213,23 +1252,21 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         ds_fit_kwargs = dict(
             clean_up_fits=clean_up_fits,
             memory_safe_fits=memory_safe_fits,
+            enable_ray_logging=enable_ray_logging,
         )
 
         # -- Validation Method
         if validation_procedure == "holdout":
             if holdout_data is None:
                 ds_fit_kwargs.update(dict(holdout_frac=holdout_frac, ds_fit_context=os.path.join(ds_fit_context, "sub_fit_ho")))
-                logger.info(f"Starting holdout-based sub-fit for dynamic stacking. Context path is: {ds_fit_kwargs['ds_fit_context']}.")
             else:
                 _, holdout_data, _ = self._validate_fit_data(train_data=X, tuning_data=holdout_data)
                 ds_fit_kwargs["ds_fit_context"] = os.path.join(ds_fit_context, "sub_fit_custom_ho")
-                logger.info(
-                    f"Starting holdout-based sub-fit for dynamic stacking with custom validation data. Context path is: {ds_fit_kwargs['ds_fit_context']}."
-                )
 
             stacked_overfitting = self._sub_fit_memory_save_wrapper(
                 train_data=X,
                 time_limit=time_limit,
+                time_start=time_start,
                 ds_fit_kwargs=ds_fit_kwargs,
                 ag_fit_kwargs=inner_ag_fit_kwargs,
                 ag_post_fit_kwargs=inner_ag_post_fit_kwargs,
@@ -1244,7 +1281,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             )
             n_splits = len(splits)
             logger.info(
-                f"Starting (repeated-)cross-validation-based sub-fits for dynamic stacking. Context path is: {ds_fit_context}. "
+                f'\tStarting (repeated-)cross-validation-based sub-fits for dynamic stacking. Context path: "{ds_fit_context}"'
                 f"Run at most {n_splits} sub-fits based on {n_repeats}-repeated {n_folds}-fold cross-validation."
             )
             np.random.RandomState(42).shuffle(splits)  # shuffle splits to mix up order such that if only one of the repeats shows leakage we might stop early.
@@ -1256,7 +1293,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                     rest_time = time_limit - time_spend_sub_fits_so_far
                     sub_fit_time = int(1 / (n_splits - split_index) * rest_time)  # if we are faster, give more time to rest of the folds.
                     if sub_fit_time <= 0:
-                        logger.info(f"Stop cross-validation during dynamic stacking early as no more time left. Consider specifying a larger time_limit.")
+                        logger.info(f"\tStop cross-validation during dynamic stacking early as no more time left. Consider specifying a larger time_limit.")
                         break
                 ds_fit_kwargs.update(
                     dict(
@@ -1266,11 +1303,12 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                     )
                 )
                 logger.info(
-                    f"Starting sub-fit {split_index + 1}. Time limit for the sub-fit of this split is: {'unlimited' if sub_fit_time is None else sub_fit_time}."
+                    f"\tStarting sub-fit {split_index + 1}. Time limit for the sub-fit of this split is: {'unlimited' if sub_fit_time is None else sub_fit_time}."
                 )
                 stacked_overfitting = self._sub_fit_memory_save_wrapper(
                     train_data=X,
                     time_limit=time_limit,
+                    time_start=time_start,
                     ds_fit_kwargs=ds_fit_kwargs,
                     ag_fit_kwargs=inner_ag_fit_kwargs,
                     ag_post_fit_kwargs=inner_ag_post_fit_kwargs,
@@ -1282,38 +1320,43 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             del splits
 
         if clean_up_fits:
-            shutil.rmtree(path=ds_fit_context)
+            try:
+                shutil.rmtree(path=ds_fit_context)
+            except FileNotFoundError as e:
+                pass
 
         # -- Determine rest time and new num_stack_levels
-        time_spend_sub_fits = int(time.time() - time_start)
-        logger.info(f"Spend {time_spend_sub_fits} seconds for the sub-fit(s) during dynamic stacking.")
+        time_spend_sub_fits = time.time() - time_start
+        num_stack_levels = 0 if stacked_overfitting else org_num_stack_levels
+        self._stacked_overfitting_occurred = stacked_overfitting
+
+        logger.info(f"\t{num_stack_levels}\t = Optimal   num_stack_levels (Stacked Overfitting Occurred: {self._stacked_overfitting_occurred})")
+        log_str = f"\t{round(time_spend_sub_fits)}s\t = DyStack   runtime"
         if time_limit_og is None:
             time_limit_fit_full = None
         else:
-            time_limit_fit_full = int(time_limit_og - time_spend_sub_fits)
-            logger.info(f"Time left for full fit of AutoGluon: {time_limit_fit_full} seconds.")
-
-        num_stack_levels = 0 if stacked_overfitting else org_num_stack_levels
-        self._stacked_overfitting_occurred = stacked_overfitting
+            time_limit_fit_full = time_limit_og - time_spend_sub_fits
+            log_str += f" |\t{round(time_limit_fit_full)}s\t = Remaining runtime"
+        logger.info(log_str)
 
         # -- Revert back
         del inner_ag_fit_kwargs
         if holdout_data is None:
             ag_fit_kwargs["X"] = X
         else:
-            logger.log(20, "Concatenating holdout data from dynamic stacking to the training data for the full fit (and reset the index).")
+            logger.log(20, "\tConcatenating holdout data from dynamic stacking to the training data for the full fit (and reset the index).")
             ag_fit_kwargs["X"] = pd.concat([X, holdout_data], ignore_index=True)
 
         ag_fit_kwargs["X_val"] = X_val
         ag_fit_kwargs["X_unlabeled"] = X_unlabeled
 
-        logger.info(f"Starting full fit now with num_stack_levels {num_stack_levels}.")
         return num_stack_levels, time_limit_fit_full
 
     def _sub_fit_memory_save_wrapper(
         self,
         train_data: Union[str, pd.DataFrame],
         time_limit: int,
+        time_start: float,
         ds_fit_kwargs: dict,
         ag_fit_kwargs: dict,
         ag_post_fit_kwargs: dict,
@@ -1322,32 +1365,59 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         """Tries to run the sub-fit in a subprocess (managed by ray). Similar to AutoGluon's parallel fold fitting strategies,
         this code does not shut down ray after usage. Otherwise, we would also kill outer-scope ray usage."""
         memory_safe_fits = ds_fit_kwargs.get("memory_safe_fits", True)
+        enable_ray_logging = ds_fit_kwargs.get("enable_ray_logging", True)
         normal_fit = False
         if memory_safe_fits:
             try:
                 _ds_ray = try_import_ray()
                 if not _ds_ray.is_initialized():
-                    _ds_ray.init(logging_level=logging.ERROR, log_to_driver=False)
+                    if enable_ray_logging:
+                        logger.info(
+                            f"\tRunning DyStack sub-fit in a ray process to avoid memory leakage. "
+                            "Enabling ray logging (enable_ray_logging=True). Specify `ds_args={'enable_ray_logging': False}` if you experience logging issues."
+                        )
+                        _ds_ray.init()
+                    else:
+                        logger.info(
+                            f"\tRunning DyStack sub-fit in a ray process to avoid memory leakage. "
+                            "Logs will not be shown until this process is complete (enable_ray_logging=False). "
+                            "You can experimentally enable logging by specifying `ds_args={'enable_ray_logging': True}`."
+                        )
+                        _ds_ray.init(
+                            logging_level=logging.ERROR,
+                            log_to_driver=False,
+                        )
             except Exception as e:
                 warnings.warn(f"Failed to use ray for memory safe fits. Falling back to normal fit. Error: {repr(e)}", stacklevel=2)
                 _ds_ray = None
 
-            if _ds_ray is not None:
-                logger.info(f"Running the sub-fit in a ray process to avoid memory leakage.")
+            if time_limit is not None:
+                # Subtract time taken to initialize ray
+                time_limit -= time.time() - time_start
+                if time_limit <= 0:
+                    logger.log(30, f"Warning: Not enough time to fit DyStack! Skipping...")
+                    return False
 
+            if holdout_data is None:
+                logger.info(f"\t\tContext path: \"{ds_fit_kwargs['ds_fit_context']}\"")
+            else:
+                logger.info(f"\t\tRunning DyStack holdout-based sub-fit with custom validation data. Context path: \"{ds_fit_kwargs['ds_fit_context']}\"")
+
+            if _ds_ray is not None:
                 # Handle resources
                 from autogluon.common.utils.resource_utils import ResourceManager
 
                 total_resources = ag_fit_kwargs["core_kwargs"]["total_resources"]
 
                 num_cpus = total_resources.get("num_cpus", "auto")
-                num_gpus = total_resources.get("num_gpus", "auto")
 
                 if num_cpus == "auto":
                     num_cpus = ResourceManager.get_cpu_count()
 
-                if num_gpus == "auto":
-                    num_gpus = ResourceManager.get_gpu_count()
+                # num_gpus is treated oddly in ray, commented out until we find a better solution
+                # num_gpus = total_resources.get("num_gpus", "auto")
+                # if num_gpus == "auto":
+                #     num_gpus = ResourceManager.get_gpu_count()
 
                 # Handle expensive data via put
                 ag_fit_kwargs_ref = _ds_ray.put(ag_fit_kwargs)
@@ -1360,8 +1430,13 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                     holdout_data_ref = None
 
                 # Call sub fit in its own subprocess via ray
-                sub_fit_caller = _ds_ray.remote(max_calls=1)(_sub_fit)
-                ref = sub_fit_caller.options(num_cpus=num_cpus, num_gpus=num_gpus).remote(
+                sub_fit_caller = _ds_ray.remote(max_calls=1)(_dystack)
+                # FIXME: For some reason ray does not treat `num_cpus` and `num_gpus` the same.
+                #  For `num_gpus`, the process will reserve the capacity and is unable to share it to child ray processes, causing a deadlock.
+                #  For `num_cpus`, the value is completely ignored by children, and they can even use more num_cpus than the parent.
+                #  Because of this, num_gpus is set to 0 here to avoid a deadlock, but num_cpus does not need to be changed.
+                #  For more info, refer to Ray documentation: https://docs.ray.io/en/latest/ray-core/tasks/nested-tasks.html#yielding-resources-while-blocked
+                ref = sub_fit_caller.options(num_cpus=num_cpus, num_gpus=0).remote(
                     predictor=predictor_ref,
                     train_data=train_data_ref,
                     time_limit=time_limit,
@@ -1371,14 +1446,18 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                     holdout_data=holdout_data_ref,
                 )
                 finished, unfinished = _ds_ray.wait([ref], num_returns=1)
-                stacked_overfitting = _ds_ray.get(finished[0])
+                stacked_overfitting, ho_leaderboard, exception = _ds_ray.get(finished[0])
+
+                # TODO: This is present to ensure worker logs are properly logged and don't get skipped / printed out of order.
+                #  Ideally find a faster way to do this that doesn't introduce a 100 ms overhead.
+                time.sleep(0.1)
             else:
                 normal_fit = True
         else:
             normal_fit = True
 
         if normal_fit:
-            stacked_overfitting = _sub_fit(
+            stacked_overfitting, ho_leaderboard, exception = _dystack(
                 predictor=self,
                 train_data=train_data,
                 time_limit=time_limit,
@@ -1387,6 +1466,30 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 ag_post_fit_kwargs=ag_post_fit_kwargs,
                 holdout_data=holdout_data,
             )
+
+        if exception is not None:
+            logger.log(40, f"Warning: Exception encountered during DyStack sub-fit:\n\t{exception}")
+        if ho_leaderboard is not None:
+            logger.log(20, "Leaderboard on holdout data (DyStack):")
+            with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):
+                # Rename to avoid confusion for the user
+                logger.log(20, ho_leaderboard.rename({"score_test": "score_holdout"}, axis=1))
+
+        if not normal_fit and enable_ray_logging:
+            try:
+                # Disables ray logging to avoid log spam in main process after DyStack completes
+                # This is somewhat of a hack, and needs to use private APIs of ray. It is unclear how to do this in a different way.
+                # Note: Once this is done, it cannot be undone,
+                # and the only known way to re-enable ray logging in the process is to call `ray.shutdown()` and `ray.init()`
+                _ds_ray._private.ray_logging.global_worker_stdstream_dispatcher.remove_handler("ray_print_logs")
+            except Exception as e:
+                logger.log(
+                    40,
+                    "WARNING: ray logging verbosity fix raised an exception. Ray might give overly verbose logging output. "
+                    "Please open a GitHub issue to notify the AutoGluon developers of this issue. "
+                    "You can avoid this issue by specifying `ds_args={'enable_ray_logging': False}`. Exception detailed below:"
+                    f"\n{e}",
+                )
 
         return stacked_overfitting
 
@@ -1490,7 +1593,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         num_cpus: str | int = "auto",
         num_gpus: str | int = "auto",
         **kwargs,
-    ):
+    ) -> "TabularPredictor":
         """
         Fits additional models after the original :meth:`TabularPredictor.fit` call.
         The original train_data and tuning_data will be used to train the models.
@@ -1554,6 +1657,9 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             logger.log(20, "Full kwargs:")
             logger.log(20, f"{pprint.pformat(kwargs)}")
             logger.log(20, "========================================")
+
+        self._validate_num_cpus(num_cpus=num_cpus)
+        self._validate_num_gpus(num_gpus=num_gpus)
 
         # TODO: Allow disable aux (default to disabled)
         # TODO: num_bag_sets
@@ -3095,7 +3201,15 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         List of persisted model names.
         """
         self._assert_is_fit("persist")
-        return self._learner.persist_trainer(low_memory=False, models=models, with_ancestors=with_ancestors, max_memory=max_memory)
+        try:
+            return self._learner.persist_trainer(low_memory=False, models=models, with_ancestors=with_ancestors, max_memory=max_memory)
+        except Exception as e:
+            valid_models = self.model_names()
+            if isinstance(models, list):
+                invalid_models = [m for m in models if m not in valid_models]
+                if invalid_models:
+                    raise ValueError(f"Invalid models specified. The following models do not exist:\n\t{invalid_models}\nValid models:\n\t{valid_models}")
+            raise e
 
     def unpersist(self, models="all") -> List[str]:
         """
@@ -4157,24 +4271,42 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             self._trainer: AbstractTrainer = self._learner.load_trainer()  # Trainer object
 
     @classmethod
-    def _load_version_file(cls, path) -> str:
+    def _load_version_file(cls, path: str) -> str:
+        """
+        Loads the version file that is part of the saved predictor artifact.
+        The version file contains a string matching `predictor._learner.version`.
+
+        Parameters
+        ----------
+        path: str
+            The path that would be used to load the predictor via `predictor.load(path)`
+
+        Returns
+        -------
+        The version of AutoGluon used to fit the predictor, as a string.
+
+        """
         version_file_path = os.path.join(path, cls._predictor_version_file_name)
-        version = load_str.load(path=version_file_path)
+        try:
+            version = load_str.load(path=version_file_path)
+        except:
+            # Loads the old version file used in `autogluon.tabular<=1.1.0`, named `__version__`.
+            # This file name was changed because Kaggle does not allow uploading files named `__version__`.
+            version_file_path = os.path.join(path, "__version__")
+            version = load_str.load(path=version_file_path)
         return version
 
     @classmethod
-    def _load_metadata_file(cls, path: str, silent=True):
+    def _load_metadata_file(cls, path: str, silent: bool = True):
         metadata_file_path = os.path.join(path, cls._predictor_metadata_file_name)
         return load_json.load(path=metadata_file_path, verbose=not silent)
 
-    def _save_version_file(self, silent=False):
-        from ..version import __version__
-
+    def _save_version_file(self, silent: bool = False):
         version_file_contents = f"{__version__}"
         version_file_path = os.path.join(self.path, self._predictor_version_file_name)
         save_str.save(path=version_file_path, data=version_file_contents, verbose=not silent)
 
-    def _save_metadata_file(self, silent=False):
+    def _save_metadata_file(self, silent: bool = False):
         """
         Save metadata json file to disk containing information such as
         python version, autogluon version, installed packages, operating system, etc.
@@ -4187,7 +4319,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         if not silent:
             logger.log(15, f"Saving {metadata_file_path}")
 
-    def save(self, silent=False):
+    def save(self, silent: bool = False):
         """
         Save this Predictor to file in directory specified by this Predictor's `path`.
         Note that :meth:`TabularPredictor.fit` already saves the predictor object automatically
@@ -4216,7 +4348,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             logger.log(20, f'TabularPredictor saved. To load, use: predictor = TabularPredictor.load("{self.path}")')
 
     @classmethod
-    def _load(cls, path: str):
+    def _load(cls, path: str) -> "TabularPredictor":
         """
         Inner load method, called in `load`.
         """
@@ -4226,9 +4358,23 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         return predictor
 
     @classmethod
-    def load(cls, path: str, verbosity: int = None, require_version_match: bool = True, require_py_version_match: bool = True, check_packages: bool = False):
+    def load(
+        cls,
+        path: str,
+        verbosity: int = None,
+        require_version_match: bool = True,
+        require_py_version_match: bool = True,
+        check_packages: bool = False,
+    ) -> "TabularPredictor":
         """
         Load a TabularPredictor object previously produced by `fit()` from file and returns this object. It is highly recommended the predictor be loaded with the exact AutoGluon version it was fit with.
+
+        .. warning::
+
+            :meth:`autogluon.tabular.TabularPredictor.load` uses `pickle` module implicitly, which is known to
+            be insecure. It is possible to construct malicious pickle data which will execute arbitrary code during
+            unpickling. Never load data that could have come from an untrusted source, or that could have been tampered
+            with. **Only load data you trust.**
 
         Parameters
         ----------
@@ -4250,9 +4396,18 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         check_packages : bool, default = False
             If True, checks package versions of the loaded predictor against the package versions of the current environment.
             Warnings will be logged for each mismatch of package version.
+
+        Returns
+        -------
+        predictor : TabularPredictor
+
+        Examples
+        --------
+        >>> predictor = TabularPredictor.load(path_to_predictor)
+
         """
         if verbosity is not None:
-            set_logger_verbosity(verbosity)  # Reset logging after load (may be in new Python session)
+            set_logger_verbosity(verbosity)  # Reset logging after load (could be in new Python session)
         if path is None:
             raise ValueError("path cannot be None in load()")
 
@@ -4269,7 +4424,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         except:
             logger.warning(
                 f'WARNING: Could not find version file at "{os.path.join(path, cls._predictor_version_file_name)}".\n'
-                f"This means that the predictor was fit in a version `<=0.3.1`."
+                f"This means that the predictor was fit in an AutoGluon version `<=0.3.1`."
             )
             version_saved = None
 
@@ -4336,8 +4491,8 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             If you specified a `log_file_path` while initializing the predictor, you should use `log_file_path` to load the log file instead.
             At least one of `predictor_path` or `log_file_path` must to be specified
 
-        Return
-        ------
+        Returns
+        -------
         List[str]
             A list containing lines of the log file
         """
@@ -4401,14 +4556,38 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
         return kwargs_sanitized
 
-    def _validate_calibrate_decision_threshold(self, calibrate_decision_threshold):
+    def _validate_calibrate_decision_threshold(self, calibrate_decision_threshold: bool | str):
         valid_calibrate_decision_threshold_options = [True, False, "auto"]
         if calibrate_decision_threshold not in valid_calibrate_decision_threshold_options:
             raise ValueError(
                 f"`calibrate_decision_threshold` must be a value in " f"{valid_calibrate_decision_threshold_options}, but is: {calibrate_decision_threshold}"
             )
 
-    def _fit_extra_kwargs_dict(self):
+    def _validate_num_cpus(self, num_cpus: int | str):
+        if num_cpus is None:
+            raise ValueError(f"`num_cpus` must be an int or 'auto'. Value: {num_cpus}")
+        if isinstance(num_cpus, str):
+            if num_cpus != "auto":
+                raise ValueError(f"`num_cpus` must be an int or 'auto'. Value: {num_cpus}")
+        elif not isinstance(num_cpus, int):
+            raise TypeError(f"`num_cpus` must be an int or 'auto'. Found: {type(num_cpus)} | Value: {num_cpus}")
+        else:
+            if num_cpus < 1:
+                raise ValueError(f"`num_cpus` must be greater than or equal to 1. (num_cpus={num_cpus})")
+
+    def _validate_num_gpus(self, num_gpus: int | float | str):
+        if num_gpus is None:
+            raise ValueError(f"`num_gpus` must be an int, float, or 'auto'. Value: {num_gpus}")
+        if isinstance(num_gpus, str):
+            if num_gpus != "auto":
+                raise ValueError(f"`num_gpus` must be an int, float, or 'auto'. Value: {num_gpus}")
+        elif not isinstance(num_gpus, (int, float)):
+            raise TypeError(f"`num_gpus` must be an int, float, or 'auto'. Found: {type(num_gpus)} | Value: {num_gpus}")
+        else:
+            if num_gpus < 0:
+                raise ValueError(f"`num_gpus` must be greater than or equal to 0. (num_gpus={num_gpus})")
+
+    def _fit_extra_kwargs_dict(self) -> dict:
         """
         Returns:
         --------
@@ -4460,6 +4639,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             memory_safe_fits=True,
             clean_up_fits=True,
             holdout_data=None,
+            enable_ray_logging=True,
         )
         allowed_kes = set(ds_args.keys())
 
@@ -4474,7 +4654,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             (not isinstance(ds_args["validation_procedure"], str)) or (ds_args["validation_procedure"] not in ["holdout", "cv"])
         ):
             raise ValueError("`validation_procedure` in `ds_args` must be str in {'holdout','cv'}. " + f"Got: {ds_args['validation_procedure']}")
-        for arg_name in ["memory_safe_fits", "clean_up_fits"]:
+        for arg_name in ["memory_safe_fits", "clean_up_fits", "enable_ray_logging"]:
             if (arg_name in ds_args) and (not isinstance(ds_args[arg_name], bool)):
                 raise ValueError(f"`{arg_name}` in `ds_args` must be bool.  Got: {type(ds_args[arg_name])}")
         for arg_name in ["detection_time_frac", "holdout_frac"]:
@@ -4494,7 +4674,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         kwargs[ds_kwargs_key] = ds_args
         return kwargs, [ds_kwargs_key]
 
-    def _validate_fit_extra_kwargs(self, kwargs, extra_valid_keys=None):
+    def _validate_fit_extra_kwargs(self, kwargs: dict, extra_valid_keys: List[str] | None = None):
         fit_extra_kwargs_default = self._fit_extra_kwargs_dict()
 
         allowed_kwarg_names = list(fit_extra_kwargs_default.keys())
@@ -4529,7 +4709,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
         return kwargs_sanitized
 
-    def _prune_data_features(self, train_features: list, other_features: list, is_labeled: bool):
+    def _prune_data_features(self, train_features: list, other_features: list, is_labeled: bool) -> Tuple[list, list]:
         """
         Removes certain columns from the provided datasets that do not contain predictive features.
 
@@ -4553,7 +4733,12 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
         return train_features, other_features
 
-    def _validate_fit_data(self, train_data, tuning_data=None, unlabeled_data=None):
+    def _validate_fit_data(
+        self,
+        train_data: str | pd.DataFrame,
+        tuning_data: str | pd.DataFrame | None = None,
+        unlabeled_data: str | pd.DataFrame | None = None,
+    ) -> Tuple[pd.DataFrame, pd.DataFrame | None, pd.DataFrame | None]:
         if isinstance(train_data, str):
             train_data = TabularDataset(train_data)
         if tuning_data is not None and isinstance(tuning_data, str):
@@ -4608,7 +4793,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         return train_data, tuning_data, unlabeled_data
 
     @staticmethod
-    def _validate_unique_indices(data, name: str):
+    def _validate_unique_indices(data: pd.DataFrame, name: str):
         is_duplicate_index = data.index.duplicated(keep=False)
         if is_duplicate_index.any():
             duplicate_count = is_duplicate_index.sum()
@@ -4732,7 +4917,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
     # TODO: Add .delete() method to easily clean-up clones?
     #  Would need to be careful that user doesn't delete important things accidentally.
     # TODO: Add .save_zip() and load_zip() methods to pack and unpack artifacts into a single file to simplify deployment code?
-    def clone(self, path: str, *, return_clone: bool = False, dirs_exist_ok: bool = False):
+    def clone(self, path: str, *, return_clone: bool = False, dirs_exist_ok: bool = False) -> str | "TabularPredictor":
         """
         Clone the predictor and all of its artifacts to a new location on local disk.
         This is ideal for use-cases where saving a snapshot of the predictor is desired before performing
@@ -4764,7 +4949,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         )
         return self.__class__.load(path=path_clone) if return_clone else path_clone
 
-    def clone_for_deployment(self, path: str, *, model: str = "best", return_clone: bool = False, dirs_exist_ok: bool = False):
+    def clone_for_deployment(self, path: str, *, model: str = "best", return_clone: bool = False, dirs_exist_ok: bool = False) -> str | "TabularPredictor":
         """
         Clone the predictor and all of its artifacts to a new location on local disk,
         then delete the clones artifacts unnecessary during prediction.
@@ -4890,12 +5075,8 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
     def _check_if_hyperparameters_handle_text(hyperparameters: dict) -> bool:
         """Check if hyperparameters contain a model that supports raw text features as input"""
         models_in_hyperparameters = set()
-        is_advanced_hyperparameter_type = False
-        for key in hyperparameters:
-            if isinstance(key, int) or key == "default":
-                is_advanced_hyperparameter_type = True
-                break
-        if is_advanced_hyperparameter_type:
+        advanced_hyperparameter_format = is_advanced_hyperparameter_format(hyperparameters=hyperparameters)
+        if advanced_hyperparameter_format:
             for key in hyperparameters:
                 for m in hyperparameters[key]:
                     models_in_hyperparameters.add(m)
@@ -4918,6 +5099,40 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             return True
         else:
             return False
+
+    @staticmethod
+    def _validate_hyperparameters(hyperparameters: dict):
+        """
+        Verifies correctness of hyperparameters object.
+        """
+        valid_types = (list, dict)
+
+        def _validate_hyperparameters_util(params: dict):
+            assert isinstance(params, dict), f"`hyperparameters` must be a dict, but found: {type(params)}"
+            for model_type in params:
+                if not isinstance(params[model_type], valid_types):
+                    extra_msg = ""
+                    if isinstance(params[model_type], str) and params[model_type] == "GBMLarge":
+                        if version.parse(__version__) >= version.parse("1.3.0"):
+                            extra_msg = "\n" + get_hyperparameter_str_deprecation_msg()
+                        else:
+                            # Will log a deprecation warning downstream in trainer
+                            continue
+                    raise AssertionError(
+                        f"Hyperparameters are incorrectly formatted, refer to the documentation for examples. "
+                        f"`hyperparameters` key '{model_type}' has an unexpected value type."
+                        f"\n\tvalid types: {valid_types}"
+                        f"\n\tactual type:  {type(params[model_type])}"
+                        f"\n\tactual value: {params[model_type]}"
+                        f"{extra_msg}"
+                    )
+
+        advanced_hyperparameter_format = is_advanced_hyperparameter_format(hyperparameters=hyperparameters)
+        if advanced_hyperparameter_format:
+            for stack_level in hyperparameters:
+                _validate_hyperparameters_util(params=hyperparameters[stack_level])
+        else:
+            _validate_hyperparameters_util(params=hyperparameters)
 
     def _sanitize_pseudo_data(self, pseudo_data: pd.DataFrame, name="pseudo_data") -> Tuple[pd.DataFrame, pd.Series, pd.Series]:
         assert isinstance(pseudo_data, pd.DataFrame)
@@ -5002,7 +5217,7 @@ class _TabularPredictorExperimental(TabularPredictor):
         return predictor
 
 
-def _sub_fit(
+def _dystack(
     predictor: TabularPredictor,
     train_data: Union[str, pd.DataFrame],
     time_limit: int,
@@ -5043,30 +5258,31 @@ def _sub_fit(
     clean_up_fits = ds_fit_kwargs.get("clean_up_fits")
 
     predictor._learner.set_contexts(path_context=ds_fit_context)
-    predictor._fit(ag_fit_kwargs=ag_fit_kwargs, ag_post_fit_kwargs=ag_post_fit_kwargs)
+    logger.log(20, f"Running DyStack sub-fit ...")
+    try:
+        predictor._fit(ag_fit_kwargs=ag_fit_kwargs, ag_post_fit_kwargs=ag_post_fit_kwargs)
+    except Exception as e:
+        return False, None, e
 
     if not predictor.model_names():
-        logger.info(f"Unable to determine stacked overfitting. AutoGluon's sub-fit did not successfully train any models!")
+        logger.log(20, f"Unable to determine stacked overfitting. AutoGluon's sub-fit did not successfully train any models!")
         stacked_overfitting = False
+        ho_leaderboard = None
     else:
         leaderboard_kwargs = dict()
         if predictor.model_best in predictor.model_refit_map(inverse=True):
             leaderboard_kwargs = dict(refit_full=True, set_refit_score_to_parent=True)
         # Determine stacked overfitting
         ho_leaderboard = predictor.leaderboard(data=val_data, **leaderboard_kwargs).reset_index(drop=True)
-        logger.info("Leaderboard on holdout data from dynamic stacking:")
-        with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):
-            # Rename to avoid confusion for the user
-            logger.info(ho_leaderboard.rename({"score_test": "holdout_score"}, axis=1))
         stacked_overfitting = check_stacked_overfitting_from_leaderboard(ho_leaderboard)
 
-    logger.info(f"Stacked overfitting occurred: {stacked_overfitting}.")
     del predictor._learner
     predictor._learner = learner_og
 
     if clean_up_fits:
+        logger.log(20, f"Deleting DyStack predictor artifacts (clean_up_fits={clean_up_fits}) ...")
         shutil.rmtree(path=ds_fit_context)
     else:
         predictor._sub_fits.append(ds_fit_context)
 
-    return stacked_overfitting
+    return stacked_overfitting, ho_leaderboard, None

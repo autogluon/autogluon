@@ -8,7 +8,6 @@ import pandas as pd
 from pandas import DataFrame
 
 from autogluon.common.utils.log_utils import convert_time_in_s_to_log_friendly
-from autogluon.common.utils.system_info import get_ag_system_info
 from autogluon.core.constants import AUTO_WEIGHT, BALANCE_WEIGHT, BINARY, MULTICLASS, QUANTILE, REGRESSION
 from autogluon.core.data import LabelCleaner
 from autogluon.core.data.cleaner import Cleaner
@@ -65,15 +64,10 @@ class DefaultLearner(AbstractTabularLearner):
         # TODO: if provided, feature_types in X, X_val are ignored right now, need to pass to Learner/trainer and update this documentation.
         self._time_limit = time_limit
         if time_limit:
-            logger.log(20, f"Beginning AutoGluon training ... Time limit = {time_limit}s")
+            logger.log(20, f"Beginning AutoGluon training ... Time limit = {time_limit:.0f}s")
         else:
             logger.log(20, "Beginning AutoGluon training ...")
         logger.log(20, f'AutoGluon will save models to "{self.path}"')
-        include_gpu_count = False
-        if verbosity >= 3:
-            include_gpu_count = True
-        msg = get_ag_system_info(path=self.path, include_gpu_count=include_gpu_count)
-        logger.log(20, msg)
         logger.log(20, f"Train Data Rows:    {len(X)}")
         logger.log(20, f"Train Data Columns: {len([column for column in X.columns if column != self.label])}")
         if X_val is not None:
@@ -85,6 +79,9 @@ class DefaultLearner(AbstractTabularLearner):
         if self.problem_type is None:
             self.problem_type = self.infer_problem_type(y=X[self.label])
         logger.log(20, f"Problem Type:       {self.problem_type}")
+        if self._eval_metric_was_str:
+            # Ensure that the eval_metric is valid for the problem_type
+            self._verify_metric(eval_metric=self.eval_metric, problem_type=self.problem_type)
         if self.groups is not None:
             num_bag_sets = 1
             num_bag_folds = len(X[self.groups].unique())
@@ -142,7 +139,15 @@ class DefaultLearner(AbstractTabularLearner):
         time_end = time.time()
         self._time_fit_training = time_end - time_preprocessing_end
         self._time_fit_total = time_end - time_preprocessing_start
-        logger.log(20, f'AutoGluon training complete, total runtime = {round(self._time_fit_total, 2)}s ... Best model: "{trainer.model_best}"')
+        log_throughput = ""
+        if trainer.model_best is not None:
+            predict_n_time_per_row = trainer.get_model_attribute_full(model=trainer.model_best, attribute="predict_n_time_per_row")
+            predict_n_size = trainer.get_model_attribute_full(model=trainer.model_best, attribute="predict_n_size", func=min)
+            if predict_n_time_per_row is not None and predict_n_size is not None:
+                log_throughput = f" | Estimated inference throughput: {(1/predict_n_time_per_row):.1f} rows/s ({int(predict_n_size)} batch size)"
+        logger.log(
+            20, f"AutoGluon training complete, total runtime = {round(self._time_fit_total, 2)}s ... Best model: {trainer.model_best}" f"{log_throughput}"
+        )
 
     def _update_infer_limit(self, X: DataFrame, *, infer_limit_batch_size: int, infer_limit: float = None):
         """
@@ -209,7 +214,8 @@ class DefaultLearner(AbstractTabularLearner):
 
             holdout_frac = 1
 
-        if (self.eval_metric is not None) and (self.eval_metric.name in ["log_loss", "pac_score"]) and (self.problem_type == MULTICLASS):
+        if self.eval_metric is not None and self.eval_metric.needs_proba and self.problem_type == MULTICLASS:
+            # Metric requires all classes present in training to be able to compute a score
             if num_bag_folds > 0:
                 self.threshold = 2
                 if self.groups is None:

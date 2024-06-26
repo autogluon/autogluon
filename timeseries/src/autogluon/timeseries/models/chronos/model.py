@@ -16,27 +16,27 @@ logger = logging.getLogger(__name__)
 
 # allowed HuggingFace model paths with custom parameter definitions
 MODEL_CONFIGS = {
-    "amazon/chronos-t5-tiny": {
+    "chronos-t5-tiny": {
         "num_gpus": 0,  # minimum number of required GPUs
         "default_torch_dtype": "auto",
         "default_batch_size": 16,
     },
-    "amazon/chronos-t5-mini": {
+    "chronos-t5-mini": {
         "num_gpus": 0,
         "default_torch_dtype": "auto",
         "default_batch_size": 16,
     },
-    "amazon/chronos-t5-small": {
+    "chronos-t5-small": {
         "num_gpus": 1,
         "default_torch_dtype": "bfloat16",
         "default_batch_size": 16,
     },
-    "amazon/chronos-t5-base": {
+    "chronos-t5-base": {
         "num_gpus": 1,
         "default_torch_dtype": "bfloat16",
         "default_batch_size": 16,
     },
-    "amazon/chronos-t5-large": {
+    "chronos-t5-large": {
         "num_gpus": 1,
         "default_torch_dtype": "bfloat16",
         "default_batch_size": 8,
@@ -45,11 +45,11 @@ MODEL_CONFIGS = {
 
 
 MODEL_ALIASES = {
-    "tiny": "amazon/chronos-t5-tiny",
-    "mini": "amazon/chronos-t5-mini",
-    "small": "amazon/chronos-t5-small",
-    "base": "amazon/chronos-t5-base",
-    "large": "amazon/chronos-t5-large",
+    "tiny": "autogluon/chronos-t5-tiny",
+    "mini": "autogluon/chronos-t5-mini",
+    "small": "autogluon/chronos-t5-small",
+    "base": "autogluon/chronos-t5-base",
+    "large": "autogluon/chronos-t5-large",
 }
 
 
@@ -75,10 +75,10 @@ class ChronosModel(AbstractTimeSeriesModel):
 
     Other Parameters
     ----------------
-    model_path: str, default = "amazon/chronos-t5-small"
+    model_path: str, default = "autogluon/chronos-t5-small"
         Model path used for the model, i.e., a HuggingFace transformers ``name_or_path``. Can be a
         compatible model name on HuggingFace Hub or a local path to a model directory. Original
-        Chronos models (i.e., ``amazon/chronos-t5-{model_size}``) can be specified with aliases
+        Chronos models (i.e., ``autogluon/chronos-t5-{model_size}``) can be specified with aliases
         ``tiny``, ``mini`` , ``small``, ``base``, and ``large``.
     batch_size : int, default = 16
         Size of batches used during inference
@@ -106,7 +106,7 @@ class ChronosModel(AbstractTimeSeriesModel):
 
     # default number of samples for prediction
     default_num_samples: int = 20
-    default_model_path = "amazon/chronos-t5-small"
+    default_model_path = "autogluon/chronos-t5-small"
     maximum_context_length = 512
 
     def __init__(
@@ -185,9 +185,10 @@ class ChronosModel(AbstractTimeSeriesModel):
     @property
     def ag_default_config(self) -> Dict[str, Any]:
         """The default configuration of the model used by AutoGluon if the model is one of those
-        defined in MODEL_CONFIGS. For now, these are ``amazon/chronos-t5-*`` family of models.
+        defined in MODEL_CONFIGS. For now, these are ``autogluon/chronos-t5-*`` family of models.
         """
-        return MODEL_CONFIGS.get(self.model_path, {})
+        model_name = str(self.model_path).split("/")[-1]
+        return MODEL_CONFIGS.get(model_name, {})
 
     @property
     def min_num_gpus(self) -> int:

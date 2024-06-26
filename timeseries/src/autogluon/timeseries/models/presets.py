@@ -31,6 +31,7 @@ from . import (
     SimpleFeedForwardModel,
     TemporalFusionTransformerModel,
     ThetaModel,
+    TiDEModel,
     WaveNetModel,
     ZeroModel,
 )
@@ -51,6 +52,7 @@ MODEL_TYPES = dict(
     DLinear=DLinearModel,
     PatchTST=PatchTSTModel,
     TemporalFusionTransformer=TemporalFusionTransformerModel,
+    TiDE=TiDEModel,
     WaveNet=WaveNetModel,
     RecursiveTabular=RecursiveTabularModel,
     DirectTabular=DirectTabularModel,
@@ -93,6 +95,7 @@ DEFAULT_MODEL_PRIORITY = dict(
     # Models that can early stop are trained at the end
     TemporalFusionTransformer=45,
     DeepAR=40,
+    TiDE=30,
     PatchTST=30,
     # Models below are not included in any presets
     WaveNet=25,

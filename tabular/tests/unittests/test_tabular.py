@@ -29,13 +29,12 @@ from random import seed
 import numpy as np
 import pandas as pd
 import pytest
-from networkx.exception import NetworkXError
 
 from autogluon.common import space
 from autogluon.common.utils.simulation_utils import convert_simulation_artifacts_to_tabular_predictions_dict
 from autogluon.core.constants import BINARY, MULTICLASS, PROBLEM_TYPES_CLASSIFICATION, QUANTILE, REGRESSION
 from autogluon.core.utils import download, unzip
-from autogluon.tabular import TabularDataset, TabularPredictor
+from autogluon.tabular import TabularDataset, TabularPredictor, __version__
 from autogluon.tabular.configs.hyperparameter_configs import get_hyperparameter_config
 
 PARALLEL_LOCAL_BAGGING = "parallel_local"
@@ -149,6 +148,10 @@ def test_advanced_functionality():
     shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
     savedir_predictor_original = savedir + "predictor/"
     predictor: TabularPredictor = TabularPredictor(label=label, path=savedir_predictor_original).fit(train_data)
+
+    version_in_file = predictor._load_version_file(path=predictor.path)
+    assert version_in_file == __version__
+
     leaderboard = predictor.leaderboard(data=test_data)
 
     # test metric_error leaderboard
@@ -247,7 +250,7 @@ def test_advanced_functionality():
     assert predictor.model_names(persisted=True) == []  # Assert that all models were unpersisted
 
     # Raise exception
-    with pytest.raises(NetworkXError):
+    with pytest.raises(ValueError):
         predictor.persist(models=["UNKNOWN_MODEL_1", "UNKNOWN_MODEL_2"])
 
     assert predictor.model_names(persisted=True) == []
@@ -1097,7 +1100,16 @@ def test_tabular_bagstack():
     if fast_benchmark:
         subsample_size = 105
         nn_options = {"num_epochs": 2}
-        gbm_options = [{"num_boost_round": 40}, "GBMLarge"]
+        gbm_options = [
+            {"num_boost_round": 40},
+            {
+                "learning_rate": 0.03,
+                "num_leaves": 128,
+                "feature_fraction": 0.9,
+                "min_data_in_leaf": 3,
+                "ag_args": {"name_suffix": "Large", "priority": 0, "hyperparameter_tune_kwargs": None},
+            },
+        ]
         hyperparameters = {"GBM": gbm_options, "NN_TORCH": nn_options}
         time_limit = 60
 
@@ -1140,7 +1152,16 @@ def test_tabular_bagstack_use_bag_holdout():
     if fast_benchmark:
         subsample_size = 105
         nn_options = {"num_epochs": 2}
-        gbm_options = [{"num_boost_round": 40}, "GBMLarge"]
+        gbm_options = [
+            {"num_boost_round": 40},
+            {
+                "learning_rate": 0.03,
+                "num_leaves": 128,
+                "feature_fraction": 0.9,
+                "min_data_in_leaf": 3,
+                "ag_args": {"name_suffix": "Large", "priority": 0, "hyperparameter_tune_kwargs": None},
+            },
+        ]
         hyperparameters = {"GBM": gbm_options, "NN_TORCH": nn_options}
         time_limit = 60
 

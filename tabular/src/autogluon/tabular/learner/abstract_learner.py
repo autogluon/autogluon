@@ -13,7 +13,7 @@ from pandas import DataFrame, Series
 from sklearn.metrics import classification_report
 
 from autogluon.core.constants import AUTO_WEIGHT, BALANCE_WEIGHT, BINARY, MULTICLASS, QUANTILE, REGRESSION
-from autogluon.core.data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
+from autogluon.core.data.label_cleaner import LabelCleaner, LabelCleanerMulticlass, LabelCleanerMulticlassToBinary
 from autogluon.core.learner import AbstractLearner
 from autogluon.core.metrics import Scorer, confusion_matrix, get_metric
 from autogluon.core.models.greedy_ensemble.ensemble_selection import EnsembleSelection
@@ -61,6 +61,7 @@ class AbstractTabularLearner(AbstractLearner):
             self.ignored_columns = []
         self.threshold = label_count_threshold
         self.problem_type = problem_type
+        self._eval_metric_was_str = eval_metric is not None and isinstance(eval_metric, str)
         self.eval_metric = get_metric(eval_metric, self.problem_type, "eval_metric")
 
         if self.problem_type == QUANTILE and quantile_levels is None:
@@ -370,11 +371,17 @@ class AbstractTabularLearner(AbstractLearner):
         return y_pred
 
     def _validate_fit_input(self, X: DataFrame, **kwargs):
-        if self.label not in X.columns:
-            raise KeyError(f"Label column '{self.label}' is missing from training data. Training data columns: {list(X.columns)}")
+        self.validate_label(X=X)
         X_val = kwargs.get("X_val", None)
         self._validate_sample_weight(X, X_val)
         self._validate_groups(X, X_val)
+
+    def validate_label(self, X: DataFrame):
+        """
+        Ensure that the label column is present in the training data
+        """
+        if self.label not in X.columns:
+            raise KeyError(f"Label column '{self.label}' is missing from training data. Training data columns: {list(X.columns)}")
 
     def _validate_sample_weight(self, X, X_val):
         if self.sample_weight is not None:
@@ -654,7 +661,13 @@ class AbstractTabularLearner(AbstractLearner):
             y_tmp = y
         else:
             y_pred = self.label_cleaner.inverse_transform_proba(y_pred_proba_internal, as_pred=False)
-            y_tmp = y_internal
+            if isinstance(self.label_cleaner, LabelCleanerMulticlass):
+                # Ensures that logic works even when y contains previously dropped classes during fit.
+                # If y contains never before seen classes, this will raise a ValueError in `self._validate_class_labels`.
+                self._validate_class_labels(y=y, eval_metric=metric)
+                y_tmp = self.label_cleaner.transform_pred_uncleaned(y)
+            else:
+                y_tmp = y_internal
         return compute_weighted_metric(y_tmp, y_pred, metric, weights=sample_weight, weight_evaluation=weight_evaluation, quantile_levels=self.quantile_levels)
 
     def _score_with_pred(self, y, y_internal, y_pred_internal, metric, sample_weight=None, weight_evaluation=None):
@@ -670,11 +683,13 @@ class AbstractTabularLearner(AbstractLearner):
             y_tmp = y
         return compute_weighted_metric(y_tmp, y_pred, metric, weights=sample_weight, weight_evaluation=weight_evaluation, quantile_levels=self.quantile_levels)
 
-    def _validate_class_labels(self, y: Series):
+    def _validate_class_labels(self, y: Series, eval_metric: Scorer = None):
         null_count = y.isnull().sum()
         if null_count:
             raise ValueError(f"Labels cannot contain missing (nan) values. Found {null_count} missing label values.")
-        if self.problem_type == MULTICLASS and not self.eval_metric.needs_pred:
+        if eval_metric is None:
+            eval_metric = self.eval_metric
+        if self.problem_type == MULTICLASS and not eval_metric.needs_pred:
             y_unique = np.unique(y)
             valid_class_set = set(self.class_labels)
             unknown_classes = []
@@ -684,7 +699,10 @@ class AbstractTabularLearner(AbstractLearner):
             if unknown_classes:
                 # log_loss / pac_score
                 raise ValueError(
-                    f"Multiclass scoring with eval_metric='{self.eval_metric.name}' does not support unknown classes. Unknown classes: {unknown_classes}"
+                    f"Multiclass scoring with eval_metric='{eval_metric.name}' does not support unknown classes. "
+                    f"Please ensure the classes you wish to evaluate are present in the training data, otherwise they cannot be scored with this metric."
+                    f"\n\tUnknown classes: {unknown_classes}"
+                    f"\n\t  Known classes: {self.class_labels}"
                 )
 
     def evaluate_predictions(self, y_true, y_pred, sample_weight=None, decision_threshold=None, display=False, auxiliary_metrics=True, detailed_report=False):
@@ -1072,6 +1090,12 @@ class AbstractTabularLearner(AbstractLearner):
             verbose=verbose,
             **kwargs,
         )
+
+    def _verify_metric(self, eval_metric: Scorer, problem_type: str):
+        """
+        Raises an exception if the eval_metric does not exist in the default metrics list for the problem type
+        """
+        get_metric(metric=eval_metric.name, problem_type=problem_type, metric_type="eval_metric")
 
     # TODO: Add data info gathering at beginning of .fit() that is used by all learners to add to get_info output
     # TODO: Add feature inference / feature engineering info to get_info output

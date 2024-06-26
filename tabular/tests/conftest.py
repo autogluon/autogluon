@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 import os
 import shutil
@@ -151,7 +153,7 @@ class FitHelper:
         refit_full=True,
         delete_directory=True,
         extra_metrics=None,
-        expected_model_count=2,
+        expected_model_count: int | None = 2,
         path_as_absolute=False,
         compile=False,
         compiler_configs=None,
@@ -204,10 +206,12 @@ class FitHelper:
 
         model_names = predictor.model_names()
         model_name = model_names[0]
-        assert len(model_names) == expected_model_count
+        if expected_model_count is not None:
+            assert len(model_names) == expected_model_count
         if refit_full:
             refit_model_names = predictor.refit_full()
-            assert len(refit_model_names) == expected_model_count
+            if expected_model_count is not None:
+                assert len(refit_model_names) == expected_model_count
             refit_model_name = refit_model_names[model_name]
             assert "_FULL" in refit_model_name
             predictor.predict(test_data, model=refit_model_name)
@@ -289,8 +293,11 @@ class ModelFitHelper:
         X_test = test_data.drop(columns=[label])
         X_test = feature_generator.transform(X_test)
 
-        model.predict(X_test)
+        y_pred = model.predict(X_test)
+        assert isinstance(y_pred, np.ndarray), f"Expected np.ndarray as model.predict(X_test) output. Got: {y_pred.__class__}"
+
         y_pred_proba = model.predict_proba(X_test)
+        assert isinstance(y_pred_proba, np.ndarray), f"Expected np.ndarray as model.predict_proba(X_test) output. Got: {y_pred.__class__}"
         model.get_info()
 
         if check_predict_children:
