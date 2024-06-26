@@ -673,16 +673,11 @@ for scorer in [pinball_loss]:
 BINARY_METRICS = dict()
 MULTICLASS_METRICS = dict()
 
-roc_auc_ovo = make_scorer(
-    "roc_auc_ovo", sklearn.metrics.roc_auc_score, multi_class="ovo", greater_is_better=True, needs_proba=True, needs_threshold=False
-)
-
 for scorer in [
     accuracy,
     balanced_accuracy,
     mcc,
     roc_auc_ovo_macro,
-    roc_auc_ovo,
     log_loss,
     pac,
     quadratic_kappa,
