@@ -587,13 +587,8 @@ balanced_accuracy = make_scorer("balanced_accuracy", classification_metrics.bala
 f1 = make_scorer("f1", sklearn.metrics.f1_score, needs_class=True)
 mcc = make_scorer("mcc", sklearn.metrics.matthews_corrcoef, needs_class=True)
 
-
 # Score functions that need decision values
 roc_auc = make_scorer("roc_auc", classification_metrics.customized_binary_roc_auc_score, greater_is_better=True, needs_threshold=True)
-
-roc_auc_ovo_macro = make_scorer(
-    "roc_auc_ovo_macro", sklearn.metrics.roc_auc_score, multi_class="ovo", average="macro", greater_is_better=True, needs_proba=True, needs_threshold=False
-)
 
 average_precision = make_scorer("average_precision", sklearn.metrics.average_precision_score, needs_threshold=True)
 precision = make_scorer("precision", sklearn.metrics.precision_score, needs_class=True)
@@ -672,12 +667,10 @@ for scorer in [pinball_loss]:
 
 BINARY_METRICS = dict()
 MULTICLASS_METRICS = dict()
-
 for scorer in [
     accuracy,
     balanced_accuracy,
     mcc,
-    roc_auc_ovo_macro,
     log_loss,
     pac,
     quadratic_kappa,
