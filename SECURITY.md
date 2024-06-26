@@ -17,6 +17,6 @@ As much as possible, AutoGluon relies on automated tools to do security scanning
 3. Code Analysis: Using CodeGuru
 
 
-## Vulnerability Reporting
+## Reporting a Vulnerability
 
 Report any security vulnerabilities to `autogluon-security@amazon.com`. This email directly links to the Autogluon security maintenance team. Once the security vulnerability is confirmed, we will work privately on a patch, aiming to produce a dedicated bugfix release as swiftly as complexity allows.
