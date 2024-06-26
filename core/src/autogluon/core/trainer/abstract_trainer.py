@@ -4283,6 +4283,7 @@ def _remote_refit(*,_self, original_model_name, level, X, y, X_val, y_val, X_unl
         model_full=model.convert_to_refit_full_via_copy()
         # FIXME: validation time not correct for infer 1 batch time, needed to hack _is_refit=True to fix
         logger.log(20,f"Fitting model: {model_full.name} | Skipping fit via cloning parent ...")
+        _self._add_model(model_full,stack_name=REFIT_FULL_NAME,level=level,_is_refit=True)
         _self.save_model(model_full)
         models_trained = [model_full.name]
 
