@@ -102,7 +102,7 @@ After GitHub & PyPi release, conduct release on Conda-Forge
 
 After release is published, on the mainline branch:
 * Update `release` in `docs/conf.py`
-* Increment version in the `VERSION` file
+* Increment version in the `VERSION` file and `SECURITY.md`
 * Update doc links in `docs/versions.rst`
 * Update `README.md` sample code with new release version.
 * Send release update to internal and external slack channels and mailing lists
