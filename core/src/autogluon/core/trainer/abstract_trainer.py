@@ -1183,16 +1183,19 @@ class AbstractTrainer:
                 batches.append(batch)
 
             # -- Parallel Predict
-            remote_func = ray.remote(num_cpus=1, num_gpus=0, max_calls=50, max_retries=0, retry_exceptions=False)(_remote_predict)
+            remote_func = ray.remote(num_cpus=1, max_calls=50, max_retries=0, retry_exceptions=False)(_remote_predict)
             self_ref = ray.put(self)
             X_ref = ray.put(X)
+
+            def num_gpus_for_model(_model_name) -> int:
+                return min(self.get_model_attribute(model=_model_name, attribute="fit_num_gpu"), 1)
 
             for model_batch in batches:
                 job_refs = []
                 model_pred_proba_dict_ref = ray.put(model_pred_proba_dict)
 
                 for model in model_batch[:ag_ray_workers]:
-                    result_ref = remote_func.remote(
+                    result_ref = remote_func.options(num_gpus=num_gpus_for_model(model)).remote(
                         _self=self_ref,
                         model_name=model,
                         X=X_ref,
@@ -1216,7 +1219,7 @@ class AbstractTrainer:
 
                     # Re-schedule workers
                     while (len(unfinished) < ag_ray_workers) and unfinished_models:
-                        result_ref = remote_func.remote(
+                        result_ref = remote_func.options(num_gpus=num_gpus_for_model(model)).remote(
                             _self=self_ref,
                             model_name=unfinished_models[0],
                             X=X_ref,
@@ -1227,9 +1230,10 @@ class AbstractTrainer:
                         unfinished.append(result_ref)
                         unfinished_models = unfinished_models[1:]
 
-            # Clean up ray
-            ray.internal.free(object_refs=[self_ref, X_ref, model_pred_proba_dict_ref])
-            del self_ref, X_ref, model_pred_proba_dict_ref
+            if batches:
+                # Clean up ray
+                ray.internal.free(object_refs=[self_ref, X_ref, model_pred_proba_dict_ref])
+                del self_ref, X_ref, model_pred_proba_dict_ref
 
         if record_pred_time:
             return model_pred_proba_dict, model_pred_time_dict
@@ -1512,7 +1516,7 @@ class AbstractTrainer:
                 ag_ray_workers=min(int(os.environ.get("AG_DISTRIBUTED_N_RAY_WORKERS",1)),len(models_level))
 
                 # -- Parallel Refit
-                remote_func=ray.remote(num_cpus=1,num_gpus=0,max_calls=8,max_retries=0,retry_exceptions=False)(_remote_refit)
+                remote_func=ray.remote(num_cpus=1,max_calls=8,max_retries=0,retry_exceptions=False)(_remote_refit)
                 self_ref=ray.put(self)
                 X_ref = ray.put(X)
                 y_ref = ray.put(y)
@@ -1522,8 +1526,12 @@ class AbstractTrainer:
                 kwargs_ref = ray.put(kwargs)
                 job_refs = []
 
+                def num_gpus_for_model(_model_name) -> int:
+                    return 1 if self.get_model_attribute(model=_model_name, attribute="refit_full_requires_gpu") else 0
+
                 for model in models_level[:ag_ray_workers]:
-                    result_ref=remote_func.remote(
+                    # TODO: do I need GPU here?
+                    result_ref=remote_func.options(num_gpus=num_gpus_for_model(model)).remote(
                         _self=self_ref,
                         original_model_name=model,
                         level=level,
@@ -1551,7 +1559,7 @@ class AbstractTrainer:
 
                     # Re-schedule workers
                     while (len(unfinished)<ag_ray_workers) and unfinished_models:
-                        result_ref=remote_func.remote(
+                        result_ref=remote_func.options(num_gpus=num_gpus_for_model(unfinished_models[0])).remote(
                             _self=self_ref,
                             original_model_name=unfinished_models[0],
                             level=level,
@@ -2164,6 +2172,9 @@ class AbstractTrainer:
             stack_name=stack_name,
             level=level,
             num_children=num_children,
+            fit_num_cpu=model._params_aux_child.get("num_cpus", 1),
+            fit_num_gpu=model._params_aux_child.get("num_gpus", 0),
+            refit_full_requires_gpu=(model._params_aux_child.get("num_gpus", 0) > 0) and model._user_params.get("refit_folds", False),
             **fit_metadata,
         )
         return model_metadata
@@ -2674,10 +2685,14 @@ class AbstractTrainer:
         hyperparameter_tune_kwargs_ref = ray.put(hyperparameter_tune_kwargs)
         job_refs = []
 
+        def num_gpus_for_model(_model) -> int:
+            model_gpus_per_fit = _model.model_base._user_params_aux.get("num_gpus", 0)
+            return model_gpus_per_fit if ((model_gpus_per_fit > 0) and _model._user_params.get("refit_folds", False)) else 0
+
         # Start initial jobs
         logger.log(20, f"Scheduling work for {ag_ray_workers} many workers...")
         for model in models[:ag_ray_workers]:
-            result_ref = remote_p.options(num_cpus=1, num_gpus=0).remote(
+            result_ref = remote_p.options(num_cpus=1, num_gpus=num_gpus_for_model(model)).remote(
                 _self=self_ref,
                 model=ray.put(model),
                 X=X_ref,
@@ -2723,7 +2738,7 @@ class AbstractTrainer:
 
             # Re-schedule workers
             while (len(unfinished) < ag_ray_workers) and unfinished_models:
-                result_ref = remote_p.options(num_cpus=1, num_gpus=0).remote(
+                result_ref = remote_p.options(num_cpus=1, num_gpus=num_gpus_for_model(unfinished_models[0])).remote(
                     _self=self_ref,
                     model=ray.put(unfinished_models[0]),
                     X=X_ref,
