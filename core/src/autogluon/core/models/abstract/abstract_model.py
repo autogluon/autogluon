@@ -457,7 +457,7 @@ class AbstractModel:
             feature_metadata = self._infer_feature_metadata(X=X)
         else:
             feature_metadata = copy.deepcopy(feature_metadata)
-        feature_metadata = self._update_feature_metadata(feature_metadata=feature_metadata)
+        feature_metadata = self._update_feature_metadata(X=X, feature_metadata=feature_metadata)
         get_features_kwargs = self.params_aux.get("get_features_kwargs", None)
         if get_features_kwargs is not None:
             valid_features = feature_metadata.get_features(**get_features_kwargs)
@@ -505,7 +505,7 @@ class AbstractModel:
         if error_if_no_features and not self._features_internal:
             raise NoValidFeatures
 
-    def _update_feature_metadata(self, feature_metadata: FeatureMetadata) -> FeatureMetadata:
+    def _update_feature_metadata(self, X: pd.DataFrame, feature_metadata: FeatureMetadata) -> FeatureMetadata:
         """
         [Advanced] Method that performs updates to feature_metadata during initialization.
         Primarily present for use in stacker models.

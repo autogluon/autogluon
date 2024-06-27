@@ -62,19 +62,22 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         self._base_model_performances_dict = base_model_performances_dict
         self._base_model_types_inner_dict = base_model_types_inner_dict
 
-    def _update_feature_metadata(self, feature_metadata: FeatureMetadata) -> FeatureMetadata:
+    def _update_feature_metadata(self, X: pd.DataFrame, feature_metadata: FeatureMetadata) -> FeatureMetadata:
         """
         Updates base_model_names and feature_metadata to reflect the used base models.
         """
         base_model_performances_dict = self._base_model_performances_dict
         base_model_types_inner_dict = self._base_model_types_inner_dict
         if (base_model_performances_dict is not None) and (base_model_types_inner_dict is not None):
-            if self.params["max_base_models_per_type"] > 0:
+            max_base_models_per_type = self.params["max_base_models_per_type"]
+            if isinstance(max_base_models_per_type, str):
+                max_base_models_per_type = self._get_dynamic_max_base_models_per_type(X=X)
+            if max_base_models_per_type > 0:
                 self.base_model_names = self.limit_models_per_type(
                     models=self.base_model_names,
                     model_types=base_model_types_inner_dict,
                     model_scores=base_model_performances_dict,
-                    max_base_models_per_type=self.params["max_base_models_per_type"],
+                    max_base_models_per_type=max_base_models_per_type,
                 )
             if self.params["max_base_models"] > 0:
                 self.base_model_names = self.limit_models(
@@ -93,6 +96,34 @@ class StackerEnsembleModel(BaggedEnsembleModel):
 
         feature_metadata = self._remove_unused_stack_in_feature_metadata(feature_metadata=feature_metadata)
         return feature_metadata
+
+    def _get_dynamic_max_base_models_per_type(self, X: pd.DataFrame):
+        num_rows = len(X)
+        if num_rows < 1000:
+            max_models_per_type = 1
+        elif num_rows < 5000:
+            max_models_per_type = 2
+        elif num_rows < 10000:
+            max_models_per_type = 3
+        elif num_rows < 15000:
+            max_models_per_type = 4
+        elif num_rows < 20000:
+            max_models_per_type = 5
+        elif num_rows < 25000:
+            max_models_per_type = 6
+        elif num_rows < 30000:
+            max_models_per_type = 7
+        elif num_rows < 35000:
+            max_models_per_type = 8
+        elif num_rows < 40000:
+            max_models_per_type = 9
+        elif num_rows < 45000:
+            max_models_per_type = 10
+        elif num_rows < 50000:
+            max_models_per_type = 11
+        else:
+            max_models_per_type = 12
+        return max_models_per_type
 
     def _infer_feature_metadata(self, X: pd.DataFrame) -> FeatureMetadata:
         """
@@ -125,7 +156,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         return self.limit_models_per_type(models=models, model_types=model_types, model_scores=model_scores, max_base_models_per_type=max_base_models)
 
     def _set_default_params(self):
-        default_params = {"use_orig_features": True, "max_base_models": 50, "max_base_models_per_type": 5}
+        default_params = {"use_orig_features": True, "max_base_models": 0, "max_base_models_per_type": "auto"}
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
         super()._set_default_params()
