@@ -1183,7 +1183,7 @@ class AbstractTrainer:
                 batches.append(batch)
 
             # -- Parallel Predict
-            remote_func = ray.remote(num_cpus=1,num_gpus=0, max_calls=50, max_retries=0, retry_exceptions=False)(_remote_predict)
+            remote_func = ray.remote(num_cpus=1, num_gpus=0, max_calls=50, max_retries=0, retry_exceptions=False)(_remote_predict)
             self_ref = ray.put(self)
             X_ref = ray.put(X)
 
@@ -1511,8 +1511,8 @@ class AbstractTrainer:
                 import ray
                 ag_ray_workers=min(int(os.environ.get("AG_DISTRIBUTED_N_RAY_WORKERS",1)),len(models_level))
 
-                # -- Parallel Predict
-                remote_func=ray.remote(num_cpus=1,num_gpus=0,max_calls=50,max_retries=0,retry_exceptions=False)(_remote_refit)
+                # -- Parallel Refit
+                remote_func=ray.remote(num_cpus=1,num_gpus=0,max_calls=8,max_retries=0,retry_exceptions=False)(_remote_refit)
                 self_ref=ray.put(self)
                 X_ref = ray.put(X)
                 y_ref = ray.put(y)
@@ -2665,7 +2665,7 @@ class AbstractTrainer:
 
         import ray
 
-        remote_p = ray.remote(max_calls=1, max_retries=0, retry_exceptions=False)(_remote_train_multi_fold)
+        remote_p = ray.remote(max_calls=8, max_retries=0, retry_exceptions=False)(_remote_train_multi_fold)
         ag_ray_workers = min(int(os.environ.get("AG_DISTRIBUTED_N_RAY_WORKERS", 1)), len(models))
         self_ref = ray.put(self)
         X_ref = ray.put(X)
