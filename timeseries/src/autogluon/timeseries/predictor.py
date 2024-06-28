@@ -712,7 +712,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         if tuning_data is not None:
             tuning_data = self._check_and_prepare_data_frame(tuning_data, name="tuning_data")
             self._check_data_for_evaluation(tuning_data, name="tuning_data")
-            logger.info(f"Provided tuning_data has {self._get_dataset_stats(train_data)}")
+            logger.info(f"Provided tuning_data has {self._get_dataset_stats(tuning_data)}")
             # TODO: Use num_val_windows to perform multi-window backtests on tuning_data
             if num_val_windows > 0:
                 logger.warning(
