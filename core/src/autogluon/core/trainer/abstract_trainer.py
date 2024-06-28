@@ -1194,20 +1194,20 @@ class AbstractTrainer:
             self_ref = ray.put(self)
             X_ref = ray.put(X)
 
-            def num_gpus_for_model(_model_name) -> int:
-                return min(self.get_model_attribute(model=_model_name, attribute="fit_num_gpu"), 1)
-
             for model_batch in batches:
                 job_refs = []
                 model_pred_proba_dict_ref = ray.put(model_pred_proba_dict)
 
                 for model in model_batch[:ag_ray_workers]:
-                    result_ref = remote_func.options(num_gpus=num_gpus_for_model(model)).remote(
+                    is_predict_full_with_gpu = self.get_model_attribute(model=model, attribute="refit_full_requires_gpu")
+                    num_gpus = self.get_model_attribute(model=model, attribute="fit_num_gpu") if is_predict_full_with_gpu else 0
+                    result_ref = remote_func.options(num_gpus=num_gpus).remote(
                         _self=self_ref,
                         model_name=model,
                         X=X_ref,
                         model_pred_proba_dict=model_pred_proba_dict_ref,
                         record_pred_time=record_pred_time,
+                        is_predict_full_with_gpu=is_predict_full_with_gpu,
                     )
                     logger.log(20, f"Scheduled predicting with model for {model}\n\t{result_ref}")
                     job_refs.append(result_ref)
@@ -1226,12 +1226,15 @@ class AbstractTrainer:
 
                     # Re-schedule workers
                     while (len(unfinished) < ag_ray_workers) and unfinished_models:
-                        result_ref = remote_func.options(num_gpus=num_gpus_for_model(model)).remote(
+                        is_predict_full_with_gpu = self.get_model_attribute(model=model, attribute="refit_full_requires_gpu")
+                        num_gpus = self.get_model_attribute(model=model, attribute="fit_num_gpu") if is_predict_full_with_gpu else 0
+                        result_ref = remote_func.options(num_gpus=num_gpus).remote(
                             _self=self_ref,
                             model_name=unfinished_models[0],
                             X=X_ref,
                             model_pred_proba_dict=model_pred_proba_dict_ref,
                             record_pred_time=record_pred_time,
+                            is_predict_full_with_gpu=is_predict_full_with_gpu,
                         )
                         unfinished.append(result_ref)
                         logger.log(20, f"Scheduled predicting with model for {unfinished_models[0]}\n\t{result_ref}")
@@ -4308,17 +4311,25 @@ def _remote_refit(*,_self, original_model_name, level, X, y, X_val, y_val, X_unl
     return original_model_name, model_name, _self.get_model_attribute(model=model_name, attribute="path"), _self.get_model_attribute(model=model_name, attribute="type"), reuse_first_fold
 
 
-def _remote_predict(*, _self, model_name, X, model_pred_proba_dict, record_pred_time) -> tuple[str, pd.DataFrame] | tuple[str, tuple[pd.DataFrame, float]]:
+def _remote_predict(*, _self, model_name, X, model_pred_proba_dict, record_pred_time, is_predict_full_with_gpu) -> tuple[str, pd.DataFrame] | tuple[str, tuple[pd.DataFrame, float]]:
     if record_pred_time:
         time_start = time.time()
 
     model = _self.load_model(model_name=model_name)
 
+
+    # This needed as for these models, we already need one GPU to load the model and only need one GPU to run the model.
+    # Hence, we can just not do remote predictions and stick to the below.
+    if is_predict_full_with_gpu:
+        pred_func = model.predict_proba
+    else:
+        pred_func = model.parallel_remote_predict_proba
+
     if isinstance(model, StackerEnsembleModel):
         preprocess_kwargs = dict(infer=False, model_pred_proba_dict=model_pred_proba_dict)
-        predictions = model.parallel_remote_predict_proba(X, **preprocess_kwargs)
+        predictions = pred_func(X, **preprocess_kwargs)
     else:
-        predictions = model.parallel_remote_predict_proba(X)
+        predictions = pred_func(X)
 
     if record_pred_time:
         time_end = time.time()
