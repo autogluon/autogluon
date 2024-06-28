@@ -204,8 +204,6 @@ class ARIMAModel(AbstractProbabilisticStatsForecastModel):
         This significantly speeds up fitting and usually leads to no change in accuracy.
     """
 
-    # TODO: This model requires statsforecast >= 1.5.0, so it will only be available after we upgrade the dependency
-
     allowed_local_model_args = [
         "order",
         "seasonal_order",
@@ -491,8 +489,7 @@ class AbstractConformalizedStatsForecastModel(AbstractStatsForecastModel):
         return pd.DataFrame(predictions)
 
 
-# TODO: Starting from StatsForecast v1.5.0, AutoCES can inherit from AbstractProbabilisticStatsForecastModel
-class AutoCESModel(AbstractConformalizedStatsForecastModel):
+class AutoCESModel(AbstractProbabilisticStatsForecastModel):
     """Forecasting with an Complex Exponential Smoothing model where the model selection is performed using the
     Akaike Information Criterion.
 

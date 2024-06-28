@@ -10,6 +10,7 @@ from autogluon.timeseries.metrics import TimeSeriesScorer
 
 from . import (
     ADIDAModel,
+    ARIMAModel,
     AutoARIMAModel,
     AutoCESModel,
     AutoETSModel,
@@ -38,9 +39,6 @@ from . import (
 from .abstract import AbstractTimeSeriesModel
 from .multi_window.multi_window_model import MultiWindowBacktestingModel
 
-# TODO: Enable ARIMAModel after upgrading to StatsForecast >=1.5.0 - currently ARIMA model is broken
-
-
 logger = logging.getLogger(__name__)
 
 ModelHyperparameters = Dict[str, Any]
@@ -68,6 +66,7 @@ MODEL_TYPES = dict(
     NPTS=NPTSModel,
     Theta=ThetaModel,
     ETS=ETSModel,
+    ARIMA=ARIMAModel,
     ADIDA=ADIDAModel,
     CrostonSBA=CrostonSBAModel,
     IMAPA=IMAPAModel,
