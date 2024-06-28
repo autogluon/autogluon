@@ -1165,8 +1165,8 @@ class AbstractTrainer:
             # -- Init info
             import ray
 
-            ag_ray_workers = min(int(os.environ.get("AG_DISTRIBUTED_N_RAY_WORKERS", 1)), len(model_pred_order))
-
+            ag_ray_workers = min(int(os.environ.get("AG_DISTRIBUTED_N_RAY_WORKERS_PREDICT", 1)), len(model_pred_order))
+            logger.info(f"Distributed Predict with {ag_ray_workers} workers.")
             # --- Get Batches
             model_batches = {}
             for model in model_pred_order:
@@ -1217,7 +1217,7 @@ class AbstractTrainer:
                 while unfinished:
                     finished, unfinished = ray.wait(unfinished, num_returns=1)
                     model_name, result = ray.get(finished[0])
-                    logger.log(20, f"Finished predicting with model for {model_name}")
+                    logger.log(20, f"Finished predicting with model for {model_name} | #Running: {len(unfinished)}")
 
                     if record_pred_time:
                         model_pred_proba_dict[model_name], model_pred_time_dict[model_name] = result
@@ -1233,8 +1233,8 @@ class AbstractTrainer:
                             model_pred_proba_dict=model_pred_proba_dict_ref,
                             record_pred_time=record_pred_time,
                         )
-                        logger.log(20, f"Scheduled predicting with model for {unfinished_models[0]}\n\t{result_ref}")
                         unfinished.append(result_ref)
+                        logger.log(20, f"Scheduled predicting with model for {unfinished_models[0]}\n\t{result_ref}")
                         unfinished_models = unfinished_models[1:]
 
             if batches:
@@ -2774,7 +2774,7 @@ class AbstractTrainer:
             if model_path is None:
                 logger.log(20, f"Model training failed for {model_name if isinstance(model_name, str) else model_name.name}.")
             else:
-                logger.log(20, f"Finished all jobs for {model_name}. "
+                logger.log(20, f"Finished all jobs for {model_name}. #Running {len(unfinished)}. "
                                f"Time remaining for this layer {int(time_limit - (time.time() - time_start)) if time_limit is not None else -1}s...")
                 # Self object is not mutated during worker execution, so no need to add model to self (again)
                 self._add_model(model_type.load(path=os.path.join(self.path, model_path), reset_paths=self.reset_paths),
@@ -2802,8 +2802,8 @@ class AbstractTrainer:
                     time_start=time_start,
                     kwargs=kwargs_ref,
                 )
-                logger.log(20, f"Scheduled model training for {unfinished_models[0].name}\n\t{result_ref}")
                 unfinished.append(result_ref)
+                logger.log(20, f"Scheduled model training for {unfinished_models[0].name}\n\t{result_ref}")
                 unfinished_models = unfinished_models[1:]
 
         # Clean up ray
