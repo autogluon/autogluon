@@ -2206,6 +2206,7 @@ class AbstractTrainer:
         predict_1_child_time = model.predict_1_time / num_children if model.predict_1_time is not None else None
         fit_metadata = model.get_fit_metadata()
 
+        model_param_aux = getattr(model, "_params_aux_child", model.params_aux)
         model_metadata = dict(
             fit_time=model.fit_time,
             compile_time=model.compile_time,
@@ -2227,9 +2228,9 @@ class AbstractTrainer:
             stack_name=stack_name,
             level=level,
             num_children=num_children,
-            fit_num_cpu=model._params_aux_child.get("num_cpus", 1),
-            fit_num_gpu=model._params_aux_child.get("num_gpus", 0),
-            refit_full_requires_gpu=(model._params_aux_child.get("num_gpus", 0) > 0) and model._user_params.get("refit_folds", False),
+            fit_num_cpu=model_param_aux.get("num_cpus", 1),
+            fit_num_gpu=model_param_aux.get("num_gpus", 0),
+            refit_full_requires_gpu=(model_param_aux.get("num_gpus", 0) > 0) and model._user_params.get("refit_folds", False),
             **fit_metadata,
         )
         return model_metadata
@@ -2741,7 +2742,7 @@ class AbstractTrainer:
         job_refs = []
 
         def num_gpus_for_model(_model) -> int:
-            model_gpus_per_fit = _model.model_base._user_params_aux.get("num_gpus", 0)
+            model_gpus_per_fit = getattr(_model, "model_base", _model)._user_params_aux.get("num_gpus", 0)
             return model_gpus_per_fit if ((model_gpus_per_fit > 0) and _model._user_params.get("refit_folds", False)) else 0
 
         # Start initial jobs
