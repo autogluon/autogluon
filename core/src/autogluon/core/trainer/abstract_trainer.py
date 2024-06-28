@@ -1219,8 +1219,8 @@ class AbstractTrainer:
 
                     # Re-schedule workers
                     while (len(unfinished) < ag_ray_workers) and unfinished_models:
-                        is_predict_full_with_gpu = self.get_model_attribute(model=model, attribute="refit_full_requires_gpu")
-                        num_gpus = self.get_model_attribute(model=model, attribute="fit_num_gpu") if is_predict_full_with_gpu else 0
+                        is_predict_full_with_gpu = self.get_model_attribute(model=unfinished_models[0], attribute="refit_full_requires_gpu")
+                        num_gpus = self.get_model_attribute(model=unfinished_models[0], attribute="fit_num_gpu") if is_predict_full_with_gpu else 0
                         result_ref = remote_func.options(num_gpus=num_gpus).remote(
                             _self=self_ref,
                             model_name=unfinished_models[0],

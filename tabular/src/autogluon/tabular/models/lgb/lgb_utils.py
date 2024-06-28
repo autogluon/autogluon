@@ -21,8 +21,6 @@ _ag_to_lgbm_metric_dict = {
     MULTICLASS: dict(
         accuracy="multi_error",
         log_loss="multi_logloss",
-        roc_auc_ovo_macro="multi_logloss",
-        roc_auc_ovo="multi_logloss",
     ),
     QUANTILE: dict(
         pinball_loss="quantile",
