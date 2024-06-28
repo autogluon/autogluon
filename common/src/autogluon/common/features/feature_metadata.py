@@ -51,6 +51,19 @@ class FeatureMetadata:
 
         self._validate()
 
+    def __eq__(self, other) -> bool:
+        if set(self.type_map_raw.keys()) != set(other.type_map_raw.keys()):
+            return False
+        for k in self.type_map_raw.keys():
+            if self.type_map_raw[k] != other.type_map_raw[k]:
+                return False
+        if set(self.type_group_map_special.keys()) != set(other.type_group_map_special.keys()):
+            return False
+        for k in self.type_group_map_special.keys():
+            if set(self.type_group_map_special[k]) != set(other.type_group_map_special[k]):
+                return False
+        return True
+
     # Confirms if inputs are valid
     def _validate(self):
         type_group_map_special_expanded = []
