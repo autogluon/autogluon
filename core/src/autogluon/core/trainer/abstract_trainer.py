@@ -1190,24 +1190,30 @@ class AbstractTrainer:
                 batches.append(batch)
 
             # -- Parallel Predict
-            remote_func = ray.remote(num_cpus=1, max_calls=50, max_retries=0, retry_exceptions=False)(_remote_predict)
+            remote_func = ray.remote(max_calls=50, max_retries=0, retry_exceptions=False)(_remote_predict)
             self_ref = ray.put(self)
             X_ref = ray.put(X)
+
+            def get_remote_options(_model):
+                _as_not_bagged = (self.get_model_attribute(model=_model, attribute="refit_full_requires_gpu")
+                                  or (self.get_model_attribute(model=_model, attribute="num_children") == 1))
+                _num_gpus = self.get_model_attribute(model=_model, attribute="fit_num_gpu") if _as_not_bagged else 0
+                _num_cpus = self.get_model_attribute(model=_model, attribute="fit_num_cpu") if _as_not_bagged else 1
+                return _as_not_bagged, _num_gpus, _num_cpus
 
             for model_batch in batches:
                 job_refs = []
                 model_pred_proba_dict_ref = ray.put(model_pred_proba_dict)
 
                 for model in model_batch[:ag_ray_workers]:
-                    is_predict_full_with_gpu = self.get_model_attribute(model=model, attribute="refit_full_requires_gpu")
-                    num_gpus = self.get_model_attribute(model=model, attribute="fit_num_gpu") if is_predict_full_with_gpu else 0
-                    result_ref = remote_func.options(num_gpus=num_gpus).remote(
+                    as_not_bagged, num_gpus, num_cpus = get_remote_options(model)
+                    result_ref = remote_func.options(num_cpus=num_cpus, num_gpus=num_gpus).remote(
                         _self=self_ref,
                         model_name=model,
                         X=X_ref,
                         model_pred_proba_dict=model_pred_proba_dict_ref,
                         record_pred_time=record_pred_time,
-                        is_predict_full_with_gpu=is_predict_full_with_gpu,
+                        as_not_bagged=as_not_bagged,
                     )
                     logger.log(20, f"Scheduled predicting with model for {model}\n\t{result_ref}")
                     job_refs.append(result_ref)
@@ -1226,15 +1232,14 @@ class AbstractTrainer:
 
                     # Re-schedule workers
                     while (len(unfinished) < ag_ray_workers) and unfinished_models:
-                        is_predict_full_with_gpu = self.get_model_attribute(model=unfinished_models[0], attribute="refit_full_requires_gpu")
-                        num_gpus = self.get_model_attribute(model=unfinished_models[0], attribute="fit_num_gpu") if is_predict_full_with_gpu else 0
-                        result_ref = remote_func.options(num_gpus=num_gpus).remote(
+                        as_not_bagged, num_gpus, num_cpus = get_remote_options(unfinished_models[0])
+                        result_ref = remote_func.options(num_cpus=num_cpus,num_gpus=num_gpus).remote(
                             _self=self_ref,
                             model_name=unfinished_models[0],
                             X=X_ref,
                             model_pred_proba_dict=model_pred_proba_dict_ref,
                             record_pred_time=record_pred_time,
-                            is_predict_full_with_gpu=is_predict_full_with_gpu,
+                            as_not_bagged=as_not_bagged,
                         )
                         unfinished.append(result_ref)
                         logger.log(20, f"Scheduled predicting with model for {unfinished_models[0]}\n\t{result_ref}")
@@ -4312,7 +4317,7 @@ def _remote_refit(*,_self, original_model_name, level, X, y, X_val, y_val, X_unl
     return original_model_name, model_name, _self.get_model_attribute(model=model_name, attribute="path"), _self.get_model_attribute(model=model_name, attribute="type"), reuse_first_fold
 
 
-def _remote_predict(*, _self, model_name, X, model_pred_proba_dict, record_pred_time, is_predict_full_with_gpu) -> tuple[str, pd.DataFrame] | tuple[str, tuple[pd.DataFrame, float]]:
+def _remote_predict(*, _self, model_name, X, model_pred_proba_dict, record_pred_time, as_not_bagged) -> tuple[str, pd.DataFrame] | tuple[str, tuple[pd.DataFrame, float]]:
     if record_pred_time:
         time_start = time.time()
 
@@ -4321,7 +4326,7 @@ def _remote_predict(*, _self, model_name, X, model_pred_proba_dict, record_pred_
 
     # This needed as for these models, we already need one GPU to load the model and only need one GPU to run the model.
     # Hence, we can just not do remote predictions and stick to the below.
-    if is_predict_full_with_gpu:
+    if as_not_bagged:
         pred_func = model.predict_proba
     else:
         pred_func = model.parallel_remote_predict_proba
