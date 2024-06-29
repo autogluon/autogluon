@@ -708,6 +708,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                 X = self.ray.get(X_ref)
                 if (bw in X.columns) and (bw not in kwargs["feature_metadata"].get_features()):
                     X_ref = self.ray.put(X.drop(columns=[bw]))
+                del X
             else:
                 kwargs_fold["sample_weight"] = self.sample_weight[train_index]
                 kwargs_fold["sample_weight_val"] = self.sample_weight[val_index]

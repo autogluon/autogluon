@@ -529,6 +529,14 @@ class BaggedEnsembleModel(AbstractModel):
         # FIXME: This can lead to poor performance. Probably not bugged, but rather all pseudolabels can come from the same class...
         #  Consider pseudolabelling to respect the original distribution
         if is_pseudo:
+            if kwargs.get("sample_weight", None) is not None:
+                import warnings
+                warnings.warn("Sample weights given, but not used due to pseudo labelled data being given.",
+                              UserWarning, stacklevel=2)
+                bw = "balance_weight"
+                if (bw in X.columns) and (bw not in kwargs["feature_metadata"].get_features()):
+                    X = X.drop(columns=[bw])
+
             # FIXME: Consider use_child_oof with pseudo labels! Need to keep track of indices
             logger.log(15, f"{len(X_pseudo)} extra rows of pseudolabeled data added to training set for {self.name}")
             assert_pseudo_column_match(X=X, X_pseudo=X_pseudo)
