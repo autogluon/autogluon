@@ -4,6 +4,7 @@ import math
 import os
 import pickle
 import time
+import warnings
 from abc import abstractmethod
 from typing import Any, Dict, Optional, Tuple, Union
 
@@ -328,12 +329,14 @@ class SequentialLocalFoldFittingStrategy(FoldFittingStrategy):
         kwargs_fold = kwargs.copy()
         is_pseudo = self.X_pseudo is not None and self.y_pseudo is not None
         if self.sample_weight is not None:
-            kwargs_fold["sample_weight"] = self.sample_weight[train_index]
-            kwargs_fold["sample_weight_val"] = self.sample_weight[val_index]
-
             if is_pseudo:
                 # TODO: Add support for sample_weight when pseudo is present
-                raise Exception("Sample weights given, but not used due to pseudo labelled data being given.")
+                warnings.warn("Sample weights given, but not used due to pseudo labelled data being given.",
+                              UserWarning, stacklevel=2)
+                bw = "balance_weight"
+                if (bw in X_fold.columns) and (bw not in kwargs["feature_metadata"].get_features()):
+                    X_fold = X_fold.drop(columns=[bw])
+                    X_val_fold = X_val_fold.drop(columns=[bw])
             else:
                 kwargs_fold["sample_weight"] = self.sample_weight[train_index]
                 kwargs_fold["sample_weight_val"] = self.sample_weight[val_index]
@@ -700,8 +703,11 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         is_pseudo = X_pseudo_ref is not None and y_pseudo_ref is not None
         if self.sample_weight is not None:
             if is_pseudo:
-                # TODO: Add support for sample_weight when pseudo is present
-                raise Exception("Sample weights given, but not used due to pseudo labelled data being given.")
+                warnings.warn("Sample weights given, but not used due to pseudo labelled data being given.", UserWarning, stacklevel=2)
+                bw = "balance_weight"
+                X = self.ray.get(X_ref)
+                if (bw in X.columns) and (bw not in kwargs["feature_metadata"].get_features()):
+                    X_ref = self.ray.put(X.drop(columns=[bw]))
             else:
                 kwargs_fold["sample_weight"] = self.sample_weight[train_index]
                 kwargs_fold["sample_weight_val"] = self.sample_weight[val_index]

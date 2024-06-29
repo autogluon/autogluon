@@ -5140,7 +5140,8 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             raise ValueError(f"'{name}' does not contain the labeled column.")
 
         if self.sample_weight is not None:
-            raise ValueError(f"Applying 'sample_weight' with {name} is not supported.")
+            warnings.warn(f"Applying 'sample_weight' with {name} is not supported. Setting it to None.", UserWarning, stacklevel=2)
+            self.sample_weight = None
 
         X_pseudo = pseudo_data.drop(columns=[self.label])
         y_pseudo_og = pseudo_data[self.label]
