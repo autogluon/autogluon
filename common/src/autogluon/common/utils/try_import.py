@@ -1,4 +1,5 @@
 import logging
+import os
 import platform
 import sys
 from types import ModuleType
@@ -44,12 +45,14 @@ def try_import_ray() -> ModuleType:
         from packaging import version
 
         if version.parse(ray.__version__) < version.parse(ray_min_version) or version.parse(ray.__version__) >= version.parse(ray_max_version):
-            msg = (
-                f"ray=={ray.__version__} detected. "
-                f"{ray_min_version} <= ray < {ray_max_version} is required. You can use pip to install certain version of ray "
-                f"`pip install ray=={ray_min_version}` "
-            )
-            raise ValueError(msg)
+            ignore_ray_version = os.environ.get("AG_IGNORE_RAY_VERSION", False)
+            if not ignore_ray_version:
+                msg = (
+                    f"ray=={ray.__version__} detected. "
+                    f"{ray_min_version} <= ray < {ray_max_version} is required. You can use pip to install certain version of ray "
+                    f"`pip install ray=={ray_min_version}` "
+                )
+                raise ValueError(msg)
         return ray
     except ImportError:
         raise ImportError(

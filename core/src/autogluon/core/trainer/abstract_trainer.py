@@ -1165,8 +1165,6 @@ class AbstractTrainer:
             # -- Init info
             import ray
 
-            ag_ray_workers = min(int(os.environ.get("AG_DISTRIBUTED_N_RAY_WORKERS_PREDICT", 1)), len(model_pred_order))
-            logger.info(f"Distributed Predict with {ag_ray_workers} workers.")
             # --- Get Batches
             model_batches = {}
             for model in model_pred_order:
@@ -1200,6 +1198,12 @@ class AbstractTrainer:
                 _num_gpus = self.get_model_attribute(model=_model, attribute="fit_num_gpu") if _as_not_bagged else 0
                 _num_cpus = self.get_model_attribute(model=_model, attribute="fit_num_cpu") if _as_not_bagged else 1
                 return _as_not_bagged, _num_gpus, _num_cpus
+
+            ag_ray_workers = min(
+                int(os.environ.get("AG_DISTRIBUTED_N_RAY_WORKERS_PREDICT", 1)),
+                max(len(e) for e in batches), # At most that many are used.
+            )
+            logger.info(f"Distributed Predict with {ag_ray_workers} workers.")
 
             for model_batch in batches:
                 job_refs = []
