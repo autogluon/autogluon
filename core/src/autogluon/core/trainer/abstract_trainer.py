@@ -4343,4 +4343,4 @@ def _remote_predict(*, _self, model_name, X, model_pred_proba_dict, record_pred_
 
         return model_name, (predictions, pred_time)
 
-    return  model_name, predictions
+    return model_name, predictions

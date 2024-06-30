@@ -461,9 +461,6 @@ class BaggedEnsembleModel(AbstractModel):
         return y_pred_proba
 
     def parallel_remote_predict_proba(self, X, normalize=False, **kwargs):
-        # FIXME: This will cause non-deterministic numerical behavior due to random order of
-        #  adding models to proba can be fixed but not that important for now.
-
         import ray
         X_ref = ray.put(self.preprocess(X, model=self.load_child(self.models[0]), **kwargs))
         self_ref = ray.put(self)
@@ -475,7 +472,8 @@ class BaggedEnsembleModel(AbstractModel):
             _func_remote_pred_proba
         )
         unfinished = []
-        for model in self.models:
+        job_refs_map = {}
+        for job_index, model in enumerate(self.models):
             result_ref = remote_func.remote(
                 _self=self_ref,
                 model_name=model,
@@ -483,24 +481,24 @@ class BaggedEnsembleModel(AbstractModel):
                 normalize=normalize,
             )
             unfinished.append(result_ref)
+            job_refs_map[result_ref] = job_index
 
-        pred_proba = None
+        # Memory overhead to be deterministic
+        pred_proba_list = []
         while unfinished:
             finished, unfinished = ray.wait(unfinished, num_returns=1)
-            if pred_proba is None:
-                pred_proba = ray.get(finished[0]).copy()
-            else:
-                pred_proba += ray.get(finished[0])
+            pred_proba_list.append((job_refs_map[finished[0]], ray.get(finished[0])))
 
-        pred_proba = pred_proba / self.n_children
+        pred_proba_list = [r for _, r in sorted(pred_proba_list, key=lambda x: x[0])]
+        pred_proba = np.sum(pred_proba_list, axis=0) / self.n_children
 
         ray.internal.free(object_refs=[self_ref, X_ref])
         del self_ref, X_ref
 
-        # if self.params_aux.get("temperature_scalar", None) is not None:
-        #     pred_proba = self._apply_temperature_scaling(pred_proba)
-        # elif self.conformalize is not None:
-        #     pred_proba = self._apply_conformalization(pred_proba)
+        if self.params_aux.get("temperature_scalar", None) is not None:
+            pred_proba = self._apply_temperature_scaling(pred_proba)
+        elif self.conformalize is not None:
+            pred_proba = self._apply_conformalization(pred_proba)
 
         return pred_proba
 
@@ -536,6 +534,7 @@ class BaggedEnsembleModel(AbstractModel):
                 bw = "balance_weight"
                 if (bw in X.columns) and (bw not in kwargs["feature_metadata"].get_features()):
                     X = X.drop(columns=[bw])
+                kwargs.pop("sample_weight")
 
             # FIXME: Consider use_child_oof with pseudo labels! Need to keep track of indices
             logger.log(15, f"{len(X_pseudo)} extra rows of pseudolabeled data added to training set for {self.name}")
