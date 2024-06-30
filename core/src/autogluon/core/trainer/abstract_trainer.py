@@ -1199,11 +1199,8 @@ class AbstractTrainer:
                 _num_cpus = self.get_model_attribute(model=_model, attribute="fit_num_cpu") if _as_not_bagged else 1
                 return _as_not_bagged, _num_gpus, _num_cpus
 
-            ag_ray_workers = min(
-                int(os.environ.get("AG_DISTRIBUTED_N_RAY_WORKERS_PREDICT", 1)),
-                max(len(e) for e in batches), # At most that many are used.
-            )
-            logger.info(f"Distributed Predict with {ag_ray_workers} workers.")
+            ag_ray_workers = int(os.environ.get("AG_DISTRIBUTED_N_RAY_WORKERS_PREDICT", 1))
+            logger.info(f"Distributed Predict with {ag_ray_workers} workers at most.")
 
             for model_batch in batches:
                 job_refs = []
