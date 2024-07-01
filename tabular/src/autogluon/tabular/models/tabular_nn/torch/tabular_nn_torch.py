@@ -13,6 +13,7 @@ from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT, 
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_torch
+from autogluon.core.metrics import get_metric
 from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION, SOFTCLASS
 from autogluon.core.hpo.constants import RAY_BACKEND
 from autogluon.core.models.abstract.abstract_nn_model import AbstractNeuralNetworkModel
@@ -245,6 +246,22 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         if isinstance(loss_kwargs.get("loss_function", "auto"), str) and loss_kwargs.get("loss_function", "auto") == "auto":
             loss_kwargs["loss_function"] = self._get_default_loss_function()
 
+        ag_params = self._get_ag_params()
+        generate_curves = ag_params.get("generate_curves", False)
+
+        if generate_curves:
+            scorer_names = list(set(ag_params.get("curve_metrics", []) + [self._get_default_stopping_metric().name]))
+            use_curve_metric_error = ag_params.get("use_error_for_curve_metrics", True)
+
+            stopping_metrics = [get_metric(metric, self.problem_type, "eval_metric") for metric in scorer_names]
+            train_curves = { metric.name : [] for metric in stopping_metrics }
+            val_curves = { metric.name : [] for metric in stopping_metrics }
+            # test_curves = { metric.name : [] for metric in stopping_metrics } # TODO: add test here, maybe add support for adding as many extra sets as desired
+
+            y_train = train_dataset.get_labels()
+            if y_train.ndim == 2 and y_train.shape[1] == 1:
+                y_train = y_train.flatten()
+
         if val_dataset is not None:
             y_val = val_dataset.get_labels()
             if y_val.ndim == 2 and y_val.shape[1] == 1:
@@ -344,11 +361,8 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
             epoch += 1
 
-            # validation
-            if val_dataset is not None:
-                # compute validation score
-                val_metric = self.score(X=val_dataset, y=y_val, metric=self.stopping_metric, _reset_threads=False)
-                if np.isnan(val_metric):
+            def _assert_valid_metric(metric):
+                if np.isnan(metric):
                     if best_epoch == 0:
                         raise RuntimeError(
                             f"NaNs encountered in {self.__class__.__name__} training. "
@@ -357,7 +371,16 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                         )
                     else:
                         logger.warning(f"Warning: NaNs encountered in {self.__class__.__name__} training. " "Reverting model to last checkpoint without NaNs.")
-                        break
+                        return False
+                return True
+
+            # validation
+            if val_dataset is not None:
+                # compute validation score
+                val_metric = self.score(X=val_dataset, y=y_val, metric=self.stopping_metric, _reset_threads=False)
+
+                if not _assert_valid_metric(val_metric):
+                    break
 
                 # update best validation
                 if (val_metric >= best_val_metric) or best_epoch == 0:
@@ -368,6 +391,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                     torch.save(self.model, net_filename)
                     best_epoch = epoch
                     best_val_update = total_updates
+
                 if verbose_eval:
                     logger.log(
                         15,
@@ -390,6 +414,38 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                 if epoch - val_improve_epoch >= epochs_wo_improve:
                     break
 
+            # learning curve generation
+            if generate_curves:
+                train_metrics = []
+                val_metrics = []
+                test_metrics = []
+
+                stop = False
+                for metric in stopping_metrics:
+                    train_metrics.append(self.score(X=train_dataset, y=y_train, metric=metric, _reset_threads=False))
+                    val_metrics.append(self.score(X=val_dataset, y=y_val, metric=metric, _reset_threads=False))
+                    # test_metrics.append(...)
+
+                    if use_curve_metric_error:
+                        train_metrics[-1] = metric.convert_score_to_error(train_metrics[-1])
+                        val_metrics[-1] = metric.convert_score_to_error(val_metrics[-1])
+                        # test_metrics[-1] = metric.convert_score_to_error(test_metrics[-1])
+
+                    if not _assert_valid_metric(train_metrics[-1]) or \
+                        not _assert_valid_metric(val_metrics[-1]): # or \
+                        # not _assert_valid_metric(test_metrics[-1]):
+                        stop = True
+                        break
+
+                if stop:
+                    break
+
+                # update learning curve
+                for i, metric in enumerate(stopping_metrics):
+                    train_curves[metric.name].append(train_metrics[i])
+                    val_curves[metric.name].append(val_metrics[i])
+                    # test_curves[metric.name].append(test_metrics[i])
+
             if epoch >= num_epochs:
                 break
 
@@ -403,6 +459,10 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
         if epoch == 0:
             raise AssertionError("0 epochs trained!")
+
+        if generate_curves:
+            metric_names = [metric.name for metric in stopping_metrics]
+            self.save_curves(metric_names, train_curves, val_curves)
 
         # revert back to best model
         if val_dataset is not None:
@@ -675,6 +735,9 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
     def _default_compiler(self):
         return TabularNeuralNetTorchNativeCompiler
+
+    def _ag_params(self) -> set:
+        return {"early_stop", "generate_curves", "curve_metrics", "use_error_for_curve_metrics"}
 
     def _get_input_types(self, batch_size=None):
         input_types = []
