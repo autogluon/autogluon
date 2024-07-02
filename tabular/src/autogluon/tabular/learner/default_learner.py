@@ -332,6 +332,9 @@ class DefaultLearner(AbstractTabularLearner):
                 "Performing general data preprocessing with merged train & validation data, so validation performance may not accurately reflect performance on new test data",
             )
             X_super = pd.concat([X, X_val, X_unlabeled], ignore_index=True)
+            if X_test is not None:
+                X_super = pd.concat([X_super, X_test], ignore_index=True)
+
             if self.feature_generator.is_fit():
                 logger.log(
                     20,
@@ -345,16 +348,25 @@ class DefaultLearner(AbstractTabularLearner):
                 else:
                     y_unlabeled = pd.Series(np.nan, index=X_unlabeled.index)
                     y_super = pd.concat([y, y_val, y_unlabeled], ignore_index=True)
+                if X_test is not None:
+                    y_super = pd.concat([y_super, y_test], ignore_index=True)
                 X_super = self.fit_transform_features(X_super, y_super, problem_type=self.label_cleaner.problem_type_transform, eval_metric=self.eval_metric)
             X = X_super.head(len(X)).set_index(X.index)
 
             X_val = X_super.head(len(X) + len(X_val)).tail(len(X_val)).set_index(X_val.index)
 
             if X_unlabeled is not None:
-                X_unlabeled = X_super.tail(len(X_unlabeled)).set_index(X_unlabeled.index)
+                X_unlabeled = X_super.head(len(X) + len(X_val) + len(X_unlabeled)).tail(len(X_unlabeled)).set_index(X_unlabeled.index)
+
+            if X_test is not None:
+                X_test = X_super.tail(len(X_test)).set_index(X_test.index)
+
             del X_super
         else:
             X_super = pd.concat([X, X_unlabeled], ignore_index=True)
+            if X_test is not None:
+                X_super = pd.concat([X_super, X_test], ignore_index=True)
+
             if self.feature_generator.is_fit():
                 logger.log(
                     20,
@@ -368,11 +380,17 @@ class DefaultLearner(AbstractTabularLearner):
                 else:
                     y_unlabeled = pd.Series(np.nan, index=X_unlabeled.index)
                     y_super = pd.concat([y, y_unlabeled], ignore_index=True)
+                if X_test is not None:
+                    y_super = pd.concat([y_super, y_test], ignore_index=True)
                 X_super = self.fit_transform_features(X_super, y_super, problem_type=self.label_cleaner.problem_type_transform, eval_metric=self.eval_metric)
 
             X = X_super.head(len(X)).set_index(X.index)
+
             if X_unlabeled is not None:
-                X_unlabeled = X_super.tail(len(X_unlabeled)).set_index(X_unlabeled.index)
+                X_unlabeled = X_super.head(len(X) + len(X_unlabeled)).tail(len(X_unlabeled)).set_index(X_unlabeled.index)
+            if X_test is not None:
+                X_test = X_super.tail(len(X_test)).set_index(X_test.index)
+
             del X_super
 
         X, X_val, X_test = self.bundle_weights(X, w, X_val, w_val, X_test, w_test)  # TODO: consider not bundling sample-weights inside X, X_val
