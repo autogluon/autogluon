@@ -308,6 +308,11 @@ class AbstractTrainer:
         save_pkl.save(path=path, object=X, verbose=verbose)
         self._X_val_saved = True
 
+    def save_X_test(self, x_test, verbose=True):
+        path = os.path.join(self.path_data, "x_test.pkl")
+        save_pkl.save(path=path, object=x_test, verbose=verbose)
+        self._x_test_saved = True
+
     def save_y(self, y, verbose=True):
         path = os.path.join(self.path_data, "y.pkl")
         save_pkl.save(path=path, object=y, verbose=verbose)
@@ -317,6 +322,11 @@ class AbstractTrainer:
         path = os.path.join(self.path_data, "y_val.pkl")
         save_pkl.save(path=path, object=y, verbose=verbose)
         self._y_val_saved = True
+
+    def save_y_test(self, y_test, verbose=True):
+        path = os.path.join(self.path_data, "y_test.pkl")
+        save_pkl.save(path=path, object=y_test, verbose=verbose)
+        self._y_test_saved = True
 
     def get_model_names(
         self, stack_name: Union[List[str], str] = None, level: Union[List[int], int] = None, can_infer: bool = None, models: List[str] = None
@@ -2643,13 +2653,16 @@ class AbstractTrainer:
         if time_limit is not None and time_limit <= 0:
             raise AssertionError(f"Not enough time left to train models. Consider specifying a larger time_limit. Time remaining: {round(time_limit, 2)}s")
         if self.save_data and not self.is_data_saved:
-            # TODO: Save test data here?
             self.save_X(X)
             self.save_y(y)
             if X_val is not None:
                 self.save_X_val(X_val)
                 if y_val is not None:
                     self.save_y_val(y_val)
+            if X_test is not None:
+                self.save_X_test(X_test)
+                if y_test is not None:
+                    self.save_y_test(y_test)   
             self.is_data_saved = True
         if self._groups is None:
             self._groups = groups
