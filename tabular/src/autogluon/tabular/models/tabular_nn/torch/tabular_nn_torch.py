@@ -183,7 +183,9 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             else:
                 batch_size = min(int(2 ** (3 + np.floor(np.log10(X.shape[0])))), self.max_batch_size)
 
-        train_dataset, val_dataset = self._generate_datasets(X=X, y=y, params=processor_kwargs, X_val=X_val, y_val=y_val)
+        X_test = kwargs.get("X_test", None)
+        y_test = kwargs.get("y_test", None)
+        train_dataset, val_dataset, test_dataset = self._generate_datasets(X=X, y=y, params=processor_kwargs, X_val=X_val, y_val=y_val, X_test=X_test, y_test=y_test)
         logger.log(
             15,
             f"Training data for {self.__class__.__name__} has: "
@@ -211,6 +213,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             loss_kwargs=loss_kwargs,
             batch_size=batch_size,
             val_dataset=val_dataset,
+            test_dataset=test_dataset,
             time_limit=time_limit,
             reporter=reporter,
             verbosity=verbosity,
@@ -234,7 +237,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         if not os.path.exists(self.path):
             os.makedirs(self.path)
 
-    def _train_net(self, train_dataset, loss_kwargs, batch_size, num_epochs, epochs_wo_improve, val_dataset=None, time_limit=None, reporter=None, verbosity=2):
+    def _train_net(self, train_dataset, loss_kwargs, batch_size, num_epochs, epochs_wo_improve, val_dataset=None, test_dataset=None, time_limit=None, reporter=None, verbosity=2):
         import torch
 
         start_time = time.time()
@@ -256,11 +259,16 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             stopping_metrics = [get_metric(metric, self.problem_type, "eval_metric") for metric in scorer_names]
             train_curves = { metric.name : [] for metric in stopping_metrics }
             val_curves = { metric.name : [] for metric in stopping_metrics }
-            # test_curves = { metric.name : [] for metric in stopping_metrics } # TODO: add test here, maybe add support for adding as many extra sets as desired
+            test_curves = { metric.name : [] for metric in stopping_metrics }
 
             y_train = train_dataset.get_labels()
             if y_train.ndim == 2 and y_train.shape[1] == 1:
                 y_train = y_train.flatten()
+
+            if test_dataset is not None:
+                y_test = test_dataset.get_labels()
+                if y_test.ndim == 2 and y_test.shape[1] == 1:
+                    y_test = y_test.flatten()
 
         if val_dataset is not None:
             y_val = val_dataset.get_labels()
@@ -424,16 +432,17 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                 for metric in stopping_metrics:
                     train_metrics.append(self.score(X=train_dataset, y=y_train, metric=metric, _reset_threads=False))
                     val_metrics.append(self.score(X=val_dataset, y=y_val, metric=metric, _reset_threads=False))
-                    # test_metrics.append(...)
+                    test_metrics += [self.score(X=test_dataset, y=y_test, metric=metric, _reset_threads=False)] if test_dataset is not None else []
 
                     if use_curve_metric_error:
                         train_metrics[-1] = metric.convert_score_to_error(train_metrics[-1])
                         val_metrics[-1] = metric.convert_score_to_error(val_metrics[-1])
-                        # test_metrics[-1] = metric.convert_score_to_error(test_metrics[-1])
+                        if test_dataset is not None: 
+                            test_metrics[-1] = metric.convert_score_to_error(test_metrics[-1])
 
                     if not _assert_valid_metric(train_metrics[-1]) or \
-                        not _assert_valid_metric(val_metrics[-1]): # or \
-                        # not _assert_valid_metric(test_metrics[-1]):
+                        not _assert_valid_metric(val_metrics[-1]) or \
+                        (test_dataset is not None and not _assert_valid_metric(test_metrics[-1])):
                         stop = True
                         break
 
@@ -444,7 +453,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                 for i, metric in enumerate(stopping_metrics):
                     train_curves[metric.name].append(train_metrics[i])
                     val_curves[metric.name].append(val_metrics[i])
-                    # test_curves[metric.name].append(test_metrics[i])
+                    test_curves[metric.name] += [test_metrics[i]] if test_dataset is not None else []
 
             if epoch >= num_epochs:
                 break
@@ -462,7 +471,10 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
         if generate_curves:
             metric_names = [metric.name for metric in stopping_metrics]
-            self.save_curves(metric_names, train_curves, val_curves)
+            curves = [train_curves]
+            curves += [val_curves] if val_dataset is not None else []
+            curves += [test_curves] if test_dataset is not None else []
+            self.save_curves(metric_names, *curves)
 
         # revert back to best model
         if val_dataset is not None:
@@ -509,7 +521,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         preds_dataset = np.concatenate(preds_dataset, 0)
         return preds_dataset
 
-    def _generate_datasets(self, X, y, params, X_val=None, y_val=None):
+    def _generate_datasets(self, X, y, params, X_val=None, y_val=None, X_test=None, y_test=None):
         from .tabular_torch_dataset import TabularTorchDataset
 
         impute_strategy = params["proc.impute_strategy"]
@@ -539,7 +551,15 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                 val_dataset = self._process_test_data(df=X_val, labels=y_val)
         else:
             val_dataset = None
-        return train_dataset, val_dataset
+        if X_test is not None:
+            if isinstance(X_test, TabularTorchDataset):
+                val_dataset = X_test
+            else:
+                X_test = self.preprocess(X_test)
+                test_dataset = self._process_test_data(df=X_test, labels=y_test)
+        else:
+            test_dataset = None
+        return train_dataset, val_dataset, test_dataset
 
     def _process_test_data(self, df, labels=None):
         """Process train or test DataFrame into a form fit for neural network models.
