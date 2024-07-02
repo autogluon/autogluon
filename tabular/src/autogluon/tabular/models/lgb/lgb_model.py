@@ -102,6 +102,13 @@ class LGBModel(AbstractModel):
         params = self._get_model_params()
         generate_curves = ag_params.get("generate_curves", False)
 
+        if generate_curves:
+            X_test = kwargs.get("X_test", None)
+            y_test = kwargs.get("y_test", None)
+        else:
+            X_test = None
+            y_test = None
+
         if verbosity <= 1:
             log_period = False
         elif verbosity == 2:
@@ -134,8 +141,8 @@ class LGBModel(AbstractModel):
             params["verbose"] = -1
 
         num_rows_train = len(X)
-        dataset_train, dataset_val = self.generate_datasets(
-            X=X, y=y, params=params, X_val=X_val, y_val=y_val, sample_weight=sample_weight, sample_weight_val=sample_weight_val
+        dataset_train, dataset_val, dataset_test = self.generate_datasets(
+            X=X, y=y, params=params, X_val=X_val, y_val=y_val, X_test=X_test, y_test=y_test, sample_weight=sample_weight, sample_weight_val=sample_weight_val
         )
         gc.collect()
 
@@ -216,10 +223,15 @@ class LGBModel(AbstractModel):
             ]
 
             eval_results = {}
-            train_params["valid_names"] = ["train_set"] + valid_names
-            train_params["valid_sets"] = [dataset_train] + valid_sets
             train_params["callbacks"].append(record_evaluation(eval_results))
             train_params["feval"] = custom_metrics
+
+            if dataset_test is not None:
+                train_params["valid_names"] = ["train_set", "test_set"] + train_params["valid_names"]
+                train_params["valid_sets"] = [dataset_train, dataset_test] + train_params["valid_sets"]
+            else:
+                train_params["valid_names"] = ["train_set"] + train_params["valid_names"]
+                train_params["valid_sets"] = [dataset_train] + train_params["valid_sets"]
 
         if not isinstance(stopping_metric, str) and not generate_curves:
             train_params["feval"] = stopping_metric
@@ -282,7 +294,8 @@ class LGBModel(AbstractModel):
         if generate_curves:      
             train_curves = eval_results["train_set"]
             val_curves = eval_results["valid_set"]
-            self.save_curves(metric_names, train_curves, val_curves)      
+            test_curves = eval_results["test_set"]
+            self.save_curves(metric_names, train_curves, val_curves, test_curves)
 
         if dataset_val is not None and not retrain:
             self.params_trained["num_boost_round"] = self.model.best_iteration
@@ -341,23 +354,42 @@ class LGBModel(AbstractModel):
         else:
             return X
 
-    def generate_datasets(self, X: DataFrame, y: Series, params, X_val=None, y_val=None, sample_weight=None, sample_weight_val=None, save=False):
+    def generate_datasets(
+            self, 
+            X: DataFrame, 
+            y: Series, 
+            params, 
+            X_val=None, 
+            y_val=None, 
+            X_test=None, 
+            y_test=None, 
+            sample_weight=None, 
+            sample_weight_val=None, 
+            sample_weight_test=None, 
+            save=False
+    ):
         lgb_dataset_params_keys = ["two_round"]  # Keys that are specific to lightGBM Dataset object construction.
         data_params = {key: params[key] for key in lgb_dataset_params_keys if key in params}.copy()
 
         X = self.preprocess(X, is_train=True)
         if X_val is not None:
             X_val = self.preprocess(X_val)
+        if X_test is not None:
+            X_test = self.preprocess(X_test)
         # TODO: Try creating multiple Datasets for subsets of features, then combining with Dataset.add_features_from(), this might avoid memory spike
 
         y_og = None
         y_val_og = None
+        y_test_og = None
         if self.problem_type == SOFTCLASS:
             y_og = np.array(y)
             y = None
             if X_val is not None:
                 y_val_og = np.array(y_val)
                 y_val = None
+            if X_test is not None:
+                y_test_og = np.array(y_test)
+                y_test = None
 
         # X, W_train = self.convert_to_weight(X=X)
         dataset_train = construct_dataset(
@@ -378,12 +410,28 @@ class LGBModel(AbstractModel):
             # dataset_val = construct_dataset_lowest_memory(X=X_val, y=y_val, location=self.path + 'datasets/val', reference=dataset_train, params=data_params)
         else:
             dataset_val = None
+
+        if X_test is not None:
+            dataset_test = construct_dataset(
+                x=X_test,
+                y=y_test,
+                location=os.path.join(self.path, "datasets", "test"),
+                reference=dataset_train,
+                params=data_params,
+                save=save,
+                weight=sample_weight_test,
+            )
+        else:
+            dataset_test = None
+
         if self.problem_type == SOFTCLASS:
             if y_og is not None:
                 dataset_train.softlabels = y_og
             if y_val_og is not None:
                 dataset_val.softlabels = y_val_og
-        return dataset_train, dataset_val
+            if y_test_og is not None:
+                dataset_test.softlabels = y_test_og
+        return dataset_train, dataset_val, dataset_test
 
     def _get_train_loss_name(self):
         if self.problem_type == BINARY:
