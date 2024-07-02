@@ -375,6 +375,10 @@ class AbstractTabularLearner(AbstractLearner):
         X_val = kwargs.get("X_val", None)
         self._validate_sample_weight(X, X_val)
         self._validate_groups(X, X_val)
+        X_test = kwargs.get("X_test", None)
+        if X_test is not None:
+            self._validate_sample_weight(X, X_test)
+            self._validate_groups(X, X_test)
 
     def validate_label(self, X: DataFrame):
         """

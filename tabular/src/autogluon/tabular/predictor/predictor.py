@@ -929,6 +929,11 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 (which may improve metrics like log_loss) and will train a scalar parameter on the validation set.
                 If True and the problem_type is quantile regression, conformalization will be used to calibrate the Predictor's estimated quantiles
                 (which may improve the prediction interval coverage, and bagging could further improve it) and will compute a set of scalar parameters on the validation set.
+            test_data : str or :class:`TabularDataset` or :class:`pd.DataFrame`
+                Table of the test data, which is similar to a pandas DataFrame.
+                If str is passed, `train_data` will be loaded using the str value as the file path.
+                NOTE: This test_data is NEVER SEEN by the model during training and, if specified, is only used for logging purposes (i.e. for learning curve generation).
+                This test_data should be treated the same way test data is used in predictor.leaderboard.
 
         Returns
         -------
@@ -1018,6 +1023,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         excluded_model_types = kwargs["excluded_model_types"]
         use_bag_holdout = kwargs["use_bag_holdout"]
         ds_args: dict = kwargs["ds_args"]
+        test_data = kwargs["test_data"]
 
         if ag_args is None:
             ag_args = {}
@@ -1027,7 +1033,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         if feature_generator_init_kwargs is None:
             feature_generator_init_kwargs = dict()
 
-        train_data, tuning_data, unlabeled_data = self._validate_fit_data(train_data=train_data, tuning_data=tuning_data, unlabeled_data=unlabeled_data)
+        train_data, tuning_data, test_data, unlabeled_data = self._validate_fit_data(train_data=train_data, tuning_data=tuning_data, test_data=test_data, unlabeled_data=unlabeled_data)
         infer_limit, infer_limit_batch_size = self._validate_infer_limit(infer_limit=infer_limit, infer_limit_batch_size=infer_limit_batch_size)
 
         if hyperparameters is None:
@@ -1133,6 +1139,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         ag_fit_kwargs = dict(
             X=train_data,
             X_val=tuning_data,
+            X_test=test_data,
             X_unlabeled=unlabeled_data,
             holdout_frac=holdout_frac,
             num_bag_folds=num_bag_folds,
@@ -1250,7 +1257,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             if holdout_data is None:
                 ds_fit_kwargs.update(dict(holdout_frac=holdout_frac, ds_fit_context=os.path.join(ds_fit_context, "sub_fit_ho")))
             else:
-                _, holdout_data, _ = self._validate_fit_data(train_data=X, tuning_data=holdout_data)
+                _, holdout_data, _, _ = self._validate_fit_data(train_data=X, tuning_data=holdout_data)
                 ds_fit_kwargs["ds_fit_context"] = os.path.join(ds_fit_context, "sub_fit_custom_ho")
 
             stacked_overfitting = self._sub_fit_memory_save_wrapper(
@@ -4614,6 +4621,8 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             # pseudo label
             pseudo_data=None,
             name_suffix=None,
+            # test data (for logging purposes only)
+            test_data=None,
         )
 
     @staticmethod
@@ -4726,12 +4735,15 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         self,
         train_data: str | pd.DataFrame,
         tuning_data: str | pd.DataFrame | None = None,
+        test_data: str | pd.DataFrame | None = None,
         unlabeled_data: str | pd.DataFrame | None = None,
     ) -> Tuple[pd.DataFrame, pd.DataFrame | None, pd.DataFrame | None]:
         if isinstance(train_data, str):
             train_data = TabularDataset(train_data)
         if tuning_data is not None and isinstance(tuning_data, str):
             tuning_data = TabularDataset(tuning_data)
+        if test_data is not None and isinstance(test_data, str):
+            test_data = TabularDataset(test_data)
         if unlabeled_data is not None and isinstance(unlabeled_data, str):
             unlabeled_data = TabularDataset(unlabeled_data)
 
@@ -4766,6 +4778,30 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                         f"\tAutoGluon will attempt to convert the dtypes to align."
                     )
 
+        if test_data is not None:
+            if not isinstance(test_data, pd.DataFrame):
+                raise AssertionError(f"test_data is required to be a pandas DataFrame, but was instead: {type(test_data)}")
+            self._validate_unique_indices(data=test_data, name="test_data")
+            train_features = [column for column in train_data.columns if column != self.label]
+            test_features = [column for column in test_data.columns if column != self.label]
+            train_features, test_features = self._prune_data_features(train_features=train_features, other_features=test_features, is_labeled=True)
+            train_features = np.array(train_features)
+            test_features = np.array(test_features)
+            if np.any(train_features != test_features):
+                raise ValueError("Column names must match between training and test data")
+
+            if self.label in test_data:
+                train_label_type = train_data[self.label].dtype
+                test_label_type = test_data[self.label].dtype
+
+                if train_label_type != test_label_type:
+                    logger.warning(
+                        f"WARNING: train_data and test_data have mismatched label column dtypes! "
+                        f"train_label_type={train_label_type}, test_type={test_label_type}.\n"
+                        f"\tYou should ensure the dtypes match to avoid bugs or instability.\n"
+                        f"\tAutoGluon will attempt to convert the dtypes to align."
+                    )
+
         if unlabeled_data is not None:
             if not isinstance(unlabeled_data, pd.DataFrame):
                 raise AssertionError(f"unlabeled_data is required to be a pandas DataFrame, but was instead: {type(unlabeled_data)}")
@@ -4779,7 +4815,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 raise ValueError(
                     "Column names must match between training and unlabeled data.\n" "Unlabeled data must have not the label column specified in it.\n"
                 )
-        return train_data, tuning_data, unlabeled_data
+        return train_data, tuning_data, test_data, unlabeled_data
 
     @staticmethod
     def _validate_unique_indices(data: pd.DataFrame, name: str):
