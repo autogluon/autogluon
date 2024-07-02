@@ -837,6 +837,12 @@ class AbstractModel:
         y_val : Series, default = None
             The validation data ground truth labels.
             If None, early stopping via validation score will be disabled.
+        X_test : DataFrame, default = None
+            The test data features. Note: Not used for training, but for tracking test performance.
+            If None, early stopping via validation score will be disabled.
+        y_test : Series, default = None
+            The test data ground truth labels. Note: Not used for training, but for tracking test performance.
+            If None, early stopping via validation score will be disabled.
         X_unlabeled : DataFrame, default = None
             Unlabeled data features.
             Models may optionally implement logic which leverages unlabeled data to improve model accuracy.
