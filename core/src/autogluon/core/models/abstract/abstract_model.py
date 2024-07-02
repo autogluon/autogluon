@@ -1133,17 +1133,18 @@ class AbstractModel:
         return path
 
 
-    def save_curves(self, metrics, train_curves, val_curves, path: str = None):
+    def save_curves(self, metrics, curve, *curves, path: str = None):
         """
         Saves learning curves to disk.
+
         Parameters
         ----------
-        metrics : list(str)
+        metrics : str or list(str)
             List of all evaluation metrics computed at each iteration of the curve
-        training_curve : dict(str : list(float))
+        curve : dict(str : list(float))
             Dictionary of evaluation metrics computed at each iteration on the training dataset
-        validation_curve : dict(str : list(float))
-            Dictionary of evaluation metrics computed at each iteration on the validation dataset
+        *curves : additional dict(str : list(float))
+            Dictionary of evaluation metrics computed at each iteration on other datasets
         e.g.
                 {
                     'logloss': [0.693147, 0.690162, ...],
@@ -1155,18 +1156,24 @@ class AbstractModel:
             This should generally be a directory path ending with a '/' character (or appropriate path separator value depending on OS).
             If None, self.path is used.
             The final curve file is typically saved to os.path.join(path, curves.json).
+
         Returns
         -------
         path : str
-            Path to the saved model, minus the file name.
+            Path to the saved curves, minus the file name.
         """
         if path is None:
             path = self.path
+        if type(metrics) == str:
+            metrics = [metrics]
+        if len(metrics) == 0:
+            raise ValueError("At least one metric must be specified to save generated learning curves.")
 
         os.makedirs(path, exist_ok=True)
         file_path = os.path.join(path, f"curves.json")
+        curves = [curve] + list(curves)
 
-        curves = [
+        out = [
             metrics,
             [
                 # iteration data goes here
@@ -1175,21 +1182,17 @@ class AbstractModel:
 
         iterations = 0
         if len(metrics) > 0:
-            iterations = len(train_curves[metrics[0]])
+            iterations = len(curve[metrics[0]])
 
         for i in range(iterations):
-            curves[1].append([])
+            out[1].append([])
             for metric in metrics:
-                curves[1][i].append([
-                        train_curves[metric][i], # "train": 
-                        val_curves[metric][i], # "val": 
-                        # "test": test_curves[metric][i], # TODO: implement test curve data
-                    ])
+                out[1][i].append([c[metric][i] for c in curves])
 
         with open(file_path, 'w') as json_file:
-            json.dump(curves, json_file, indent=4)
+            json.dump(out, json_file, indent=4)
 
-        return curves
+        return file_path
 
 
     @classmethod
