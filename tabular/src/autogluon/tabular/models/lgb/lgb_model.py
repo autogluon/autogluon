@@ -291,11 +291,11 @@ class LGBModel(AbstractModel):
                     else:
                         logger.log(15, f"Not enough time to retrain LGB model ('dart' mode)...")
 
-        if generate_curves:      
-            train_curves = eval_results["train_set"]
-            val_curves = eval_results["valid_set"]
-            test_curves = eval_results["test_set"]
-            self.save_curves(metric_names, train_curves, val_curves, test_curves)
+        if generate_curves:
+            curves = [eval_results["train_set"]]
+            curves += [eval_results["valid_set"]] if X_val is not None else []
+            curves += [eval_results["test_set"]] if X_test is not None else []
+            self.save_curves(metric_names, *curves)
 
         if dataset_val is not None and not retrain:
             self.params_trained["num_boost_round"] = self.model.best_iteration
