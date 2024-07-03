@@ -34,6 +34,14 @@ LARGE_DATA_THRESHOLD = 1000
 REGRESS_THRESHOLD_LARGE_DATA = 0.05
 REGRESS_THRESHOLD_SMALL_DATA = 0.1
 
+# Models that currently support learning curve generation
+LEARNING_CURVE_SUPPORTED_MODELS = ["XGB", "NN_TORCH", "GBM"]
+DEFAULT_LEARNING_CURVE_METRICS = {
+    BINARY: ["log_loss", "accuracy", "precision", "recall", "f1", "roc_auc"],
+    REGRESSION: ['root_mean_squared_error', 'mean_squared_error', 'mean_absolute_error', 'median_absolute_error', 'r2'],
+    MULTICLASS: ["accuracy", "precision_weighted", "recall_weighted", "f1_weighted"],
+}
+
 # TODO: Add docs to dedicated page, or should it live in AbstractModel?
 # TODO: How to reference correct version of docs?
 # TODO: Add error in AG_ARGS if unknown key present
