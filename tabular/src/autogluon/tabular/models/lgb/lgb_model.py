@@ -206,6 +206,7 @@ class LGBModel(AbstractModel):
         if generate_curves:
             metric_names = list(set(ag_params.get("curve_metrics", [])))
             use_curve_metric_error = ag_params.get("use_error_for_curve_metrics", True)
+            og_metric_names = metric_names.copy()
 
             if self.stopping_metric.name not in metric_names:
                 metric_names.append(self.stopping_metric.name)
@@ -292,10 +293,13 @@ class LGBModel(AbstractModel):
                         logger.log(15, f"Not enough time to retrain LGB model ('dart' mode)...")
 
         if generate_curves:
-            curves = [eval_results["train_set"]]
-            curves += [eval_results["valid_set"]] if X_val is not None else []
-            curves += [eval_results["test_set"]] if X_test is not None else []
-            self.save_curves(metric_names, *curves)
+            def filter(d, keys):
+                return {key: d[key] for key in keys if key in d}
+
+            curves = [filter(eval_results["train_set"], og_metric_names)]
+            curves += [filter(eval_results["valid_set"], og_metric_names)] if X_val is not None else []
+            curves += [filter(eval_results["test_set"], og_metric_names)] if X_test is not None else []
+            self.save_curves(og_metric_names, *curves)
 
         if dataset_val is not None and not retrain:
             self.params_trained["num_boost_round"] = self.model.best_iteration
