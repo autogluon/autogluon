@@ -1051,6 +1051,8 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         infer_limit, infer_limit_batch_size = self._validate_infer_limit(infer_limit=infer_limit, infer_limit_batch_size=infer_limit_batch_size)
 
         learning_curves = self._initialize_learning_curve_params(learning_curves)
+        if len(learning_curves) == 0:
+            test_data = None
         if ag_args_fit is not None:
             ag_args_fit.update(learning_curves)
         else:
