@@ -226,6 +226,7 @@ class AbstractTrainer:
         self._num_rows_train = None
         self._num_cols_train = None
         self._num_rows_val = None
+        self._num_rows_test = None
 
         self.is_data_saved = False
         self._X_saved = False
@@ -299,24 +300,40 @@ class AbstractTrainer:
         return X, y, X_val, y_val
 
     def save_X(self, X, verbose=True):
+        if X is None: return
         path = os.path.join(self.path_data, "X.pkl")
         save_pkl.save(path=path, object=X, verbose=verbose)
         self._X_saved = True
 
     def save_X_val(self, X, verbose=True):
+        if X is None: return
         path = os.path.join(self.path_data, "X_val.pkl")
         save_pkl.save(path=path, object=X, verbose=verbose)
         self._X_val_saved = True
 
+    def save_X_test(self, X, verbose=True):
+        if X is None: return
+        path = os.path.join(self.path_data, "X_test.pkl")
+        save_pkl.save(path=path, object=X, verbose=verbose)
+        self._X_test_saved = True
+
     def save_y(self, y, verbose=True):
+        if y is None: return
         path = os.path.join(self.path_data, "y.pkl")
         save_pkl.save(path=path, object=y, verbose=verbose)
         self._y_saved = True
 
     def save_y_val(self, y, verbose=True):
+        if y is None: return
         path = os.path.join(self.path_data, "y_val.pkl")
         save_pkl.save(path=path, object=y, verbose=verbose)
         self._y_val_saved = True
+
+    def save_y_test(self, y, verbose=True):
+        if y is None: return
+        path = os.path.join(self.path_data, "y_test.pkl")
+        save_pkl.save(path=path, object=y, verbose=verbose)
+        self._y_test_saved = True
 
     def get_model_names(
         self, stack_name: Union[List[str], str] = None, level: Union[List[int], int] = None, can_infer: bool = None, models: List[str] = None
@@ -730,7 +747,7 @@ class AbstractTrainer:
         if X_val is not None:
             X_val = self.get_inputs_to_stacker(X_val, base_models=base_model_names, fit=False, use_val_cache=True)
         if X_test is not None:
-            X_test = self.get_inputs_to_stacker(X_test, base_models=base_model_names, fit=False, use_val_cache=True)
+            X_test = self.get_inputs_to_stacker(X_test, base_models=base_model_names, fit=False, use_val_cache=False)
         compute_score = not refit_full
         if refit_full and X_val is not None:
             X_init = pd.concat([X_init, X_val])
@@ -2643,19 +2660,20 @@ class AbstractTrainer:
         if time_limit is not None and time_limit <= 0:
             raise AssertionError(f"Not enough time left to train models. Consider specifying a larger time_limit. Time remaining: {round(time_limit, 2)}s")
         if self.save_data and not self.is_data_saved:
-            # TODO: Save test data here?
             self.save_X(X)
             self.save_y(y)
-            if X_val is not None:
-                self.save_X_val(X_val)
-                if y_val is not None:
-                    self.save_y_val(y_val)
+            self.save_X_val(X_val)
+            self.save_y_val(y_val)
+            self.save_X_test(X_test)
+            self.save_y_test(y_test)
             self.is_data_saved = True
         if self._groups is None:
             self._groups = groups
         self._num_rows_train = len(X)
         if X_val is not None:
             self._num_rows_val = len(X_val)
+        if X_test is not None:
+            self._num_rows_test = len(X_test)
         self._num_cols_train = len(list(X.columns))
         model_names_fit = self.train_multi_levels(
             X,
@@ -3331,6 +3349,7 @@ class AbstractTrainer:
         num_rows_train = self._num_rows_train
         num_cols_train = self._num_cols_train
         num_rows_val = self._num_rows_val
+        num_rows_test = self._num_rows_test
         num_classes = self.num_classes
         # TODO:
         #  Disk size of models
@@ -3349,6 +3368,7 @@ class AbstractTrainer:
             "num_rows_train": num_rows_train,
             "num_cols_train": num_cols_train,
             "num_rows_val": num_rows_val,
+            "num_rows_test": num_rows_test,
             "num_classes": num_classes,
             "problem_type": problem_type,
             "eval_metric": eval_metric,

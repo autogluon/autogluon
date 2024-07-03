@@ -43,6 +43,8 @@ from autogluon.core.constants import (
     QUANTILE,
     REGRESSION,
     SOFTCLASS,
+    LEARNING_CURVE_SUPPORTED_MODELS,
+    DEFAULT_LEARNING_CURVE_METRICS,
 )
 from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.dataset import TabularDataset
@@ -934,6 +936,17 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 If str is passed, `train_data` will be loaded using the str value as the file path.
                 NOTE: This test_data is NEVER SEEN by the model during training and, if specified, is only used for logging purposes (i.e. for learning curve generation).
                 This test_data should be treated the same way test data is used in predictor.leaderboard.
+            learning_curves : bool or dict, default = True
+                If bool and is True, default learning curve hyperparameter ag_args will be initialized for each of the models included in the ensemble.
+                    Default metrics for each problem type are maintained in autogluon.core.constants:
+                    BINARY: ["log_loss", "accuracy", "precision", "recall", "f1", "roc_auc"],
+                    REGRESSION: ['root_mean_squared_error', 'mean_squared_error', 'mean_absolute_error', 'median_absolute_error', 'r2'],
+                    MULTICLASS: ["accuracy", "precision_weighted", "recall_weighted", "f1_weighted"],
+                If dict, user can pass learning_curve parameters to be initialized as ag_args in the following format:
+                    {
+                        "metrics": str or list(str) : str represents autogluon scorer metric names calculated at each iteration
+                        "use_error": bool : whether to use error or score format for metrics listed above
+                    }
 
         Returns
         -------
@@ -1024,6 +1037,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         use_bag_holdout = kwargs["use_bag_holdout"]
         ds_args: dict = kwargs["ds_args"]
         test_data = kwargs["test_data"]
+        learning_curves = kwargs["learning_curves"]
 
         if ag_args is None:
             ag_args = {}
@@ -1035,6 +1049,12 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
         train_data, tuning_data, test_data, unlabeled_data = self._validate_fit_data(train_data=train_data, tuning_data=tuning_data, test_data=test_data, unlabeled_data=unlabeled_data)
         infer_limit, infer_limit_batch_size = self._validate_infer_limit(infer_limit=infer_limit, infer_limit_batch_size=infer_limit_batch_size)
+
+        learning_curves = self._initialize_learning_curve_params(learning_curves)
+        if ag_args_fit is not None:
+            ag_args_fit.update(learning_curves)
+        else:
+            ag_args_fit = learning_curves
 
         if hyperparameters is None:
             hyperparameters = "default"
@@ -2543,6 +2563,66 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             set_refit_score_to_parent=set_refit_score_to_parent,
             display=display,
         )
+
+    def learning_curves(self):
+        """
+        Retrieves learning curves generated during predictor.fit(). 
+        Will not work if the learning_curves flag was not set during training.
+        Note that learning curves are only generated for iterative learners.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        :class:`dict` object. Returns aggregated learning curves across all models.
+        Aggregation should look like this:
+            {
+                metadata,
+                {
+                    "model": json from associated model's curves.json,
+                    "model": json from associated model's curves.json,
+                    "model": json from associated model's curves.json,
+                    "model": json from associated model's curves.json,
+                }
+            }
+        """
+        # build mapping from model library specific class names (i.e. XGBoost) to AG shorthand model names (i.e. XGB)
+        from autogluon.tabular.trainer.model_presets.presets import MODEL_TYPES, DEFAULT_MODEL_NAMES
+        MODEL_NAMES = {DEFAULT_MODEL_NAMES[val]: key for key, val in MODEL_TYPES.items() if val in DEFAULT_MODEL_NAMES}
+
+        metadata = self.info()
+        path = os.path.join(metadata["path"], "models")
+        models = os.listdir(path)
+        models = [name for name in models if MODEL_NAMES.get(name, None) in LEARNING_CURVE_SUPPORTED_MODELS]
+
+        model_data = {}
+        for model in models:
+            file = os.path.join(path, model, "curves.json")
+
+            if not os.path.exists(file):
+                raise FileNotFoundError(f"Could not find curves.json file at {file}" + \
+                    "\nDid you call predictor.fit() with an appropriate learning_curves parameter?")
+
+            model_data[MODEL_NAMES[model]] = load_json.load(file)
+
+            # Attempt to delete the file
+            try:
+                os.remove(file)
+            except PermissionError:
+                print(f"Error: Permission denied to delete '{file}'.")
+            except OSError as e:
+                print(f"Error: {e}")
+
+            self.verbosity
+
+        aggregated_data = [
+            metadata,
+            model_data
+        ]
+
+        return aggregated_data
 
     def model_failures(self, verbose: bool = False) -> pd.DataFrame:
         """
@@ -4545,6 +4625,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             feature_generator="auto",
             unlabeled_data=None,
             _feature_generator_kwargs=None,
+            learning_curves=False
         )
         kwargs, ds_valid_keys = self._sanitize_dynamic_stacking_kwargs(kwargs)
         kwargs = self._validate_fit_extra_kwargs(kwargs, extra_valid_keys=list(fit_kwargs_default.keys()) + ds_valid_keys)
@@ -4816,6 +4897,33 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                     "Column names must match between training and unlabeled data.\n" "Unlabeled data must have not the label column specified in it.\n"
                 )
         return train_data, tuning_data, test_data, unlabeled_data
+
+    def _initialize_learning_curve_params(self, learning_curves):
+        if learning_curves is None or learning_curves == False:
+            return {}
+        elif type(learning_curves) != dict and type(learning_curves) != bool:
+            raise ValueError("VALUE ERROR: learning curves parameter must be a boolean or dict!")
+
+        use_error = True
+        metrics = DEFAULT_LEARNING_CURVE_METRICS[self.problem_type]
+
+        if type(learning_curves) == dict:
+            if "metrics" in learning_curves:
+                if type(learning_curves["metrics"]) == str:
+                    metrics = [learning_curves["metrics"]]
+                else:
+                    metrics = learning_curves["metrics"]
+
+            if "use_error" in learning_curves:
+                use_error = learning_curves["use_error"]
+
+        params = {
+            "ag.generate_curves": True,
+            "ag.curve_metrics": metrics,
+            "ag.use_error_for_curve_metrics": use_error,
+        }
+
+        return params
 
     @staticmethod
     def _validate_unique_indices(data: pd.DataFrame, name: str):

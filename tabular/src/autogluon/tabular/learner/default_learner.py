@@ -193,42 +193,13 @@ class DefaultLearner(AbstractTabularLearner):
     # TODO: Add default values to X_val, X_unlabeled, holdout_frac, and num_bag_folds
     def general_data_processing(self, X: DataFrame, X_val: DataFrame, X_unlabeled: DataFrame, holdout_frac: float, num_bag_folds: int, X_test : DataFrame = None):
         """General data processing steps used for all models."""
-        X = copy.deepcopy(X)
-        # treat None, NaN, INF, NINF as NA
-        X[self.label] = X[self.label].replace([np.inf, -np.inf], np.nan)
-        invalid_labels = X[self.label].isna()
-        if invalid_labels.any():
-            first_invalid_label_idx = invalid_labels.idxmax()
-            raise ValueError(
-                f"Label column cannot contain non-finite values (NaN, Inf, Ninf). First invalid label at train_data idx: {first_invalid_label_idx}"
-            )
+        X = self._check_for_non_finite_values(X, is_train=True)
+        X_val = self._check_for_non_finite_values(X_val, is_train=False)
+        X_test = self._check_for_non_finite_values(X_test, is_train=False)
 
         holdout_frac_og = holdout_frac
         if X_val is not None and self.label in X_val.columns:
-            X_val = copy.deepcopy(X_val)
-
-            # treat None, NaN, INF, NINF as NA
-            X_val[self.label] = X_val[self.label].replace([np.inf, -np.inf], np.nan)
-            invalid_tuning_labels = X_val[self.label].isna()
-            if invalid_tuning_labels.any():
-                first_invalid_label_idx = invalid_tuning_labels.idxmax()
-                raise ValueError(
-                    f"Label column cannot contain non-finite values (NaN, Inf, Ninf). First invalid label at tuning_data idx: {first_invalid_label_idx}"
-                )
-
             holdout_frac = 1
-        
-        if X_test is not None and self.label in X_test.columns:
-            X_test = copy.deepcopy(X_test)
-
-            # treat None, NaN, INF, NINF as NA
-            X_test[self.label] = X_test[self.label].replace([np.inf, -np.inf], np.nan)
-            invalid_tuning_labels = X_test[self.label].isna()
-            if invalid_tuning_labels.any():
-                first_invalid_label_idx = invalid_tuning_labels.idxmax()
-                raise ValueError(
-                    f"Label column cannot contain non-finite values (NaN, Inf, Ninf). First invalid label at tuning_data idx: {first_invalid_label_idx}"
-                )
 
         if self.eval_metric is not None and self.eval_metric.needs_proba and self.problem_type == MULTICLASS:
             # Metric requires all classes present in training to be able to compute a score
@@ -257,167 +228,66 @@ class DefaultLearner(AbstractTabularLearner):
         if self.label_cleaner.num_classes is not None and self.problem_type != BINARY:
             logger.log(20, f"Train Data Class Count: {self.label_cleaner.num_classes}")
 
-        if X_val is not None and self.label in X_val.columns:
-            y_val_og = X_val[self.label]
-            X_val = self.cleaner.transform(X_val)
-            if len(X_val) == 0:
-                logger.warning(
-                    "############################################################################################################\n"
-                    "WARNING: All X_val data contained low frequency classes, ignoring X_val and generating from subset of X\n"
-                    "\tYour input validation data or training data labels might be corrupted, please manually inspect them for correctness!"
-                )
-                if self.problem_type in [BINARY, MULTICLASS]:
-                    train_classes = sorted(list(y_uncleaned.unique()))
-                    val_classes = sorted(list(y_val_og.unique()))
-                    logger.warning(f"\tTraining Classes: {train_classes}")
-                    logger.warning(f"\tTuning   Classes: {val_classes}")
-                    logger.warning(f"\tTraining Class Dtype: {y_uncleaned.dtype}")
-                    logger.warning(f"\tTuning   Class Dtype: {y_val_og.dtype}")
-                    missing_classes = [c for c in val_classes if c not in train_classes]
-                    logger.warning(f"\tClasses missing from Training Data: {missing_classes}")
-                logger.warning("############################################################################################################")
-
-                X_val = None
-                y_val = None
-                w_val = None
-                holdout_frac = holdout_frac_og
-            else:
-                X_val, y_val = self.extract_label(X_val)
-                y_val = self.label_cleaner.transform(y_val)
-                X_val = self.set_predefined_weights(X_val, y_val)
-                X_val, w_val = extract_column(X_val, self.sample_weight)
-        else:
-            y_val = None
-            w_val = None
-
-        if X_test is not None and self.label in X_test.columns:
-            y_test_og = X_test[self.label]
-            X_test = self.cleaner.transform(X_test)
-            if len(X_test) == 0:
-                logger.warning(
-                    "############################################################################################################\n"
-                    "WARNING: All X_test data contained low frequency classes, ignoring X_test and generating from subset of X\n"
-                    "\tYour input validation data or training data labels might be corrupted, please manually inspect them for correctness!"
-                )
-                if self.problem_type in [BINARY, MULTICLASS]:
-                    train_classes = sorted(list(y_uncleaned.unique()))
-                    test_classes = sorted(list(y_test_og.unique()))
-                    logger.warning(f"\tTraining Classes: {train_classes}")
-                    logger.warning(f"\Test      Classes: {test_classes}")
-                    logger.warning(f"\tTraining Class Dtype: {y_uncleaned.dtype}")
-                    logger.warning(f"\Test      Class Dtype: {y_test_og.dtype}")
-                    missing_classes = [c for c in test_classes if c not in train_classes]
-                    logger.warning(f"\tClasses missing from Training Data: {missing_classes}")
-                logger.warning("############################################################################################################")
-
-                X_test = None
-                y_test = None
-                w_test = None
-            else:
-                X_test, y_test = self.extract_label(X_test)
-                y_test = self.label_cleaner.transform(y_test)
-                X_test = self.set_predefined_weights(X_test, y_test)
-                X_test, w_test = extract_column(X_test, self.sample_weight)
-        else:
-            y_test = None
-            w_test = None
+        X_val, y_val, w_val, holdout_frac = self._apply_cleaner_transform(X_val, y_uncleaned, holdout_frac, holdout_frac_og, "X_val")
+        X_test, y_test, w_test, holdout_frac = self._apply_cleaner_transform(X_test, y_uncleaned, holdout_frac, holdout_frac_og, "X_test")
 
         self._original_features = list(X.columns)
         # TODO: Move this up to top of data before removing data, this way our feature generator is better
         logger.log(20, f"Using Feature Generators to preprocess the data ...")
-        if X_val is not None:
-            # Do this if working with SKLearn models, otherwise categorical features may perform very badly on the test set
+
+        if X_val is not None or X_test is not None:
             logger.log(
                 15,
-                "Performing general data preprocessing with merged train & validation data, so validation performance may not accurately reflect performance on new test data",
+                "Performing general data preprocessing with merged train & validation data, so validation/test performance may not accurately reflect performance on new test data",
             )
-            X_super = pd.concat([X, X_val, X_unlabeled], ignore_index=True)
-            if X_test is not None:
-                X_super = pd.concat([X_super, X_test], ignore_index=True)
 
-            if self.feature_generator.is_fit():
-                logger.log(
-                    20,
-                    f"{self.feature_generator.__class__.__name__} is already fit, so the training data will be processed via .transform() instead of .fit_transform().",
-                )
-                X_super = self.feature_generator.transform(X_super)
-                self.feature_generator.print_feature_metadata_info()
-            else:
-                if X_unlabeled is None:
-                    y_super = pd.concat([y, y_val], ignore_index=True)
-                else:
-                    y_unlabeled = pd.Series(np.nan, index=X_unlabeled.index)
-                    y_super = pd.concat([y, y_val, y_unlabeled], ignore_index=True)
-                if X_test is not None:
-                    y_super = pd.concat([y_super, y_test], ignore_index=True)
-                X_super = self.fit_transform_features(X_super, y_super, problem_type=self.label_cleaner.problem_type_transform, eval_metric=self.eval_metric)
-            X = X_super.head(len(X)).set_index(X.index)
+        datasets = [X, X_val, X_test, X_unlabeled]
+        X_super = pd.concat(datasets, ignore_index=True)
 
-            X_val = X_super.head(len(X) + len(X_val)).tail(len(X_val)).set_index(X_val.index)
+        y_unlabeled = pd.Series(np.nan, index=X_unlabeled.index) if X_unlabeled is not None else None
+        y_list = [y, y_val, y_test, y_unlabeled]
 
-            if X_unlabeled is not None:
-                X_unlabeled = X_super.head(len(X) + len(X_val) + len(X_unlabeled)).tail(len(X_unlabeled)).set_index(X_unlabeled.index)
-
-            if X_test is not None:
-                X_test = X_super.tail(len(X_test)).set_index(X_test.index)
-
-            del X_super
+        if self.feature_generator.is_fit():
+            logger.log(
+                20,
+                f"{self.feature_generator.__class__.__name__} is already fit, so the training data will be processed via .transform() instead of .fit_transform().",
+            )
+            X_super = self.feature_generator.transform(X_super)
+            self.feature_generator.print_feature_metadata_info()
         else:
-            X_super = pd.concat([X, X_unlabeled], ignore_index=True)
-            if X_test is not None:
-                X_super = pd.concat([X_super, X_test], ignore_index=True)
+            y_super = pd.concat(y_list, ignore_index=True)
+            X_super = self.fit_transform_features(X_super, y_super, problem_type=self.label_cleaner.problem_type_transform, eval_metric=self.eval_metric)
 
-            if self.feature_generator.is_fit():
-                logger.log(
-                    20,
-                    f"{self.feature_generator.__class__.__name__} is already fit, so the training data will be processed via .transform() instead of .fit_transform().",
-                )
-                X_super = self.feature_generator.transform(X_super)
-                self.feature_generator.print_feature_metadata_info()
-            else:
-                if X_unlabeled is None:
-                    y_super = y.reset_index(drop=True)
-                else:
-                    y_unlabeled = pd.Series(np.nan, index=X_unlabeled.index)
-                    y_super = pd.concat([y, y_unlabeled], ignore_index=True)
-                if X_test is not None:
-                    y_super = pd.concat([y_super, y_test], ignore_index=True)
-                X_super = self.fit_transform_features(X_super, y_super, problem_type=self.label_cleaner.problem_type_transform, eval_metric=self.eval_metric)
+        idx = 0
+        for i in range(len(datasets)):
+            if datasets[i] is not None:
+                datasets[i] = X_super.iloc[idx : idx + len(datasets[i])].set_index(datasets[i].index)
+                idx += len(datasets[i])
 
-            X = X_super.head(len(X)).set_index(X.index)
+        X, X_val, X_test, X_unlabeled = datasets
+        del X_super
 
-            if X_unlabeled is not None:
-                X_unlabeled = X_super.head(len(X) + len(X_unlabeled)).tail(len(X_unlabeled)).set_index(X_unlabeled.index)
-            if X_test is not None:
-                X_test = X_super.tail(len(X_test)).set_index(X_test.index)
-
-            del X_super
-
-        X, X_val, X_test = self.bundle_weights(X, w, X_val, w_val, X_test, w_test)  # TODO: consider not bundling sample-weights inside X, X_val
+        # TODO: consider not bundling sample-weights inside X, X_val
+        X = self.bundle_weights(X, w, "X")
+        X_val = self.bundle_weights(X_val, w_val, "X_val")
+        X_test = self.bundle_weights(X_test, w_test, "X_test")
         return X, y, X_val, y_val, X_test, y_test, X_unlabeled, holdout_frac, num_bag_folds, groups
 
-    def bundle_weights(self, X, w, X_val, w_val, X_test, w_test):
-        if w is not None:
-            X[self.sample_weight] = w
-            if X_val is not None:
-                if w_val is not None:
-                    X_val[self.sample_weight] = w_val
-                elif not self.weight_evaluation:
-                    nan_vals = np.empty((len(X_val),))
-                    nan_vals[:] = np.nan
-                    X_val[self.sample_weight] = nan_vals
-                else:
-                    raise ValueError(f"sample_weight column '{self.sample_weight}' cannot be missing from X_val if weight_evaluation=True")
-            if X_test is not None:
-                if w_test is not None:
-                    X_test[self.sample_weight] = w_test
-                elif not self.weight_evaluation:
-                    nan_vals = np.empty((len(X_test),))
-                    nan_vals[:] = np.nan
-                    X_test[self.sample_weight] = nan_vals
-                else:
-                    raise ValueError(f"sample_weight column '{self.sample_weight}' cannot be missing from X_test if weight_evaluation=True")
-        return X, X_val, X_test
+    def bundle_weights(self, X, w, X_name, is_train=False):
+        if is_train:
+            if w is not None:
+                X[self.sample_weight] = w
+        elif X is not None:
+            if w is not None:
+                X[self.sample_weight] = w
+            elif not self.weight_evaluation:
+                nan_vals = np.empty((len(X),))
+                nan_vals[:] = np.nan
+                X[self.sample_weight] = nan_vals
+            else:
+                raise ValueError(f"sample_weight column '{self.sample_weight}' cannot be missing from {X_name} dataset if weight_evaluation=True")
+
+        return X
 
     def set_predefined_weights(self, X, y):
         if self.sample_weight not in [AUTO_WEIGHT, BALANCE_WEIGHT] or self.problem_type not in [BINARY, MULTICLASS]:
@@ -439,6 +309,58 @@ class DefaultLearner(AbstractTabularLearner):
             raise NotImplementedError(f"{AUTO_WEIGHT} strategy not yet supported.")
         X[self.sample_weight] = w  # TODO: consider not bundling sample weights inside X
         return X
+
+    def _check_for_non_finite_values(self, X, is_train=False):
+        if is_train or (X is not None and self.label in X.columns):
+            X = copy.deepcopy(X)
+
+            # treat None, NaN, INF, NINF as NA
+            X[self.label] = X[self.label].replace([np.inf, -np.inf], np.nan)
+            invalid_labels = X[self.label].isna()
+            if invalid_labels.any():
+                first_invalid_label_idx = invalid_labels.idxmax()
+                raise ValueError(
+                    f"Label column cannot contain non-finite values (NaN, Inf, Ninf). First invalid label at data idx: {first_invalid_label_idx}"
+                )
+
+        return X
+    
+    def _apply_cleaner_transform(self, X, y_uncleaned, holdout_frac, holdout_frac_og, X_name):
+        if X is not None and self.label in X.columns:
+            y_og = X[self.label]
+            X = self.cleaner.transform(X)
+            if len(X) == 0:
+                logger.warning(
+                    "############################################################################################################\n"
+                    f"WARNING: All {X_name} data contained low frequency classes, ignoring {X_name} and generating from subset of X\n"
+                    "\tYour input validation data or training data labels might be corrupted, please manually inspect them for correctness!"
+                )
+                if self.problem_type in [BINARY, MULTICLASS]:
+                    train_classes = sorted(list(y_uncleaned.unique()))
+                    val_classes = sorted(list(y_og.unique()))
+                    logger.warning(f"\tTraining Classes: {train_classes}")
+                    logger.warning(f"\tTuning   Classes: {val_classes}")
+                    logger.warning(f"\tTraining Class Dtype: {y_uncleaned.dtype}")
+                    logger.warning(f"\tTuning   Class Dtype: {y_og.dtype}")
+                    missing_classes = [c for c in val_classes if c not in train_classes]
+                    logger.warning(f"\tClasses missing from Training Data: {missing_classes}")
+                logger.warning("############################################################################################################")
+
+                X = None
+                y = None
+                w = None
+                holdout_frac = holdout_frac_og
+            else:
+                X, y = self.extract_label(X)
+                y = self.label_cleaner.transform(y)
+                X = self.set_predefined_weights(X, y)
+                X, w = extract_column(X, self.sample_weight)
+        else:
+            y = None
+            w = None
+
+        return X, y, w, holdout_frac
+
 
     def adjust_threshold_if_necessary(self, y, threshold, holdout_frac, num_bag_folds):
         new_threshold, new_holdout_frac, new_num_bag_folds = self._adjust_threshold_if_necessary(y, threshold, holdout_frac, num_bag_folds)
