@@ -4837,68 +4837,37 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             raise ValueError(
                 "Column names are not unique, please change duplicated column names (in pandas: train_data.rename(columns={'current_name':'new_name'})"
             )
-        if tuning_data is not None:
-            if not isinstance(tuning_data, pd.DataFrame):
-                raise AssertionError(f"tuning_data is required to be a pandas DataFrame, but was instead: {type(tuning_data)}")
-            self._validate_unique_indices(data=tuning_data, name="tuning_data")
-            train_features = [column for column in train_data.columns if column != self.label]
-            tuning_features = [column for column in tuning_data.columns if column != self.label]
-            train_features, tuning_features = self._prune_data_features(train_features=train_features, other_features=tuning_features, is_labeled=True)
-            train_features = np.array(train_features)
-            tuning_features = np.array(tuning_features)
-            if np.any(train_features != tuning_features):
-                raise ValueError("Column names must match between training and tuning data")
 
-            if self.label in tuning_data:
-                train_label_type = train_data[self.label].dtype
-                tuning_label_type = tuning_data[self.label].dtype
+        self._validate_single_fit_dataset(train_data=train_data, other_data=tuning_data, name="tuning_data")
+        self._validate_single_fit_dataset(train_data=train_data, other_data=test_data, name="test_data")
+        self._validate_single_fit_dataset(train_data=train_data, other_data=unlabeled_data, name="unlabeled_data")
 
-                if train_label_type != tuning_label_type:
-                    logger.warning(
-                        f"WARNING: train_data and tuning_data have mismatched label column dtypes! "
-                        f"train_label_type={train_label_type}, tuning_data_type={tuning_label_type}.\n"
-                        f"\tYou should ensure the dtypes match to avoid bugs or instability.\n"
-                        f"\tAutoGluon will attempt to convert the dtypes to align."
-                    )
-
-        if test_data is not None:
-            if not isinstance(test_data, pd.DataFrame):
-                raise AssertionError(f"test_data is required to be a pandas DataFrame, but was instead: {type(test_data)}")
-            self._validate_unique_indices(data=test_data, name="test_data")
-            train_features = [column for column in train_data.columns if column != self.label]
-            test_features = [column for column in test_data.columns if column != self.label]
-            train_features, test_features = self._prune_data_features(train_features=train_features, other_features=test_features, is_labeled=True)
-            train_features = np.array(train_features)
-            test_features = np.array(test_features)
-            if np.any(train_features != test_features):
-                raise ValueError("Column names must match between training and test data")
-
-            if self.label in test_data:
-                train_label_type = train_data[self.label].dtype
-                test_label_type = test_data[self.label].dtype
-
-                if train_label_type != test_label_type:
-                    logger.warning(
-                        f"WARNING: train_data and test_data have mismatched label column dtypes! "
-                        f"train_label_type={train_label_type}, test_type={test_label_type}.\n"
-                        f"\tYou should ensure the dtypes match to avoid bugs or instability.\n"
-                        f"\tAutoGluon will attempt to convert the dtypes to align."
-                    )
-
-        if unlabeled_data is not None:
-            if not isinstance(unlabeled_data, pd.DataFrame):
-                raise AssertionError(f"unlabeled_data is required to be a pandas DataFrame, but was instead: {type(unlabeled_data)}")
-            self._validate_unique_indices(data=unlabeled_data, name="unlabeled_data")
-            train_features = [column for column in train_data.columns if column != self.label]
-            unlabeled_features = [column for column in unlabeled_data.columns]
-            train_features, unlabeled_features = self._prune_data_features(train_features=train_features, other_features=unlabeled_features, is_labeled=False)
-            train_features = sorted(np.array(train_features))
-            unlabeled_features = sorted(np.array(unlabeled_features))
-            if np.any(train_features != unlabeled_features):
-                raise ValueError(
-                    "Column names must match between training and unlabeled data.\n" "Unlabeled data must have not the label column specified in it.\n"
-                )
         return train_data, tuning_data, test_data, unlabeled_data
+    
+    def _validate_single_fit_dataset(self, train_data, other_data, name):
+        if other_data is not None:
+            if not isinstance(other_data, pd.DataFrame):
+                raise AssertionError(f"{name} is required to be a pandas DataFrame, but was instead: {type(other_data)}")
+            self._validate_unique_indices(data=other_data, name=name)
+            train_features = [column for column in train_data.columns if column != self.label]
+            other_features = [column for column in other_data.columns if column != self.label]
+            train_features, other_features = self._prune_data_features(train_features=train_features, other_features=other_features, is_labeled=True)
+            train_features = np.array(train_features)
+            other_features = np.array(other_features)
+            if np.any(train_features != other_features):
+                raise ValueError(f"Column names must match between train_data and {name}")
+
+            if self.label in other_data:
+                train_label_type = train_data[self.label].dtype
+                other_label_type = other_data[self.label].dtype
+
+                if train_label_type != other_label_type:
+                    logger.warning(
+                        f"WARNING: train_data and {name} have mismatched label column dtypes! "
+                        f"train_label_type={train_label_type}, {name}_type={other_label_type}.\n"
+                        f"\tYou should ensure the dtypes match to avoid bugs or instability.\n"
+                        f"\tAutoGluon will attempt to convert the dtypes to align."
+                    )
 
     def _initialize_learning_curve_params(self, learning_curves):
         if learning_curves is None or learning_curves == False:
