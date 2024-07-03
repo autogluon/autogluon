@@ -235,9 +235,9 @@ def is_image_column(
                 f"Among {sample_num} sampled images in column '{col_name}', "
                 f"{failure_ratio:.0%} images can't be open. "
                 "You may need to thoroughly check your data to see the percentage of missing images, "
-                "and estimate the potential influence. By default, we skip the samples with missing images. "
-                "You can also set hyperparameter 'data.image.missing_value_strategy' to be 'zero', "
-                "which uses a zero image to replace any missing image.",
+                "and estimate the potential influence. By default, we use an image with zero pixels. "
+                "You can also set hyperparameter 'data.image.missing_value_strategy' to be 'skip', "
+                "which skips samples that contain a missing image.",
                 UserWarning,
             )
         return True
