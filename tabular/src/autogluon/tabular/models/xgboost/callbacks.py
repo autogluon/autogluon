@@ -1,13 +1,76 @@
 import logging
 import time
 
-from xgboost.callback import EarlyStopping
+from xgboost import DMatrix
+from xgboost.callback import EarlyStopping, TrainingCallback
 
 from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.utils.early_stopping import SimpleES
 
+from .xgboost_utils import func_generator
+
 logger = logging.getLogger(__name__)
+
+
+class CustomMetricCallback(TrainingCallback):
+    """Calculating additional custom metrics during training.
+    
+    Custom metrics can be found by calling evals_result() on the associated XGBClassifier or XGBRegressor 
+    object used for training. i.e.
+
+        model.evals_result() = {
+            "validation_0" : {
+                "metric_1": [...],
+                "metric_2": [...],
+                "metric_3": [...],
+                ...
+            },
+            "validation_1": {
+                "metric_1": [...],
+                "metric_2": [...],
+                "metric_3": [...],
+                ...
+            },
+            ...
+        }
+
+    Parameters
+    ----------
+    scorers : list(Scorer)
+       List of all metrics, represented as Scorer objects, to be computed at each iteration.
+
+    eval_sets : list(tuple())
+       List of (X, y) tuples containing the datasets used to train the model where X is the output of
+       AbstractModel's preprocess method, and y is the truth values fed into an AbstractModel's _fit() method
+            e.g. [(X, y), (X_val, y_val)]    
+
+    problem_type : str
+       Autogluon constant communicating the current problem_type (i.e. BINARY or REGRESSION)
+
+    use_error : bool
+       Whether the scorers specified should calculate metrics using Scorer() or scorer.error()
+    """
+
+    def __init__(self, scorers, eval_sets, problem_type, use_error=True):
+        self.metrics = [func_generator(scorer, problem_type=problem_type, error=use_error) for scorer in scorers]
+        self.eval_sets = [(DMatrix(eval_set[0], label=eval_set[1]), eval_set[1]) for eval_set in eval_sets]
+
+    def after_iteration(self, model, epoch, evals_log):
+        y_preds = [model.predict(eval_set[0]) for eval_set in self.eval_sets]
+
+        if epoch == 0:
+            for i, eval_set in enumerate(self.eval_sets):
+                evals_log[f"validation_{i}"]
+                for metric in self.metrics:
+                    if metric.__name__ not in evals_log[f"validation_{i}"]:
+                        evals_log[f"validation_{i}"][metric.__name__] = []
+
+        for i, eval_set in enumerate(self.eval_sets):
+            for metric in self.metrics:
+                evals_log[f"validation_{i}"][metric.__name__].append(metric(eval_set[1], y_preds[i]))
+
+        return False
 
 
 class EarlyStoppingCustom(EarlyStopping):
