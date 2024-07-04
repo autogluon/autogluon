@@ -42,3 +42,4 @@ data:
       # 3:
       #   template: "{{premise}} \n\nQuestion: Are we justified in saying that '{{hypothesis}}'? Yes, no, or maybe? ||| {{answer_choices[label]}}"
       #   answer_choices: "Yes ||| Maybe ||| No"
+  modality_drop_ratio: 0.2

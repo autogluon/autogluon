@@ -54,6 +54,7 @@ class CategoricalMLP(nn.Module):
         self.column_mlps = nn.ModuleList()
         assert isinstance(num_categories, list)
 
+        self.num_categories = num_categories
         for num_categories_per_col in num_categories:
             embedding_dim_per_col = int(
                 size_factor * max(2, min(max_embedding_dim, 1.6 * num_categories_per_col**embed_exponent))
