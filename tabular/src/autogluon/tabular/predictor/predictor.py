@@ -48,7 +48,7 @@ from autogluon.core.constants import (
 )
 from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.dataset import TabularDataset
-from autogluon.core.metrics import Scorer
+from autogluon.core.metrics import Scorer, get_metric
 from autogluon.core.problem_type import problem_type_info
 from autogluon.core.pseudolabeling.pseudolabeling import filter_ensemble_pseudo, filter_pseudo
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
@@ -1050,14 +1050,6 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         train_data, tuning_data, test_data, unlabeled_data = self._validate_fit_data(train_data=train_data, tuning_data=tuning_data, test_data=test_data, unlabeled_data=unlabeled_data)
         infer_limit, infer_limit_batch_size = self._validate_infer_limit(infer_limit=infer_limit, infer_limit_batch_size=infer_limit_batch_size)
 
-        learning_curves = self._initialize_learning_curve_params(learning_curves)
-        if len(learning_curves) == 0:
-            test_data = None
-        if ag_args_fit is not None:
-            ag_args_fit.update(learning_curves)
-        else:
-            ag_args_fit = learning_curves
-
         if hyperparameters is None:
             hyperparameters = "default"
         if isinstance(hyperparameters, str):
@@ -1078,6 +1070,14 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         else:
             self._learner.validate_label(X=train_data)
             inferred_problem_type = self._learner.infer_problem_type(y=train_data[self.label], silent=True)
+
+        learning_curves = self._initialize_learning_curve_params(learning_curves, inferred_problem_type)
+        if len(learning_curves) == 0:
+            test_data = None
+        if ag_args_fit is not None:
+            ag_args_fit.update(learning_curves)
+        else:
+            ag_args_fit = learning_curves
 
         num_bag_folds, num_bag_sets, num_stack_levels, dynamic_stacking, use_bag_holdout = self._sanitize_stack_args(
             num_bag_folds=num_bag_folds,
@@ -4704,7 +4704,8 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             # pseudo label
             pseudo_data=None,
             name_suffix=None,
-            # test data (for logging purposes only)
+            # learning curves and test data (for logging purposes only)
+            learning_curves=False,
             test_data=None,
         )
 
@@ -4869,21 +4870,22 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                         f"\tAutoGluon will attempt to convert the dtypes to align."
                     )
 
-    def _initialize_learning_curve_params(self, learning_curves):
+    def _initialize_learning_curve_params(self, learning_curves, problem_type):
         if learning_curves is None or learning_curves == False:
             return {}
         elif type(learning_curves) != dict and type(learning_curves) != bool:
             raise ValueError("VALUE ERROR: learning curves parameter must be a boolean or dict!")
 
         use_error = True
-        metrics = DEFAULT_LEARNING_CURVE_METRICS[self.problem_type]
+        metrics = DEFAULT_LEARNING_CURVE_METRICS[problem_type]
 
         if type(learning_curves) == dict:
             if "metrics" in learning_curves:
                 if type(learning_curves["metrics"]) == str:
                     metrics = [learning_curves["metrics"]]
                 else:
-                    metrics = learning_curves["metrics"]
+                    # replace all aliases with actual metric names and remove duplicate metrics
+                    metrics = list(set([get_metric(metric, problem_type, "eval_metric").name for metric in learning_curves["metrics"]]))
 
             if "use_error" in learning_curves:
                 use_error = learning_curves["use_error"]

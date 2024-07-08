@@ -161,6 +161,8 @@ class FitHelper:
         expected_stacked_overfitting_at_test=None,
         expected_stacked_overfitting_at_val=None,
         scikit_api=False,
+        use_test_data=False,
+        use_test_for_val=False,
     ) -> TabularPredictor:
         if compiler_configs is None:
             compiler_configs = {}
@@ -186,6 +188,12 @@ class FitHelper:
             init_args["path"] = PathConverter.to_absolute(path=init_args["path"])
             assert PathConverter._is_absolute(path=init_args["path"])
         save_path = init_args["path"]
+
+        if use_test_data:
+            fit_args["test_data"] = test_data
+            if use_test_for_val:
+                fit_args["tuning_data"] = test_data
+
         predictor: TabularPredictor = FitHelper.fit_dataset(
             train_data=train_data, init_args=init_args, fit_args=fit_args, sample_size=sample_size, scikit_api=scikit_api
         )

@@ -35,7 +35,8 @@ REGRESS_THRESHOLD_LARGE_DATA = 0.05
 REGRESS_THRESHOLD_SMALL_DATA = 0.1
 
 # Models that currently support learning curve generation
-LEARNING_CURVE_SUPPORTED_MODELS = ["XGB", "NN_TORCH", "GBM"]
+LEARNING_CURVE_SUPPORTED_MODELS = ["GBM", "NN_TORCH", "XGB"]
+LEARNING_CURVE_SUPPORTED_PROBLEM_TYPES = [BINARY, MULTICLASS, REGRESSION]
 DEFAULT_LEARNING_CURVE_METRICS = {
     BINARY: ["log_loss", "accuracy", "precision", "recall", "f1", "roc_auc"],
     REGRESSION: ['root_mean_squared_error', 'mean_squared_error', 'mean_absolute_error', 'median_absolute_error', 'r2'],
