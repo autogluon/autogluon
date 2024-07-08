@@ -253,7 +253,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         generate_curves = ag_params.get("generate_curves", False)
 
         if generate_curves:
-            scorer_names = list(set(ag_params.get("curve_metrics", []) + [self._get_default_stopping_metric().name]))
+            scorer_names = list(set(ag_params.get("curve_metrics", [])))
             use_curve_metric_error = ag_params.get("use_error_for_curve_metrics", True)
 
             stopping_metrics = [get_metric(metric, self.problem_type, "eval_metric") for metric in scorer_names]
