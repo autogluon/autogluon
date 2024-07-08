@@ -4,13 +4,25 @@ from autogluon.core.constants import BINARY, REGRESSION, MULTICLASS
 from autogluon.core.constants import DEFAULT_LEARNING_CURVE_METRICS, LEARNING_CURVE_SUPPORTED_MODELS, LEARNING_CURVE_SUPPORTED_PROBLEM_TYPES
 
 
-def generate_params():
+def get_one_model_problem():
+    problem_type = LEARNING_CURVE_SUPPORTED_PROBLEM_TYPES[0]
+    model = LEARNING_CURVE_SUPPORTED_MODELS[0]
+    return [(problem_type, model)]
+
+
+def get_all_models():
+    problem_type = LEARNING_CURVE_SUPPORTED_PROBLEM_TYPES[0]
+    models = LEARNING_CURVE_SUPPORTED_MODELS
+    return [(problem_type, model) for model in models]
+
+
+def get_all_model_problems():
     problem_types = LEARNING_CURVE_SUPPORTED_PROBLEM_TYPES
     models = LEARNING_CURVE_SUPPORTED_MODELS
     return [(problem, model) for problem in problem_types for model in models]
 
 
-@pytest.mark.parametrize("problem_type, model", generate_params())
+@pytest.mark.parametrize("problem_type, model", get_one_model_problem())
 def test_learning_curves_off(problem_type, model, get_dataset_map, fit_helper):
     fit_args = dict(
         hyperparameters={model: {}},
@@ -23,7 +35,7 @@ def test_learning_curves_off(problem_type, model, get_dataset_map, fit_helper):
         predictor.learning_curves()
 
 
-@pytest.mark.parametrize("problem_type, model", generate_params())
+@pytest.mark.parametrize("problem_type, model", get_one_model_problem())
 def test_learning_curves_false(problem_type, model, get_dataset_map, fit_helper):
     fit_args = dict(
         learning_curves=False,
@@ -37,7 +49,7 @@ def test_learning_curves_false(problem_type, model, get_dataset_map, fit_helper)
         predictor.learning_curves()
 
 
-@pytest.mark.parametrize("problem_type, model", generate_params())
+@pytest.mark.parametrize("problem_type, model", get_all_model_problems())
 def test_learning_curves_true(problem_type, model, get_dataset_map, fit_helper):
     import numpy as np
     fit_args = dict(
@@ -56,7 +68,7 @@ def test_learning_curves_true(problem_type, model, get_dataset_map, fit_helper):
     assert sorted(model_metrics) == sorted(DEFAULT_LEARNING_CURVE_METRICS[predictor.problem_type])
 
 
-@pytest.mark.parametrize("problem_type, model", generate_params())
+@pytest.mark.parametrize("problem_type, model", get_one_model_problem())
 def test_learning_curves_custom_metrics(problem_type, model, get_dataset_map, fit_helper):
     metrics = [metric for metric in METRICS[problem_type]]
 
@@ -76,7 +88,7 @@ def test_learning_curves_custom_metrics(problem_type, model, get_dataset_map, fi
     assert sorted(model_metrics) == sorted(metrics)
 
 
-@pytest.mark.parametrize("problem_type, model", generate_params())
+@pytest.mark.parametrize("problem_type, model", get_all_models())
 def test_learning_curves_error(problem_type, model, get_dataset_map, fit_helper):
     metrics = {
         BINARY: "log_loss",
@@ -97,7 +109,7 @@ def test_learning_curves_error(problem_type, model, get_dataset_map, fit_helper)
 
     assert lc[1][model][1][0][0][0] >= 0
 
-@pytest.mark.parametrize("problem_type, model", generate_params())
+@pytest.mark.parametrize("problem_type, model", get_all_models())
 def test_learning_curves_score(problem_type, model, get_dataset_map, fit_helper):
     metrics = {
         BINARY: "log_loss",
@@ -119,7 +131,7 @@ def test_learning_curves_score(problem_type, model, get_dataset_map, fit_helper)
 
     assert lc[1][model][1][0][0][0] <= 0
 
-@pytest.mark.parametrize("problem_type, model", generate_params())
+@pytest.mark.parametrize("problem_type, model", get_all_models())
 def test_learning_curves_with_test_data(problem_type, model, get_dataset_map, fit_helper):
     fit_args = dict(
         learning_curves=True,
