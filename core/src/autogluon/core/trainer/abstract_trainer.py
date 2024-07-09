@@ -2753,8 +2753,30 @@ class AbstractTrainer:
 
         # Start initial jobs
         logger.log(20, f"Scheduling work for {ag_ray_workers} many workers...")
-        for model in models[:ag_ray_workers]:
-            result_ref = remote_p.options(num_cpus=1, num_gpus=num_gpus_for_model(model)).remote(
+        total_num_cpus = kwargs.get("total_resources", {}).get("num_cpus", 1)
+        org_total_num_cpus = total_num_cpus
+        total_num_gpus = kwargs.get("total_resources", {}).get("num_gpus", 0)
+        n_splits = kwargs.get("k_fold", 1) * kwargs.get("n_repeats", 1)  # TODO: what happens in HO case?
+        job_ref_to_resources = {}
+        rest_models = []
+        for model_i in range(len(models)):
+            model = models[model_i]
+            num_gpu_for_fitter = num_gpus_for_model(model)
+            model_needs_num_cpus = 1 + getattr(model, "model_base", model)._user_params_aux.get("num_cpus", 0) * n_splits
+            model_needs_num_gpus = num_gpu_for_fitter + getattr(model, "model_base", model)._user_params_aux.get("num_gpus", 0) * n_splits
+
+            if len(job_refs) >= ag_ray_workers:
+                rest_models.extend(models[model_i:])
+                break
+            if (total_num_cpus <= -(org_total_num_cpus // 10)): # allow for oversubscribing to half the # of CPUs
+                rest_models.extend(models[model_i:])
+                break
+            if (model_needs_num_gpus > 0) and (total_num_gpus <= (model_needs_num_gpus // 2)):
+                logger.log(20, f"Delay scheduling model {model.name} due to not enough GPUs.")
+                rest_models.append(model)
+                continue
+
+            result_ref = remote_p.options(num_cpus=1, num_gpus=num_gpu_for_fitter).remote(
                 _self=self_ref,
                 model=ray.put(model),
                 X=X_ref,
@@ -2768,9 +2790,14 @@ class AbstractTrainer:
             )
             logger.log(20, f"Scheduled model training for {model.name}\n\t{result_ref}")
             job_refs.append(result_ref)
+
+            # Adjust for resources used
+            job_ref_to_resources[result_ref] = dict(num_cpus=model_needs_num_cpus, num_gpus=model_needs_num_gpus)
+            total_num_gpus -= model_needs_num_gpus
+            total_num_cpus -= model_needs_num_cpus
             time.sleep(0.5)
 
-        unfinished_models = models[ag_ray_workers:]
+        unfinished_models = rest_models
         unfinished = job_refs
         while unfinished:
             # Get results - only 1 at a time
@@ -2780,7 +2807,14 @@ class AbstractTrainer:
                 for f in unfinished:
                     ray.cancel(f)
                 break
+
+            to_free_resources = job_ref_to_resources[finished[0]]
+            total_num_gpus += to_free_resources["num_gpus"]
+            total_num_cpus += to_free_resources["num_cpus"]
+            del job_ref_to_resources[finished[0]]
+
             model_name, model_path, model_type = ray.get(finished[0])
+
             if model_path is None:
                 logger.log(20, f"Model training failed for {model_name if isinstance(model_name, str) else model_name.name}.")
             else:
@@ -2799,10 +2833,33 @@ class AbstractTrainer:
                 break
 
             # Re-schedule workers
+            model_i = 0
             while (len(unfinished) < ag_ray_workers) and unfinished_models:
-                result_ref = remote_p.options(num_cpus=1, num_gpus=num_gpus_for_model(unfinished_models[0])).remote(
+                # available_resources = ray.available_resources()
+                # print(available_resources)
+                if model_i >= len(unfinished_models):
+                    logger.log(20, "Delay scheduling any model due to not being able to schedule any yet-to-fit model.")
+                    break
+
+                model = unfinished_models[model_i]
+                num_gpu_for_fitter = num_gpus_for_model(model)
+                model_needs_num_cpus = 1 + getattr(model, "model_base", model)._user_params_aux.get("num_cpus",0) * n_splits
+                model_needs_num_gpus = num_gpu_for_fitter + getattr(model, "model_base", model)._user_params_aux.get("num_gpus", 0) * n_splits
+
+                av_cpus = total_num_cpus # min(available_resources.get("CPU", 0), total_num_cpus)
+                av_gpus = total_num_gpus # min(available_resources.get("GPU", 0), total_num_gpus)
+                if (av_cpus<= -(org_total_num_cpus // 10)): # allow for oversubscribing 10% of the # of CPUs
+                    # logger.log(20, f"Delay scheduling model {model.name} due to not enough CPUs.")
+                    model_i += 1
+                    continue
+                if (model_needs_num_gpus > 0) and (av_gpus <= (model_needs_num_gpus // 2)):
+                    # logger.log(20, f"Delay scheduling model {model.name} due to not enough GPUs.")
+                    model_i += 1
+                    continue
+
+                result_ref = remote_p.options(num_cpus=1, num_gpus=num_gpu_for_fitter).remote(
                     _self=self_ref,
-                    model=ray.put(unfinished_models[0]),
+                    model=ray.put(model),
                     X=X_ref,
                     y=y_ref,
                     hyperparameter_tune_kwargs=hyperparameter_tune_kwargs_ref,
@@ -2813,8 +2870,13 @@ class AbstractTrainer:
                     kwargs=kwargs_ref,
                 )
                 unfinished.append(result_ref)
-                logger.log(20, f"Scheduled model training for {unfinished_models[0].name}\n\t{result_ref}")
-                unfinished_models = unfinished_models[1:]
+                job_ref_to_resources[result_ref] = dict(num_cpus=model_needs_num_cpus, num_gpus=model_needs_num_gpus)
+                total_num_gpus -= model_needs_num_gpus
+                total_num_cpus -= model_needs_num_cpus
+                logger.log(20, f"Scheduled model training for {model.name}\n\t{result_ref}")
+                del model, unfinished_models[model_i]
+                model_i = 0
+                time.sleep(0.5)
 
         # Clean up ray
         ray.internal.free(object_refs=[self_ref, X_ref, y_ref, kwargs_ref, hyperparameter_tune_kwargs_ref])
