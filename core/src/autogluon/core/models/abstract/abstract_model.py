@@ -1137,6 +1137,28 @@ class AbstractModel:
         """
         Saves learning curves to disk.
 
+        Outputted Curve Format:
+            out = [
+                metrics,
+                [
+                    [ # log_loss
+                        [0.693147, 0.690162, ...], # train
+                        [0.693147, 0.690162, ...], # val
+                        [0.693147, 0.690162, ...], # test
+                    ],
+                    [ # accuracy
+                        [0.693147, 0.690162, ...], # train
+                        [0.693147, 0.690162, ...], # val
+                        [0.693147, 0.690162, ...], # test
+                    ],
+                    [ # f1
+                        [0.693147, 0.690162, ...], # train
+                        [0.693147, 0.690162, ...], # val
+                        [0.693147, 0.690162, ...], # test
+                    ],
+                ]
+            ]
+
         Parameters
         ----------
         metrics : str or list(str)
@@ -1180,14 +1202,8 @@ class AbstractModel:
             ]
         ]
 
-        iterations = 0
-        if len(metrics) > 0:
-            iterations = len(curve[metrics[0]])
-
-        for i in range(iterations):
-            out[1].append([])
-            for metric in metrics:
-                out[1][i].append([c[metric][i] for c in curves])
+        for i, metric in enumerate(metrics):
+            out[1].append([c[metric] for c in curves])
 
         with open(file_path, 'w') as json_file:
             json.dump(out, json_file, indent=4)
