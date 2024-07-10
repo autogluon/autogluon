@@ -45,7 +45,11 @@ def test_dump_hf_text():
     predictor_1 = MultiModalPredictor(
         label=dataset.label_columns[0], problem_type=dataset.problem_type, eval_metric=dataset.metric
     )
-    hyperparameters = {"optimization.max_epochs": 1, "model.hf_text.checkpoint_name": base_model_name}
+    hyperparameters = {
+        "optimization.max_epochs": 1,
+        "model.hf_text.checkpoint_name": base_model_name,
+        "env.num_workers": 0,  # https://github.com/pytorch/pytorch/issues/33296
+    }
     predictor_1.fit(train_data=dataset.train_df, hyperparameters=hyperparameters, time_limit=5, seed=42)
     predictor_1.dump_model(save_path=model_dump_path)
 
@@ -54,7 +58,11 @@ def test_dump_hf_text():
     predictor_2 = MultiModalPredictor(
         label=dataset.label_columns[0], problem_type=dataset.problem_type, eval_metric=dataset.metric
     )
-    hyperparameters = {"optimization.max_epochs": 1, "model.hf_text.checkpoint_name": f"{model_dump_path}/hf_text"}
+    hyperparameters = {
+        "optimization.max_epochs": 1,
+        "model.hf_text.checkpoint_name": f"{model_dump_path}/hf_text",
+        "env.num_workers": 0,  # https://github.com/pytorch/pytorch/issues/33296
+    }
     predictor_2.fit(train_data=dataset.train_df, hyperparameters=hyperparameters, time_limit=5, seed=42)
 
 
