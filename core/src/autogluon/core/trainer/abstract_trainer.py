@@ -2182,7 +2182,7 @@ class AbstractTrainer:
             logger.log(
                 15,
                 f"\t{round(1/(predict_n_time_per_row if predict_n_time_per_row else np.finfo(np.float16).eps), 1)}"
-                "\t = Inference  throughput (rows/s | {int(predict_n_size)} batch size)",
+                f"\t = Inference  throughput (rows/s | {int(predict_n_size)} batch size)",
             )
         if model.predict_1_time is not None:
             fit_metadata = model.get_fit_metadata()
