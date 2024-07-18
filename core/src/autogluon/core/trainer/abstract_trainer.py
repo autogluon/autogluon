@@ -196,6 +196,7 @@ class AbstractTrainer:
 
         self._time_limit = None  # Internal float of the total time limit allowed for a given fit call. Used in logging statements.
         self._time_train_start = None  # Internal timestamp of the time training started for a given fit call. Used in logging statements.
+        self._time_train_start_last = None  # Same as `self._time_train_start` except it is not reset to None after the fit call completes.
 
         self._num_rows_train = None
         self._num_cols_train = None
@@ -217,6 +218,9 @@ class AbstractTrainer:
         self._models_failed_to_train_errors = dict()  # Dict of model name -> model failure metadata
 
         # self._exceptions_list = []  # TODO: Keep exceptions list for debugging during benchmarking.
+
+        self.callbacks: List[callable] = []
+        self._callback_early_stop = False
 
     # path_root is the directory containing learner.pkl
     @property
@@ -376,6 +380,7 @@ class AbstractTrainer:
         level_time_modifier=0.333,
         infer_limit=None,
         infer_limit_batch_size=None,
+        callbacks: List[callable] = None,
     ) -> List[str]:
         """
         Trains a multi-layer stack ensemble using the input data on the hyperparameters dict input.
@@ -393,8 +398,7 @@ class AbstractTrainer:
 
         Returns a list of the model names that were trained from this method call, in order of fit.
         """
-        self._time_limit = time_limit
-        self._time_train_start = time.time()
+        self._fit_setup(time_limit=time_limit, callbacks=callbacks)
         time_train_start = self._time_train_start
 
         hyperparameters = self._process_hyperparameters(hyperparameters=hyperparameters)
@@ -459,9 +463,39 @@ class AbstractTrainer:
             model_names_fit += base_model_names + aux_models
         if self.model_best is None and len(model_names_fit) != 0:
             self.model_best = self.get_model_best(can_infer=True, infer_limit=infer_limit, infer_limit_as_child=True)
-        self._time_limit = None
+        self._fit_cleanup()
         self.save()
         return model_names_fit
+
+    def _fit_setup(self, time_limit: float | None = None, callbacks: List[callable] = None):
+        """
+        Prepare the trainer state at the start of / prior to a fit call.
+        Should be paired with a `self._fit_cleanup()` at the conclusion of the fit call.
+        """
+        self._time_train_start = time.time()
+        self._time_train_start_last = self._time_train_start
+        self._time_limit = time_limit
+        self.reset_callbacks()
+        if callbacks is not None:
+            assert isinstance(callbacks, list), f"`callbacks` must be a list. Found invalid type: `{type(callbacks)}`."
+        else:
+            callbacks = []
+        self.callbacks = callbacks
+
+    def _fit_cleanup(self):
+        """
+        Cleanup the trainer state after fit call completes.
+        This ensures that future fit calls are not corrupted by prior fit calls.
+        Should be paired with an earlier `self._fit_setup()` call.
+        """
+        self._time_limit = None
+        self._time_train_start = None
+        self.reset_callbacks()
+
+    def reset_callbacks(self):
+        """Deletes callback objects and resets `self._callback_early_stop` to False."""
+        self.callbacks = []
+        self._callback_early_stop = False
 
     # TODO: Consider better greedy approximation method such as via fitting a weighted ensemble to evaluate the value of a subset.
     def _filter_base_models_via_infer_limit(
@@ -2267,6 +2301,20 @@ class AbstractTrainer:
         Returns a list of successfully trained and saved model names.
         Models trained from this method will be accessible in this Trainer.
         """
+        if self._callback_early_stop:
+            return []
+        check_callbacks = k_fold_start == 0 and n_repeat_start == 0
+        skip_model = False
+        if self.callbacks and check_callbacks:
+            skip_model, time_limit = self._callbacks_before_fit(
+                model=model,
+                time_limit=time_limit,
+                stack_name=stack_name,
+                level=level,
+            )
+        if self._callback_early_stop or skip_model:
+            return []
+
         model_fit_kwargs = self._get_model_fit_kwargs(
             X=X, X_val=X_val, time_limit=time_limit, k_fold=k_fold, fit_kwargs=fit_kwargs, ens_sample_weight=kwargs.get("ens_sample_weight", None)
         )
@@ -2357,8 +2405,57 @@ class AbstractTrainer:
                 total_resources=total_resources,
                 **model_fit_kwargs,
             )
+        if self.callbacks and check_callbacks:
+            self._callbacks_after_fit(model_names=model_names_trained, stack_name=stack_name, level=level)
         self.save()
         return model_names_trained
+
+    def _callbacks_before_fit(
+        self,
+        *,
+        model: AbstractModel,
+        time_limit: float | None,
+        stack_name: str,
+        level: int,
+    ):
+        skip_model = False
+        ts = time.time()
+        for callback in self.callbacks:
+            callback_early_stop, callback_skip_model = callback.before_fit(
+                trainer=self,
+                model=model,
+                logger=logger,
+                time_limit=time_limit,
+                stack_name=stack_name,
+                level=level,
+            )
+            if callback_early_stop:
+                self._callback_early_stop = True
+            if callback_skip_model:
+                skip_model = True
+            if time_limit is not None:
+                te = time.time()
+                time_limit -= te - ts
+                ts = te
+        return skip_model, time_limit
+
+    def _callbacks_after_fit(
+        self,
+        *,
+        model_names: List[str],
+        stack_name: str,
+        level: int,
+    ):
+        for callback in self.callbacks:
+            callback_early_stop = callback.after_fit(
+                self,
+                model_names=model_names,
+                logger=logger,
+                stack_name=stack_name,
+                level=level,
+            )
+            if callback_early_stop:
+                self._callback_early_stop = True
 
     # TODO: How to deal with models that fail during this? They have trained valid models before, but should we still use those models or remove the entire model? Currently we still use models.
     # TODO: Time allowance can be made better by only using time taken during final model training and not during HPO and feature pruning.
@@ -2393,6 +2490,8 @@ class AbstractTrainer:
                     break
             logger.log(20, f"Repeating k-fold bagging: {n+1}/{n_repeats}")
             for i, model in enumerate(models_valid):
+                if self._callback_early_stop:
+                    break
                 if not self.get_model_attribute(model=model, attribute="can_fit"):
                     if isinstance(model, str):
                         models_valid_next.append(model)
@@ -2554,6 +2653,8 @@ class AbstractTrainer:
         else:
             time_limit_model_split = time_limit
         for i, model in enumerate(models):
+            if self._callback_early_stop:
+                return models_valid
             if isinstance(model, str):
                 model = self.load_model(model)
             elif self.low_memory:
@@ -3352,7 +3453,7 @@ class AbstractTrainer:
 
         problem_type = self.problem_type
         eval_metric = self.eval_metric.name
-        time_train_start = self._time_train_start
+        time_train_start = self._time_train_start_last
         num_rows_train = self._num_rows_train
         num_cols_train = self._num_cols_train
         num_rows_val = self._num_rows_val

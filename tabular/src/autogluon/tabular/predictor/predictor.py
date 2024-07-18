@@ -25,6 +25,7 @@ from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.system_info import get_ag_system_info
 from autogluon.common.utils.try_import import try_import_ray
 from autogluon.common.utils.utils import check_saved_predictor_version, compare_autogluon_metadata, get_autogluon_metadata, setup_outputdir
+from autogluon.core.callbacks import AbstractCallback
 from autogluon.core.constants import (
     AUTO_WEIGHT,
     BALANCE_WEIGHT,
@@ -403,6 +404,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         num_cpus: int | str = "auto",
         num_gpus: int | str = "auto",
         memory_limit: float | str = "auto",
+        callbacks: List[AbstractCallback] = None,
         **kwargs,
     ) -> "TabularPredictor":
         """
@@ -698,6 +700,21 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             setting the memory limit (and any other resources) on systems with shared resources that are controlled by the operating system (e.g., SLURM and
             cgroups). Otherwise, AutoGluon might wrongly assume more resources are available for fitting a model than the operating system allows,
             which can result in model training failing or being very inefficient.
+        callbacks : List[AbstractCallback], default = None
+            [Experimental] Callback support is preliminary, targeted towards developers, and is subject to change.
+            The API, class structure, and overall functionality may be changed without warning between releases while it remains experimental.
+
+            A list of callback objects inheriting from `autogluon.core.callbacks.AbstractCallback`.
+            These objects will be called before and after each model fit within trainer.
+            They have the ability to skip models or early stop the training process.
+            They can also theoretically change the entire logical flow of the trainer code by interacting with the passed `trainer` object.
+            For more details, refer to `AbstractCallback` source code.
+            If None, no callback objects will be used.
+
+            [Note] Callback objects can be mutated in-place by the fit call if they are stateful.
+            Ensure that you avoid re-using a mutated callback object between multiple fit calls.
+
+            [Note] Callback objects are deleted from trainer at the end of the fit call. They will not impact operations such as `refit_full` or `fit_extra`.
         **kwargs :
             auto_stack : bool, default = False
                 Whether AutoGluon should automatically utilize bagging and multi-layer stack ensembling to boost predictive accuracy.
@@ -1177,6 +1194,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             infer_limit_batch_size=infer_limit_batch_size,
             verbosity=verbosity,
             use_bag_holdout=use_bag_holdout,
+            callbacks=callbacks,
         )
         ag_post_fit_kwargs = dict(
             keep_only_best=kwargs["keep_only_best"],
