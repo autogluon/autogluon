@@ -685,6 +685,8 @@ class AbstractTrainer:
         If self.bagged_mode, then models will be trained as StackerEnsembleModels.
         The data provided in this method should not contain stack features, as they will be automatically generated if necessary.
         """
+        if self._callback_early_stop:
+            return []
         if get_models_func is None:
             get_models_func = self.construct_model_templates
         if base_model_names is None:
@@ -825,6 +827,8 @@ class AbstractTrainer:
         Level must be greater than the level of any of the base models.
         Auxiliary models never use the original features and only train with the predictions of other models as features.
         """
+        if self._callback_early_stop:
+            return []
         if fit_weighted_ensemble is False:
             # Skip fitting of aux models
             return []
