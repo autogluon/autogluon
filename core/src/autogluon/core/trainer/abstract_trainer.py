@@ -400,6 +400,9 @@ class AbstractTrainer:
         """
         self._fit_setup(time_limit=time_limit, callbacks=callbacks)
         time_train_start = self._time_train_start
+        if callbacks:
+            callback_classes = [c.__class__.__name__ for c in callbacks]
+            logger.log(20, f"User-specified callbacks ({len(callbacks)}): {callback_classes}")
 
         hyperparameters = self._process_hyperparameters(hyperparameters=hyperparameters)
 
