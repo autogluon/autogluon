@@ -2,7 +2,7 @@ def test_memory_mocking():
     import psutil
 
     # Mock patch to guarantee that test does not fail
-    # due to memory changing inbetween calls to psutil.
+    # due to memory changing between calls to psutil.
     _mock_vem = psutil.virtual_memory()
     psutil.virtual_memory = lambda: _mock_vem
 
@@ -19,7 +19,7 @@ def test_custom_memory_soft_limit():
     import psutil
 
     # Mock patch to guarantee that test does not fail
-    # due to memory changing inbetween calls to psutil.
+    # due to memory changing between calls to psutil.
     p = psutil.Process()
     allocated_memory = p.memory_info()
     psutil.Process.memory_info = lambda _: allocated_memory
