@@ -1,5 +1,6 @@
 def test_memory_mocking():
     import psutil
+
     from autogluon.common.utils.resource_utils import ResourceManager
 
     assert psutil.virtual_memory().total == ResourceManager._get_memory_size()
