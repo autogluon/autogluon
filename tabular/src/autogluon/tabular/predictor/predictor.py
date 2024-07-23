@@ -700,7 +700,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             Auto means AutoGluon will make the decision based on the total number of gpus available and the model requirement for best performance.
             Users generally don't need to set this value
         memory_limit: float | str, default = "auto"
-            The total amount of memory in GB you want AutoGluon predictor to use. "auto" means AutoGluon will use all available memory on the systems
+            The total amount of memory in GB you want AutoGluon predictor to use. "auto" means AutoGluon will use all available memory on the system
             (that is detectable by psutil).
             Note that this is only a soft limit! AutoGluon uses this limit to skip training models that are expected to require too much memory or stop
             training a model that would exceed the memory limit. AutoGluon does not guarantee the enforcement of this limit (yet). Nevertheless, we expect
@@ -1637,7 +1637,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             Auto means AutoGluon will make the decision based on the total number of gpus available and the model requirement for best performance.
             Users generally don't need to set this value
         memory_limit: float | str, default = "auto"
-            The total amount of memory in GB you want AutoGluon predictor to use. "auto" means AutoGluon will use all available memory on the systems
+            The total amount of memory in GB you want AutoGluon predictor to use. "auto" means AutoGluon will use all available memory on the system
             (that is detectable by psutil).
             Note that this is only a soft limit! AutoGluon uses this limit to skip training models that are expected to require too much memory or stop
             training a model that would exceed the memory limit. AutoGluon does not guarantee the enforcement of this limit (yet). Nevertheless, we expect
