@@ -4608,7 +4608,8 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             if memory_limit != "auto":
                 raise ValueError(f"`memory_limit` must be an int, float, or 'auto'. Value: {memory_limit}")
         elif not isinstance(memory_limit, (int, float)):
-            raise TypeError(f"`memory_limit` must be an int or 'auto'. Found: {type(memory_limit)} | Value: {memory_limit}")
+            raise TypeError("`memory_limit` must be an int, float, or 'auto'."
+                            f" Found: {type(memory_limit)} | Value: {memory_limit}")
         else:
             if memory_limit <= 0:
                 raise ValueError(f"`memory_limit` must be greater than 0. (memory_limit={memory_limit})")
