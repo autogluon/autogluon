@@ -29,22 +29,22 @@ def get_and_assert_max_memory():
         del os.environ["AG_MEMORY_LIMIT_IN_GB"]
 
 
-def test_memory_mocking():
-    import psutil
+def test_custom_memory_soft_limit_tabular_fit(get_and_assert_max_memory, fit_helper):
+    fit_args = dict(
+        hyperparameters={"DUMMY": {}},
+        memory_limit=get_and_assert_max_memory,
+        dynamic_stacking=False,
+        fit_weighted_ensemble=False,
+        num_bag_folds=2,
+        num_bag_sets=1,
+        num_stack_levels=0,
+        ag_args_ensemble={"fold_fitting_strategy": "sequential_local"},
+    )
+    dataset_name = "adult"
 
-    # Mock patch to guarantee that test does not fail
-    # due to memory changing between calls to psutil.
-    _mock_vem = psutil.virtual_memory()
-    psutil.virtual_memory = lambda: _mock_vem
-
-    # Need to import this after the mock patch above.
-    from autogluon.common.utils.resource_utils import ResourceManager
-
-    assert _mock_vem.total == ResourceManager._get_memory_size()
-    assert _mock_vem.available == ResourceManager._get_available_virtual_mem()
-
-
-def test_custom_memory_soft_limit_envar(get_and_assert_max_memory):
-    import os
-
-    os.environ["AG_MEMORY_LIMIT_IN_GB"] = str(get_and_assert_max_memory)
+    fit_helper.fit_and_validate_dataset(
+        dataset_name=dataset_name,
+        fit_args=fit_args,
+        expected_model_count=1,
+        refit_full=False,
+    )
