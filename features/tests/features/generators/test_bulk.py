@@ -22,7 +22,9 @@ def test_bulk_feature_generator(generator_helper, data_helper):
     toy_vectorizer = CountVectorizer(min_df=2, ngram_range=(1, 3), max_features=1000, dtype=np.uint8)
 
     text_ngram_feature_generator = TextNgramFeatureGenerator(vectorizer=toy_vectorizer)
-    text_ngram_feature_generator.max_memory_ratio = None  # Necessary in test to avoid CI non-deterministically pruning ngram counts.
+    text_ngram_feature_generator.max_memory_ratio = (
+        None  # Necessary in test to avoid CI non-deterministically pruning ngram counts.
+    )
 
     generator = BulkFeatureGenerator(
         generators=[
@@ -54,7 +56,13 @@ def test_bulk_feature_generator(generator_helper, data_helper):
         ("category", ()): ["obj", "cat"],
         ("float", ()): ["float"],
         ("int", ()): ["int"],
-        ("int", ("binned", "text_special")): ["text.char_count", "text.word_count", "text.lower_ratio", "text.special_ratio", "text.symbol_ratio. "],
+        ("int", ("binned", "text_special")): [
+            "text.char_count",
+            "text.word_count",
+            "text.lower_ratio",
+            "text.special_ratio",
+            "text.symbol_ratio. ",
+        ],
         ("int", ("bool",)): ["int_bool"],
         ("int", ("datetime_as_int",)): [
             "datetime",

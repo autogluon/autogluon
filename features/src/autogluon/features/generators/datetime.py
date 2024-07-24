@@ -67,7 +67,9 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
         for datetime_feature in self.features_in:
             X_datetime[datetime_feature] = self.normalize_timeseries(X, datetime_feature, is_fit=is_fit)
             for feature in self.features:
-                X_datetime[datetime_feature + "." + feature] = getattr(X_datetime[datetime_feature].dt, feature).astype(np.int64)
+                X_datetime[datetime_feature + "." + feature] = getattr(
+                    X_datetime[datetime_feature].dt, feature
+                ).astype(np.int64)
             X_datetime[datetime_feature] = pd.to_numeric(X_datetime[datetime_feature])
         return X_datetime
 

@@ -132,7 +132,9 @@ class AbstractFeatureGenerator:
         self._is_fit = False  # Whether the feature generator has been fit
         self.features_in = features_in  # Original features to use as input to feature generation
         self.features_out = None  # Final list of features after transformation
-        self.feature_metadata_in: FeatureMetadata = feature_metadata_in  # FeatureMetadata object based on the original input features.
+        self.feature_metadata_in: FeatureMetadata = (
+            feature_metadata_in  # FeatureMetadata object based on the original input features.
+        )
 
         # FeatureMetadata object based on the processed features. Pass to models to enable advanced functionality.
         self.feature_metadata: FeatureMetadata = None
@@ -150,7 +152,9 @@ class AbstractFeatureGenerator:
             elif infer_features_in_args_strategy == "update":
                 self._infer_features_in_args.update(infer_features_in_args)
             else:
-                raise ValueError(f"infer_features_in_args_strategy must be one of: {['overwrite', 'update']}, but was: '{infer_features_in_args_strategy}'")
+                raise ValueError(
+                    f"infer_features_in_args_strategy must be one of: {['overwrite', 'update']}, but was: '{infer_features_in_args_strategy}'"
+                )
         if banned_feature_special_types:
             if "invalid_special_types" not in self._infer_features_in_args:
                 self._infer_features_in_args["invalid_special_types"] = banned_feature_special_types
@@ -172,7 +176,9 @@ class AbstractFeatureGenerator:
             from .rename import RenameFeatureGenerator
 
             # inplace=False required to avoid altering outer context: refer to https://github.com/autogluon/autogluon/issues/2688
-            self._post_generators.append(RenameFeatureGenerator(name_prefix=name_prefix, name_suffix=name_suffix, inplace=False))
+            self._post_generators.append(
+                RenameFeatureGenerator(name_prefix=name_prefix, name_suffix=name_suffix, inplace=False)
+            )
 
         if self._post_generators:
             if not self.get_tags().get("allow_post_generators", True):
@@ -211,7 +217,9 @@ class AbstractFeatureGenerator:
         """
         self.fit_transform(X, **kwargs)
 
-    def fit_transform(self, X: DataFrame, y: Series = None, feature_metadata_in: FeatureMetadata = None, **kwargs) -> DataFrame:
+    def fit_transform(
+        self, X: DataFrame, y: Series = None, feature_metadata_in: FeatureMetadata = None, **kwargs
+    ) -> DataFrame:
         """
         Fit generator to the provided data and return the transformed version of the data as if fit and transform were called sequentially with the same data.
         This is generally more efficient than calling fit and transform separately and can be up to twice as fast if the fit process requires transformation
@@ -271,7 +279,9 @@ class AbstractFeatureGenerator:
             from .astype import AsTypeFeatureGenerator
 
             self._pre_astype_generator = AsTypeFeatureGenerator(
-                features_in=self.features_in, feature_metadata_in=self.feature_metadata_in, log_prefix=self.log_prefix + "\t"
+                features_in=self.features_in,
+                feature_metadata_in=self.feature_metadata_in,
+                log_prefix=self.log_prefix + "\t",
             )
             self._pre_astype_generator.fit(X)
 
@@ -280,16 +290,24 @@ class AbstractFeatureGenerator:
         X_out, type_family_groups_special = self._fit_transform(X[self.features_in], y=y, **kwargs)
 
         type_map_raw = get_type_map_raw(X_out)
-        self._feature_metadata_before_post = FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_family_groups_special)
+        self._feature_metadata_before_post = FeatureMetadata(
+            type_map_raw=type_map_raw, type_group_map_special=type_family_groups_special
+        )
         if self._post_generators:
             X_out, self.feature_metadata, self._post_generators = self._fit_generators(
-                X=X_out, y=y, feature_metadata=self._feature_metadata_before_post, generators=self._post_generators, **kwargs
+                X=X_out,
+                y=y,
+                feature_metadata=self._feature_metadata_before_post,
+                generators=self._post_generators,
+                **kwargs,
             )
         else:
             self.feature_metadata = self._feature_metadata_before_post
         type_map_real = get_type_map_real(X_out)
         self.features_out = list(X_out.columns)
-        self.feature_metadata_real = FeatureMetadata(type_map_raw=type_map_real, type_group_map_special=self.feature_metadata.get_type_group_map_raw())
+        self.feature_metadata_real = FeatureMetadata(
+            type_map_raw=type_map_real, type_group_map_special=self.feature_metadata.get_type_group_map_raw()
+        )
 
         self._post_fit_cleanup()
         if self.reset_index:
@@ -434,7 +452,8 @@ class AbstractFeatureGenerator:
         if self.feature_metadata_in is None:
             self._log(
                 20,
-                "\tInferring data type of each feature based on column values. Set feature_metadata_in to manually specify special " "dtypes of the features.",
+                "\tInferring data type of each feature based on column values. Set feature_metadata_in to manually specify special "
+                "dtypes of the features.",
             )
             self.feature_metadata_in = self._infer_feature_metadata_in(X=X)
         if self.features_in is None:
@@ -486,7 +505,9 @@ class AbstractFeatureGenerator:
     def get_default_infer_features_in_args() -> dict:
         raise NotImplementedError
 
-    def _fit_generators(self, X, y, feature_metadata, generators: list, **kwargs) -> (DataFrame, FeatureMetadata, list):
+    def _fit_generators(
+        self, X, y, feature_metadata, generators: list, **kwargs
+    ) -> (DataFrame, FeatureMetadata, list):
         """
         Fit a list of AbstractFeatureGenerator objects in sequence, with the output of generators[i] fed as the input to generators[i+1]
         This is called to sequentially fit self._post_generators generators on the output of _fit_transform to obtain the final output of the generator.
@@ -571,7 +592,9 @@ class AbstractFeatureGenerator:
             generated_features = set()
             for feature_in in feature_links_chain[i + 1]:
                 generated_features = generated_features.union(feature_links_chain[i + 1][feature_in])
-            features_out_to_remove = [feature for feature in generator.features_out if feature not in generated_features]
+            features_out_to_remove = [
+                feature for feature in generator.features_out if feature not in generated_features
+            ]
             generator._remove_features_out(features_out_to_remove)
 
     def _rename_features_in(self, column_rename_map: dict):
@@ -586,7 +609,9 @@ class AbstractFeatureGenerator:
         """
         if y is not None and isinstance(y, Series):
             if list(y.index) != list(X.index):
-                raise AssertionError(f"y.index and X.index must be equal when fitting {self.__class__.__name__}, but they differ.")
+                raise AssertionError(
+                    f"y.index and X.index must be equal when fitting {self.__class__.__name__}, but they differ."
+                )
 
     def _post_fit_cleanup(self):
         """
@@ -604,7 +629,9 @@ class AbstractFeatureGenerator:
             for column in count_dict:
                 if count_dict[column] > 1:
                     invalid_columns.append(column)
-            raise AssertionError(f"Columns appear multiple times in X. Columns must be unique. Invalid columns: {invalid_columns}")
+            raise AssertionError(
+                f"Columns appear multiple times in X. Columns must be unique. Invalid columns: {invalid_columns}"
+            )
 
     # TODO: Move to a generator
     @staticmethod
@@ -700,7 +727,9 @@ class AbstractFeatureGenerator:
             for feature in features_in:
                 feature_links_new[feature] = set()
                 for feature_out in feature_links[feature]:
-                    feature_links_new[feature] = feature_links_new[feature].union(feature_links_chain[i].get(feature_out, []))
+                    feature_links_new[feature] = feature_links_new[feature].union(
+                        feature_links_chain[i].get(feature_out, [])
+                    )
                 feature_links_new[feature] = list(feature_links_new[feature])
             feature_links = feature_links_new
         return feature_links
@@ -714,11 +743,15 @@ class AbstractFeatureGenerator:
                 else:
                     features_in = self._post_generators[i - 1].features_out
                 features_in_list.append(features_in)
-        return self._get_unused_features_generic(feature_links_chain=feature_links_chain, features_in_list=features_in_list)
+        return self._get_unused_features_generic(
+            feature_links_chain=feature_links_chain, features_in_list=features_in_list
+        )
 
     # TODO: Unit test this
     @staticmethod
-    def _get_unused_features_generic(feature_links_chain: List[Dict[str, List[str]]], features_in_list: List[List[str]]) -> List[List[str]]:
+    def _get_unused_features_generic(
+        feature_links_chain: List[Dict[str, List[str]]], features_in_list: List[List[str]]
+    ) -> List[List[str]]:
         unused_features = []
         unused_features_by_stage = []
         for i, chain in enumerate(reversed(feature_links_chain)):
@@ -748,7 +781,10 @@ class AbstractFeatureGenerator:
         """
         if self.fit_time:
             self._log(log_level, f"\t{round(self.fit_time, 1)}s = Fit runtime")
-            self._log(log_level, f"\t{len(self.features_in)} features in original data used to generate {len(self.features_out)} features in processed data.")
+            self._log(
+                log_level,
+                f"\t{len(self.features_in)} features in original data used to generate {len(self.features_out)} features in processed data.",
+            )
 
     def print_feature_metadata_info(self, log_level: int = 20):
         """
@@ -763,7 +799,9 @@ class AbstractFeatureGenerator:
         self.feature_metadata_in.print_feature_metadata_full(self.log_prefix + "\t\t", log_level=log_level)
         if self.feature_metadata_real:
             self._log(log_level - 5, "\tTypes of features in processed data (exact raw dtype, raw dtype):")
-            self.feature_metadata_real.print_feature_metadata_full(self.log_prefix + "\t\t", print_only_one_special=True, log_level=log_level - 5)
+            self.feature_metadata_real.print_feature_metadata_full(
+                self.log_prefix + "\t\t", print_only_one_special=True, log_level=log_level - 5
+            )
         self._log(log_level, "\tTypes of features in processed data (raw dtype, special dtypes):")
         self.feature_metadata.print_feature_metadata_full(self.log_prefix + "\t\t", log_level=log_level)
 

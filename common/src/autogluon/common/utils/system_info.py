@@ -25,7 +25,10 @@ def get_ag_system_info_disk_space(path: str) -> Tuple[str, int]:
                 f"and large datasets may require more."
             )
             disk_verbosity = 30
-        msg = f"Disk Space Avail:   {disk_free_gb:.2f} GB / {disk_total_gb:.2f} GB " f"({disk_proportion_avail * 100:.1f}%){disk_log_extra}"
+        msg = (
+            f"Disk Space Avail:   {disk_free_gb:.2f} GB / {disk_total_gb:.2f} GB "
+            f"({disk_proportion_avail * 100:.1f}%){disk_log_extra}"
+        )
         return msg, disk_verbosity
     except Exception as e:
         # Note: using a broad exception catch as it is unknown what scenarios an exception would be raised, and what exception type would be used.
@@ -80,7 +83,9 @@ def get_ag_system_info(*, path: str = None, include_gpu_count=False, include_pyt
             system_num_gpus = f"WARNING: Exception was raised when calculating GPU count ({e.__class__.__name__})"
         msg_list.append(f"GPU Count:          {system_num_gpus}")
 
-    msg_list.append(f"Memory Avail:       {available_mem:.2f} GB / {total_mem:.2f} GB ({mem_avail_percent * 100:.1f}%)")
+    msg_list.append(
+        f"Memory Avail:       {available_mem:.2f} GB / {total_mem:.2f} GB ({mem_avail_percent * 100:.1f}%)"
+    )
 
     if path is not None:
         disk_avail_msg, _ = get_ag_system_info_disk_space(path=path)

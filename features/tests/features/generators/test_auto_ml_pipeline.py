@@ -37,10 +37,30 @@ def test_auto_ml_pipeline_feature_generator(generator_helper, data_helper):
         ("category", ()): ["obj", "cat"],
         ("float", ()): ["float"],
         ("int", ()): ["int"],
-        ("int", ("binned", "text_special")): ["text.char_count", "text.word_count", "text.lower_ratio", "text.special_ratio", "text.symbol_ratio. "],
+        ("int", ("binned", "text_special")): [
+            "text.char_count",
+            "text.word_count",
+            "text.lower_ratio",
+            "text.special_ratio",
+            "text.symbol_ratio. ",
+        ],
         ("int", ("bool",)): ["int_bool"],
-        ("int", ("datetime_as_int",)): ["datetime", "datetime.year", "datetime.month", "datetime.day", "datetime.dayofweek"],
-        ("int", ("text_ngram",)): ["__nlp__.breaks", "__nlp__.end", "__nlp__.end of", "__nlp__.sentence", "__nlp__.the", "__nlp__.world", "__nlp__._total_"],
+        ("int", ("datetime_as_int",)): [
+            "datetime",
+            "datetime.year",
+            "datetime.month",
+            "datetime.day",
+            "datetime.dayofweek",
+        ],
+        ("int", ("text_ngram",)): [
+            "__nlp__.breaks",
+            "__nlp__.end",
+            "__nlp__.end of",
+            "__nlp__.sentence",
+            "__nlp__.the",
+            "__nlp__.world",
+            "__nlp__._total_",
+        ],
     }
 
     expected_output_data_feat_datetime = [
@@ -112,10 +132,30 @@ def test_auto_ml_pipeline_feature_generator_raw_text(generator_helper, data_help
         ("category", ()): ["obj", "cat"],
         ("float", ()): ["float"],
         ("int", ()): ["int"],
-        ("int", ("binned", "text_special")): ["text.char_count", "text.word_count", "text.lower_ratio", "text.special_ratio", "text.symbol_ratio. "],
+        ("int", ("binned", "text_special")): [
+            "text.char_count",
+            "text.word_count",
+            "text.lower_ratio",
+            "text.special_ratio",
+            "text.symbol_ratio. ",
+        ],
         ("int", ("bool",)): ["int_bool"],
-        ("int", ("datetime_as_int",)): ["datetime", "datetime.year", "datetime.month", "datetime.day", "datetime.dayofweek"],
-        ("int", ("text_ngram",)): ["__nlp__.breaks", "__nlp__.end", "__nlp__.end of", "__nlp__.sentence", "__nlp__.the", "__nlp__.world", "__nlp__._total_"],
+        ("int", ("datetime_as_int",)): [
+            "datetime",
+            "datetime.year",
+            "datetime.month",
+            "datetime.day",
+            "datetime.dayofweek",
+        ],
+        ("int", ("text_ngram",)): [
+            "__nlp__.breaks",
+            "__nlp__.end",
+            "__nlp__.end of",
+            "__nlp__.sentence",
+            "__nlp__.the",
+            "__nlp__.world",
+            "__nlp__._total_",
+        ],
         ("object", ("text",)): ["text_raw_text"],
     }
 
@@ -152,8 +192,22 @@ def test_auto_ml_pipeline_feature_generator_only_raw_text(generator_helper, data
     expected_feature_metadata_in_full = {("object", ("text",)): ["text"]}
 
     expected_feature_metadata_full = {
-        ("int", ("binned", "text_special")): ["text.char_count", "text.word_count", "text.lower_ratio", "text.special_ratio", "text.symbol_ratio. "],
-        ("int", ("text_ngram",)): ["__nlp__.breaks", "__nlp__.end", "__nlp__.end of", "__nlp__.sentence", "__nlp__.the", "__nlp__.world", "__nlp__._total_"],
+        ("int", ("binned", "text_special")): [
+            "text.char_count",
+            "text.word_count",
+            "text.lower_ratio",
+            "text.special_ratio",
+            "text.symbol_ratio. ",
+        ],
+        ("int", ("text_ngram",)): [
+            "__nlp__.breaks",
+            "__nlp__.end",
+            "__nlp__.end of",
+            "__nlp__.sentence",
+            "__nlp__.the",
+            "__nlp__.world",
+            "__nlp__._total_",
+        ],
         ("object", ("text",)): ["text_raw_text"],
     }
 
@@ -204,7 +258,13 @@ def test_auto_ml_pipeline_feature_generator_duplicates(generator_helper, data_he
         ("category", ()): ["obj", "cat"],
         ("float", ()): ["float"],
         ("int", ()): ["int"],
-        ("int", ("binned", "text_special")): ["text.char_count", "text.word_count", "text.lower_ratio", "text.special_ratio", "text.symbol_ratio. "],
+        ("int", ("binned", "text_special")): [
+            "text.char_count",
+            "text.word_count",
+            "text.lower_ratio",
+            "text.special_ratio",
+            "text.symbol_ratio. ",
+        ],
         ("int", ("bool",)): ["int_bool"],
         ("int", ("datetime_as_int",)): [
             "datetime_as_object",
@@ -213,7 +273,15 @@ def test_auto_ml_pipeline_feature_generator_duplicates(generator_helper, data_he
             "datetime_as_object.day",
             "datetime_as_object.dayofweek",
         ],
-        ("int", ("text_ngram",)): ["__nlp__.breaks", "__nlp__.end", "__nlp__.end of", "__nlp__.sentence", "__nlp__.the", "__nlp__.world", "__nlp__._total_"],
+        ("int", ("text_ngram",)): [
+            "__nlp__.breaks",
+            "__nlp__.end",
+            "__nlp__.end of",
+            "__nlp__.sentence",
+            "__nlp__.the",
+            "__nlp__.world",
+            "__nlp__._total_",
+        ],
     }
 
     expected_output_data_feat_datetime = [
@@ -319,7 +387,13 @@ def test_auto_ml_pipeline_feature_generator_duplicates_without_dedupe(generator_
         ("category", ()): ["obj", "cat"],
         ("float", ()): ["float"],
         ("int", ()): ["int"],
-        ("int", ("binned", "text_special")): ["text.char_count", "text.word_count", "text.lower_ratio", "text.special_ratio", "text.symbol_ratio. "],
+        ("int", ("binned", "text_special")): [
+            "text.char_count",
+            "text.word_count",
+            "text.lower_ratio",
+            "text.special_ratio",
+            "text.symbol_ratio. ",
+        ],
         ("int", ("bool",)): [
             "int_bool",
             "int_bool_dup_1",

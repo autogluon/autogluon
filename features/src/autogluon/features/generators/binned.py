@@ -23,7 +23,10 @@ class BinnedFeatureGenerator(AbstractFeatureGenerator):
 
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
         self._bin_map = self._get_bin_map(X=X)
-        self._astype_map = {feature: get_smallest_valid_dtype_int(min_val=0, max_val=len(bin_index)) for feature, bin_index in self._bin_map.items()}
+        self._astype_map = {
+            feature: get_smallest_valid_dtype_int(min_val=0, max_val=len(bin_index))
+            for feature, bin_index in self._bin_map.items()
+        }
         X_out = self._transform(X)
         type_group_map_special = copy.deepcopy(self.feature_metadata_in.type_group_map_special)
         type_group_map_special[S_BINNED] += list(X_out.columns)
@@ -42,7 +45,9 @@ class BinnedFeatureGenerator(AbstractFeatureGenerator):
     def _transform_bin(self, X: DataFrame):
         X_out = dict()
         for column in self._bin_map:
-            X_out[column] = binning.bin_column(series=X[column], bins=self._bin_map[column], dtype=self._astype_map[column])
+            X_out[column] = binning.bin_column(
+                series=X[column], bins=self._bin_map[column], dtype=self._astype_map[column]
+            )
         X_out = pd.DataFrame(X_out, index=X.index)
         return X_out
 

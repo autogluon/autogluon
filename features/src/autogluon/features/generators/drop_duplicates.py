@@ -41,11 +41,15 @@ class DropDuplicatesFeatureGenerator(AbstractFeatureGenerator):
 
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
         if self.sample_size_init is not None and len(X) > self.sample_size_init:
-            features_to_check = self._drop_duplicate_features(X, self.feature_metadata_in, keep=False, sample_size=self.sample_size_init)
+            features_to_check = self._drop_duplicate_features(
+                X, self.feature_metadata_in, keep=False, sample_size=self.sample_size_init
+            )
             X_candidates = X[features_to_check]
         else:
             X_candidates = X
-        features_to_drop = self._drop_duplicate_features(X_candidates, self.feature_metadata_in, sample_size=self.sample_size_final)
+        features_to_drop = self._drop_duplicate_features(
+            X_candidates, self.feature_metadata_in, sample_size=self.sample_size_final
+        )
         self._remove_features_in(features_to_drop)
         if features_to_drop:
             self._log(15, f"\t{len(features_to_drop)} duplicate columns removed: {features_to_drop}")
@@ -60,7 +64,9 @@ class DropDuplicatesFeatureGenerator(AbstractFeatureGenerator):
         return dict()
 
     @classmethod
-    def _drop_duplicate_features(cls, X: DataFrame, feature_metadata_in, keep: Union[str, bool] = "first", sample_size=None) -> list:
+    def _drop_duplicate_features(
+        cls, X: DataFrame, feature_metadata_in, keep: Union[str, bool] = "first", sample_size=None
+    ) -> list:
         if sample_size is not None and len(X) > sample_size:
             X = X.sample(sample_size, random_state=0)
         features_to_remove = []
@@ -76,7 +82,9 @@ class DropDuplicatesFeatureGenerator(AbstractFeatureGenerator):
         features_to_check_categorical = feature_metadata_in.get_features(valid_raw_types=[R_CATEGORY, R_BOOL])
         features_to_check_categorical = [feature for feature in features_to_check_categorical if feature in X_columns]
         if features_to_check_categorical:
-            features_to_remove += cls._drop_duplicate_features_categorical(X=X[features_to_check_categorical], keep=keep)
+            features_to_remove += cls._drop_duplicate_features_categorical(
+                X=X[features_to_check_categorical], keep=keep
+            )
             X = X.drop(columns=features_to_check_categorical)
 
         if len(X.columns) > 0:
@@ -128,7 +136,9 @@ class DropDuplicatesFeatureGenerator(AbstractFeatureGenerator):
             features_to_check = features_unique_count_dict[feature_unique_count]
             if len(features_to_check) <= 1:
                 continue
-            mapping_features_val_dict_cur = {feature: mapping_features_val_dict[feature] for feature in features_to_check}
+            mapping_features_val_dict_cur = {
+                feature: mapping_features_val_dict[feature] for feature in features_to_check
+            }
             # Converts ['a', 'd', 'f', 'a'] to [0, 1, 2, 0]
             # Converts [5, 'a', np.nan, 5] to [0, 1, 2, 0], these would be considered duplicates since they carry the same information.
 
@@ -141,7 +151,9 @@ class DropDuplicatesFeatureGenerator(AbstractFeatureGenerator):
             else:
                 # refer to https://pandas.pydata.org/docs/whatsnew/v2.2.0.html#deprecated-automatic-downcasting
                 with pd.option_context("future.no_silent_downcasting", True):
-                    X_cur = X[features_to_check].astype("object").replace(mapping_features_val_dict_cur).astype(np.int64)
+                    X_cur = (
+                        X[features_to_check].astype("object").replace(mapping_features_val_dict_cur).astype(np.int64)
+                    )
             features_to_remove += cls._drop_duplicate_features_numeric(X=X_cur, keep=keep)
 
         return features_to_remove
