@@ -101,16 +101,29 @@ class KNNModel(AbstractModel):
         if time_limit is None or num_rows_max <= 10000:
             self.model = self._get_model_type()(**params).fit(X, y)
         else:
-            self.model = self._fit_with_samples(X=X, y=y, model_params=params, time_limit=time_limit - (time.time() - time_start))
+            self.model = self._fit_with_samples(
+                X=X, y=y, model_params=params, time_limit=time_limit - (time.time() - time_start)
+            )
 
     def _estimate_memory_usage(self, X, **kwargs):
         model_size_bytes = 4 * X.shape[0] * X.shape[1]  # Assuming float32 types
-        expected_final_model_size_bytes = model_size_bytes * 3.6  # Roughly what can be expected of the final KNN model in memory size
+        expected_final_model_size_bytes = (
+            model_size_bytes * 3.6
+        )  # Roughly what can be expected of the final KNN model in memory size
         return expected_final_model_size_bytes
 
-    def _validate_fit_memory_usage(self, mem_error_threshold: float = 0.2, mem_warning_threshold: float = 0.15, mem_size_threshold: int = 1e7, **kwargs):
+    def _validate_fit_memory_usage(
+        self,
+        mem_error_threshold: float = 0.2,
+        mem_warning_threshold: float = 0.15,
+        mem_size_threshold: int = 1e7,
+        **kwargs,
+    ):
         return super()._validate_fit_memory_usage(
-            mem_error_threshold=mem_error_threshold, mem_warning_threshold=mem_warning_threshold, mem_size_threshold=mem_size_threshold, **kwargs
+            mem_error_threshold=mem_error_threshold,
+            mem_warning_threshold=mem_warning_threshold,
+            mem_size_threshold=mem_size_threshold,
+            **kwargs,
         )
 
     # TODO: Won't work for RAPIDS without modification
@@ -152,7 +165,17 @@ class KNNModel(AbstractModel):
         return y_oof_pred_proba
 
     # TODO: Consider making this fully generic and available to all models
-    def _fit_with_samples(self, X, y, model_params, time_limit, start_samples=10000, max_samples=None, sample_growth_factor=2, sample_time_growth_factor=8):
+    def _fit_with_samples(
+        self,
+        X,
+        y,
+        model_params,
+        time_limit,
+        start_samples=10000,
+        max_samples=None,
+        sample_growth_factor=2,
+        sample_time_growth_factor=8,
+    ):
         """
         Fit model with samples of the data repeatedly, gradually increasing the amount of data until time_limit is reached or all data is used.
 
@@ -228,7 +251,10 @@ class KNNModel(AbstractModel):
             time_limit_left = time_limit - (time_fit_end_sample - time_start)
             time_fit_sample = time_limit_left_prior - time_limit_left
             time_required_for_next = time_fit_sample * sample_time_growth_factor
-            logger.log(15, f"\t{round(time_fit_sample, 2)}s \t= Train Time (Using {samples}/{num_rows_max} rows) ({round(time_limit_left, 2)}s remaining time)")
+            logger.log(
+                15,
+                f"\t{round(time_fit_sample, 2)}s \t= Train Time (Using {samples}/{num_rows_max} rows) ({round(time_limit_left, 2)}s remaining time)",
+            )
             if time_required_for_next > time_limit_left and i != len(num_rows_samples) - 1:
                 logger.log(
                     20,

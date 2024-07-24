@@ -165,7 +165,9 @@ class FitHelper:
         if compiler_configs is None:
             compiler_configs = {}
         directory_prefix = "./datasets/"
-        train_data, test_data, dataset_info = DatasetLoaderHelper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
+        train_data, test_data, dataset_info = DatasetLoaderHelper.load_dataset(
+            name=dataset_name, directory_prefix=directory_prefix
+        )
         label = dataset_info["label"]
         _init_args = dict(
             label=label,
@@ -187,7 +189,11 @@ class FitHelper:
             assert PathConverter._is_absolute(path=init_args["path"])
         save_path = init_args["path"]
         predictor: TabularPredictor = FitHelper.fit_dataset(
-            train_data=train_data, init_args=init_args, fit_args=fit_args, sample_size=sample_size, scikit_api=scikit_api
+            train_data=train_data,
+            init_args=init_args,
+            fit_args=fit_args,
+            sample_size=sample_size,
+            scikit_api=scikit_api,
         )
         if compile:
             predictor.compile(models="all", compiler_configs=compiler_configs)
@@ -219,19 +225,29 @@ class FitHelper:
                 predictor.predict_proba(test_data, model=refit_model_name)
         predictor.info()
         lb = predictor.leaderboard(test_data, extra_info=True, extra_metrics=extra_metrics)
-        stacked_overfitting_assert(lb, predictor, expected_stacked_overfitting_at_val, expected_stacked_overfitting_at_test)
+        stacked_overfitting_assert(
+            lb, predictor, expected_stacked_overfitting_at_val, expected_stacked_overfitting_at_test
+        )
 
         predictor_load = predictor.load(path=predictor.path)
         predictor_load.predict(test_data)
 
         assert os.path.realpath(save_path) == os.path.realpath(predictor.path)
         if delete_directory:
-            shutil.rmtree(save_path, ignore_errors=True)  # Delete AutoGluon output directory to ensure runs' information has been removed.
+            shutil.rmtree(
+                save_path, ignore_errors=True
+            )  # Delete AutoGluon output directory to ensure runs' information has been removed.
         return predictor
 
     @staticmethod
     def fit_and_validate_dataset_with_cascade(
-        dataset_name, fit_args, cascade: List[str], sample_size=1000, refit_full=True, delete_directory=True, expected_model_count=2
+        dataset_name,
+        fit_args,
+        cascade: List[str],
+        sample_size=1000,
+        refit_full=True,
+        delete_directory=True,
+        expected_model_count=2,
     ):
         predictor = FitHelper.fit_and_validate_dataset(
             dataset_name=dataset_name,
@@ -242,13 +258,17 @@ class FitHelper:
             delete_directory=False,
         )
         directory_prefix = "./datasets/"
-        train_data, test_data, dataset_info = DatasetLoaderHelper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
+        train_data, test_data, dataset_info = DatasetLoaderHelper.load_dataset(
+            name=dataset_name, directory_prefix=directory_prefix
+        )
 
         predictor.predict(test_data, model=cascade)
         predictor.predict_proba(test_data, model=cascade)
 
         if delete_directory:
-            shutil.rmtree(predictor.path, ignore_errors=True)  # Delete AutoGluon output directory to ensure runs' information has been removed.
+            shutil.rmtree(
+                predictor.path, ignore_errors=True
+            )  # Delete AutoGluon output directory to ensure runs' information has been removed.
 
     @staticmethod
     def fit_dataset(train_data, init_args, fit_args, sample_size=None, scikit_api=False) -> TabularPredictor:
@@ -279,10 +299,16 @@ class FitHelper:
 class ModelFitHelper:
     @staticmethod
     def fit_and_validate_dataset(
-        dataset_name: str, model: AbstractModel, fit_args: dict, sample_size: int = 1000, check_predict_children: bool = False
+        dataset_name: str,
+        model: AbstractModel,
+        fit_args: dict,
+        sample_size: int = 1000,
+        check_predict_children: bool = False,
     ) -> AbstractModel:
         directory_prefix = "./datasets/"
-        train_data, test_data, dataset_info = DatasetLoaderHelper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
+        train_data, test_data, dataset_info = DatasetLoaderHelper.load_dataset(
+            name=dataset_name, directory_prefix=directory_prefix
+        )
         label = dataset_info["label"]
         model, label_cleaner, feature_generator = ModelFitHelper.fit_dataset(
             train_data=train_data, model=model, label=label, fit_args=fit_args, sample_size=sample_size
@@ -294,10 +320,14 @@ class ModelFitHelper:
         X_test = feature_generator.transform(X_test)
 
         y_pred = model.predict(X_test)
-        assert isinstance(y_pred, np.ndarray), f"Expected np.ndarray as model.predict(X_test) output. Got: {y_pred.__class__}"
+        assert isinstance(
+            y_pred, np.ndarray
+        ), f"Expected np.ndarray as model.predict(X_test) output. Got: {y_pred.__class__}"
 
         y_pred_proba = model.predict_proba(X_test)
-        assert isinstance(y_pred_proba, np.ndarray), f"Expected np.ndarray as model.predict_proba(X_test) output. Got: {y_pred.__class__}"
+        assert isinstance(
+            y_pred_proba, np.ndarray
+        ), f"Expected np.ndarray as model.predict_proba(X_test) output. Got: {y_pred.__class__}"
         model.get_info()
 
         if check_predict_children:
@@ -394,10 +424,16 @@ def stacked_overfitting_assert_func():
     return stacked_overfitting_assert
 
 
-def stacked_overfitting_assert(lb, predictor, expected_stacked_overfitting_at_val, expected_stacked_overfitting_at_test):
+def stacked_overfitting_assert(
+    lb, predictor, expected_stacked_overfitting_at_val, expected_stacked_overfitting_at_test
+):
     if expected_stacked_overfitting_at_val is not None:
-        assert predictor._stacked_overfitting_occurred == expected_stacked_overfitting_at_val, "Expected stacked overfitting at val mismatch!"
+        assert (
+            predictor._stacked_overfitting_occurred == expected_stacked_overfitting_at_val
+        ), "Expected stacked overfitting at val mismatch!"
 
     if expected_stacked_overfitting_at_test is not None:
         stacked_overfitting = check_stacked_overfitting_from_leaderboard(lb)
-        assert stacked_overfitting == expected_stacked_overfitting_at_test, "Expected stacked overfitting at test mismatch!"
+        assert (
+            stacked_overfitting == expected_stacked_overfitting_at_test
+        ), "Expected stacked overfitting at test mismatch!"

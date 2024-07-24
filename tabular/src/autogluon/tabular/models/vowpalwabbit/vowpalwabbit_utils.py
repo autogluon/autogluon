@@ -30,12 +30,19 @@ class VWFeaturesConverter:
                 X_out = (
                     self.PIPE
                     + self.SPACE
-                    + self.__generate_namespace_based_on_ml_type(X[feature], raw_feature, special_feature, feature).astype("str")
+                    + self.__generate_namespace_based_on_ml_type(
+                        X[feature], raw_feature, special_feature, feature
+                    ).astype("str")
                     + self.SPACE
                 )
             else:
                 X_out += (
-                    "" + self.SPACE + self.__generate_namespace_based_on_ml_type(X[feature], raw_feature, special_feature, feature).astype("str") + self.SPACE
+                    ""
+                    + self.SPACE
+                    + self.__generate_namespace_based_on_ml_type(
+                        X[feature], raw_feature, special_feature, feature
+                    ).astype("str")
+                    + self.SPACE
                 )
         return X_out
 

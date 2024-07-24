@@ -16,9 +16,13 @@ def test_no_models(fit_helper, dataset_loader_helper):
 
     dataset_name = "adult"
     directory_prefix = "./datasets/"
-    train_data, test_data, dataset_info = dataset_loader_helper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
+    train_data, test_data, dataset_info = dataset_loader_helper.load_dataset(
+        name=dataset_name, directory_prefix=directory_prefix
+    )
 
-    predictor = fit_helper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
+    predictor = fit_helper.fit_dataset(
+        train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args
+    )
 
     assert not predictor.model_names()
     with pytest.raises(AssertionError):
@@ -40,9 +44,13 @@ def test_no_models_raise(fit_helper, dataset_loader_helper):
 
     dataset_name = "adult"
     directory_prefix = "./datasets/"
-    train_data, test_data, dataset_info = dataset_loader_helper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
+    train_data, test_data, dataset_info = dataset_loader_helper.load_dataset(
+        name=dataset_name, directory_prefix=directory_prefix
+    )
 
-    predictor = fit_helper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
+    predictor = fit_helper.fit_dataset(
+        train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args
+    )
 
     assert not predictor.model_names()
     with pytest.raises(AssertionError):
@@ -144,7 +152,9 @@ def test_dummy_binary_absolute_path_stack(fit_helper):
 
     dataset_name = "adult"
 
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, expected_model_count=4, path_as_absolute=True)
+    fit_helper.fit_and_validate_dataset(
+        dataset_name=dataset_name, fit_args=fit_args, expected_model_count=4, path_as_absolute=True
+    )
 
 
 def test_dummy_binary_model_absolute_path(model_fit_helper):

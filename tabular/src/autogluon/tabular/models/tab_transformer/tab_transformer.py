@@ -78,7 +78,9 @@ class TabTransformer(TabModelBase):
             self.cont_init_norm = self.get_norm(hidden_dim * n_cont_embeddings)
 
         if self.readout == "readout_emb":
-            self.readout_emb = nn.Parameter(torch.zeros(1, hidden_dim).uniform_(-1, 1))  # We do the readout from a learned embedding
+            self.readout_emb = nn.Parameter(
+                torch.zeros(1, hidden_dim).uniform_(-1, 1)
+            )  # We do the readout from a learned embedding
             self.n_embeddings += 1
 
         if fix_attention is True:
@@ -99,7 +101,13 @@ class TabTransformer(TabModelBase):
         else:
             self.tfmr_layers = nn.ModuleList(
                 [
-                    nn.TransformerEncoderLayer(d_model=hidden_dim, nhead=n_heads, dim_feedforward=4 * hidden_dim, dropout=self.p_dropout, activation="gelu")
+                    nn.TransformerEncoderLayer(
+                        d_model=hidden_dim,
+                        nhead=n_heads,
+                        dim_feedforward=4 * hidden_dim,
+                        dropout=self.p_dropout,
+                        activation="gelu",
+                    )
                     for _ in range(n_layers)
                 ]
             )

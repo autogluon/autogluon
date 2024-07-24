@@ -84,7 +84,9 @@ def test_lightgbm_binary_with_calibrate_decision_threshold(fit_helper):
     )
     dataset_name = "adult"
 
-    predictor: TabularPredictor = fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, delete_directory=False, refit_full=False)
+    predictor: TabularPredictor = fit_helper.fit_and_validate_dataset(
+        dataset_name=dataset_name, fit_args=fit_args, delete_directory=False, refit_full=False
+    )
 
     for metric in [None, "f1", "balanced_accuracy", "mcc", "recall", "precision"]:
         decision_threshold = predictor.calibrate_decision_threshold(metric=metric)
@@ -97,15 +99,23 @@ def test_lightgbm_binary_with_calibrate_decision_threshold(fit_helper):
         y_val = predictor.transform_labels(labels=y_val, inverse=True)
 
         y_pred_val = predictor.predict(data=X_val, transform_features=False)
-        y_pred_val_w_decision_threshold = predictor.predict(data=X_val, decision_threshold=decision_threshold, transform_features=False)
-        y_pred_multi_val_w_decision_threshold = predictor.predict_multi(data=X_val, decision_threshold=decision_threshold, transform_features=False)
+        y_pred_val_w_decision_threshold = predictor.predict(
+            data=X_val, decision_threshold=decision_threshold, transform_features=False
+        )
+        y_pred_multi_val_w_decision_threshold = predictor.predict_multi(
+            data=X_val, decision_threshold=decision_threshold, transform_features=False
+        )
         y_pred_multi_val_w_decision_threshold_cache = predictor.predict_multi(decision_threshold=decision_threshold)
 
         y_pred_proba_val = predictor.predict_proba(data=X_val, transform_features=False)
-        y_pred_val_w_decision_threshold_from_proba = predictor.predict_from_proba(y_pred_proba=y_pred_proba_val, decision_threshold=decision_threshold)
+        y_pred_val_w_decision_threshold_from_proba = predictor.predict_from_proba(
+            y_pred_proba=y_pred_proba_val, decision_threshold=decision_threshold
+        )
 
         assert y_pred_val_w_decision_threshold.equals(y_pred_multi_val_w_decision_threshold[predictor.model_best])
-        assert y_pred_val_w_decision_threshold.equals(y_pred_multi_val_w_decision_threshold_cache[predictor.model_best])
+        assert y_pred_val_w_decision_threshold.equals(
+            y_pred_multi_val_w_decision_threshold_cache[predictor.model_best]
+        )
         assert y_pred_val_w_decision_threshold.equals(y_pred_val_w_decision_threshold_from_proba)
 
         result = predictor.evaluate_predictions(y_true=y_val, y_pred=y_pred_val)
@@ -131,7 +141,9 @@ def test_lightgbm_binary_with_calibrate_decision_threshold_bagged_refit(fit_help
     dataset_name = "adult"
 
     directory_prefix = "./datasets/"
-    train_data, test_data, dataset_info = dataset_loader_helper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
+    train_data, test_data, dataset_info = dataset_loader_helper.load_dataset(
+        name=dataset_name, directory_prefix=directory_prefix
+    )
     label = dataset_info["label"]
     predictor: TabularPredictor = fit_helper.fit_and_validate_dataset(
         dataset_name=dataset_name, init_args=init_args, fit_args=fit_args, delete_directory=False, refit_full=True

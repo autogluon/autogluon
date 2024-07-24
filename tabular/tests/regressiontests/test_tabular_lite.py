@@ -2,6 +2,7 @@
     The test needs to be run via pyodide/tools/pytest_wrapper.py,
     and using conftest.py from pyodide root directory.
 """
+
 from pathlib import Path
 
 import pytest
@@ -20,7 +21,10 @@ def selenium_standalone_micropip(selenium_standalone):
         ("tabular", f"{WHL_PREFIX}.tabular-*.whl"),
         ("autogluon", f"{WHL_PREFIX}-*.whl"),
     ]:
-        wheel_path = [f"{regex_path_str[0]}/dist/{w.name}" for w in (ROOT_PATH / regex_path_str[0] / "dist").glob(regex_path_str[1])]
+        wheel_path = [
+            f"{regex_path_str[0]}/dist/{w.name}"
+            for w in (ROOT_PATH / regex_path_str[0] / "dist").glob(regex_path_str[1])
+        ]
         assert len(wheel_path) == 1
         wheel_path = wheel_path[0]
         wheel_paths.append(wheel_path)

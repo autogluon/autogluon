@@ -59,7 +59,9 @@ class XGBoostModel(AbstractModel):
 
     # Use specialized XGBoost metric if available (fast), otherwise use custom func generator
     def get_eval_metric(self):
-        eval_metric = xgboost_utils.convert_ag_metric_to_xgbm(ag_metric_name=self.stopping_metric.name, problem_type=self.problem_type)
+        eval_metric = xgboost_utils.convert_ag_metric_to_xgbm(
+            ag_metric_name=self.stopping_metric.name, problem_type=self.problem_type
+        )
         if eval_metric is None:
             eval_metric = xgboost_utils.func_generator(metric=self.stopping_metric, problem_type=self.problem_type)
         return eval_metric
@@ -77,7 +79,20 @@ class XGBoostModel(AbstractModel):
 
         return X
 
-    def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, num_gpus=0, num_cpus=None, sample_weight=None, sample_weight_val=None, verbosity=2, **kwargs):
+    def _fit(
+        self,
+        X,
+        y,
+        X_val=None,
+        y_val=None,
+        time_limit=None,
+        num_gpus=0,
+        num_cpus=None,
+        sample_weight=None,
+        sample_weight_val=None,
+        verbosity=2,
+        **kwargs
+    ):
         # TODO: utilize sample_weight_val in early-stopping if provided
         start_time = time.time()
         ag_params = self._get_ag_params()
@@ -120,7 +135,9 @@ class XGBoostModel(AbstractModel):
             eval_set.append((X_val, y_val))
             early_stopping_rounds = ag_params.get("early_stop", "adaptive")
             if isinstance(early_stopping_rounds, (str, tuple, list)):
-                early_stopping_rounds = self._get_early_stopping_rounds(num_rows_train=num_rows_train, strategy=early_stopping_rounds)
+                early_stopping_rounds = self._get_early_stopping_rounds(
+                    num_rows_train=num_rows_train, strategy=early_stopping_rounds
+                )
 
         if num_gpus != 0:
             params["tree_method"] = "gpu_hist"
@@ -138,7 +155,11 @@ class XGBoostModel(AbstractModel):
             callbacks = []
             if log_period is not None:
                 callbacks.append(EvaluationMonitor(period=log_period))
-            callbacks.append(EarlyStoppingCustom(early_stopping_rounds, start_time=start_time, time_limit=time_limit, verbose=verbose))
+            callbacks.append(
+                EarlyStoppingCustom(
+                    early_stopping_rounds, start_time=start_time, time_limit=time_limit, verbose=verbose
+                )
+            )
             params["callbacks"] = callbacks
 
         from xgboost import XGBClassifier, XGBRegressor
@@ -204,9 +225,13 @@ class XGBoostModel(AbstractModel):
             Scales roughly by 5120*num_features*2^max_depth bytes
             For 10000 features and 6 max_depth, the histogram would be 3.2 GB.
         """
-        num_classes = self.num_classes if self.num_classes else 1  # self.num_classes could be None after initialization if it's a regression problem
+        num_classes = (
+            self.num_classes if self.num_classes else 1
+        )  # self.num_classes could be None after initialization if it's a regression problem
         data_mem_usage = get_approximate_df_mem_usage(X).sum()
-        data_mem_usage_bytes = data_mem_usage * 7 + data_mem_usage / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
+        data_mem_usage_bytes = (
+            data_mem_usage * 7 + data_mem_usage / 4 * num_classes
+        )  # TODO: Extremely crude approximation, can be vastly improved
 
         params = self._get_model_params(convert_search_spaces_to_default=True)
         max_bin = params.get("max_bin", 256)
@@ -226,9 +251,18 @@ class XGBoostModel(AbstractModel):
         approx_mem_size_req = data_mem_usage_bytes + histogram_mem_usage_bytes
         return approx_mem_size_req
 
-    def _validate_fit_memory_usage(self, mem_error_threshold: float = 1.0, mem_warning_threshold: float = 0.75, mem_size_threshold: int = 1e9, **kwargs):
+    def _validate_fit_memory_usage(
+        self,
+        mem_error_threshold: float = 1.0,
+        mem_warning_threshold: float = 0.75,
+        mem_size_threshold: int = 1e9,
+        **kwargs
+    ):
         return super()._validate_fit_memory_usage(
-            mem_error_threshold=mem_error_threshold, mem_warning_threshold=mem_warning_threshold, mem_size_threshold=mem_size_threshold, **kwargs
+            mem_error_threshold=mem_error_threshold,
+            mem_warning_threshold=mem_warning_threshold,
+            mem_size_threshold=mem_size_threshold,
+            **kwargs
         )
 
     def get_minimum_resources(self, is_gpu_available=False):

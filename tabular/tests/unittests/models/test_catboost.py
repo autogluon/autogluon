@@ -5,7 +5,9 @@ import pytest
 from autogluon.tabular.models.catboost.catboost_model import CatBoostModel
 
 
-@pytest.mark.skipif(sys.version_info >= (3, 11) and sys.platform == "darwin", reason="catboost has no wheel for py311 darwin")
+@pytest.mark.skipif(
+    sys.version_info >= (3, 11) and sys.platform == "darwin", reason="catboost has no wheel for py311 darwin"
+)
 def test_catboost_binary(fit_helper):
     fit_args = dict(
         hyperparameters={CatBoostModel: {}},
@@ -14,7 +16,9 @@ def test_catboost_binary(fit_helper):
     fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args)
 
 
-@pytest.mark.skipif(sys.version_info >= (3, 11) and sys.platform == "darwin", reason="catboost has no wheel for py311 darwin")
+@pytest.mark.skipif(
+    sys.version_info >= (3, 11) and sys.platform == "darwin", reason="catboost has no wheel for py311 darwin"
+)
 def test_catboost_multiclass(fit_helper):
     fit_args = dict(
         hyperparameters={CatBoostModel: {}},
@@ -23,7 +27,9 @@ def test_catboost_multiclass(fit_helper):
     fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args)
 
 
-@pytest.mark.skipif(sys.version_info >= (3, 11) and sys.platform == "darwin", reason="catboost has no wheel for py311 darwin")
+@pytest.mark.skipif(
+    sys.version_info >= (3, 11) and sys.platform == "darwin", reason="catboost has no wheel for py311 darwin"
+)
 def test_catboost_regression(fit_helper):
     fit_args = dict(
         hyperparameters={CatBoostModel: {}},
@@ -33,7 +39,9 @@ def test_catboost_regression(fit_helper):
     fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args)
 
 
-@pytest.mark.skipif(sys.version_info >= (3, 11) and sys.platform == "darwin", reason="catboost has no wheel for py311 darwin")
+@pytest.mark.skipif(
+    sys.version_info >= (3, 11) and sys.platform == "darwin", reason="catboost has no wheel for py311 darwin"
+)
 def test_catboost_quantile(fit_helper):
     fit_args = dict(
         hyperparameters={"CAT": {}},

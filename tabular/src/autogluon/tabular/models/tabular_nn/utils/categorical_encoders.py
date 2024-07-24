@@ -3,6 +3,7 @@ Variant of the sklearn OneHotEncoder and OrdinalEncoder that can handle unknown 
 as well as binning of infrequent categories to limit the overall number of categories considered.
 Unknown categories are returned as None in inverse transforms. Always converts input list X to list of the same type elements first (string typically)
 """
+
 import copy
 from numbers import Integral
 
@@ -198,7 +199,9 @@ class _BaseEncoder(BaseEstimator, TransformerMixin):
 
         if self.max_levels is not None:
             if not isinstance(self.max_levels, Integral) or self.max_levels <= 0:
-                raise ValueError("max_levels must be None or a strictly " "positive int, got {}.".format(self.max_levels))
+                raise ValueError(
+                    "max_levels must be None or a strictly " "positive int, got {}.".format(self.max_levels)
+                )
 
         self.categories_ = []
         self.infrequent_indices_ = []
@@ -397,7 +400,11 @@ class OneHotMergeRaresHandleUnknownEncoder(_BaseEncoder):
         # values, there will be ambiguous cells. This creates difficulties
         # in interpreting the model.
         if self.drop is not None and self.handle_unknown != "error":
-            raise ValueError("`handle_unknown` must be 'error' when the drop parameter is " "specified, as both would create categories that are all " "zero.")
+            raise ValueError(
+                "`handle_unknown` must be 'error' when the drop parameter is "
+                "specified, as both would create categories that are all "
+                "zero."
+            )
 
     def _compute_drop_idx(self):
         if self.drop is None:
@@ -422,7 +429,10 @@ class OneHotMergeRaresHandleUnknownEncoder(_BaseEncoder):
                     "data.\n{}".format("\n".join(["Category: {}, Feature: {}".format(c, v) for c, v in missing_drops]))
                 )
                 raise ValueError(msg)
-            return np.array([np.where(cat_list == val)[0][0] for (val, cat_list) in zip(self.drop, self.categories_)], dtype=np.int_)
+            return np.array(
+                [np.where(cat_list == val)[0][0] for (val, cat_list) in zip(self.drop, self.categories_)],
+                dtype=np.int_,
+            )
         else:
             msg = "Wrong input for parameter `drop`. Expected " "'first', None or array of objects, got {}"
             raise ValueError(msg.format(type(self.drop)))
@@ -457,7 +467,9 @@ class OneHotMergeRaresHandleUnknownEncoder(_BaseEncoder):
         # check if user wants to manually drop a feature that is
         # infrequent: this is not allowed
         if self.drop is not None and not isinstance(self.drop, str):
-            for feature_idx, (infrequent_indices, drop_idx) in enumerate(zip(self.infrequent_indices_, self.drop_idx_)):
+            for feature_idx, (infrequent_indices, drop_idx) in enumerate(
+                zip(self.infrequent_indices_, self.drop_idx_)
+            ):
                 if drop_idx in infrequent_indices:
                     raise ValueError(
                         "Category {} of feature {} is infrequent and thus "
@@ -646,7 +658,10 @@ class OneHotMergeRaresHandleUnknownEncoder(_BaseEncoder):
         if input_features is None:
             input_features = ["x%d" % i for i in range(len(cats))]
         elif len(input_features) != len(self.categories_):
-            raise ValueError("input_features should have length equal to number of " "features ({}), got {}".format(len(self.categories_), len(input_features)))
+            raise ValueError(
+                "input_features should have length equal to number of "
+                "features ({}), got {}".format(len(self.categories_), len(input_features))
+            )
 
         feature_names = []
         for i in range(len(cats)):
@@ -748,7 +763,9 @@ class OrdinalMergeRaresHandleUnknownEncoder(_BaseEncoder):
         """
         X = self._label_encoder.transform(X)
         X_og_array = np.array(X)  # original X array before transform
-        X_int, _ = self._transform(X, handle_unknown="ignore")  # will contain zeros for 0th category as well as unknown values.
+        X_int, _ = self._transform(
+            X, handle_unknown="ignore"
+        )  # will contain zeros for 0th category as well as unknown values.
 
         for i in range(X_int.shape[1]):
             X_col_data = X_og_array[:, i]
