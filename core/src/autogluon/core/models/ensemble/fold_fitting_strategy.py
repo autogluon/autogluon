@@ -188,14 +188,18 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
         if user_ensemble_cpu is not None or user_ensemble_gpu is not None:
             user_ensemble_resources = dict()
         if user_ensemble_cpu is not None:
-            assert user_ensemble_cpu <= self.num_cpus, f"Detected ensemble cpu requirement = {user_ensemble_cpu} > total cpu granted = {self.num_cpus}"
+            assert (
+                user_ensemble_cpu <= self.num_cpus
+            ), f"Detected ensemble cpu requirement = {user_ensemble_cpu} > total cpu granted = {self.num_cpus}"
             assert (
                 user_ensemble_cpu >= minimum_model_num_cpus
             ), f"Detected ensenble cpu requirement = {user_ensemble_cpu} < minimum cpu required by the model = {minimum_model_num_cpus}"
             user_ensemble_resources["num_cpus"] = user_ensemble_cpu
             self.num_cpus = user_ensemble_cpu
         if user_ensemble_gpu is not None:
-            assert user_ensemble_gpu <= self.num_gpus, f"Detected ensemble gpu requirement = {user_ensemble_gpu} > total gpu granted = {self.num_gpus}"
+            assert (
+                user_ensemble_gpu <= self.num_gpus
+            ), f"Detected ensemble gpu requirement = {user_ensemble_gpu} > total gpu granted = {self.num_gpus}"
             assert (
                 user_ensemble_gpu >= minimum_model_num_gpus
             ), f"Detected ensenble gpu requirement = {user_ensemble_cpu} < minimum gpu required by the model = {minimum_model_num_gpus}"
@@ -254,7 +258,9 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
         self.bagged_ensemble_model._add_child_times_to_bag(model=fold_model)
 
     def _predict_oof(self, fold_model: AbstractModel, fold_ctx) -> Tuple[AbstractModel, ndarray]:
-        fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix = self._get_fold_properties(fold_ctx)
+        fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix = self._get_fold_properties(
+            fold_ctx
+        )
         _, val_index = fold
         X_val_fold = self.X.iloc[val_index, :]
         y_val_fold = self.y.iloc[val_index]
@@ -278,7 +284,8 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
     @staticmethod
     def _get_fold_properties(fold_ctx):
         fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix = [
-            fold_ctx[f] for f in ["fold", "folds_finished", "folds_left", "folds_to_fit", "is_last_fold", "model_name_suffix"]
+            fold_ctx[f]
+            for f in ["fold", "folds_finished", "folds_left", "folds_to_fit", "is_last_fold", "model_name_suffix"]
         ]
         return fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix
 
@@ -317,7 +324,9 @@ class SequentialLocalFoldFittingStrategy(FoldFittingStrategy):
         self._update_bagged_ensemble(fold_model, pred_proba, fold_ctx)
 
     def _fit(self, model_base, time_start_fold, time_limit_fold, fold_ctx, kwargs):
-        fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix = self._get_fold_properties(fold_ctx)
+        fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix = self._get_fold_properties(
+            fold_ctx
+        )
         train_index, val_index = fold
         X_fold, X_val_fold = self.X.iloc[train_index, :], self.X.iloc[val_index, :]
         y_fold, y_val_fold = self.y.iloc[train_index], self.y.iloc[val_index]
@@ -338,7 +347,10 @@ class SequentialLocalFoldFittingStrategy(FoldFittingStrategy):
                 kwargs_fold["sample_weight_val"] = self.sample_weight[val_index]
 
         if is_pseudo:
-            logger.log(15, f"{len(self.X_pseudo)} extra rows of pseudolabeled data added to training set for {fold_model.name}")
+            logger.log(
+                15,
+                f"{len(self.X_pseudo)} extra rows of pseudolabeled data added to training set for {fold_model.name}",
+            )
             assert_pseudo_column_match(X=X_fold, X_pseudo=self.X_pseudo)
             X_fold = pd.concat([X_fold, self.X_pseudo], axis=0, ignore_index=True)
             y_fold = pd.concat([y_fold, self.y_pseudo], axis=0, ignore_index=True)
@@ -348,7 +360,16 @@ class SequentialLocalFoldFittingStrategy(FoldFittingStrategy):
         if self.user_resources_per_job is not None:
             num_cpus = min(self.num_cpus, self.user_resources_per_job.get("num_cpus", math.inf))
             num_gpus = min(self.num_gpus, self.user_resources_per_job.get("num_gpus", math.inf))
-        fold_model.fit(X=X_fold, y=y_fold, X_val=X_val_fold, y_val=y_val_fold, time_limit=time_limit_fold, num_cpus=num_cpus, num_gpus=num_gpus, **kwargs_fold)
+        fold_model.fit(
+            X=X_fold,
+            y=y_fold,
+            X_val=X_val_fold,
+            y_val=y_val_fold,
+            time_limit=time_limit_fold,
+            num_cpus=num_cpus,
+            num_gpus=num_gpus,
+            **kwargs_fold,
+        )
         fold_model.fit_time = time.time() - time_start_fold
         return fold_model
 
@@ -377,7 +398,9 @@ def _ray_fit(
     logger.debug(f"executing fold on node {node_id}")
     logger.log(10, "ray worker training")
     time_start_fold = time.time()
-    fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix = FoldFittingStrategy._get_fold_properties(fold_ctx)
+    fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix = (
+        FoldFittingStrategy._get_fold_properties(fold_ctx)
+    )
     train_index, val_index = fold
     fold_model = copy.deepcopy(model_base)
     fold_model.name = f"{fold_model.name}{model_name_suffix}"
@@ -401,7 +424,9 @@ def _ray_fit(
         logger.log(15, f"{len(X_pseudo)} extra rows of pseudolabeled data added to training set for {fold_model.name}")
         X_fold = pd.concat([X_fold, X_pseudo], axis=0, ignore_index=True)
         y_fold = pd.concat([y_fold, y_pseudo], axis=0, ignore_index=True)
-    fold_model.fit(X=X_fold, y=y_fold, X_val=X_val_fold, y_val=y_val_fold, time_limit=time_limit_fold, **resources, **kwargs_fold)
+    fold_model.fit(
+        X=X_fold, y=y_fold, X_val=X_val_fold, y_val=y_val_fold, time_limit=time_limit_fold, **resources, **kwargs_fold
+    )
     time_train_end_fold = time.time()
     fold_model.fit_time = time_train_end_fold - time_start_fold
     fold_model, pred_proba = _ray_predict_oof(
@@ -416,10 +441,24 @@ def _ray_fit(
         model_sync_path = model_sync_path + f"{fold_model.name}/"  # s3 path hence need "/" as the saperator
         bucket, prefix = s3_path_to_bucket_prefix(model_sync_path)
         upload_s3_folder(bucket=bucket, prefix=prefix, folder_to_upload=save_path, verbose=False)
-    return fold_model.name, pred_proba, time_start_fold, time_train_end_fold, fold_model.predict_time, fold_model.predict_1_time, fold_model.predict_n_size
+    return (
+        fold_model.name,
+        pred_proba,
+        time_start_fold,
+        time_train_end_fold,
+        fold_model.predict_time,
+        fold_model.predict_1_time,
+        fold_model.predict_n_size,
+    )
 
 
-def _ray_predict_oof(fold_model: AbstractModel, X_val_fold: pd.DataFrame, y_val_fold: pd.Series, num_cpus: int = -1, save_bag_folds: bool = True):
+def _ray_predict_oof(
+    fold_model: AbstractModel,
+    X_val_fold: pd.DataFrame,
+    y_val_fold: pd.Series,
+    num_cpus: int = -1,
+    save_bag_folds: bool = True,
+):
     y_pred_proba = fold_model.predict_proba(X_val_fold, record_time=True, num_cpus=num_cpus)
     fold_model.val_score = fold_model.score_with_y_pred_proba(y=y_val_fold, y_pred_proba=y_pred_proba)
     fold_model.reduce_memory_size(remove_fit=True, remove_info=False, requires_save=True)
@@ -467,7 +506,15 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
             The amount of time used to do out of folds predictions for all folds.
     """
 
-    def __init__(self, *, num_jobs: int, num_folds_parallel: int, max_memory_usage_ratio: float = 0.8, model_sync_path: Optional[str] = None, **kwargs):
+    def __init__(
+        self,
+        *,
+        num_jobs: int,
+        num_folds_parallel: int,
+        max_memory_usage_ratio: float = 0.8,
+        model_sync_path: Optional[str] = None,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
         self.ray = try_import_ray()
         self.max_memory_usage_ratio = max_memory_usage_ratio
@@ -483,10 +530,14 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         self.mem_est_model = self._initialized_model_base.estimate_memory_usage(X=self.X)
         self.mem_est_data = self._estimate_data_memory_usage()
         self.mem_available = ResourceManager.get_available_virtual_mem()
-        num_folds_parallel = self.folds_to_fit_in_parallel_with_mem(user_specified_num_folds_parallel=num_folds_parallel)
+        num_folds_parallel = self.folds_to_fit_in_parallel_with_mem(
+            user_specified_num_folds_parallel=num_folds_parallel
+        )
         self._pseudo_sequential: bool = num_folds_parallel == 1
         self.resources, self.resources_model, self.batches, self.num_parallel_jobs = self._get_resource_suggestions(
-            num_jobs=num_jobs, user_specified_num_folds_parallel=num_folds_parallel, user_resources_per_job=self.user_resources_per_job
+            num_jobs=num_jobs,
+            user_specified_num_folds_parallel=num_folds_parallel,
+            user_resources_per_job=self.user_resources_per_job,
         )
 
     def mem_est_proportion_per_fold(self):
@@ -506,11 +557,15 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         folds_to_train_with_mem_valid = mem_available / mem_est_total * max_memory_usage_ratio
         max_folds_to_train_with_mem = max(1, int(folds_to_train_with_mem_valid))
         if max_folds_to_train_with_mem == 1:
-            self._initialized_model_base._validate_fit_memory_usage(approx_mem_size_req=mem_est_total, available_mem=mem_available)
+            self._initialized_model_base._validate_fit_memory_usage(
+                approx_mem_size_req=mem_est_total, available_mem=mem_available
+            )
         num_folds_parallel = user_specified_num_folds_parallel
         if max_folds_to_train_with_mem < user_specified_num_folds_parallel:
             # If memory is not sufficient to train num_folds_parallel, reduce to max power of 2 folds that's smaller than folds_can_be_fit_in_parallel.
-            num_folds_parallel = int(math.pow(2, math.floor((math.log10(max_folds_to_train_with_mem) / math.log10(2)))))
+            num_folds_parallel = int(
+                math.pow(2, math.floor((math.log10(max_folds_to_train_with_mem) / math.log10(2))))
+            )
             logger.log(
                 30,
                 f"\tMemory not enough to fit {user_specified_num_folds_parallel} folds in parallel. "
@@ -536,7 +591,9 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
 
     def _process_fold_results(self, finished, unfinished, fold_ctx):
         try:
-            fold_model, pred_proba, time_start_fit, time_end_fit, predict_time, predict_1_time, predict_n_size = self.ray.get(finished)
+            fold_model, pred_proba, time_start_fit, time_end_fit, predict_time, predict_1_time, predict_n_size = (
+                self.ray.get(finished)
+            )
             assert fold_ctx is not None
             self._update_bagged_ensemble(
                 fold_model=fold_model,
@@ -553,7 +610,9 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                 model_sync_path: str = self.model_sync_path + fold_model
                 if not model_sync_path.endswith("/"):
                     model_sync_path += "/"
-            self.sync_model_artifact(local_path=os.path.join(self.bagged_ensemble_model.path, fold_model), model_sync_path=model_sync_path)
+            self.sync_model_artifact(
+                local_path=os.path.join(self.bagged_ensemble_model.path, fold_model), model_sync_path=model_sync_path
+            )
         except TimeLimitExceeded:
             # Terminate all ray tasks because a fold failed
             self.terminate_all_unfinished_tasks(unfinished)
@@ -577,7 +636,9 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         self.fit_time = 0
         if self.time_start_fit and self.time_end_fit:
             self.fit_time = self.time_end_fit - self.time_start_fit
-        self.bagged_ensemble_model._add_parallel_child_times(fit_time=self.fit_time, predict_time=self.predict_time, predict_1_time=self.predict_1_time)
+        self.bagged_ensemble_model._add_parallel_child_times(
+            fit_time=self.fit_time, predict_time=self.predict_time, predict_1_time=self.predict_1_time
+        )
         self.bagged_ensemble_model._add_predict_n_size(predict_n_size_lst=self.predict_n_size_lst)
 
     def _run_parallel(self, X, y, X_pseudo, y_pseudo, model_base_ref, time_limit_fold, head_node_id):
@@ -690,7 +751,9 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
     ):
         if resources_model is None:
             resources_model = resources
-        fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix = self._get_fold_properties(fold_ctx)
+        fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix = self._get_fold_properties(
+            fold_ctx
+        )
         logger.debug(f"Folding resources per job {resources}")
         train_index, val_index = fold
         fold_ctx_ref = self.ray.put(fold_ctx)
@@ -706,7 +769,10 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                 kwargs_fold["sample_weight_val"] = self.sample_weight[val_index]
         pg = self.ray.util.get_current_placement_group()
         return self._ray_fit.options(
-            **resources, scheduling_strategy=self.ray.util.scheduling_strategies.PlacementGroupSchedulingStrategy(placement_group=pg)
+            **resources,
+            scheduling_strategy=self.ray.util.scheduling_strategies.PlacementGroupSchedulingStrategy(
+                placement_group=pg
+            ),
         ).remote(
             model_base=model_base_ref,
             bagged_ensemble_model_path=self.bagged_ensemble_model.path,
@@ -723,7 +789,17 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
             model_sync_path=self.model_sync_path,
         )
 
-    def _update_bagged_ensemble(self, fold_model, pred_proba, time_start_fit, time_end_fit, predict_time, predict_1_time, predict_n_size, fold_ctx):
+    def _update_bagged_ensemble(
+        self,
+        fold_model,
+        pred_proba,
+        time_start_fit,
+        time_end_fit,
+        predict_time,
+        predict_1_time,
+        predict_n_size,
+        fold_ctx,
+    ):
         _, val_index = fold_ctx["fold"]
         self.models.append(fold_model)
         self.oof_pred_proba[val_index] += pred_proba
@@ -757,7 +833,9 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
             time_limit_fold = None
         return time_limit_fold
 
-    def _get_resource_suggestions(self, num_jobs: int, user_specified_num_folds_parallel: int, user_resources_per_job: dict) -> Tuple[dict, dict, int, int]:
+    def _get_resource_suggestions(
+        self, num_jobs: int, user_specified_num_folds_parallel: int, user_resources_per_job: dict
+    ) -> Tuple[dict, dict, int, int]:
         """
         Get resources per job, number of total batches, and number of jobs running in parallel for a single batch
         based on total number of jobs, user specified number of jobs to be run in parallel, and user specified resources per job.
@@ -766,7 +844,9 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         """
         user_specified_num_folds_parallel = min(num_jobs, user_specified_num_folds_parallel)
         model_min_resources = self._initialized_model_base.get_minimum_resources(is_gpu_available=(self.num_gpus > 0))
-        resources_calculator = ResourceCalculatorFactory.get_resource_calculator(calculator_type="cpu" if self.num_gpus == 0 else "gpu")
+        resources_calculator = ResourceCalculatorFactory.get_resource_calculator(
+            calculator_type="cpu" if self.num_gpus == 0 else "gpu"
+        )
         # use minimum resource to control number of jobs running in parallel
         min_cpu_per_job_based_on_num_folds_parallel = self.num_cpus // user_specified_num_folds_parallel
         min_gpu_per_job_based_on_num_folds_parallel = self.num_gpus / user_specified_num_folds_parallel
@@ -913,7 +993,9 @@ class ParallelDistributedFoldFittingStrategy(ParallelFoldFittingStrategy):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # Append bag model name in the path
-        self.model_sync_path = self.model_sync_path + os.path.basename(os.path.normpath(self.bagged_ensemble_model.path)) + "/"
+        self.model_sync_path = (
+            self.model_sync_path + os.path.basename(os.path.normpath(self.bagged_ensemble_model.path)) + "/"
+        )
 
     def _sync_model_artifact(self, local_path, model_sync_path):
         bucket, path = s3_path_to_bucket_prefix(model_sync_path)

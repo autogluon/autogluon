@@ -126,7 +126,9 @@ class AbstractModel:
             self.path_root = path_cur.rsplit(self.path_suffix, 1)[0]
             logger.log(20, f"Warning: No path was specified for model, defaulting to: {self.path_root}")
 
-        self.path = self.create_contexts(os.path.join(self.path_root, self.path_suffix))  # TODO: Make this path a function for consistency.
+        self.path = self.create_contexts(
+            os.path.join(self.path_root, self.path_suffix)
+        )  # TODO: Make this path a function for consistency.
 
         self.num_classes = None
         self.quantile_levels = None
@@ -137,7 +139,9 @@ class AbstractModel:
         self.conformalize = None
 
         if eval_metric is not None:
-            self.eval_metric = metrics.get_metric(eval_metric, self.problem_type, "eval_metric")  # Note: we require higher values = better performance
+            self.eval_metric = metrics.get_metric(
+                eval_metric, self.problem_type, "eval_metric"
+            )  # Note: we require higher values = better performance
         else:
             self.eval_metric = None
         self.stopping_metric = None
@@ -170,7 +174,10 @@ class AbstractModel:
 
     @classmethod
     def _init_user_params(
-        cls, params: Optional[Dict[str, Any]] = None, ag_args_fit: str = AG_ARGS_FIT, ag_arg_prefix: str = AG_ARG_PREFIX
+        cls,
+        params: Optional[Dict[str, Any]] = None,
+        ag_args_fit: str = AG_ARGS_FIT,
+        ag_arg_prefix: str = AG_ARG_PREFIX,
     ) -> (Dict[str, Any], Dict[str, Any]):
         """
         Given the user-specified hyperparameters, split into `params` and `params_aux`.
@@ -247,7 +254,9 @@ class AbstractModel:
         self.nondefault_params = []
         if hyperparameters is not None:
             self.params.update(hyperparameters)
-            self.nondefault_params = list(hyperparameters.keys())[:]  # These are hyperparameters that user has specified.
+            self.nondefault_params = list(hyperparameters.keys())[
+                :
+            ]  # These are hyperparameters that user has specified.
         self.params_trained = dict()
 
     def _init_params_aux(self):
@@ -494,8 +503,13 @@ class AbstractModel:
         else:
             features_to_drop_internal = None
         if features_to_drop_internal is not None:
-            logger.log(10, f"\tDropped {len(features_to_drop_internal)} of {len(self.features)} internal features: {features_to_drop_internal}")
-            self._features_internal = [feature for feature in self.features if feature not in features_to_drop_internal]
+            logger.log(
+                10,
+                f"\tDropped {len(features_to_drop_internal)} of {len(self.features)} internal features: {features_to_drop_internal}",
+            )
+            self._features_internal = [
+                feature for feature in self.features if feature not in features_to_drop_internal
+            ]
             self._feature_metadata = self.feature_metadata.keep_features(self._features_internal)
             self._is_features_in_same_as_ex = False
         else:
@@ -586,7 +600,9 @@ class AbstractModel:
                 20,
                 f"Model {self.name}'s eval_metric inferred to be '{self.eval_metric.name}' because problem_type='{self.problem_type}' and eval_metric was not specified during init.",
             )
-        self.eval_metric = metrics.get_metric(self.eval_metric, self.problem_type, "eval_metric")  # Note: we require higher values = better performance
+        self.eval_metric = metrics.get_metric(
+            self.eval_metric, self.problem_type, "eval_metric"
+        )  # Note: we require higher values = better performance
 
         self.stopping_metric = self.params_aux.get("stopping_metric", self._get_default_stopping_metric())
         self.stopping_metric = metrics.get_metric(self.stopping_metric, self.problem_type, "stopping_metric")
@@ -595,7 +611,9 @@ class AbstractModel:
 
         if self.eval_metric.name in OBJECTIVES_TO_NORMALIZE:
             self.normalize_pred_probas = True
-            logger.debug(f"{self.name} predicted probabilities will be transformed to never =0 since eval_metric='{self.eval_metric.name}'")
+            logger.debug(
+                f"{self.name} predicted probabilities will be transformed to never =0 since eval_metric='{self.eval_metric.name}'"
+            )
         else:
             self.normalize_pred_probas = False
 
@@ -607,25 +625,38 @@ class AbstractModel:
 
         # retrieve model level requirement when self is bagged model
         user_specified_model_level_resource = self._get_child_aux_val(key=resource_type, default=None)
-        if user_specified_model_level_resource is not None and not isinstance(user_specified_model_level_resource, (int, float)):
+        if user_specified_model_level_resource is not None and not isinstance(
+            user_specified_model_level_resource, (int, float)
+        ):
             raise TypeError(
                 f"{resource_type} must be int or float. Found: {type(user_specified_model_level_resource)} | Value: {user_specified_model_level_resource}"
             )
         if user_specified_model_level_resource is not None:
-            assert user_specified_model_level_resource <= system_resource, f"Specified {resource_type} per model base is more than the total: {system_resource}"
+            assert (
+                user_specified_model_level_resource <= system_resource
+            ), f"Specified {resource_type} per model base is more than the total: {system_resource}"
         user_specified_lower_level_resource = user_specified_ensemble_resource
         if user_specified_ensemble_resource is not None:
             if user_specified_model_level_resource is not None:
                 user_specified_lower_level_resource = min(
-                    user_specified_model_level_resource * k_fold, user_specified_ensemble_resource, system_resource, user_specified_total_resource
+                    user_specified_model_level_resource * k_fold,
+                    user_specified_ensemble_resource,
+                    system_resource,
+                    user_specified_total_resource,
                 )
         else:
             if user_specified_model_level_resource is not None:
-                user_specified_lower_level_resource = min(user_specified_model_level_resource * k_fold, system_resource, user_specified_total_resource)
+                user_specified_lower_level_resource = min(
+                    user_specified_model_level_resource * k_fold, system_resource, user_specified_total_resource
+                )
         return user_specified_lower_level_resource
 
     def _calculate_total_resources(
-        self, silent: bool = False, total_resources: Optional[Dict[str, Union[int, float]]] = None, parallel_hpo: bool = False, **kwargs
+        self,
+        silent: bool = False,
+        total_resources: Optional[Dict[str, Union[int, float]]] = None,
+        parallel_hpo: bool = False,
+        **kwargs,
     ) -> Dict[str, Any]:
         """
         Process user-specified total resources.
@@ -659,25 +690,33 @@ class AbstractModel:
             # pass all resources here by default
             default_num_cpus = system_num_cpus
             default_num_gpus = system_num_gpus if default_num_gpus > 0 else 0
-            user_specified_lower_level_num_cpus = self._process_user_provided_resource_requirement_to_calculate_total_resource_when_ensemble(
-                system_resource=system_num_cpus,
-                user_specified_total_resource=num_cpus,
-                user_specified_ensemble_resource=user_specified_lower_level_num_cpus,
-                resource_type="num_cpus",
-                k_fold=k_fold,
+            user_specified_lower_level_num_cpus = (
+                self._process_user_provided_resource_requirement_to_calculate_total_resource_when_ensemble(
+                    system_resource=system_num_cpus,
+                    user_specified_total_resource=num_cpus,
+                    user_specified_ensemble_resource=user_specified_lower_level_num_cpus,
+                    resource_type="num_cpus",
+                    k_fold=k_fold,
+                )
             )
-            user_specified_lower_level_num_gpus = self._process_user_provided_resource_requirement_to_calculate_total_resource_when_ensemble(
-                system_resource=system_num_gpus,
-                user_specified_total_resource=num_gpus,
-                user_specified_ensemble_resource=user_specified_lower_level_num_gpus,
-                resource_type="num_gpus",
-                k_fold=k_fold,
+            user_specified_lower_level_num_gpus = (
+                self._process_user_provided_resource_requirement_to_calculate_total_resource_when_ensemble(
+                    system_resource=system_num_gpus,
+                    user_specified_total_resource=num_gpus,
+                    user_specified_ensemble_resource=user_specified_lower_level_num_gpus,
+                    resource_type="num_gpus",
+                    k_fold=k_fold,
+                )
             )
         if num_cpus != "auto" and num_cpus > system_num_cpus:
-            logger.warning(f"Specified total num_cpus: {num_cpus}, but only {system_num_cpus} are available. Will use {system_num_cpus} instead")
+            logger.warning(
+                f"Specified total num_cpus: {num_cpus}, but only {system_num_cpus} are available. Will use {system_num_cpus} instead"
+            )
             num_cpus = system_num_cpus
         if num_gpus != "auto" and num_gpus > system_num_gpus:
-            logger.warning(f"Specified total num_gpus: {num_gpus}, but only {system_num_gpus} are available. Will use {system_num_gpus} instead")
+            logger.warning(
+                f"Specified total num_gpus: {num_gpus}, but only {system_num_gpus} are available. Will use {system_num_gpus} instead"
+            )
             num_gpus = system_num_gpus
         if num_cpus == "auto":
             if user_specified_lower_level_num_cpus is not None:
@@ -743,12 +782,18 @@ class AbstractModel:
         kwargs["num_cpus"] = num_cpus
         kwargs["num_gpus"] = num_gpus
         if not silent:
-            logger.log(15, f"\tFitting {self.name} with 'num_gpus': {kwargs['num_gpus']}, 'num_cpus': {kwargs['num_cpus']}")
+            logger.log(
+                15, f"\tFitting {self.name} with 'num_gpus': {kwargs['num_gpus']}, 'num_cpus': {kwargs['num_cpus']}"
+            )
 
         return kwargs
 
     def _preprocess_fit_resources(
-        self, silent: bool = False, total_resources: Optional[Dict[str, Union[int, float]]] = None, parallel_hpo: bool = False, **kwargs
+        self,
+        silent: bool = False,
+        total_resources: Optional[Dict[str, Union[int, float]]] = None,
+        parallel_hpo: bool = False,
+        **kwargs,
     ) -> Dict[str, Any]:
         """
         This function should be called to process user-specified total resources.
@@ -766,7 +811,12 @@ class AbstractModel:
             # They should always be set to valid values
             enforced_num_cpus = kwargs.get("num_cpus", None)
             enforced_num_gpus = kwargs.get("num_gpus", None)
-            assert enforced_num_cpus is not None and enforced_num_cpus != "auto" and enforced_num_gpus is not None and enforced_num_gpus != "auto"
+            assert (
+                enforced_num_cpus is not None
+                and enforced_num_cpus != "auto"
+                and enforced_num_gpus is not None
+                and enforced_num_gpus != "auto"
+            )
             # The logic below is needed because ray cluster is running some process in the backend even when it's ready to be used
             # Trying to use all cores on the machine could lead to resource contention situation
             # TODO: remove this logic if ray team can identify what's going on underneath and how to workaround
@@ -778,14 +828,18 @@ class AbstractModel:
             if DistributedContext.is_distributed_mode():
                 minimum_model_resources = self.get_minimum_resources(is_gpu_available=(enforced_num_gpus > 0))
                 minimum_model_num_cpus = minimum_model_resources.get("num_cpus", 1)
-                enforced_num_cpus = max(minimum_model_num_cpus, enforced_num_cpus - 2)  # leave some cpu resources for process running by cluster nodes
+                enforced_num_cpus = max(
+                    minimum_model_num_cpus, enforced_num_cpus - 2
+                )  # leave some cpu resources for process running by cluster nodes
             if max_num_cpus is not None:
                 enforced_num_cpus = min(max_num_cpus, enforced_num_cpus)
             kwargs["num_cpus"] = enforced_num_cpus
             kwargs["num_gpus"] = enforced_num_gpus
             return kwargs
 
-        return self._calculate_total_resources(silent=silent, total_resources=total_resources, parallel_hpo=parallel_hpo, **kwargs)
+        return self._calculate_total_resources(
+            silent=silent, total_resources=total_resources, parallel_hpo=parallel_hpo, **kwargs
+        )
 
     def _register_fit_metadata(self, **kwargs):
         """
@@ -875,7 +929,9 @@ class AbstractModel:
         )  # FIXME: This might have to go before self._preprocess_fit_args, but then time_limit might be incorrect in **kwargs init to initialize
         kwargs = self._preprocess_fit_args(**kwargs)
         if "time_limit" in kwargs and kwargs["time_limit"] is not None and kwargs["time_limit"] <= 0:
-            logger.warning(f'\tWarning: Model has no time left to train, skipping model... (Time Left = {kwargs["time_limit"]:.1f}s)')
+            logger.warning(
+                f'\tWarning: Model has no time left to train, skipping model... (Time Left = {kwargs["time_limit"]:.1f}s)'
+            )
             raise TimeLimitExceeded
 
         self._register_fit_metadata(**kwargs)
@@ -898,7 +954,12 @@ class AbstractModel:
         Returns self
         """
         predict_1_batch_size = self.params_aux.get("predict_1_batch_size", None)
-        if self.predict_1_time is None and predict_1_batch_size is not None and "X" in kwargs and kwargs["X"] is not None:
+        if (
+            self.predict_1_time is None
+            and predict_1_batch_size is not None
+            and "X" in kwargs
+            and kwargs["X"] is not None
+        ):
             X_1 = sample_df_for_time_func(df=kwargs["X"], sample_size=predict_1_batch_size)
             self.predict_1_time = time_func(f=self.predict, args=[X_1]) / len(X_1)
         return self
@@ -1196,7 +1257,9 @@ class AbstractModel:
         features_to_check = [feature for feature in features if feature not in banned_features]
 
         if features_to_check:
-            fi_df = self._compute_permutation_importance(X=X, y=y, features=features_to_check, silent=silent, importance_as_list=importance_as_list, **kwargs)
+            fi_df = self._compute_permutation_importance(
+                X=X, y=y, features=features_to_check, silent=silent, importance_as_list=importance_as_list, **kwargs
+            )
             n = fi_df.iloc[0]["n"] if len(fi_df) > 0 else 1
         else:
             fi_df = None
@@ -1204,10 +1267,14 @@ class AbstractModel:
 
         if importance_as_list:
             banned_importance = [0] * n
-            results_banned = pd.Series(data=[banned_importance for _ in range(len(banned_features))], index=banned_features, dtype="object")
+            results_banned = pd.Series(
+                data=[banned_importance for _ in range(len(banned_features))], index=banned_features, dtype="object"
+            )
         else:
             banned_importance = 0
-            results_banned = pd.Series(data=[banned_importance for _ in range(len(banned_features))], index=banned_features, dtype="float64")
+            results_banned = pd.Series(
+                data=[banned_importance for _ in range(len(banned_features))], index=banned_features, dtype="float64"
+            )
 
         results_banned_df = results_banned.to_frame(name="importance")
         results_banned_df["stddev"] = 0
@@ -1370,7 +1437,8 @@ class AbstractModel:
         if not compiler_cls.can_compile():
             if not compiler_fallback_to_native:
                 raise AssertionError(
-                    f"Specified compiler ({compiler}) is unable to compile" ' (potentially lacking dependencies) and "compiler_fallback_to_native==False"'
+                    f"Specified compiler ({compiler}) is unable to compile"
+                    ' (potentially lacking dependencies) and "compiler_fallback_to_native==False"'
                 )
             compiler_cls = self._default_compiler()
         return compiler_cls
@@ -1451,7 +1519,9 @@ class AbstractModel:
             params["hyperparameters"][AG_ARGS_FIT] = dict()
 
         # Increase memory limit by 25% to avoid memory restrictions during fit
-        params["hyperparameters"][AG_ARGS_FIT]["max_memory_usage_ratio"] = params["hyperparameters"][AG_ARGS_FIT].get("max_memory_usage_ratio", 1.0) * 1.25
+        params["hyperparameters"][AG_ARGS_FIT]["max_memory_usage_ratio"] = (
+            params["hyperparameters"][AG_ARGS_FIT].get("max_memory_usage_ratio", 1.0) * 1.25
+        )
 
         params["hyperparameters"].update(self.params_trained)
         params["name"] = params["name"] + REFIT_FULL_SUFFIX
@@ -1459,7 +1529,9 @@ class AbstractModel:
 
         return template
 
-    def hyperparameter_tune(self, hyperparameter_tune_kwargs="auto", hpo_executor: HpoExecutor = None, time_limit: float = None, **kwargs):
+    def hyperparameter_tune(
+        self, hyperparameter_tune_kwargs="auto", hpo_executor: HpoExecutor = None, time_limit: float = None, **kwargs
+    ):
         """
         Perform hyperparameter tuning of the model, fitting multiple variants of the model based on the search space provided in `hyperparameters` during init.
 
@@ -1519,7 +1591,9 @@ class AbstractModel:
         if hpo_executor is None:
             hpo_executor = self._get_default_hpo_executor()
             default_num_trials = kwargs.pop("default_num_trials", None)
-            hpo_executor.initialize(hyperparameter_tune_kwargs, default_num_trials=default_num_trials, time_limit=time_limit)
+            hpo_executor.initialize(
+                hyperparameter_tune_kwargs, default_num_trials=default_num_trials, time_limit=time_limit
+            )
         kwargs = self.initialize(time_limit=time_limit, **kwargs)
         self._register_fit_metadata(**kwargs)
         self._validate_fit_memory_usage(**kwargs)
@@ -1564,7 +1638,9 @@ class AbstractModel:
         # We set soft time limit to avoid trials being terminated directly by ray tune
         trial_soft_time_limit = None
         if hpo_executor.time_limit is not None:
-            trial_soft_time_limit = max(hpo_executor.time_limit * 0.9, hpo_executor.time_limit - 5)  # 5 seconds max for buffer
+            trial_soft_time_limit = max(
+                hpo_executor.time_limit * 0.9, hpo_executor.time_limit - 5
+            )  # 5 seconds max for buffer
 
         fit_kwargs = dict()
         fit_kwargs["feature_metadata"] = self.feature_metadata
@@ -1584,7 +1660,9 @@ class AbstractModel:
         model_estimate_memory_usage = None
         if self.estimate_memory_usage is not None:
             model_estimate_memory_usage = self.estimate_memory_usage(X=X, **kwargs)
-        minimum_resources = self.get_minimum_resources(is_gpu_available=(hpo_executor.resources.get("num_gpus", 0) > 0))
+        minimum_resources = self.get_minimum_resources(
+            is_gpu_available=(hpo_executor.resources.get("num_gpus", 0) > 0)
+        )
         # This explicitly tells ray.Tune to not change the working directory
         # to the trial directory, giving access to paths relative to
         # the original working directory.
@@ -1621,7 +1699,9 @@ class AbstractModel:
         return CUSTOM_BACKEND
 
     def _get_default_hpo_executor(self) -> HpoExecutor:
-        backend = self._get_model_base()._get_hpo_backend()  # If ensemble, will use the base model to determine backend
+        backend = (
+            self._get_model_base()._get_hpo_backend()
+        )  # If ensemble, will use the base model to determine backend
         if backend == RAY_BACKEND:
             try:
                 try_import_ray()
@@ -1707,22 +1787,30 @@ class AbstractModel:
         Verifies that the provided num_cpus and num_gpus (or defaults if not provided) are sufficient to train the model.
         Raises an AssertionError if not sufficient.
         """
-        resources = self._preprocess_fit_resources(num_cpus=num_cpus, num_gpus=num_gpus, total_resources=total_resources, silent=True)
+        resources = self._preprocess_fit_resources(
+            num_cpus=num_cpus, num_gpus=num_gpus, total_resources=total_resources, silent=True
+        )
         self._validate_fit_resources(**resources)
 
     def _validate_fit_resources(self, **resources):
         res_min = self.get_minimum_resources()
         for resource_name in res_min:
             if resource_name not in resources:
-                raise AssertionError(f"Model requires {res_min[resource_name]} {resource_name} to fit, but no available amount was defined.")
+                raise AssertionError(
+                    f"Model requires {res_min[resource_name]} {resource_name} to fit, but no available amount was defined."
+                )
             elif res_min[resource_name] > resources[resource_name]:
-                raise AssertionError(f"Model requires {res_min[resource_name]} {resource_name} to fit, but {resources[resource_name]} are available.")
+                raise AssertionError(
+                    f"Model requires {res_min[resource_name]} {resource_name} to fit, but {resources[resource_name]} are available."
+                )
         total_resources = resources.get("total_resources", None)
         if total_resources is None:
             total_resources = {}
         for resource_name, resource_value in total_resources.items():
             if resources[resource_name] > resource_value:
-                raise AssertionError(f"Specified {resources[resource_name]} {resource_name} to fit, but only {resource_value} are available in total.")
+                raise AssertionError(
+                    f"Specified {resources[resource_name]} {resource_name} to fit, but only {resource_value} are available in total."
+                )
 
     def get_minimum_resources(self, is_gpu_available: bool = False) -> Dict[str, Union[int, float]]:
         """
@@ -1803,7 +1891,9 @@ class AbstractModel:
 
         if approx_mem_size_req is None:
             approx_mem_size_req = self.estimate_memory_usage(**kwargs)
-        if mem_size_threshold is not None and approx_mem_size_req < (mem_size_threshold * min(max_memory_usage_ratio, 1)):
+        if mem_size_threshold is not None and approx_mem_size_req < (
+            mem_size_threshold * min(max_memory_usage_ratio, 1)
+        ):
             return  # Model is smaller than the min threshold to check available mem
 
         if available_mem is None:
@@ -1854,7 +1944,9 @@ class AbstractModel:
                 )
             logger.warning(f"\tWarning: Potentially not enough memory to safely train model. {log_user_guideline}")
 
-    def reduce_memory_size(self, remove_fit: bool = True, remove_info: bool = False, requires_save: bool = True, **kwargs):
+    def reduce_memory_size(
+        self, remove_fit: bool = True, remove_info: bool = False, requires_save: bool = True, **kwargs
+    ):
         """
         Removes non-essential objects from the model to reduce memory and disk footprint.
         If `remove_fit=True`, enables the removal of variables which are required for fitting the model. If the model is already fully trained, then it is safe to remove these.

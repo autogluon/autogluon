@@ -71,7 +71,9 @@ class TestInferProblemType(unittest.TestCase):
         assert inferred_problem_type == REGRESSION
 
     def test_infer_problem_type_small_integer_data_multiclass(self):
-        small_integer_multiclass_series = pd.Series(np.repeat(np.arange(3), MULTICLASS_UPPER_LIMIT - 1), dtype=np.int64)
+        small_integer_multiclass_series = pd.Series(
+            np.repeat(np.arange(3), MULTICLASS_UPPER_LIMIT - 1), dtype=np.int64
+        )
         inferred_problem_type = infer_problem_type(small_integer_multiclass_series)
         assert inferred_problem_type == MULTICLASS
 
@@ -92,7 +94,9 @@ def test_generate_train_test_split_edgecase():
         """
         Normal Case: Regression should always work
         """
-        X_train, X_test, y_train, y_test = generate_train_test_split(X=data, y=data["label"], problem_type="regression", test_size=test_size)
+        X_train, X_test, y_train, y_test = generate_train_test_split(
+            X=data, y=data["label"], problem_type="regression", test_size=test_size
+        )
         assert len(X_train) == len(y_train)
         assert list(X_train.index) == list(y_train.index)
         assert len(X_test) == len(y_test)
@@ -105,7 +109,9 @@ def test_generate_train_test_split_edgecase():
         Edge-case: There are fewer test rows than classes
          This only works because of special try/except logic in `generate_train_test_split`.
         """
-        X_train, X_test, y_train, y_test = generate_train_test_split(X=data, y=data["label"], problem_type="multiclass", test_size=test_size)
+        X_train, X_test, y_train, y_test = generate_train_test_split(
+            X=data, y=data["label"], problem_type="multiclass", test_size=test_size
+        )
         assert len(X_train) == len(y_train)
         assert list(X_train.index) == list(y_train.index)
         assert len(X_test) == len(y_test)
@@ -117,7 +123,9 @@ def test_generate_train_test_split_edgecase():
         """
         Normal Case
         """
-        X_train, X_test, y_train, y_test = generate_train_test_split(X=data, y=data["label"], problem_type="multiclass", test_size=test_size)
+        X_train, X_test, y_train, y_test = generate_train_test_split(
+            X=data, y=data["label"], problem_type="multiclass", test_size=test_size
+        )
         assert len(X_train) == len(y_train)
         assert list(X_train.index) == list(y_train.index)
         assert len(X_test) == len(y_test)
@@ -132,4 +140,6 @@ def test_generate_train_test_split_edgecase():
         Note: Ideally this shouldn't raise an exception, but writing the logic to avoid the error is tricky and the scenario should never occur in practice.
         """
         with pytest.raises(ValueError):
-            X_train, X_test, y_train, y_test = generate_train_test_split(X=data, y=data["label"], problem_type="multiclass", test_size=test_size)
+            X_train, X_test, y_train, y_test = generate_train_test_split(
+                X=data, y=data["label"], problem_type="multiclass", test_size=test_size
+            )

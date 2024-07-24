@@ -52,7 +52,12 @@ class HpoExecutor(ABC):
         self._time_limit = value
 
     @abstractmethod
-    def initialize(self, hyperparameter_tune_kwargs: Union[str, dict], default_num_trials: Optional[int] = None, time_limit: Optional[float] = None):
+    def initialize(
+        self,
+        hyperparameter_tune_kwargs: Union[str, dict],
+        default_num_trials: Optional[int] = None,
+        time_limit: Optional[float] = None,
+    ):
         """
         Parse `hyperparameter_tune_kwargs` and initialize the executor
 
@@ -68,7 +73,14 @@ class HpoExecutor(ABC):
         """
         raise NotImplementedError
 
-    def register_resources(self, initialized_model: AbstractModel, num_cpus: int, num_gpus: Union[int, float], k_fold: Optional[int] = None, **kwargs):
+    def register_resources(
+        self,
+        initialized_model: AbstractModel,
+        num_cpus: int,
+        num_gpus: Union[int, float],
+        k_fold: Optional[int] = None,
+        **kwargs,
+    ):
         """
         Register total resources used for the experiment, and calculate resources per trial if user specified.
         User specified resources per trial will be validated against total resources and minimum resources required, and respected directly if legit.
@@ -96,20 +108,31 @@ class HpoExecutor(ABC):
         minimum_model_num_gpus = minimum_model_resources.get("num_gpus", 0)
         initialized_model_params = initialized_model.get_params()
 
-        if "hyperparameters" in initialized_model_params and "ag_args_fit" in initialized_model_params["hyperparameters"]:
-            user_specified_trial_num_cpus = initialized_model_params["hyperparameters"]["ag_args_fit"].get("num_cpus", None)
-            user_specified_trial_num_gpus = initialized_model_params["hyperparameters"]["ag_args_fit"].get("num_gpus", None)
+        if (
+            "hyperparameters" in initialized_model_params
+            and "ag_args_fit" in initialized_model_params["hyperparameters"]
+        ):
+            user_specified_trial_num_cpus = initialized_model_params["hyperparameters"]["ag_args_fit"].get(
+                "num_cpus", None
+            )
+            user_specified_trial_num_gpus = initialized_model_params["hyperparameters"]["ag_args_fit"].get(
+                "num_gpus", None
+            )
             if user_specified_trial_num_cpus is not None or user_specified_trial_num_gpus is not None:
                 num_trials_in_parallel_with_gpu = math.inf
                 if user_specified_trial_num_cpus is None:
                     # If user didn't specify cpu per trial, we find the min based on gpu
                     num_trials_in_parallel_with_gpu = num_gpus // user_specified_trial_num_gpus
-                    user_specified_trial_num_cpus = num_cpus // num_trials_in_parallel_with_gpu  # keep gpus per trial int to avoid complexity
+                    user_specified_trial_num_cpus = (
+                        num_cpus // num_trials_in_parallel_with_gpu
+                    )  # keep gpus per trial int to avoid complexity
                 num_trials_in_parallel_with_cpu = math.inf
                 if user_specified_trial_num_gpus is None:
                     # If user didn't specify gpu per trial, we find the min based on cpu
                     num_trials_in_parallel_with_cpu = num_cpus // user_specified_trial_num_cpus
-                    user_specified_trial_num_gpus = num_gpus // num_trials_in_parallel_with_cpu  # keep gpus per trial int to avoid complexity
+                    user_specified_trial_num_gpus = (
+                        num_gpus // num_trials_in_parallel_with_cpu
+                    )  # keep gpus per trial int to avoid complexity
                 assert (
                     user_specified_trial_num_cpus <= num_cpus
                 ), f"Detected trial level cpu requirement = {user_specified_trial_num_cpus} > total cpu granted to AG predictor = {num_cpus}"
@@ -124,7 +147,10 @@ class HpoExecutor(ABC):
                 ), f"The trial requires minimum gpu {minimum_model_num_gpus}, but you only specified {user_specified_trial_num_gpus}"
 
                 # Custom backend should set its total resource to be resources_per_trial
-                self.hyperparameter_tune_kwargs["resources_per_trial"] = {"num_cpus": user_specified_trial_num_cpus, "num_gpus": user_specified_trial_num_gpus}
+                self.hyperparameter_tune_kwargs["resources_per_trial"] = {
+                    "num_cpus": user_specified_trial_num_cpus,
+                    "num_gpus": user_specified_trial_num_gpus,
+                }
 
         model_base = initialized_model._get_model_base()
         if model_base != initialized_model:
@@ -136,7 +162,9 @@ class HpoExecutor(ABC):
                 total_num_cpus_per_trial = resources_per_trial.get("num_cpus")
                 total_num_gpus_per_trial = resources_per_trial.get("num_gpus")
             user_specified_fold_resources = model_base._user_params_aux
-            user_specified_fold_num_cpus = user_specified_fold_resources.get("num_cpus", None)  # We shouldn't always use it
+            user_specified_fold_num_cpus = user_specified_fold_resources.get(
+                "num_cpus", None
+            )  # We shouldn't always use it
             user_specified_fold_num_gpus = user_specified_fold_resources.get("num_gpus", None)
             if user_specified_fold_num_cpus is not None or user_specified_fold_num_gpus is not None:
                 num_folds_in_parallel_with_cpu = math.inf
@@ -168,7 +196,10 @@ class HpoExecutor(ABC):
                 gpu_per_trial = user_specified_fold_num_gpus * min(k_fold, num_folds_in_parallel)
 
                 # Custom backend should set its total resource to be resources_per_trial
-                self.hyperparameter_tune_kwargs["resources_per_trial"] = {"num_cpus": cpu_per_trial, "num_gpus": gpu_per_trial}
+                self.hyperparameter_tune_kwargs["resources_per_trial"] = {
+                    "num_cpus": cpu_per_trial,
+                    "num_gpus": gpu_per_trial,
+                }
         if "resources_per_trial" not in self.hyperparameter_tune_kwargs:
             # User didn't provide any requirements
             num_jobs_in_parallel_with_mem = math.inf
@@ -182,7 +213,9 @@ class HpoExecutor(ABC):
             num_jobs_in_parallel_with_gpu = math.inf
             if minimum_model_num_gpus > 0:
                 num_jobs_in_parallel_with_gpu = num_gpus // minimum_model_num_gpus
-            num_jobs_in_parallel = min(num_jobs_in_parallel_with_mem, num_jobs_in_parallel_with_cpu, num_jobs_in_parallel_with_gpu)
+            num_jobs_in_parallel = min(
+                num_jobs_in_parallel_with_mem, num_jobs_in_parallel_with_cpu, num_jobs_in_parallel_with_gpu
+            )
             if k_fold is not None and k_fold > 0:
                 max_models = self.hyperparameter_tune_kwargs.get("num_trials", math.inf) * k_fold
                 num_jobs_in_parallel = min(num_jobs_in_parallel, max_models)
@@ -212,7 +245,10 @@ class HpoExecutor(ABC):
             cpu_per_trial = min(cpu_per_trial, system_num_cpu)
             gpu_per_trial = min(gpu_per_trial, system_num_gpu)
 
-            self.hyperparameter_tune_kwargs["resources_per_trial"] = {"num_cpus": cpu_per_trial, "num_gpus": gpu_per_trial}
+            self.hyperparameter_tune_kwargs["resources_per_trial"] = {
+                "num_cpus": cpu_per_trial,
+                "num_gpus": gpu_per_trial,
+            }
 
         self.resources = dict(num_gpus=num_gpus, num_cpus=num_cpus)
 
@@ -234,7 +270,9 @@ class HpoExecutor(ABC):
         """
         raise NotImplementedError
 
-    def prepare_data(self, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame, y_val: pd.Series, path_prefix: str) -> Tuple[str, str]:
+    def prepare_data(
+        self, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame, y_val: pd.Series, path_prefix: str
+    ) -> Tuple[str, str]:
         """
         Prepare data as pickle files for hpo trials.
         If path_prefix is a s3 url, will store to s3. Otherwise, store in local disk
@@ -347,7 +385,8 @@ class RayHpoExecutor(HpoExecutor):
 
         if not any(isinstance(search_space[hyperparam], (space.Space, Domain)) for hyperparam in search_space):
             logger.warning(
-                f"\tNo hyperparameter search space specified for {model_name}. Skipping HPO. " f"Will train one model based on the provided hyperparameters."
+                f"\tNo hyperparameter search space specified for {model_name}. Skipping HPO. "
+                f"Will train one model based on the provided hyperparameters."
             )
             raise EmptySearchSpace
         self.search_space = search_space
@@ -486,7 +525,9 @@ class CustomHpoExecutor(HpoExecutor):
             num_trials = default_num_trials  # This will be ignored if hyperparameter_tune_kwargs contains num_trials
             if default_num_trials is None:
                 num_trials = 1 if time_limit is None else 1000
-            hyperparameter_tune_kwargs = scheduler_factory(hyperparameter_tune_kwargs, num_trials=num_trials, nthreads_per_trial="auto", ngpus_per_trial="auto")
+            hyperparameter_tune_kwargs = scheduler_factory(
+                hyperparameter_tune_kwargs, num_trials=num_trials, nthreads_per_trial="auto", ngpus_per_trial="auto"
+            )
             hyperparameter_tune_kwargs = copy.deepcopy(hyperparameter_tune_kwargs)
             if "time_out" not in hyperparameter_tune_kwargs[1]:
                 hyperparameter_tune_kwargs[1]["time_out"] = time_limit
@@ -502,12 +543,15 @@ class CustomHpoExecutor(HpoExecutor):
         if self.hyperparameter_tune_kwargs.get("resources_per_trial", None) is not None:
             # Custom backend only run trials sequentially
             self.scheduler_options[1]["resource"] = self.hyperparameter_tune_kwargs["resources_per_trial"]
-        logger.debug(f"custom backend resource: {self.resources}, per trial resource: {self.hyperparameter_tune_kwargs}")
+        logger.debug(
+            f"custom backend resource: {self.resources}, per trial resource: {self.hyperparameter_tune_kwargs}"
+        )
 
     def validate_search_space(self, search_space, model_name):
         if not any(isinstance(search_space[hyperparam], space.Space) for hyperparam in search_space):
             logger.warning(
-                f"\tNo hyperparameter search space specified for {model_name}. Skipping HPO. " f"Will train one model based on the provided hyperparameters."
+                f"\tNo hyperparameter search space specified for {model_name}. Skipping HPO. "
+                f"Will train one model based on the provided hyperparameters."
             )
             raise EmptySearchSpace
         self.search_space = search_space
@@ -522,7 +566,9 @@ class CustomHpoExecutor(HpoExecutor):
         if scheduler_cls is None or scheduler_params is None:
             raise ValueError("scheduler_cls and scheduler_params cannot be None for hyperparameter tuning")
         train_fn_kwargs["fit_kwargs"].update(scheduler_params["resource"].copy())
-        scheduler = scheduler_cls(model_trial, search_space=self.search_space, train_fn_kwargs=train_fn_kwargs, **scheduler_params)
+        scheduler = scheduler_cls(
+            model_trial, search_space=self.search_space, train_fn_kwargs=train_fn_kwargs, **scheduler_params
+        )
         self.scheduler = scheduler
 
         scheduler.run()
@@ -557,7 +603,10 @@ class CustomHpoExecutor(HpoExecutor):
             if trial_reward is None or trial_reward == float("-inf"):
                 continue
             hpo_models[trial_model_name] = dict(
-                path=trial_model_path, val_score=trial_reward, trial=trial, hyperparameters=hpo_results["config_history"][trial]
+                path=trial_model_path,
+                val_score=trial_reward,
+                trial=trial,
+                hyperparameters=hpo_results["config_history"][trial],
             )
 
             hpo_model_performances[trial_model_name] = trial_reward
