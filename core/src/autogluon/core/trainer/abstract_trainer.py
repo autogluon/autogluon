@@ -812,7 +812,7 @@ class AbstractTrainer:
         X,
         y,
         base_model_names: List[str],
-        level,
+        level: int | str = "auto",
         fit=True,
         stack_name="aux1",
         time_limit=None,
@@ -841,6 +841,15 @@ class AbstractTrainer:
         if len(base_model_names) == 0:
             logger.log(20, f"No base models to train on, skipping auxiliary stack level {level}...")
             return []
+
+        if isinstance(level, str):
+            assert level == "auto", f"level must be 'auto' if str, found: {level}"
+            levels_dict = self.get_models_attribute_dict(attribute="level", models=base_model_names)
+            base_model_level_max = None
+            for k, v in levels_dict.items():
+                if base_model_level_max is None or v > base_model_level_max:
+                    base_model_level_max = v
+            level = base_model_level_max + 1
 
         if infer_limit_batch_size is not None:
             ag_args_fit = dict()
