@@ -53,6 +53,8 @@ def get_approximate_df_mem_usage(df: DataFrame, sample_ratio=0.2):
                 )
         if columns_inexact:
             # this line causes NumExpr log, suspend_logging is used to hide the log.
-            memory_usage_inexact = df[columns_inexact].head(num_rows_sample).memory_usage(deep=True)[columns_inexact] / sample_ratio
+            memory_usage_inexact = (
+                df[columns_inexact].head(num_rows_sample).memory_usage(deep=True)[columns_inexact] / sample_ratio
+            )
             memory_usage = memory_usage_inexact.combine_first(memory_usage)
         return memory_usage

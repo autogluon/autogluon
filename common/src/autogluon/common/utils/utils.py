@@ -24,7 +24,9 @@ LITE_MODE: bool = __lite__ is not None and __lite__
 
 def setup_outputdir(path, warn_if_exist=True, create_dir=True, path_suffix=None):
     if path:
-        assert isinstance(path, (str, Path)), f"Only str and pathlib.Path types are supported for path, got {path} of type {type(path)}."
+        assert isinstance(
+            path, (str, Path)
+        ), f"Only str and pathlib.Path types are supported for path, got {path} of type {type(path)}."
     if path_suffix is None:
         path_suffix = ""
     if path_suffix and path_suffix[-1] == os.path.sep:
@@ -56,7 +58,9 @@ def setup_outputdir(path, warn_if_exist=True, create_dir=True, path_suffix=None)
             elif os.path.isdir(path):
                 raise FileExistsError
         except FileExistsError:
-            logger.warning(f'Warning: path already exists! This predictor may overwrite an existing predictor! path="{path}"')
+            logger.warning(
+                f'Warning: path already exists! This predictor may overwrite an existing predictor! path="{path}"'
+            )
     path = os.path.expanduser(path)  # replace ~ with absolute path if it exists
     return path
 

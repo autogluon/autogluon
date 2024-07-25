@@ -155,11 +155,19 @@ def test_drop_duplicates_numeric_edge_cases(generator_helper):
 
     og_feature_metadata_in = FeatureMetadata.from_df(df).to_dict(inverse=True)
 
-    expected_og_feature_metadata_in = {("float", ()): ["C", "D", "H", "I", "J"], ("int", ()): ["A", "E", "F", "G"], ("object", ()): ["B"]}
+    expected_og_feature_metadata_in = {
+        ("float", ()): ["C", "D", "H", "I", "J"],
+        ("int", ()): ["A", "E", "F", "G"],
+        ("object", ()): ["B"],
+    }
 
     assert expected_og_feature_metadata_in == og_feature_metadata_in
 
-    expected_feature_metadata_in_full = {("float", ()): ["C", "I"], ("int", ()): ["A", "E", "F"], ("object", ()): ["B"]}
+    expected_feature_metadata_in_full = {
+        ("float", ()): ["C", "I"],
+        ("int", ()): ["A", "E", "F"],
+        ("object", ()): ["B"],
+    }
 
     expected_feature_metadata_full = {("float", ()): ["C", "I"], ("int", ()): ["A", "E", "F"], ("object", ()): ["B"]}
 
