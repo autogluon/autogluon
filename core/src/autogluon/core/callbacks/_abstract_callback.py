@@ -22,6 +22,7 @@ class AbstractCallback(object, metaclass=ABCMeta):
     >>> label = 'class'
     >>> predictor = TabularPredictor(label=label).fit(train_data, callbacks=callbacks)
     """
+
     def __init__(
         self,
         allow_recursive_calls: bool = False,
