@@ -11,6 +11,8 @@ class AbstractCallback(object, metaclass=ABCMeta):
     Abstract callback class for AutoGluon's TabularPredictor.
     The inner API and logic within `trainer` is considered private API. It may change without warning between releases.
 
+    # TODO: Docstring for init args
+
     Examples
     --------
     >>> from autogluon.core.callbacks import ExampleCallback
@@ -20,8 +22,17 @@ class AbstractCallback(object, metaclass=ABCMeta):
     >>> label = 'class'
     >>> predictor = TabularPredictor(label=label).fit(train_data, callbacks=callbacks)
     """
+    def __init__(
+        self,
+        allow_recursive_calls: bool = False,
+        skip_if_trainer_stopped: bool = False,
+    ):
+        assert isinstance(allow_recursive_calls, bool)
+        assert isinstance(skip_if_trainer_stopped, bool)
+        self.allow_recursive_calls = allow_recursive_calls
+        self.skip_if_trainer_stopped = skip_if_trainer_stopped
+        self._skip = False
 
-    @abstractmethod
     def before_fit(
         self,
         trainer: AbstractTrainer,
@@ -65,9 +76,34 @@ class AbstractCallback(object, metaclass=ABCMeta):
             if False, the trainer continues with its normal logic.
             Ignored if `early_stop=True`.
         """
-        raise NotImplementedError
+        if self._skip or (self.skip_if_trainer_stopped and trainer._callback_early_stop):
+            return False, False
+        if not self.allow_recursive_calls:
+            self._skip = True
+        early_stop, skip_model = self._before_fit(
+            trainer=trainer,
+            model=model,
+            logger=logger,
+            time_limit=time_limit,
+            stack_name=stack_name,
+            level=level,
+        )
+        if not self.allow_recursive_calls:
+            self._skip = False
+        return early_stop, skip_model
 
     @abstractmethod
+    def _before_fit(
+        self,
+        trainer: AbstractTrainer,
+        model: AbstractModel,
+        logger: Logger,
+        time_limit: float | None = None,
+        stack_name: str = "core",
+        level: int = 1,
+    ) -> Tuple[bool, bool]:
+        raise NotImplementedError
+
     def after_fit(
         self,
         trainer: AbstractTrainer,
@@ -108,4 +144,28 @@ class AbstractCallback(object, metaclass=ABCMeta):
             If True, the trainer stops training additional models and ends the fit process immediately.
             If False, the trainer continues with its normal logic.
         """
+        if self._skip or (self.skip_if_trainer_stopped and trainer._callback_early_stop):
+            return False
+        if not self.allow_recursive_calls:
+            self._skip = True
+        early_stop = self._after_fit(
+            trainer=trainer,
+            model_names=model_names,
+            logger=logger,
+            stack_name=stack_name,
+            level=level,
+        )
+        if not self.allow_recursive_calls:
+            self._skip = False
+        return early_stop
+
+    @abstractmethod
+    def _after_fit(
+        self,
+        trainer: AbstractTrainer,
+        model_names: List[str],
+        logger: Logger,
+        stack_name: str = "core",
+        level: int = 1,
+    ) -> bool:
         raise NotImplementedError

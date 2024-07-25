@@ -14,7 +14,7 @@ class ExampleCallback(AbstractCallback):
     Example callback showcasing how to access and log information from the trainer.
     """
 
-    def before_fit(
+    def _before_fit(
         self,
         trainer: AbstractTrainer,
         model: AbstractModel,
@@ -49,7 +49,7 @@ class ExampleCallback(AbstractCallback):
 
         return False, False
 
-    def after_fit(
+    def _after_fit(
         self,
         trainer: AbstractTrainer,
         logger: Logger,
