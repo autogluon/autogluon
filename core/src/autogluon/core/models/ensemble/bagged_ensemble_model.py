@@ -490,7 +490,15 @@ class BaggedEnsembleModel(AbstractModel):
             pred_proba_list.append((job_refs_map[finished[0]], ray.get(finished[0])))
 
         pred_proba_list = [r for _, r in sorted(pred_proba_list, key=lambda x: x[0])]
-        pred_proba = np.sum(pred_proba_list, axis=0) / self.n_children
+        try:
+            pred_proba = np.sum(pred_proba_list, axis=0) / self.n_children
+        except Exception:
+            logger.warning("Bagged Model Parallel Predict failed, likely due to a Ray Buffer bug. Fixing it.")
+            pred_proba_list = [
+                r if isinstance(r, np.ndarray) else np.frombuffer(r[b"data"], dtype=r[b"type"]).reshape(r[b"shape"])
+                for r in pred_proba_list
+            ]
+            pred_proba = np.sum(pred_proba_list, axis=0) / self.n_children
 
         ray.internal.free(object_refs=[self_ref, X_ref])
         del self_ref, X_ref
@@ -1468,6 +1476,6 @@ class BaggedEnsembleModel(AbstractModel):
         return self._get_model_base()._get_tags()
 
 
-def _func_remote_pred_proba(*, _self, model_name, X, normalize):
+def _func_remote_pred_proba(*, _self, model_name, X, normalize) -> np.ndarray:
     model = _self.load_child(model_name)
     return model.predict_proba(X=X, preprocess_nonadaptive=False, normalize=normalize)
