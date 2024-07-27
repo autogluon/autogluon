@@ -1375,7 +1375,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             prefix = "model."
 
         if best_k_models:
-            if top_k_average_method == UNIFORM_SOUP:
+            if True: # top_k_average_method == UNIFORM_SOUP: # force this as bug with eval below for multiclass
                 logger.info(f"Start to fuse {len(best_k_models)} checkpoints via the uniform soup algorithm.")
                 ingredients = top_k_model_paths = list(best_k_models.keys())
             else:

@@ -34,6 +34,7 @@ from .constants import (
     REGRESSION,
     RMSE,
     ROC_AUC,
+    LOG_LOSS,
     ROIS,
     SEMANTIC_SEGMENTATION,
     SM,
@@ -158,8 +159,8 @@ PROBLEM_TYPES_REG.register(
         supported_label_type={CATEGORICAL},
         is_classification=True,
         _supported_evaluation_metrics=METRICS[MULTICLASS].keys(),
-        _fallback_evaluation_metric=ACCURACY,
-        _fallback_validation_metric=ACCURACY,
+        _fallback_evaluation_metric=LOG_LOSS,
+        _fallback_validation_metric=LOG_LOSS,
     ),
 )
 
@@ -282,7 +283,7 @@ PROBLEM_TYPES_REG.register(
         supported_modality_type={IMAGE, TEXT},
         supported_label_type={CATEGORICAL},
         _supported_evaluation_metrics=METRICS[MULTICLASS].keys(),
-        _fallback_evaluation_metric=ACCURACY,
-        _fallback_validation_metric=ACCURACY,
+        _fallback_evaluation_metric=LOG_LOSS,
+        _fallback_validation_metric=LOG_LOSS,
     ),
 )
