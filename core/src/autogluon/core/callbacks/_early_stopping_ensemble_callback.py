@@ -9,6 +9,7 @@ class EarlyStoppingEnsembleCallback(EarlyStoppingCallback):
     Identical to `EarlyStoppingCallback`, except that it fits a weighted ensemble model after every normal model fit.
     This should generally lead to a better solution than the simpler `EarlyStoppingCallback` because it captures the improvement in the ensemble strength.
     """
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 

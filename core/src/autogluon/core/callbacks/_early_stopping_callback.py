@@ -55,8 +55,7 @@ class EarlyStoppingCallback(AbstractCallback):
             if not self.logged_stopping_msg:
                 self.logged_stopping_msg = True
                 if self.patience_per_level:
-                    msg = (f"Early stopping trainer fit for level={level}. "
-                           f"Reason: No score_val improvement in the past {self.last_improvement} models.")
+                    msg = f"Early stopping trainer fit for level={level}. " f"Reason: No score_val improvement in the past {self.last_improvement} models."
                 else:
                     msg = f"Early stopping trainer fit. Reason: No score_val improvement in the past {self.last_improvement} models."
                 self._log(trainer.logger, 20, msg=msg)
