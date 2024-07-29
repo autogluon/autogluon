@@ -16,6 +16,7 @@ from autogluon.common.utils.try_import import try_import_lightgbm
 from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION, SOFTCLASS
 from autogluon.core.models import AbstractModel
 from autogluon.core.models._utils import get_early_stopping_rounds
+from autogluon.core.metrics import get_metric
 
 from . import lgb_utils
 from .hyperparameters.parameters import DEFAULT_NUM_BOOST_ROUND, get_lgb_objective, get_param_baseline
@@ -99,6 +100,14 @@ class LGBModel(AbstractModel):
         start_time = time.time()
         ag_params = self._get_ag_params()
         params = self._get_model_params()
+        generate_curves = ag_params.get("generate_curves", False)
+
+        if generate_curves:
+            X_test = kwargs.get("X_test", None)
+            y_test = kwargs.get("y_test", None)
+        else:
+            X_test = None
+            y_test = None
 
         if verbosity <= 1:
             log_period = False
@@ -132,8 +141,8 @@ class LGBModel(AbstractModel):
             params["verbose"] = -1
 
         num_rows_train = len(X)
-        dataset_train, dataset_val = self.generate_datasets(
-            X=X, y=y, params=params, X_val=X_val, y_val=y_val, sample_weight=sample_weight, sample_weight_val=sample_weight_val
+        dataset_train, dataset_val, dataset_test = self.generate_datasets(
+            X=X, y=y, params=params, X_val=X_val, y_val=y_val, X_test=X_test, y_test=y_test, sample_weight=sample_weight, sample_weight_val=sample_weight_val
         )
         gc.collect()
 
@@ -177,7 +186,8 @@ class LGBModel(AbstractModel):
             valid_sets = [dataset_val] + valid_sets
         else:
             early_stopping_callback_kwargs = None
-        from lightgbm.callback import log_evaluation
+
+        from lightgbm.callback import log_evaluation, record_evaluation
 
         if log_period is not None:
             callbacks.append(log_evaluation(period=log_period))
@@ -187,17 +197,51 @@ class LGBModel(AbstractModel):
             "params": params,
             "train_set": dataset_train,
             "num_boost_round": num_boost_round,
-            "valid_sets": valid_sets,
             "valid_names": valid_names,
+            "valid_sets": valid_sets,
             "callbacks": callbacks,
+            "keep_training_booster": generate_curves,
         }
-        if not isinstance(stopping_metric, str):
+
+        if generate_curves:
+            metric_names = list(set(ag_params.get("curve_metrics", [])))
+            use_curve_metric_error = ag_params.get("use_error_for_curve_metrics", True)
+            og_metric_names = metric_names.copy()
+
+            if self.stopping_metric.name not in metric_names:
+                metric_names.append(self.stopping_metric.name)
+
+            scorers = [get_metric(name, self.problem_type, "eval_metric") for name in metric_names]
+            custom_metrics = [
+                lgb_utils.func_generator(
+                    metric=scorer, 
+                    is_higher_better=True, 
+                    needs_pred_proba=not scorer.needs_pred, 
+                    problem_type=self.problem_type, 
+                    error=use_curve_metric_error
+                )
+                for scorer in scorers
+            ]
+
+            eval_results = {}
+            train_params["callbacks"].append(record_evaluation(eval_results))
+            train_params["feval"] = custom_metrics
+
+            if dataset_test is not None:
+                train_params["valid_names"] = ["train_set", "test_set"] + train_params["valid_names"]
+                train_params["valid_sets"] = [dataset_train, dataset_test] + train_params["valid_sets"]
+            else:
+                train_params["valid_names"] = ["train_set"] + train_params["valid_names"]
+                train_params["valid_sets"] = [dataset_train] + train_params["valid_sets"]
+
+        if not isinstance(stopping_metric, str) and not generate_curves:
             train_params["feval"] = stopping_metric
-        else:
+        elif isinstance(stopping_metric, str):
             if "metric" not in train_params["params"] or train_params["params"]["metric"] == "":
                 train_params["params"]["metric"] = stopping_metric
             elif stopping_metric not in train_params["params"]["metric"]:
                 train_params["params"]["metric"] = f'{train_params["params"]["metric"]},{stopping_metric}'
+
         if self.problem_type == SOFTCLASS:
             train_params["fobj"] = lgb_utils.softclass_lgbobj
         elif self.problem_type == QUANTILE:
@@ -208,6 +252,7 @@ class LGBModel(AbstractModel):
             np.random.seed(seed_val)
 
         # Train LightGBM model:
+        # Note that self.model returns a <class 'lightgbm.basic.Booster'> not a LightBGMClassifier or LightGBMRegressor object
         from lightgbm.basic import LightGBMError
 
         with warnings.catch_warnings():
@@ -246,6 +291,15 @@ class LGBModel(AbstractModel):
                         self.model = train_lgb_model(**train_params)
                     else:
                         logger.log(15, f"Not enough time to retrain LGB model ('dart' mode)...")
+
+        if generate_curves:
+            def filter(d, keys):
+                return {key: d[key] for key in keys if key in d}
+
+            curves = [filter(eval_results["train_set"], og_metric_names)]
+            curves += [filter(eval_results["valid_set"], og_metric_names)] if X_val is not None else []
+            curves += [filter(eval_results["test_set"], og_metric_names)] if X_test is not None else []
+            self.save_curves(og_metric_names, *curves)
 
         if dataset_val is not None and not retrain:
             self.params_trained["num_boost_round"] = self.model.best_iteration
@@ -304,23 +358,42 @@ class LGBModel(AbstractModel):
         else:
             return X
 
-    def generate_datasets(self, X: DataFrame, y: Series, params, X_val=None, y_val=None, sample_weight=None, sample_weight_val=None, save=False):
+    def generate_datasets(
+            self, 
+            X: DataFrame, 
+            y: Series, 
+            params, 
+            X_val=None, 
+            y_val=None, 
+            X_test=None, 
+            y_test=None, 
+            sample_weight=None, 
+            sample_weight_val=None, 
+            sample_weight_test=None, 
+            save=False
+    ):
         lgb_dataset_params_keys = ["two_round"]  # Keys that are specific to lightGBM Dataset object construction.
         data_params = {key: params[key] for key in lgb_dataset_params_keys if key in params}.copy()
 
         X = self.preprocess(X, is_train=True)
         if X_val is not None:
             X_val = self.preprocess(X_val)
+        if X_test is not None:
+            X_test = self.preprocess(X_test)
         # TODO: Try creating multiple Datasets for subsets of features, then combining with Dataset.add_features_from(), this might avoid memory spike
 
         y_og = None
         y_val_og = None
+        y_test_og = None
         if self.problem_type == SOFTCLASS:
             y_og = np.array(y)
             y = None
             if X_val is not None:
                 y_val_og = np.array(y_val)
                 y_val = None
+            if X_test is not None:
+                y_test_og = np.array(y_test)
+                y_test = None
 
         # X, W_train = self.convert_to_weight(X=X)
         dataset_train = construct_dataset(
@@ -341,12 +414,28 @@ class LGBModel(AbstractModel):
             # dataset_val = construct_dataset_lowest_memory(X=X_val, y=y_val, location=self.path + 'datasets/val', reference=dataset_train, params=data_params)
         else:
             dataset_val = None
+
+        if X_test is not None:
+            dataset_test = construct_dataset(
+                x=X_test,
+                y=y_test,
+                location=os.path.join(self.path, "datasets", "test"),
+                reference=dataset_train,
+                params=data_params,
+                save=save,
+                weight=sample_weight_test,
+            )
+        else:
+            dataset_test = None
+
         if self.problem_type == SOFTCLASS:
             if y_og is not None:
                 dataset_train.softlabels = y_og
             if y_val_og is not None:
                 dataset_val.softlabels = y_val_og
-        return dataset_train, dataset_val
+            if y_test_og is not None:
+                dataset_test.softlabels = y_test_og
+        return dataset_train, dataset_val, dataset_test
 
     def _get_train_loss_name(self):
         if self.problem_type == BINARY:
@@ -404,7 +493,7 @@ class LGBModel(AbstractModel):
         return self._features_internal_list
 
     def _ag_params(self) -> set:
-        return {"early_stop"}
+        return {"early_stop", "generate_curves", "curve_metrics", "use_error_for_curve_metrics"}
 
     def _more_tags(self):
         # `can_refit_full=True` because num_boost_round is communicated at end of `_fit`
