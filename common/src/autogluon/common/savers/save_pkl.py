@@ -19,12 +19,22 @@ def save(path, object, format=None, verbose=True, **kwargs):
     if compression_fn in compression_fn_map:
         validated_path = compression_utils.get_validated_path(path, compression_fn)
     else:
-        raise ValueError(f"compression_fn={compression_fn} is not a valid compression_fn. Valid values: {compression_fn_map.keys()}")
+        raise ValueError(
+            f"compression_fn={compression_fn} is not a valid compression_fn. Valid values: {compression_fn_map.keys()}"
+        )
 
     def pickle_fn(o, buffer):
         return pickle.dump(o, buffer, protocol=4)
 
-    save_with_fn(validated_path, object, pickle_fn, format=format, verbose=verbose, compression_fn=compression_fn, compression_fn_kwargs=compression_fn_kwargs)
+    save_with_fn(
+        validated_path,
+        object,
+        pickle_fn,
+        format=format,
+        verbose=verbose,
+        compression_fn=compression_fn,
+        compression_fn_kwargs=compression_fn_kwargs,
+    )
 
 
 def save_with_fn(path, object, pickle_fn, format=None, verbose=True, compression_fn=None, compression_fn_kwargs=None):
