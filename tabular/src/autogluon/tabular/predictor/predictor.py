@@ -829,6 +829,9 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                     `enable_ray_logging` : bool, default = True
                         If True, will log the dynamic stacking sub-fit when ray is used (`memory_safe_fits=True`).
                         Note that because of how ray works, this may cause extra unwanted logging in the main fit process after dynamic stacking completes.
+                    `enable_callbacks` : bool, default = False
+                        If True, will perform a deepcopy on the specified user callbacks and enable them during the DyStack call.
+                        If False, will not include callbacks in the DyStack call.
                     `holdout_data`: str or :class:`TabularDataset` or :class:`pd.DataFrame`, default = None
                         Another dataset containing validation data reserved for detecting stacked overfitting. This dataset should be in the same format as
                         `train_data`. If str is passed, `holdout_data` will be loaded using the str value as the file path.
@@ -1252,6 +1255,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         memory_safe_fits: bool,
         clean_up_fits: bool,
         enable_ray_logging: bool,
+        enable_callbacks: bool,
         holdout_data: Optional[Union[str, pd.DataFrame, None]] = None,
     ):
         """Dynamically determines if stacking is used or not by validating the behavior of a sub-fit of AutoGluon that uses stacking on held out data.
@@ -1277,7 +1281,12 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         X = ag_fit_kwargs.pop("X")
         X_val = ag_fit_kwargs.pop("X_val")
         X_unlabeled = ag_fit_kwargs.pop("X_unlabeled")
+        callbacks = None
+        if not enable_callbacks:
+            callbacks = ag_fit_kwargs.pop("callbacks")
         inner_ag_fit_kwargs = copy.deepcopy(ag_fit_kwargs)
+        if not enable_callbacks:
+            ag_fit_kwargs["callbacks"] = callbacks
         inner_ag_fit_kwargs["X_val"] = X_val
         inner_ag_fit_kwargs["X_unlabeled"] = X_unlabeled
         inner_ag_post_fit_kwargs = copy.deepcopy(ag_post_fit_kwargs)
@@ -4776,6 +4785,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             clean_up_fits=True,
             holdout_data=None,
             enable_ray_logging=True,
+            enable_callbacks=False,
         )
         allowed_kes = set(ds_args.keys())
 
