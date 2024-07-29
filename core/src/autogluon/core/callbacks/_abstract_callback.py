@@ -1,11 +1,13 @@
-from abc import ABCMeta, abstractmethod
-from logging import Logger
-from typing import List, Tuple
+from __future__ import annotations
+
+from abc import ABCMeta
 
 from ..models import AbstractModel
 from ..trainer import AbstractTrainer
 
 
+# TODO: Open design questions:
+#  1. Should trainer be a class variable for ease of access?
 class AbstractCallback(object, metaclass=ABCMeta):
     """
     Abstract callback class for AutoGluon's TabularPredictor.
@@ -46,15 +48,40 @@ class AbstractCallback(object, metaclass=ABCMeta):
         self.skip_if_trainer_stopped = skip_if_trainer_stopped
         self._skip = False
 
-    def before_fit(
+    def before_trainer_fit(self, trainer: AbstractTrainer, **kwargs):
+        """
+        Called before fitting a trainer.
+        This will be the first method call to the callback at the start of the training process (prior to `before_model_fit`).
+        All available arguments are passed as kwargs along with the trainer object.
+        This allows this method to theoretically override the entire training logic if desired.
+
+        Parameters
+        ----------
+        trainer : AbstractTrainer
+            The AutoGluon trainer object
+        **kwargs
+            Arguments passed to the trainer object's `train_multi_levels` method.
+            Contains all relevant information to completely override the trainer's logic if desired.
+            Refer to the source code for more details, or use a debugger to see the contents of `**kwargs`.
+        """
+        pass
+
+    def after_trainer_fit(self, trainer: AbstractTrainer):
+        """
+        Called after fitting a trainer.
+        This will be the final method call to the callback before AutoGluon training completes.
+        Example usages of this method include logging a final summary of the training, saving information to disk, or executing additional post-fit logic.
+        """
+        pass
+
+    def before_model_fit(
         self,
         trainer: AbstractTrainer,
         model: AbstractModel,
-        logger: Logger,
         time_limit: float | None = None,
         stack_name: str = "core",
         level: int = 1,
-    ) -> Tuple[bool, bool]:
+    ) -> tuple[bool, bool]:
         """
         Called before fitting a model.
 
@@ -64,8 +91,6 @@ class AbstractCallback(object, metaclass=ABCMeta):
             The AutoGluon trainer object
         model : AbstractModel
             The AutoGluon model object to be fit
-        logger : Logger
-            The Logger object used by trainer
         time_limit : float | None, default = None
             The time limit in seconds remaining to fit the model
         stack_name : str, default = "core"
@@ -93,10 +118,9 @@ class AbstractCallback(object, metaclass=ABCMeta):
             return False, False
         if not self.allow_recursive_calls:
             self._skip = True
-        early_stop, skip_model = self._before_fit(
+        early_stop, skip_model = self._before_model_fit(
             trainer=trainer,
             model=model,
-            logger=logger,
             time_limit=time_limit,
             stack_name=stack_name,
             level=level,
@@ -105,23 +129,25 @@ class AbstractCallback(object, metaclass=ABCMeta):
             self._skip = False
         return early_stop, skip_model
 
-    @abstractmethod
-    def _before_fit(
+    def _before_model_fit(
         self,
         trainer: AbstractTrainer,
         model: AbstractModel,
-        logger: Logger,
         time_limit: float | None = None,
         stack_name: str = "core",
         level: int = 1,
-    ) -> Tuple[bool, bool]:
-        raise NotImplementedError
+    ) -> tuple[bool, bool]:
+        """
+        Recommended method to implement in subclasses for logic that triggers before a model fit.
 
-    def after_fit(
+        By default, simply returns False, False to continue training as usual.
+        """
+        return False, False
+
+    def after_model_fit(
         self,
         trainer: AbstractTrainer,
-        model_names: List[str],
-        logger: Logger,
+        model_names: list[str],
         stack_name: str = "core",
         level: int = 1,
     ) -> bool:
@@ -132,14 +158,12 @@ class AbstractCallback(object, metaclass=ABCMeta):
         ----------
         trainer : AbstractTrainer
             The AutoGluon trainer object
-        model_names : List[str]
+        model_names : list[str]
             The list of successfully fit model names in the most recent model fit.
             In most cases this will be a list of size 1 corresponding to `model.name` from the previous `before_fit` call.
             If hyperparameter tuning is enabled, the size can be >1.
             If the model crashed or failed to train for some reason, the size will be 0.
             You can load the model artifact using the model name via `model = trainer.load_model(model_name)`
-        logger : Logger
-            The Logger object used by trainer
         stack_name : str, default = "core"
             [Advanced] The stack_name the model originates from.
             You can use this value to toggle logic on and off. For example, skipping core models while still fitting weighted ensemble models.
@@ -161,10 +185,9 @@ class AbstractCallback(object, metaclass=ABCMeta):
             return False
         if not self.allow_recursive_calls:
             self._skip = True
-        early_stop = self._after_fit(
+        early_stop = self._after_model_fit(
             trainer=trainer,
             model_names=model_names,
-            logger=logger,
             stack_name=stack_name,
             level=level,
         )
@@ -172,13 +195,16 @@ class AbstractCallback(object, metaclass=ABCMeta):
             self._skip = False
         return early_stop
 
-    @abstractmethod
-    def _after_fit(
+    def _after_model_fit(
         self,
         trainer: AbstractTrainer,
-        model_names: List[str],
-        logger: Logger,
+        model_names: list[str],
         stack_name: str = "core",
         level: int = 1,
     ) -> bool:
-        raise NotImplementedError
+        """
+        Recommended method to implement in subclasses for logic that triggers after a model fit.
+
+        By default, simply returns False to continue training as usual.
+        """
+        return False
