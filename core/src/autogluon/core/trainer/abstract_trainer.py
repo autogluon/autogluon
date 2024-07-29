@@ -270,6 +270,13 @@ class AbstractTrainer:
         """Whether the trainer uses validation data"""
         return self._num_rows_val is not None
 
+    @property
+    def logger(self) -> logging.Logger:
+        return logger
+
+    def log(self, level: int, msg, *args, **kwargs):
+        self.logger.log(level, msg, *args, **kwargs)
+
     def load_X(self):
         if self._X_saved:
             path = os.path.join(self.path_data, "X.pkl")
@@ -413,9 +420,9 @@ class AbstractTrainer:
         """
         self._fit_setup(time_limit=time_limit, callbacks=callbacks)
         time_train_start = self._time_train_start
-        if callbacks:
-            callback_classes = [c.__class__.__name__ for c in callbacks]
-            logger.log(20, f"User-specified callbacks ({len(callbacks)}): {callback_classes}")
+        if self.callbacks:
+            callback_classes = [c.__class__.__name__ for c in self.callbacks]
+            logger.log(20, f"User-specified callbacks ({len(self.callbacks)}): {callback_classes}")
 
         hyperparameters = self._process_hyperparameters(hyperparameters=hyperparameters)
 
@@ -439,6 +446,26 @@ class AbstractTrainer:
 
         core_kwargs = {} if core_kwargs is None else core_kwargs.copy()
         aux_kwargs = {} if aux_kwargs is None else aux_kwargs.copy()
+
+        self._callbacks_setup(
+            X=X,
+            y=y,
+            hyperparameters=hyperparameters,
+            X_val=X_val,
+            y_val=y_val,
+            X_unlabeled=X_unlabeled,
+            level_start=level_start,
+            level_end=level_end,
+            time_limit=time_limit,
+            base_model_names=base_model_names,
+            core_kwargs=core_kwargs,
+            aux_kwargs=aux_kwargs,
+            name_suffix=name_suffix,
+            level_time_modifier=level_time_modifier,
+            infer_limit=infer_limit,
+            infer_limit_batch_size=infer_limit_batch_size,
+        )
+        # TODO: Add logic for callbacks to specify that the rest of the trainer logic should be skipped in the case where they are overriding the trainer logic.
 
         model_names_fit = []
         if level_start != level_end:
@@ -475,8 +502,9 @@ class AbstractTrainer:
                 additional_full_weighted_ensemble=additional_full_weighted_ensemble,
             )
             model_names_fit += base_model_names + aux_models
-        if self.model_best is None and len(model_names_fit) != 0:
+        if (self.model_best is None or infer_limit is not None) and len(model_names_fit) != 0:
             self.model_best = self.get_model_best(can_infer=True, infer_limit=infer_limit, infer_limit_as_child=True)
+        self._callbacks_conclude()
         self._fit_cleanup()
         self.save()
         return model_names_fit
@@ -505,6 +533,14 @@ class AbstractTrainer:
         self._time_limit = None
         self._time_train_start = None
         self.reset_callbacks()
+
+    def _callbacks_setup(self, **kwargs):
+        for callback in self.callbacks:
+            callback.before_trainer_fit(trainer=self, **kwargs)
+
+    def _callbacks_conclude(self):
+        for callback in self.callbacks:
+            callback.after_trainer_fit(trainer=self)
 
     def reset_callbacks(self):
         """Deletes callback objects and resets `self._callback_early_stop` to False."""
@@ -1628,7 +1664,7 @@ class AbstractTrainer:
             models_predict_1_time = self.get_models_attribute_full(models=models, attribute=predict_1_time_attribute)
             models_og = copy.deepcopy(models)
             for model_key in models_predict_1_time:
-                if models_predict_1_time[model_key] > infer_limit:
+                if models_predict_1_time[model_key] is None or models_predict_1_time[model_key] > infer_limit:
                     models.remove(model_key)
             if models_og and not models:
                 # get the fastest model
@@ -2415,10 +2451,9 @@ class AbstractTrainer:
         skip_model = False
         ts = time.time()
         for callback in self.callbacks:
-            callback_early_stop, callback_skip_model = callback.before_fit(
+            callback_early_stop, callback_skip_model = callback.before_model_fit(
                 trainer=self,
                 model=model,
-                logger=logger,
                 time_limit=time_limit,
                 stack_name=stack_name,
                 level=level,
@@ -2441,10 +2476,9 @@ class AbstractTrainer:
         level: int,
     ):
         for callback in self.callbacks:
-            callback_early_stop = callback.after_fit(
+            callback_early_stop = callback.after_model_fit(
                 self,
                 model_names=model_names,
-                logger=logger,
                 stack_name=stack_name,
                 level=level,
             )
@@ -2979,10 +3013,13 @@ class AbstractTrainer:
         model_types = self.get_models_attribute_dict(attribute="type", models=model_names)
         return model_names, model_paths, model_types
 
-    # Sums the attribute value across all models that the provided model depends on, including itself.
-    # For instance, this function can return the expected total predict_time of a model.
-    # attribute is the name of the desired attribute to be summed, or a dictionary of model name -> attribute value if the attribute is not present in the graph.
-    def get_model_attribute_full(self, model: Union[str, List[str]], attribute: str, func=sum):
+    def get_model_attribute_full(self, model: Union[str, List[str]], attribute: str, func=sum) -> Union[float, int]:
+        """
+        Sums the attribute value across all models that the provided model depends on, including itself.
+        For instance, this function can return the expected total predict_time of a model.
+        attribute is the name of the desired attribute to be summed,
+        or a dictionary of model name -> attribute value if the attribute is not present in the graph.
+        """
         if isinstance(model, list):
             base_model_set = self.get_minimum_models_set(model)
         else:
@@ -3022,8 +3059,10 @@ class AbstractTrainer:
             d[model] = self.get_model_attribute_full(model=model, attribute=attribute, func=func)
         return d
 
-    # Returns dictionary of model name -> attribute value for the provided attribute
-    def get_models_attribute_dict(self, attribute, models: list = None) -> dict:
+    def get_models_attribute_dict(self, attribute: str, models: list = None) -> Dict[str, Any]:
+        """
+        Returns dictionary of model name -> attribute value for the provided attribute.
+        """
         models_attribute_dict = nx.get_node_attributes(self.model_graph, attribute)
         if models is not None:
             model_names = []
@@ -3037,7 +3076,7 @@ class AbstractTrainer:
                 models_attribute_dict = {key: val for key, val in models_attribute_dict.items() if key in model_names}
         return models_attribute_dict
 
-    def get_model_attribute(self, model, attribute: str, **kwargs):
+    def get_model_attribute(self, model, attribute: str, **kwargs) -> Any:
         """
         Return model attribute value.
         If `default` is specified, return default value if attribute does not exist.
