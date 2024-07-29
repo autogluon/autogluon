@@ -246,6 +246,20 @@ class AbstractTrainer:
         return self._num_rows_val is not None
 
     @property
+    def time_left(self) -> float | None:
+        """
+        Remaining time left in the fit call.
+        None if time_limit was unspecified.
+        """
+        if self._time_train_start is None:
+            return None
+        elif self._time_limit is None:
+            return None
+        time_elapsed = time.time() - self._time_train_start
+        time_left = self._time_limit - time_elapsed
+        return time_left
+
+    @property
     def logger(self) -> logging.Logger:
         return logger
 
