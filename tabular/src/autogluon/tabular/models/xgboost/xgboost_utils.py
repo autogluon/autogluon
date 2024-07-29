@@ -26,32 +26,45 @@ def convert_ag_metric_to_xgbm(ag_metric_name, problem_type):
     return _ag_to_xgbm_metric_dict.get(problem_type, dict()).get(ag_metric_name, None)
 
 
-def func_generator(metric, problem_type: str):
+"""
+Documentation of XGBoost support for Custom Metrics:
+Trying to use Multiple Custom Metrics: https://stackoverflow.com/questions/44527485/how-to-pass-multiple-custom-metrics-eval-metric-in-python-xgboost
+Multiple Custom Not possible: https://github.com/dmlc/xgboost/issues/2408
+Possible Workaround: https://github.com/dmlc/xgboost/issues/1125 -> Didn't work
+Resolution: Instead, use custom metrics by passing in list of AutoGluon Scorers into custom metric callback
+"""
+
+# TODO: make sure getting rid of sign * doesn't break stuff
+def func_generator(metric, problem_type: str, error=False):
     """Create a custom metric compatible with XGBoost, based on the XGBoost 1.6+ API"""
     sign = -1 if metric.greater_is_better else 1
     needs_pred_proba = not metric.needs_pred
+    compute = (metric.error if error else metric)
     if needs_pred_proba:
 
         def custom_metric(y_true, y_hat):
-            return sign * metric(y_true, y_hat)
+            return compute(y_true, y_hat)
 
     else:
         if problem_type in [MULTICLASS, SOFTCLASS]:
 
             def custom_metric(y_true, y_hat):
                 y_hat = y_hat.argmax(axis=1)
-                return sign * metric(y_true, y_hat)
+                return compute(y_true, y_hat)
 
         elif problem_type == BINARY:
 
             def custom_metric(y_true, y_hat):
                 y_hat = np.round(y_hat)
-                return sign * metric(y_true, y_hat)
+                return compute(y_true, y_hat)
 
         else:
 
             def custom_metric(y_true, y_hat):
-                return sign * metric(y_true, y_hat)
+                return compute(y_true, y_hat)
+
+    # set the Scorer name as the the custom metric name
+    custom_metric.__name__ = metric.name 
 
     return custom_metric
 
