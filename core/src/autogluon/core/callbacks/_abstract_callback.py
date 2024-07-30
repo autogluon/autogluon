@@ -17,11 +17,11 @@ class AbstractCallback(object, metaclass=ABCMeta):
     ----------
     allow_recursive_calls : bool, default = False
         If True, will allow recursive calls to this callback.
-        For example, a recursive call can happen if inside `self.before_fit` or `self.after_fit`, the callback initiates a model fit in trainer.
-        This model fit will then trigger `self.before_fit` again, which could lead to an infinite loop if the callback is not implemented carefully.
+        For example, a recursive call can happen if inside `self.before_model_fit` or `self.after_model_fit`, the callback initiates a model fit in trainer.
+        This model fit will then trigger `self.before_model_fit` again, which could lead to an infinite loop if the callback is not implemented carefully.
         If False, guarantees that the callback logic will be skipped if it is part of a recursive call.
     skip_if_trainer_stopped : bool, default = False
-        If True, will skip self.before_fit and self.after_fit logic if `early_stop=True` was returned from any callback,
+        If True, will skip self.before_model_fit and self.after_model_fit logic if `early_stop=True` was returned from any callback,
         indicating that the trainer is stopping training.
         This matters if you have 2 or more callbacks, and the first callback returns `early_stop=True`.
         If the second callback has `skip_if_trainer_stopped=True`, it will skip its callback logic.
