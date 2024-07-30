@@ -7,6 +7,7 @@ import shutil
 import sys
 import time
 import traceback
+import typing
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
@@ -47,6 +48,10 @@ from ..utils.feature_selection import FeatureSelector
 from ..utils.loaders import load_pkl
 from ..utils.savers import save_json, save_pkl
 from .utils import process_hyperparameters
+
+if typing.TYPE_CHECKING:
+    # avoid circular import for type hints
+    from ..callbacks import AbstractCallback
 
 logger = logging.getLogger(__name__)
 
@@ -219,7 +224,7 @@ class AbstractTrainer:
 
         # self._exceptions_list = []  # TODO: Keep exceptions list for debugging during benchmarking.
 
-        self.callbacks: List[Callable] = []
+        self.callbacks: List[AbstractCallback] = []
         self._callback_early_stop = False
 
     # path_root is the directory containing learner.pkl
@@ -401,7 +406,7 @@ class AbstractTrainer:
         level_time_modifier=0.333,
         infer_limit=None,
         infer_limit_batch_size=None,
-        callbacks: List[Callable] = None,
+        callbacks: List[AbstractCallback] = None,
     ) -> List[str]:
         """
         Trains a multi-layer stack ensemble using the input data on the hyperparameters dict input.
