@@ -20,10 +20,11 @@ class EarlyStoppingEnsembleCallback(EarlyStoppingCallback):
         super().before_trainer_fit(trainer=trainer, **kwargs)
         self.infer_limit_batch_size = kwargs.get("infer_limit_batch_size", None)
 
-    def calc_new_best(self, trainer: AbstractTrainer, stack_name: str = "core", **kwargs):
-        if stack_name == "core":
+    def calc_new_best(self, trainer: AbstractTrainer, **kwargs):
+        if kwargs["stack_name"] == "core" and len(kwargs["model_names"]) != 0:
+            # only fit weighted ensemble if stack_name == "core" and at least one new model has been fit.
             self._fit_weighted_ensemble(trainer=trainer)
-        return super().calc_new_best(trainer=trainer)
+        return super().calc_new_best(trainer=trainer, **kwargs)
 
     def _fit_weighted_ensemble(self, trainer: AbstractTrainer):
         """

@@ -47,7 +47,7 @@ class EarlyStoppingCallback(AbstractCallback):
     def before_trainer_fit(self, trainer: AbstractTrainer, **kwargs):
         self.infer_limit = kwargs.get("infer_limit", None)
 
-    def _before_model_fit(self, trainer: AbstractTrainer, *, stack_name: str, level: int, **kwargs) -> tuple[bool, bool]:
+    def _before_model_fit(self, trainer: AbstractTrainer, stack_name: str = "core", level: int = 1, **kwargs) -> tuple[bool, bool]:
         if self.patience_per_level and (self.last_level is None or self.last_level != level):
             self.last_improvement = 0
             self.last_level = level
