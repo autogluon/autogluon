@@ -109,8 +109,9 @@ class RFOnnxCompiler:
     @staticmethod
     def save(model, path: str) -> str:
         """Save the compiled model into onnx file format."""
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(os.path.join(path, "model.onnx"), "wb") as f:
+        file_path = os.path.join(path, "model.onnx")
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        with open(file_path, "wb") as f:
             f.write(model.SerializeToString())
         return os.path.join(path, "model.onnx")
 
