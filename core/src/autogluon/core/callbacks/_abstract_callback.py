@@ -13,7 +13,7 @@ class AbstractCallback(object, metaclass=ABCMeta):
     Abstract callback class for AutoGluon's TabularPredictor.
     The inner API and logic within `trainer` is considered private API. It may change without warning between releases.
 
-    Parameters
+    Attributes
     ----------
     allow_recursive_calls : bool, default = False
         If True, will allow recursive calls to this callback.
@@ -37,15 +37,10 @@ class AbstractCallback(object, metaclass=ABCMeta):
     >>> predictor = TabularPredictor(label=label).fit(train_data, callbacks=callbacks)
     """
 
-    def __init__(
-        self,
-        allow_recursive_calls: bool = False,
-        skip_if_trainer_stopped: bool = False,
-    ):
-        assert isinstance(allow_recursive_calls, bool)
-        assert isinstance(skip_if_trainer_stopped, bool)
-        self.allow_recursive_calls = allow_recursive_calls
-        self.skip_if_trainer_stopped = skip_if_trainer_stopped
+    allow_recursive_calls: bool = False
+    skip_if_trainer_stopped: bool = False
+
+    def __init__(self):
         self._skip = False
 
     def before_trainer_fit(self, trainer: AbstractTrainer, **kwargs):
