@@ -9,7 +9,7 @@ import time
 import traceback
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import networkx as nx
 import numpy as np
@@ -219,7 +219,7 @@ class AbstractTrainer:
 
         # self._exceptions_list = []  # TODO: Keep exceptions list for debugging during benchmarking.
 
-        self.callbacks: List[callable] = []
+        self.callbacks: List[Callable] = []
         self._callback_early_stop = False
 
     # path_root is the directory containing learner.pkl
@@ -401,7 +401,7 @@ class AbstractTrainer:
         level_time_modifier=0.333,
         infer_limit=None,
         infer_limit_batch_size=None,
-        callbacks: List[callable] = None,
+        callbacks: List[Callable] = None,
     ) -> List[str]:
         """
         Trains a multi-layer stack ensemble using the input data on the hyperparameters dict input.
@@ -512,7 +512,7 @@ class AbstractTrainer:
         self.save()
         return model_names_fit
 
-    def _fit_setup(self, time_limit: float | None = None, callbacks: List[callable] = None):
+    def _fit_setup(self, time_limit: float | None = None, callbacks: List[Callable] = None):
         """
         Prepare the trainer state at the start of / prior to a fit call.
         Should be paired with a `self._fit_cleanup()` at the conclusion of the fit call.
