@@ -10,7 +10,7 @@ import traceback
 import typing
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import networkx as nx
 import numpy as np
@@ -517,7 +517,7 @@ class AbstractTrainer:
         self.save()
         return model_names_fit
 
-    def _fit_setup(self, time_limit: float | None = None, callbacks: List[Callable] = None):
+    def _fit_setup(self, time_limit: float | None = None, callbacks: List[AbstractCallback] = None):
         """
         Prepare the trainer state at the start of / prior to a fit call.
         Should be paired with a `self._fit_cleanup()` at the conclusion of the fit call.
