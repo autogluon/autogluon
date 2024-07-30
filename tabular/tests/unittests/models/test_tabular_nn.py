@@ -1,4 +1,4 @@
-import pytest
+import shutil
 
 from autogluon.tabular.models.tabular_nn.torch.tabular_nn_torch import TabularNeuralNetTorchModel
 
@@ -49,6 +49,19 @@ def test_tabular_nn_binary_compile_onnx(fit_helper):
     from autogluon.tabular.models.tabular_nn.compilers.onnx import TabularNeuralNetTorchOnnxTransformer
 
     assert isinstance(predictor._learner.trainer.models["NeuralNetTorch"].processor, TabularNeuralNetTorchOnnxTransformer)
+
+
+def test_tabular_nn_binary_compile_onnx_as_ag_arg(fit_helper):
+    fit_args = dict(
+        hyperparameters={TabularNeuralNetTorchModel: {"ag.compile": {"compiler": "onnx"}}},
+    )
+    dataset_name = "adult"
+    predictor = fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, refit_full=True, delete_directory=False)
+    from autogluon.tabular.models.tabular_nn.compilers.onnx import TabularNeuralNetTorchOnnxTransformer
+
+    assert isinstance(predictor._learner.trainer.load_model("NeuralNetTorch").processor, TabularNeuralNetTorchOnnxTransformer)
+    assert isinstance(predictor._learner.trainer.load_model("NeuralNetTorch_FULL").processor, TabularNeuralNetTorchOnnxTransformer)
+    shutil.rmtree(predictor.path, ignore_errors=True)
 
 
 def test_tabular_nn_multiclass_compile_onnx(fit_helper):

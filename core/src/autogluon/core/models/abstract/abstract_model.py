@@ -897,6 +897,16 @@ class AbstractModel:
         -------
         Returns self
         """
+        compiler_configs = self.params_aux.get("compile", None)
+        if compiler_configs is not None:
+            compile_model = True
+            if isinstance(compiler_configs, bool):
+                if compiler_configs:
+                    compiler_configs = None
+                else:
+                    compile_model = False
+            if compile_model:
+                self.compile(compiler_configs=compiler_configs)
         predict_1_batch_size = self.params_aux.get("predict_1_batch_size", None)
         if self.predict_1_time is None and predict_1_batch_size is not None and "X" in kwargs and kwargs["X"] is not None:
             X_1 = sample_df_for_time_func(df=kwargs["X"], sample_size=predict_1_batch_size)
