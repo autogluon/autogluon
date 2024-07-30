@@ -28,8 +28,10 @@ class EarlyStoppingCallback(AbstractCallback):
         If True, will log a stopping message when early stopping triggers.
     """
 
-    def __init__(self, patience: int = 10, patience_per_level: bool = True, verbose: bool = True, **kwargs):
-        super().__init__(**kwargs)
+    skip_if_trainer_stopped: bool = True
+
+    def __init__(self, patience: int = 10, patience_per_level: bool = True, verbose: bool = True):
+        super().__init__()
         self.patience = patience
         self.patience_per_level = patience_per_level
         self.last_improvement = 0
@@ -45,7 +47,7 @@ class EarlyStoppingCallback(AbstractCallback):
     def before_trainer_fit(self, trainer: AbstractTrainer, **kwargs):
         self.infer_limit = kwargs.get("infer_limit", None)
 
-    def _before_model_fit(self, trainer: AbstractTrainer, stack_name: str, level: int, **kwargs) -> tuple[bool, bool]:
+    def _before_model_fit(self, trainer: AbstractTrainer, *, stack_name: str, level: int, **kwargs) -> tuple[bool, bool]:
         if self.patience_per_level and (self.last_level is None or self.last_level != level):
             self.last_improvement = 0
             self.last_level = level
