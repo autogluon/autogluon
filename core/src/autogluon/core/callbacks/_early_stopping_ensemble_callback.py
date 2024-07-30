@@ -35,6 +35,8 @@ class EarlyStoppingEnsembleCallback(EarlyStoppingCallback):
             return
         use_val = trainer._X_val_saved and trainer._y_val_saved
 
+        # TODO: Can optimize this with some code refactoring in AbstractTrainer
+        #  It shouldn't be necessary to load `X` since the features are not used by the weighted ensemble.
         if use_val:  # holdout
             X = trainer.load_X_val()
             y = trainer.load_y_val()
