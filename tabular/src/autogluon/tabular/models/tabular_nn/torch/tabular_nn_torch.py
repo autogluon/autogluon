@@ -482,7 +482,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         self.params_trained["batch_size"] = batch_size
         self.params_trained["num_epochs"] = best_epoch
 
-    def _assert_valid_metric(self, metric: int | float, best_epoch: int) -> bool:
+    def _assert_valid_metric(self, metric: Union[int, float], best_epoch: int) -> bool:
         """
         Asserts that metric calculated is valid.
 
