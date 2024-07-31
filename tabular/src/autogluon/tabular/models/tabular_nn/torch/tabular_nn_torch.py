@@ -253,13 +253,13 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         generate_curves = ag_params.get("generate_curves", False)
 
         if generate_curves:
-            scorer_names = list(set(ag_params.get("curve_metrics", [])))
-            use_curve_metric_error = ag_params.get("use_error_for_curve_metrics", True)
+            scorers = ag_params.get("curve_metrics", [])
+            use_curve_metric_error = ag_params.get("use_error_for_curve_metrics", False)
+            metric_names = [scorer.name for scorer in scorers]
 
-            stopping_metrics = [get_metric(metric, self.problem_type, "eval_metric") for metric in scorer_names]
-            train_curves = { metric.name : [] for metric in stopping_metrics }
-            val_curves = { metric.name : [] for metric in stopping_metrics }
-            test_curves = { metric.name : [] for metric in stopping_metrics }
+            train_curves = { metric.name : [] for metric in scorers }
+            val_curves = { metric.name : [] for metric in scorers }
+            test_curves = { metric.name : [] for metric in scorers }
 
             y_train = train_dataset.get_labels()
             if y_train.ndim == 2 and y_train.shape[1] == 1:
@@ -369,25 +369,52 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
             epoch += 1
 
-            def _assert_valid_metric(metric):
-                if np.isnan(metric):
-                    if best_epoch == 0:
-                        raise RuntimeError(
-                            f"NaNs encountered in {self.__class__.__name__} training. "
-                            "Features/labels may be improperly formatted, "
-                            "or NN weights may have diverged."
-                        )
-                    else:
-                        logger.warning(f"Warning: NaNs encountered in {self.__class__.__name__} training. " "Reverting model to last checkpoint without NaNs.")
-                        return False
-                return True
+            # TODO: assertion check with prediction proba with vs without LC
+            # learning curve generation
+            if generate_curves:
+                train_metrics = []
+                val_metrics = []
+                test_metrics = []
+
+                stop = False
+                for metric in scorers:
+                    # FIXME: for some reason, running these three lines causes a change in model validation score calculation in if block above
+                    train_metrics.append(self.score(X=train_dataset, y=y_train, metric=metric, _reset_threads=False))
+                    val_metrics += [self.score(X=val_dataset, y=y_val, metric=metric, _reset_threads=False)] if val_dataset is not None else []
+                    test_metrics += [self.score(X=test_dataset, y=y_test, metric=metric, _reset_threads=False)] if test_dataset is not None else []
+
+                    # train_metrics.append(1)
+                    # val_metrics += [1] if val_dataset is not None else []
+                    # test_metrics += [1] if test_dataset is not None else []
+
+                    if use_curve_metric_error:
+                        train_metrics[-1] = metric.convert_score_to_error(train_metrics[-1])
+                        if val_dataset is not None: 
+                            val_metrics[-1] = metric.convert_score_to_error(val_metrics[-1])
+                        if test_dataset is not None: 
+                            test_metrics[-1] = metric.convert_score_to_error(test_metrics[-1])
+
+                    if not self._assert_valid_metric(metric=train_metrics[-1], best_epoch=best_epoch) or \
+                        (val_dataset is not None and not self._assert_valid_metric(metric=val_metrics[-1], best_epoch=best_epoch)) or \
+                        (test_dataset is not None and not self._assert_valid_metric(metric=test_metrics[-1], best_epoch=best_epoch)):
+                        stop = True
+                        break
+
+                if stop:
+                    break
+
+                # update learning curve
+                for i, metric in enumerate(scorers):
+                    train_curves[metric.name].append(train_metrics[i])
+                    val_curves[metric.name] += [val_metrics[i]] if val_dataset is not None else []
+                    test_curves[metric.name] += [test_metrics[i]] if test_dataset is not None else []
 
             # validation
             if val_dataset is not None:
                 # compute validation score
                 val_metric = self.score(X=val_dataset, y=y_val, metric=self.stopping_metric, _reset_threads=False)
 
-                if not _assert_valid_metric(val_metric):
+                if not self._assert_valid_metric(metric=val_metric, best_epoch=best_epoch):
                     break
 
                 # update best validation
@@ -422,39 +449,6 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                 if epoch - val_improve_epoch >= epochs_wo_improve:
                     break
 
-            # learning curve generation
-            if generate_curves:
-                train_metrics = []
-                val_metrics = []
-                test_metrics = []
-
-                stop = False
-                for metric in stopping_metrics:
-                    train_metrics.append(self.score(X=train_dataset, y=y_train, metric=metric, _reset_threads=False))
-                    val_metrics.append(self.score(X=val_dataset, y=y_val, metric=metric, _reset_threads=False))
-                    test_metrics += [self.score(X=test_dataset, y=y_test, metric=metric, _reset_threads=False)] if test_dataset is not None else []
-
-                    if use_curve_metric_error:
-                        train_metrics[-1] = metric.convert_score_to_error(train_metrics[-1])
-                        val_metrics[-1] = metric.convert_score_to_error(val_metrics[-1])
-                        if test_dataset is not None: 
-                            test_metrics[-1] = metric.convert_score_to_error(test_metrics[-1])
-
-                    if not _assert_valid_metric(train_metrics[-1]) or \
-                        not _assert_valid_metric(val_metrics[-1]) or \
-                        (test_dataset is not None and not _assert_valid_metric(test_metrics[-1])):
-                        stop = True
-                        break
-
-                if stop:
-                    break
-
-                # update learning curve
-                for i, metric in enumerate(stopping_metrics):
-                    train_curves[metric.name].append(train_metrics[i])
-                    val_curves[metric.name].append(val_metrics[i])
-                    test_curves[metric.name] += [test_metrics[i]] if test_dataset is not None else []
-
             if epoch >= num_epochs:
                 break
 
@@ -470,11 +464,10 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             raise AssertionError("0 epochs trained!")
 
         if generate_curves:
-            metric_names = [metric.name for metric in stopping_metrics]
             curves = [train_curves]
             curves += [val_curves] if val_dataset is not None else []
             curves += [test_curves] if test_dataset is not None else []
-            self.save_curves(metric_names, *curves)
+            self.save_learning_curves(metric_names, *curves)
 
         # revert back to best model
         if val_dataset is not None:
@@ -488,6 +481,33 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             logger.log(15, f"Best model found on Epoch {best_epoch} (Update {best_val_update}).")
         self.params_trained["batch_size"] = batch_size
         self.params_trained["num_epochs"] = best_epoch
+
+    def _assert_valid_metric(self, metric: int | float, best_epoch: int) -> bool:
+        """
+        Asserts that metric calculated is valid.
+
+        Parameters:
+        -----------
+        metric: int or float
+            the metric calculated
+        best_epoch: int
+            the best epoch encountered since training started
+        
+        Returns:
+        --------
+        Whether the metric is valid
+        """
+        if np.isnan(metric):
+            if best_epoch == 0:
+                raise RuntimeError(
+                    f"NaNs encountered in {self.__class__.__name__} training. "
+                    "Features/labels may be improperly formatted, "
+                    "or NN weights may have diverged."
+                )
+            else:
+                logger.warning(f"Warning: NaNs encountered in {self.__class__.__name__} training. " "Reverting model to last checkpoint without NaNs.")
+                return False
+        return True
 
     def _predict_proba(self, X, **kwargs):
         """To align predict with abstract_model API.
@@ -743,6 +763,12 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             # Our custom implementation does not support partial GPU. No gpu usage according to nvidia-smi when the `num_gpus` passed to fit is fractional`
             minimum_resources["num_gpus"] = 1
         return minimum_resources
+
+    @classmethod
+    def _class_tags(cls):
+        tags = super(TabularNeuralNetTorchModel, cls)._class_tags().copy()
+        tags.update({"supports_learning_curves": True})
+        return tags
 
     def _more_tags(self):
         # `can_refit_full=True` because batch_size and num_epochs is communicated at end of `_fit`:

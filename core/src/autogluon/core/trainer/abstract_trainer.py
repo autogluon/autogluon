@@ -300,37 +300,31 @@ class AbstractTrainer:
         return X, y, X_val, y_val
 
     def save_X(self, X, verbose=True):
-        if X is None: return
         path = os.path.join(self.path_data, "X.pkl")
         save_pkl.save(path=path, object=X, verbose=verbose)
         self._X_saved = True
 
     def save_X_val(self, X, verbose=True):
-        if X is None: return
         path = os.path.join(self.path_data, "X_val.pkl")
         save_pkl.save(path=path, object=X, verbose=verbose)
         self._X_val_saved = True
 
     def save_X_test(self, X, verbose=True):
-        if X is None: return
         path = os.path.join(self.path_data, "X_test.pkl")
         save_pkl.save(path=path, object=X, verbose=verbose)
         self._X_test_saved = True
 
     def save_y(self, y, verbose=True):
-        if y is None: return
         path = os.path.join(self.path_data, "y.pkl")
         save_pkl.save(path=path, object=y, verbose=verbose)
         self._y_saved = True
 
     def save_y_val(self, y, verbose=True):
-        if y is None: return
         path = os.path.join(self.path_data, "y_val.pkl")
         save_pkl.save(path=path, object=y, verbose=verbose)
         self._y_val_saved = True
 
     def save_y_test(self, y, verbose=True):
-        if y is None: return
         path = os.path.join(self.path_data, "y_test.pkl")
         save_pkl.save(path=path, object=y, verbose=verbose)
         self._y_test_saved = True
@@ -2666,10 +2660,14 @@ class AbstractTrainer:
         if self.save_data and not self.is_data_saved:
             self.save_X(X)
             self.save_y(y)
-            self.save_X_val(X_val)
-            self.save_y_val(y_val)
-            self.save_X_test(X_test)
-            self.save_y_test(y_test)
+            if X_val is not None:
+                self.save_X_val(X_val)
+                if y_val is not None:
+                    self.save_y_val(y_val)
+            if X_test is not None:
+                self.save_X_test(X_test)
+                if y_test is not None:
+                    self.save_y_test(y_test)
             self.is_data_saved = True
         if self._groups is None:
             self._groups = groups

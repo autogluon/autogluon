@@ -24,6 +24,7 @@ from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager, get_resource_manager
 from autogluon.common.utils.try_import import try_import_ray
 from autogluon.common.utils.utils import setup_outputdir
+from autogluon.common.loaders import load_json
 
 from ... import metrics
 from ...calibrate.temperature_scaling import apply_temperature_scaling
@@ -104,6 +105,7 @@ class AbstractModel:
     model_file_name = "model.pkl"
     model_info_name = "info.pkl"
     model_info_json_name = "info.json"
+    learning_curve_file_name = "curves.json"
 
     def __init__(
         self,
@@ -591,6 +593,13 @@ class AbstractModel:
 
         self.stopping_metric = self.params_aux.get("stopping_metric", self._get_default_stopping_metric())
         self.stopping_metric = metrics.get_metric(self.stopping_metric, self.problem_type, "stopping_metric")
+
+        ag_params = self._get_ag_params()
+        generate_curves = ag_params.get("generate_curves", None)
+        if generate_curves:
+            curve_metrics = ag_params.get("curve_metrics", None)
+            if not curve_metrics:
+                self.params_aux["curve_metrics"] = [self.eval_metric]
 
         self.quantile_levels = self.params_aux.get("quantile_levels", None)
 
@@ -1132,8 +1141,39 @@ class AbstractModel:
         self.model = _model
         return path
 
+    @classmethod
+    def load(cls, path: str, reset_paths: bool = True, verbose: bool = True):
+        """
+        Loads the model from disk to memory.
 
-    def save_curves(self, metrics, curve, *curves, path: str = None):
+        Parameters
+        ----------
+        path : str
+            Path to the saved model, minus the file name.
+            This should generally be a directory path ending with a '/' character (or appropriate path separator value depending on OS).
+            The model file is typically located in os.path.join(path, cls.model_file_name).
+        reset_paths : bool, default True
+            Whether to reset the self.path value of the loaded model to be equal to path.
+            It is highly recommended to keep this value as True unless accessing the original self.path value is important.
+            If False, the actual valid path and self.path may differ, leading to strange behaviour and potential exceptions if the model needs to load any other files at a later time.
+        verbose : bool, default True
+            Whether to log the location of the loaded file.
+
+        Returns
+        -------
+        model : cls
+            Loaded model object.
+        """
+        file_path = os.path.join(path, cls.model_file_name)
+        model = load_pkl.load(path=file_path, verbose=verbose)
+        if reset_paths:
+            model.set_contexts(path)
+        if hasattr(model, "_compiler"):
+            if model._compiler is not None and not model._compiler.save_in_pkl:
+                model.model = model._compiler.load(path=path)
+        return model
+
+    def save_learning_curves(self, metrics: str | List[str], curve: dict[str:List[float]], *curves: dict[str:List[float]], path: str = None) -> str:
         """
         Saves learning curves to disk.
 
@@ -1192,7 +1232,7 @@ class AbstractModel:
             raise ValueError("At least one metric must be specified to save generated learning curves.")
 
         os.makedirs(path, exist_ok=True)
-        file_path = os.path.join(path, f"curves.json")
+        file_path = os.path.join(path, self.learning_curve_file_name)
         curves = [curve] + list(curves)
 
         out = [
@@ -1210,11 +1250,10 @@ class AbstractModel:
 
         return file_path
 
-
     @classmethod
-    def load(cls, path: str, reset_paths: bool = True, verbose: bool = True):
+    def load_learning_curves(cls, path: str) -> List:
         """
-        Loads the model from disk to memory.
+        Loads the learning_curve data from disk to memory.
 
         Parameters
         ----------
@@ -1222,26 +1261,23 @@ class AbstractModel:
             Path to the saved model, minus the file name.
             This should generally be a directory path ending with a '/' character (or appropriate path separator value depending on OS).
             The model file is typically located in os.path.join(path, cls.model_file_name).
-        reset_paths : bool, default True
-            Whether to reset the self.path value of the loaded model to be equal to path.
-            It is highly recommended to keep this value as True unless accessing the original self.path value is important.
-            If False, the actual valid path and self.path may differ, leading to strange behaviour and potential exceptions if the model needs to load any other files at a later time.
-        verbose : bool, default True
-            Whether to log the location of the loaded file.
 
         Returns
         -------
-        model : cls
-            Loaded model object.
+        learning_curves : List
+            Loaded learning curve data.
         """
-        file_path = os.path.join(path, cls.model_file_name)
-        model = load_pkl.load(path=file_path, verbose=verbose)
-        if reset_paths:
-            model.set_contexts(path)
-        if hasattr(model, "_compiler"):
-            if model._compiler is not None and not model._compiler.save_in_pkl:
-                model.model = model._compiler.load(path=path)
-        return model
+        if not cls._get_class_tags().get("supports_learning_curves", False):
+            raise ValueError("Attempted to load learning curves from model without learning curve support")
+
+        file = os.path.join(path, cls.learning_curve_file_name)
+
+        if not os.path.exists(file):
+            raise FileNotFoundError(f"Could not find learning curve file at {file}" + \
+                "\nDid you call predictor.fit() with an appropriate learning_curves parameter?")
+
+        return load_json.load(file)
+
 
     # TODO: v1.0: Add docs
     def compute_feature_importance(
@@ -1985,7 +2021,7 @@ class AbstractModel:
             "hyperparameters": self.params,
             "hyperparameters_fit": self.params_trained,  # TODO: Explain in docs that this is for hyperparameters that differ in final model from original hyperparameters, such as epochs (from early stopping)
             "hyperparameters_nondefault": self.nondefault_params,
-            AG_ARGS_FIT: self.params_aux,
+            AG_ARGS_FIT: self.get_params_aux_info(),
             "num_features": len(self.features) if self.features else None,
             "features": self.features,
             "feature_metadata": self.feature_metadata,
@@ -1998,6 +2034,25 @@ class AbstractModel:
             "can_infer": self.can_infer(),
         }
         return info
+
+    def get_params_aux_info(self) -> dict:
+        """
+        Converts learning curve scorer objects into their name strings.
+
+        Parameters:
+        -----------
+        None
+
+        Returns:
+        --------
+        params_aux dictionary with changed curve_metrics field, if applicable.
+        """
+        if "curve_metrics" in self.params_aux:
+            params_aux = self.params_aux.copy()
+            params_aux["curve_metrics"] = [metric.name for metric in params_aux["curve_metrics"]]
+            return params_aux
+
+        return self.params_aux
 
     @classmethod
     def load_info(cls, path: str, load_model_if_required: bool = True) -> dict:

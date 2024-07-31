@@ -138,13 +138,19 @@ class XGBoostModel(AbstractModel):
         # xgb does not support list(custom_metrics). Instead, use the CustomMetricCallback defined in xgb callbacks file
         if "eval_metric" not in params:
             eval_metric = self.get_eval_metric()
-            if eval_metric is not None:
-                params["eval_metric"] = eval_metric
+            eval_metric_name = eval_metric.__name__ if not isinstance(eval_metric, str) else eval_metric
+            params["eval_metric"] = eval_metric
 
         if generate_curves and eval_set is not None:
-            metric_names = list(set(ag_params.get("curve_metrics", [])))
-            use_curve_metric_error = ag_params.get("use_error_for_curve_metrics", True)
-            scorers = [get_metric(name, self.problem_type, "eval_metric") for name in metric_names]
+            scorers = ag_params.get("curve_metrics", [])
+            use_curve_metric_error = ag_params.get("use_error_for_curve_metrics", False)
+            metric_names = [scorer.name for scorer in scorers]
+
+            if eval_metric_name in metric_names:
+                idx = metric_names.index(eval_metric_name)
+                scorers[idx].name = f"_{eval_metric_name}"
+                metric_names[idx] = scorers[idx].name
+
             eval_set = [(X, y)] + eval_set
 
         if num_gpus != 0:
@@ -165,8 +171,8 @@ class XGBoostModel(AbstractModel):
             if log_period is not None:
                 callbacks.append(EvaluationMonitor(period=log_period))
 
-            # metric_name=eval_metric forces stopping_metric to be used for early stopping rather than arbitrary last metric
-            callbacks.append(EarlyStoppingCustom(early_stopping_rounds, start_time=start_time, time_limit=time_limit, verbose=verbose, metric_name=eval_metric))
+            # metric_name=eval_metric forces stopping_metric to be used for early stopping rather than arbitrary last metric            
+            callbacks.append(EarlyStoppingCustom(early_stopping_rounds, start_time=start_time, time_limit=time_limit, verbose=verbose, metric_name=eval_metric_name))
             params["callbacks"] = callbacks
 
         from xgboost import XGBClassifier, XGBRegressor
@@ -181,15 +187,25 @@ class XGBoostModel(AbstractModel):
             self.model.fit(X=X, y=y, eval_set=eval_set, verbose=False, sample_weight=sample_weight)
 
         if generate_curves:
+            def og_name(key):
+                if key == f'_{eval_metric_name}':
+                    return eval_metric_name
+                return key
+
             def filter(d, keys):
-                return {key: d[key] for key in keys if key in d}
+                return {og_name(key): d[key] for key in keys if key in d}
 
             # validation_{i} is listed in order specified by eval_set: train, test, valid
             eval_results = self.model.evals_result()
             curves = [filter(eval_results["validation_0"], metric_names)]
             curves += [filter(eval_results["validation_2"], metric_names)] if X_test is not None else []
-            curves.append(filter(eval_results["validation_1"], metric_names))
-            self.save_curves(metric_names, *curves) # curves should be ordered: train, val, test or train, val
+            curves += [filter(eval_results["validation_1"], metric_names)]
+
+            if f'_{eval_metric_name}' in metric_names:
+                idx = metric_names.index(f'_{eval_metric_name}')
+                metric_names[idx] = eval_metric_name
+
+            self.save_learning_curves(metric_names, *curves) # curves should be ordered: train, val, test or train, val
 
         bst = self.model.get_booster()
         # TODO: Investigate speed-ups from GPU inference
@@ -306,6 +322,12 @@ class XGBoostModel(AbstractModel):
             model.model.load_model(os.path.join(path, "xgb.ubj"))
             model._xgb_model_type = None
         return model
+
+    @classmethod
+    def _class_tags(cls):
+        tags = super(XGBoostModel, cls)._class_tags().copy()
+        tags.update({"supports_learning_curves": True})
+        return tags
 
     def _more_tags(self):
         # `can_refit_full=True` because n_estimators is communicated at end of `_fit`:

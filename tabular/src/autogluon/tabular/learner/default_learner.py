@@ -5,7 +5,7 @@ import time
 
 import numpy as np
 import pandas as pd
-from pandas import DataFrame
+from pandas import DataFrame, Series
 
 from autogluon.common.utils.log_utils import convert_time_in_s_to_log_friendly
 from autogluon.core.constants import AUTO_WEIGHT, BALANCE_WEIGHT, BINARY, MULTICLASS, QUANTILE, REGRESSION
@@ -89,7 +89,15 @@ class DefaultLearner(AbstractTabularLearner):
             num_bag_folds = len(X[self.groups].unique())
         X_og = None if infer_limit_batch_size is None else X
         logger.log(20, "Preprocessing data ...")
-        X, y, X_val, y_val, X_test, y_test, X_unlabeled, holdout_frac, num_bag_folds, groups = self.general_data_processing(X, X_val, X_unlabeled, holdout_frac, num_bag_folds, X_test=X_test)
+        X, y, X_val, y_val, X_test, y_test, X_unlabeled, holdout_frac, num_bag_folds, groups = \
+            self.general_data_processing(
+                X=X,
+                X_val=X_val,
+                X_test=X_test, 
+                X_unlabeled=X_unlabeled, 
+                holdout_frac=holdout_frac, 
+                num_bag_folds=num_bag_folds
+            )
         if X_og is not None:
             infer_limit = self._update_infer_limit(X=X_og, infer_limit_batch_size=infer_limit_batch_size, infer_limit=infer_limit)
 
@@ -191,7 +199,7 @@ class DefaultLearner(AbstractTabularLearner):
         return infer_limit
 
     # TODO: Add default values to X_val, X_unlabeled, holdout_frac, and num_bag_folds
-    def general_data_processing(self, X: DataFrame, X_val: DataFrame, X_unlabeled: DataFrame, holdout_frac: float, num_bag_folds: int, X_test : DataFrame = None):
+    def general_data_processing(self, X: DataFrame = None, X_val: DataFrame = None, X_test : DataFrame = None, X_unlabeled: DataFrame = None, holdout_frac: float = 1, num_bag_folds: int = 0):
         """General data processing steps used for all models."""
         X = self._check_for_non_finite_values(X, is_train=True)
         X_val = self._check_for_non_finite_values(X_val, is_train=False)
@@ -229,7 +237,7 @@ class DefaultLearner(AbstractTabularLearner):
             logger.log(20, f"Train Data Class Count: {self.label_cleaner.num_classes}")
 
         X_val, y_val, w_val, holdout_frac = self._apply_cleaner_transform(X_val, y_uncleaned, holdout_frac, holdout_frac_og, "X_val")
-        X_test, y_test, w_test, holdout_frac = self._apply_cleaner_transform(X_test, y_uncleaned, holdout_frac, holdout_frac_og, "X_test")
+        X_test, y_test, w_test, _ = self._apply_cleaner_transform(X_test, y_uncleaned, holdout_frac, holdout_frac_og, "X_test")
 
         self._original_features = list(X.columns)
         # TODO: Move this up to top of data before removing data, this way our feature generator is better
@@ -261,19 +269,20 @@ class DefaultLearner(AbstractTabularLearner):
         idx = 0
         for i in range(len(datasets)):
             if datasets[i] is not None:
-                datasets[i] = X_super.iloc[idx : idx + len(datasets[i])].set_index(datasets[i].index)
-                idx += len(datasets[i])
+                length = len(datasets[i])
+                datasets[i] = X_super.iloc[idx : idx + length].set_index(datasets[i].index)
+                idx += length
 
         X, X_val, X_test, X_unlabeled = datasets
         del X_super
 
         # TODO: consider not bundling sample-weights inside X, X_val
-        X = self.bundle_weights(X, w, "X")
-        X_val = self.bundle_weights(X_val, w_val, "X_val")
-        X_test = self.bundle_weights(X_test, w_test, "X_test")
+        X = self.bundle_weights(X, w, "X", is_train=True)
+        X_val = self.bundle_weights(X_val, w_val, "X_val", is_train=False)
+        X_test = self.bundle_weights(X_test, w_test, "X_test", is_train=False)
         return X, y, X_val, y_val, X_test, y_test, X_unlabeled, holdout_frac, num_bag_folds, groups
 
-    def bundle_weights(self, X, w, X_name, is_train=False):
+    def bundle_weights(self, X: DataFrame | None, w: Series | None, name: str, is_train=False) -> DataFrame:
         if is_train:
             if w is not None:
                 X[self.sample_weight] = w
@@ -285,7 +294,8 @@ class DefaultLearner(AbstractTabularLearner):
                 nan_vals[:] = np.nan
                 X[self.sample_weight] = nan_vals
             else:
-                raise ValueError(f"sample_weight column '{self.sample_weight}' cannot be missing from {X_name} dataset if weight_evaluation=True")
+                raise ValueError(f"sample_weight column '{self.sample_weight}' \
+                                 cannot be missing from {name} dataset if weight_evaluation=True")
 
         return X
 
@@ -310,7 +320,7 @@ class DefaultLearner(AbstractTabularLearner):
         X[self.sample_weight] = w  # TODO: consider not bundling sample weights inside X
         return X
 
-    def _check_for_non_finite_values(self, X, is_train=False):
+    def _check_for_non_finite_values(self, X: DataFrame, is_train=False) -> DataFrame:
         if is_train or (X is not None and self.label in X.columns):
             X = copy.deepcopy(X)
 
@@ -325,7 +335,14 @@ class DefaultLearner(AbstractTabularLearner):
 
         return X
     
-    def _apply_cleaner_transform(self, X, y_uncleaned, holdout_frac, holdout_frac_og, X_name):
+    def _apply_cleaner_transform(
+            self, 
+            X: DataFrame, 
+            y_uncleaned: Series, 
+            holdout_frac: float | int, 
+            holdout_frac_og: float | int, 
+            X_name: str
+        ) -> tuple[DataFrame, Series, Series | None, float | int]:
         if X is not None and self.label in X.columns:
             y_og = X[self.label]
             X = self.cleaner.transform(X)

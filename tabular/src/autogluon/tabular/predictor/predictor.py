@@ -43,8 +43,6 @@ from autogluon.core.constants import (
     QUANTILE,
     REGRESSION,
     SOFTCLASS,
-    LEARNING_CURVE_SUPPORTED_MODELS,
-    DEFAULT_LEARNING_CURVE_METRICS,
 )
 from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.dataset import TabularDataset
@@ -942,20 +940,19 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 (which may improve metrics like log_loss) and will train a scalar parameter on the validation set.
                 If True and the problem_type is quantile regression, conformalization will be used to calibrate the Predictor's estimated quantiles
                 (which may improve the prediction interval coverage, and bagging could further improve it) and will compute a set of scalar parameters on the validation set.
-            test_data : str or :class:`TabularDataset` or :class:`pd.DataFrame`
+            test_data : str or :class:`TabularDataset` or :class:`pd.DataFrame`, default = None
                 Table of the test data, which is similar to a pandas DataFrame.
-                If str is passed, `train_data` will be loaded using the str value as the file path.
+                If str is passed, `test_data` will be loaded using the str value as the file path.
                 NOTE: This test_data is NEVER SEEN by the model during training and, if specified, is only used for logging purposes (i.e. for learning curve generation).
                 This test_data should be treated the same way test data is used in predictor.leaderboard.
-            learning_curves : bool or dict, default = True
+            learning_curves : bool or dict, default = None
                 If bool and is True, default learning curve hyperparameter ag_args will be initialized for each of the models included in the ensemble.
-                    Default metrics for each problem type are maintained in autogluon.core.constants:
-                    BINARY: ["log_loss", "accuracy", "precision", "recall", "f1", "roc_auc"],
-                    REGRESSION: ['root_mean_squared_error', 'mean_squared_error', 'mean_absolute_error', 'median_absolute_error', 'r2'],
-                    MULTICLASS: ["accuracy", "precision_weighted", "recall_weighted", "f1_weighted"],
-                If dict, user can pass learning_curve parameters to be initialized as ag_args in the following format:
-                    {
-                        "metrics": str or list(str) : str represents autogluon scorer metric names calculated at each iteration
+                    By default, learning curves will include eval_metric scores specified in fit call arguments. 
+                    This can be overwritten as shown below.
+                If dict, user can pass learning_curves parameters to be initialized as ag_args in the following format:
+                    learning_curves = {
+                        "metrics": str or list(str) or Scorer or list(Scorer): 
+                            autogluon metric scorer(s) to be calculated at each iteration, represented as Scorer object(s) or scorer name(s) (str)
                         "use_error": bool : whether to use error or score format for metrics listed above
                     }
 
@@ -1083,7 +1080,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             self._learner.validate_label(X=train_data)
             inferred_problem_type = self._learner.infer_problem_type(y=train_data[self.label], silent=True)
 
-        learning_curves = self._initialize_learning_curve_params(learning_curves, inferred_problem_type)
+        learning_curves = self._initialize_learning_curve_params(learning_curves=learning_curves, problem_type=inferred_problem_type)
         if len(learning_curves) == 0:
             test_data = None
         if ag_args_fit is not None:
@@ -2590,11 +2587,12 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             display=display,
         )
 
-    def learning_curves(self):
+    def learning_curves(self) -> Tuple[dict, dict]:
         """
         Retrieves learning curves generated during predictor.fit(). 
         Will not work if the learning_curves flag was not set during training.
-        Note that learning curves are only generated for iterative learners.
+        Note that learning curves are only generated for iterative learners with 
+        learning curve support.
 
         Parameters
         ----------
@@ -2602,53 +2600,62 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
         Returns
         -------
-        :class:`dict` object. Returns aggregated learning curves across all models.
-        Aggregation should look like this:
-            {
-                metadata,
-                {
-                    "model": json from associated model's curves.json,
-                    "model": json from associated model's curves.json,
-                    "model": json from associated model's curves.json,
-                    "model": json from associated model's curves.json,
-                }
-            }
-        """
-        # build mapping from model library specific class names (i.e. XGBoost) to AG shorthand model names (i.e. XGB)
-        from autogluon.tabular.trainer.model_presets.presets import MODEL_TYPES, DEFAULT_MODEL_NAMES
-        MODEL_NAMES = {DEFAULT_MODEL_NAMES[val]: key for key, val in MODEL_TYPES.items() if val in DEFAULT_MODEL_NAMES}
+        metadata: dict
+            A dictionary containing metadata related to the training process.
 
+        model_data: dict
+            A dictionary containing the learning curves across all models.
+            To see curve_data format, refer to AbstractModel's save_learning_curves() method.
+                {
+                    "model": curve_data,
+                    "model": curve_data,
+                    "model": curve_data,
+                    "model": curve_data,
+                }
+        """
         metadata = self.info()
         path = os.path.join(metadata["path"], "models")
-        models = os.listdir(path)
-        models = [name for name in models if MODEL_NAMES.get(name, None) in LEARNING_CURVE_SUPPORTED_MODELS]
+
+        def _valid_model(model: str):
+            model_type = self._trainer.get_model_attribute(model=model, attribute="type")
+            supports_learning_curves = model_type._get_class_tags().get("supports_learning_curves", False)
+            return supports_learning_curves
+
+        metadata = {
+            "problem_type": metadata["problem_type"],
+            "eval_metric": metadata["eval_metric"],
+            "num_classes": metadata["num_classes"],
+            "num_rows_train": metadata["num_rows_train"],
+            "num_rows_val": metadata["num_rows_val"],
+            "num_rows_test": metadata["num_rows_test"],
+            "models": {
+                model: {
+                    "model_name": info["name"],
+                    "model_type": info["model_type"],
+                    "stopping_metric": info["stopping_metric"],
+                    "hyperparameters": info["hyperparameters"],
+                    "hyperparameters_fit": info["hyperparameters_fit"],
+                    "ag_args_fit": info["ag_args_fit"],
+                    "predict_time": info["predict_time"],
+                    "fit_time": info["fit_time"],
+                    "val_score": info["val_score"],
+                } for model, info in metadata["model_info"].items()
+                if _valid_model(model=model)
+            }
+        }
 
         model_data = {}
+        generated_models = os.listdir(path)
+        trained_models = self._trainer.get_model_names()
+        assert set(trained_models).issubset(generated_models)
+
+        models = trained_models
         for model in models:
-            file = os.path.join(path, model, "curves.json")
+            if _valid_model(model):
+                model_type = self._trainer.get_model_attribute(model=model, attribute="type")
+                model_data[model] = model_type.load_learning_curves(os.path.join(path, model))
 
-            if not os.path.exists(file):
-                raise FileNotFoundError(f"Could not find curves.json file at {file}" + \
-                    "\nDid you call predictor.fit() with an appropriate learning_curves parameter?")
-
-            model_data[MODEL_NAMES[model]] = load_json.load(file)
-
-            # Attempt to delete the file
-            try:
-                os.remove(file)
-            except PermissionError:
-                print(f"Error: Permission denied to delete '{file}'.")
-            except OSError as e:
-                print(f"Error: {e}")
-
-            self.verbosity
-
-        aggregated_data = [
-            metadata,
-            model_data
-        ]
-
-        return aggregated_data
+        return metadata, model_data
 
     def model_failures(self, verbose: bool = False) -> pd.DataFrame:
         """
@@ -4651,7 +4658,9 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             feature_generator="auto",
             unlabeled_data=None,
             _feature_generator_kwargs=None,
-            learning_curves=False
+            # learning curves and test data (for logging purposes only)
+            learning_curves=False,
+            test_data=None,
         )
         kwargs, ds_valid_keys = self._sanitize_dynamic_stacking_kwargs(kwargs)
         kwargs = self._validate_fit_extra_kwargs(kwargs, extra_valid_keys=list(fit_kwargs_default.keys()) + ds_valid_keys)
@@ -4744,9 +4753,6 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             # pseudo label
             pseudo_data=None,
             name_suffix=None,
-            # learning curves and test data (for logging purposes only)
-            learning_curves=False,
-            test_data=None,
         )
 
     @staticmethod
@@ -4885,7 +4891,23 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
         return train_data, tuning_data, test_data, unlabeled_data
     
-    def _validate_single_fit_dataset(self, train_data, other_data, name):
+    def _validate_single_fit_dataset(self, train_data: pd.DataFrame, other_data: pd.DataFrame, name: str):
+        """
+        Validates additional dataset, ensuring format is consistent with train dataset.
+
+        Parameters:
+        -----------
+        train_data : DataFrame
+            training set dataframe
+        other_data : DataFrame
+            additional data set
+        name : str
+            name of additional data set
+
+        Returns:
+        --------
+        None
+        """
         if other_data is not None:
             if not isinstance(other_data, pd.DataFrame):
                 raise AssertionError(f"{name} is required to be a pandas DataFrame, but was instead: {type(other_data)}")
@@ -4910,22 +4932,55 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                         f"\tAutoGluon will attempt to convert the dtypes to align."
                     )
 
-    def _initialize_learning_curve_params(self, learning_curves, problem_type):
+    def _initialize_learning_curve_params(self, learning_curves: dict | bool | None = None, problem_type: str = "") -> dict:
+        """
+        Convert users learning_curve dict parameters into ag_param format.
+        Also, converts all metrics into list of autogluon Scorer objects.
+
+        Parameters:
+        -----------
+        learning_curves : bool | dict | None
+            If bool, whether to generate learning curves.
+            If dict, the dictionary of learning_curves parameters passed into predictor from the user. 
+            If None, will not generate curves.
+        problem_type : str
+            The current problem type.
+
+        Returns:
+        --------
+        params : dict
+            The learning curves parameters in ag_params format.
+        """
         if learning_curves is None or learning_curves == False:
             return {}
         elif type(learning_curves) != dict and type(learning_curves) != bool:
             raise ValueError("VALUE ERROR: learning curves parameter must be a boolean or dict!")
 
-        use_error = True
-        metrics = DEFAULT_LEARNING_CURVE_METRICS[problem_type]
+        # metrics defaults to self.eval_metric if not specified
+        metrics = None
+        use_error = False
+
+        def make_scorer(name):
+            return get_metric(name, problem_type, "eval_metric")
 
         if type(learning_curves) == dict:
             if "metrics" in learning_curves:
-                if type(learning_curves["metrics"]) == str:
+                if isinstance(learning_curves["metrics"], str):
+                    metrics = [make_scorer(learning_curves["metrics"])]
+                elif isinstance(learning_curves["metrics"], Scorer):
                     metrics = [learning_curves["metrics"]]
-                else:
-                    # replace all aliases with actual metric names and remove duplicate metrics
-                    metrics = list(set([get_metric(metric, problem_type, "eval_metric").name for metric in learning_curves["metrics"]]))
+                elif isinstance(learning_curves["metrics"], list):
+                    names, scorers = [], []
+                    for metric in learning_curves["metrics"]:
+                        if isinstance(metric, str):
+                            names.append(metric)
+                        elif isinstance(metric, Scorer):
+                            scorers.append(metric)
+
+                    # remove duplicate metrics / aliases
+                    names = list(set([make_scorer(name).name for name in names]))
+                    names = [make_scorer(name) for name in names]
+                    metrics = names + scorers
 
             if "use_error" in learning_curves:
                 use_error = learning_curves["use_error"]

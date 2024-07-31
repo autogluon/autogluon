@@ -1,3 +1,4 @@
+import copy
 import gc
 import logging
 import os
@@ -204,18 +205,19 @@ class LGBModel(AbstractModel):
         }
 
         if generate_curves:
-            metric_names = list(set(ag_params.get("curve_metrics", [])))
-            use_curve_metric_error = ag_params.get("use_error_for_curve_metrics", True)
-            og_metric_names = metric_names.copy()
+            scorers = ag_params.get("curve_metrics", [])
+            use_curve_metric_error = ag_params.get("use_error_for_curve_metrics", False)
+            metric_names = [scorer.name for scorer in scorers]
 
-            if self.stopping_metric.name not in metric_names:
-                metric_names.append(self.stopping_metric.name)
+            if stopping_metric_name in metric_names:
+                idx = metric_names.index(stopping_metric_name)
+                scorers[idx].name = f"_{stopping_metric_name}"
+                metric_names[idx] = scorers[idx].name
 
-            scorers = [get_metric(name, self.problem_type, "eval_metric") for name in metric_names]
             custom_metrics = [
                 lgb_utils.func_generator(
                     metric=scorer, 
-                    is_higher_better=True, 
+                    is_higher_better=scorer.greater_is_better_internal, 
                     needs_pred_proba=not scorer.needs_pred, 
                     problem_type=self.problem_type, 
                     error=use_curve_metric_error
@@ -234,13 +236,17 @@ class LGBModel(AbstractModel):
                 train_params["valid_names"] = ["train_set"] + train_params["valid_names"]
                 train_params["valid_sets"] = [dataset_train] + train_params["valid_sets"]
 
-        if not isinstance(stopping_metric, str) and not generate_curves:
-            train_params["feval"] = stopping_metric
+        # NOTE: lgb stops based on first metric if more than one
+        if not isinstance(stopping_metric, str):
+            if generate_curves:
+                train_params["feval"].insert(0, stopping_metric)
+            else:
+                train_params["feval"] = stopping_metric
         elif isinstance(stopping_metric, str):
             if "metric" not in train_params["params"] or train_params["params"]["metric"] == "":
                 train_params["params"]["metric"] = stopping_metric
             elif stopping_metric not in train_params["params"]["metric"]:
-                train_params["params"]["metric"] = f'{train_params["params"]["metric"]},{stopping_metric}'
+                train_params["params"]["metric"] = f'{stopping_metric},{train_params["params"]["metric"]}'
 
         if self.problem_type == SOFTCLASS:
             train_params["fobj"] = lgb_utils.softclass_lgbobj
@@ -252,7 +258,7 @@ class LGBModel(AbstractModel):
             np.random.seed(seed_val)
 
         # Train LightGBM model:
-        # Note that self.model returns a <class 'lightgbm.basic.Booster'> not a LightBGMClassifier or LightGBMRegressor object
+        # Note that self.model contains a <class 'lightgbm.basic.Booster'> not a LightBGMClassifier or LightGBMRegressor object
         from lightgbm.basic import LightGBMError
 
         with warnings.catch_warnings():
@@ -293,13 +299,23 @@ class LGBModel(AbstractModel):
                         logger.log(15, f"Not enough time to retrain LGB model ('dart' mode)...")
 
         if generate_curves:
-            def filter(d, keys):
-                return {key: d[key] for key in keys if key in d}
+            def og_name(key):
+                if key == f'_{stopping_metric_name}':
+                    return stopping_metric_name
+                return key
 
-            curves = [filter(eval_results["train_set"], og_metric_names)]
-            curves += [filter(eval_results["valid_set"], og_metric_names)] if X_val is not None else []
-            curves += [filter(eval_results["test_set"], og_metric_names)] if X_test is not None else []
-            self.save_curves(og_metric_names, *curves)
+            def filter(d, keys):
+                return {og_name(key): d[key] for key in keys if key in d}
+
+            curves = [filter(eval_results["train_set"], metric_names)]
+            curves += [filter(eval_results["valid_set"], metric_names)] if X_val is not None else []
+            curves += [filter(eval_results["test_set"], metric_names)] if X_test is not None else []
+
+            if f'_{stopping_metric_name}' in metric_names:
+                idx = metric_names.index(f'_{stopping_metric_name}')
+                metric_names[idx] = stopping_metric_name
+
+            self.save_learning_curves(metric_names, *curves)
 
         if dataset_val is not None and not retrain:
             self.params_trained["num_boost_round"] = self.model.best_iteration
@@ -494,6 +510,12 @@ class LGBModel(AbstractModel):
 
     def _ag_params(self) -> set:
         return {"early_stop", "generate_curves", "curve_metrics", "use_error_for_curve_metrics"}
+
+    @classmethod
+    def _class_tags(cls):
+        tags = super(LGBModel, cls)._class_tags().copy()
+        tags.update({"supports_learning_curves": True})
+        return tags
 
     def _more_tags(self):
         # `can_refit_full=True` because num_boost_round is communicated at end of `_fit`
