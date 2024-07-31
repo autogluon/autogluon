@@ -403,6 +403,10 @@ def _ray_fit(
     train_index = train_index if isinstance(train_index, np.ndarray) else np.frombuffer(train_index[b"data"], dtype=train_index[b"type"]).reshape(train_index[b"shape"])
     val_index = val_index if isinstance(val_index, np.ndarray) else np.frombuffer(val_index[b"data"], dtype=val_index[b"type"]).reshape(val_index[b"shape"])
 
+    if "sample_weight" in kwargs_fold:
+        kwargs_fold["sample_weight"] = kwargs_fold["sample_weight"] if isinstance(kwargs_fold["sample_weight"], np.ndarray) \
+            else np.frombuffer(kwargs_fold["sample_weight"][b"data"], dtype=kwargs_fold["sample_weight"][b"type"]).reshape(kwargs_fold["sample_weight"][b"shape"])
+
     X_fold, X_val_fold = X.iloc[train_index, :], X.iloc[val_index, :]
     y_fold, y_val_fold = y.iloc[train_index], y.iloc[val_index]
     if is_pseudo:
