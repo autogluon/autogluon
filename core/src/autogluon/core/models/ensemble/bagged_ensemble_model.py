@@ -482,6 +482,7 @@ class BaggedEnsembleModel(AbstractModel):
             )
             unfinished.append(result_ref)
             job_refs_map[result_ref] = job_index
+            time.sleep(0.1)
 
         # Memory overhead to be deterministic
         pred_proba_list = []

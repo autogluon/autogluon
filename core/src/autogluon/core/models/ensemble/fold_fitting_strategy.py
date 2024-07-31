@@ -7,6 +7,7 @@ import time
 import warnings
 from abc import abstractmethod
 from typing import Any, Dict, Optional, Tuple, Union
+import numpy as np
 
 import pandas as pd
 from numpy import ndarray
@@ -398,6 +399,9 @@ def _ray_fit(
                 X_pseudo = pickle.load(X_pseudo_f)
                 y_pseudo = pickle.load(y_pseudo_f)
         is_pseudo = True
+
+    train_index = train_index if isinstance(train_index, np.ndarray) else np.frombuffer(train_index[b"data"], dtype=train_index[b"type"]).reshape(train_index[b"shape"])
+    val_index = val_index if isinstance(val_index, np.ndarray) else np.frombuffer(val_index[b"data"], dtype=val_index[b"type"]).reshape(val_index[b"shape"])
 
     X_fold, X_val_fold = X.iloc[train_index, :], X.iloc[val_index, :]
     y_fold, y_val_fold = y.iloc[train_index], y.iloc[val_index]

@@ -1188,7 +1188,7 @@ class AbstractTrainer:
                 batches.append(batch)
 
             # -- Parallel Predict
-            remote_func = ray.remote(max_calls=50, max_retries=0, retry_exceptions=False)(_remote_predict)
+            remote_func = ray.remote(max_calls=10, max_retries=0, retry_exceptions=False)(_remote_predict)
             self_ref = ray.put(self)
             X_ref = ray.put(X)
 
@@ -1218,6 +1218,7 @@ class AbstractTrainer:
                     )
                     logger.log(20, f"Scheduled predicting with model for {model}\n\t{result_ref}")
                     job_refs.append(result_ref)
+                    time.sleep(0.1)
 
                 unfinished_models = model_batch[ag_ray_workers:]
                 unfinished = job_refs
