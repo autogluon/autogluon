@@ -182,7 +182,8 @@ class StackerEnsembleModel(BaggedEnsembleModel):
                         base_model = self.load_base_model(base_model_name)
                         y_pred_proba = base_model.predict_proba(X)
                     X_stacker.append(
-                        y_pred_proba
+                        y_pred_proba if isinstance(y_pred_proba, np.ndarray)
+                        else np.frombuffer(y_pred_proba[b"data"], dtype=y_pred_proba[b"type"]).reshape(y_pred_proba[b"shape"])
                     )  # TODO: This could get very large on a high class count problem. Consider capping to top N most frequent classes and merging least frequent
                 X_stacker = self.pred_probas_to_df(X_stacker, index=X.index)
                 if self.params["use_orig_features"]:
