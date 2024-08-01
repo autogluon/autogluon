@@ -66,7 +66,7 @@ tests_require = [
     "onnx>=1.13.0,<1.14.0",
     "onnxruntime>=1.15.0,<1.16.0;platform_system=='Darwin'",
     "onnxruntime-gpu>=1.15.0,<1.16.0;platform_system!='Darwin'",
-    "tensorrt>=8.6.0,<8.6.2;platform_system=='Linux' and python_version<'3.11'",
+    "tensorrt>=8.6.0,<10.3;platform_system=='Linux' and python_version<'3.11'",
 ]
 
 extras_require = {"tests": tests_require}
