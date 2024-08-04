@@ -750,6 +750,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                 num_classes=self._output_shape,
                 num_numerical_columns=len(df_preprocessor.numerical_feature_names),
                 num_categories=df_preprocessor.categorical_num_categories,
+                column_types=self._column_types,
             )
         return model
 
@@ -2354,6 +2355,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             num_numerical_columns=len(learner._df_preprocessor.numerical_feature_names),
             num_categories=learner._df_preprocessor.categorical_num_categories,
             pretrained=False if not peft else True,  # set "pretrain=False" to prevent downloading online models
+            column_types=learner.column_types,
         )
         if learner._data_processors is None:
             learner._data_processors = create_fusion_data_processors(
