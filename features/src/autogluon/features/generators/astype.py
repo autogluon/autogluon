@@ -67,7 +67,9 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
         elif convert_bool_method == "auto":
             self._use_fast_bool_method = "auto"
         else:
-            raise ValueError(f"Unknown `convert_bool_method` value: {convert_bool_method}. " f'Valid values: ["v1", "v2", "auto"]')
+            raise ValueError(
+                f"Unknown `convert_bool_method` value: {convert_bool_method}. " f'Valid values: ["v1", "v2", "auto"]'
+            )
         self._bool_features_list = None
         self._non_bool_features_list = None
         self._bool_features_val = None
@@ -115,7 +117,11 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
                         self._bool_features[feature] = feature_bool_val
 
         if self._bool_features:
-            self._log(20, f"\tNote: Converting {len(self._bool_features)} features to boolean dtype " f"as they only contain 2 unique values.")
+            self._log(
+                20,
+                f"\tNote: Converting {len(self._bool_features)} features to boolean dtype "
+                f"as they only contain 2 unique values.",
+            )
             self._set_bool_features_val()
             if self._use_fast_bool_method == "auto":
                 self._use_fast_bool_method = len(self._bool_features) >= self._convert_bool_method_v2_threshold
@@ -246,7 +252,9 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
         super()._infer_features_in_full(X=X, feature_metadata_in=feature_metadata_in)
         type_map_real = get_type_map_real(X[self.feature_metadata_in.get_features()])
         self._type_map_real_opt = X[self.feature_metadata_in.get_features()].dtypes.to_dict()
-        self._feature_metadata_in_real = FeatureMetadata(type_map_raw=type_map_real, type_group_map_special=self.feature_metadata_in.get_type_group_map_raw())
+        self._feature_metadata_in_real = FeatureMetadata(
+            type_map_raw=type_map_real, type_group_map_special=self.feature_metadata_in.get_type_group_map_raw()
+        )
 
     def _remove_features_in(self, features):
         super()._remove_features_in(features)
@@ -266,7 +274,9 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
 
     def print_feature_metadata_info(self, log_level=20):
         self._log(log_level, "\tOriginal Features (exact raw dtype, raw dtype):")
-        self._feature_metadata_in_real.print_feature_metadata_full(self.log_prefix + "\t\t", print_only_one_special=True, log_level=log_level)
+        self._feature_metadata_in_real.print_feature_metadata_full(
+            self.log_prefix + "\t\t", print_only_one_special=True, log_level=log_level
+        )
         super().print_feature_metadata_info(log_level=log_level)
 
     def _more_tags(self):

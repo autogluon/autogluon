@@ -57,7 +57,9 @@ class PipelineFeatureGenerator(BulkFeatureGenerator):
         # (will contain dtypes such as 'int16' and 'float32' instead of 'int' and 'float').
         self._feature_metadata_in_real: FeatureMetadata = None
 
-        self._is_dummy = False  # If True, returns a single dummy feature as output. Occurs if fit with no useful features.
+        self._is_dummy = (
+            False  # If True, returns a single dummy feature as output. Occurs if fit with no useful features.
+        )
 
         self.pre_memory_usage = None
         self.pre_memory_usage_per_row = None
@@ -73,7 +75,9 @@ class PipelineFeatureGenerator(BulkFeatureGenerator):
 
     def _fit_transform(self, X: DataFrame, y=None, **kwargs):
         X_out, type_group_map_special = super()._fit_transform(X=X, y=y, **kwargs)
-        X_out, type_group_map_special = self._fit_transform_custom(X_out=X_out, type_group_map_special=type_group_map_special, y=y)
+        X_out, type_group_map_special = self._fit_transform_custom(
+            X_out=X_out, type_group_map_special=type_group_map_special, y=y
+        )
         return X_out, type_group_map_special
 
     def _fit_transform_custom(self, X_out: DataFrame, type_group_map_special: dict, y=None) -> (DataFrame, dict):
@@ -94,7 +98,9 @@ class PipelineFeatureGenerator(BulkFeatureGenerator):
     def _infer_features_in_full(self, X: DataFrame, feature_metadata_in: FeatureMetadata = None):
         super()._infer_features_in_full(X=X, feature_metadata_in=feature_metadata_in)
         type_map_real = get_type_map_real(X[self.feature_metadata_in.get_features()])
-        self._feature_metadata_in_real = FeatureMetadata(type_map_raw=type_map_real, type_group_map_special=self.feature_metadata_in.get_type_group_map_raw())
+        self._feature_metadata_in_real = FeatureMetadata(
+            type_map_raw=type_map_real, type_group_map_special=self.feature_metadata_in.get_type_group_map_raw()
+        )
 
     def _remove_features_in(self, features: list):
         super()._remove_features_in(features)
@@ -103,20 +109,25 @@ class PipelineFeatureGenerator(BulkFeatureGenerator):
 
     def _pre_fit_validate(self, X: DataFrame, **kwargs):
         super()._pre_fit_validate(X=X, **kwargs)
-        self._ensure_no_duplicate_column_names(X=X)  # TODO: Remove this, move pre_memory_usage and post_memory_usage into super().
+        self._ensure_no_duplicate_column_names(
+            X=X
+        )  # TODO: Remove this, move pre_memory_usage and post_memory_usage into super().
         self._compute_pre_memory_usage(X)
 
     def _compute_pre_memory_usage(self, X: DataFrame):
         X_len = len(X)
         self.pre_memory_usage = get_approximate_df_mem_usage(X, sample_ratio=0.2).sum()
-        pre_memory_usage_mb = ResourceManager.bytes_converter(value=self.pre_memory_usage, format_in="B", format_out="MB")
+        pre_memory_usage_mb = ResourceManager.bytes_converter(
+            value=self.pre_memory_usage, format_in="B", format_out="MB"
+        )
         self.pre_memory_usage_per_row = self.pre_memory_usage / X_len
         available_mem_mb = ResourceManager.get_available_virtual_mem(format="MB")
         pre_memory_usage_percent = pre_memory_usage_mb / (available_mem_mb + pre_memory_usage_mb)
         self._log(20, f"\tAvailable Memory:                    {(pre_memory_usage_mb + available_mem_mb):.2f} MB")
         self._log(
             20,
-            f"\tTrain Data (Original)  Memory Usage: {pre_memory_usage_mb:.2f} MB " f"({(pre_memory_usage_percent * 100):.1f}% of available memory)",
+            f"\tTrain Data (Original)  Memory Usage: {pre_memory_usage_mb:.2f} MB "
+            f"({(pre_memory_usage_percent * 100):.1f}% of available memory)",
         )
         if pre_memory_usage_percent > 0.05:
             self._log(
@@ -129,13 +140,20 @@ class PipelineFeatureGenerator(BulkFeatureGenerator):
         X_len = len(X)
         self.post_memory_usage = get_approximate_df_mem_usage(X, sample_ratio=0.2).sum()
         self.post_memory_usage_per_row = self.post_memory_usage / X_len
-        post_memory_usage_mb = ResourceManager.bytes_converter(value=self.post_memory_usage, format_in="B", format_out="MB")
-        pre_memory_usage_mb = ResourceManager.bytes_converter(value=self.pre_memory_usage, format_in="B", format_out="MB")
+        post_memory_usage_mb = ResourceManager.bytes_converter(
+            value=self.post_memory_usage, format_in="B", format_out="MB"
+        )
+        pre_memory_usage_mb = ResourceManager.bytes_converter(
+            value=self.pre_memory_usage, format_in="B", format_out="MB"
+        )
         available_mem_mb = ResourceManager.get_available_virtual_mem(format="MB")
-        post_memory_usage_percent = post_memory_usage_mb / (available_mem_mb + post_memory_usage_mb + pre_memory_usage_mb)
+        post_memory_usage_percent = post_memory_usage_mb / (
+            available_mem_mb + post_memory_usage_mb + pre_memory_usage_mb
+        )
         self._log(
             20,
-            f"\tTrain Data (Processed) Memory Usage: {post_memory_usage_mb:.2f} MB " f"({(post_memory_usage_percent * 100):.1f}% of available memory)",
+            f"\tTrain Data (Processed) Memory Usage: {post_memory_usage_mb:.2f} MB "
+            f"({(post_memory_usage_percent * 100):.1f}% of available memory)",
         )
         if post_memory_usage_percent > 0.15:
             self._log(
@@ -146,7 +164,10 @@ class PipelineFeatureGenerator(BulkFeatureGenerator):
 
     def print_feature_metadata_info(self, log_level=20):
         if self._useless_features_in:
-            self._log(log_level, f"\tUseless Original Features (Count: {len(self._useless_features_in)}): {list(self._useless_features_in)}")
+            self._log(
+                log_level,
+                f"\tUseless Original Features (Count: {len(self._useless_features_in)}): {list(self._useless_features_in)}",
+            )
             # TODO: What about features with 1 unique value but also np.nan?
             self._log(log_level, "\t\tThese features carry no predictive signal and should be manually investigated.")
             self._log(log_level, "\t\tThis is typically a feature which has the same value for all rows.")
@@ -172,5 +193,7 @@ class PipelineFeatureGenerator(BulkFeatureGenerator):
             self._log(log_level, "\t\tThese features do not need to be present at inference time.")
             self._feature_metadata_in_unused.print_feature_metadata_full(self.log_prefix + "\t\t", log_level=log_level)
         self._log(log_level - 5, "\tTypes of features in original data (exact raw dtype, raw dtype):")
-        self._feature_metadata_in_real.print_feature_metadata_full(self.log_prefix + "\t\t", print_only_one_special=True, log_level=log_level - 5)
+        self._feature_metadata_in_real.print_feature_metadata_full(
+            self.log_prefix + "\t\t", print_only_one_special=True, log_level=log_level - 5
+        )
         super().print_feature_metadata_info(log_level=log_level)

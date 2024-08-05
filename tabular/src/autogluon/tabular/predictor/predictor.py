@@ -413,6 +413,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         calibrate_decision_threshold: bool | str = False,
         num_cpus: int | str = "auto",
         num_gpus: int | str = "auto",
+        memory_limit: float | str = "auto",
         **kwargs,
     ) -> "TabularPredictor":
         """
@@ -698,6 +699,16 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             The total amount of gpus you want AutoGluon predictor to use.
             Auto means AutoGluon will make the decision based on the total number of gpus available and the model requirement for best performance.
             Users generally don't need to set this value
+        memory_limit: float | str, default = "auto"
+            The total amount of memory in GB you want AutoGluon predictor to use. "auto" means AutoGluon will use all available memory on the system
+            (that is detectable by psutil).
+            Note that this is only a soft limit! AutoGluon uses this limit to skip training models that are expected to require too much memory or stop
+            training a model that would exceed the memory limit. AutoGluon does not guarantee the enforcement of this limit (yet). Nevertheless, we expect
+            AutoGluon to abide by the limit in most cases or, at most, go over the limit by a small margin.
+            For most virtualized systems (e.g., in the cloud) and local usage on a server or laptop, "auto" is ideal for this parameter. We recommend manually
+            setting the memory limit (and any other resources) on systems with shared resources that are controlled by the operating system (e.g., SLURM and
+            cgroups). Otherwise, AutoGluon might wrongly assume more resources are available for fitting a model than the operating system allows,
+            which can result in model training failing or being very inefficient.
         **kwargs :
             auto_stack : bool, default = False
                 Whether AutoGluon should automatically utilize bagging and multi-layer stack ensembling to boost predictive accuracy.
@@ -1010,6 +1021,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
         self._validate_num_cpus(num_cpus=num_cpus)
         self._validate_num_gpus(num_gpus=num_gpus)
+        self._validate_and_set_memory_limit(memory_limit=memory_limit)
         self._validate_calibrate_decision_threshold(calibrate_decision_threshold=calibrate_decision_threshold)
 
         holdout_frac = kwargs["holdout_frac"]
@@ -1592,6 +1604,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         full_weighted_ensemble_additionally: bool = False,
         num_cpus: str | int = "auto",
         num_gpus: str | int = "auto",
+        memory_limit: float | str = "auto",
         **kwargs,
     ) -> "TabularPredictor":
         """
@@ -1633,6 +1646,16 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             The total amount of gpus you want AutoGluon predictor to use.
             Auto means AutoGluon will make the decision based on the total number of gpus available and the model requirement for best performance.
             Users generally don't need to set this value
+        memory_limit: float | str, default = "auto"
+            The total amount of memory in GB you want AutoGluon predictor to use. "auto" means AutoGluon will use all available memory on the system
+            (that is detectable by psutil).
+            Note that this is only a soft limit! AutoGluon uses this limit to skip training models that are expected to require too much memory or stop
+            training a model that would exceed the memory limit. AutoGluon does not guarantee the enforcement of this limit (yet). Nevertheless, we expect
+            AutoGluon to abide by the limit in most cases or, at most, go over the limit by a small margin.
+            For most virtualized systems (e.g., in the cloud) and local usage on a server or laptop, "auto" is ideal for this parameter. We recommend manually
+            setting the memory limit (and any other resources) on systems with shared resources that are controlled by the operating system (e.g., SLURM and
+            cgroups). Otherwise, AutoGluon might wrongly assume more resources are available for fitting a model than the operating system allows,
+            which can result in model training failing or being very inefficient.
         **kwargs :
             Refer to kwargs documentation in :meth:`TabularPredictor.fit`.
             Note that the following kwargs are not available in `fit_extra` as they cannot be changed from their values set in `fit()`:
@@ -1660,6 +1683,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
         self._validate_num_cpus(num_cpus=num_cpus)
         self._validate_num_gpus(num_gpus=num_gpus)
+        self._validate_and_set_memory_limit(memory_limit=memory_limit)
 
         # TODO: Allow disable aux (default to disabled)
         # TODO: num_bag_sets
@@ -4586,6 +4610,22 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         else:
             if num_gpus < 0:
                 raise ValueError(f"`num_gpus` must be greater than or equal to 0. (num_gpus={num_gpus})")
+
+    def _validate_and_set_memory_limit(self, memory_limit: float | str):
+        if memory_limit is None:
+            raise ValueError(f"`memory_limit` must be an int, float, or 'auto'. Value: {memory_limit}")
+        if isinstance(memory_limit, str):
+            if memory_limit != "auto":
+                raise ValueError(f"`memory_limit` must be an int, float, or 'auto'. Value: {memory_limit}")
+        elif not isinstance(memory_limit, (int, float)):
+            raise TypeError("`memory_limit` must be an int, float, or 'auto'." f" Found: {type(memory_limit)} | Value: {memory_limit}")
+        else:
+            if memory_limit <= 0:
+                raise ValueError(f"`memory_limit` must be greater than 0. (memory_limit={memory_limit})")
+
+        if memory_limit != "auto":
+            logger.log(20, f"Enforcing custom memory (soft) limit of {memory_limit} GB!")
+            os.environ["AG_MEMORY_LIMIT_IN_GB"] = str(memory_limit)
 
     def _fit_extra_kwargs_dict(self) -> dict:
         """

@@ -144,7 +144,7 @@ class DefaultLearner(AbstractTabularLearner):
             predict_n_time_per_row = trainer.get_model_attribute_full(model=trainer.model_best, attribute="predict_n_time_per_row")
             predict_n_size = trainer.get_model_attribute_full(model=trainer.model_best, attribute="predict_n_size", func=min)
             if predict_n_time_per_row is not None and predict_n_size is not None:
-                log_throughput = f" | Estimated inference throughput: {(1/predict_n_time_per_row):.1f} rows/s ({int(predict_n_size)} batch size)"
+                log_throughput = f" | Estimated inference throughput: {1/(predict_n_time_per_row if predict_n_time_per_row else np.finfo(np.float16).eps):.1f} rows/s ({int(predict_n_size)} batch size)"
         logger.log(
             20, f"AutoGluon training complete, total runtime = {round(self._time_fit_total, 2)}s ... Best model: {trainer.model_best}" f"{log_throughput}"
         )

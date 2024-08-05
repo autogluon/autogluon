@@ -34,4 +34,9 @@ from autogluon.common.model_filter import ModelFilter
     ],
 )
 def test_filter_model(models, included_model_types, excluded_model_types, expected_answer):
-    assert ModelFilter.filter_models(models=models, included_model_types=included_model_types, excluded_model_types=excluded_model_types) == expected_answer
+    assert (
+        ModelFilter.filter_models(
+            models=models, included_model_types=included_model_types, excluded_model_types=excluded_model_types
+        )
+        == expected_answer
+    )

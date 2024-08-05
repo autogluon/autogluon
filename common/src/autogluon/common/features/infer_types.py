@@ -25,7 +25,10 @@ def get_type_family_raw(dtype) -> str:
         elif np.issubdtype(dtype, np.floating):
             return "float"
     except Exception as err:
-        logger.error(f"Warning: dtype {dtype} is not recognized as a valid dtype by numpy! " f"AutoGluon may incorrectly handle this feature...")
+        logger.error(
+            f"Warning: dtype {dtype} is not recognized as a valid dtype by numpy! "
+            f"AutoGluon may incorrectly handle this feature..."
+        )
         logger.error(err)
 
     if dtype.name in ["bool", "bool_"]:

@@ -40,7 +40,13 @@ class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
     """
 
     def __init__(
-        self, symbols: List[str] = None, min_occur_ratio=0.01, min_occur_offset=10, bin_features: bool = True, post_drop_duplicates: bool = True, **kwargs
+        self,
+        symbols: List[str] = None,
+        min_occur_ratio=0.01,
+        min_occur_offset=10,
+        bin_features: bool = True,
+        post_drop_duplicates: bool = True,
+        **kwargs,
     ):
         super().__init__(post_drop_duplicates=post_drop_duplicates, **kwargs)
         if symbols is None:
@@ -66,11 +72,21 @@ class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
         feature_names = {}
         for feature in self.features_in:
             feature_names_cur = {}
-            for feature_name_base in ["char_count", "word_count", "capital_ratio", "lower_ratio", "digit_ratio", "special_ratio"]:
+            for feature_name_base in [
+                "char_count",
+                "word_count",
+                "capital_ratio",
+                "lower_ratio",
+                "digit_ratio",
+                "special_ratio",
+            ]:
                 feature_names_cur[feature_name_base] = f"{feature}.{feature_name_base}"
             symbols = self._symbols_per_feature[feature]
             for symbol in symbols:
-                feature_names_cur[symbol] = {"count": f"{feature}.symbol_count.{symbol}", "ratio": f"{feature}.symbol_ratio.{symbol}"}
+                feature_names_cur[symbol] = {
+                    "count": f"{feature}.symbol_count.{symbol}",
+                    "ratio": f"{feature}.symbol_ratio.{symbol}",
+                }
             feature_names[feature] = feature_names_cur
         return feature_names
 
@@ -82,7 +98,9 @@ class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
         symbols_per_feature = {}
         if self.features_in:
             num_samples = len(X)
-            symbol_occur_threshold = min(np.ceil(self._min_occur_offset + num_samples * self._min_occur_ratio), np.ceil(num_samples / 2))
+            symbol_occur_threshold = min(
+                np.ceil(self._min_occur_offset + num_samples * self._min_occur_ratio), np.ceil(num_samples / 2)
+            )
             for text_feature_name in self.features_in:
                 above_threshold_symbols = []
                 text_feature = X[text_feature_name].astype(str)
@@ -98,7 +116,10 @@ class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
             X_text_special_combined = {}
             for text_feature in self.features_in:
                 X_text_special_combined = self._generate_text_special(
-                    X[text_feature], text_feature, symbols=self._symbols_per_feature[text_feature], X_dict=X_text_special_combined
+                    X[text_feature],
+                    text_feature,
+                    symbols=self._symbols_per_feature[text_feature],
+                    X_dict=X_text_special_combined,
                 )
             X_text_special_combined = pd.DataFrame(X_text_special_combined, index=X.index)
         else:
@@ -116,15 +137,25 @@ class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
 
         X_dict[fn["char_count"]] = char_count.to_numpy(dtype=np.uint32)
         X_dict[fn["word_count"]] = X_str.str.split().str.len().to_numpy(dtype=np.uint32)
-        X_dict[fn["capital_ratio"]] = X_no_ws.str.count("[A-Z]").divide(X_no_ws_text_len, fill_value=0.0).fillna(0.0).to_numpy(dtype=np.float32)
-        X_dict[fn["lower_ratio"]] = X_no_ws.str.count("[a-z]").divide(X_no_ws_text_len, fill_value=0.0).fillna(0.0).to_numpy(dtype=np.float32)
-        X_dict[fn["digit_ratio"]] = X_no_ws.str.count("[0-9]").divide(X_no_ws_text_len, fill_value=0.0).fillna(0.0).to_numpy(dtype=np.float32)
-        X_dict[fn["special_ratio"]] = X_no_ws.str.count(r"[^\w]").divide(X_no_ws_text_len, fill_value=0.0).fillna(0.0).to_numpy(dtype=np.float32)
+        X_dict[fn["capital_ratio"]] = (
+            X_no_ws.str.count("[A-Z]").divide(X_no_ws_text_len, fill_value=0.0).fillna(0.0).to_numpy(dtype=np.float32)
+        )
+        X_dict[fn["lower_ratio"]] = (
+            X_no_ws.str.count("[a-z]").divide(X_no_ws_text_len, fill_value=0.0).fillna(0.0).to_numpy(dtype=np.float32)
+        )
+        X_dict[fn["digit_ratio"]] = (
+            X_no_ws.str.count("[0-9]").divide(X_no_ws_text_len, fill_value=0.0).fillna(0.0).to_numpy(dtype=np.float32)
+        )
+        X_dict[fn["special_ratio"]] = (
+            X_no_ws.str.count(r"[^\w]").divide(X_no_ws_text_len, fill_value=0.0).fillna(0.0).to_numpy(dtype=np.float32)
+        )
 
         for symbol in symbols:
             symbol_count = X_str.str.count("\\" + symbol)
             X_dict[fn[symbol]["count"]] = symbol_count.to_numpy(dtype=np.uint32)
-            X_dict[fn[symbol]["ratio"]] = symbol_count.divide(char_count, fill_value=0.0).fillna(0.0).to_numpy(dtype=np.float32)
+            X_dict[fn[symbol]["ratio"]] = (
+                symbol_count.divide(char_count, fill_value=0.0).fillna(0.0).to_numpy(dtype=np.float32)
+            )
 
         return X_dict
 

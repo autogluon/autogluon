@@ -160,8 +160,21 @@ class ResourceManager:
         return gpu_count
 
     @staticmethod
+    def _get_custom_memory_size():
+        memory_limit = float(os.environ.get("AG_MEMORY_LIMIT_IN_GB"))
+
+        if memory_limit <= 0:
+            raise ValueError("Memory set via `AG_MEMORY_LIMIT_IN_GB` must be greater than 0!")
+
+        # Transform to bytes and return
+        return max(int(memory_limit * (1024.0**3)), 1)
+
+    @staticmethod
     @disable_if_lite_mode(ret=1073741824)  # set to 1GB as an empirical value in lite/web-browser mode.
     def _get_memory_size() -> float:
+        if os.environ.get("AG_MEMORY_LIMIT_IN_GB", None) is not None:
+            return ResourceManager._get_custom_memory_size()
+
         import psutil
 
         return psutil.virtual_memory().total
@@ -175,6 +188,11 @@ class ResourceManager:
     @disable_if_lite_mode(ret=1073741824)  # set to 1GB as an empirical value in lite/web-browser mode.
     def _get_available_virtual_mem() -> float:
         import psutil
+
+        if os.environ.get("AG_MEMORY_LIMIT_IN_GB", None) is not None:
+            total_memory = ResourceManager._get_custom_memory_size()
+            p = psutil.Process()
+            return total_memory - p.memory_info().rss
 
         return psutil.virtual_memory().available
 
