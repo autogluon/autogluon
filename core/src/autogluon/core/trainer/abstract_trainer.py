@@ -1196,7 +1196,8 @@ class AbstractTrainer:
                 _as_not_bagged = (self.get_model_attribute(model=_model, attribute="refit_full_requires_gpu")
                                   or (self.get_model_attribute(model=_model, attribute="num_children") == 1))
                 _num_gpus = self.get_model_attribute(model=_model, attribute="fit_num_gpu") if _as_not_bagged else 0
-                _num_cpus = self.get_model_attribute(model=_model, attribute="fit_num_cpu") if _as_not_bagged else 1
+                # TODO: rework usage of this env variable
+                _num_cpus = self.get_model_attribute(model=_model, attribute="fit_num_cpu") if _as_not_bagged else int(os.environ.get("AG_DISTRIBUTED_RAY_WORKER_N_CPUS", 1))
                 return _as_not_bagged, _num_gpus, _num_cpus
 
             ag_ray_workers = int(os.environ.get("AG_DISTRIBUTED_N_RAY_WORKERS_PREDICT", 1))
@@ -2755,7 +2756,7 @@ class AbstractTrainer:
         # Start initial jobs
         logger.log(20, f"Scheduling work for {ag_ray_workers} many workers...")
         total_num_cpus = kwargs.get("total_resources", {}).get("num_cpus", 1)
-        org_total_num_cpus = total_num_cpus
+        org_total_num_cpus = 1000 if isinstance(total_num_cpus, str) else total_num_cpus # TODO: fix this for auto?
         total_num_gpus = kwargs.get("total_resources", {}).get("num_gpus", 0)
         n_splits = kwargs.get("k_fold", 1) * kwargs.get("n_repeats", 1)  # TODO: what happens in HO case?
         job_ref_to_resources = {}
@@ -2777,7 +2778,7 @@ class AbstractTrainer:
                 rest_models.append(model)
                 continue
 
-            result_ref = remote_p.options(num_cpus=1, num_gpus=num_gpu_for_fitter).remote(
+            result_ref = remote_p.options(num_cpus=int(os.environ.get("AG_DISTRIBUTED_RAY_WORKER_N_CPUS", 1)), num_gpus=num_gpu_for_fitter).remote(
                 _self=self_ref,
                 model=ray.put(model),
                 X=X_ref,
@@ -2858,7 +2859,7 @@ class AbstractTrainer:
                     model_i += 1
                     continue
 
-                result_ref = remote_p.options(num_cpus=1, num_gpus=num_gpu_for_fitter).remote(
+                result_ref = remote_p.options(num_cpus=int(os.environ.get("AG_DISTRIBUTED_RAY_WORKER_N_CPUS", 1)), num_gpus=num_gpu_for_fitter).remote(
                     _self=self_ref,
                     model=ray.put(model),
                     X=X_ref,
