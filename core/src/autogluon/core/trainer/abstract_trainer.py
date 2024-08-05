@@ -20,7 +20,7 @@ from autogluon.common.features.types import R_FLOAT, S_STACK
 from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.log_utils import convert_time_in_s_to_log_friendly
 from autogluon.common.utils.path_converter import PathConverter
-from autogluon.common.utils.resource_utils import ResourceManager
+from autogluon.common.utils.resource_utils import ResourceManager, get_resource_manager
 from autogluon.common.utils.try_import import try_import_torch
 
 from ..augmentation.distill_utils import augment_data, format_distillation_labels
@@ -2756,8 +2756,15 @@ class AbstractTrainer:
         # Start initial jobs
         logger.log(20, f"Scheduling work for {ag_ray_workers} many workers...")
         total_num_cpus = kwargs.get("total_resources", {}).get("num_cpus", 1)
-        org_total_num_cpus = 1000 if isinstance(total_num_cpus, str) else total_num_cpus # TODO: fix this for auto?
         total_num_gpus = kwargs.get("total_resources", {}).get("num_gpus", 0)
+
+        # fix "auto" case
+        if isinstance(total_num_cpus, str):
+            total_num_cpus = get_resource_manager().get_cpu_count()
+        if isinstance(total_num_gpus, str):
+            total_num_gpus = get_resource_manager().get_gpu_count()
+
+        org_total_num_cpus = total_num_cpus
         n_splits = kwargs.get("k_fold", 1) * kwargs.get("n_repeats", 1)  # TODO: what happens in HO case?
         job_ref_to_resources = {}
         rest_models = []
