@@ -1,8 +1,6 @@
-import os
 import math
 import pytest
 import numpy as np
-import pandas as pd
 from sklearn.metrics import accuracy_score
 
 from autogluon.tabular import TabularPredictor
@@ -10,6 +8,10 @@ from autogluon.core.metrics import METRICS, get_metric, make_scorer
 from autogluon.core.constants import BINARY, REGRESSION, MULTICLASS
 from autogluon.tabular.trainer.model_presets.presets import MODEL_TYPES, DEFAULT_MODEL_NAMES
 from autogluon.tabular.models import LGBModel, XGBoostModel, TabularNeuralNetTorchModel
+
+
+def get_default_model_name(model):
+    return DEFAULT_MODEL_NAMES[MODEL_TYPES[model]]
 
 MODELS = [name for name, model in MODEL_TYPES.items() if model._get_class_tags().get("supports_learning_curves", False)]
 PROBLEM_TYPES = [BINARY, MULTICLASS, REGRESSION]
@@ -21,9 +23,9 @@ long_run = 500
 short_run = 50
 
 model_iterations = {
-    "GBM": long_run,
-    "XGB": long_run,
-    "NN_TORCH": short_run,
+    "LightGBM": long_run,
+    "XGBoost": long_run,
+    "NeuralNetTorch": short_run,
 }
 
 extended_run_hyperparams = {
@@ -41,6 +43,13 @@ extended_run_hyperparams = {
     },
 }
 
+for model in MODELS:
+    if model not in extended_run_hyperparams:
+        extended_run_hyperparams[model] = {}
+
+    if get_default_model_name(model) not in extended_run_hyperparams:
+        extended_run_hyperparams[get_default_model_name(model)] = long_run
+
 
 def get_one_model_problem():
     problem_type = PROBLEM_TYPES[0]
@@ -49,15 +58,13 @@ def get_one_model_problem():
 
 
 def get_all_models():
-    problem_type = PROBLEM_TYPES[0]
-    models = MODELS
-    return [(problem_type, model) for model in models]
+    n = len(PROBLEM_TYPES)
+    return [(PROBLEM_TYPES[i % n], model) for i, model in enumerate(MODELS)]
 
 
 def get_all_problems():
-    problem_types = PROBLEM_TYPES
-    model = MODELS[0]
-    return [(problem_type, model) for problem_type in problem_types]
+    n = len(MODELS)
+    return [(problem_type, MODELS[i % n]) for i, problem_type in enumerate(PROBLEM_TYPES)]
 
 
 def get_all_model_problems():
@@ -104,11 +111,11 @@ def test_flag_true(problem_type, model, get_dataset_map, fit_helper):
 
     dataset_name = get_dataset_map[problem_type]
     predictor = fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, **common_args)
-    meta_data, model_data = predictor.learning_curves()
 
-    model = DEFAULT_MODEL_NAMES[MODEL_TYPES[model]]
-    model_metrics = model_data[model][0]
-    metric_count, eval_set_count, iteration_count = np.array(model_data[model][1]).shape
+    model = get_default_model_name(model)
+    _, model_data = predictor.learning_curves()
+    _, model_metrics, data = model_data[model]
+    metric_count, eval_set_count, _ = np.array(data).shape
 
     assert metric_count == 1
     assert eval_set_count == 2
@@ -128,11 +135,12 @@ def test_metrics(problem_type, model, get_dataset_map, fit_helper):
 
     dataset_name = get_dataset_map[problem_type]
     predictor = fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, **common_args)
-    meta_data, model_data = predictor.learning_curves()
+
+    model = get_default_model_name(model)
+    _, model_data = predictor.learning_curves()
+    _, model_metrics, data = model_data[model]
 
     metrics = list(set([get_metric(metric, problem_type, "eval_metric").name for metric in metrics]))
-    model = DEFAULT_MODEL_NAMES[MODEL_TYPES[model]]
-    model_metrics = model_data[model][0]
     assert sorted(model_metrics) == sorted(metrics)
 
 
@@ -155,44 +163,57 @@ def test_custom_metrics(problem_type, model, get_dataset_map, fit_helper):
 
     dataset_name = get_dataset_map[problem_type]
     predictor = fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, **args)
-    meta_data, model_data = predictor.learning_curves()
 
-    model = DEFAULT_MODEL_NAMES[MODEL_TYPES[model]]
-    metrics = model_data[model][0]
-    idx, myidx = metrics.index("accuracy"), metrics.index("myaccuracy")
-    myaccuracy_scores = model_data[model][1][myidx]
-    accuracy_scores = [[metric * 100 for metric in eval_set] for eval_set in model_data[model][1][idx]]
+    model = get_default_model_name(model)
+    _, model_data = predictor.learning_curves()
+    _, model_metrics, data = model_data[model]
+
+    idx, myidx = model_metrics.index("accuracy"), model_metrics.index("myaccuracy")
+    myaccuracy_scores = data[myidx]
+    accuracy_scores = [[metric * 100 for metric in eval_set] for eval_set in data[idx]]
     assert myaccuracy_scores == accuracy_scores
 
 
-@pytest.mark.parametrize("problem_type, model", get_all_problems())
+# @pytest.mark.parametrize("problem_type, model", get_all_problems())
+@pytest.mark.parametrize("problem_type, model, metric", get_all_model_problem_metrics())
 @pytest.mark.parametrize("use_error", [True, False])
-def test_metric_format(problem_type, model, use_error, get_dataset_map, fit_helper):
-    metrics = {
-        BINARY: "log_loss",
-        MULTICLASS: "log_loss",
-        REGRESSION: "mean_squared_error"
-    }[problem_type]
+def test_metric_format(problem_type, model, metric, use_error, get_dataset_map, fit_helper):
+    metric = get_metric(metric, problem_type, "eval_metric")
+
+    init_args = {
+        "eval_metric": metric,
+        # "verbosity": 4,
+    }
 
     fit_args = dict(
         learning_curves={
-            "metrics": metrics,
+            "metrics": metric,
             "use_error": use_error,
         },
         hyperparameters={model: {}},
     )
 
-    dataset_name = get_dataset_map[problem_type]
-    predictor = fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, **common_args)
-    meta_data, model_data = predictor.learning_curves()
+    args = common_args.copy()
+    args["sample_size"] = 500
 
-    model = DEFAULT_MODEL_NAMES[MODEL_TYPES[model]]
-    curve = model_data[model][1][0][0]
+    dataset_name = get_dataset_map[problem_type]
+    predictor = fit_helper.fit_and_validate_dataset(
+            dataset_name=dataset_name,
+            init_args=init_args,
+            fit_args=fit_args,
+            **args
+        )
+
+    model = get_default_model_name(model)
+    _, model_data = predictor.learning_curves()
+    _, _, data = model_data[model]
+
+    curve = np.array(data[0][1])
 
     if use_error:
-        assert all(val >= 0 for val in curve)
+        assert np.all(curve >= 0)
     else:
-        assert all(val <= 0 for val in curve)
+        assert np.all((np.sign(curve) == np.sign(metric._sign)) | (curve == 0))
 
 
 @pytest.mark.parametrize("problem_type, model", get_all_models())
@@ -204,16 +225,18 @@ def test_with_test_data(problem_type, model, get_dataset_map, fit_helper):
 
     dataset_name = get_dataset_map[problem_type]
     predictor = fit_helper.fit_and_validate_dataset(
-        dataset_name=dataset_name, 
-        fit_args=fit_args, 
-        use_test_data=True, 
-        use_test_for_val=True, 
-        **common_args
-    )
-    meta_data, model_data = predictor.learning_curves()
-    model = DEFAULT_MODEL_NAMES[MODEL_TYPES[model]]
+            dataset_name=dataset_name, 
+            fit_args=fit_args, 
+            use_test_data=True, 
+            use_test_for_val=True, 
+            **common_args
+        )
 
-    metric_count, eval_set_count, iteration_count = np.array(model_data[model][1]).shape
+    model = get_default_model_name(model)
+    _, model_data = predictor.learning_curves()
+    eval_sets, _, data = model_data[model]
+    metric_count, eval_set_count, _ = np.array(data).shape
+
     assert eval_set_count == 3
 
     # ensure test_data preprocessing is same as val_data preprocessing
@@ -221,66 +244,75 @@ def test_with_test_data(problem_type, model, get_dataset_map, fit_helper):
 
     for m in range(metric_count):
         for e in range(eval_set_count):
-            eval_sets[e].append(model_data[model][1][m][e])
-    
+            eval_sets[e].append(data[m][e])
+
     _, val, test = eval_sets
     assert val == test
 
 
-# def leaderboard_result(predictor: TabularPredictor, model: str):
-#     df = predictor.leaderboard(score_format='error')
-#     return list(df[df["model"] == model]["metric_error_val"])[0]
+# TODO: how should we limit test parameters here? 22.5 min is much too long, but curve correctness
+# is a crucial aspect of learning curve generation that should be tested well
 
-# # why is nn torch failing?
-# @pytest.mark.parametrize("problem_type, model, metric", get_all_model_problem_metrics())
-# def test_correctness(problem_type, model, metric, get_dataset_map, fit_helper):
-#     metric = get_metric(metric, problem_type, "eval_metric")
+# takes 22.5 minutes for full test run
+@pytest.mark.parametrize("problem_type, model, metric", get_all_model_problem_metrics())
+def test_correctness(problem_type, model, metric, get_dataset_map, fit_helper):
+    metric = get_metric(metric, problem_type, "eval_metric")
 
-#     init_args = {
-#         "eval_metric": metric,
-#         "verbosity": 4,
-#     }
+    init_args = {
+        "eval_metric": metric,
+        "verbosity": 4,
+    }
 
-#     fit_args = dict(
-#         learning_curves={
-#             "metrics": metric,
-#             "use_error": True,
-#         },
-#         hyperparameters={model: extended_run_hyperparams[model]},
-#     )
+    fit_args = dict(
+        learning_curves={
+            "metrics": metric,
+            "use_error": True,
+        },
+        hyperparameters={model: extended_run_hyperparams[model]},
+    )
 
-#     args = common_args.copy()
-#     del args["sample_size"]
+    args = common_args.copy()
+    args["sample_size"] = 1000
+    if metric.name == "roc_auc":
+        args["sample_size"] = 10000
 
-#     dataset_name = get_dataset_map[problem_type]
-#     predictor = fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, init_args=init_args, fit_args=fit_args, **args)
+    dataset_name = get_dataset_map[problem_type]
+    predictor = fit_helper.fit_and_validate_dataset(
+            dataset_name=dataset_name,
+            init_args=init_args,
+            fit_args=fit_args,
+            **args
+        )
 
-#     meta_data, model_data = predictor.learning_curves()
-#     model_name = DEFAULT_MODEL_NAMES[MODEL_TYPES[model]]
+    model = get_default_model_name(model)
+    _, model_data = predictor.learning_curves()
+    _, _, data = model_data[model]
 
-#     def score(tabular_predictor):
-#         model_type = tabular_predictor._trainer.get_model_attribute(model=model_name, attribute="type")
-#         model_path = os.path.join(tabular_predictor.path, 'models', model_name)
-#         model_obj = model_type.load(model_path)
+    def score(tabular_predictor: TabularPredictor):
+        df = tabular_predictor.leaderboard(score_format='error')
+        return list(df[df["model"] == model]["metric_error_val"])[0]
 
-#         X_val = tabular_predictor._trainer.load_X_val()
-#         y_val = tabular_predictor._trainer.load_y_val()
+    def equal(a, b):
+        if metric.needs_proba or metric.needs_threshold or problem_type == "regression":
+            tol = 1e-06 if metric.name != "roc_auc" else 1e-02
+            return math.isclose(a, b, rel_tol=tol)
+        return a == b
 
-#         result = model_obj.score(X=X_val, y=y_val, metric = metric)
-#         return metric.convert_score_to_error(result)
+    curve = data[0][1] # get default eval_metric curve on validation dataset
+    best = min(curve)
 
-#     # default eval_metric curve on validation dataset
-#     curve = model_data[model_name][1][0][1]
-#     assert len(curve) == model_iterations[model]
+    assert len(curve) == model_iterations[model]
+    assert equal(best, score(predictor))
 
-#     best = min(curve)
-#     # predictor_result = leaderboard_result(predictor=predictor, model=model_name)
-#     assert math.isclose(best, score(predictor), rel_tol=1e-02)
+    fit_args["learning_curves"] = False
+    clean_predictor = fit_helper.fit_and_validate_dataset(
+            dataset_name=dataset_name,
+            init_args=init_args,
+            fit_args=fit_args,
+            **args
+        )
 
-#     fit_args["learning_curves"] = False
-#     clean_predictor = fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, init_args=init_args, fit_args=fit_args, **args)
-#     # clean_predictor_result = leaderboard_result(predictor=clean_predictor, model=model_name)
-#     assert math.isclose(best, score(clean_predictor), rel_tol=1e-02)
+    assert equal(best, score(clean_predictor))
 
 
 @pytest.mark.parametrize("learning_curve_supported_class", [LGBModel, XGBoostModel, TabularNeuralNetTorchModel])

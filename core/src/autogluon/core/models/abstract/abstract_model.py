@@ -593,14 +593,6 @@ class AbstractModel:
 
         self.stopping_metric = self.params_aux.get("stopping_metric", self._get_default_stopping_metric())
         self.stopping_metric = metrics.get_metric(self.stopping_metric, self.problem_type, "stopping_metric")
-
-        ag_params = self._get_ag_params()
-        generate_curves = ag_params.get("generate_curves", None)
-        if generate_curves:
-            curve_metrics = ag_params.get("curve_metrics", None)
-            if not curve_metrics:
-                self.params_aux["curve_metrics"] = [self.eval_metric]
-
         self.quantile_levels = self.params_aux.get("quantile_levels", None)
 
         if self.eval_metric.name in OBJECTIVES_TO_NORMALIZE:
@@ -1173,7 +1165,7 @@ class AbstractModel:
                 model.model = model._compiler.load(path=path)
         return model
 
-    def save_learning_curves(self, metrics: str | List[str], curve: dict[str:List[float]], *curves: dict[str:List[float]], path: str = None) -> str:
+    def save_learning_curves(self, metrics: str | List[str], curves: dict[dict[str:List[float]]], path: str = None) -> str:
         """
         Saves learning curves to disk.
 
@@ -1203,16 +1195,20 @@ class AbstractModel:
         ----------
         metrics : str or list(str)
             List of all evaluation metrics computed at each iteration of the curve
-        curve : dict(str : list(float))
-            Dictionary of evaluation metrics computed at each iteration on the training dataset
-        *curves : additional dict(str : list(float))
-            Dictionary of evaluation metrics computed at each iteration on other datasets
-        e.g.
-                {
-                    'logloss': [0.693147, 0.690162, ...],
-                    'accuracy': [0.500000, 0.400000, ...],
-                    'f1': [0.693147, 0.690162, ...]
-                }
+        curves : dict[dict[str : list[float]]]
+            Dictionary of evaluation sets and their learning curve dictionaries.
+            Each learning curve dictionary contains evaluation metrics computed at each iteration.
+            e.g.
+                curves = {
+                        "train": {
+                            'logloss': [0.693147, 0.690162, ...],
+                            'accuracy': [0.500000, 0.400000, ...],
+                            'f1': [0.693147, 0.690162, ...]
+                        },
+                        "val": {...},
+                        "test": {...},
+                    }
+  
         path : str, default None
             Path where the learning curves are saved, minus the file name.
             This should generally be a directory path ending with a '/' character (or appropriate path separator value depending on OS).
@@ -1233,22 +1229,51 @@ class AbstractModel:
 
         os.makedirs(path, exist_ok=True)
         file_path = os.path.join(path, self.learning_curve_file_name)
-        curves = [curve] + list(curves)
-
-        out = [
-            metrics,
-            [
-                # iteration data goes here
-            ]
-        ]
-
-        for i, metric in enumerate(metrics):
-            out[1].append([c[metric] for c in curves])
+        out = self._make_learning_curves(metrics=metrics, curves=curves)
 
         with open(file_path, 'w') as json_file:
             json.dump(out, json_file, indent=4)
 
         return file_path
+
+    def _make_learning_curves(
+            self,
+            metrics: str | List[str],
+            curves: dict[dict[str:List[float]]]
+        ) -> List[List[str], List[str], List[List[float]]]:
+        """
+        Parameters
+        ----------
+        metrics : str or list(str)
+            List of all evaluation metrics computed at each iteration of the curve
+        curves : dict[dict[str : list[float]]]
+            Dictionary of evaluation sets and their learning curve dictionaries.
+            Each learning curve dictionary contains evaluation metrics computed at each iteration.
+            See Abstract Model's save_learning_curves method for a sample curves input.
+
+        Returns
+        -------
+        List[List[str], List[str], List[List[float]]]: The generated learning curve artifact.
+            if eval set names includes: train, val, or test
+            these sets will be placed first in the above order.
+        """
+
+        # ensure main eval sets first: train, val, test
+        items = []
+        order = ["train", "val", "test"]
+        for eval_set in order:
+            if eval_set in curves:
+                items.append((eval_set, curves[eval_set]))
+                del curves[eval_set]
+
+        items.extend(curves.items())
+        eval_sets, curves = list(zip(*items))
+    
+        data = []
+        for metric in metrics:
+            data.append([c[metric] for c in curves])
+
+        return [eval_sets, metrics, data]
 
     @classmethod
     def load_learning_curves(cls, path: str) -> List:
@@ -1268,7 +1293,7 @@ class AbstractModel:
             Loaded learning curve data.
         """
         if not cls._get_class_tags().get("supports_learning_curves", False):
-            raise ValueError("Attempted to load learning curves from model without learning curve support")
+            raise AssertionError("Attempted to load learning curves from model without learning curve support")
 
         file = os.path.join(path, cls.learning_curve_file_name)
 
@@ -2039,15 +2064,11 @@ class AbstractModel:
         """
         Converts learning curve scorer objects into their name strings.
 
-        Parameters:
-        -----------
-        None
-
         Returns:
         --------
         params_aux dictionary with changed curve_metrics field, if applicable.
         """
-        if "curve_metrics" in self.params_aux:
+        if self.params_aux.get("curve_metrics", None) is not None:
             params_aux = self.params_aux.copy()
             params_aux["curve_metrics"] = [metric.name for metric in params_aux["curve_metrics"]]
             return params_aux

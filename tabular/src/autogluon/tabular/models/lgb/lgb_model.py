@@ -205,7 +205,7 @@ class LGBModel(AbstractModel):
         }
 
         if generate_curves:
-            scorers = ag_params.get("curve_metrics", [])
+            scorers = ag_params.get("curve_metrics", [self.eval_metric])
             use_curve_metric_error = ag_params.get("use_error_for_curve_metrics", False)
             metric_names = [scorer.name for scorer in scorers]
 
@@ -307,15 +307,17 @@ class LGBModel(AbstractModel):
             def filter(d, keys):
                 return {og_name(key): d[key] for key in keys if key in d}
 
-            curves = [filter(eval_results["train_set"], metric_names)]
-            curves += [filter(eval_results["valid_set"], metric_names)] if X_val is not None else []
-            curves += [filter(eval_results["test_set"], metric_names)] if X_test is not None else []
+            curves = {"train": filter(eval_results["train_set"], metric_names)}
+            if X_val is not None:
+                curves["val"] = filter(eval_results["valid_set"], metric_names)
+            if X_test is not None:
+                curves["test"] = filter(eval_results["test_set"], metric_names)
 
             if f'_{stopping_metric_name}' in metric_names:
                 idx = metric_names.index(f'_{stopping_metric_name}')
                 metric_names[idx] = stopping_metric_name
 
-            self.save_learning_curves(metric_names, *curves)
+            self.save_learning_curves(metrics=metric_names, curves=curves)
 
         if dataset_val is not None and not retrain:
             self.params_trained["num_boost_round"] = self.model.best_iteration
@@ -513,9 +515,7 @@ class LGBModel(AbstractModel):
 
     @classmethod
     def _class_tags(cls):
-        tags = super(LGBModel, cls)._class_tags().copy()
-        tags.update({"supports_learning_curves": True})
-        return tags
+        return {"supports_learning_curves": True}
 
     def _more_tags(self):
         # `can_refit_full=True` because num_boost_round is communicated at end of `_fit`

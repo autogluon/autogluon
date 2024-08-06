@@ -7,7 +7,7 @@ from matplotlib.figure import Figure
 from typing import Tuple
 
 
-def plot_curves(learning_curves: Tuple[dict, dict], model: str, metric: str) -> Figure:
+def plot_curves(learning_curves: Tuple[dict, dict], model: str, metric: str, return_fig: bool = True) -> Figure:
     """
     Plots learning curves across all evaluation sets for specified model-metric pairing.
 
@@ -25,24 +25,57 @@ def plot_curves(learning_curves: Tuple[dict, dict], model: str, metric: str) -> 
     Returns:
     --------
     The matplotlib Figure object with the plotted learning curve data.
+
+    Sample Usage:
+    -------------
+
+        import pandas as pd
+        from autogluon.tabular import TabularPredictor
+
+        train_data = pd.read_csv('https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
+        test_data = pd.read_csv('https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
+
+        hyperparameters = {
+            "GBM": {},
+            "XGB": {},
+            "NN_TORCH": {},
+        }
+
+        params = {
+            "metrics": ["f1", "accuracy", "log_loss"],
+        }
+
+        predictor = TabularPredictor(label="class", problem_type="binary")
+        predictor = predictor.fit(train_data=train_data, test_data=test_data, learning_curves=params, hyperparameters=hyperparameters)
+        curves = predictor.learning_curves()
+
+
+        from autogluon.core.learning_curves.plot_curves import plot_curves
+
+        # in jupyter environment, simply call function to view graph
+        # note that returning the matplotlib figure object in a jupyter env
+        # will cause graph to appear twice, so set return_fig to False
+        plot_curves(curves, "GBM", "accuracy", return_fig = False)
+
+        # to save figure to path
+        path = "plot.png"
+        fig.savefig(path)
     """
     meta_data, model_data = learning_curves
+    eval_sets, metrics, data = model_data[model]
 
-    metric_index = model_data[model][0].index(metric)
-    curve = model_data[model][1][metric_index]
+    metric_index = metrics.index(metric)
+    curve = data[metric_index]
 
-    eval_set_count, iteration_count = np.array(curve).shape
-    eval_sets = ["train", "val", "test"][:eval_set_count]
-    iteration_count += 1
+    _, iterations = np.array(curve).shape
 
     data = pd.DataFrame({
-        "iterations": list(range(1, iteration_count)),
+        "iterations": list(range(1, iterations + 1)),
         **{ eval_set : curve[i] for i, eval_set in enumerate(eval_sets) },
     })
 
     data = data.melt(id_vars='iterations', var_name='Line', value_name='Y')
 
-    plt.ioff()
     fig, ax = plt.subplots()
 
     sns.lineplot(x='iterations', y='Y', hue='Line', data=data, ax=ax)
@@ -52,6 +85,7 @@ def plot_curves(learning_curves: Tuple[dict, dict], model: str, metric: str) -> 
     ax.set_ylabel(metric)
     ax.legend()
     ax.grid(True)
-    plt.ion()
+    plt.show()
 
-    return fig
+    if return_fig:
+        return fig

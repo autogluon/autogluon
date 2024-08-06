@@ -4987,9 +4987,11 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
         params = {
             "ag.generate_curves": True,
-            "ag.curve_metrics": metrics,
             "ag.use_error_for_curve_metrics": use_error,
         }
+
+        if metrics:
+            params["ag.curve_metrics"] = metrics
 
         return params
 
