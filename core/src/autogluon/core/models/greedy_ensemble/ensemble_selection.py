@@ -169,9 +169,7 @@ class EnsembleSelection(AbstractWeightedEnsemble):
             order.append(best)
             used_models.add(best)
 
-            ensemble_prediction *= s
-            ensemble_prediction += ensemble[-1]
-            ensemble_prediction /= s+1
+            ensemble_prediction = ensemble_prediction * (s / (s + 1)) + ensemble[-1] / (s + 1)
 
             # Handle special case
             if len(predictions) == 1:
