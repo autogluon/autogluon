@@ -63,6 +63,7 @@ tests_require = [
     "types-requests",
     "types-setuptools",
     "pytest-mypy",
+    "flake8",
 ]
 
 all_requires = []
