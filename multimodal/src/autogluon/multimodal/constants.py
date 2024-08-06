@@ -334,6 +334,7 @@ DEFAULT = "default"
 HIGH_QUALITY = "high_quality"
 MEDIUM_QUALITY = "medium_quality"
 BEST_QUALITY = "best_quality"
+COMPETITION_QUALITY = "competition_quality"
 ALL_MODEL_QUALITIES = [HIGH_QUALITY, MEDIUM_QUALITY, BEST_QUALITY, DEFAULT]
 
 # datasets

@@ -1125,6 +1125,9 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                     if hasattr(config.optimization, "check_val_every_n_epoch")
                     else 1,
                     plugins=plugins,
+                    num_sanity_val_steps=config.optimization.num_sanity_val_steps
+                    if hasattr(config.optimization, "check_val_evnum_sanity_val_steps")
+                    else 2,
                 )
         else:
             blacklist_msgs = []

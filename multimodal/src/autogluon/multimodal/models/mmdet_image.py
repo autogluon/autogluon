@@ -90,8 +90,6 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         self._update_classes(classes)
         self._load_checkpoint(self.checkpoint_file)
 
-        freeze_model_layers(self.model, self.frozen_layers)
-
     def _reset_classes(self, classes: list):
         temp_ckpt_file = f"temp_ckpt_{int(time.time()*1000)}.pth"
         self._save_weights(temp_ckpt_file)
@@ -149,6 +147,8 @@ class MMDetAutoModelForObjectDetection(nn.Module):
 
         self.name_to_id = self.get_layer_ids()
         self.head_layer_names = [n for n, layer_id in self.name_to_id.items() if layer_id <= 0]
+
+        freeze_model_layers(self.model, self.frozen_layers)
 
     def set_data_preprocessor_device(self):
         if not self.device:
@@ -225,6 +225,20 @@ class MMDetAutoModelForObjectDetection(nn.Module):
             "yolox_x": {
                 "url": "https://download.openmmlab.com/mmdetection/v2.0/yolox/yolox_x_8x8_300e_coco/yolox_x_8x8_300e_coco_20211126_140254-1ef88d67.pth",
                 "config_file": os.path.join(mmdet_configs_dir, "yolox", "yolox_x_8xb8-300e_coco.py"),
+            },
+            "co_dino": {
+                "url": "https://download.openmmlab.com/mmdetection/v3.0/codetr/co_dino_5scale_swin_large_3x_coco-d7a6d8af.pth",
+                "config_file": os.path.join(mmdet_configs_dir, "co_dino", "co_dino_5scale_swin_l_16xb1_3x_coco.py"),
+            },
+            "co_dino_o365": {
+                "url": "https://download.openmmlab.com/mmdetection/v3.0/codetr/co_dino_5scale_swin_large_16e_o365tococo-614254c9.pth",
+                "config_file": os.path.join(
+                    mmdet_configs_dir, "co_dino", "co_dino_5scale_swin_l_16xb1_16e_o365tococo.py"
+                ),
+            },
+            "co_dino_r50": {
+                "url": "https://download.openmmlab.com/mmdetection/v3.0/codetr/co_dino_5scale_r50_1x_coco-7481f903.pth",
+                "config_file": os.path.join(mmdet_configs_dir, "co_dino", "co_dino_5scale_r50_8xb2_1x_coco.py"),
             },
             "dino_swinl_tta": {
                 "url": "https://github.com/RistoranteRist/mmlab-weights/releases/download/dino-swinl/dino-5scale_swin-l_8xb2-36e_coco-5486e051.pth",
