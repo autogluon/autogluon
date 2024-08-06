@@ -33,6 +33,7 @@ from autogluon.common.utils.utils import (
     get_autogluon_metadata,
     setup_outputdir,
 )
+from autogluon.core.callbacks import AbstractCallback
 from autogluon.core.constants import (
     AUTO_WEIGHT,
     BALANCE_WEIGHT,
@@ -414,6 +415,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         num_cpus: int | str = "auto",
         num_gpus: int | str = "auto",
         memory_limit: float | str = "auto",
+        callbacks: List[AbstractCallback] = None,
         **kwargs,
     ) -> "TabularPredictor":
         """
@@ -709,6 +711,21 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             setting the memory limit (and any other resources) on systems with shared resources that are controlled by the operating system (e.g., SLURM and
             cgroups). Otherwise, AutoGluon might wrongly assume more resources are available for fitting a model than the operating system allows,
             which can result in model training failing or being very inefficient.
+        callbacks : List[AbstractCallback], default = None
+            [Experimental] Callback support is preliminary, targeted towards developers, and is subject to change.
+            The API, class structure, and overall functionality may be changed without warning between releases while it remains experimental.
+
+            A list of callback objects inheriting from `autogluon.core.callbacks.AbstractCallback`.
+            These objects will be called before and after each model fit within trainer.
+            They have the ability to skip models or early stop the training process.
+            They can also theoretically change the entire logical flow of the trainer code by interacting with the passed `trainer` object.
+            For more details, refer to `AbstractCallback` source code.
+            If None, no callback objects will be used.
+
+            [Note] Callback objects can be mutated in-place by the fit call if they are stateful.
+            Ensure that you avoid re-using a mutated callback object between multiple fit calls.
+
+            [Note] Callback objects are deleted from trainer at the end of the fit call. They will not impact operations such as `refit_full` or `fit_extra`.
         **kwargs :
             auto_stack : bool, default = False
                 Whether AutoGluon should automatically utilize bagging and multi-layer stack ensembling to boost predictive accuracy.
@@ -823,6 +840,9 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                     `enable_ray_logging` : bool, default = True
                         If True, will log the dynamic stacking sub-fit when ray is used (`memory_safe_fits=True`).
                         Note that because of how ray works, this may cause extra unwanted logging in the main fit process after dynamic stacking completes.
+                    `enable_callbacks` : bool, default = False
+                        If True, will perform a deepcopy on the specified user callbacks and enable them during the DyStack call.
+                        If False, will not include callbacks in the DyStack call.
                     `holdout_data`: str or :class:`TabularDataset` or :class:`pd.DataFrame`, default = None
                         Another dataset containing validation data reserved for detecting stacked overfitting. This dataset should be in the same format as
                         `train_data`. If str is passed, `holdout_data` will be loaded using the str value as the file path.
@@ -1158,6 +1178,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             infer_limit_batch_size=infer_limit_batch_size,
             verbosity=verbosity,
             use_bag_holdout=use_bag_holdout,
+            callbacks=callbacks,
         )
         ag_post_fit_kwargs = dict(
             keep_only_best=kwargs["keep_only_best"],
@@ -1214,6 +1235,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         memory_safe_fits: bool,
         clean_up_fits: bool,
         enable_ray_logging: bool,
+        enable_callbacks: bool,
         holdout_data: Optional[Union[str, pd.DataFrame, None]] = None,
     ):
         """Dynamically determines if stacking is used or not by validating the behavior of a sub-fit of AutoGluon that uses stacking on held out data.
@@ -1239,7 +1261,12 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         X = ag_fit_kwargs.pop("X")
         X_val = ag_fit_kwargs.pop("X_val")
         X_unlabeled = ag_fit_kwargs.pop("X_unlabeled")
+        callbacks = None
+        if not enable_callbacks:
+            callbacks = ag_fit_kwargs.pop("callbacks")
         inner_ag_fit_kwargs = copy.deepcopy(ag_fit_kwargs)
+        if not enable_callbacks:
+            ag_fit_kwargs["callbacks"] = callbacks
         inner_ag_fit_kwargs["X_val"] = X_val
         inner_ag_fit_kwargs["X_unlabeled"] = X_unlabeled
         inner_ag_post_fit_kwargs = copy.deepcopy(ag_post_fit_kwargs)
@@ -4669,6 +4696,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             clean_up_fits=True,
             holdout_data=None,
             enable_ray_logging=True,
+            enable_callbacks=False,
         )
         allowed_kes = set(ds_args.keys())
 
