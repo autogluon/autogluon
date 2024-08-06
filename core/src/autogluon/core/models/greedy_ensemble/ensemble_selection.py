@@ -110,19 +110,12 @@ class EnsembleSelection(AbstractWeightedEnsemble):
         round_scores = False
         epsilon = 1e-4
         round_decimals = 6
+        ensemble_prediction = np.zeros(predictions[0].shape)
         for i in range(ensemble_size):
             scores = np.zeros((len(predictions)))
             s = len(ensemble)
-            if s == 0:
-                weighted_ensemble_prediction = np.zeros(predictions[0].shape)
-            else:
-                # Memory-efficient averaging!
-                ensemble_prediction = np.zeros(ensemble[0].shape)
-                for pred in ensemble:
-                    ensemble_prediction += pred
-                ensemble_prediction /= s
 
-                weighted_ensemble_prediction = (s / float(s + 1)) * ensemble_prediction
+            weighted_ensemble_prediction = (s / float(s + 1)) * ensemble_prediction
             fant_ensemble_prediction = np.zeros(weighted_ensemble_prediction.shape)
             for j, pred in enumerate(predictions):
                 fant_ensemble_prediction[:] = weighted_ensemble_prediction + (1.0 / float(s + 1)) * pred
@@ -175,6 +168,10 @@ class EnsembleSelection(AbstractWeightedEnsemble):
             trajectory.append(best_score)
             order.append(best)
             used_models.add(best)
+
+            ensemble_prediction *= s
+            ensemble_prediction += ensemble[-1]
+            ensemble_prediction /= s+1
 
             # Handle special case
             if len(predictions) == 1:
