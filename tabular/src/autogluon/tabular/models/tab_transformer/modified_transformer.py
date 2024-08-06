@@ -218,7 +218,18 @@ class MultiheadAttention(Module):
         "bias_v": torch._jit_internal.Optional[torch.Tensor],
     }
 
-    def __init__(self, embed_dim, n_cat_embeddings, num_heads, dropout=0.0, bias=True, add_bias_kv=False, add_zero_attn=False, kdim=None, vdim=None):
+    def __init__(
+        self,
+        embed_dim,
+        n_cat_embeddings,
+        num_heads,
+        dropout=0.0,
+        bias=True,
+        add_bias_kv=False,
+        add_zero_attn=False,
+        kdim=None,
+        vdim=None,
+    ):
         super().__init__()
 
         self.embed_dim = embed_dim
@@ -410,7 +421,9 @@ class Linear(Module):
         return F.linear(input, self.weight, self.bias)
 
     def extra_repr(self) -> str:
-        return "in_features={}, out_features={}, bias={}".format(self.in_features, self.out_features, self.bias is not None)
+        return "in_features={}, out_features={}, bias={}".format(
+            self.in_features, self.out_features, self.bias is not None
+        )
 
 
 # This class exists solely for Transformer; it has an annotation stating
@@ -465,7 +478,12 @@ class TransformerEncoderLayerModified(Module):
             state["activation"] = F.relu
         super().__setstate__(state)
 
-    def forward(self, src: torch.Tensor, src_mask: Optional[torch.Tensor] = None, src_key_padding_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+    def forward(
+        self,
+        src: torch.Tensor,
+        src_mask: Optional[torch.Tensor] = None,
+        src_key_padding_mask: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
         """Pass the input through the encoder layer.
 
         Args:

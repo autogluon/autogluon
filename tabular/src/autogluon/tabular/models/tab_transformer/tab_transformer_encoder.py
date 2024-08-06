@@ -111,7 +111,9 @@ class ScalarQuantileOrdinalEnc(EncBase):
         if n_bins_ is not None and bin_edges_ is not None:
             self.disc = self.get_new_base_enc()
             self.disc.n_bins_ = np.array([n_bins_])
-            self.disc.bin_edges_ = np.array([np.array(bin_edges_), np.array(bin_edges_[:-1])])[:1]  # Dumb hack, but it's what sklearn needs
+            self.disc.bin_edges_ = np.array([np.array(bin_edges_), np.array(bin_edges_[:-1])])[
+                :1
+            ]  # Dumb hack, but it's what sklearn needs
             self.cat_cards = [n_bins_ + 1]
 
     def fit(self, data):
@@ -219,7 +221,9 @@ class ScalarPowerTransformerEnc(ScalarRescaleEnc):
     def __init__(self, lambdas_=None, scale_=None, mean_=None, var_=None, n_samples_seen_=None):
         if all(a is not None for a in [lambdas_, scale_, mean_, var_, n_samples_seen_]):
             self.scaler = self.get_new_base_enc()
-            self.scaler.fit([[0.0]])  # This is just to make the PowerTransformer initialize before we overwrite its params
+            self.scaler.fit(
+                [[0.0]]
+            )  # This is just to make the PowerTransformer initialize before we overwrite its params
             self.scaler.lambdas_ = np.array([lambdas_])
             self.scaler._scaler.scale_ = np.array([scale_])
             self.scaler._scaler.mean_ = np.array([mean_])
@@ -237,7 +241,13 @@ class ScalarPowerTransformerEnc(ScalarRescaleEnc):
         return PowerTransformer(method="yeo-johnson", standardize=True, copy=True)
 
     def get_base_enc_params(self):
-        return self.scaler.lambdas_, self.scaler._scaler.scale_, self.scaler._scaler.mean_, self.scaler._scaler.var_, self.scaler._scaler.n_samples_seen_
+        return (
+            self.scaler.lambdas_,
+            self.scaler._scaler.scale_,
+            self.scaler._scaler.mean_,
+            self.scaler._scaler.var_,
+            self.scaler._scaler.n_samples_seen_,
+        )
 
 
 class ScalarQuantileTransformerEnc(ScalarRescaleEnc):
@@ -412,7 +422,9 @@ class LatLongQuantileOrdinalEnc(EncBase):
 
     @staticmethod
     def get_new_base_enc():
-        return [KBinsDiscretizer(n_bins=8, encode="ordinal", strategy="quantile") for _ in range(LatLongScalarEnc.cont_dim)]
+        return [
+            KBinsDiscretizer(n_bins=8, encode="ordinal", strategy="quantile") for _ in range(LatLongScalarEnc.cont_dim)
+        ]
 
     def get_base_enc_params(self):
         return [(disc.n_bins_, disc.bin_edges_) for disc in self.discs]
@@ -449,7 +461,14 @@ class TfidfEnc(EncBase):
 
     @staticmethod
     def get_new_base_enc():
-        return TfidfVectorizer(input="content", decode_error="replace", strip_accents="ascii", lowercase=True, analyzer="word", min_df=5 / 100000)
+        return TfidfVectorizer(
+            input="content",
+            decode_error="replace",
+            strip_accents="ascii",
+            lowercase=True,
+            analyzer="word",
+            min_df=5 / 100000,
+        )
 
     def get_base_enc_params(self):
         return self.tfidf.vocabulary_, self.tfidf.idf_
@@ -553,7 +572,9 @@ class EmbeddingInitializer(nn.Module):
                 self.embed.weight.data[1:, :] = torch.eye(self.emb_dim)
         if shared_embedding:
             assert not one_hot
-            ce_dim = self.emb_dim if shared_embedding_added else (out_dim if out_dim else self.emb_dim) // n_shared_embs  # used to be //8
+            ce_dim = (
+                self.emb_dim if shared_embedding_added else (out_dim if out_dim else self.emb_dim) // n_shared_embs
+            )  # used to be //8
             self.shared_emb = nn.Parameter(torch.empty(1, ce_dim).uniform_(-1, 1))
         self.do = nn.Dropout(p=p_dropout)
 
@@ -654,7 +675,9 @@ def cyclic_dt_features(d: Union[date, datetime], time: bool = True, add_linear: 
     return feats
 
 
-def add_cyclic_datepart(df: DataFrame, field_name: str, prefix: str = None, drop: bool = True, time: bool = False, add_linear: bool = False):
+def add_cyclic_datepart(
+    df: DataFrame, field_name: str, prefix: str = None, drop: bool = True, time: bool = False, add_linear: bool = False
+):
     "Helper function that adds trigonometric date/time features to a date in the column `field_name` of `df`."
     make_date(df, field_name)
     field = df[field_name]

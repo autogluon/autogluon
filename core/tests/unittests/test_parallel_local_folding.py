@@ -61,10 +61,16 @@ def _test_resource_allocation_and_time_limit(num_jobs, num_folds_parallel, time_
     num_cpus = ResourceManager.get_cpu_count()
     num_gpus = ResourceManager.get_gpu_count()
     time_start = time.time()
-    fold_fitting_strategy = _construct_dummy_fold_strategy(num_jobs=num_jobs, time_limit=time_limit, num_folds_parallel=num_folds_parallel)
+    fold_fitting_strategy = _construct_dummy_fold_strategy(
+        num_jobs=num_jobs, time_limit=time_limit, num_folds_parallel=num_folds_parallel
+    )
     for i in range(num_jobs):
         fold_fitting_strategy.schedule_fold_model_fit(dict())
-    resources, batches, num_parallel_jobs = fold_fitting_strategy.resources, fold_fitting_strategy.batches, fold_fitting_strategy.num_parallel_jobs
+    resources, batches, num_parallel_jobs = (
+        fold_fitting_strategy.resources,
+        fold_fitting_strategy.batches,
+        fold_fitting_strategy.num_parallel_jobs,
+    )
     time_elapsed = time.time() - time_start
     time_remaining = time_limit - time_elapsed
     time_limit_fold = fold_fitting_strategy._get_fold_time_limit()
@@ -100,14 +106,20 @@ def test_resource_allocation_and_time_limit():
 @patch("autogluon.common.utils.resource_utils.ResourceManager.get_available_virtual_mem")
 def test_dynamic_resource_allocation(mock_get_mem):
     mock_get_mem.return_value = 2.5 * 1e9
-    fold_fitting_strategy = _construct_dummy_fold_strategy(model_base_cls=DummyBigModel, num_jobs=8, num_folds_parallel=8)
+    fold_fitting_strategy = _construct_dummy_fold_strategy(
+        model_base_cls=DummyBigModel, num_jobs=8, num_folds_parallel=8
+    )
     assert fold_fitting_strategy.num_parallel_jobs == 2 and fold_fitting_strategy.batches == 4
     mock_get_mem.return_value = 7.5 * 1e9
-    fold_fitting_strategy = _construct_dummy_fold_strategy(model_base_cls=DummyBigModel, num_jobs=8, num_folds_parallel=8)
+    fold_fitting_strategy = _construct_dummy_fold_strategy(
+        model_base_cls=DummyBigModel, num_jobs=8, num_folds_parallel=8
+    )
     # If memory is not sufficient to train num_folds_parallel, reduce to max power of 2 folds that's smaller than folds_can_be_fit_in_parallel.
     # Here memory can only train 7 folds, therefore we train 4 folds instead in two batches
     assert fold_fitting_strategy.num_parallel_jobs == 4 and fold_fitting_strategy.batches == 2
     mock_get_mem.return_value = 6 * 1e9
-    fold_fitting_strategy = _construct_dummy_fold_strategy(model_base_cls=DummyBigModel, num_jobs=10, num_folds_parallel=10)
+    fold_fitting_strategy = _construct_dummy_fold_strategy(
+        model_base_cls=DummyBigModel, num_jobs=10, num_folds_parallel=10
+    )
     # Here memory can only train 10 folds, therefore we train 4 folds instead in three batches, the last batch would train 2 folds in parallel
     assert fold_fitting_strategy.num_parallel_jobs == 4 and fold_fitting_strategy.batches == 3

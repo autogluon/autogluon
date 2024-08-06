@@ -47,7 +47,9 @@ class CVSplitter:
         if self.groups is not None:
             num_groups = len(self.groups.unique())
             if self.n_repeats != 1:
-                raise AssertionError(f"n_repeats must be 1 when split groups are specified. (n_repeats={self.n_repeats})")
+                raise AssertionError(
+                    f"n_repeats must be 1 when split groups are specified. (n_repeats={self.n_repeats})"
+                )
             self.n_splits = num_groups
             splitter_cls = LeaveOneGroupOut
             # pass
@@ -77,7 +79,9 @@ class CVSplitter:
                     y_dummy = pd.concat([y, pd.Series([-1] * self.n_splits)], ignore_index=True)
                     X_dummy = pd.concat([X, X.head(self.n_splits)], ignore_index=True)
                     invalid_index = set(list(y_dummy.tail(self.n_splits).index))
-                    out = [[train_index, test_index] for train_index, test_index in self._splitter.split(X_dummy, y_dummy)]
+                    out = [
+                        [train_index, test_index] for train_index, test_index in self._splitter.split(X_dummy, y_dummy)
+                    ]
                     len_out = len(out)
                     for i in range(len_out):
                         train_index, test_index = out[i]
@@ -85,7 +89,9 @@ class CVSplitter:
                         out[i][1] = [index for index in test_index if index not in invalid_index]
             return out
         else:
-            return [[train_index, test_index] for train_index, test_index in self._splitter.split(X, y, groups=self.groups)]
+            return [
+                [train_index, test_index] for train_index, test_index in self._splitter.split(X, y, groups=self.groups)
+            ]
 
 
 def setup_compute(nthreads_per_trial, ngpus_per_trial):
@@ -122,7 +128,9 @@ def setup_trial_limits(time_limit, num_trials, hyperparameters):
     return time_limit, num_trials
 
 
-def get_leaderboard_pareto_frontier(leaderboard: DataFrame, score_col="score_val", inference_time_col="pred_time_val_full") -> DataFrame:
+def get_leaderboard_pareto_frontier(
+    leaderboard: DataFrame, score_col="score_val", inference_time_col="pred_time_val_full"
+) -> DataFrame:
     """
     Given a set of models, returns in ranked order from best score to worst score models which satisfy the criteria:
     1. No other model in the set has both a lower inference time and a better or equal score.
@@ -132,7 +140,9 @@ def get_leaderboard_pareto_frontier(leaderboard: DataFrame, score_col="score_val
     :param inference_time_col: Column name in leaderboard of model inference times
     :return: Subset of the original leaderboard DataFrame containing only models that are a valid optimal choice at different valuations of score and inference time.
     """
-    leaderboard = leaderboard.sort_values(by=[score_col, inference_time_col], ascending=[False, True]).reset_index(drop=True)
+    leaderboard = leaderboard.sort_values(by=[score_col, inference_time_col], ascending=[False, True]).reset_index(
+        drop=True
+    )
     leaderboard_unique = leaderboard.drop_duplicates(subset=[score_col])
 
     pareto_frontier = []
@@ -163,7 +173,9 @@ def normalize_binary_probas(y_predprob, eps):
     (pmin, pmax) = (eps, 1 - eps)  # predicted probs outside this range will be remapped into (0,1)
     which_toobig = y_predprob > pmax
     if np.sum(which_toobig) > 0:  # remap overly large probs
-        y_predprob = np.logical_not(which_toobig) * y_predprob + which_toobig * (1 - (eps * np.exp(-(y_predprob - pmax))))
+        y_predprob = np.logical_not(which_toobig) * y_predprob + which_toobig * (
+            1 - (eps * np.exp(-(y_predprob - pmax)))
+        )
     which_toosmall = y_predprob < pmin
     if np.sum(which_toosmall) > 0:  # remap overly small probs
         y_predprob = np.logical_not(which_toosmall) * y_predprob + which_toosmall * eps * np.exp(-(pmin - y_predprob))
@@ -192,7 +204,9 @@ def default_holdout_frac(num_train_rows, hyperparameter_tune=False):
         holdout_frac = max(0.01, min(0.1, 2500.0 / num_train_rows))
 
     if hyperparameter_tune:
-        holdout_frac = min(0.2, holdout_frac * 2)  # We want to allocate more validation data for HPO to avoid overfitting
+        holdout_frac = min(
+            0.2, holdout_frac * 2
+        )  # We want to allocate more validation data for HPO to avoid overfitting
 
     return holdout_frac
 
@@ -261,7 +275,9 @@ def augment_rare_classes(X, label, threshold):
     return X
 
 
-def get_pred_from_proba_df(y_pred_proba: pd.DataFrame, problem_type: str = BINARY, decision_threshold: float = None) -> pd.Series:
+def get_pred_from_proba_df(
+    y_pred_proba: pd.DataFrame, problem_type: str = BINARY, decision_threshold: float = None
+) -> pd.Series:
     """
     From input DataFrame of pred_proba, return Series of pred.
     The input DataFrame's columns must be the names of the target classes.
@@ -272,7 +288,9 @@ def get_pred_from_proba_df(y_pred_proba: pd.DataFrame, problem_type: str = BINAR
         y_pred = y_pred_proba
     elif problem_type == BINARY and decision_threshold is not None:
         negative_class, positive_class = y_pred_proba.columns
-        y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba.values, problem_type=problem_type, decision_threshold=decision_threshold)
+        y_pred = get_pred_from_proba(
+            y_pred_proba=y_pred_proba.values, problem_type=problem_type, decision_threshold=decision_threshold
+        )
         y_pred = [positive_class if pred == 1 else negative_class for pred in y_pred]
         y_pred = pd.Series(data=y_pred, index=y_pred_proba.index)
     else:
@@ -280,7 +298,9 @@ def get_pred_from_proba_df(y_pred_proba: pd.DataFrame, problem_type: str = BINAR
     return y_pred
 
 
-def get_pred_from_proba(y_pred_proba: np.ndarray, problem_type: str = BINARY, decision_threshold: float = None) -> np.ndarray:
+def get_pred_from_proba(
+    y_pred_proba: np.ndarray, problem_type: str = BINARY, decision_threshold: float = None
+) -> np.ndarray:
     if problem_type == BINARY:
         if decision_threshold is None:
             decision_threshold = 0.5
@@ -304,7 +324,9 @@ def get_pred_from_proba(y_pred_proba: np.ndarray, problem_type: str = BINARY, de
     return y_pred
 
 
-def convert_pred_probas_to_df(pred_proba_list: List[ArrayLike], columns: List[str], problem_type: str, index: pd.Index = None) -> DataFrame:
+def convert_pred_probas_to_df(
+    pred_proba_list: List[ArrayLike], columns: List[str], problem_type: str, index: pd.Index = None
+) -> DataFrame:
     """
     Converts a list of pred_proba model outputs to a DataFrame
 
@@ -359,7 +381,12 @@ def extract_label(data: DataFrame, label: str) -> (DataFrame, Series):
 
 
 def generate_train_test_split_combined(
-    data: DataFrame, label: str, problem_type: str, test_size: float = 0.1, random_state: int = 0, min_cls_count_train: int = 1
+    data: DataFrame,
+    label: str,
+    problem_type: str,
+    test_size: float = 0.1,
+    random_state: int = 0,
+    min_cls_count_train: int = 1,
 ) -> (DataFrame, DataFrame):
     """
     Generate a train test split from a DataFrame that contains the label column.
@@ -392,7 +419,12 @@ def generate_train_test_split_combined(
     """
     X, y = extract_label(data=data, label=label)
     train_data, test_data, y_train, y_test = generate_train_test_split(
-        X=X, y=y, problem_type=problem_type, test_size=test_size, random_state=random_state, min_cls_count_train=min_cls_count_train
+        X=X,
+        y=y,
+        problem_type=problem_type,
+        test_size=test_size,
+        random_state=random_state,
+        min_cls_count_train=min_cls_count_train,
     )
     train_data[label] = y_train
     test_data[label] = y_test
@@ -400,7 +432,12 @@ def generate_train_test_split_combined(
 
 
 def generate_train_test_split(
-    X: DataFrame, y: Series, problem_type: str, test_size: Union[float, int] = 0.1, random_state=0, min_cls_count_train=1
+    X: DataFrame,
+    y: Series,
+    problem_type: str,
+    test_size: Union[float, int] = 0.1,
+    random_state=0,
+    min_cls_count_train=1,
 ) -> Tuple[DataFrame, DataFrame, Series, Series]:
     """
     Generate a train test split from input X, y.
@@ -444,7 +481,9 @@ def generate_train_test_split(
     elif isinstance(test_size, int):
         assert test_size > 0
     valid_problem_types = [BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE]
-    assert problem_type in valid_problem_types, f'Unknown problem type "{problem_type}" | Valid problem types: {valid_problem_types}'
+    assert (
+        problem_type in valid_problem_types
+    ), f'Unknown problem type "{problem_type}" | Valid problem types: {valid_problem_types}'
 
     X_split = X
     y_split = y
@@ -461,7 +500,9 @@ def generate_train_test_split(
         cls_counts_invalid = cls_counts[cls_counts < min_cls_count_train]
 
         if len(cls_counts_invalid) > 0:
-            logger.error(f"ERROR: Classes have too few samples to split the data! At least {min_cls_count_train} are required.")
+            logger.error(
+                f"ERROR: Classes have too few samples to split the data! At least {min_cls_count_train} are required."
+            )
             logger.error(cls_counts_invalid)
             raise AssertionError("Not enough data to split data into train and val without dropping classes!")
         elif min_cls_count_train < 2:
@@ -548,7 +589,9 @@ def normalize_pred_probas(y_predprob, problem_type, eps=1e-7):
 
     if problem_type in [BINARY, REGRESSION]:
         if len(y_predprob.shape) > 1 and min(y_predprob.shape) > 1:
-            raise ValueError(f"cannot call normalize_pred_probas with problem_type={problem_type} and y_predprob.shape=={y_predprob.shape}")
+            raise ValueError(
+                f"cannot call normalize_pred_probas with problem_type={problem_type} and y_predprob.shape=={y_predprob.shape}"
+            )
         return normalize_binary_probas(y_predprob, eps)
     elif problem_type in [MULTICLASS, SOFTCLASS]:  # clip all probs below at eps and then renormalize
         if len(y_predprob.shape) == 1:
@@ -574,9 +617,7 @@ def infer_problem_type(y: Series, silent=False) -> str:
     unique_values = y.unique()
 
     if num_rows > LARGE_DATA_THRESHOLD:
-        regression_threshold = (
-            REGRESS_THRESHOLD_LARGE_DATA  # if the unique-ratio is less than this, we assume multiclass classification, even when labels are integers
-        )
+        regression_threshold = REGRESS_THRESHOLD_LARGE_DATA  # if the unique-ratio is less than this, we assume multiclass classification, even when labels are integers
     else:
         regression_threshold = REGRESS_THRESHOLD_SMALL_DATA
 
@@ -628,7 +669,10 @@ def infer_problem_type(y: Series, silent=False) -> str:
             y_min = y.min()
             y_mean = y.mean()
             y_stddev = y.std()
-            logger.log(20, f"\tLabel info (max, min, mean, stddev): ({y_max}, {y_min}, {round(y_mean, 5)}, {round(y_stddev, 5)})")
+            logger.log(
+                20,
+                f"\tLabel info (max, min, mean, stddev): ({y_max}, {y_min}, {round(y_mean, 5)}, {round(y_stddev, 5)})",
+            )
 
         logger.log(
             25,
@@ -678,7 +722,10 @@ def compute_weighted_metric(y, y_pred, metric, weights, weight_evaluation=None, 
             metric_name = metric.name
         else:
             metric_name = metric
-        logger.log(30, f"WARNING: eval_metric='{metric_name}' does not support sample weights so they will be ignored in reported metric.")
+        logger.log(
+            30,
+            f"WARNING: eval_metric='{metric_name}' does not support sample weights so they will be ignored in reported metric.",
+        )
         weighted_metric = metric(y, y_pred, **kwargs)
     return weighted_metric
 
@@ -846,17 +893,26 @@ def compute_permutation_feature_importance(
             if shuffle_repeat == 0:
                 if not silent:
                     time_score = time.time() - time_start_score
-                    time_estimated = ((num_features + 1) * time_score) * num_shuffle_sets + time_start_score - time_start
+                    time_estimated = (
+                        ((num_features + 1) * time_score) * num_shuffle_sets + time_start_score - time_start
+                    )
                     time_estimated_per_set = time_estimated / num_shuffle_sets
-                    logger.log(20, f"{log_prefix}\t{round(time_estimated, 2)}s\t= Expected runtime ({round(time_estimated_per_set, 2)}s per shuffle set)")
+                    logger.log(
+                        20,
+                        f"{log_prefix}\t{round(time_estimated, 2)}s\t= Expected runtime ({round(time_estimated_per_set, 2)}s per shuffle set)",
+                    )
 
                 if transform_func is None:
                     feature_batch_count = _get_safe_fi_batch_count(X=X, num_features=num_features)
                 else:
-                    feature_batch_count = _get_safe_fi_batch_count(X=X, num_features=num_features, X_transformed=X_transformed)
+                    feature_batch_count = _get_safe_fi_batch_count(
+                        X=X, num_features=num_features, X_transformed=X_transformed
+                    )
 
             # creating copy of original data N=feature_batch_count times for parallel processing
-            X_raw = pd.concat([X.copy() for _ in range(feature_batch_count)], ignore_index=True, sort=False).reset_index(drop=True)
+            X_raw = pd.concat(
+                [X.copy() for _ in range(feature_batch_count)], ignore_index=True, sort=False
+            ).reset_index(drop=True)
 
         row_count = len(X)
 
@@ -879,7 +935,11 @@ def compute_permutation_feature_importance(
 
             if (num_features_processing < feature_batch_count) and final_iteration:
                 X_raw_transformed = X_raw.loc[: row_count * num_features_processing - 1]
-                X_raw_transformed = X_raw_transformed if transform_func is None else transform_func(X_raw_transformed, **transform_func_kwargs)
+                X_raw_transformed = (
+                    X_raw_transformed
+                    if transform_func is None
+                    else transform_func(X_raw_transformed, **transform_func_kwargs)
+                )
             else:
                 X_raw_transformed = X_raw if transform_func is None else transform_func(X_raw, **transform_func_kwargs)
             y_pred = predict_func(X_raw_transformed, **predict_func_kwargs)
@@ -953,7 +1013,9 @@ def _validate_features(features: list, valid_features: list):
         else:
             feature_name = feature
             if feature_name not in valid_features:
-                raise ValueError(f"Feature does not exist in data: {feature_name}\n" f"Valid Features:\n" f"{valid_features}")
+                raise ValueError(
+                    f"Feature does not exist in data: {feature_name}\n" f"Valid Features:\n" f"{valid_features}"
+                )
         if feature_name in used_features:
             raise ValueError(f"Feature is present multiple times in feature list: {feature_name}")
         used_features.add(feature_name)
@@ -966,7 +1028,9 @@ def _compute_fi_with_stddev(fi_list_dict: dict, importance_as_list=False) -> Dat
     fi_p_value = dict()
     fi_n = dict()
     for feature in features:
-        fi[feature], fi_stddev[feature], fi_p_value[feature], fi_n[feature] = _compute_mean_stddev_and_p_value(fi_list_dict[feature])
+        fi[feature], fi_stddev[feature], fi_p_value[feature], fi_n[feature] = _compute_mean_stddev_and_p_value(
+            fi_list_dict[feature]
+        )
         if importance_as_list:
             fi[feature] = fi_list_dict[feature]
 

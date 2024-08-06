@@ -119,16 +119,22 @@ class BERTPretext(nn.Module):
 
         elif self.replacement_noise == "low_rank":
             assert self.p_replace + 0.2 <= 1, "p_replace too big, lower it!"
-            weights = torch.tensor([self.p_replace, 0.1, 0.9 - self.p_replace], dtype=torch.float)  # 0=pad, 1=replace with random value, 2=dont change
+            weights = torch.tensor(
+                [self.p_replace, 0.1, 0.9 - self.p_replace], dtype=torch.float
+            )  # 0=pad, 1=replace with random value, 2=dont change
 
-            locs_to_change = torch.multinomial(weights, np.prod(cat_feats.shape), replacement=True).view(cat_feats.shape)
+            locs_to_change = torch.multinomial(weights, np.prod(cat_feats.shape), replacement=True).view(
+                cat_feats.shape
+            )
             col_cardinalities = torch.LongTensor([i[1] for i in self.cat_feat_origin_cards]).to(cat_feats)
             col_cardinalities = col_cardinalities.unsqueeze(0).expand_as(cat_feats)
 
             unif = torch.rand(cat_feats.shape, device=col_cardinalities.device)
             random_feats = (unif * col_cardinalities).floor().to(torch.int64) + 1  # + 1 since 0 is the padding value
 
-            extra_replace = torch.mul((cat_feats == random_feats).to(int), (locs_to_change == 1).to(int)).to(torch.bool)
+            extra_replace = torch.mul((cat_feats == random_feats).to(int), (locs_to_change == 1).to(int)).to(
+                torch.bool
+            )
             cat_feats[locs_to_change == 1] = random_feats[locs_to_change == 1]
             cat_feats[locs_to_change == 0] = 0
 

@@ -74,7 +74,10 @@ def early_stopping_custom(
 
     def _init(env):
         if not ignore_dart_warning:
-            enabled[0] = not any((boost_alias in env.params and env.params[boost_alias] == "dart") for boost_alias in ("boosting", "boosting_type", "boost"))
+            enabled[0] = not any(
+                (boost_alias in env.params and env.params[boost_alias] == "dart")
+                for boost_alias in ("boosting", "boosting_type", "boost")
+            )
         if not enabled[0]:
             warnings.warn("Early stopping is not available in dart mode")
             return
@@ -169,7 +172,9 @@ def early_stopping_custom(
         if not enabled[0]:
             return
         if train_loss_name is not None:
-            train_loss_evals = [eval for eval in env.evaluation_result_list if eval[0] == "train_set" and eval[1] == train_loss_name]
+            train_loss_evals = [
+                eval for eval in env.evaluation_result_list if eval[0] == "train_set" and eval[1] == train_loss_name
+            ]
             train_loss_val = train_loss_evals[0][2]
         else:
             train_loss_val = 0.0
@@ -184,7 +189,9 @@ def early_stopping_custom(
                 best_score_list[i] = env.evaluation_result_list
                 best_trainloss[i] = train_loss_val
             if reporter is not None:  # Report current best scores for iteration, used in HPO
-                if i == indices_to_check[0]:  # TODO: documentation needs to note that we assume 0th index is the 'official' validation performance metric.
+                if (
+                    i == indices_to_check[0]
+                ):  # TODO: documentation needs to note that we assume 0th index is the 'official' validation performance metric.
                     if cmp_op[i] == gt:
                         validation_perf = score
                     else:
@@ -204,7 +211,10 @@ def early_stopping_custom(
                     logger.log(
                         15,
                         "Early stopping, best iteration is:\n[%d]\t%s"
-                        % (best_iter[i] + 1, "\t".join([_format_eval_result(x, show_stdv=False) for x in best_score_list[i]])),
+                        % (
+                            best_iter[i] + 1,
+                            "\t".join([_format_eval_result(x, show_stdv=False) for x in best_score_list[i]]),
+                        ),
                     )
                 raise EarlyStopException(best_iter[i], best_score_list[i])
             elif (max_diff is not None) and (abs(score - best_score[i]) > max_diff):
@@ -214,7 +224,10 @@ def early_stopping_custom(
                     logger.log(
                         15,
                         "Early stopping, best iteration is:\n[%d]\t%s"
-                        % (best_iter[i] + 1, "\t".join([_format_eval_result(x, show_stdv=False) for x in best_score_list[i]])),
+                        % (
+                            best_iter[i] + 1,
+                            "\t".join([_format_eval_result(x, show_stdv=False) for x in best_score_list[i]]),
+                        ),
                     )
                 raise EarlyStopException(best_iter[i], best_score_list[i])
             if env.iteration == env.end_iteration - 1:
@@ -222,7 +235,10 @@ def early_stopping_custom(
                     logger.log(
                         15,
                         "Did not meet early stopping criterion. Best iteration is:\n[%d]\t%s"
-                        % (best_iter[i] + 1, "\t".join([_format_eval_result(x, show_stdv=False) for x in best_score_list[i]])),
+                        % (
+                            best_iter[i] + 1,
+                            "\t".join([_format_eval_result(x, show_stdv=False) for x in best_score_list[i]]),
+                        ),
                     )
                 raise EarlyStopException(best_iter[i], best_score_list[i])
             if verbose:
@@ -233,7 +249,10 @@ def early_stopping_custom(
                 logger.log(
                     20,
                     "Found manual stop file, early stopping. Best iteration is:\n[%d]\t%s"
-                    % (best_iter[i] + 1, "\t".join([_format_eval_result(x, show_stdv=False) for x in best_score_list[i]])),
+                    % (
+                        best_iter[i] + 1,
+                        "\t".join([_format_eval_result(x, show_stdv=False) for x in best_score_list[i]]),
+                    ),
                 )
                 raise EarlyStopException(best_iter[i], best_score_list[i])
         if time_limit:
@@ -245,7 +264,11 @@ def early_stopping_custom(
                     20,
                     "\tRan out of time, early stopping on iteration "
                     + str(env.iteration + 1)
-                    + ". Best iteration is:\n\t[%d]\t%s" % (best_iter[i] + 1, "\t".join([_format_eval_result(x, show_stdv=False) for x in best_score_list[i]])),
+                    + ". Best iteration is:\n\t[%d]\t%s"
+                    % (
+                        best_iter[i] + 1,
+                        "\t".join([_format_eval_result(x, show_stdv=False) for x in best_score_list[i]]),
+                    ),
                 )
                 raise EarlyStopException(best_iter[i], best_score_list[i])
 

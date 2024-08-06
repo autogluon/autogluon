@@ -17,7 +17,16 @@ DEFAULT_DISTILL_PRIORITY = dict(
 )
 
 
-def get_preset_models_distillation(path, problem_type, eval_metric, hyperparameters, level=1, name_suffix="_DSTL", invalid_model_names: list = None, **kwargs):
+def get_preset_models_distillation(
+    path,
+    problem_type,
+    eval_metric,
+    hyperparameters,
+    level=1,
+    name_suffix="_DSTL",
+    invalid_model_names: list = None,
+    **kwargs,
+):
     hyperparameters = process_hyperparameters(hyperparameters)
     level_key = level if level in hyperparameters.keys() else "default"
     if level_key not in hyperparameters.keys() and level_key == "default":
@@ -52,7 +61,12 @@ def get_preset_models_distillation(path, problem_type, eval_metric, hyperparamet
 
     if problem_type == MULTICLASS:
         models, model_args_fit = get_preset_models_softclass(
-            path=path, hyperparameters=hyperparameters, level=level, name_suffix=name_suffix, invalid_model_names=invalid_model_names, **kwargs
+            path=path,
+            hyperparameters=hyperparameters,
+            level=level,
+            name_suffix=name_suffix,
+            invalid_model_names=invalid_model_names,
+            **kwargs,
         )
     else:  # BINARY or REGRESSION
         models, model_args_fit = get_preset_models(

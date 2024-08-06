@@ -204,7 +204,9 @@ class TabularTorchDataset(torch.utils.data.IterableDataset):
                 feat_i = self.feature_groups["embed"][i]
                 feat_i_data = self.get_feature_data(feat_i).flatten().tolist()
                 num_categories_i = len(set(feat_i_data))  # number of categories for ith feature
-                num_categories_per_embedfeature[i] = num_categories_i + 1  # to account for unknown test-time categories
+                num_categories_per_embedfeature[i] = (
+                    num_categories_i + 1
+                )  # to account for unknown test-time categories
             return num_categories_per_embedfeature
 
     def get_feature_data(self, feature):
@@ -248,5 +250,7 @@ class TabularTorchDataset(torch.utils.data.IterableDataset):
         self.batch_size = batch_size
         self.shuffle = False if is_test else True
         self.drop_last = False if is_test else True
-        loader = torch.utils.data.DataLoader(self, num_workers=num_workers, batch_size=None, worker_init_fn=worker_init_fn)  # no collation
+        loader = torch.utils.data.DataLoader(
+            self, num_workers=num_workers, batch_size=None, worker_init_fn=worker_init_fn
+        )  # no collation
         return loader

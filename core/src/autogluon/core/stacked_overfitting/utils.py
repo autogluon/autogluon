@@ -31,7 +31,9 @@ def get_affected_stacked_overfitting_model_names(leaderboard: pd.DataFrame) -> T
     for model_name in set(leaderboard["model"]):
         # TODO: move away from using names to metadata properties (somehow).
         #   - include something like linear models once we are sure that they cannot leak
-        if (model_name.startswith("WeightedEnsemble") and model_to_level_map[model_name] <= stack_level) or model_to_level_map[model_name] <= (stack_level - 1):
+        if (
+            model_name.startswith("WeightedEnsemble") and model_to_level_map[model_name] <= stack_level
+        ) or model_to_level_map[model_name] <= (stack_level - 1):
             non_affected.append(model_name)
         else:
             affected.append(model_name)
@@ -58,17 +60,29 @@ def get_best_val_models(leaderboard: pd.DataFrame) -> Tuple[str, str, bool]:
     """
     non_affected, affected = get_affected_stacked_overfitting_model_names(leaderboard=leaderboard)
 
-    best_non_affected_model = leaderboard[leaderboard["model"].isin(non_affected)].sort_values(by="score_val", ascending=False).iloc[0].loc["model"]
+    best_non_affected_model = (
+        leaderboard[leaderboard["model"].isin(non_affected)]
+        .sort_values(by="score_val", ascending=False)
+        .iloc[0]
+        .loc["model"]
+    )
 
     affected_models_exist = len(affected) > 0
     best_affected_model = None
     if affected_models_exist:
-        best_affected_model = leaderboard[leaderboard["model"].isin(affected)].sort_values(by="score_val", ascending=False).iloc[0].loc["model"]
+        best_affected_model = (
+            leaderboard[leaderboard["model"].isin(affected)]
+            .sort_values(by="score_val", ascending=False)
+            .iloc[0]
+            .loc["model"]
+        )
 
     return best_non_affected_model, best_affected_model, affected_models_exist
 
 
-def _check_stacked_overfitting_for_models(best_non_affected_model: str, best_affected_model: str, leaderboard: pd.DataFrame) -> bool:
+def _check_stacked_overfitting_for_models(
+    best_non_affected_model: str, best_affected_model: str, leaderboard: pd.DataFrame
+) -> bool:
     """
     Determine whether stacked overfitting occurred for the given two models and a leaderboard containing their scores.
 
@@ -125,5 +139,7 @@ def check_stacked_overfitting_from_leaderboard(leaderboard: pd.DataFrame) -> boo
         return False
 
     return _check_stacked_overfitting_for_models(
-        best_non_affected_model=best_non_affected_model, best_affected_model=best_affected_model, leaderboard=leaderboard
+        best_non_affected_model=best_non_affected_model,
+        best_affected_model=best_affected_model,
+        leaderboard=leaderboard,
     )

@@ -93,7 +93,9 @@ class EarlyStoppingCustom(EarlyStopping):
                 logger.warning(
                     f"Warning: Early stopped XGB model prior to optimal result to avoid OOM error. Please increase available memory to avoid subpar model quality.\n"
                 )
-                logger.warning(f"Early stopping. Best iteration is: \t[{model.attr('best_iteration')}]\t{model.attr('best_score')}")
+                logger.warning(
+                    f"Early stopping. Best iteration is: \t[{model.attr('best_iteration')}]\t{model.attr('best_score')}"
+                )
             return True
         elif self.verbose and (model_size_memory_ratio > 0.25):
             logger.log(15, f"Available Memory: {available_mb} MB")

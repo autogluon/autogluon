@@ -2,7 +2,9 @@
 BINARY = "binary"
 MULTICLASS = "multiclass"
 REGRESSION = "regression"
-SOFTCLASS = "softclass"  # classification with soft-target (rather than classes, labels are probabilities of each class).
+SOFTCLASS = (
+    "softclass"  # classification with soft-target (rather than classes, labels are probabilities of each class).
+)
 QUANTILE = "quantile"  # quantile regression (over multiple quantile levels, which are between 0.0 and 1.0)
 
 PROBLEM_TYPES_CLASSIFICATION = [BINARY, MULTICLASS]
@@ -17,9 +19,7 @@ REFIT_FULL_SUFFIX = "_FULL"  # suffix appended to model name for refit_single_fu
 # AG_ARGS variables are key names in model hyperparameters to dictionaries of custom AutoGluon arguments.
 # TODO: Have documentation for all AG_ARGS values
 AG_ARGS = "ag_args"  # Contains arguments to control model name, model priority, and the valid configurations which it can be used in.
-AG_ARGS_FIT = (
-    "ag_args_fit"  # Contains arguments that impact model training, such as early stopping rounds, #cores, #gpus, max time limit, max memory usage  # TODO
-)
+AG_ARGS_FIT = "ag_args_fit"  # Contains arguments that impact model training, such as early stopping rounds, #cores, #gpus, max time limit, max memory usage  # TODO
 AG_ARGS_ENSEMBLE = "ag_args_ensemble"  # Contains arguments that impact model ensembling, such as if an ensemble model is allowed to use the original features.  # TODO: v0.1 add to documentation
 AG_ARG_PREFIX = "ag."  # Prefix to add to a hyperparameter to indicate it is an aux param for ag_args_fit.
 

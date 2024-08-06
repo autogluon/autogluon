@@ -30,7 +30,9 @@ def format_distillation_labels(y, problem_type, num_classes=None, eps_labelsmoot
     return y
 
 
-def augment_data(X, feature_metadata: FeatureMetadata, augmentation_data=None, augment_method="spunge", augment_args=None):
+def augment_data(
+    X, feature_metadata: FeatureMetadata, augmentation_data=None, augment_method="spunge", augment_args=None
+):
     """augment_method options: ['spunge', 'munge']"""
     if augment_args is None:
         augment_args = {}
@@ -40,7 +42,9 @@ def augment_data(X, feature_metadata: FeatureMetadata, augmentation_data=None, a
         if "num_augmented_samples" not in augment_args:
             if "max_size" not in augment_args:
                 augment_args["max_size"] = np.inf
-            augment_args["num_augmented_samples"] = int(min(augment_args["max_size"], augment_args["size_factor"] * len(X)))
+            augment_args["num_augmented_samples"] = int(
+                min(augment_args["max_size"], augment_args["size_factor"] * len(X))
+            )
 
         if augment_method == "spunge":
             X_aug = spunge_augment(X, feature_metadata, **augment_args)
@@ -64,7 +68,14 @@ def postprocess_augmented(X_aug, X):
 
 
 # TODO: This can easily be optimized heavily
-def spunge_augment(X, feature_metadata: FeatureMetadata, num_augmented_samples=10000, frac_perturb=0.1, continuous_feature_noise=0.1, **kwargs):
+def spunge_augment(
+    X,
+    feature_metadata: FeatureMetadata,
+    num_augmented_samples=10000,
+    frac_perturb=0.1,
+    continuous_feature_noise=0.1,
+    **kwargs,
+):
     """Generates synthetic datapoints for learning to mimic teacher model in distillation
     via simplified version of MUNGE strategy (that does not require near-neighbor search).
 
@@ -75,7 +86,9 @@ def spunge_augment(X, feature_metadata: FeatureMetadata, num_augmented_samples=1
     """
     if frac_perturb > 1.0:
         raise ValueError("frac_perturb must be <= 1")
-    logger.log(20, f"SPUNGE: Augmenting training data with {num_augmented_samples} synthetic samples for distillation...")
+    logger.log(
+        20, f"SPUNGE: Augmenting training data with {num_augmented_samples} synthetic samples for distillation..."
+    )
 
     X = X.copy()
     nan_category = "__NaN__"
@@ -91,12 +104,16 @@ def spunge_augment(X, feature_metadata: FeatureMetadata, num_augmented_samples=1
     X_aug = pd.concat([X.iloc[[0]].copy()] * num_augmented_samples)
     X_aug.reset_index(drop=True, inplace=True)
     continuous_types = [R_FLOAT, R_INT]
-    continuous_featnames = feature_metadata.get_features(valid_raw_types=continuous_types)  # these features will have shuffled values with added noise
+    continuous_featnames = feature_metadata.get_features(
+        valid_raw_types=continuous_types
+    )  # these features will have shuffled values with added noise
 
     for i in range(num_augmented_samples):  # hot-deck sample some features per datapoint
         og_ind = i % len(X)
         augdata_i = X.iloc[og_ind].copy()
-        num_feature_perturb_i = np.random.choice(range(1, num_feature_perturb + 1))  # randomly sample number of features to perturb
+        num_feature_perturb_i = np.random.choice(
+            range(1, num_feature_perturb + 1)
+        )  # randomly sample number of features to perturb
         cols_toperturb = np.random.choice(list(X.columns), size=num_feature_perturb_i, replace=False)
         for feature in cols_toperturb:
             feature_data = X[feature]
@@ -107,7 +124,9 @@ def spunge_augment(X, feature_metadata: FeatureMetadata, num_augmented_samples=1
         if feature in continuous_featnames:
             feature_data = X[feature]
             aug_data = X_aug[feature]
-            noise = np.random.normal(scale=np.nanstd(feature_data) * continuous_feature_noise, size=num_augmented_samples)
+            noise = np.random.normal(
+                scale=np.nanstd(feature_data) * continuous_feature_noise, size=num_augmented_samples
+            )
             mask = np.random.binomial(n=1, p=frac_perturb, size=num_augmented_samples)
             aug_data = aug_data + noise * mask
             X_aug[feature] = pd.Series(aug_data, index=X_aug.index)
@@ -119,7 +138,9 @@ def spunge_augment(X, feature_metadata: FeatureMetadata, num_augmented_samples=1
 
 
 # TODO: Remove or fix, likely doesn't work anymore
-def munge_augment(X, feature_metadata: FeatureMetadata, num_augmented_samples=10000, perturb_prob=0.5, s=1.0, **kwargs):
+def munge_augment(
+    X, feature_metadata: FeatureMetadata, num_augmented_samples=10000, perturb_prob=0.5, s=1.0, **kwargs
+):
     """Uses MUNGE algorithm to generate synthetic datapoints for learning to mimic teacher model in distillation: https://www.cs.cornell.edu/~caruana/compression.kdd06.pdf
     Args:
         num_augmented_samples: number of additional augmented data points to return
@@ -164,12 +185,16 @@ def munge_augment(X, feature_metadata: FeatureMetadata, num_augmented_samples=10
 
     if perturb_prob > 1.0:
         raise ValueError("frac_perturb must be <= 1")
-    logger.log(20, f"MUNGE: Augmenting training data with {num_augmented_samples} synthetic samples for distillation...")
+    logger.log(
+        20, f"MUNGE: Augmenting training data with {num_augmented_samples} synthetic samples for distillation..."
+    )
     X = X.copy()
     X_aug = pd.concat([X.iloc[[0]].copy()] * num_augmented_samples)
     X_aug.reset_index(drop=True, inplace=True)
     continuous_types = ["float", "int"]
-    continuous_featnames = feature_metadata.get_features(valid_raw_types=continuous_types)  # these features will have shuffled values with added noise
+    continuous_featnames = feature_metadata.get_features(
+        valid_raw_types=continuous_types
+    )  # these features will have shuffled values with added noise
     for col in continuous_featnames:
         X_aug[col] = X_aug[col].astype(float)
         X[col] = X[col].astype(float)
@@ -179,7 +204,9 @@ def munge_augment(X, feature_metadata: FeatureMetadata, num_augmented_samples=10
         augdata_i = X.iloc[og_ind].copy()
         neighbor_i = X.iloc[neigh_ind[og_ind]].copy()
         # dist_i = neigh_dist[og_ind]
-        cols_toperturb = np.random.choice(list(X.columns), size=np.random.binomial(X.shape[1], p=perturb_prob, size=1)[0], replace=False)
+        cols_toperturb = np.random.choice(
+            list(X.columns), size=np.random.binomial(X.shape[1], p=perturb_prob, size=1)[0], replace=False
+        )
         for col in cols_toperturb:
             new_val = neighbor_i[col]
             if col in continuous_featnames:

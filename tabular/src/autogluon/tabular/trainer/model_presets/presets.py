@@ -232,7 +232,9 @@ def get_preset_models(
     if level_key not in hyperparameters.keys() and level_key == "default":
         hyperparameters = {"default": hyperparameters}
     hp_level = hyperparameters[level_key]
-    hp_level = ModelFilter.filter_models(models=hp_level, included_model_types=included_model_types, excluded_model_types=excluded_model_types)
+    hp_level = ModelFilter.filter_models(
+        models=hp_level, included_model_types=included_model_types, excluded_model_types=excluded_model_types
+    )
     model_cfg_priority_dict = defaultdict(list)
     model_type_list = list(hp_level.keys())
     for model_type in model_type_list:
@@ -251,7 +253,9 @@ def get_preset_models(
                 ag_args_fit=ag_args_fit,
                 problem_type=problem_type,
             )
-            model_cfg[AG_ARGS]["priority"] = model_cfg[AG_ARGS].get("priority", default_priorities.get(model_type, DEFAULT_CUSTOM_MODEL_PRIORITY))
+            model_cfg[AG_ARGS]["priority"] = model_cfg[AG_ARGS].get(
+                "priority", default_priorities.get(model_type, DEFAULT_CUSTOM_MODEL_PRIORITY)
+            )
             model_priority = model_cfg[AG_ARGS]["priority"]
             # Check if model_cfg is valid
             is_valid = is_model_cfg_valid(model_cfg, level=level, problem_type=problem_type)
@@ -260,7 +264,11 @@ def get_preset_models(
             if is_valid:
                 model_cfg_priority_dict[model_priority].append(model_cfg)
 
-    model_cfg_priority_list = [model for priority in sorted(model_cfg_priority_dict.keys(), reverse=True) for model in model_cfg_priority_dict[priority]]
+    model_cfg_priority_list = [
+        model
+        for priority in sorted(model_cfg_priority_dict.keys(), reverse=True)
+        for model in model_cfg_priority_dict[priority]
+    ]
 
     if not silent:
         logger.log(20, "Model configs that will be trained (in order):")
@@ -280,7 +288,9 @@ def get_preset_models(
         )
         invalid_name_set.add(model.name)
         if "hyperparameter_tune_kwargs" in model_cfg[AG_ARGS]:
-            model_args_fit[model.name] = {"hyperparameter_tune_kwargs": model_cfg[AG_ARGS]["hyperparameter_tune_kwargs"]}
+            model_args_fit[model.name] = {
+                "hyperparameter_tune_kwargs": model_cfg[AG_ARGS]["hyperparameter_tune_kwargs"]
+            }
         if "ag_args_ensemble" in model_cfg and not model_cfg["ag_args_ensemble"]:
             model_cfg.pop("ag_args_ensemble")
         if not silent:
@@ -289,7 +299,9 @@ def get_preset_models(
     return models, model_args_fit
 
 
-def clean_model_cfg(model_cfg: dict, model_type=None, ag_args=None, ag_args_ensemble=None, ag_args_fit=None, problem_type=None):
+def clean_model_cfg(
+    model_cfg: dict, model_type=None, ag_args=None, ag_args_ensemble=None, ag_args_fit=None, problem_type=None
+):
     model_cfg = _verify_model_cfg(model_cfg=model_cfg, model_type=model_type)
     model_cfg = copy.deepcopy(model_cfg)
     if AG_ARGS not in model_cfg:
@@ -301,7 +313,9 @@ def clean_model_cfg(model_cfg: dict, model_type=None, ag_args=None, ag_args_ense
     model_type = model_cfg[AG_ARGS]["model_type"]
     if not inspect.isclass(model_type):
         if model_type not in MODEL_TYPES:
-            raise AssertionError(f"Unknown model type specified in hyperparameters: '{model_type}'. Valid model types: {list(MODEL_TYPES.keys())}")
+            raise AssertionError(
+                f"Unknown model type specified in hyperparameters: '{model_type}'. Valid model types: {list(MODEL_TYPES.keys())}"
+            )
         model_type = MODEL_TYPES[model_type]
     elif not issubclass(model_type, AbstractModel):
         logger.warning(
@@ -376,7 +390,9 @@ def is_model_cfg_valid(model_cfg, level=1, problem_type=None):
         is_valid = False  # AG_ARGS is required
     elif model_cfg[AG_ARGS].get("model_type", None) is None:
         is_valid = False  # model_type is required
-    elif model_cfg[AG_ARGS].get("hyperparameter_tune_kwargs", None) and model_cfg[AG_ARGS].get("disable_in_hpo", False):
+    elif model_cfg[AG_ARGS].get("hyperparameter_tune_kwargs", None) and model_cfg[AG_ARGS].get(
+        "disable_in_hpo", False
+    ):
         is_valid = False
     elif not model_cfg[AG_ARGS].get("valid_stacker", True) and level > 1:
         is_valid = False  # Not valid as a stacker model
@@ -445,7 +461,13 @@ def model_factory(
         if ensemble_kwargs_model["hyperparameters"] is None:
             ensemble_kwargs_model["hyperparameters"] = {}
         ensemble_kwargs_model["hyperparameters"].update(extra_ensemble_hyperparameters)
-        model_init = ensemble_type(path=path, name=name_stacker, model_base=model_type, model_base_kwargs=model_init_kwargs, **ensemble_kwargs_model)
+        model_init = ensemble_type(
+            path=path,
+            name=name_stacker,
+            model_base=model_type,
+            model_base_kwargs=model_init_kwargs,
+            **ensemble_kwargs_model,
+        )
     else:
         model_init = model_type(**model_init_kwargs)
 
@@ -468,7 +490,9 @@ def get_preset_models_softclass(hyperparameters, invalid_model_names: list = Non
         rf_newparams = {"criterion": "squared_error", "ag_args": {"name_suffix": "MSE"}}
         for i in range(len(rf_params)):
             rf_params[i].update(rf_newparams)
-        rf_params = [j for n, j in enumerate(rf_params) if j not in rf_params[(n + 1) :]]  # Remove duplicates which may arise after overwriting criterion
+        rf_params = [
+            j for n, j in enumerate(rf_params) if j not in rf_params[(n + 1) :]
+        ]  # Remove duplicates which may arise after overwriting criterion
         hyperparameters_standard["RF"] = rf_params
     models, model_args_fit = get_preset_models(
         problem_type=SOFTCLASS,

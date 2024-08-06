@@ -15,7 +15,9 @@ def test_no_weighted_ensemble(fit_helper):
     dataset_name = "adult"
     extra_metrics = list(METRICS[BINARY])
 
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, expected_model_count=1)
+    fit_helper.fit_and_validate_dataset(
+        dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, expected_model_count=1
+    )
 
 
 def test_no_full_last_level_weighted_ensemble(fit_helper):
@@ -32,7 +34,9 @@ def test_no_full_last_level_weighted_ensemble(fit_helper):
     dataset_name = "adult"
     extra_metrics = list(METRICS[BINARY])
 
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, expected_model_count=4)
+    fit_helper.fit_and_validate_dataset(
+        dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, expected_model_count=4
+    )
 
 
 def test_no_full_last_level_weighted_ensemble_additionally(fit_helper):
@@ -50,7 +54,9 @@ def test_no_full_last_level_weighted_ensemble_additionally(fit_helper):
     dataset_name = "adult"
     extra_metrics = list(METRICS[BINARY])
 
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, expected_model_count=4)
+    fit_helper.fit_and_validate_dataset(
+        dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, expected_model_count=4
+    )
 
 
 def test_full_last_level_weighted_ensemble_additionally(fit_helper):
@@ -68,10 +74,14 @@ def test_full_last_level_weighted_ensemble_additionally(fit_helper):
     dataset_name = "adult"
     extra_metrics = list(METRICS[BINARY])
 
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, expected_model_count=5)
+    fit_helper.fit_and_validate_dataset(
+        dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, expected_model_count=5
+    )
 
     fit_args["num_stack_levels"] = 0
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, expected_model_count=2)
+    fit_helper.fit_and_validate_dataset(
+        dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, expected_model_count=2
+    )
 
 
 def test_full_last_level_weighted_ensemble(fit_helper):
@@ -88,7 +98,9 @@ def test_full_last_level_weighted_ensemble(fit_helper):
     dataset_name = "adult"
     extra_metrics = list(METRICS[BINARY])
 
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, expected_model_count=4)
+    fit_helper.fit_and_validate_dataset(
+        dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics, expected_model_count=4
+    )
 
 
 def test_max_sets(fit_helper):
@@ -192,7 +204,13 @@ def test_use_bag_holdout_calibrate(fit_helper):
 
 def test_num_folds_parallel(fit_helper, capsys):
     """Tests that num_folds_parallel equal to 1 works"""
-    fit_args = dict(hyperparameters={"DUMMY": {}}, fit_weighted_ensemble=False, num_bag_folds=2, num_bag_sets=1, ag_args_ensemble=dict(num_folds_parallel=1))
+    fit_args = dict(
+        hyperparameters={"DUMMY": {}},
+        fit_weighted_ensemble=False,
+        num_bag_folds=2,
+        num_bag_sets=1,
+        ag_args_ensemble=dict(num_folds_parallel=1),
+    )
     dataset_name = "adult"
 
     predictor = fit_helper.fit_and_validate_dataset(

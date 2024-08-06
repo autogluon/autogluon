@@ -150,11 +150,13 @@ class VowpalWabbitModel(AbstractModel):
         if loss_function:
             if self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
                 assert loss_function in self.CLASSIFICATION_LOSS_FUNCTIONS, (
-                    f"For {self.problem_type} problem, VW supports: {self.CLASSIFICATION_LOSS_FUNCTIONS}. " f"Got loss_function:{loss_function}"
+                    f"For {self.problem_type} problem, VW supports: {self.CLASSIFICATION_LOSS_FUNCTIONS}. "
+                    f"Got loss_function:{loss_function}"
                 )
             elif self.problem_type in PROBLEM_TYPES_REGRESSION:
                 assert loss_function in self.REGRESSION_LOSS_FUNCTIONS, (
-                    f"For {self.problem_type} problem, VW supports: {self.REGRESSION_LOSS_FUNCTIONS}. " f"Got loss_function:{loss_function}"
+                    f"For {self.problem_type} problem, VW supports: {self.REGRESSION_LOSS_FUNCTIONS}. "
+                    f"Got loss_function:{loss_function}"
                 )
 
     def _get_default_loss_function(self) -> str:
@@ -249,7 +251,8 @@ class VowpalWabbitModel(AbstractModel):
         # Ignore the below mentioned special types. Only those features that are not of the below mentioned
         # type are passed to the model for training list are passed features
         extra_auxiliary_params = dict(
-            valid_raw_types=[R_INT, R_FLOAT, R_CATEGORY, R_OBJECT], ignored_type_group_special=[S_IMAGE_PATH, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL]
+            valid_raw_types=[R_INT, R_FLOAT, R_CATEGORY, R_OBJECT],
+            ignored_type_group_special=[S_IMAGE_PATH, S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL],
         )
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params

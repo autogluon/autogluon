@@ -47,12 +47,24 @@ def quantile_transformer_converter(scope, operator, container):
     if opv < 18:
         C_col = OnnxSplit(C, axis=1, output_names=[f"C_col{x}" for x in range(op.n_features_in_)], op_version=opv)
     else:
-        C_col = OnnxSplit(C, axis=1, num_outputs=C.shape[1], output_names=[f"C_col{x}" for x in range(op.n_features_in_)], op_version=opv)
+        C_col = OnnxSplit(
+            C,
+            axis=1,
+            num_outputs=C.shape[1],
+            output_names=[f"C_col{x}" for x in range(op.n_features_in_)],
+            op_version=opv,
+        )
     C_col.add_to(scope, container)
     if opv < 18:
         X_col = OnnxSplit(X, axis=1, output_names=[f"X_col{x}" for x in range(op.n_features_in_)], op_version=opv)
     else:
-        X_col = OnnxSplit(X, axis=1, num_outputs=X.type.shape[1], output_names=[f"X_col{x}" for x in range(op.n_features_in_)], op_version=opv)
+        X_col = OnnxSplit(
+            X,
+            axis=1,
+            num_outputs=X.type.shape[1],
+            output_names=[f"X_col{x}" for x in range(op.n_features_in_)],
+            op_version=opv,
+        )
     X_col.add_to(scope, container)
     Y_col = []
     for feature_idx in range(op.n_features_in_):
@@ -83,8 +95,12 @@ def quantile_transformer_converter(scope, operator, container):
         )
         references = np.clip(norm.ppf(op.references_), -5.2, 5.2).astype(dtype)
         cst = np.broadcast_to(references, (batch_size, n_quantiles))
-        argmin_reshaped = OnnxReshape(argmin, np.array([batch_size, 1], dtype=np.int64), output_names=[f"reshape_col{feature_idx}"])
-        ref = OnnxGatherElements(cst, argmin_reshaped, axis=1, op_version=opv, output_names=[f"gathernd_col{feature_idx}"])
+        argmin_reshaped = OnnxReshape(
+            argmin, np.array([batch_size, 1], dtype=np.int64), output_names=[f"reshape_col{feature_idx}"]
+        )
+        ref = OnnxGatherElements(
+            cst, argmin_reshaped, axis=1, op_version=opv, output_names=[f"gathernd_col{feature_idx}"]
+        )
         ref_reshape = OnnxReshape(ref, np.array([batch_size, 1], dtype=np.int64), output_names=[f"Y_col{feature_idx}"])
         ref_cast = OnnxCast(ref_reshape, to=1, op_version=opv, output_names=[f"ref_cast{feature_idx}"])
         Y_col.append(ref_cast)
@@ -147,9 +163,17 @@ def _encoder_handle_unknown_transformer_converter(scope, operator, container, na
 
     C_col = op.categories_
     if opv < 18:
-        X_col = OnnxSplit(X, axis=1, output_names=[f"{name_prefix}X_col{x}" for x in range(num_categories)], op_version=opv)
+        X_col = OnnxSplit(
+            X, axis=1, output_names=[f"{name_prefix}X_col{x}" for x in range(num_categories)], op_version=opv
+        )
     else:
-        X_col = OnnxSplit(X, axis=1, num_outputs=X.type.shape[1], output_names=[f"{name_prefix}X_col{x}" for x in range(num_categories)], op_version=opv)
+        X_col = OnnxSplit(
+            X,
+            axis=1,
+            num_outputs=X.type.shape[1],
+            output_names=[f"{name_prefix}X_col{x}" for x in range(num_categories)],
+            op_version=opv,
+        )
     X_col.add_to(scope, container)
     Y_col = []
     for feature_idx in range(num_categories):
@@ -194,7 +218,9 @@ def _encoder_handle_unknown_transformer_converter(scope, operator, container, na
                 output_names=[f"{name_prefix}Y_col{feature_idx}"],
                 op_version=opv,
             )
-            onehot_cast = OnnxCast(onehot_reshaped, to=1, op_version=opv, output_names=[f"{name_prefix}onehot_cast{feature_idx}"])
+            onehot_cast = OnnxCast(
+                onehot_reshaped, to=1, op_version=opv, output_names=[f"{name_prefix}onehot_cast{feature_idx}"]
+            )
             Y_col.append(onehot_cast)
         else:
             argmin_reshaped = OnnxReshape(
@@ -203,7 +229,9 @@ def _encoder_handle_unknown_transformer_converter(scope, operator, container, na
                 output_names=[f"{name_prefix}Y_col{feature_idx}"],
                 op_version=opv,
             )
-            argmin_cast = OnnxCast(argmin_reshaped, to=1, op_version=opv, output_names=[f"{name_prefix}argmin_cast{feature_idx}"])
+            argmin_cast = OnnxCast(
+                argmin_reshaped, to=1, op_version=opv, output_names=[f"{name_prefix}argmin_cast{feature_idx}"]
+            )
             Y_col.append(argmin_cast)
     Y = OnnxConcat(*Y_col, axis=1, op_version=opv, output_names=out[:1])
     Y.add_to(scope, container)

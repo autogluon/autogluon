@@ -22,7 +22,9 @@ from .hyperparameters.parameters import DEFAULT_NUM_BOOST_ROUND, get_lgb_objecti
 from .hyperparameters.searchspaces import get_default_searchspace
 from .lgb_utils import construct_dataset, train_lgb_model
 
-warnings.filterwarnings("ignore", category=UserWarning, message="Starting from version")  # lightGBM brew libomp warning
+warnings.filterwarnings(
+    "ignore", category=UserWarning, message="Starting from version"
+)  # lightGBM brew libomp warning
 logger = logging.getLogger(__name__)
 
 
@@ -54,10 +56,15 @@ class LGBModel(AbstractModel):
 
     # Use specialized LightGBM metric if available (fast), otherwise use custom func generator
     def _get_stopping_metric_internal(self):
-        stopping_metric = lgb_utils.convert_ag_metric_to_lgbm(ag_metric_name=self.stopping_metric.name, problem_type=self.problem_type)
+        stopping_metric = lgb_utils.convert_ag_metric_to_lgbm(
+            ag_metric_name=self.stopping_metric.name, problem_type=self.problem_type
+        )
         if stopping_metric is None:
             stopping_metric = lgb_utils.func_generator(
-                metric=self.stopping_metric, is_higher_better=True, needs_pred_proba=not self.stopping_metric.needs_pred, problem_type=self.problem_type
+                metric=self.stopping_metric,
+                is_higher_better=True,
+                needs_pred_proba=not self.stopping_metric.needs_pred,
+                problem_type=self.problem_type,
             )
             stopping_metric_name = self.stopping_metric.name
         else:
@@ -75,9 +82,13 @@ class LGBModel(AbstractModel):
             Scales roughly by 5100*num_features*num_leaves bytes
             For 10000 features and 128 num_leaves, the histogram would be 6.5 GB.
         """
-        num_classes = self.num_classes if self.num_classes else 1  # self.num_classes could be None after initialization if it's a regression problem
+        num_classes = (
+            self.num_classes if self.num_classes else 1
+        )  # self.num_classes could be None after initialization if it's a regression problem
         data_mem_usage = get_approximate_df_mem_usage(X).sum()
-        data_mem_usage_bytes = data_mem_usage * 5 + data_mem_usage / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
+        data_mem_usage_bytes = (
+            data_mem_usage * 5 + data_mem_usage / 4 * num_classes
+        )  # TODO: Extremely crude approximation, can be vastly improved
 
         params = self._get_model_params(convert_search_spaces_to_default=True)
         max_bins = params.get("max_bins", 255)
@@ -94,7 +105,20 @@ class LGBModel(AbstractModel):
         approx_mem_size_req = data_mem_usage_bytes + histogram_mem_usage_bytes
         return approx_mem_size_req
 
-    def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, num_gpus=0, num_cpus=0, sample_weight=None, sample_weight_val=None, verbosity=2, **kwargs):
+    def _fit(
+        self,
+        X,
+        y,
+        X_val=None,
+        y_val=None,
+        time_limit=None,
+        num_gpus=0,
+        num_cpus=0,
+        sample_weight=None,
+        sample_weight_val=None,
+        verbosity=2,
+        **kwargs,
+    ):
         try_import_lightgbm()  # raise helpful error message if LightGBM isn't installed
         start_time = time.time()
         ag_params = self._get_ag_params()
@@ -112,14 +136,19 @@ class LGBModel(AbstractModel):
         stopping_metric, stopping_metric_name = self._get_stopping_metric_internal()
 
         num_boost_round = params.pop("num_boost_round", DEFAULT_NUM_BOOST_ROUND)
-        dart_retrain = params.pop("dart_retrain", False)  # Whether to retrain the model to get optimal iteration if model is trained in 'dart' mode.
+        dart_retrain = params.pop(
+            "dart_retrain", False
+        )  # Whether to retrain the model to get optimal iteration if model is trained in 'dart' mode.
         if num_gpus != 0:
             if "device" not in params:
                 # TODO: lightgbm must have a special install to support GPU: https://github.com/Microsoft/LightGBM/tree/master/python-package#build-gpu-version
                 #  Before enabling GPU, we should add code to detect that GPU-enabled version is installed and that a valid GPU exists.
                 #  GPU training heavily alters accuracy, often in a negative manner. We will have to be careful about when to use GPU.
                 params["device"] = "gpu"
-                logger.log(20, f"\tTraining {self.name} with GPU, note that this may negatively impact model quality compared to CPU training.")
+                logger.log(
+                    20,
+                    f"\tTraining {self.name} with GPU, note that this may negatively impact model quality compared to CPU training.",
+                )
         logger.log(15, f"\tFitting {num_boost_round} rounds... Hyperparameters: {params}")
 
         if "num_threads" not in params:
@@ -133,7 +162,13 @@ class LGBModel(AbstractModel):
 
         num_rows_train = len(X)
         dataset_train, dataset_val = self.generate_datasets(
-            X=X, y=y, params=params, X_val=X_val, y_val=y_val, sample_weight=sample_weight, sample_weight_val=sample_weight_val
+            X=X,
+            y=y,
+            params=params,
+            X_val=X_val,
+            y_val=y_val,
+            sample_weight=sample_weight,
+            sample_weight_val=sample_weight_val,
         )
         gc.collect()
 
@@ -146,7 +181,9 @@ class LGBModel(AbstractModel):
             # TODO: Better solution: Track trend to early stop when score is far worse than best score, or score is trending worse over time
             early_stopping_rounds = ag_params.get("early_stop", "adaptive")
             if isinstance(early_stopping_rounds, (str, tuple, list)):
-                early_stopping_rounds = self._get_early_stopping_rounds(num_rows_train=num_rows_train, strategy=early_stopping_rounds)
+                early_stopping_rounds = self._get_early_stopping_rounds(
+                    num_rows_train=num_rows_train, strategy=early_stopping_rounds
+                )
             if early_stopping_rounds is None:
                 early_stopping_rounds = 999999
             reporter = kwargs.get("reporter", None)
@@ -215,7 +252,9 @@ class LGBModel(AbstractModel):
             warnings.filterwarnings("ignore", message="Overriding the parameters from Reference Dataset.")
             warnings.filterwarnings("ignore", message="categorical_column in param dict is overridden.")
             try:
-                self.model = train_lgb_model(early_stopping_callback_kwargs=early_stopping_callback_kwargs, **train_params)
+                self.model = train_lgb_model(
+                    early_stopping_callback_kwargs=early_stopping_callback_kwargs, **train_params
+                )
             except LightGBMError:
                 if train_params["params"].get("device", "cpu") != "gpu":
                     raise
@@ -228,7 +267,9 @@ class LGBModel(AbstractModel):
                         "\tpip install lightgbm --install-option=--gpu"
                     )
                     train_params["params"]["device"] = "cpu"
-                    self.model = train_lgb_model(early_stopping_callback_kwargs=early_stopping_callback_kwargs, **train_params)
+                    self.model = train_lgb_model(
+                        early_stopping_callback_kwargs=early_stopping_callback_kwargs, **train_params
+                    )
             retrain = False
             if train_params["params"].get("boosting_type", "") == "dart":
                 if dataset_val is not None and dart_retrain and (self.model.best_iteration != num_boost_round):
@@ -293,7 +334,9 @@ class LGBModel(AbstractModel):
                         self._requires_remap = True
                         break
             if self._requires_remap:
-                self._features_internal_list = np.array([self._features_internal_map[feature] for feature in list(X.columns)])
+                self._features_internal_list = np.array(
+                    [self._features_internal_map[feature] for feature in list(X.columns)]
+                )
             else:
                 self._features_internal_list = self._features_internal
 
@@ -304,7 +347,17 @@ class LGBModel(AbstractModel):
         else:
             return X
 
-    def generate_datasets(self, X: DataFrame, y: Series, params, X_val=None, y_val=None, sample_weight=None, sample_weight_val=None, save=False):
+    def generate_datasets(
+        self,
+        X: DataFrame,
+        y: Series,
+        params,
+        X_val=None,
+        y_val=None,
+        sample_weight=None,
+        sample_weight_val=None,
+        save=False,
+    ):
         lgb_dataset_params_keys = ["two_round"]  # Keys that are specific to lightGBM Dataset object construction.
         data_params = {key: params[key] for key in lgb_dataset_params_keys if key in params}.copy()
 
@@ -324,7 +377,12 @@ class LGBModel(AbstractModel):
 
         # X, W_train = self.convert_to_weight(X=X)
         dataset_train = construct_dataset(
-            x=X, y=y, location=os.path.join("self.path", "datasets", "train"), params=data_params, save=save, weight=sample_weight
+            x=X,
+            y=y,
+            location=os.path.join("self.path", "datasets", "train"),
+            params=data_params,
+            save=save,
+            weight=sample_weight,
         )
         # dataset_train = construct_dataset_lowest_memory(X=X, y=y, location=self.path + 'datasets/train', params=data_params)
         if X_val is not None:

@@ -37,7 +37,9 @@ def test_timeout_scheduler():
         time.sleep(0.01)
         reporter(reward=time.time() - start_tick, time_attr=0)
 
-    scheduler = LocalSequentialScheduler(train_fn, search_space=search_space, num_trials=7, time_attr="time_attr", time_out=0.025)
+    scheduler = LocalSequentialScheduler(
+        train_fn, search_space=search_space, num_trials=7, time_attr="time_attr", time_out=0.025
+    )
     scheduler.run()
     scheduler.join_jobs()
     assert len(scheduler.config_history) <= 2

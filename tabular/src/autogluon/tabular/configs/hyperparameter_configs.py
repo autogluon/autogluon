@@ -24,12 +24,18 @@ hyperparameter_config_dict = dict(
         "RF": [
             {"criterion": "gini", "ag_args": {"name_suffix": "Gini", "problem_types": ["binary", "multiclass"]}},
             {"criterion": "entropy", "ag_args": {"name_suffix": "Entr", "problem_types": ["binary", "multiclass"]}},
-            {"criterion": "squared_error", "ag_args": {"name_suffix": "MSE", "problem_types": ["regression", "quantile"]}},
+            {
+                "criterion": "squared_error",
+                "ag_args": {"name_suffix": "MSE", "problem_types": ["regression", "quantile"]},
+            },
         ],
         "XT": [
             {"criterion": "gini", "ag_args": {"name_suffix": "Gini", "problem_types": ["binary", "multiclass"]}},
             {"criterion": "entropy", "ag_args": {"name_suffix": "Entr", "problem_types": ["binary", "multiclass"]}},
-            {"criterion": "squared_error", "ag_args": {"name_suffix": "MSE", "problem_types": ["regression", "quantile"]}},
+            {
+                "criterion": "squared_error",
+                "ag_args": {"name_suffix": "MSE", "problem_types": ["regression", "quantile"]},
+            },
         ],
         "KNN": [
             {"weights": "uniform", "ag_args": {"name_suffix": "Unif"}},
@@ -54,14 +60,38 @@ hyperparameter_config_dict = dict(
         "XGB": {},
         "FASTAI": {},
         "RF": [
-            {"criterion": "gini", "max_depth": 15, "ag_args": {"name_suffix": "Gini", "problem_types": ["binary", "multiclass"]}},
-            {"criterion": "entropy", "max_depth": 15, "ag_args": {"name_suffix": "Entr", "problem_types": ["binary", "multiclass"]}},
-            {"criterion": "squared_error", "max_depth": 15, "ag_args": {"name_suffix": "MSE", "problem_types": ["regression", "quantile"]}},
+            {
+                "criterion": "gini",
+                "max_depth": 15,
+                "ag_args": {"name_suffix": "Gini", "problem_types": ["binary", "multiclass"]},
+            },
+            {
+                "criterion": "entropy",
+                "max_depth": 15,
+                "ag_args": {"name_suffix": "Entr", "problem_types": ["binary", "multiclass"]},
+            },
+            {
+                "criterion": "squared_error",
+                "max_depth": 15,
+                "ag_args": {"name_suffix": "MSE", "problem_types": ["regression", "quantile"]},
+            },
         ],
         "XT": [
-            {"criterion": "gini", "max_depth": 15, "ag_args": {"name_suffix": "Gini", "problem_types": ["binary", "multiclass"]}},
-            {"criterion": "entropy", "max_depth": 15, "ag_args": {"name_suffix": "Entr", "problem_types": ["binary", "multiclass"]}},
-            {"criterion": "squared_error", "max_depth": 15, "ag_args": {"name_suffix": "MSE", "problem_types": ["regression", "quantile"]}},
+            {
+                "criterion": "gini",
+                "max_depth": 15,
+                "ag_args": {"name_suffix": "Gini", "problem_types": ["binary", "multiclass"]},
+            },
+            {
+                "criterion": "entropy",
+                "max_depth": 15,
+                "ag_args": {"name_suffix": "Entr", "problem_types": ["binary", "multiclass"]},
+            },
+            {
+                "criterion": "squared_error",
+                "max_depth": 15,
+                "ag_args": {"name_suffix": "MSE", "problem_types": ["regression", "quantile"]},
+            },
         ],
     },
     # Results in much smaller models. Behaves similarly to 'light', but in many cases with over 10x less disk usage and a further reduction in accuracy.
@@ -119,8 +149,22 @@ hyperparameter_config_dict = dict(
         # 'IM_HSTREE': [{'max_rules': 6}, {'max_rules': 12}, {'max_rules': 18}],
     },
     zeroshot_hpo={
-        "XT": [{"min_samples_leaf": 1, "max_leaf_nodes": 15000, "max_features": 0.5, "ag_args": {"name_suffix": "_r19", "priority": 20}}],
-        "RF": [{"min_samples_leaf": 5, "max_leaf_nodes": 50000, "max_features": 0.5, "ag_args": {"name_suffix": "_r5", "priority": 19}}],
+        "XT": [
+            {
+                "min_samples_leaf": 1,
+                "max_leaf_nodes": 15000,
+                "max_features": 0.5,
+                "ag_args": {"name_suffix": "_r19", "priority": 20},
+            }
+        ],
+        "RF": [
+            {
+                "min_samples_leaf": 5,
+                "max_leaf_nodes": 50000,
+                "max_features": 0.5,
+                "ag_args": {"name_suffix": "_r5", "priority": 19},
+            }
+        ],
         "GBM": [
             {
                 "extra_trees": False,
@@ -229,10 +273,30 @@ hyperparameter_config_dict = dict(
             },
         ],
         "CAT": [
-            {"depth": 5, "l2_leaf_reg": 4.774992314058497, "learning_rate": 0.038551267822920274, "ag_args": {"name_suffix": "_r16", "priority": 6}},
-            {"depth": 4, "l2_leaf_reg": 1.9950125740798321, "learning_rate": 0.028091050379971633, "ag_args": {"name_suffix": "_r42", "priority": 5}},
-            {"depth": 6, "l2_leaf_reg": 1.8298803017644376, "learning_rate": 0.017844259810823604, "ag_args": {"name_suffix": "_r93", "priority": 4}},
-            {"depth": 7, "l2_leaf_reg": 4.81099604606794, "learning_rate": 0.019085060180573103, "ag_args": {"name_suffix": "_r44", "priority": 3}},
+            {
+                "depth": 5,
+                "l2_leaf_reg": 4.774992314058497,
+                "learning_rate": 0.038551267822920274,
+                "ag_args": {"name_suffix": "_r16", "priority": 6},
+            },
+            {
+                "depth": 4,
+                "l2_leaf_reg": 1.9950125740798321,
+                "learning_rate": 0.028091050379971633,
+                "ag_args": {"name_suffix": "_r42", "priority": 5},
+            },
+            {
+                "depth": 6,
+                "l2_leaf_reg": 1.8298803017644376,
+                "learning_rate": 0.017844259810823604,
+                "ag_args": {"name_suffix": "_r93", "priority": 4},
+            },
+            {
+                "depth": 7,
+                "l2_leaf_reg": 4.81099604606794,
+                "learning_rate": 0.019085060180573103,
+                "ag_args": {"name_suffix": "_r44", "priority": 3},
+            },
         ],
     },
     zeroshot_hpo_hybrid={
@@ -240,14 +304,30 @@ hyperparameter_config_dict = dict(
         "XT": [
             {"criterion": "gini", "ag_args": {"name_suffix": "Gini", "problem_types": ["binary", "multiclass"]}},
             {"criterion": "entropy", "ag_args": {"name_suffix": "Entr", "problem_types": ["binary", "multiclass"]}},
-            {"criterion": "squared_error", "ag_args": {"name_suffix": "MSE", "problem_types": ["regression", "quantile"]}},
-            {"min_samples_leaf": 1, "max_leaf_nodes": 15000, "max_features": 0.5, "ag_args": {"name_suffix": "_r19", "priority": 20}},
+            {
+                "criterion": "squared_error",
+                "ag_args": {"name_suffix": "MSE", "problem_types": ["regression", "quantile"]},
+            },
+            {
+                "min_samples_leaf": 1,
+                "max_leaf_nodes": 15000,
+                "max_features": 0.5,
+                "ag_args": {"name_suffix": "_r19", "priority": 20},
+            },
         ],
         "RF": [
             {"criterion": "gini", "ag_args": {"name_suffix": "Gini", "problem_types": ["binary", "multiclass"]}},
             {"criterion": "entropy", "ag_args": {"name_suffix": "Entr", "problem_types": ["binary", "multiclass"]}},
-            {"criterion": "squared_error", "ag_args": {"name_suffix": "MSE", "problem_types": ["regression", "quantile"]}},
-            {"min_samples_leaf": 5, "max_leaf_nodes": 50000, "max_features": 0.5, "ag_args": {"name_suffix": "_r5", "priority": 19}},
+            {
+                "criterion": "squared_error",
+                "ag_args": {"name_suffix": "MSE", "problem_types": ["regression", "quantile"]},
+            },
+            {
+                "min_samples_leaf": 5,
+                "max_leaf_nodes": 50000,
+                "max_features": 0.5,
+                "ag_args": {"name_suffix": "_r5", "priority": 19},
+            },
         ],
         "GBM": [
             {"extra_trees": True, "ag_args": {"name_suffix": "XT"}},
@@ -369,10 +449,30 @@ hyperparameter_config_dict = dict(
         ],
         "CAT": [
             {},
-            {"depth": 5, "l2_leaf_reg": 4.774992314058497, "learning_rate": 0.038551267822920274, "ag_args": {"name_suffix": "_r16", "priority": 6}},
-            {"depth": 4, "l2_leaf_reg": 1.9950125740798321, "learning_rate": 0.028091050379971633, "ag_args": {"name_suffix": "_r42", "priority": 5}},
-            {"depth": 6, "l2_leaf_reg": 1.8298803017644376, "learning_rate": 0.017844259810823604, "ag_args": {"name_suffix": "_r93", "priority": 4}},
-            {"depth": 7, "l2_leaf_reg": 4.81099604606794, "learning_rate": 0.019085060180573103, "ag_args": {"name_suffix": "_r44", "priority": 3}},
+            {
+                "depth": 5,
+                "l2_leaf_reg": 4.774992314058497,
+                "learning_rate": 0.038551267822920274,
+                "ag_args": {"name_suffix": "_r16", "priority": 6},
+            },
+            {
+                "depth": 4,
+                "l2_leaf_reg": 1.9950125740798321,
+                "learning_rate": 0.028091050379971633,
+                "ag_args": {"name_suffix": "_r42", "priority": 5},
+            },
+            {
+                "depth": 6,
+                "l2_leaf_reg": 1.8298803017644376,
+                "learning_rate": 0.017844259810823604,
+                "ag_args": {"name_suffix": "_r93", "priority": 4},
+            },
+            {
+                "depth": 7,
+                "l2_leaf_reg": 4.81099604606794,
+                "learning_rate": 0.019085060180573103,
+                "ag_args": {"name_suffix": "_r44", "priority": 3},
+            },
         ],
         "KNN": [
             {"weights": "uniform", "ag_args": {"name_suffix": "Unif"}},
@@ -398,5 +498,7 @@ def get_hyperparameter_config_options():
 def get_hyperparameter_config(config_name):
     config_options = get_hyperparameter_config_options()
     if config_name not in config_options:
-        raise ValueError(f"Valid hyperparameter config names are: {config_options}, but '{config_name}' was given instead.")
+        raise ValueError(
+            f"Valid hyperparameter config names are: {config_options}, but '{config_name}' was given instead."
+        )
     return copy.deepcopy(hyperparameter_config_dict[config_name])

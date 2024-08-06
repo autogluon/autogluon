@@ -69,14 +69,16 @@ extras_require = {
         # No vowpalwabbit wheel for python 3.11 or above yet
         "vowpalwabbit>=9,<9.10; python_version < '3.11'",
     ],
-    "skl2onnx": [
-        "skl2onnx>=1.15.0,<1.17.0",
-        # For macOS, there isn't a onnxruntime-gpu package installed with skl2onnx.
-        # Therefore, we install onnxruntime explicitly here just for macOS.
-        "onnxruntime>=1.15.0,<1.18.0",
-    ]
-    if sys.platform == "darwin"
-    else ["skl2onnx>=1.15.0,<1.17.0", "onnxruntime-gpu>=1.15.0,<1.18.0"],
+    "skl2onnx": (
+        [
+            "skl2onnx>=1.15.0,<1.17.0",
+            # For macOS, there isn't a onnxruntime-gpu package installed with skl2onnx.
+            # Therefore, we install onnxruntime explicitly here just for macOS.
+            "onnxruntime>=1.15.0,<1.18.0",
+        ]
+        if sys.platform == "darwin"
+        else ["skl2onnx>=1.15.0,<1.17.0", "onnxruntime-gpu>=1.15.0,<1.18.0"]
+    ),
 }
 
 # TODO: v1.0: Rename `all` to `core`, make `all` contain everything.
