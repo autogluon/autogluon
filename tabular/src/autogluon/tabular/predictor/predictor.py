@@ -1015,6 +1015,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         self._validate_num_gpus(num_gpus=num_gpus)
         self._validate_and_set_memory_limit(memory_limit=memory_limit)
         self._validate_calibrate_decision_threshold(calibrate_decision_threshold=calibrate_decision_threshold)
+        calibrate_decision_threshold = self._check_calibrate_decision_threshold(calibrate_decision_threshold=calibrate_decision_threshold)
 
         holdout_frac = kwargs["holdout_frac"]
         num_bag_folds = kwargs["num_bag_folds"]
@@ -1556,16 +1557,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
         if isinstance(calibrate_decision_threshold, str) and calibrate_decision_threshold == "auto":
             calibrate_decision_threshold = self._can_calibrate_decision_threshold()
-            if calibrate_decision_threshold and self.eval_metric.name == "precision":
-                # precision becomes undefined when no true positives exist.
-                # This interacts weirdly with threshold calibration where val score will be 1.0, but test score can be 0.0 due to being undefined.
-                calibrate_decision_threshold = False
-                logger.log(
-                    30,
-                    f"Disabling decision threshold calibration for metric `precision` to avoid undefined results. "
-                    f"Force calibration via specifying `calibrate_decision_threshold=True`.",
-                )
-            elif calibrate_decision_threshold:
+            if calibrate_decision_threshold:
                 logger.log(20, f"Enabling decision threshold calibration (calibrate_decision_threshold='auto', metric is valid, problem_type is 'binary')")
         if calibrate_decision_threshold:
             if self.problem_type != BINARY:
@@ -4576,6 +4568,19 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             raise ValueError(
                 f"`calibrate_decision_threshold` must be a value in " f"{valid_calibrate_decision_threshold_options}, but is: {calibrate_decision_threshold}"
             )
+
+    def _check_calibrate_decision_threshold(self, calibrate_decision_threshold: bool | str):
+        if isinstance(calibrate_decision_threshold, str) and calibrate_decision_threshold == "auto":
+            if calibrate_decision_threshold and self.eval_metric is not None and self.eval_metric.name == "precision":
+                # precision becomes undefined when no true positives exist.
+                # This interacts weirdly with threshold calibration where val score will be 1.0, but test score can be 0.0 due to being undefined.
+                calibrate_decision_threshold = False
+                logger.log(
+                    30,
+                    f"Disabling decision threshold calibration for metric `precision` to avoid undefined results. "
+                    f"Force calibration via specifying `calibrate_decision_threshold=True`.",
+                )
+        return calibrate_decision_threshold
 
     def _validate_num_cpus(self, num_cpus: int | str):
         if num_cpus is None:

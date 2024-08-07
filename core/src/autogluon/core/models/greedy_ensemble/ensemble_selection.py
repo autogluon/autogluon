@@ -9,19 +9,22 @@ import numpy as np
 import pandas as pd
 
 from ...constants import PROBLEM_TYPES
-from ...metrics import log_loss
+from ...metrics import Scorer, log_loss
 from ...utils import compute_weighted_metric, get_pred_from_proba
 
 logger = logging.getLogger(__name__)
 
 
 class AbstractWeightedEnsemble:
-    def predict(self, X):
+    def predict(self, X, decision_threshold: float | None = None):
         y_pred_proba = self.predict_proba(X)
-        return get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
+        return self.predict_from_proba(y_pred_proba=y_pred_proba, decision_threshold=decision_threshold)
 
     def predict_proba(self, X):
         return self.weight_pred_probas(X, weights=self.weights_)
+
+    def predict_from_proba(self, y_pred_proba, decision_threshold: float | None = None):
+        return get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type, decision_threshold=decision_threshold)
 
     @staticmethod
     def weight_pred_probas(pred_probas, weights):
@@ -38,16 +41,29 @@ class EnsembleSelection(AbstractWeightedEnsemble):
         metric,
         sorted_initialization: bool = False,
         bagging: bool = False,
+        calibrate_decision_threshold: bool | str = False,
         tie_breaker: str = "random",
         subsample_size: int | None = None,
         random_state: np.random.RandomState = None,
         **kwargs,
     ):
+        assert calibrate_decision_threshold in [True, False, "auto"]
         self.ensemble_size = ensemble_size
         self.problem_type = problem_type
         self.metric = metric
         self.sorted_initialization = sorted_initialization
         self.bagging = bagging
+        if isinstance(calibrate_decision_threshold, str) and calibrate_decision_threshold == "auto":
+            if self.problem_type != "binary":
+                self.calibrate_decision_threshold = False
+            elif isinstance(self.metric, Scorer):
+                self.calibrate_decision_threshold = self.metric.needs_class
+            else:
+                self.calibrate_decision_threshold = False
+        else:
+            self.calibrate_decision_threshold = calibrate_decision_threshold
+        if problem_type != "binary" and self.calibrate_decision_threshold:
+            raise AssertionError(f"Cannot set calibrate_decision_threshold=True when problem_type is not 'binary'. (problem_type={self.problem_type})")
         self.use_best = True
         if tie_breaker not in ["random", "second_metric"]:
             raise ValueError(f"Unknown tie_breaker value: {tie_breaker}. Must be one of: ['random', 'second_metric']")
@@ -82,6 +98,7 @@ class EnsembleSelection(AbstractWeightedEnsemble):
         self.num_input_models_ = len(predictions)
         ensemble = []
         trajectory = []
+        trajectory_decision_threshold = []
         order = []
         used_models = set()
         num_samples_total = len(labels)
@@ -110,8 +127,11 @@ class EnsembleSelection(AbstractWeightedEnsemble):
         round_scores = False
         epsilon = 1e-4
         round_decimals = 6
+        decision_thresholds = None
         for i in range(ensemble_size):
-            scores = np.zeros((len(predictions)))
+            scores = np.zeros(self.num_input_models_)
+            if self.calibrate_decision_threshold:
+                decision_thresholds = np.zeros(self.num_input_models_)
             s = len(ensemble)
             if s == 0:
                 weighted_ensemble_prediction = np.zeros(predictions[0].shape)
@@ -129,7 +149,25 @@ class EnsembleSelection(AbstractWeightedEnsemble):
                 if self.problem_type in ["multiclass", "softclass"]:
                     # Renormalize
                     fant_ensemble_prediction[:] = fant_ensemble_prediction / fant_ensemble_prediction.sum(axis=1)[:, np.newaxis]
-                scores[j] = self._calculate_regret(y_true=labels, y_pred_proba=fant_ensemble_prediction, metric=self.metric, sample_weight=sample_weight)
+                if self.calibrate_decision_threshold:
+                    calibrate_decision_threshold_kwargs = dict(
+                        metric_kwargs=dict(sample_weight=sample_weight),
+                        decision_thresholds=10,
+                        secondary_decision_thresholds=4,
+                        verbose=False,
+                    )
+                    threshold_optimal = self.metric.calibrate_decision_threshold(labels, fant_ensemble_prediction, **calibrate_decision_threshold_kwargs)
+                    decision_thresholds[j] = threshold_optimal
+                else:
+                    threshold_optimal = None
+
+                scores[j] = self._calculate_regret(
+                    y_true=labels,
+                    y_pred_proba=fant_ensemble_prediction,
+                    metric=self.metric,
+                    sample_weight=sample_weight,
+                    decision_threshold=threshold_optimal,
+                )
                 if round_scores:
                     scores[j] = scores[j].round(round_decimals)
 
@@ -162,6 +200,9 @@ class EnsembleSelection(AbstractWeightedEnsemble):
 
             best = self.random_state.choice(all_best)
             best_score = scores[best]
+            if self.calibrate_decision_threshold:
+                best_decision_threshold = decision_thresholds[best]
+                trajectory_decision_threshold.append(best_decision_threshold)
 
             # If first iteration
             if i == 0:
@@ -197,22 +238,26 @@ class EnsembleSelection(AbstractWeightedEnsemble):
             self.indices_ = order[: first_index_of_best + 1]
             self.trajectory_ = trajectory[: first_index_of_best + 1]
             self.train_score_ = trajectory[first_index_of_best]
+            self.trajectory_decision_threshold_ = trajectory_decision_threshold[: first_index_of_best + 1] if self.calibrate_decision_threshold else None
+            self.train_decision_threshold_ = trajectory_decision_threshold[first_index_of_best] if self.calibrate_decision_threshold else None
             self.ensemble_size = first_index_of_best + 1
             logger.log(15, "Ensemble size: %s" % self.ensemble_size)
         else:
             self.indices_ = order
             self.trajectory_ = trajectory
             self.train_score_ = trajectory[-1]
+            self.trajectory_decision_threshold_ = trajectory_decision_threshold if self.calibrate_decision_threshold else None
+            self.train_decision_threshold_ = trajectory_decision_threshold[-1] if self.calibrate_decision_threshold else None
 
         logger.debug("Ensemble indices: " + str(self.indices_))
 
-    def _calculate_regret(self, y_true: np.ndarray, y_pred_proba: np.ndarray, metric, sample_weight=None):
+    def _calculate_regret(self, y_true: np.ndarray, y_pred_proba: np.ndarray, metric: Scorer, sample_weight=None, decision_threshold: float | None = None):
         if metric.needs_pred or metric.needs_quantile:
-            preds = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
+            preds = self.predict_from_proba(y_pred_proba=y_pred_proba, decision_threshold=decision_threshold)
         else:
             preds = y_pred_proba
-        score = compute_weighted_metric(y_true, preds, metric, sample_weight, quantile_levels=self.quantile_levels)
-        return metric._optimum - score
+        score = compute_weighted_metric(y=y_true, y_pred=preds, metric=metric, weights=sample_weight, quantile_levels=self.quantile_levels)
+        return metric.convert_score_to_error(score=score)
 
     def _calculate_weights(self):
         ensemble_members = Counter(self.indices_).most_common()
