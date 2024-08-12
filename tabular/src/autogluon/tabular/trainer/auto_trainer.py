@@ -115,10 +115,17 @@ class AutoTrainer(AbstractTrainer):
         log_str = f"{extra_log_str}User-specified model hyperparameters to be fit:\n" "{\n"
         if display_all:
             for k in hyperparameters.keys():
-                log_str += f"\t'{k}': {hyperparameters[k]},\n"
+                # TODO: Make hyperparameters[k] be a list upstream to avoid needing these edge-cases
+                if not isinstance(hyperparameters[k], list):
+                    log_str += f"\t'{k}': {[hyperparameters[k]]},\n"
+                else:
+                    log_str += f"\t'{k}': {hyperparameters[k]},\n"
         else:
             for k in hyperparameters.keys():
-                log_str += f"\t'{k}': {hyperparameters[k][:3]},\n"
+                if not isinstance(hyperparameters[k], list):
+                    log_str += f"\t'{k}': {[hyperparameters[k]]},\n"
+                else:
+                    log_str += f"\t'{k}': {hyperparameters[k][:3]},\n"
         log_str += "}"
         logger.log(20, log_str)
 
