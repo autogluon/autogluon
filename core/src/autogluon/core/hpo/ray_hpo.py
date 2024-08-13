@@ -420,12 +420,13 @@ class TabularRayTuneAdapter(RayTuneAdapter):
         return ResourceCalculatorFactory.get_resource_calculator(calculator_type="cpu" if num_gpus == 0 else "gpu")
 
     def trainable_args_update_method(self, trainable_args: dict) -> dict:
+        # Convert num_cpus to int to avoid bug with RayTune converting int to float in tune.PlacementGroupFactory
         if isinstance(self.resources_per_trial, dict):
-            trainable_args["fit_kwargs"]["num_cpus"] = self.resources_per_trial.get("cpu", 1)
+            trainable_args["fit_kwargs"]["num_cpus"] = int(self.resources_per_trial.get("cpu", 1))
             trainable_args["fit_kwargs"]["num_gpus"] = self.resources_per_trial.get("gpu", 0)
         elif isinstance(self.resources_per_trial, tune.PlacementGroupFactory):
             required_resources = self.resources_per_trial.required_resources
-            trainable_args["fit_kwargs"]["num_cpus"] = required_resources.get("CPU", 1)
+            trainable_args["fit_kwargs"]["num_cpus"] = int(required_resources.get("CPU", 1))
             trainable_args["fit_kwargs"]["num_gpus"] = required_resources.get("GPU", 0)
         return trainable_args
 
