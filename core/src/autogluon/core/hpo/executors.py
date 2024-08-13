@@ -171,10 +171,10 @@ class HpoExecutor(ABC):
                     user_specified_fold_num_gpus = total_num_gpus_per_trial // num_folds_in_parallel
 
                 assert (
-                        user_specified_fold_num_cpus >= minimum_model_num_cpus
+                    user_specified_fold_num_cpus >= minimum_model_num_cpus
                 ), f"The model requires minimum cpu {minimum_model_num_cpus}, but you only specified {user_specified_fold_num_cpus}"
                 assert (
-                        user_specified_fold_num_gpus >= minimum_model_num_gpus
+                    user_specified_fold_num_gpus >= minimum_model_num_gpus
                 ), f"The model requires minimum gpu {minimum_model_num_gpus}, but you only specified {user_specified_fold_num_gpus}"
 
                 cpu_per_trial = user_specified_fold_num_cpus * num_folds_in_parallel
