@@ -1098,6 +1098,10 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             raise ValueError("`path` cannot be None or empty in load().")
         path: str = setup_outputdir(path, warn_if_exist=False)
 
+        predictor_path = Path(path) / cls.predictor_file_name
+        if not predictor_path.exists():
+            raise FileNotFoundError(f"No such file '{predictor_path}'")
+
         try:
             version_saved = cls._load_version_file(path=path)
         except:
@@ -1116,7 +1120,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
         logger.info(f"Loading predictor from path {path}")
         learner = AbstractLearner.load(path)
-        predictor = load_pkl.load(path=os.path.join(learner.path, cls.predictor_file_name))
+        predictor = load_pkl.load(path=str(predictor_path))
         predictor._learner = learner
         predictor.path = learner.path
         return predictor
