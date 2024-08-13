@@ -111,17 +111,21 @@ class EnsembleSelection(AbstractWeightedEnsemble):
         epsilon = 1e-4
         round_decimals = 6
         ensemble_prediction = np.zeros(predictions[0].shape)
+        weighted_ensemble_prediction = np.zeros(predictions[0].shape)
+        fant_ensemble_prediction = np.zeros(predictions[0].shape)
         for i in range(ensemble_size):
             scores = np.zeros((len(predictions)))
             s = len(ensemble)
 
-            weighted_ensemble_prediction = (s / float(s + 1)) * ensemble_prediction
-            fant_ensemble_prediction = np.zeros(weighted_ensemble_prediction.shape)
+            if s != 0:
+                ensemble_prediction *= (s - 1) / s
+                ensemble_prediction += ensemble[-1] / s
+                weighted_ensemble_prediction[:] = (s / float(s + 1)) * ensemble_prediction
             for j, pred in enumerate(predictions):
                 fant_ensemble_prediction[:] = weighted_ensemble_prediction + (1.0 / float(s + 1)) * pred
                 if self.problem_type in ["multiclass", "softclass"]:
                     # Renormalize
-                    fant_ensemble_prediction[:] = fant_ensemble_prediction / fant_ensemble_prediction.sum(axis=1)[:, np.newaxis]
+                    fant_ensemble_prediction /= fant_ensemble_prediction.sum(axis=1)[:, np.newaxis]
                 scores[j] = self._calculate_regret(y_true=labels, y_pred_proba=fant_ensemble_prediction, metric=self.metric, sample_weight=sample_weight)
                 if round_scores:
                     scores[j] = scores[j].round(round_decimals)
@@ -168,8 +172,6 @@ class EnsembleSelection(AbstractWeightedEnsemble):
             trajectory.append(best_score)
             order.append(best)
             used_models.add(best)
-
-            ensemble_prediction = ensemble_prediction * (s / (s + 1)) + ensemble[-1] / (s + 1)
 
             # Handle special case
             if len(predictions) == 1:
