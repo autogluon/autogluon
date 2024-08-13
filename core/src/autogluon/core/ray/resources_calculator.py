@@ -50,7 +50,7 @@ class CpuResourceCalculator(ResourceCalculator):
         user_resources_per_job=None,
         **kwargs,
     ):
-        if user_resources_per_job is not None:
+        if user_resources_per_job is not None and "num_cpus" in user_resources_per_job:
             cpu_per_job = user_resources_per_job.get("num_cpus", 0)
             assert cpu_per_job <= total_num_cpus, f"Detected model level cpu requirement = {cpu_per_job} > total cpu granted to AG predictor = {total_num_cpus}"
             assert cpu_per_job >= minimum_cpu_per_job, f"The model requires minimum cpu {minimum_cpu_per_job}, but you only specified {cpu_per_job}"
