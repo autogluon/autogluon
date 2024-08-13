@@ -36,6 +36,7 @@ class WeightedEnsembleModel(StackerEnsembleModel):
             base_model_name for base_model_name in self.base_model_names if base_model_name in min_stack_column_prefix_to_model_map.values()
         ]
         self.stack_column_prefix_to_model_map = min_stack_column_prefix_to_model_map
+        self._decision_threshold = model._decision_threshold
         return self
 
     def _get_model_weights(self) -> dict:

@@ -167,6 +167,7 @@ class AbstractModel:
         self._fit_metadata = dict()
 
         self._compiler = None
+        self._decision_threshold: float | None = None  # Decision threshold for classification used when calling `predict`
 
     @classmethod
     def _init_user_params(
@@ -974,7 +975,7 @@ class AbstractModel:
         For regression problems, this returns the predicted values as a 1d numpy array.
         """
         y_pred_proba = self.predict_proba(X, **kwargs)
-        y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
+        y_pred = self.predict_from_proba(y_pred_proba=y_pred_proba)
         return y_pred
 
     def predict_proba(self, X, *, normalize: bool | None = None, record_time: bool = False, **kwargs) -> np.ndarray:
@@ -1023,7 +1024,7 @@ class AbstractModel:
         y_pred_proba = y_pred_proba.astype(np.float32)
         return y_pred_proba
 
-    def predict_from_proba(self, y_pred_proba: np.ndarray) -> np.ndarray:
+    def predict_from_proba(self, y_pred_proba: np.ndarray, decision_threshold: float | None = None) -> np.ndarray:
         """
         Convert prediction probabilities to predictions.
 
@@ -1031,6 +1032,9 @@ class AbstractModel:
         ----------
         y_pred_proba : np.ndarray
             The prediction probabilities to be converted to predictions.
+        decision_threshold : float | None, default = None
+            The decision threshold to use in binary classification.
+            If None, defaults to 0.5.
 
         Returns
         -------
@@ -1045,7 +1049,9 @@ class AbstractModel:
         >>> # Identical to y_pred
         >>> y_pred_from_proba = predictor.predict_from_proba(y_pred_proba)
         """
-        return get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
+        if decision_threshold is None:
+            decision_threshold = self._decision_threshold
+        return get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type, decision_threshold=decision_threshold)
 
     def _predict_proba(self, X, **kwargs) -> np.ndarray:
         X = self.preprocess(X, **kwargs)

@@ -61,6 +61,7 @@ class GreedyWeightedEnsembleModel(AbstractModel):
         self.features = self._set_stack_columns(base_model_names=self.base_model_names)
         self.params_trained["ensemble_size"] = self.model.ensemble_size
         self.weights_ = self.model.weights_
+        self._decision_threshold = self.model.train_decision_threshold_
 
     def convert_pred_probas_df_to_list(self, pred_probas_df) -> list:
         pred_probas = []

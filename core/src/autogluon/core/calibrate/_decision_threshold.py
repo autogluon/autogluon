@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Callable, List, Union
+from typing import Callable, List
 
 import numpy as np
 import pandas as pd
@@ -18,14 +18,14 @@ logger = logging.getLogger(__name__)
 def calibrate_decision_threshold(
     y: np.array,
     y_pred_proba: np.array,
-    metric: Union[Callable, Scorer],
+    metric: Callable | Scorer,
     metric_kwargs: dict | None = None,
     decision_thresholds: int | List[float] = 25,
     secondary_decision_thresholds: int | None = 19,
     subsample_size: int | None = None,
     seed: int = 0,
     metric_name: str | None = None,
-    verbose: bool = True,
+    verbose: bool = False,
 ) -> float:
     assert isinstance(decision_thresholds, (int, list)), f"decision_thresholds must be int or List[float] (decision_thresholds={decision_thresholds})"
     assert secondary_decision_thresholds is None or isinstance(
