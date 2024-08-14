@@ -335,6 +335,12 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                             raise TimeLimitExceeded
                     time_elapsed = time_cur - start_fit_time
                     if time_limit < time_elapsed:
+                        if epoch == 0:
+                            logger.log(
+                                30,
+                                f"\tNot enough time to train first epoch. Stopped on Update {total_updates} (Epoch {epoch}))",
+                            )
+                            raise TimeLimitExceeded
                         logger.log(15, f"\tRan out of time, stopping training early. (Stopped on Update {total_updates} (Epoch {epoch}))")
                         do_update = False
                         break
