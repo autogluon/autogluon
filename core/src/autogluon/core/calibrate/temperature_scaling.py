@@ -6,7 +6,7 @@ from ..constants import BINARY
 from ..data.label_cleaner import LabelCleanerMulticlassToBinary
 
 
-def tune_temperature_scaling(y_val_probs: np.ndarray, y_val: np.ndarray, init_val: float = 1, max_iter: int = 1000, lr: float = 0.01):
+def tune_temperature_scaling(y_val_probs: np.ndarray, y_val: np.ndarray, init_val: float = 1, max_iter: int = 200, lr: float = 0.1):
     """
     Tunes a temperature scalar term that divides the logits produced by autogluon model. Logits are generated
     by natural log the predicted probs from model then divides by a temperature scalar, which is tuned
