@@ -6,8 +6,8 @@ import os
 import random
 import time
 import warnings
-from typing import Dict, Union
 from copy import deepcopy
+from typing import Dict, Union
 
 import numpy as np
 import pandas as pd
@@ -16,9 +16,9 @@ from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT, 
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_torch
-from autogluon.core.metrics import get_metric
 from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION, SOFTCLASS
 from autogluon.core.hpo.constants import RAY_BACKEND
+from autogluon.core.metrics import get_metric
 from autogluon.core.models.abstract.abstract_nn_model import AbstractNeuralNetworkModel
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 
@@ -190,7 +190,6 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         y_test = kwargs.get("y_test", None)
 
         train_dataset = self._generate_dataset(X, y, train_params=processor_kwargs, is_train=True)
-        # curve_train_dataset = self._generate_dataset(X, y)
         val_dataset = self._generate_dataset(X_val, y_val)
         test_dataset = self._generate_dataset(X_test, y_test)
 
@@ -220,7 +219,6 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             train_dataset=train_dataset,
             loss_kwargs=loss_kwargs,
             batch_size=batch_size,
-            # _curve_train_dataset=curve_train_dataset,
             val_dataset=val_dataset,
             test_dataset=test_dataset,
             time_limit=time_limit,
@@ -246,8 +244,19 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         if not os.path.exists(self.path):
             os.makedirs(self.path)
 
-    def _train_net(self, train_dataset, loss_kwargs, batch_size, num_epochs, epochs_wo_improve, val_dataset=None, test_dataset=None, time_limit=None, reporter=None, verbosity=2):
-        # _curve_train_dataset=None,
+    def _train_net(
+        self,
+        train_dataset,
+        loss_kwargs,
+        batch_size,
+        num_epochs,
+        epochs_wo_improve,
+        val_dataset=None,
+        test_dataset=None,
+        time_limit=None,
+        reporter=None,
+        verbosity=2,
+    ):
         import torch
 
         start_time = time.time()
@@ -267,11 +276,13 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             use_curve_metric_error = ag_params.get("use_error_for_curve_metrics", False)
             metric_names = [scorer.name for scorer in scorers]
 
-            train_curves = { metric.name : [] for metric in scorers }
-            val_curves = { metric.name : [] for metric in scorers }
-            test_curves = { metric.name : [] for metric in scorers }
+            train_curves = {metric.name: [] for metric in scorers}
+            val_curves = {metric.name: [] for metric in scorers}
+            test_curves = {metric.name: [] for metric in scorers}
 
-            y_train = train_dataset.get_labels() # _curve_train_dataset
+            # make copy of train_dataset to avoid interfering with train_dataloader
+            curve_train_dataset = deepcopy(train_dataset)
+            y_train = curve_train_dataset.get_labels()
             if y_train.ndim == 2 and y_train.shape[1] == 1:
                 y_train = y_train.flatten()
 
@@ -379,37 +390,30 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
             epoch += 1
 
-            # TODO: assertion check with prediction proba with vs without LC
             # learning curve generation
             if generate_curves:
                 train_metrics = []
                 val_metrics = []
                 test_metrics = []
 
-                curve_train_dataset = train_dataset # deepcopy(_curve_train_dataset)
-                curve_val_dataset = val_dataset # deepcopy(val_dataset)
-                curve_test_dataset = test_dataset # deepcopy(test_dataset)
-
                 stop = False
                 for metric in scorers:
-                    # Without deepcopies of datasets, this line makes train_dataloader change from length 25 to 2????
-                    # Note: the issues are 100% due to the next three lines, likely with how the score functionality is interacting
-                    # with the TorchTabularDatasets: have tried using A) deep copies of datasets, C) using preprocess_test on train data
-                    # Not sure what the problem is ==> waiting for Nick to consult further on this
-                    train_metrics.append(self.score(X=curve_train_dataset, y=y_train, metric=metric, _reset_threads=True))
-                    val_metrics += [self.score(X=curve_val_dataset, y=y_val, metric=metric, _reset_threads=True)] if curve_val_dataset is not None else []
-                    test_metrics += [self.score(X=curve_test_dataset, y=y_test, metric=metric, _reset_threads=True)] if curve_test_dataset is not None else []
+                    train_metrics.append(self.score(X=curve_train_dataset, y=y_train, metric=metric, _reset_threads=False))
+                    val_metrics += [self.score(X=val_dataset, y=y_val, metric=metric, _reset_threads=False)] if val_dataset is not None else []
+                    test_metrics += [self.score(X=test_dataset, y=y_test, metric=metric, _reset_threads=False)] if test_dataset is not None else []
 
                     if use_curve_metric_error:
                         train_metrics[-1] = metric.convert_score_to_error(train_metrics[-1])
-                        if curve_val_dataset is not None: 
+                        if val_dataset is not None:
                             val_metrics[-1] = metric.convert_score_to_error(val_metrics[-1])
-                        if curve_test_dataset is not None: 
+                        if test_dataset is not None:
                             test_metrics[-1] = metric.convert_score_to_error(test_metrics[-1])
 
-                    if not self._assert_valid_metric(metric=train_metrics[-1], best_epoch=best_epoch) or \
-                        (curve_val_dataset is not None and not self._assert_valid_metric(metric=val_metrics[-1], best_epoch=best_epoch)) or \
-                        (curve_test_dataset is not None and not self._assert_valid_metric(metric=test_metrics[-1], best_epoch=best_epoch)):
+                    if (
+                        not self._assert_valid_metric(metric=train_metrics[-1], best_epoch=best_epoch)
+                        or (val_dataset is not None and not self._assert_valid_metric(metric=val_metrics[-1], best_epoch=best_epoch))
+                        or (test_dataset is not None and not self._assert_valid_metric(metric=test_metrics[-1], best_epoch=best_epoch))
+                    ):
                         stop = True
                         break
 
@@ -419,8 +423,8 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                 # update learning curve
                 for i, metric in enumerate(scorers):
                     train_curves[metric.name].append(train_metrics[i])
-                    val_curves[metric.name] += [val_metrics[i]] if curve_val_dataset is not None else []
-                    test_curves[metric.name] += [test_metrics[i]] if curve_test_dataset is not None else []
+                    val_curves[metric.name] += [val_metrics[i]] if val_dataset is not None else []
+                    test_curves[metric.name] += [test_metrics[i]] if test_dataset is not None else []
 
             # validation
             if val_dataset is not None:
@@ -475,7 +479,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             raise AssertionError("0 epochs trained!")
 
         if generate_curves:
-            curves = { "train": train_curves }
+            curves = {"train": train_curves}
             if val_dataset is not None:
                 curves["val"] = val_curves
             if test_dataset is not None:
@@ -505,7 +509,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             the metric calculated
         best_epoch: int
             the best epoch encountered since training started
-        
+
         Returns:
         --------
         Whether the metric is valid
@@ -793,7 +797,6 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
     @classmethod
     def _class_tags(cls):
         return {"supports_learning_curves": True}
-
 
     def _more_tags(self):
         # `can_refit_full=True` because batch_size and num_epochs is communicated at end of `_fit`:
