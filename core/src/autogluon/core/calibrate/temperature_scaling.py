@@ -61,7 +61,10 @@ def tune_temperature_scaling(y_val_probs: np.ndarray, y_val: np.ndarray, init_va
 
     optimizer.step(temperature_scale_step)
 
-    best_loss_index = np.array(optimizer_trajectory)[:, 0].argmin()
+    try:
+        best_loss_index = np.nanargmin(np.array(optimizer_trajectory)[:, 0])
+    except ValueError:
+        return None
     temperature_scale = float(np.array(optimizer_trajectory)[best_loss_index, 1])
 
     if np.isnan(temperature_scale):
