@@ -3870,8 +3870,7 @@ class AbstractTrainer:
             elif temp_scalar <= 0:
                 logger.log(
                     30,
-                    f"Warning: Temperature scaling found optimal at a negative value ({temp_scalar}). "
-                    f"Disabling temperature scaling to avoid overfitting.",
+                    f"Warning: Temperature scaling found optimal at a negative value ({temp_scalar}). Disabling temperature scaling to avoid overfitting.",
                 )
             else:
                 # Check that scaling improves performance for the target metric
