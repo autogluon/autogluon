@@ -3867,7 +3867,7 @@ class AbstractTrainer:
                     f"Warning: Infinity found during calibration, skipping calibration on {model.name}! "
                     f"This can occur when the model is absolutely certain of a validation prediction (1.0 pred_proba).",
                 )
-            elif temp_scalar < 0:
+            elif temp_scalar <= 0:
                 logger.log(
                     30,
                     f"Warning: Temperature scaling found optimal at a negative value ({temp_scalar}). "
