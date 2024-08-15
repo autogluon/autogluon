@@ -47,6 +47,8 @@ def tune_temperature_scaling(y_val_probs: np.ndarray, y_val: np.ndarray, init_va
     optimizer = torch.optim.LBFGS([temperature_param], lr=lr, max_iter=max_iter)
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.99)
 
+    optimizer_trajectory = []
+
     def temperature_scale_step():
         optimizer.zero_grad()
         temp = temperature_param.unsqueeze(1).expand(logits.size(0), logits.size(1))
@@ -54,11 +56,17 @@ def tune_temperature_scaling(y_val_probs: np.ndarray, y_val: np.ndarray, init_va
         loss = nll_criterion(new_logits, y_val_tensor)
         loss.backward()
         scheduler.step()
+        optimizer_trajectory.append((loss.item(), temperature_param.item()))
         return loss
 
     optimizer.step(temperature_scale_step)
 
-    temperature_scale = temperature_param.item()
+    try:
+        best_loss_index = np.nanargmin(np.array(optimizer_trajectory)[:, 0])
+    except ValueError:
+        return None
+    temperature_scale = float(np.array(optimizer_trajectory)[best_loss_index, 1])
+
     if np.isnan(temperature_scale):
         return None
 
@@ -72,9 +80,9 @@ def custom_softmax(logits: np.ndarray) -> np.ndarray:
     return y_pred_proba
 
 
-def apply_temperature_scaling(y_pred_proba: np.ndarray, temperature_scalar: float, problem_type: str) -> np.ndarray:
+def apply_temperature_scaling(y_pred_proba: np.ndarray, temperature_scalar: float, problem_type: str, *, transform_binary_proba: bool = True) -> np.ndarray:
     # TODO: This is expensive to convert at inference time, try to avoid in future
-    if problem_type == BINARY:
+    if transform_binary_proba and (problem_type == BINARY):
         y_pred_proba = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_pred_proba)
 
     logits = np.log(y_pred_proba)
