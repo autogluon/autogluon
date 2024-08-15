@@ -47,6 +47,8 @@ def tune_temperature_scaling(y_val_probs: np.ndarray, y_val: np.ndarray, init_va
     optimizer = torch.optim.LBFGS([temperature_param], lr=lr, max_iter=max_iter)
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.99)
 
+    optimizer_trajectory = []
+
     def temperature_scale_step():
         optimizer.zero_grad()
         temp = temperature_param.unsqueeze(1).expand(logits.size(0), logits.size(1))
@@ -54,11 +56,14 @@ def tune_temperature_scaling(y_val_probs: np.ndarray, y_val: np.ndarray, init_va
         loss = nll_criterion(new_logits, y_val_tensor)
         loss.backward()
         scheduler.step()
+        optimizer_trajectory.append((loss.item(), temperature_param.item()))
         return loss
 
     optimizer.step(temperature_scale_step)
 
-    temperature_scale = temperature_param.item()
+    best_loss_index = np.array(optimizer_trajectory)[:, 0].argmin()
+    temperature_scale = float(np.array(optimizer_trajectory)[best_loss_index, 1])
+
     if np.isnan(temperature_scale):
         return None
 

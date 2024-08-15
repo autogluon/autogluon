@@ -26,7 +26,7 @@ from autogluon.common.utils.try_import import try_import_torch
 from ..augmentation.distill_utils import augment_data, format_distillation_labels
 from ..calibrate import calibrate_decision_threshold
 from ..calibrate.conformity_score import compute_conformity_score
-from ..calibrate.temperature_scaling import tune_temperature_scaling
+from ..calibrate.temperature_scaling import tune_temperature_scaling, apply_temperature_scaling
 from ..constants import (
     AG_ARGS,
     BINARY,
@@ -3868,9 +3868,17 @@ class AbstractTrainer:
                     f"This can occur when the model is absolutely certain of a validation prediction (1.0 pred_proba).",
                 )
             else:
-                logger.log(15, f"Temperature term found is: {temp_scalar}")
-                model.params_aux["temperature_scalar"] = temp_scalar
-                model.save()
+                # Check that scaling improves performance for the target metric
+                score_without_temp = self.score_with_y_pred_proba(y=y_val, y_pred_proba=y_val_probs, weights=None)
+                scaled_y_val_probs = apply_temperature_scaling(y_val_probs, temp_scalar, problem_type=self.problem_type)
+                score_with_temp = self.score_with_y_pred_proba(y=y_val, y_pred_proba=scaled_y_val_probs, weights=None)
+
+                if score_with_temp > score_without_temp:
+                    logger.log(15, f"Temperature term found is: {temp_scalar}")
+                    model.params_aux["temperature_scalar"] = temp_scalar
+                    model.save()
+                else:
+                    logger.log(15, "Temperature did not improve performance, skipping calibration.")
 
     def calibrate_decision_threshold(
         self,
