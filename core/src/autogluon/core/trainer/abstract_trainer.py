@@ -26,7 +26,7 @@ from autogluon.common.utils.try_import import try_import_torch
 from ..augmentation.distill_utils import augment_data, format_distillation_labels
 from ..calibrate import calibrate_decision_threshold
 from ..calibrate.conformity_score import compute_conformity_score
-from ..calibrate.temperature_scaling import tune_temperature_scaling, apply_temperature_scaling
+from ..calibrate.temperature_scaling import apply_temperature_scaling, tune_temperature_scaling
 from ..constants import (
     AG_ARGS,
     BINARY,
