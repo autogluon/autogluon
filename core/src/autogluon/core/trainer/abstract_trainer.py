@@ -3870,7 +3870,7 @@ class AbstractTrainer:
             else:
                 # Check that scaling improves performance for the target metric
                 score_without_temp = self.score_with_y_pred_proba(y=y_val, y_pred_proba=y_val_probs, weights=None)
-                scaled_y_val_probs = apply_temperature_scaling(y_val_probs, temp_scalar, problem_type=self.problem_type)
+                scaled_y_val_probs = apply_temperature_scaling(y_val_probs, temp_scalar, problem_type=self.problem_type, transform_binary_proba=False)
                 score_with_temp = self.score_with_y_pred_proba(y=y_val, y_pred_proba=scaled_y_val_probs, weights=None)
 
                 if score_with_temp > score_without_temp:

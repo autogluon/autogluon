@@ -80,9 +80,9 @@ def custom_softmax(logits: np.ndarray) -> np.ndarray:
     return y_pred_proba
 
 
-def apply_temperature_scaling(y_pred_proba: np.ndarray, temperature_scalar: float, problem_type: str) -> np.ndarray:
+def apply_temperature_scaling(y_pred_proba: np.ndarray, temperature_scalar: float, problem_type: str, *, transform_binary_proba: bool = True) -> np.ndarray:
     # TODO: This is expensive to convert at inference time, try to avoid in future
-    if problem_type == BINARY:
+    if transform_binary_proba and (problem_type == BINARY):
         y_pred_proba = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_pred_proba)
 
     logits = np.log(y_pred_proba)
