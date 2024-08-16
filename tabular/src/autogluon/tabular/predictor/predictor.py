@@ -935,7 +935,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 to any amount of labeled data.
             verbosity : int
                 If specified, overrides the existing `predictor.verbosity` value.
-            raise_on_no_models_fitted: bool, default = False
+            raise_on_no_models_fitted: bool, default = True
                 If True, will raise a RuntimeError if no models were successfully fit during `fit()`.
             calibrate: bool or str, default = 'auto'
                 Note: It is recommended to use ['auto', False] as the values and avoid True.
@@ -1510,7 +1510,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         calibrate_decision_threshold=False,
         infer_limit=None,
         refit_full_kwargs: dict = None,
-        raise_on_no_models_fitted: bool = False,
+        raise_on_no_models_fitted: bool = True,
     ):
         if refit_full_kwargs is None:
             refit_full_kwargs = {}
@@ -4660,7 +4660,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             # other
             verbosity=self.verbosity,
             feature_prune_kwargs=None,
-            raise_on_no_models_fitted=False,
+            raise_on_no_models_fitted=True,
             # private
             _save_bag_folds=None,
             calibrate="auto",
