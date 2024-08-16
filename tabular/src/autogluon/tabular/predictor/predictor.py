@@ -701,9 +701,10 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             cgroups). Otherwise, AutoGluon might wrongly assume more resources are available for fitting a model than the operating system allows,
             which can result in model training failing or being very inefficient.
         callbacks : List[AbstractCallback], default = None
-            [Experimental] Callback support is preliminary, targeted towards developers, and is subject to change.
-            The API, class structure, and overall functionality may be changed without warning between releases while it remains experimental.
-
+            :::{warning}
+            Callbacks are an experimental feature and may change in future releases without warning.
+            Callback support is preliminary and targeted towards developers.
+            :::
             A list of callback objects inheriting from `autogluon.core.callbacks.AbstractCallback`.
             These objects will be called before and after each model fit within trainer.
             They have the ability to skip models or early stop the training process.

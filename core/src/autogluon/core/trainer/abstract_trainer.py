@@ -528,6 +528,10 @@ class AbstractTrainer:
         self.reset_callbacks()
         if callbacks is not None:
             assert isinstance(callbacks, list), f"`callbacks` must be a list. Found invalid type: `{type(callbacks)}`."
+            for callback in callbacks:
+                assert isinstance(
+                    callback, AbstractCallback
+                ), f"Elements in `callbacks` must be of type AbstractCallback. Found invalid type: `{type(callback)}`."
         else:
             callbacks = []
         self.callbacks = callbacks
