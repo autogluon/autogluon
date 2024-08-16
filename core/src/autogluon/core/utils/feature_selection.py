@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import time
 import traceback
@@ -8,6 +10,7 @@ from typing import List, Set, Tuple, Union
 import numpy as np
 import pandas as pd
 
+from autogluon.common import FeatureMetadata
 from autogluon.common.features.types import R_FLOAT
 
 from ..models.abstract.abstract_model import AbstractModel
@@ -400,7 +403,7 @@ class FeatureSelector:
             "features": evaluated_features,
             "time_limit": time_budget_fi,
             "silent": True,
-            "random_state": self.rng.integers(low=0, high=1e5),
+            "random_state": self.get_random_state(),
         }
         fi_kwargs.update({"is_oof": True} if self.is_bagged else {})
         # FIXME: Right now the upper bound on the number of features we evaluate feature importance at once is determined by our expected feature
@@ -465,7 +468,7 @@ class FeatureSelector:
 
         sample_weights = [1 / i for i in range(1, len(below_threshold_rows) + 1)] if weighted else None
         for _ in range(50):
-            random_state = self.rng.integers(low=0, high=1e5)
+            random_state = self.get_random_state()
             removal_candidate_rows = below_threshold_rows.sample(n=n_remove, random_state=random_state, replace=False, weights=sample_weights)
             removal_candidates = tuple(removal_candidate_rows.index)
             if removal_candidates not in self.attempted_removals:
@@ -534,15 +537,15 @@ class FeatureSelector:
         }
 
     def setup(
-        self, X: pd.DataFrame, y: pd.DataFrame, X_val: pd.DataFrame, y_val: pd.DataFrame, n_train_subsample: int, prune_threshold: float, **kwargs: dict
-    ) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series, pd.DataFrame, pd.Series, Union[float, str], List[str]]:
+        self, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame, y_val: pd.Series, n_train_subsample: int, prune_threshold: float, **kwargs: dict
+    ) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series, pd.DataFrame, pd.Series, float | str, List[str], FeatureMetadata | None]:
         """
         Modify training data, validation data, and model fit kwargs appropriately by subsampling, adding noise columns, replacing bagged
         models, and more.
         """
         # subsample training data
         min_fi_samples = kwargs.get("min_fi_samples", 10000)
-        random_state = self.rng.integers(low=0, high=1e5)
+        random_state = self.get_random_state()
         if n_train_subsample is not None and len(X) > n_train_subsample:
             logger.log(20, f"\tNumber of training samples {len(X)} is greater than {n_train_subsample}. Using {n_train_subsample} samples as training data.")
             drop_ratio = 1.0 - n_train_subsample / len(X)
@@ -582,3 +585,7 @@ class FeatureSelector:
             assert isinstance(prune_threshold, float), "prune_threshold must be float, 'noise', or 'none'."
         X_fi, y_fi = (X_train, y_train) if self.is_bagged else (X_val, y_val)
         return X_train, y_train, X_val, y_val, X_fi, y_fi, prune_threshold, noise_columns, feature_metadata
+
+    def get_random_state(self) -> int:
+        # convert random_state to Python int to avoid crash on Windows
+        return self.rng.integers(low=0, high=1e5, dtype=int)
