@@ -126,7 +126,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             2: Standard logging
             3: Verbose logging (ex: log validation score every 50 iterations)
             4: Maximally verbose logging (ex: log validation score every iteration)
-    log_to_file: bool, default = True
+    log_to_file: bool, default = False
         Whether to save the logs into a file for later reference
     log_file_path: str, default = "auto"
         File path to save the logs.
@@ -254,7 +254,6 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             )
         self._validate_init_kwargs(kwargs)
         path = setup_outputdir(path)
-        self._setup_log_to_file(path=path, log_to_file=log_to_file, log_file_path=log_file_path)
 
         learner_type = kwargs.pop("learner_type", DefaultLearner)
         learner_kwargs = kwargs.pop("learner_kwargs", dict())
@@ -276,6 +275,9 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         self._trainer: AbstractTrainer = None
         self._sub_fits: List[str] = []
         self._stacked_overfitting_occurred: bool | None = None
+
+        if log_to_file:
+            self._setup_log_to_file(log_file_path=log_file_path)
 
     @property
     def classes_(self) -> list:
@@ -4531,13 +4533,12 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             lines = f.readlines()
         return lines
 
-    def _setup_log_to_file(self, path, log_to_file, log_file_path):
-        if log_to_file:
-            if log_file_path == "auto":
-                log_file_path = os.path.join(path, "logs", self._predictor_log_file_name)
-            log_file_path = os.path.abspath(os.path.normpath(log_file_path))
-            os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
-            add_log_to_file(log_file_path)
+    def _setup_log_to_file(self, log_file_path: str):
+        if log_file_path == "auto":
+            log_file_path = os.path.join(self.path, "logs", self._predictor_log_file_name)
+        log_file_path = os.path.abspath(os.path.normpath(log_file_path))
+        os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
+        add_log_to_file(log_file_path)
 
     @staticmethod
     def _validate_init_kwargs(kwargs):
