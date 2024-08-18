@@ -700,7 +700,7 @@ for name, metric, kwargs in [
     ("roc_auc_ovr", customized_roc_auc, dict(multi_class="ovr")),
 ]:
     scorer_kwargs = dict(greater_is_better=True, needs_proba=True, needs_threshold=False)
-    globals()[name] = make_scorer(name, partial(metric, average=average, **kwargs), **scorer_kwargs)
+    globals()[name] = make_scorer(name, partial(metric, average="macro", **kwargs), **scorer_kwargs)
     macro_name = "{0}_{1}".format(name, "macro")
     globals()[name].add_alias(macro_name)
     _add_scorer_to_metric_dict(metric_dict=MULTICLASS_METRICS, scorer=globals()[name])
