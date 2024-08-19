@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import time
+import typing
 
 import pandas as pd
 
 from ..models import AbstractModel
-from ..trainer import AbstractTrainer
 from ._abstract_callback import AbstractCallback
+
+if typing.TYPE_CHECKING:
+    # avoid circular import for type hints
+    from ..trainer import AbstractTrainer
 
 
 class ExampleCallback(AbstractCallback):

@@ -28,6 +28,7 @@ from ..augmentation.distill_utils import augment_data, format_distillation_label
 from ..calibrate import calibrate_decision_threshold
 from ..calibrate.conformity_score import compute_conformity_score
 from ..calibrate.temperature_scaling import apply_temperature_scaling, tune_temperature_scaling
+from ..callbacks import AbstractCallback
 from ..constants import AG_ARGS, BINARY, MULTICLASS, QUANTILE, REFIT_FULL_NAME, REFIT_FULL_SUFFIX, REGRESSION, SOFTCLASS
 from ..data.label_cleaner import LabelCleanerMulticlassToBinary
 from ..metrics import Scorer, get_metric
@@ -48,10 +49,6 @@ from ..utils.feature_selection import FeatureSelector
 from ..utils.loaders import load_pkl
 from ..utils.savers import save_json, save_pkl
 from .utils import process_hyperparameters
-
-if typing.TYPE_CHECKING:
-    # avoid circular import for type hints
-    from ..callbacks import AbstractCallback
 
 logger = logging.getLogger(__name__)
 

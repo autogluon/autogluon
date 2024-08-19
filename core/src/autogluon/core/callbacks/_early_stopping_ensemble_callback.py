@@ -1,7 +1,12 @@
 from __future__ import annotations
 
-from ..trainer import AbstractTrainer
+import typing
+
 from ._early_stopping_callback import EarlyStoppingCallback
+
+if typing.TYPE_CHECKING:
+    # avoid circular import for type hints
+    from ..trainer import AbstractTrainer
 
 
 class EarlyStoppingEnsembleCallback(EarlyStoppingCallback):

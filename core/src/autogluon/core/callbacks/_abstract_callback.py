@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import typing
 from abc import ABCMeta
 
 from ..models import AbstractModel
-from ..trainer import AbstractTrainer
+
+if typing.TYPE_CHECKING:
+    # avoid circular import for type hints
+    from ..trainer import AbstractTrainer
 
 
 # TODO: Open design questions:
