@@ -365,7 +365,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             Seasonal naive forecast for short series, if there are any in the dataset.
         """
         ts_lengths = data.num_timesteps_per_item()
-        short_series = ts_lengths.index[ts_lengths <= self._sum_of_differences + 1]
+        short_series = ts_lengths.index[ts_lengths <= self._sum_of_differences]
         if len(short_series) > 0:
             logger.warning(
                 f"Warning: {len(short_series)} time series ({len(short_series) / len(ts_lengths):.1%}) are shorter "
