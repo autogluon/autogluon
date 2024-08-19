@@ -489,5 +489,44 @@ class FeatureMetadata:
         type_group_map_special = get_type_group_map_special(df)
         return cls(type_map_raw=type_map_raw, type_group_map_special=type_group_map_special)
 
+    def verify_data(self, df: pd.DataFrame) -> bool:
+        """
+        Returns True if the DataFrame's raw types match FeatureMetadata, else False
+        """
+        type_map_raw = get_type_map_raw(df)
+        features = set(type_map_raw.keys())
+        if features != set(self.get_features()):
+            return False
+        return self._verify_data_type_raw(type_map_raw=type_map_raw)
+
+    def verify_data_subset(self, df: pd.DataFrame) -> bool:
+        """
+        Returns True if the DataFrame's features are a subset of FeatureMetadata and its raw types match FeatureMetadata, else False
+        """
+        type_map_raw = get_type_map_raw(df)
+        features = set(type_map_raw.keys())
+        if not features.issubset(set(self.get_features())):
+            return False
+        return self._verify_data_type_raw(type_map_raw=type_map_raw)
+
+    def verify_data_superset(self, df: pd.DataFrame) -> bool:
+        """
+        Returns True if the DataFrame's features are a superset of FeatureMetadata and its raw types match FeatureMetadata, else False
+        """
+        type_map_raw = get_type_map_raw(df)
+        features = set(type_map_raw.keys())
+        features_self = set(self.get_features())
+        if not features.issuperset(features_self):
+            return False
+        type_map_raw = {k: v for k, v in type_map_raw.items() if k in features_self}
+        return self._verify_data_type_raw(type_map_raw=type_map_raw)
+
+    def _verify_data_type_raw(self, type_map_raw: dict) -> bool:
+        features = set(type_map_raw.keys())
+        for feature in features:
+            if type_map_raw[feature] != self.type_map_raw[feature]:
+                return False
+        return True
+
     def __str__(self):
         return self.print_feature_metadata_full(return_str=True)
