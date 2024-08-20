@@ -192,6 +192,10 @@ def test_custom_metrics(problem_type, model, get_dataset_map, fit_helper):
 def test_metric_format(problem_type, model, metric, use_error, get_dataset_map, fit_helper):
     metric = get_metric(metric, problem_type, "eval_metric")
 
+    # TODO: metric format test not accurately testing format for: pac, pac_score, quad kappa, r2
+    if metric.name in ("r2", "pac", "pac_score", "quadratic_kappa"):
+        return
+
     init_args = {
         "eval_metric": metric,
         # "verbosity": 4,
@@ -222,6 +226,8 @@ def test_metric_format(problem_type, model, metric, use_error, get_dataset_map, 
     if use_error:
         assert np.all(curve >= 0)
     else:
+        # but r2 can be pos or neg depending on data, and others
+        # what is the best way to go about this?
         assert np.all((np.sign(curve) == np.sign(metric._sign)) | (curve == 0))
 
 
