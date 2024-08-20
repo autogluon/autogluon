@@ -291,13 +291,11 @@ class LitModule(pl.LightningModule):
             output = self.model_postprocess_fn(output)
         # By default, on_step=False and on_epoch=True
         self.log("val_loss", loss)
-        (
-            self._compute_metric_score(
-                metric=self.validation_metric,
-                custom_metric_func=self.custom_metric_func,
-                logits=output[self.model.prefix][LOGITS],
-                label=batch[self.model.label_key],
-            ),
+        self._compute_metric_score(
+            metric=self.validation_metric,
+            custom_metric_func=self.custom_metric_func,
+            logits=output[self.model.prefix][LOGITS],
+            label=batch[self.model.label_key],
         )
         self.log(
             self.validation_metric_name,
