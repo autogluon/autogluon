@@ -43,7 +43,6 @@ def func_generator(metric, is_higher_better, needs_pred_proba, problem_type, err
 
     compute = metric.error if error else metric
     if problem_type in [REGRESSION, QUANTILE]:
-
         # TODO: Might not work for custom quantile metrics
         def function_template(y_hat, data):
             y_true = data.get_label()
