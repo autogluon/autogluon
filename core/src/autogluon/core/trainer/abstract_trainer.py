@@ -26,7 +26,7 @@ from autogluon.common.utils.try_import import try_import_torch
 from ..augmentation.distill_utils import augment_data, format_distillation_labels
 from ..calibrate import calibrate_decision_threshold
 from ..calibrate.conformity_score import compute_conformity_score
-from ..calibrate.temperature_scaling import tune_temperature_scaling
+from ..calibrate.temperature_scaling import apply_temperature_scaling, tune_temperature_scaling
 from ..constants import (
     AG_ARGS,
     BINARY,
@@ -3832,7 +3832,7 @@ class AbstractTrainer:
         best_candidate_model_rows = candidate_model_rows.loc[candidate_model_rows["score_val"] == candidate_model_rows["score_val"].max()]
         return self.load_model(best_candidate_model_rows.loc[best_candidate_model_rows["fit_time"].idxmin()]["model"])
 
-    def calibrate_model(self, model_name: str = None, lr: float = 0.01, max_iter: int = 1000, init_val: float = 1.0):
+    def calibrate_model(self, model_name: str = None, lr: float = 0.1, max_iter: int = 200, init_val: float = 1.0):
         """
         Applies temperature scaling to a model.
         Applies inverse softmax to predicted probs then trains temperature scalar
@@ -3845,9 +3845,9 @@ class AbstractTrainer:
         model_name: str: default = None
             model name to tune temperature scaling on.
             If None, will tune best model only. Best model chosen by validation score
-        lr: float: default = 0.01
+        lr: float: default = 0.1
             The learning rate for temperature scaling algorithm
-        max_iter: int: default = 1000
+        max_iter: int: default = 200
             Number of iterations optimizer should take for
             tuning temperature scaler
         init_val: float: default = 1.0
@@ -3906,10 +3906,23 @@ class AbstractTrainer:
                     f"Warning: Infinity found during calibration, skipping calibration on {model.name}! "
                     f"This can occur when the model is absolutely certain of a validation prediction (1.0 pred_proba).",
                 )
+            elif temp_scalar <= 0:
+                logger.log(
+                    30,
+                    f"Warning: Temperature scaling found optimal at a negative value ({temp_scalar}). Disabling temperature scaling to avoid overfitting.",
+                )
             else:
-                logger.log(15, f"Temperature term found is: {temp_scalar}")
-                model.params_aux["temperature_scalar"] = temp_scalar
-                model.save()
+                # Check that scaling improves performance for the target metric
+                score_without_temp = self.score_with_y_pred_proba(y=y_val, y_pred_proba=y_val_probs, weights=None)
+                scaled_y_val_probs = apply_temperature_scaling(y_val_probs, temp_scalar, problem_type=self.problem_type, transform_binary_proba=False)
+                score_with_temp = self.score_with_y_pred_proba(y=y_val, y_pred_proba=scaled_y_val_probs, weights=None)
+
+                if score_with_temp > score_without_temp:
+                    logger.log(15, f"Temperature term found is: {temp_scalar}")
+                    model.params_aux["temperature_scalar"] = temp_scalar
+                    model.save()
+                else:
+                    logger.log(15, "Temperature did not improve performance, skipping calibration.")
 
     def calibrate_decision_threshold(
         self,

@@ -12,12 +12,39 @@ logger = logging.getLogger(__name__)
 
 
 def is_s3_url(path: str) -> bool:
+    """
+    Checks if path is a s3 uri.
+
+    Params:
+    -------
+    path: str
+        The path to check.
+
+    Returns:
+    --------
+    bool: whether the path is a s3 uri.
+    """
     if (path[:2] == "s3") and ("://" in path[:6]):
         return True
     return False
 
 
 def s3_path_to_bucket_prefix(s3_path: str) -> Tuple[str, str]:
+    """
+    Retrieves the bucket and key from a s3 uri.
+
+    Params:
+    -------
+    origin_path: str
+        The path (s3 uri) to be parsed.
+
+    Returns:
+    --------
+    bucket_name: str
+        the associated bucket name
+    object_key: str
+        the associated key
+    """
     s3_path_cleaned = s3_path.split("://", 1)[1]
     bucket, prefix = s3_path_cleaned.split("/", 1)
 
@@ -328,6 +355,28 @@ def download_s3_file(
                 pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
         s3 = boto3.resource("s3")
         s3.Bucket(s3_bucket).download_file(s3_prefix, local_path)
+
+
+def copy_s3_file(origin_path: str, destination_path: str) -> None:
+    """
+    Copies s3 file from origin_path to destination_path
+
+    Params:
+    -------
+    origin_path: str
+        The path (s3 uri) to the original location of the object
+    destination_path: str
+        The path (s3 uri) to the intended destination location of the object
+    """
+    import boto3
+
+    origin_bucket, origin_key = s3_path_to_bucket_prefix(origin_path)
+    destination_bucket, destination_key = s3_path_to_bucket_prefix(destination_path)
+
+    s3 = boto3.client("s3")
+    s3.copy_object(
+        Bucket=destination_bucket, CopySource={"Bucket": origin_bucket, "Key": origin_key}, Key=destination_key
+    )
 
 
 def download_s3_files(*, s3_to_local_tuple_list: List[Tuple[str, str]], dry_run: bool = False, verbose: bool = False):

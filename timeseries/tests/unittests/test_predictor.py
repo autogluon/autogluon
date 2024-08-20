@@ -1751,3 +1751,8 @@ def test_when_predictor_saved_to_same_directory_and_loaded_then_number_of_models
         == set(loaded_predictor.model_names())
         == set(hyperparameters).union({"WeightedEnsemble"})
     )
+
+
+def test_when_invalid_path_provided_to_load_then_correct_exception_is_raised():
+    with pytest.raises(FileNotFoundError, match="No such file"):
+        TimeSeriesPredictor.load("some_invalid_path")
