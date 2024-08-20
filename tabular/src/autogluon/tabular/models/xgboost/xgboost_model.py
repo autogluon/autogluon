@@ -186,7 +186,7 @@ class XGBoostModel(AbstractModel):
         self.model = model_type(**params)
         import warnings
 
-        with warnings.catch_warnings():tabular/src/autogluon/tabular/models/xgboost/xgboost_utils.py
+        with warnings.catch_warnings():
             # FIXME: v1.1: Upgrade XGBoost to 2.0.1+ to avoid deprecation warnings from Pandas 2.1+ during XGBoost fit.
             warnings.simplefilter(action="ignore", category=FutureWarning)
             self.model.fit(X=X, y=y, eval_set=eval_set, verbose=False, sample_weight=sample_weight)
