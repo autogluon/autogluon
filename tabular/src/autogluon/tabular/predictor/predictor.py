@@ -951,11 +951,11 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 This test_data should be treated the same way test data is used in predictor.leaderboard.
             learning_curves : bool or dict, default = None
                 If bool and is True, default learning curve hyperparameter ag_args will be initialized for each of the models included in the ensemble.
-                    By default, learning curves will include eval_metric scores specified in fit call arguments. 
+                    By default, learning curves will include eval_metric scores specified in fit call arguments.
                     This can be overwritten as shown below.
                 If dict, user can pass learning_curves parameters to be initialized as ag_args in the following format:
                     learning_curves = {
-                        "metrics": str or list(str) or Scorer or list(Scorer): 
+                        "metrics": str or list(str) or Scorer or list(Scorer):
                             autogluon metric scorer(s) to be calculated at each iteration, represented as Scorer object(s) or scorer name(s) (str)
                         "use_error": bool : whether to use error or score format for metrics listed above
                     }
@@ -1060,7 +1060,9 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         if feature_generator_init_kwargs is None:
             feature_generator_init_kwargs = dict()
 
-        train_data, tuning_data, test_data, unlabeled_data = self._validate_fit_data(train_data=train_data, tuning_data=tuning_data, test_data=test_data, unlabeled_data=unlabeled_data)
+        train_data, tuning_data, test_data, unlabeled_data = self._validate_fit_data(
+            train_data=train_data, tuning_data=tuning_data, test_data=test_data, unlabeled_data=unlabeled_data
+        )
         infer_limit, infer_limit_batch_size = self._validate_infer_limit(infer_limit=infer_limit, infer_limit_batch_size=infer_limit_batch_size)
 
         if hyperparameters is None:
@@ -2602,9 +2604,9 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
     def learning_curves(self) -> Tuple[dict, dict]:
         """
-        Retrieves learning curves generated during predictor.fit(). 
+        Retrieves learning curves generated during predictor.fit().
         Will not work if the learning_curves flag was not set during training.
-        Note that learning curves are only generated for iterative learners with 
+        Note that learning curves are only generated for iterative learners with
         learning curve support.
 
         Parameters
@@ -2652,9 +2654,10 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                     "predict_time": info["predict_time"],
                     "fit_time": info["fit_time"],
                     "val_score": info["val_score"],
-                } for model, info in metadata["model_info"].items()
+                }
+                for model, info in metadata["model_info"].items()
                 if _valid_model(model=model)
-            }
+            },
         }
 
         model_data = {}
@@ -4903,7 +4906,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         self._validate_single_fit_dataset(train_data=train_data, other_data=unlabeled_data, name="unlabeled_data")
 
         return train_data, tuning_data, test_data, unlabeled_data
-    
+
     def _validate_single_fit_dataset(self, train_data: pd.DataFrame, other_data: pd.DataFrame, name: str):
         """
         Validates additional dataset, ensuring format is consistent with train dataset.
@@ -4954,7 +4957,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         -----------
         learning_curves : bool | dict | None
             If bool, whether to generate learning curves.
-            If dict, the dictionary of learning_curves parameters passed into predictor from the user. 
+            If dict, the dictionary of learning_curves parameters passed into predictor from the user.
             If None, will not generate curves.
         problem_type : str
             The current problem type.

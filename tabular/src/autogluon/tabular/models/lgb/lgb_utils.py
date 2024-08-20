@@ -41,7 +41,7 @@ def func_generator(metric, is_higher_better, needs_pred_proba, problem_type, err
     if error:
         is_higher_better = False
 
-    compute = (metric.error if error else metric)
+    compute = metric.error if error else metric
     if problem_type in [REGRESSION, QUANTILE]:
 
         # TODO: Might not work for custom quantile metrics
@@ -55,25 +55,25 @@ def func_generator(metric, is_higher_better, needs_pred_proba, problem_type, err
             def function_template(y_hat, data):
                 y_true = data.get_label()
                 return metric.name, compute(y_true, y_hat), is_higher_better
-            
+
         elif problem_type == SOFTCLASS:  # metric must take in soft labels array, like soft_log_loss
-            
+
             def function_template(y_hat, data):
                 y_true = data.softlabels
                 y_hat = y_hat.reshape(y_true.shape[1], -1).T
                 y_hat = np.exp(y_hat)
                 y_hat = np.multiply(y_hat, 1 / np.sum(y_hat, axis=1)[:, np.newaxis])
                 return metric.name, compute(y_true, y_hat), is_higher_better
-        
+
         else:
-            
+
             def function_template(y_hat, data):
                 y_true = data.get_label()
                 return metric.name, compute(y_true, y_hat), is_higher_better
-    
+
     else:
         if problem_type == MULTICLASS:
-            
+
             def function_template(y_hat, data):
                 y_true = data.get_label()
                 y_hat = y_hat.argmax(axis=1)

@@ -1,10 +1,10 @@
+from typing import Tuple
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
-
-from typing import Tuple
 
 
 def plot_curves(learning_curves: Tuple[dict, dict], model: str, metric: str, return_fig: bool = True) -> Figure:
@@ -20,7 +20,7 @@ def plot_curves(learning_curves: Tuple[dict, dict], model: str, metric: str, ret
         training process, and thus the associated learning curves.
     metric: str
         The metric to plot curves for. Metric must be specified in TabularPredictor's
-        training process, and thus the associated learning curves.  
+        training process, and thus the associated learning curves.
 
     Returns:
     --------
@@ -69,19 +69,21 @@ def plot_curves(learning_curves: Tuple[dict, dict], model: str, metric: str, ret
 
     _, iterations = np.array(curve).shape
 
-    data = pd.DataFrame({
-        "iterations": list(range(1, iterations + 1)),
-        **{ eval_set : curve[i] for i, eval_set in enumerate(eval_sets) },
-    })
+    data = pd.DataFrame(
+        {
+            "iterations": list(range(1, iterations + 1)),
+            **{eval_set: curve[i] for i, eval_set in enumerate(eval_sets)},
+        }
+    )
 
-    data = data.melt(id_vars='iterations', var_name='Line', value_name='Y')
+    data = data.melt(id_vars="iterations", var_name="Line", value_name="Y")
 
     fig, ax = plt.subplots()
 
-    sns.lineplot(x='iterations', y='Y', hue='Line', data=data, ax=ax)
+    sns.lineplot(x="iterations", y="Y", hue="Line", data=data, ax=ax)
 
-    ax.set_title(f'Learning Curves for {model} using {metric} as Eval Metric')
-    ax.set_xlabel('iterations')
+    ax.set_title(f"Learning Curves for {model} using {metric} as Eval Metric")
+    ax.set_xlabel("iterations")
     ax.set_ylabel(metric)
     ax.legend()
     ax.grid(True)

@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
+from autogluon.common.loaders import load_json
 from autogluon.common.space import Space
 from autogluon.common.utils.distribute_utils import DistributedContext
 from autogluon.common.utils.lite import disable_if_lite_mode
@@ -24,7 +25,6 @@ from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager, get_resource_manager
 from autogluon.common.utils.try_import import try_import_ray
 from autogluon.common.utils.utils import setup_outputdir
-from autogluon.common.loaders import load_json
 
 from ... import metrics
 from ...calibrate.temperature_scaling import apply_temperature_scaling
@@ -1175,7 +1175,7 @@ class AbstractModel:
                 model.model = model._compiler.load(path=path)
         return model
 
-    def save_learning_curves(self, metrics: str | List[str], curves: dict[dict[str:List[float]]], path: str = None) -> str:
+    def save_learning_curves(self, metrics: str | List[str], curves: dict[dict[str : List[float]]], path: str = None) -> str:
         """
         Saves learning curves to disk.
 
@@ -1218,7 +1218,7 @@ class AbstractModel:
                         "val": {...},
                         "test": {...},
                     }
-  
+
         path : str, default None
             Path where the learning curves are saved, minus the file name.
             This should generally be a directory path ending with a '/' character (or appropriate path separator value depending on OS).
@@ -1241,16 +1241,12 @@ class AbstractModel:
         file_path = os.path.join(path, self.learning_curve_file_name)
         out = self._make_learning_curves(metrics=metrics, curves=curves)
 
-        with open(file_path, 'w') as json_file:
+        with open(file_path, "w") as json_file:
             json.dump(out, json_file, indent=4)
 
         return file_path
 
-    def _make_learning_curves(
-            self,
-            metrics: str | List[str],
-            curves: dict[dict[str:List[float]]]
-        ) -> List[List[str], List[str], List[List[float]]]:
+    def _make_learning_curves(self, metrics: str | List[str], curves: dict[dict[str : List[float]]]) -> List[List[str], List[str], List[List[float]]]:
         """
         Parameters
         ----------
@@ -1278,7 +1274,7 @@ class AbstractModel:
 
         items.extend(curves.items())
         eval_sets, curves = list(zip(*items))
-    
+
         data = []
         for metric in metrics:
             data.append([c[metric] for c in curves])
@@ -1308,11 +1304,11 @@ class AbstractModel:
         file = os.path.join(path, cls.learning_curve_file_name)
 
         if not os.path.exists(file):
-            raise FileNotFoundError(f"Could not find learning curve file at {file}" + \
-                "\nDid you call predictor.fit() with an appropriate learning_curves parameter?")
+            raise FileNotFoundError(
+                f"Could not find learning curve file at {file}" + "\nDid you call predictor.fit() with an appropriate learning_curves parameter?"
+            )
 
         return load_json.load(file)
-
 
     # TODO: v1.0: Add docs
     def compute_feature_importance(
@@ -2242,7 +2238,7 @@ class AbstractModel:
             boolean flag determining if learning curves should be saved to disk for iterative learners.
 
         curve_metrics : list(...)
-            list of metrics to be evaluated at each iteration of the learning curves 
+            list of metrics to be evaluated at each iteration of the learning curves
             (only used if generate_curves is True)
 
         use_error_for_curve_metrics : bool

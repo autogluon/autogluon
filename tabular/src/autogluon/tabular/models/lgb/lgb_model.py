@@ -15,9 +15,9 @@ from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_lightgbm
 from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION, SOFTCLASS
+from autogluon.core.metrics import get_metric
 from autogluon.core.models import AbstractModel
 from autogluon.core.models._utils import get_early_stopping_rounds
-from autogluon.core.metrics import get_metric
 
 from . import lgb_utils
 from .hyperparameters.parameters import DEFAULT_NUM_BOOST_ROUND, get_lgb_objective, get_param_baseline
@@ -216,11 +216,11 @@ class LGBModel(AbstractModel):
 
             custom_metrics = [
                 lgb_utils.func_generator(
-                    metric=scorer, 
-                    is_higher_better=scorer.greater_is_better_internal, 
-                    needs_pred_proba=not scorer.needs_pred, 
-                    problem_type=self.problem_type, 
-                    error=use_curve_metric_error
+                    metric=scorer,
+                    is_higher_better=scorer.greater_is_better_internal,
+                    needs_pred_proba=not scorer.needs_pred,
+                    problem_type=self.problem_type,
+                    error=use_curve_metric_error,
                 )
                 for scorer in scorers
             ]
@@ -299,8 +299,9 @@ class LGBModel(AbstractModel):
                         logger.log(15, f"Not enough time to retrain LGB model ('dart' mode)...")
 
         if generate_curves:
+
             def og_name(key):
-                if key == f'_{stopping_metric_name}':
+                if key == f"_{stopping_metric_name}":
                     return stopping_metric_name
                 return key
 
@@ -313,8 +314,8 @@ class LGBModel(AbstractModel):
             if X_test is not None:
                 curves["test"] = filter(eval_results["test_set"], metric_names)
 
-            if f'_{stopping_metric_name}' in metric_names:
-                idx = metric_names.index(f'_{stopping_metric_name}')
+            if f"_{stopping_metric_name}" in metric_names:
+                idx = metric_names.index(f"_{stopping_metric_name}")
                 metric_names[idx] = stopping_metric_name
 
             self.save_learning_curves(metrics=metric_names, curves=curves)
@@ -377,18 +378,18 @@ class LGBModel(AbstractModel):
             return X
 
     def generate_datasets(
-            self, 
-            X: DataFrame, 
-            y: Series, 
-            params, 
-            X_val=None, 
-            y_val=None, 
-            X_test=None, 
-            y_test=None, 
-            sample_weight=None, 
-            sample_weight_val=None, 
-            sample_weight_test=None, 
-            save=False
+        self,
+        X: DataFrame,
+        y: Series,
+        params,
+        X_val=None,
+        y_val=None,
+        X_test=None,
+        y_test=None,
+        sample_weight=None,
+        sample_weight_val=None,
+        sample_weight_test=None,
+        save=False,
     ):
         lgb_dataset_params_keys = ["two_round"]  # Keys that are specific to lightGBM Dataset object construction.
         data_params = {key: params[key] for key in lgb_dataset_params_keys if key in params}.copy()

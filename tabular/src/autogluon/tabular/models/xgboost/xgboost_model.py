@@ -153,28 +153,26 @@ class XGBoostModel(AbstractModel):
 
         try_import_xgboost()
         from xgboost.callback import EvaluationMonitor
-        from .callbacks import EarlyStoppingCustom, CustomMetricCallback
+
+        from .callbacks import CustomMetricCallback, EarlyStoppingCustom
 
         if eval_set is not None and "callbacks" not in params:
             callbacks = []
             if generate_curves:
-                callbacks.append(CustomMetricCallback(
-                        scorers=scorers, 
-                        eval_sets=eval_set,
-                        problem_type=self.problem_type, 
-                        use_error=use_curve_metric_error
-                    ))
+                callbacks.append(CustomMetricCallback(scorers=scorers, eval_sets=eval_set, problem_type=self.problem_type, use_error=use_curve_metric_error))
             if log_period is not None:
                 callbacks.append(EvaluationMonitor(period=log_period))
 
-            callbacks.append(EarlyStoppingCustom(
-                    early_stopping_rounds, 
-                    start_time=start_time, 
-                    time_limit=time_limit, 
+            callbacks.append(
+                EarlyStoppingCustom(
+                    early_stopping_rounds,
+                    start_time=start_time,
+                    time_limit=time_limit,
                     verbose=verbose,
-                    metric_name=eval_metric_name, # forces stopping_metric rather than arbitrary last metric
-                    data_name="validation_0", # forces val dataset rather than arbitrary last dataset  
-                ))
+                    metric_name=eval_metric_name,  # forces stopping_metric rather than arbitrary last metric
+                    data_name="validation_0",  # forces val dataset rather than arbitrary last dataset
+                )
+            )
             params["callbacks"] = callbacks
 
         if eval_set is not None:
@@ -188,12 +186,13 @@ class XGBoostModel(AbstractModel):
         self.model = model_type(**params)
         import warnings
 
-        with warnings.catch_warnings():
+        with warnings.catch_warnings():tabular/src/autogluon/tabular/models/xgboost/xgboost_utils.py
             # FIXME: v1.1: Upgrade XGBoost to 2.0.1+ to avoid deprecation warnings from Pandas 2.1+ during XGBoost fit.
             warnings.simplefilter(action="ignore", category=FutureWarning)
             self.model.fit(X=X, y=y, eval_set=eval_set, verbose=False, sample_weight=sample_weight)
 
         if generate_curves:
+
             def filter(d, keys):
                 # ensure only specified curve metrics are included
                 return {key: d[key] for key in keys if key in d}

@@ -91,15 +91,9 @@ class DefaultLearner(AbstractTabularLearner):
             num_bag_folds = len(X[self.groups].unique())
         X_og = None if infer_limit_batch_size is None else X
         logger.log(20, "Preprocessing data ...")
-        X, y, X_val, y_val, X_test, y_test, X_unlabeled, holdout_frac, num_bag_folds, groups = \
-            self.general_data_processing(
-                X=X,
-                X_val=X_val,
-                X_test=X_test, 
-                X_unlabeled=X_unlabeled, 
-                holdout_frac=holdout_frac, 
-                num_bag_folds=num_bag_folds
-            )
+        X, y, X_val, y_val, X_test, y_test, X_unlabeled, holdout_frac, num_bag_folds, groups = self.general_data_processing(
+            X=X, X_val=X_val, X_test=X_test, X_unlabeled=X_unlabeled, holdout_frac=holdout_frac, num_bag_folds=num_bag_folds
+        )
         if X_og is not None:
             infer_limit = self._update_infer_limit(X=X_og, infer_limit_batch_size=infer_limit_batch_size, infer_limit=infer_limit)
 
@@ -201,7 +195,9 @@ class DefaultLearner(AbstractTabularLearner):
         return infer_limit
 
     # TODO: Add default values to X_val, X_unlabeled, holdout_frac, and num_bag_folds
-    def general_data_processing(self, X: DataFrame, X_val: DataFrame = None, X_test : DataFrame = None, X_unlabeled: DataFrame = None, holdout_frac: float = 1, num_bag_folds: int = 0):
+    def general_data_processing(
+        self, X: DataFrame, X_val: DataFrame = None, X_test: DataFrame = None, X_unlabeled: DataFrame = None, holdout_frac: float = 1, num_bag_folds: int = 0
+    ):
         """General data processing steps used for all models."""
         X = self._check_for_non_finite_values(X, name="train", is_train=True)
         if X_val is not None:
@@ -240,8 +236,12 @@ class DefaultLearner(AbstractTabularLearner):
         if self.label_cleaner.num_classes is not None and self.problem_type != BINARY:
             logger.log(20, f"Train Data Class Count: {self.label_cleaner.num_classes}")
 
-        X_val, y_val, w_val, holdout_frac = self._apply_cleaner_transform(X=X_val, y_uncleaned=y_uncleaned, holdout_frac=holdout_frac, holdout_frac_og=holdout_frac_og, name="val")
-        X_test, y_test, w_test, _ = self._apply_cleaner_transform(X=X_test, y_uncleaned=y_uncleaned, holdout_frac=holdout_frac, holdout_frac_og=holdout_frac_og, name="test")
+        X_val, y_val, w_val, holdout_frac = self._apply_cleaner_transform(
+            X=X_val, y_uncleaned=y_uncleaned, holdout_frac=holdout_frac, holdout_frac_og=holdout_frac_og, name="val"
+        )
+        X_test, y_test, w_test, _ = self._apply_cleaner_transform(
+            X=X_test, y_uncleaned=y_uncleaned, holdout_frac=holdout_frac, holdout_frac_og=holdout_frac_og, name="test"
+        )
 
         self._original_features = list(X.columns)
         # TODO: Move this up to top of data before removing data, this way our feature generator is better
@@ -313,8 +313,10 @@ class DefaultLearner(AbstractTabularLearner):
                 nan_vals[:] = np.nan
                 X[self.sample_weight] = nan_vals
             else:
-                raise ValueError(f"sample_weight column '{self.sample_weight}' \
-                                 cannot be missing from {name} dataset if weight_evaluation=True")
+                raise ValueError(
+                    f"sample_weight column '{self.sample_weight}' \
+                                 cannot be missing from {name} dataset if weight_evaluation=True"
+                )
 
         return X
 
@@ -353,15 +355,10 @@ class DefaultLearner(AbstractTabularLearner):
                 )
 
         return X
-    
+
     def _apply_cleaner_transform(
-            self, 
-            X: DataFrame, 
-            y_uncleaned: Series, 
-            holdout_frac: float | int, 
-            holdout_frac_og: float | int, 
-            name: str
-        ) -> tuple[DataFrame, Series, Series | None, float | int]:
+        self, X: DataFrame, y_uncleaned: Series, holdout_frac: float | int, holdout_frac_og: float | int, name: str
+    ) -> tuple[DataFrame, Series, Series | None, float | int]:
         if X is not None and self.label in X.columns:
             y_og = X[self.label]
             X = self.cleaner.transform(X)
@@ -396,7 +393,6 @@ class DefaultLearner(AbstractTabularLearner):
             w = None
 
         return X, y, w, holdout_frac
-
 
     def adjust_threshold_if_necessary(self, y, threshold, holdout_frac, num_bag_folds):
         new_threshold, new_holdout_frac, new_num_bag_folds = self._adjust_threshold_if_necessary(y, threshold, holdout_frac, num_bag_folds)

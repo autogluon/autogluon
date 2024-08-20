@@ -1,7 +1,7 @@
 import logging
 import time
-
 from collections import OrderedDict
+
 from xgboost import DMatrix
 from xgboost.callback import EarlyStopping, TrainingCallback
 
@@ -16,8 +16,8 @@ logger = logging.getLogger(__name__)
 
 class CustomMetricCallback(TrainingCallback):
     """Calculating additional custom metrics during training.
-    
-    Custom metrics can be found by calling evals_result() on the associated XGBClassifier or XGBRegressor 
+
+    Custom metrics can be found by calling evals_result() on the associated XGBClassifier or XGBRegressor
     object used for training. i.e.
 
         model.evals_result() = {
@@ -41,7 +41,7 @@ class CustomMetricCallback(TrainingCallback):
     scorers : list(Scorer)
        List of all metrics, represented as Scorer objects, to be computed at each iteration.
     eval_sets : dict(str: tuple)
-       Dict of {name: eval_set} pairs, where eval_set = (X, y), containing the datasets used to train the model. 
+       Dict of {name: eval_set} pairs, where eval_set = (X, y), containing the datasets used to train the model.
        X is the output of AbstractModel's preprocess method, and y is the truth values fed into an AbstractModel's _fit() method
             e.g. {"train": (X, y), "val": (X_val, y_val)}
     problem_type : str

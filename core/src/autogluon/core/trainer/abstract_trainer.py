@@ -1913,7 +1913,9 @@ class AbstractTrainer:
                         self.model_best = weighted_ensemble_model_name
         return models
 
-    def _train_single(self, X, y, model: AbstractModel, X_val=None, y_val=None, X_test=None, y_test=None, total_resources=None, **model_fit_kwargs) -> AbstractModel:
+    def _train_single(
+        self, X, y, model: AbstractModel, X_val=None, y_val=None, X_test=None, y_test=None, total_resources=None, **model_fit_kwargs
+    ) -> AbstractModel:
         """
         Trains model but does not add the trained model to this Trainer.
         Returns trained model object.
@@ -1922,7 +1924,19 @@ class AbstractTrainer:
         return model
 
     def _train_and_save(
-        self, X, y, model: AbstractModel, X_val=None, y_val=None, X_test=None, y_test=None, stack_name="core", level=1, compute_score=True, total_resources=None, **model_fit_kwargs
+        self,
+        X,
+        y,
+        model: AbstractModel,
+        X_val=None,
+        y_val=None,
+        X_test=None,
+        y_test=None,
+        stack_name="core",
+        level=1,
+        compute_score=True,
+        total_resources=None,
+        **model_fit_kwargs,
     ) -> List[str]:
         """
         Trains model and saves it to disk, returning a list with a single element: The name of the model, or no elements if training failed.
@@ -2652,7 +2666,19 @@ class AbstractTrainer:
         return model_names_trained
 
     def _train_multi_and_ensemble(
-        self, X, y, X_val, y_val, X_test=None, y_test=None, hyperparameters: dict = None, X_unlabeled=None, num_stack_levels=0, time_limit=None, groups=None, **kwargs
+        self,
+        X,
+        y,
+        X_val,
+        y_val,
+        X_test=None,
+        y_test=None,
+        hyperparameters: dict = None,
+        X_unlabeled=None,
+        num_stack_levels=0,
+        time_limit=None,
+        groups=None,
+        **kwargs,
     ) -> List[str]:
         """Identical to self.train_multi_levels, but also saves the data to disk. This should only ever be called once."""
         if time_limit is not None and time_limit <= 0:
