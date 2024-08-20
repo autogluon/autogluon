@@ -50,7 +50,6 @@ test_requirements = [
     "types-setuptools",
     "pytest-mypy",
     "PyHamcrest",
-    "isort",
 ]
 
 test_requirements = list(set(test_requirements))

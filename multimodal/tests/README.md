@@ -25,7 +25,7 @@ ruff format source_file_or_directory --line-length 119
 
 We use line length 119 instead of the default. You can refer to the CI's [ruff configurations](https://github.com/autogluon/autogluon/blob/master/pyproject.toml).
 
-Note that if using `ruff` as a plugin in your IDE, the plugin may not use the configuration file `pyproject.toml` in our project. So, you need to configure the IDE plugin separately by following [here](https://black.readthedocs.io/en/stable/usage_and_configuration/the_basics.html#configuration-via-a-file).
+Note that if using `ruff` as a plugin in your IDE, the plugin may not use the configuration file `pyproject.toml` in our project. So, you need to configure the IDE plugin separately by following [here](https://docs.astral.sh/ruff/configuration/).
 
 
 ## Unit Testing
