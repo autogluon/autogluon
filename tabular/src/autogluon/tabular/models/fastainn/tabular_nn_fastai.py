@@ -599,7 +599,7 @@ class NNFastAiTabularModel(AbstractModel):
             "recall_micro": Recall(average="micro"),
             "recall_weighted": Recall(average="weighted"),
             "log_loss": None,
-            "pinball_loss": HuberPinballLoss(quantile_levels=self.quantile_levels)
+            "pinball_loss": HuberPinballLoss(quantile_levels=self.quantile_levels),
             # Not supported: pac_score
         }
         return metrics_map

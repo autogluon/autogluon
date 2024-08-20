@@ -49,7 +49,10 @@ model = dict(
         post_norm_cfg=None,
     ),
     positional_encoding=dict(
-        num_feats=128, normalize=True, offset=0.0, temperature=20  # -0.5 for DeformDETR
+        num_feats=128,
+        normalize=True,
+        offset=0.0,
+        temperature=20,  # -0.5 for DeformDETR
     ),  # 10000 for DeformDETR
     bbox_head=dict(
         type="DINOHead",

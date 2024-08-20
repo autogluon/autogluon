@@ -51,8 +51,6 @@ extras_require = {
         "ruff>=0.0.285",
         "flaky>=3.7,<4",
         "pytest-timeout>=2.1,<3",
-        "isort>=5.10",
-        "black~=23.0",
     ],
     "chronos-openvino": [  # for faster CPU inference in pretrained models with OpenVINO
         "optimum-intel[openvino,nncf]>=1.15,<1.17",

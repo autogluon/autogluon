@@ -39,9 +39,7 @@ if not sys.platform.startswith("win32"):
             finally:
                 raise OSError(
                     "Moving downloaded temp file - {}, to {} failed. \
-                    Please retry the download.".format(
-                        src, dst
-                    )
+                    Please retry the download.".format(src, dst)
                 )
 
 else:

@@ -1,4 +1,5 @@
 """Storing the constants"""
+
 from autogluon.core.metrics import METRICS
 
 # Column/Label Types

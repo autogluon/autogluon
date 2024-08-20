@@ -184,12 +184,14 @@ class NerLitModule(LitModule):
         active_loss = label.view(-1) != 0
         active_logits = logits.view(-1, self.model.num_classes)[active_loss]
         active_labels = label.view(-1)[active_loss]
-        self._compute_metric_score(
-            metric=self.validation_metric,
-            custom_metric_func=self.custom_metric_func,
-            logits=active_logits,
-            label=active_labels,
-        ),
+        (
+            self._compute_metric_score(
+                metric=self.validation_metric,
+                custom_metric_func=self.custom_metric_func,
+                logits=active_logits,
+                label=active_labels,
+            ),
+        )
         self.log(
             self.validation_metric_name,
             self.validation_metric,

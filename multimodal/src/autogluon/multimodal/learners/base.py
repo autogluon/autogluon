@@ -1017,8 +1017,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         if (
             config.env.strategy == DEEPSPEED_OFFLOADING and num_gpus == 1 and DEEPSPEED_MODULE not in sys.modules
         ):  # Offloading currently only tested for single GPU
-            assert version.parse(pl.__version__) >= version.parse(
-                DEEPSPEED_MIN_PL_VERSION
+            assert (
+                version.parse(pl.__version__) >= version.parse(DEEPSPEED_MIN_PL_VERSION)
             ), f"For DeepSpeed Offloading to work reliably you need at least lightning version {DEEPSPEED_MIN_PL_VERSION}, however, found {pl.__version__}. Please update your lightning version."
             from ..optimization.deepspeed import CustomDeepSpeedStrategy
 

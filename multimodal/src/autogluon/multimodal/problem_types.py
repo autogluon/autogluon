@@ -250,8 +250,8 @@ _ner_property = ProblemTypeProperty(
     _supported_evaluation_metrics=[OVERALL_F1, NER_TOKEN_F1],
     _fallback_validation_metric=NER_TOKEN_F1,
 )
-PROBLEM_TYPES_REG.register(NER, _ner_property),
-PROBLEM_TYPES_REG.register(NAMED_ENTITY_RECOGNITION, _ner_property),
+(PROBLEM_TYPES_REG.register(NER, _ner_property),)
+(PROBLEM_TYPES_REG.register(NAMED_ENTITY_RECOGNITION, _ner_property),)
 
 # Feature Extraction: text --> feature, image --> features
 PROBLEM_TYPES_REG.register(

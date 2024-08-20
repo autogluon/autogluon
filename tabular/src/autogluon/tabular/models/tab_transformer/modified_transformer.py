@@ -1,8 +1,8 @@
 """
-This code is a modification of the official PyTorch Transformer code found at: 
+This code is a modification of the official PyTorch Transformer code found at:
 https://github.com/pytorch/pytorch/blob/master/torch/nn/modules/transformer.py
 
-The modification allows the option of fixing the attention map 
+The modification allows the option of fixing the attention map
 """
 
 import math

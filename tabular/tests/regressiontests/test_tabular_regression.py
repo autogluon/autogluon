@@ -1,30 +1,31 @@
-""" Runs autogluon.tabular on synthetic classification and regression datasets.
-    We test various parameters to TabularPredictor() and fit()
-    We then check the leaderboard:
-       Did we run the expected list of models
-       Did each model have the expected score (within given range)
-       Did the ensembling produce the expected score (within given range)
-    This helps us spot any change in model performance.
-    If any changes are spotted, the script does its best to dump out new proposed score ranges
-    that you can cut and paste into the tests.  Only do this once you've identified the cause!
+"""Runs autogluon.tabular on synthetic classification and regression datasets.
+We test various parameters to TabularPredictor() and fit()
+We then check the leaderboard:
+   Did we run the expected list of models
+   Did each model have the expected score (within given range)
+   Did the ensembling produce the expected score (within given range)
+This helps us spot any change in model performance.
+If any changes are spotted, the script does its best to dump out new proposed score ranges
+that you can cut and paste into the tests.  Only do this once you've identified the cause!
 
-    Potential naming confusion: 
-        - this is a *regression* test, to make sure no functionality has accidentally got worse (testing terminology)
-        - it runs two types of TabularPredictor tests : *regression* and classification (ML terminology)
+Potential naming confusion:
+    - this is a *regression* test, to make sure no functionality has accidentally got worse (testing terminology)
+    - it runs two types of TabularPredictor tests : *regression* and classification (ML terminology)
 
-    These tests are designed to run fast, to permit them to be run on a github hook.
-    Currently the 11 tests, calling TabularPredictor.fit() 20 times, run in ~8 minutes on an 8 vcore machine with no GPU.
+These tests are designed to run fast, to permit them to be run on a github hook.
+Currently the 11 tests, calling TabularPredictor.fit() 20 times, run in ~8 minutes on an 8 vcore machine with no GPU.
 
-    Testing by @willsmithorg on master AG as of 2022-02-22 - 2022-02-23:
-    Tested on AWS Linux instance m5.2xlarge, amzn2-ami-kernel-5.10-hvm-2.0.20211223.0-x86_64-gp2 with 
-                                               (8  vcore, no GPU, Python==3.7.10, scikit-learn==1.0.2, torch==1.10.2), 
-    Tested on Github jenkins Linux:
-                                               (?  vcore,  0 GPU, Python==3.9.10, scikit-learn==1.0.2, torch==1.10.2), 
-    Tested on AWS Windows instance t3.xlarge, 
-                                               (4  vcore,  0 GPU, Python==3.9.7 , scikit-learn==1.0.2, torch==1.10.2), 
-                                               - Pytorch scores are slightly different, all else same.
+Testing by @willsmithorg on master AG as of 2022-02-22 - 2022-02-23:
+Tested on AWS Linux instance m5.2xlarge, amzn2-ami-kernel-5.10-hvm-2.0.20211223.0-x86_64-gp2 with
+                                           (8  vcore, no GPU, Python==3.7.10, scikit-learn==1.0.2, torch==1.10.2),
+Tested on Github jenkins Linux:
+                                           (?  vcore,  0 GPU, Python==3.9.10, scikit-learn==1.0.2, torch==1.10.2),
+Tested on AWS Windows instance t3.xlarge,
+                                           (4  vcore,  0 GPU, Python==3.9.7 , scikit-learn==1.0.2, torch==1.10.2),
+                                           - Pytorch scores are slightly different, all else same.
 
 """
+
 import hashlib
 import math
 import sys
@@ -150,7 +151,6 @@ def inner_test_tabular(testname):
         "small classification boolean",
     ],
 )
-
 # These results have only been confirmed for Linux.  Windows is known to give different results for Pytorch.
 @pytest.mark.skipif(sys.platform != "linux", reason="Scores only confirmed on Linux")
 @pytest.mark.regression

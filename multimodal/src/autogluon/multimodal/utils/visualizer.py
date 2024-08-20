@@ -578,9 +578,7 @@ class NERVisualizer:
         """
         text = '<mark style="background-color:{}; color:white; border-radius: .6em .6em; padding: .1em;">{} \
          <b style="background-color:white; color:black; font-size:x-small; border-radius: 0.5em .5em; padding: .0em;">{} </b> \
-         </mark>'.format(
-            color, self.escape_html(text), self.escape_html(label)
-        )
+         </mark>'.format(color, self.escape_html(text), self.escape_html(label))
         return text
 
     def _repr_html_(self):

@@ -1,4 +1,4 @@
-""" Data preprocessing helper functions for tabular neural network models """
+"""Data preprocessing helper functions for tabular neural network models"""
 
 from collections import OrderedDict
 

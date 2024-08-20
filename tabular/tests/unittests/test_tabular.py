@@ -1,24 +1,25 @@
-""" Runs autogluon.tabular on multiple benchmark datasets.
-    Run this benchmark with fast_benchmark=False to assess whether major chances make autogluon better or worse overall.
-    Lower performance-values = better, normalized to [0,1] for each dataset to enable cross-dataset comparisons.
-    Classification performance = error-rate, Regression performance = 1 - R^2
+"""Runs autogluon.tabular on multiple benchmark datasets.
+Run this benchmark with fast_benchmark=False to assess whether major chances make autogluon better or worse overall.
+Lower performance-values = better, normalized to [0,1] for each dataset to enable cross-dataset comparisons.
+Classification performance = error-rate, Regression performance = 1 - R^2
 
-    # TODO: assess that Autogluon correctly inferred the type of each feature (continuous vs categorical vs text)
+# TODO: assess that Autogluon correctly inferred the type of each feature (continuous vs categorical vs text)
 
-    # TODO: may want to take allowed run-time of AutoGluon into account? Eg. can produce performance vs training time curves for each dataset.
+# TODO: may want to take allowed run-time of AutoGluon into account? Eg. can produce performance vs training time curves for each dataset.
 
-    # TODO: We'd like to add extra benchmark datasets with the following properties:
-    - parquet file format
-    - poker hand data: https://archive.ics.uci.edu/ml/datasets/Poker+Hand
-    - test dataset with just one data point
-    - test dataset where order of columns different than in training data (same column names)
-    - extreme-multiclass classification (500+ classes)
-    - high-dimensional features + low-sample size
-    - high levels of missingness in test data only, no missingness in train data
-    - classification w severe class imbalance
-    - regression with severely skewed Y-values (eg. predicting count data)
-    - text features in dataset
+# TODO: We'd like to add extra benchmark datasets with the following properties:
+- parquet file format
+- poker hand data: https://archive.ics.uci.edu/ml/datasets/Poker+Hand
+- test dataset with just one data point
+- test dataset where order of columns different than in training data (same column names)
+- extreme-multiclass classification (500+ classes)
+- high-dimensional features + low-sample size
+- high levels of missingness in test data only, no missingness in train data
+- classification w severe class imbalance
+- regression with severely skewed Y-values (eg. predicting count data)
+- text features in dataset
 """
+
 import os
 import shutil
 import sys
