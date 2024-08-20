@@ -1,5 +1,5 @@
-""" Methods to create various plots used throughout AutoGluon.
-    If matplotlib or bokeh are not installed, simply will print warning message that plots cannot be shown.
+"""Methods to create various plots used throughout AutoGluon.
+If matplotlib or bokeh are not installed, simply will print warning message that plots cannot be shown.
 """
 
 import os

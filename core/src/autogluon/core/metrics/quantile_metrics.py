@@ -1,4 +1,4 @@
-""" Metrics for quantile regression """
+"""Metrics for quantile regression"""
 
 import logging
 
