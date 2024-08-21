@@ -1008,3 +1008,7 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
         # This hides method from IPython autocomplete, but not VSCode autocomplete
         deprecated = ["get_reindexed_view", "to_regular_index"]
         return [d for d in super().__dir__() if d not in deprecated]
+
+    def to_data_frame(self) -> pd.DataFrame:
+        """Convert `TimeSeriesDataFrame` to a `pandas.DataFrame`"""
+        return pd.DataFrame(self)
