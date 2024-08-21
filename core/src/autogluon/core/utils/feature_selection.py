@@ -220,7 +220,7 @@ class FeatureSelector:
         )
         original_features = X.columns.tolist()
         if len(original_features) <= 1:
-            logger.log(20, f"\tSkipping feature pruning since there is less than 2 features in the dataset.")
+            logger.log(20, "\tSkipping feature pruning since there is less than 2 features in the dataset.")
             return original_features
         X, y, X_val, y_val, X_fi, y_fi, prune_threshold, noise_columns, feature_metadata = self.setup(
             X=X, y=y, X_val=X_val, y_val=y_val, n_train_subsample=n_train_subsample, prune_threshold=prune_threshold, **kwargs
@@ -266,7 +266,7 @@ class FeatureSelector:
                     fn_args=fn_args, round_time_budget=time_budget_fi, prev_best_features=best_info["features"], prev_importance_df=importance_df
                 )
                 if not success:
-                    logger.log(20, f"\tTime is up while computing feature importance or there are no more features to prune. Ending...")
+                    logger.log(20, "\tTime is up while computing feature importance or there are no more features to prune. Ending...")
                     break
                 curr_model, score, fit_score_time = self.fit_score_model(X, y, X_val, y_val, candidate_features, model_name, **kwargs)
 
@@ -298,10 +298,10 @@ class FeatureSelector:
                     logger.log(20, f"\tScore has not improved for {stopping_round} feature pruning rounds. Ending...")
                     break
                 if time_remaining <= self.fit_score_time + prune_time:
-                    logger.log(20, f"\tInsufficient time to finish next pruning round. Ending...")
+                    logger.log(20, "\tInsufficient time to finish next pruning round. Ending...")
                     break
         except TimeLimitExceeded:
-            logger.log(20, f"\tTime limit exceeded while pruning features. Ending...")
+            logger.log(20, "\tTime limit exceeded while pruning features. Ending...")
         except Exception as e:
             logger.error(traceback.format_exc())
             logger.error(f"\tERROR: Exception raised during feature pruning. Reason: {e}. Ending...")
@@ -556,7 +556,7 @@ class FeatureSelector:
         else:
             trigger_replace_bag = kwargs.get("replace_bag", True) and self.is_bagged and len(X) > n_train_subsample + min_fi_samples
         if trigger_replace_bag:
-            logger.log(20, f"\tFeature selection model is bagged and replace_bag=True. Using a non-bagged version of the model for feature selection.")
+            logger.log(20, "\tFeature selection model is bagged and replace_bag=True. Using a non-bagged version of the model for feature selection.")
             val_ratio = 1.0 - n_train_subsample / len(X) if n_train_subsample is not None else 0.25
             X_train, X_val, y_train, y_val = generate_train_test_split(X=X, y=y, problem_type=self.problem_type, random_state=random_state, test_size=val_ratio)
             self.is_bagged = False

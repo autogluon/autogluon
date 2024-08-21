@@ -54,7 +54,7 @@ def test_astype_feature_generator_bool(generator_helper, data_helper):
     }
 
     # When
-    output_data = generator_helper.fit_transform_assert(
+    generator_helper.fit_transform_assert(
         input_data=input_data,
         generator=generator,
         expected_feature_metadata_in_full=expected_feature_metadata_in_full,
@@ -103,7 +103,7 @@ def test_astype_feature_generator_bool_edgecase(generator_helper, data_helper):
     expected_feature_metadata_full = {("float", ()): ["edgecase_bool"]}
 
     # When
-    output_data = generator_helper.fit_transform_assert(
+    generator_helper.fit_transform_assert(
         input_data=input_data,
         generator=generator,
         expected_feature_metadata_in_full=expected_feature_metadata_in_full,

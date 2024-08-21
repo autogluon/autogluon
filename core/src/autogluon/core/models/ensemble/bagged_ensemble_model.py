@@ -3,9 +3,7 @@ from __future__ import annotations
 import copy
 import inspect
 import logging
-import math
 import os
-import platform
 import time
 from collections import Counter
 from statistics import mean
@@ -200,7 +198,7 @@ class BaggedEnsembleModel(AbstractModel):
     ):
         use_child_oof = self.params.get("use_child_oof", False)
         if use_child_oof and groups is not None:
-            logger.log(20, f"\tForcing `use_child_oof=False` because `groups` is specified")
+            logger.log(20, "\tForcing `use_child_oof=False` because `groups` is specified")
             use_child_oof = False
         if use_child_oof:
             if self.is_fit():
@@ -877,7 +875,7 @@ class BaggedEnsembleModel(AbstractModel):
                     time_left = time_limit - (time_now - time_start)
                     time_child_average = (time_now - time_start) / children_completed
                     if time_left < (time_child_average * 1.1):
-                        log_final_suffix = f" (Early stopping due to lack of time...)"
+                        log_final_suffix = " (Early stopping due to lack of time...)"
                         early_stop = True
                         break
             if early_stop:

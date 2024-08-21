@@ -73,7 +73,7 @@ def test_local_grid_searcher_numeric():
                 cfg = searcher.get_config()
                 actual_values.append(cfg)
                 searcher.update(cfg, reward=0.1)
-            except AssertionError as e:
+            except AssertionError:
                 assert expected_values == actual_values
                 break
 
@@ -98,6 +98,6 @@ def test_local_grid_searcher_numeric_grid_settings():
                 cfg = searcher.get_config()
                 actual_values.append(cfg)
                 searcher.update(cfg, reward=0.1)
-            except AssertionError as e:
+            except AssertionError:
                 assert expected_values == actual_values
                 break

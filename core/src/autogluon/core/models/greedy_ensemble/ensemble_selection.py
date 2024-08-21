@@ -63,7 +63,7 @@ class EnsembleSelection(AbstractWeightedEnsemble):
         self.ensemble_size = int(self.ensemble_size)
         if self.ensemble_size < 1:
             raise ValueError("Ensemble size cannot be less than one!")
-        if not self.problem_type in PROBLEM_TYPES:
+        if self.problem_type not in PROBLEM_TYPES:
             raise ValueError("Unknown problem type %s." % self.problem_type)
         # if not isinstance(self.metric, Scorer):
         #     raise ValueError('Metric must be of type scorer')

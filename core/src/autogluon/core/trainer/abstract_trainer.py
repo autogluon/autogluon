@@ -4,7 +4,6 @@ import copy
 import logging
 import os
 import shutil
-import sys
 import time
 import traceback
 from collections import defaultdict
@@ -19,7 +18,6 @@ from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.features.types import R_FLOAT, S_STACK
 from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.log_utils import convert_time_in_s_to_log_friendly
-from autogluon.common.utils.path_converter import PathConverter
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_torch
 
@@ -28,12 +26,10 @@ from ..calibrate import calibrate_decision_threshold
 from ..calibrate.conformity_score import compute_conformity_score
 from ..calibrate.temperature_scaling import apply_temperature_scaling, tune_temperature_scaling
 from ..constants import (
-    AG_ARGS,
     BINARY,
     MULTICLASS,
     QUANTILE,
     REFIT_FULL_NAME,
-    REFIT_FULL_SUFFIX,
     REGRESSION,
     SOFTCLASS,
 )
@@ -1718,7 +1714,7 @@ class AbstractTrainer:
             )
         model_names = [model_name for model_name in model_names if model_name not in model_names_already_persisted]
         if not model_names:
-            logger.log(30, f"No valid unpersisted models were specified to be persisted, so no change in model persistence was performed.")
+            logger.log(30, "No valid unpersisted models were specified to be persisted, so no change in model persistence was performed.")
             return []
         if max_memory is not None:
 
@@ -1740,7 +1736,7 @@ class AbstractTrainer:
                     )
                     logger.log(
                         30,
-                        f"\tModels will be loaded on-demand from disk to maintain safe memory usage, increasing inference latency. If inference latency is a concern, try to use smaller models or increase the value of max_memory.",
+                        "\tModels will be loaded on-demand from disk to maintain safe memory usage, increasing inference latency. If inference latency is a concern, try to use smaller models or increase the value of max_memory.",
                     )
                     return False
                 else:
@@ -1790,7 +1786,7 @@ class AbstractTrainer:
         if unpersisted_models:
             logger.log(20, f"Unpersisted {len(unpersisted_models)} models: {unpersisted_models}")
         else:
-            logger.log(30, f"No valid persisted models were specified to be unpersisted, so no change in model persistence was performed.")
+            logger.log(30, "No valid persisted models were specified to be unpersisted, so no change in model persistence was performed.")
         return unpersisted_models
 
     def generate_weighted_ensemble(
@@ -1946,7 +1942,7 @@ class AbstractTrainer:
             else:
                 if level > 1:
                     if X_pseudo is not None and y_pseudo is not None:
-                        logger.log(15, f"Dropping pseudo in stacking layer due to missing out-of-fold predictions")
+                        logger.log(15, "Dropping pseudo in stacking layer due to missing out-of-fold predictions")
                     model_fit_kwargs.pop("X_pseudo", None)
                     model_fit_kwargs.pop("y_pseudo", None)
                 model = self._train_single(X, y, model, X_val, y_val, total_resources=total_resources, **model_fit_kwargs)
@@ -2162,7 +2158,7 @@ class AbstractTrainer:
             logger.log(20, f"\tEnsemble Weights: {{{msg_weights}}}")
         if model.val_score is not None:
             if model.eval_metric.name != self.eval_metric.name:
-                logger.log(20, f"\tNote: model has different eval_metric than default.")
+                logger.log(20, "\tNote: model has different eval_metric than default.")
             if not model.eval_metric.greater_is_better_internal:
                 sign_str = "-"
             else:
@@ -3453,7 +3449,7 @@ class AbstractTrainer:
                 for model in models_to_remove:
                     model = self.load_model(model)
                     logger.log(30, f"\tDirectory {model.path} would have been deleted.")
-            logger.log(30, f"To perform the deletion, set dry_run=False")
+            logger.log(30, "To perform the deletion, set dry_run=False")
             return
 
         if delete_from_disk:
@@ -3742,7 +3738,7 @@ class AbstractTrainer:
 
         # FIXME: Sample weight `extract_column` is a hack, have to compute feature_metadata here because sample weight column could be in X upstream, extract sample weight column upstream instead.
         if "feature_metadata" not in model_fit_kwargs:
-            raise AssertionError(f"Missing expected parameter 'feature_metadata'.")
+            raise AssertionError("Missing expected parameter 'feature_metadata'.")
         return model_fit_kwargs
 
     def _get_bagged_model_fit_kwargs(self, k_fold: int, k_fold_start: int, k_fold_end: int, n_repeats: int, n_repeat_start: int) -> dict:

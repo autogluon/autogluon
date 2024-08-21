@@ -182,7 +182,7 @@ def scheduler_factory(hyperparameter_tune_kwargs, time_out: float = None, num_tr
         By default in scheduler_params: time_attr='epoch', reward_attr='validation_performance'
     """
     if hyperparameter_tune_kwargs is None:
-        raise ValueError(f"hyperparameter_tune_kwargs cannot be None.")
+        raise ValueError("hyperparameter_tune_kwargs cannot be None.")
     if isinstance(hyperparameter_tune_kwargs, str):
         hyperparameter_tune_kwargs = get_hyperparameter_tune_kwargs_preset(hyperparameter_tune_kwargs)
     if not isinstance(hyperparameter_tune_kwargs, dict):
@@ -227,7 +227,7 @@ def get_scheduler_from_preset(scheduler_cls):
 def get_hyperparameter_tune_kwargs_preset(preset: str):
     # TODO: re-enable bayesopt after it's been implemented
     if preset == "bayesopt":
-        logger.warning(f"Bayesopt hyperparameter tuning is currently disabled. Will use random hyperparameter tuning instead.")
+        logger.warning("Bayesopt hyperparameter tuning is currently disabled. Will use random hyperparameter tuning instead.")
         preset = "random"
     if preset not in _scheduler_presets:
         raise ValueError(f'Invalid hyperparameter_tune_kwargs preset value "{preset}". Valid presets: {list(_scheduler_presets.keys())}')

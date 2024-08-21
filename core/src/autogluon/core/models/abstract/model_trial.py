@@ -2,7 +2,7 @@ import logging
 import os
 import time
 
-from ...hpo.constants import CUSTOM_BACKEND, RAY_BACKEND, VALID_BACKEND
+from ...hpo.constants import CUSTOM_BACKEND, RAY_BACKEND
 from ...utils.exceptions import TimeLimitExceeded
 from ...utils.loaders import load_pkl
 

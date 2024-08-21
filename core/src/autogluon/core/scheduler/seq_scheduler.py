@@ -172,7 +172,7 @@ class LocalSequentialScheduler(object):
                 trials_total_time += trial_end_time - trial_start_time
 
             if self.max_reward and self.get_best_reward() >= self.max_reward:
-                logger.log(20, f"\tStopping HPO: Max reward reached")
+                logger.log(20, "\tStopping HPO: Max reward reached")
                 break
 
             if failure_count >= min_failure_threshold and (failure_count / trial_count) >= failure_rate_threshold:
@@ -187,7 +187,7 @@ class LocalSequentialScheduler(object):
             if self.time_out is not None:
                 avg_trial_run_time = 0 if trial_count == failure_count else trials_total_time / (trial_count - failure_count)
                 if not self.has_enough_time_for_trial_(self.time_out, time_start, trial_start_time, trial_end_time, avg_trial_run_time):
-                    logger.log(20, f"\tStopping HPO to satisfy time limit...")
+                    logger.log(20, "\tStopping HPO to satisfy time limit...")
                     break
 
     @classmethod

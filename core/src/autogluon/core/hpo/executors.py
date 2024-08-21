@@ -6,7 +6,7 @@ import math
 import os
 import time
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Tuple, Union
 
 import pandas as pd
 
@@ -14,7 +14,6 @@ from autogluon.common import space
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.s3_utils import is_s3_url
 
-from ..ray.resources_calculator import ResourceCalculator
 from ..scheduler.scheduler_factory import scheduler_factory
 from ..utils.savers import save_pkl
 from .constants import CUSTOM_BACKEND, RAY_BACKEND
