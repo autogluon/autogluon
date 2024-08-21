@@ -21,7 +21,7 @@ from autogluon.core.hpo.constants import RAY_BACKEND
 from autogluon.core.metrics import Scorer
 from autogluon.core.models.abstract.abstract_nn_model import AbstractNeuralNetworkModel
 from autogluon.core.utils.exceptions import TimeLimitExceeded
-from tabular.src.autogluon.tabular.models.tabular_nn.torch.tabular_torch_dataset import TabularTorchDataset
+from autogluon.tabular.models.tabular_nn.torch.tabular_torch_dataset import TabularTorchDataset
 
 from ..compilers.native import TabularNeuralNetTorchNativeCompiler
 from ..compilers.onnx import TabularNeuralNetTorchOnnxCompiler

@@ -3,7 +3,6 @@ from __future__ import annotations
 import copy
 import gc
 import inspect
-import json
 import logging
 import math
 import os
@@ -16,7 +15,6 @@ import numpy as np
 import pandas as pd
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
-from autogluon.common.loaders import load_json
 from autogluon.common.space import Space
 from autogluon.common.utils.distribute_utils import DistributedContext
 from autogluon.common.utils.lite import disable_if_lite_mode
@@ -43,7 +41,7 @@ from ...utils import (
     normalize_pred_probas,
 )
 from ...utils.exceptions import NotEnoughMemoryError, NoValidFeatures, TimeLimitExceeded
-from ...utils.loaders import load_pkl
+from ...utils.loaders import load_json, load_pkl
 from ...utils.savers import save_json, save_pkl
 from ...utils.time import sample_df_for_time_func, time_func
 from ._tags import _DEFAULT_CLASS_TAGS, _DEFAULT_TAGS
@@ -1226,18 +1224,15 @@ class AbstractModel:
 
         if path is None:
             path = self.path
-        if type(metrics) == str:
+        if not isinstance(metrics, list):
             metrics = [metrics]
         if len(metrics) == 0:
             raise ValueError("At least one metric must be specified to save generated learning curves.")
 
         os.makedirs(path, exist_ok=True)
-        file_path = os.path.join(path, self.learning_curve_file_name)
         out = self._make_learning_curves(metrics=metrics, curves=curves)
-
-        with open(file_path, "w") as json_file:
-            json.dump(out, json_file, indent=4)
-
+        file_path = os.path.join(path, self.learning_curve_file_name)
+        save_json.save(file_path, out)
         self.saved_learning_curves = True
         return file_path
 

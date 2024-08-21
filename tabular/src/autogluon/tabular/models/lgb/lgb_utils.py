@@ -4,7 +4,6 @@ import time
 from typing import List, Optional
 
 import numpy as np
-import pandas as pd
 from pandas import DataFrame, Series
 
 from autogluon.common.utils.try_import import try_import_lightgbm
