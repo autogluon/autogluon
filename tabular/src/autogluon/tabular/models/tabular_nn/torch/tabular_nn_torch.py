@@ -11,7 +11,6 @@ from typing import Dict, Union
 
 import numpy as np
 import pandas as pd
-from core.src.autogluon.core.metrics import Scorer
 
 from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT, S_TEXT_AS_CATEGORY, S_TEXT_NGRAM
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
@@ -19,6 +18,7 @@ from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_torch
 from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION, SOFTCLASS
 from autogluon.core.hpo.constants import RAY_BACKEND
+from autogluon.core.metrics import Scorer
 from autogluon.core.models.abstract.abstract_nn_model import AbstractNeuralNetworkModel
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from tabular.src.autogluon.tabular.models.tabular_nn.torch.tabular_torch_dataset import TabularTorchDataset
