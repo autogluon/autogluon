@@ -5,7 +5,7 @@ import json
 import logging
 import time
 from collections.abc import Iterable
-from typing import List, Union
+from typing import List
 
 import numpy as np
 import pandas as pd
