@@ -49,7 +49,7 @@ def get_ag_system_info(*, path: str = None, include_gpu_count=False, include_pyt
     version = __version__
     python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
     msg_list = [
-        f"=================== System Info ===================",
+        "=================== System Info ===================",
         f"AutoGluon Version:  {version}",
         f"Python Version:     {python_version}",
         f"Operating System:   {platform.system()}",
@@ -62,7 +62,7 @@ def get_ag_system_info(*, path: str = None, include_gpu_count=False, include_pyt
             import torch
 
             torch_version = torch.__version__
-        except Exception as e:
+        except Exception:
             torch_version = "Can't import torch"
         msg_list.append(f"Pytorch Version:    {torch_version}")
     if include_cuda:
@@ -73,7 +73,7 @@ def get_ag_system_info(*, path: str = None, include_gpu_count=False, include_pyt
                 cuda_version = torch.version.cuda
             else:
                 cuda_version = "CUDA is not available"
-        except Exception as e:
+        except Exception:
             cuda_version = "Can't get cuda version from torch"
         msg_list.append(f"CUDA Version:       {cuda_version}")
     if include_gpu_count:
@@ -90,7 +90,7 @@ def get_ag_system_info(*, path: str = None, include_gpu_count=False, include_pyt
     if path is not None:
         disk_avail_msg, _ = get_ag_system_info_disk_space(path=path)
         msg_list.append(disk_avail_msg)
-    msg_list.append(f"===================================================")
+    msg_list.append("===================================================")
 
     msg = "\n".join(msg_list)
     return msg

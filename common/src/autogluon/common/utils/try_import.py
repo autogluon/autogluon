@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 def try_import_mxboard():
     try:
-        import mxboard
+        import mxboard  # noqa: F401
     except ImportError:
         raise ImportError(
             "Unable to import dependency mxboard. " "A quick tip is to install via `pip install mxboard`. "
@@ -64,8 +64,8 @@ def try_import_ray() -> ModuleType:
 
 def try_import_catboost():
     try:
-        import catboost
-    except ImportError as e:
+        import catboost  # noqa: F401
+    except ImportError:
         error_msg = "`import catboost` failed. "
         if sys.version_info >= (3, 11) and sys.platform == "darwin":
             error_msg += f"Detected your env as {sys.platform}. Please either downgrade your python version to below 3.11 or move to another platform. Then install via ``pip install autogluon.tabular[catboost]=={__version__}``"
@@ -82,8 +82,8 @@ def try_import_catboost():
 
 def try_import_lightgbm():
     try:
-        import lightgbm
-    except ImportError as e:
+        import lightgbm  # noqa: F401
+    except ImportError:
         raise ImportError(
             "`import lightgbm` failed. "
             f"A quick tip is to install via `pip install autogluon.tabular[lightgbm]=={__version__}`."
@@ -114,7 +114,7 @@ def try_import_xgboost():
 
 def try_import_faiss():
     try:
-        import faiss
+        import faiss  # noqa: F401
     except ImportError:
         raise ImportError(
             "Unable to import dependency faiss. " "A quick tip is to install via `pip install faiss-cpu`. "
@@ -133,9 +133,9 @@ def try_import_fastai():
 
         # fastai is doing library setup during star imports. These are required for correct library functioning.
         # Local star imports are not possible in-place, so separate helper packages is created
-        import autogluon.tabular.models.fastainn.imports_helper
+        import autogluon.tabular.models.fastainn.imports_helper  # noqa: F401
 
-    except ModuleNotFoundError as e:
+    except ModuleNotFoundError:
         raise ImportError(
             f"Import fastai failed. A quick tip is to install via `pip install autogluon.tabular[fastai]=={__version__}`. "
         )
@@ -143,8 +143,8 @@ def try_import_fastai():
 
 def try_import_torch():
     try:
-        import torch
-    except ImportError as e:
+        import torch  # noqa: F401
+    except ImportError:
         raise ImportError(
             "Unable to import dependency torch\n"
             "A quick tip is to install via `pip install torch`.\n"
@@ -154,7 +154,7 @@ def try_import_torch():
 
 def try_import_autogluon_multimodal():
     try:
-        import autogluon.multimodal
+        import autogluon.multimodal  # noqa: F401
     except ImportError:
         raise ImportError(
             "`import autogluon.multimodal` failed.\n"
@@ -164,7 +164,7 @@ def try_import_autogluon_multimodal():
 
 def try_import_rapids_cuml():
     try:
-        import cuml
+        import cuml  # noqa: F401
     except ImportError:
         raise ImportError(
             "`import cuml` failed.\n"
@@ -177,7 +177,7 @@ def try_import_rapids_cuml():
 
 def try_import_imodels():
     try:
-        import imodels
+        import imodels  # noqa: F401
     except ImportError:
         raise ImportError(
             "Unable to import dependency imodels. " "A quick tip is to install via `pip install imodels`. "
