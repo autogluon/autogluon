@@ -212,12 +212,8 @@ class AbstractTrainer:
 
         self.model_best = None
 
-        self.models = (
-            {}
-        )  # Dict of model name -> model object. A key, value pair only exists if a model is persisted in memory.  # TODO: v0.1 Rename and consider making private
-        self.model_graph = (
-            nx.DiGraph()
-        )  # Directed Acyclic Graph (DAG) of model interactions. Describes how certain models depend on the predictions of certain other models. Contains numerous metadata regarding each model.
+        self.models = {}  # Dict of model name -> model object. A key, value pair only exists if a model is persisted in memory.  # TODO: v0.1 Rename and consider making private
+        self.model_graph = nx.DiGraph()  # Directed Acyclic Graph (DAG) of model interactions. Describes how certain models depend on the predictions of certain other models. Contains numerous metadata regarding each model.
         self.reset_paths = False
 
         self._time_limit = None  # Internal float of the total time limit allowed for a given fit call. Used in logging statements.

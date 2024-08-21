@@ -6,6 +6,7 @@
 An awesome colormap for really neat visualizations.
 Copied from Detectron, and removed gray colors.
 """
+
 import random
 
 import numpy as np

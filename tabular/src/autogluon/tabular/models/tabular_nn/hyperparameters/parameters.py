@@ -1,5 +1,5 @@
-""" Default (fixed) hyperparameter values used in Tabular Neural Network models.
-    A value of None typically indicates an adaptive value for the hyperparameter will be chosen based on the data.
+"""Default (fixed) hyperparameter values used in Tabular Neural Network models.
+A value of None typically indicates an adaptive value for the hyperparameter will be chosen based on the data.
 """
 
 from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION

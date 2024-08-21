@@ -1,6 +1,7 @@
 """Utilities built on top of nlpaug. This file is meant to be lazy-imported because importing nlpaug can take time.
 See the discussion in https://github.com/autogluon/autogluon/issues/2706
 """
+
 import random
 
 from nlpaug import Augmenter

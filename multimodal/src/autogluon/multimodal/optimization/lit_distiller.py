@@ -416,7 +416,7 @@ class DistillerLitModule(pl.LightningModule):
             custom_metric_func=self.custom_metric_func,
             logits=student_output[self.student_model.prefix][LOGITS],
             label=batch[self.student_model.label_key],
-        ),
+        )
         self.log(
             self.validation_metric_name,
             self.validation_metric,

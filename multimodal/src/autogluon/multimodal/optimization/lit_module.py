@@ -296,7 +296,7 @@ class LitModule(pl.LightningModule):
             custom_metric_func=self.custom_metric_func,
             logits=output[self.model.prefix][LOGITS],
             label=batch[self.model.label_key],
-        ),
+        )
         self.log(
             self.validation_metric_name,
             self.validation_metric,

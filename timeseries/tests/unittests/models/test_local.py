@@ -410,3 +410,15 @@ def test_when_local_models_fit_then_quantiles_are_present_and_ranked(model_class
 
     assert set(model.quantile_levels) == set(float(q) for q in quantile_columns)
     assert np.diff(predictions[quantile_columns].values, axis=1).min() >= 0
+
+
+def test_when_leading_nans_are_present_then_seasonal_naive_can_forecast(temp_model_path):
+    data = get_data_frame_with_item_index(item_list=["A"], data_length=30, freq="D")
+    data.iloc[:-3] = float("nan")
+    model = SeasonalNaiveModel(
+        path=temp_model_path, prediction_length=7, hyperparameters={**DEFAULT_HYPERPARAMETERS, "seasonal_period": 7}
+    )
+    model.fit(train_data=data)
+    predictions = model.predict(data)
+
+    assert not pd.isna(predictions).any(axis=None)

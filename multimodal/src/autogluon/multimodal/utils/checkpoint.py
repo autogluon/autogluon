@@ -9,9 +9,8 @@ import torch
 from lightning.pytorch.strategies import DeepSpeedStrategy
 from lightning.pytorch.utilities.rank_zero import rank_zero_warn
 
-from .cloud_io import _atomic_save
+from .cloud_io import _atomic_save, get_filesystem
 from .cloud_io import _load as pl_load
-from .cloud_io import get_filesystem
 
 logger = logging.getLogger(__name__)
 

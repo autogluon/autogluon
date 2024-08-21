@@ -1,4 +1,5 @@
-""" TabTransformer model """
+"""TabTransformer model"""
+
 import logging
 import os
 import time
