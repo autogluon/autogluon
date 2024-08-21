@@ -1387,7 +1387,14 @@ def partial_dependence_plots(
                 "<sub><sup>Use `show_help_text=False` to hide this information when calling this function.</sup></sub>",
                 condition_fn=lambda _: show_help_text and not two_way,
             ),
-            PDPInteractions(features=features, two_way=two_way, fig_args=fig_args, sample=max_ice_lines, target=target, **chart_args),  # type: ignore
+            PDPInteractions(
+                features=features,
+                two_way=two_way,
+                fig_args=fig_args,
+                sample=max_ice_lines,
+                target=target,
+                **chart_args,
+            ),  # type: ignore
             MarkdownSectionComponent(
                 f"The following variable(s) are categorical: {cats}. They are represented as the numbers in the figures above. "
                 f"Mappings are available in `state.pdp_id_to_category_mappings`. The`state` can be returned from this call via adding `return_state=True`.",

@@ -1,6 +1,7 @@
 """
 Unit tests to ensure correctness of internal stacking logic.
 """
+
 import shutil
 
 from autogluon.common.features.types import S_STACK

@@ -190,8 +190,8 @@ def try_import_vowpalwabbit():
         from pkg_resources import parse_version  # pylint: disable=import-outside-toplevel
 
         vowpalwabbit_version = parse_version(vowpalwabbit.__version__)
-        assert vowpalwabbit_version >= parse_version("9.0.0") and vowpalwabbit_version < parse_version(
-            "9.10.0"
+        assert (
+            vowpalwabbit_version >= parse_version("9.0.0") and vowpalwabbit_version < parse_version("9.10.0")
         ), f"Currently, we only support vowpalwabbit version >=9.0 and <9.10. Found vowpalwabbit version: {vowpalwabbit_version}"
     except ImportError:
         raise ImportError(

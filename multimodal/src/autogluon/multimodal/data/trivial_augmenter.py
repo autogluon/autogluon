@@ -1,5 +1,5 @@
 """
-This file implements TrivialAugment.(https://arxiv.org/abs/2103.10158) We extend it for multi-modality setting. 
+This file implements TrivialAugment.(https://arxiv.org/abs/2103.10158) We extend it for multi-modality setting.
 
 Code is partially adapted from its official implementation https://github.com/automl/trivialaugment
 """

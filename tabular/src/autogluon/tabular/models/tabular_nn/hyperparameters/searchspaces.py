@@ -1,5 +1,5 @@
-""" Default (fixed) hyperparameter search spaces used in Tabular Neural Network models.
-"""
+"""Default (fixed) hyperparameter search spaces used in Tabular Neural Network models."""
+
 from autogluon.common import space
 from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION
 

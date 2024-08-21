@@ -1,4 +1,4 @@
-""" Default (fixed) hyperparameter values used in Gradient Boosting model. """
+"""Default (fixed) hyperparameter values used in Gradient Boosting model."""
 
 from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION, SOFTCLASS
 

@@ -1,4 +1,5 @@
 """Wrapper of the MultiModalPredictor."""
+
 import logging
 from typing import Dict
 

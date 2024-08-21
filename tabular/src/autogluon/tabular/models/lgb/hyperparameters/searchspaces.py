@@ -1,4 +1,5 @@
-""" Default hyperparameter search spaces used in Gradient Boosting model """
+"""Default hyperparameter search spaces used in Gradient Boosting model"""
+
 from autogluon.common import space
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 

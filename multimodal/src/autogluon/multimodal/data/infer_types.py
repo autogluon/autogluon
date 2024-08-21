@@ -828,9 +828,7 @@ def infer_ner_column_type(column_types: Dict):
     if any([col_type.startswith(TEXT_NER) for col_type in column_types.values()]):
         return column_types
 
-    for (
-        column
-    ) in (
+    for column in (
         column_types.keys()
     ):  # column_types is an ordered dict, so column_types.keys() returns the keys in the order of insertions.
         if column_types[column].startswith(TEXT):
