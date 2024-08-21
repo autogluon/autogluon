@@ -1241,6 +1241,11 @@ class AbstractTrainer:
         else:
             raise AssertionError(f"Model {model} must be a BaggedEnsembleModel to return oof_pred_proba")
 
+    def get_model_learning_curves(self, model: str) -> dict:
+        model_type = self.get_model_attribute(model=model, attribute="type")
+        model_path = self.get_model_attribute(model=model, attribute="path")
+        return model_type.load_learning_curves(path=os.path.join(self.path, model_path))
+
     def _update_pred_proba_dict_with_val_cache(self, model_set: set, model_pred_proba_dict):
         """For each model in model_set, check if y_pred_proba_val is cached to disk. If so, load and add it to model_pred_proba_dict"""
         for model in model_set:

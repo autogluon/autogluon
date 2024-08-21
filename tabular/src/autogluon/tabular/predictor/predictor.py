@@ -2629,13 +2629,6 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 }
         """
         metadata = self.info()
-        path = os.path.join(metadata["path"], "models")
-
-        def _valid_model(model: str):
-            model_type = self._trainer.get_model_attribute(model=model, attribute="type")
-            supports_learning_curves = model_type._get_class_tags().get("supports_learning_curves", False)
-            return supports_learning_curves
-
         metadata = {
             "problem_type": metadata["problem_type"],
             "eval_metric": metadata["eval_metric"],
@@ -2656,20 +2649,14 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                     "val_score": info["val_score"],
                 }
                 for model, info in metadata["model_info"].items()
-                if _valid_model(model=model)
+                if info.get("has_learning_curves", False)
             },
         }
 
         model_data = {}
-        generated_models = os.listdir(path)
-        trained_models = self._trainer.get_model_names()
-        assert set(trained_models).issubset(generated_models)
-
-        models = trained_models
-        for model in models:
-            if _valid_model(model):
-                model_type = self._trainer.get_model_attribute(model=model, attribute="type")
-                model_data[model] = model_type.load_learning_curves(os.path.join(path, model))
+        for model in metadata["models"].values():
+            model_name = model["model_name"]
+            model_data[model_name] = self._trainer.get_model_learning_curves(model=model_name)
 
         return metadata, model_data
 
@@ -4901,13 +4888,13 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 "Column names are not unique, please change duplicated column names (in pandas: train_data.rename(columns={'current_name':'new_name'})"
             )
 
-        self._validate_single_fit_dataset(train_data=train_data, other_data=tuning_data, name="tuning_data")
-        self._validate_single_fit_dataset(train_data=train_data, other_data=test_data, name="test_data")
-        self._validate_single_fit_dataset(train_data=train_data, other_data=unlabeled_data, name="unlabeled_data")
+        self._validate_single_fit_dataset(train_data=train_data, other_data=tuning_data, name="tuning_data", is_labeled=True)
+        self._validate_single_fit_dataset(train_data=train_data, other_data=test_data, name="test_data", is_labeled=True)
+        self._validate_single_fit_dataset(train_data=train_data, other_data=unlabeled_data, name="unlabeled_data", is_labeled=False)
 
         return train_data, tuning_data, test_data, unlabeled_data
 
-    def _validate_single_fit_dataset(self, train_data: pd.DataFrame, other_data: pd.DataFrame, name: str):
+    def _validate_single_fit_dataset(self, train_data: pd.DataFrame, other_data: pd.DataFrame, name: str, is_labeled: bool = True):
         """
         Validates additional dataset, ensuring format is consistent with train dataset.
 
@@ -4919,6 +4906,8 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             additional data set
         name : str
             name of additional data set
+        is_labeled : bool
+            whether the other_data is labeled
 
         Returns:
         --------
@@ -4930,7 +4919,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             self._validate_unique_indices(data=other_data, name=name)
             train_features = [column for column in train_data.columns if column != self.label]
             other_features = [column for column in other_data.columns if column != self.label]
-            train_features, other_features = self._prune_data_features(train_features=train_features, other_features=other_features, is_labeled=True)
+            train_features, other_features = self._prune_data_features(train_features=train_features, other_features=other_features, is_labeled=is_labeled)
             train_features = np.array(train_features)
             other_features = np.array(other_features)
             if np.any(train_features != other_features):
@@ -4948,7 +4937,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                         f"\tAutoGluon will attempt to convert the dtypes to align."
                     )
 
-    def _initialize_learning_curve_params(self, learning_curves: dict | bool | None = None, problem_type: str = "") -> dict:
+    def _initialize_learning_curve_params(self, learning_curves: dict | bool | None = None, problem_type: str | None = None) -> dict:
         """
         Convert users learning_curve dict parameters into ag_param format.
         Also, converts all metrics into list of autogluon Scorer objects.
@@ -4959,7 +4948,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             If bool, whether to generate learning curves.
             If dict, the dictionary of learning_curves parameters passed into predictor from the user.
             If None, will not generate curves.
-        problem_type : str
+        problem_type : str | None
             The current problem type.
 
         Returns:
@@ -4970,33 +4959,35 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         if learning_curves is None or learning_curves == False:
             return {}
         elif type(learning_curves) != dict and type(learning_curves) != bool:
-            raise ValueError("VALUE ERROR: learning curves parameter must be a boolean or dict!")
+            raise ValueError("Learning curves parameter must be a boolean or dict!")
 
         # metrics defaults to self.eval_metric if not specified
         metrics = None
         use_error = False
 
-        def make_scorer(name):
-            return get_metric(name, problem_type, "eval_metric")
-
         if type(learning_curves) == dict:
             if "metrics" in learning_curves:
-                if isinstance(learning_curves["metrics"], str):
-                    metrics = [make_scorer(learning_curves["metrics"])]
-                elif isinstance(learning_curves["metrics"], Scorer):
-                    metrics = [learning_curves["metrics"]]
-                elif isinstance(learning_curves["metrics"], list):
-                    names, scorers = [], []
-                    for metric in learning_curves["metrics"]:
-                        if isinstance(metric, str):
-                            names.append(metric)
-                        elif isinstance(metric, Scorer):
-                            scorers.append(metric)
+                metrics = learning_curves["metrics"]
+                if not isinstance(metrics, list):
+                    metrics = [metrics]
 
-                    # remove duplicate metrics / aliases
-                    names = list(set([make_scorer(name).name for name in names]))
-                    names = [make_scorer(name) for name in names]
-                    metrics = names + scorers
+                names, scorers = [], []
+                for metric in metrics:
+                    if isinstance(metric, str):
+                        names.append(metric)
+                    elif isinstance(metric, Scorer):
+                        scorers.append(metric)
+
+                names = [get_metric(name, problem_type, "eval_metric") for name in names]
+                metrics = names + scorers
+
+                # check for duplicate metrics / aliases
+                all_metric_names = [metric.name for metric in metrics]
+                if len(set(all_metric_names)) != len(all_metric_names):
+                    from collections import Counter
+
+                    counts = {metric: count for metric, count in Counter(all_metric_names).items() if count > 1}
+                    raise ValueError(f"The following learning curve metrics appeared more than once: {counts}")
 
             if "use_error" in learning_curves:
                 use_error = learning_curves["use_error"]

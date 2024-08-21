@@ -168,6 +168,7 @@ class AbstractModel:
         self._is_initialized = False
         self._is_fit_metadata_registered = False
         self._fit_metadata = dict()
+        self.saved_learning_curves = False
 
         self._compiler = None
 
@@ -1230,6 +1231,9 @@ class AbstractModel:
         path : str
             Path to the saved curves, minus the file name.
         """
+        if not self._get_class_tags().get("supports_learning_curves", False):
+            raise AssertionError(f"Learning Curves are not supported for model: {self.name}")
+
         if path is None:
             path = self.path
         if type(metrics) == str:
@@ -1244,6 +1248,7 @@ class AbstractModel:
         with open(file_path, "w") as json_file:
             json.dump(out, json_file, indent=4)
 
+        self.saved_learning_curves = True
         return file_path
 
     def _make_learning_curves(self, metrics: str | List[str], curves: dict[dict[str : List[float]]]) -> List[List[str], List[str], List[List[float]]]:
@@ -2063,6 +2068,7 @@ class AbstractModel:
             "is_fit": self.is_fit(),
             "is_valid": self.is_valid(),
             "can_infer": self.can_infer(),
+            "has_learning_curves": self.saved_learning_curves,
         }
         return info
 

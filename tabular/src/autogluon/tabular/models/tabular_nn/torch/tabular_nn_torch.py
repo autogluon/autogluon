@@ -18,9 +18,10 @@ from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_torch
 from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION, SOFTCLASS
 from autogluon.core.hpo.constants import RAY_BACKEND
-from autogluon.core.metrics import get_metric
 from autogluon.core.models.abstract.abstract_nn_model import AbstractNeuralNetworkModel
 from autogluon.core.utils.exceptions import TimeLimitExceeded
+from core.src.autogluon.core.metrics import Scorer
+from tabular.src.autogluon.tabular.models.tabular_nn.torch.tabular_torch_dataset import TabularTorchDataset
 
 from ..compilers.native import TabularNeuralNetTorchNativeCompiler
 from ..compilers.onnx import TabularNeuralNetTorchOnnxCompiler
@@ -398,39 +399,23 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
             # learning curve generation
             if generate_curves:
-                train_metrics = []
-                val_metrics = []
-                test_metrics = []
-
-                stop = False
-                for metric in scorers:
-                    train_metrics.append(self.score(X=curve_train_dataset, y=y_train, metric=metric, _reset_threads=False))
-                    val_metrics += [self.score(X=val_dataset, y=y_val, metric=metric, _reset_threads=False)] if val_dataset is not None else []
-                    test_metrics += [self.score(X=test_dataset, y=y_test, metric=metric, _reset_threads=False)] if test_dataset is not None else []
-
-                    if use_curve_metric_error:
-                        train_metrics[-1] = metric.convert_score_to_error(train_metrics[-1])
-                        if val_dataset is not None:
-                            val_metrics[-1] = metric.convert_score_to_error(val_metrics[-1])
-                        if test_dataset is not None:
-                            test_metrics[-1] = metric.convert_score_to_error(test_metrics[-1])
-
-                    if (
-                        not self._assert_valid_metric(metric=train_metrics[-1], best_epoch=best_epoch)
-                        or (val_dataset is not None and not self._assert_valid_metric(metric=val_metrics[-1], best_epoch=best_epoch))
-                        or (test_dataset is not None and not self._assert_valid_metric(metric=test_metrics[-1], best_epoch=best_epoch))
-                    ):
-                        stop = True
-                        break
+                stop = self._generate_curves(
+                    train_curves=train_curves,
+                    val_curves=val_curves,
+                    test_curves=test_curves,
+                    scorers=scorers,
+                    best_epoch=best_epoch,
+                    use_curve_metric_error=use_curve_metric_error,
+                    train_dataset=curve_train_dataset,
+                    val_dataset=val_dataset,
+                    test_dataset=test_dataset,
+                    y_train=y_train,
+                    y_val=y_val,
+                    y_test=y_test,
+                )
 
                 if stop:
                     break
-
-                # update learning curve
-                for i, metric in enumerate(scorers):
-                    train_curves[metric.name].append(train_metrics[i])
-                    val_curves[metric.name] += [val_metrics[i]] if val_dataset is not None else []
-                    test_curves[metric.name] += [test_metrics[i]] if test_dataset is not None else []
 
             # validation
             if val_dataset is not None:
@@ -504,6 +489,60 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             logger.log(15, f"Best model found on Epoch {best_epoch} (Update {best_val_update}).")
         self.params_trained["batch_size"] = batch_size
         self.params_trained["num_epochs"] = best_epoch
+
+    def _generate_curves(
+        self,
+        train_curves: dict,
+        val_curves: dict,
+        test_curves: dict,
+        scorers: list[Scorer],
+        best_epoch: int,
+        use_curve_metric_error: bool,
+        train_dataset: TabularTorchDataset,
+        val_dataset: TabularTorchDataset,
+        test_dataset: TabularTorchDataset,
+        y_train: np.ndarray,
+        y_val: np.ndarray,
+        y_test: np.ndarray,
+    ) -> bool:
+        """
+        Extends learning curve dictionaries across all metrics listed in scorers by one epoch.
+
+        Returns:
+        --------
+        bool:
+            Whether to break out of the neural net training loop.
+        """
+        train_metrics = []
+        val_metrics = []
+        test_metrics = []
+
+        for metric in scorers:
+            train_metrics.append(self.score(X=train_dataset, y=y_train, metric=metric, _reset_threads=False))
+            val_metrics += [self.score(X=val_dataset, y=y_val, metric=metric, _reset_threads=False)] if val_dataset is not None else []
+            test_metrics += [self.score(X=test_dataset, y=y_test, metric=metric, _reset_threads=False)] if test_dataset is not None else []
+
+            if use_curve_metric_error:
+                train_metrics[-1] = metric.convert_score_to_error(train_metrics[-1])
+                if val_dataset is not None:
+                    val_metrics[-1] = metric.convert_score_to_error(val_metrics[-1])
+                if test_dataset is not None:
+                    test_metrics[-1] = metric.convert_score_to_error(test_metrics[-1])
+
+            if (
+                not self._assert_valid_metric(metric=train_metrics[-1], best_epoch=best_epoch)
+                or (val_dataset is not None and not self._assert_valid_metric(metric=val_metrics[-1], best_epoch=best_epoch))
+                or (test_dataset is not None and not self._assert_valid_metric(metric=test_metrics[-1], best_epoch=best_epoch))
+            ):
+                return True
+
+        # update learning curve
+        for i, metric in enumerate(scorers):
+            train_curves[metric.name].append(train_metrics[i])
+            val_curves[metric.name] += [val_metrics[i]] if val_dataset is not None else []
+            test_curves[metric.name] += [test_metrics[i]] if test_dataset is not None else []
+
+        return False
 
     def _assert_valid_metric(self, metric: int | float, best_epoch: int) -> bool:
         """

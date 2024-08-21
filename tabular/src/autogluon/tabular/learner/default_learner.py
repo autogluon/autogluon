@@ -237,10 +237,10 @@ class DefaultLearner(AbstractTabularLearner):
             logger.log(20, f"Train Data Class Count: {self.label_cleaner.num_classes}")
 
         X_val, y_val, w_val, holdout_frac = self._apply_cleaner_transform(
-            X=X_val, y_uncleaned=y_uncleaned, holdout_frac=holdout_frac, holdout_frac_og=holdout_frac_og, name="val"
+            X=X_val, y_uncleaned=y_uncleaned, holdout_frac=holdout_frac, holdout_frac_og=holdout_frac_og, name="val", is_test=False
         )
         X_test, y_test, w_test, _ = self._apply_cleaner_transform(
-            X=X_test, y_uncleaned=y_uncleaned, holdout_frac=holdout_frac, holdout_frac_og=holdout_frac_og, name="test"
+            X=X_test, y_uncleaned=y_uncleaned, holdout_frac=holdout_frac, holdout_frac_og=holdout_frac_og, name="test", is_test=True
         )
 
         self._original_features = list(X.columns)
@@ -264,8 +264,6 @@ class DefaultLearner(AbstractTabularLearner):
 
         datasets = [X, X_val, X_test_super, X_unlabeled]
         X_super = pd.concat(datasets, ignore_index=True)
-        y_unlabeled = pd.Series(np.nan, index=X_unlabeled.index) if X_unlabeled is not None else None
-        y_list = [y, y_val, y_test_super, y_unlabeled]
 
         if self.feature_generator.is_fit():
             logger.log(
@@ -277,6 +275,8 @@ class DefaultLearner(AbstractTabularLearner):
                 X_test = self.feature_generator.transform(X_test)
             self.feature_generator.print_feature_metadata_info()
         else:
+            y_unlabeled = pd.Series(np.nan, index=X_unlabeled.index) if X_unlabeled is not None else None
+            y_list = [y, y_val, y_test_super, y_unlabeled]
             y_super = pd.concat(y_list, ignore_index=True)
             X_super = self.fit_transform_features(X_super, y_super, problem_type=self.label_cleaner.problem_type_transform, eval_metric=self.eval_metric)
             if not transform_with_test and X_test is not None:
@@ -357,11 +357,18 @@ class DefaultLearner(AbstractTabularLearner):
         return X
 
     def _apply_cleaner_transform(
-        self, X: DataFrame, y_uncleaned: Series, holdout_frac: float | int, holdout_frac_og: float | int, name: str
+        self, X: DataFrame, y_uncleaned: Series, holdout_frac: float | int, holdout_frac_og: float | int, name: str, is_test: bool = False
     ) -> tuple[DataFrame, Series, Series | None, float | int]:
         if X is not None and self.label in X.columns:
             y_og = X[self.label]
+            len_og = len(X) if is_test else None
             X = self.cleaner.transform(X)
+            if is_test and len(X) != len_og:
+                # FIXME: Currently, there are ways in which this code can be reached (@innixma)
+                raise AssertionError(
+                    f"{name} cannot have low frequency classes! Please create a GitHub issue if you see this message, as it should never occur."
+                )
+
             if len(X) == 0:
                 logger.warning(
                     "############################################################################################################\n"
