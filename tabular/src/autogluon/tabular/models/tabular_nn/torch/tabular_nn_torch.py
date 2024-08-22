@@ -291,6 +291,8 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                 y_test = test_dataset.get_labels()
                 if y_test.ndim == 2 and y_test.shape[1] == 1:
                     y_test = y_test.flatten()
+            else:
+                y_test = None
 
         if val_dataset is not None:
             y_val = val_dataset.get_labels()
