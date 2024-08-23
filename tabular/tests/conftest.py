@@ -17,7 +17,7 @@ from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.data.label_cleaner import LabelCleaner
 from autogluon.core.models import AbstractModel, BaggedEnsembleModel
 from autogluon.core.stacked_overfitting.utils import check_stacked_overfitting_from_leaderboard
-from autogluon.core.utils import download, generate_train_test_split, infer_problem_type, unzip
+from autogluon.core.utils import download, generate_train_test_split, generate_train_test_split_combined, infer_problem_type, unzip
 from autogluon.features.generators import AbstractFeatureGenerator, AutoMLPipelineFeatureGenerator
 from autogluon.tabular import TabularDataset, TabularPredictor
 
@@ -260,15 +260,19 @@ class FitHelper:
 
     @staticmethod
     def fit_dataset(train_data, init_args, fit_args, sample_size=None, scikit_api=False) -> TabularPredictor:
+        if "problem_type" in init_args:
+            problem_type = init_args["problem_type"]
+        else:
+            problem_type = infer_problem_type(train_data[init_args["label"]])
+
         if sample_size is not None and sample_size < len(train_data):
-            train_data = train_data.sample(n=sample_size, random_state=0)
+            train_data, _ = generate_train_test_split_combined(
+                data=train_data, label=init_args["label"], problem_type=problem_type, test_size=len(train_data) - sample_size
+            )
+
         if scikit_api:
             from autogluon.tabular.experimental import TabularClassifier, TabularRegressor
 
-            if "problem_type" in init_args:
-                problem_type = init_args["problem_type"]
-            else:
-                problem_type = infer_problem_type(train_data[init_args["label"]])
             X = train_data.drop(columns=[init_args["label"]])
             y = train_data[init_args["label"]]
             if problem_type in [REGRESSION]:

@@ -49,7 +49,7 @@ for model in MODELS:
     if model not in extended_run_hyperparams:
         extended_run_hyperparams[model] = {}
 
-    # TODO: Not sure this is correct
+    # TODO: Not sure this will be correct for additional models
     if get_default_model_name(model) not in extended_run_hyperparams:
         extended_run_hyperparams[get_default_model_name(model)] = long_run
 
@@ -230,7 +230,12 @@ def test_metric_format(problem_type, model, metric, use_error, get_dataset_map, 
 
 
 @pytest.mark.parametrize("problem_type, model", get_all_models())
-def test_with_test_data(problem_type, model, get_dataset_map, fit_helper):
+def test_with_test_data(problem_type, model, get_dataset_map, fit_helper, get_default_metrics):
+    init_args = {
+        "eval_metric": get_default_metrics[problem_type],
+        "verbosity": 4,
+    }
+
     fit_args = dict(
         learning_curves=True,
         hyperparameters={
@@ -238,8 +243,12 @@ def test_with_test_data(problem_type, model, get_dataset_map, fit_helper):
         },
     )
 
+    common_args["sample_size"] = 1000
+
     dataset_name = get_dataset_map[problem_type]
-    predictor = fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, use_test_data=True, use_test_for_val=True, **common_args)
+    predictor = fit_helper.fit_and_validate_dataset(
+        dataset_name=dataset_name, init_args=init_args, fit_args=fit_args, use_test_data=True, use_test_for_val=True, **common_args
+    )
 
     model = get_default_model_name(model)
     _, model_data = predictor.learning_curves()
@@ -262,8 +271,6 @@ def test_with_test_data(problem_type, model, get_dataset_map, fit_helper):
 # TODO: how should we limit test parameters here? 22.5 min is much too long, but curve correctness
 # is a crucial aspect of learning curve generation that should be tested well
 # takes 8.7 minutes for full test run (only correctness tests)
-
-
 @pytest.mark.parametrize("problem_type, model, metric", get_all_model_problem_metrics())
 def test_correctness(problem_type, model, metric, get_dataset_map, fit_helper):
     metric = get_metric(metric, problem_type, "eval_metric")
@@ -317,8 +324,6 @@ def test_correctness(problem_type, model, metric, get_dataset_map, fit_helper):
 
     assert equal(error(predictor), error(clean_predictor))
 
-    # just add line here to check format
-
 
 @pytest.mark.parametrize("learning_curve_supported_class", [LGBModel, XGBoostModel, TabularNeuralNetTorchModel])
 def test_supported_class_tags(learning_curve_supported_class):
@@ -331,4 +336,13 @@ def get_dataset_map():
         BINARY: "adult",
         MULTICLASS: "covertype_small",
         REGRESSION: "ames",
+    }
+
+
+@pytest.fixture()
+def get_default_metrics():
+    return {
+        BINARY: "accuracy",
+        MULTICLASS: "log_loss",
+        REGRESSION: "rmse",
     }
