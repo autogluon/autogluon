@@ -320,7 +320,6 @@ def test_correctness(problem_type, model, metric, get_dataset_map, fit_helper):
     # just add line here to check format
 
 
-
 @pytest.mark.parametrize("learning_curve_supported_class", [LGBModel, XGBoostModel, TabularNeuralNetTorchModel])
 def test_supported_class_tags(learning_curve_supported_class):
     assert learning_curve_supported_class._get_class_tags().get("supports_learning_curves", False)
