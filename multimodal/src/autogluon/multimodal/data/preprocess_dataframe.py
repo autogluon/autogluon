@@ -306,6 +306,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         if self._fit_x_called:
             raise RuntimeError("fit_x() has been called. Please create a new preprocessor and call it again!")
         self._fit_x_called = True
+        X = X.copy(deep=True)
+        X.flags.writeable = True
 
         for col_name in sorted(X.columns):
             # Just in case X accidentally contains the label column
@@ -378,6 +380,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         if self._fit_y_called:
             raise RuntimeError("fit_y() has been called. Please create a new preprocessor and call it again!")
         self._fit_y_called = True
+        y = y.copy(deep=True)
+        y.flags.writeable = True
         logger.debug(f'Process col "{self._label_column}" with type label')
         if self.label_type == CATEGORICAL:
             self._label_generator.fit(y)
@@ -739,6 +743,8 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         assert (
             self._fit_called or self._fit_y_called
         ), "You will need to first call preprocessor.fit_y() before calling preprocessor.transform_label."
+        df = df.copy(deep=True)
+        df.flags.writeable = True
         y_df = df[self._label_column]
         if self.label_type == CATEGORICAL:
             y = self._label_generator.transform(y_df).astype(np.int64)
