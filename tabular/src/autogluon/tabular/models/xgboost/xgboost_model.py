@@ -59,9 +59,9 @@ class XGBoostModel(AbstractModel):
 
     # Use specialized XGBoost metric if available (fast), otherwise use custom func generator
     def get_eval_metric(self):
-        eval_metric = xgboost_utils.convert_ag_metric_to_xgbm(ag_metric_name=self.eval_metric.name, problem_type=self.problem_type)
+        eval_metric = xgboost_utils.convert_ag_metric_to_xgbm(ag_metric_name=self.stopping_metric.name, problem_type=self.problem_type)
         if eval_metric is None:
-            eval_metric = xgboost_utils.func_generator(metric=self.eval_metric, problem_type=self.problem_type)
+            eval_metric = xgboost_utils.func_generator(metric=self.stopping_metric, problem_type=self.problem_type)
         return eval_metric
 
     def _preprocess(self, X, is_train=False, max_category_levels=None, **kwargs):

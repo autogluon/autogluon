@@ -89,8 +89,8 @@ def test_off(problem_type, model, get_dataset_map, fit_helper):
     dataset_name = get_dataset_map[problem_type]
     predictor = fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, **common_args)
 
-    with pytest.raises(FileNotFoundError):
-        predictor.learning_curves()
+    _, data = predictor.learning_curves()
+    assert data == {}
 
 
 @pytest.mark.parametrize("problem_type, model", get_one_model_problem())
@@ -105,8 +105,8 @@ def test_flag_false(problem_type, model, get_dataset_map, fit_helper):
     dataset_name = get_dataset_map[problem_type]
     predictor = fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, **common_args)
 
-    with pytest.raises(FileNotFoundError):
-        predictor.learning_curves()
+    _, data = predictor.learning_curves()
+    assert data == {}
 
 
 @pytest.mark.parametrize("problem_type, model", get_all_model_problems())
@@ -133,7 +133,9 @@ def test_flag_true(problem_type, model, get_dataset_map, fit_helper):
 
 @pytest.mark.parametrize("problem_type, model", get_all_problems())
 def test_metrics(problem_type, model, get_dataset_map, fit_helper):
-    metrics = [metric for metric in METRICS[problem_type]]
+    # get all unique metrics
+    metrics = list(set([metric.name for metric in METRICS[problem_type].values()]))
+    metrics = [get_metric(name, problem_type) for name in metrics]
 
     fit_args = dict(
         learning_curves={
@@ -186,15 +188,13 @@ def test_custom_metrics(problem_type, model, get_dataset_map, fit_helper):
     assert myaccuracy_scores == accuracy_scores
 
 
+# TODO: can't the error = True tests these be checked at the same time as the
+# correctness tests?
 # @pytest.mark.parametrize("problem_type, model", get_all_problems())
 @pytest.mark.parametrize("problem_type, model, metric", get_all_model_problem_metrics())
 @pytest.mark.parametrize("use_error", [True, False])
 def test_metric_format(problem_type, model, metric, use_error, get_dataset_map, fit_helper):
     metric = get_metric(metric, problem_type, "eval_metric")
-
-    # TODO: metric format test not accurately testing format for: pac, pac_score, quad kappa, r2
-    if metric.name in ("r2", "pac", "pac_score", "quadratic_kappa"):
-        return
 
     init_args = {
         "eval_metric": metric,
@@ -223,12 +223,10 @@ def test_metric_format(problem_type, model, metric, use_error, get_dataset_map, 
 
     curve = np.array(data[0][1])
 
-    if use_error:
-        assert np.all(curve >= 0)
-    else:
-        # but r2 can be pos or neg depending on data, and others
-        # what is the best way to go about this?
-        assert np.all((np.sign(curve) == np.sign(metric._sign)) | (curve == 0))
+    if not use_error:
+        curve = np.array([metric.convert_score_to_error(val) for val in curve])
+
+    assert np.all(curve >= 0)
 
 
 @pytest.mark.parametrize("problem_type, model", get_all_models())
@@ -318,6 +316,9 @@ def test_correctness(problem_type, model, metric, get_dataset_map, fit_helper):
     clean_predictor = fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, init_args=init_args, fit_args=fit_args, **args)
 
     assert equal(error(predictor), error(clean_predictor))
+
+    # just add line here to check format
+
 
 
 @pytest.mark.parametrize("learning_curve_supported_class", [LGBModel, XGBoostModel, TabularNeuralNetTorchModel])
