@@ -146,8 +146,11 @@ def test_metrics(problem_type, model, get_dataset_map, fit_helper):
         },
     )
 
+    # FIXME: This is needed due to a bug: https://github.com/autogluon/autogluon/issues/4423
+    min_cls_count_train = 10
+
     dataset_name = get_dataset_map[problem_type]
-    predictor = fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, **common_args)
+    predictor = fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, min_cls_count_train=min_cls_count_train, **common_args)
 
     model = get_default_model_name(model)
     _, model_data = predictor.learning_curves()
@@ -213,6 +216,9 @@ def test_metric_format(problem_type, model, metric, use_error, get_dataset_map, 
 
     args = common_args.copy()
     args["sample_size"] = 500
+
+    # FIXME: Avoid needing this, using this to avoid bug: https://github.com/autogluon/autogluon/issues/4423
+    args["min_cls_count_train"] = 10
 
     dataset_name = get_dataset_map[problem_type]
     predictor = fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, init_args=init_args, fit_args=fit_args, **args)

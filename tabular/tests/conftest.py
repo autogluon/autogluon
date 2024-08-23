@@ -154,6 +154,7 @@ class FitHelper:
         delete_directory=True,
         extra_metrics=None,
         expected_model_count: int | None = 2,
+        min_cls_count_train=1,
         path_as_absolute=False,
         compile=False,
         compiler_configs=None,
@@ -195,7 +196,12 @@ class FitHelper:
                 fit_args["tuning_data"] = test_data
 
         predictor: TabularPredictor = FitHelper.fit_dataset(
-            train_data=train_data, init_args=init_args, fit_args=fit_args, sample_size=sample_size, scikit_api=scikit_api
+            train_data=train_data,
+            init_args=init_args,
+            fit_args=fit_args,
+            sample_size=sample_size,
+            scikit_api=scikit_api,
+            min_cls_count_train=min_cls_count_train,
         )
         if compile:
             predictor.compile(models="all", compiler_configs=compiler_configs)
@@ -259,7 +265,7 @@ class FitHelper:
             shutil.rmtree(predictor.path, ignore_errors=True)  # Delete AutoGluon output directory to ensure runs' information has been removed.
 
     @staticmethod
-    def fit_dataset(train_data, init_args, fit_args, sample_size=None, scikit_api=False) -> TabularPredictor:
+    def fit_dataset(train_data, init_args, fit_args, sample_size=None, min_cls_count_train=1, scikit_api=False) -> TabularPredictor:
         if "problem_type" in init_args:
             problem_type = init_args["problem_type"]
         else:
@@ -267,7 +273,11 @@ class FitHelper:
 
         if sample_size is not None and sample_size < len(train_data):
             train_data, _ = generate_train_test_split_combined(
-                data=train_data, label=init_args["label"], problem_type=problem_type, test_size=len(train_data) - sample_size
+                data=train_data,
+                label=init_args["label"],
+                problem_type=problem_type,
+                test_size=len(train_data) - sample_size,
+                min_cls_count_train=min_cls_count_train,
             )
 
         if scikit_api:

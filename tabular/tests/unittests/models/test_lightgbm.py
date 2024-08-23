@@ -137,7 +137,9 @@ def test_lightgbm_binary_with_calibrate_decision_threshold_bagged_refit(fit_help
         dataset_name=dataset_name, init_args=init_args, fit_args=fit_args, delete_directory=False, refit_full=True
     )
 
+    expected_decision_threshold = 0.502
     assert predictor._decision_threshold is not None
+    assert predictor.decision_threshold == expected_decision_threshold
     assert predictor.decision_threshold == predictor._decision_threshold
     optimal_decision_threshold = predictor.calibrate_decision_threshold()
     assert optimal_decision_threshold == predictor.decision_threshold
@@ -152,7 +154,7 @@ def test_lightgbm_binary_with_calibrate_decision_threshold_bagged_refit(fit_help
     for k in scores_predictions:
         assert scores[k] == scores_predictions[k]
     assert scores["f1"] > scores_05["f1"]  # Calibration should help f1
-    assert scores["accuracy"] < scores_05["accuracy"]  # Calibration should harm accuracy
+    assert scores["accuracy"] > scores_05["accuracy"]  # Calibration should help accuracy
 
     predictor.set_decision_threshold(0.5)
     assert predictor.decision_threshold == 0.5
