@@ -1,4 +1,14 @@
 [tool.ruff]
+namespace-packages = [
+    "autogluon/common",
+    "autogluon/features",
+    "autogluon/core",
+    "autogluon/tabular",
+    "autogluon/timeseries",
+    "autogluon/multimodal",
+    "autogluon/eda",
+    "autogluon/autogluon",
+]
 line-length = 119
 target-version = "py38"
 extend-exclude = ["__init__.py"]
