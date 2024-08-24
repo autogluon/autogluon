@@ -1,18 +1,4 @@
-[build-system]
-requires = ["setuptools==63.4.3"]
-build-backend = "setuptools.build_meta"
-
 [tool.ruff]
-namespace-packages = [
-    "common",
-    "features",
-    "core",
-    "tabular",
-    "timeseries",
-    "multimodal",
-    "eda",
-    "autogluon",
-]
 line-length = 119
 target-version = "py38"
 extend-exclude = ["__init__.py"]
