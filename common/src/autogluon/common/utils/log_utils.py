@@ -30,7 +30,7 @@ class DuplicateFilter(object):
         return rv
 
     def attach_filter_targets(self, filter_targets):
-        if type(filter_targets) == str:
+        if isinstance(filter_targets, str):
             filter_targets = [filter_targets]
         for target in filter_targets:
             self.filter_targets.add(target)

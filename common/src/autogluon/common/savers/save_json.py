@@ -2,7 +2,6 @@
 import json
 import logging
 import os
-import tempfile
 
 from ..utils import s3_utils
 

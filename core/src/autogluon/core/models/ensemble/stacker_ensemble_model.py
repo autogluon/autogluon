@@ -267,7 +267,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         """
         Updates `self.feature_metadata` to only contain stack features specified in `self.stack_columns`.
         """
-        assert feature_metadata is not None, f"feature_metadata must be specified prior to adding stack feature information."
+        assert feature_metadata is not None, "feature_metadata must be specified prior to adding stack feature information."
         # Trust feature metadata
         original_stack_features = feature_metadata.get_features(required_special_types=[S_STACK])
         current_stack_features = self.stack_columns

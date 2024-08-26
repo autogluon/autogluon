@@ -662,8 +662,8 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         if self._pseudo_sequential:
             logger.log(
                 30,
-                f"\t\tSwitching to pseudo sequential ParallelFoldFittingStrategy to avoid Python memory leakage.\n"
-                f"\t\tOverrule this behavior by setting fold_fitting_strategy to 'sequential_local' in ag_args_ensemble when when calling `predictor.fit`",
+                "\t\tSwitching to pseudo sequential ParallelFoldFittingStrategy to avoid Python memory leakage.\n"
+                "\t\tOverrule this behavior by setting fold_fitting_strategy to 'sequential_local' in ag_args_ensemble when when calling `predictor.fit`",
             )
             self._run_pseudo_sequential(X, y, X_pseudo, y_pseudo, model_base_ref, time_limit_fold, head_node_id)
         else:

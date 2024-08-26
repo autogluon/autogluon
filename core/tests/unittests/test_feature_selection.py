@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 import pytest
-from numpy.core.fromnumeric import sort
 
 from autogluon.core.utils.feature_selection import *
 from autogluon.core.utils.utils import unevaluated_fi_df_template

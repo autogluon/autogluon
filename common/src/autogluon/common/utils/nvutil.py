@@ -1,7 +1,7 @@
 import os
 import sys
 import threading
-from ctypes import *
+from ctypes import create_string_buffer, c_uint, byref, CDLL, cudaErrorString
 
 __all__ = ["cudaInit", "cudaDeviceGetCount", "cudaSystemGetNVMLVersion", "cudaShutdown"]
 
@@ -55,12 +55,12 @@ def _LoadNvmlLibrary():
     global cudaLib
 
     ret = True
-    if cudaLib == None:
+    if cudaLib is None:
         # lock to ensure only one caller loads the library
         libLoadLock.acquire()
         try:
             # ensure the library still isn't loaded
-            if cudaLib == None:
+            if cudaLib is None:
                 try:
                     if sys.platform[:3] == "win":
                         # cdecl calling convention
@@ -73,10 +73,10 @@ def _LoadNvmlLibrary():
                     else:
                         # assume linux
                         cudaLib = CDLL("libnvidia-ml.so.1")
-                except OSError as ose:
+                except OSError:
                     pass
 
-                if cudaLib == None:
+                if cudaLib is None:
                     ret = False
         finally:
             # lock is always freed
@@ -106,7 +106,7 @@ def _cudaGetFunctionPointer(name):
     libLoadLock.acquire()
     try:
         # ensure library was loaded
-        if cudaLib == None:
+        if cudaLib is None:
             raise NVMLError(NVML_ERROR_UNINITIALIZED)
         try:
             _cudaGetFunctionPointer_cache[name] = getattr(cudaLib, name)

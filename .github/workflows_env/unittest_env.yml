@@ -3,4 +3,3 @@ dependencies:
 - pip
 - pip:
   - nose
-  - flake8

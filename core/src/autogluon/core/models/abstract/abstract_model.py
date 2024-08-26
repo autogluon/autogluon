@@ -1846,8 +1846,8 @@ class AbstractModel:
             )
             if min_error_memory_ratio >= 1:
                 log_user_guideline += (
-                    f'\n\t\tSetting "ag.max_memory_usage_ratio" to values above 1 may result in out-of-memory errors. '
-                    f"You may consider using a machine with more memory as a safer alternative."
+                    '\n\t\tSetting "ag.max_memory_usage_ratio" to values above 1 may result in out-of-memory errors. '
+                    "You may consider using a machine with more memory as a safer alternative."
                 )
             logger.warning(f"\tWarning: Not enough memory to safely train model. {log_user_guideline}")
             raise NotEnoughMemoryError
@@ -1859,8 +1859,8 @@ class AbstractModel:
             )
             if min_warning_memory_ratio >= 1:
                 log_user_guideline += (
-                    f'\n\t\tSetting "ag.max_memory_usage_ratio" to values above 1 may result in out-of-memory errors. '
-                    f"You may consider using a machine with more memory as a safer alternative."
+                    '\n\t\tSetting "ag.max_memory_usage_ratio" to values above 1 may result in out-of-memory errors. '
+                    "You may consider using a machine with more memory as a safer alternative."
                 )
             logger.warning(f"\tWarning: Potentially not enough memory to safely train model. {log_user_guideline}")
 

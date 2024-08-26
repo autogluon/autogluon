@@ -437,7 +437,7 @@ def generate_train_test_split(
 
     """
     if len(X) == 1:
-        raise ValueError(f"Cannot split data into train/val as it contains only one sample.")
+        raise ValueError("Cannot split data into train/val as it contains only one sample.")
     if isinstance(test_size, float):
         if (test_size <= 0.0) or (test_size >= 1.0):
             raise ValueError("fraction of data to hold-out must be specified between 0 and 1")
@@ -556,7 +556,7 @@ def normalize_pred_probas(y_predprob, problem_type, eps=1e-7):
         else:
             return normalize_multi_probas(y_predprob, eps)
     else:
-        raise ValueError(f"Invalid problem_type")
+        raise ValueError("Invalid problem_type")
 
 
 def infer_problem_type(y: Series, silent=False) -> str:
@@ -666,7 +666,7 @@ def compute_weighted_metric(y, y_pred, metric, weights, weight_evaluation=None, 
     if not metric.needs_quantile:
         kwargs.pop("quantile_levels", None)
     if weight_evaluation is None:
-        weight_evaluation = not (weights is None)
+        weight_evaluation = weights is not None
     if weight_evaluation and weights is None:
         raise ValueError("Sample weights cannot be None when weight_evaluation=True.")
     if not weight_evaluation:

@@ -11,6 +11,8 @@ function lint_check {
     ruff format --diff "$1/"
     # isort
     ruff check --select I "$1/"
+    # flake8
+    ruff check "$1/"
 }
 
 function lint_check_all {
@@ -24,4 +26,3 @@ function lint_check_all {
 
 bandit -r multimodal/src -ll
 lint_check_all
-ruff check timeseries/

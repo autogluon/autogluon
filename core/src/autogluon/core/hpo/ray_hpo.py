@@ -13,7 +13,7 @@ from typing import Callable, List, Optional, Union
 
 import ray
 from ray import air, tune
-from ray.tune import ExperimentAnalysis, PlacementGroupFactory
+from ray.tune import PlacementGroupFactory
 from ray.tune.schedulers import TrialScheduler
 from ray.tune.search import SearchAlgorithm, Searcher
 from ray.tune.search.sample import Domain
