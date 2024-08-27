@@ -26,17 +26,7 @@ from autogluon.common.utils.utils import setup_outputdir
 
 from ... import metrics
 from ...calibrate.temperature_scaling import apply_temperature_scaling
-from ...constants import (
-    AG_ARG_PREFIX,
-    AG_ARGS_FIT,
-    BINARY,
-    MULTICLASS,
-    OBJECTIVES_TO_NORMALIZE,
-    QUANTILE,
-    REFIT_FULL_SUFFIX,
-    REGRESSION,
-    SOFTCLASS,
-)
+from ...constants import AG_ARG_PREFIX, AG_ARGS_FIT, BINARY, MULTICLASS, OBJECTIVES_TO_NORMALIZE, QUANTILE, REFIT_FULL_SUFFIX, REGRESSION, SOFTCLASS
 from ...data.label_cleaner import LabelCleaner
 from ...hpo.constants import CUSTOM_BACKEND, RAY_BACKEND
 from ...hpo.exceptions import EmptySearchSpace
@@ -51,7 +41,7 @@ from ...utils import (
     normalize_pred_probas,
 )
 from ...utils.exceptions import NotEnoughMemoryError, NoValidFeatures, TimeLimitExceeded
-from ...utils.loaders import load_pkl
+from ...utils.loaders import load_json, load_pkl
 from ...utils.savers import save_json, save_pkl
 from ...utils.time import sample_df_for_time_func, time_func
 from ._tags import _DEFAULT_CLASS_TAGS, _DEFAULT_TAGS
@@ -103,6 +93,7 @@ class AbstractModel:
     model_file_name = "model.pkl"
     model_info_name = "info.pkl"
     model_info_json_name = "info.json"
+    learning_curve_file_name = "curves.json"
 
     def __init__(
         self,
@@ -165,6 +156,7 @@ class AbstractModel:
         self._is_initialized = False
         self._is_fit_metadata_registered = False
         self._fit_metadata = dict()
+        self.saved_learning_curves = False
 
         self._compiler = None
 
@@ -590,7 +582,6 @@ class AbstractModel:
 
         self.stopping_metric = self.params_aux.get("stopping_metric", self._get_default_stopping_metric())
         self.stopping_metric = metrics.get_metric(self.stopping_metric, self.problem_type, "stopping_metric")
-
         self.quantile_levels = self.params_aux.get("quantile_levels", None)
 
         if self.eval_metric.name in OBJECTIVES_TO_NORMALIZE:
@@ -835,6 +826,12 @@ class AbstractModel:
             If None, early stopping via validation score will be disabled.
         y_val : Series, default = None
             The validation data ground truth labels.
+            If None, early stopping via validation score will be disabled.
+        X_test : DataFrame, default = None
+            The test data features. Note: Not used for training, but for tracking test performance.
+            If None, early stopping via validation score will be disabled.
+        y_test : Series, default = None
+            The test data ground truth labels. Note: Not used for training, but for tracking test performance.
             If None, early stopping via validation score will be disabled.
         X_unlabeled : DataFrame, default = None
             Unlabeled data features.
@@ -1166,6 +1163,142 @@ class AbstractModel:
             if model._compiler is not None and not model._compiler.save_in_pkl:
                 model.model = model._compiler.load(path=path)
         return model
+
+    def save_learning_curves(self, metrics: str | List[str], curves: dict[dict[str : List[float]]], path: str = None) -> str:
+        """
+        Saves learning curves to disk.
+
+        Outputted Curve Format:
+            out = [
+                metrics,
+                [
+                    [ # log_loss
+                        [0.693147, 0.690162, ...], # train
+                        [0.693147, 0.690162, ...], # val
+                        [0.693147, 0.690162, ...], # test
+                    ],
+                    [ # accuracy
+                        [0.693147, 0.690162, ...], # train
+                        [0.693147, 0.690162, ...], # val
+                        [0.693147, 0.690162, ...], # test
+                    ],
+                    [ # f1
+                        [0.693147, 0.690162, ...], # train
+                        [0.693147, 0.690162, ...], # val
+                        [0.693147, 0.690162, ...], # test
+                    ],
+                ]
+            ]
+
+        Parameters
+        ----------
+        metrics : str or list(str)
+            List of all evaluation metrics computed at each iteration of the curve
+        curves : dict[dict[str : list[float]]]
+            Dictionary of evaluation sets and their learning curve dictionaries.
+            Each learning curve dictionary contains evaluation metrics computed at each iteration.
+            e.g.
+                curves = {
+                        "train": {
+                            'logloss': [0.693147, 0.690162, ...],
+                            'accuracy': [0.500000, 0.400000, ...],
+                            'f1': [0.693147, 0.690162, ...]
+                        },
+                        "val": {...},
+                        "test": {...},
+                    }
+
+        path : str, default None
+            Path where the learning curves are saved, minus the file name.
+            This should generally be a directory path ending with a '/' character (or appropriate path separator value depending on OS).
+            If None, self.path is used.
+            The final curve file is typically saved to os.path.join(path, curves.json).
+
+        Returns
+        -------
+        path : str
+            Path to the saved curves, minus the file name.
+        """
+        if not self._get_class_tags().get("supports_learning_curves", False):
+            raise AssertionError(f"Learning Curves are not supported for model: {self.name}")
+
+        if path is None:
+            path = self.path
+        if not isinstance(metrics, list):
+            metrics = [metrics]
+        if len(metrics) == 0:
+            raise ValueError("At least one metric must be specified to save generated learning curves.")
+
+        os.makedirs(path, exist_ok=True)
+        out = self._make_learning_curves(metrics=metrics, curves=curves)
+        file_path = os.path.join(path, self.learning_curve_file_name)
+        save_json.save(file_path, out)
+        self.saved_learning_curves = True
+        return file_path
+
+    def _make_learning_curves(self, metrics: str | List[str], curves: dict[dict[str : List[float]]]) -> List[List[str], List[str], List[List[float]]]:
+        """
+        Parameters
+        ----------
+        metrics : str or list(str)
+            List of all evaluation metrics computed at each iteration of the curve
+        curves : dict[dict[str : list[float]]]
+            Dictionary of evaluation sets and their learning curve dictionaries.
+            Each learning curve dictionary contains evaluation metrics computed at each iteration.
+            See Abstract Model's save_learning_curves method for a sample curves input.
+
+        Returns
+        -------
+        List[List[str], List[str], List[List[float]]]: The generated learning curve artifact.
+            if eval set names includes: train, val, or test
+            these sets will be placed first in the above order.
+        """
+
+        # ensure main eval sets first: train, val, test
+        items = []
+        order = ["train", "val", "test"]
+        for eval_set in order:
+            if eval_set in curves:
+                items.append((eval_set, curves[eval_set]))
+                del curves[eval_set]
+
+        items.extend(curves.items())
+        eval_sets, curves = list(zip(*items))
+
+        data = []
+        for metric in metrics:
+            data.append([c[metric] for c in curves])
+
+        return [eval_sets, metrics, data]
+
+    @classmethod
+    def load_learning_curves(cls, path: str) -> List:
+        """
+        Loads the learning_curve data from disk to memory.
+
+        Parameters
+        ----------
+        path : str
+            Path to the saved model, minus the file name.
+            This should generally be a directory path ending with a '/' character (or appropriate path separator value depending on OS).
+            The model file is typically located in os.path.join(path, cls.model_file_name).
+
+        Returns
+        -------
+        learning_curves : List
+            Loaded learning curve data.
+        """
+        if not cls._get_class_tags().get("supports_learning_curves", False):
+            raise AssertionError("Attempted to load learning curves from model without learning curve support")
+
+        file = os.path.join(path, cls.learning_curve_file_name)
+
+        if not os.path.exists(file):
+            raise FileNotFoundError(
+                f"Could not find learning curve file at {file}" + "\nDid you call predictor.fit() with an appropriate learning_curves parameter?"
+            )
+
+        return load_json.load(file)
 
     # TODO: v1.0: Add docs
     def compute_feature_importance(
@@ -1909,7 +2042,7 @@ class AbstractModel:
             "hyperparameters": self.params,
             "hyperparameters_fit": self.params_trained,  # TODO: Explain in docs that this is for hyperparameters that differ in final model from original hyperparameters, such as epochs (from early stopping)
             "hyperparameters_nondefault": self.nondefault_params,
-            AG_ARGS_FIT: self.params_aux,
+            AG_ARGS_FIT: self.get_params_aux_info(),
             "num_features": len(self.features) if self.features else None,
             "features": self.features,
             "feature_metadata": self.feature_metadata,
@@ -1920,8 +2053,24 @@ class AbstractModel:
             "is_fit": self.is_fit(),
             "is_valid": self.is_valid(),
             "can_infer": self.can_infer(),
+            "has_learning_curves": self.saved_learning_curves,
         }
         return info
+
+    def get_params_aux_info(self) -> dict:
+        """
+        Converts learning curve scorer objects into their name strings.
+
+        Returns:
+        --------
+        params_aux dictionary with changed curve_metrics field, if applicable.
+        """
+        if self.params_aux.get("curve_metrics", None) is not None:
+            params_aux = self.params_aux.copy()
+            params_aux["curve_metrics"] = [metric.name for metric in params_aux["curve_metrics"]]
+            return params_aux
+
+        return self.params_aux
 
     @classmethod
     def load_info(cls, path: str, load_model_if_required: bool = True) -> dict:
@@ -2075,6 +2224,16 @@ class AbstractModel:
         Below are common patterns / options to make available. Their actual usage and options in a particular model should be documented in the model itself, as it has flexibility to differ.
 
         Possible params:
+
+        generate_curves : bool
+            boolean flag determining if learning curves should be saved to disk for iterative learners.
+
+        curve_metrics : list(...)
+            list of metrics to be evaluated at each iteration of the learning curves
+            (only used if generate_curves is True)
+
+        use_error_for_curve_metrics : bool
+            boolean flag determining if learning curve metrics should be displayed in error format (see Scorer class)
 
         early_stop : int, str, or tuple
             generic name for early stopping logic. Typically can be an int or a str preset/strategy.

@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 import json
 import logging
 import os
 import random
 import time
 import warnings
+from copy import deepcopy
 from typing import Dict, Union
 
 import numpy as np
@@ -15,8 +18,10 @@ from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_torch
 from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION, SOFTCLASS
 from autogluon.core.hpo.constants import RAY_BACKEND
+from autogluon.core.metrics import Scorer
 from autogluon.core.models.abstract.abstract_nn_model import AbstractNeuralNetworkModel
 from autogluon.core.utils.exceptions import TimeLimitExceeded
+from autogluon.tabular.models.tabular_nn.torch.tabular_torch_dataset import TabularTorchDataset
 
 from ..compilers.native import TabularNeuralNetTorchNativeCompiler
 from ..compilers.onnx import TabularNeuralNetTorchOnnxCompiler
@@ -182,7 +187,13 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             else:
                 batch_size = min(int(2 ** (3 + np.floor(np.log10(X.shape[0])))), self.max_batch_size)
 
-        train_dataset, val_dataset = self._generate_datasets(X=X, y=y, params=processor_kwargs, X_val=X_val, y_val=y_val)
+        X_test = kwargs.get("X_test", None)
+        y_test = kwargs.get("y_test", None)
+
+        train_dataset = self._generate_dataset(X, y, train_params=processor_kwargs, is_train=True)
+        val_dataset = self._generate_dataset(X_val, y_val)
+        test_dataset = self._generate_dataset(X_test, y_test)
+
         logger.log(
             15,
             f"Training data for {self.__class__.__name__} has: "
@@ -210,6 +221,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             loss_kwargs=loss_kwargs,
             batch_size=batch_size,
             val_dataset=val_dataset,
+            test_dataset=test_dataset,
             time_limit=time_limit,
             reporter=reporter,
             verbosity=verbosity,
@@ -233,7 +245,19 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         if not os.path.exists(self.path):
             os.makedirs(self.path)
 
-    def _train_net(self, train_dataset, loss_kwargs, batch_size, num_epochs, epochs_wo_improve, val_dataset=None, time_limit=None, reporter=None, verbosity=2):
+    def _train_net(
+        self,
+        train_dataset,
+        loss_kwargs,
+        batch_size,
+        num_epochs,
+        epochs_wo_improve,
+        val_dataset=None,
+        test_dataset=None,
+        time_limit=None,
+        reporter=None,
+        verbosity=2,
+    ):
         import torch
 
         start_time = time.time()
@@ -244,6 +268,31 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
         if isinstance(loss_kwargs.get("loss_function", "auto"), str) and loss_kwargs.get("loss_function", "auto") == "auto":
             loss_kwargs["loss_function"] = self._get_default_loss_function()
+
+        ag_params = self._get_ag_params()
+        generate_curves = ag_params.get("generate_curves", False)
+
+        if generate_curves:
+            scorers = ag_params.get("curve_metrics", [self.eval_metric])
+            use_curve_metric_error = ag_params.get("use_error_for_curve_metrics", False)
+            metric_names = [scorer.name for scorer in scorers]
+
+            train_curves = {metric.name: [] for metric in scorers}
+            val_curves = {metric.name: [] for metric in scorers}
+            test_curves = {metric.name: [] for metric in scorers}
+
+            # make copy of train_dataset to avoid interfering with train_dataloader
+            curve_train_dataset = deepcopy(train_dataset)
+            y_train = curve_train_dataset.get_labels()
+            if y_train.ndim == 2 and y_train.shape[1] == 1:
+                y_train = y_train.flatten()
+
+            if test_dataset is not None:
+                y_test = test_dataset.get_labels()
+                if y_test.ndim == 2 and y_test.shape[1] == 1:
+                    y_test = y_test.flatten()
+            else:
+                y_test = None
 
         if val_dataset is not None:
             y_val = val_dataset.get_labels()
@@ -350,20 +399,32 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
             epoch += 1
 
+            # learning curve generation
+            if generate_curves:
+                stop = self._generate_curves(
+                    train_curves=train_curves,
+                    val_curves=val_curves,
+                    test_curves=test_curves,
+                    scorers=scorers,
+                    best_epoch=best_epoch,
+                    use_curve_metric_error=use_curve_metric_error,
+                    train_dataset=curve_train_dataset,
+                    val_dataset=val_dataset,
+                    test_dataset=test_dataset,
+                    y_train=y_train,
+                    y_val=y_val,
+                    y_test=y_test,
+                )
+
+                if stop:
+                    break
+
             # validation
             if val_dataset is not None:
                 # compute validation score
                 val_metric = self.score(X=val_dataset, y=y_val, metric=self.stopping_metric, _reset_threads=False)
-                if np.isnan(val_metric):
-                    if best_epoch == 0:
-                        raise RuntimeError(
-                            f"NaNs encountered in {self.__class__.__name__} training. "
-                            "Features/labels may be improperly formatted, "
-                            "or NN weights may have diverged."
-                        )
-                    else:
-                        logger.warning(f"Warning: NaNs encountered in {self.__class__.__name__} training. " "Reverting model to last checkpoint without NaNs.")
-                        break
+                if not self._assert_valid_metric(metric=val_metric, best_epoch=best_epoch):
+                    break
 
                 # update best validation
                 if (val_metric >= best_val_metric) or best_epoch == 0:
@@ -410,6 +471,14 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         if epoch == 0:
             raise AssertionError("0 epochs trained!")
 
+        if generate_curves:
+            curves = {"train": train_curves}
+            if val_dataset is not None:
+                curves["val"] = val_curves
+            if test_dataset is not None:
+                curves["test"] = test_curves
+            self.save_learning_curves(metrics=metric_names, curves=curves)
+
         # revert back to best model
         if val_dataset is not None:
             logger.log(15, f"Best model found on Epoch {best_epoch} (Update {best_val_update}). Val {self.stopping_metric.name}: {best_val_metric}")
@@ -422,6 +491,87 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             logger.log(15, f"Best model found on Epoch {best_epoch} (Update {best_val_update}).")
         self.params_trained["batch_size"] = batch_size
         self.params_trained["num_epochs"] = best_epoch
+
+    def _generate_curves(
+        self,
+        train_curves: dict,
+        val_curves: dict,
+        test_curves: dict,
+        scorers: list[Scorer],
+        best_epoch: int,
+        use_curve_metric_error: bool,
+        train_dataset: TabularTorchDataset,
+        val_dataset: TabularTorchDataset,
+        test_dataset: TabularTorchDataset,
+        y_train: np.ndarray,
+        y_val: np.ndarray,
+        y_test: np.ndarray,
+    ) -> bool:
+        """
+        Extends learning curve dictionaries across all metrics listed in scorers by one epoch.
+
+        Returns:
+        --------
+        bool:
+            Whether to break out of the neural net training loop.
+        """
+        train_metrics = []
+        val_metrics = []
+        test_metrics = []
+
+        for metric in scorers:
+            train_metrics.append(self.score(X=train_dataset, y=y_train, metric=metric, _reset_threads=False))
+            val_metrics += [self.score(X=val_dataset, y=y_val, metric=metric, _reset_threads=False)] if val_dataset is not None else []
+            test_metrics += [self.score(X=test_dataset, y=y_test, metric=metric, _reset_threads=False)] if test_dataset is not None else []
+
+            if use_curve_metric_error:
+                train_metrics[-1] = metric.convert_score_to_error(train_metrics[-1])
+                if val_dataset is not None:
+                    val_metrics[-1] = metric.convert_score_to_error(val_metrics[-1])
+                if test_dataset is not None:
+                    test_metrics[-1] = metric.convert_score_to_error(test_metrics[-1])
+
+            if (
+                not self._assert_valid_metric(metric=train_metrics[-1], best_epoch=best_epoch)
+                or (val_dataset is not None and not self._assert_valid_metric(metric=val_metrics[-1], best_epoch=best_epoch))
+                or (test_dataset is not None and not self._assert_valid_metric(metric=test_metrics[-1], best_epoch=best_epoch))
+            ):
+                return True
+
+        # update learning curve
+        for i, metric in enumerate(scorers):
+            train_curves[metric.name].append(train_metrics[i])
+            val_curves[metric.name] += [val_metrics[i]] if val_dataset is not None else []
+            test_curves[metric.name] += [test_metrics[i]] if test_dataset is not None else []
+
+        return False
+
+    def _assert_valid_metric(self, metric: int | float, best_epoch: int) -> bool:
+        """
+        Asserts that metric calculated is valid.
+
+        Parameters:
+        -----------
+        metric: int or float
+            the metric calculated
+        best_epoch: int
+            the best epoch encountered since training started
+
+        Returns:
+        --------
+        Whether the metric is valid
+        """
+        if np.isnan(metric):
+            if best_epoch == 0:
+                raise RuntimeError(
+                    f"NaNs encountered in {self.__class__.__name__} training. "
+                    "Features/labels may be improperly formatted, "
+                    "or NN weights may have diverged."
+                )
+            else:
+                logger.warning(f"Warning: NaNs encountered in {self.__class__.__name__} training. " "Reverting model to last checkpoint without NaNs.")
+                return False
+        return True
 
     def _predict_proba(self, X, **kwargs):
         """To align predict with abstract_model API.
@@ -455,37 +605,58 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         preds_dataset = np.concatenate(preds_dataset, 0)
         return preds_dataset
 
-    def _generate_datasets(self, X, y, params, X_val=None, y_val=None):
+    def _generate_dataset(self, X: pd.DataFrame, y: pd.Series, train_params: dict = {}, is_train: bool = False):
+        """
+        Generate TabularTorchDataset from X and y.
+
+        Params:
+        -------
+        X: pd.DataFrame
+            The X data.
+        y: pd.Series
+            The y data.
+        params: dict
+            Parameters related to processing training data.
+        is_train: bool
+            Whether the X and y values are training data.
+
+        Returns:
+        --------
+        TabularTorchDataset containing the contents of X and y.
+        """
         from .tabular_torch_dataset import TabularTorchDataset
 
-        impute_strategy = params["proc.impute_strategy"]
-        max_category_levels = params["proc.max_category_levels"]
-        skew_threshold = params["proc.skew_threshold"]
-        embed_min_categories = params["proc.embed_min_categories"]
-        use_ngram_features = params["use_ngram_features"]
+        if is_train:
+            impute_strategy = train_params["proc.impute_strategy"]
+            max_category_levels = train_params["proc.max_category_levels"]
+            skew_threshold = train_params["proc.skew_threshold"]
+            embed_min_categories = train_params["proc.embed_min_categories"]
+            use_ngram_features = train_params["use_ngram_features"]
 
-        if isinstance(X, TabularTorchDataset):
-            train_dataset = X
-        else:
-            X = self.preprocess(X)
-            train_dataset = self._process_train_data(
-                df=X,
-                labels=y,
-                impute_strategy=impute_strategy,
-                max_category_levels=max_category_levels,
-                skew_threshold=skew_threshold,
-                embed_min_categories=embed_min_categories,
-                use_ngram_features=use_ngram_features,
-            )
-        if X_val is not None:
-            if isinstance(X_val, TabularTorchDataset):
-                val_dataset = X_val
+            if isinstance(X, TabularTorchDataset):
+                dataset = X
             else:
-                X_val = self.preprocess(X_val)
-                val_dataset = self._process_test_data(df=X_val, labels=y_val)
+                X = self.preprocess(X)
+                dataset = self._process_train_data(
+                    df=X,
+                    labels=y,
+                    impute_strategy=impute_strategy,
+                    max_category_levels=max_category_levels,
+                    skew_threshold=skew_threshold,
+                    embed_min_categories=embed_min_categories,
+                    use_ngram_features=use_ngram_features,
+                )
         else:
-            val_dataset = None
-        return train_dataset, val_dataset
+            if X is not None:
+                if isinstance(X, TabularTorchDataset):
+                    dataset = X
+                else:
+                    X = self.preprocess(X)
+                    dataset = self._process_test_data(df=X, labels=y)
+            else:
+                dataset = None
+
+        return dataset
 
     def _process_test_data(self, df, labels=None):
         """Process train or test DataFrame into a form fit for neural network models.
@@ -670,6 +841,10 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             minimum_resources["num_gpus"] = 1
         return minimum_resources
 
+    @classmethod
+    def _class_tags(cls):
+        return {"supports_learning_curves": True}
+
     def _more_tags(self):
         # `can_refit_full=True` because batch_size and num_epochs is communicated at end of `_fit`:
         #  self.params_trained['batch_size'] = batch_size
@@ -681,6 +856,9 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
     def _default_compiler(self):
         return TabularNeuralNetTorchNativeCompiler
+
+    def _ag_params(self) -> set:
+        return {"early_stop", "generate_curves", "curve_metrics", "use_error_for_curve_metrics"}
 
     def _get_input_types(self, batch_size=None):
         input_types = []

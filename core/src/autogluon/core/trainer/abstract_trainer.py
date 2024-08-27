@@ -27,26 +27,10 @@ from ..augmentation.distill_utils import augment_data, format_distillation_label
 from ..calibrate import calibrate_decision_threshold
 from ..calibrate.conformity_score import compute_conformity_score
 from ..calibrate.temperature_scaling import apply_temperature_scaling, tune_temperature_scaling
-from ..constants import (
-    AG_ARGS,
-    BINARY,
-    MULTICLASS,
-    QUANTILE,
-    REFIT_FULL_NAME,
-    REFIT_FULL_SUFFIX,
-    REGRESSION,
-    SOFTCLASS,
-)
+from ..constants import AG_ARGS, BINARY, MULTICLASS, QUANTILE, REFIT_FULL_NAME, REFIT_FULL_SUFFIX, REGRESSION, SOFTCLASS
 from ..data.label_cleaner import LabelCleanerMulticlassToBinary
 from ..metrics import Scorer, get_metric
-from ..models import (
-    AbstractModel,
-    BaggedEnsembleModel,
-    GreedyWeightedEnsembleModel,
-    SimpleWeightedEnsembleModel,
-    StackerEnsembleModel,
-    WeightedEnsembleModel,
-)
+from ..models import AbstractModel, BaggedEnsembleModel, GreedyWeightedEnsembleModel, SimpleWeightedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel
 from ..pseudolabeling.pseudolabeling import assert_pseudo_column_match
 from ..utils import (
     compute_permutation_feature_importance,
@@ -58,13 +42,7 @@ from ..utils import (
     get_pred_from_proba,
     infer_eval_metric,
 )
-from ..utils.exceptions import (
-    NoGPUError,
-    NotEnoughCudaMemoryError,
-    NotEnoughMemoryError,
-    NoValidFeatures,
-    TimeLimitExceeded,
-)
+from ..utils.exceptions import NoGPUError, NotEnoughCudaMemoryError, NotEnoughMemoryError, NoValidFeatures, TimeLimitExceeded
 from ..utils.feature_selection import FeatureSelector
 from ..utils.loaders import load_pkl
 from ..utils.savers import save_json, save_pkl
@@ -222,6 +200,7 @@ class AbstractTrainer:
         self._num_rows_train = None
         self._num_cols_train = None
         self._num_rows_val = None
+        self._num_rows_test = None
 
         self.is_data_saved = False
         self._X_saved = False
@@ -304,6 +283,11 @@ class AbstractTrainer:
         save_pkl.save(path=path, object=X, verbose=verbose)
         self._X_val_saved = True
 
+    def save_X_test(self, X, verbose=True):
+        path = os.path.join(self.path_data, "X_test.pkl")
+        save_pkl.save(path=path, object=X, verbose=verbose)
+        self._X_test_saved = True
+
     def save_y(self, y, verbose=True):
         path = os.path.join(self.path_data, "y.pkl")
         save_pkl.save(path=path, object=y, verbose=verbose)
@@ -313,6 +297,11 @@ class AbstractTrainer:
         path = os.path.join(self.path_data, "y_val.pkl")
         save_pkl.save(path=path, object=y, verbose=verbose)
         self._y_val_saved = True
+
+    def save_y_test(self, y, verbose=True):
+        path = os.path.join(self.path_data, "y_test.pkl")
+        save_pkl.save(path=path, object=y, verbose=verbose)
+        self._y_test_saved = True
 
     def get_model_names(
         self, stack_name: Union[List[str], str] = None, level: Union[List[int], int] = None, can_infer: bool = None, models: List[str] = None
@@ -373,6 +362,8 @@ class AbstractTrainer:
         hyperparameters: dict,
         X_val=None,
         y_val=None,
+        X_test=None,
+        y_test=None,
         X_unlabeled=None,
         base_model_names: List[str] = None,
         core_kwargs: dict = None,
@@ -451,6 +442,8 @@ class AbstractTrainer:
                 y=y,
                 X_val=X_val,
                 y_val=y_val,
+                X_test=X_test,
+                y_test=y_test,
                 X_unlabeled=X_unlabeled,
                 models=hyperparameters,
                 level=level,
@@ -569,6 +562,8 @@ class AbstractTrainer:
         models: Union[List[AbstractModel], dict],
         X_val=None,
         y_val=None,
+        X_test=None,
+        y_test=None,
         X_unlabeled=None,
         level=1,
         base_model_names: List[str] = None,
@@ -599,6 +594,8 @@ class AbstractTrainer:
             y=y,
             X_val=X_val,
             y_val=y_val,
+            X_test=X_test,
+            y_test=y_test,
             X_unlabeled=X_unlabeled,
             models=models,
             level=level,
@@ -628,6 +625,8 @@ class AbstractTrainer:
         models: Union[List[AbstractModel], dict],
         X_val=None,
         y_val=None,
+        X_test=None,
+        y_test=None,
         X_unlabeled=None,
         level=1,
         base_model_names: List[str] = None,
@@ -715,6 +714,8 @@ class AbstractTrainer:
         feature_metadata = self.get_feature_metadata(use_orig_features=True, base_models=base_model_names)
         if X_val is not None:
             X_val = self.get_inputs_to_stacker(X_val, base_models=base_model_names, fit=False, use_val_cache=True)
+        if X_test is not None:
+            X_test = self.get_inputs_to_stacker(X_test, base_models=base_model_names, fit=False, use_val_cache=False)
         compute_score = not refit_full
         if refit_full and X_val is not None:
             X_init = pd.concat([X_init, X_val])
@@ -735,6 +736,8 @@ class AbstractTrainer:
             y=y,
             X_val=X_val,
             y_val=y_val,
+            X_test=X_test,
+            y_test=y_test,
             X_unlabeled=X_unlabeled,
             models=models,
             level=level,
@@ -1211,6 +1214,11 @@ class AbstractTrainer:
             return model_type.load_oof(path=os.path.join(self.path, model_path))
         else:
             raise AssertionError(f"Model {model} must be a BaggedEnsembleModel to return oof_pred_proba")
+
+    def get_model_learning_curves(self, model: str) -> dict:
+        model_type = self.get_model_attribute(model=model, attribute="type")
+        model_path = self.get_model_attribute(model=model, attribute="path")
+        return model_type.load_learning_curves(path=os.path.join(self.path, model_path))
 
     def _update_pred_proba_dict_with_val_cache(self, model_set: set, model_pred_proba_dict):
         """For each model in model_set, check if y_pred_proba_val is cached to disk. If so, load and add it to model_pred_proba_dict"""
@@ -1884,16 +1892,30 @@ class AbstractTrainer:
                         self.model_best = weighted_ensemble_model_name
         return models
 
-    def _train_single(self, X, y, model: AbstractModel, X_val=None, y_val=None, total_resources=None, **model_fit_kwargs) -> AbstractModel:
+    def _train_single(
+        self, X, y, model: AbstractModel, X_val=None, y_val=None, X_test=None, y_test=None, total_resources=None, **model_fit_kwargs
+    ) -> AbstractModel:
         """
         Trains model but does not add the trained model to this Trainer.
         Returns trained model object.
         """
-        model = model.fit(X=X, y=y, X_val=X_val, y_val=y_val, total_resources=total_resources, **model_fit_kwargs)
+        model = model.fit(X=X, y=y, X_val=X_val, y_val=y_val, X_test=X_test, y_test=y_test, total_resources=total_resources, **model_fit_kwargs)
         return model
 
     def _train_and_save(
-        self, X, y, model: AbstractModel, X_val=None, y_val=None, stack_name="core", level=1, compute_score=True, total_resources=None, **model_fit_kwargs
+        self,
+        X,
+        y,
+        model: AbstractModel,
+        X_val=None,
+        y_val=None,
+        X_test=None,
+        y_test=None,
+        stack_name="core",
+        level=1,
+        compute_score=True,
+        total_resources=None,
+        **model_fit_kwargs,
     ) -> List[str]:
         """
         Trains model and saves it to disk, returning a list with a single element: The name of the model, or no elements if training failed.
@@ -1942,14 +1964,14 @@ class AbstractTrainer:
                 model_fit_kwargs.pop("X_pseudo")
                 model_fit_kwargs.pop("y_pseudo")
                 logger.log(15, f"{len(X_pseudo)} extra rows of pseudolabeled data added to training set for {model.name}")
-                model = self._train_single(X_w_pseudo, y_w_pseudo, model, X_val, y_val, **model_fit_kwargs)
+                model = self._train_single(X_w_pseudo, y_w_pseudo, model, X_val, y_val, X_test=X_test, y_test=y_test, **model_fit_kwargs)
             else:
                 if level > 1:
                     if X_pseudo is not None and y_pseudo is not None:
                         logger.log(15, f"Dropping pseudo in stacking layer due to missing out-of-fold predictions")
                     model_fit_kwargs.pop("X_pseudo", None)
                     model_fit_kwargs.pop("y_pseudo", None)
-                model = self._train_single(X, y, model, X_val, y_val, total_resources=total_resources, **model_fit_kwargs)
+                model = self._train_single(X, y, model, X_val, y_val, X_test=X_test, y_test=y_test, total_resources=total_resources, **model_fit_kwargs)
 
             fit_end_time = time.time()
             if self.weight_evaluation:
@@ -2221,6 +2243,8 @@ class AbstractTrainer:
         X_unlabeled=None,
         X_val=None,
         y_val=None,
+        X_test=None,
+        y_test=None,
         X_pseudo=None,
         y_pseudo=None,
         feature_prune=False,
@@ -2324,6 +2348,8 @@ class AbstractTrainer:
                 model=model,
                 X_val=X_val,
                 y_val=y_val,
+                X_test=X_test,
+                y_test=y_test,
                 X_unlabeled=X_unlabeled,
                 stack_name=stack_name,
                 level=level,
@@ -2619,7 +2645,19 @@ class AbstractTrainer:
         return model_names_trained
 
     def _train_multi_and_ensemble(
-        self, X, y, X_val, y_val, hyperparameters: dict = None, X_unlabeled=None, num_stack_levels=0, time_limit=None, groups=None, **kwargs
+        self,
+        X,
+        y,
+        X_val,
+        y_val,
+        X_test=None,
+        y_test=None,
+        hyperparameters: dict = None,
+        X_unlabeled=None,
+        num_stack_levels=0,
+        time_limit=None,
+        groups=None,
+        **kwargs,
     ) -> List[str]:
         """Identical to self.train_multi_levels, but also saves the data to disk. This should only ever be called once."""
         if time_limit is not None and time_limit <= 0:
@@ -2631,12 +2669,18 @@ class AbstractTrainer:
                 self.save_X_val(X_val)
                 if y_val is not None:
                     self.save_y_val(y_val)
+            if X_test is not None:
+                self.save_X_test(X_test)
+                if y_test is not None:
+                    self.save_y_test(y_test)
             self.is_data_saved = True
         if self._groups is None:
             self._groups = groups
         self._num_rows_train = len(X)
         if X_val is not None:
             self._num_rows_val = len(X_val)
+        if X_test is not None:
+            self._num_rows_test = len(X_test)
         self._num_cols_train = len(list(X.columns))
         model_names_fit = self.train_multi_levels(
             X,
@@ -2644,6 +2688,8 @@ class AbstractTrainer:
             hyperparameters=hyperparameters,
             X_val=X_val,
             y_val=y_val,
+            X_test=X_test,
+            y_test=y_test,
             X_unlabeled=X_unlabeled,
             level_start=1,
             level_end=num_stack_levels + 1,
@@ -3310,6 +3356,7 @@ class AbstractTrainer:
         num_rows_train = self._num_rows_train
         num_cols_train = self._num_cols_train
         num_rows_val = self._num_rows_val
+        num_rows_test = self._num_rows_test
         num_classes = self.num_classes
         # TODO:
         #  Disk size of models
@@ -3328,6 +3375,7 @@ class AbstractTrainer:
             "num_rows_train": num_rows_train,
             "num_cols_train": num_cols_train,
             "num_rows_val": num_rows_val,
+            "num_rows_test": num_rows_test,
             "num_classes": num_classes,
             "problem_type": problem_type,
             "eval_metric": eval_metric,

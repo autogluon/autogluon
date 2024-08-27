@@ -26,7 +26,7 @@ def test_stack_feature_usage_binary(fit_helper):
 def test_stack_feature_usage_multiclass(fit_helper):
     """Tests that stacker models use base model predictions as features correctly for multiclass"""
     dataset_name = "covertype_small"
-    expected_ancestors = {"LightGBM_BAG_L1", "DummyModel_BAG_L1"}
+    expected_ancestors = {"LightGBM_BAG_L1", "KNeighbors_BAG_L1"}
     _fit_predictor_stack_feature_usage(
         dataset_name=dataset_name,
         max_base_models_per_type=1,

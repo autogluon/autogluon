@@ -416,9 +416,6 @@ def generate_train_test_split(
     problem_type : str
         The problem_type the label is used for. Determines if stratification is used.
         Options: ["binary", "multiclass", "regression", "softclass", "quantile"]
-    test_size : float, default = 0.1
-        The proportion of data to use for the test set.
-        The remaining (1 - test_size) of data will be used for the training set.
     test_size : float or int, default = 0.1
         If float, should be between 0.0 and 1.0 and represent the proportion of the dataset to include in the test split.
         If int, represents the absolute number of test samples.

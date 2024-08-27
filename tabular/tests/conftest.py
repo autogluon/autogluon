@@ -17,7 +17,7 @@ from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.data.label_cleaner import LabelCleaner
 from autogluon.core.models import AbstractModel, BaggedEnsembleModel
 from autogluon.core.stacked_overfitting.utils import check_stacked_overfitting_from_leaderboard
-from autogluon.core.utils import download, generate_train_test_split, infer_problem_type, unzip
+from autogluon.core.utils import download, generate_train_test_split, generate_train_test_split_combined, infer_problem_type, unzip
 from autogluon.features.generators import AbstractFeatureGenerator, AutoMLPipelineFeatureGenerator
 from autogluon.tabular import TabularDataset, TabularPredictor
 
@@ -154,6 +154,7 @@ class FitHelper:
         delete_directory=True,
         extra_metrics=None,
         expected_model_count: int | None = 2,
+        min_cls_count_train=1,
         path_as_absolute=False,
         compile=False,
         compiler_configs=None,
@@ -161,6 +162,8 @@ class FitHelper:
         expected_stacked_overfitting_at_test=None,
         expected_stacked_overfitting_at_val=None,
         scikit_api=False,
+        use_test_data=False,
+        use_test_for_val=False,
     ) -> TabularPredictor:
         if compiler_configs is None:
             compiler_configs = {}
@@ -186,8 +189,19 @@ class FitHelper:
             init_args["path"] = PathConverter.to_absolute(path=init_args["path"])
             assert PathConverter._is_absolute(path=init_args["path"])
         save_path = init_args["path"]
+
+        if use_test_data:
+            fit_args["test_data"] = test_data
+            if use_test_for_val:
+                fit_args["tuning_data"] = test_data
+
         predictor: TabularPredictor = FitHelper.fit_dataset(
-            train_data=train_data, init_args=init_args, fit_args=fit_args, sample_size=sample_size, scikit_api=scikit_api
+            train_data=train_data,
+            init_args=init_args,
+            fit_args=fit_args,
+            sample_size=sample_size,
+            scikit_api=scikit_api,
+            min_cls_count_train=min_cls_count_train,
         )
         if compile:
             predictor.compile(models="all", compiler_configs=compiler_configs)
@@ -251,16 +265,24 @@ class FitHelper:
             shutil.rmtree(predictor.path, ignore_errors=True)  # Delete AutoGluon output directory to ensure runs' information has been removed.
 
     @staticmethod
-    def fit_dataset(train_data, init_args, fit_args, sample_size=None, scikit_api=False) -> TabularPredictor:
+    def fit_dataset(train_data, init_args, fit_args, sample_size=None, min_cls_count_train=1, scikit_api=False) -> TabularPredictor:
+        if "problem_type" in init_args:
+            problem_type = init_args["problem_type"]
+        else:
+            problem_type = infer_problem_type(train_data[init_args["label"]])
+
         if sample_size is not None and sample_size < len(train_data):
-            train_data = train_data.sample(n=sample_size, random_state=0)
+            train_data, _ = generate_train_test_split_combined(
+                data=train_data,
+                label=init_args["label"],
+                problem_type=problem_type,
+                test_size=len(train_data) - sample_size,
+                min_cls_count_train=min_cls_count_train,
+            )
+
         if scikit_api:
             from autogluon.tabular.experimental import TabularClassifier, TabularRegressor
 
-            if "problem_type" in init_args:
-                problem_type = init_args["problem_type"]
-            else:
-                problem_type = infer_problem_type(train_data[init_args["label"]])
             X = train_data.drop(columns=[init_args["label"]])
             y = train_data[init_args["label"]]
             if problem_type in [REGRESSION]:
