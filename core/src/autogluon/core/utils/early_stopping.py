@@ -1,13 +1,28 @@
+from __future__ import annotations
+
+
 class AbstractES:
     """
     Abstract early stopping class
     """
 
-    def update(self, cur_round, is_best=False) -> bool:
+    def update(self, cur_round, is_best: bool = False) -> bool:
         raise NotImplementedError
 
-    def early_stop(self, cur_round, is_best=False) -> bool:
+    def early_stop(self, cur_round, is_best: bool = False) -> bool:
         raise NotImplementedError
+
+
+class NoES(AbstractES):
+    """
+    Dummy early stopping method that never triggers early stopping
+    """
+
+    def update(self, cur_round: int, is_best: bool = False) -> bool:
+        return self.early_stop(cur_round, is_best=is_best)
+
+    def early_stop(self, cur_round: int, is_best: bool = False) -> bool:
+        return False
 
 
 class SimpleES(AbstractES):
@@ -20,16 +35,16 @@ class SimpleES(AbstractES):
         If no improvement occurs in `patience` rounds or greater, self.early_stop will return True.
     """
 
-    def __init__(self, patience=10):
+    def __init__(self, patience: int = 10):
         self.patience = patience
         self.best_round = 0
 
-    def update(self, cur_round, is_best=False):
+    def update(self, cur_round: int, is_best: bool = False) -> bool:
         if is_best:
             self.best_round = cur_round
         return self.early_stop(cur_round, is_best=is_best)
 
-    def early_stop(self, cur_round, is_best=False):
+    def early_stop(self, cur_round: int, is_best: bool = False) -> bool:
         if is_best:
             return False
         return cur_round - self.best_round >= self.patience
@@ -41,6 +56,9 @@ class SimpleES(AbstractES):
 class AdaptiveES(AbstractES):
     """
     Implements early stopping with adaptive patience
+
+    Patience follows the formula `patience = ax + b`, where `a = adaptive_rate`, `x = round` and `b = adaptive_offset`.
+    Patience is only updated when a new `best_round` is observed.
 
     Patience is adaptively adjusted across training instead of being a fixed value.
     This generally outperforms fixed patience strategies. Examples below:
@@ -56,10 +74,10 @@ class AdaptiveES(AbstractES):
         Set to 0 to disable, or negative to shrink patience during training.
     adaptive_offset : int, default 10
         The initial patience when cur_round is 0.
-    min_patience : int, default 10
-        The minimum value of patience.
-    max_patience : int, default 10000
-        The maximum value of patience.
+    min_patience : int | None, default None
+        The minimum value of patience. Ignored if None.
+    max_patience : int | None, default None
+        The maximum value of patience. Ignored if None.
 
     Attributes
     ----------
@@ -73,7 +91,7 @@ class AdaptiveES(AbstractES):
         Effectively, patience = self.best_round * self.adaptive_rate + self.adaptive_offset, bound by min_patience and max_patience
     """
 
-    def __init__(self, adaptive_rate=0.3, adaptive_offset=10, min_patience=10, max_patience=10000):
+    def __init__(self, adaptive_rate: float = 0.3, adaptive_offset: int = 10, min_patience: int | None = None, max_patience: int | None = None):
         self.adaptive_rate = adaptive_rate
         self.adaptive_offset = adaptive_offset
         self.min_patience = min_patience
@@ -81,7 +99,7 @@ class AdaptiveES(AbstractES):
         self.best_round = 0
         self.patience = self._update_patience(self.best_round)
 
-    def update(self, cur_round, is_best=False):
+    def update(self, cur_round: int, is_best: bool = False) -> bool:
         """
         Updates the state of the object. Identical to calling self.early_stop, but if `is_best=True`, it will set `self.best_round=cur_round`.
         If cur_round achieved a new best score, set `is_best=True`.
@@ -92,7 +110,7 @@ class AdaptiveES(AbstractES):
             self.patience = self._update_patience(self.best_round)
         return self.early_stop(cur_round, is_best=is_best)
 
-    def early_stop(self, cur_round, is_best=False):
+    def early_stop(self, cur_round: int, is_best: bool = False) -> bool:
         """
         Returns True if (cur_round - self.best_round) equals or exceeds self.patience, otherwise returns False.
         This can be used to indicate if training should stop.
@@ -101,16 +119,13 @@ class AdaptiveES(AbstractES):
             return False
         return cur_round - self.best_round >= self.patience
 
-    def _update_patience(self, best_round):
-        return min(
-            self.max_patience,
-            (
-                max(
-                    self.min_patience,
-                    round(best_round * self.adaptive_rate + self.adaptive_offset),
-                )
-            ),
-        )
+    def _update_patience(self, best_round: int) -> int:
+        patience = round(self.adaptive_rate * best_round + self.adaptive_offset)  # ax + b
+        if self.min_patience is not None:
+            patience = max(self.min_patience, patience)
+        if self.max_patience is not None:
+            patience = min(self.max_patience, patience)
+        return patience
 
 
 ES_CLASS_MAP = {
