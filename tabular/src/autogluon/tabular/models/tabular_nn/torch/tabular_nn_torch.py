@@ -19,7 +19,9 @@ from autogluon.common.utils.try_import import try_import_torch
 from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION, SOFTCLASS
 from autogluon.core.hpo.constants import RAY_BACKEND
 from autogluon.core.metrics import Scorer
+from autogluon.core.models._utils import get_early_stopping_rounds
 from autogluon.core.models.abstract.abstract_nn_model import AbstractNeuralNetworkModel
+from autogluon.core.utils.early_stopping import AdaptiveES, NoES, SimpleES
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.tabular.models.tabular_nn.torch.tabular_torch_dataset import TabularTorchDataset
 
@@ -37,6 +39,10 @@ logger = logging.getLogger(__name__)
 class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
     """
     PyTorch neural network models for classification/regression with tabular data.
+
+    Extra hyperparameter options:
+        ag.early_stop : int | str, default = "default"
+            Specifies the early stopping rounds. Defaults to an adaptive strategy. Recommended to keep default.
     """
 
     # Constants used throughout this class:
@@ -268,6 +274,10 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
         if isinstance(loss_kwargs.get("loss_function", "auto"), str) and loss_kwargs.get("loss_function", "auto") == "auto":
             loss_kwargs["loss_function"] = self._get_default_loss_function()
+        if epochs_wo_improve is not None:
+            early_stopping_method = SimpleES(patience=epochs_wo_improve)
+        else:
+            early_stopping_method = self._get_early_stopping_strategy(num_rows_train=len(train_dataset))
 
         ag_params = self._get_ag_params()
         generate_curves = ag_params.get("generate_curves", False)
@@ -421,6 +431,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
             # validation
             if val_dataset is not None:
+                is_best = False
                 # compute validation score
                 val_metric = self.score(X=val_dataset, y=y_val, metric=self.stopping_metric, _reset_threads=False)
                 if not self._assert_valid_metric(metric=val_metric, best_epoch=best_epoch):
@@ -429,12 +440,13 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                 # update best validation
                 if (val_metric >= best_val_metric) or best_epoch == 0:
                     if val_metric > best_val_metric:
-                        val_improve_epoch = epoch
+                        is_best = True
                     best_val_metric = val_metric
                     os.makedirs(os.path.dirname(self.path), exist_ok=True)
                     torch.save(self.model, net_filename)
                     best_epoch = epoch
                     best_val_update = total_updates
+                early_stop = early_stopping_method.update(cur_round=epoch-1, is_best=is_best)
                 if verbose_eval:
                     logger.log(
                         15,
@@ -454,7 +466,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                     )
 
                 # no improvement
-                if epoch - val_improve_epoch >= epochs_wo_improve:
+                if early_stop:
                     break
 
             if epoch >= num_epochs:
@@ -491,6 +503,27 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             logger.log(15, f"Best model found on Epoch {best_epoch} (Update {best_val_update}).")
         self.params_trained["batch_size"] = batch_size
         self.params_trained["num_epochs"] = best_epoch
+
+    def _get_early_stopping_strategy(self, num_rows_train: int):
+        ag_early_stop = self._get_ag_params().get("early_stop", "default")
+        if ag_early_stop is None:
+            early_stopping_method = NoES()
+        elif isinstance(ag_early_stop, str) and ag_early_stop == "default":
+            early_stopping_method = self._get_early_stop_default()
+        elif isinstance(ag_early_stop, (str, tuple, list)):
+            early_stopping_rounds = self._get_early_stopping_rounds(num_rows_train=num_rows_train, strategy=ag_early_stop)
+            early_stopping_method = early_stopping_rounds[0](**early_stopping_rounds[1])
+        elif isinstance(ag_early_stop, int):
+            early_stopping_method = SimpleES(patience=ag_early_stop)
+        else:
+            raise ValueError(f"Invalid `ag.early_stop` value specified: `{ag_early_stop}`")
+        return early_stopping_method
+
+    def _get_early_stop_default(self):
+        return AdaptiveES(adaptive_rate=0.5, adaptive_offset=20)
+
+    def _get_early_stopping_rounds(self, num_rows_train, strategy="auto"):
+        return get_early_stopping_rounds(num_rows_train=num_rows_train, strategy=strategy)
 
     def _generate_curves(
         self,

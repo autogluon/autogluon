@@ -11,8 +11,8 @@ def get_fixed_params(framework):
         # 'seed_value': 0,  # random seed for reproducibility (set = None to ignore)
     }
     pytorch_fixed_params = {
-        "num_epochs": 500,  # maximum number of epochs (passes over full dataset) for training NN
-        "epochs_wo_improve": 20,  # we terminate training if validation performance hasn't improved in the last 'epochs_wo_improve' # of epochs
+        "num_epochs": 1000,  # maximum number of epochs (passes over full dataset) for training NN
+        "epochs_wo_improve": None,  # we terminate training if validation performance hasn't improved in the last 'epochs_wo_improve' # of epochs
     }
     return merge_framework_params(framework=framework, shared_params=fixed_params, pytorch_params=pytorch_fixed_params)
 
