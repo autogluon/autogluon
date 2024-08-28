@@ -58,6 +58,7 @@ class AutoTrainer(AbstractTrainer):
         infer_limit_batch_size=None,
         use_bag_holdout=False,
         groups=None,
+        callbacks: List[callable] = None,
         **kwargs,
     ):
         for key in kwargs:
@@ -147,6 +148,7 @@ class AutoTrainer(AbstractTrainer):
             infer_limit=infer_limit,
             infer_limit_batch_size=infer_limit_batch_size,
             groups=groups,
+            callbacks=callbacks,
         )
 
     def construct_model_templates_distillation(self, hyperparameters, **kwargs):

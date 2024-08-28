@@ -7,6 +7,7 @@ import shutil
 import sys
 import time
 import traceback
+import typing
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -27,6 +28,7 @@ from ..augmentation.distill_utils import augment_data, format_distillation_label
 from ..calibrate import calibrate_decision_threshold
 from ..calibrate.conformity_score import compute_conformity_score
 from ..calibrate.temperature_scaling import apply_temperature_scaling, tune_temperature_scaling
+from ..callbacks import AbstractCallback
 from ..constants import AG_ARGS, BINARY, MULTICLASS, QUANTILE, REFIT_FULL_NAME, REFIT_FULL_SUFFIX, REGRESSION, SOFTCLASS
 from ..data.label_cleaner import LabelCleanerMulticlassToBinary
 from ..metrics import Scorer, get_metric
@@ -196,6 +198,7 @@ class AbstractTrainer:
 
         self._time_limit = None  # Internal float of the total time limit allowed for a given fit call. Used in logging statements.
         self._time_train_start = None  # Internal timestamp of the time training started for a given fit call. Used in logging statements.
+        self._time_train_start_last = None  # Same as `self._time_train_start` except it is not reset to None after the fit call completes.
 
         self._num_rows_train = None
         self._num_cols_train = None
@@ -217,6 +220,9 @@ class AbstractTrainer:
         self._models_failed_to_train_errors = dict()  # Dict of model name -> model failure metadata
 
         # self._exceptions_list = []  # TODO: Keep exceptions list for debugging during benchmarking.
+
+        self.callbacks: List[AbstractCallback] = []
+        self._callback_early_stop = False
 
     # path_root is the directory containing learner.pkl
     @property
@@ -240,6 +246,27 @@ class AbstractTrainer:
     def has_val(self) -> bool:
         """Whether the trainer uses validation data"""
         return self._num_rows_val is not None
+
+    @property
+    def time_left(self) -> float | None:
+        """
+        Remaining time left in the fit call.
+        None if time_limit was unspecified.
+        """
+        if self._time_train_start is None:
+            return None
+        elif self._time_limit is None:
+            return None
+        time_elapsed = time.time() - self._time_train_start
+        time_left = self._time_limit - time_elapsed
+        return time_left
+
+    @property
+    def logger(self) -> logging.Logger:
+        return logger
+
+    def log(self, level: int, msg, *args, **kwargs):
+        self.logger.log(level, msg, *args, **kwargs)
 
     def load_X(self):
         if self._X_saved:
@@ -376,6 +403,7 @@ class AbstractTrainer:
         level_time_modifier=0.333,
         infer_limit=None,
         infer_limit_batch_size=None,
+        callbacks: List[AbstractCallback] = None,
     ) -> List[str]:
         """
         Trains a multi-layer stack ensemble using the input data on the hyperparameters dict input.
@@ -393,9 +421,11 @@ class AbstractTrainer:
 
         Returns a list of the model names that were trained from this method call, in order of fit.
         """
-        self._time_limit = time_limit
-        self._time_train_start = time.time()
+        self._fit_setup(time_limit=time_limit, callbacks=callbacks)
         time_train_start = self._time_train_start
+        if self.callbacks:
+            callback_classes = [c.__class__.__name__ for c in self.callbacks]
+            logger.log(20, f"User-specified callbacks ({len(self.callbacks)}): {callback_classes}")
 
         hyperparameters = self._process_hyperparameters(hyperparameters=hyperparameters)
 
@@ -419,6 +449,26 @@ class AbstractTrainer:
 
         core_kwargs = {} if core_kwargs is None else core_kwargs.copy()
         aux_kwargs = {} if aux_kwargs is None else aux_kwargs.copy()
+
+        self._callbacks_setup(
+            X=X,
+            y=y,
+            hyperparameters=hyperparameters,
+            X_val=X_val,
+            y_val=y_val,
+            X_unlabeled=X_unlabeled,
+            level_start=level_start,
+            level_end=level_end,
+            time_limit=time_limit,
+            base_model_names=base_model_names,
+            core_kwargs=core_kwargs,
+            aux_kwargs=aux_kwargs,
+            name_suffix=name_suffix,
+            level_time_modifier=level_time_modifier,
+            infer_limit=infer_limit,
+            infer_limit_batch_size=infer_limit_batch_size,
+        )
+        # TODO: Add logic for callbacks to specify that the rest of the trainer logic should be skipped in the case where they are overriding the trainer logic.
 
         model_names_fit = []
         if level_start != level_end:
@@ -457,11 +507,54 @@ class AbstractTrainer:
                 additional_full_weighted_ensemble=additional_full_weighted_ensemble,
             )
             model_names_fit += base_model_names + aux_models
-        if self.model_best is None and len(model_names_fit) != 0:
+        if (self.model_best is None or infer_limit is not None) and len(model_names_fit) != 0:
             self.model_best = self.get_model_best(can_infer=True, infer_limit=infer_limit, infer_limit_as_child=True)
-        self._time_limit = None
+        self._callbacks_conclude()
+        self._fit_cleanup()
         self.save()
         return model_names_fit
+
+    def _fit_setup(self, time_limit: float | None = None, callbacks: List[AbstractCallback] = None):
+        """
+        Prepare the trainer state at the start of / prior to a fit call.
+        Should be paired with a `self._fit_cleanup()` at the conclusion of the fit call.
+        """
+        self._time_train_start = time.time()
+        self._time_train_start_last = self._time_train_start
+        self._time_limit = time_limit
+        self.reset_callbacks()
+        if callbacks is not None:
+            assert isinstance(callbacks, list), f"`callbacks` must be a list. Found invalid type: `{type(callbacks)}`."
+            for callback in callbacks:
+                assert isinstance(
+                    callback, AbstractCallback
+                ), f"Elements in `callbacks` must be of type AbstractCallback. Found invalid type: `{type(callback)}`."
+        else:
+            callbacks = []
+        self.callbacks = callbacks
+
+    def _fit_cleanup(self):
+        """
+        Cleanup the trainer state after fit call completes.
+        This ensures that future fit calls are not corrupted by prior fit calls.
+        Should be paired with an earlier `self._fit_setup()` call.
+        """
+        self._time_limit = None
+        self._time_train_start = None
+        self.reset_callbacks()
+
+    def _callbacks_setup(self, **kwargs):
+        for callback in self.callbacks:
+            callback.before_trainer_fit(trainer=self, **kwargs)
+
+    def _callbacks_conclude(self):
+        for callback in self.callbacks:
+            callback.after_trainer_fit(trainer=self)
+
+    def reset_callbacks(self):
+        """Deletes callback objects and resets `self._callback_early_stop` to False."""
+        self.callbacks = []
+        self._callback_early_stop = False
 
     # TODO: Consider better greedy approximation method such as via fitting a weighted ensemble to evaluate the value of a subset.
     def _filter_base_models_via_infer_limit(
@@ -651,6 +744,8 @@ class AbstractTrainer:
         If self.bagged_mode, then models will be trained as StackerEnsembleModels.
         The data provided in this method should not contain stack features, as they will be automatically generated if necessary.
         """
+        if self._callback_early_stop:
+            return []
         if get_models_func is None:
             get_models_func = self.construct_model_templates
         if base_model_names is None:
@@ -773,7 +868,7 @@ class AbstractTrainer:
         X,
         y,
         base_model_names: List[str],
-        level,
+        level: int | str = "auto",
         fit=True,
         stack_name="aux1",
         time_limit=None,
@@ -791,6 +886,8 @@ class AbstractTrainer:
         Level must be greater than the level of any of the base models.
         Auxiliary models never use the original features and only train with the predictions of other models as features.
         """
+        if self._callback_early_stop:
+            return []
         if fit_weighted_ensemble is False:
             # Skip fitting of aux models
             return []
@@ -800,6 +897,15 @@ class AbstractTrainer:
         if len(base_model_names) == 0:
             logger.log(20, f"No base models to train on, skipping auxiliary stack level {level}...")
             return []
+
+        if isinstance(level, str):
+            assert level == "auto", f"level must be 'auto' if str, found: {level}"
+            levels_dict = self.get_models_attribute_dict(attribute="level", models=base_model_names)
+            base_model_level_max = None
+            for k, v in levels_dict.items():
+                if base_model_level_max is None or v > base_model_level_max:
+                    base_model_level_max = v
+            level = base_model_level_max + 1
 
         if infer_limit_batch_size is not None:
             ag_args_fit = dict()
@@ -1582,7 +1688,7 @@ class AbstractTrainer:
             models_predict_1_time = self.get_models_attribute_full(models=models, attribute=predict_1_time_attribute)
             models_og = copy.deepcopy(models)
             for model_key in models_predict_1_time:
-                if models_predict_1_time[model_key] > infer_limit:
+                if models_predict_1_time[model_key] is None or models_predict_1_time[model_key] > infer_limit:
                     models.remove(model_key)
             if models_og and not models:
                 # get the fastest model
@@ -2267,6 +2373,20 @@ class AbstractTrainer:
         Returns a list of successfully trained and saved model names.
         Models trained from this method will be accessible in this Trainer.
         """
+        if self._callback_early_stop:
+            return []
+        check_callbacks = k_fold_start == 0 and n_repeat_start == 0
+        skip_model = False
+        if self.callbacks and check_callbacks:
+            skip_model, time_limit = self._callbacks_before_fit(
+                model=model,
+                time_limit=time_limit,
+                stack_name=stack_name,
+                level=level,
+            )
+        if self._callback_early_stop or skip_model:
+            return []
+
         model_fit_kwargs = self._get_model_fit_kwargs(
             X=X, X_val=X_val, time_limit=time_limit, k_fold=k_fold, fit_kwargs=fit_kwargs, ens_sample_weight=kwargs.get("ens_sample_weight", None)
         )
@@ -2357,8 +2477,55 @@ class AbstractTrainer:
                 total_resources=total_resources,
                 **model_fit_kwargs,
             )
+        if self.callbacks and check_callbacks:
+            self._callbacks_after_fit(model_names=model_names_trained, stack_name=stack_name, level=level)
         self.save()
         return model_names_trained
+
+    def _callbacks_before_fit(
+        self,
+        *,
+        model: AbstractModel,
+        time_limit: float | None,
+        stack_name: str,
+        level: int,
+    ):
+        skip_model = False
+        ts = time.time()
+        for callback in self.callbacks:
+            callback_early_stop, callback_skip_model = callback.before_model_fit(
+                trainer=self,
+                model=model,
+                time_limit=time_limit,
+                stack_name=stack_name,
+                level=level,
+            )
+            if callback_early_stop:
+                self._callback_early_stop = True
+            if callback_skip_model:
+                skip_model = True
+            if time_limit is not None:
+                te = time.time()
+                time_limit -= te - ts
+                ts = te
+        return skip_model, time_limit
+
+    def _callbacks_after_fit(
+        self,
+        *,
+        model_names: List[str],
+        stack_name: str,
+        level: int,
+    ):
+        for callback in self.callbacks:
+            callback_early_stop = callback.after_model_fit(
+                self,
+                model_names=model_names,
+                stack_name=stack_name,
+                level=level,
+            )
+            if callback_early_stop:
+                self._callback_early_stop = True
 
     # TODO: How to deal with models that fail during this? They have trained valid models before, but should we still use those models or remove the entire model? Currently we still use models.
     # TODO: Time allowance can be made better by only using time taken during final model training and not during HPO and feature pruning.
@@ -2393,6 +2560,8 @@ class AbstractTrainer:
                     break
             logger.log(20, f"Repeating k-fold bagging: {n+1}/{n_repeats}")
             for i, model in enumerate(models_valid):
+                if self._callback_early_stop:
+                    break
                 if not self.get_model_attribute(model=model, attribute="can_fit"):
                     if isinstance(model, str):
                         models_valid_next.append(model)
@@ -2554,6 +2723,8 @@ class AbstractTrainer:
         else:
             time_limit_model_split = time_limit
         for i, model in enumerate(models):
+            if self._callback_early_stop:
+                return models_valid
             if isinstance(model, str):
                 model = self.load_model(model)
             elif self.low_memory:
@@ -2904,10 +3075,13 @@ class AbstractTrainer:
         model_types = self.get_models_attribute_dict(attribute="type", models=model_names)
         return model_names, model_paths, model_types
 
-    # Sums the attribute value across all models that the provided model depends on, including itself.
-    # For instance, this function can return the expected total predict_time of a model.
-    # attribute is the name of the desired attribute to be summed, or a dictionary of model name -> attribute value if the attribute is not present in the graph.
-    def get_model_attribute_full(self, model: Union[str, List[str]], attribute: str, func=sum):
+    def get_model_attribute_full(self, model: Union[str, List[str]], attribute: str, func=sum) -> Union[float, int]:
+        """
+        Sums the attribute value across all models that the provided model depends on, including itself.
+        For instance, this function can return the expected total predict_time of a model.
+        attribute is the name of the desired attribute to be summed,
+        or a dictionary of model name -> attribute value if the attribute is not present in the graph.
+        """
         if isinstance(model, list):
             base_model_set = self.get_minimum_models_set(model)
         else:
@@ -2947,8 +3121,10 @@ class AbstractTrainer:
             d[model] = self.get_model_attribute_full(model=model, attribute=attribute, func=func)
         return d
 
-    # Returns dictionary of model name -> attribute value for the provided attribute
-    def get_models_attribute_dict(self, attribute, models: list = None) -> dict:
+    def get_models_attribute_dict(self, attribute: str, models: list = None) -> Dict[str, Any]:
+        """
+        Returns dictionary of model name -> attribute value for the provided attribute.
+        """
         models_attribute_dict = nx.get_node_attributes(self.model_graph, attribute)
         if models is not None:
             model_names = []
@@ -2962,7 +3138,7 @@ class AbstractTrainer:
                 models_attribute_dict = {key: val for key, val in models_attribute_dict.items() if key in model_names}
         return models_attribute_dict
 
-    def get_model_attribute(self, model, attribute: str, **kwargs):
+    def get_model_attribute(self, model, attribute: str, **kwargs) -> Any:
         """
         Return model attribute value.
         If `default` is specified, return default value if attribute does not exist.
@@ -3352,7 +3528,7 @@ class AbstractTrainer:
 
         problem_type = self.problem_type
         eval_metric = self.eval_metric.name
-        time_train_start = self._time_train_start
+        time_train_start = self._time_train_start_last
         num_rows_train = self._num_rows_train
         num_cols_train = self._num_cols_train
         num_rows_val = self._num_rows_val
