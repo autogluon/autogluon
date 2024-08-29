@@ -611,9 +611,24 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                                 Set to 0 to disable usage of GPUs.
                     ag_args_ensemble: Dictionary of hyperparameters shared by all models that control how they are ensembled, if bag mode is enabled.
                         Valid keys:
-                            use_orig_features: (bool) Whether a stack model will use the original features along with the stack features to train (akin to skip-connections). If the model has no stack features (no base models), this value is ignored and the stack model will use the original features.
-                            max_base_models: (int, default=25) Maximum number of base models whose predictions form the features input to this stacker model. If more than `max_base_models` base models are available, only the top `max_base_models` models with highest validation score are used.
-                            max_base_models_per_type: (int, default=5) Similar to `max_base_models`. If more than `max_base_models_per_type` of any particular model type are available, only the top `max_base_models_per_type` of that type are used. This occurs before the `max_base_models` filter.
+                            use_orig_features: [True, False, "never"], default True
+                                Whether a stack model will use the original features along with the stack features to train (akin to skip-connections).
+                                If True, will use the original data features.
+                                If False, will discard the original data features and only use stack features, except when no stack features exist (such as in layer 1).
+                                If "never", will always discard the original data features. Will be skipped in layer 1.
+                            valid_stacker : bool, default True
+                                If True, will be marked as valid to include as a stacker model.
+                                If False, will only be fit as a base model (layer 1) and will not be fit in stack layers (layer 2+).
+                            max_base_models : int, default 0
+                                Maximum number of base models whose predictions form the features input to this stacker model.
+                                If more than `max_base_models` base models are available, only the top `max_base_models` models with highest validation score are used.
+                                If 0, the logic is skipped.
+                            max_base_models_per_type : int | str, default "auto"
+                                Similar to `max_base_models`. If more than `max_base_models_per_type` of any particular model type are available,
+                                only the top `max_base_models_per_type` of that type are used. This occurs before the `max_base_models` filter.
+                                If "auto", the value will be adaptively set based on the number of training samples.
+                                    More samples will lead to larger values, starting at 1 with <1000 samples, increasing up to 12 at >=50000 samples.
+                                If 0, the logic is skipped.
                             num_folds: (int, default=None) If specified, the number of folds to fit in the bagged model.
                                 If specified, overrides any other value used to determine the number of folds such as predictor.fit `num_bag_folds` argument.
                             max_sets: (int, default=None) If specified, the maximum sets to fit in the bagged model.
