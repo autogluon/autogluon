@@ -1027,7 +1027,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 20,
                 "No presets specified! To achieve strong results with AutoGluon, it is recommended to use the available presets. Defaulting to `'medium_quality'`...\n"
                 "\tRecommended Presets (For more details refer to https://auto.gluon.ai/stable/tutorials/tabular/tabular-essentials.html#presets):\n"
-                "\tpresets='best_quality'   : Maximize accuracy. Use this for competitions, benchmarks, and quality sensitive tasks. Default time_limit=3600.\n"
+                "\tpresets='best_quality'   : Maximize accuracy. Recommended for most users. Use in competitions and benchmarks. Default time_limit=3600.\n"
                 "\tpresets='high_quality'   : Strong accuracy with fast inference speed. Default time_limit=3600.\n"
                 "\tpresets='good_quality'   : Good accuracy with very fast inference speed. Default time_limit=3600.\n"
                 "\tpresets='medium_quality' : Fast training time, ideal for initial prototyping.",
