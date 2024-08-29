@@ -732,8 +732,10 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 To further improve predictions, avoid increasing `num_bag_folds` much beyond 10 and instead increase `num_bag_sets`.
             num_bag_sets : int, default = None
                 Number of repeats of kfold bagging to perform (values must be >= 1). Total number of models trained during bagging = `num_bag_folds * num_bag_sets`.
-                Defaults to 1 if `time_limit` is not specified, otherwise 20 (always disabled if `num_bag_folds` is not specified).
+                Defaults to 1 when unspecified. Value is ignored if `num_bag_folds<=2`.
                 Values greater than 1 will result in superior predictive performance, especially on smaller problems and with stacking enabled (reduces overall variance).
+                Be warned: This will drastically increase overall runtime, and if using a time limit, can very commonly lead to worse performance.
+                It is recommended to increase this value only as a last resort, as it is the least computationally efficient method to improve performance.
             num_stack_levels : int, default = None
                 Number of stacking levels to use in stack ensemble. Roughly increases model training time by factor of `num_stack_levels+1` (set = 0 to disable stack ensembling).
                 Disabled by default (0), but we recommend values between 1-3 to maximize predictive performance.
@@ -5105,13 +5107,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         if num_stack_levels != 0 and num_bag_folds == 0:
             raise ValueError(f"num_stack_levels must be 0 if num_bag_folds is 0. (num_stack_levels={num_stack_levels}, num_bag_folds={num_bag_folds})")
         if num_bag_sets is None:
-            if num_bag_folds >= 2:
-                if time_limit is not None:
-                    num_bag_sets = 5
-                else:
-                    num_bag_sets = 1
-            else:
-                num_bag_sets = 1
+            num_bag_sets = 1
         if not isinstance(num_bag_sets, int):
             raise ValueError(f"num_bag_sets must be an integer. (num_bag_sets={num_bag_sets})")
         if not isinstance(dynamic_stacking, bool):
