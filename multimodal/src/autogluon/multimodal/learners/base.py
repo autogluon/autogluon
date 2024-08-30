@@ -1334,13 +1334,19 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             model=model,
         )
 
+        best_score = (
+            trainer.callback_metrics[f"val_{self._validation_metric_name}"].item()
+            if f"val_{self._validation_metric_name}" in trainer.callback_metrics
+            else self._best_score
+        )  # https://github.com/autogluon/autogluon/issues/4428
+
         return dict(
             config=config,
             df_preprocessor=df_preprocessor,
             data_processors=data_processors,
             model=model,
             model_postprocess_fn=model_postprocess_fn,
-            best_score=trainer.callback_metrics[f"val_{self._validation_metric_name}"].item(),
+            best_score=best_score,
             strategy=strategy,
             strict_loading=not peft_param_names,
         )
