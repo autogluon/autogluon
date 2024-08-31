@@ -44,7 +44,7 @@ from ..utils import (
     get_pred_from_proba,
     infer_eval_metric,
 )
-from ..utils.exceptions import NoGPUError, NotEnoughCudaMemoryError, NotEnoughMemoryError, NoValidFeatures, TimeLimitExceeded
+from ..utils.exceptions import NoGPUError, NotEnoughCudaMemoryError, NotEnoughMemoryError, NotValidStacker, NoStackFeatures, NoValidFeatures, TimeLimitExceeded
 from ..utils.feature_selection import FeatureSelector
 from ..utils.loaders import load_pkl
 from ..utils.savers import save_json, save_pkl
@@ -2113,6 +2113,10 @@ class AbstractTrainer:
                 logger.log(20, f"\tTime limit exceeded... Skipping {model.name}.")
             elif isinstance(err, NotEnoughMemoryError):
                 logger.warning(f"\tNot enough memory to train {model.name}... Skipping this model.")
+            elif isinstance(err, NoStackFeatures):
+                logger.warning(f"\tNo stack features to train {model.name}... Skipping this model. {err}")
+            elif isinstance(err, NotValidStacker):
+                logger.warning(f"\tStacking disabled for {model.name}... Skipping this model. {err}")
             elif isinstance(err, NoValidFeatures):
                 logger.warning(f"\tNo valid features to train {model.name}... Skipping this model.")
             elif isinstance(err, NoGPUError):
@@ -2441,8 +2445,15 @@ class AbstractTrainer:
                 if len(hpo_models) == 0:
                     logger.warning(f"No model was trained during hyperparameter tuning {model.name}... Skipping this model.")
             except Exception as err:
-                logger.exception(f"Warning: Exception caused {model.name} to fail during hyperparameter tuning... Skipping this model.")
-                logger.warning(err)
+                if isinstance(err, NoStackFeatures):
+                    logger.warning(f"\tNo stack features to train {model.name}... Skipping this model. {err}")
+                elif isinstance(err, NotValidStacker):
+                    logger.warning(f"\tStacking disabled for {model.name}... Skipping this model. {err}")
+                elif isinstance(err, NoValidFeatures):
+                    logger.warning(f"\tNo valid features to train {model.name}... Skipping this model.")
+                else:
+                    logger.exception(f"Warning: Exception caused {model.name} to fail during hyperparameter tuning... Skipping this model.")
+                    logger.warning(err)
                 del model
                 model_names_trained = []
             else:

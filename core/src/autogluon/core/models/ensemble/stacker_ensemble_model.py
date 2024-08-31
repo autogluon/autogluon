@@ -14,6 +14,7 @@ from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.features.types import R_FLOAT, S_STACK
 
 from ...constants import MULTICLASS, QUANTILE, SOFTCLASS
+from ...utils.exceptions import NoStackFeatures, NotValidStacker
 from ..abstract.abstract_model import AbstractModel
 from .bagged_ensemble_model import BaggedEnsembleModel
 
@@ -32,6 +33,33 @@ class StackerEnsembleModel(BaggedEnsembleModel):
     This property allows for significantly improved model quality in many situations compared to non-stacking alternatives.
 
     Stacker models can act as base models to other stacker models, enabling multi-layer stack ensembling.
+
+    Stacker kwargs can be specified in the `"ag_args_ensemble"` dictionary. For example:
+    ```
+    predictor = TabularPredictor(...).fit(..., hyperparameters={"GBM": [{"ag_args_ensemble": {"max_base_models_per_type": 0}}]})
+    ```
+
+    Parameters
+    ----------
+    **kwargs
+        use_orig_features : [True, False, "never"], default True
+            If True, will use the original data features.
+            If False, will discard the original data features and only use stack features, except when no stack features exist (such as in layer 1).
+            If "never", will always discard the original data features. Will raise a NoStackFeatures exception if no stack features exist (skipping in layer 1).
+        valid_stacker : bool, default True
+            If True, will be marked as valid to include as a stacker model.
+            If False, will only be fit as a base model (layer 1) and will not be fit in stack layers (layer 2+).
+        max_base_models : int, default 0
+            Maximum number of base models whose predictions form the features input to this stacker model.
+            If more than `max_base_models` base models are available, only the top `max_base_models` models with highest validation score are used.
+            If 0, the logic is skipped.
+        max_base_models_per_type : int | str, default "auto"
+            Similar to `max_base_models`. If more than `max_base_models_per_type` of any particular model type are available,
+            only the top `max_base_models_per_type` of that type are used. This occurs before the `max_base_models` filter.
+            If "auto", the value will be adaptively set based on the number of training samples.
+                More samples will lead to larger values, starting at 1 with <1000 samples, increasing up to 12 at >=50000 samples.
+            If 0, the logic is skipped.
+        Refer to BaggedEnsembleModel documentation for additional kwargs
     """
 
     def __init__(
@@ -97,6 +125,23 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         feature_metadata = self._remove_unused_stack_in_feature_metadata(feature_metadata=feature_metadata)
         return feature_metadata
 
+    def _validate_params(self):
+        """
+        Verify correctness of self.params
+        """
+        super()._validate_params()
+
+        valid_use_orig_features_values = [True, False, "never"]
+        if self.params["use_orig_features"] not in valid_use_orig_features_values:
+            raise ValueError(f"use_orig_params must be one of {valid_use_orig_features_values}. (`use_orig_params`={self.params['use_orig_features']})")
+        if isinstance(self.params["use_orig_features"], str) and self.params["use_orig_features"] == "never" and not self.base_model_names:
+            raise NoStackFeatures(f"(use_orig_features={self.params['use_orig_features']})")
+
+        if not isinstance(self.params["valid_stacker"], bool):
+            raise TypeError(f"valid_stacker must be one of [True, False]. (`valid_stacker={self.params['valid_stacker']})")
+        if not self.params["valid_stacker"] and self.base_model_names:
+            raise NotValidStacker(f"(valid_stacker={self.params['valid_stacker']})")
+
     def _get_dynamic_max_base_models_per_type(self, X: pd.DataFrame):
         num_rows = len(X)
         if num_rows < 1000:
@@ -156,12 +201,20 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         return self.limit_models_per_type(models=models, model_types=model_types, model_scores=model_scores, max_base_models_per_type=max_base_models)
 
     def _set_default_params(self):
-        default_params = {"use_orig_features": True, "max_base_models": 0, "max_base_models_per_type": "auto"}
+        default_params = {
+            "use_orig_features": True,
+            "valid_stacker": True,
+            "max_base_models": 0,
+            "max_base_models_per_type": "auto",
+        }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
         super()._set_default_params()
 
     def preprocess(self, X, fit=False, compute_base_preds=True, infer=True, model_pred_proba_dict=None, **kwargs):
+        use_orig_features = self.params["use_orig_features"]
+        use_orig_features_l1 = isinstance(use_orig_features, bool)
+        use_orig_features_in_stack = use_orig_features_l1 and use_orig_features  # use_orig_features == True
         if self.stack_column_prefix_lst:
             if infer:
                 if set(self.stack_columns).issubset(set(list(X.columns))):
@@ -185,12 +238,16 @@ class StackerEnsembleModel(BaggedEnsembleModel):
                         y_pred_proba
                     )  # TODO: This could get very large on a high class count problem. Consider capping to top N most frequent classes and merging least frequent
                 X_stacker = self.pred_probas_to_df(X_stacker, index=X.index)
-                if self.params["use_orig_features"]:
+                if use_orig_features_in_stack:
                     X = pd.concat([X_stacker, X], axis=1)
                 else:
                     X = X_stacker
-            elif not self.params["use_orig_features"]:
+            elif not use_orig_features_in_stack:
                 X = X[self.stack_columns]
+        elif not use_orig_features_l1:
+            # use_orig_features == "never"
+            raise NoStackFeatures(f"(use_orig_features={use_orig_features}) NOTE: This should never trigger. Please submit a GitHub issue.")
+
         X = super().preprocess(X, **kwargs)
         return X
 

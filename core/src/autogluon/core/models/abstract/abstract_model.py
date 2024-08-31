@@ -241,6 +241,7 @@ class AbstractModel:
             self.params.update(hyperparameters)
             self.nondefault_params = list(hyperparameters.keys())[:]  # These are hyperparameters that user has specified.
         self.params_trained = dict()
+        self._validate_params()
 
     def _init_params_aux(self):
         """
@@ -253,6 +254,14 @@ class AbstractModel:
         if hyperparameters_aux is not None:
             self.params_aux.update(hyperparameters_aux)
         self._validate_params_aux()
+
+    # TODO: Consider validating before fit call to avoid executing a ray task when it will immediately fail this check in distributed mode
+    # TODO: Consider avoiding logging `Fitting model: xyz...` if this fails for particular error types.
+    def _validate_params(self):
+        """
+        Verify correctness of self.params
+        """
+        pass
 
     def _validate_params_aux(self):
         """
