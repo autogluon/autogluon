@@ -353,6 +353,8 @@ class AbstractTabularLearner(AbstractLearner):
         predict_proba_dict = self.predict_proba_multi(
             X=X, models=models, as_pandas=as_pandas, transform_features=transform_features, inverse_transform=inverse_transform
         )
+        if self.problem_type in [REGRESSION, QUANTILE]:
+            return predict_proba_dict
         predict_dict = {}
         for m in predict_proba_dict:
             predict_dict[m] = self.get_pred_from_proba(
