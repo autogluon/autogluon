@@ -11,6 +11,8 @@ on:
       - 'cloud/**'
       - '.github/workflows/cloud_continuous_integration.yml'
       - '.github/workflow_scripts/test_cloud.sh'
+    branches:
+      - 'master'
 
 permissions:
   id-token: write
