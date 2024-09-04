@@ -3,6 +3,8 @@ name: Continuous Integration
 on:
   push:
   pull_request_target:
+    branches:
+      - 'master'
 
 permissions:
   id-token: write
