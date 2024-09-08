@@ -69,11 +69,8 @@ class SimpleGluonTSDataset(GluonTSDataset):
         self.prediction_length = prediction_length
 
         # Replace inefficient groupby ITEMID with indptr that stores start:end of each time series
-        item_id_index = target_df.index.get_level_values(ITEMID)
-        indices_sizes = item_id_index.value_counts(sort=False)
-        self.item_ids = indices_sizes.index  # shape [num_items]
-        cum_sizes = indices_sizes.values.cumsum()
-        self.indptr = np.append(0, cum_sizes).astype(np.int32)
+        self.indptr = target_df.indptr
+        self.item_ids = target_df.item_ids
         self.start_timestamps = target_df.reset_index(TIMESTAMP).groupby(level=ITEMID, sort=False).first()[TIMESTAMP]
         assert len(self.item_ids) == len(self.start_timestamps)
 

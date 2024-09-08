@@ -340,13 +340,15 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
 
         Saves per-item residuals to `self.residuals_std_per_item` and average std to `self._avg_residuals_std`.
         """
-        residuals = val_df[MLF_TARGET] - self._mlf.models_["mean"].predict(val_df)
+        residuals_df = val_df[[MLF_ITEMID, MLF_TARGET]]
+        residuals_df = residuals_df.assign(y_pred=self._mlf.models_["mean"].predict(val_df))
+        if self._scaler is not None:
+            # Scaler expects to find column MLF_TIMESTAMP even though it's not used - fill with dummy
+            residuals_df = residuals_df.assign(**{MLF_TIMESTAMP: 1})
+            residuals_df = self._scaler.inverse_transform(residuals_df)
+        residuals = residuals_df[MLF_TARGET] - residuals_df["y_pred"]
         self._residuals_std_per_item = residuals.pow(2.0).groupby(val_df[MLF_ITEMID], sort=False).mean().pow(0.5)
         self._avg_residuals_std = np.sqrt(residuals.pow(2.0).mean())
-
-    def _get_scale_per_item(self, item_ids: pd.Index) -> pd.Series:
-        """Extract the '_scale' values from the scaler object, if available."""
-        raise NotImplementedError
 
     def _remove_short_ts_and_generate_fallback_forecast(
         self,
@@ -399,7 +401,6 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         """
         from scipy.stats import norm
 
-        scale_per_item = self._get_scale_per_item(repeated_item_ids.unique())
         num_items = int(len(predictions) / self.prediction_length)
         sqrt_h = np.sqrt(np.arange(1, self.prediction_length + 1))
         # Series where normal_scale_per_timestep.loc[item_id].loc[N] = sqrt(1 + N) for N in range(prediction_length)
@@ -409,7 +410,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         # Use avg_residuals_std in case unseen item received for prediction
         if residuals_std_per_timestep.isna().any():
             residuals_std_per_timestep = residuals_std_per_timestep.fillna(value=self._avg_residuals_std)
-        std_per_timestep = residuals_std_per_timestep * scale_per_item * normal_scale_per_timestep
+        std_per_timestep = residuals_std_per_timestep * normal_scale_per_timestep
         for q in self.quantile_levels:
             predictions[str(q)] = predictions["mean"] + norm.ppf(q) * std_per_timestep.to_numpy()
         return predictions
@@ -558,10 +559,6 @@ class DirectTabularModel(AbstractMLForecastModel):
         column_order = ["mean"] + [col for col in predictions.columns if col != "mean"]
         return predictions[column_order]
 
-    def _get_scale_per_item(self, item_ids: pd.Index) -> pd.Series:
-        # Rescaling is applied in the inverse_transform step, no need to scale predictions
-        return pd.Series(1.0, index=item_ids)
-
     def _get_extra_tabular_init_kwargs(self) -> dict:
         if self.is_quantile_model:
             return {
@@ -670,9 +667,3 @@ class RecursiveTabularModel(AbstractMLForecastModel):
             "problem_type": ag.constants.REGRESSION,
             "eval_metric": self.eval_metric.equivalent_tabular_regression_metric or "mean_absolute_error",
         }
-
-    def _get_scale_per_item(self, item_ids: pd.Index) -> pd.Series:
-        if self._scaler is not None:
-            return self._scaler.stats_["_scale"].copy().reindex(item_ids)
-        else:
-            return pd.Series(1.0, index=item_ids)

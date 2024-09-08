@@ -9,6 +9,7 @@ from itertools import islice
 from pathlib import Path
 from typing import Any, List, Optional, Tuple, Type, Union
 
+import numpy as np
 import pandas as pd
 from joblib.parallel import Parallel, delayed
 from pandas.core.internals import ArrayManager, BlockManager
@@ -1008,3 +1009,11 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
         # This hides method from IPython autocomplete, but not VSCode autocomplete
         deprecated = ["get_reindexed_view", "to_regular_index"]
         return [d for d in super().__dir__() if d not in deprecated]
+
+    @property
+    def indptr(self) -> np.ndarray:
+        """An array indicating the start and end indices of each time series."""
+        if not self.index.is_monotonic_increasing:
+            raise ValueError("TimeSeriesDataFrame must be sorted to use `indptr`.")
+        cum_sizes = self.num_timesteps_per_item().values.cumsum()
+        return np.append(0, cum_sizes).astype(np.int32)
