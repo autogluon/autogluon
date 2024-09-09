@@ -68,6 +68,7 @@ jobs:
           environment-file: .github/workflows_env/unittest_env.yml
           auto-update-conda: true
           python-version: ${{ matrix.python }}
+          miniconda-version: "latest"
       - name: unit-test
         shell: bash -l {0}
         run: |
@@ -100,6 +101,7 @@ jobs:
           environment-file: .github/workflows_env/unittest_env.yml
           auto-update-conda: true
           python-version: ${{ matrix.python }}
+          miniconda-version: "latest"
       - name: unit-test
         shell: bash -l {0}
         run: |
@@ -132,6 +134,7 @@ jobs:
           environment-file: .github/workflows_env/unittest_env.yml
           auto-update-conda: true
           python-version: ${{ matrix.python }}
+          miniconda-version: "latest"
       - name: unit-test
         shell: bash -l {0}
         run: |
@@ -197,6 +200,7 @@ jobs:
           environment-file: .github/workflows_env/unittest_env.yml
           auto-update-conda: true
           python-version: ${{ matrix.python }}
+          miniconda-version: "latest"
       - name: Setup OMP
         if: matrix.os == 'macos-latest'
         shell: bash -l {0}
@@ -239,6 +243,7 @@ jobs:
           environment-file: .github/workflows_env/unittest_env.yml
           auto-update-conda: true
           python-version: ${{ matrix.python }}
+          miniconda-version: "latest"
       - name: Setup OMP
         if: matrix.os == 'macos-latest'
         shell: bash -l {0}
@@ -280,6 +285,7 @@ jobs:
           environment-file: .github/workflows_env/unittest_env.yml
           auto-update-conda: true
           python-version: ${{ matrix.python }}
+          miniconda-version: "latest"
       - name: unit-test
         if: matrix.os != 'windows-latest'
         shell: bash -l {0}
