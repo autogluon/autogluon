@@ -62,12 +62,13 @@ jobs:
         if: (github.event_name == 'schedule')
         uses: actions/checkout@v2
       - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@v2.0.0
+        uses: conda-incubator/setup-miniconda@v3
         with:
           activate-environment: autogluon_py3
           environment-file: .github/workflows_env/unittest_env.yml
           auto-update-conda: true
           python-version: ${{ matrix.python }}
+          miniconda-version: "latest"
       - name: unit-test
         shell: bash -l {0}
         run: |
@@ -94,12 +95,13 @@ jobs:
         if: (github.event_name == 'schedule')
         uses: actions/checkout@v2
       - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@v2.0.0
+        uses: conda-incubator/setup-miniconda@v3
         with:
           activate-environment: autogluon_py3
           environment-file: .github/workflows_env/unittest_env.yml
           auto-update-conda: true
           python-version: ${{ matrix.python }}
+          miniconda-version: "latest"
       - name: unit-test
         shell: bash -l {0}
         run: |
@@ -126,12 +128,13 @@ jobs:
         if: (github.event_name == 'schedule')
         uses: actions/checkout@v2
       - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@v2.0.0
+        uses: conda-incubator/setup-miniconda@v3
         with:
           activate-environment: autogluon_py3
           environment-file: .github/workflows_env/unittest_env.yml
           auto-update-conda: true
           python-version: ${{ matrix.python }}
+          miniconda-version: "latest"
       - name: unit-test
         shell: bash -l {0}
         run: |
@@ -158,7 +161,7 @@ jobs:
   #       if: (github.event_name == 'schedule')
   #       uses: actions/checkout@v2
   #     - name: Setup Miniconda
-  #       uses: conda-incubator/setup-miniconda@v2.0.0
+  #       uses: conda-incubator/setup-miniconda@v3
   #       with:
   #         activate-environment: autogluon_py3
   #         environment-file: .github/workflows_env/unittest_env.yml
@@ -191,12 +194,13 @@ jobs:
         if: (github.event_name == 'schedule')
         uses: actions/checkout@v2
       - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@v2.0.0
+        uses: conda-incubator/setup-miniconda@v3
         with:
           activate-environment: autogluon_py3
           environment-file: .github/workflows_env/unittest_env.yml
           auto-update-conda: true
           python-version: ${{ matrix.python }}
+          miniconda-version: "latest"
       - name: Setup OMP
         if: matrix.os == 'macos-latest'
         shell: bash -l {0}
@@ -233,12 +237,13 @@ jobs:
         if: (github.event_name == 'schedule')
         uses: actions/checkout@v2
       - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@v2.0.0
+        uses: conda-incubator/setup-miniconda@v3
         with:
           activate-environment: autogluon_py3
           environment-file: .github/workflows_env/unittest_env.yml
           auto-update-conda: true
           python-version: ${{ matrix.python }}
+          miniconda-version: "latest"
       - name: Setup OMP
         if: matrix.os == 'macos-latest'
         shell: bash -l {0}
@@ -274,12 +279,13 @@ jobs:
         if: (github.event_name == 'schedule')
         uses: actions/checkout@v2
       - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@v2.0.0
+        uses: conda-incubator/setup-miniconda@v3
         with:
           activate-environment: autogluon_py3
           environment-file: .github/workflows_env/unittest_env.yml
           auto-update-conda: true
           python-version: ${{ matrix.python }}
+          miniconda-version: "latest"
       - name: unit-test
         if: matrix.os != 'windows-latest'
         shell: bash -l {0}
