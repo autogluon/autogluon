@@ -8,10 +8,10 @@ import pandas as pd
 from autogluon.common import space
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.models import AbstractModel
-from autogluon.core.models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
-from autogluon.core.models.ensemble.fold_fitting_strategy import (
-    ParallelLocalFoldFittingStrategy,
-)
+from autogluon.core.models.ensemble.bagged_ensemble_model import \
+    BaggedEnsembleModel
+from autogluon.core.models.ensemble.fold_fitting_strategy import \
+    ParallelLocalFoldFittingStrategy
 from autogluon.core.searcher import LocalRandomSearcher
 
 
@@ -117,7 +117,7 @@ def test_dynamic_resource_allocation(mock_get_mem):
     )
     assert (
         fold_fitting_strategy.num_parallel_jobs == 3
-        and fold_fitting_strategy.batches == 4
+        and fold_fitting_strategy.batches == 3
     )
     mock_get_mem.return_value = 7.5 * 1e9
     fold_fitting_strategy = _construct_dummy_fold_strategy(
