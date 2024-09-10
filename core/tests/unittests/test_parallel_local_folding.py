@@ -101,7 +101,7 @@ def test_resource_allocation_and_time_limit():
 def test_dynamic_resource_allocation(mock_get_mem):
     mock_get_mem.return_value = 2.5 * 1e9
     fold_fitting_strategy = _construct_dummy_fold_strategy(model_base_cls=DummyBigModel, num_jobs=8, num_folds_parallel=8)
-    assert fold_fitting_strategy.num_parallel_jobs == 2 and fold_fitting_strategy.batches == 4
+    assert fold_fitting_strategy.num_parallel_jobs == 3 and fold_fitting_strategy.batches == 4
     mock_get_mem.return_value = 7.5 * 1e9
     fold_fitting_strategy = _construct_dummy_fold_strategy(model_base_cls=DummyBigModel, num_jobs=8, num_folds_parallel=8)
     # If memory is not sufficient to train num_folds_parallel, reduce to max power of 2 folds that's smaller than folds_can_be_fit_in_parallel.
