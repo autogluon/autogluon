@@ -32,7 +32,7 @@ jobs:
         id: pr_info
         run: |
           # Use the GitHub API to fetch information about the pull request
-          pr_info=$(curl -s -H "Authorization: token ${{ secrets.PAT }}" \
+          pr_info=$(curl -s -H "Authorization: token ${{ secrets.CICD_PAT }}" \
                       "https://api.github.com/repos/${{ github.repository }}/pulls/${{ steps.pr_number.outputs.result }}")
 
           # Extract the forked repository and branch from the pull request info
@@ -46,7 +46,7 @@ jobs:
         id: scd
         uses: peter-evans/slash-command-dispatch@v4
         with:
-          token: ${{ secrets.PAT }}
+          token: ${{ secrets.CICD_PAT }}
           permission: write
           commands: |
             benchmark

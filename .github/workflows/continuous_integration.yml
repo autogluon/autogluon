@@ -84,7 +84,7 @@ jobs:
   #         /bin/bash ./.github/workflow_scripts/version_diff.sh
   #     - name: Update pull request with diff
   #       env:
-  #         GH_TOKEN: ${{ secrets.PAT }}
+  #         GH_TOKEN: ${{ secrets.CICD_PAT }}
   #       run: |
   #         pr_number=$(jq --raw-output .pull_request.number "$GITHUB_EVENT_PATH")
   #         comment_body=$(jq -n --arg body "`cat ./table_output.txt`" '{body: $body}')
