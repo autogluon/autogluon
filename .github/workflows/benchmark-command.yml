@@ -79,7 +79,7 @@ jobs:
         if: (github.event_name == 'workflow_dispatch')
         uses: peter-evans/create-or-update-comment@v4
         with:
-          token: ${{ secrets.PAT }}
+          token: ${{ secrets.CICD_PAT }}
           repository: ${{ github.event.inputs.repository }}
           comment-id: ${{ github.event.inputs.comment-id }}
           body: |
@@ -197,7 +197,7 @@ jobs:
       - name: Comment Evaluation Result of PR with Master
         uses: peter-evans/create-or-update-comment@v4
         with:
-          token: ${{ secrets.PAT }}
+          token: ${{ secrets.CICD_PAT }}
           repository: ${{ github.event.inputs.repository }}
           comment-id: ${{ github.event.inputs.comment-id }}
           body: ${{ steps.eval_result.outputs.body }}
@@ -213,7 +213,7 @@ jobs:
       - name: Comment Dashboard Website Link on PR
         uses: peter-evans/create-or-update-comment@v4
         with:
-          token: ${{ secrets.PAT }}
+          token: ${{ secrets.CICD_PAT }}
           repository: ${{ github.event.inputs.repository }}
           comment-id: ${{ github.event.inputs.comment-id }}
           body: ${{ steps.website.outputs.body }}
