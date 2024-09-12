@@ -10,9 +10,13 @@ from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.models import AbstractModel
 from autogluon.core.models.ensemble.bagged_ensemble_model import \
     BaggedEnsembleModel
-from autogluon.core.models.ensemble.fold_fitting_strategy import \
-    ParallelLocalFoldFittingStrategy
+from autogluon.core.models.ensemble.fold_fitting_strategy import (
+    FoldFittingStrategy, ParallelLocalFoldFittingStrategy)
+from autogluon.core.ray.resources_calculator import CpuResourceCalculator
 from autogluon.core.searcher import LocalRandomSearcher
+
+NUM_CPU = 8
+NUM_GPU = 1
 
 
 class DummyBigModel(AbstractModel):
@@ -51,8 +55,8 @@ def _construct_dummy_fold_strategy(
         oof_pred_proba=np.array([]),
         oof_pred_model_repeats=np.array([]),
         save_folds=True,
-        num_cpus=ResourceManager.get_cpu_count(),
-        num_gpus=ResourceManager.get_gpu_count(),
+        num_cpus=NUM_CPU,
+        num_gpus=NUM_GPU,
         num_jobs=num_jobs,
         num_folds_parallel=num_folds_parallel,
         time_limit_fold_ratio=1,
@@ -62,8 +66,8 @@ def _construct_dummy_fold_strategy(
 
 
 def _test_resource_allocation_and_time_limit(num_jobs, num_folds_parallel, time_limit):
-    num_cpus = ResourceManager.get_cpu_count()
-    num_gpus = ResourceManager.get_gpu_count()
+    num_cpus = NUM_CPU
+    num_gpus = NUM_GPU
     time_start = time.time()
     fold_fitting_strategy = _construct_dummy_fold_strategy(
         num_jobs=num_jobs, time_limit=time_limit, num_folds_parallel=num_folds_parallel
@@ -110,8 +114,12 @@ def test_resource_allocation_and_time_limit():
 @patch(
     "autogluon.common.utils.resource_utils.ResourceManager.get_available_virtual_mem"
 )
-def test_dynamic_resource_allocation(mock_get_mem):
+@patch(
+    "autogluon.core.ray.resources_calculator.ResourceCalculatorFactory.get_resource_calculator"
+)
+def test_dynamic_resource_allocation(resource_cal, mock_get_mem):
     mock_get_mem.return_value = 2.5 * 1e9
+    resource_cal.return_value = CpuResourceCalculator()
     fold_fitting_strategy = _construct_dummy_fold_strategy(
         model_base_cls=DummyBigModel, num_jobs=8, num_folds_parallel=8
     )
