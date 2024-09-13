@@ -274,6 +274,8 @@ jobs:
       - name: Checkout repository for nightly test
         if: (github.event_name == 'schedule')
         uses: actions/checkout@v2
+      - name: Free up disk space
+        uses: actions/github-action-cleanup@v2
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v2.0.0
         with:
