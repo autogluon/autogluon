@@ -10,11 +10,7 @@ from sklearn.base import BaseEstimator
 
 import autogluon.core as ag
 from autogluon.tabular import TabularPredictor
-from autogluon.timeseries.dataset.ts_dataframe import (
-    ITEMID,
-    TIMESTAMP,
-    TimeSeriesDataFrame,
-)
+from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.local import SeasonalNaiveModel
 from autogluon.timeseries.utils.datetime import (
@@ -33,11 +29,7 @@ logger = logging.getLogger(__name__)
 class TabularEstimator(BaseEstimator):
     """Scikit-learn compatible interface for TabularPredictor."""
 
-    def __init__(
-        self,
-        predictor_init_kwargs: Optional[dict] = None,
-        predictor_fit_kwargs: Optional[dict] = None,
-    ):
+    def __init__(self, predictor_init_kwargs: Optional[dict] = None, predictor_fit_kwargs: Optional[dict] = None):
         self.predictor_init_kwargs = predictor_init_kwargs if predictor_init_kwargs is not None else {}
         self.predictor_fit_kwargs = predictor_fit_kwargs if predictor_fit_kwargs is not None else {}
 
@@ -108,11 +100,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
 
     @classmethod
     def load(
-        cls,
-        path: str,
-        reset_paths: bool = True,
-        load_oof: bool = False,
-        verbose: bool = True,
+        cls, path: str, reset_paths: bool = True, load_oof: bool = False, verbose: bool = True
     ) -> "AbstractTimeSeriesModel":
         model = super().load(path=path, reset_paths=reset_paths, load_oof=load_oof, verbose=verbose)
         assert "mean" in model._mlf.models_, "Loaded model doesn't have a trained TabularPredictor"
@@ -202,10 +190,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         return mlforecast_df.groupby(MLF_ITEMID, as_index=False, sort=False).tail(max_length)
 
     def _generate_train_val_dfs(
-        self,
-        data: TimeSeriesDataFrame,
-        max_num_items: Optional[int] = None,
-        max_num_samples: Optional[int] = None,
+        self, data: TimeSeriesDataFrame, max_num_items: Optional[int] = None, max_num_samples: Optional[int] = None
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
         # Exclude items that are too short for chosen differences - otherwise exception will be raised
         if self._sum_of_differences > 0:
@@ -275,13 +260,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
 
         df = pd.DataFrame(data)[selected_columns].reset_index()
         if static_features is not None:
-            df = pd.merge(
-                df,
-                static_features,
-                how="left",
-                on=ITEMID,
-                suffixes=(None, "_static_feat"),
-            )
+            df = pd.merge(df, static_features, how="left", on=ITEMID, suffixes=(None, "_static_feat"))
 
         for col in self._non_boolean_real_covariates:
             # Normalize non-boolean features using mean_abs scaling
@@ -340,10 +319,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         self._mlf.models = {"mean": estimator}
 
         with warning_filter():
-            self._mlf.fit_models(
-                X=train_df.drop(columns=[MLF_TARGET, MLF_ITEMID]),
-                y=train_df[MLF_TARGET],
-            )
+            self._mlf.fit_models(X=train_df.drop(columns=[MLF_TARGET, MLF_ITEMID]), y=train_df[MLF_TARGET])
 
         self._save_residuals_std(val_df)
 
@@ -368,11 +344,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         self,
         data: TimeSeriesDataFrame,
         known_covariates: Optional[TimeSeriesDataFrame] = None,
-    ) -> Tuple[
-        TimeSeriesDataFrame,
-        Optional[TimeSeriesDataFrame],
-        Optional[TimeSeriesDataFrame],
-    ]:
+    ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame], Optional[TimeSeriesDataFrame]]:
         """Remove series that are too short for chosen differencing from data and generate naive forecast for them.
 
         Returns
