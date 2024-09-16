@@ -9,7 +9,6 @@ from itertools import islice
 from pathlib import Path
 from typing import Any, List, Optional, Tuple, Type, Union
 
-import numpy as np
 import pandas as pd
 from joblib.parallel import Parallel, delayed
 from pandas.core.internals import ArrayManager, BlockManager
