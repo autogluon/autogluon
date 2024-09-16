@@ -1,9 +1,11 @@
-import pytest
-import numpy as np
 from unittest import mock
+
+import numpy as np
+import pytest
 
 from autogluon.timeseries.models import NaiveModel
 from autogluon.timeseries.transforms.scaler import get_target_scaler
+
 from .common import DUMMY_TS_DATAFRAME
 from .models.test_models import get_multi_window_deepar
 

@@ -1,18 +1,19 @@
+from typing import Literal, Optional, Union
+
 import numpy as np
 import pandas as pd
 from mlforecast.target_transforms import (
     BaseTargetTransform,
-    _BaseGroupedArrayTargetTransform,
     GroupedArray,
+    _BaseGroupedArrayTargetTransform,
 )
-from typing import Literal, Optional, Union
 
-from autogluon.timeseries.transforms.scaler import get_target_scaler, LocalTargetScaler
 from autogluon.timeseries.dataset.ts_dataframe import (
     ITEMID,
     TIMESTAMP,
     TimeSeriesDataFrame,
 )
+from autogluon.timeseries.transforms.scaler import LocalTargetScaler, get_target_scaler
 
 from .utils import MLF_ITEMID, MLF_TIMESTAMP
 
