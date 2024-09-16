@@ -558,11 +558,9 @@ class AbstractTimeSeriesModel(AbstractModel):
         - can_refit_full: Does it make sense to retrain the model without validation data?
             See `autogluon.core.models.abstract._tags._DEFAULT_TAGS` for more details.
         - can_use_val_data: Can model use val_data if it's provided to model.fit()?
-        - requires_fit: Model must be fit before calling predict.
         """
         return {
             "allow_nan": False,
             "can_refit_full": False,
             "can_use_val_data": False,
-            "requires_fit": True,
         }
