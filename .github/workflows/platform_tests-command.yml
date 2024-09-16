@@ -186,11 +186,11 @@ jobs:
         python: ["3.8", "3.9", "3.10", "3.11"]
     steps:
       - name: "Cleanup build folder"
-          run: |
-            ls -la ./
-            rm -rf ./* || true
-            rm -rf ./.??* || true
-            ls -la ./
+        run: |
+          ls -la ./
+          rm -rf ./* || true
+          rm -rf ./.??* || true
+          ls -la ./
       - name: Checkout repository for PR
         if: (github.event_name == 'workflow_dispatch')
         uses: actions/checkout@v2
@@ -233,11 +233,11 @@ jobs:
         python: ["3.8", "3.9", "3.10", "3.11"]
     steps:
       - name: "Cleanup build folder"
-          run: |
-            ls -la ./
-            rm -rf ./* || true
-            rm -rf ./.??* || true
-            ls -la ./
+        run: |
+          ls -la ./
+          rm -rf ./* || true
+          rm -rf ./.??* || true
+          ls -la ./
       - name: Checkout repository for PR
         if: (github.event_name == 'workflow_dispatch')
         uses: actions/checkout@v2
