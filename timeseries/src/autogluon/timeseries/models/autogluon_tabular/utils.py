@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 from mlforecast.target_transforms import BaseTargetTransform
 
+from autogluon.timeseries.transforms.scaler import LocalMinMaxScaler, LocalMeanAbsScaler, LocalStandardScaler
+
 
 class StandardScaler(BaseTargetTransform):
     """Standardizes the series by subtracting mean and diving by standard deviation."""
