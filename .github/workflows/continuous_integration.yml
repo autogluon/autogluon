@@ -2,6 +2,8 @@ name: Continuous Integration
 
 on:
   push:
+    branches:
+      - master
     paths-ignore:
       - 'cloud/**'
       - '.github/workflows/cloud_continuous_integration.yml'
