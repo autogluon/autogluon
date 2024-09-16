@@ -1011,18 +1011,3 @@ def test_when_timestamps_have_datetime64_type_then_tsdf_can_be_constructed(dtype
     df[TIMESTAMP] = df[TIMESTAMP].astype(dtype)
     assert df[TIMESTAMP].dtype == dtype
     TimeSeriesDataFrame.from_data_frame(df)
-
-
-def test_when_tsdf_unsorted_then_indptr_raises_an_exception():
-    df = get_data_frame_with_variable_lengths({"B": 20, "A": 10})
-    with pytest.raises(ValueError, match="must be sorted"):
-        df.indptr
-
-
-@pytest.mark.parametrize("idx", [0, 1, SAMPLE_TS_DATAFRAME.num_items - 1])
-def test_when_indexing_with_indptr_then_selection_equivalent_to_loc(idx):
-    df = SAMPLE_TS_DATAFRAME
-    indptr = df.indptr
-    selected_with_indptr = df.iloc[indptr[idx] : indptr[idx + 1]]
-    selected_with_loc = df.loc[df.item_ids[[idx]]]
-    assert selected_with_indptr.equals(selected_with_loc)

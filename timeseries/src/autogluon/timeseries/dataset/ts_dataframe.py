@@ -1009,14 +1009,3 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
         # This hides method from IPython autocomplete, but not VSCode autocomplete
         deprecated = ["get_reindexed_view", "to_regular_index"]
         return [d for d in super().__dir__() if d not in deprecated]
-
-    @property
-    def indptr(self) -> np.ndarray:
-        """An array indicating the start and end indices of each time series."""
-        if not self.index.is_monotonic_increasing:
-            logger.warning(
-                "Calling `indptr` on an unsorted dataframe may produce wrong results. "
-                "It is highly recommended to call `ts_df.sort_index()` before calling `ts_df.indptr`"
-            )
-        cum_sizes = self.num_timesteps_per_item().values.cumsum()
-        return np.append(0, cum_sizes).astype(np.int32)

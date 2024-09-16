@@ -21,7 +21,8 @@ class ChronosInferenceDataset:
         self.context_length = context_length
         self.target_array = target_df[target_column].to_numpy(dtype=np.float32)
         self.freq = target_df.freq
-        self.indptr = target_df.indptr
+        cum_sizes = target_df.num_timesteps_per_item().values.cumsum()
+        self.indptr = np.append(0, cum_sizes).astype(np.int32)
 
     def __len__(self):
         return len(self.indptr) - 1  # noqa
