@@ -1,6 +1,6 @@
 # TODO: Rename scaler -> window_scaler for GluonTS models
 
-from typing import Literal, Optional, Tuple, Type, Union
+from typing import Literal, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd

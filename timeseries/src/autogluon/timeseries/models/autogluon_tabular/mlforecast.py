@@ -10,7 +10,11 @@ from sklearn.base import BaseEstimator
 
 import autogluon.core as ag
 from autogluon.tabular import TabularPredictor
-from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
+from autogluon.timeseries.dataset.ts_dataframe import (
+    ITEMID,
+    TIMESTAMP,
+    TimeSeriesDataFrame,
+)
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.local import SeasonalNaiveModel
 from autogluon.timeseries.utils.datetime import (
@@ -21,17 +25,19 @@ from autogluon.timeseries.utils.datetime import (
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 from autogluon.timeseries.utils.warning_filters import warning_filter
 
-logger = logging.getLogger(__name__)
+from .utils import MLF_ITEMID, MLF_TARGET, MLF_TIMESTAMP
 
-MLF_TARGET = "y"
-MLF_ITEMID = "unique_id"
-MLF_TIMESTAMP = "ds"
+logger = logging.getLogger(__name__)
 
 
 class TabularEstimator(BaseEstimator):
     """Scikit-learn compatible interface for TabularPredictor."""
 
-    def __init__(self, predictor_init_kwargs: Optional[dict] = None, predictor_fit_kwargs: Optional[dict] = None):
+    def __init__(
+        self,
+        predictor_init_kwargs: Optional[dict] = None,
+        predictor_fit_kwargs: Optional[dict] = None,
+    ):
         self.predictor_init_kwargs = predictor_init_kwargs if predictor_init_kwargs is not None else {}
         self.predictor_fit_kwargs = predictor_fit_kwargs if predictor_fit_kwargs is not None else {}
 
@@ -102,7 +108,11 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
 
     @classmethod
     def load(
-        cls, path: str, reset_paths: bool = True, load_oof: bool = False, verbose: bool = True
+        cls,
+        path: str,
+        reset_paths: bool = True,
+        load_oof: bool = False,
+        verbose: bool = True,
     ) -> "AbstractTimeSeriesModel":
         model = super().load(path=path, reset_paths=reset_paths, load_oof=load_oof, verbose=verbose)
         assert "mean" in model._mlf.models_, "Loaded model doesn't have a trained TabularPredictor"
@@ -137,7 +147,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
     def _get_mlforecast_init_args(self, train_data: TimeSeriesDataFrame, model_params: dict) -> dict:
         from mlforecast.target_transforms import Differences
 
-        from .utils import MeanAbsScaler, StandardScaler
+        from .transforms import MLForecastScaler
 
         lags = model_params.get("lags")
         if lags is None:
@@ -167,19 +177,9 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             target_transforms.append(Differences(differences))
             self._sum_of_differences = sum(differences)
 
-        scaler_name = model_params.get("scaler")
-        if scaler_name is None:
-            pass
-        elif scaler_name == "standard":
-            self._scaler = StandardScaler()
-        elif scaler_name == "mean_abs":
-            self._scaler = MeanAbsScaler()
-        else:
-            logger.warning(
-                f"Unrecognized `scaler` {scaler_name} (supported options: ['standard', 'mean_abs', None]). Scaling disabled."
-            )
-
-        if self._scaler is not None:
+        scaler_type = model_params.get("scaler")
+        if scaler_type is not None:
+            self._scaler = MLForecastScaler(scaler_type=scaler_type)
             target_transforms.append(self._scaler)
 
         return {
@@ -202,7 +202,10 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         return mlforecast_df.groupby(MLF_ITEMID, as_index=False, sort=False).tail(max_length)
 
     def _generate_train_val_dfs(
-        self, data: TimeSeriesDataFrame, max_num_items: Optional[int] = None, max_num_samples: Optional[int] = None
+        self,
+        data: TimeSeriesDataFrame,
+        max_num_items: Optional[int] = None,
+        max_num_samples: Optional[int] = None,
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
         # Exclude items that are too short for chosen differences - otherwise exception will be raised
         if self._sum_of_differences > 0:
@@ -272,7 +275,13 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
 
         df = pd.DataFrame(data)[selected_columns].reset_index()
         if static_features is not None:
-            df = pd.merge(df, static_features, how="left", on=ITEMID, suffixes=(None, "_static_feat"))
+            df = pd.merge(
+                df,
+                static_features,
+                how="left",
+                on=ITEMID,
+                suffixes=(None, "_static_feat"),
+            )
 
         for col in self._non_boolean_real_covariates:
             # Normalize non-boolean features using mean_abs scaling
@@ -323,7 +332,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             },
             predictor_fit_kwargs={
                 "tuning_data": val_df.drop(columns=[MLF_ITEMID]),
-                "time_limit": None if time_limit is None else time_limit - (time.time() - fit_start_time),
+                "time_limit": (None if time_limit is None else time_limit - (time.time() - fit_start_time)),
                 "hyperparameters": model_params["tabular_hyperparameters"],
                 **model_params["tabular_fit_kwargs"],
             },
@@ -331,7 +340,10 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         self._mlf.models = {"mean": estimator}
 
         with warning_filter():
-            self._mlf.fit_models(X=train_df.drop(columns=[MLF_TARGET, MLF_ITEMID]), y=train_df[MLF_TARGET])
+            self._mlf.fit_models(
+                X=train_df.drop(columns=[MLF_TARGET, MLF_ITEMID]),
+                y=train_df[MLF_TARGET],
+            )
 
         self._save_residuals_std(val_df)
 
@@ -347,14 +359,20 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             residuals_df = residuals_df.assign(**{MLF_TIMESTAMP: 1})
             residuals_df = self._scaler.inverse_transform(residuals_df)
         residuals = residuals_df[MLF_TARGET] - residuals_df["y_pred"]
-        self._residuals_std_per_item = residuals.pow(2.0).groupby(val_df[MLF_ITEMID], sort=False).mean().pow(0.5)
+        self._residuals_std_per_item = (
+            residuals.pow(2.0).groupby(val_df[MLF_ITEMID].values, sort=False).mean().pow(0.5)
+        )
         self._avg_residuals_std = np.sqrt(residuals.pow(2.0).mean())
 
     def _remove_short_ts_and_generate_fallback_forecast(
         self,
         data: TimeSeriesDataFrame,
         known_covariates: Optional[TimeSeriesDataFrame] = None,
-    ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame], Optional[TimeSeriesDataFrame]]:
+    ) -> Tuple[
+        TimeSeriesDataFrame,
+        Optional[TimeSeriesDataFrame],
+        Optional[TimeSeriesDataFrame],
+    ]:
         """Remove series that are too short for chosen differencing from data and generate naive forecast for them.
 
         Returns
@@ -450,7 +468,7 @@ class DirectTabularModel(AbstractMLForecastModel):
         Differences to take of the target before computing the features. These are restored at the forecasting step.
         If None, will be set to ``[seasonal_period]``, where seasonal_period is determined based on the data frequency.
         Defaults to no differencing.
-    scaler : {"standard", "mean_abs", None}, default = "mean_abs"
+    scaler : {"standard", "mean_abs", "min_max", "robust", None}, default = "mean_abs"
         Scaling applied to each time series.
     tabular_hyperparameters : Dict[Dict[str, Any]], optional
         Hyperparameters dictionary passed to ``TabularPredictor.fit``. Contains the names of models that should be fit.
@@ -502,6 +520,8 @@ class DirectTabularModel(AbstractMLForecastModel):
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
+        from .transforms import apply_inverse_transform
+
         original_item_id_order = data.item_ids
         data, known_covariates, forecast_for_short_series = self._remove_short_ts_and_generate_fallback_forecast(
             data=data, known_covariates=known_covariates
@@ -537,9 +557,12 @@ class DirectTabularModel(AbstractMLForecastModel):
             mlforecast_df_past = self._to_mlforecast_df(data, None)
             if self._max_ts_length is not None:
                 mlforecast_df_past = self._shorten_all_series(mlforecast_df_past, self._max_ts_length)
-            self._mlf.preprocess(mlforecast_df_past, static_features=[])
+            self._mlf.preprocess(mlforecast_df_past, static_features=[], dropna=False)
             for tfm in self._mlf.ts.target_transforms[::-1]:
-                predictions = tfm.inverse_transform(predictions)
+                predictions = apply_inverse_transform(predictions, transform=tfm)
+
+        if not self.is_quantile_model:
+            predictions = self._add_gaussian_quantiles(predictions, repeated_item_ids=predictions[MLF_ITEMID])
         predictions = TimeSeriesDataFrame(predictions.rename(columns={MLF_ITEMID: ITEMID, MLF_TIMESTAMP: TIMESTAMP}))
 
         if forecast_for_short_series is not None:
@@ -554,7 +577,6 @@ class DirectTabularModel(AbstractMLForecastModel):
             predictions["mean"] = predictions["0.5"]
         else:
             predictions = pd.DataFrame(predictions, columns=["mean"])
-            predictions = self._add_gaussian_quantiles(predictions, repeated_item_ids=repeated_item_ids)
 
         column_order = ["mean"] + [col for col in predictions.columns if col != "mean"]
         return predictions[column_order]
@@ -600,7 +622,7 @@ class RecursiveTabularModel(AbstractMLForecastModel):
     differences : List[int], default = None
         Differences to take of the target before computing the features. These are restored at the forecasting step.
         If None, will be set to ``[seasonal_period]``, where seasonal_period is determined based on the data frequency.
-    scaler : {"standard", "mean_abs", None}, default = "standard"
+    scaler : {"standard", "mean_abs", "min_max", "robust", None}, default = "standard"
         Scaling applied to each time series.
     tabular_hyperparameters : Dict[Dict[str, Any]], optional
         Hyperparameters dictionary passed to ``TabularPredictor.fit``. Contains the names of models that should be fit.
