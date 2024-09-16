@@ -1,5 +1,4 @@
 function setup_build_env {
-    pip cache purge
     python -m pip install --upgrade pip
     python -m pip install tox
     python -m pip install flake8
