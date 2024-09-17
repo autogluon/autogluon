@@ -255,6 +255,11 @@ class AbstractTimeSeriesModel(AbstractModel):
             val_data = self.preprocess(val_data, is_train=False)
         return super().fit(train_data=train_data, val_data=val_data, **kwargs)
 
+    @property
+    def allowed_hyperparameters(self) -> List[str]:
+        """List of hyperparameters allowed by the model."""
+        return ["target_scaler"]
+
     def _get_target_scaler(self) -> Optional[LocalTargetScaler]:
         # TODO: Add support for custom target transforms (e.g., Box-Cox, log1p, ...)
         target_scaler_type = self._get_model_params().get("target_scaler")

@@ -87,6 +87,14 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         self.time_limit: Optional[float] = None
         self._dummy_forecast: Optional[pd.DataFrame] = None
 
+    @property
+    def allowed_hyperparameters(self) -> List[str]:
+        return (
+            super().allowed_hyperparameters
+            + ["use_fallback_model", "max_ts_length", "n_jobs"]
+            + self.allowed_local_model_args
+        )
+
     def preprocess(self, data: TimeSeriesDataFrame, is_train: bool = False, **kwargs) -> Any:
         if not self._get_tags()["allow_nan"]:
             data = data.fill_missing_values()
@@ -103,8 +111,9 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
 
         unused_local_model_args = []
         local_model_args = {}
+        # TODO: Move filtering logic to AbstractTimeSeriesModel
         for key, value in raw_local_model_args.items():
-            if key in self.allowed_local_model_args:
+            if key in self.allowed_hyperparameters:
                 local_model_args[key] = value
             else:
                 unused_local_model_args.append(key)
