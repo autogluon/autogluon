@@ -441,7 +441,7 @@ class DirectTabularModel(AbstractMLForecastModel):
         If None, will be set to ``[seasonal_period]``, where seasonal_period is determined based on the data frequency.
         Defaults to no differencing.
     scaler : {"standard", "mean_abs", "min_max", "robust", None}, default = "mean_abs"
-        Scaling applied to each time series.
+        Scaling applied to each time series. Scaling is applied after differencing.
     tabular_hyperparameters : Dict[Dict[str, Any]], optional
         Hyperparameters dictionary passed to ``TabularPredictor.fit``. Contains the names of models that should be fit.
         Defaults to ``{"GBM": {}}``.
@@ -595,7 +595,7 @@ class RecursiveTabularModel(AbstractMLForecastModel):
         Differences to take of the target before computing the features. These are restored at the forecasting step.
         If None, will be set to ``[seasonal_period]``, where seasonal_period is determined based on the data frequency.
     scaler : {"standard", "mean_abs", "min_max", "robust", None}, default = "standard"
-        Scaling applied to each time series.
+        Scaling applied to each time series. Scaling is applied after differencing.
     tabular_hyperparameters : Dict[Dict[str, Any]], optional
         Hyperparameters dictionary passed to ``TabularPredictor.fit``. Contains the names of models that should be fit.
         Defaults to ``{"GBM": {}}``.
