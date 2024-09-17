@@ -33,7 +33,6 @@ install_requires = [
     "accelerate",  # version range defined in `core/_setup_utils.py`
     "requests>=2.21,<3",
     "jsonschema>=4.18,<4.22",
-    "seqeval>=1.2.2,<1.3.0",
     "evaluate>=0.4.0,<0.5.0",
     "timm>=0.9.5,<0.10.0",
     "torchvision>=0.16.0,<0.19.0",
