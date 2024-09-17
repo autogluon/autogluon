@@ -7,25 +7,25 @@ import pandas as pd
 
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
 
-from .abstract import AbstractTargetTransform
 
-
-class LocalTargetScaler(AbstractTargetTransform):
+class LocalTargetScaler:
     """Applies an affine transformation (x - loc) / scale independently to each time series in the dataset."""
 
     def __init__(
         self,
         target: str = "target",
         min_scale: float = 1e-2,
-        **kwargs,
     ):
-        super().__init__(target=target)
+        self.target = target
         self.min_scale = min_scale
         self.loc: Optional[pd.Series] = None
         self.scale: Optional[pd.Series] = None
 
     def _compute_loc_scale(self, target_series: pd.Series) -> Tuple[Optional[pd.Series], Optional[pd.Series]]:
         raise NotImplementedError
+
+    def fit_transform(self, data: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
+        return self.fit(data=data).transform(data=data)
 
     def fit(self, data: TimeSeriesDataFrame) -> "LocalTargetScaler":
         target_series = data[self.target].replace([np.inf, -np.inf], np.nan)
@@ -49,10 +49,12 @@ class LocalTargetScaler(AbstractTargetTransform):
         return loc, scale
 
     def transform(self, data: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
+        """Apply scaling to the target column in the dataframe."""
         loc, scale = self._reindex_loc_scale(item_index=data.index.get_level_values(ITEMID))
         return data.assign(**{self.target: (data[self.target] - loc) / scale})
 
     def inverse_transform(self, predictions: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
+        """Apply inverse scaling to all columns in the predictions dataframe."""
         loc, scale = self._reindex_loc_scale(item_index=predictions.index.get_level_values(ITEMID))
         return predictions.assign(**{col: predictions[col] * scale + loc for col in predictions.columns})
 

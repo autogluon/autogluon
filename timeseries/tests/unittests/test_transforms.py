@@ -110,8 +110,7 @@ def test_given_target_transform_param_set_when_model_fits_then_target_transform_
         hyperparameters={"target_transform": scaler_name},
     )
     model.fit(train_data=data)
-    assert len(model.target_transforms) == 1
-    assert isinstance(model.target_transforms[0], scaler_cls)
+    assert isinstance(model.target_scaler, scaler_cls)
 
 
 def test_given_invalid_scaler_name_when_model_fits_then_exception_is_raised():
@@ -132,4 +131,4 @@ def test_given_no_scaler_name_when_model_fits_then_no_scaler_is_added(hyperparam
         hyperparameters=hyperparameters,
     )
     model.fit(train_data=data)
-    assert len(model.target_transforms) == 0
+    assert model.target_scaler is None

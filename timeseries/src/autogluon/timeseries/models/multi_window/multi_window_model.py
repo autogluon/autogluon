@@ -4,7 +4,7 @@ import logging
 import math
 import os
 import time
-from typing import Dict, List, Optional, Type, Union
+from typing import Dict, Optional, Type, Union
 
 import numpy as np
 
@@ -13,7 +13,7 @@ from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.local.abstract_local_model import AbstractLocalModel
 from autogluon.timeseries.splitter import AbstractWindowSplitter, ExpandingWindowSplitter
-from autogluon.timeseries.transforms import AbstractTargetTransform
+from autogluon.timeseries.transforms import LocalTargetScaler
 
 logger = logging.getLogger(__name__)
 
@@ -85,9 +85,9 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
     def get_minimum_resources(self, is_gpu_available: bool = False) -> bool:
         return self._get_model_base().get_minimum_resources(is_gpu_available)
 
-    def _get_target_transforms(self) -> List[AbstractTargetTransform]:
-        # Do not set any transforms in the MultiWindowModel to avoid duplication; they will be set in the inner model
-        return []
+    def _get_target_scaler(self) -> Optional[LocalTargetScaler]:
+        # Do not use scaler in the MultiWindowModel to avoid duplication; it will be created in the inner model
+        return None
 
     def _fit(
         self,
