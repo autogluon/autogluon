@@ -61,7 +61,7 @@ def test_when_model_fits_then_fit_transform_called_as_many_times_as_expected(mod
         hyperparameters={
             "max_epochs": 1,
             "num_batches_per_epoch": 1,
-            "target_transform": "standard",
+            "target_scaler": "standard",
         },
     )
     with mock.patch(
@@ -81,7 +81,7 @@ def test_when_model_predicts_then_fit_transform_called_once(model_class):
         hyperparameters={
             "max_epochs": 1,
             "num_batches_per_epoch": 1,
-            "target_transform": "min_max",
+            "target_scaler": "min_max",
         },
     )
     model.fit(train_data=data)
@@ -102,12 +102,12 @@ def test_when_model_predicts_then_fit_transform_called_once(model_class):
         ("standard", LocalStandardScaler),
     ],
 )
-def test_given_target_transform_param_set_when_model_fits_then_target_transform_created(scaler_name, scaler_cls):
+def test_given_target_scaler_param_set_when_model_fits_then_target_scaler_created(scaler_name, scaler_cls):
     data = DUMMY_TS_DATAFRAME.copy()
     model = NaiveModel(
         prediction_length=4,
         freq=data.freq,
-        hyperparameters={"target_transform": scaler_name},
+        hyperparameters={"target_scaler": scaler_name},
     )
     model.fit(train_data=data)
     assert isinstance(model.target_scaler, scaler_cls)
@@ -116,13 +116,13 @@ def test_given_target_transform_param_set_when_model_fits_then_target_transform_
 def test_given_invalid_scaler_name_when_model_fits_then_exception_is_raised():
     model = NaiveModel(
         prediction_length=4,
-        hyperparameters={"target_transform": "invalid_scaler"},
+        hyperparameters={"target_scaler": "invalid_scaler"},
     )
     with pytest.raises(KeyError, match="not supported. Available scalers"):
         model.fit(train_data=DUMMY_TS_DATAFRAME)
 
 
-@pytest.mark.parametrize("hyperparameters", [{}, {"target_transform": None}])
+@pytest.mark.parametrize("hyperparameters", [{}, {"target_scaler": None}])
 def test_given_no_scaler_name_when_model_fits_then_no_scaler_is_added(hyperparameters):
     data = DUMMY_TS_DATAFRAME.copy()
     model = NaiveModel(

@@ -165,7 +165,8 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             target_transforms.append(Differences(differences))
             self._sum_of_differences = sum(differences)
 
-        scaler_type = model_params.get("scaler")
+        # Support "scaler" for backward compatibility
+        scaler_type = model_params.get("target_scaler", model_params.get("scaler"))
         if scaler_type is not None:
             self._scaler = MLForecastScaler(scaler_type=scaler_type)
             target_transforms.append(self._scaler)
@@ -408,6 +409,10 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
     def _more_tags(self) -> dict:
         return {"allow_nan": True, "can_refit_full": True}
 
+    def _get_target_scaler(self):
+        # Do not create a scaler in the model, scaler will be passed to MLForecast
+        return None
+
 
 class DirectTabularModel(AbstractMLForecastModel):
     """Predict all future time series values simultaneously using TabularPredictor from AutoGluon-Tabular.
@@ -440,7 +445,7 @@ class DirectTabularModel(AbstractMLForecastModel):
         Differences to take of the target before computing the features. These are restored at the forecasting step.
         If None, will be set to ``[seasonal_period]``, where seasonal_period is determined based on the data frequency.
         Defaults to no differencing.
-    scaler : {"standard", "mean_abs", "min_max", "robust", None}, default = "mean_abs"
+    target_scaler : {"standard", "mean_abs", "min_max", "robust", None}, default = "mean_abs"
         Scaling applied to each time series. Scaling is applied after differencing.
     tabular_hyperparameters : Dict[Dict[str, Any]], optional
         Hyperparameters dictionary passed to ``TabularPredictor.fit``. Contains the names of models that should be fit.
@@ -463,8 +468,9 @@ class DirectTabularModel(AbstractMLForecastModel):
 
     def _get_model_params(self) -> dict:
         model_params = super()._get_model_params()
-        model_params.setdefault("scaler", "mean_abs")
-        model_params.setdefault("differences", [])
+        model_params.setdefault("target_scaler", "mean_abs")
+        if "differences" not in model_params or model_params["differences"] is None:
+            model_params["differences"] = []
         return model_params
 
     def _mask_df(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -594,7 +600,7 @@ class RecursiveTabularModel(AbstractMLForecastModel):
     differences : List[int], default = None
         Differences to take of the target before computing the features. These are restored at the forecasting step.
         If None, will be set to ``[seasonal_period]``, where seasonal_period is determined based on the data frequency.
-    scaler : {"standard", "mean_abs", "min_max", "robust", None}, default = "standard"
+    target_scaler : {"standard", "mean_abs", "min_max", "robust", None}, default = "standard"
         Scaling applied to each time series. Scaling is applied after differencing.
     tabular_hyperparameters : Dict[Dict[str, Any]], optional
         Hyperparameters dictionary passed to ``TabularPredictor.fit``. Contains the names of models that should be fit.
@@ -613,8 +619,9 @@ class RecursiveTabularModel(AbstractMLForecastModel):
 
     def _get_model_params(self) -> dict:
         model_params = super()._get_model_params()
-        model_params.setdefault("scaler", "standard")
-        model_params.setdefault("differences", [get_seasonality(self.freq)])
+        model_params.setdefault("target_scaler", "standard")
+        if "differences" not in model_params or model_params["differences"] is None:
+            model_params["differences"] = [get_seasonality(self.freq)]
         return model_params
 
     def _predict(

@@ -262,3 +262,19 @@ def test_when_trained_model_moved_to_different_folder_then_loaded_model_can_pred
     loaded_model = model_type.load(os.path.join(new_model_dir, model.name))
     predictions = loaded_model.predict(data)
     assert isinstance(predictions, TimeSeriesDataFrame)
+
+
+@pytest.mark.parametrize("model_type", TESTABLE_MODELS)
+@pytest.mark.parametrize("eval_metric", ["WAPE", "WQL"])
+def test_when_target_transform_provided_then_scaler_is_used_inside_mlforecast(model_type, eval_metric):
+    data = DUMMY_TS_DATAFRAME.copy().sort_index()
+    model = model_type(
+        freq=data.freq,
+        eval_metric=eval_metric,
+        quantile_levels=[0.1, 0.5, 0.9],
+        prediction_length=3,
+        hyperparameters={"target_scaler": "robust"},
+    )
+    model.fit(train_data=data)
+    assert model.target_scaler is None
+    assert model._scaler is not None
