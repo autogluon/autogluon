@@ -85,6 +85,8 @@ class DeepARModel(AbstractGluonTSModel):
         If True, ``lightning_logs`` directory will NOT be removed after the model finished training.
     """
 
+    # TODO: Should we rename "scaling: bool" to, e.g., "window_scaler": {"mean_abs", None} and have a hyperparameter names for all models?
+
     supports_known_covariates = True
     supports_static_features = True
 
