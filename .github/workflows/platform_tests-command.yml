@@ -306,12 +306,10 @@ jobs:
       - name: Set macOS deployment target (only on macOS)
         if: matrix.os == 'macos-latest'
         run: |
+          # Purge pip cache (only for macOS)
+          pip cache purge
           mac_version=$(sw_vers -productVersion | cut -d '.' -f 1,2)
-          if [[ "$mac_version" < "10.13" ]]; then
-            export MACOSX_DEPLOYMENT_TARGET="10.13"
-          else
-            export MACOSX_DEPLOYMENT_TARGET="$mac_version"   # https://github.com/facebookresearch/detectron2/issues/5216
-          fi
+          export MACOSX_DEPLOYMENT_TARGET="$mac_version"   # https://github.com/facebookresearch/detectron2/issues/5216
           echo "MACOSX_DEPLOYMENT_TARGET is set to $MACOSX_DEPLOYMENT_TARGET"
       - name: unit-test
         if: matrix.os != 'windows-latest'
