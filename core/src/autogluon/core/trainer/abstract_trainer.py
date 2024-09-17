@@ -508,7 +508,7 @@ class AbstractTrainer:
             )
             model_names_fit += base_model_names + aux_models
         if (self.model_best is None or infer_limit is not None) and len(model_names_fit) != 0:
-            self.model_best = self.get_model_best(can_infer=True, infer_limit=infer_limit, infer_limit_as_child=True)
+            self.model_best = self.get_model_best(infer_limit=infer_limit, infer_limit_as_child=True)
         self._callbacks_conclude()
         self._fit_cleanup()
         self.save()
