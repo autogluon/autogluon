@@ -62,7 +62,7 @@ jobs:
         if: (github.event_name == 'schedule')
         uses: actions/checkout@v2
       - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@v2.0.0
+        uses: conda-incubator/setup-miniconda@v3
         with:
           activate-environment: autogluon_py3
           environment-file: .github/workflows_env/unittest_env.yml
@@ -95,7 +95,7 @@ jobs:
         if: (github.event_name == 'schedule')
         uses: actions/checkout@v2
       - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@v2.0.0
+        uses: conda-incubator/setup-miniconda@v3
         with:
           activate-environment: autogluon_py3
           environment-file: .github/workflows_env/unittest_env.yml
@@ -128,7 +128,7 @@ jobs:
         if: (github.event_name == 'schedule')
         uses: actions/checkout@v2
       - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@v2.0.0
+        uses: conda-incubator/setup-miniconda@v3
         with:
           activate-environment: autogluon_py3
           environment-file: .github/workflows_env/unittest_env.yml
@@ -161,7 +161,7 @@ jobs:
   #       if: (github.event_name == 'schedule')
   #       uses: actions/checkout@v2
   #     - name: Setup Miniconda
-  #       uses: conda-incubator/setup-miniconda@v2.0.0
+  #       uses: conda-incubator/setup-miniconda@v3
   #       with:
   #         activate-environment: autogluon_py3
   #         environment-file: .github/workflows_env/unittest_env.yml
@@ -201,7 +201,7 @@ jobs:
         if: (github.event_name == 'schedule')
         uses: actions/checkout@v2
       - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@v2.0.0
+        uses: conda-incubator/setup-miniconda@v3
         with:
           activate-environment: autogluon_py3
           environment-file: .github/workflows_env/unittest_env.yml
@@ -249,7 +249,7 @@ jobs:
         if: (github.event_name == 'schedule')
         uses: actions/checkout@v2
       - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@v2.0.0
+        uses: conda-incubator/setup-miniconda@v3
         with:
           activate-environment: autogluon_py3
           environment-file: .github/workflows_env/unittest_env.yml
@@ -296,7 +296,7 @@ jobs:
         if: (github.event_name == 'schedule')
         uses: actions/checkout@v2
       - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@v2.0.0
+        uses: conda-incubator/setup-miniconda@v3
         with:
           activate-environment: autogluon_py3
           environment-file: .github/workflows_env/unittest_env.yml
