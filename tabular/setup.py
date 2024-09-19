@@ -48,6 +48,9 @@ extras_require = {
     "xgboost": [
         "xgboost>=1.6,<2.1",  # <{N+1} upper cap, where N is the latest released minor version
     ],
+    "interpret": [
+        "interpret-core>=0.6.1",
+    ],
     "fastai": [
         "torch",  # version range defined in `core/_setup_utils.py`
         "fastai>=2.3.1,<2.8",  # <{N+1} upper cap, where N is the latest released minor version
@@ -89,7 +92,7 @@ extras_require["all"] = all_requires
 
 
 test_requires = []
-for test_package in ["tabpfn", "imodels", "vowpalwabbit", "skl2onnx"]:
+for test_package in ["interpret", "tabpfn", "imodels", "vowpalwabbit", "skl2onnx"]:
     test_requires += extras_require[test_package]
 extras_require["tests"] = test_requires
 install_requires = ag.get_dependency_version_ranges(install_requires)
