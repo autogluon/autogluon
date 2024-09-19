@@ -5,6 +5,7 @@ function setup_build_env {
     python -m pip install bandit
     python -m pip install packaging
     python -m pip install ruff
+    python -m pip install interpret-core
 }
 
 function setup_build_contrib_env {
