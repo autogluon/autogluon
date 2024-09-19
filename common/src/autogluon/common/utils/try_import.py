@@ -28,7 +28,8 @@ def try_import_mxboard():
         import mxboard
     except ImportError:
         raise ImportError(
-            "Unable to import dependency mxboard. " "A quick tip is to install via `pip install mxboard`. "
+            "Unable to import dependency mxboard. "
+            "A quick tip is to install via `pip install mxboard`. "
         )
 
 
@@ -46,9 +47,9 @@ def try_import_ray() -> ModuleType:
         import ray
         from packaging import version
 
-        if version.parse(ray.__version__) < version.parse(ray_min_version) or version.parse(
-            ray.__version__
-        ) >= version.parse(ray_max_version):
+        if version.parse(ray.__version__) < version.parse(
+            ray_min_version
+        ) or version.parse(ray.__version__) >= version.parse(ray_max_version):
             msg = (
                 f"ray=={ray.__version__} detected. "
                 f"{ray_min_version} <= ray < {ray_max_version} is required. You can use pip to install certain version of ray "
@@ -99,7 +100,9 @@ def try_import_lightgbm():
 def try_import_xgboost():
     try:
         import xgboost
-        from pkg_resources import parse_version  # pylint: disable=import-outside-toplevel
+        from pkg_resources import (
+            parse_version,
+        )  # pylint: disable=import-outside-toplevel
 
         xgboost_version = parse_version(xgboost.__version__)
         min_version = "1.6"
@@ -118,7 +121,8 @@ def try_import_interpret():
         import interpret
     except ImportError:
         raise ImportError(
-            "Unable to import dependency interpret. " "A quick tip is to install via `pip install autogluon.tabular[interpret]`. "
+            "Unable to import dependency interpret. "
+            "A quick tip is to install via `pip install autogluon.tabular[interpret]`. "
         )
 
 
@@ -127,14 +131,17 @@ def try_import_faiss():
         import faiss
     except ImportError:
         raise ImportError(
-            "Unable to import dependency faiss. " "A quick tip is to install via `pip install faiss-cpu`. "
+            "Unable to import dependency faiss. "
+            "A quick tip is to install via `pip install faiss-cpu`. "
         )
 
 
 def try_import_fastai():
     try:
         import fastai
-        from pkg_resources import parse_version  # pylint: disable=import-outside-toplevel
+        from pkg_resources import (
+            parse_version,
+        )  # pylint: disable=import-outside-toplevel
 
         fastai_version = parse_version(fastai.__version__)
         assert (
@@ -190,22 +197,28 @@ def try_import_imodels():
         import imodels
     except ImportError:
         raise ImportError(
-            "Unable to import dependency imodels. " "A quick tip is to install via `pip install imodels`. "
+            "Unable to import dependency imodels. "
+            "A quick tip is to install via `pip install imodels`. "
         )
 
 
 def try_import_vowpalwabbit():
     try:
         import vowpalwabbit
-        from pkg_resources import parse_version  # pylint: disable=import-outside-toplevel
+        from pkg_resources import (
+            parse_version,
+        )  # pylint: disable=import-outside-toplevel
 
         vowpalwabbit_version = parse_version(vowpalwabbit.__version__)
-        assert (
-            vowpalwabbit_version >= parse_version("9.0.0") and vowpalwabbit_version < parse_version("9.10.0")
+        assert vowpalwabbit_version >= parse_version(
+            "9.0.0"
+        ) and vowpalwabbit_version < parse_version(
+            "9.10.0"
         ), f"Currently, we only support vowpalwabbit version >=9.0 and <9.10. Found vowpalwabbit version: {vowpalwabbit_version}"
     except ImportError:
         raise ImportError(
-            "`import vowpalwabbit` failed.\n" "A quick tip is to install via `pip install vowpalwabbit>=9,<9.10"
+            "`import vowpalwabbit` failed.\n"
+            "A quick tip is to install via `pip install vowpalwabbit>=9,<9.10"
         )
 
 
