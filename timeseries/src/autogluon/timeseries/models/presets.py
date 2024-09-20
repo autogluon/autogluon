@@ -209,7 +209,7 @@ def get_preset_models(
     for model in model_priority_list:
         if isinstance(model, str):
             if model not in MODEL_TYPES:
-                raise ValueError(f"Model {model} is not supported yet.")
+                raise ValueError(f"Model {model} is not supported. Available models: {sorted(MODEL_TYPES)}")
             if model in excluded_models:
                 logger.info(
                     f"\tFound '{model}' model in `hyperparameters`, but '{model}' "

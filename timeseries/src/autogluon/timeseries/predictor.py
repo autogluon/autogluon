@@ -1199,6 +1199,8 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
     def leaderboard(
         self,
         data: Optional[Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]] = None,
+        extra_info: bool = False,
+        extra_metrics: Optional[List[Union[str, TimeSeriesScorer]]] = None,
         display: bool = False,
         use_cache: bool = True,
         **kwargs,
@@ -1236,6 +1238,17 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             If provided data is a path or a pandas.DataFrame, AutoGluon will attempt to automatically convert it to a
             ``TimeSeriesDataFrame``.
 
+        extra_info : bool, default = False
+            If True, the leaderboard will contain an additional column `hyperparameters` with the hyperparameters used
+            by model during training. An empty dictionary `{}` means that the model was trained with default
+            hyperparameters.
+        extra_metrics : List[Union[str, TimeSeriesScorer]], optional
+            A list of metrics to calculate scores for and include in the output DataFrame.
+
+            Only valid when `data` is specified. The scores refer to the scores on `data` (same data as used to
+            calculate the `score_test` column).
+
+            This list can contain any values which would also be valid for `eval_metric` when creating a `TimeSeriesPredictor`.
         display : bool, default = False
             If True, the leaderboard DataFrame will be printed.
         use_cache : bool, default = True
@@ -1255,11 +1268,16 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         if len(kwargs) > 0:
             for key in kwargs:
                 raise TypeError(f"TimeSeriesPredictor.leaderboard() got an unexpected keyword argument '{key}'")
+        if data is None and extra_metrics is not None:
+            raise ValueError("`extra_metrics` is only valid when `data` is specified.")
 
         if data is not None:
             data = self._check_and_prepare_data_frame(data)
             self._check_data_for_evaluation(data)
-        leaderboard = self._learner.leaderboard(data, use_cache=use_cache)
+
+        leaderboard = self._learner.leaderboard(
+            data, extra_info=extra_info, extra_metrics=extra_metrics, use_cache=use_cache
+        )
         if display:
             with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):
                 print(leaderboard)

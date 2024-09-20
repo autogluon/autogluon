@@ -21,6 +21,7 @@ from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.ensemble import AbstractTimeSeriesEnsembleModel, TimeSeriesGreedyEnsemble
+from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
 from autogluon.timeseries.models.presets import contains_searchspace
 from autogluon.timeseries.splitter import AbstractWindowSplitter, ExpandingWindowSplitter
 from autogluon.timeseries.utils.features import (
@@ -755,7 +756,13 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         self.save_model(model=ensemble)
         return ensemble.name
 
-    def leaderboard(self, data: Optional[TimeSeriesDataFrame] = None, use_cache: bool = True) -> pd.DataFrame:
+    def leaderboard(
+        self,
+        data: Optional[TimeSeriesDataFrame] = None,
+        extra_info: bool = False,
+        extra_metrics: Optional[List[Union[str, TimeSeriesScorer]]] = None,
+        use_cache: bool = True,
+    ) -> pd.DataFrame:
         logger.debug("Generating leaderboard for all models trained")
 
         model_names = self.get_model_names()
@@ -771,6 +778,14 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 "fit_time_marginal": self.get_model_attribute(model_name, "fit_time"),
                 "pred_time_val": self.get_model_attribute(model_name, "predict_time"),
             }
+            if extra_info:
+                model = self.load_model(model_name=model_name)
+                if isinstance(model, MultiWindowBacktestingModel):
+                    model = model.most_recent_model
+                model_info[model_name]["hyperparameters"] = model.params
+
+        if extra_metrics is None:
+            extra_metrics = []
 
         if data is not None:
             past_data, known_covariates = data.get_model_inputs_for_scoring(
@@ -799,6 +814,14 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                     model_info[model_name]["score_test"] = self._score_with_predictions(data, model_preds)
                     model_info[model_name]["pred_time_test"] = pred_time_dict[model_name]
 
+                for metric in extra_metrics:
+                    if model_preds is None:
+                        model_info[model_name][str(metric)] = float("nan")
+                    else:
+                        model_info[model_name][str(metric)] = self._score_with_predictions(
+                            data, model_preds, metric=metric
+                        )
+
         explicit_column_order = [
             "model",
             "score_test",
@@ -808,15 +831,18 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             "fit_time_marginal",
             "fit_order",
         ]
+        if extra_info:
+            explicit_column_order += ["hyperparameters"]
 
-        df = pd.DataFrame(model_info.values(), columns=explicit_column_order)
         if data is None:
             explicit_column_order.remove("score_test")
             explicit_column_order.remove("pred_time_test")
             sort_column = "score_val"
         else:
             sort_column = "score_test"
+            explicit_column_order += [str(metric) for metric in extra_metrics]
 
+        df = pd.DataFrame(model_info.values(), columns=explicit_column_order)
         df.sort_values(by=[sort_column, "model"], ascending=[False, False], inplace=True)
         df.reset_index(drop=True, inplace=True)
 
