@@ -68,9 +68,6 @@ def track_all_calls(cls):
             num_calls_between = self._total_calls - cur_calls
 
             exit_idx = self._total_calls - 1
-            # time_og = self._method_call_order[exit_idx][6]
-
-            # call_time = time_og - cur_time_elapsed
 
             self._method_call_order[pos] += [cur_time_exit, num_calls_between, exit_idx]
             return out
