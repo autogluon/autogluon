@@ -52,6 +52,18 @@ def test_lightgbm_binary_model(model_fit_helper):
     model_fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, model=LGBModel(), fit_args=fit_args)
 
 
+# TODO: WIP
+def test_lightgbm_binary_model_with_tracer(model_fit_helper):
+    fit_args = dict()
+    dataset_name = "adult"
+    from autogluon.common.testing.track_calls import track_all_calls
+    model_cls = track_all_calls(LGBModel)
+    model = model_cls()
+    model = model_fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, model=model, fit_args=fit_args)
+    call_order = model.get_call_order()
+    print(call_order)
+
+
 def test_lightgbm_multiclass_model(model_fit_helper):
     fit_args = dict()
     dataset_name = "covertype_small"
