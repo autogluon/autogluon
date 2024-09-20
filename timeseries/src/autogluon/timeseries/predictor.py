@@ -1240,7 +1240,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
         extra_info : bool, default = False
             If True, the leaderboard will contain an additional column `hyperparameters` with the hyperparameters used
-            by model during training. An empty dictionary `{}` means that the model was trained with default
+            by each model during training. An empty dictionary `{}` means that the model was trained with default
             hyperparameters.
         extra_metrics : List[Union[str, TimeSeriesScorer]], optional
             A list of metrics to calculate scores for and include in the output DataFrame.
