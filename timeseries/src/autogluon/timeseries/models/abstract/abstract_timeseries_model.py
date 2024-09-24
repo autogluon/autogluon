@@ -13,7 +13,7 @@ from autogluon.core.hpo.executors import HpoExecutor, RayHpoExecutor
 from autogluon.core.models import AbstractModel
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
-from autogluon.timeseries.transforms import LocalTargetScaler, get_target_scaler
+from autogluon.timeseries.transforms import LocalTargetScaler, get_target_scaler_from_name
 from autogluon.timeseries.utils.features import CovariateMetadata
 from autogluon.timeseries.utils.warning_filters import disable_stdout, warning_filter
 
@@ -244,7 +244,7 @@ class AbstractTimeSeriesModel(AbstractModel):
             The fitted model object
         """
         self.initialize(**kwargs)
-        self.target_scaler = self._get_target_scaler()
+        self.target_scaler = self._create_target_scaler()
         if self.target_scaler is not None:
             train_data = self.target_scaler.fit_transform(train_data)
 
@@ -260,11 +260,12 @@ class AbstractTimeSeriesModel(AbstractModel):
         """List of hyperparameters allowed by the model."""
         return ["target_scaler"]
 
-    def _get_target_scaler(self) -> Optional[LocalTargetScaler]:
+    def _create_target_scaler(self) -> Optional[LocalTargetScaler]:
+        """Create a LocalTargetScaler object based on the value of the `target_scaler` hyperparameter."""
         # TODO: Add support for custom target transforms (e.g., Box-Cox, log1p, ...)
         target_scaler_type = self._get_model_params().get("target_scaler")
         if target_scaler_type is not None:
-            return get_target_scaler(target_scaler_type, target=self.target)
+            return get_target_scaler_from_name(target_scaler_type, target=self.target)
         else:
             return None
 

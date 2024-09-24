@@ -10,7 +10,7 @@ from autogluon.timeseries.transforms.scaler import (
     LocalMinMaxScaler,
     LocalRobustScaler,
     LocalStandardScaler,
-    get_target_scaler,
+    get_target_scaler_from_name,
 )
 
 from .common import DUMMY_TS_DATAFRAME
@@ -21,7 +21,7 @@ TESTABLE_MODELS = [NaiveModel, get_multi_window_deepar]
 
 @pytest.mark.parametrize("scaler_name", AVAILABLE_SCALERS)
 def test_when_scaler_transforms_then_input_data_is_not_modified(scaler_name):
-    scaler = get_target_scaler(scaler_name)
+    scaler = get_target_scaler_from_name(scaler_name)
     data = DUMMY_TS_DATAFRAME.copy()
     data_original = data.copy()
     data_transformed = scaler.fit_transform(data)
@@ -31,7 +31,7 @@ def test_when_scaler_transforms_then_input_data_is_not_modified(scaler_name):
 
 @pytest.mark.parametrize("scaler_name", AVAILABLE_SCALERS)
 def test_when_scaler_transforms_then_no_new_nans_appear(scaler_name):
-    scaler = get_target_scaler(scaler_name)
+    scaler = get_target_scaler_from_name(scaler_name)
     data = DUMMY_TS_DATAFRAME.copy()
     data_transformed = scaler.fit_transform(data)
     assert data.isna().equals(data_transformed.isna())
@@ -39,7 +39,7 @@ def test_when_scaler_transforms_then_no_new_nans_appear(scaler_name):
 
 @pytest.mark.parametrize("scaler_name", AVAILABLE_SCALERS)
 def test_when_inverse_transform_applied_then_output_matches_input(scaler_name):
-    scaler = get_target_scaler(scaler_name)
+    scaler = get_target_scaler_from_name(scaler_name)
     data = DUMMY_TS_DATAFRAME.copy()
     data_transformed = scaler.fit_transform(data)
     data_inverse = scaler.inverse_transform(data_transformed)

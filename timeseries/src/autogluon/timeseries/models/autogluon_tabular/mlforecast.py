@@ -409,7 +409,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
     def _more_tags(self) -> dict:
         return {"allow_nan": True, "can_refit_full": True}
 
-    def _get_target_scaler(self):
+    def _create_target_scaler(self):
         # Do not create a scaler in the model, scaler will be passed to MLForecast
         return None
 

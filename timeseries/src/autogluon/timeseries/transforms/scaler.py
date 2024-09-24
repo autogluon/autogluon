@@ -58,7 +58,10 @@ class LocalTargetScaler:
 
 
 class LocalStandardScaler(LocalTargetScaler):
-    """Applies standard scaling to each time series in the dataset."""
+    """Applies standard scaling to each time series in the dataset.
+
+    The resulting affine transformation is (x - loc) / scale, where scale = std(x), loc = mean(x).
+    """
 
     def _compute_loc_scale(self, target_series: pd.Series) -> Tuple[pd.Series, pd.Series]:
         stats = target_series.groupby(level=ITEMID, sort=False).agg(["mean", "std"])
@@ -74,7 +77,10 @@ class LocalMeanAbsScaler(LocalTargetScaler):
 
 
 class LocalMinMaxScaler(LocalTargetScaler):
-    """Applies min/max scaling to each time series in the dataset."""
+    """Applies min/max scaling to each time series in the dataset.
+
+    The resulting affine transformation is (x - loc) / scale, where scale = max(x) - min(x), loc = min(x) / scale.
+    """
 
     def _compute_loc_scale(self, target_series: pd.Series) -> Tuple[pd.Series, pd.Series]:
         stats = target_series.abs().groupby(level=ITEMID, sort=False).agg(["min", "max"])
@@ -84,6 +90,11 @@ class LocalMinMaxScaler(LocalTargetScaler):
 
 
 class LocalRobustScaler(LocalTargetScaler):
+    """Applies a robust scaler based on the interquartile range. Less sensitive to outliers compared to other scaler.
+
+    The resulting affine transformation is (x - loc) / scale, where scale = quantile(x, 0.75) - quantile(x, 0.25), loc = median(x).
+    """
+
     def __init__(
         self,
         target: str = "target",
@@ -112,7 +123,7 @@ AVAILABLE_SCALERS = {
 }
 
 
-def get_target_scaler(
+def get_target_scaler_from_name(
     name: Literal["standard", "mean_abs", "min_max", "robust"], **scaler_kwargs
 ) -> LocalTargetScaler:
     """Get LocalTargetScaler object from a string."""

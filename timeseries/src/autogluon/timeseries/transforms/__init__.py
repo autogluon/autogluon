@@ -4,5 +4,5 @@ from .scaler import (
     LocalMeanAbsScaler,
     LocalRobustScaler,
     LocalTargetScaler,
-    get_target_scaler
+    get_target_scaler_from_name
 )

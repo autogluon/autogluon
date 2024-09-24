@@ -85,7 +85,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
     def get_minimum_resources(self, is_gpu_available: bool = False) -> bool:
         return self._get_model_base().get_minimum_resources(is_gpu_available)
 
-    def _get_target_scaler(self) -> Optional[LocalTargetScaler]:
+    def _create_target_scaler(self) -> Optional[LocalTargetScaler]:
         # Do not use scaler in the MultiWindowModel to avoid duplication; it will be created in the inner model
         return None
 
