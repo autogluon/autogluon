@@ -1248,7 +1248,10 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             Only valid when `data` is specified. The scores refer to the scores on `data` (same data as used to
             calculate the `score_test` column).
 
-            This list can contain any values which would also be valid for `eval_metric` when creating a `TimeSeriesPredictor`.
+            This list can contain any values which would also be valid for `eval_metric` when creating a :class:`~autogluon.timeseries.TimeSeriesPredictor`.
+
+            For each provided `metric`, a column with name `str(metric)` will be added to the leaderboard, containing
+            the value of the metric computed on `data`.
         display : bool, default = False
             If True, the leaderboard DataFrame will be printed.
         use_cache : bool, default = True
