@@ -110,8 +110,6 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         known as dynamic features, exogenous variables, additional regressors or related time series. Examples of such
         covariates include holidays, promotions or weather forecasts.
 
-        Currently, only numeric (float of integer dtype) are supported.
-
         If ``known_covariates_names`` are provided, then:
 
         - :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit`, :meth:`~autogluon.timeseries.TimeSeriesPredictor.evaluate`, and :meth:`~autogluon.timeseries.TimeSeriesPredictor.leaderboard` will expect a data frame with columns listed in ``known_covariates_names`` (in addition to the ``target`` column).
@@ -437,7 +435,6 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
             If ``known_covariates_names`` were specified when creating the predictor, ``train_data`` must include the
             columns listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
-            The known covariates must have a numeric (float or integer) dtype.
 
             Columns of ``train_data`` except ``target`` and those listed in ``known_covariates_names`` will be
             interpreted as ``past_covariates`` - covariates that are known only in the past.
