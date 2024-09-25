@@ -66,7 +66,8 @@ class DeepARModel(AbstractGluonTSModel):
     distr_output : gluonts.torch.distributions.DistributionOutput, default = StudentTOutput()
         Distribution to use to evaluate observations and sample predictions
     scaling: bool, default = True
-        Whether to automatically scale the target values
+        If True, mean absolute scaling will be applied to each *context window* during training & prediction.
+        Note that this is different from the `target_scaler` that is applied to the *entire time series*.
     max_epochs : int, default = 100
         Number of epochs the model will be trained for
     batch_size : int, default = 64
@@ -85,7 +86,7 @@ class DeepARModel(AbstractGluonTSModel):
         If True, ``lightning_logs`` directory will NOT be removed after the model finished training.
     """
 
-    # TODO: Should we rename "scaling: bool" to, e.g., "window_scaler": {"mean_abs", None} and have a hyperparameter names for all models?
+    # TODO: Replace "scaling: bool" with "window_scaler": {"mean_abs", None} for consistency?
 
     supports_known_covariates = True
     supports_static_features = True
@@ -124,7 +125,8 @@ class SimpleFeedForwardModel(AbstractGluonTSModel):
     batch_normalization : bool, default = False
         Whether to use batch normalization
     mean_scaling : bool, default = True
-        Scale the network input by the data mean and the network output by its inverse
+        If True, mean absolute scaling will be applied to each *context window* during training & prediction.
+        Note that this is different from the `target_scaler` that is applied to the *entire time series*.
     max_epochs : int, default = 100
         Number of epochs the model will be trained for
     batch_size : int, default = 64
@@ -256,7 +258,10 @@ class DLinearModel(AbstractGluonTSModel):
     distr_output : gluonts.torch.distributions.DistributionOutput, default = StudentTOutput()
         Distribution to fit.
     scaling : {"mean", "std", None}, default = "mean"
-        Scaling applied to the inputs. One of ``"mean"`` (mean absolute scaling), ``"std"`` (standardization), ``None`` (no scaling).
+        Scaling applied to each *context window* during training & prediction.
+        One of ``"mean"`` (mean absolute scaling), ``"std"`` (standardization), ``None`` (no scaling).
+
+        Note that this is different from the `target_scaler` that is applied to the *entire time series*.
     max_epochs : int, default = 100
         Number of epochs the model will be trained for
     batch_size : int, default = 64
@@ -316,7 +321,10 @@ class PatchTSTModel(AbstractGluonTSModel):
     distr_output : gluonts.torch.distributions.DistributionOutput, default = StudentTOutput()
         Distribution to fit.
     scaling : {"mean", "std", None}, default = "mean"
-        Scaling applied to the inputs. One of ``"mean"`` (mean absolute scaling), ``"std"`` (standardization), ``None`` (no scaling).
+        Scaling applied to each *context window* during training & prediction.
+        One of ``"mean"`` (mean absolute scaling), ``"std"`` (standardization), ``None`` (no scaling).
+
+        Note that this is different from the `target_scaler` that is applied to the *entire time series*.
     max_epochs : int, default = 100
         Number of epochs the model will be trained for
     batch_size : int, default = 64
@@ -479,7 +487,10 @@ class TiDEModel(AbstractGluonTSModel):
     layer_norm : bool, default = False
         Should layer normalization be enabled?
     scaling : {"mean", "std", None}, default = "mean"
-        Scaling applied to the inputs. One of ``"mean"`` (mean absolute scaling), ``"std"`` (standardization), ``None`` (no scaling).
+        Scaling applied to each *context window* during training & prediction.
+        One of ``"mean"`` (mean absolute scaling), ``"std"`` (standardization), ``None`` (no scaling).
+
+        Note that this is different from the `target_scaler` that is applied to the *entire time series*.
     max_epochs : int, default = 100
         Number of epochs the model will be trained for
     batch_size : int, default = 64
