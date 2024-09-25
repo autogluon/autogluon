@@ -21,8 +21,8 @@ import yaml
 from lightning.pytorch.strategies import DeepSpeedStrategy
 from omegaconf import DictConfig, OmegaConf
 from packaging import version
+from safetensors.torch import load_file, save_file
 from torch import nn
-from safetensors.torch import save_file, load_file
 
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_ray

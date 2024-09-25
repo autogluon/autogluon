@@ -30,8 +30,7 @@ import fsspec
 import torch
 from fsspec.core import url_to_fs
 from fsspec.implementations.local import AbstractFileSystem
-from safetensors.torch import save_file, load_file
-
+from safetensors.torch import load_file, save_file
 
 _PATH = Union[str, Path]
 _DEVICE = Union[torch.device, str, int]

@@ -3,12 +3,12 @@ import os
 import re
 import shutil
 from typing import Any, Dict, List, Optional, Tuple, Union
-from safetensors.torch import load_file
 
 import lightning.pytorch as pl
 import torch
 from lightning.pytorch.strategies import DeepSpeedStrategy
 from lightning.pytorch.utilities.rank_zero import rank_zero_warn
+from safetensors.torch import load_file
 
 from .cloud_io import _atomic_save, get_filesystem
 from .cloud_io import _load as pl_load

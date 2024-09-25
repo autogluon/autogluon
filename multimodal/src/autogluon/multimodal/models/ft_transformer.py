@@ -3,8 +3,8 @@ import tempfile
 from typing import List, Optional
 
 import torch
-from torch import Tensor, nn
 from safetensors.torch import load_file
+from torch import Tensor, nn
 
 from ..constants import CATEGORICAL, FEATURES, LABEL, LOGITS, NUMERICAL
 from .custom_transformer import CLSToken, Custom_Transformer, _TokenInitialization

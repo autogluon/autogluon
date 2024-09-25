@@ -4,10 +4,10 @@ import os
 from typing import Dict, List, Optional
 
 import torch
+from safetensors.torch import save_file
 from timm import create_model
 from timm.layers.linear import Linear
 from torch import nn
-from safetensors.torch import save_file
 
 from ..constants import AUTOMM, COLUMN, COLUMN_FEATURES, FEATURES, IMAGE, IMAGE_VALID_NUM, LABEL, LOGITS, MASKS
 from .utils import assign_layer_ids, get_column_features, get_model_head

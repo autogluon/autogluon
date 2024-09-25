@@ -3,9 +3,9 @@ import os
 import time
 import warnings
 from typing import Optional
-from safetensors.torch import save_file, load_file
 
 import torch
+from safetensors.torch import load_file, save_file
 from torch import nn
 
 from ..constants import BBOX, BBOX_FORMATS, COLUMN, IMAGE, IMAGE_VALID_NUM, LABEL, XYXY

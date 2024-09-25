@@ -17,9 +17,8 @@ import pandas as pd
 import torch
 import yaml
 from omegaconf import DictConfig, OmegaConf
+from safetensors.torch import load_file, save_file
 from torch import nn
-from safetensors.torch import save_file, load_file
-
 
 from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.common.utils.resource_utils import ResourceManager
