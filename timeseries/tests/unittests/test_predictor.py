@@ -1756,3 +1756,45 @@ def test_when_predictor_saved_to_same_directory_and_loaded_then_number_of_models
 def test_when_invalid_path_provided_to_load_then_correct_exception_is_raised():
     with pytest.raises(FileNotFoundError, match="No such file"):
         TimeSeriesPredictor.load("some_invalid_path")
+
+
+@pytest.mark.parametrize("tuning_data", [DUMMY_TS_DATAFRAME, None])
+def test_when_extra_info_is_true_then_leaderboard_returns_concrete_hyperparameters(temp_model_path, tuning_data):
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=3)
+    predictor.fit(
+        DUMMY_TS_DATAFRAME,
+        tuning_data=tuning_data,
+        hyperparameters={"SeasonalNaive": {"seasonal_period": space.Int(1, 24)}},
+        hyperparameter_tune_kwargs="auto",
+    )
+    leaderboard = predictor.leaderboard(extra_info=True)
+    for hps in leaderboard["hyperparameters"]:
+        for val in hps.values():
+            assert not isinstance(val, space.Space)
+
+
+@pytest.mark.parametrize("extra_metrics", [["WQL", "MASE"], ["wql", "MASE"], [CustomMetric(), "MAPE"]])
+def test_when_extra_metrics_provided_then_leaderboard_contains_metric_values(temp_model_path, extra_metrics):
+    data = DUMMY_TS_DATAFRAME
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=3)
+    predictor.fit(data, hyperparameters={"SeasonalNaive": {}, "Naive": {}})
+    leaderboard = predictor.leaderboard(data, extra_metrics=extra_metrics)
+    for metric in extra_metrics:
+        assert leaderboard[str(metric)].notna().all()
+
+
+def test_when_extra_metrics_provided_and_data_missing_then_exception_is_raised(temp_model_path):
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=3)
+    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
+    with pytest.raises(ValueError, match="is only valid when"):
+        predictor.leaderboard(extra_metrics=["WQL"])
+
+
+def test_when_extra_metrics_and_extra_info_provided_then_leaderboard_contains_correct_columns(temp_model_path):
+    data = DUMMY_TS_DATAFRAME
+    predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=3)
+    predictor.fit(data, hyperparameters={"SeasonalNaive": {}, "Naive": {}})
+    extra_metrics = ["MASE", "smape"]
+    leaderboard = predictor.leaderboard(data, extra_info=True, extra_metrics=extra_metrics)
+    for col in ["hyperparameters"] + extra_metrics:
+        assert col in leaderboard.columns

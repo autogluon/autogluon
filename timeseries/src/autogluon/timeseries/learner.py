@@ -280,10 +280,18 @@ class TimeSeriesLearner(AbstractLearner):
 
         return importance_df
 
-    def leaderboard(self, data: Optional[TimeSeriesDataFrame] = None, use_cache: bool = True) -> pd.DataFrame:
+    def leaderboard(
+        self,
+        data: Optional[TimeSeriesDataFrame] = None,
+        extra_info: bool = False,
+        extra_metrics: Optional[List[Union[str, TimeSeriesScorer]]] = None,
+        use_cache: bool = True,
+    ) -> pd.DataFrame:
         if data is not None:
             data = self.feature_generator.transform(data)
-        return self.load_trainer().leaderboard(data, use_cache=use_cache)
+        return self.load_trainer().leaderboard(
+            data, extra_info=extra_info, extra_metrics=extra_metrics, use_cache=use_cache
+        )
 
     def get_info(self, include_model_info: bool = False, **kwargs) -> Dict[str, Any]:
         learner_info = super().get_info(include_model_info=include_model_info)
