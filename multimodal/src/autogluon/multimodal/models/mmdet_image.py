@@ -3,6 +3,7 @@ import os
 import time
 import warnings
 from typing import Optional
+from safetensors.torch import save_file, load_file
 
 import torch
 from torch import nn
@@ -169,7 +170,8 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         if not save_path:
             save_path = f"./{self.checkpoint_name}_autogluon.pth"
 
-        torch.save({"state_dict": self.model.state_dict(), "meta": {"CLASSES": self.model.CLASSES}}, save_path)
+        save_file({"state_dict": self.model.state_dict(), "meta": {"CLASSES": self.model.CLASSES}}, save_path)
+
 
     def _save_configs(self, save_path=None):
         if not save_path:
@@ -500,7 +502,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         """
         sd = source_path
 
-        model_dict = torch.load(sd, map_location=torch.device("cpu"))
+        model_dict = load_file(sd, map_location=torch.device("cpu"))
         if "state_dict" in model_dict:
             model_dict = model_dict["state_dict"]
         if "model" in model_dict:
@@ -617,6 +619,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         data = {"state_dict": new_dict}
 
         target_directory = os.path.splitext(sd)[0] + f"_cvt.pth"
-        torch.save(data, target_directory)
+        save_file(data, target_directory)
+
 
         return target_directory

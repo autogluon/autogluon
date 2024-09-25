@@ -3,6 +3,7 @@ import os
 import re
 import shutil
 from typing import Any, Dict, List, Optional, Tuple, Union
+from safetensors.torch import load_file
 
 import lightning.pytorch as pl
 import torch
@@ -40,9 +41,9 @@ def average_checkpoints(
 
                 convert_zero_checkpoint_to_fp32_state_dict(per_path + "-dir", per_path)
                 shutil.rmtree(per_path + "-dir")
-                state_dict = torch.load(per_path, map_location=torch.device("cpu"))["state_dict"]
+                state_dict = load_file(per_path, map_location=torch.device("cpu"))["state_dict"]
             else:
-                state_dict = torch.load(per_path, map_location=torch.device("cpu"))["state_dict"]
+                state_dict = load_file(per_path, map_location=torch.device("cpu"))["state_dict"]
             for k, v in state_dict.items():
                 if k not in avg_state_dict:
                     avg_state_dict[k] = v.clone().to(dtype=torch.float64)

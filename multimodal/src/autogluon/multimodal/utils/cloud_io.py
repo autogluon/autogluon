@@ -30,6 +30,8 @@ import fsspec
 import torch
 from fsspec.core import url_to_fs
 from fsspec.implementations.local import AbstractFileSystem
+from safetensors.torch import save_file, load_file
+
 
 _PATH = Union[str, Path]
 _DEVICE = Union[torch.device, str, int]
@@ -48,15 +50,15 @@ def _load(
     """
     if not isinstance(path_or_url, (str, Path)):
         # any sort of BytesIO or similar
-        return torch.load(path_or_url, map_location=map_location)
+        return load_file(path_or_url, map_location)
     if str(path_or_url).startswith("http"):
         return torch.hub.load_state_dict_from_url(
             str(path_or_url),
-            map_location=map_location,  # type: ignore[arg-type] # upstream annotation is not correct
+            map_location,  # type: ignore[arg-type] # upstream annotation is not correct
         )
     fs = get_filesystem(path_or_url)
     with fs.open(path_or_url, "rb") as f:
-        return torch.load(f, map_location=map_location)
+        return load_file(f, map_location)
 
 
 def get_filesystem(path: _PATH, **kwargs: Any) -> AbstractFileSystem:
@@ -69,12 +71,12 @@ def _atomic_save(checkpoint: Dict[str, Any], filepath: Union[str, Path]) -> None
 
     Args:
         checkpoint: The object to save.
-            Built to be used with the ``dump_checkpoint`` method, but can deal with anything which ``torch.save``
+            Built to be used with the ``dump_checkpoint`` method, but can deal with anything which ``safetensors.torch.save_file``
             accepts.
         filepath: The path to which the checkpoint will be saved.
             This points to the file that the checkpoint will be stored in.
     """
     bytesbuffer = io.BytesIO()
-    torch.save(checkpoint, bytesbuffer)
+    save_file(checkpoint, bytesbuffer)
     with fsspec.open(filepath, "wb") as f:
         f.write(bytesbuffer.getvalue())

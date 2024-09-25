@@ -22,6 +22,7 @@ from lightning.pytorch.strategies import DeepSpeedStrategy
 from omegaconf import DictConfig, OmegaConf
 from packaging import version
 from torch import nn
+from safetensors.torch import save_file, load_file
 
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_ray
@@ -1477,7 +1478,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                     "state_dict": {"model." + name: param for name, param in self._model.state_dict().items()}
                 }
 
-        torch.save(checkpoint, os.path.join(save_path, MODEL_CHECKPOINT))
+        save_file(checkpoint, os.path.join(save_path, MODEL_CHECKPOINT))
 
         if clean_ckpts:
             # clean old checkpoints + the intermediate files stored
@@ -2112,9 +2113,9 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
                 convert_zero_checkpoint_to_fp32_state_dict(path + "-dir", path)
                 shutil.rmtree(path + "-dir")
-                state_dict = torch.load(path, map_location=torch.device("cpu"))["state_dict"]
+                state_dict = load_file(path, map_location=torch.device("cpu"))["state_dict"]
             else:
-                state_dict = torch.load(path, map_location=torch.device("cpu"))["state_dict"]
+                state_dict = load_file(path, map_location=torch.device("cpu"))["state_dict"]
         state_dict = {k.partition(prefix)[2]: v for k, v in state_dict.items() if k.startswith(prefix)}
 
         # Some buffers like `position_ids` are registered as persistent=False since transformers 4.31.0
@@ -2222,7 +2223,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
         if save_model:
             checkpoint = {"state_dict": {"model." + name: param for name, param in model.state_dict().items()}}
-            torch.save(checkpoint, os.path.join(os.path.abspath(path), MODEL_CHECKPOINT))
+            save_file(checkpoint, os.path.join(os.path.abspath(path), MODEL_CHECKPOINT))
 
     @staticmethod
     def _load_metadata(

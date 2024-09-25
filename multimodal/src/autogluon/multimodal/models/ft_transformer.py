@@ -4,6 +4,7 @@ from typing import List, Optional
 
 import torch
 from torch import Tensor, nn
+from safetensors.torch import load_file
 
 from ..constants import CATEGORICAL, FEATURES, LABEL, LOGITS, NUMERICAL
 from .custom_transformer import CLSToken, Custom_Transformer, _TokenInitialization
@@ -609,12 +610,12 @@ class FT_Transformer(nn.Module):
 
         if pretrained and checkpoint_name:
             if os.path.exists(checkpoint_name):
-                ckpt = torch.load(checkpoint_name)
+                ckpt = load_file(checkpoint_name)
             else:
                 with tempfile.TemporaryDirectory() as tmpdirname:
                     checkpoint_path = os.path.join(tmpdirname, "./ft_transformer_pretrained.ckpt")
                     download(checkpoint_name, checkpoint_path)
-                    ckpt = torch.load(checkpoint_path)
+                    ckpt = load_file(checkpoint_path)
             self.transformer.load_state_dict(ckpt["state_dict"])
 
         self.name_to_id = self.get_layer_ids()

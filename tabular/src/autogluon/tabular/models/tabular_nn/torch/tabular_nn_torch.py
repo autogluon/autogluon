@@ -8,6 +8,7 @@ import time
 import warnings
 from copy import deepcopy
 from typing import Dict, Union
+from safetensors.torch import load_file, save_file
 
 import numpy as np
 import pandas as pd
@@ -335,7 +336,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                 self.optimizer.step()
 
             os.makedirs(os.path.dirname(self.path), exist_ok=True)
-            torch.save(self.model, net_filename)
+            save_file(self.model, net_filename)
             logger.log(15, "Untrained Tabular Neural Network saved to file")
             return
 
@@ -443,7 +444,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                         is_best = True
                     best_val_metric = val_metric
                     os.makedirs(os.path.dirname(self.path), exist_ok=True)
-                    torch.save(self.model, net_filename)
+                    save_file(self.model, net_filename)
                     best_epoch = epoch
                     best_val_update = total_updates
                 early_stop = early_stopping_method.update(cur_round=epoch-1, is_best=is_best)
@@ -495,7 +496,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         if val_dataset is not None:
             logger.log(15, f"Best model found on Epoch {best_epoch} (Update {best_val_update}). Val {self.stopping_metric.name}: {best_val_metric}")
             try:
-                self.model = torch.load(net_filename)
+                self.model = load_file(net_filename)
                 os.remove(net_filename)
             except FileNotFoundError:
                 pass

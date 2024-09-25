@@ -7,6 +7,7 @@ import time
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
+from safetensors.torch import load_file, save_file
 
 from autogluon.common.features.types import R_OBJECT, S_TEXT_AS_CATEGORY, S_TEXT_NGRAM
 from autogluon.common.utils.try_import import try_import_torch
@@ -341,7 +342,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
 
                     best_val_epoch = e
                     os.makedirs(os.path.dirname(self.path), exist_ok=True)
-                    torch.save(self.model, os.path.join(self.path, self._temp_file_name))
+                    save_file(self.model, os.path.join(self.path, self._temp_file_name))
 
             # If time limit has exceeded or we haven't improved in some number of epochs, stop early.
             if e - best_val_epoch > epochs_wo_improve:
@@ -355,7 +356,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
 
         if loader_val is not None:
             try:
-                self.model = torch.load(os.path.join(self.path, self._temp_file_name))
+                self.model = load_file(os.path.join(self.path, self._temp_file_name))
                 os.remove(os.path.join(self.path, self._temp_file_name))
             except:
                 pass
@@ -496,7 +497,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
 
         temp_model = self.model
         if self.model is not None:
-            torch.save(self.model, params_filepath)
+            save_file(self.model, params_filepath)
 
         self.model = None  # Avoiding pickling the weights.
         modelobj_filepath = super().save(path=path, verbose=verbose)
@@ -513,7 +514,7 @@ class TabTransformerModel(AbstractNeuralNetworkModel):
         if reset_paths:
             obj.set_contexts(path)
 
-        obj.model = torch.load(os.path.join(path, cls.params_file_name))
+        obj.model = load_file(os.path.join(path, cls.params_file_name))
 
         return obj
 
