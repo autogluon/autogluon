@@ -138,7 +138,7 @@ class LabelCleanerMulticlass(LabelCleaner):
         Inverse transforms uncleaned internal labels to external labels.
         """
         y = self._convert_to_valid_series(y=y)
-        y = y.map(self.cat_mappings_dependent_var_uncleaned)
+        y = y.map(self.cat_mappings_dependent_var_uncleaned).astype('int64')
         return y
 
     # TODO: Unused? There are not many reasonable situations that seem to require this method.
