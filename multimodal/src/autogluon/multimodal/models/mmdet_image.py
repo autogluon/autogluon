@@ -502,7 +502,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         """
         sd = source_path
 
-        model_dict = load_file(sd, map_location=torch.device("cpu"))
+        model_dict = load_file(sd, "cpu")
         if "state_dict" in model_dict:
             model_dict = model_dict["state_dict"]
         if "model" in model_dict:

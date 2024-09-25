@@ -1843,7 +1843,7 @@ class MultiModalMatcher(BaseLearner):
         response_prefix: str = "response_model.",
     ):
         if state_dict is None:
-            state_dict = load_file(path, map_location=torch.device("cpu"))["state_dict"]
+            state_dict = load_file(path, "cpu")["state_dict"]
         query_state_dict = {
             k.partition(query_prefix)[2]: v for k, v in state_dict.items() if k.startswith(query_prefix)
         }
