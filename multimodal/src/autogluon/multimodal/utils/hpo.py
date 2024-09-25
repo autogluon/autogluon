@@ -50,9 +50,9 @@ def hpo_trial(sampled_hyperparameters, learner, checkpoint_dir=None, **_fit_args
     resources = context.get_trial_resources().required_resources
     num_cpus = int(resources.get("CPU"))
 
-    _fit_args[
-        "hyperparameters"
-    ] = sampled_hyperparameters  # The original hyperparameters is the search space, replace it with the hyperparameters sampled
+    _fit_args["hyperparameters"] = (
+        sampled_hyperparameters  # The original hyperparameters is the search space, replace it with the hyperparameters sampled
+    )
     _fit_args["save_path"] = context.get_trial_dir()  # We want to save each trial to a separate directory
     logger.debug(f"hpo trial save_path: {_fit_args['save_path']}")
     if checkpoint_dir is not None:

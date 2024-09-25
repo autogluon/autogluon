@@ -288,7 +288,9 @@ class RankingMetrics:
             "ndcg": 4,
         }
 
-        assert len(pred) == len(target), f"The prediction and groudtruth target should have the same number of queries, \
+        assert len(pred) == len(
+            target
+        ), f"The prediction and groudtruth target should have the same number of queries, \
         while there are {len(pred)} queries in prediction and {len(target)} in the target."
 
         self.results = {}
