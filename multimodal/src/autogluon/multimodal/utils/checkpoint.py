@@ -61,7 +61,7 @@ def average_checkpoints(
         for k in avg_state_dict:
             avg_state_dict[k].clamp_(float32_info.min, float32_info.max).to(dtype=torch.float32)
     else:
-        avg_state_dict = torch.load(checkpoint_paths[0], "cpu")["state_dict"]
+        avg_state_dict = load_file(checkpoint_paths[0], "cpu")["state_dict"]
 
     return avg_state_dict
 
