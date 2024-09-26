@@ -125,6 +125,9 @@ class LabelCleanerMulticlass(LabelCleaner):
     def _inverse_transform(self, y: Series) -> Series:
         y = y.map(self.cat_mappings_dependent_var)
         return y
+    
+    def _safe_convert_to_int(self, series):
+        return pd.to_numeric(series, errors='coerce').astype(pd.Int64Dtype())
 
     def transform_pred_uncleaned(self, y: Union[Series, np.ndarray]) -> Series:
         """
@@ -138,8 +141,10 @@ class LabelCleanerMulticlass(LabelCleaner):
         """
         Inverse transforms uncleaned internal labels to external labels.
         """
+        
         y = self._convert_to_valid_series(y=y)
-        y = y.map(self.cat_mappings_dependent_var_uncleaned).astype(pd.Int64Dtype())
+        y = y.map(self.cat_mappings_dependent_var_uncleaned)
+        y = self._safe_convert_to_int(y)  # Safely handle non-numeric values
         return y
 
     # TODO: Unused? There are not many reasonable situations that seem to require this method.
