@@ -13,6 +13,7 @@ from autogluon.core.hpo.executors import HpoExecutor, RayHpoExecutor
 from autogluon.core.models import AbstractModel
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
+from autogluon.timeseries.transforms import LocalTargetScaler, get_target_scaler_from_name
 from autogluon.timeseries.utils.features import CovariateMetadata
 from autogluon.timeseries.utils.warning_filters import disable_stdout, warning_filter
 
@@ -122,6 +123,7 @@ class AbstractTimeSeriesModel(AbstractModel):
             self.must_drop_median = False
 
         self._oof_predictions: Optional[List[TimeSeriesDataFrame]] = None
+        self.target_scaler: Optional[LocalTargetScaler] = None
 
     def __repr__(self) -> str:
         return self.name
@@ -241,10 +243,31 @@ class AbstractTimeSeriesModel(AbstractModel):
         model: AbstractTimeSeriesModel
             The fitted model object
         """
+        self.initialize(**kwargs)
+        self.target_scaler = self._create_target_scaler()
+        if self.target_scaler is not None:
+            train_data = self.target_scaler.fit_transform(train_data)
+
         train_data = self.preprocess(train_data, is_train=True)
         if self._get_tags()["can_use_val_data"] and val_data is not None:
+            if self.target_scaler is not None:
+                val_data = self.target_scaler.transform(val_data)
             val_data = self.preprocess(val_data, is_train=False)
         return super().fit(train_data=train_data, val_data=val_data, **kwargs)
+
+    @property
+    def allowed_hyperparameters(self) -> List[str]:
+        """List of hyperparameters allowed by the model."""
+        return ["target_scaler"]
+
+    def _create_target_scaler(self) -> Optional[LocalTargetScaler]:
+        """Create a LocalTargetScaler object based on the value of the `target_scaler` hyperparameter."""
+        # TODO: Add support for custom target transforms (e.g., Box-Cox, log1p, ...)
+        target_scaler_type = self._get_model_params().get("target_scaler")
+        if target_scaler_type is not None:
+            return get_target_scaler_from_name(target_scaler_type, target=self.target)
+        else:
+            return None
 
     def _fit(
         self,
@@ -299,6 +322,9 @@ class AbstractTimeSeriesModel(AbstractModel):
             data is given as a separate forecast item in the dictionary, keyed by the `item_id`s
             of input items.
         """
+        if self.target_scaler is not None:
+            data = self.target_scaler.fit_transform(data)
+
         data = self.preprocess(data, is_train=False)
         known_covariates = self.preprocess_known_covariates(known_covariates)
         predictions = self._predict(data=data, known_covariates=known_covariates, **kwargs)
@@ -309,6 +335,9 @@ class AbstractTimeSeriesModel(AbstractModel):
                 predictions["mean"] = predictions["0.5"]
             if self.must_drop_median:
                 predictions = predictions.drop("0.5", axis=1)
+
+        if self.target_scaler is not None:
+            predictions = self.target_scaler.inverse_transform(predictions)
         return predictions
 
     def _predict(

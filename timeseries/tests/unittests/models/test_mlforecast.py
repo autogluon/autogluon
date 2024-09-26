@@ -100,21 +100,6 @@ def test_when_eval_metric_is_changed_then_model_can_predict(temp_model_path, mod
 
 
 @pytest.mark.parametrize("model_type", TESTABLE_MODELS)
-@pytest.mark.parametrize("scaler", ["standard", "mean_abs"])
-def test_when_scaler_used_during_fit_then_scales_are_stored(temp_model_path, model_type, scaler):
-    data = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME.copy()
-    model = model_type(
-        path=temp_model_path,
-        freq=data.freq,
-        hyperparameters={"scaler": scaler, "tabular_hyperparameters": {"DUMMY": {}}},
-    )
-    model.fit(train_data=data)
-    scale_per_item = model._get_scale_per_item(data.item_ids)
-    assert model._scaler is not None
-    assert scale_per_item.index.equals(data.item_ids)
-
-
-@pytest.mark.parametrize("model_type", TESTABLE_MODELS)
 @pytest.mark.parametrize("differences", [[], [14]])
 def test_given_long_time_series_passed_to_model_then_preprocess_receives_shortened_time_series(
     temp_model_path, model_type, differences
@@ -277,3 +262,19 @@ def test_when_trained_model_moved_to_different_folder_then_loaded_model_can_pred
     loaded_model = model_type.load(os.path.join(new_model_dir, model.name))
     predictions = loaded_model.predict(data)
     assert isinstance(predictions, TimeSeriesDataFrame)
+
+
+@pytest.mark.parametrize("model_type", TESTABLE_MODELS)
+@pytest.mark.parametrize("eval_metric", ["WAPE", "WQL"])
+def test_when_target_transform_provided_then_scaler_is_used_inside_mlforecast(model_type, eval_metric):
+    data = DUMMY_TS_DATAFRAME.copy().sort_index()
+    model = model_type(
+        freq=data.freq,
+        eval_metric=eval_metric,
+        quantile_levels=[0.1, 0.5, 0.9],
+        prediction_length=3,
+        hyperparameters={"target_scaler": "robust"},
+    )
+    model.fit(train_data=data)
+    assert model.target_scaler is None
+    assert model._scaler is not None
