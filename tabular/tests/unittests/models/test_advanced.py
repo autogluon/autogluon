@@ -20,6 +20,7 @@ def test_bagged_predict_children(model_fit_helper):
     )
 
 
+# TODO: Test num_gpus>0
 def test_resource_constraints(fit_helper, dataset_loader_helper):
     """
     Verify that num_cpus and num_gpus are respected when specified in the fit call.
