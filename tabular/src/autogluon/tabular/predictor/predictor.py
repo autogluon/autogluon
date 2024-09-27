@@ -1192,7 +1192,12 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             "excluded_model_types": excluded_model_types,
             "feature_prune_kwargs": kwargs.get("feature_prune_kwargs", None),
         }
-        aux_kwargs = {}
+        aux_kwargs = {
+            "total_resources": {
+                "num_cpus": num_cpus,
+                "num_gpus": num_gpus,
+            },
+        }
         if fit_weighted_ensemble is False:
             aux_kwargs["fit_weighted_ensemble"] = False
         aux_kwargs["fit_full_last_level_weighted_ensemble"] = fit_full_last_level_weighted_ensemble
@@ -1791,7 +1796,12 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         ag_args = self._set_hyperparameter_tune_kwargs_in_ag_args(kwargs["hyperparameter_tune_kwargs"], ag_args, time_limit=time_limit)
 
         fit_new_weighted_ensemble = False  # TODO: Add as option
-        aux_kwargs = {}
+        aux_kwargs = {
+            "total_resources": {
+                "num_cpus": num_cpus,
+                "num_gpus": num_gpus,
+            },
+        }
         if fit_weighted_ensemble is False:
             aux_kwargs = {"fit_weighted_ensemble": False}
         aux_kwargs["fit_full_last_level_weighted_ensemble"] = fit_full_last_level_weighted_ensemble
@@ -3663,6 +3673,11 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             y = trainer.load_y_val()
             fit = False
 
+        total_resources = {
+            "num_cpus": num_cpus,
+            "num_gpus": num_gpus,
+        }
+
         stack_name = "aux1"
         if base_models is None:
             base_models = trainer.get_model_names(stack_name="core")
@@ -3688,6 +3703,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                     base_model_names=models_to_check_now,
                     name_suffix=name_suffix + "_Pareto" + str(i),
                     time_limit=time_limit,
+                    total_resources=total_resources,
                 )
 
         max_base_model_level = max([trainer.get_model_level(base_model) for base_model in base_models])
@@ -3700,6 +3716,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             base_model_names=base_models,
             name_suffix=name_suffix,
             time_limit=time_limit,
+            total_resources=total_resources,
         )
 
         if refit_full:

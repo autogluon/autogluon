@@ -795,8 +795,8 @@ class AbstractModel:
             self._fit_metadata = self._compute_fit_metadata(**kwargs)
             self._is_fit_metadata_registered = True
 
-    def _compute_fit_metadata(self, X_val: pd.DataFrame = None, X_unlabeled: pd.DataFrame = None, **kwargs) -> dict:
-        fit_metadata = dict(val_in_fit=X_val is not None, unlabeled_in_fit=X_unlabeled is not None)
+    def _compute_fit_metadata(self, X_val: pd.DataFrame = None, X_unlabeled: pd.DataFrame = None, num_cpus: int = None, num_gpus: int = None, **kwargs) -> dict:
+        fit_metadata = dict(val_in_fit=X_val is not None, unlabeled_in_fit=X_unlabeled is not None, num_cpus=num_cpus, num_gpus=num_gpus)
         return fit_metadata
 
     def get_fit_metadata(self) -> dict:
@@ -2064,6 +2064,8 @@ class AbstractModel:
             "can_infer": self.can_infer(),
             "has_learning_curves": self.saved_learning_curves,
         }
+        if self._is_fit_metadata_registered:
+            info.update(self._fit_metadata)
         return info
 
     def get_params_aux_info(self) -> dict:

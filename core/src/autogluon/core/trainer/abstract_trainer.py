@@ -880,6 +880,7 @@ class AbstractTrainer:
         use_val_cache=True,
         fit_weighted_ensemble: bool = True,
         name_extra: str | None = None,
+        total_resources: dict | None = None,
     ) -> List[str]:
         """
         Trains auxiliary models (currently a single weighted ensemble) using the provided base models.
@@ -934,6 +935,7 @@ class AbstractTrainer:
             get_models_func=get_models_func,
             check_if_best=check_if_best,
             child_hyperparameters=child_hyperparameters,
+            total_resources=total_resources,
         )
 
     def predict(self, X, model=None):
@@ -1924,6 +1926,7 @@ class AbstractTrainer:
         check_if_best=True,
         child_hyperparameters=None,
         get_models_func=None,
+        total_resources: dict | None = None,
     ) -> List[str]:
         if get_models_func is None:
             get_models_func = self.construct_model_templates
@@ -1985,6 +1988,7 @@ class AbstractTrainer:
             time_limit=time_limit,
             ens_sample_weight=w,
             fit_kwargs=dict(feature_metadata=feature_metadata, num_classes=self.num_classes, groups=None),  # FIXME: Is this the right way to do this?
+            total_resources=total_resources,
         )
         for weighted_ensemble_model_name in models:
             if check_if_best and weighted_ensemble_model_name in self.get_model_names():
@@ -2369,7 +2373,7 @@ class AbstractTrainer:
         time_limit=None,
         fit_kwargs=None,
         compute_score=True,
-        total_resources=None,
+        total_resources: dict | None = None,
         **kwargs,
     ) -> List[str]:
         """
