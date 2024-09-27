@@ -691,7 +691,6 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         if resources_model is None:
             resources_model = resources
         fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix = self._get_fold_properties(fold_ctx)
-        logger.debug(f"Folding resources per job {resources}")
         train_index, val_index = fold
         fold_ctx_ref = self.ray.put(fold_ctx)
         save_bag_folds = self.save_folds
