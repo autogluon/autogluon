@@ -1429,7 +1429,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
     def _sub_fit_memory_save_wrapper(
         self,
         train_data: Union[str, pd.DataFrame],
-        time_limit: int,
+        time_limit: float,
         time_start: float,
         ds_fit_kwargs: dict,
         ag_fit_kwargs: dict,
@@ -3616,10 +3616,10 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
     def fit_weighted_ensemble(
         self,
         base_models: list = None,
-        name_suffix="Best",
-        expand_pareto_frontier=False,
-        time_limit=None,
-        refit_full=False,
+        name_suffix: str = "Best",
+        expand_pareto_frontier: bool = False,
+        time_limit: float = None,
+        refit_full: bool = False,
         num_cpus: int | str = "auto",
         num_gpus: int | str = "auto",
     ):
@@ -3629,19 +3629,19 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
         Parameters
         ----------
-        base_models : list, default = None
+        base_models: list, default = None
             List of model names the weighted ensemble can consider as candidates.
             If None, all previously trained models are considered except for weighted ensemble models.
             As an example, to train a weighted ensemble that can only have weights assigned to the models 'model_a' and 'model_b', set `base_models=['model_a', 'model_b']`
-        name_suffix : str, default = 'Best'
+        name_suffix: str, default = 'Best'
             Name suffix to add to the name of the newly fitted ensemble model.
-        expand_pareto_frontier : bool, default = False
+        expand_pareto_frontier: bool, default = False
             If True, will train N-1 weighted ensemble models instead of 1, where `N=len(base_models)`.
             The final model trained when True is equivalent to the model trained when False.
             These weighted ensemble models will attempt to expand the pareto frontier.
             This will create many different weighted ensembles which have different accuracy/memory/inference-speed trade-offs.
             This is particularly useful when inference speed is an important consideration.
-        time_limit : int, default = None
+        time_limit: float, default = None
             Time in seconds each weighted ensemble model is allowed to train for. If `expand_pareto_frontier=True`, the `time_limit` value is applied to each model.
             If None, the ensemble models train without time restriction.
         refit_full : bool, default = False
@@ -5525,7 +5525,7 @@ class _TabularPredictorExperimental(TabularPredictor):
 def _dystack(
     predictor: TabularPredictor,
     train_data: Union[str, pd.DataFrame],
-    time_limit: int,
+    time_limit: float,
     ds_fit_kwargs: dict,
     ag_fit_kwargs: dict,
     ag_post_fit_kwargs: dict,
