@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Any
 
 import torch
-from safetensors.torch import save_file
 from fastai.torch_core import flatten_check
 
 
@@ -24,7 +23,7 @@ def export(model, filename_or_stream="export.pkl", pickle_module=pickle, pickle_
     with warnings.catch_warnings():
         # To avoid the warning that come from PyTorch about model not being checked
         warnings.simplefilter("ignore")
-        save_file(model, target, pickle_module=pickle_module, pickle_protocol=pickle_protocol)
+        torch.save(model, target, pickle_module=pickle_module, pickle_protocol=pickle_protocol) # nosec B614
     model.create_opt()
     if state is not None:
         model.opt.load_state_dict(state)

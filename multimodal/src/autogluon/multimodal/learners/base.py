@@ -1468,17 +1468,16 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         else:
             if isinstance(strategy, DeepSpeedStrategy):
                 checkpoint = {
-                    "state_dict": {
-                        name.partition("module.")[2]: param
-                        for name, param in strategy.model._zero3_consolidated_16bit_state_dict().items()
-                    }
+                    f"model.{name.partition('module.')[2]}": param
+                    for name, param in strategy.model._zero3_consolidated_16bit_state_dict().items()
                 }
             else:
                 checkpoint = {
-                    "state_dict": {"model." + name: param for name, param in self._model.state_dict().items()}
+                    f"model.{name}": param
+                    for name, param in self._model.state_dict().items()
                 }
 
-        save_file(checkpoint, os.path.join(save_path, MODEL_CHECKPOINT))
+            save_file(checkpoint, os.path.join(save_path, MODEL_CHECKPOINT))
 
         if clean_ckpts:
             # clean old checkpoints + the intermediate files stored
@@ -2113,9 +2112,9 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
                 convert_zero_checkpoint_to_fp32_state_dict(path + "-dir", path)
                 shutil.rmtree(path + "-dir")
-                state_dict = load_file(path, "cpu")["state_dict"]
+                state_dict = load_file(path, "cpu")
             else:
-                state_dict = load_file(path, "cpu")["state_dict"]
+                state_dict = load_file(path, "cpu")
         state_dict = {k.partition(prefix)[2]: v for k, v in state_dict.items() if k.startswith(prefix)}
 
         # Some buffers like `position_ids` are registered as persistent=False since transformers 4.31.0
@@ -2221,9 +2220,11 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                 ensure_ascii=True,
             )
 
-        if save_model:
-            checkpoint = {"state_dict": {"model." + name: param for name, param in model.state_dict().items()}}
-            save_file(checkpoint, os.path.join(os.path.abspath(path), MODEL_CHECKPOINT))
+        if save_model and model is not None:
+            # Flatten the state_dict for safetensors compatibility as it expects Dict in format of [str, torch.Tensor]
+            checkpoint = {f"model.{name}": param for name, param in model.state_dict().items()}
+            checkpoint_path = os.path.join(os.path.abspath(path), MODEL_CHECKPOINT)
+            save_file(checkpoint, checkpoint_path)
 
     @staticmethod
     def _load_metadata(

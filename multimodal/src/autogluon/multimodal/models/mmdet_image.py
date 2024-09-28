@@ -170,6 +170,7 @@ class MMDetAutoModelForObjectDetection(nn.Module):
         if not save_path:
             save_path = f"./{self.checkpoint_name}_autogluon.pth"
 
+        # TODO: save the model.state_dict() with safetensors, currently it is not compatible with safetensors format
         save_file({"state_dict": self.model.state_dict(), "meta": {"CLASSES": self.model.CLASSES}}, save_path)
 
     def _save_configs(self, save_path=None):

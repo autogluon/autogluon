@@ -8,7 +8,7 @@ import lightning.pytorch as pl
 import torch
 from lightning.pytorch.strategies import DeepSpeedStrategy
 from lightning.pytorch.utilities.rank_zero import rank_zero_warn
-from safetensors.torch import load_file
+from safetensors.torch import load_file, save_file
 
 from .cloud_io import _atomic_save, get_filesystem
 from .cloud_io import _load as pl_load
@@ -41,9 +41,9 @@ def average_checkpoints(
 
                 convert_zero_checkpoint_to_fp32_state_dict(per_path + "-dir", per_path)
                 shutil.rmtree(per_path + "-dir")
-                state_dict = load_file(per_path, "cpu")["state_dict"]
+                state_dict = load_file(per_path, "cpu")
             else:
-                state_dict = load_file(per_path, "cpu")["state_dict"]
+                state_dict = load_file(per_path, "cpu")
             for k, v in state_dict.items():
                 if k not in avg_state_dict:
                     avg_state_dict[k] = v.clone().to(dtype=torch.float64)
@@ -61,7 +61,7 @@ def average_checkpoints(
         for k in avg_state_dict:
             avg_state_dict[k].clamp_(float32_info.min, float32_info.max).to(dtype=torch.float32)
     else:
-        avg_state_dict = load_file(checkpoint_paths[0], "cpu")["state_dict"]
+        avg_state_dict = load_file(checkpoint_paths[0], "cpu")
 
     return avg_state_dict
 
@@ -125,14 +125,14 @@ class AutoMMModelCheckpointIO(pl.plugins.CheckpointIO):
         fs.makedirs(os.path.dirname(path), exist_ok=True)
         try:
             # write the checkpoint dictionary on the file
-            _atomic_save(checkpoint, path)
+            save_file(checkpoint['state_dict'], path)
         except AttributeError as err:
             # todo (sean): is this try catch necessary still?
             # https://github.com/Lightning-AI/lightning/pull/431
             key = pl.LightningModule.CHECKPOINT_HYPER_PARAMS_KEY
             checkpoint.pop(key, None)
             rank_zero_warn(f"Warning, `{key}` dropped from checkpoint. An attribute is not picklable: {err}")
-            _atomic_save(checkpoint, path)
+            save_file(checkpoint['state_dict'], path)
 
     def load_checkpoint(self, path, map_location: Optional[Any] = None) -> Dict[str, Any]:
         """

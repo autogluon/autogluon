@@ -1057,8 +1057,10 @@ class MultiModalMatcher(BaseLearner):
             response_model=self._response_model,
         )
 
-        checkpoint = {"state_dict": task.state_dict()}
-        save_file(checkpoint, os.path.join(save_path, MODEL_CHECKPOINT))
+        # Flatten the state_dict for safetensors compatibility
+        checkpoint = {f"model.{name}": param for name, param in task.state_dict().items()}
+        checkpoint_path = os.path.join(os.path.abspath(save_path), MODEL_CHECKPOINT)
+        save_file(checkpoint, checkpoint_path)
 
         if clean_ckpts:
             # clean old checkpoints + the intermediate files stored
@@ -1842,7 +1844,7 @@ class MultiModalMatcher(BaseLearner):
         response_prefix: str = "response_model.",
     ):
         if state_dict is None:
-            state_dict = load_file(path, "cpu")["state_dict"]
+            state_dict = load_file(path, "cpu")
         query_state_dict = {
             k.partition(query_prefix)[2]: v for k, v in state_dict.items() if k.startswith(query_prefix)
         }
@@ -1986,8 +1988,10 @@ class MultiModalMatcher(BaseLearner):
                 query_model=self._query_model,
                 response_model=self._response_model,
             )
-            checkpoint = {"state_dict": task.state_dict()}
-            save_file(checkpoint, os.path.join(path, MODEL_CHECKPOINT))
+            # Flatten the state_dict for safetensors compatibility
+            checkpoint = {f"model.{name}": param for name, param in task.state_dict().items()}
+            checkpoint_path = os.path.join(os.path.abspath(path), MODEL_CHECKPOINT)
+            save_file(checkpoint, checkpoint_path)
 
     @staticmethod
     def _load_metadata(
