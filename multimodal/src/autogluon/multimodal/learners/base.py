@@ -1472,10 +1472,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                     for name, param in strategy.model._zero3_consolidated_16bit_state_dict().items()
                 }
             else:
-                checkpoint = {
-                    f"model.{name}": param
-                    for name, param in self._model.state_dict().items()
-                }
+                checkpoint = {f"model.{name}": param for name, param in self._model.state_dict().items()}
 
             save_file(checkpoint, os.path.join(save_path, MODEL_CHECKPOINT))
 

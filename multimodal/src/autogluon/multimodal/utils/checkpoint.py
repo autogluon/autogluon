@@ -125,14 +125,14 @@ class AutoMMModelCheckpointIO(pl.plugins.CheckpointIO):
         fs.makedirs(os.path.dirname(path), exist_ok=True)
         try:
             # write the checkpoint dictionary on the file
-            save_file(checkpoint['state_dict'], path)
+            save_file(checkpoint["state_dict"], path)
         except AttributeError as err:
             # todo (sean): is this try catch necessary still?
             # https://github.com/Lightning-AI/lightning/pull/431
             key = pl.LightningModule.CHECKPOINT_HYPER_PARAMS_KEY
             checkpoint.pop(key, None)
             rank_zero_warn(f"Warning, `{key}` dropped from checkpoint. An attribute is not picklable: {err}")
-            save_file(checkpoint['state_dict'], path)
+            save_file(checkpoint["state_dict"], path)
 
     def load_checkpoint(self, path, map_location: Optional[Any] = None) -> Dict[str, Any]:
         """
