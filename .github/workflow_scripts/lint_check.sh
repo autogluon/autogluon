@@ -22,6 +22,6 @@ function lint_check_all {
     # lint_check tabular
 }
 
-bandit -r multimodal/src -ll --skip B614
+bandit -r multimodal/src -ll
 lint_check_all
 ruff check timeseries/

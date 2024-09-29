@@ -92,10 +92,10 @@ class DDPPredictionWriter(BasePredictionWriter):
         """
         # this will create N (num processes) files in `cache_dir` each containing
         # the predictions of its respective rank
-        torch.save(predictions, self.get_predictions_cache_dir(trainer.global_rank))
+        torch.save(predictions, self.get_predictions_cache_dir(trainer.global_rank)) # nosec B614
         # here we save `batch_indices` to get the information about the data index
         # from prediction data
-        torch.save(batch_indices, self.get_batch_indices_cache_dir(trainer.global_rank))
+        torch.save(batch_indices, self.get_batch_indices_cache_dir(trainer.global_rank)) # nosec B614
 
     def read_single_gpu_results(self, global_rank: Optional[int]):
         """
@@ -109,8 +109,8 @@ class DDPPredictionWriter(BasePredictionWriter):
         while (not os.path.exists(sample_indices_file)) or (not os.path.exists(predictions_file)):
             logger.info(f"waiting for rank #{global_rank} to finish saving predictions...")
             time.sleep(self.sleep_time)
-        sample_indices = torch.load(sample_indices_file)
-        predictions = torch.load(predictions_file)
+        sample_indices = torch.load(sample_indices_file) # nosec B614
+        predictions = torch.load(predictions_file) # nosec B614
 
         return sample_indices, predictions
 

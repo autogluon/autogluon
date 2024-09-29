@@ -231,14 +231,14 @@ class TabularTorchDataset(torch.utils.data.IterableDataset):
         dataobj_file = file_prefix + self.DATAOBJ_SUFFIX
         if not os.path.exists(os.path.dirname(dataobj_file)):
             os.makedirs(os.path.dirname(dataobj_file))
-        torch.save(self, dataobj_file)
+        torch.save(self, dataobj_file) # nosec B614
         logger.debug("TabularPyTorchDataset Dataset saved to a file: \n %s" % dataobj_file)
 
     @classmethod
     def load(cls, file_prefix=""):
         """Additional naming changes will be appended to end of file_prefix (must contain full absolute path)"""
         dataobj_file = file_prefix + cls.DATAOBJ_SUFFIX
-        dataset: TabularTorchDataset = torch.load(dataobj_file)
+        dataset: TabularTorchDataset = torch.load(dataobj_file) # nosec B614
         logger.debug("TabularNN Dataset loaded from a file: \n %s" % dataobj_file)
         return dataset
 
