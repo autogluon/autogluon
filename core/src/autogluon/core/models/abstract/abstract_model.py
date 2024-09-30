@@ -131,7 +131,7 @@ class AbstractModel:
             self.eval_metric = metrics.get_metric(eval_metric, self.problem_type, "eval_metric")  # Note: we require higher values = better performance
         else:
             self.eval_metric = None
-        self.stopping_metric = None
+        self.stopping_metric: Scorer = None
         self.normalize_pred_probas = None
 
         self.features = None  # External features, do not use internally
@@ -1088,7 +1088,7 @@ class AbstractModel:
         else:  # Unknown problem type
             raise AssertionError(f'Unknown y_pred_proba format for `problem_type="{self.problem_type}"`.')
 
-    def score(self, X, y, metric=None, sample_weight=None, **kwargs) -> np.ndarray:
+    def score(self, X, y, metric=None, sample_weight=None, **kwargs) -> float:
         if metric is None:
             metric = self.eval_metric
 
@@ -1098,7 +1098,7 @@ class AbstractModel:
             y_pred = self.predict_proba(X=X, **kwargs)
         return compute_weighted_metric(y, y_pred, metric, sample_weight, quantile_levels=self.quantile_levels)
 
-    def score_with_y_pred_proba(self, y, y_pred_proba: np.ndarray, metric=None, sample_weight=None) -> np.ndarray:
+    def score_with_y_pred_proba(self, y, y_pred_proba: np.ndarray, metric=None, sample_weight=None) -> float:
         if metric is None:
             metric = self.eval_metric
         if metric.needs_pred:
