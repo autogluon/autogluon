@@ -67,7 +67,7 @@ extras_require = {
     "vowpalwabbit": [
         # FIXME: 9.5+ causes VW to save an empty model which always predicts 0. Confirmed on MacOS (Intel CPU). Unknown how to fix.
         # No vowpalwabbit wheel for python 3.11 or above yet
-        "vowpalwabbit>=9,<9.10; python_version < '3.11'",
+        "vowpalwabbit>=9,<9.10; python_version < '3.11'" and sys_platform != 'darwin'",
     ],
     "skl2onnx": [
         "onnx>=1.13.0,<1.16.0",  # cap at 1.15.0 for issue https://github.com/autogluon/autogluon/issues/3804
