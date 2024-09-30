@@ -22,11 +22,11 @@ jobs:
         AG_MODULE: [tabular, timeseries, multimodal]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Setup Env Vars
         uses: ./.github/actions/setup-env-vars
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmarkConfig
           role-duration-seconds: 3600
@@ -54,17 +54,17 @@ jobs:
           docker-images: true
           swap-storage: true
       - name: Checkout repository for PR
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Setup Python
-        uses: actions/setup-python@v1
+        uses: actions/setup-python@v4
         with:
           python-version: '3.9'
       - name: Setup npm
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 'latest'
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
           role-duration-seconds: 36000
@@ -76,7 +76,7 @@ jobs:
           npm install -g aws-cdk
           /bin/bash ./.github/workflow_scripts/run_benchmark.sh tabular tabular_best tabular_full 1h8c ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
       - name: Upload evaluation results as artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: upload-evaluation-results-tabular
           path: evaluate
@@ -100,17 +100,17 @@ jobs:
           docker-images: true
           swap-storage: true
       - name: Checkout repository for PR
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Setup Python
-        uses: actions/setup-python@v1
+        uses: actions/setup-python@v4
         with:
           python-version: '3.9'
       - name: Setup npm
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 'latest'
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
           role-duration-seconds: 36000
@@ -122,7 +122,7 @@ jobs:
           npm install -g aws-cdk
           /bin/bash ./.github/workflow_scripts/run_benchmark.sh timeseries timeseries_best timeseries_small 10m4c ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
       - name: Upload evaluation results as artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: upload-evaluation-results-timeseries
           path: evaluate
@@ -146,17 +146,17 @@ jobs:
           docker-images: true
           swap-storage: true
       - name: Checkout repository for PR
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Setup Python
-        uses: actions/setup-python@v1
+        uses: actions/setup-python@v4
         with:
           python-version: '3.9'
       - name: Setup npm
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 'latest'
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
           role-duration-seconds: 36000
@@ -168,7 +168,7 @@ jobs:
           npm install -g aws-cdk
           /bin/bash ./.github/workflow_scripts/run_benchmark.sh multimodal multimodal_best automm-text g4_12x ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
       - name: Upload evaluation results as artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: upload-evaluation-results-automm-text
           path: evaluate
@@ -192,17 +192,17 @@ jobs:
           docker-images: true
           swap-storage: true
       - name: Checkout repository for PR
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Setup Python
-        uses: actions/setup-python@v1
+        uses: actions/setup-python@v4
         with:
           python-version: '3.9'
       - name: Setup npm
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 'latest'
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
           role-duration-seconds: 36000
@@ -214,7 +214,7 @@ jobs:
           npm install -g aws-cdk
           /bin/bash ./.github/workflow_scripts/run_benchmark.sh multimodal multimodal_best automm-text-tabular g4_12x ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
       - name: Upload evaluation results as artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: upload-evaluation-results-automm-text-tabular
           path: evaluate
@@ -238,17 +238,17 @@ jobs:
           docker-images: true
           swap-storage: true
       - name: Checkout repository for PR
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Setup Python
-        uses: actions/setup-python@v1
+        uses: actions/setup-python@v4
         with:
           python-version: '3.9'
       - name: Setup npm
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 'latest'
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
           role-duration-seconds: 36000
@@ -260,7 +260,7 @@ jobs:
           npm install -g aws-cdk
           /bin/bash ./.github/workflow_scripts/run_benchmark.sh multimodal multimodal_best automm-image g4_12x ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
       - name: Upload evaluation results as artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: upload-evaluation-results-automm-image
           path: evaluate
