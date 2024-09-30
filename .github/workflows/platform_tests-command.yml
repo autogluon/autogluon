@@ -313,7 +313,6 @@ jobs:
         if: matrix.os == 'macos-latest'
         run: |
           # Purge pip cache (only for macOS)
-          pip cache purge
           mac_version=$(sw_vers -productVersion | cut -d '.' -f 1,2)
           export MACOSX_DEPLOYMENT_TARGET="$mac_version"   # https://github.com/facebookresearch/detectron2/issues/5216
           echo "MACOSX_DEPLOYMENT_TARGET is set to $MACOSX_DEPLOYMENT_TARGET"
