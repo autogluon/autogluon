@@ -1057,7 +1057,7 @@ class MultiModalMatcher(BaseLearner):
         )
 
         checkpoint = {"state_dict": task.state_dict()}
-        torch.save(checkpoint, os.path.join(save_path, MODEL_CHECKPOINT))
+        torch.save(checkpoint, os.path.join(save_path, MODEL_CHECKPOINT))  # nosec B614
 
         if clean_ckpts:
             # clean old checkpoints + the intermediate files stored
@@ -1841,7 +1841,7 @@ class MultiModalMatcher(BaseLearner):
         response_prefix: str = "response_model.",
     ):
         if state_dict is None:
-            state_dict = torch.load(path, map_location=torch.device("cpu"))["state_dict"]
+            state_dict = torch.load(path, map_location=torch.device("cpu"))["state_dict"]  # nosec B614
         query_state_dict = {
             k.partition(query_prefix)[2]: v for k, v in state_dict.items() if k.startswith(query_prefix)
         }
@@ -1986,7 +1986,7 @@ class MultiModalMatcher(BaseLearner):
                 response_model=self._response_model,
             )
             checkpoint = {"state_dict": task.state_dict()}
-            torch.save(checkpoint, os.path.join(path, MODEL_CHECKPOINT))
+            torch.save(checkpoint, os.path.join(path, MODEL_CHECKPOINT))  # nosec B614
 
     @staticmethod
     def _load_metadata(

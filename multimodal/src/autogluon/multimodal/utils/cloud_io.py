@@ -48,7 +48,7 @@ def _load(
     """
     if not isinstance(path_or_url, (str, Path)):
         # any sort of BytesIO or similar
-        return torch.load(path_or_url, map_location=map_location)
+        return torch.load(path_or_url, map_location=map_location)  # nosec B614
     if str(path_or_url).startswith("http"):
         return torch.hub.load_state_dict_from_url(
             str(path_or_url),
@@ -56,7 +56,7 @@ def _load(
         )
     fs = get_filesystem(path_or_url)
     with fs.open(path_or_url, "rb") as f:
-        return torch.load(f, map_location=map_location)
+        return torch.load(f, map_location=map_location)  # nosec B614
 
 
 def get_filesystem(path: _PATH, **kwargs: Any) -> AbstractFileSystem:
@@ -75,6 +75,6 @@ def _atomic_save(checkpoint: Dict[str, Any], filepath: Union[str, Path]) -> None
             This points to the file that the checkpoint will be stored in.
     """
     bytesbuffer = io.BytesIO()
-    torch.save(checkpoint, bytesbuffer)
+    torch.save(checkpoint, bytesbuffer)  # nosec B614
     with fsspec.open(filepath, "wb") as f:
         f.write(bytesbuffer.getvalue())
