@@ -208,15 +208,12 @@ jobs:
           auto-update-conda: true
           python-version: ${{ matrix.python }}
           miniconda-version: "latest"
-      - name: Setup OMP
+      - name: Install LLVM and OMP
         if: matrix.os == 'macos-latest'
         shell: bash -l {0}
         run: |
-          brew install libomp
-          export CC=/usr/local/opt/llvm/bin/clang
-          export CXX=/usr/local/opt/llvm/bin/clang++
-          export LDFLAGS="-L/usr/local/opt/llvm/lib"
-          export CPPFLAGS="-I/usr/local/opt/llvm/include"
+          brew update
+          brew install llvm libomp cmake  
       - name: unit-test
         shell: bash -l {0}
         run: |
@@ -259,15 +256,12 @@ jobs:
           auto-update-conda: true
           python-version: ${{ matrix.python }}
           miniconda-version: "latest"
-      - name: Setup OMP
+      - name: Install LLVM and OMP
         if: matrix.os == 'macos-latest'
         shell: bash -l {0}
         run: |
-          brew install libomp
-          export CC=/usr/local/opt/llvm/bin/clang
-          export CXX=/usr/local/opt/llvm/bin/clang++
-          export LDFLAGS="-L/usr/local/opt/llvm/lib"
-          export CPPFLAGS="-I/usr/local/opt/llvm/include"
+          brew update
+          brew install llvm libomp cmake  
       - name: unit-test
         shell: bash -l {0}
         run: |
@@ -309,13 +303,19 @@ jobs:
           auto-update-conda: true
           python-version: ${{ matrix.python }}
           miniconda-version: "latest"
-      - name: Set macOS deployment target (only on macOS)
+      - name: Install LLVM and OMP
         if: matrix.os == 'macos-latest'
+        shell: bash -l {0}
         run: |
-          # Purge pip cache (only for macOS)
-          mac_version=$(sw_vers -productVersion | cut -d '.' -f 1,2)
-          export MACOSX_DEPLOYMENT_TARGET="$mac_version"   # https://github.com/facebookresearch/detectron2/issues/5216
-          echo "MACOSX_DEPLOYMENT_TARGET is set to $MACOSX_DEPLOYMENT_TARGET"
+          brew update
+          brew install llvm libomp cmake  
+      # - name: Set up Clang from LLVM
+      #   run: |
+      #     export PATH="/usr/local/opt/llvm/bin:$PATH"  # Add LLVM's clang to PATH
+      #     export LDFLAGS="-L/usr/local/opt/llvm/lib -L/usr/local/opt/libomp/lib"
+      #     export CPPFLAGS="-I/usr/local/opt/llvm/include -I/usr/local/opt/libomp/include"
+      #     export CC=clang
+      #     export CXX=clang++
       - name: unit-test
         if: matrix.os != 'windows-latest'
         shell: bash -l {0}
