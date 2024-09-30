@@ -79,7 +79,7 @@ def test_label_cleaner_binary():
 def test_label_cleaner_multiclass():
     # Given
     problem_type = MULTICLASS
-    input_labels_numpy = np.array([2, 4, 2, 2, 4, 1])
+    input_labels_numpy = np.array([2, 4, 2, 2, 4, 1], dtype="int64")
     input_labels = pd.Series(input_labels_numpy)
     input_labels_category = input_labels.astype("category")
     input_labels_with_shifted_index = input_labels.copy()
@@ -114,7 +114,7 @@ def test_label_cleaner_multiclass():
     output_labels_uncleaned_new_inverse = label_cleaner.inverse_transform_pred_uncleaned(y=output_labels_uncleaned_new)
 
     assert expected_output_labels.equals(output_labels)
-    assert expected_output_labels.equals(output_labels_with_numpy)
+    assert expected_output_labels.equals(output_labels_with_numpy.astype("int64"))
     assert expected_output_labels.equals(output_labels_category)
     assert not expected_output_labels.equals(output_labels_with_shifted_index)
     output_labels_with_shifted_index.index -= 5
