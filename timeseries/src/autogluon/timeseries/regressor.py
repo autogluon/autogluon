@@ -24,6 +24,7 @@ class CovariatesRegressor:
         max_num_samples: Optional[int] = 500_000,
         metadata: Optional[CovariateMetadata] = None,
         target: str = "target",
+        validation_fraction: float = 0.1,
     ):
         if model_name not in TABULAR_MODEL_TYPES:
             raise ValueError(
@@ -36,16 +37,38 @@ class CovariatesRegressor:
         self.refit_during_predict = refit_during_predict
         self.tabular_eval_metric = tabular_eval_metric
         self.max_num_samples = max_num_samples
+        self.validation_fraction = validation_fraction
         self.model: Optional[AbstractModel] = None
         self.metadata = metadata or CovariateMetadata()
+
+    def _subsample_df(self, df: pd.DataFrame) -> pd.DataFrame:
+        if self.max_num_samples is not None and len(df) > self.max_num_samples:
+            df = df.sample(n=self.max_num_samples)
+        return df
 
     def fit(self, data: TimeSeriesDataFrame, time_limit: Optional[float] = None) -> "CovariatesRegressor":
         tabular_df = self._get_tabular_df(data, static_features=data.static_features)
         tabular_df = tabular_df.query(f"{self.target}.notnull()")
-        if self.max_num_samples is not None and len(tabular_df) > self.max_num_samples:
-            tabular_df = tabular_df.sample(n=self.max_num_samples)
+
+        median_ts_length = data.num_timesteps_per_item().median()
+        if self.validation_fraction is not None:
+            grouped_df = tabular_df.groupby(ITEMID)
+            val_size = max(int(self.validation_fraction * median_ts_length), 1)
+            train_df = self._subsample_df(grouped_df.head(-val_size))
+            val_df = self._subsample_df(grouped_df.tail(val_size))
+            X = train_df.drop(columns=[self.target])
+            y = train_df[self.target]
+            X_val = val_df.drop(columns=[self.target])
+            y_val = val_df[self.target]
+        else:
+            tabular_df = self._subsample_df(tabular_df)
+            X = tabular_df.drop(columns=[self.target])
+            y = tabular_df[self.target]
+            X_val = None
+            y_val = None
+
         self.model = self._get_tabular_model()
-        self.model.fit(X=tabular_df.drop(columns=[self.target]), y=tabular_df[self.target], time_limit=time_limit)
+        self.model.fit(time_limit=time_limit, X=X, y=y, X_val=X_val, y_val=y_val)
         return self
 
     def transform(self, data: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
