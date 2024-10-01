@@ -309,13 +309,11 @@ jobs:
         run: |
           brew update
           brew install llvm libomp cmake  
-      # - name: Set up Clang from LLVM
-      #   run: |
-      #     export PATH="/usr/local/opt/llvm/bin:$PATH"  # Add LLVM's clang to PATH
-      #     export LDFLAGS="-L/usr/local/opt/llvm/lib -L/usr/local/opt/libomp/lib"
-      #     export CPPFLAGS="-I/usr/local/opt/llvm/include -I/usr/local/opt/libomp/include"
-      #     export CC=clang
-      #     export CXX=clang++
+          export PATH="/usr/local/opt/llvm/bin:$PATH"  # Add LLVM's clang to PATH
+          export LDFLAGS="-L/usr/local/opt/llvm/lib -L/usr/local/opt/libomp/lib"
+          export CPPFLAGS="-I/usr/local/opt/llvm/include -I/usr/local/opt/libomp/include"
+          export CC=clang
+          export CXX=clang++
       - name: unit-test
         if: matrix.os != 'windows-latest'
         shell: bash -l {0}
