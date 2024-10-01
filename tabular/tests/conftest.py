@@ -423,3 +423,11 @@ def stacked_overfitting_assert(lb, predictor, expected_stacked_overfitting_at_va
     if expected_stacked_overfitting_at_test is not None:
         stacked_overfitting = check_stacked_overfitting_from_leaderboard(lb)
         assert stacked_overfitting == expected_stacked_overfitting_at_test, "Expected stacked overfitting at test mismatch!"
+
+
+@pytest.fixture(autouse=True)
+def mock_tqdm(monkeypatch):
+    def noop_tqdm(iterable, **kwargs):
+        return iterable
+
+    monkeypatch.setattr("tqdm.tqdm", noop_tqdm)
