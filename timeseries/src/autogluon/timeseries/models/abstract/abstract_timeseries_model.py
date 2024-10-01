@@ -259,7 +259,10 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         self.covariates_regressor = self._create_covariates_regressor()
         if self.covariates_regressor is not None:
-            train_data = self.covariates_regressor.fit_transform(train_data, time_limit=time_limit)
+            train_data = self.covariates_regressor.fit_transform(
+                train_data,
+                time_limit=time_limit * 0.5 if time_limit is not None else time_limit,
+            )
 
         train_data = self.preprocess(train_data, is_train=True)
         if self._get_tags()["can_use_val_data"] and val_data is not None:
@@ -288,9 +291,11 @@ class AbstractTimeSeriesModel(AbstractModel):
             return None
 
     def _create_covariates_regressor(self) -> Optional[CovariatesRegressor]:
-        covariates_regressor_name = self._get_model_params().get("covariates_regressor")
-        if covariates_regressor_name is not None:
-            return CovariatesRegressor(covariates_regressor_name, target=self.target, metadata=self.metadata)
+        covariates_regressor = self._get_model_params().get("covariates_regressor")
+        if isinstance(covariates_regressor, str):
+            return CovariatesRegressor(covariates_regressor, target=self.target, metadata=self.metadata)
+        elif isinstance(covariates_regressor, CovariatesRegressor):
+            return covariates_regressor
         else:
             return None
 
