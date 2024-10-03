@@ -21,6 +21,7 @@ DEPENDENT_PACKAGES = {
     "pandas": ">=2.0.0,<2.3.0",  # "<{N+3}" upper cap
     "scikit-learn": ">=1.4.0,<1.5.2",  # capping to latest version
     "scipy": ">=1.5.4,<1.13",  # "<{N+2}" upper cap
+    "matplotlib": ">=3.7.0,<3.11",  # "<{N+2}" upper cap
     "psutil": ">=5.7.3,<6",  # Major version cap
     "s3fs": ">=2023.1,<2025",  # Yearly cap
     "networkx": ">=3.0,<4",  # Major version cap
