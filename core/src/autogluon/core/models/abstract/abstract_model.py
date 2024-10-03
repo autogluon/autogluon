@@ -131,7 +131,7 @@ class AbstractModel:
             self.eval_metric = metrics.get_metric(eval_metric, self.problem_type, "eval_metric")  # Note: we require higher values = better performance
         else:
             self.eval_metric = None
-        self.stopping_metric = None
+        self.stopping_metric: Scorer = None
         self.normalize_pred_probas = None
 
         self.features = None  # External features, do not use internally
@@ -478,7 +478,8 @@ class AbstractModel:
             valid_features_extra = feature_metadata.get_features(**get_features_kwargs_extra)
             valid_features = [feature for feature in valid_features if feature in valid_features_extra]
         dropped_features = [feature for feature in self.features if feature not in valid_features]
-        logger.log(10, f"\tDropped {len(dropped_features)} of {len(self.features)} features.")
+        if dropped_features:
+            logger.log(10, f"\tDropped {len(dropped_features)} of {len(self.features)} features.")
         self.features = [feature for feature in self.features if feature in valid_features]
         self.feature_metadata = feature_metadata.keep_features(self.features)
         error_if_no_features = self.params_aux.get("error_if_no_features", True)
@@ -795,8 +796,8 @@ class AbstractModel:
             self._fit_metadata = self._compute_fit_metadata(**kwargs)
             self._is_fit_metadata_registered = True
 
-    def _compute_fit_metadata(self, X_val: pd.DataFrame = None, X_unlabeled: pd.DataFrame = None, **kwargs) -> dict:
-        fit_metadata = dict(val_in_fit=X_val is not None, unlabeled_in_fit=X_unlabeled is not None)
+    def _compute_fit_metadata(self, X_val: pd.DataFrame = None, X_unlabeled: pd.DataFrame = None, num_cpus: int = None, num_gpus: int = None, **kwargs) -> dict:
+        fit_metadata = dict(val_in_fit=X_val is not None, unlabeled_in_fit=X_unlabeled is not None, num_cpus=num_cpus, num_gpus=num_gpus)
         return fit_metadata
 
     def get_fit_metadata(self) -> dict:
@@ -1087,7 +1088,7 @@ class AbstractModel:
         else:  # Unknown problem type
             raise AssertionError(f'Unknown y_pred_proba format for `problem_type="{self.problem_type}"`.')
 
-    def score(self, X, y, metric=None, sample_weight=None, **kwargs) -> np.ndarray:
+    def score(self, X, y, metric=None, sample_weight=None, **kwargs) -> float:
         if metric is None:
             metric = self.eval_metric
 
@@ -1097,7 +1098,7 @@ class AbstractModel:
             y_pred = self.predict_proba(X=X, **kwargs)
         return compute_weighted_metric(y, y_pred, metric, sample_weight, quantile_levels=self.quantile_levels)
 
-    def score_with_y_pred_proba(self, y, y_pred_proba: np.ndarray, metric=None, sample_weight=None) -> np.ndarray:
+    def score_with_y_pred_proba(self, y, y_pred_proba: np.ndarray, metric=None, sample_weight=None) -> float:
         if metric is None:
             metric = self.eval_metric
         if metric.needs_pred:
@@ -2064,6 +2065,8 @@ class AbstractModel:
             "can_infer": self.can_infer(),
             "has_learning_curves": self.saved_learning_curves,
         }
+        if self._is_fit_metadata_registered:
+            info.update(self._fit_metadata)
         return info
 
     def get_params_aux_info(self) -> dict:

@@ -23,7 +23,7 @@ def export(model, filename_or_stream="export.pkl", pickle_module=pickle, pickle_
     with warnings.catch_warnings():
         # To avoid the warning that come from PyTorch about model not being checked
         warnings.simplefilter("ignore")
-        torch.save(model, target, pickle_module=pickle_module, pickle_protocol=pickle_protocol)
+        torch.save(model, target, pickle_module=pickle_module, pickle_protocol=pickle_protocol)  # nosec B614
     model.create_opt()
     if state is not None:
         model.opt.load_state_dict(state)

@@ -73,7 +73,11 @@ class EarlyStoppingCallback(AbstractCallback):
     def _after_model_fit(self, trainer: AbstractTrainer, **kwargs) -> bool:
         self.calc_new_best(trainer=trainer, **kwargs)
         if self.verbose:
-            msg = f"Best Score: {self.score_best:.4f} | Patience: {self.last_improvement}/{self.patience} | Best Model: {self.model_best}"
+            if self.score_best is None:
+                msg_score = f"{self.score_best}"
+            else:
+                msg_score = f"{self.score_best:.4f}"
+            msg = f"Best Score: {msg_score} | Patience: {self.last_improvement}/{self.patience} | Best Model: {self.model_best}"
             if self.last_improvement == 0:
                 msg += " (New Best)"
             self._log(trainer.logger, 20, msg=msg)
