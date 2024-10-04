@@ -47,9 +47,12 @@ install_requires = (
 
 
 extras_require = {
+<<<<<<< HEAD
     "ray": [
         "ray[default]>=2.10.0,<2.11",  # sync with common/src/autogluon/common/utils/try_import.py
     ],
+=======
+>>>>>>> f10404e4... [Stable] Update installation instructions to use uv temporarily (#4517)
     "raytune": [
         "ray[default,tune]>=2.10.0,<2.11",  # sync with common/src/autogluon/common/utils/try_import.py
         # TODO: consider alternatives as hyperopt is not actively maintained.
