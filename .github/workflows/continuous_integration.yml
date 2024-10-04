@@ -3,7 +3,7 @@ name: Continuous Integration
 on:
   push:
     branches:
-      - master
+      - stable
   pull_request_target:
 
 concurrency:
