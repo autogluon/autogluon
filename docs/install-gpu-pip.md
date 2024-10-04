@@ -1,6 +1,7 @@
 ```console
 pip install -U pip
 pip install -U setuptools wheel
-pip install autogluon
+pip install -U uv
+uv pip install autogluon
 ```
 
