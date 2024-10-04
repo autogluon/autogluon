@@ -32,6 +32,7 @@ install_requires = [
     "accelerate",  # version range defined in `core/_setup_utils.py`
     "gluonts==0.15.1",
     "networkx",  # version range defined in `core/_setup_utils.py`
+    "statsmodels>=0.14.2,<0.15",
     "statsforecast>=1.7.0,<1.8",
     "mlforecast==0.13.4",
     "utilsforecast>=0.2.3,<0.2.5",  # to prevent breaking changes that propagate through mlforecast's dependency
@@ -58,7 +59,9 @@ extras_require = {
         "optimum[openvino,nncf]>=1.17,<1.19",
     ],
     "chronos-onnx": [  # for faster CPU inference in pretrained models with ONNX
-        "optimum[onnxruntime]>=1.17,<1.19",
+        "optuna>=3.4.0,<5.0.0",
+        "onnx>=1.15.0",
+        "optimum[onnxruntime]>=1.20,<1.22.1",
     ],
 }
 

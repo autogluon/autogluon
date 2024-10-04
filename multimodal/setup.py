@@ -37,6 +37,7 @@ install_requires = [
     "evaluate>=0.4.0,<0.5.0",
     "timm>=0.9.5,<0.10.0",
     "torchvision>=0.16.0,<0.19.0",
+    "tifffile>=2024.1.30",
     "scikit-image>=0.19.1,<0.21.0",
     "text-unidecode>=1.3,<1.4",
     "torchmetrics>=1.2.0,<1.3.0",
