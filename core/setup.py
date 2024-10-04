@@ -51,7 +51,7 @@ extras_require = {
         "ray[default]>=2.10.0,<2.32",  # sync with common/src/autogluon/common/utils/try_import.py
     ],
     "raytune": [
-        "pyarrow>=17.0.0",  # cap Pyarrow to fix source installation - https://github.com/autogluon/autogluon/issues/4519
+        "pyarrow>=15.0.0",  # cap Pyarrow to fix source installation - https://github.com/autogluon/autogluon/issues/4519
         "ray[default,tune]>=2.10.0,<2.32",  # sync with common/src/autogluon/common/utils/try_import.py
         # TODO: consider alternatives as hyperopt is not actively maintained.
         "hyperopt>=0.2.7,<0.2.8",  # This is needed for the bayes search to work.
