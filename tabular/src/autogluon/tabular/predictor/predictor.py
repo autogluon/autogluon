@@ -3863,6 +3863,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
         Returns the out-of-fold (OOF) predictions for every row in the training data.
 
+        For a similar method, refer to :meth:`TabularPredictor.predict_multi` with `data=None`.
         For more information, refer to `predict_proba_oof()` documentation.
 
         Parameters
@@ -3895,8 +3896,6 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             return self._learner.label_cleaner.to_transformed_dtype(y_pred_oof)
         return y_pred_oof
 
-    # TODO: Improve error messages when trying to get oof from refit_full and distilled models.
-    # TODO: v0.1 add tutorial related to this method, as it is very powerful.
     # TODO: Remove train_data argument once we start caching the raw original data: Can just load that instead.
     def predict_proba_oof(
         self, model: str = None, *, transformed=False, as_multiclass=True, train_data=None, internal_oof=False, can_infer=None
@@ -3908,6 +3907,8 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         OOF prediction probabilities may provide unbiased estimates of generalization accuracy (reflecting how predictions will behave on new data)
         Predictions for each row are only made using models that were fit to a subset of data where this row was held-out.
 
+        For a similar method, refer to :meth:`TabularPredictor.predict_proba_multi` with `data=None`.
+
         Warning: This method will raise an exception if called on a model that is not a bagged ensemble. Only bagged models (such a stacker models) can produce OOF predictions.
             This also means that refit_full models and distilled models will raise an exception.
         Warning: If intending to join the output of this method with the original training data, be aware that a rare edge-case issue exists:
@@ -3915,7 +3916,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             If this has occurred, then the indices and row counts of the returned :class:`pd.Series` in this method may not align with the training data.
             In this case, consider fetching the processed training data using `predictor.load_data_internal()` instead of using the original training data.
             A more benign version of this issue occurs when 'log_loss' wasn't specified as the eval_metric but rare classes were dropped by AutoGluon.
-            In this case, not all of the original training data rows will have an OOF prediction. It is recommended to either drop these rows during the join or to get direct predictions on the missing rows via :meth:`TabularPredictor.predict_proba`.
+            In this case, not all original training data rows will have an OOF prediction. It is recommended to either drop these rows during the join or to get direct predictions on the missing rows via :meth:`TabularPredictor.predict_proba`.
 
         Parameters
         ----------
