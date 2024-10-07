@@ -2843,7 +2843,13 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             )
         data = self._get_dataset(data, allow_nan=True)
         return self._learner.predict_proba_multi(
-            X=data, models=models, as_pandas=as_pandas, as_multiclass=as_multiclass, transform_features=transform_features, inverse_transform=inverse_transform
+            X=data,
+            models=models,
+            as_pandas=as_pandas,
+            as_multiclass=as_multiclass,
+            transform_features=transform_features,
+            inverse_transform=inverse_transform,
+            use_refit_parent_oof=True,
         )
 
     @overload

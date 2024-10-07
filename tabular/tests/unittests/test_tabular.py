@@ -395,6 +395,11 @@ def test_advanced_functionality_bagging():
         predict_proba_oof = predictor.predict_proba_oof(model=m)
         assert predict_proba_oof.equals(predict_proba_dict_oof[m])
 
+    predict_dict_oof = predictor.predict_multi()
+    for m in predictor.model_names():
+        predict_oof = predictor.predict_oof(model=m)
+        assert predict_oof.equals(predict_dict_oof[m])
+
     score_oof = predictor.evaluate_predictions(train_data[label], oof_pred_proba)
     model_best = predictor.model_best
 
@@ -408,6 +413,18 @@ def test_advanced_functionality_bagging():
     # assert that refit model uses original model's OOF predictions
     oof_pred_proba_refit = predictor.predict_proba_oof()
     assert oof_pred_proba.equals(oof_pred_proba_refit)
+
+    # check predict_proba_multi after refit does not raise an exception
+    predict_proba_dict_oof = predictor.predict_proba_multi()
+    for m in predictor.model_names():
+        predict_proba_oof = predictor.predict_proba_oof(model=m)
+        assert predict_proba_oof.equals(predict_proba_dict_oof[m])
+
+    # check predict_multi after refit does not raise an exception
+    predict_dict_oof = predictor.predict_multi()
+    for m in predictor.model_names():
+        predict_oof = predictor.predict_oof(model=m)
+        assert predict_oof.equals(predict_dict_oof[m])
 
 
 def load_data(directory_prefix, train_file, test_file, name, url=None):
