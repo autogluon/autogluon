@@ -2793,7 +2793,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             predict_proba_dict[m] = predictor.predict_proba(data, model=m)
         ```
 
-        Note that this will generally be much faster than calling `self.predict_proba` separately for each model
+        Note that this will generally be much faster than calling :meth:`TabularPredictor.predict_proba` separately for each model
         because this method leverages the model dependency graph to avoid redundant computation.
 
         Parameters
@@ -2802,7 +2802,12 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             The data to predict on.
             If None:
                 If self.has_val, the validation data is used.
-                Else, the out-of-fold prediction probabilities are used.
+                Else, prediction is skipped and the out-of-fold (OOF) prediction probabilities are returned, equivalent to:
+                ```
+                predict_proba_dict = {}
+                for m in models:
+                    predict_proba_dict[m] = predictor.predict_proba_oof(model=m)
+                ```
         models : List[str], default = None
             The list of models to get predictions for.
             If None, all models that can infer are used.
@@ -2861,7 +2866,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             predict_dict[m] = predictor.predict(data, model=m)
         ```
 
-        Note that this will generally be much faster than calling `self.predict` separately for each model
+        Note that this will generally be much faster than calling :meth:`TabularPredictor.predict` separately for each model
         because this method leverages the model dependency graph to avoid redundant computation.
 
         Parameters
@@ -2870,14 +2875,17 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             The data to predict on.
             If None:
                 If self.has_val, the validation data is used.
-                Else, the out-of-fold prediction probabilities are used.
+                Else, prediction is skipped and the out-of-fold (OOF) predictions are returned, equivalent to:
+                ```
+                predict_dict = {}
+                for m in models:
+                    predict_dict[m] = predictor.predict_oof(model=m)
+                ```
         models : List[str], default = None
             The list of models to get predictions for.
             If None, all models that can infer are used.
         as_pandas : bool, default = True
-            Whether to return the output of each model as a pandas object (True) or numpy array (False).
-            Pandas object is a DataFrame if this is a multiclass problem, otherwise it is a Series.
-            If the output is a DataFrame, the column order will be equivalent to `predictor.class_labels`.
+            Whether to return the output of each model as a pandas Series (True) or numpy array (False).
         transform_features : bool, default = True
             If True, preprocesses data before predicting with models.
             If False, skips global feature preprocessing.
@@ -2890,7 +2898,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             Only relevant for binary classification, otherwise ignored.
             If None, defaults to `0.5`.
             Valid values are in the range [0.0, 1.0]
-            You can obtain an optimized `decision_threshold` by first calling `predictor.calibrate_decision_threshold()`.
+            You can obtain an optimized `decision_threshold` by first calling :meth:`TabularPredictor.calibrate_decision_threshold`.
             Useful to set for metrics such as `balanced_accuracy` and `f1` as `0.5` is often not an optimal threshold.
             Predictions are calculated via the following logic on the positive class: `1 if pred > decision_threshold else 0`
 
