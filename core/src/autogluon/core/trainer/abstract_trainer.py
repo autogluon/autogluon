@@ -1314,8 +1314,25 @@ class AbstractTrainer:
         else:
             return model_pred_dict
 
-    def get_model_oof(self, model: str) -> np.ndarray:
-        """Gets the out of fold prediction probabilities for a bagged ensemble model"""
+    def get_model_oof(self, model: str, use_refit_parent: bool = False) -> np.ndarray:
+        """
+        Gets the out of fold prediction probabilities for a bagged ensemble model
+
+        Parameters
+        ----------
+        model : str
+            Name of the model to get OOF.
+        use_refit_parent: bool = False
+            If True and the model is a refit model, will instead return the parent model's OOF.
+            If False and the model is a refit model, an exception will be raised.
+
+        Returns
+        -------
+        np.ndarray
+            model OOF prediction probabilities (if classification) or predictions (if regression)
+        """
+        if use_refit_parent and self.get_model_attribute(model=model, attribute="refit_full", default=False):
+            model = self.get_model_attribute(model=model, attribute="refit_full_parent")
         model_type = self.get_model_attribute(model=model, attribute="type")
         if issubclass(model_type, BaggedEnsembleModel):
             model_path = self.get_model_attribute(model=model, attribute="path")
