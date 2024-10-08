@@ -267,6 +267,7 @@ class AbstractTabularLearner(AbstractLearner):
         as_multiclass: bool = True,
         transform_features: bool = True,
         inverse_transform: bool = True,
+        use_refit_parent_oof: bool = True,
     ) -> dict:
         """
         Returns a dictionary of prediction probabilities where the key is
@@ -302,6 +303,8 @@ class AbstractTabularLearner(AbstractLearner):
         inverse_transform : bool, default = True
             If True, will return prediction probabilities in the original format.
             If False (advanced), will return prediction probabilities in AutoGluon's internal format.
+        use_refit_parent_oof: bool = True
+            If True and data is None and returning OOF, will return the parent model's OOF for refit models instead of raising an exception.
 
         Returns
         -------
@@ -328,7 +331,7 @@ class AbstractTabularLearner(AbstractLearner):
                 X_index = copy.deepcopy(X.index) if as_pandas else None
                 predict_proba_dict = dict()
                 for m in models:
-                    predict_proba_dict[m] = trainer.get_model_oof(m)
+                    predict_proba_dict[m] = trainer.get_model_oof(m, use_refit_parent=use_refit_parent_oof)
 
         # Inverse Transform labels
         for m, pred_proba in predict_proba_dict.items():
@@ -344,6 +347,7 @@ class AbstractTabularLearner(AbstractLearner):
         as_pandas: bool = True,
         transform_features: bool = True,
         inverse_transform: bool = True,
+        use_refit_parent_oof: bool = True,
         *,
         decision_threshold: float = None,
     ) -> dict:
@@ -351,7 +355,12 @@ class AbstractTabularLearner(AbstractLearner):
         Identical to predict_proba_multi, except returns predictions instead of probabilities.
         """
         predict_proba_dict = self.predict_proba_multi(
-            X=X, models=models, as_pandas=as_pandas, transform_features=transform_features, inverse_transform=inverse_transform
+            X=X,
+            models=models,
+            as_pandas=as_pandas,
+            transform_features=transform_features,
+            inverse_transform=inverse_transform,
+            use_refit_parent_oof=use_refit_parent_oof,
         )
         if self.problem_type in [REGRESSION, QUANTILE]:
             return predict_proba_dict
