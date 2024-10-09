@@ -951,7 +951,8 @@ def test_given_only_short_series_in_train_data_then_exception_is_raised(
 
 
 @pytest.mark.parametrize(
-    "num_val_windows, refit_every_n_windows, expected_num_refits", [(5, None, 1), (7, 7, 1), (5, 1, 5), (6, 2, 3)]
+    "num_val_windows, refit_every_n_windows, expected_num_refits",
+    [(5, None, 1), (1, None, 1), (7, 7, 1), (5, 1, 5), (6, 2, 3)],
 )
 @pytest.mark.parametrize("model_name", ["Naive", "RecursiveTabular"])
 def test_given_refit_every_n_windows_when_fit_then_model_is_fit_correct_number_of_times(
