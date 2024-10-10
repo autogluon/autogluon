@@ -79,15 +79,14 @@ class CovariatesRegressor:
     def fit_transform(self, data: TimeSeriesDataFrame, time_limit: Optional[float] = None) -> TimeSeriesDataFrame:
         return self.fit(data=data, time_limit=time_limit).transform(data=data)
 
-    def inverse_transform(
+    def predict(
         self,
-        predictions: TimeSeriesDataFrame,
         known_covariates: TimeSeriesDataFrame,
         static_features: Optional[pd.DataFrame],
-    ) -> TimeSeriesDataFrame:
+    ) -> pd.DataFrame:
         tabular_df = self._get_tabular_df(known_covariates, static_features=static_features)
         y_pred_future = self.model.predict(X=tabular_df)
-        return predictions.assign(**{col: predictions[col] + y_pred_future for col in predictions.columns})
+        return pd.DataFrame(y_pred_future, index=known_covariates.index, columns=[self.target])
 
     def _get_tabular_df(
         self, data: TimeSeriesDataFrame, static_features: Optional[pd.DataFrame] = None
