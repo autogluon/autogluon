@@ -324,6 +324,12 @@ class AbstractTimeSeriesModel(AbstractModel):
                 "as hyperparameters when initializing or use `hyperparameter_tune` instead."
             )
 
+    def _maybe_unscale_data(self, data: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
+        return data
+
+    def _maybe_unscale_predictions(self, predictions: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
+        return predictions
+
     def predict(
         self,
         data: Union[TimeSeriesDataFrame, Dict[str, TimeSeriesDataFrame]],
@@ -367,6 +373,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         # FIXME: The clean solution is to convert all methods executed in parallel to @classmethod
         covariates_regressor = self.covariates_regressor
         self.covariates_regressor = None
+        data = self._maybe_unscale_data(data)
         predictions = self._predict(data=data, known_covariates=known_covariates, **kwargs)
         self.covariates_regressor = covariates_regressor
 
@@ -377,18 +384,20 @@ class AbstractTimeSeriesModel(AbstractModel):
             if self.must_drop_median:
                 predictions = predictions.drop("0.5", axis=1)
 
+        if self.target_scaler is not None and not self.name.startswith("Chronos"):
+            predictions = self.target_scaler.inverse_transform(predictions)
+
         if self.covariates_regressor is not None:
             if known_covariates is None:
                 forecast_index = get_forecast_horizon_index_ts_dataframe(
                     data, prediction_length=self.prediction_length, freq=self.freq
                 )
                 known_covariates = pd.DataFrame(index=forecast_index, dtype="float32")
-            predictions = self.covariates_regressor.inverse_transform(
-                predictions, known_covariates=known_covariates, static_features=data.static_features
-            )
 
-        if self.target_scaler is not None:
-            predictions = self.target_scaler.inverse_transform(predictions)
+            regressor_pred = self.covariates_regressor.predict(known_covariates, static_features=data.static_features)
+            regressor_pred = self._maybe_unscale_predictions(regressor_pred)[self.target]
+            predictions = predictions.assign(**{col: predictions[col] + regressor_pred for col in predictions.columns})
+
         return predictions
 
     def _predict(

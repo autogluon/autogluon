@@ -351,3 +351,18 @@ class ChronosModel(AbstractTimeSeriesModel):
         super().score_and_cache_oof(
             val_data, store_val_score, store_predict_time, time_limit=self.time_limit, **predict_kwargs
         )
+
+    def _maybe_unscale_data(self, data: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
+        if self._get_model_params().get("unscale") and self.target_scaler is not None:
+            target_unscaled = self.target_scaler.inverse_transform(data[[self.target]])
+            data = data.assign(**{self.target: target_unscaled[self.target]})
+        return data
+
+    def _maybe_unscale_predictions(self, predictions: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
+        if self._get_model_params().get("unscale") and self.target_scaler is not None:
+            # Only scale, do not subtract the mean
+            loc = self.target_scaler.loc
+            self.target_scaler.loc = None
+            predictions = self.target_scaler.inverse_transform(predictions)
+            self.target_scaler.loc = loc
+        return predictions
