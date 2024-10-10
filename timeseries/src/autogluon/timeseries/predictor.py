@@ -416,7 +416,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         excluded_model_types: Optional[List[str]] = None,
         num_val_windows: int = 1,
         val_step_size: Optional[int] = None,
-        refit_every_n_windows: int = 1,
+        refit_every_n_windows: Optional[int] = 1,
         refit_full: bool = False,
         enable_ensemble: bool = True,
         skip_model_selection: bool = False,
@@ -720,7 +720,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         if num_val_windows == 0 and tuning_data is None:
             raise ValueError("Please set num_val_windows >= 1 or provide custom tuning_data")
 
-        if num_val_windows <= 1 and refit_every_n_windows > 1:
+        if num_val_windows <= 1 and refit_every_n_windows is not None and refit_every_n_windows > 1:
             logger.warning(
                 f"\trefit_every_n_windows provided as {refit_every_n_windows} but num_val_windows is set to {num_val_windows}."
                 " Refit_every_n_windows will have no effect."
