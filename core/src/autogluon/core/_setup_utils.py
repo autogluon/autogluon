@@ -17,7 +17,7 @@ PYTHON_REQUIRES = ">=3.9, <3.13"
 # Only put packages here that would otherwise appear multiple times across different module's setup.py files.
 DEPENDENT_PACKAGES = {
     "boto3": ">=1.10,<2",  # <2 because unlikely to introduce breaking changes in minor releases. >=1.10 because 1.10 is 3 years old, no need to support older
-    "numpy": ">=1.21,<1.29",  # "<{N+3}" upper cap, where N is the latest released minor version, assuming no warnings using N
+    "numpy": ">=1.25.0,<2.1.4",  # "<{N+3}" upper cap, where N is the latest released minor version, assuming no warnings using N
     "pandas": ">=2.0.0,<2.3.0",  # "<{N+3}" upper cap
     "scikit-learn": ">=1.4.0,<1.5.3",  # capping to latest version
     "scipy": ">=1.5.4,<1.13",  # "<{N+2}" upper cap
