@@ -70,7 +70,7 @@ class SimpleGluonTSDataset(GluonTSDataset):
 
         # Replace inefficient groupby ITEMID with indptr that stores start:end of each time series
         item_id_index = target_df.index.get_level_values(ITEMID)
-        indices_sizes = item_id_index.value_counts(sort=False)
+        indices_sizes = item_id_index.value_counts(sort=False).astype(int)
         self.item_ids = indices_sizes.index  # shape [num_items]
         cum_sizes = indices_sizes.values.cumsum()
         self.indptr = np.append(0, cum_sizes).astype(np.int32)
