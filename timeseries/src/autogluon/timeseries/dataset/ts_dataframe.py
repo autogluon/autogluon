@@ -7,6 +7,7 @@ import reprlib
 from collections.abc import Iterable
 from itertools import islice
 from pathlib import Path
+from pprint import pformat
 from typing import Any, List, Optional, Tuple, Type, Union
 
 import pandas as pd
@@ -478,25 +479,69 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
 
     @property
     def freq(self):
-        if self._cached_freq is not None and self._cached_freq == IRREGULAR_TIME_INDEX_FREQSTR:
+        if self._cached_freq is None:
+            self._cached_freq = self.infer_freq()
+
+        if self._cached_freq == IRREGULAR_TIME_INDEX_FREQSTR:
             return None  # irregularly sampled time series
-        elif self._cached_freq:
+        else:
             return self._cached_freq
 
+    def infer_freq(self, num_items: Optional[int] = 500, raise_if_irregular: bool = False) -> str:
+        """Infer the time series frequency of based on the timestamps of the observations.
+
+        When this method is called, the inferred frequency is also saved to the `_cached_freq` attribute.
+
+        Parameters
+        ----------
+        num_items : int or None, default = 500
+            Number of items (individual time series) used to infer the frequency. Lower values speed up the method,
+            but leave a chance that some items with an invalid frequency are missed because of subsampling.
+        raise_if_irregular : bool, default = False
+            If True, an exception will be raised if some items have an irregular frequency, or if different items have
+            different frequencies.
+
+        Returns
+        -------
+        freq : str
+            If all time series have a regular frequency, returns a pandas-compatible `frequency alias <https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases>`_.
+
+            If irregular time series
+        """
+
         def get_freq(series):
-            return series.index.freq or series.index.inferred_freq
+            freq = series.index.freq or series.index.inferred_freq
+            return pd.DataFrame([freq], columns=["freq"])
 
-        # check the frequencies of the first 100 items to see if frequencies are consistent and
-        # can be inferred
-        freq_for_each_series = [get_freq(self.loc[idx]) for idx in self.item_ids[:100]]
-        freq = freq_for_each_series[0]
+        df = pd.DataFrame(self)
+        if num_items is not None:
+            all_item_ids = self.item_ids
+            if len(all_item_ids) > num_items:
+                items_subset = all_item_ids.to_series().sample(n=num_items, random_state=123)
+                df = df.loc[items_subset]
+
+        item_ids = df.index.get_level_values(ITEMID)
+        timestamps = df.index.get_level_values(TIMESTAMP)
+        index_df = pd.DataFrame(item_ids, index=timestamps)
+
+        freq_for_each_series = index_df.groupby(ITEMID).apply(get_freq, include_groups=False)["freq"]
+        freq = freq_for_each_series.iloc[0]
         if len(set(freq_for_each_series)) > 1 or freq is None:
-            self._cached_freq = IRREGULAR_TIME_INDEX_FREQSTR
-            return None
-
-        freq = freq.freqstr if isinstance(freq, pd._libs.tslibs.BaseOffset) else freq
-        self._cached_freq = freq
-        return freq
+            if raise_on_error:
+                items_with_irregular_freq = freq_for_each_series[pd.isnull(freq_for_each_series)]
+                if len(items_with_irregular_freq) > 0:
+                    raise ValueError(
+                        "Cannot infer frequency. Items with irregular frequency: "
+                        f"{pformat(items_with_irregular_freq.index.tolist())}"
+                    )
+                else:
+                    raise ValueError(
+                        "Cannot infer frequency. Multiple frequencies detected in the dataset: "
+                        f"{freq_for_each_series.value_counts(dropna=False).to_dict()}"
+                    )
+            return IRREGULAR_TIME_INDEX_FREQSTR
+        else:
+            return freq.freqstr if isinstance(freq, pd._libs.tslibs.BaseOffset) else freq
 
     @property
     def num_items(self):
