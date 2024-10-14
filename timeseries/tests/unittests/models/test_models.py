@@ -616,3 +616,14 @@ def test_given_context_has_1_observation_when_model_predicts_then_model_can_pred
     )
     predictions = model.predict(data)
     assert len(predictions) == data.num_items * prediction_length
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+def test_when_itemid_has_string_dtype_then_model_can_predict(model_class, trained_models):
+    model = trained_models[(5, repr(model_class))]
+    data = DUMMY_TS_DATAFRAME.copy()
+    # Convert item_id level to pd.StringDtype()
+    data.index = data.index.set_levels(data.index.levels[0].astype(pd.StringDtype()), level="item_id")
+    predictions = model.predict(data)
+    assert isinstance(predictions, TimeSeriesDataFrame)
+    assert len(predictions) == predictions.num_items * model.prediction_length
