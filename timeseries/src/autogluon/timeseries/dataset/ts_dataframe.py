@@ -482,9 +482,11 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
 
         Parameters
         ----------
-        num_items : int or None, default = 500
+        num_items : int or None, default = 100
             Number of items (individual time series) randomly selected to infer the frequency. Lower values speed up
             the method, but increase the chance that some items with invalid frequency are missed by subsampling.
+
+            If set to `None`, all items will be used for inferring the frequency.
         raise_if_irregular : bool, default = False
             If True, an exception will be raised if some items have an irregular frequency, or if different items have
             different frequencies.
