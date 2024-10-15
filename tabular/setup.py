@@ -70,13 +70,18 @@ extras_require = {
         "vowpalwabbit>=9,<9.10; python_version < '3.11' and sys_platform != 'darwin'",
     ],
     "skl2onnx": [
-        "skl2onnx>=1.15.0,<1.17.0",
+        "onnx>=1.13.0,<1.16.2",  # cap at 1.16.1 for issue https://github.com/onnx/onnx/issues/6267
+        "skl2onnx>=1.15.0,<1.18.0",
         # For macOS, there isn't a onnxruntime-gpu package installed with skl2onnx.
         # Therefore, we install onnxruntime explicitly here just for macOS.
         "onnxruntime>=1.15.0,<1.18.0",
     ]
     if sys.platform == "darwin"
-    else ["skl2onnx>=1.15.0,<1.17.0", "onnxruntime-gpu>=1.15.0,<1.18.0"],
+    else [
+        "onnx>=1.13.0,<1.16.2",  # cap at 1.16.1 for issue https://github.com/onnx/onnx/issues/6267
+        "skl2onnx>=1.15.0,<1.18.0", 
+        "onnxruntime>=1.15.0,<1.18.0",
+        "onnxruntime-gpu>=1.15.0,<1.18.0"],
 }
 
 # TODO: v1.0: Rename `all` to `core`, make `all` contain everything.
