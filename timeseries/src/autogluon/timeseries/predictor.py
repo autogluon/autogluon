@@ -299,7 +299,10 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
         # Ensure that data has a regular frequency that matches the predictor frequency
         if self.freq is None:
-            if df.freq is None:
+            try:
+                # Use all items for inferring the frequency
+                self.freq = df.infer_freq(num_items=None, raise_if_irregular=True)
+            except ValueError:
                 raise ValueError(
                     f"Frequency of {name} is not provided and cannot be inferred. Please set the expected data "
                     f"frequency when creating the predictor with `TimeSeriesPredictor(freq=...)` or ensure that "

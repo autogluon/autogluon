@@ -303,6 +303,9 @@ def test_when_dataset_constructed_via_constructor_with_freq_and_persisted_then_c
 
 IRREGULAR_TIME_INDEXES = [
     [
+        ["2020-01-01 00:00:00", "2020-01-01 00:01:00"],
+    ],
+    [
         ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
     ],
     [
@@ -312,6 +315,10 @@ IRREGULAR_TIME_INDEXES = [
     [
         ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:00"],
         ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-04 00:00:00"],
+    ],
+    [
+        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:00"],
+        ["2020-01-01 00:00:00", "2020-02-01 00:00:00", "2020-03-01 00:00:00"],
     ],
     [
         ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
@@ -350,6 +357,20 @@ def test_when_dataset_constructed_with_irregular_timestamps_then_freq_call_cache
     tsdf = TimeSeriesDataFrame.from_data_frame(df)
     _ = tsdf.freq
     assert tsdf._cached_freq == IRREGULAR_TIME_INDEX_FREQSTR
+
+
+@pytest.mark.parametrize("irregular_index", IRREGULAR_TIME_INDEXES)
+def test_given_raise_if_irregular_is_true_when_frequency_inferred_then_error_is_raised(irregular_index):
+    df_tuples = []
+    for i, ts in enumerate(irregular_index):
+        for t in ts:
+            df_tuples.append((i, pd.Timestamp(t), np.random.rand()))
+
+    df = pd.DataFrame(df_tuples, columns=[ITEMID, TIMESTAMP, "target"])
+
+    tsdf = TimeSeriesDataFrame.from_data_frame(df)
+    with pytest.raises(ValueError, match="Cannot infer frequency"):
+        tsdf.infer_freq(raise_if_irregular=True)
 
 
 SAMPLE_ITERABLE_2 = [
