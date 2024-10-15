@@ -67,7 +67,7 @@ extras_require = {
     "vowpalwabbit": [
         # FIXME: 9.5+ causes VW to save an empty model which always predicts 0. Confirmed on MacOS (Intel CPU). Unknown how to fix.
         # No vowpalwabbit wheel for python 3.11 or above yet
-        "vowpalwabbit>=9,<9.10; python_version < '3.11'",
+        "vowpalwabbit>=9,<9.10; python_version < '3.11' and sys_platform != 'darwin'",
     ],
     "skl2onnx": [
         "skl2onnx>=1.15.0,<1.17.0",
