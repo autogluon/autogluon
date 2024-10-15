@@ -211,6 +211,11 @@ jobs:
           fi
           brew install libomp.rb
           rm libomp.rb
+      - name: Set Env Variable for MacOS MPS
+        if: matrix.os == 'macos-latest'
+        run: |
+          echo "Running on macOS"
+          export PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.0
       - name: unit-test
         shell: bash -l {0}
         run: |
@@ -256,6 +261,11 @@ jobs:
           fi
           brew install libomp.rb
           rm libomp.rb
+      - name: Set Env Variable for MacOS MPS
+        if: matrix.os == 'macos-latest'
+        run: |
+          echo "Running on macOS"
+          export PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.0
       - name: unit-test
         shell: bash -l {0}
         run: |
