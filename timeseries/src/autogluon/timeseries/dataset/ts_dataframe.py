@@ -477,7 +477,7 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
 
         self._static_features = value
 
-    def infer_frequency(self, num_items: Optional[int] = 500, raise_if_irregular: bool = False) -> str:
+    def infer_frequency(self, num_items: Optional[int] = 100, raise_if_irregular: bool = False) -> str:
         """Infer the time series frequency based on the timestamps of the observations.
 
         Parameters

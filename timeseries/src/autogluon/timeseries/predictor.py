@@ -252,7 +252,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         self,
         data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
         name: str = "data",
-    ) -> "TimeSeriesDataFrame":
+    ) -> TimeSeriesDataFrame:
         if isinstance(data, TimeSeriesDataFrame):
             return data
         elif isinstance(data, (pd.DataFrame, Path, str)):
@@ -301,7 +301,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         if self.freq is None:
             try:
                 # Use all items for inferring the frequency
-                self.freq = df.infer_freq(num_items=None, raise_if_irregular=True)
+                self.freq = df.infer_frequency(num_items=None, raise_if_irregular=True)
             except ValueError:
                 raise ValueError(
                     f"Frequency of {name} is not provided and cannot be inferred. Please set the expected data "
