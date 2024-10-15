@@ -508,11 +508,6 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
             `IRREG`.
         """
 
-        def get_freq(series: pd.Series) -> Optional[str]:
-            """Equivalent to pd.infer_freq but does not raise ValueError on < 3 observations."""
-            dt_index = pd.DatetimeIndex(series)
-            return dt_index.inferred_freq
-
         df = pd.DataFrame(self)
         if num_items is not None:
             all_item_ids = self.item_ids
@@ -520,12 +515,29 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
                 items_subset = all_item_ids.to_series().sample(n=num_items, random_state=123)
                 df = df.loc[items_subset]
 
-        index_df = pd.DataFrame({key: df.index.get_level_values(key) for key in [ITEMID, TIMESTAMP]})
-        freq_for_each_series = index_df.groupby(ITEMID).aggregate(get_freq)[TIMESTAMP]
-        freq = freq_for_each_series.iloc[0]
-        if len(set(freq_for_each_series)) > 1 or freq is None:
+        candidate_freq = df.index.levels[1].freq
+        item_ids = df.index.get_level_values(ITEMID)
+        timestamps = df.index.get_level_values(TIMESTAMP)
+        index_df = pd.DataFrame({ITEMID: item_ids, "freq": None}, index=timestamps)
+
+        def get_freq(series: pd.Series) -> Optional[str]:
+            inferred_freq = series.index.inferred_freq
+            # Fallback option: maybe original index has a `freq` attribute that pandas fails to infer
+            if inferred_freq is None and candidate_freq is not None:
+                try:
+                    # If this line does not raise an exception, then candidate_freq is a compatible frequency
+                    series.index.freq = candidate_freq
+                except ValueError:
+                    inferred_freq = None
+                else:
+                    inferred_freq = candidate_freq
+            return inferred_freq
+
+        freq_for_each_item = index_df.groupby(ITEMID).agg(get_freq)["freq"]
+        freq = freq_for_each_item.iloc[0]
+        if len(set(freq_for_each_item)) > 1 or freq is None:
             if raise_if_irregular:
-                items_with_irregular_freq = freq_for_each_series[pd.isnull(freq_for_each_series)]
+                items_with_irregular_freq = freq_for_each_item[pd.isnull(freq_for_each_item)]
                 if len(items_with_irregular_freq) > 0:
                     raise ValueError(
                         "Cannot infer frequency. Items with irregular frequency: "
@@ -534,7 +546,7 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
                 else:
                     raise ValueError(
                         "Cannot infer frequency. Multiple frequencies detected in the dataset: "
-                        f"{freq_for_each_series.unique().tolist()}"
+                        f"{freq_for_each_item.unique().tolist()}"
                     )
             return IRREGULAR_TIME_INDEX_FREQSTR
         else:
