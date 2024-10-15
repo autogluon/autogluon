@@ -477,17 +477,7 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
 
         self._static_features = value
 
-    @property
-    def freq(self):
-        if self._cached_freq is None:
-            self._cached_freq = self.infer_freq()
-
-        if self._cached_freq == IRREGULAR_TIME_INDEX_FREQSTR:
-            return None  # irregularly sampled time series
-        else:
-            return self._cached_freq
-
-    def infer_freq(self, num_items: Optional[int] = 500, raise_if_irregular: bool = False) -> str:
+    def infer_frequency(self, num_items: Optional[int] = 500, raise_if_irregular: bool = False) -> str:
         """Infer the time series frequency based on the timestamps of the observations.
 
         Parameters
@@ -516,24 +506,23 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
                 df = df.loc[items_subset]
 
         candidate_freq = df.index.levels[1].freq
-        item_ids = df.index.get_level_values(ITEMID)
-        timestamps = df.index.get_level_values(TIMESTAMP)
-        index_df = pd.DataFrame({ITEMID: item_ids, "freq": None}, index=timestamps)
+        index_df = df.index.to_frame(index=False)
 
         def get_freq(series: pd.Series) -> Optional[str]:
-            inferred_freq = series.index.inferred_freq
-            # Fallback option: maybe original index has a `freq` attribute that pandas fails to infer
+            dt_index = pd.DatetimeIndex(series)
+            inferred_freq = dt_index.inferred_freq
+            # Fallback option: maybe original index has a `freq` attribute that pandas fails to infer (e.g., 'SME')
             if inferred_freq is None and candidate_freq is not None:
                 try:
                     # If this line does not raise an exception, then candidate_freq is a compatible frequency
-                    series.index.freq = candidate_freq
+                    dt_index.freq = candidate_freq
                 except ValueError:
                     inferred_freq = None
                 else:
                     inferred_freq = candidate_freq
             return inferred_freq
 
-        freq_for_each_item = index_df.groupby(ITEMID).agg(get_freq)["freq"]
+        freq_for_each_item = index_df.groupby(ITEMID, sort=False).agg(get_freq)[TIMESTAMP]
         freq = freq_for_each_item.iloc[0]
         if len(set(freq_for_each_item)) > 1 or freq is None:
             if raise_if_irregular:
@@ -551,6 +540,16 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
             return IRREGULAR_TIME_INDEX_FREQSTR
         else:
             return freq.freqstr if isinstance(freq, pd._libs.tslibs.BaseOffset) else freq
+
+    @property
+    def freq(self):
+        if self._cached_freq is None:
+            self._cached_freq = self.infer_frequency()
+
+        if self._cached_freq == IRREGULAR_TIME_INDEX_FREQSTR:
+            return None  # irregularly sampled time series
+        else:
+            return self._cached_freq
 
     @property
     def num_items(self):

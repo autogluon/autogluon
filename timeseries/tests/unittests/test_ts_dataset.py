@@ -370,7 +370,7 @@ def test_given_raise_if_irregular_is_true_when_frequency_inferred_then_error_is_
 
     tsdf = TimeSeriesDataFrame.from_data_frame(df)
     with pytest.raises(ValueError, match="Cannot infer frequency"):
-        tsdf.infer_freq(raise_if_irregular=True)
+        tsdf.infer_frequency(raise_if_irregular=True)
 
 
 SAMPLE_ITERABLE_2 = [
