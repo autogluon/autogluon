@@ -34,7 +34,7 @@ class DropDuplicatesFeatureGenerator(AbstractFeatureGenerator):
         Refer to :class:`AbstractFeatureGenerator` documentation for details on valid key word arguments.
     """
 
-    def __init__(self, sample_size_init=500, sample_size_final=2000, **kwargs):
+    def __init__(self, sample_size_init=500, sample_size_final=3000, **kwargs):
         super().__init__(**kwargs)
         self.sample_size_init = sample_size_init
         self.sample_size_final = sample_size_final
@@ -53,8 +53,10 @@ class DropDuplicatesFeatureGenerator(AbstractFeatureGenerator):
         self._remove_features_in(features_to_drop)
         if features_to_drop:
             self._log(15, f"\t{len(features_to_drop)} duplicate columns removed: {features_to_drop}")
-        X_out = X[self.features_in]
-        return X_out, self.feature_metadata_in.type_group_map_special
+        # Avoid creating an unnecessary copy with X[self.features_in], if possible
+        if self.features_in != X.columns.to_list():
+            X = X[self.features_in]
+        return X, self.feature_metadata_in.type_group_map_special
 
     def _transform(self, X: DataFrame) -> DataFrame:
         return X
@@ -68,7 +70,7 @@ class DropDuplicatesFeatureGenerator(AbstractFeatureGenerator):
         cls, X: DataFrame, feature_metadata_in, keep: Union[str, bool] = "first", sample_size=None
     ) -> list:
         if sample_size is not None and len(X) > sample_size:
-            X = X.sample(sample_size, random_state=0)
+            X = X.sample(sample_size, random_state=0, replace=True)
         features_to_remove = []
 
         X_columns = set(X.columns)
