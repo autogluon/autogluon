@@ -1,5 +1,6 @@
 import logging
 import os
+import random
 
 import numpy as np
 import torch
@@ -230,23 +231,30 @@ class TabularTorchDataset(torch.utils.data.IterableDataset):
         dataobj_file = file_prefix + self.DATAOBJ_SUFFIX
         if not os.path.exists(os.path.dirname(dataobj_file)):
             os.makedirs(os.path.dirname(dataobj_file))
-        torch.save(self, dataobj_file)
+        torch.save(self, dataobj_file) # nosec B614
         logger.debug("TabularPyTorchDataset Dataset saved to a file: \n %s" % dataobj_file)
 
     @classmethod
     def load(cls, file_prefix=""):
         """Additional naming changes will be appended to end of file_prefix (must contain full absolute path)"""
         dataobj_file = file_prefix + cls.DATAOBJ_SUFFIX
-        dataset: TabularTorchDataset = torch.load(dataobj_file)
+        dataset: TabularTorchDataset = torch.load(dataobj_file) # nosec B614
         logger.debug("TabularNN Dataset loaded from a file: \n %s" % dataobj_file)
         return dataset
 
     def build_loader(self, batch_size, num_workers, is_test=False):
+        # See https://pytorch.org/docs/stable/notes/randomness.html
         def worker_init_fn(worker_id):
-            np.random.seed(np.random.get_state()[1][0] + worker_id)
+            if is_test:
+                worker_seed = torch.initial_seed() % 2**32
+                np.random.seed(worker_seed)
+                random.seed(worker_seed)
+            else:
+                np.random.seed(np.random.get_state()[1][0] + worker_id)
 
         self.batch_size = batch_size
         self.shuffle = False if is_test else True
         self.drop_last = False if is_test else True
-        loader = torch.utils.data.DataLoader(self, num_workers=num_workers, batch_size=None, worker_init_fn=worker_init_fn)  # no collation
+        generator = torch.Generator().manual_seed(torch.initial_seed()) if is_test else None
+        loader = torch.utils.data.DataLoader(self, num_workers=num_workers, batch_size=None, worker_init_fn=worker_init_fn, generator=generator)  # no collation
         return loader

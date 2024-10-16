@@ -235,7 +235,9 @@ class SemanticSegImageProcessor:
                 if self.num_classes == 1:
                     gt = gt.convert("L")
                 if self.num_classes > 1:
-                    gt = np.array(gt).astype(
+                    gt = np.array(
+                        gt
+                    ).astype(
                         "float32"
                     )  # There may be issues with 'transforms.ToTensor()' without this line because 'transforms.ToTensor()' converts 'unit8' to values between 0 and 1.
                     gt = Image.fromarray(gt)

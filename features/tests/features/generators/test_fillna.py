@@ -10,7 +10,16 @@ def test_fillna_feature_generator(generator_helper, data_helper):
     # Given
     input_data = data_helper.generate_multi_feature_full()
     expected_output_data = input_data.fillna(
-        {"int": np.nan, "float": np.nan, "obj": "", "cat": np.nan, "datetime": np.nan, "text": "", "datetime_as_object": ""}, downcast=False
+        {
+            "int": np.nan,
+            "float": np.nan,
+            "obj": "",
+            "cat": np.nan,
+            "datetime": np.nan,
+            "text": "",
+            "datetime_as_object": "",
+        },
+        downcast=False,
     )
 
     generator = FillNaFeatureGenerator()

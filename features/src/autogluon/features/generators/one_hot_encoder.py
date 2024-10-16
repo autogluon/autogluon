@@ -70,7 +70,15 @@ class CatToInt:
         return X
 
     def pd_to_np(self, X: DataFrame) -> np.ndarray:
-        return X.to_numpy(dtype=self._dtype, na_value=self.fillna_val, copy=True)
+        """
+        Converts pandas categoricals to a numpy ndarray of the codes of the categories.
+        """
+        with warnings.catch_warnings():
+            if np.issubdtype(self._dtype, np.integer):
+                # Filter incorrect pandas RuntimeWarning message
+                # For more details, refer to https://github.com/autogluon/autogluon/pull/4224#issuecomment-2156423410
+                warnings.filterwarnings("ignore", category=RuntimeWarning)
+            return X.to_numpy(dtype=self._dtype, na_value=self.fillna_val, copy=True)
 
     def _get_dtype_and_fillna(self, X: DataFrame, dtype_buffer=2):
         assert dtype_buffer >= 1, "dtype_buffer must be >= 1 or else fillna_val could be invalid."

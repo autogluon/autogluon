@@ -87,6 +87,14 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         self.time_limit: Optional[float] = None
         self._dummy_forecast: Optional[pd.DataFrame] = None
 
+    @property
+    def allowed_hyperparameters(self) -> List[str]:
+        return (
+            super().allowed_hyperparameters
+            + ["use_fallback_model", "max_ts_length", "n_jobs"]
+            + self.allowed_local_model_args
+        )
+
     def preprocess(self, data: TimeSeriesDataFrame, is_train: bool = False, **kwargs) -> Any:
         if not self._get_tags()["allow_nan"]:
             data = data.fill_missing_values()
@@ -103,8 +111,9 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
 
         unused_local_model_args = []
         local_model_args = {}
+        # TODO: Move filtering logic to AbstractTimeSeriesModel
         for key, value in raw_local_model_args.items():
-            if key in self.allowed_local_model_args:
+            if key in self.allowed_hyperparameters:
                 local_model_args[key] = value
             else:
                 unused_local_model_args.append(key)
@@ -222,18 +231,22 @@ def seasonal_naive_forecast(
 ) -> pd.DataFrame:
     """Generate seasonal naive forecast, predicting the last observed value from the same period."""
 
-    def numpy_ffill(arr: np.ndarray) -> np.ndarray:
-        """Fast implementation of forward fill in numpy."""
+    def numpy_fillna(arr: np.ndarray) -> np.ndarray:
+        """Fast implementation of forward fill + avg fill in numpy."""
+        # First apply forward fill
         idx = np.arange(len(arr))
         mask = np.isnan(arr)
         idx[mask] = 0
-        return arr[np.maximum.accumulate(idx)]
+        arr_filled = arr[np.maximum.accumulate(idx)]
+        # Leading NaNs are filled with the mean
+        arr_filled[np.isnan(arr_filled)] = np.nanmean(arr_filled)
+        return arr_filled
 
     forecast = {}
     # At least seasonal_period + 2 values are required to compute sigma for seasonal naive
     if len(target) > seasonal_period + 1 and seasonal_period > 1:
         if np.isnan(target[-(seasonal_period + 2) :]).any():
-            target = numpy_ffill(target)
+            target = numpy_fillna(target)
 
         indices = [len(target) - seasonal_period + k % seasonal_period for k in range(prediction_length)]
         forecast["mean"] = target[indices]

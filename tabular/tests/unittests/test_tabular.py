@@ -1,24 +1,25 @@
-""" Runs autogluon.tabular on multiple benchmark datasets.
-    Run this benchmark with fast_benchmark=False to assess whether major chances make autogluon better or worse overall.
-    Lower performance-values = better, normalized to [0,1] for each dataset to enable cross-dataset comparisons.
-    Classification performance = error-rate, Regression performance = 1 - R^2
+"""Runs autogluon.tabular on multiple benchmark datasets.
+Run this benchmark with fast_benchmark=False to assess whether major chances make autogluon better or worse overall.
+Lower performance-values = better, normalized to [0,1] for each dataset to enable cross-dataset comparisons.
+Classification performance = error-rate, Regression performance = 1 - R^2
 
-    # TODO: assess that Autogluon correctly inferred the type of each feature (continuous vs categorical vs text)
+# TODO: assess that Autogluon correctly inferred the type of each feature (continuous vs categorical vs text)
 
-    # TODO: may want to take allowed run-time of AutoGluon into account? Eg. can produce performance vs training time curves for each dataset.
+# TODO: may want to take allowed run-time of AutoGluon into account? Eg. can produce performance vs training time curves for each dataset.
 
-    # TODO: We'd like to add extra benchmark datasets with the following properties:
-    - parquet file format
-    - poker hand data: https://archive.ics.uci.edu/ml/datasets/Poker+Hand
-    - test dataset with just one data point
-    - test dataset where order of columns different than in training data (same column names)
-    - extreme-multiclass classification (500+ classes)
-    - high-dimensional features + low-sample size
-    - high levels of missingness in test data only, no missingness in train data
-    - classification w severe class imbalance
-    - regression with severely skewed Y-values (eg. predicting count data)
-    - text features in dataset
+# TODO: We'd like to add extra benchmark datasets with the following properties:
+- parquet file format
+- poker hand data: https://archive.ics.uci.edu/ml/datasets/Poker+Hand
+- test dataset with just one data point
+- test dataset where order of columns different than in training data (same column names)
+- extreme-multiclass classification (500+ classes)
+- high-dimensional features + low-sample size
+- high levels of missingness in test data only, no missingness in train data
+- classification w severe class imbalance
+- regression with severely skewed Y-values (eg. predicting count data)
+- text features in dataset
 """
+
 import os
 import shutil
 import sys
@@ -29,7 +30,6 @@ from random import seed
 import numpy as np
 import pandas as pd
 import pytest
-from networkx.exception import NetworkXError
 
 from autogluon.common import space
 from autogluon.common.utils.simulation_utils import convert_simulation_artifacts_to_tabular_predictions_dict
@@ -251,7 +251,7 @@ def test_advanced_functionality():
     assert predictor.model_names(persisted=True) == []  # Assert that all models were unpersisted
 
     # Raise exception
-    with pytest.raises(NetworkXError):
+    with pytest.raises(ValueError):
         predictor.persist(models=["UNKNOWN_MODEL_1", "UNKNOWN_MODEL_2"])
 
     assert predictor.model_names(persisted=True) == []
@@ -395,6 +395,11 @@ def test_advanced_functionality_bagging():
         predict_proba_oof = predictor.predict_proba_oof(model=m)
         assert predict_proba_oof.equals(predict_proba_dict_oof[m])
 
+    predict_dict_oof = predictor.predict_multi()
+    for m in predictor.model_names():
+        predict_oof = predictor.predict_oof(model=m)
+        assert predict_oof.equals(predict_dict_oof[m])
+
     score_oof = predictor.evaluate_predictions(train_data[label], oof_pred_proba)
     model_best = predictor.model_best
 
@@ -408,6 +413,18 @@ def test_advanced_functionality_bagging():
     # assert that refit model uses original model's OOF predictions
     oof_pred_proba_refit = predictor.predict_proba_oof()
     assert oof_pred_proba.equals(oof_pred_proba_refit)
+
+    # check predict_proba_multi after refit does not raise an exception
+    predict_proba_dict_oof = predictor.predict_proba_multi()
+    for m in predictor.model_names():
+        predict_proba_oof = predictor.predict_proba_oof(model=m)
+        assert predict_proba_oof.equals(predict_proba_dict_oof[m])
+
+    # check predict_multi after refit does not raise an exception
+    predict_dict_oof = predictor.predict_multi()
+    for m in predictor.model_names():
+        predict_oof = predictor.predict_oof(model=m)
+        assert predict_oof.equals(predict_dict_oof[m])
 
 
 def load_data(directory_prefix, train_file, test_file, name, url=None):
@@ -1101,7 +1118,16 @@ def test_tabular_bagstack():
     if fast_benchmark:
         subsample_size = 105
         nn_options = {"num_epochs": 2}
-        gbm_options = [{"num_boost_round": 40}, "GBMLarge"]
+        gbm_options = [
+            {"num_boost_round": 40},
+            {
+                "learning_rate": 0.03,
+                "num_leaves": 128,
+                "feature_fraction": 0.9,
+                "min_data_in_leaf": 3,
+                "ag_args": {"name_suffix": "Large", "priority": 0, "hyperparameter_tune_kwargs": None},
+            },
+        ]
         hyperparameters = {"GBM": gbm_options, "NN_TORCH": nn_options}
         time_limit = 60
 
@@ -1144,7 +1170,16 @@ def test_tabular_bagstack_use_bag_holdout():
     if fast_benchmark:
         subsample_size = 105
         nn_options = {"num_epochs": 2}
-        gbm_options = [{"num_boost_round": 40}, "GBMLarge"]
+        gbm_options = [
+            {"num_boost_round": 40},
+            {
+                "learning_rate": 0.03,
+                "num_leaves": 128,
+                "feature_fraction": 0.9,
+                "min_data_in_leaf": 3,
+                "ag_args": {"name_suffix": "Large", "priority": 0, "hyperparameter_tune_kwargs": None},
+            },
+        ]
         hyperparameters = {"GBM": gbm_options, "NN_TORCH": nn_options}
         time_limit = 60
 

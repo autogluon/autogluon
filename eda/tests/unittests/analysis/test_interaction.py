@@ -148,9 +148,7 @@ def test_Correlation_focus():
             "correlations_focus_high_corr": {"train_data": pd.DataFrame(index=list("ad"), data={"c": [0.88, -1.00]})},
         }
     )
-    assert actual.correlations_focus_high_corr.train_data.equals(
-        expected.correlations_focus_high_corr.train_data
-    )  # noqa
+    assert actual.correlations_focus_high_corr.train_data.equals(expected.correlations_focus_high_corr.train_data)  # noqa
     actual.correlations_focus_high_corr.train_data = "--"
     expected.correlations_focus_high_corr.train_data = "--"
     __compare_outputs(expected, actual)

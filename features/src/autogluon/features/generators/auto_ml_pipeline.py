@@ -93,7 +93,8 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
     ):
         if "generators" in kwargs:
             raise KeyError(
-                f"generators is not a valid parameter to {self.__class__.__name__}. " f"Use {PipelineFeatureGenerator.__name__} to specify custom generators."
+                f"generators is not a valid parameter to {self.__class__.__name__}. "
+                f"Use {PipelineFeatureGenerator.__name__} to specify custom generators."
             )
         if "enable_raw_features" in kwargs:
             enable_numeric_features = kwargs.pop("enable_raw_features")
@@ -117,11 +118,15 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
     def _get_default_generators(self, vectorizer=None):
         generator_group = []
         if self.enable_numeric_features:
-            generator_group.append(IdentityFeatureGenerator(infer_features_in_args=dict(valid_raw_types=[R_INT, R_FLOAT])))
+            generator_group.append(
+                IdentityFeatureGenerator(infer_features_in_args=dict(valid_raw_types=[R_INT, R_FLOAT]))
+            )
         if self.enable_raw_text_features:
             generator_group.append(
                 IdentityFeatureGenerator(
-                    infer_features_in_args=dict(required_special_types=[S_TEXT], invalid_special_types=[S_IMAGE_PATH, S_IMAGE_BYTEARRAY]),
+                    infer_features_in_args=dict(
+                        required_special_types=[S_TEXT], invalid_special_types=[S_IMAGE_PATH, S_IMAGE_BYTEARRAY]
+                    ),
                     name_suffix="_raw_text",
                 )
             )
@@ -161,4 +166,6 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
 
 class AutoMLInterpretablePipelineFeatureGenerator(AutoMLPipelineFeatureGenerator):
     def _get_category_feature_generator(self):
-        return CategoryFeatureGenerator(minimize_memory=False, maximum_num_cat=10, post_generators=[OneHotEncoderFeatureGenerator()])
+        return CategoryFeatureGenerator(
+            minimize_memory=False, maximum_num_cat=10, post_generators=[OneHotEncoderFeatureGenerator()]
+        )

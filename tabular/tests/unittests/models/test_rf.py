@@ -44,6 +44,14 @@ def test_rf_binary_compile_onnx(fit_helper):
     fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, compile=True, compiler_configs=compiler_configs)
 
 
+def test_rf_binary_compile_onnx_as_ag_arg(fit_helper):
+    fit_args = dict(
+        hyperparameters={RFModel: {"ag.compile": {"compiler": "onnx"}}},
+    )
+    dataset_name = "adult"
+    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args)
+
+
 def test_rf_multiclass_compile_onnx(fit_helper):
     fit_args = dict(
         hyperparameters={RFModel: {}},

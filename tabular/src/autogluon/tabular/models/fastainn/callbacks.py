@@ -80,6 +80,7 @@ class EarlyStoppingCallbackWithTimeLimit(TrackerCallback):
 
 class AgSaveModelCallback(TrackerCallback):
     "A `TrackerCallback` that saves the model's best during training and loads it at the end."
+
     _only_train_loop = True
 
     def __init__(

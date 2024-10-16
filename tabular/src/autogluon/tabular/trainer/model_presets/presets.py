@@ -3,7 +3,13 @@ import inspect
 import logging
 from collections import defaultdict
 
+from packaging import version
+
 from autogluon.common.model_filter import ModelFilter
+from autogluon.common.utils.hyperparameter_utils import (
+    get_deprecated_lightgbm_large_hyperparameters,
+    get_hyperparameter_str_deprecation_msg,
+)
 from autogluon.core.constants import (
     AG_ARGS,
     AG_ARGS_ENSEMBLE,
@@ -47,7 +53,7 @@ from ...models import (
     XTModel,
 )
 from ...models.tab_transformer.tab_transformer_model import TabTransformerModel
-from .presets_custom import get_preset_custom
+from ...version import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -235,13 +241,7 @@ def get_preset_models(
             models_of_type = [models_of_type]
         model_cfgs_to_process = []
         for model_cfg in models_of_type:
-            if isinstance(model_cfg, str):
-                if model_type == "AG_TEXT_NN" or model_type == "AG_AUTOMM":
-                    model_cfgs_to_process.append({})
-                else:
-                    model_cfgs_to_process += get_preset_custom(name=model_cfg, problem_type=problem_type)
-            else:
-                model_cfgs_to_process.append(model_cfg)
+            model_cfgs_to_process.append(model_cfg)
         for model_cfg in model_cfgs_to_process:
             model_cfg = clean_model_cfg(
                 model_cfg=model_cfg,
@@ -290,6 +290,7 @@ def get_preset_models(
 
 
 def clean_model_cfg(model_cfg: dict, model_type=None, ag_args=None, ag_args_ensemble=None, ag_args_fit=None, problem_type=None):
+    model_cfg = _verify_model_cfg(model_cfg=model_cfg, model_type=model_type)
     model_cfg = copy.deepcopy(model_cfg)
     if AG_ARGS not in model_cfg:
         model_cfg[AG_ARGS] = dict()
@@ -299,6 +300,8 @@ def clean_model_cfg(model_cfg: dict, model_type=None, ag_args=None, ag_args_ense
         raise AssertionError(f"model_type was not specified for model! Model: {model_cfg}")
     model_type = model_cfg[AG_ARGS]["model_type"]
     if not inspect.isclass(model_type):
+        if model_type not in MODEL_TYPES:
+            raise AssertionError(f"Unknown model type specified in hyperparameters: '{model_type}'. Valid model types: {list(MODEL_TYPES.keys())}")
         model_type = MODEL_TYPES[model_type]
     elif not issubclass(model_type, AbstractModel):
         logger.warning(
@@ -332,6 +335,34 @@ def clean_model_cfg(model_cfg: dict, model_type=None, ag_args=None, ag_args_ense
     if default_ag_args_ensemble is not None:
         default_ag_args_ensemble.update(model_cfg.get(AG_ARGS_ENSEMBLE, dict()))
         model_cfg[AG_ARGS_ENSEMBLE] = default_ag_args_ensemble
+    return model_cfg
+
+
+def _verify_model_cfg(model_cfg, model_type) -> dict:
+    """
+    Ensures that model_cfg is of the correct type, or else raises an exception.
+    Returns model_cfg
+    """
+    if not isinstance(model_cfg, dict):
+        extra_msg = ""
+        error = True
+        if isinstance(model_cfg, str) and model_cfg == "GBMLarge":
+            extra_msg = get_hyperparameter_str_deprecation_msg()
+            if version.parse(__version__) >= version.parse("1.3.0"):
+                error = True
+                extra_msg = "\n" + extra_msg
+            else:
+                error = False
+                model_cfg = get_deprecated_lightgbm_large_hyperparameters()
+                logger.warning(
+                    f"#######################################################"
+                    f"\nWARNING: {extra_msg}"
+                    f"\n#######################################################"
+                )
+        if error:
+            raise AssertionError(
+                f"Invalid model hyperparameters, expecting dict, but found {type(model_cfg)}! Model Type: {model_type} | Value: {model_cfg}{extra_msg}"
+            )
     return model_cfg
 
 

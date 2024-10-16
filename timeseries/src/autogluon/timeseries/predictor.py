@@ -110,8 +110,6 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         known as dynamic features, exogenous variables, additional regressors or related time series. Examples of such
         covariates include holidays, promotions or weather forecasts.
 
-        Currently, only numeric (float of integer dtype) are supported.
-
         If ``known_covariates_names`` are provided, then:
 
         - :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit`, :meth:`~autogluon.timeseries.TimeSeriesPredictor.evaluate`, and :meth:`~autogluon.timeseries.TimeSeriesPredictor.leaderboard` will expect a data frame with columns listed in ``known_covariates_names`` (in addition to the ``target`` column).
@@ -437,7 +435,6 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
             If ``known_covariates_names`` were specified when creating the predictor, ``train_data`` must include the
             columns listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
-            The known covariates must have a numeric (float or integer) dtype.
 
             Columns of ``train_data`` except ``target`` and those listed in ``known_covariates_names`` will be
             interpreted as ``past_covariates`` - covariates that are known only in the past.
@@ -712,7 +709,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         if tuning_data is not None:
             tuning_data = self._check_and_prepare_data_frame(tuning_data, name="tuning_data")
             self._check_data_for_evaluation(tuning_data, name="tuning_data")
-            logger.info(f"Provided tuning_data has {self._get_dataset_stats(train_data)}")
+            logger.info(f"Provided tuning_data has {self._get_dataset_stats(tuning_data)}")
             # TODO: Use num_val_windows to perform multi-window backtests on tuning_data
             if num_val_windows > 0:
                 logger.warning(
@@ -1098,6 +1095,10 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             raise ValueError("`path` cannot be None or empty in load().")
         path: str = setup_outputdir(path, warn_if_exist=False)
 
+        predictor_path = Path(path) / cls.predictor_file_name
+        if not predictor_path.exists():
+            raise FileNotFoundError(f"No such file '{predictor_path}'")
+
         try:
             version_saved = cls._load_version_file(path=path)
         except:
@@ -1116,7 +1117,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
         logger.info(f"Loading predictor from path {path}")
         learner = AbstractLearner.load(path)
-        predictor = load_pkl.load(path=os.path.join(learner.path, cls.predictor_file_name))
+        predictor = load_pkl.load(path=str(predictor_path))
         predictor._learner = learner
         predictor.path = learner.path
         return predictor
@@ -1195,6 +1196,8 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
     def leaderboard(
         self,
         data: Optional[Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]] = None,
+        extra_info: bool = False,
+        extra_metrics: Optional[List[Union[str, TimeSeriesScorer]]] = None,
         display: bool = False,
         use_cache: bool = True,
         **kwargs,
@@ -1232,6 +1235,20 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             If provided data is a path or a pandas.DataFrame, AutoGluon will attempt to automatically convert it to a
             ``TimeSeriesDataFrame``.
 
+        extra_info : bool, default = False
+            If True, the leaderboard will contain an additional column `hyperparameters` with the hyperparameters used
+            by each model during training. An empty dictionary `{}` means that the model was trained with default
+            hyperparameters.
+        extra_metrics : List[Union[str, TimeSeriesScorer]], optional
+            A list of metrics to calculate scores for and include in the output DataFrame.
+
+            Only valid when `data` is specified. The scores refer to the scores on `data` (same data as used to
+            calculate the `score_test` column).
+
+            This list can contain any values which would also be valid for `eval_metric` when creating a :class:`~autogluon.timeseries.TimeSeriesPredictor`.
+
+            For each provided `metric`, a column with name `str(metric)` will be added to the leaderboard, containing
+            the value of the metric computed on `data`.
         display : bool, default = False
             If True, the leaderboard DataFrame will be printed.
         use_cache : bool, default = True
@@ -1251,11 +1268,16 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         if len(kwargs) > 0:
             for key in kwargs:
                 raise TypeError(f"TimeSeriesPredictor.leaderboard() got an unexpected keyword argument '{key}'")
+        if data is None and extra_metrics is not None:
+            raise ValueError("`extra_metrics` is only valid when `data` is specified.")
 
         if data is not None:
             data = self._check_and_prepare_data_frame(data)
             self._check_data_for_evaluation(data)
-        leaderboard = self._learner.leaderboard(data, use_cache=use_cache)
+
+        leaderboard = self._learner.leaderboard(
+            data, extra_info=extra_info, extra_metrics=extra_metrics, use_cache=use_cache
+        )
         if display:
             with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):
                 print(leaderboard)

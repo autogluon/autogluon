@@ -105,7 +105,8 @@ def assert_leaderboard_contains_all_models(leaderboard: pd.DataFrame, include_en
         model
         for model in expected_models
         if not any(
-            fitted.startswith(model) for fitted in leaderboard["model"]  # Chronos appends more information to name
+            fitted.startswith(model)
+            for fitted in leaderboard["model"]  # Chronos appends more information to name
         )
     ]
     assert len(failed_models) == 0, f"Failed models: {failed_models}"

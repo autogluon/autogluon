@@ -22,7 +22,17 @@ For example:
 .. code-block:: python
     hyperparameters = {
         'NN_TORCH': {},
-        'GBM': [{'extra_trees': True, 'ag_args': {'name_suffix': 'XT'}}, {}, 'GBMLarge'],
+        'GBM': [
+            {'extra_trees': True, 'ag_args': {'name_suffix': 'XT'}},
+            {},
+            {
+                "learning_rate": 0.03,
+                "num_leaves": 128,
+                "feature_fraction": 0.9,
+                "min_data_in_leaf": 3,
+                "ag_args": {"name_suffix": "Large", "priority": 0, "hyperparameter_tune_kwargs": None},
+            },
+        ],
         'CAT': {},
         'XGB': {},
         'FASTAI': {},

@@ -13,6 +13,7 @@ from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.local.abstract_local_model import AbstractLocalModel
 from autogluon.timeseries.splitter import AbstractWindowSplitter, ExpandingWindowSplitter
+from autogluon.timeseries.transforms import LocalTargetScaler
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,8 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
     model_base_kwargs : Optional[Dict[str, any]], default = None
         kwargs used to initialize model_base if model_base is a class.
     """
+
+    # TODO: Remove the MultiWindowBacktestingModel class, move the logic to AbstractTimeSeriesTrainer
 
     def __init__(
         self,
@@ -81,6 +84,10 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
 
     def get_minimum_resources(self, is_gpu_available: bool = False) -> bool:
         return self._get_model_base().get_minimum_resources(is_gpu_available)
+
+    def _create_target_scaler(self) -> Optional[LocalTargetScaler]:
+        # Do not use scaler in the MultiWindowModel to avoid duplication; it will be created in the inner model
+        return None
 
     def _fit(
         self,

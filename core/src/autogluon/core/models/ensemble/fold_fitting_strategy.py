@@ -157,6 +157,8 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
         self.num_gpus = num_gpus
         logger.debug(f"Upper level total_num_cpus, num_gpus {self.num_cpus} | {self.num_gpus}")
         self._validate_user_specified_resources()
+        if not isinstance(self.num_cpus, int):
+            raise TypeError(f"`num_cpus` must be an int! Found: {type(num_cpus)} | Value: {self.num_cpus}")
 
     def schedule_fold_model_fit(self, fold_ctx):
         raise NotImplementedError
@@ -689,7 +691,6 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         if resources_model is None:
             resources_model = resources
         fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix = self._get_fold_properties(fold_ctx)
-        logger.debug(f"Folding resources per job {resources}")
         train_index, val_index = fold
         fold_ctx_ref = self.ray.put(fold_ctx)
         save_bag_folds = self.save_folds

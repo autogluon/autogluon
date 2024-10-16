@@ -7,8 +7,10 @@ source $(dirname "$0")/env_setup.sh
 setup_build_env
 
 function lint_check {
-    black --check --diff "$1/"
-    isort --check --diff "$1/"
+    # black
+    ruff format --diff "$1/"
+    # isort
+    ruff check --select I "$1/"
 }
 
 function lint_check_all {

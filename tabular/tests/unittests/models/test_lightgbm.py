@@ -37,6 +37,15 @@ def test_lightgbm_regression(fit_helper):
     fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, extra_metrics=extra_metrics)
 
 
+def test_lightgbm_quantile(fit_helper):
+    fit_args = dict(
+        hyperparameters={"GBM": {}},
+    )
+    dataset_name = "ames"
+    init_args = dict(problem_type="quantile", quantile_levels=[0.25, 0.5, 0.75])
+    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, init_args=init_args)
+
+
 def test_lightgbm_binary_model(model_fit_helper):
     fit_args = dict()
     dataset_name = "adult"
@@ -55,13 +64,17 @@ def test_lightgbm_regression_model(model_fit_helper):
     model_fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, model=LGBModel(), fit_args=fit_args)
 
 
-def test_lightgbm_quantile(fit_helper):
-    fit_args = dict(
-        hyperparameters={"GBM": {}},
-    )
+def test_lightgbm_quantile_model(model_fit_helper):
+    fit_args = dict()
     dataset_name = "ames"
-    init_args = dict(problem_type="quantile", quantile_levels=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
-    fit_helper.fit_and_validate_dataset(dataset_name=dataset_name, fit_args=fit_args, init_args=init_args)
+    model_fit_helper.fit_and_validate_dataset(
+        dataset_name=dataset_name,
+        model=LGBModel(
+            problem_type="quantile",
+            hyperparameters={"ag.quantile_levels": [0.25, 0.5, 0.75]},
+        ),
+        fit_args=fit_args,
+    )
 
 
 def test_lightgbm_binary_with_calibrate_decision_threshold(fit_helper):
@@ -124,7 +137,9 @@ def test_lightgbm_binary_with_calibrate_decision_threshold_bagged_refit(fit_help
         dataset_name=dataset_name, init_args=init_args, fit_args=fit_args, delete_directory=False, refit_full=True
     )
 
+    expected_decision_threshold = 0.502
     assert predictor._decision_threshold is not None
+    assert predictor.decision_threshold == expected_decision_threshold
     assert predictor.decision_threshold == predictor._decision_threshold
     optimal_decision_threshold = predictor.calibrate_decision_threshold()
     assert optimal_decision_threshold == predictor.decision_threshold
@@ -139,7 +154,7 @@ def test_lightgbm_binary_with_calibrate_decision_threshold_bagged_refit(fit_help
     for k in scores_predictions:
         assert scores[k] == scores_predictions[k]
     assert scores["f1"] > scores_05["f1"]  # Calibration should help f1
-    assert scores["accuracy"] < scores_05["accuracy"]  # Calibration should harm accuracy
+    assert scores["accuracy"] > scores_05["accuracy"]  # Calibration should help accuracy
 
     predictor.set_decision_threshold(0.5)
     assert predictor.decision_threshold == 0.5

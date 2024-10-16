@@ -204,8 +204,6 @@ class ARIMAModel(AbstractProbabilisticStatsForecastModel):
         This significantly speeds up fitting and usually leads to no change in accuracy.
     """
 
-    # TODO: This model requires statsforecast >= 1.5.0, so it will only be available after we upgrade the dependency
-
     allowed_local_model_args = [
         "order",
         "seasonal_order",
@@ -286,7 +284,7 @@ class AutoETSModel(AbstractProbabilisticStatsForecastModel):
         # Disable seasonality if time series too short for chosen season_length, season_length is too high, or
         # season_length == 1. Otherwise model will crash
         season_length = local_model_args["season_length"]
-        if len(time_series) < 2 * season_length or season_length == 1 or season_length > 24:
+        if len(time_series) < 2 * season_length or season_length == 1:
             # changing last character to "N" disables seasonality, e.g., model="AAA" -> model="AAN"
             local_model_args["model"] = local_model_args["model"][:-1] + "N"
         return super()._predict_with_local_model(time_series=time_series, local_model_args=local_model_args)
@@ -491,8 +489,7 @@ class AbstractConformalizedStatsForecastModel(AbstractStatsForecastModel):
         return pd.DataFrame(predictions)
 
 
-# TODO: Starting from StatsForecast v1.5.0, AutoCES can inherit from AbstractProbabilisticStatsForecastModel
-class AutoCESModel(AbstractConformalizedStatsForecastModel):
+class AutoCESModel(AbstractProbabilisticStatsForecastModel):
     """Forecasting with an Complex Exponential Smoothing model where the model selection is performed using the
     Akaike Information Criterion.
 

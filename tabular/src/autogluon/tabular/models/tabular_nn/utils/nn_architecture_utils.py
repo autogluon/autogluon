@@ -1,4 +1,4 @@
-""" Helper functions related to NN architectures """
+"""Helper functions related to NN architectures"""
 
 import numpy as np
 

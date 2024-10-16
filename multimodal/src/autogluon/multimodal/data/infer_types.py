@@ -235,9 +235,9 @@ def is_image_column(
                 f"Among {sample_num} sampled images in column '{col_name}', "
                 f"{failure_ratio:.0%} images can't be open. "
                 "You may need to thoroughly check your data to see the percentage of missing images, "
-                "and estimate the potential influence. By default, we skip the samples with missing images. "
-                "You can also set hyperparameter 'data.image.missing_value_strategy' to be 'zero', "
-                "which uses a zero image to replace any missing image.",
+                "and estimate the potential influence. By default, we use an image with zero pixels. "
+                "You can also set hyperparameter 'data.image.missing_value_strategy' to be 'skip', "
+                "which skips samples that contain a missing image.",
                 UserWarning,
             )
         return True
@@ -828,9 +828,7 @@ def infer_ner_column_type(column_types: Dict):
     if any([col_type.startswith(TEXT_NER) for col_type in column_types.values()]):
         return column_types
 
-    for (
-        column
-    ) in (
+    for column in (
         column_types.keys()
     ):  # column_types is an ordered dict, so column_types.keys() returns the keys in the order of insertions.
         if column_types[column].startswith(TEXT):

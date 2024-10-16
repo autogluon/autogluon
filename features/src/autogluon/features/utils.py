@@ -50,4 +50,6 @@ def get_smallest_valid_dtype_int(min_val: int, max_val: int):
     for dtype in [np.uint8, np.uint16, np.uint32, np.uint64]:
         if max_val <= np.iinfo(dtype).max and min_val >= np.iinfo(dtype).min:
             return dtype
-    raise ValueError(f"Value is not able to be represented by {dtypes_to_check[-1].__name__}. (min_val, max_val): ({min_val}, {max_val})")
+    raise ValueError(
+        f"Value is not able to be represented by {dtypes_to_check[-1].__name__}. (min_val, max_val): ({min_val}, {max_val})"
+    )

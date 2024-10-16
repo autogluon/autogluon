@@ -52,7 +52,7 @@ def get_hyper_params():
         # Options: Categorical(1, 2, 3, 4, 5)
         "feature_dim": 64,  # Size of fully connected layer in TabNet.
         # Options: Int(8, 128)
-        "num_output_layers": 1  # How many fully-connected layers on top of transformer to produce predictions. Minimum 1 layer.
+        "num_output_layers": 1,  # How many fully-connected layers on top of transformer to produce predictions. Minimum 1 layer.
         # Options: Categorical(1, 2, 3)
     }
 

@@ -1,18 +1,20 @@
+from __future__ import annotations
+
 import copy
 import logging
 import os
 import time
 from collections import defaultdict
-from typing import Dict
+from typing import Dict, List
 
 import numpy as np
 import pandas as pd
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.features.types import R_FLOAT, S_STACK
-from autogluon.common.utils.path_converter import PathConverter
 
 from ...constants import MULTICLASS, QUANTILE, SOFTCLASS
+from ...utils.exceptions import NoStackFeatures, NotValidStacker
 from ..abstract.abstract_model import AbstractModel
 from .bagged_ensemble_model import BaggedEnsembleModel
 
@@ -31,16 +33,43 @@ class StackerEnsembleModel(BaggedEnsembleModel):
     This property allows for significantly improved model quality in many situations compared to non-stacking alternatives.
 
     Stacker models can act as base models to other stacker models, enabling multi-layer stack ensembling.
+
+    Stacker kwargs can be specified in the `"ag_args_ensemble"` dictionary. For example:
+    ```
+    predictor = TabularPredictor(...).fit(..., hyperparameters={"GBM": [{"ag_args_ensemble": {"max_base_models_per_type": 0}}]})
+    ```
+
+    Parameters
+    ----------
+    **kwargs
+        use_orig_features : [True, False, "never"], default True
+            If True, will use the original data features.
+            If False, will discard the original data features and only use stack features, except when no stack features exist (such as in layer 1).
+            If "never", will always discard the original data features. Will raise a NoStackFeatures exception if no stack features exist (skipping in layer 1).
+        valid_stacker : bool, default True
+            If True, will be marked as valid to include as a stacker model.
+            If False, will only be fit as a base model (layer 1) and will not be fit in stack layers (layer 2+).
+        max_base_models : int, default 0
+            Maximum number of base models whose predictions form the features input to this stacker model.
+            If more than `max_base_models` base models are available, only the top `max_base_models` models with highest validation score are used.
+            If 0, the logic is skipped.
+        max_base_models_per_type : int | str, default "auto"
+            Similar to `max_base_models`. If more than `max_base_models_per_type` of any particular model type are available,
+            only the top `max_base_models_per_type` of that type are used. This occurs before the `max_base_models` filter.
+            If "auto", the value will be adaptively set based on the number of training samples.
+                More samples will lead to larger values, starting at 1 with <1000 samples, increasing up to 12 at >=50000 samples.
+            If 0, the logic is skipped.
+        Refer to BaggedEnsembleModel documentation for additional kwargs
     """
 
     def __init__(
         self,
-        base_model_names=None,
-        base_models_dict=None,
-        base_model_paths_dict=None,
-        base_model_types_dict=None,
-        base_model_types_inner_dict=None,
-        base_model_performances_dict=None,
+        base_model_names: List[str] | None = None,
+        base_models_dict: Dict[str, AbstractModel] | None = None,
+        base_model_paths_dict: Dict[str, str] = None,
+        base_model_types_dict: dict | None = None,
+        base_model_types_inner_dict: dict | None = None,
+        base_model_performances_dict: Dict[str, float] | None = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -61,17 +90,22 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         self._base_model_performances_dict = base_model_performances_dict
         self._base_model_types_inner_dict = base_model_types_inner_dict
 
-    def _initialize(self, **kwargs):
-        super()._initialize(**kwargs)
+    def _update_feature_metadata(self, X: pd.DataFrame, feature_metadata: FeatureMetadata) -> FeatureMetadata:
+        """
+        Updates base_model_names and feature_metadata to reflect the used base models.
+        """
         base_model_performances_dict = self._base_model_performances_dict
         base_model_types_inner_dict = self._base_model_types_inner_dict
         if (base_model_performances_dict is not None) and (base_model_types_inner_dict is not None):
-            if self.params["max_base_models_per_type"] > 0:
+            max_base_models_per_type = self.params["max_base_models_per_type"]
+            if isinstance(max_base_models_per_type, str):
+                max_base_models_per_type = self._get_dynamic_max_base_models_per_type(X=X)
+            if max_base_models_per_type > 0:
                 self.base_model_names = self.limit_models_per_type(
                     models=self.base_model_names,
                     model_types=base_model_types_inner_dict,
                     model_scores=base_model_performances_dict,
-                    max_base_models_per_type=self.params["max_base_models_per_type"],
+                    max_base_models_per_type=max_base_models_per_type,
                 )
             if self.params["max_base_models"] > 0:
                 self.base_model_names = self.limit_models(
@@ -88,7 +122,66 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             stack_column_prefix: self.base_model_names[i] for i, stack_column_prefix in enumerate(self.stack_column_prefix_lst)
         }
 
-        self._add_stack_to_feature_metadata()
+        feature_metadata = self._remove_unused_stack_in_feature_metadata(feature_metadata=feature_metadata)
+        return feature_metadata
+
+    def _validate_params(self):
+        """
+        Verify correctness of self.params
+        """
+        super()._validate_params()
+
+        valid_use_orig_features_values = [True, False, "never"]
+        if self.params["use_orig_features"] not in valid_use_orig_features_values:
+            raise ValueError(f"use_orig_params must be one of {valid_use_orig_features_values}. (`use_orig_params`={self.params['use_orig_features']})")
+        if isinstance(self.params["use_orig_features"], str) and self.params["use_orig_features"] == "never" and not self.base_model_names:
+            raise NoStackFeatures(f"(use_orig_features={self.params['use_orig_features']})")
+
+        if not isinstance(self.params["valid_stacker"], bool):
+            raise TypeError(f"valid_stacker must be one of [True, False]. (`valid_stacker={self.params['valid_stacker']})")
+        if not self.params["valid_stacker"] and self.base_model_names:
+            raise NotValidStacker(f"(valid_stacker={self.params['valid_stacker']})")
+
+    def _get_dynamic_max_base_models_per_type(self, X: pd.DataFrame):
+        num_rows = len(X)
+        if num_rows < 1000:
+            max_models_per_type = 1
+        elif num_rows < 5000:
+            max_models_per_type = 2
+        elif num_rows < 10000:
+            max_models_per_type = 3
+        elif num_rows < 15000:
+            max_models_per_type = 4
+        elif num_rows < 20000:
+            max_models_per_type = 5
+        elif num_rows < 25000:
+            max_models_per_type = 6
+        elif num_rows < 30000:
+            max_models_per_type = 7
+        elif num_rows < 35000:
+            max_models_per_type = 8
+        elif num_rows < 40000:
+            max_models_per_type = 9
+        elif num_rows < 45000:
+            max_models_per_type = 10
+        elif num_rows < 50000:
+            max_models_per_type = 11
+        else:
+            max_models_per_type = 12
+        return max_models_per_type
+
+    def _infer_feature_metadata(self, X: pd.DataFrame) -> FeatureMetadata:
+        """
+        Additionally adds the stack feature special types to the inferred feature_metadata.
+        """
+        feature_metadata = super()._infer_feature_metadata(X=X)
+        stack_column_prefix_lst = copy.deepcopy(self.base_model_names)
+        stack_columns, num_pred_cols_per_model = self.set_stack_columns(stack_column_prefix_lst=stack_column_prefix_lst)
+        type_map_raw = {column: R_FLOAT for column in stack_columns}
+        type_group_map_special = {S_STACK: stack_columns}
+        stacker_feature_metadata = FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_group_map_special)
+        feature_metadata = feature_metadata.add_special_types(stacker_feature_metadata.get_type_map_special())
+        return feature_metadata
 
     @staticmethod
     def limit_models_per_type(models, model_types, model_scores, max_base_models_per_type):
@@ -108,12 +201,20 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         return self.limit_models_per_type(models=models, model_types=model_types, model_scores=model_scores, max_base_models_per_type=max_base_models)
 
     def _set_default_params(self):
-        default_params = {"use_orig_features": True, "max_base_models": 25, "max_base_models_per_type": 5}
+        default_params = {
+            "use_orig_features": True,
+            "valid_stacker": True,
+            "max_base_models": 0,
+            "max_base_models_per_type": "auto",
+        }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
         super()._set_default_params()
 
     def preprocess(self, X, fit=False, compute_base_preds=True, infer=True, model_pred_proba_dict=None, **kwargs):
+        use_orig_features = self.params["use_orig_features"]
+        use_orig_features_l1 = isinstance(use_orig_features, bool)
+        use_orig_features_in_stack = use_orig_features_l1 and use_orig_features  # use_orig_features == True
         if self.stack_column_prefix_lst:
             if infer:
                 if set(self.stack_columns).issubset(set(list(X.columns))):
@@ -137,12 +238,16 @@ class StackerEnsembleModel(BaggedEnsembleModel):
                         y_pred_proba
                     )  # TODO: This could get very large on a high class count problem. Consider capping to top N most frequent classes and merging least frequent
                 X_stacker = self.pred_probas_to_df(X_stacker, index=X.index)
-                if self.params["use_orig_features"]:
+                if use_orig_features_in_stack:
                     X = pd.concat([X_stacker, X], axis=1)
                 else:
                     X = X_stacker
-            elif not self.params["use_orig_features"]:
+            elif not use_orig_features_in_stack:
                 X = X[self.stack_columns]
+        elif not use_orig_features_l1:
+            # use_orig_features == "never"
+            raise NoStackFeatures(f"(use_orig_features={use_orig_features}) NOTE: This should never trigger. Please submit a GitHub issue.")
+
         X = super().preprocess(X, **kwargs)
         return X
 
@@ -215,19 +320,19 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         info["children_info"] = children_info  # Ensure children_info is last in order
         return info
 
-    def _add_stack_to_feature_metadata(self):
-        if len(self.models) == 0:
-            type_map_raw = {column: R_FLOAT for column in self.stack_columns}
-            type_group_map_special = {S_STACK: self.stack_columns}
-            stacker_feature_metadata = FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_group_map_special)
-            if self.feature_metadata is None:  # TODO: This is probably not the best way to do this
-                self.feature_metadata = stacker_feature_metadata
-            else:
-                # FIXME: This is a hack, stack feature special types should be already present in feature_metadata, not added here
-                existing_stack_features = self.feature_metadata.get_features(required_special_types=[S_STACK])
-                # HACK: Currently AutoGluon auto-adds all base learner prediction features into self.feature_metadata.
-                # The two lines below are here because if feature pruning would crash if it prunes a base learner prediction feature.
-                existing_features = self.feature_metadata.get_features()
-                stacker_feature_metadata = stacker_feature_metadata.keep_features([feature for feature in existing_features if feature in type_map_raw])
-                if set(stacker_feature_metadata.get_features()) != set(existing_stack_features):
-                    self.feature_metadata = self.feature_metadata.add_special_types(stacker_feature_metadata.get_type_map_special())
+    def _remove_unused_stack_in_feature_metadata(self, feature_metadata: FeatureMetadata) -> FeatureMetadata:
+        """
+        Updates `self.feature_metadata` to only contain stack features specified in `self.stack_columns`.
+        """
+        assert feature_metadata is not None, f"feature_metadata must be specified prior to adding stack feature information."
+        # Trust feature metadata
+        original_stack_features = feature_metadata.get_features(required_special_types=[S_STACK])
+        current_stack_features = self.stack_columns
+        for stack_feature in current_stack_features:
+            assert stack_feature in original_stack_features, (
+                f"Missing expected stack feature '{stack_feature}' in original feature_metadata. "
+                f"Stack features in feature_metadata: {original_stack_features}"
+            )
+        stack_features_to_remove = [stack_feature for stack_feature in original_stack_features if stack_feature not in current_stack_features]
+        feature_metadata = feature_metadata.remove_features(features=stack_features_to_remove)
+        return feature_metadata

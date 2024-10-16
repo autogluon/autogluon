@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import math
 import pickle
@@ -453,12 +455,6 @@ def generate_train_test_split(
         The problem_type the label is used for. Determines if stratification is used.
         If "binary" or "multiclass", enables the `min_cls_count_train` logic.
         Options: ["binary", "multiclass", "regression", "softclass", "quantile"]
-<<<<<<< HEAD
-    test_size : float, default = 0.1
-        The proportion of data to use for the test set.
-        The remaining (1 - test_size) of data will be used for the training set.
-    test_size : float or int, default = 0.1
-=======
     stratify : bool | Series, default = None
         The stratification strategy.
         If True, will stratify using `y`.
@@ -467,7 +463,6 @@ def generate_train_test_split(
             True if problem_type in ["binary", "multiclass"], else False.
         If None and problem_type is None, defaults to False.
     test_size : int | float, default = None
->>>>>>> 2830e692... [core] Enhance generate_train_test_split (#4478)
         If float, should be between 0.0 and 1.0 and represent the proportion of the dataset to include in the test split.
         If int, represents the absolute number of test samples.
         If test_size is None and train_size is None, test_size defaults to 0.1
@@ -733,7 +728,7 @@ def extract_column(X, col_name):
     return X, w
 
 
-def compute_weighted_metric(y, y_pred, metric, weights, weight_evaluation=None, **kwargs):
+def compute_weighted_metric(y, y_pred, metric, weights, weight_evaluation=None, **kwargs) -> float:
     """Report weighted metric if: weights is not None, weight_evaluation=True, and the given metric supports sample weights.
     If weight_evaluation=None, it will be set to False if weights=None, True otherwise.
     """
