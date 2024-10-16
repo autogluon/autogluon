@@ -34,7 +34,7 @@ class DropDuplicatesFeatureGenerator(AbstractFeatureGenerator):
         Refer to :class:`AbstractFeatureGenerator` documentation for details on valid key word arguments.
     """
 
-    def __init__(self, sample_size_init=500, sample_size_final=2000, **kwargs):
+    def __init__(self, sample_size_init=500, sample_size_final=3000, **kwargs):
         super().__init__(**kwargs)
         self.sample_size_init = sample_size_init
         self.sample_size_final = sample_size_final
@@ -68,7 +68,8 @@ class DropDuplicatesFeatureGenerator(AbstractFeatureGenerator):
         cls, X: DataFrame, feature_metadata_in, keep: Union[str, bool] = "first", sample_size=None
     ) -> list:
         if sample_size is not None and len(X) > sample_size:
-            X = X.sample(sample_size, random_state=0)
+            # Sampling with replacement is much faster than without replacement
+            X = X.sample(sample_size, random_state=0, replace=True)
         features_to_remove = []
 
         X_columns = set(X.columns)
