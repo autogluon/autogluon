@@ -21,8 +21,8 @@ PROBLEM_TYPES = [BINARY, MULTICLASS, REGRESSION]
 common_args = {"sample_size": 50, "delete_directory": False, "refit_full": False}
 
 early_stop = 999999
-long_run = 10
-short_run = 5
+long_run = 5
+short_run = 3
 
 model_iterations = {
     "LightGBM": long_run,
@@ -43,6 +43,12 @@ extended_run_hyperparams = {
         "epochs_wo_improve": early_stop,
         "num_epochs": short_run,
     },
+}
+
+metrics_to_test = {
+    BINARY: ["roc_auc"],
+    MULTICLASS: ["log_loss"],
+    REGRESSION: ["root_mean_squared_error"],
 }
 
 for model in MODELS:
@@ -76,6 +82,13 @@ def get_all_model_problems():
 
 def get_all_model_problem_metrics():
     return [(problem, model, metric) for model in MODELS for problem in PROBLEM_TYPES for metric in METRICS[problem]]
+
+
+# This is much faster to run than `get_all_model_problem_metrics`, but isn't fully comprehensive
+# This makes tests run in 79s , vs 1200s with `get_all_model_problem_metrics`.
+def get_subset_model_problem_metrics():
+    output = [(problem, model, metric) for model in MODELS for problem in PROBLEM_TYPES for metric in metrics_to_test[problem]]
+    return output
 
 
 @pytest.mark.parametrize("problem_type, model", get_one_model_problem())
@@ -194,7 +207,7 @@ def test_custom_metrics(problem_type, model, get_dataset_map, fit_helper):
 # TODO: can't the error = True tests these be checked at the same time as the
 # correctness tests?
 # @pytest.mark.parametrize("problem_type, model", get_all_problems())
-@pytest.mark.parametrize("problem_type, model, metric", get_all_model_problem_metrics())
+@pytest.mark.parametrize("problem_type, model, metric", get_subset_model_problem_metrics())
 @pytest.mark.parametrize("use_error", [True, False])
 def test_metric_format(problem_type, model, metric, use_error, get_dataset_map, fit_helper):
     metric = get_metric(metric, problem_type, "eval_metric")
@@ -277,7 +290,7 @@ def test_with_test_data(problem_type, model, get_dataset_map, fit_helper, get_de
 # TODO: how should we limit test parameters here? 22.5 min is much too long, but curve correctness
 # is a crucial aspect of learning curve generation that should be tested well
 # takes 8.7 minutes for full test run (only correctness tests)
-@pytest.mark.parametrize("problem_type, model, metric", get_all_model_problem_metrics())
+@pytest.mark.parametrize("problem_type, model, metric", get_subset_model_problem_metrics())
 def test_correctness(problem_type, model, metric, get_dataset_map, fit_helper):
     metric = get_metric(metric, problem_type, "eval_metric")
 
