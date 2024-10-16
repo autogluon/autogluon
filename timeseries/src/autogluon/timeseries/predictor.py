@@ -291,7 +291,9 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             Preprocessed data in TimeSeriesDataFrame format.
         """
         df = self._to_data_frame(data, name=name)
-        df = df.astype({self.target: "float64"})
+        if not pd.api.types.is_numeric_dtype(df[self.target]):
+            raise ValueError(f"Target column {name}['{self.target}'] has a non-numeric dtype {df[self.target].dtype}")
+        df[self.target] = df[self.target].astype("float64")
         # MultiIndex.is_monotonic_increasing checks if index is sorted by ["item_id", "timestamp"]
         if not df.index.is_monotonic_increasing:
             df = df.sort_index()

@@ -53,8 +53,10 @@ class DropDuplicatesFeatureGenerator(AbstractFeatureGenerator):
         self._remove_features_in(features_to_drop)
         if features_to_drop:
             self._log(15, f"\t{len(features_to_drop)} duplicate columns removed: {features_to_drop}")
-        X_out = X[self.features_in]
-        return X_out, self.feature_metadata_in.type_group_map_special
+        # Avoid creating an unnecessary copy with X[self.features_in], if possible
+        if self.features_in != X.columns.to_list():
+            X = X[self.features_in]
+        return X, self.feature_metadata_in.type_group_map_special
 
     def _transform(self, X: DataFrame) -> DataFrame:
         return X
