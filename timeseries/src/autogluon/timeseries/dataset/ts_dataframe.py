@@ -541,7 +541,7 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
                     )
             return IRREGULAR_TIME_INDEX_FREQSTR
         else:
-            return freq.freqstr if isinstance(freq, pd._libs.tslibs.BaseOffset) else freq
+            return pd.tseries.frequencies.to_offset(freq).freqstr
 
     @property
     def freq(self):
