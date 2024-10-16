@@ -79,7 +79,7 @@ def test_when_covariates_present_in_data_then_they_are_included_in_metadata(
 
 
 @pytest.mark.skipif(sys.version_info[:2] <= (3, 8), reason="np.dtypes not available in Python 3.8")
-def test_when_transform_applied_then_numeric_features_are_converted_to_float64():
+def test_when_transform_applied_then_numeric_features_are_converted_to_float32():
     data = get_data_frame_with_covariates(covariates_cat=["cov_cat"], static_features_cat=["static_cat"])
 
     data["int1"] = np.random.randint(0, 100, size=len(data), dtype=np.int32)
@@ -95,9 +95,9 @@ def test_when_transform_applied_then_numeric_features_are_converted_to_float64()
     feat_generator = TimeSeriesFeatureGenerator(target="target", known_covariates_names=["int1", "float2"])
     data_transformed = feat_generator.fit_transform(data)
     for col in ["int1", "int2", "float1", "float2"]:
-        assert isinstance(data_transformed[col].dtype, np.dtypes.Float64DType)
+        assert isinstance(data_transformed[col].dtype, np.dtypes.Float32DType)
     for col in ["int1_s", "int2_s", "float1_s", "float2_s"]:
-        assert isinstance(data_transformed.static_features[col].dtype, np.dtypes.Float64DType)
+        assert isinstance(data_transformed.static_features[col].dtype, np.dtypes.Float32DType)
 
 
 def test_when_duplicate_columns_provided_during_fit_then_they_are_removed():
