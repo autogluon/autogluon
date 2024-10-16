@@ -24,7 +24,7 @@ class DropDuplicatesFeatureGenerator(AbstractFeatureGenerator):
         The number of rows to sample when doing an initial filter of duplicate feature candidates.
         Usually, the majority of features can be filtered out using this smaller amount of rows which greatly speeds up the computation of the final check.
         If None or greater than the number of rows, no initial filter will occur. This may increase the time to fit immensely for large datasets.
-    sample_size_final : int, default 2000
+    sample_size_final : int, default 3000
         The number of rows to sample when doing the final filter to determine duplicate features.
         This theoretically can lead to features that are very nearly duplicates but not exact duplicates being removed,
         but should be near impossible in practice.
@@ -70,6 +70,7 @@ class DropDuplicatesFeatureGenerator(AbstractFeatureGenerator):
         cls, X: DataFrame, feature_metadata_in, keep: Union[str, bool] = "first", sample_size=None
     ) -> list:
         if sample_size is not None and len(X) > sample_size:
+            # Sampling with replacement is much faster than without replacement
             X = X.sample(sample_size, random_state=0, replace=True)
         features_to_remove = []
 
