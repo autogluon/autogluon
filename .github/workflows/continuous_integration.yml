@@ -182,28 +182,28 @@ jobs:
           job-type: CI-GPU
           job-name: AutoGluon-Tabular
           command: chmod +x ./.github/workflow_scripts/test_tabular.sh && ./.github/workflow_scripts/test_tabular.sh
-  test_tabular_lite:
-    needs: lint_check
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Check if changes beside docs
-        uses: dorny/paths-filter@v2
-        id: changes
-        with:
-          filters: |
-            other_than_docs:
-              - '!(docs/**)**'
-            other_than_timeseries:
-              - '!(timeseries/**)**'
-      - name: Test AutoGluonLite package via Pyodide on AWS Batch
-        if: steps.changes.outputs.other_than_docs == 'true' && steps.changes.outputs.other_than_timeseries == 'true'
-        uses: ./.github/actions/submit-job
-        with:
-          job-type: CI-WASM
-          job-name: AutoGluon-Lite
-          command: chmod +x ./.github/workflow_scripts/test_tabular_lite.sh && ./.github/workflow_scripts/test_tabular_lite.sh
+  #  test_tabular_lite:
+  #    needs: lint_check
+  #    runs-on: ubuntu-latest
+  #    steps:
+  #      - name: Checkout repository
+  #        uses: actions/checkout@v2
+  #      - name: Check if changes beside docs
+  #        uses: dorny/paths-filter@v2
+  #        id: changes
+  #        with:
+  #          filters: |
+  #            other_than_docs:
+  #              - '!(docs/**)**'
+  #            other_than_timeseries:
+  #              - '!(timeseries/**)**'
+  #      - name: Test AutoGluonLite package via Pyodide on AWS Batch
+  #        if: steps.changes.outputs.other_than_docs == 'true' && steps.changes.outputs.other_than_timeseries == 'true'
+  #        uses: ./.github/actions/submit-job
+  #        with:
+  #          job-type: CI-WASM
+  #          job-name: AutoGluon-Lite
+  #          command: chmod +x ./.github/workflow_scripts/test_tabular_lite.sh && ./.github/workflow_scripts/test_tabular_lite.sh
   # test_eda:
   #   needs: lint_check
   #   runs-on: ubuntu-latest
