@@ -248,7 +248,7 @@ def test_raises_num_gpus_neg(fit_helper):
         )
 
 @pytest.mark.parametrize("delay_bag_sets", [True, False])
-def test_max_sets(fit_helper,delay_bag_sets):
+def test_delay_bag_sets(fit_helper,delay_bag_sets):
     """Tests that max_sets works"""
     fit_args = dict(
         hyperparameters={"DUMMY": [{}, {}]},
