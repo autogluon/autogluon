@@ -33,7 +33,6 @@ install_requires = [
     "accelerate",  # version range defined in `core/_setup_utils.py`
     "requests>=2.21,<3",
     "jsonschema>=4.18,<4.22",
-    "seqeval>=1.2.2,<1.3.0",
     "evaluate>=0.4.0,<0.5.0",
     "timm>=0.9.5,<0.10.0",
     "torchvision>=0.16.0,<0.19.0",
@@ -62,10 +61,9 @@ install_requires = ag.get_dependency_version_ranges(install_requires)
 tests_require = [
     "ruff",
     "datasets>=2.10.0,<2.15.0",
-    "onnx>=1.13.0,<1.14.0",
-    "onnxruntime>=1.15.0,<1.16.0;platform_system=='Darwin'",
-    "onnxruntime-gpu>=1.15.0,<1.16.0;platform_system!='Darwin'",
-    "tensorrt>=8.6.0,<10.3;platform_system=='Linux' and python_version<'3.11'",
+    "onnx>=1.13.0,<1.16.0",
+    "onnxruntime>=1.15.0,<1.18.0;platform_system=='Darwin'",
+    "onnxruntime-gpu>=1.15.0,<1.18.0;platform_system!='Darwin'",
 ]
 
 extras_require = {"tests": tests_require}
