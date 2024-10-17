@@ -2,6 +2,8 @@ import shutil
 
 import pytest
 
+from pathlib import Path
+
 from autogluon.core.constants import BINARY
 from autogluon.core.metrics import METRICS
 
@@ -244,3 +246,41 @@ def test_raises_num_gpus_neg(fit_helper):
             expected_model_count=None,
             delete_directory=True,
         )
+
+@pytest.mark.parametrize("delay_bag_sets", [True, False])
+def test_delay_bag_sets(fit_helper,delay_bag_sets):
+    """Tests that max_sets works"""
+    fit_args = dict(
+        hyperparameters={"DUMMY": [{}, {}]},
+        fit_weighted_ensemble=False,
+        num_bag_folds=2,
+        num_bag_sets=2,
+        time_limit=30,  # has no impact, but otherwise `delay_bag_sets` is ignored.
+        delay_bag_sets=delay_bag_sets,
+        ag_args_ensemble={"fold_fitting_strategy":"sequential_local"},
+    )
+    dataset_name = "adult"
+
+    predictor = fit_helper.fit_and_validate_dataset(
+        dataset_name=dataset_name,
+        fit_args=fit_args,
+        expected_model_count=2,
+        refit_full=False,
+        delete_directory=False,
+    )
+
+    # Verify fit order is correct.
+    model_1 = predictor._trainer.load_model('DummyModel_BAG_L1')
+    max_model_times_1 = max([(Path(model_1.path)/bm).stat().st_mtime_ns for bm in model_1.models])
+
+    model_2 = predictor._trainer.load_model('DummyModel_2_BAG_L1')
+    min_model_times_2 = min([(Path(model_2.path) / bm).stat().st_mtime_ns for bm in model_2.models])
+
+    if delay_bag_sets:
+        # Last model of model 1 should be trained after fist model of model 2
+        assert max_model_times_1 > min_model_times_2
+    else:
+        # Last model of model 1 should be trained before fist model of model 2
+        assert max_model_times_1 <= min_model_times_2
+
+    shutil.rmtree(predictor.path, ignore_errors=True)

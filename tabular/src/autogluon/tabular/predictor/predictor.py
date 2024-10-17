@@ -764,6 +764,15 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 Number of stacking levels to use in stack ensemble. Roughly increases model training time by factor of `num_stack_levels+1` (set = 0 to disable stack ensembling).
                 Disabled by default (0), but we recommend `num_stack_levels=1` to maximize predictive performance.
                 To prevent overfitting, `num_bag_folds >= 2` must also be set or else a ValueError will be raised.
+            delay_bag_sets : bool, default = False
+                Controls when repeats of kfold bagging are executed in AutoGluon when under a time limit.
+                We suggest sticking to `False` to avoid overfitting.
+                    If True, AutoGluon delays repeating kfold bagging until after evaluating all models
+                        from `hyperparameters`, if there is enough time. This allows AutoGluon to explore
+                        more hyperparameters to obtain a better final performance but it may lead to
+                        more overfitting.
+                    If False, AutoGluon repeats kfold bagging immediately after evaluating each model.
+                        Thus, AutoGluon might evaluate fewer models with less overfitting.
             holdout_frac : float, default = None
                 Fraction of train_data to holdout as tuning data for optimizing hyperparameters (ignored unless `tuning_data = None`, ignored if `num_bag_folds != 0` unless `use_bag_holdout == True`).
                 Default value (if None) is selected based on the number of rows in the training data. Default values range from 0.2 at 2,500 rows to 0.01 at 250,000 rows.
@@ -1083,6 +1092,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         excluded_model_types = kwargs["excluded_model_types"]
         use_bag_holdout = kwargs["use_bag_holdout"]
         ds_args: dict = kwargs["ds_args"]
+        delay_bag_sets: bool = kwargs["delay_bag_sets"]
         test_data = kwargs["test_data"]
         learning_curves = kwargs["learning_curves"]
 
@@ -1200,6 +1210,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             "included_model_types": included_model_types,
             "excluded_model_types": excluded_model_types,
             "feature_prune_kwargs": kwargs.get("feature_prune_kwargs", None),
+            "delay_bag_sets": delay_bag_sets,
         }
         aux_kwargs = {
             "total_resources": {
@@ -4880,6 +4891,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         return dict(
             # data split / ensemble architecture kwargs -> Don't nest but have nested documentation -> Actually do nesting
             num_bag_sets=None,
+            delay_bag_sets=False,
             num_stack_levels=None,
             hyperparameter_tune_kwargs=None,
             # core_kwargs -> +1 nest
