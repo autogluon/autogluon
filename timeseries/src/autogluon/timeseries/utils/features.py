@@ -13,7 +13,6 @@ from autogluon.features.generators import (
     CategoryFeatureGenerator,
     IdentityFeatureGenerator,
     PipelineFeatureGenerator,
-    DropDuplicatesFeatureGenerator,
 )
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
 from autogluon.timeseries.utils.warning_filters import warning_filter
@@ -83,8 +82,7 @@ class ContinuousAndCategoricalFeatureGenerator(PipelineFeatureGenerator):
         super().__init__(
             generators=[generators],
             post_generators=[],
-            pre_generators=[],
-            # pre_generators=[AsTypeFeatureGenerator(convert_bool=False)],
+            pre_generators=[AsTypeFeatureGenerator(convert_bool=False)],
             pre_enforce_types=False,
             pre_drop_useless=False,
             post_drop_duplicates=True,
@@ -253,15 +251,18 @@ class TimeSeriesFeatureGenerator:
             # ffill + bfill covariates that have at least some observed values
             covariates_real = ts_df[covariates_real_names].fill_missing_values()
             # If for some items covariates consist completely of NaNs, fill them with median of training data
-            if np.isnan(covariates_real.to_numpy(self.float_dtype)).any():
+            if np.isnan(covariates_real.to_numpy()).any():
                 covariates_real.fillna(self._train_covariates_real_median, inplace=True)
             ts_df[covariates_real_names] = covariates_real
 
-        # Fill missing static_features_real with the median of the training set
         static_real_names = self.covariate_metadata.static_features_real
         static_df = ts_df.static_features
-        if static_df is not None and static_real_names and static_df[static_real_names].isna().any(axis=None):
-            static_df[static_real_names].fillna(self._train_static_real_median, inplace=True)
+        if static_df is not None and static_real_names:
+            static_real = static_df[static_real_names]
+            # Fill missing static_features_real with the median of the training set
+            if np.isnan(static_real.to_numpy()).any():
+                static_real.fillna(self._train_static_real_median, inplace=True)
+                static_df[static_real_names] = static_real
 
         return ts_df
 
