@@ -14,6 +14,8 @@ from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.local.abstract_local_model import AbstractLocalModel
 from autogluon.timeseries.splitter import AbstractWindowSplitter, ExpandingWindowSplitter
 from autogluon.timeseries.transforms import LocalTargetScaler
+from autogluon.timeseries.regressor import CovariatesRegressor
+
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +89,10 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
 
     def _create_target_scaler(self) -> Optional[LocalTargetScaler]:
         # Do not use scaler in the MultiWindowModel to avoid duplication; it will be created in the inner model
+        return None
+
+    def _create_covariates_regressor(self) -> Optional[CovariatesRegressor]:
+        # Do not use regressor in the MultiWindowModel to avoid duplication; it will be created in the inner model
         return None
 
     def _fit(
