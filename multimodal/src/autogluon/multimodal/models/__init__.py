@@ -1,6 +1,7 @@
 from . import utils
 from .categorical_mlp import CategoricalMLP
 from .clip import CLIPForImageText
+from .clipfusion_mlp import CLIPForImageText_fusionmlp
 from .document_transformer import DocumentTransformer
 from .ft_transformer import FT_Transformer
 from .fusion import (

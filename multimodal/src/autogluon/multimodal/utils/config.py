@@ -263,6 +263,8 @@ def get_name_prefix(
     if len(search_results) == 0:
         return None
     elif len(search_results) >= 2:
+        if "clip" in search_results and "clip_fusion_mlp" in search_results:
+            return "clip_fusion_mlp"
         raise ValueError(
             f"Model name `{name}` is mapped to multiple models, "
             f"which means some names in `{prefixes}` have duplicate prefixes."
