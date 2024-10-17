@@ -1,6 +1,7 @@
 from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
+import torch
 from torch import nn
 
 from ..constants import CATEGORICAL, COLUMN
@@ -14,11 +15,7 @@ class CategoricalProcessor:
     for each related model so that they will have independent input.
     """
 
-    def __init__(
-        self,
-        model: nn.Module,
-        requires_column_info: bool = False,
-    ):
+    def __init__(self, model: nn.Module, requires_column_info: bool = False, modality_drop_ratio: float = 0.0):
         """
         Parameters
         ----------
@@ -29,6 +26,9 @@ class CategoricalProcessor:
         """
         self.prefix = model.prefix
         self.requires_column_info = requires_column_info
+        if hasattr(model, "num_categories"):
+            self.num_categories = model.num_categories
+        self.modality_drop_rate = modality_drop_ratio
 
     @property
     def categorical_key(self):
@@ -60,6 +60,7 @@ class CategoricalProcessor:
     def process_one_sample(
         self,
         categorical_features: Dict[str, int],
+        is_training: bool,
     ) -> Dict:
         """
         Process one sample's categorical features. Assume the categorical features
@@ -81,6 +82,12 @@ class CategoricalProcessor:
                 ret[f"{self.categorical_column_prefix}_{col_name}"] = i
 
         ret[self.categorical_key] = list(categorical_features.values())
+
+        if is_training and self.modality_drop_rate > 0.0:
+            dropout_probs = torch.empty(len(ret[self.categorical_key])).uniform_()
+            for i in range(len(ret[self.categorical_key])):
+                if dropout_probs[i] <= self.modality_drop_rate:
+                    ret[self.categorical_key][i] = self.num_categories[i] - 1
 
         return ret
 
@@ -106,4 +113,4 @@ class CategoricalProcessor:
         -------
         A dictionary containing one sample's processed categorical features.
         """
-        return self.process_one_sample(categorical_features)
+        return self.process_one_sample(categorical_features, is_training)
