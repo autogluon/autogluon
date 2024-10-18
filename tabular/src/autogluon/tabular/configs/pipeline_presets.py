@@ -74,7 +74,7 @@ def get_validation_and_stacking_method(
 ) -> tuple[int, int, int, bool, bool, float, bool]:
     """Get the validation method for AutoGluon via a heuristic.
 
-    Input variables are `None` if they were not specified by the user or have an explict default.
+    Input variables are `None` if they were not specified by the user or have an explicit default.
 
     Parameters
     ----------
