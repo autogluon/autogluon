@@ -16,15 +16,15 @@ def _get_validation_preset(num_train_rows: int, hpo_enabled: bool) -> dict[str, 
     num_bag_sets = 1
 
     use_bag_holdout = num_train_rows >= USE_BAG_HOLDOUT_AUTO_THRESHOLD
-    holdout_frac = default_holdout_frac(num_train_rows=num_train_rows, hyperparameter_tune=hpo_enabled)
+    holdout_frac = round(default_holdout_frac(num_train_rows=num_train_rows, hyperparameter_tune=hpo_enabled), 4)
 
     # Changes to avoid overfitting
     if num_train_rows <= 1_000:
-        num_bag_folds = min(8, max(5, math.floor(num_train_rows / 10)))
-        num_bag_sets = 4 + (2 * (8 - num_bag_folds))
-    elif num_train_rows <= 5_000:
-        num_bag_folds = 4
-    elif num_train_rows <= 10_000:
+        num_bag_folds = min(8, max(4, math.floor(num_train_rows / 100)))
+        num_bag_sets = min(10, 4 + (2 * (8 - num_bag_folds)))
+    elif num_train_rows < 5_000:
+        num_bag_sets = 4
+    elif num_train_rows < 10_000:
         num_bag_sets = 2
     elif num_train_rows < USE_BAG_HOLDOUT_AUTO_THRESHOLD:
         # TODO(improvement): go towards 4-fold cv for more than 100k rows?
@@ -61,7 +61,7 @@ def get_validation_and_stacking_method(
     num_bag_folds: int | None,
     num_bag_sets: int | None,
     use_bag_holdout: bool | None,
-    holdout_frac: float,
+    holdout_frac: float | None,
     # Stacking/Pipeline parameters
     auto_stack: bool,
     num_stack_levels: int | None,
