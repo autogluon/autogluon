@@ -84,7 +84,7 @@ class TimeSeriesLearner(AbstractLearner):
         self._time_limit = time_limit
         time_start = time.time()
 
-        train_data = self.feature_generator.fit_transform(train_data, data_frame_name="train_data")
+        train_data = self.feature_generator.fit_transform(train_data)
         if val_data is not None:
             val_data = self.feature_generator.transform(val_data, data_frame_name="tuning_data")
 
