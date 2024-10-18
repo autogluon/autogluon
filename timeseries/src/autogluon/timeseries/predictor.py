@@ -291,7 +291,9 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             Preprocessed data in TimeSeriesDataFrame format.
         """
         df = self._to_data_frame(data, name=name)
-        df = df.astype({self.target: "float64"})
+        if not pd.api.types.is_numeric_dtype(df[self.target]):
+            raise ValueError(f"Target column {name}['{self.target}'] has a non-numeric dtype {df[self.target].dtype}")
+        df[self.target] = df[self.target].astype("float64")
         # MultiIndex.is_monotonic_increasing checks if index is sorted by ["item_id", "timestamp"]
         if not df.index.is_monotonic_increasing:
             df = df.sort_index()
@@ -442,12 +444,15 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             Columns of ``train_data`` except ``target`` and those listed in ``known_covariates_names`` will be
             interpreted as ``past_covariates`` - covariates that are known only in the past.
 
-            If ``train_data`` has static features (i.e., ``train_data.static_features`` is a pandas DataFrame), the
-            predictor will interpret columns with ``int`` and ``float`` dtypes as continuous (real-valued) features,
-            columns with ``object`` and ``str`` dtypes as categorical features, and will ignore the rest of columns.
+            If ``train_data`` contains covariates or static features, they will be interpreted as follows:
 
-            For example, to ensure that column "store_id" with dtype ``int`` is interpreted as a category,
-            we need to change its type to ``category``::
+                * columns with ``int``, ``bool`` and ``float`` dtypes are interpreted as continuous (real-valued) features
+                * columns with ``object``, ``str`` and ``category`` dtypes are as interpreted as categorical features
+                * columns with other dtypes are ignored
+
+            To ensure that the column type is interpreted correctly, please convert it to one of the above dtypes.
+            For example, to ensure that column "store_id" with dtype ``int`` is interpreted as a category, change
+            its dtype to ``category``::
 
                 data.static_features["store_id"] = data.static_features["store_id"].astype("category")
 
