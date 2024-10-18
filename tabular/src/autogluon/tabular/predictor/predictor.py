@@ -1082,7 +1082,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         self._validate_and_set_memory_limit(memory_limit=memory_limit)
         self._validate_calibrate_decision_threshold(calibrate_decision_threshold=calibrate_decision_threshold)
 
-        auto_stack = kwargs["auto_stack"],
+        auto_stack = kwargs["auto_stack"]
         feature_generator = kwargs["feature_generator"]
         unlabeled_data = kwargs["unlabeled_data"]
         ag_args = kwargs["ag_args"]
