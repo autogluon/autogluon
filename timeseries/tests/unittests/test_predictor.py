@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest import mock
 from uuid import uuid4
 
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -1222,6 +1223,7 @@ def test_when_plot_called_then_figure_contains_correct_number_of_subplots(
     point_forecast_column,
     expected_num_subplots,
 ):
+    matplotlib.use('Agg')  # Use a non-interactive backend for testing  
     fig = TimeSeriesPredictor().plot(
         DUMMY_TS_DATAFRAME,
         predictions=predictions,

@@ -1,5 +1,6 @@
 import copy
 import logging
+import pandas as pd
 from typing import Union
 
 import numpy as np
@@ -137,6 +138,7 @@ class LabelCleanerMulticlass(LabelCleaner):
         """
         Inverse transforms uncleaned internal labels to external labels.
         """
+        
         y = self._convert_to_valid_series(y=y)
         y = y.map(self.cat_mappings_dependent_var_uncleaned)
         return y

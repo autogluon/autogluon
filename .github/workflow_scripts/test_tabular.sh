@@ -19,16 +19,14 @@ install_local_packages "common/[tests]" "core/[all,tests]" "features/"
 if [ "$IS_PLATFORM_TEST" = "true" ]
 then
     install_tabular_platforms "[all,tests]"
-    install_multimodal "[tests]"
 else
     install_tabular "[all,tests]"
-    install_multimodal "[tests]"
 fi
 
 cd tabular/
 if [ -n "$ADDITIONAL_TEST_ARGS" ]
 then
-    python -m pytest --junitxml=results.xml --runslow "$ADDITIONAL_TEST_ARGS" tests
+    python -m pytest --junitxml=results.xml --runslow "$ADDITIONAL_TEST_ARGS" -vv --tb=long -s tests
 else
-    python -m pytest --junitxml=results.xml --runslow tests
+    python -m pytest --junitxml=results.xml --runslow -vv --tb=long -s tests
 fi

@@ -56,9 +56,18 @@ function install_multimodal {
 }
 
 function install_all {
-    install_local_packages "common/[tests]" "core/[all]" "features/" "tabular/[all,tests]" "timeseries/[all,tests]" "eda/[tests]"
-    install_multimodal "[tests]"
-    install_local_packages "autogluon/"
+    set -euo pipefail
+    python3 -m pip install -e common/[tests]
+    python3 -m pip install -e core/[all,tests]
+    python3 -m pip install -e features/
+    python3 -m pip install -e tabular/[all,tests]
+    python3 -m pip install -e multimodal/[tests]
+    python3 -m pip install -e timeseries/[all,tests]
+    python3 -m pip install -e eda/
+    python3 -m pip install -e autogluon/
+    python -m pip install --upgrade pytest-xdist
+    source $(dirname "$0")/setup_mmcv.sh
+    setup_mmcv
 }
 
 function install_all_windows {
