@@ -1,4 +1,5 @@
 from typing import Any, Dict, Optional, Tuple
+import numpy as np
 import pandas as pd
 from autogluon.core.models import AbstractModel
 from autogluon.tabular.trainer.model_presets.presets import (
@@ -83,10 +84,10 @@ class CovariatesRegressor:
         self,
         known_covariates: TimeSeriesDataFrame,
         static_features: Optional[pd.DataFrame],
-    ) -> pd.DataFrame:
+    ) -> np.ndarray:
         tabular_df = self._get_tabular_df(known_covariates, static_features=static_features)
         y_pred_future = self.model.predict(X=tabular_df)
-        return pd.DataFrame(y_pred_future, index=known_covariates.index, columns=[self.target])
+        return y_pred_future
 
     def _get_tabular_df(
         self, data: TimeSeriesDataFrame, static_features: Optional[pd.DataFrame] = None
