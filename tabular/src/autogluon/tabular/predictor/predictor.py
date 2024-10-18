@@ -52,9 +52,12 @@ from autogluon.core.utils.loaders import load_pkl, load_str
 from autogluon.core.utils.savers import save_pkl, save_str
 from autogluon.core.utils.utils import CVSplitter, generate_train_test_split_combined
 
-from ..configs.pipeline_presets import get_validation_and_stacking_method, USE_BAG_HOLDOUT_AUTO_THRESHOLD
 from ..configs.feature_generator_presets import get_default_feature_generator
 from ..configs.hyperparameter_configs import get_hyperparameter_config
+from ..configs.pipeline_presets import (
+    USE_BAG_HOLDOUT_AUTO_THRESHOLD,
+    get_validation_and_stacking_method,
+)
 from ..configs.presets_configs import tabular_presets_alias, tabular_presets_dict
 from ..learner import AbstractTabularLearner, DefaultLearner
 from ..trainer.model_presets.presets import MODEL_TYPES
