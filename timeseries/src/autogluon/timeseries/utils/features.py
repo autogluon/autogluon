@@ -148,6 +148,7 @@ class TimeSeriesFeatureGenerator:
     def fit_transform(self, data: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
         assert not self._is_fit, f"{self.__class__.__name__} has already been fit"
 
+        start_time = time.monotonic()
         self.past_covariates_names = []
         for column in data.columns:
             if column != self.target and column not in self.known_covariates_names:
@@ -161,7 +162,7 @@ class TimeSeriesFeatureGenerator:
         df = pd.DataFrame(data)
         index = df.index
         df.reset_index(drop=True, inplace=True)
-        df = self._convert_numerical_columns_to_float(df)
+        df = self._convert_numeric_to_float_dtype(df)
 
         dfs_to_concat = [df[[self.target]]]
 
@@ -193,7 +194,9 @@ class TimeSeriesFeatureGenerator:
         )
 
         if data.static_features is not None:
-            static_features_df = self.static_feature_pipeline.fit_transform(data.static_features)
+            static_features_df = self.static_feature_pipeline.fit_transform(
+                self._convert_numeric_to_float_dtype(data.static_features)
+            )
             logger.info("\tstatic_features:")
             static_features_cat, static_features_real = self._detect_and_log_column_types(static_features_df)
             ignored_static_features = data.static_features.columns.difference(self.static_feature_pipeline.features_in)
@@ -225,16 +228,18 @@ class TimeSeriesFeatureGenerator:
             static_features_real=static_features_real,
         )
 
-        # Use a subsample of the data to speed up median calculation
+        # Median of real-valued covariates will be used for missing value imputation
         if self.num_samples is not None and len(df) > self.num_samples:
             df = df.sample(n=self.num_samples, replace=True)
         self._train_covariates_real_median = df[self.covariate_metadata.covariates_real].median()
+
+        self.fit_time = time.monotonic() - start_time
         self._is_fit = True
 
         df_out = self._concat_dfs(dfs_to_concat)
         df_out.index = index
-        ts_df = TimeSeriesDataFrame(df_out, static_features=static_features_df)
-        return self._impute_missing_features(ts_df)
+        ts_df = TimeSeriesDataFrame(df_out, static_features=self._impute_static_features(static_features_df))
+        return self._impute_covariates(ts_df, column_names=self.covariate_metadata.covariates_real)
 
     @staticmethod
     def _concat_dfs(dfs_to_concat: List[pd.DataFrame]) -> pd.DataFrame:
@@ -243,28 +248,25 @@ class TimeSeriesFeatureGenerator:
         else:
             return pd.concat(dfs_to_concat, axis=1, copy=False)
 
-    def _impute_missing_features(self, ts_df: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
-        # Missing categorical features are already filled by CategoryFeatureGenerator, only reals must be imputed
-
-        covariates_real_names = self.covariate_metadata.covariates_real
-        if len(covariates_real_names) > 0:
+    def _impute_covariates(self, ts_df: TimeSeriesDataFrame, column_names: List[str]) -> TimeSeriesDataFrame:
+        """Impute missing values in selected columns with ffill, bfill, and median imputation."""
+        if len(column_names) > 0:
             # ffill + bfill covariates that have at least some observed values
-            covariates_real = ts_df[covariates_real_names].fill_missing_values()
+            covariates_real = ts_df[column_names].fill_missing_values()
             # If for some items covariates consist completely of NaNs, fill them with median of training data
             if np.isnan(covariates_real.to_numpy()).any():
                 covariates_real.fillna(self._train_covariates_real_median, inplace=True)
-            ts_df[covariates_real_names] = covariates_real
+            ts_df[column_names] = covariates_real
+        return ts_df
 
+    def _impute_static_features(self, static_df: Optional[pd.DataFrame]) -> Optional[pd.DataFrame]:
+        """Impute missing values in static features using the median."""
         static_real_names = self.covariate_metadata.static_features_real
-        static_df = ts_df.static_features
         if static_df is not None and static_real_names:
             static_real = static_df[static_real_names]
-            # Fill missing static_features_real with the median of the training set
             if np.isnan(static_real.to_numpy()).any():
-                static_real.fillna(self._train_static_real_median, inplace=True)
-                static_df[static_real_names] = static_real
-
-        return ts_df
+                static_df[static_real_names] = static_real.fillna(self._train_static_real_median)
+        return static_df
 
     def transform(self, data: TimeSeriesDataFrame, data_frame_name: str = "data") -> TimeSeriesDataFrame:
         """Transform static features and past/known covariates.
@@ -282,7 +284,6 @@ class TimeSeriesFeatureGenerator:
         df = pd.DataFrame(data)
         index = df.index
         df.reset_index(drop=True, inplace=True)
-        df = self._convert_numerical_columns_to_float(df)
 
         dfs_to_concat = [df[[self.target]]]
 
@@ -297,15 +298,14 @@ class TimeSeriesFeatureGenerator:
         if self.static_feature_pipeline.is_fit():
             if data.static_features is None:
                 raise ValueError(f"Provided {data_frame_name} must contain static_features")
-            static_features = self.static_feature_pipeline.transform(data.static_features)
+            static_features_df = self.static_feature_pipeline.transform(data.static_features)
         else:
-            static_features = None
+            static_features_df = None
 
         df_out = self._concat_dfs(dfs_to_concat)
         df_out.index = index
-        ts_df = TimeSeriesDataFrame(df_out, static_features=static_features)
-
-        return self._impute_missing_features(ts_df)
+        ts_df = TimeSeriesDataFrame(df_out, static_features=self._impute_static_features(static_features_df))
+        return self._impute_covariates(ts_df, column_names=self.covariate_metadata.covariates_real)
 
     def transform_future_known_covariates(
         self, known_covariates: Optional[TimeSeriesDataFrame]
@@ -316,13 +316,12 @@ class TimeSeriesFeatureGenerator:
             self._check_required_columns_are_present(
                 known_covariates, required_column_names=self.known_covariates_names, data_frame_name="known_covariates"
             )
-            known_covariates = TimeSeriesDataFrame(self.known_covariates_pipeline.transform(known_covariates))
-            # ffill + bfill covariates that have at least some observed values
-            known_covariates = known_covariates.fill_missing_values()
-            # If for some items covariates consist completely of NaNs, fill them with median of training data
-            if known_covariates.isna().any(axis=None):
-                known_covariates = known_covariates.fillna(self._train_covariates_real_median)
-            return known_covariates
+            known_covariates = TimeSeriesDataFrame(
+                self.known_covariates_pipeline.transform(pd.DataFrame(known_covariates))
+            )
+            return self._impute_covariates(
+                known_covariates, column_names=self.covariate_metadata.known_covariates_real
+            )
         else:
             return None
 
@@ -351,12 +350,14 @@ class TimeSeriesFeatureGenerator:
                 f"{len(missing_columns)} columns are missing from {data_frame_name}: {reprlib.repr(missing_columns.to_list())}"
             )
 
-    def _convert_numerical_columns_to_float(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Convert the dtype of all numerical (float or int) columns to the given float dtype."""
+    def _convert_numeric_to_float_dtype(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Convert the dtype of all numeric (float, int or bool) columns to self.float_dtype."""
         numeric_columns = [
             col for col, dtype in df.dtypes.items() if pd.api.types.is_numeric_dtype(dtype) and col != self.target
         ]
-        return df.astype({col: self.float_dtype for col in numeric_columns}, copy=False)
+        if len(numeric_columns) > 0:
+            df = df.astype({col: self.float_dtype for col in numeric_columns}, copy=False)
+        return df
 
 
 class AbstractFeatureImportanceTransform:
