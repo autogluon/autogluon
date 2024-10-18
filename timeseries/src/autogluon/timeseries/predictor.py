@@ -444,7 +444,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             Columns of ``train_data`` except ``target`` and those listed in ``known_covariates_names`` will be
             interpreted as ``past_covariates`` - covariates that are known only in the past.
 
-            If ``train_data`` contains covariates or static features, the predictor will interpret them as follows:
+            If ``train_data`` contains covariates or static features, they will be interpreted as follows:
 
                 * columns with ``int``, ``bool`` and ``float`` dtypes are interpreted as continuous (real-valued) features
                 * columns with ``object``, ``str`` and ``category`` dtypes are as interpreted as categorical features
