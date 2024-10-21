@@ -114,6 +114,18 @@ class TimeSeriesFeatureGenerator:
     2. For real static features, we impute missing values with the median of the training set.
     3. For real covariates (past, known), we ffill + bfill within each time series. If for some time series all
         covariate values are missing, we fill them with the median of the training set.
+
+    Parameters
+    ----------
+    target : str
+        Name of the target column.
+    known_covariates_names : List[str]
+        Columns that contain covariates that are known into the future.
+    float_dtype : str, default = "float32"
+        Numpy float dtype to which all numeric columns (float, int, bool) will be converted both in static & dynamic dfs.
+    num_samples : int or None, default = 20_000
+        Number of rows sampled from the training dataset to speed up computation of the median (used later for imputation).
+        If set to `None`, median will be computed using all rows.
     """
 
     def __init__(

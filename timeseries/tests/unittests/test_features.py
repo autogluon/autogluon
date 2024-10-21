@@ -115,11 +115,12 @@ def test_when_data_transformed_then_original_data_is_not_modified():
     data_orig = data.copy()
     feat_generator = TimeSeriesFeatureGenerator(target="target", known_covariates_names=["known_cat", "known_real"])
     feat_generator.fit(data)
-    feat_generator.transform(data)
+    data_transformed = feat_generator.transform(data)
     assert data.equals(data_orig)
     assert data.dtypes.equals(data_orig.dtypes)
     assert data.static_features.equals(data_orig.static_features)
     assert data.static_features.dtypes.equals(data_orig.static_features.dtypes)
+    assert data_transformed.index is data.index
 
 
 def test_when_known_covariates_transformed_then_original_known_covariates_not_modified():
