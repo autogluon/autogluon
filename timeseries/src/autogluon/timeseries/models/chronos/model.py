@@ -219,7 +219,8 @@ class ChronosModel(AbstractTimeSeriesModel):
         return minimum_resources
 
     def load_model_pipeline(self, context_length: Optional[int] = None):
-        from .pipeline import OptimizedChronosPipeline
+        # from .pipeline import OptimizedChronosPipeline
+        from chronos import ForecastPipeline
 
         gpu_available = self._is_gpu_available()
 
@@ -232,12 +233,12 @@ class ChronosModel(AbstractTimeSeriesModel):
 
         device = self.device or ("cuda" if gpu_available else "cpu")
 
-        pipeline = OptimizedChronosPipeline.from_pretrained(
+        pipeline = ForecastPipeline.from_pretrained(
             self.model_path,
             device_map=device,
-            optimization_strategy=self.optimization_strategy,
+            # optimization_strategy=self.optimization_strategy,
             torch_dtype=self.torch_dtype,
-            context_length=context_length or self.context_length,
+            # context_length=context_length or self.context_length,
         )
 
         self.model_pipeline = pipeline
@@ -297,6 +298,7 @@ class ChronosModel(AbstractTimeSeriesModel):
 
         with warning_filter(all_warnings=True):
             import torch
+            from chronos import ForecastType
 
             if self.model_pipeline is None:
                 # load model pipeline to device memory
@@ -310,23 +312,38 @@ class ChronosModel(AbstractTimeSeriesModel):
             )
             self.model_pipeline.model.eval()
             with torch.inference_mode():
-                prediction_samples = [
-                    self.model_pipeline.predict(
-                        batch,
-                        prediction_length=self.prediction_length,
-                        num_samples=self.num_samples,
-                        limit_prediction_length=False,
-                    )
-                    .detach()
-                    .cpu()
-                    .numpy()
-                    for batch in inference_data_loader
-                ]
-
-        samples = np.concatenate(prediction_samples, axis=0).swapaxes(1, 2).reshape(-1, self.num_samples)
-
-        mean = samples.mean(axis=-1, keepdims=True)
-        quantiles = np.quantile(samples, self.quantile_levels, axis=-1).T
+                if self.model_pipeline.forecast_type == ForecastType.SAMPLES:
+                    prediction_samples = [
+                        self.model_pipeline.predict(
+                            batch,
+                            prediction_length=self.prediction_length,
+                            num_samples=self.num_samples,
+                            limit_prediction_length=False,
+                        )
+                        .detach()
+                        .cpu()
+                        .numpy()
+                        for batch in inference_data_loader
+                    ]
+                    samples = np.concatenate(prediction_samples, axis=0).swapaxes(1, 2).reshape(-1, self.num_samples)
+                    mean = samples.mean(axis=-1, keepdims=True)
+                    quantiles = np.quantile(samples, self.quantile_levels, axis=-1).T
+                elif self.model_pipeline.forecast_type == ForecastType.QUANTILES:
+                    # TODO: Handle interpolation for arbitrary quantiles
+                    predictions = [
+                        self.model_pipeline.predict(
+                            batch,
+                            prediction_length=self.prediction_length,
+                            limit_prediction_length=False,
+                        )
+                        .detach()
+                        .cpu()
+                        .numpy()
+                        for batch in inference_data_loader
+                    ]
+                    model_quantiles = self.model_pipeline.quantiles
+                    quantiles = np.concatenate(predictions, axis=0).swapaxes(1, 2).reshape(-1, len(model_quantiles))
+                    mean = quantiles[:, [model_quantiles.index("0.5")]]
 
         df = pd.DataFrame(
             np.concatenate([mean, quantiles], axis=1),
