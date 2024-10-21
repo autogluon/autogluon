@@ -13,9 +13,7 @@ from autogluon.timeseries.models.local import (
     AutoCESModel,
     AutoETSModel,
     AverageModel,
-    CrostonClassicModel,
-    CrostonOptimizedModel,
-    CrostonSBAModel,
+    CrostonModel,
     DynamicOptimizedThetaModel,
     ETSModel,
     IMAPAModel,
@@ -55,9 +53,7 @@ SEASONAL_TESTABLE_MODELS = [
 NONSEASONAL_TESTABLE_MODELS = [
     ADIDAModel,
     ZeroModel,
-    CrostonClassicModel,
-    CrostonSBAModel,
-    CrostonOptimizedModel,
+    CrostonModel,
     IMAPAModel,
 ]
 TESTABLE_MODELS = SEASONAL_TESTABLE_MODELS + NONSEASONAL_TESTABLE_MODELS
