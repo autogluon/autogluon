@@ -4,6 +4,7 @@ from typing import Dict
 import numpy as np
 import pandas as pd
 import pytest
+from statsforecast.models import CrostonClassic, CrostonOptimized, CrostonSBA
 
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.models.local import (
@@ -418,3 +419,22 @@ def test_when_leading_nans_are_present_then_seasonal_naive_can_forecast(temp_mod
     predictions = model.predict(data)
 
     assert not pd.isna(predictions).any(axis=None)
+
+
+@pytest.mark.parametrize(
+    "hyperparameters, expected_cls",
+    [
+        ({}, CrostonSBA),
+        ({"version": "SBA"}, CrostonSBA),
+        ({"version": "Classic"}, CrostonClassic),
+        ({"version": "Optimized"}, CrostonOptimized),
+    ],
+)
+def test_when_version_hyperparameter_provided_to_croston_model_then_correct_model_class_is_created(
+    hyperparameters, expected_cls
+):
+    data = DUMMY_TS_DATAFRAME.copy()
+    model = CrostonModel(freq=data.freq, hyperparameters=hyperparameters)
+    model.fit(train_data=data)
+    model_cls = model._get_model_type(model._local_model_args.get("version"))
+    assert model_cls is expected_cls

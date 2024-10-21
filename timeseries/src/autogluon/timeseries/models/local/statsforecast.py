@@ -19,11 +19,11 @@ class AbstractStatsForecastModel(AbstractLocalModel):
         local_model_args["season_length"] = seasonal_period
         return local_model_args
 
-    def _get_model_type(self, variant: Optional[str] = None) -> Type:
+    def _get_model_type(self, version: Optional[str] = None) -> Type:
         raise NotImplementedError
 
     def _get_local_model(self, local_model_args: Dict):
-        model_type = self._get_model_type(local_model_args.get("variant"))
+        model_type = self._get_model_type(local_model_args.get("version"))
         return model_type(**local_model_args)
 
     def _get_point_forecast(
@@ -626,6 +626,10 @@ class CrostonModel(AbstractStatsForecastIntermittentDemandModel):
         If not None, only the last ``max_ts_length`` time steps of each time series will be used to train the model.
         This significantly speeds up fitting and usually leads to no change in accuracy.
     """
+
+    allowed_local_model_args = [
+        "version",
+    ]
 
     def _get_model_type(self, version: Optional[str] = None):
         from statsforecast.models import CrostonClassic, CrostonOptimized, CrostonSBA
