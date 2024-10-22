@@ -1,11 +1,13 @@
 import ast
 import codecs
 import copy
+import os
 import re
 import warnings
-from io import BytesIO
+from contextlib import redirect_stdout
 from typing import Callable, Dict, Iterable, List, Optional, Tuple, Union
 
+import nltk
 import numpy as np
 import pandas as pd
 import PIL
@@ -25,8 +27,6 @@ from ..constants import (
     CLIP_IMAGE_STD,
     IDENTIFIER,
     IMAGE,
-    IMAGE_BYTEARRAY,
-    IMAGE_PATH,
     MMDET_IMAGE,
     MMLAB_MODELS,
 )
@@ -613,3 +613,9 @@ def image_mean_std(norm_type: str):
         return CLIP_IMAGE_MEAN, CLIP_IMAGE_STD
     else:
         raise ValueError(f"unknown image normalization: {norm_type}")
+
+
+def silent_nltk_download(package):
+    with open(os.devnull, 'w') as devnull:
+        with redirect_stdout(devnull):
+            return nltk.download(package, quiet=True)
