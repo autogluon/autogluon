@@ -19,14 +19,14 @@ DEPENDENT_PACKAGES = {
     "boto3": ">=1.10,<2",  # <2 because unlikely to introduce breaking changes in minor releases. >=1.10 because 1.10 is 3 years old, no need to support older
     "numpy": ">=1.21,<1.29",  # "<{N+3}" upper cap, where N is the latest released minor version, assuming no warnings using N
     "pandas": ">=2.0.0,<2.3.0",  # "<{N+3}" upper cap
-    "scikit-learn": ">=1.4.0,<1.5.2",  # capping to latest version
+    "scikit-learn": ">=1.4.0,<1.5.3",  # capping to latest version
     "scipy": ">=1.5.4,<1.13",  # "<{N+2}" upper cap
     "matplotlib": ">=3.7.0,<3.11",  # "<{N+2}" upper cap
-    "psutil": ">=5.7.3,<6",  # Major version cap
+    "psutil": ">=5.7.3,<7.0.0",  # Major version cap
     "s3fs": ">=2023.1,<2025",  # Yearly cap
     "networkx": ">=3.0,<4",  # Major version cap
     "tqdm": ">=4.38,<5",  # Major version cap
-    "Pillow": ">=10.0.1,<11",  # Major version cap
+    "Pillow": ">=10.0.1,<12",  # Major version cap
     "torch": ">=2.2,<2.5",  # Major version cap, sync with common/src/autogluon/common/utils/try_import.py
     "lightning": ">=2.2,<2.4",  # Major version cap
     "pytorch_lightning": ">=2.2,<2.4",  # Major version cap, capping `lightning` does not cap `pytorch_lightning`!
