@@ -291,11 +291,24 @@ class AbstractTimeSeriesModel(AbstractModel):
             return None
 
     def _create_covariates_regressor(self) -> Optional[CovariatesRegressor]:
+        """Create a CovariatesRegressor object based on the value of the `covariates_regressor` hyperparameter."""
         covariates_regressor = self._get_model_params().get("covariates_regressor")
-        if isinstance(covariates_regressor, str):
-            return CovariatesRegressor(covariates_regressor, target=self.target, metadata=self.metadata)
-        elif isinstance(covariates_regressor, CovariatesRegressor):
-            return covariates_regressor
+        if covariates_regressor is not None:
+            if len(self.metadata.known_covariates + self.metadata.static_features) == 0:
+                logger.debug(
+                    "Skipping CovariatesRegressor since the dataset contains no covariates or static features."
+                )
+                return None
+            else:
+                if isinstance(covariates_regressor, str):
+                    return CovariatesRegressor(covariates_regressor, target=self.target, metadata=self.metadata)
+                elif isinstance(covariates_regressor, CovariatesRegressor):
+                    logger.warning("Using a custom CovariatesRegressor object is experimental functionality!")
+                    return covariates_regressor
+                else:
+                    raise ValueError(
+                        f"Invalid value for covariates_regressor {covariates_regressor} of type {type(covariates_regressor)}"
+                    )
         else:
             return None
 
@@ -384,8 +397,11 @@ class AbstractTimeSeriesModel(AbstractModel):
                 )
                 known_covariates = pd.DataFrame(index=forecast_index, dtype="float32")
 
-            regressor_pred = self.covariates_regressor.predict(known_covariates, static_features=data.static_features)
-            predictions = predictions.assign(**{col: predictions[col] + regressor_pred for col in predictions.columns})
+            predictions = self.covariates_regressor.inverse_transform(
+                predictions,
+                known_covariates=known_covariates,
+                static_features=data.static_features,
+            )
 
         if self.target_scaler is not None:
             predictions = self.target_scaler.inverse_transform(predictions)

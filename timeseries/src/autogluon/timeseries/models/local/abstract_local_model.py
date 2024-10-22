@@ -116,7 +116,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
             if key in self.allowed_local_model_args:
                 local_model_args[key] = value
             elif key in self.allowed_hyperparameters:
-                # Quietly ignore params in self.allowed_hyperparameters
+                # Quietly ignore params in self.allowed_hyperparameters - they are used by AbstractTimeSeriesModel
                 pass
             else:
                 unused_local_model_args.append(key)

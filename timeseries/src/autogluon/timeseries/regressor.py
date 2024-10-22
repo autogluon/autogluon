@@ -1,20 +1,42 @@
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional
+
 import numpy as np
 import pandas as pd
+
 from autogluon.core.models import AbstractModel
-from autogluon.tabular.trainer.model_presets.presets import (
-    MODEL_TYPES as TABULAR_MODEL_TYPES,
-)
-from autogluon.timeseries.dataset.ts_dataframe import (
-    ITEMID,
-    TIMESTAMP,
-    TimeSeriesDataFrame,
-)
+from autogluon.tabular.trainer.model_presets.presets import MODEL_TYPES as TABULAR_MODEL_TYPES
+from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
 from autogluon.timeseries.utils.features import CovariateMetadata
 
 
 class CovariatesRegressor:
-    """Predicts y values from the covariates."""
+    """Predicts target values from the covariates for the same observation.
+
+    The model construct the feature matrix using known_covariates and static_features.
+
+    Parameters
+    ----------
+    model_name : str
+        Name of the tabular regression model. See `autogluon.tabular.trainer.model_presets.presets.MODEL_TYPES` for the
+        list of available models.
+    model_hyperparameters : dict or None
+        Hyperparameters dict passed to the tabular regression model.
+    tabular_eval_metric : str
+        Metric provided as `eval_metric` to the tabular regression model. Must be compatible with `problem_type="regression"`.
+    refit_during_predict : bool
+        If True, the model should be re-trained at prediction time. If False, the model will only be trained during `fit`.
+        Note that this attribute does not affect the internals of the CovariatesRegressor. Rather, it's checked outside
+        by the AbstractTimeSeriesModel.
+    max_num_samples : int or None
+        If not None, training dataset passed to regression model will contain at most this many rows.
+    metadata : CovariateMetadata
+        Metadata object describing the covariates available in the dataset.
+    target : str
+        Name of the target column.
+    validation_frac : float
+        Fraction of observations that are reserved as the validation set during training (starting from the end of each
+        time series).
+    """
 
     def __init__(
         self,
@@ -42,12 +64,8 @@ class CovariatesRegressor:
         self.model: Optional[AbstractModel] = None
         self.metadata = metadata or CovariateMetadata()
 
-    def _subsample_df(self, df: pd.DataFrame) -> pd.DataFrame:
-        if self.max_num_samples is not None and len(df) > self.max_num_samples:
-            df = df.sample(n=self.max_num_samples)
-        return df
-
-    def fit(self, data: TimeSeriesDataFrame, time_limit: Optional[float] = None) -> "CovariatesRegressor":
+    def fit(self, data: TimeSeriesDataFrame, time_limit: Optional[float] = None, **kwargs) -> "CovariatesRegressor":
+        """Fit the tabular regressor on the target column using covariates as features."""
         tabular_df = self._get_tabular_df(data, static_features=data.static_features)
         tabular_df = tabular_df.query(f"{self.target}.notnull()")
 
@@ -68,38 +86,50 @@ class CovariatesRegressor:
             X_val = None
             y_val = None
 
-        self.model = self._get_tabular_model()
-        self.model.fit(time_limit=time_limit, X=X, y=y, X_val=X_val, y_val=y_val)
+        self.model = self.model_type(
+            problem_type="regression",
+            hyperparameters=self.model_hyperparameters,
+            eval_metric=self.tabular_eval_metric,
+        )
+        self.model.fit(X=X, y=y, X_val=X_val, y_val=y_val, time_limit=time_limit, **kwargs)
         return self
 
     def transform(self, data: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
-        tabular_df = self._get_tabular_df(data, static_features=data.static_features)
-        y_pred = self.model.predict(X=tabular_df)
+        """Subtract the tabular regressor predictions from the target column."""
+        y_pred = self._predict(data, static_features=data.static_features)
         return data.assign(**{self.target: data[self.target] - y_pred})
 
-    def fit_transform(self, data: TimeSeriesDataFrame, time_limit: Optional[float] = None) -> TimeSeriesDataFrame:
-        return self.fit(data=data, time_limit=time_limit).transform(data=data)
+    def fit_transform(
+        self, data: TimeSeriesDataFrame, time_limit: Optional[float] = None, **kwargs
+    ) -> TimeSeriesDataFrame:
+        return self.fit(data=data, time_limit=time_limit, **kwargs).transform(data=data)
 
-    def predict(
+    def inverse_transform(
         self,
+        predictions: TimeSeriesDataFrame,
         known_covariates: TimeSeriesDataFrame,
         static_features: Optional[pd.DataFrame],
-    ) -> np.ndarray:
-        tabular_df = self._get_tabular_df(known_covariates, static_features=static_features)
-        y_pred_future = self.model.predict(X=tabular_df)
-        return y_pred_future
+    ) -> TimeSeriesDataFrame:
+        """Add the tabular regressor predictions to the target column."""
+        y_pred = self._predict(known_covariates, static_features=static_features)
+        return predictions.assign(**{col: predictions[col] + y_pred for col in predictions.columns})
+
+    def _predict(self, data: TimeSeriesDataFrame, static_features: Optional[pd.DataFrame]) -> np.ndarray:
+        """Construct the tabular features matrix and make predictions"""
+        tabular_df = self._get_tabular_df(data, static_features=static_features)
+        return self.model.predict(X=tabular_df)
 
     def _get_tabular_df(
         self, data: TimeSeriesDataFrame, static_features: Optional[pd.DataFrame] = None
     ) -> pd.DataFrame:
+        """Construct a tabular dataframe from known covariates and static features."""
         tabular_df = pd.DataFrame(data).reset_index().drop(columns=[TIMESTAMP] + self.metadata.past_covariates)
         if static_features is not None:
             tabular_df = pd.merge(tabular_df, static_features, on=ITEMID)
         return tabular_df
 
-    def _get_tabular_model(self) -> AbstractModel:
-        return self.model_type(
-            problem_type="regression",
-            hyperparameters=self.model_hyperparameters,
-            eval_metric=self.tabular_eval_metric,
-        )
+    def _subsample_df(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Randomly subsample the dataframe if it contains more than self.max_num_samples rows."""
+        if self.max_num_samples is not None and len(df) > self.max_num_samples:
+            df = df.sample(n=self.max_num_samples)
+        return df
