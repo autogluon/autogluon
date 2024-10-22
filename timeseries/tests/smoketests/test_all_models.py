@@ -62,7 +62,7 @@ ALL_MODELS = {
     "Average": DUMMY_MODEL_HPARAMS,
     "AutoCES": DUMMY_MODEL_HPARAMS,
     "Chronos": {},
-    "CrostonSBA": DUMMY_MODEL_HPARAMS,
+    "Croston": DUMMY_MODEL_HPARAMS,
     "DLinear": DUMMY_MODEL_HPARAMS,
     "DeepAR": DUMMY_MODEL_HPARAMS,
     "DirectTabular": DUMMY_MODEL_HPARAMS,

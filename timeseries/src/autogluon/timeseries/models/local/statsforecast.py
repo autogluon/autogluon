@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, Type
+from typing import Any, Dict, Optional, Type
 
 import numpy as np
 import pandas as pd
@@ -19,11 +19,13 @@ class AbstractStatsForecastModel(AbstractLocalModel):
         local_model_args["season_length"] = seasonal_period
         return local_model_args
 
-    def _get_model_type(self) -> Type:
+    def _get_model_type(self, variant: Optional[str] = None) -> Type:
         raise NotImplementedError
 
     def _get_local_model(self, local_model_args: Dict):
-        model_type = self._get_model_type()
+        local_model_args = local_model_args.copy()
+        variant = local_model_args.pop("variant", None)
+        model_type = self._get_model_type(variant)
         return model_type(**local_model_args)
 
     def _get_point_forecast(
@@ -154,7 +156,7 @@ class AutoARIMAModel(AbstractProbabilisticStatsForecastModel):
         local_model_args.setdefault("allowmean", True)
         return local_model_args
 
-    def _get_model_type(self):
+    def _get_model_type(self, variant: Optional[str] = None):
         from statsforecast.models import AutoARIMA
 
         return AutoARIMA
@@ -222,7 +224,7 @@ class ARIMAModel(AbstractProbabilisticStatsForecastModel):
         local_model_args.setdefault("order", (1, 1, 1))
         return local_model_args
 
-    def _get_model_type(self):
+    def _get_model_type(self, variant: Optional[str] = None):
         from statsforecast.models import ARIMA
 
         return ARIMA
@@ -265,7 +267,7 @@ class AutoETSModel(AbstractProbabilisticStatsForecastModel):
         "seasonal_period",
     ]
 
-    def _get_model_type(self):
+    def _get_model_type(self, variant: Optional[str] = None):
         from statsforecast.models import AutoETS
 
         return AutoETS
@@ -365,7 +367,7 @@ class DynamicOptimizedThetaModel(AbstractProbabilisticStatsForecastModel):
         "seasonal_period",
     ]
 
-    def _get_model_type(self):
+    def _get_model_type(self, variant: Optional[str] = None):
         from statsforecast.models import DynamicOptimizedTheta
 
         return DynamicOptimizedTheta
@@ -409,7 +411,7 @@ class ThetaModel(AbstractProbabilisticStatsForecastModel):
         "seasonal_period",
     ]
 
-    def _get_model_type(self):
+    def _get_model_type(self, variant: Optional[str] = None):
         from statsforecast.models import Theta
 
         return Theta
@@ -529,7 +531,7 @@ class AutoCESModel(AbstractProbabilisticStatsForecastModel):
         "seasonal_period",
     ]
 
-    def _get_model_type(self):
+    def _get_model_type(self, variant: Optional[str] = None):
         from statsforecast.models import AutoCES
 
         return AutoCES
@@ -591,27 +593,32 @@ class ADIDAModel(AbstractStatsForecastIntermittentDemandModel):
         This significantly speeds up fitting and usually leads to no change in accuracy.
     """
 
-    def _get_model_type(self):
+    def _get_model_type(self, variant: Optional[str] = None):
         from statsforecast.models import ADIDA
 
         return ADIDA
 
 
-class CrostonSBAModel(AbstractStatsForecastIntermittentDemandModel):
-    """Intermittent demand forecasting model using Croston's model with the Syntetos-Boylan
-    bias correction approach [SyntetosBoylan2001]_.
-
-    Based on `statsforecast.models.CrostonSBA <https://nixtla.mintlify.app/statsforecast/docs/models/crostonsba.html>`_.
-
+class CrostonModel(AbstractStatsForecastIntermittentDemandModel):
+    """Intermittent demand forecasting model using Croston's model from [Croston1972]_ and [SyntetosBoylan2001]_.
 
     References
     ----------
+    .. [Croston1972] Croston, John D. "Forecasting and stock control for intermittent demands." Journal of
+        the Operational Research Society 23.3 (1972): 289-303.
     .. [SyntetosBoylan2001] Syntetos, Aris A., and John E. Boylan. "On the bias of intermittent
         demand estimates." International journal of production economics 71.1-3 (2001): 457-466.
 
 
     Other Parameters
     ----------------
+    variant : {"SBA", "classic", "optimized"}, default = "SBA"
+        Variant of the Croston model that is used. Available options:
+
+        - `"classic"` - variant of the Croston method where the smoothing parameter is fixed to 0.1 (based on `statsforecast.models.CrostonClassic <https://nixtla.mintlify.app/statsforecast/docs/models/crostonclassic.html>`_)
+        - `"SBA"` - variant of the Croston method based on Syntetos-Boylan Approximation (based on `statsforecast.models.CrostonSBA <https://nixtla.mintlify.app/statsforecast/docs/models/crostonsba.html>`_)
+        - `"optimized"` - variant of the Croston method where the smoothing parameter is optimized (based on `statsforecast.models.CrostonOptimized <https://nixtla.mintlify.app/statsforecast/docs/models/crostonoptimized.html>`_)
+
     n_jobs : int or float, default = 0.5
         Number of CPU cores used to fit the models in parallel.
         When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
@@ -622,72 +629,30 @@ class CrostonSBAModel(AbstractStatsForecastIntermittentDemandModel):
         This significantly speeds up fitting and usually leads to no change in accuracy.
     """
 
-    def _get_model_type(self):
-        from statsforecast.models import CrostonSBA
+    allowed_local_model_args = [
+        "variant",
+    ]
 
-        return CrostonSBA
+    def _get_model_type(self, variant: Optional[str] = None):
+        from statsforecast.models import CrostonClassic, CrostonOptimized, CrostonSBA
 
+        model_variants = {
+            "classic": CrostonClassic,
+            "sba": CrostonSBA,
+            "optimized": CrostonOptimized,
+        }
 
-class CrostonOptimizedModel(AbstractStatsForecastIntermittentDemandModel):
-    """Intermittent demand forecasting model using Croston's model where the smoothing parameter
-    is optimized [Croston1972]_.
+        if not isinstance(variant, str) or variant.lower() not in model_variants:
+            raise ValueError(
+                f"Invalid model variant '{variant}'. Available Croston model variants: {list(model_variants)}"
+            )
+        else:
+            return model_variants[variant.lower()]
 
-    Based on `statsforecast.models.CrostonOptimized <https://nixtla.mintlify.app/statsforecast/docs/models/crostonoptimized.html>`_.
-
-
-    References
-    ----------
-    .. [Croston1972] Croston, John D. "Forecasting and stock control for intermittent demands." Journal of
-        the Operational Research Society 23.3 (1972): 289-303.
-
-
-    Other Parameters
-    ----------------
-    n_jobs : int or float, default = 0.5
-        Number of CPU cores used to fit the models in parallel.
-        When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
-        When set to a positive integer, that many cores are used.
-        When set to -1, all CPU cores are used.
-    max_ts_length : int, default = 2500
-        If not None, only the last ``max_ts_length`` time steps of each time series will be used to train the model.
-        This significantly speeds up fitting and usually leads to no change in accuracy.
-    """
-
-    def _get_model_type(self):
-        from statsforecast.models import CrostonOptimized
-
-        return CrostonOptimized
-
-
-class CrostonClassicModel(AbstractStatsForecastIntermittentDemandModel):
-    """Intermittent demand forecasting model using Croston's model where the smoothing parameter
-    is fixed to 0.1 [Croston1972]_.
-
-    Based on `statsforecast.models.CrostonClassic <https://nixtla.mintlify.app/statsforecast/docs/models/crostonclassic.html>`_.
-
-
-    References
-    ----------
-    .. [Croston1972] Croston, John D. "Forecasting and stock control for intermittent demands." Journal of
-        the Operational Research Society 23.3 (1972): 289-303.
-
-
-    Other Parameters
-    ----------------
-    n_jobs : int or float, default = 0.5
-        Number of CPU cores used to fit the models in parallel.
-        When set to a float between 0.0 and 1.0, that fraction of available CPU cores is used.
-        When set to a positive integer, that many cores are used.
-        When set to -1, all CPU cores are used.
-    max_ts_length : int, default = 2500
-        If not None, only the last ``max_ts_length`` time steps of each time series will be used to train the model.
-        This significantly speeds up fitting and usually leads to no change in accuracy.
-    """
-
-    def _get_model_type(self):
-        from statsforecast.models import CrostonClassic
-
-        return CrostonClassic
+    def _update_local_model_args(self, local_model_args: dict) -> dict:
+        local_model_args = super()._update_local_model_args(local_model_args)
+        local_model_args.setdefault("variant", "SBA")
+        return local_model_args
 
 
 class IMAPAModel(AbstractStatsForecastIntermittentDemandModel):
@@ -716,7 +681,7 @@ class IMAPAModel(AbstractStatsForecastIntermittentDemandModel):
         This significantly speeds up fitting and usually leads to no change in accuracy.
     """
 
-    def _get_model_type(self):
+    def _get_model_type(self, variant: Optional[str] = None):
         from statsforecast.models import IMAPA
 
         return IMAPA
@@ -738,7 +703,7 @@ class ZeroModel(AbstractStatsForecastIntermittentDemandModel):
         This significantly speeds up fitting and usually leads to no change in accuracy.
     """
 
-    def _get_model_type(self):
+    def _get_model_type(self, variant: Optional[str] = None):
         # ZeroModel does not depend on a StatsForecast implementation
         raise NotImplementedError
 

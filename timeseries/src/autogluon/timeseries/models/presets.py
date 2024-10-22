@@ -16,7 +16,7 @@ from . import (
     AutoETSModel,
     AverageModel,
     ChronosModel,
-    CrostonSBAModel,
+    CrostonModel,
     DeepARModel,
     DirectTabularModel,
     DLinearModel,
@@ -68,7 +68,8 @@ MODEL_TYPES = dict(
     ETS=ETSModel,
     ARIMA=ARIMAModel,
     ADIDA=ADIDAModel,
-    CrostonSBA=CrostonSBAModel,
+    Croston=CrostonModel,
+    CrostonSBA=CrostonModel,  # Alias for backward compatibility
     IMAPA=IMAPAModel,
     Chronos=ChronosModel,
 )
@@ -85,7 +86,8 @@ DEFAULT_MODEL_PRIORITY = dict(
     # All local models are grouped together to make sure that joblib parallel pool is reused
     NPTS=80,
     ETS=80,
-    CrostonSBA=80,
+    CrostonSBA=80,  # Alias for backward compatibility
+    Croston=80,
     Theta=75,
     DynamicOptimizedTheta=75,
     AutoETS=70,
@@ -141,7 +143,7 @@ def get_default_hps(key):
         },
         "default": {
             "SeasonalNaive": {},
-            "CrostonSBA": {},
+            "Croston": {},
             "AutoETS": {},
             "AutoARIMA": {},
             "NPTS": {},
