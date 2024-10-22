@@ -616,6 +616,6 @@ def image_mean_std(norm_type: str):
 
 
 def silent_nltk_download(package):
-    with open(os.devnull, 'w') as devnull:
+    with open(os.devnull, "w") as devnull:
         with redirect_stdout(devnull):
             return nltk.download(package, quiet=True)
