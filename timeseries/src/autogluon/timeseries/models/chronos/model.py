@@ -55,7 +55,7 @@ MODEL_ALIASES = {
 
 class ChronosModel(AbstractTimeSeriesModel):
     """Chronos pretrained time series forecasting models, based on the original
-    `ChronosModel <https://github.com/amazon-science/chronos-forecasting>`_ implementation.
+    `ChronosModel <https://github.com/amazon-science/chronostimeseries/src/autogluon/timeseries/models/chronos/model.py-forecasting>`_ implementation.
 
     Chronos is family of pretrained models, based on the T5 family, with number of parameters ranging between 8M and 710M.
     The full collection of Chronos models is available on
@@ -230,7 +230,7 @@ class ChronosModel(AbstractTimeSeriesModel):
                 "`import torch; torch.cuda.is_available()` returns `True`."
             )
 
-        device = self.device or ("cuda" if gpu_available else "auto")
+        device = self.device or ("cuda" if gpu_available else "cpu")
 
         pipeline = OptimizedChronosPipeline.from_pretrained(
             self.model_path,
