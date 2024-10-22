@@ -324,12 +324,6 @@ class AbstractTimeSeriesModel(AbstractModel):
                 "as hyperparameters when initializing or use `hyperparameter_tune` instead."
             )
 
-    def _maybe_unscale_data(self, data: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
-        return data
-
-    def _maybe_unscale_predictions(self, predictions: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
-        return predictions
-
     def predict(
         self,
         data: Union[TimeSeriesDataFrame, Dict[str, TimeSeriesDataFrame]],
