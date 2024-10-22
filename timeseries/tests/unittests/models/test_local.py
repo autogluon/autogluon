@@ -425,16 +425,16 @@ def test_when_leading_nans_are_present_then_seasonal_naive_can_forecast(temp_mod
     "hyperparameters, expected_cls",
     [
         ({}, CrostonSBA),
-        ({"version": "SBA"}, CrostonSBA),
-        ({"version": "Classic"}, CrostonClassic),
-        ({"version": "Optimized"}, CrostonOptimized),
+        ({"variant": "SBA"}, CrostonSBA),
+        ({"variant": "Classic"}, CrostonClassic),
+        ({"variant": "Optimized"}, CrostonOptimized),
     ],
 )
-def test_when_version_hyperparameter_provided_to_croston_model_then_correct_model_class_is_created(
+def test_when_variant_hyperparameter_provided_to_croston_model_then_correct_model_class_is_created(
     hyperparameters, expected_cls
 ):
     data = DUMMY_TS_DATAFRAME.copy()
     model = CrostonModel(freq=data.freq, hyperparameters=hyperparameters)
     model.fit(train_data=data)
-    model_cls = model._get_model_type(model._local_model_args.get("version"))
+    model_cls = model._get_model_type(model._local_model_args.get("variant"))
     assert model_cls is expected_cls

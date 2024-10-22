@@ -19,11 +19,13 @@ class AbstractStatsForecastModel(AbstractLocalModel):
         local_model_args["season_length"] = seasonal_period
         return local_model_args
 
-    def _get_model_type(self, version: Optional[str] = None) -> Type:
+    def _get_model_type(self, variant: Optional[str] = None) -> Type:
         raise NotImplementedError
 
     def _get_local_model(self, local_model_args: Dict):
-        model_type = self._get_model_type(local_model_args.get("version"))
+        local_model_args = local_model_args.copy()
+        variant = local_model_args.pop("variant", None)
+        model_type = self._get_model_type(variant)
         return model_type(**local_model_args)
 
     def _get_point_forecast(
@@ -154,7 +156,7 @@ class AutoARIMAModel(AbstractProbabilisticStatsForecastModel):
         local_model_args.setdefault("allowmean", True)
         return local_model_args
 
-    def _get_model_type(self, version: Optional[str] = None):
+    def _get_model_type(self, variant: Optional[str] = None):
         from statsforecast.models import AutoARIMA
 
         return AutoARIMA
@@ -222,7 +224,7 @@ class ARIMAModel(AbstractProbabilisticStatsForecastModel):
         local_model_args.setdefault("order", (1, 1, 1))
         return local_model_args
 
-    def _get_model_type(self, version: Optional[str] = None):
+    def _get_model_type(self, variant: Optional[str] = None):
         from statsforecast.models import ARIMA
 
         return ARIMA
@@ -265,7 +267,7 @@ class AutoETSModel(AbstractProbabilisticStatsForecastModel):
         "seasonal_period",
     ]
 
-    def _get_model_type(self, version: Optional[str] = None):
+    def _get_model_type(self, variant: Optional[str] = None):
         from statsforecast.models import AutoETS
 
         return AutoETS
@@ -365,7 +367,7 @@ class DynamicOptimizedThetaModel(AbstractProbabilisticStatsForecastModel):
         "seasonal_period",
     ]
 
-    def _get_model_type(self, version: Optional[str] = None):
+    def _get_model_type(self, variant: Optional[str] = None):
         from statsforecast.models import DynamicOptimizedTheta
 
         return DynamicOptimizedTheta
@@ -409,7 +411,7 @@ class ThetaModel(AbstractProbabilisticStatsForecastModel):
         "seasonal_period",
     ]
 
-    def _get_model_type(self, version: Optional[str] = None):
+    def _get_model_type(self, variant: Optional[str] = None):
         from statsforecast.models import Theta
 
         return Theta
@@ -529,7 +531,7 @@ class AutoCESModel(AbstractProbabilisticStatsForecastModel):
         "seasonal_period",
     ]
 
-    def _get_model_type(self, version: Optional[str] = None):
+    def _get_model_type(self, variant: Optional[str] = None):
         from statsforecast.models import AutoCES
 
         return AutoCES
@@ -591,7 +593,7 @@ class ADIDAModel(AbstractStatsForecastIntermittentDemandModel):
         This significantly speeds up fitting and usually leads to no change in accuracy.
     """
 
-    def _get_model_type(self, version: Optional[str] = None):
+    def _get_model_type(self, variant: Optional[str] = None):
         from statsforecast.models import ADIDA
 
         return ADIDA
@@ -610,12 +612,12 @@ class CrostonModel(AbstractStatsForecastIntermittentDemandModel):
 
     Other Parameters
     ----------------
-    version : str, default = "SBA"
-        Version of the Croston model that is trained. Available versions:
+    variant : {"SBA", "classic", "optimized"}, default = "SBA"
+        Variant of the Croston model that is used. Available options:
 
-            - `"classic"` - version of the Croston method where the smoothing parameter is fixed to 0.1 (based on `statsforecast.models.CrostonClassic <https://nixtla.mintlify.app/statsforecast/docs/models/crostonclassic.html>`_)
-            - `"SBA"` - version of the Croston method based on Syntetos-Boylan Approximation (based on `statsforecast.models.CrostonSBA <https://nixtla.mintlify.app/statsforecast/docs/models/crostonsba.html>`_)
-            - `"optimized"` - version of the Croston method where the smoothing parameter is optimized (based on `statsforecast.models.CrostonOptimized <https://nixtla.mintlify.app/statsforecast/docs/models/crostonoptimized.html>`_)
+            - `"classic"` - variant of the Croston method where the smoothing parameter is fixed to 0.1 (based on `statsforecast.models.CrostonClassic <https://nixtla.mintlify.app/statsforecast/docs/models/crostonclassic.html>`_)
+            - `"SBA"` - variant of the Croston method based on Syntetos-Boylan Approximation (based on `statsforecast.models.CrostonSBA <https://nixtla.mintlify.app/statsforecast/docs/models/crostonsba.html>`_)
+            - `"optimized"` - variant of the Croston method where the smoothing parameter is optimized (based on `statsforecast.models.CrostonOptimized <https://nixtla.mintlify.app/statsforecast/docs/models/crostonoptimized.html>`_)
 
     n_jobs : int or float, default = 0.5
         Number of CPU cores used to fit the models in parallel.
@@ -628,28 +630,28 @@ class CrostonModel(AbstractStatsForecastIntermittentDemandModel):
     """
 
     allowed_local_model_args = [
-        "version",
+        "variant",
     ]
 
-    def _get_model_type(self, version: Optional[str] = None):
+    def _get_model_type(self, variant: Optional[str] = None):
         from statsforecast.models import CrostonClassic, CrostonOptimized, CrostonSBA
 
-        model_versions = {
+        model_variants = {
             "classic": CrostonClassic,
             "sba": CrostonSBA,
             "optimized": CrostonOptimized,
         }
 
-        if version.lower() not in model_versions:
+        if not isinstance(variant, str) or variant.lower() not in model_variants:
             raise ValueError(
-                f"Invalid model version {version}. Available Croston model versions: {list(model_versions)}"
+                f"Invalid model variant '{variant}'. Available Croston model variants: {list(model_variants)}"
             )
         else:
-            return model_versions[version.lower()]
+            return model_variants[variant.lower()]
 
     def _update_local_model_args(self, local_model_args: dict) -> dict:
         local_model_args = super()._update_local_model_args(local_model_args)
-        local_model_args.setdefault("version", "SBA")
+        local_model_args.setdefault("variant", "SBA")
         return local_model_args
 
 
@@ -679,7 +681,7 @@ class IMAPAModel(AbstractStatsForecastIntermittentDemandModel):
         This significantly speeds up fitting and usually leads to no change in accuracy.
     """
 
-    def _get_model_type(self, version: Optional[str] = None):
+    def _get_model_type(self, variant: Optional[str] = None):
         from statsforecast.models import IMAPA
 
         return IMAPA
@@ -701,7 +703,7 @@ class ZeroModel(AbstractStatsForecastIntermittentDemandModel):
         This significantly speeds up fitting and usually leads to no change in accuracy.
     """
 
-    def _get_model_type(self, version: Optional[str] = None):
+    def _get_model_type(self, variant: Optional[str] = None):
         # ZeroModel does not depend on a StatsForecast implementation
         raise NotImplementedError
 
