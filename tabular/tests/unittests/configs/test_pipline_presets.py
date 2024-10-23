@@ -49,12 +49,12 @@ def test_default_get_validation_and_stacking_method():
         # (also checks that dynamic stacking is disabled for holdout validation)
         (
             dict(num_train_rows=1_000_000),
-            dict(num_bag_folds=0, num_bag_sets=0, holdout_frac=0.01, dynamic_stacking=False, use_bag_holdout=True),
+            dict(num_bag_folds=8, num_bag_sets=1, holdout_frac=0.01, dynamic_stacking=False, use_bag_holdout=True),
         ),
         # HPO On check
         (
             dict(num_train_rows=1_000_000, hpo_enabled=True),
-            dict(num_bag_folds=0, num_bag_sets=0, holdout_frac=0.02, dynamic_stacking=False, use_bag_holdout=True),
+            dict(num_bag_folds=8, num_bag_sets=1, holdout_frac=0.02, dynamic_stacking=False, use_bag_holdout=True),
         ),
         # No dynamic stacking, auto_stack check
         (dict(num_train_rows=749, dynamic_stacking=False), dict(dynamic_stacking=False, num_stack_levels=0)),
