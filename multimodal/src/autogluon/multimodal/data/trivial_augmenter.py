@@ -206,7 +206,7 @@ def set_image_augmentation_space():
 
 def download_nltk():
     from . import silent_nltk_download
-    
+
     try:
         nltk.data.find("tagger/averaged_perceptron_tagger")
     except LookupError:
