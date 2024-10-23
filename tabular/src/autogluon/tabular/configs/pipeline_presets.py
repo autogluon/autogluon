@@ -27,12 +27,8 @@ def _get_validation_preset(num_train_rows: int, hpo_enabled: bool) -> dict[str, 
     elif num_train_rows < 10_000:
         num_bag_sets = 2
     elif num_train_rows < USE_BAG_HOLDOUT_AUTO_THRESHOLD:
-        # TODO(improvement): go towards 4-fold cv for more than 100k rows?
+        # TODO(improvement): go towards lower number of folds cv for more than 100k rows?
         pass
-    else:
-        # Only use holdout validation afterward
-        num_bag_folds = 0
-        num_bag_sets = 0
 
     return dict(
         num_bag_sets=num_bag_sets,
