@@ -24,7 +24,7 @@ class TestInferProblemType(unittest.TestCase):
 
     def test_infer_problem_type_ninf(self):
         with self.assertRaises(ValueError):
-            infer_problem_type(pd.Series([np.NINF]))
+            infer_problem_type(pd.Series([-np.inf]))
 
     def test_infer_problem_type_binary(self):
         inferred_problem_type = infer_problem_type(pd.Series([-1, -1, 99, -1, -1, 99]))
