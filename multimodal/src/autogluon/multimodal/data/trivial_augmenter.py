@@ -11,7 +11,7 @@ import nltk
 from PIL import Image, ImageEnhance, ImageOps
 
 from ..constants import IMAGE, TEXT
-from .utils import silent_nltk_download
+from . import silent_nltk_download
 
 logger = logging.getLogger(__name__)
 

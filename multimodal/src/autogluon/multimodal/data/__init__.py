@@ -21,3 +21,4 @@ from .process_ner import NerProcessor
 from .process_numerical import NumericalProcessor
 from .process_semantic_seg_img import SemanticSegImageProcessor
 from .process_text import TextProcessor
+from .utils import silent_nltk_download
