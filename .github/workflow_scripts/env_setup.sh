@@ -29,8 +29,9 @@ function setup_hf_model_mirror {
 }
 
 function install_local_packages {
+    pip install --upgrade uv 
     while(($#)) ; do
-        python -m pip install --upgrade -e $1
+        uv pip install -e $1 --no-cache-dir
         shift
     done
 }
