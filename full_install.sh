@@ -9,11 +9,4 @@ then
 fi
 
 # Use uv to install packages
-uv pip install -e common/[tests]
-uv pip install -e core/[all,tests]
-uv pip install -e features/
-uv pip install -e tabular/[all,tests]
-uv pip install -e multimodal/[tests]
-uv pip install -e timeseries/[all,tests]
-uv pip install -e eda/
-uv pip install -e autogluon/
+uv pip install -e common/[tests] core/[all,tests] features/ tabular/[all,tests] multimodal/[tests] timeseries/[all,tests] eda/ autogluon/
