@@ -3,9 +3,9 @@ import codecs
 import copy
 import re
 import warnings
-from io import BytesIO
 from typing import Callable, Dict, Iterable, List, Optional, Tuple, Union
 
+import nltk
 import numpy as np
 import pandas as pd
 import PIL
@@ -25,8 +25,6 @@ from ..constants import (
     CLIP_IMAGE_STD,
     IDENTIFIER,
     IMAGE,
-    IMAGE_BYTEARRAY,
-    IMAGE_PATH,
     MMDET_IMAGE,
     MMLAB_MODELS,
 )
@@ -613,3 +611,16 @@ def image_mean_std(norm_type: str):
         return CLIP_IMAGE_MEAN, CLIP_IMAGE_STD
     else:
         raise ValueError(f"unknown image normalization: {norm_type}")
+
+
+def silent_nltk_download(package):
+    import sys
+
+    is_jupyter = "ipykernel" in sys.modules
+    if is_jupyter:
+        from IPython.utils.io import capture_output
+
+        with capture_output():
+            return nltk.download(package, quiet=True)
+    else:
+        return nltk.download(package, quiet=True)

@@ -10,7 +10,7 @@ import random
 import nltk
 from PIL import Image, ImageEnhance, ImageOps
 
-from ..constants import AUTOMM, IMAGE, TEXT
+from ..constants import IMAGE, TEXT
 
 logger = logging.getLogger(__name__)
 
@@ -205,18 +205,20 @@ def set_image_augmentation_space():
 
 
 def download_nltk():
+    from . import silent_nltk_download
+
     try:
         nltk.data.find("tagger/averaged_perceptron_tagger")
     except LookupError:
-        nltk.download("averaged_perceptron_tagger", quiet=True)
+        silent_nltk_download("averaged_perceptron_tagger")
     try:
         nltk.data.find("corpora/wordnet")
     except LookupError:
-        nltk.download("wordnet", quiet=True)
+        silent_nltk_download("wordnet")
     try:
         nltk.data.find("corpora/omw-1.4")
     except LookupError:
-        nltk.download("omw-1.4", quiet=True)
+        silent_nltk_download("omw-1.4")
 
 
 def set_text_augmentation_space(space):
