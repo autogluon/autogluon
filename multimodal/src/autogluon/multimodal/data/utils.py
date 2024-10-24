@@ -616,7 +616,7 @@ def image_mean_std(norm_type: str):
 def silent_nltk_download(package):
     import sys
 
-    is_jupyter = 'ipykernel' in sys.modules
+    is_jupyter = "ipykernel" in sys.modules
     if is_jupyter:
         from IPython.utils.io import capture_output
 
