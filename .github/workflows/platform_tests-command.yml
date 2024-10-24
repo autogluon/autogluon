@@ -33,7 +33,7 @@ jobs:
         if: (github.event_name == 'workflow_dispatch')
         uses: peter-evans/create-or-update-comment@v4
         with:
-          token: ${{ secrets.PAT }}
+          token: ${{ secrets.CICD_PAT }}
           repository: ${{ github.event.inputs.repository }}
           comment-id: ${{ github.event.inputs.comment-id }}
           body: |

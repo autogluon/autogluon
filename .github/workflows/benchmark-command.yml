@@ -79,7 +79,7 @@ jobs:
         if: (github.event_name == 'workflow_dispatch')
         uses: peter-evans/create-or-update-comment@v4
         with:
-          token: ${{ secrets.PAT }}
+          token: ${{ secrets.CICD_PAT }}
           repository: ${{ github.event.inputs.repository }}
           comment-id: ${{ github.event.inputs.comment-id }}
           body: |
@@ -92,11 +92,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Setup Env Vars
         uses: ./.github/actions/setup-env-vars
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmarkConfig
           role-duration-seconds: 3600
@@ -133,22 +133,22 @@ jobs:
           swap-storage: true
       - name: Checkout repository for PR
         if: (github.event_name == 'workflow_dispatch')
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.pr-sha }}
       - name: Checkout repository for nightly test
         if: (github.event_name == 'schedule')
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Setup Python
-        uses: actions/setup-python@v1
+        uses: actions/setup-python@v4
         with:
           python-version: '3.9'
       - name: Setup npm
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 'latest'
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
           role-duration-seconds: 36000
@@ -168,12 +168,12 @@ jobs:
           npm install -g aws-cdk
           /bin/bash ./.github/workflow_scripts/run_benchmark.sh ${{ github.event.inputs.module }} ${{ github.event.inputs.preset }} ${{ github.event.inputs.benchmark }} ${{ github.event.inputs.time_limit }} ${{ steps.parse_fork_info.outputs.FORK_BRANCH }} ${{ github.sha }}
       - name: Upload website.txt
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: dashboard-website
           path: ./website.txt
       - name: Upload final_eval.txt
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: evaluation-results
           path: ./final_eval.txt       
@@ -186,7 +186,7 @@ jobs:
         shell: bash
     steps:
       - name: Download final_eval.txt
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: evaluation-results
       - name: get evaluation results
@@ -197,12 +197,12 @@ jobs:
       - name: Comment Evaluation Result of PR with Master
         uses: peter-evans/create-or-update-comment@v4
         with:
-          token: ${{ secrets.PAT }}
+          token: ${{ secrets.CICD_PAT }}
           repository: ${{ github.event.inputs.repository }}
           comment-id: ${{ github.event.inputs.comment-id }}
           body: ${{ steps.eval_result.outputs.body }}
       - name: Download website.txt
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: dashboard-website
       - name: get dashboard website
@@ -213,7 +213,7 @@ jobs:
       - name: Comment Dashboard Website Link on PR
         uses: peter-evans/create-or-update-comment@v4
         with:
-          token: ${{ secrets.PAT }}
+          token: ${{ secrets.CICD_PAT }}
           repository: ${{ github.event.inputs.repository }}
           comment-id: ${{ github.event.inputs.comment-id }}
           body: ${{ steps.website.outputs.body }}
