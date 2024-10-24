@@ -15,7 +15,7 @@ from autogluon.core.hpo.executors import HpoExecutor, RayHpoExecutor
 from autogluon.core.models import AbstractModel
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
-from autogluon.timeseries.regressor import CovariatesRegressor
+from autogluon.timeseries.regressor import CovariateRegressor
 from autogluon.timeseries.transforms import LocalTargetScaler, get_target_scaler_from_name
 from autogluon.timeseries.utils.features import CovariateMetadata
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
@@ -261,7 +261,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         if self.covariates_regressor is not None:
             train_data = self.covariates_regressor.fit_transform(
                 train_data,
-                time_limit=time_limit * 0.5 if time_limit is not None else time_limit,
+                time_limit=0.5 * time_limit if time_limit is not None else None,
             )
 
         train_data = self.preprocess(train_data, is_train=True)
@@ -290,7 +290,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         else:
             return None
 
-    def _create_covariates_regressor(self) -> Optional[CovariatesRegressor]:
+    def _create_covariates_regressor(self) -> Optional[CovariateRegressor]:
         """Create a CovariatesRegressor object based on the value of the `covariates_regressor` hyperparameter."""
         covariates_regressor = self._get_model_params().get("covariates_regressor")
         if covariates_regressor is not None:
@@ -301,9 +301,13 @@ class AbstractTimeSeriesModel(AbstractModel):
                 return None
             else:
                 if isinstance(covariates_regressor, str):
-                    return CovariatesRegressor(covariates_regressor, target=self.target, metadata=self.metadata)
-                elif isinstance(covariates_regressor, CovariatesRegressor):
-                    logger.warning("Using a custom CovariatesRegressor object is experimental functionality!")
+                    return CovariateRegressor(covariates_regressor, target=self.target, metadata=self.metadata)
+                elif isinstance(covariates_regressor, CovariateRegressor):
+                    logger.warning(
+                        "Using a custom CovariatesRegressor object is experimental functionality that may break in the future!"
+                    )
+                    covariates_regressor.target = self.target
+                    covariates_regressor.metadata = self.metadata
                     return covariates_regressor
                 else:
                     raise ValueError(
@@ -368,15 +372,12 @@ class AbstractTimeSeriesModel(AbstractModel):
         if self.target_scaler is not None:
             data = self.target_scaler.fit_transform(data)
         if self.covariates_regressor is not None:
-            if self.covariates_regressor.refit_during_predict:
-                data = self.covariates_regressor.fit_transform(data)
-            else:
-                data = self.covariates_regressor.transform(data)
+            data = self.covariates_regressor.fit_transform(data)
 
         data = self.preprocess(data, is_train=False)
         known_covariates = self.preprocess_known_covariates(known_covariates)
 
-        # FIXME: Avoid copying covariates_regressor across processes if self._predict uses joblib.
+        # FIXME: Set self.covariates_regressor=None so to avoid copying it across processes during _predict
         # FIXME: The clean solution is to convert all methods executed in parallel to @classmethod
         covariates_regressor = self.covariates_regressor
         self.covariates_regressor = None

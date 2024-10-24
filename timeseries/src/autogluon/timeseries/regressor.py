@@ -9,7 +9,7 @@ from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSer
 from autogluon.timeseries.utils.features import CovariateMetadata
 
 
-class CovariatesRegressor:
+class CovariateRegressor:
     """Predicts target values from the covariates for the same observation.
 
     The model construct the feature matrix using known_covariates and static_features.
@@ -20,20 +20,20 @@ class CovariatesRegressor:
         Name of the tabular regression model. See `autogluon.tabular.trainer.model_presets.presets.MODEL_TYPES` for the
         list of available models.
     model_hyperparameters : dict or None
-        Hyperparameters dict passed to the tabular regression model.
-    tabular_eval_metric : str
+        Hyperparameters passed to the tabular regression model.
+    eval_metric : str
         Metric provided as `eval_metric` to the tabular regression model. Must be compatible with `problem_type="regression"`.
     refit_during_predict : bool
-        If True, the model should be re-trained at prediction time. If False, the model will only be trained during `fit`.
-        Note that this attribute does not affect the internals of the CovariatesRegressor. Rather, it's checked outside
-        by the AbstractTimeSeriesModel.
+        If True, the model will be re-trained every time `fit_transform` is called. If False, the model will only be
+        trained the first time that `fit_transform` is called, and future calls to `fit_transform` will only perform a
+        `transform`.
     max_num_samples : int or None
         If not None, training dataset passed to regression model will contain at most this many rows.
     metadata : CovariateMetadata
         Metadata object describing the covariates available in the dataset.
     target : str
         Name of the target column.
-    validation_frac : float
+    validation_frac : float, optional
         Fraction of observations that are reserved as the validation set during training (starting from the end of each
         time series).
     """
@@ -42,12 +42,12 @@ class CovariatesRegressor:
         self,
         model_name: str = "GBM",
         model_hyperparameters: Optional[Dict[str, Any]] = None,
-        tabular_eval_metric: str = "mean_absolute_error",
+        eval_metric: str = "mean_absolute_error",
         refit_during_predict: bool = False,
         max_num_samples: Optional[int] = 500_000,
         metadata: Optional[CovariateMetadata] = None,
         target: str = "target",
-        validation_fraction: float = 0.1,
+        validation_fraction: Optional[float] = 0.1,
     ):
         if model_name not in TABULAR_MODEL_TYPES:
             raise ValueError(
@@ -58,13 +58,16 @@ class CovariatesRegressor:
         self.model_name = model_name
         self.model_hyperparameters = model_hyperparameters or {}
         self.refit_during_predict = refit_during_predict
-        self.tabular_eval_metric = tabular_eval_metric
+        self.tabular_eval_metric = eval_metric
         self.max_num_samples = max_num_samples
         self.validation_fraction = validation_fraction
         self.model: Optional[AbstractModel] = None
         self.metadata = metadata or CovariateMetadata()
 
-    def fit(self, data: TimeSeriesDataFrame, time_limit: Optional[float] = None, **kwargs) -> "CovariatesRegressor":
+    def is_fit(self) -> bool:
+        return self.model is not None
+
+    def fit(self, data: TimeSeriesDataFrame, time_limit: Optional[float] = None, **kwargs) -> "CovariateRegressor":
         """Fit the tabular regressor on the target column using covariates as features."""
         tabular_df = self._get_tabular_df(data, static_features=data.static_features)
         tabular_df = tabular_df.query(f"{self.target}.notnull()")
@@ -102,7 +105,9 @@ class CovariatesRegressor:
     def fit_transform(
         self, data: TimeSeriesDataFrame, time_limit: Optional[float] = None, **kwargs
     ) -> TimeSeriesDataFrame:
-        return self.fit(data=data, time_limit=time_limit, **kwargs).transform(data=data)
+        if not self.is_fit() or self.refit_during_predict:
+            self.fit(data=data, time_limit=time_limit, **kwargs)
+        return self.transform(data=data)
 
     def inverse_transform(
         self,
@@ -123,7 +128,7 @@ class CovariatesRegressor:
         self, data: TimeSeriesDataFrame, static_features: Optional[pd.DataFrame] = None
     ) -> pd.DataFrame:
         """Construct a tabular dataframe from known covariates and static features."""
-        tabular_df = pd.DataFrame(data).reset_index().drop(columns=[TIMESTAMP] + self.metadata.past_covariates)
+        tabular_df = pd.DataFrame(data).reset_index()[[ITEMID] + self.metadata.known_covariates]
         if static_features is not None:
             tabular_df = pd.merge(tabular_df, static_features, on=ITEMID)
         return tabular_df
