@@ -233,6 +233,8 @@ def compute_score(
     metric = get_metric(metric)
     if metric.name in [ROC_AUC, AVERAGE_PRECISION]:
         return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED_PROB][:, pos_label])
+    elif metric.name in [LOG_LOSS]:
+        return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED_PROB])
     elif metric.name in [F1]:  # only for binary classification
         return f1_score(metric_data[Y_TRUE], metric_data[Y_PRED], pos_label=pos_label)
     else:
