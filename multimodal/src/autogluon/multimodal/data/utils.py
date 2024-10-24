@@ -1,10 +1,8 @@
 import ast
 import codecs
 import copy
-import os
 import re
 import warnings
-from contextlib import redirect_stdout
 from typing import Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 import nltk
@@ -616,6 +614,7 @@ def image_mean_std(norm_type: str):
 
 
 def silent_nltk_download(package):
-    with open(os.devnull, "w") as devnull:
-        with redirect_stdout(devnull):
-            return nltk.download(package, quiet=True)
+    from IPython.utils.io import capture_output
+    
+    with capture_output():
+        return nltk.download(package, quiet=True)
