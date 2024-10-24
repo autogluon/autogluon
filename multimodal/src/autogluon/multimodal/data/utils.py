@@ -615,6 +615,6 @@ def image_mean_std(norm_type: str):
 
 def silent_nltk_download(package):
     from IPython.utils.io import capture_output
-    
+
     with capture_output():
         return nltk.download(package, quiet=True)
