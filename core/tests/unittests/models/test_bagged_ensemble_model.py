@@ -14,7 +14,7 @@ def test_generate_fold_configs():
     n_repeat_start = 2
     n_repeats = 5
 
-    cv_splitter = CVSplitter(n_splits=k_fold, n_repeats=n_repeats, stratified=True, random_state=0)
+    cv_splitter = CVSplitter(n_splits=k_fold, n_repeats=n_repeats, stratify=True, random_state=0)
 
     fold_fit_args_list, n_repeats_started, n_repeats_finished = BaggedEnsembleModel._generate_fold_configs(
         X=X,
