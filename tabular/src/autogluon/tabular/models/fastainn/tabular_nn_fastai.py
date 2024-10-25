@@ -152,6 +152,12 @@ class NNFastAiTabularModel(AbstractModel):
             self.cont_columns = self._feature_metadata.get_features(valid_raw_types=[R_INT, R_FLOAT, R_DATETIME])
             self.cat_columns = self._feature_metadata.get_features(valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL])
             if self.cont_columns:
+                # Drop columns that have less than 2 unique values (ignoring NaNs)
+                # If these columns are kept, it will raise an exception when trying to normalize.
+                # TODO: Can instead treat them as boolean if 1 unique + NaN
+                unique_vals = X[self.cont_columns].nunique()
+                self.cont_columns = [c for c in self.cont_columns if unique_vals[c] > 1]
+            if self.cont_columns:
                 self._cont_normalization = (np.array(X[self.cont_columns].mean()), np.array(X[self.cont_columns].std()))
 
             num_cat_cols_og = len(self.cat_columns)
