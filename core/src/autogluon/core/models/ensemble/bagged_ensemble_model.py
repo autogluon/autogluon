@@ -18,7 +18,7 @@ from autogluon.common.utils.distribute_utils import DistributedContext
 from autogluon.common.utils.log_utils import DuplicateFilter
 from autogluon.common.utils.try_import import try_import_ray
 
-from ...constants import MULTICLASS, QUANTILE, REFIT_FULL_SUFFIX, REGRESSION, SOFTCLASS
+from ...constants import BINARY, MULTICLASS, QUANTILE, REFIT_FULL_SUFFIX, REGRESSION, SOFTCLASS
 from ...hpo.exceptions import EmptySearchSpace
 from ...pseudolabeling.pseudolabeling import assert_pseudo_column_match
 from ...utils.exceptions import TimeLimitExceeded
@@ -106,6 +106,9 @@ class BaggedEnsembleModel(AbstractModel):
             # 'refit_folds': False,  # [Advanced, Experimental] Whether to refit bags immediately to a refit_full model in a single .fit call.
             # 'num_folds' None,  # Number of bagged folds per set. If specified, overrides .fit `k_fold` value.
             # 'max_sets': None,  # Maximum bagged repeats to allow, if specified, will set `self.can_fit()` to `self._n_repeats_finished < max_repeats`
+            "stratify": "auto",
+            "bin": "auto",
+            "n_bins": None,
         }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
@@ -125,11 +128,19 @@ class BaggedEnsembleModel(AbstractModel):
     def can_infer(self):
         return self.is_fit() and self.params.get("save_bag_folds", True)
 
-    def is_stratified(self):
-        if self.problem_type in [REGRESSION, QUANTILE, SOFTCLASS]:
-            return False
+    def is_stratified(self) -> bool:
+        stratify = self.params.get("stratify", "auto")
+        if isinstance(stratify, str) and stratify == "auto":
+            return self.problem_type in [BINARY, MULTICLASS, REGRESSION, QUANTILE]
         else:
-            return True
+            return stratify
+
+    def is_binned(self) -> bool:
+        bin = self.params.get("bin", "auto")
+        if isinstance(bin, str) and bin == "auto":
+            return self.problem_type in [REGRESSION, QUANTILE]
+        else:
+            return bin
 
     def is_fit(self) -> bool:
         return self.n_children != 0
@@ -188,8 +199,16 @@ class BaggedEnsembleModel(AbstractModel):
         else:
             return X
 
-    def _get_cv_splitter(self, n_splits, n_repeats, groups=None):
-        return CVSplitter(n_splits=n_splits, n_repeats=n_repeats, groups=groups, stratified=self.is_stratified(), random_state=self._random_state)
+    def _get_cv_splitter(self, n_splits: int, n_repeats: int, groups=None) -> CVSplitter:
+        return CVSplitter(
+            n_splits=n_splits,
+            n_repeats=n_repeats,
+            groups=groups,
+            stratify=self.is_stratified(),
+            bin=self.is_binned(),
+            n_bins=self.params.get("n_bins", None),
+            random_state=self._random_state,
+        )
 
     def _fit(
         self,
