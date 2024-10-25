@@ -530,6 +530,7 @@ def generate_train_test_split(
     rare_indices = None
     if stratify is not None:
         cls_counts = y.value_counts()
+        cls_counts = cls_counts[cls_counts > 0]  # > 0 to avoid error if missing class when dtype is categorical.
         cls_counts_invalid = cls_counts[cls_counts < min_cls_count_train]
 
         if len(cls_counts_invalid) > 0:
@@ -573,7 +574,9 @@ def generate_train_test_split(
         y_train = pd.concat([y_train, y.loc[rare_indices]])
 
     if problem_type is not None and problem_type in [BINARY, MULTICLASS]:
-        class_counts_dict_orig = y.value_counts().to_dict()
+        class_counts_dict_orig = y.value_counts()
+        class_counts_dict_orig = class_counts_dict_orig[class_counts_dict_orig > 0]
+        class_counts_dict_orig = class_counts_dict_orig.to_dict()
         class_counts_dict = y_train.value_counts().to_dict()
         class_counts_dict_test = y_test.value_counts().to_dict()
 
@@ -728,7 +731,7 @@ def extract_column(X, col_name):
     return X, w
 
 
-def compute_weighted_metric(y, y_pred, metric, weights, weight_evaluation=None, **kwargs) -> float:
+def compute_weighted_metric(y: np.ndarray, y_pred: np.ndarray, metric: Scorer, weights: np.ndarray, weight_evaluation: bool = None, **kwargs) -> float:
     """Report weighted metric if: weights is not None, weight_evaluation=True, and the given metric supports sample weights.
     If weight_evaluation=None, it will be set to False if weights=None, True otherwise.
     """
