@@ -75,4 +75,6 @@ fi
 
 # Write docs to s3
 write_to_s3 $BUCKET $LOCAL_DOC_PATH $S3_PATH
+echo "Current Branch Status..."
+git branch
 

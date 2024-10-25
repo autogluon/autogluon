@@ -1,3 +1,6 @@
+#!/bin/bash
+set -x
+
 function build_doc {
     DOC="$1"
     BRANCH="$2"
@@ -50,6 +53,9 @@ function build_doc {
 
     write_to_s3 $BUCKET $LOCAL_DOC_PATH $S3_DOC_PATH
     write_to_s3 $BUCKET $LOCAL_IMG_PATH $S3_IMG_PATH
+
+    echo "Current Branch Status..."
+    git branch
 
     cd ..
 }
