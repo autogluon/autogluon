@@ -11,24 +11,14 @@ USE_BAG_HOLDOUT_AUTO_THRESHOLD = 1_000_000
 def _get_validation_preset(num_train_rows: int, hpo_enabled: bool) -> dict[str, int | float]:
     """Recommended validation preset manually defined by the AutoGluon developers."""
 
-    # Default recommendation
-    num_bag_folds = 8  # due to 8 cores per CPU being very common.
-    num_bag_sets = 1
+    # -- Default recommendation
+    #  max 8 due to 8 cores per CPU being very common.
+    #  down to 5 folds for small datasets to have enough samples for a representative validation set.
+    num_bag_folds = min(8, max(5, math.floor(num_train_rows / 10)))
 
+    num_bag_sets = 1  # More repeats do not seem to help due to overfitting on val data.
     use_bag_holdout = num_train_rows >= USE_BAG_HOLDOUT_AUTO_THRESHOLD
     holdout_frac = round(default_holdout_frac(num_train_rows=num_train_rows, hyperparameter_tune=hpo_enabled), 4)
-
-    # Changes to avoid overfitting
-    if num_train_rows <= 1_000:
-        num_bag_folds = min(8, max(4, math.floor(num_train_rows / 100)))
-        num_bag_sets = min(10, 4 + (2 * (8 - num_bag_folds)))
-    elif num_train_rows < 5_000:
-        num_bag_sets = 4
-    elif num_train_rows < 10_000:
-        num_bag_sets = 2
-    elif num_train_rows < USE_BAG_HOLDOUT_AUTO_THRESHOLD:
-        # TODO(improvement): go towards lower number of folds cv for more than 100k rows?
-        pass
 
     return dict(
         num_bag_sets=num_bag_sets,
@@ -45,13 +35,8 @@ def _get_validation_preset(num_train_rows: int, hpo_enabled: bool) -> dict[str, 
 #       num_features: The number of features in the dataset.
 #       num_models: The number of models in the portfolio to fit.
 #       time_limit: The time limit for fitting models.
-#   Pointer for more advanced heuristic:
-#       -> very large num features -> make less folds
-#       -> very large num models -> make more folds
-#       -> very small num models -> refit
-#       -> not enough time -> no bagging
 #   Pointer for non-heuristic approach:
-#       -> meta-learning via TabRepo 3.0 like Auto-Sklearn 2.0
+#       -> meta-learning like Auto-Sklearn 2.0, needs a lot of metadata
 def get_validation_and_stacking_method(
     # Validation parameters
     num_bag_folds: int | None,

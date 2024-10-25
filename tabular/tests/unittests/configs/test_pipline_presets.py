@@ -41,24 +41,28 @@ def test_default_get_validation_and_stacking_method():
     "metadata_and_expected_result",
     [
         # Reaction to dataset size checks
-        (dict(num_train_rows=400), dict(num_bag_folds=4, num_bag_sets=10)),
-        (dict(num_train_rows=700), dict(num_bag_folds=7, num_bag_sets=6)),
-        (dict(num_train_rows=4_999), dict(num_bag_folds=8, num_bag_sets=4, holdout_frac=0.1)),
-        (dict(num_train_rows=9_999), dict(num_bag_folds=8, num_bag_sets=2, holdout_frac=0.1)),
-        (dict(num_train_rows=10_000), dict(num_bag_folds=8, num_bag_sets=1, holdout_frac=0.1)),
+        (dict(num_train_rows=40), dict(num_bag_folds=5)),
+        (dict(num_train_rows=70), dict(num_bag_folds=7)),
+        (dict(num_train_rows=10_000), dict(holdout_frac=0.1)),
         # (also checks that dynamic stacking is disabled for holdout validation)
         (
             dict(num_train_rows=1_000_000),
-            dict(num_bag_folds=8, num_bag_sets=1, holdout_frac=0.01, dynamic_stacking=False, use_bag_holdout=True),
+            dict(holdout_frac=0.01, dynamic_stacking=False, use_bag_holdout=True),
         ),
         # HPO On check
         (
             dict(num_train_rows=1_000_000, hpo_enabled=True),
-            dict(num_bag_folds=8, num_bag_sets=1, holdout_frac=0.02, dynamic_stacking=False, use_bag_holdout=True),
+            dict(holdout_frac=0.02, dynamic_stacking=False, use_bag_holdout=True),
         ),
         # No dynamic stacking, auto_stack check
-        (dict(num_train_rows=749, dynamic_stacking=False), dict(dynamic_stacking=False, num_stack_levels=0)),
-        (dict(num_train_rows=750, dynamic_stacking=False), dict(dynamic_stacking=False, num_stack_levels=1)),
+        (
+            dict(num_train_rows=749, dynamic_stacking=False),
+            dict(dynamic_stacking=False, num_stack_levels=0),
+        ),
+        (
+            dict(num_train_rows=750, dynamic_stacking=False),
+            dict(dynamic_stacking=False, num_stack_levels=1),
+        ),
         (
             dict(num_train_rows=750, dynamic_stacking=False, problem_type=BINARY),
             dict(dynamic_stacking=False, num_stack_levels=0),
@@ -77,8 +81,8 @@ def test_auto_stack_get_validation_and_stacking_method(metadata_and_expected_res
     metadata["dynamic_stacking"] = metadata.get("dynamic_stacking", None)
     metadata["use_bag_holdout"] = metadata.get("use_bag_holdout", None)
 
-    num_bag_folds = expected_result.get("num_bag_folds", 7)
-    num_bag_sets = expected_result.get("num_bag_sets", 6)
+    num_bag_folds = expected_result.get("num_bag_folds", 8)
+    num_bag_sets = expected_result.get("num_bag_sets", 1)
     num_stack_levels = expected_result.get("num_stack_levels", 1)
     dynamic_stacking = expected_result.get("dynamic_stacking", True)
     use_bag_holdout = expected_result.get("use_bag_holdout", False)
