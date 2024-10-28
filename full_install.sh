@@ -9,4 +9,9 @@ then
 fi
 
 # Use uv to install packages
-python -m uv pip install --refresh -e common/[tests] -e core/[all,tests] -e features/ -e tabular/[all,tests] -e multimodal/[tests] -e timeseries/[all,tests] -e eda/ -e autogluon/
+
+# install common first to avoid bugs with parallelization
+python -m uv pip install --refresh -e common/[tests]
+
+# install the rest
+python -m uv pip install -e core/[all,tests] -e features/ -e tabular/[all,tests] -e multimodal/[tests] -e timeseries/[all,tests] -e eda/ -e autogluon/
