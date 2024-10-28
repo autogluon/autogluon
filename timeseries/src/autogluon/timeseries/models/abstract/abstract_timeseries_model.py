@@ -257,9 +257,9 @@ class AbstractTimeSeriesModel(AbstractModel):
         if self.target_scaler is not None:
             train_data = self.target_scaler.fit_transform(train_data)
 
-        self.covariates_regressor = self._create_covariates_regressor()
-        if self.covariates_regressor is not None:
-            train_data = self.covariates_regressor.fit_transform(
+        self.covariate_regressor = self._create_covariate_regressor()
+        if self.covariate_regressor is not None:
+            train_data = self.covariate_regressor.fit_transform(
                 train_data,
                 time_limit=0.5 * time_limit if time_limit is not None else None,
             )
@@ -268,8 +268,8 @@ class AbstractTimeSeriesModel(AbstractModel):
         if self._get_tags()["can_use_val_data"] and val_data is not None:
             if self.target_scaler is not None:
                 val_data = self.target_scaler.transform(val_data)
-            if self.covariates_regressor is not None:
-                val_data = self.covariates_regressor.transform(val_data)
+            if self.covariate_regressor is not None:
+                val_data = self.covariate_regressor.transform(val_data)
             val_data = self.preprocess(val_data, is_train=False)
 
         if time_limit is not None:
@@ -279,7 +279,7 @@ class AbstractTimeSeriesModel(AbstractModel):
     @property
     def allowed_hyperparameters(self) -> List[str]:
         """List of hyperparameters allowed by the model."""
-        return ["target_scaler", "covariates_regressor"]
+        return ["target_scaler", "covariate_regressor"]
 
     def _create_target_scaler(self) -> Optional[LocalTargetScaler]:
         """Create a LocalTargetScaler object based on the value of the `target_scaler` hyperparameter."""
@@ -290,28 +290,28 @@ class AbstractTimeSeriesModel(AbstractModel):
         else:
             return None
 
-    def _create_covariates_regressor(self) -> Optional[CovariateRegressor]:
-        """Create a CovariatesRegressor object based on the value of the `covariates_regressor` hyperparameter."""
-        covariates_regressor = self._get_model_params().get("covariates_regressor")
-        if covariates_regressor is not None:
+    def _create_covariate_regressor(self) -> Optional[CovariateRegressor]:
+        """Create a CovariateRegressor object based on the value of the `covariate_regressor` hyperparameter."""
+        covariate_regressor = self._get_model_params().get("covariate_regressor")
+        if covariate_regressor is not None:
             if len(self.metadata.known_covariates + self.metadata.static_features) == 0:
                 logger.debug(
-                    "Skipping CovariatesRegressor since the dataset contains no covariates or static features."
+                    "Skipping CovariateRegressor since the dataset contains no covariates or static features."
                 )
                 return None
             else:
-                if isinstance(covariates_regressor, str):
-                    return CovariateRegressor(covariates_regressor, target=self.target, metadata=self.metadata)
-                elif isinstance(covariates_regressor, CovariateRegressor):
+                if isinstance(covariate_regressor, str):
+                    return CovariateRegressor(covariate_regressor, target=self.target, metadata=self.metadata)
+                elif isinstance(covariate_regressor, CovariateRegressor):
                     logger.warning(
-                        "Using a custom CovariatesRegressor object is experimental functionality that may break in the future!"
+                        "Using a custom CovariateRegressor object is experimental functionality that may break in the future!"
                     )
-                    covariates_regressor.target = self.target
-                    covariates_regressor.metadata = self.metadata
-                    return covariates_regressor
+                    covariate_regressor.target = self.target
+                    covariate_regressor.metadata = self.metadata
+                    return covariate_regressor
                 else:
                     raise ValueError(
-                        f"Invalid value for covariates_regressor {covariates_regressor} of type {type(covariates_regressor)}"
+                        f"Invalid value for covariate_regressor {covariate_regressor} of type {type(covariate_regressor)}"
                     )
         else:
             return None
@@ -371,18 +371,18 @@ class AbstractTimeSeriesModel(AbstractModel):
         """
         if self.target_scaler is not None:
             data = self.target_scaler.fit_transform(data)
-        if self.covariates_regressor is not None:
-            data = self.covariates_regressor.fit_transform(data)
+        if self.covariate_regressor is not None:
+            data = self.covariate_regressor.fit_transform(data)
 
         data = self.preprocess(data, is_train=False)
         known_covariates = self.preprocess_known_covariates(known_covariates)
 
-        # FIXME: Set self.covariates_regressor=None so to avoid copying it across processes during _predict
+        # FIXME: Set self.covariate_regressor=None so to avoid copying it across processes during _predict
         # FIXME: The clean solution is to convert all methods executed in parallel to @classmethod
-        covariates_regressor = self.covariates_regressor
-        self.covariates_regressor = None
+        covariate_regressor = self.covariate_regressor
+        self.covariate_regressor = None
         predictions = self._predict(data=data, known_covariates=known_covariates, **kwargs)
-        self.covariates_regressor = covariates_regressor
+        self.covariate_regressor = covariate_regressor
 
         # "0.5" might be missing from the quantiles if self is a wrapper (MultiWindowBacktestingModel or ensemble)
         if "0.5" in predictions.columns:
@@ -391,14 +391,14 @@ class AbstractTimeSeriesModel(AbstractModel):
             if self.must_drop_median:
                 predictions = predictions.drop("0.5", axis=1)
 
-        if self.covariates_regressor is not None:
+        if self.covariate_regressor is not None:
             if known_covariates is None:
                 forecast_index = get_forecast_horizon_index_ts_dataframe(
                     data, prediction_length=self.prediction_length, freq=self.freq
                 )
                 known_covariates = pd.DataFrame(index=forecast_index, dtype="float32")
 
-            predictions = self.covariates_regressor.inverse_transform(
+            predictions = self.covariate_regressor.inverse_transform(
                 predictions,
                 known_covariates=known_covariates,
                 static_features=data.static_features,

@@ -19,6 +19,7 @@ from autogluon.timeseries.metrics import AVAILABLE_METRICS
 from autogluon.timeseries.models import DeepARModel, ETSModel
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
+from autogluon.timeseries.regressor import CovariateRegressor
 
 from ..common import (
     DUMMY_TS_DATAFRAME,
@@ -42,17 +43,6 @@ TESTABLE_MODELS = (
 )
 
 TESTABLE_PREDICTION_LENGTHS = [1, 5]
-
-
-@pytest.fixture(scope="module")
-def dummy_hyperparameters(hf_model_path):
-    return {
-        "epochs": 1,
-        "num_batches_per_epoch": 1,
-        "n_jobs": 1,
-        "use_fallback_model": False,
-        "model_path": hf_model_path,
-    }
 
 
 @pytest.fixture(scope="module")
@@ -626,4 +616,44 @@ def test_when_itemid_has_string_dtype_then_model_can_predict(model_class, traine
     data.index = data.index.set_levels(data.index.levels[0].astype(pd.StringDtype()), level="item_id")
     predictions = model.predict(data)
     assert isinstance(predictions, TimeSeriesDataFrame)
+    assert len(predictions) == predictions.num_items * model.prediction_length
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+def test_when_target_scaler_is_used_then_model_can_fit_and_predict(
+    model_class, dummy_hyperparameters, df_with_covariates_and_metadata
+):
+    data, covariate_metadata = df_with_covariates_and_metadata
+    model = model_class(freq=data.freq, hyperparameters={"target_scaler": "min_max", **dummy_hyperparameters})
+    model.fit(train_data=data)
+    predictions = model.predict(data)
+    assert isinstance(predictions, TimeSeriesDataFrame)
+    assert not predictions.isna().any(axis=None)
+    assert len(predictions) == predictions.num_items * model.prediction_length
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+@pytest.mark.parametrize("target_scaler", [None, "standard"])
+def test_when_covariate_regressor_is_used_then_model_can_fit_and_predict(
+    model_class, dummy_hyperparameters, target_scaler, df_with_covariates_and_metadata
+):
+    prediction_length = 3
+    data, covariate_metadata = df_with_covariates_and_metadata
+    train_data, test_data = data.train_test_split(prediction_length)
+    model = model_class(
+        freq=train_data.freq,
+        prediction_length=prediction_length,
+        hyperparameters={"covariate_regressor": "LR", "target_scaler": target_scaler, **dummy_hyperparameters},
+        metadata=covariate_metadata,
+    )
+    model.fit(train_data=train_data)
+    assert isinstance(model.covariate_regressor, CovariateRegressor)
+    assert model.covariate_regressor.is_fit()
+
+    predictions = model.predict(
+        train_data,
+        known_covariates=test_data.slice_by_timestep(-prediction_length, None),
+    )
+    assert isinstance(predictions, TimeSeriesDataFrame)
+    assert not predictions.isna().any(axis=None)
     assert len(predictions) == predictions.num_items * model.prediction_length

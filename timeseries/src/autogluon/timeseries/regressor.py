@@ -5,7 +5,7 @@ import pandas as pd
 
 from autogluon.core.models import AbstractModel
 from autogluon.tabular.trainer.model_presets.presets import MODEL_TYPES as TABULAR_MODEL_TYPES
-from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
+from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFrame
 from autogluon.timeseries.utils.features import CovariateMetadata
 
 
@@ -69,7 +69,7 @@ class CovariateRegressor:
 
     def fit(self, data: TimeSeriesDataFrame, time_limit: Optional[float] = None, **kwargs) -> "CovariateRegressor":
         """Fit the tabular regressor on the target column using covariates as features."""
-        tabular_df = self._get_tabular_df(data, static_features=data.static_features)
+        tabular_df = self._get_tabular_df(data, static_features=data.static_features, include_target=True)
         tabular_df = tabular_df.query(f"{self.target}.notnull()")
 
         median_ts_length = data.num_timesteps_per_item().median()
@@ -125,10 +125,16 @@ class CovariateRegressor:
         return self.model.predict(X=tabular_df)
 
     def _get_tabular_df(
-        self, data: TimeSeriesDataFrame, static_features: Optional[pd.DataFrame] = None
+        self,
+        data: TimeSeriesDataFrame,
+        static_features: Optional[pd.DataFrame] = None,
+        include_target: bool = False,
     ) -> pd.DataFrame:
         """Construct a tabular dataframe from known covariates and static features."""
-        tabular_df = pd.DataFrame(data).reset_index()[[ITEMID] + self.metadata.known_covariates]
+        available_columns = [ITEMID] + self.metadata.known_covariates
+        if include_target:
+            available_columns += [self.target]
+        tabular_df = pd.DataFrame(data).reset_index()[available_columns]
         if static_features is not None:
             tabular_df = pd.merge(tabular_df, static_features, on=ITEMID)
         return tabular_df
