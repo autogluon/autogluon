@@ -616,5 +616,5 @@ def image_mean_std(norm_type: str):
 def silent_nltk_download(package):
     import logging
 
-    logging.getLogger('nltk').setLevel(logging.ERROR)
+    logging.getLogger("nltk").setLevel(logging.ERROR)
     return nltk.download(package, quiet=True)
