@@ -362,15 +362,15 @@ class RMSLE(TimeSeriesScorer):
         )
 
 
-class CPE(TimeSeriesScorer):
-    r"""Cumulative path error.
+class CE(TimeSeriesScorer):
+    r"""Cumulative error.
 
     This error measures the discrepancy between the cumulative sum of the forecast and the cumulative sum of the actual
     values.
 
     .. math::
 
-        \operatorname{CPE} = \frac{1}{N} \frac{1}{H} \sum_{i=1}^{N} \sum_{t=T+1}^{T+H} \alpha1 \cdot \max(0, -d_{i, t}) + \alpha2 \cdot \max(0, d_{i, t})
+        \operatorname{CE} = \frac{1}{N} \frac{1}{H} \sum_{i=1}^{N} \sum_{t=T+1}^{T+H} \alpha1 \cdot \max(0, -d_{i, t}) + \alpha2 \cdot \max(0, d_{i, t})
 
     where :math:`d_{i, t}` is the difference between the cumulative predicted value and the cumulative actual value
 

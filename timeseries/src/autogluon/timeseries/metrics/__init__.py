@@ -2,11 +2,11 @@ from pprint import pformat
 from typing import Type, Union
 
 from .abstract import TimeSeriesScorer
-from .point import CPE, MAE, MAPE, MASE, MSE, RMSE, RMSLE, RMSSE, SMAPE, WAPE
+from .point import CE, MAE, MAPE, MASE, MSE, RMSE, RMSLE, RMSSE, SMAPE, WAPE
 from .quantile import SQL, WQL
 
 __all__ = [
-    "CPE",
+    "CE",
     "MAE",
     "MAPE",
     "MASE",
@@ -43,7 +43,7 @@ DEPRECATED_METRICS = {
 
 # Experimental metrics that are not yet user facing
 EXPERIMENTAL_METRICS = {
-    "CPE": CPE,
+    "CE": CE,
 }
 
 
