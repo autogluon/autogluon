@@ -81,7 +81,7 @@ extras_require = {
     else [
         "onnx>=1.13.0,<1.16.2",  # cap at 1.16.1 for issue https://github.com/onnx/onnx/issues/6267
         "skl2onnx>=1.15.0,<1.18.0", 
-        "onnxruntime>=1.17.0,<1.20.0",
+        "onnxruntime>=1.17.0,<1.20.0",   # install for gpu system due to https://github.com/autogluon/autogluon/issues/3804
         "onnxruntime-gpu>=1.17.0,<1.20.0"],
 }
 
