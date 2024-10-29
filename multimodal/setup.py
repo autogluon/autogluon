@@ -62,7 +62,8 @@ install_requires = ag.get_dependency_version_ranges(install_requires)
 tests_require = [
     "ruff",
     "datasets>=2.10.0,<2.15.0",
-    "onnx>=1.13.0,<1.16.2",  # cap at 1.16.1 for issue https://github.com/onnx/onnx/issues/6267
+    "onnx>=1.13.0,<1.16.2;platform_system=='Windows'",  # cap at 1.16.1 for issue https://github.com/onnx/onnx/issues/6267
+    "onnx>=1.13.0,<1.18.0;platform_system!='Windows'",
     "onnxruntime>=1.17.0,<1.20.0",  # install for gpu system due to https://github.com/autogluon/autogluon/issues/3804
     "onnxruntime-gpu>=1.17.0,<1.20.0;platform_system!='Darwin'",
     "tensorrt>=8.6.0,<10.3;platform_system=='Linux' and python_version<'3.11'",
