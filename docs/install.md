@@ -212,7 +212,8 @@ Note that the above example is only valid while the branch still exists. A user 
 AutoGluon offers nightly builds that can be installed using the `--pre` argument. Nightly builds have the latest features but have not been as rigorously tested as stable releases.
 
 ```bash
-pip install --pre autogluon
+pip install -U uv
+uv pip install --pre autogluon
 ```
 :::
 
