@@ -5,7 +5,7 @@ on:
     branches:
       - master
   schedule:
-    - cron: '00 09 * * SUN' #  UTC 9:00(2:00 PST Time) every Sunday
+    - cron: '00 02 * * *' #  UTC 2:00 AM every day
 
 env:
   AG_BRANCH_NAME: master
