@@ -1,4 +1,5 @@
 import logging
+import warnings
 from typing import Optional
 
 import numpy as np
@@ -359,3 +360,54 @@ class RMSLE(TimeSeriesScorer):
             seasonal_period=seasonal_period,
             **kwargs,
         )
+
+
+class CPE(TimeSeriesScorer):
+    r"""Cumulative path error.
+
+    This error measures the discrepancy between the cumulative sum of the forecast and the cumulative sum of the actual
+    values.
+
+    .. math::
+
+        \operatorname{CPE} = \frac{1}{N} \frac{1}{H} \sum_{i=1}^{N} \sum_{t=T+1}^{T+H} \alpha1 \cdot \max(0, -d_{i, t}) + \alpha2 \cdot \max(0, d_{i, t})
+
+    where :math:`d_{i, t}` is the difference between the cumulative predicted value and the cumulative actual value
+
+    .. math::
+
+        d_{i, t} = \left(\sum_{t=T+1}^t f_{i, t}) - \left(\sum_{t=T+1}^t y_{i, t})
+
+    Parameters
+    ----------
+    alpha1 : float
+        Penalty assigned to underpredictions (when cumulative forecast is below the cumulative actual value).
+    alpha2 : float
+        Penalty assigned to overpredictions (when cumulative forecast is above the cumulative actual value).
+    """
+
+    def __init__(self, alpha1: float = 0.75, alpha2: float = 0.25):
+        self.alpha1 = alpha1
+        self.alpha2 = alpha2
+        self.num_items: Optional[int] = None
+        warnings.warn(
+            f"{self.name} is an experimental metric. Its behavior may change in the future version of AutoGluon."
+        )
+
+    def save_past_metrics(self, data_past: TimeSeriesDataFrame, **kwargs) -> None:
+        self.num_items = data_past.num_items
+
+    def _fast_cumsum(self, y: np.ndarray) -> np.ndarray:
+        """Compute the cumulative sum for each consecutive `prediction_length` items in the array."""
+        y = y.reshape(self.num_items, -1)
+        return np.nancumsum(y, axis=1).ravel()
+
+    def compute_metric(
+        self, data_future: TimeSeriesDataFrame, predictions: TimeSeriesDataFrame, target: str = "target", **kwargs
+    ) -> float:
+        y_true, y_pred = self._get_point_forecast_score_inputs(data_future, predictions, target=target)
+        cumsum_true = self._fast_cumsum(y_true.to_numpy())
+        cumsum_pred = self._fast_cumsum(y_pred.to_numpy())
+        diffs = cumsum_pred - cumsum_true
+        error = diffs * np.where(diffs < 0, -self.alpha1, self.alpha2)
+        return self._safemean(error)

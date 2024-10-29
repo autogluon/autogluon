@@ -20,7 +20,7 @@ from gluonts.model.evaluation import evaluate_forecasts
 from gluonts.model.forecast import QuantileForecast
 
 from autogluon.timeseries import TimeSeriesPredictor
-from autogluon.timeseries.metrics import AVAILABLE_METRICS, DEFAULT_METRIC_NAME, check_get_evaluation_metric
+from autogluon.timeseries.metrics import AVAILABLE_METRICS, CPE, DEFAULT_METRIC_NAME, check_get_evaluation_metric
 from autogluon.timeseries.metrics.utils import _in_sample_abs_seasonal_error, _in_sample_squared_seasonal_error
 from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
 
@@ -326,3 +326,11 @@ def test_when_better_predictions_passed_to_metric_then_score_improves(metric_nam
     good_score = eval_metric.score(data, predictions + 1, prediction_length=prediction_length)
     bad_score = eval_metric.score(data, predictions + 50, prediction_length=prediction_length)
     assert good_score > bad_score
+
+
+@pytest.mark.parametrize("metric_name", ["CPE", "cpe"])
+def test_when_experimental_metric_name_used_then_predictor_can_score(metric_name):
+    predictor = TimeSeriesPredictor(prediction_length=3, eval_metric=metric_name)
+    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"DeepAR": {"epochs": 1, "num_batches_per_epoch": 1}})
+    score = predictor.score(DUMMY_TS_DATAFRAME)
+    assert np.isfinite(score["CPE"])
