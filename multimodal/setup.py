@@ -31,13 +31,13 @@ install_requires = [
     "lightning",  # version range defined in `core/_setup_utils.py`
     "transformers[sentencepiece]",  # version range defined in `core/_setup_utils.py`
     "accelerate",  # version range defined in `core/_setup_utils.py`
-    "requests>=2.21,<3",
+    "requests>=2.30,<3",
     "jsonschema>=4.18,<4.22",
     "seqeval>=1.2.2,<1.3.0",
     "evaluate>=0.4.0,<0.5.0",
     "timm>=0.9.5,<0.10.0",
     "torchvision>=0.16.0,<0.21.0",
-    "scikit-image>=0.19.1,<0.21.0",
+    "scikit-image>=0.19.1,<0.25.0",
     "text-unidecode>=1.3,<1.4",
     "torchmetrics>=1.2.0,<1.3.0",
     "nptyping>=1.4.4,<2.5.0",
@@ -62,9 +62,10 @@ install_requires = ag.get_dependency_version_ranges(install_requires)
 tests_require = [
     "ruff",
     "datasets>=2.10.0,<2.15.0",
-    "onnx>=1.13.0,<1.14.0",
-    "onnxruntime>=1.15.0,<1.16.0",
-    "onnxruntime-gpu>=1.15.0,<1.16.0;platform_system!='Darwin'",
+    "onnx>=1.13.0,<1.16.2;platform_system=='Windows'",  # cap at 1.16.1 for issue https://github.com/onnx/onnx/issues/6267
+    "onnx>=1.13.0,<1.18.0;platform_system!='Windows'",
+    "onnxruntime>=1.17.0,<1.20.0",  # install for gpu system due to https://github.com/autogluon/autogluon/issues/3804
+    "onnxruntime-gpu>=1.17.0,<1.20.0;platform_system!='Darwin'",
     "tensorrt>=8.6.0,<10.3;platform_system=='Linux' and python_version<'3.11'",
 ]
 

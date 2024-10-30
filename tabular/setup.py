@@ -49,6 +49,7 @@ extras_require = {
         "xgboost>=1.6,<2.2",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "fastai": [
+        "spacy<3.8",  # cap for issue https://github.com/explosion/spaCy/issues/13653
         "torch",  # version range defined in `core/_setup_utils.py`
         "fastai>=2.3.1,<2.8",  # <{N+1} upper cap, where N is the latest released minor version
     ],
@@ -70,18 +71,20 @@ extras_require = {
         "vowpalwabbit>=9,<9.10; python_version < '3.11' and sys_platform != 'darwin'",
     ],
     "skl2onnx": [
-        "onnx>=1.13.0,<1.16.2",  # cap at 1.16.1 for issue https://github.com/onnx/onnx/issues/6267
+        "onnx>=1.13.0,<1.16.2;platform_system=='Windows'",  # cap at 1.16.1 for issue https://github.com/onnx/onnx/issues/6267
+        "onnx>=1.13.0,<1.18.0;platform_system!='Windows'",
         "skl2onnx>=1.15.0,<1.18.0",
         # For macOS, there isn't a onnxruntime-gpu package installed with skl2onnx.
         # Therefore, we install onnxruntime explicitly here just for macOS.
-        "onnxruntime>=1.15.0,<1.18.0",
+        "onnxruntime>=1.17.0,<1.20.0",
     ]
     if sys.platform == "darwin"
     else [
-        "onnx>=1.13.0,<1.16.2",  # cap at 1.16.1 for issue https://github.com/onnx/onnx/issues/6267
+        "onnx>=1.13.0,<1.16.2;platform_system=='Windows'",  # cap at 1.16.1 for issue https://github.com/onnx/onnx/issues/6267
+        "onnx>=1.13.0,<1.18.0;platform_system!='Windows'",
         "skl2onnx>=1.15.0,<1.18.0", 
-        "onnxruntime>=1.15.0,<1.18.0",
-        "onnxruntime-gpu>=1.15.0,<1.18.0"],
+        "onnxruntime>=1.17.0,<1.20.0",   # install for gpu system due to https://github.com/autogluon/autogluon/issues/3804
+        "onnxruntime-gpu>=1.17.0,<1.20.0"],
 }
 
 # TODO: v1.0: Rename `all` to `core`, make `all` contain everything.
