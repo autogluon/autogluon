@@ -41,7 +41,7 @@ class CategoricalFeatureTokenizer(nn.Module):
         References
         ----------
         1. Yury Gorishniy, Ivan Rubachev, Valentin Khrulkov, Artem Babenko,
-        "Revisiting Deep Learning Models for Tabular Data", 2021
+        "Revisiting Deep Learning Models for Tabular Data", NeurIPS 2021
         https://arxiv.org/pdf/2106.11959.pdf
         2. Code: https://github.com/Yura52/tabular-dl-revisiting-models
         """
