@@ -27,7 +27,7 @@ if [ $MODULE == "tabular" ] || [ $MODULE == "timeseries" ]; then
     --amlb-benchmark $BENCHMARK \
     --amlb-constraint $TIME_LIMIT \
     --amlb-user-dir $(dirname "$0")/amlb_user_dir \
-    --git-uri-branch https://github.com/openml/automlbenchmark.git#stable
+    --git-uri-branch https://github.com/Innixma/automlbenchmark.git#autogluon_switch_to_uv
 else
     FRAMEWORK=AutoGluon_$PRESET
     aws s3 cp --recursive s3://autogluon-ci-benchmark/configs/$MODULE/$USER_DIR_S3_PREFIX/latest/ $(dirname "$0")/custom_user_dir/
