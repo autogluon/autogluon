@@ -14,8 +14,7 @@ do
 done
 
 # Check if uv is installed
-if ! command -v uv &> /dev/null
-then
+if ! python -m pip show uv &> /dev/null; then
     echo "uv could not be found. Installing uv..."
     python -m pip install uv
 fi
