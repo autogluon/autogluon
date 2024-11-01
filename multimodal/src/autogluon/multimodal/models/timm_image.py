@@ -83,7 +83,7 @@ class TimmAutoModelForImagePrediction(nn.Module):
             self.num_classes = self.model.num_classes
 
         self.pretrained = pretrained
-        self.out_features = self.model.num_features
+        self.out_features = self.head.in_features
         self.global_pool = self.model.global_pool if hasattr(self.model, "global_pool") else None
         self.model.reset_classifier(0)  # remove the internal head
 
