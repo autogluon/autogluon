@@ -2111,6 +2111,7 @@ class AbstractTrainer:
         predict_1_child_time = model.predict_1_time / num_children if model.predict_1_time is not None else None
         fit_metadata = model.get_fit_metadata()
 
+        model_param_aux = getattr(model, "_params_aux_child", model.params_aux)
         model_metadata = dict(
             fit_time=model.fit_time,
             compile_time=model.compile_time,
@@ -2132,6 +2133,10 @@ class AbstractTrainer:
             stack_name=stack_name,
             level=level,
             num_children=num_children,
+            fit_num_cpu=model_param_aux.get("num_cpus", 1),
+            fit_num_gpu=model_param_aux.get("num_gpus", 0),
+            # TODO: workaround to load GPU models at (re)fit time, re-evaluate if this is still needed.
+            refit_full_requires_gpu=(model_param_aux.get("num_gpus",0) > 0) and model._user_params.get("refit_folds", False),
             **fit_metadata,
         )
         return model_metadata
