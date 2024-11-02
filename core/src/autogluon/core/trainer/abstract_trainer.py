@@ -24,6 +24,7 @@ from autogluon.common.utils.path_converter import PathConverter
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_torch
 
+from common.src.autogluon.common.utils.distribute_utils import DistributedContext
 from ..augmentation.distill_utils import augment_data, format_distillation_labels
 from ..calibrate import calibrate_decision_threshold
 from ..calibrate.conformity_score import compute_conformity_score
@@ -2689,33 +2690,105 @@ class AbstractTrainer:
             time_limit_model_split = time_limit / len(models)
         else:
             time_limit_model_split = time_limit
-        for i, model in enumerate(models):
-            if self._callback_early_stop:
-                return models_valid
-            if isinstance(model, str):
-                model = self.load_model(model)
-            elif self.low_memory:
-                model = copy.deepcopy(model)
-            if hyperparameter_tune_kwargs is not None and isinstance(hyperparameter_tune_kwargs, dict):
-                hyperparameter_tune_kwargs_model = hyperparameter_tune_kwargs.get(model.name, None)
-            else:
-                hyperparameter_tune_kwargs_model = None
-            # TODO: Only update scores when finished, only update model as part of final models if finished!
-            if time_split:
-                time_left = time_limit_model_split
-            else:
-                if time_limit is None:
-                    time_left = None
-                else:
-                    time_start_model = time.time()
-                    time_left = time_limit - (time_start_model - time_start)
-            model_name_trained_lst = self._train_single_full(
-                X, y, model, time_limit=time_left, hyperparameter_tune_kwargs=hyperparameter_tune_kwargs_model, **kwargs
-            )
 
-            if self.low_memory:
-                del model
-            models_valid += model_name_trained_lst
+        if (not DistributedContext.is_distributed_mode()) or (kwargs["stack_name"] != "core"):
+            for model in models:
+                if self._callback_early_stop:
+                    return models_valid
+
+                models_valid += _detached_train_multi_fold(
+                    _self=self,
+                    model=model,
+                    X=X,
+                    y=y,
+                    time_start=time_start,
+                    time_split=time_split,
+                    time_limit=time_limit,
+                    time_limit_model_split=time_limit_model_split,
+                    hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+                    kwargs=kwargs,
+                )
+
+            return models_valid
+
+        # -- Distributed training
+        from autogluon.core.ray.distributed_jobs_managers import DistributedFitManager
+        from autogluon.common.utils.try_import import try_import_ray
+
+        ray = try_import_ray()
+
+        logger.log(20, "Scheduling distributed model-workers for training...")
+
+        distributed_manager = DistributedFitManager(
+            models_to_fit=models,
+            func=_remote_train_multi_fold,
+            func_kwargs=dict(
+                time_split=time_split,
+                time_limit_model_split=time_limit_model_split,
+                time_limit=time_limit,
+                time_start=time_start,
+            ),
+            func_put_kwargs=dict(
+                _self=self,
+                X=X,
+                y=y,
+                hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+                kwargs=kwargs,
+            ),
+            num_cpus=kwargs.get("total_resources", {}).get("num_cpus", 1),
+            num_gpus=kwargs.get("total_resources", {}).get("num_gpus", 0),
+            num_splits=kwargs.get("k_fold", 1) * kwargs.get("n_repeats", 1)
+        )
+        unfinished_job_refs = distributed_manager.schedule_jobs()
+        timeout = int(time_limit - (time.time() - time_start) + 5) if time_limit is not None else None # include 5 second overhead.
+
+
+        while unfinished_job_refs:
+            finished, unfinished_job_refs = ray.wait(unfinished_job_refs, num_returns=1, timeout=timeout)
+
+            if not finished:
+                logger.log(20,"Ran into timeout while waiting for model training to finish. Stopping now.")
+                break
+
+            distributed_manager.deallocate_resources(job_ref=finished[0])
+            model_name, model_path, model_type = ray.get(finished[0])
+
+            if model_path is None:
+                logger.log(20, f"Model training failed for {model_name if isinstance(model_name, str) else model_name.name}.")
+            else:
+                logger.log(20, f"Finished all jobs for {model_name}. #Running {len(unfinished_job_refs)}. "
+                               f"Time remaining for this layer {int(time_limit - (time.time() - time_start)) if time_limit is not None else -1}s...")
+
+                # TODO: figure out a way to avoid calling _add_model in the worker-process to save overhead time.
+                #       - Right now, we need to call it within _add_model to be able to pass the model path to the main process without changing
+                #         the return signature of _train_single_full. This can be a lot of work to change.
+                # TODO: determine if y_pred_proba_val was cached in the worker-process. Right now, we re-do predictions for holdout data.
+                # Self object is not permanently mutated during worker execution, so we need to add model to the "main" self (again).
+                # This is the synchronization point between the distributed and main processes.
+                if self._add_model(
+                        model_type.load(path=os.path.join(self.path, model_path), reset_paths=self.reset_paths),
+                        stack_name=kwargs["stack_name"],
+                        level=kwargs["level"]
+                ):
+                    models_valid.append(model_name)
+                else:
+                    logger.log(20, f"Failed to add {model_name} to model graph.")
+
+            # Stop due to time limit after adding model
+            if (time_limit is not None) and ((time.time()-time_start) > time_limit):
+                logger.log(20,"Time limit reached for this stacking layer. Stopping model training and cancel pending tasks.")
+                break
+
+            # TODO: look into what this does / how this works for distributed training
+            if self._callback_early_stop:
+                logger.log(20,"Callback triggered in distributed setting. Stopping model training and cancel pending tasks.")
+                break
+
+            # Re-schedule jobs
+            unfinished_job_refs += distributed_manager.schedule_jobs()
+
+        distributed_manager.clean_up_ray(unfinished_job_refs=unfinished_job_refs)
+        logger.log(20, "Finished all distributed work for this stacking layer.")
 
         return models_valid
 
@@ -4169,3 +4242,86 @@ class AbstractTrainer:
             assert len(quantile_levels) > 0, f"quantile_levels must not be an empty list (quantile_levels={quantile_levels})"
         else:
             assert quantile_levels is None, f"quantile_levels must be None when problem_type='{problem_type}' (quantile_levels={quantile_levels})"
+
+
+def _detached_train_multi_fold(
+    *,
+    _self: AbstractTrainer,
+    model: str | AbstractModel,
+    X: pd.DataFrame,
+    y: pd.Series,
+    time_split: bool,
+    time_start: float,
+    time_limit: float|None,
+    time_limit_model_split: float | None,
+    hyperparameter_tune_kwargs: dict,
+    kwargs: dict,
+) -> list[str]:
+    """Dedicated class-detached function to train a single model on multiple folds."""
+    if isinstance(model,str):
+        model = _self.load_model(model)
+    elif _self.low_memory:
+        model = copy.deepcopy(model)
+    if hyperparameter_tune_kwargs is not None and isinstance(hyperparameter_tune_kwargs,dict):
+        hyperparameter_tune_kwargs_model = hyperparameter_tune_kwargs.get(model.name,None)
+    else:
+        hyperparameter_tune_kwargs_model=None
+    # TODO: Only update scores when finished, only update model as part of final models if finished!
+    if time_split:
+        time_left=time_limit_model_split
+    else:
+        if time_limit is None:
+            time_left=None
+        else:
+            time_start_model=time.time()
+            time_left=time_limit-(time_start_model-time_start)
+
+    model_name_trained_lst = _self._train_single_full(
+        X,
+        y,
+        model,
+        time_limit=time_left,
+        hyperparameter_tune_kwargs=hyperparameter_tune_kwargs_model,
+        **kwargs
+    )
+
+    if _self.low_memory:
+        del model
+
+    return model_name_trained_lst
+
+def _remote_train_multi_fold(
+    *,
+    _self: AbstractTrainer,
+    model: str | AbstractModel,
+    X: pd.DataFrame,
+    y: pd.Series,
+    time_split: bool,
+    time_start: float,
+    time_limit: float|None,
+    time_limit_model_split: float | None,
+    hyperparameter_tune_kwargs: dict,
+    kwargs: dict,
+) -> tuple[str, str | None, str | None]:
+    from autogluon.common.utils.log_utils import reset_logger_for_remote_call
+    reset_logger_for_remote_call(verbosity=_self.verbosity)
+
+    model_name_list = _detached_train_multi_fold(
+        _self=_self,
+        model=model,
+        X=X,
+        y=y,
+        time_start=time_start,
+        time_split=time_split,
+        time_limit=time_limit,
+        time_limit_model_split=time_limit_model_split,
+        hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+        kwargs=kwargs,
+    )
+
+    # Fallback, return original model name if training failed.
+    if not model_name_list:
+        model_name = model if isinstance(model, str) else model.name
+        return model_name, None, None
+    model_name = model_name_list[0]
+    return model_name, _self.get_model_attribute(model=model_name,attribute="path"), _self.get_model_attribute(model=model_name,attribute="type")
