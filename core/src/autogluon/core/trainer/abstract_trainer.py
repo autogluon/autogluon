@@ -2232,8 +2232,7 @@ class AbstractTrainer:
         model = self.load_model(model)
         print_weights = model._get_tags().get("print_weights", False)
 
-        is_log_during_distributed_fit = os.environ.get("AG_DISTRIBUTED_FIT_MODELS_PARALLEL", "False") == "True"
-        is_log_during_distributed_fit = is_log_during_distributed_fit and (not is_distributed_main)
+        is_log_during_distributed_fit = DistributedContext.is_distributed_mode() and (not is_distributed_main)
         log_level = 10 if is_log_during_distributed_fit else 20
 
         if print_weights:
@@ -2756,8 +2755,12 @@ class AbstractTrainer:
             if model_path is None:
                 logger.log(20, f"Model training failed for {model_name if isinstance(model_name, str) else model_name.name}.")
             else:
-                logger.log(20, f"Finished all jobs for {model_name}. #Running {len(unfinished_job_refs)}. "
-                               f"Time remaining for this layer {int(time_limit - (time.time() - time_start)) if time_limit is not None else -1}s...")
+                logger.log(
+                    20,
+                    f"Finished all jobs for {model_name}."
+                    f"\n\t{len(unfinished_job_refs)} jobs are still running."
+                    f"\n\tTime remaining for this layer {int(time_limit - (time.time() - time_start)) if time_limit is not None else -1}s..."
+                )
 
                 # TODO: figure out a way to avoid calling _add_model in the worker-process to save overhead time.
                 #       - Right now, we need to call it within _add_model to be able to pass the model path to the main process without changing

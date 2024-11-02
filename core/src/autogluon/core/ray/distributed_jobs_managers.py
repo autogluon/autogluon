@@ -112,19 +112,29 @@ class DistributedFitManager:
 
             is_sufficient, reason = self.check_sufficient_resources(resources=model_resources)
             if not is_sufficient:
-                logger.log(0, f"Delay scheduling model {model.name}: {reason}.")
-                models_to_schedule_later.append(model)
-                continue
+                if len(job_refs) + len(self.job_refs_to_allocated_resources) == 0:
+                    logger.log(
+                        20,
+                        "Insufficient total resources for training a model fully distributed. Consider disabling distributed training."
+                        "Forcing to train one model anyhow, but this will lead to inefficient parallelization.",
+                    )
+                else:
+                    logger.log(0, f"Delay scheduling model {model.name}: {reason}.")
+                    models_to_schedule_later.append(model)
+                    continue
 
             job_ref = self.remote_func.options(
                 num_cpus=model_resources.num_cpus_for_model_worker, num_gpus=model_resources.num_gpus_for_model_worker
             ).remote(model=ray.put(model), **self.job_kwargs)
             job_refs.append(job_ref)
-
-            logger.log(20, f"Scheduled model training for {model.name}"
-                           f"\n\tAllocated {model_resources.total_num_cpus} CPUs and {model_resources.total_num_gpus} GPUs"
-                           f"\n\tRay{job_ref}")
             self.allocate_resources(job_ref=job_ref, resources=model_resources)
+
+            logger.log(
+                20,
+                f"Scheduled model training for {model.name}. {len(self.job_refs_to_allocated_resources)} jobs are running."
+                f"\n\tAllocated {model_resources.total_num_cpus} CPUs and {model_resources.total_num_gpus} GPUs"
+                f"\n\tRay{job_ref}",
+            )
             time.sleep(0.1)
 
         self.models_to_schedule = models_to_schedule_later
@@ -134,12 +144,12 @@ class DistributedFitManager:
         """Determine if there are enough resources to scheduling fitting another model."""
 
         # Allow for oversubscribing to 10% of the CPUs due to scheduling overhead.
-        if self.available_num_cpus + (self.total_num_cpus // 10) <= resources.total_num_cpus:
+        if self.available_num_cpus + (self.total_num_cpus // 10) < resources.total_num_cpus:
             return False, "not enough CPUs free."
 
         # All models need at least one CPU but not all a GPU
         # Avoid scheduling a model if there are not at least 50% of the required GPUs available
-        if (resources.total_num_gpus > 0) and (self.available_num_gpus <= (resources.total_num_gpus // 2)):
+        if (resources.total_num_gpus > 0) and (self.available_num_gpus < (resources.total_num_gpus // 2)):
             return False, "not enough GPUs free."
 
         return True, None
