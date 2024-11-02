@@ -17,6 +17,7 @@ from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.s3_utils import download_s3_folder, s3_path_to_bucket_prefix, upload_s3_folder
 from autogluon.common.utils.try_import import try_import_ray
 from autogluon.common.utils.distribute_utils import DistributedContext
+from autogluon.common.utils.log_utils import reset_logger_for_remote_call
 
 from ...pseudolabeling.pseudolabeling import assert_pseudo_column_match
 from ...ray.resources_calculator import ResourceCalculatorFactory
@@ -371,6 +372,8 @@ def _ray_fit(
     model_sync_path: Optional[str] = None,
 ):
     import ray  # ray must be present
+
+    reset_logger_for_remote_call(verbosity=kwargs_fold.get("verbosity",2))
 
     node_id = ray.get_runtime_context().get_node_id()
     is_head_node = node_id == head_node_id

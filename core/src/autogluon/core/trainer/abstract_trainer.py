@@ -2136,7 +2136,7 @@ class AbstractTrainer:
         )
         return model_metadata
 
-    def _add_model(self, model: AbstractModel, stack_name: str = "core", level: int = 1, y_pred_proba_val=None, _is_refit=False) -> bool:
+    def _add_model(self, model: AbstractModel, stack_name: str = "core", level: int = 1, y_pred_proba_val=None, _is_refit=False, is_distributed_main=False) -> bool:
         """
         Registers the fit model in the Trainer object. Stores information such as model performance, save path, model type, and more.
         To use a model in Trainer, self._add_model must be called.
@@ -2152,6 +2152,9 @@ class AbstractTrainer:
             Stack level of the stack name to assign the model to. This is used for advanced functionality.
             The model's name is appended to self.models_level[stack_name][level]
             The model's base_models (if it has any) must all be a lower level than the model.
+        is_distributed_main: bool, default = False
+            If True, the main process in distributed training is calling this function.
+            This is used to avoid redundant logging in distributed training.
 
         Returns
         -------
@@ -2188,7 +2191,7 @@ class AbstractTrainer:
                         f"Model '{model.name}' depends on model '{base_model_name}', but '{base_model_name}' is not in a lower stack level. ('{model.name}' level: {level}, '{base_model_name}' level: {self.model_graph.nodes[base_model_name]['level']})"
                     )
                 self.model_graph.add_edge(base_model_name, model.name)
-        self._log_model_stats(model, _is_refit=_is_refit)
+        self._log_model_stats(model, _is_refit=_is_refit, is_distributed_main=is_distributed_main)
         if self.low_memory:
             del model
         return True
@@ -2218,10 +2221,14 @@ class AbstractTrainer:
             raise AssertionError(f'"{model}" is not a key in self.model_graph, cannot add attributes: {attributes}')
         self.model_graph.nodes[model].update(attributes)
 
-    def _log_model_stats(self, model, _is_refit=False):
+    def _log_model_stats(self, model, _is_refit=False, is_distributed_main=False):
         """Logs model fit time, val score, predict time, and predict_1_time"""
         model = self.load_model(model)
         print_weights = model._get_tags().get("print_weights", False)
+
+        is_log_during_distributed_fit = os.environ.get("AG_DISTRIBUTED_FIT_MODELS_PARALLEL", "False") == "True"
+        is_log_during_distributed_fit = is_log_during_distributed_fit and (not is_distributed_main)
+        log_level = 10 if is_log_during_distributed_fit else 20
 
         if print_weights:
             model_weights = model._get_model_weights()
@@ -2233,19 +2240,19 @@ class AbstractTrainer:
                     msg_weights += ", "
                 msg_weights += f"'{key}': {value}"
                 is_first = False
-            logger.log(20, f"\tEnsemble Weights: {{{msg_weights}}}")
+            logger.log(log_level, f"\tEnsemble Weights: {{{msg_weights}}}")
         if model.val_score is not None:
             if model.eval_metric.name != self.eval_metric.name:
-                logger.log(20, f"\tNote: model has different eval_metric than default.")
+                logger.log(log_level, f"\tNote: model has different eval_metric than default.")
             if not model.eval_metric.greater_is_better_internal:
                 sign_str = "-"
             else:
                 sign_str = ""
-            logger.log(20, f"\t{round(model.val_score, 4)}\t = Validation score   ({sign_str}{model.eval_metric.name})")
+            logger.log(log_level, f"\t{round(model.val_score, 4)}\t = Validation score   ({sign_str}{model.eval_metric.name})")
         if model.fit_time is not None:
-            logger.log(20, f"\t{round(model.fit_time, 2)}s\t = Training   runtime")
+            logger.log(log_level, f"\t{round(model.fit_time, 2)}s\t = Training   runtime")
         if model.predict_time is not None:
-            logger.log(20, f"\t{round(model.predict_time, 2)}s\t = Validation runtime")
+            logger.log(log_level, f"\t{round(model.predict_time, 2)}s\t = Validation runtime")
         predict_n_time_per_row = self.get_model_attribute_full(model=model.name, attribute="predict_n_time_per_row")
         predict_n_size = self.get_model_attribute_full(model=model.name, attribute="predict_n_size", func=min)
         if predict_n_time_per_row is not None and predict_n_size is not None:
@@ -2267,23 +2274,23 @@ class AbstractTrainer:
                 predict_1_time_full = self.get_model_attribute_full(model=model.name, attribute="predict_1_time")
 
             predict_1_time_log, time_unit = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time)
-            logger.log(20, f"\t{round(predict_1_time_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size | MARGINAL)")
+            logger.log(log_level, f"\t{round(predict_1_time_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size | MARGINAL)")
 
             predict_1_time_full_log, time_unit = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time_full)
-            logger.log(20, f"\t{round(predict_1_time_full_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size)")
+            logger.log(log_level, f"\t{round(predict_1_time_full_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size)")
 
             if not _is_refit:
                 predict_1_time_child = self.get_model_attribute(model=model.name, attribute="predict_1_child_time")
                 predict_1_time_child_log, time_unit = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time_child)
                 logger.log(
-                    20,
+                    log_level,
                     f"\t{round(predict_1_time_child_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size | REFIT | MARGINAL)",
                 )
 
                 predict_1_time_full_child = self.get_model_attribute_full(model=model.name, attribute="predict_1_child_time")
                 predict_1_time_full_child_log, time_unit = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time_full_child)
                 logger.log(
-                    20, f"\t{round(predict_1_time_full_child_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size | REFIT)"
+                    log_level, f"\t{round(predict_1_time_full_child_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size | REFIT)"
                 )
 
     # TODO: Split this to avoid confusion, HPO should go elsewhere?
