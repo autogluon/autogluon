@@ -205,7 +205,7 @@ class DistributedFitManager:
         """Try to clean up ray object store."""
         import ray
 
-        # TODO: determine how to supress error messages from cancelling jobs.
+        # TODO: determine how to suppress error messages from cancelling jobs.
         for f in unfinished_job_refs:
             ray.cancel(f)
 
