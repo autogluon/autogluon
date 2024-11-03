@@ -1,9 +1,10 @@
 import logging
 from dataclasses import dataclass
-from typing import Callable
+from typing import Callable, Literal
 import time
 from autogluon.core.models import AbstractModel, StackerEnsembleModel
 from autogluon.common.utils.resource_utils import get_resource_manager
+import math
 
 logger = logging.getLogger(__name__)
 
@@ -46,8 +47,8 @@ class DistributedFitManager:
 
     Parameters
     ----------
-    models_to_fit: list[AbstractModel]
-        The models that shall be fitted in a distributed manner.
+    mode: {"fit", "refit"}
+        The mode to use for fitting the models.
     func: callable
         The fit function to distribute.
     func_kwargs: dict, default=None
@@ -58,24 +59,32 @@ class DistributedFitManager:
         Total number of CPUs available in the cluster (or `auto`).
     num_gpus : int | str
         Total number of GPUs available in the cluster (or `auto`).
-    num_splits : int
-        Number of training splits/bags for a model.
+    num_splits : int | None, default=None
+        Number of training splits/bags for a model. Required if mode='fit'.
+    get_model_attribute_func : callable, default=None
+        Function to get an attribute for a model. Required if mode='refit'.
     """
-
-    job_refs_to_allocated_resources: dict[str, ModelResources] = {}
 
     def __init__(
         self,
         *,
-        models_to_fit: list[AbstractModel],
+        mode: Literal["fit", "refit"],
         func: Callable,
         func_kwargs: dict,
         func_put_kwargs: dict,
         num_cpus: int | str,
         num_gpus: int | str,
-        num_splits: int,
+        num_splits: int | None = None,
+        get_model_attribute_func: Callable | None = None,
     ):
+        self.mode = mode
         self.num_splits = num_splits
+        self.get_model_attribute_func = get_model_attribute_func
+
+        if self.mode == "fit":
+            assert num_splits is not None, "num_splits must be set for mode='fit'."
+        if self.mode == "refit":
+            assert get_model_attribute_func is not None, "get_model_attribute_func must be set for mode='refit'."
 
         # Resource tracking
         if isinstance(num_cpus, str):
@@ -88,7 +97,8 @@ class DistributedFitManager:
         self.available_num_gpus = num_gpus
 
         # Job tracking
-        self.models_to_schedule = models_to_fit[:]
+        self.job_refs_to_allocated_resources: dict[str, ModelResources] = {}
+        self.models_to_schedule: list[AbstractModel] | list[str] = []
 
         # Init remote function
         import ray
@@ -101,37 +111,74 @@ class DistributedFitManager:
             self.job_kwargs[key] = ray.put(value)
         self.func_put_kwargs = func_put_kwargs
 
-    def schedule_jobs(self) -> list[str]:
-        """Yield the next model to schedule."""
+    def schedule_jobs(self, *, models_to_fit: list[AbstractModel] | list[str] | None = None) -> list[str]:
+        """Schedule model training.
+
+        This function must be first called with `models_to_fit is not None` and then with `models_to_fit is None`.
+        Whereby the first call initializes the list of models to fit and subsequent calls schedule the remaining jobs.
+
+        models_to_fit: list[AbstractModel] | list[str] | None, default=None
+            The models that shall be fitted in a distributed manner.
+        """
         import ray
+
+        if models_to_fit is not None:
+            models_to_schedule = models_to_fit
+        else:
+            models_to_schedule = self.models_to_schedule
 
         models_to_schedule_later = []
         job_refs = []
-        for model in self.models_to_schedule:
+        for model in models_to_schedule:
             model_resources = self.get_resources_for_model(model=model)
+            model_name = model if self.mode == "refit" else model.name
 
             is_sufficient, reason = self.check_sufficient_resources(resources=model_resources)
             if not is_sufficient:
                 if len(job_refs) + len(self.job_refs_to_allocated_resources) == 0:
                     logger.log(
                         20,
-                        "Insufficient total resources for training a model fully distributed. Consider disabling distributed training."
+                        "Insufficient total resources for training a model fully parallel. Consider disabling distributed training."
                         "Forcing to train one model anyhow, but this will lead to inefficient parallelization.",
                     )
+
+                    # Ray's nested calls will keep blocking GPUs and thus create a deadlock if all GPUs are allocated to the model-worker and
+                    # none can be used by the fold-worker.
+                    if (
+                        model_resources.num_gpus_for_model_worker + model_resources.num_gpus_for_fold_worker
+                    ) > self.total_num_gpus:
+                        raise ValueError(
+                            "Insufficient number of GPUs to train any model, even in a non-parallel setting."
+                            "This is likely the results of requiring more GPUs than available to distribute the training."
+                            "Ray does not support freeing GPU resources for nested calls with GPUs. "
+                            "Thus, we need at least twice the amount of GPUs needed to fit one model. "
+                        )
                 else:
-                    logger.log(0, f"Delay scheduling model {model.name}: {reason}.")
+                    if (
+                        model_resources.num_gpus_for_model_worker + model_resources.num_gpus_for_fold_worker
+                    ) > self.total_num_gpus:
+                        logger.log(
+                            40,
+                            f"Delay scheduling model {model_name}: "
+                            "Insufficient number of GPUs to train any model, even in a non-parallel setting."
+                            "This is likely the results of requiring more GPUs than available to distribute the training."
+                            "Ray does not support freeing GPU resources for nested calls with GPUs. "
+                            "Thus, we need at least twice the amount of GPUs needed to fit one model.",
+                        )
+
+                    logger.log(0, f"Delay scheduling model {model_name}: {reason}.")
                     models_to_schedule_later.append(model)
                     continue
 
             job_ref = self.remote_func.options(
                 num_cpus=model_resources.num_cpus_for_model_worker, num_gpus=model_resources.num_gpus_for_model_worker
-            ).remote(model=ray.put(model), **self.job_kwargs)
+            ).remote(model=ray.put(model) if self.mode in ["fit"] else model, **self.job_kwargs)
             job_refs.append(job_ref)
             self.allocate_resources(job_ref=job_ref, resources=model_resources)
 
             logger.log(
                 20,
-                f"Scheduled model training for {model.name}. {len(self.job_refs_to_allocated_resources)} jobs are running."
+                f"Scheduled model {self.mode} for {model_name}. {len(self.job_refs_to_allocated_resources)} jobs are running."
                 f"\n\tAllocated {model_resources.total_num_cpus} CPUs and {model_resources.total_num_gpus} GPUs"
                 f"\n\tRay{job_ref}",
             )
@@ -149,12 +196,40 @@ class DistributedFitManager:
 
         # All models need at least one CPU but not all a GPU
         # Avoid scheduling a model if there are not at least 50% of the required GPUs available
-        if (resources.total_num_gpus > 0) and (self.available_num_gpus < (resources.total_num_gpus // 2)):
+        if (resources.total_num_gpus > 0) and (self.available_num_gpus < math.ceil(resources.total_num_gpus / 2)):
             return False, "not enough GPUs free."
 
         return True, None
 
-    def get_resources_for_model(self, *, model: AbstractModel) -> ModelResources:
+    def get_resources_for_model(self, *, model: AbstractModel | str) -> ModelResources:
+        if self.mode == "fit":
+            # model is AbstractModel
+            return self.get_resources_for_model_fit(model=model)
+        elif self.mode == "refit":
+            # model is str
+            return self.get_resources_for_model_refit(model=model)
+        else:
+            raise ValueError(f"Unknown mode: {self.mode}")
+
+    def get_resources_for_model_refit(self, model: str) -> ModelResources:
+        """Estimate the resources required to fit a model."""
+
+        num_gpus_for_fold_worker = self.get_model_attribute_func(model=model, attribute="fit_num_gpu")
+        num_cpus_for_fold_worker = self.get_model_attribute_func(model=model, attribute="fit_num_cpu")
+        num_gpus_for_model_worker = (
+            1 if self.get_model_attribute_func(model=model, attribute="refit_full_requires_gpu") else 0
+        )
+        return ModelResources(
+            num_gpus_for_fold_worker=num_gpus_for_fold_worker,
+            num_cpus_for_fold_worker=num_cpus_for_fold_worker,
+            num_gpus_for_model_worker=num_gpus_for_model_worker,
+            num_cpus_for_model_worker=1,
+            # num_cpus_for_model_worker is freed once the nested ray call is done
+            total_num_cpus=num_cpus_for_fold_worker,
+            total_num_gpus=num_gpus_for_model_worker + num_gpus_for_fold_worker,
+        )
+
+    def get_resources_for_model_fit(self, *, model: AbstractModel) -> ModelResources:
         """Estimate the resources required to fit a model."""
 
         num_gpus_for_fold_worker = getattr(model, "model_base", model)._user_params_aux.get("num_gpus", 0)
@@ -166,6 +241,7 @@ class DistributedFitManager:
             num_gpus_for_model_worker = num_gpus_for_fold_worker
             num_cpus_for_fold_worker = 0
             num_gpus_for_fold_worker = 0
+            total_num_cpus = num_cpus_for_model_worker
         else:
             # If refit_folds is True, we need to pass GPU resources to the model-worker
             num_gpus_for_model_worker = (
@@ -175,8 +251,8 @@ class DistributedFitManager:
             )
             num_cpus_for_model_worker = 1
 
-        total_num_cpus = num_cpus_for_model_worker + num_cpus_for_fold_worker * self.num_splits
-        total_num_gpus = num_gpus_for_model_worker + num_gpus_for_fold_worker * self.num_splits
+            # num_cpus_for_model_worker is freed once the nested ray call is done
+            total_num_cpus = num_cpus_for_fold_worker * self.num_splits
 
         return ModelResources(
             num_gpus_for_fold_worker=num_gpus_for_fold_worker,
@@ -184,7 +260,7 @@ class DistributedFitManager:
             num_gpus_for_model_worker=num_gpus_for_model_worker,
             num_cpus_for_model_worker=num_cpus_for_model_worker,
             total_num_cpus=total_num_cpus,
-            total_num_gpus=total_num_gpus,
+            total_num_gpus=num_gpus_for_model_worker + num_gpus_for_fold_worker * self.num_splits,
         )
 
     def allocate_resources(self, *, job_ref: str, resources: ModelResources) -> None:
@@ -201,13 +277,27 @@ class DistributedFitManager:
         self.available_num_cpus += resources.total_num_cpus
         self.available_num_gpus += resources.total_num_gpus
 
-    def clean_up_ray(self, *, unfinished_job_refs: list[str]) -> None:
-        """Try to clean up ray object store."""
+    def clean_unfinished_job_refs(self, *, unfinished_job_refs: list[str] | None = None):
         import ray
 
         # TODO: determine how to suppress error messages from cancelling jobs.
-        for f in unfinished_job_refs:
-            ray.cancel(f)
+        if unfinished_job_refs is not None:
+            for f in unfinished_job_refs:
+                ray.cancel(f)
+
+    def clean_job_state(self, *, unfinished_job_refs: list[str] | None = None) -> None:
+        """Clean up state of manager."""
+        self.job_refs_to_allocated_resources = {}
+        self.models_to_schedule = []
+        self.available_num_cpus = self.total_num_cpus
+        self.available_num_gpus = self.total_num_gpus
+        self.clean_unfinished_job_refs(unfinished_job_refs=unfinished_job_refs)
+
+    def clean_up_ray(self, *, unfinished_job_refs: list[str] | None = None) -> None:
+        """Try to clean up ray object store."""
+        import ray
+
+        self.clean_unfinished_job_refs(unfinished_job_refs=unfinished_job_refs)
 
         ray.internal.free(object_refs=[self.job_kwargs[key] for key in self.func_put_kwargs])
         for key in self.func_put_kwargs:

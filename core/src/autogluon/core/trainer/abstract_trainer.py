@@ -806,7 +806,9 @@ class AbstractTrainer:
                     if "hyperparameter_tune_kwargs" in model_args_fit[model_name]
                 }
                 kwargs["hyperparameter_tune_kwargs"] = hyperparameter_tune_kwargs
-        logger.log(20, f"Fitting {len(models)} L{level} models ...")
+
+        logger.log(10 if ((not refit_full) and DistributedContext.is_distributed_mode()) else 20, f"Fitting {len(models)} L{level} models ...")
+
         X_init = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=True)
         feature_metadata = self.get_feature_metadata(use_orig_features=True, base_models=base_model_names)
         if X_val is not None:
@@ -1437,85 +1439,94 @@ class AbstractTrainer:
 
         levels = sorted(model_levels.keys())
         models_trained_full = []
-        model_refit_map = {}
-        for level in levels:
-            models_level = model_levels[level]
-            for model in models_level:
-                model = self.load_model(model)
-                model_name = model.name
-                reuse_first_fold = False
-                if isinstance(model, BaggedEnsembleModel):
-                    # Reuse if model is already _FULL and no X_val
-                    if X_val is None:
-                        reuse_first_fold = not model._bagged_mode
-                if not reuse_first_fold:
-                    if isinstance(model, BaggedEnsembleModel):
-                        can_refit_full = model._get_tags_child().get("can_refit_full", False)
-                    else:
-                        can_refit_full = model._get_tags().get("can_refit_full", False)
-                    reuse_first_fold = not can_refit_full
-                if not reuse_first_fold:
-                    model_full = model.convert_to_refit_full_template()
-                    # Mitigates situation where bagged models barely had enough memory and refit requires more. Worst case results in OOM, but this lowers chance of failure.
-                    model_full._user_params_aux["max_memory_usage_ratio"] = model.params_aux["max_memory_usage_ratio"] * 1.15
-                    # TODO: Do it for all models in the level at once to avoid repeated processing of data?
-                    base_model_names = self.get_base_model_names(model_name)
-                    # FIXME: Logs for inference speed (1 row) are incorrect because
-                    #  parents are non-refit models in this sequence and later correct after logging.
-                    #  Avoiding fix at present to minimize hacks in the code.
-                    #  Return to this later when Trainer controls all stacking logic to map correct parent.
-                    models_trained = self.stack_new_level_core(
+        model_refit_map = {}  # FIXME: is this even used, remove?
+
+        if not DistributedContext.is_distributed_mode():
+            for level in levels:
+                models_level = model_levels[level]
+                for model in models_level:
+                    model_name, models_trained = _detached_refit_single_full(
+                        _self=self,
+                        model=model,
                         X=X,
                         y=y,
                         X_val=X_val,
                         y_val=y_val,
                         X_unlabeled=X_unlabeled,
-                        models=[model_full],
-                        base_model_names=base_model_names,
                         level=level,
-                        stack_name=REFIT_FULL_NAME,
-                        hyperparameter_tune_kwargs=None,
-                        feature_prune=False,
-                        k_fold=0,
-                        n_repeats=1,
-                        ensemble_type=type(model),
-                        refit_full=True,
-                        **kwargs,
+                        kwargs=kwargs,
                     )
-                    if len(models_trained) == 0:
-                        reuse_first_fold = True
-                        logger.log(
-                            30,
-                            f"WARNING: Refit training failure detected for '{model_name}'... "
-                            f"Falling back to using first fold to avoid downstream exception."
-                            f"\n\tThis is likely due to an out-of-memory error or other memory related issue. "
-                            f"\n\tPlease create a GitHub issue if this was triggered from a non-memory related problem.",
+                    if len(models_trained) == 1:
+                        model_refit_map[model_name] = models_trained[0]
+                    for model_trained in models_trained:
+                        self._update_model_attr(
+                            model_trained,
+                            refit_full=True,
+                            refit_full_parent=model_name,
+                            refit_full_parent_val_score=self.get_model_attribute(model_name, "val_score"),
                         )
-                        if not model.params.get("save_bag_folds", True):
-                            raise AssertionError(
-                                f"Cannot avoid training failure during refit for '{model_name}' by falling back to "
-                                f"copying the first fold because it does not exist! (save_bag_folds=False)"
-                                f"\n\tPlease specify `save_bag_folds=True` in the `.fit` call to avoid this exception."
-                            )
+                    models_trained_full += models_trained
+        else:
+            # -- Distributed refit
+            from autogluon.core.ray.distributed_jobs_managers import DistributedFitManager
+            from autogluon.common.utils.try_import import try_import_ray
 
-                if reuse_first_fold:
-                    # Perform fallback black-box refit logic that doesn't retrain.
-                    model_full = model.convert_to_refit_full_via_copy()
-                    # FIXME: validation time not correct for infer 1 batch time, needed to hack _is_refit=True to fix
-                    logger.log(20, f"Fitting model: {model_full.name} | Skipping fit via cloning parent ...")
-                    self._add_model(model_full, stack_name=REFIT_FULL_NAME, level=level, _is_refit=True)
-                    self.save_model(model_full)
-                    models_trained = [model_full.name]
-                if len(models_trained) == 1:
-                    model_refit_map[model_name] = models_trained[0]
-                for model_trained in models_trained:
+            ray = try_import_ray()
+
+            distributed_manager = DistributedFitManager(
+                mode="refit",
+                func=_remote_refit_single_full,
+                func_kwargs=dict(),
+                func_put_kwargs=dict(
+                    _self=self,
+                    X=X,
+                    y=y,
+                    X_val=X_val,
+                    y_val=y_val,
+                    X_unlabeled=X_unlabeled,
+                    kwargs=kwargs,
+                ),
+                # TODO: check if this is available in the kwargs
+                num_cpus=kwargs.get("total_resources", {}).get("num_cpus", 1),
+                num_gpus=kwargs.get("total_resources", {}).get("num_gpus", 0),
+                get_model_attribute_func=self.get_model_attribute,
+            )
+
+            for level in levels:
+                models_trained_full_level = []
+                distributed_manager.job_kwargs["level"] = level
+                models_level = model_levels[level]
+
+                logger.log(20, f"Scheduling distributed model-workers for refitting {len(models_level)} L{level} models...")
+                unfinished_job_refs = distributed_manager.schedule_jobs(models_to_fit=models_level)
+
+                while unfinished_job_refs:
+                    finished, unfinished_job_refs = ray.wait(unfinished_job_refs, num_returns=1)
+                    refit_full_parent, model_trained, model_path, model_type = ray.get(finished[0])
+
+                    self._add_model(
+                        model_type.load(path=os.path.join(self.path,model_path), reset_paths=self.reset_paths),
+                        stack_name=REFIT_FULL_NAME,
+                        level=level,
+                        _is_refit=True
+                    )
+                    model_refit_map[refit_full_parent] = model_trained
                     self._update_model_attr(
                         model_trained,
                         refit_full=True,
-                        refit_full_parent=model_name,
-                        refit_full_parent_val_score=self.get_model_attribute(model_name, "val_score"),
+                        refit_full_parent=refit_full_parent,
+                        refit_full_parent_val_score=self.get_model_attribute(refit_full_parent,"val_score"),
                     )
-                models_trained_full += models_trained
+                    models_trained_full_level.append(model_trained)
+
+                    logger.log(20,f"Finished refit model for {refit_full_parent}")
+                    unfinished_job_refs += distributed_manager.schedule_jobs()
+
+                logger.log(20, f"Finished distributed refitting for {len(models_trained_full_level)} L{level} models.")
+                models_trained_full += models_trained_full_level
+                distributed_manager.clean_job_state(unfinished_job_refs=unfinished_job_refs)
+
+            distributed_manager.clean_up_ray()
 
         keys_to_del = []
         for model in model_refit_map.keys():
@@ -1997,7 +2008,7 @@ class AbstractTrainer:
                 else:
                     time_left_total = time_limit
                 fit_log_message += f" Training model for up to {round(time_limit, 2)}s of the {round(time_left_total, 2)}s of remaining time."
-            logger.log(20, fit_log_message)
+            logger.log(10 if DistributedContext.is_distributed_mode() else 20, fit_log_message)
 
             if isinstance(model, BaggedEnsembleModel) and not compute_score:
                 # Do not perform OOF predictions when we don't compute a score.
@@ -2136,8 +2147,7 @@ class AbstractTrainer:
             num_children=num_children,
             fit_num_cpu=model_param_aux.get("num_cpus", 1),
             fit_num_gpu=model_param_aux.get("num_gpus", 0),
-            # TODO: workaround to load GPU models at (re)fit time, re-evaluate if this is still needed.
-            refit_full_requires_gpu=(model_param_aux.get("num_gpus",0) > 0) and model._user_params.get("refit_folds", False),
+            refit_full_requires_gpu=(model_param_aux.get("num_gpus", 0) > 0) and model._user_params.get("refit_folds", False),
             **fit_metadata,
         )
         return model_metadata
@@ -2719,7 +2729,7 @@ class AbstractTrainer:
         logger.log(20, "Scheduling distributed model-workers for training...")
 
         distributed_manager = DistributedFitManager(
-            models_to_fit=models,
+            mode="fit",
             func=_remote_train_multi_fold,
             func_kwargs=dict(
                 time_split=time_split,
@@ -2738,7 +2748,7 @@ class AbstractTrainer:
             num_gpus=kwargs.get("total_resources", {}).get("num_gpus", 0),
             num_splits=kwargs.get("k_fold", 1) * kwargs.get("n_repeats", 1)
         )
-        unfinished_job_refs = distributed_manager.schedule_jobs()
+        unfinished_job_refs = distributed_manager.schedule_jobs(models_to_fit=models)
         timeout = int(time_limit - (time.time() - time_start) + 5) if time_limit is not None else None # include 5 second overhead.
 
 
@@ -4328,3 +4338,114 @@ def _remote_train_multi_fold(
         return model_name, None, None
     model_name = model_name_list[0]
     return model_name, _self.get_model_attribute(model=model_name,attribute="path"), _self.get_model_attribute(model=model_name,attribute="type")
+
+def _detached_refit_single_full(
+    *,
+    _self: AbstractTrainer,
+    model: str,
+    X: pd.DataFrame,
+    y: pd.Series,
+    X_val: pd.DataFrame,
+    y_val: pd.Series,
+    X_unlabeled: pd.DataFrame,
+    level: int,
+    kwargs: dict,
+) -> tuple[str, list[str]]:
+    # TODO: loading the model is the reasons we must allocate GPU resources for this job in cases where models require GPU when loaded from disk
+    model=_self.load_model(model)
+    model_name = model.name
+    reuse_first_fold = False
+
+    if isinstance(model,BaggedEnsembleModel):
+        # Reuse if model is already _FULL and no X_val
+        if X_val is None:
+            reuse_first_fold = not model._bagged_mode
+
+    if not reuse_first_fold:
+        if isinstance(model,BaggedEnsembleModel):
+            can_refit_full=model._get_tags_child().get("can_refit_full",False)
+        else:
+            can_refit_full=model._get_tags().get("can_refit_full",False)
+        reuse_first_fold = not can_refit_full
+
+    if not reuse_first_fold:
+        model_full=model.convert_to_refit_full_template()
+        # Mitigates situation where bagged models barely had enough memory and refit requires more. Worst case results in OOM, but this lowers chance of failure.
+        model_full._user_params_aux["max_memory_usage_ratio"]=model.params_aux["max_memory_usage_ratio"]*1.15
+        # TODO: Do it for all models in the level at once to avoid repeated processing of data?
+        base_model_names=_self.get_base_model_names(model_name)
+        # FIXME: Logs for inference speed (1 row) are incorrect because
+        #  parents are non-refit models in this sequence and later correct after logging.
+        #  Avoiding fix at present to minimize hacks in the code.
+        #  Return to this later when Trainer controls all stacking logic to map correct parent.
+        models_trained = _self.stack_new_level_core(
+            X=X,
+            y=y,
+            X_val=X_val,
+            y_val=y_val,
+            X_unlabeled=X_unlabeled,
+            models=[model_full],
+            base_model_names=base_model_names,
+            level=level,
+            stack_name=REFIT_FULL_NAME,
+            hyperparameter_tune_kwargs=None,
+            feature_prune=False,
+            k_fold=0,
+            n_repeats=1,
+            ensemble_type=type(model),
+            refit_full=True,
+            **kwargs,
+        )
+        if len(models_trained)==0:
+            reuse_first_fold=True
+            logger.log(30,f"WARNING: Refit training failure detected for '{model_name}'... "
+                          f"Falling back to using first fold to avoid downstream exception."
+                          f"\n\tThis is likely due to an out-of-memory error or other memory related issue. "
+                          f"\n\tPlease create a GitHub issue if this was triggered from a non-memory related problem.",)
+            if not model.params.get("save_bag_folds",True):
+                raise AssertionError(f"Cannot avoid training failure during refit for '{model_name}' by falling back to "
+                                     f"copying the first fold because it does not exist! (save_bag_folds=False)"
+                                     f"\n\tPlease specify `save_bag_folds=True` in the `.fit` call to avoid this exception.")
+
+    if reuse_first_fold:
+        # Perform fallback black-box refit logic that doesn't retrain.
+        model_full=model.convert_to_refit_full_via_copy()
+        # FIXME: validation time not correct for infer 1 batch time, needed to hack _is_refit=True to fix
+        logger.log(20,f"Fitting model: {model_full.name} | Skipping fit via cloning parent ...")
+        _self._add_model(model_full,stack_name=REFIT_FULL_NAME,level=level,_is_refit=True)
+        _self.save_model(model_full)
+        models_trained=[model_full.name]
+
+    return model_name, models_trained
+
+def _remote_refit_single_full(
+    *,
+    _self: AbstractTrainer,
+    model: str,
+    X: pd.DataFrame,
+    y: pd.Series,
+    X_val: pd.DataFrame,
+    y_val: pd.Series,
+    X_unlabeled: pd.DataFrame,
+    level: int,
+    kwargs: dict,
+) -> tuple[str, str, list[str], str, str]:
+    from autogluon.common.utils.log_utils import reset_logger_for_remote_call
+    reset_logger_for_remote_call(verbosity=_self.verbosity)
+
+    model_name, models_trained = _detached_refit_single_full(
+        _self=_self,
+        model=model,
+        X=X,
+        y=y,
+        X_val=X_val,
+        y_val=y_val,
+        X_unlabeled=X_unlabeled,
+        level=level,
+        kwargs=kwargs,
+    )
+
+    # We always just refit one model per call, so this must be the case.
+    assert len(models_trained) == 1
+    refitted_model_name = models_trained[0]
+    return model_name, refitted_model_name, _self.get_model_attribute(model=refitted_model_name,attribute="path"),_self.get_model_attribute(model=refitted_model_name, attribute="type")
