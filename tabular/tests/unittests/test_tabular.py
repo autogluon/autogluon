@@ -965,8 +965,8 @@ def test_sample_weight():
     test_file = "test_data.csv"
     train_data, test_data = load_data(directory_prefix=directory_prefix, train_file=train_file, test_file=test_file, name=dataset["name"], url=dataset["url"])
     print(f"Evaluating Benchmark Dataset {dataset['name']}")
-    directory = directory_prefix + dataset["name"] + "/"
-    savedir = directory + "AutogluonOutput/"
+    directory = os.path.join(directory_prefix, dataset["name"])
+    savedir = os.path.join(directory, "AutogluonOutput")
     shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
     sample_weight = "sample_weights"
     weights = np.abs(
@@ -1049,7 +1049,7 @@ def test_tabular_bagstack():
             },
         ]
         hyperparameters = {"GBM": gbm_options, "NN_TORCH": nn_options}
-        time_limit = 60
+        time_limit = 240
 
     fit_args = {
         "num_bag_folds": num_bag_folds,
@@ -1101,7 +1101,7 @@ def test_tabular_bagstack_use_bag_holdout():
             },
         ]
         hyperparameters = {"GBM": gbm_options, "NN_TORCH": nn_options}
-        time_limit = 60
+        time_limit = 240
 
     fit_args = {
         "num_bag_folds": num_bag_folds,

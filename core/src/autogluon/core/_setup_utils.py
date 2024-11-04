@@ -11,7 +11,7 @@ LITE_MODE = "lite" in PACKAGE_NAME
 
 AUTOGLUON_ROOT_PATH = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", ".."))
 
-PYTHON_REQUIRES = ">=3.9, <3.12"
+PYTHON_REQUIRES = ">=3.9, <3.13"
 
 
 # Only put packages here that would otherwise appear multiple times across different module's setup.py files.
@@ -32,7 +32,7 @@ DEPENDENT_PACKAGES = {
     "pytorch_lightning": ">=2.2,<2.4",  # Major version cap, capping `lightning` does not cap `pytorch_lightning`!
     "async_timeout": ">=4.0,<5",  # Major version cap
     "transformers[sentencepiece]": ">=4.38.0,<4.41.0",
-    "accelerate": ">=0.21.0,<0.22.0",
+    "accelerate": ">=0.21.0,<0.34.0",
 }
 if LITE_MODE:
     DEPENDENT_PACKAGES = {package: version for package, version in DEPENDENT_PACKAGES.items() if package not in ["psutil", "Pillow", "timm"]}
@@ -142,6 +142,7 @@ def default_setup_args(*, version, submodule):
             "Programming Language :: Python :: 3.9",
             "Programming Language :: Python :: 3.10",
             "Programming Language :: Python :: 3.11",
+            "Programming Language :: Python :: 3.12",
             "Topic :: Software Development",
             "Topic :: Scientific/Engineering :: Artificial Intelligence",
             "Topic :: Scientific/Engineering :: Information Analysis",
