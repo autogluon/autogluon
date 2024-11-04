@@ -1850,6 +1850,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             "excluded_model_types": excluded_model_types,
         }
 
+        # FIXME: v1.2 pseudo_data can be passed in `fit()` but it is ignored!
         if X_pseudo is not None and y_pseudo is not None:
             core_kwargs["X_pseudo"] = X_pseudo
             core_kwargs["y_pseudo"] = y_pseudo
