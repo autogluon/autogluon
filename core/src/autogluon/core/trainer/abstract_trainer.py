@@ -2578,6 +2578,8 @@ class AbstractTrainer:
                 )
                 model_fit_kwargs.update(bagged_model_fit_kwargs)
 
+            # FIXME: v1.3: X.columns incorrectly includes sample_weight column
+            # FIXME: v1.3: Move sample_weight logic into fit_stack_core level methods, currently we are editing X too many times in self._get_model_fit_kwargs
             candidate_features = self._proxy_model_feature_prune(
                 time_limit=time_limit,
                 layer_fit_time=multi_fold_time_elapsed,

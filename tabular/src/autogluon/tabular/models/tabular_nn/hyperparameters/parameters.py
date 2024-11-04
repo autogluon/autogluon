@@ -10,6 +10,7 @@ def get_fixed_params(framework):
     fixed_params = {
         # 'seed_value': 0,  # random seed for reproducibility (set = None to ignore)
     }
+    # TODO: v1.2 Change default epochs_wo_improve to "auto", so that None can mean no early stopping.
     pytorch_fixed_params = {
         "num_epochs": 1000,  # maximum number of epochs (passes over full dataset) for training NN
         "epochs_wo_improve": None,  # we terminate training if validation performance hasn't improved in the last 'epochs_wo_improve' # of epochs
