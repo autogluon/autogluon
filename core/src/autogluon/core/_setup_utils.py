@@ -27,12 +27,11 @@ DEPENDENT_PACKAGES = {
     "networkx": ">=3.0,<4",  # Major version cap
     "tqdm": ">=4.38,<5",  # Major version cap
     "Pillow": ">=10.0.1,<12",  # Major version cap
-    "torch": ">=2.2,<2.5",  # Major version cap, sync with common/src/autogluon/common/utils/try_import.py
-    "lightning": ">=2.2,<2.4",  # Major version cap
-    "pytorch_lightning": ">=2.2,<2.4",  # Major version cap, capping `lightning` does not cap `pytorch_lightning`!
-    "async_timeout": ">=4.0,<5",  # Major version cap
-    "transformers[sentencepiece]": ">=4.38.0,<4.41.0",
-    "accelerate": ">=0.21.0,<0.34.0",
+    "torch": ">=2.2,<2.6",  # Major version cap, sync with common/src/autogluon/common/utils/try_import.py
+    "lightning": ">=2.2,<2.6",  # Major version cap
+    "async_timeout": ">=4.0,<6",  # Major version cap
+    "transformers[sentencepiece]": ">=4.38.0,<5",
+    "accelerate": ">=0.21.0,<1.2",
 }
 if LITE_MODE:
     DEPENDENT_PACKAGES = {package: version for package, version in DEPENDENT_PACKAGES.items() if package not in ["psutil", "Pillow", "timm"]}
