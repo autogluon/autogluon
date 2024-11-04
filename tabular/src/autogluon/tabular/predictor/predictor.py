@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 from packaging import version
 
-from autogluon.common import FeatureMetadata
+from autogluon.common import FeatureMetadata, TabularDataset
 from autogluon.common.loaders import load_json
 from autogluon.common.savers import save_json
 from autogluon.common.utils.file_utils import get_directory_size, get_directory_size_per_file
@@ -39,7 +39,6 @@ from autogluon.core.constants import (
     SOFTCLASS,
 )
 from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
-from autogluon.core.dataset import TabularDataset
 from autogluon.core.metrics import Scorer, get_metric
 from autogluon.core.problem_type import problem_type_info
 from autogluon.core.pseudolabeling.pseudolabeling import filter_ensemble_pseudo, filter_pseudo

@@ -1,13 +1,11 @@
 import pandas as pd
 
-from .utils.loaders import load_pd
+from .loaders import load_pd
 
 __all__ = ["TabularDataset"]
 
 
 # FIXME: Add unit tests
-# FIXME: Move to common
-# FIXME: Check dtypes, remove usage of type checks for TabularDataset!
 class TabularDataset(pd.DataFrame):
     """
     A dataset in tabular format (with rows = samples, columns = features/variables).
