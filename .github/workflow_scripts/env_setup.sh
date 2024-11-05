@@ -51,7 +51,7 @@ function install_multimodal {
     # launch different process for each test to make sure memory is released
     python -m pip install --upgrade pytest-xdist
     install_local_packages "multimodal/$1"
-    setup_mmcv
+    # setup_mmcv
     # python -m pip install --upgrade "mmocr<1.0"  # not compatible with mmcv 2.0
 }
 
