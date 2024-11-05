@@ -2765,11 +2765,15 @@ class AbstractTrainer:
             if model_path is None:
                 logger.log(20, f"Model training failed for {model_name if isinstance(model_name, str) else model_name.name}.")
             else:
+                if time_limit is not None:
+                    extra_log = f"\n\tTime remaining for this layer: {int(time_limit - (time.time() - time_start))}s..."
+                else:
+                    extra_log = ""
                 logger.log(
                     20,
                     f"Finished all jobs for {model_name}."
                     f"\n\t{len(unfinished_job_refs)} jobs are still running."
-                    f"\n\tTime remaining for this layer {int(time_limit - (time.time() - time_start)) if time_limit is not None else -1}s..."
+                    f"{extra_log}"
                 )
 
                 # TODO: figure out a way to avoid calling _add_model in the worker-process to save overhead time.
