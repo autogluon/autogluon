@@ -170,6 +170,13 @@ class DistributedFitManager:
                     models_to_schedule_later.append(model)
                     continue
 
+            if self.mode == "fit":
+                # Set the resources each model fit is allowed to use.
+                # Only needed at in fit mode as all other modes rely on the data stored in the model metadata.
+                getattr(model, "model_base", model)._user_params_aux["num_gpus"] = model_resources.num_gpus_for_fold_worker
+                getattr(model, "model_base", model)._user_params_aux["num_cpus"] = model_resources.num_cpus_for_fold_worker
+
+
             job_ref = self.remote_func.options(
                 num_cpus=model_resources.num_cpus_for_model_worker, num_gpus=model_resources.num_gpus_for_model_worker
             ).remote(model=ray.put(model) if self.mode in ["fit"] else model, **self.job_kwargs)
