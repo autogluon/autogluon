@@ -657,6 +657,7 @@ class AbstractModel:
                 user_specified_lower_level_num_gpus <= system_num_cpus
             ), f"Specified num_gpus per {self.__class__.__name__} is more than the total: {system_num_cpus}"
         k_fold = kwargs.get("k_fold", None)
+        k_fold = 1 if self.params.get("use_child_oof", False) else k_fold
         if k_fold is not None and k_fold > 0:
             # bagged model will look ag_args_ensemble and ag_args_fit internally to determine resources
             # pass all resources here by default
