@@ -175,6 +175,15 @@ class DistributedFitManager:
                     models_to_schedule_later.append(model)
                     continue
 
+            model = prepare_model_resources_for_fit(
+                model=model,
+                num_cpus=model_resources.num_cpus_for_fold_worker,
+                num_gpus=model_resources.num_gpus_for_fold_worker,
+                num_cpus_worker=model_resources.num_cpus_for_model_worker,
+                num_gpus_worker=model_resources.num_gpus_for_model_worker,
+                total_num_cpus=self.total_num_cpus,
+                total_num_gpus=self.total_num_gpus,
+            )
             job_ref = self.remote_func.options(
                 num_cpus=model_resources.num_cpus_for_model_worker, num_gpus=model_resources.num_gpus_for_model_worker
             ).remote(model=ray.put(model) if self.mode in ["fit"] else model, **self.job_kwargs)
@@ -326,19 +335,30 @@ class DistributedFitManager:
 
 # TODO: make this logic be good.
 def prepare_model_resources_for_fit(
-    *, models: list[AbstractModel], total_num_cpus: int, total_num_gpus: int
-) -> list[AbstractModel]:
+    *,
+    model: AbstractModel,
+    total_num_cpus: int,
+    total_num_gpus: int,
+    num_cpus: int = 1,
+    num_gpus: float = 0,
+    num_cpus_worker: int = 1,
+    num_gpus_worker: float = 0,
+) -> AbstractModel:
     """Allocate each model resources for fitting. (This is currently an in-place operation!)
 
     We allocate resources by setting the _user_params_aux of a model.
 
     """
 
-    for model in models:
-        upa = getattr(model, "model_base", model)._user_params_aux
-        if "num_cpus" not in upa:
-            getattr(model, "model_base", model)._user_params_aux["num_cpus"] = 1
-        if "num_gpus" not in upa:
-            getattr(model, "model_base", model)._user_params_aux["num_gpus"] = 0
+    if num_cpus == 0:
+        # Non-bagged mode
+        num_cpus = num_cpus_worker
+        num_gpus = num_gpus_worker
 
-    return models
+    upa = getattr(model, "model_base", model)._user_params_aux
+    if "num_cpus" not in upa:
+        getattr(model, "model_base", model)._user_params_aux["num_cpus"] = num_cpus
+    if "num_gpus" not in upa:
+        getattr(model, "model_base", model)._user_params_aux["num_gpus"] = num_gpus
+
+    return model
