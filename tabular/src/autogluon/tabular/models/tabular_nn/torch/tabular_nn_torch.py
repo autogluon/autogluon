@@ -575,9 +575,9 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
         # update learning curve
         for i, metric in enumerate(scorers):
-            train_curves[metric.name].append(train_metrics[i])
-            val_curves[metric.name] += [val_metrics[i]] if val_dataset is not None else []
-            test_curves[metric.name] += [test_metrics[i]] if test_dataset is not None else []
+            train_curves[metric.name].append(float(train_metrics[i]))
+            val_curves[metric.name] += [float(val_metrics[i])] if val_dataset is not None else []
+            test_curves[metric.name] += [float(test_metrics[i])] if test_dataset is not None else []
 
         return False
 
