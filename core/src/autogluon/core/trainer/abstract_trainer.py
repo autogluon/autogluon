@@ -2147,7 +2147,7 @@ class AbstractTrainer:
             num_children=num_children,
             fit_num_cpu=model.fit_num_cpus,
             fit_num_gpu=model.fit_num_gpus,
-            refit_full_requires_gpu=(model.fit_num_gpus > 0) and model._user_params.get("refit_folds", False),
+            refit_full_requires_gpu=(model.fit_num_gpus is not None) and (model.fit_num_gpus > 1) and model._user_params.get("refit_folds", False),
             **fit_metadata,
         )
         return model_metadata
@@ -4376,6 +4376,13 @@ def _detached_refit_single_full(
         model_full=model.convert_to_refit_full_template()
         # Mitigates situation where bagged models barely had enough memory and refit requires more. Worst case results in OOM, but this lowers chance of failure.
         model_full._user_params_aux["max_memory_usage_ratio"]=model.params_aux["max_memory_usage_ratio"]*1.15
+        # Re-set user specified training resources.
+        if DistributedContext.is_distributed_mode():
+            # FIXME: this is technically also a bug for non-distributed mode, but there it is good to use more/all resources per refit.
+            if model.fit_num_cpus is not None:
+                model_full._user_params_aux["num_cpus"] = model.fit_num_cpus
+            if model.fit_num_gpus is not None:
+                model_full._user_params_aux["num_gpus"] = model.fit_num_gpus
         # TODO: Do it for all models in the level at once to avoid repeated processing of data?
         base_model_names=_self.get_base_model_names(model_name)
         # FIXME: Logs for inference speed (1 row) are incorrect because

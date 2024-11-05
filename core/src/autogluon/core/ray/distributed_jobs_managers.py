@@ -244,10 +244,10 @@ class DistributedFitManager:
             )
 
         # Fallback if required information are not given at this point, we can only assume that the model will use all available CPU resources of a node.
-        # As we have no information about if the model needs GPUs, we assume that it does not need any.
         num_cpus_for_fold_worker = getattr(model, "model_base", model)._user_params_aux.get(
             "num_cpus", self.max_cpu_resources_per_node
         )
+        # As we have no information about if the model needs GPUs, we assume that it does not need any.
         num_gpus_for_fold_worker = getattr(model, "model_base", model)._user_params_aux.get("num_gpus", 0)
 
         if (not isinstance(model, StackerEnsembleModel)) or model._user_params.get("use_child_oof", False):
