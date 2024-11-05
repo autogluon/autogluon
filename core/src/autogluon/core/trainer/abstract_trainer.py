@@ -2145,9 +2145,9 @@ class AbstractTrainer:
             stack_name=stack_name,
             level=level,
             num_children=num_children,
-            fit_num_cpu=model_param_aux.get("num_cpus", 1),
-            fit_num_gpu=model_param_aux.get("num_gpus", 0),
-            refit_full_requires_gpu=(model_param_aux.get("num_gpus", 0) > 0) and model._user_params.get("refit_folds", False),
+            fit_num_cpu=model.fit_num_cpus,
+            fit_num_gpu=model.fit_num_gpus,
+            refit_full_requires_gpu=(model.fit_num_gpus > 0) and model._user_params.get("refit_folds", False),
             **fit_metadata,
         )
         return model_metadata

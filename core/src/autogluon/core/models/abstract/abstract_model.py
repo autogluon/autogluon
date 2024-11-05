@@ -145,6 +145,8 @@ class AbstractModel:
         self.predict_1_time = None  # Time taken to predict 1 row of data in seconds (with batch size `predict_1_batch_size` in params_aux)
         self.compile_time = None  # Time taken to compile the model in seconds
         self.val_score = None  # Score with eval_metric (Validation data)
+        self.fit_num_cpus: int | None = None # Number of CPUs used during fit
+        self.fit_num_gpus: int | None = None # Number of GPUs used during fit
 
         self._user_params, self._user_params_aux = self._init_user_params(params=hyperparameters)
 
@@ -918,6 +920,10 @@ class AbstractModel:
         if self.predict_1_time is None and predict_1_batch_size is not None and "X" in kwargs and kwargs["X"] is not None:
             X_1 = sample_df_for_time_func(df=kwargs["X"], sample_size=predict_1_batch_size)
             self.predict_1_time = time_func(f=self.predict, args=[X_1]) / len(X_1)
+        # Save auxiliary information about fit
+        self.fit_num_cpus = kwargs.get("num_cpus", None)
+        self.fit_num_gpus = kwargs.get("num_gpus", None)
+
         return self
 
     def get_features(self) -> List[str]:
@@ -1833,6 +1839,8 @@ class AbstractModel:
         self.compile_time = None
         self.val_score = None
         self.params_trained = dict()
+        self.fit_num_cpus = None
+        self.fit_num_gpus = None
 
     # TODO: Experimental, currently unused
     #  Has not been tested on Windows

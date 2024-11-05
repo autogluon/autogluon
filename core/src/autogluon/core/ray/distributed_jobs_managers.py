@@ -77,6 +77,8 @@ class DistributedFitManager:
         num_splits: int | None = None,
         get_model_attribute_func: Callable | None = None,
     ):
+        import ray
+
         self.mode = mode
         self.num_splits = num_splits
         self.get_model_attribute_func = get_model_attribute_func
@@ -96,13 +98,15 @@ class DistributedFitManager:
         self.available_num_cpus = num_cpus
         self.available_num_gpus = num_gpus
 
+        # Detect max resources a job could use on some node
+        # FIXME: deprecated call without alternative?
+        self.max_cpu_resources_per_node = int(max([n["CPU"] for n in ray.state.total_resources_per_node().values()]))
+
         # Job tracking
         self.job_refs_to_allocated_resources: dict[str, ModelResources] = {}
         self.models_to_schedule: list[AbstractModel] | list[str] = []
 
         # Init remote function
-        import ray
-
         self.remote_func = ray.remote(**DEFAULT_REMOTE_KWARGS)(func)
         self.job_kwargs = dict()
         for key, value in func_kwargs.items():
@@ -138,7 +142,8 @@ class DistributedFitManager:
                 if len(job_refs) + len(self.job_refs_to_allocated_resources) == 0:
                     logger.log(
                         20,
-                        "Insufficient total resources for training a model fully parallel. Consider disabling distributed training."
+                        "DISTRIBUTED WARNING: Insufficient total resources for training a model fully distributed parallel. "
+                        "Consider disabling distributed training. "
                         "Forcing to train one model anyhow, but this will lead to inefficient parallelization.",
                     )
 
@@ -148,10 +153,10 @@ class DistributedFitManager:
                         model_resources.num_gpus_for_model_worker + model_resources.num_gpus_for_fold_worker
                     ) > self.total_num_gpus:
                         raise ValueError(
-                            "Insufficient number of GPUs to train any model, even in a non-parallel setting."
-                            "This is likely the results of requiring more GPUs than available to distribute the training."
+                            "DISTRIBUTED ERROR: Insufficient number of GPUs to train any model, even in a non-parallel setting. "
+                            "This is likely the results of requiring more GPUs than available to distribute the training. "
                             "Ray does not support freeing GPU resources for nested calls with GPUs. "
-                            "Thus, we need at least twice the amount of GPUs needed to fit one model. "
+                            "Thus, we need at least twice the amount of GPUs needed to fit one model."
                         )
                 else:
                     if (
@@ -159,9 +164,9 @@ class DistributedFitManager:
                     ) > self.total_num_gpus:
                         logger.log(
                             40,
-                            f"Delay scheduling model {model_name}: "
-                            "Insufficient number of GPUs to train any model, even in a non-parallel setting."
-                            "This is likely the results of requiring more GPUs than available to distribute the training."
+                            f"DISTRIBUTED WARNING: Delay scheduling model {model_name}: "
+                            "Insufficient number of GPUs to train any model, even in a non-parallel setting. "
+                            "This is likely the results of requiring more GPUs than available to distribute the training. "
                             "Ray does not support freeing GPU resources for nested calls with GPUs. "
                             "Thus, we need at least twice the amount of GPUs needed to fit one model.",
                         )
@@ -169,13 +174,6 @@ class DistributedFitManager:
                     logger.log(0, f"Delay scheduling model {model_name}: {reason}.")
                     models_to_schedule_later.append(model)
                     continue
-
-            if self.mode == "fit":
-                # Set the resources each model fit is allowed to use.
-                # Only needed at in fit mode as all other modes rely on the data stored in the model metadata.
-                getattr(model, "model_base", model)._user_params_aux["num_gpus"] = model_resources.num_gpus_for_fold_worker
-                getattr(model, "model_base", model)._user_params_aux["num_cpus"] = model_resources.num_cpus_for_fold_worker
-
 
             job_ref = self.remote_func.options(
                 num_cpus=model_resources.num_cpus_for_model_worker, num_gpus=model_resources.num_gpus_for_model_worker
@@ -186,7 +184,7 @@ class DistributedFitManager:
             logger.log(
                 20,
                 f"Scheduled model {self.mode} for {model_name}. {len(self.job_refs_to_allocated_resources)} jobs are running."
-                f"\n\tAllocated {model_resources.total_num_cpus} CPUs and {model_resources.total_num_gpus} GPUs"
+                f"\n\tAllocated {'' if is_sufficient else 'UP TO '}{model_resources.total_num_cpus} CPUs and {model_resources.total_num_gpus} GPUs"
                 f"\n\tRay{job_ref}",
             )
             time.sleep(0.1)
@@ -239,8 +237,18 @@ class DistributedFitManager:
     def get_resources_for_model_fit(self, *, model: AbstractModel) -> ModelResources:
         """Estimate the resources required to fit a model."""
 
+        if "num_cpus" not in getattr(model, "model_base", model)._user_params_aux:
+            logger.warning(
+                f"DISTRIBUTED WARNING: Model {model.name} does not specify the number of resources to use! "
+                "Assuming that the model will use all available node resources, which can heavily impact the performance of distributed training."
+            )
+
+        # Fallback if required information are not given at this point, we can only assume that the model will use all available CPU resources of a node.
+        # As we have no information about if the model needs GPUs, we assume that it does not need any.
+        num_cpus_for_fold_worker = getattr(model, "model_base", model)._user_params_aux.get(
+            "num_cpus", self.max_cpu_resources_per_node
+        )
         num_gpus_for_fold_worker = getattr(model, "model_base", model)._user_params_aux.get("num_gpus", 0)
-        num_cpus_for_fold_worker = getattr(model, "model_base", model)._user_params_aux.get("num_cpus", 1)
 
         if (not isinstance(model, StackerEnsembleModel)) or model._user_params.get("use_child_oof", False):
             # Only one fold is fit, so we need to use all fit resources for the model-worker
