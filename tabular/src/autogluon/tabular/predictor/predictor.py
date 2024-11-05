@@ -1497,6 +1497,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
             if _ds_ray is not None:
                 # Handle resources
+                # FIXME: what about distributed?
                 from autogluon.common.utils.resource_utils import ResourceManager
 
                 total_resources = ag_fit_kwargs["core_kwargs"]["total_resources"]
