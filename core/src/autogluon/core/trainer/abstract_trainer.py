@@ -2721,13 +2721,12 @@ class AbstractTrainer:
             return models_valid
 
         # -- Distributed training
-        from autogluon.core.ray.distributed_jobs_managers import DistributedFitManager
+        from autogluon.core.ray.distributed_jobs_managers import DistributedFitManager, prepare_model_resources_for_fit
         from autogluon.common.utils.try_import import try_import_ray
 
         ray = try_import_ray()
 
         logger.log(20, "Scheduling distributed model-workers for training...")
-
         distributed_manager = DistributedFitManager(
             mode="fit",
             func=_remote_train_multi_fold,
@@ -2748,6 +2747,8 @@ class AbstractTrainer:
             num_gpus=kwargs.get("total_resources", {}).get("num_gpus", 0),
             num_splits=kwargs.get("k_fold", 1) * kwargs.get("n_repeats", 1)
         )
+        models = prepare_model_resources_for_fit(models=models, total_num_cpus=distributed_manager.total_num_cpus, total_num_gpus=distributed_manager.total_num_gpus)
+
         unfinished_job_refs = distributed_manager.schedule_jobs(models_to_fit=models)
         timeout = int(time_limit - (time.time() - time_start) + 5) if time_limit is not None else None # include 5 second overhead.
 

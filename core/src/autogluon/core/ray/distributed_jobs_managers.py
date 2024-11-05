@@ -221,6 +221,11 @@ class DistributedFitManager:
 
         num_gpus_for_fold_worker = self.get_model_attribute_func(model=model, attribute="fit_num_gpu")
         num_cpus_for_fold_worker = self.get_model_attribute_func(model=model, attribute="fit_num_cpu")
+        num_cpus_for_fold_worker = (
+            num_cpus_for_fold_worker if num_cpus_for_fold_worker is not None else self.max_cpu_resources_per_node
+        )
+        num_gpus_for_fold_worker = num_gpus_for_fold_worker if num_gpus_for_fold_worker is not None else 0
+
         num_gpus_for_model_worker = (
             1 if self.get_model_attribute_func(model=model, attribute="refit_full_requires_gpu") else 0
         )
@@ -317,3 +322,23 @@ class DistributedFitManager:
         ray.internal.free(object_refs=[self.job_kwargs[key] for key in self.func_put_kwargs])
         for key in self.func_put_kwargs:
             del self.job_kwargs[key]
+
+
+# TODO: make this logic be good.
+def prepare_model_resources_for_fit(
+    *, models: list[AbstractModel], total_num_cpus: int, total_num_gpus: int
+) -> list[AbstractModel]:
+    """Allocate each model resources for fitting. (This is currently an in-place operation!)
+
+    We allocate resources by setting the _user_params_aux of a model.
+
+    """
+
+    for model in models:
+        upa = getattr(model, "model_base", model)._user_params_aux
+        if "num_cpus" not in upa:
+            getattr(model, "model_base", model)._user_params_aux["num_cpus"] = 1
+        if "num_gpus" not in upa:
+            getattr(model, "model_base", model)._user_params_aux["num_gpus"] = 0
+
+    return models
