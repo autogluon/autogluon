@@ -27,6 +27,20 @@ The Conda install may have subtle differences in installed dependencies that cou
   
   :::::
   
+  :::::{tab} UV
+  
+    ::::{tab} CPU
+    ```{include} install-cpu-uv.md
+    ```
+    ::::
+    
+    ::::{tab} GPU
+    ```{include} install-gpu-pip.md
+    ```
+    ::::
+  
+  :::::
+  
   :::::{tab} Conda
   
     ::::{tab} CPU
@@ -71,6 +85,23 @@ The Conda install may have subtle differences in installed dependencies that cou
   
     ::::{tab} GPU
     ```{include} install-mac-nogpu.md
+    ::::
+  
+  :::::
+  
+  :::::{tab} UV
+  
+    ::::{tab} CPU
+    ```{include} install-mac-libomp.md
+    ```
+
+    ```{include} install-cpu-uv.md
+    ```
+    ::::
+  
+    ::::{tab} GPU
+    ```{include} install-mac-nogpu.md
+    ```
     ::::
   
   :::::
@@ -125,6 +156,26 @@ The Conda install may have subtle differences in installed dependencies that cou
     ```
 
 	  ```{include} install-gpu-pip.md 
+    ```
+    ::::
+  
+  :::::
+  
+  :::::{tab} UV
+  
+    ::::{tab} CPU
+    ```{include} install-windows-cpu.md
+    ```
+    
+    ```{include} install-cpu-uv.md
+    ```
+    ::::
+    
+    ::::{tab} GPU
+    ```{include} install-windows-gpu.md
+    ```
+
+    ```{include} install-gpu-pip.md
     ```
     ::::
   
@@ -213,7 +264,7 @@ AutoGluon offers nightly builds that can be installed using the `--pre` argument
 
 ```bash
 pip install -U uv
-uv pip install --pre autogluon
+python -m uv pip install --pre autogluon
 ```
 :::
 
