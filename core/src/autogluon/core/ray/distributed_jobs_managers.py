@@ -134,6 +134,13 @@ class DistributedFitManager:
         models_to_schedule_later = []
         job_refs = []
         for model in models_to_schedule:
+            model = prepare_model_resources_for_fit(
+                model=model,
+                num_cpus=1,
+                num_gpus=0,
+                total_num_cpus=self.total_num_cpus,
+                total_num_gpus=self.total_num_gpus,
+            )
             model_resources = self.get_resources_for_model(model=model)
             model_name = model if self.mode == "refit" else model.name
 
@@ -175,15 +182,6 @@ class DistributedFitManager:
                     models_to_schedule_later.append(model)
                     continue
 
-            model = prepare_model_resources_for_fit(
-                model=model,
-                num_cpus=model_resources.num_cpus_for_fold_worker,
-                num_gpus=model_resources.num_gpus_for_fold_worker,
-                num_cpus_worker=model_resources.num_cpus_for_model_worker,
-                num_gpus_worker=model_resources.num_gpus_for_model_worker,
-                total_num_cpus=self.total_num_cpus,
-                total_num_gpus=self.total_num_gpus,
-            )
             job_ref = self.remote_func.options(
                 num_cpus=model_resources.num_cpus_for_model_worker, num_gpus=model_resources.num_gpus_for_model_worker
             ).remote(model=ray.put(model) if self.mode in ["fit"] else model, **self.job_kwargs)
