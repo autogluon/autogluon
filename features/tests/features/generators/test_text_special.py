@@ -35,7 +35,7 @@ def test_text_special_feature_generator(generator_helper, data_helper):
         expected_feature_metadata_full=expected_feature_metadata_full,
     )
 
-    assert expected_output_data_feat_lower_ratio == list(output_data["text.lower_ratio"].values)
+    assert expected_output_data_feat_lower_ratio == list(map(int, output_data["text.lower_ratio"].values))
 
 
 def test_text_special_feature_generator_categorical_nan(generator_helper, data_helper):
@@ -78,4 +78,4 @@ def test_text_special_feature_generator_categorical_nan(generator_helper, data_h
         expected_feature_metadata_full=expected_feature_metadata_full,
     )
 
-    assert expected_output_data_feat_lower_ratio == list(output_data["text.lower_ratio"].values)
+    assert expected_output_data_feat_lower_ratio == list(map(int, output_data["text.lower_ratio"].values))

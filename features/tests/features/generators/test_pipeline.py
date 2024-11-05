@@ -110,7 +110,7 @@ def test_pipeline_feature_generator(generator_helper, data_helper):
     assert expected_output_data_feat_datetime == list(output_data["datetime"].values)
 
     # text_special checks
-    assert expected_output_data_feat_lower_ratio == list(output_data["text.lower_ratio"].values)
+    assert expected_output_data_feat_lower_ratio == list(map(int, output_data["text.lower_ratio"].values))
 
     # text_ngram checks
     assert expected_output_data_feat_total == list(output_data["__nlp__._total_"].values)
