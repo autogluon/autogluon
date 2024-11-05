@@ -199,24 +199,22 @@ EVALUATION_METRICS = {
 }
 
 VALIDATION_METRICS = {
-    # For types with explicit evaluation metrics, filter through METRIC_MODE_MAP and add DIRECT_LOSS
-    BINARY: [metric for metric in METRICS[BINARY].keys() if metric in METRIC_MODE_MAP.keys()] + [DIRECT_LOSS],
-    MULTICLASS: [metric for metric in METRICS[MULTICLASS].keys() if metric in METRIC_MODE_MAP.keys()] + [DIRECT_LOSS],
-    REGRESSION: [metric for metric in METRICS[REGRESSION].keys() if metric in METRIC_MODE_MAP.keys()] + [DIRECT_LOSS],
-    
-    OBJECT_DETECTION: [metric for metric in DETECTION_METRICS if metric in METRIC_MODE_MAP.keys()] + [DIRECT_LOSS],
-    SEMANTIC_SEGMENTATION: [metric for metric in [IOU, BER, SM] if metric in METRIC_MODE_MAP.keys()] + [DIRECT_LOSS],
-    NER: [metric for metric in [OVERALL_F1, NER_TOKEN_F1] if metric in METRIC_MODE_MAP.keys()] + [DIRECT_LOSS],
-    NAMED_ENTITY_RECOGNITION: [metric for metric in [OVERALL_F1, NER_TOKEN_F1] if metric in METRIC_MODE_MAP.keys()] + [DIRECT_LOSS],
-    FEW_SHOT_CLASSIFICATION: [metric for metric in METRICS[MULTICLASS].keys() if metric in METRIC_MODE_MAP.keys()] + [DIRECT_LOSS],
-    
-    # For types without explicit evaluation metrics, return empty list as per supported_validation_metrics property
-    CLASSIFICATION: [],
-    FEATURE_EXTRACTION: [],
-    ZERO_SHOT_IMAGE_CLASSIFICATION: [],
-    TEXT_SIMILARITY: [],
-    IMAGE_SIMILARITY: [],
-    IMAGE_TEXT_SIMILARITY: [],
+    BINARY: METRICS[BINARY].keys(),
+    MULTICLASS: METRICS[MULTICLASS].keys(),
+    REGRESSION: METRICS[REGRESSION].keys(),
+    OBJECT_DETECTION: DETECTION_METRICS,
+    SEMANTIC_SEGMENTATION: [IOU, BER, SM],
+    NER: [OVERALL_F1, NER_TOKEN_F1],
+    NAMED_ENTITY_RECOGNITION: [OVERALL_F1, NER_TOKEN_F1],
+    FEW_SHOT_CLASSIFICATION: METRICS[MULTICLASS].keys(),
+}
+
+VALIDATION_METRICS = {
+    metric_type: [
+        metric for metric in source 
+        if metric in METRIC_MODE_MAP
+    ] + [DIRECT_LOSS]
+    for metric_type, source in VALIDATION_METRICS.items()
 }
 
 # Training status
