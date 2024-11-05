@@ -188,33 +188,14 @@ EVALUATION_METRICS = {
     NER: [OVERALL_F1, NER_TOKEN_F1],
     NAMED_ENTITY_RECOGNITION: [OVERALL_F1, NER_TOKEN_F1],
     FEW_SHOT_CLASSIFICATION: METRICS[MULTICLASS].keys(),
-    
-    # TODO
-    CLASSIFICATION: [],
-    FEATURE_EXTRACTION: [],
-    ZERO_SHOT_IMAGE_CLASSIFICATION: [],
-    TEXT_SIMILARITY: [],
-    IMAGE_SIMILARITY: [],
-    IMAGE_TEXT_SIMILARITY: [],
 }
 
 VALIDATION_METRICS = {
-    BINARY: METRICS[BINARY].keys(),
-    MULTICLASS: METRICS[MULTICLASS].keys(),
-    REGRESSION: METRICS[REGRESSION].keys(),
-    OBJECT_DETECTION: DETECTION_METRICS,
-    SEMANTIC_SEGMENTATION: [IOU, BER, SM],
-    NER: [OVERALL_F1, NER_TOKEN_F1],
-    NAMED_ENTITY_RECOGNITION: [OVERALL_F1, NER_TOKEN_F1],
-    FEW_SHOT_CLASSIFICATION: METRICS[MULTICLASS].keys(),
-}
-
-VALIDATION_METRICS = {
-    metric_type: [
-        metric for metric in source 
+    problem_type: [
+        metric for metric in metrics 
         if metric in METRIC_MODE_MAP
     ] + [DIRECT_LOSS]
-    for metric_type, source in VALIDATION_METRICS.items()
+    for problem_type, metrics in EVALUATION_METRICS.items()
 }
 
 # Training status
