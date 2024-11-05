@@ -175,7 +175,7 @@ def hyperparameter_tune(hyperparameter_tune_kwargs, resources, is_matching=False
     mode = _fit_args.get("learner")._minmax_mode
     save_path = _fit_args.get("save_path")
     time_budget_s = _fit_args.get("max_time")
-    num_to_keep = hyperparameter_tune_kwargs.pop("num_to_keep") if "num_to_keep" in hyperparameter_tune_kwargs else 3
+    num_to_keep = hyperparameter_tune_kwargs.pop("num_to_keep", 3)
     if time_budget_s is not None:
         time_budget_s *= 0.95  # give some buffer time to ray
     try:
