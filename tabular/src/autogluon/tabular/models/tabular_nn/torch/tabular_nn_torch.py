@@ -769,6 +769,8 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             optimizer = torch.optim.SGD(params=self.model.parameters(), lr=learning_rate, weight_decay=weight_decay)
         elif optimizer == "adam":
             optimizer = torch.optim.Adam(params=self.model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+        elif optimizer == "adamw":
+            optimizer = torch.optim.AdamW(params=self.model.parameters(), lr=learning_rate, weight_decay=weight_decay)
         else:
             raise ValueError(f"Unknown optimizer specified: {optimizer}")
         return optimizer
