@@ -5,6 +5,7 @@ from autogluon.common.utils.try_import import try_import_ray
 from .constants import (
     BEST_QUALITY,
     BINARY,
+    COMPETITION_QUALITY,
     DATA,
     DEFAULT,
     ENVIRONMENT,
@@ -330,7 +331,7 @@ def object_detection(presets: str = DEFAULT):
         hyperparameters.update(default_tunable_hyperparameters)
         hyperparameter_tune_kwargs.update(default_hyperparameter_tune_kwargs)
 
-    if presets == MEDIUM_QUALITY:
+    if presets in [DEFAULT, MEDIUM_QUALITY]:
         hyperparameters.update(
             {
                 "model.mmdet_image.checkpoint_name": "yolox_l",
@@ -346,7 +347,7 @@ def object_detection(presets: str = DEFAULT):
                 "optimization.gradient_clip_val": 1,
             }
         )
-    elif presets in [DEFAULT, HIGH_QUALITY]:
+    elif presets == HIGH_QUALITY:
         hyperparameters.update(
             {
                 "model.mmdet_image.checkpoint_name": "dino-4scale_r50_8xb2-12e_coco",
@@ -356,6 +357,21 @@ def object_detection(presets: str = DEFAULT):
         hyperparameters.update(
             {
                 "model.mmdet_image.checkpoint_name": "dino-5scale_swin-l_8xb2-36e_coco",
+            }
+        )
+    elif presets == COMPETITION_QUALITY:
+        hyperparameters.update(
+            {
+                "model.mmdet_image.checkpoint_name": "co_dino",
+                "model.mmdet_image.frozen_layers": ["backbone"],
+                "env.per_gpu_batch_size": 1,  # Works on 40G GPU
+                "optimization.learning_rate": 1e-4,
+                "optimization.lr_choice": "two_stages",
+                "optimization.patience": 30,
+                "optimization.max_epochs": 100,
+                "optimization.val_check_interval": 1.0,
+                "optimization.num_sanity_val_steps": 0,  # To avoid the CUDA OOM Error
+                "optimization.check_val_every_n_epoch": 1,
             }
         )
     else:
