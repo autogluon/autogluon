@@ -303,7 +303,7 @@ class DistributedFitManager:
         # TODO: determine how to suppress error messages from cancelling jobs.
         if unfinished_job_refs is not None:
             for f in unfinished_job_refs:
-                ray.cancel(f)
+                ray.cancel(f, force=True)
 
     def clean_job_state(self, *, unfinished_job_refs: list[str] | None = None) -> None:
         """Clean up state of manager."""
