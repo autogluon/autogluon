@@ -53,9 +53,7 @@ def hpo_trial(sampled_hyperparameters, learner, checkpoint_dir=None, **_fit_args
     _fit_args["hyperparameters"] = (
         sampled_hyperparameters  # The original hyperparameters is the search space, replace it with the hyperparameters sampled
     )
-    _fit_args["save_path"] = (
-        context.get_trial_dir()
-    )  # We want to save each trial to a separate directory
+    _fit_args["save_path"] = context.get_trial_dir()  # We want to save each trial to a separate directory
     logger.debug(f"hpo trial save_path: {_fit_args['save_path']}")
     if checkpoint_dir is not None:
         _fit_args["resume"] = True
@@ -97,9 +95,7 @@ def build_final_learner(
         from ..learners.matching import MultiModalMatcher
 
         # reload the learner metadata
-        matcher = MultiModalMatcher._load_metadata(
-            matcher=learner, path=best_trial_path
-        )
+        matcher = MultiModalMatcher._load_metadata(matcher=learner, path=best_trial_path)
         # construct the model
         matcher._query_model, matcher._response_model = create_siamese_model(
             query_config=matcher._query_config,
@@ -144,9 +140,7 @@ def build_final_learner(
         return learner
 
 
-def hyperparameter_tune(
-    hyperparameter_tune_kwargs, resources, is_matching=False, **_fit_args
-):
+def hyperparameter_tune(hyperparameter_tune_kwargs, resources, is_matching=False, **_fit_args):
     """
     Tune hyperparameters of learner.
 
@@ -181,11 +175,7 @@ def hyperparameter_tune(
     mode = _fit_args.get("learner")._minmax_mode
     save_path = _fit_args.get("save_path")
     time_budget_s = _fit_args.get("max_time")
-    num_to_keep = (
-        hyperparameter_tune_kwargs.pop("num_to_keep")
-        if "num_to_keep" in hyperparameter_tune_kwargs
-        else 3
-    )
+    num_to_keep = hyperparameter_tune_kwargs.pop("num_to_keep") if "num_to_keep" in hyperparameter_tune_kwargs else 3
     if time_budget_s is not None:
         time_budget_s *= 0.95  # give some buffer time to ray
     try:
@@ -207,16 +197,12 @@ def hyperparameter_tune(
             total_resources=resources,
             minimum_gpu_per_trial=1.0 if resources["num_gpus"] > 0 else 0.0,
             time_budget_s=time_budget_s,
-            tune_config_kwargs={
-                "reuse_actors": False
-            },  # reuse_actors cause crashing in ray tune
+            tune_config_kwargs={"reuse_actors": False},  # reuse_actors cause crashing in ray tune
             run_config_kwargs=run_config_kwargs,
             verbose=2,
         )
     except EmptySearchSpace:
-        raise ValueError(
-            "Please provide a search space using `hyperparameters` in order to do hyperparameter tune"
-        )
+        raise ValueError("Please provide a search space using `hyperparameters` in order to do hyperparameter tune")
     except Exception as e:
         raise e
     else:
@@ -238,9 +224,7 @@ def hyperparameter_tune(
 
         checkpoints_paths_and_scores = dict(
             (os.path.join(checkpoint.path, RAY_TUNE_CHECKPOINT), score)
-            for checkpoint, score in analysis._get_trial_checkpoints_with_metric(
-                best_trial, metric=metric
-            )
+            for checkpoint, score in analysis._get_trial_checkpoints_with_metric(best_trial, metric=metric)
         )
         # write checkpoint paths and scores to yaml file so that top_k_average could read it
         best_k_model_path = os.path.join(best_trial_path, BEST_K_MODELS_FILE)
