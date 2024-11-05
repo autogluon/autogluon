@@ -182,7 +182,6 @@ EVALUATION_METRICS = {
     BINARY: METRICS[BINARY].keys(),
     MULTICLASS: METRICS[MULTICLASS].keys(),
     REGRESSION: METRICS[REGRESSION].keys(),
-    
     OBJECT_DETECTION: DETECTION_METRICS,
     SEMANTIC_SEGMENTATION: [IOU, BER, SM],
     NER: [OVERALL_F1, NER_TOKEN_F1],
@@ -191,10 +190,7 @@ EVALUATION_METRICS = {
 }
 
 VALIDATION_METRICS = {
-    problem_type: [
-        metric for metric in metrics 
-        if metric in METRIC_MODE_MAP
-    ] + [DIRECT_LOSS]
+    problem_type: [metric for metric in metrics if metric in METRIC_MODE_MAP] + [DIRECT_LOSS]
     for problem_type, metrics in EVALUATION_METRICS.items()
 }
 
