@@ -4,10 +4,7 @@ from autogluon.common import TabularDataset
 
 
 def test_tabular_dataset():
-    data = {
-        "col1": [1, 2, 3, 4],
-        "col2": ["a", "b", "b", "c"]
-    }
+    data = {"col1": [1, 2, 3, 4], "col2": ["a", "b", "b", "c"]}
 
     df_1 = pd.DataFrame(data)
     df_2 = TabularDataset(data)
