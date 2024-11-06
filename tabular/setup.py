@@ -39,6 +39,7 @@ extras_require = {
         # CatBoost wheel build is not working correctly on darwin for CatBoost 1.2, so use old version in this case.
         # https://github.com/autogluon/autogluon/pull/3190#issuecomment-1540599280
         # Catboost 1.2 doesn't have wheel for python 3.11
+        "numpy>=1.25,<2.0.0",  # TODO support numpy>=2.0.0 once issue resolved https://github.com/catboost/catboost/issues/2671
         "catboost>=1.1,<1.2 ; sys_platform == 'darwin' and python_version < '3.11'",
         "catboost>=1.1,<1.3; sys_platform != 'darwin'",
     ],
