@@ -21,7 +21,6 @@ from ..utils import (
     from_coco_or_voc,
     get_detection_classes,
     object_detection_data_to_df,
-    save_ovd_result_df,
     save_result_coco_format,
     setup_save_path,
     split_train_tuning_data,
@@ -703,10 +702,7 @@ class ObjectDetectionLearner(BaseLearner):
         if as_pandas is None and isinstance(data, pd.DataFrame):
             as_pandas = True
 
-        if self._problem_type == OPEN_VOCABULARY_OBJECT_DETECTION:
-            ret_type = OVD_RET
-        else:
-            ret_type = BBOX
+        ret_type = BBOX
 
         # only supports coco/voc format for OBJECT_DETECTION
         if self._problem_type == OBJECT_DETECTION:
@@ -751,16 +747,6 @@ class ObjectDetectionLearner(BaseLearner):
                 else:
                     pred_df.to_csv(result_path, index=False)
                 logger.info(f"Saved detection results {'as coco' if as_coco else 'as dataframe'} to {result_path}")
-
-        # TODO: refactor and merge with OBJECT DETECTION
-        if self._problem_type == OPEN_VOCABULARY_OBJECT_DETECTION:
-            if as_pandas:
-                pred = save_ovd_result_df(
-                    pred=pred,
-                    data=data,
-                    result_path=None,
-                )
-            return pred
 
         if as_pandas:
             return pred_df
