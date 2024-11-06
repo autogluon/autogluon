@@ -18,6 +18,7 @@ from ..constants import (
     F1,
     FEW_SHOT_CLASSIFICATION,
     IOU,
+    LOG_LOSS,
     MAP,
     MATCHING_METRICS,
     MATCHING_METRICS_WITHOUT_PROBLEM_TYPE,
