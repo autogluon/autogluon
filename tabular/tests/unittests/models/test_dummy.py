@@ -8,10 +8,25 @@ from autogluon.core.metrics import METRICS
 from autogluon.core.models.dummy.dummy_model import DummyModel
 
 
-def test_no_models(fit_helper, dataset_loader_helper):
-    """Tests that logic works properly when no models are trained"""
+def test_no_models_will_raise(fit_helper, dataset_loader_helper):
+    """Tests that RuntimeError is raised when no models fit"""
     fit_args = dict(
         hyperparameters={},
+    )
+
+    dataset_name = "adult"
+    directory_prefix = "./datasets/"
+    train_data, test_data, dataset_info = dataset_loader_helper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
+
+    with pytest.raises(RuntimeError):
+        fit_helper.fit_dataset(train_data=train_data, init_args=dict(label=dataset_info["label"]), fit_args=fit_args)
+
+
+def test_no_models(fit_helper, dataset_loader_helper):
+    """Tests that logic works properly when no models are trained and raise_on_no_models_fitted=False"""
+    fit_args = dict(
+        hyperparameters={},
+        raise_on_no_models_fitted=False,
     )
 
     dataset_name = "adult"
@@ -29,13 +44,14 @@ def test_no_models(fit_helper, dataset_loader_helper):
 
 
 def test_no_models_raise(fit_helper, dataset_loader_helper):
-    """Tests that logic works properly when no models are trained, and tests predictor.model_failures()"""
+    """Tests that logic works properly when no models are trained, and tests predictor.model_failures() and raise_on_no_models_fitted=False"""
 
     expected_exc_str = "Test Error Message"
 
     # Force DummyModel to raise an exception when fit.
     fit_args = dict(
         hyperparameters={DummyModel: {"raise": ValueError, "raise_msg": expected_exc_str}},
+        raise_on_no_models_fitted=False,
     )
 
     dataset_name = "adult"

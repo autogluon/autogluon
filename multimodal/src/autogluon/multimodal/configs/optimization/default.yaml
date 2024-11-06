@@ -5,7 +5,7 @@ optimization:
   lr_choice: "layerwise_decay"
   lr_decay: 0.9
   lr_schedule: "cosine_decay"
-  max_epochs: 10
+  max_epochs: 20
   max_steps: -1
   warmup_steps: 0.1
   end_lr: 0
@@ -34,6 +34,7 @@ optimization:
       - "^o$"
     r: 8
     alpha: 8
+    conv_lora_expert_num: 8 # default setting for Conv-LoRA
   loss_function:
     "auto" # The replaced loss for regression. Can only support loss function in torch.nn.
     # example

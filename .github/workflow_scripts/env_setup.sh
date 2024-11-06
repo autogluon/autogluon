@@ -1,17 +1,15 @@
 function setup_build_env {
-    python3 -m pip install --upgrade pip
-    python3 -m pip install tox
-    python3 -m pip install flake8
-    python3 -m pip install "black~=23.0"
-    python3 -m pip install isort>=5.10
-    python3 -m pip install bandit
-    python3 -m pip install packaging
-    python3 -m pip install ruff
+    python -m pip install --upgrade pip
+    python -m pip install tox
+    python -m pip install flake8
+    python -m pip install bandit
+    python -m pip install packaging
+    python -m pip install ruff
 }
 
 function setup_build_contrib_env {
-    python3 -m pip install --upgrade pip
-    python3 -m pip install -r $(dirname "$0")/../../docs/requirements_doc.txt
+    python -m pip install --upgrade pip
+    python -m pip install -r $(dirname "$0")/../../docs/requirements_doc.txt
     export AG_DOCS=1
     export AUTOMM_TUTORIAL_MODE=1 # Disable progress bar in MultiModalPredictor
 }
@@ -21,23 +19,24 @@ function setup_benchmark_env {
     git clone https://github.com/autogluon/autogluon-dashboard.git
     pip install -e ./autogluon-dashboard
     pip install yq
+    pip install s3fs
 }
 
 function setup_hf_model_mirror {
-    pip3 install PyYAML
+    pip install PyYAML
     SUB_FOLDER="$1"
-    python3 $(dirname "$0")/setup_hf_model_mirror.py --model_list_file $(dirname "$0")/../../multimodal/tests/hf_model_list.yaml --sub_folder $SUB_FOLDER
+    python $(dirname "$0")/setup_hf_model_mirror.py --model_list_file $(dirname "$0")/../../multimodal/tests/hf_model_list.yaml --sub_folder $SUB_FOLDER
 }
 
 function install_local_packages {
     while(($#)) ; do
-        python3 -m pip install --upgrade -e $1
+        python -m pip install --upgrade -e $1
         shift
     done
 }
 
 function install_tabular {
-    python3 -m pip install --upgrade pygraphviz
+    python -m pip install --upgrade pygraphviz
     install_local_packages "tabular/$1"
 }
 
@@ -46,28 +45,14 @@ function install_tabular_platforms {
     install_local_packages "tabular/$1"
 }
 
-function install_multimodal_no_groundingdino {
-    # groundingdino has issue when installing on Windows
-    # https://github.com/IDEA-Research/GroundingDINO/issues/57
-    source $(dirname "$0")/setup_mmcv.sh
-
-    # launch different process for each test to make sure memory is released
-    python3 -m pip install --upgrade pytest-xdist
-    install_local_packages "multimodal/$1"
-    setup_mmcv
-    # python3 -m pip install --upgrade "mmocr<1.0"  # not compatible with mmcv 2.0
-}
-
 function install_multimodal {
     source $(dirname "$0")/setup_mmcv.sh
-    source $(dirname "$0")/setup_groundingdino.sh
 
     # launch different process for each test to make sure memory is released
-    python3 -m pip install --upgrade pytest-xdist
+    python -m pip install --upgrade pytest-xdist
     install_local_packages "multimodal/$1"
     setup_mmcv
-    # python3 -m pip install --upgrade "mmocr<1.0"  # not compatible with mmcv 2.0
-    setup_groundingdino
+    # python -m pip install --upgrade "mmocr<1.0"  # not compatible with mmcv 2.0
 }
 
 function install_all {
@@ -78,7 +63,7 @@ function install_all {
 
 function install_all_windows {
     install_local_packages "common/[tests]" "core/[all]" "features/" "tabular/[all,tests]" "timeseries/[all,tests]" "eda/[tests]"
-    install_multimodal_no_groundingdino "[tests]"
+    install_multimodal "[tests]"
     install_local_packages "autogluon/"
 }
 
@@ -89,6 +74,7 @@ function install_all_no_tests {
 }
 
 function build_pkg {
+    pip install --upgrade setuptools wheel
     while(($#)) ; do
         cd "$1"/
         python setup.py sdist bdist_wheel

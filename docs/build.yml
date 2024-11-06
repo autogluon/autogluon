@@ -2,9 +2,7 @@ dependencies:
 - python=3.10
 - pip
 - pip:
-  - flake8
-  - black~=23.0
-  - isort>=5.10
+  - ruff
   - sphinx
   - furo
   - myst_parser

@@ -19,7 +19,9 @@ class DropUniqueFeatureGenerator(AbstractFeatureGenerator):
         self.max_unique_ratio = max_unique_ratio
 
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
-        features_to_drop = self._drop_unique_features(X, self.feature_metadata_in, max_unique_ratio=self.max_unique_ratio)
+        features_to_drop = self._drop_unique_features(
+            X, self.feature_metadata_in, max_unique_ratio=self.max_unique_ratio
+        )
         self._remove_features_in(features_to_drop)
         X_out = X[self.features_in]
         return X_out, self.feature_metadata_in.type_group_map_special
@@ -42,7 +44,9 @@ class DropUniqueFeatureGenerator(AbstractFeatureGenerator):
             # Drop features that are always the same
             if unique_value_count == 1:
                 features_to_drop.append(column)
-            elif feature_metadata.get_feature_type_raw(column) in [R_CATEGORY, R_OBJECT] and (unique_value_count > max_unique_value_count):
+            elif feature_metadata.get_feature_type_raw(column) in [R_CATEGORY, R_OBJECT] and (
+                unique_value_count > max_unique_value_count
+            ):
                 special_types = feature_metadata.get_feature_types_special(column)
                 if S_TEXT in special_types:
                     # We should not drop a text column

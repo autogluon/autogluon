@@ -1,10 +1,12 @@
 from .autogluon_tabular import DirectTabularModel, RecursiveTabularModel
+from .chronos import ChronosModel
 from .gluonts import (
     DeepARModel,
     DLinearModel,
     PatchTSTModel,
     SimpleFeedForwardModel,
     TemporalFusionTransformerModel,
+    TiDEModel,
     WaveNetModel,
 )
 from .local import (
@@ -14,9 +16,7 @@ from .local import (
     AutoCESModel,
     AutoETSModel,
     AverageModel,
-    CrostonClassicModel,
-    CrostonOptimizedModel,
-    CrostonSBAModel,
+    CrostonModel,
     DynamicOptimizedThetaModel,
     ETSModel,
     IMAPAModel,
@@ -35,15 +35,14 @@ __all__ = [
     "AutoCESModel",
     "AutoETSModel",
     "AverageModel",
-    "CrostonClassicModel",
-    "CrostonSBAModel",
-    "CrostonOptimizedModel",
+    "CrostonModel",
     "DLinearModel",
     "DeepARModel",
     "DirectTabularModel",
     "DynamicOptimizedThetaModel",
     "ETSModel",
     "IMAPAModel",
+    "ChronosModel",
     "NPTSModel",
     "NaiveModel",
     "PatchTSTModel",
@@ -53,6 +52,7 @@ __all__ = [
     "SimpleFeedForwardModel",
     "TemporalFusionTransformerModel",
     "ThetaModel",
+    "TiDEModel",
     "WaveNetModel",
     "ZeroModel",
 ]

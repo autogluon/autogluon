@@ -1,5 +1,9 @@
 import shutil
 
+import pytest
+
+from pathlib import Path
+
 from autogluon.core.constants import BINARY
 from autogluon.core.metrics import METRICS
 
@@ -202,4 +206,81 @@ def test_num_folds_parallel(fit_helper, capsys):
     )
     leaderboard = predictor.leaderboard(extra_info=True)
     assert leaderboard.iloc[0]["num_models"] == 2
+    shutil.rmtree(predictor.path, ignore_errors=True)
+
+
+def test_raises_num_cpus_float(fit_helper):
+    """Tests that num_cpus specified as a float raises a TypeError"""
+    fit_args = dict(num_cpus=1.0)
+    dataset_name = "adult"
+    with pytest.raises(TypeError, match=r"`num_cpus` must be an int or 'auto'. Found: .*"):
+        fit_helper.fit_and_validate_dataset(
+            dataset_name=dataset_name,
+            fit_args=fit_args,
+            expected_model_count=None,
+            delete_directory=True,
+        )
+
+
+def test_raises_num_cpus_zero(fit_helper):
+    """Tests that num_cpus=0 raises a ValueError"""
+    fit_args = dict(num_cpus=0)
+    dataset_name = "adult"
+    with pytest.raises(ValueError, match=r"`num_cpus` must be greater than or equal to 1. .*"):
+        fit_helper.fit_and_validate_dataset(
+            dataset_name=dataset_name,
+            fit_args=fit_args,
+            expected_model_count=None,
+            delete_directory=True,
+        )
+
+
+def test_raises_num_gpus_neg(fit_helper):
+    """Tests that num_gpus<0 raises a ValueError"""
+    fit_args = dict(num_gpus=-1)
+    dataset_name = "adult"
+    with pytest.raises(ValueError, match=r"`num_gpus` must be greater than or equal to 0. .*"):
+        fit_helper.fit_and_validate_dataset(
+            dataset_name=dataset_name,
+            fit_args=fit_args,
+            expected_model_count=None,
+            delete_directory=True,
+        )
+
+@pytest.mark.parametrize("delay_bag_sets", [True, False])
+def test_delay_bag_sets(fit_helper,delay_bag_sets):
+    """Tests that max_sets works"""
+    fit_args = dict(
+        hyperparameters={"DUMMY": [{}, {}]},
+        fit_weighted_ensemble=False,
+        num_bag_folds=2,
+        num_bag_sets=2,
+        time_limit=30,  # has no impact, but otherwise `delay_bag_sets` is ignored.
+        delay_bag_sets=delay_bag_sets,
+        ag_args_ensemble={"fold_fitting_strategy":"sequential_local"},
+    )
+    dataset_name = "adult"
+
+    predictor = fit_helper.fit_and_validate_dataset(
+        dataset_name=dataset_name,
+        fit_args=fit_args,
+        expected_model_count=2,
+        refit_full=False,
+        delete_directory=False,
+    )
+
+    # Verify fit order is correct.
+    model_1 = predictor._trainer.load_model('DummyModel_BAG_L1')
+    max_model_times_1 = max([(Path(model_1.path)/bm).stat().st_mtime_ns for bm in model_1.models])
+
+    model_2 = predictor._trainer.load_model('DummyModel_2_BAG_L1')
+    min_model_times_2 = min([(Path(model_2.path) / bm).stat().st_mtime_ns for bm in model_2.models])
+
+    if delay_bag_sets:
+        # Last model of model 1 should be trained after fist model of model 2
+        assert max_model_times_1 > min_model_times_2
+    else:
+        # Last model of model 1 should be trained before fist model of model 2
+        assert max_model_times_1 <= min_model_times_2
+
     shutil.rmtree(predictor.path, ignore_errors=True)

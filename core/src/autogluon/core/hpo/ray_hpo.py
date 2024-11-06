@@ -8,6 +8,7 @@ from autogluon.common.utils.try_import import try_import_ray
 
 try_import_ray()  # try import ray before importing the remaining contents so we can give proper error messages
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Callable, List, Optional, Union
 
 import ray
@@ -206,9 +207,9 @@ def run(
     verbose
         0 = silent, 1 = only status updates, 2 = status and brief trial results, 3 = status and detailed trial results.
     tune_config_kwargs
-        Additional args being passed to tune.TuneConfig https://docs.ray.io/en/latest/ray-air/package-ref.html#ray.tune.tune_config.TuneConfig
+        Additional args being passed to tune.TuneConfig  https://docs.ray.io/en/latest/tune/api/doc/ray.tune.TuneConfig.html#ray-tune-tuneconfig
     run_config_kwargs
-        Additional args being passed to air.RunConfig https://docs.ray.io/en/latest/ray-air/package-ref.html#ray.air.config.RunConfig
+        Additional args being passed to air.RunConfig https://docs.ray.io/en/latest/train/api/doc/ray.train.RunConfig.html#ray.train.RunConfig
     """
     assert mode in [MIN, MAX], f"mode {mode} is not a valid option. Options are {[MIN, MAX]}"
     if isinstance(hyperparameter_tune_kwargs, str):
@@ -264,13 +265,17 @@ def run(
         tune_config_kwargs = dict()
     if run_config_kwargs is None:
         run_config_kwargs = dict()
+
+    # storage_path needs to be an absolute path starting in Ray 2.7+
+    #  https://github.com/ultralytics/ultralytics/issues/4980#issuecomment-1741684208
+    storage_path = str(Path(os.path.dirname(save_dir)).resolve())
     tuner = tune.Tuner(
         tune.with_resources(tune.with_parameters(trainable, **trainable_args), resources_per_trial),
         param_space=search_space,
         tune_config=tune.TuneConfig(
             num_samples=num_samples, search_alg=searcher, scheduler=scheduler, metric=metric, mode=mode, time_budget_s=time_budget_s, **tune_config_kwargs
         ),
-        run_config=air.RunConfig(name=os.path.basename(save_dir), local_dir=os.path.dirname(save_dir), verbose=verbose, **run_config_kwargs),
+        run_config=air.RunConfig(name=os.path.basename(save_dir), storage_path=storage_path, verbose=verbose, **run_config_kwargs),
         _tuner_kwargs={"trial_name_creator": _trial_name_creator, "trial_dirname_creator": _trial_dirname_creator},
     )
     results = tuner.fit()
@@ -415,12 +420,13 @@ class TabularRayTuneAdapter(RayTuneAdapter):
         return ResourceCalculatorFactory.get_resource_calculator(calculator_type="cpu" if num_gpus == 0 else "gpu")
 
     def trainable_args_update_method(self, trainable_args: dict) -> dict:
+        # Convert num_cpus to int to avoid bug with RayTune converting int to float in tune.PlacementGroupFactory
         if isinstance(self.resources_per_trial, dict):
-            trainable_args["fit_kwargs"]["num_cpus"] = self.resources_per_trial.get("cpu", 1)
+            trainable_args["fit_kwargs"]["num_cpus"] = int(self.resources_per_trial.get("cpu", 1))
             trainable_args["fit_kwargs"]["num_gpus"] = self.resources_per_trial.get("gpu", 0)
         elif isinstance(self.resources_per_trial, tune.PlacementGroupFactory):
             required_resources = self.resources_per_trial.required_resources
-            trainable_args["fit_kwargs"]["num_cpus"] = required_resources.get("CPU", 1)
+            trainable_args["fit_kwargs"]["num_cpus"] = int(required_resources.get("CPU", 1))
             trainable_args["fit_kwargs"]["num_gpus"] = required_resources.get("GPU", 0)
         return trainable_args
 

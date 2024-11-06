@@ -11,11 +11,6 @@
   How to train high quality object detection model with AutoMM in under 5 minutes on COCO format dataset.
 :::
 
-:::{grid-item-card} Quick Start on Open Voccabulary Detection
-  :link: quick_start/quick_start_ovd.html
-
-  How to use a foundation model in object detection to detect novel classes defined by an unbounded (open) vocabulary.
-:::
 ::::
 
 ## Data Preparation

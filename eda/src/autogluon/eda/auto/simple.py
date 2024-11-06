@@ -1090,6 +1090,7 @@ def explain_rows(
     train_data: pd.DataFrame,
     model: TabularPredictor,
     rows: pd.DataFrame,
+    positive_class: Optional = None,
     display_rows: bool = False,
     plot: Optional[str] = "force",
     baseline_sample: int = 100,
@@ -1113,6 +1114,10 @@ def explain_rows(
         trained AutoGluon predictor
     rows: pd.DataFrame,
         rows to explain
+    positive_class: Optional
+        Optionally specify positive class to explain; if not provided, the value will be autodetected.
+        For binary it's derived from `model.positive_class`.
+        For multiclass it's the last column in prediction probabilities.
     display_rows: bool, default = False
         if `True` then display the row before the explanation chart
     plot: Optional[str], default = 'force'
@@ -1180,7 +1185,7 @@ def explain_rows(
         train_data=train_data[model.original_features],
         model=model,
         return_state=return_state,
-        anlz_facets=[ShapAnalysis(rows, baseline_sample=baseline_sample, **fit_args)],  # type: ignore
+        anlz_facets=[ShapAnalysis(rows, positive_class=positive_class, baseline_sample=baseline_sample, **fit_args)],  # type: ignore
         viz_facets=viz_facets,  # type: ignore
     )
 
@@ -1382,7 +1387,14 @@ def partial_dependence_plots(
                 "<sub><sup>Use `show_help_text=False` to hide this information when calling this function.</sup></sub>",
                 condition_fn=lambda _: show_help_text and not two_way,
             ),
-            PDPInteractions(features=features, two_way=two_way, fig_args=fig_args, sample=max_ice_lines, target=target, **chart_args),  # type: ignore
+            PDPInteractions(
+                features=features,
+                two_way=two_way,
+                fig_args=fig_args,
+                sample=max_ice_lines,
+                target=target,
+                **chart_args,
+            ),  # type: ignore
             MarkdownSectionComponent(
                 f"The following variable(s) are categorical: {cats}. They are represented as the numbers in the figures above. "
                 f"Mappings are available in `state.pdp_id_to_category_mappings`. The`state` can be returned from this call via adding `return_state=True`.",

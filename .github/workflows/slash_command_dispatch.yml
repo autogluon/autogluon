@@ -32,7 +32,7 @@ jobs:
         id: pr_info
         run: |
           # Use the GitHub API to fetch information about the pull request
-          pr_info=$(curl -s -H "Authorization: token ${{ secrets.PAT }}" \
+          pr_info=$(curl -s -H "Authorization: token ${{ secrets.CICD_PAT }}" \
                       "https://api.github.com/repos/${{ github.repository }}/pulls/${{ steps.pr_number.outputs.result }}")
 
           # Extract the forked repository and branch from the pull request info
@@ -44,9 +44,9 @@ jobs:
           echo "FORK_BRANCH=$forked_branch" >> $GITHUB_OUTPUT
       - name: Slash Command Dispatch
         id: scd
-        uses: peter-evans/slash-command-dispatch@v2.3.0
+        uses: peter-evans/slash-command-dispatch@v4
         with:
-          token: ${{ secrets.PAT }}
+          token: ${{ secrets.CICD_PAT }}
           permission: write
           commands: |
             benchmark
@@ -60,7 +60,7 @@ jobs:
             fork_info=${{ steps.pr_info.outputs.FORK_NAME }}|${{ steps.pr_info.outputs.FORK_BRANCH }}
       - name: Edit comment with error message
         if: steps.scd.outputs.error-message
-        uses: peter-evans/create-or-update-comment@v1
+        uses: peter-evans/create-or-update-comment@v4
         with:
           comment-id: ${{ github.event.comment.id }}
           body: |

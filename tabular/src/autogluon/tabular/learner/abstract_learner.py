@@ -5,7 +5,7 @@ import json
 import logging
 import time
 from collections.abc import Iterable
-from typing import List, Union
+from typing import List
 
 import numpy as np
 import pandas as pd
@@ -13,7 +13,7 @@ from pandas import DataFrame, Series
 from sklearn.metrics import classification_report
 
 from autogluon.core.constants import AUTO_WEIGHT, BALANCE_WEIGHT, BINARY, MULTICLASS, QUANTILE, REGRESSION
-from autogluon.core.data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
+from autogluon.core.data.label_cleaner import LabelCleaner, LabelCleanerMulticlass, LabelCleanerMulticlassToBinary
 from autogluon.core.learner import AbstractLearner
 from autogluon.core.metrics import Scorer, confusion_matrix, get_metric
 from autogluon.core.models.greedy_ensemble.ensemble_selection import EnsembleSelection
@@ -61,6 +61,7 @@ class AbstractTabularLearner(AbstractLearner):
             self.ignored_columns = []
         self.threshold = label_count_threshold
         self.problem_type = problem_type
+        self._eval_metric_was_str = eval_metric is not None and isinstance(eval_metric, str)
         self.eval_metric = get_metric(eval_metric, self.problem_type, "eval_metric")
 
         if self.problem_type == QUANTILE and quantile_levels is None:
@@ -266,6 +267,7 @@ class AbstractTabularLearner(AbstractLearner):
         as_multiclass: bool = True,
         transform_features: bool = True,
         inverse_transform: bool = True,
+        use_refit_parent_oof: bool = True,
     ) -> dict:
         """
         Returns a dictionary of prediction probabilities where the key is
@@ -301,6 +303,8 @@ class AbstractTabularLearner(AbstractLearner):
         inverse_transform : bool, default = True
             If True, will return prediction probabilities in the original format.
             If False (advanced), will return prediction probabilities in AutoGluon's internal format.
+        use_refit_parent_oof: bool = True
+            If True and data is None and returning OOF, will return the parent model's OOF for refit models instead of raising an exception.
 
         Returns
         -------
@@ -327,7 +331,7 @@ class AbstractTabularLearner(AbstractLearner):
                 X_index = copy.deepcopy(X.index) if as_pandas else None
                 predict_proba_dict = dict()
                 for m in models:
-                    predict_proba_dict[m] = trainer.get_model_oof(m)
+                    predict_proba_dict[m] = trainer.get_model_oof(m, use_refit_parent=use_refit_parent_oof)
 
         # Inverse Transform labels
         for m, pred_proba in predict_proba_dict.items():
@@ -343,6 +347,7 @@ class AbstractTabularLearner(AbstractLearner):
         as_pandas: bool = True,
         transform_features: bool = True,
         inverse_transform: bool = True,
+        use_refit_parent_oof: bool = True,
         *,
         decision_threshold: float = None,
     ) -> dict:
@@ -350,8 +355,15 @@ class AbstractTabularLearner(AbstractLearner):
         Identical to predict_proba_multi, except returns predictions instead of probabilities.
         """
         predict_proba_dict = self.predict_proba_multi(
-            X=X, models=models, as_pandas=as_pandas, transform_features=transform_features, inverse_transform=inverse_transform
+            X=X,
+            models=models,
+            as_pandas=as_pandas,
+            transform_features=transform_features,
+            inverse_transform=inverse_transform,
+            use_refit_parent_oof=use_refit_parent_oof,
         )
+        if self.problem_type in [REGRESSION, QUANTILE]:
+            return predict_proba_dict
         predict_dict = {}
         for m in predict_proba_dict:
             predict_dict[m] = self.get_pred_from_proba(
@@ -370,11 +382,21 @@ class AbstractTabularLearner(AbstractLearner):
         return y_pred
 
     def _validate_fit_input(self, X: DataFrame, **kwargs):
-        if self.label not in X.columns:
-            raise KeyError(f"Label column '{self.label}' is missing from training data. Training data columns: {list(X.columns)}")
+        self.validate_label(X=X)
         X_val = kwargs.get("X_val", None)
         self._validate_sample_weight(X, X_val)
         self._validate_groups(X, X_val)
+        X_test = kwargs.get("X_test", None)
+        if X_test is not None:
+            self._validate_sample_weight(X, X_test)
+            self._validate_groups(X, X_test)
+
+    def validate_label(self, X: DataFrame):
+        """
+        Ensure that the label column is present in the training data
+        """
+        if self.label not in X.columns:
+            raise KeyError(f"Label column '{self.label}' is missing from training data. Training data columns: {list(X.columns)}")
 
     def _validate_sample_weight(self, X, X_val):
         if self.sample_weight is not None:
@@ -446,8 +468,8 @@ class AbstractTabularLearner(AbstractLearner):
     # Fits _FULL models and links them in the stack so _FULL models only use other _FULL models as input during stacking
     # If model is specified, will fit all _FULL models that are ancestors of the provided model, automatically linking them.
     # If no model is specified, all models are refit and linked appropriately.
-    def refit_ensemble_full(self, model: str | List[str] = "all"):
-        return self.load_trainer().refit_ensemble_full(model=model)
+    def refit_ensemble_full(self, model: str | List[str] = "all", **kwargs):
+        return self.load_trainer().refit_ensemble_full(model=model, **kwargs)
 
     def fit_transform_features(self, X, y=None, **kwargs):
         if self.label in X:
@@ -600,8 +622,8 @@ class AbstractTabularLearner(AbstractLearner):
             data={
                 "model": model_names_final,
                 "score_test": list(scores.values()),
-                "pred_time_test": [pred_time_test[model] for model in model_names_final],
-                "pred_time_test_marginal": [pred_time_test_marginal[model] for model in model_names_final],
+                "pred_time_test": [pred_time_test.get(model, np.nan) for model in model_names_final],
+                "pred_time_test_marginal": [pred_time_test_marginal.get(model, np.nan) for model in model_names_final],
             }
         )
         if df_extra_scores is not None:
@@ -654,7 +676,13 @@ class AbstractTabularLearner(AbstractLearner):
             y_tmp = y
         else:
             y_pred = self.label_cleaner.inverse_transform_proba(y_pred_proba_internal, as_pred=False)
-            y_tmp = y_internal
+            if isinstance(self.label_cleaner, LabelCleanerMulticlass):
+                # Ensures that logic works even when y contains previously dropped classes during fit.
+                # If y contains never before seen classes, this will raise a ValueError in `self._validate_class_labels`.
+                self._validate_class_labels(y=y, eval_metric=metric)
+                y_tmp = self.label_cleaner.transform_pred_uncleaned(y)
+            else:
+                y_tmp = y_internal
         return compute_weighted_metric(y_tmp, y_pred, metric, weights=sample_weight, weight_evaluation=weight_evaluation, quantile_levels=self.quantile_levels)
 
     def _score_with_pred(self, y, y_internal, y_pred_internal, metric, sample_weight=None, weight_evaluation=None):
@@ -670,11 +698,13 @@ class AbstractTabularLearner(AbstractLearner):
             y_tmp = y
         return compute_weighted_metric(y_tmp, y_pred, metric, weights=sample_weight, weight_evaluation=weight_evaluation, quantile_levels=self.quantile_levels)
 
-    def _validate_class_labels(self, y: Series):
+    def _validate_class_labels(self, y: Series, eval_metric: Scorer = None):
         null_count = y.isnull().sum()
         if null_count:
             raise ValueError(f"Labels cannot contain missing (nan) values. Found {null_count} missing label values.")
-        if self.problem_type == MULTICLASS and not self.eval_metric.needs_pred:
+        if eval_metric is None:
+            eval_metric = self.eval_metric
+        if self.problem_type == MULTICLASS and not eval_metric.needs_pred:
             y_unique = np.unique(y)
             valid_class_set = set(self.class_labels)
             unknown_classes = []
@@ -684,7 +714,10 @@ class AbstractTabularLearner(AbstractLearner):
             if unknown_classes:
                 # log_loss / pac_score
                 raise ValueError(
-                    f"Multiclass scoring with eval_metric='{self.eval_metric.name}' does not support unknown classes. Unknown classes: {unknown_classes}"
+                    f"Multiclass scoring with eval_metric='{eval_metric.name}' does not support unknown classes. "
+                    f"Please ensure the classes you wish to evaluate are present in the training data, otherwise they cannot be scored with this metric."
+                    f"\n\tUnknown classes: {unknown_classes}"
+                    f"\n\t  Known classes: {self.class_labels}"
                 )
 
     def evaluate_predictions(self, y_true, y_pred, sample_weight=None, decision_threshold=None, display=False, auxiliary_metrics=True, detailed_report=False):
@@ -879,8 +912,12 @@ class AbstractTabularLearner(AbstractLearner):
                 inplace=True,
             )
             if "metric_error_test" in leaderboard:
-                leaderboard["metric_error_test"] = leaderboard["metric_error_test"].apply(self.eval_metric.convert_score_to_error)
-            leaderboard["metric_error_val"] = leaderboard["metric_error_val"].apply(self.eval_metric.convert_score_to_error)
+                leaderboard.loc[leaderboard["metric_error_test"].notnull(), "metric_error_test"] = leaderboard.loc[
+                    leaderboard["metric_error_test"].notnull(), "metric_error_test"
+                ].apply(self.eval_metric.convert_score_to_error)
+            leaderboard.loc[leaderboard["metric_error_val"].notnull(), "metric_error_val"] = leaderboard.loc[
+                leaderboard["metric_error_val"].notnull(), "metric_error_val"
+            ].apply(self.eval_metric.convert_score_to_error)
         if display:
             with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):
                 print(leaderboard)
@@ -1038,8 +1075,10 @@ class AbstractTabularLearner(AbstractLearner):
         data: pd.DataFrame | None = None,
         metric: str | Scorer | None = None,
         model: str = "best",
-        decision_thresholds: int | List[float] = 50,
+        decision_thresholds: int | List[float] = 25,
+        secondary_decision_thresholds: int | None = 19,
         verbose: bool = True,
+        **kwargs,
     ) -> float:
         # TODO: docstring
         if metric is None:
@@ -1056,8 +1095,22 @@ class AbstractTabularLearner(AbstractLearner):
             y = self.transform_labels(y=data[self.label])
 
         return self.load_trainer().calibrate_decision_threshold(
-            X=X, y=y, metric=metric, model=model, weights=weights, decision_thresholds=decision_thresholds, verbose=verbose
+            X=X,
+            y=y,
+            metric=metric,
+            model=model,
+            weights=weights,
+            decision_thresholds=decision_thresholds,
+            secondary_decision_thresholds=secondary_decision_thresholds,
+            verbose=verbose,
+            **kwargs,
         )
+
+    def _verify_metric(self, eval_metric: Scorer, problem_type: str):
+        """
+        Raises an exception if the eval_metric does not exist in the default metrics list for the problem type
+        """
+        get_metric(metric=eval_metric.name, problem_type=problem_type, metric_type="eval_metric")
 
     # TODO: Add data info gathering at beginning of .fit() that is used by all learners to add to get_info output
     # TODO: Add feature inference / feature engineering info to get_info output

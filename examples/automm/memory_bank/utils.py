@@ -32,7 +32,7 @@ def generate_dataset(args):
     if args.type == "text":
         dataset = load_dataset(args.dataset)
         train_dataset = sample_dataset(dataset["train"], label_column=args.label_column, num_samples=args.shots)
-        val_dataset = dataset["validation"] if "validaiton" in dataset else dataset["test"]
+        val_dataset = dataset["validation"] if "validation" in dataset else dataset["test"]
         test_dataset = dataset["test"]
 
         train_dataset.set_format("pandas")

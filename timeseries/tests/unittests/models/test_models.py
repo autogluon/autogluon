@@ -1,4 +1,5 @@
 """Unit tests and utils common to all models"""
+
 import itertools
 import shutil
 import sys
@@ -19,37 +20,52 @@ from autogluon.timeseries.models import DeepARModel, ETSModel
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
 
-from ..common import DUMMY_TS_DATAFRAME, CustomMetric, dict_equal_primitive, get_data_frame_with_item_index
+from ..common import (
+    DUMMY_TS_DATAFRAME,
+    CustomMetric,
+    dict_equal_primitive,
+    get_data_frame_with_item_index,
+    to_supported_pandas_freq,
+)
+from .test_chronos import TESTABLE_MODELS as CHRONOS_TESTABLE_MODELS
 from .test_gluonts import TESTABLE_MODELS as GLUONTS_TESTABLE_MODELS
 from .test_local import TESTABLE_MODELS as LOCAL_TESTABLE_MODELS
 from .test_mlforecast import TESTABLE_MODELS as MLFORECAST_TESTABLE_MODELS
 from .test_multi_window_model import get_multi_window_deepar
 
 TESTABLE_MODELS = (
-    GLUONTS_TESTABLE_MODELS + LOCAL_TESTABLE_MODELS + MLFORECAST_TESTABLE_MODELS + [get_multi_window_deepar]
+    CHRONOS_TESTABLE_MODELS
+    + GLUONTS_TESTABLE_MODELS
+    + LOCAL_TESTABLE_MODELS
+    + MLFORECAST_TESTABLE_MODELS
+    + [get_multi_window_deepar]
 )
 
-DUMMY_HYPERPARAMETERS = {
-    "epochs": 1,
-    "num_batches_per_epoch": 1,
-    "maxiter": 1,
-    "n_jobs": 1,
-    "use_fallback_model": False,
-}
 TESTABLE_PREDICTION_LENGTHS = [1, 5]
 
 
 @pytest.fixture(scope="module")
-def trained_models():
+def dummy_hyperparameters(hf_model_path):
+    return {
+        "epochs": 1,
+        "num_batches_per_epoch": 1,
+        "n_jobs": 1,
+        "use_fallback_model": False,
+        "model_path": hf_model_path,
+    }
+
+
+@pytest.fixture(scope="module")
+def trained_models(dummy_hyperparameters):
     models = {}
     model_paths = []
     for model_class, prediction_length in itertools.product(TESTABLE_MODELS, TESTABLE_PREDICTION_LENGTHS):
         temp_model_path = tempfile.mkdtemp()
         model = model_class(
             path=temp_model_path,
-            freq="H",
+            freq="h",
             prediction_length=prediction_length,
-            hyperparameters=DUMMY_HYPERPARAMETERS,
+            hyperparameters=dummy_hyperparameters,
         )
 
         model.fit(train_data=DUMMY_TS_DATAFRAME)
@@ -65,7 +81,7 @@ def trained_models():
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
 def test_models_can_be_initialized(model_class, temp_model_path):
-    model = model_class(path=temp_model_path, freq="H", prediction_length=24)
+    model = model_class(path=temp_model_path, freq="h", prediction_length=24)
     assert isinstance(model, AbstractTimeSeriesModel)
 
 
@@ -112,14 +128,14 @@ def test_when_score_called_then_model_receives_truncated_data(model_class, predi
     with mock.patch.object(model, "predict") as patch_method:
         # Mock breaks the internals of the `score` method
         try:
-            _ = model.score(DUMMY_TS_DATAFRAME)
-        except AttributeError:
+            model.score(DUMMY_TS_DATAFRAME)
+        except AssertionError:
             pass
 
         (call_df,) = patch_method.call_args[0]
 
         for j in DUMMY_TS_DATAFRAME.item_ids:
-            assert np.allclose(call_df.loc[j], DUMMY_TS_DATAFRAME.loc[j][:-prediction_length])
+            assert np.allclose(call_df.loc[j], DUMMY_TS_DATAFRAME.loc[j][:-prediction_length], equal_nan=True)
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
@@ -141,16 +157,14 @@ def test_when_models_saved_then_they_can_be_loaded(model_class, trained_models, 
 @flaky
 @pytest.mark.skipif(sys.platform.startswith("win"), reason="HPO tests lead to known issues in Windows platform tests")
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct(model_class, temp_model_path):
+def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct(
+    model_class, temp_model_path, dummy_hyperparameters
+):
     model = model_class(
         path=temp_model_path,
-        freq="H",
+        freq="h",
         quantile_levels=[0.1, 0.9],
-        hyperparameters={
-            "epochs": space.Int(1, 3),
-            "num_batches_per_epoch": 1,
-            "use_fallback_model": False,
-        },
+        hyperparameters={**dummy_hyperparameters, "epochs": space.Int(1, 3)},
     )
     if isinstance(model, MultiWindowBacktestingModel):
         val_data = None
@@ -174,7 +188,7 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct
 def test_given_hyperparameter_spaces_to_init_when_fit_called_then_error_is_raised(model_class, temp_model_path):
     model = model_class(
         path=temp_model_path,
-        freq="H",
+        freq="h",
         quantile_levels=[0.1, 0.9],
         hyperparameters={
             "epochs": space.Int(3, 4),
@@ -195,14 +209,14 @@ def test_given_hyperparameter_spaces_to_init_when_fit_called_then_error_is_raise
     ],
 )
 def test_when_fit_called_then_models_train_and_returned_predictor_inference_has_mean_and_correct_quantiles(
-    model_class, quantile_levels, temp_model_path
+    model_class, quantile_levels, temp_model_path, dummy_hyperparameters
 ):
     model = model_class(
         path=temp_model_path,
-        freq="H",
+        freq="h",
         prediction_length=3,
         quantile_levels=quantile_levels,
-        hyperparameters=DUMMY_HYPERPARAMETERS,
+        hyperparameters=dummy_hyperparameters,
     )
     model.fit(train_data=DUMMY_TS_DATAFRAME)
     predictions = model.predict(DUMMY_TS_DATAFRAME, quantile_levels=quantile_levels)
@@ -239,7 +253,7 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_corr
 )
 @pytest.mark.parametrize("test_data_index", [["A", "B"], ["C", "D"], ["A"]])
 def test_when_fit_called_then_models_train_and_returned_predictor_inference_aligns_with_time(
-    model_class, test_data_index, temp_model_path
+    model_class, test_data_index, temp_model_path, dummy_hyperparameters
 ):
     prediction_length = 3
     train_data = get_data_frame_with_item_index(["A", "B"], data_length=10)
@@ -247,9 +261,9 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_alig
 
     model = model_class(
         path=temp_model_path,
-        freq="H",
+        freq="h",
         prediction_length=prediction_length,
-        hyperparameters=DUMMY_HYPERPARAMETERS,
+        hyperparameters=dummy_hyperparameters,
     )
 
     model.fit(train_data=train_data)
@@ -261,9 +275,12 @@ def test_when_fit_called_then_models_train_and_returned_predictor_inference_alig
     assert min_hour_in_pred == max_hour_in_test + 1
 
 
-@pytest.mark.parametrize("freq", ["D", "H", "S", "M"])
+@pytest.mark.parametrize("freq", ["D", "h", "s", "ME"])
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-def test_when_predict_called_then_predicted_timestamps_align_with_time(model_class, freq, temp_model_path):
+def test_when_predict_called_then_predicted_timestamps_align_with_time(
+    model_class, freq, temp_model_path, dummy_hyperparameters
+):
+    freq = to_supported_pandas_freq(freq)
     prediction_length = 4
     train_length = 20
     item_id = "A"
@@ -275,7 +292,7 @@ def test_when_predict_called_then_predicted_timestamps_align_with_time(model_cla
         path=temp_model_path,
         freq=train_data.freq,
         prediction_length=prediction_length,
-        hyperparameters=DUMMY_HYPERPARAMETERS,
+        hyperparameters=dummy_hyperparameters,
     )
 
     model.fit(train_data=train_data)
@@ -314,14 +331,14 @@ def test_when_predict_called_then_predicted_timestamps_align_with_time(model_cla
     ],
 )
 def test_when_predict_called_with_test_data_then_predictor_inference_correct(
-    model_class, temp_model_path, train_data, test_data
+    model_class, temp_model_path, train_data, test_data, dummy_hyperparameters
 ):
     prediction_length = 5
     model = model_class(
         path=temp_model_path,
-        freq="H",
+        freq="h",
         prediction_length=prediction_length,
-        hyperparameters=DUMMY_HYPERPARAMETERS,
+        hyperparameters=dummy_hyperparameters,
     )
 
     model.fit(train_data=train_data)
@@ -359,29 +376,34 @@ def test_when_get_info_is_called_then_all_keys_are_present(model_class, predicti
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-def test_when_median_not_in_quantile_levels_then_median_is_present_in_raw_predictions(model_class):
+def test_when_median_not_in_quantile_levels_then_median_is_present_in_raw_predictions(
+    model_class, dummy_hyperparameters
+):
+    data = get_data_frame_with_item_index(["B", "A", "X", "C"])
     model = model_class(
         prediction_length=3,
         quantile_levels=[0.1, 0.15],
-        freq=DUMMY_TS_DATAFRAME.freq,
-        hyperparameters=DUMMY_HYPERPARAMETERS,
+        freq=data.freq,
+        hyperparameters=dummy_hyperparameters,
     )
     if isinstance(model, MultiWindowBacktestingModel):
         # Median is present in the predictions of the base model, but not in the MultiWindowBacktestingModel wrapper
         pytest.skip()
-    model.fit(train_data=DUMMY_TS_DATAFRAME)
+    model.fit(train_data=data)
 
-    raw_predictions = model._predict(DUMMY_TS_DATAFRAME)
+    raw_predictions = model._predict(data)
     assert "0.5" in raw_predictions.columns
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-def test_when_median_not_in_quantile_levels_then_median_is_dropped_at_prediction_time(model_class):
+def test_when_median_not_in_quantile_levels_then_median_is_dropped_at_prediction_time(
+    model_class, dummy_hyperparameters
+):
     model = model_class(
         prediction_length=3,
         quantile_levels=[0.1, 0.15],
         freq=DUMMY_TS_DATAFRAME.freq,
-        hyperparameters=DUMMY_HYPERPARAMETERS,
+        hyperparameters=dummy_hyperparameters,
     )
     assert model.must_drop_median
     model.fit(train_data=DUMMY_TS_DATAFRAME)
@@ -390,12 +412,12 @@ def test_when_median_not_in_quantile_levels_then_median_is_dropped_at_prediction
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-def test_when_custom_metric_passed_to_model_then_model_can_score(model_class):
+def test_when_custom_metric_passed_to_model_then_model_can_score(model_class, dummy_hyperparameters):
     model = model_class(
         prediction_length=3,
         freq=DUMMY_TS_DATAFRAME.freq,
         quantile_levels=[0.1, 0.15],
-        hyperparameters=DUMMY_HYPERPARAMETERS,
+        hyperparameters=dummy_hyperparameters,
         eval_metric=CustomMetric(),
     )
     model.fit(train_data=DUMMY_TS_DATAFRAME)
@@ -404,15 +426,11 @@ def test_when_custom_metric_passed_to_model_then_model_can_score(model_class):
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
-def test_when_custom_metric_passed_to_model_then_model_can_hyperparameter_tune(model_class):
+def test_when_custom_metric_passed_to_model_then_model_can_hyperparameter_tune(model_class, dummy_hyperparameters):
     model = model_class(
         prediction_length=3,
         freq=DUMMY_TS_DATAFRAME.freq,
-        hyperparameters={
-            "epochs": space.Int(1, 3),
-            "num_batches_per_epoch": 1,
-            "use_fallback_model": False,
-        },
+        hyperparameters={**dummy_hyperparameters, "epochs": space.Int(1, 3)},
         eval_metric=CustomMetric(),
     )
     backend = model._get_hpo_backend()
@@ -476,3 +494,136 @@ def test_given_searcher_when_ray_backend_used_in_hpo_then_correct_searcher_used(
             "bayes": "HyperOpt",
             "random": "BasicVariant",
         }.get(searcher) in ray_searcher_class_name
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+def test_when_data_contains_missing_values_then_model_can_fit_and_predict(
+    temp_model_path, model_class, dummy_hyperparameters
+):
+    data = DUMMY_TS_DATAFRAME
+    prediction_length = 5
+    model = model_class(
+        freq=data.freq,
+        path=temp_model_path,
+        prediction_length=prediction_length,
+        hyperparameters=dummy_hyperparameters,
+    )
+    model.fit(
+        train_data=data,
+        val_data=None if isinstance(model, MultiWindowBacktestingModel) else data,
+    )
+    predictions = model.predict(data)
+    assert not predictions.isna().any(axis=None) and all(predictions.item_ids == data.item_ids)
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+def test_when_fit_and_predict_called_then_train_val_and_test_data_is_preprocessed(
+    temp_model_path, model_class, dummy_hyperparameters
+):
+    train_data = DUMMY_TS_DATAFRAME.copy()
+    model = model_class(freq=train_data.freq, path=temp_model_path, hyperparameters=dummy_hyperparameters)
+    preprocessed_data = train_data + 5.0
+    if model._get_tags()["can_use_val_data"]:
+        expected_val_data = preprocessed_data
+    else:
+        expected_val_data = train_data
+    # We need the ugly line break because Python <3.10 does not support parentheses for context managers
+    with mock.patch.object(model, "preprocess") as mock_preprocess, mock.patch.object(
+        model, "_fit"
+    ) as mock_fit, mock.patch.object(model, "_predict") as mock_predict:
+        mock_preprocess.return_value = preprocessed_data
+        model.fit(train_data=train_data, val_data=train_data)
+        fit_kwargs = mock_fit.call_args[1]
+        model_train_data = fit_kwargs["train_data"]
+        model_val_data = fit_kwargs["val_data"]
+        assert model_train_data.equals(preprocessed_data)
+        assert model_val_data.equals(expected_val_data)
+
+        model.predict(train_data)
+        model_predict_data = mock_predict.call_args[1]["data"]
+        assert model_predict_data.equals(preprocessed_data)
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+def test_given_model_doesnt_support_nan_when_model_fits_then_nans_are_filled(
+    temp_model_path, model_class, dummy_hyperparameters
+):
+    data = get_data_frame_with_item_index(["B", "A", "C", "X"])
+    data.iloc[[0, 1, 5, 10, 23, 26, 33, 60]] = float("nan")
+    prediction_length = 5
+    model = model_class(
+        freq=data.freq,
+        path=temp_model_path,
+        prediction_length=prediction_length,
+        hyperparameters=dummy_hyperparameters,
+    )
+
+    with mock.patch.object(model, "_fit") as mock_fit:
+        model.fit(
+            train_data=data,
+            val_data=None if isinstance(model, MultiWindowBacktestingModel) else data,
+        )
+        fit_kwargs = mock_fit.call_args[1]
+
+    model_allows_nan = model._get_tags()["allow_nan"]
+    input_contains_nan = fit_kwargs["train_data"].isna().any(axis=None)
+    assert model_allows_nan == input_contains_nan
+
+
+EXPECTED_MODEL_TAGS = [
+    "allow_nan",
+    "can_refit_full",
+    "can_use_val_data",
+    # Tabular tags - not used by time series models
+    "valid_oof",
+    "handles_text",
+]
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+def test_when_model_created_then_model_has_all_required_tags(temp_model_path, model_class):
+    model = model_class(path=temp_model_path)
+    model_tags = model._get_tags()
+    for tag in EXPECTED_MODEL_TAGS:
+        assert tag in model_tags
+    assert len(model_tags) == len(EXPECTED_MODEL_TAGS)
+
+
+@pytest.mark.parametrize("model_class", CHRONOS_TESTABLE_MODELS + LOCAL_TESTABLE_MODELS)
+def test_when_inference_only_model_scores_oof_then_time_limit_is_passed_to_predict(model_class, dummy_hyperparameters):
+    data = DUMMY_TS_DATAFRAME
+    model = model_class(freq=data.freq, hyperparameters=dummy_hyperparameters)
+    time_limit = 94.4
+    model.fit(train_data=data, time_limit=time_limit)
+    with mock.patch.object(model, "_predict") as mock_predict:
+        model.score_and_cache_oof(data)
+        assert mock_predict.call_args[1]["time_limit"] == time_limit
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+@pytest.mark.parametrize("prediction_length", [1, 5])
+def test_given_context_has_1_observation_when_model_predicts_then_model_can_predict(
+    model_class, prediction_length, trained_models
+):
+    from autogluon.timeseries.models.local.statsforecast import AbstractProbabilisticStatsForecastModel
+
+    if isinstance(model_class, type) and issubclass(model_class, AbstractProbabilisticStatsForecastModel):
+        pytest.skip("StatsForecast models will use fallback model if history has 1 observation")
+
+    model = trained_models[(prediction_length, repr(model_class))]
+    data = TimeSeriesDataFrame.from_iterable_dataset(
+        [{"target": [1], "start": pd.Period("2020-01-01", freq="D")} for _ in range(5)]
+    )
+    predictions = model.predict(data)
+    assert len(predictions) == data.num_items * prediction_length
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+def test_when_itemid_has_string_dtype_then_model_can_predict(model_class, trained_models):
+    model = trained_models[(5, repr(model_class))]
+    data = DUMMY_TS_DATAFRAME.copy()
+    # Convert item_id level to pd.StringDtype()
+    data.index = data.index.set_levels(data.index.levels[0].astype(pd.StringDtype()), level="item_id")
+    predictions = model.predict(data)
+    assert isinstance(predictions, TimeSeriesDataFrame)
+    assert len(predictions) == predictions.num_items * model.prediction_length

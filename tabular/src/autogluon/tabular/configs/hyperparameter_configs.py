@@ -10,7 +10,13 @@ hyperparameter_config_dict = dict(
         "GBM": [
             {"extra_trees": True, "ag_args": {"name_suffix": "XT"}},
             {},
-            "GBMLarge",
+            {
+                "learning_rate": 0.03,
+                "num_leaves": 128,
+                "feature_fraction": 0.9,
+                "min_data_in_leaf": 3,
+                "ag_args": {"name_suffix": "Large", "priority": 0, "hyperparameter_tune_kwargs": None},
+            },
         ],
         "CAT": {},
         "XGB": {},
@@ -36,7 +42,13 @@ hyperparameter_config_dict = dict(
         "GBM": [
             {"extra_trees": True, "ag_args": {"name_suffix": "XT"}},
             {},
-            "GBMLarge",
+            {
+                "learning_rate": 0.03,
+                "num_leaves": 128,
+                "feature_fraction": 0.9,
+                "min_data_in_leaf": 3,
+                "ag_args": {"name_suffix": "Large", "priority": 0, "hyperparameter_tune_kwargs": None},
+            },
         ],
         "CAT": {},
         "XGB": {},
@@ -58,7 +70,13 @@ hyperparameter_config_dict = dict(
         "GBM": [
             {"extra_trees": True, "ag_args": {"name_suffix": "XT"}},
             {},
-            "GBMLarge",
+            {
+                "learning_rate": 0.03,
+                "num_leaves": 128,
+                "feature_fraction": 0.9,
+                "min_data_in_leaf": 3,
+                "ag_args": {"name_suffix": "Large", "priority": 0, "hyperparameter_tune_kwargs": None},
+            },
         ],
         "CAT": {},
         "XGB": {},
@@ -77,7 +95,13 @@ hyperparameter_config_dict = dict(
         "GBM": [
             {},
             {"extra_trees": True, "ag_args": {"name_suffix": "XT"}},
-            "GBMLarge",
+            {
+                "learning_rate": 0.03,
+                "num_leaves": 128,
+                "feature_fraction": 0.9,
+                "min_data_in_leaf": 3,
+                "ag_args": {"name_suffix": "Large", "priority": 0, "hyperparameter_tune_kwargs": None},
+            },
         ],
         "CAT": {},
         "XGB": {},
@@ -228,7 +252,13 @@ hyperparameter_config_dict = dict(
         "GBM": [
             {"extra_trees": True, "ag_args": {"name_suffix": "XT"}},
             {},
-            "GBMLarge",
+            {
+                "learning_rate": 0.03,
+                "num_leaves": 128,
+                "feature_fraction": 0.9,
+                "min_data_in_leaf": 3,
+                "ag_args": {"name_suffix": "Large", "priority": 0, "hyperparameter_tune_kwargs": None},
+            },
             {
                 "extra_trees": False,
                 "feature_fraction": 0.7248284762542815,

@@ -20,7 +20,16 @@ def test_feature_metadata(data_helper):
         ("object", ("text",)): ["text"],
     }
 
-    expected_feature_metadata_get_features = ["int_bool", "int", "float", "obj", "cat", "datetime", "text", "datetime_as_object"]
+    expected_feature_metadata_get_features = [
+        "int_bool",
+        "int",
+        "float",
+        "obj",
+        "cat",
+        "datetime",
+        "text",
+        "datetime_as_object",
+    ]
 
     expected_type_map_raw = {
         "cat": "category",
@@ -59,22 +68,30 @@ def test_feature_metadata(data_helper):
 
     # When
     feature_metadata = FeatureMetadata.from_df(input_data)
-    feature_metadata_renamed = feature_metadata.rename_features(rename_map={"text": "text_renamed", "int": "int_renamed", "obj": "float", "float": "obj"})
+    feature_metadata_renamed = feature_metadata.rename_features(
+        rename_map={"text": "text_renamed", "int": "int_renamed", "obj": "float", "float": "obj"}
+    )
     feature_metadata_remove = feature_metadata.remove_features(features=["text", "obj", "float"])
     feature_metadata_keep = feature_metadata.keep_features(features=["text", "obj", "float"])
     feature_metadata_custom = FeatureMetadata(
-        type_map_raw={"int": "int", "new_feature": "custom_raw_type"}, type_group_map_special={"custom_special_type": ["int", "new_feature"]}
+        type_map_raw={"int": "int", "new_feature": "custom_raw_type"},
+        type_group_map_special={"custom_special_type": ["int", "new_feature"]},
     )
     feature_metadata_recombined = feature_metadata_keep.join_metadata(feature_metadata_remove)
-    feature_metadata_recombined_alternate = FeatureMetadata.join_metadatas(metadata_list=[feature_metadata_keep, feature_metadata_remove])
+    feature_metadata_recombined_alternate = FeatureMetadata.join_metadatas(
+        metadata_list=[feature_metadata_keep, feature_metadata_remove]
+    )
     feature_metadata_recombined_full = FeatureMetadata.join_metadatas(
-        metadata_list=[feature_metadata_keep, feature_metadata_remove, feature_metadata_custom], shared_raw_features="error_if_diff"
+        metadata_list=[feature_metadata_keep, feature_metadata_remove, feature_metadata_custom],
+        shared_raw_features="error_if_diff",
     )
 
     # Therefore
     with pytest.raises(AssertionError):
         # Error because special contains feature not in raw
-        FeatureMetadata(type_map_raw={"int": "int"}, type_group_map_special={"custom_special_type": ["int", "new_feature"]})
+        FeatureMetadata(
+            type_map_raw={"int": "int"}, type_group_map_special={"custom_special_type": ["int", "new_feature"]}
+        )
     with pytest.raises(AssertionError):
         # Error because renaming to another existing feature without also renaming that feature
         feature_metadata.rename_features(rename_map={"text": "obj"})
@@ -89,7 +106,9 @@ def test_feature_metadata(data_helper):
         feature_metadata_remove.get_feature_types_special("text")
     with pytest.raises(AssertionError):
         # Error because feature_metadata_remove and feature_metadata_custom share a raw feature
-        FeatureMetadata.join_metadatas(metadata_list=[feature_metadata_keep, feature_metadata_remove, feature_metadata_custom])
+        FeatureMetadata.join_metadatas(
+            metadata_list=[feature_metadata_keep, feature_metadata_remove, feature_metadata_custom]
+        )
 
     assert feature_metadata.to_dict(inverse=True) == expected_feature_metadata_full
     assert feature_metadata.get_features() == expected_feature_metadata_get_features
@@ -186,13 +205,49 @@ def test_feature_metadata_get_features():
         for subset in itertools.combinations(raw_types_to_check, L):
             valid_raw_types = list(subset)
             invalid_raw_types = [raw_type for raw_type in raw_types_to_check if raw_type not in valid_raw_types]
-            assert feature_metadata.get_features(valid_raw_types=valid_raw_types) == feature_metadata.get_features(invalid_raw_types=invalid_raw_types)
+            assert feature_metadata.get_features(valid_raw_types=valid_raw_types) == feature_metadata.get_features(
+                invalid_raw_types=invalid_raw_types
+            )
 
     # Combined arguments
     assert feature_metadata.get_features(invalid_special_types=["s2", "s3"], required_special_types=["s1"]) == ["d"]
     assert feature_metadata.get_features(valid_raw_types=["2", "3"], valid_special_types=["s1"]) == ["b", "c"]
-    assert feature_metadata.get_features(valid_raw_types=["2", "3"], valid_special_types=["s1"], required_at_least_one_special=True) == ["b"]
+    assert feature_metadata.get_features(
+        valid_raw_types=["2", "3"], valid_special_types=["s1"], required_at_least_one_special=True
+    ) == ["b"]
     assert feature_metadata.get_features(valid_raw_types=["2", "3"], required_special_types=["s1"]) == ["b"]
-    assert feature_metadata.get_features(valid_raw_types=["2", "3"], required_special_types=["s1"], required_exact=True) == []
+    assert (
+        feature_metadata.get_features(valid_raw_types=["2", "3"], required_special_types=["s1"], required_exact=True)
+        == []
+    )
     assert feature_metadata.get_features(valid_raw_types=["2", "3"], required_special_types=["s1", "s3"]) == ["b"]
-    assert feature_metadata.get_features(valid_raw_types=["2", "3"], required_special_types=["s1", "s3"], required_exact=True) == ["b"]
+    assert feature_metadata.get_features(
+        valid_raw_types=["2", "3"], required_special_types=["s1", "s3"], required_exact=True
+    ) == ["b"]
+
+
+def test_feature_metadata_equals():
+    type_map_raw = dict(
+        a="1",
+        b="2",
+        c="3",
+        d="1",
+        e="1",
+        f="4",
+    )
+    type_group_map_special = {"s1": ["a", "b", "d"], "s2": ["a", "e"], "s3": ["a", "b"], "s4": ["f"]}
+    feature_metadata = FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_group_map_special)
+    feature_metadata_2 = FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_group_map_special)
+    assert feature_metadata == feature_metadata_2
+    feature_metadata_2 = feature_metadata_2.remove_features(features=["a"])
+    assert feature_metadata != feature_metadata_2
+
+    feature_metadata_3 = FeatureMetadata(type_map_raw=dict(a="1"))
+    feature_metadata_2 = feature_metadata_2.join_metadata(feature_metadata_3)
+    assert feature_metadata != feature_metadata_2
+
+    feature_metadata_2 = feature_metadata_2.add_special_types(type_map_special={"a": ["s1"]})
+    assert feature_metadata != feature_metadata_2
+
+    feature_metadata_2 = feature_metadata_2.add_special_types(type_map_special={"a": ["s2", "s3"]})
+    assert feature_metadata == feature_metadata_2

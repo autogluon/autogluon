@@ -70,7 +70,7 @@ pytest
 cd ../timeseries/
 pytest
 cd ../eda/
-isort src tests && black src tests && tox -e lint,format,typecheck,testenv
+ruff check --select I src tests && ruff format src tests && tox -e lint,format,typecheck,testenv
 ```
 
 - We encourage you to add your own unit tests, but please ensure they run quickly (unit tests should train models on small data-subsample with the lowest values of training iterations and time-limits that suffice to evaluate the intended functionality). You can run a specific unit test within a specific file like this:

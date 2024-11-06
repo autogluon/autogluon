@@ -62,7 +62,12 @@ class VowpalWabbitModel(AbstractModel):
 
     # The `_fit` method takes the input training data (and optionally the validation data) and trains the model.
     def _fit(
-        self, X: pd.DataFrame, y: pd.Series, time_limit=None, verbosity=2, **kwargs  # training data  # training labels
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
+        time_limit=None,
+        verbosity=2,
+        **kwargs,  # training data  # training labels
     ):  # kwargs includes many other potential inputs, refer to AbstractModel documentation for details
         time_start = time.time()
         try_import_vowpalwabbit()

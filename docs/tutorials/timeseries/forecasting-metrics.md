@@ -50,6 +50,7 @@ Currently, AutoGluon supports following evaluation metrics:
    MASE
    MSE
    RMSE
+   RMSLE
    RMSSE
    SMAPE
    WAPE
@@ -128,6 +129,10 @@ If your goal is to predict the **mean** (expected value), you should use `MSE`, 
      - 
      - ✅
      - mean
+   * - :class:`~autogluon.timeseries.metrics.RMSLE`
+     - 
+     - 
+     -
    * - :class:`~autogluon.timeseries.metrics.RMSSE`
      - 
      - 
@@ -172,6 +177,10 @@ We use the following notation in mathematical definitions of point forecast metr
 
 ```{eval-rst}
 .. autoclass:: RMSE
+```
+
+```{eval-rst}
+.. autoclass:: RMSLE
 ```
 
 ```{eval-rst}

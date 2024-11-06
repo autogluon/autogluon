@@ -1,8 +1,8 @@
 """
-This code is a modification of the official PyTorch Transformer code found at: 
+This code is a modification of the official PyTorch Transformer code found at:
 https://github.com/pytorch/pytorch/blob/master/torch/nn/modules/transformer.py
 
-The modification allows the option of fixing the attention map 
+The modification allows the option of fixing the attention map
 """
 
 import math
@@ -16,7 +16,7 @@ try:
     from torch.overrides import handle_torch_function, has_torch_function
 # Needed for pytorch 1.6
 except ImportError:
-    from torch._overrides import has_torch_function, handle_torch_function
+    from torch._overrides import handle_torch_function, has_torch_function
 
 from torch.nn import Module, init
 from torch.nn.functional import dropout, linear, softmax

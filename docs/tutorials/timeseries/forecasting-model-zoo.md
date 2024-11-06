@@ -56,9 +56,7 @@ Note that some of the models' hyperparameters have names and default values that
    AutoCESModel
    ThetaModel
    ADIDAModel
-   CrostonClassicModel
-   CrostonOptimizedModel
-   CrostonSBAModel
+   CrostonModel
    IMAPAModel
    NPTSModel
    DeepARModel
@@ -66,9 +64,11 @@ Note that some of the models' hyperparameters have names and default values that
    PatchTSTModel
    SimpleFeedForwardModel
    TemporalFusionTransformerModel
+   TiDEModel
    WaveNetModel
    DirectTabularModel
    RecursiveTabularModel
+   ChronosModel
 
 ```
 
@@ -103,7 +103,7 @@ Baseline models are simple approaches that use minimal historical data to make p
 
 
 ```{eval-rst}
-.. autoclass:: ZeroModel 
+.. autoclass:: ZeroModel
    :members: init
 
 ```
@@ -158,31 +158,19 @@ in intermittent demand forecasting.
 
 
 ```{eval-rst}
-.. autoclass:: ADIDAModel 
+.. autoclass:: ADIDAModel
    :members: init
 ```
 
 
 ```{eval-rst}
-.. autoclass:: CrostonClassicModel 
+.. autoclass:: CrostonModel
    :members: init
 ```
 
 
 ```{eval-rst}
-.. autoclass:: CrostonOptimizedModel 
-   :members: init
-```
-
-
-```{eval-rst}
-.. autoclass:: CrostonSBAModel 
-   :members: init
-```
-
-
-```{eval-rst}
-.. autoclass:: IMAPAModel  
+.. autoclass:: IMAPAModel
    :members: init
 ```
 
@@ -227,6 +215,14 @@ Deep learning models use neural networks to capture complex patterns in the data
 
 
 ```{eval-rst}
+.. autoclass:: TiDEModel
+   :members: init
+
+
+```
+
+
+```{eval-rst}
 .. autoclass:: WaveNetModel
    :members: init
 
@@ -251,6 +247,35 @@ Tabular models convert time series forecasting into a tabular regression problem
 
 ```
 
+
+## Pretrained models
+
+Deep learning models pretrained on large time series datasets, able to perform zero-shot forecasting.
+
+
+```{eval-rst}
+.. autoclass:: ChronosModel
+   :members: init
+
+```
+
+
+## Hyperparameters shared by all models
+
+- **target_scaler** *({"standard", "mean_abs", "robust", "min_max", None}, default = None)* - If provided, each time
+   series will be scaled as `(y - loc) / scale` before being passed to the model for training / prediction. An inverse
+   transformation `y * scale + loc` will be applied to the predictions.
+
+   Note that `loc` and `scale` are computed separately for each individual time series.
+
+   Available options:
+   - `"standard"` - standard scaler, `loc = mean(y)`, `scale = std(y)`
+   - `"mean_abs"` - mean absolute scaler, `loc = 0`, `scale = mean(abs(y))`
+   - `"robust"` - robust scaler, `loc = median(y)`, `scale = quantile(y, 0.75) - quantile(y, 0.25)`
+   - `"min_max"` - min-max scaler that converts data into the (0, 1) range, `loc = min(y) / scale`, `scale = max(y) - min(y)`.
+   - `None` - no scaling
+
+
 ## MXNet Models
 
 MXNet models from GluonTS have been deprecated because of dependency conflicts caused by MXNet.
@@ -266,25 +291,21 @@ Models not included in this table currently do not support any additional featur
    :header-rows: 1
    :stub-columns: 1
    :align: center
-   :widths: 40 15 15 15 15
+   :widths: 55 15 15 15
 
    * - Model
-     - Static features (continuous)
-     - Static features (categorical)
-     - Known covariates (continuous)
-     - Past covariates (continuous)
+     - Static features (continuous + categorical)
+     - Known covariates (continuous + categorical)
+     - Past covariates (continuous + categorical)
    * - :class:`~autogluon.timeseries.models.DirectTabularModel`
-     - ✅
      - ✅
      - ✅
      -
    * - :class:`~autogluon.timeseries.models.RecursiveTabularModel`
      - ✅
      - ✅
-     - ✅
      -
    * - :class:`~autogluon.timeseries.models.DeepARModel`
-     - ✅
      - ✅
      - ✅
      -
@@ -292,10 +313,12 @@ Models not included in this table currently do not support any additional featur
      - ✅
      - ✅
      - ✅
+   * - :class:`~autogluon.timeseries.models.TiDEModel`
      - ✅
+     - ✅
+     -
    * - :class:`~autogluon.timeseries.models.WaveNetModel`
      - ✅
      - ✅
-     - ✅
-     - 
+     -
 ```

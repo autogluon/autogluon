@@ -19,11 +19,12 @@ from ..constants import (
     LOGITS,
     MASKS,
     OCR,
+    PEFT_ADDITIVE_STRATEGIES,
     REGRESSION,
     SEMANTIC_MASK,
     SEMANTIC_SEGMENTATION,
 )
-from .adaptation_layers import IA3Linear, IA3LoRALinear, LoRALinear
+from .adaptation_layers import ConvLoRALinear, IA3Linear, IA3LoRALinear, LoRALinear
 
 logger = logging.getLogger(__name__)
 
@@ -236,8 +237,11 @@ def group_param_names(
     # split blocks at the first level
     children_prefix = []
     for n in selected_names:
-        child_name = n[len(model_prefix) + 1 :].split(".")[0]
-        child_prefix = f"{model_prefix}.{child_name}"
+        if model_prefix is not None:
+            child_name = n[len(model_prefix) + 1 :].split(".")[0]
+            child_prefix = f"{model_prefix}.{child_name}"
+        else:
+            child_prefix = n.split(".")[0]
         if child_prefix not in children_prefix:
             children_prefix.append(child_prefix)
 
@@ -446,7 +450,7 @@ def get_column_features(
     return column_features, feature_masks
 
 
-def create_adaptation(efficient_finetune: str, layer: nn.Module, lora_r: int, lora_alpha: int):
+def create_adaptation(efficient_finetune: str, layer: nn.Module, lora_r: int, lora_alpha: int, **kwargs):
     """
     Creates a model adaptation module (IA3, LoRA, IA3_LoRA) given a linear layer.
 
@@ -476,6 +480,15 @@ def create_adaptation(efficient_finetune: str, layer: nn.Module, lora_r: int, lo
         return IA3LoRALinear(
             layer.in_features, layer.out_features, r=lora_r, lora_alpha=lora_alpha, merge_weights=False
         )
+    elif "conv_lora" in efficient_finetune:
+        return ConvLoRALinear(
+            layer.in_features,
+            layer.out_features,
+            r=lora_r,
+            lora_alpha=lora_alpha,
+            merge_weights=False,
+            conv_lora_expert_num=kwargs["conv_lora_expert_num"],
+        )
     elif "ia3" in efficient_finetune:
         return IA3Linear(layer.in_features, layer.out_features, merge_weights=False)
     elif "lora" in efficient_finetune:
@@ -484,7 +497,7 @@ def create_adaptation(efficient_finetune: str, layer: nn.Module, lora_r: int, lo
         raise NotImplementedError(
             f"The efficient finetuning strategy '{efficient_finetune}'"
             f" is not supported. We only support"
-            f" {', '.join(PEFT_STRATEGIES)}."
+            f" {', '.join(PEFT_ADDITIVE_STRATEGIES)}."
         )
 
 
@@ -496,6 +509,7 @@ def inject_adaptation_to_linear_layer(
     filter: Optional[List[str]] = None,
     module_filter: Optional[List[str]] = None,
     extra_trainable_params: Optional[List[str]] = None,
+    **kwargs,
 ) -> nn.Module:
     """
     Injects trainable adatio Low-Rank decomposition matrices (LoRA) into linear
@@ -539,7 +553,7 @@ def inject_adaptation_to_linear_layer(
                     assert isinstance(
                         layer, nn.Linear
                     ), f"LoRA can only be applied to torch.nn.Linear, but {layer} is {type(layer)}."
-                    adaptation_layer = create_adaptation(efficient_finetune, layer, lora_r, lora_alpha)
+                    adaptation_layer = create_adaptation(efficient_finetune, layer, lora_r, lora_alpha, **kwargs)
                     adaptation_layer.weight = layer.weight
                     adaptation_layer.bias = layer.bias
                     setattr(module, c_name, adaptation_layer)

@@ -1,10 +1,11 @@
 # Workflow to trigger/schedule benchmarking, cleaning, aggregating on master branch only and storing results in S3
 name: Benchmark Master Branch
 on:
-  # push:
-  #   branches: ["master"]  # Uncomment post v1.0
+  workflow_dispatch:
+    branches:
+      - master
   schedule:
-    - cron: '00 09 * * SUN' #  UTC 9:00(2:00 PST Time) every Sunday
+    - cron: '00 02 * * *' #  UTC 2:00 AM every day
 
 env:
   AG_BRANCH_NAME: master
@@ -21,11 +22,11 @@ jobs:
         AG_MODULE: [tabular, timeseries, multimodal]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Setup Env Vars
         uses: ./.github/actions/setup-env-vars
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmarkConfig
           role-duration-seconds: 3600
@@ -53,17 +54,17 @@ jobs:
           docker-images: true
           swap-storage: true
       - name: Checkout repository for PR
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Setup Python
-        uses: actions/setup-python@v1
+        uses: actions/setup-python@v4
         with:
           python-version: '3.9'
       - name: Setup npm
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 'latest'
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
           role-duration-seconds: 36000
@@ -73,7 +74,12 @@ jobs:
         run: |
           nvm install 20
           npm install -g aws-cdk
-          /bin/bash ./.github/workflow_scripts/run_benchmark.sh tabular best tabular_full 1h8c ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
+          /bin/bash ./.github/workflow_scripts/run_benchmark.sh tabular tabular_best tabular_full 1h8c ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
+      - name: Upload evaluation results as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: upload-evaluation-results-tabular
+          path: evaluate
 
   benchmark-timeseries:
     needs: benchmark-tabular
@@ -94,17 +100,17 @@ jobs:
           docker-images: true
           swap-storage: true
       - name: Checkout repository for PR
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Setup Python
-        uses: actions/setup-python@v1
+        uses: actions/setup-python@v4
         with:
           python-version: '3.9'
       - name: Setup npm
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 'latest'
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
           role-duration-seconds: 36000
@@ -114,7 +120,12 @@ jobs:
         run: |
           nvm install 20
           npm install -g aws-cdk
-          /bin/bash ./.github/workflow_scripts/run_benchmark.sh timeseries dev timeseries_small 10m4c ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
+          /bin/bash ./.github/workflow_scripts/run_benchmark.sh timeseries timeseries_best timeseries_small 10m4c ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
+      - name: Upload evaluation results as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: upload-evaluation-results-timeseries
+          path: evaluate
 
   benchmark-multimodal-text:
     needs: benchmark-timeseries
@@ -135,17 +146,17 @@ jobs:
           docker-images: true
           swap-storage: true
       - name: Checkout repository for PR
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Setup Python
-        uses: actions/setup-python@v1
+        uses: actions/setup-python@v4
         with:
           python-version: '3.9'
       - name: Setup npm
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 'latest'
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
           role-duration-seconds: 36000
@@ -155,7 +166,12 @@ jobs:
         run: |
           nvm install 20
           npm install -g aws-cdk
-          /bin/bash ./.github/workflow_scripts/run_benchmark.sh multimodal master_medium automm-text g4_12x ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
+          /bin/bash ./.github/workflow_scripts/run_benchmark.sh multimodal multimodal_best automm-text g4_12x ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
+      - name: Upload evaluation results as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: upload-evaluation-results-automm-text
+          path: evaluate
 
   benchmark-multimodal-text-tabular:
     needs: benchmark-multimodal-text
@@ -176,17 +192,17 @@ jobs:
           docker-images: true
           swap-storage: true
       - name: Checkout repository for PR
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Setup Python
-        uses: actions/setup-python@v1
+        uses: actions/setup-python@v4
         with:
           python-version: '3.9'
       - name: Setup npm
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 'latest'
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
           role-duration-seconds: 36000
@@ -196,7 +212,12 @@ jobs:
         run: |
           nvm install 20
           npm install -g aws-cdk
-          /bin/bash ./.github/workflow_scripts/run_benchmark.sh multimodal master_medium automm-text-tabular g4_12x ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
+          /bin/bash ./.github/workflow_scripts/run_benchmark.sh multimodal multimodal_best automm-text-tabular g4_12x ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
+      - name: Upload evaluation results as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: upload-evaluation-results-automm-text-tabular
+          path: evaluate
 
   benchmark-multimodal-image:
     needs: benchmark-multimodal-text-tabular
@@ -217,17 +238,17 @@ jobs:
           docker-images: true
           swap-storage: true
       - name: Checkout repository for PR
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Setup Python
-        uses: actions/setup-python@v1
+        uses: actions/setup-python@v4
         with:
           python-version: '3.9'
       - name: Setup npm
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 'latest'
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::369469875935:role/AutoGluonCIBenchmark
           role-duration-seconds: 36000
@@ -237,4 +258,9 @@ jobs:
         run: |
           nvm install 20
           npm install -g aws-cdk
-          /bin/bash ./.github/workflow_scripts/run_benchmark.sh multimodal master_medium automm-image g4_12x ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
+          /bin/bash ./.github/workflow_scripts/run_benchmark.sh multimodal multimodal_best automm-image g4_12x ${{ env.AG_BRANCH_NAME }} ${{ github.sha }}
+      - name: Upload evaluation results as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: upload-evaluation-results-automm-image
+          path: evaluate

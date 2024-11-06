@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import copy
 import os
 import shutil
 import uuid
 from contextlib import contextmanager
-from typing import List, Tuple
+from typing import Tuple
 
 import numpy as np
 import pandas as pd
@@ -15,7 +17,7 @@ from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.data.label_cleaner import LabelCleaner
 from autogluon.core.models import AbstractModel, BaggedEnsembleModel
 from autogluon.core.stacked_overfitting.utils import check_stacked_overfitting_from_leaderboard
-from autogluon.core.utils import download, generate_train_test_split, infer_problem_type, unzip
+from autogluon.core.utils import download, generate_train_test_split, generate_train_test_split_combined, infer_problem_type, unzip
 from autogluon.features.generators import AbstractFeatureGenerator, AutoMLPipelineFeatureGenerator
 from autogluon.tabular import TabularDataset, TabularPredictor
 
@@ -51,6 +53,19 @@ def pytest_collection_modifyitems(config, items):
         for marker in custom_markers:
             if marker in item.keywords:
                 item.add_marker(custom_markers[marker])
+
+    # Normalize the file paths and use a consistent comparison method
+    normalized_path = lambda p: os.path.normpath(str(p))
+    resource_allocation_path = normalized_path("tests/unittests/resource_allocation")
+
+    # Reordering logic to ensure tests under ./unittests/resource_allocation run last
+    # TODO: Fix this once resource_allocation tests are robost enough to run with other tests without ordering issues
+    resource_allocation_tests = [item for item in items if resource_allocation_path in normalized_path(item.fspath)]
+    other_tests = [item for item in items if resource_allocation_path not in normalized_path(item.fspath)]
+
+    items.clear()
+    items.extend(other_tests)
+    items.extend(resource_allocation_tests)
 
 
 class DatasetLoaderHelper:
@@ -138,7 +153,8 @@ class FitHelper:
         refit_full=True,
         delete_directory=True,
         extra_metrics=None,
-        expected_model_count=2,
+        expected_model_count: int | None = 2,
+        min_cls_count_train=1,
         path_as_absolute=False,
         compile=False,
         compiler_configs=None,
@@ -146,7 +162,9 @@ class FitHelper:
         expected_stacked_overfitting_at_test=None,
         expected_stacked_overfitting_at_val=None,
         scikit_api=False,
-    ):
+        use_test_data=False,
+        use_test_for_val=False,
+    ) -> TabularPredictor:
         if compiler_configs is None:
             compiler_configs = {}
         directory_prefix = "./datasets/"
@@ -171,7 +189,20 @@ class FitHelper:
             init_args["path"] = PathConverter.to_absolute(path=init_args["path"])
             assert PathConverter._is_absolute(path=init_args["path"])
         save_path = init_args["path"]
-        predictor = FitHelper.fit_dataset(train_data=train_data, init_args=init_args, fit_args=fit_args, sample_size=sample_size, scikit_api=scikit_api)
+
+        if use_test_data:
+            fit_args["test_data"] = test_data
+            if use_test_for_val:
+                fit_args["tuning_data"] = test_data
+
+        predictor: TabularPredictor = FitHelper.fit_dataset(
+            train_data=train_data,
+            init_args=init_args,
+            fit_args=fit_args,
+            sample_size=sample_size,
+            scikit_api=scikit_api,
+            min_cls_count_train=min_cls_count_train,
+        )
         if compile:
             predictor.compile(models="all", compiler_configs=compiler_configs)
             predictor.persist(models="all")
@@ -189,10 +220,12 @@ class FitHelper:
 
         model_names = predictor.model_names()
         model_name = model_names[0]
-        assert len(model_names) == expected_model_count
+        if expected_model_count is not None:
+            assert len(model_names) == expected_model_count
         if refit_full:
             refit_model_names = predictor.refit_full()
-            assert len(refit_model_names) == expected_model_count
+            if expected_model_count is not None:
+                assert len(refit_model_names) == expected_model_count
             refit_model_name = refit_model_names[model_name]
             assert "_FULL" in refit_model_name
             predictor.predict(test_data, model=refit_model_name)
@@ -211,37 +244,24 @@ class FitHelper:
         return predictor
 
     @staticmethod
-    def fit_and_validate_dataset_with_cascade(
-        dataset_name, fit_args, cascade: List[str], sample_size=1000, refit_full=True, delete_directory=True, expected_model_count=2
-    ):
-        predictor = FitHelper.fit_and_validate_dataset(
-            dataset_name=dataset_name,
-            fit_args=fit_args,
-            sample_size=sample_size,
-            refit_full=refit_full,
-            expected_model_count=expected_model_count,
-            delete_directory=False,
-        )
-        directory_prefix = "./datasets/"
-        train_data, test_data, dataset_info = DatasetLoaderHelper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
+    def fit_dataset(train_data, init_args, fit_args, sample_size=None, min_cls_count_train=1, scikit_api=False) -> TabularPredictor:
+        if "problem_type" in init_args:
+            problem_type = init_args["problem_type"]
+        else:
+            problem_type = infer_problem_type(train_data[init_args["label"]])
 
-        predictor.predict(test_data, model=cascade)
-        predictor.predict_proba(test_data, model=cascade)
-
-        if delete_directory:
-            shutil.rmtree(predictor.path, ignore_errors=True)  # Delete AutoGluon output directory to ensure runs' information has been removed.
-
-    @staticmethod
-    def fit_dataset(train_data, init_args, fit_args, sample_size=None, scikit_api=False) -> TabularPredictor:
         if sample_size is not None and sample_size < len(train_data):
-            train_data = train_data.sample(n=sample_size, random_state=0)
+            train_data, _ = generate_train_test_split_combined(
+                data=train_data,
+                label=init_args["label"],
+                problem_type=problem_type,
+                test_size=len(train_data) - sample_size,
+                min_cls_count_train=min_cls_count_train,
+            )
+
         if scikit_api:
             from autogluon.tabular.experimental import TabularClassifier, TabularRegressor
 
-            if "problem_type" in init_args:
-                problem_type = init_args["problem_type"]
-            else:
-                problem_type = infer_problem_type(train_data[init_args["label"]])
             X = train_data.drop(columns=[init_args["label"]])
             y = train_data[init_args["label"]]
             if problem_type in [REGRESSION]:
@@ -274,8 +294,11 @@ class ModelFitHelper:
         X_test = test_data.drop(columns=[label])
         X_test = feature_generator.transform(X_test)
 
-        model.predict(X_test)
+        y_pred = model.predict(X_test)
+        assert isinstance(y_pred, np.ndarray), f"Expected np.ndarray as model.predict(X_test) output. Got: {y_pred.__class__}"
+
         y_pred_proba = model.predict_proba(X_test)
+        assert isinstance(y_pred_proba, np.ndarray), f"Expected np.ndarray as model.predict_proba(X_test) output. Got: {y_pred.__class__}"
         model.get_info()
 
         if check_predict_children:

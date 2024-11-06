@@ -5,7 +5,7 @@ import torch
 import torchmetrics
 from transformers.models.mask2former.modeling_mask2former import Mask2FormerLoss
 
-from ..constants import CLASS_LOGITS, LOGITS, SEMANTIC_MASK, WEIGHT
+from ..constants import CLASS_LOGITS, LOGITS, MOE_LOSS, SEMANTIC_MASK, WEIGHT
 from ..models.utils import run_model
 from .lit_module import LitModule
 from .semantic_seg_metrics import Multiclass_IoU
@@ -42,6 +42,10 @@ class SemanticSegmentationLitModule(LitModule):
                     )
                     * weight
                 )
+            # MoE loss
+            if MOE_LOSS in per_output:
+                loss += per_output[MOE_LOSS]
+
         return loss
 
     def _compute_metric_score(

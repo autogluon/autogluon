@@ -33,19 +33,24 @@ runs:
     - name: Submit Job(For Push)
       if: ${{ github.event_name == 'push' }}
       shell: bash
+      env:
+        COMMAND: ${{ inputs.command }}
+        SOURCE_REF: ${{ github.ref }}
       run: |
         echo "Start submitting job"
         python ./CI/batch/submit-job.py --job-type ${{ inputs.job-type }}-PUSH \
-                                        --name ${{ inputs.job-name }}-'${{ github.ref }}' \
-                                        --source-ref '${{ github.ref }}' \
+                                        --name "${{ inputs.job-name }}-$SOURCE_REF" \
+                                        --source-ref "$SOURCE_REF" \
                                         --work-dir ${{ inputs.work-dir }} \
                                         --remote https://github.com/'${{ github.repository }}' \
-                                        --command "${{ inputs.command }}" \
+                                        --command "$COMMAND" \
                                         --safe-to-use-script \
                                         --wait
     - name: Submit Job(For Pull Request Safe Scripts)
       if: ${{ github.event_name == 'pull_request_target' && steps.check.outputs.permitted == 'true' }}
       shell: bash
+      env:
+        COMMAND: ${{ inputs.command }}
       run: |
         echo "Start submitting job"
         python ./CI/batch/submit-job.py --job-type ${{ inputs.job-type }} \
@@ -53,12 +58,14 @@ runs:
                                         --source-ref '${{ github.event.pull_request.head.sha }}' \
                                         --work-dir ${{ inputs.work-dir }} \
                                         --remote https://github.com/'${{ github.event.pull_request.head.repo.full_name }}' \
-                                        --command "${{ inputs.command }}" \
+                                        --command "$COMMAND" \
                                         --safe-to-use-script \
                                         --wait
     - name: Submit Job(For Pull Request Not Safe Scripts)
       if: ${{ github.event_name == 'pull_request_target' && steps.check.outputs.permitted != 'true' }}
       shell: bash
+      env:
+        COMMAND: ${{ inputs.command }}
       run: |
         echo "Start submitting job"
         python ./CI/batch/submit-job.py --job-type ${{ inputs.job-type }} \
@@ -66,5 +73,5 @@ runs:
                                         --source-ref '${{ github.event.pull_request.head.sha }}' \
                                         --work-dir ${{ inputs.work-dir }} \
                                         --remote https://github.com/'${{ github.event.pull_request.head.repo.full_name }}' \
-                                        --command "${{ inputs.command }}" \
+                                        --command "$COMMAND" \
                                         --wait

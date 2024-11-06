@@ -110,6 +110,7 @@ def _add_stream_handler():
 
 
 __FIXED_KAGGLE_LOGGING = False
+__FIXED_SKLEARNEX_LOGGING = False
 
 
 def fix_logging_if_kaggle():
@@ -122,6 +123,23 @@ def fix_logging_if_kaggle():
         _add_stream_handler()
     # After the fix is performed, or it is determined we are not in Kaggle, no need to fix again.
     __FIXED_KAGGLE_LOGGING = True
+
+
+def fix_sklearnex_logging_if_kaggle():
+    """
+    Fixes logging verbosity for sklearnex when in a Kaggle notebook.
+    By default, sklearnex verbosity is set to `info` in Kaggle, which results in unintended logging spam.
+    This corrects this by detected if we are in a Kaggle environment and then setting the logger verbosity back to WARNING.
+
+    For more details, refer to the following:
+        1. https://github.com/intel/scikit-learn-intelex/issues/1695#issuecomment-1948647937
+        2. https://github.com/autogluon/autogluon/issues/4141
+    """
+    global __FIXED_SKLEARNEX_LOGGING
+    if (not __FIXED_SKLEARNEX_LOGGING) and _check_if_kaggle():
+        logging.getLogger("sklearnex").setLevel("WARNING")
+    # After the fix is performed, no need to fix again.
+    __FIXED_SKLEARNEX_LOGGING = True
 
 
 def convert_time_in_s_to_log_friendly(time_in_sec: float, min_value: float = 0.01):

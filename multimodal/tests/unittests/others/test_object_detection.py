@@ -30,13 +30,9 @@ def download_sample_dataset():
 
 
 # TODO: Pytest does not support DDP
-@pytest.mark.single_gpu
-@pytest.mark.parametrize(
-    "checkpoint_name",
-    [
-        "yolox_s",
-    ],
-)
+# TODO: Issue #4126 Skipping object detection tests due to incompatibility of mmdet with Torch 2.2
+@pytest.mark.torch_mmdet
+@pytest.mark.parametrize("checkpoint_name", ["yolox_s"])
 def test_mmdet_object_detection_fit_basics(checkpoint_name):
     mmdet_image_name = download_sample_images()
     data_dir = download_sample_dataset()
@@ -45,22 +41,14 @@ def test_mmdet_object_detection_fit_basics(checkpoint_name):
     test_path = os.path.join(data_dir, "Annotations", "test_cocoformat.json")
     # Init predictor
     predictor = MultiModalPredictor(
-        hyperparameters={
-            "model.mmdet_image.checkpoint_name": checkpoint_name,
-            "env.num_gpus": -1,
-        },
+        hyperparameters={"model.mmdet_image.checkpoint_name": checkpoint_name, "env.num_gpus": -1},
         problem_type="object_detection",
         sample_data_path=train_path,
     )
 
     # Fit
     predictor.fit(
-        train_path,
-        hyperparameters={
-            "optimization.learning_rate": 2e-4,
-            "env.per_gpu_batch_size": 2,
-        },
-        time_limit=40,
+        train_path, hyperparameters={"optimization.learning_rate": 2e-4, "env.per_gpu_batch_size": 2}, time_limit=40
     )
 
     # Evaluate on COCO format data
@@ -89,13 +77,9 @@ def test_mmdet_object_detection_fit_basics(checkpoint_name):
 
 
 # TODO: Pytest does not support DDP
-@pytest.mark.single_gpu
-@pytest.mark.parametrize(
-    "checkpoint_name",
-    [
-        "yolov3_mobilenetv2_8xb24-320-300e_coco",
-    ],
-)
+# TODO: Issue #4126 Skipping object detection tests due to incompatibility of mmdet with Torch 2.2
+@pytest.mark.torch_mmdet
+@pytest.mark.parametrize("checkpoint_name", ["yolov3_mobilenetv2_8xb24-320-300e_coco"])
 def test_mmdet_object_detection_inference_basics(checkpoint_name):
     mmdet_image_name = download_sample_images()
 
@@ -141,13 +125,9 @@ def test_mmdet_object_detection_inference_basics(checkpoint_name):
 
 
 # TODO: FIX DDP multi runs!
-@pytest.mark.single_gpu
-@pytest.mark.parametrize(
-    "checkpoint_name",
-    [
-        "yolov3_mobilenetv2_8xb24-320-300e_coco",
-    ],
-)
+# TODO: Issue #4126 Skipping object detection tests due to incompatibility of mmdet with Torch 2.2
+@pytest.mark.torch_mmdet
+@pytest.mark.parametrize("checkpoint_name", ["yolov3_mobilenetv2_8xb24-320-300e_coco"])
 def test_mmdet_object_detection_inference_xywh_output(checkpoint_name):
     mmdet_image_name = download_sample_images()
 
@@ -185,23 +165,16 @@ def test_mmdet_object_detection_inference_xywh_output(checkpoint_name):
 
 
 # TODO: FIX DDP multi runs!
-@pytest.mark.single_gpu
-@pytest.mark.parametrize(
-    "checkpoint_name",
-    [
-        "yolov3_mobilenetv2_8xb24-320-300e_coco",
-    ],
-)
+# TODO: Issue #4126 Skipping object detection tests due to incompatibility of mmdet with Torch 2.2
+@pytest.mark.torch_mmdet
+@pytest.mark.parametrize("checkpoint_name", ["yolov3_mobilenetv2_8xb24-320-300e_coco"])
 def test_mmdet_object_detection_save_and_load(checkpoint_name):
     data_dir = download_sample_dataset()
 
     test_path = os.path.join(data_dir, "Annotations", "test_cocoformat.json")
     # Init predictor
     predictor = MultiModalPredictor(
-        hyperparameters={
-            "model.mmdet_image.checkpoint_name": checkpoint_name,
-            "env.num_gpus": -1,
-        },
+        hyperparameters={"model.mmdet_image.checkpoint_name": checkpoint_name, "env.num_gpus": -1},
         problem_type="object_detection",
     )
 
@@ -210,10 +183,7 @@ def test_mmdet_object_detection_save_and_load(checkpoint_name):
     model_save_subdir = predictor._learner._model.save()
 
     new_predictor = MultiModalPredictor(
-        hyperparameters={
-            "model.mmdet_image.checkpoint_name": model_save_subdir,
-            "env.num_gpus": -1,
-        },
+        hyperparameters={"model.mmdet_image.checkpoint_name": model_save_subdir, "env.num_gpus": -1},
         problem_type="object_detection",
     )
     new_pred = new_predictor.predict(test_path)
@@ -222,13 +192,9 @@ def test_mmdet_object_detection_save_and_load(checkpoint_name):
 
 
 # TODO: FIX DDP multi runs!
-@pytest.mark.single_gpu
-@pytest.mark.parametrize(
-    "checkpoint_name",
-    [
-        "yolov3_mobilenetv2_8xb24-320-300e_coco",
-    ],
-)
+# TODO: Issue #4126 Skipping object detection tests due to incompatibility of mmdet with Torch 2.2
+@pytest.mark.torch_mmdet
+@pytest.mark.parametrize("checkpoint_name", ["yolov3_mobilenetv2_8xb24-320-300e_coco"])
 def test_mmdet_object_detection_fit_eval_predict_df(checkpoint_name):
     data_dir = download_sample_dataset()
 
@@ -237,21 +203,13 @@ def test_mmdet_object_detection_fit_eval_predict_df(checkpoint_name):
     # Init predictor
     train_df = from_coco_or_voc(train_path)
     predictor = MultiModalPredictor(
-        hyperparameters={
-            "model.mmdet_image.checkpoint_name": checkpoint_name,
-            "env.num_gpus": -1,
-        },
+        hyperparameters={"model.mmdet_image.checkpoint_name": checkpoint_name, "env.num_gpus": -1},
         problem_type="object_detection",
         sample_data_path=train_df,
     )
 
     predictor.fit(
-        train_df,
-        hyperparameters={
-            "optimization.learning_rate": 2e-4,
-            "env.per_gpu_batch_size": 2,
-        },
-        time_limit=30,
+        train_df, hyperparameters={"optimization.learning_rate": 2e-4, "env.per_gpu_batch_size": 2}, time_limit=30
     )
 
     test_df = from_coco_or_voc(test_path)
@@ -260,13 +218,9 @@ def test_mmdet_object_detection_fit_eval_predict_df(checkpoint_name):
 
 
 # TODO: Pytest does not support DDP
-@pytest.mark.single_gpu
-@pytest.mark.parametrize(
-    "checkpoint_name",
-    [
-        "yolov3_mobilenetv2_8xb24-320-300e_coco",
-    ],
-)
+# TODO: Issue #4126 Skipping object detection tests due to incompatibility of mmdet with Torch 2.2
+@pytest.mark.torch_mmdet
+@pytest.mark.parametrize("checkpoint_name", ["yolov3_mobilenetv2_8xb24-320-300e_coco"])
 def test_mmdet_object_detection_fit_with_freeze_backbone(checkpoint_name):
     data_dir = download_sample_dataset()
 
@@ -285,17 +239,13 @@ def test_mmdet_object_detection_fit_with_freeze_backbone(checkpoint_name):
     )
 
     predictor.fit(
-        train_df,
-        hyperparameters={
-            "optimization.learning_rate": 2e-4,
-            "env.per_gpu_batch_size": 2,
-        },
-        time_limit=30,
+        train_df, hyperparameters={"optimization.learning_rate": 2e-4, "env.per_gpu_batch_size": 2}, time_limit=30
     )
 
 
 # TODO: FIX DDP multi runs!
-@pytest.mark.single_gpu
+# TODO: Issue #4126 Skipping object detection tests due to incompatibility of mmdet with Torch 2.2
+@pytest.mark.torch_mmdet
 def test_detector_hyperparameters_consistency():
     data_dir = download_sample_dataset()
 
@@ -309,22 +259,13 @@ def test_detector_hyperparameters_consistency():
 
     # pass hyperparameters to init()
     predictor = MultiModalPredictor(
-        problem_type="object_detection",
-        sample_data_path=train_df,
-        hyperparameters=hyperparameters,
+        problem_type="object_detection", sample_data_path=train_df, hyperparameters=hyperparameters
     )
     predictor.fit(train_df, time_limit=10)
 
     # pass hyperparameters to fit()
-    predictor_2 = MultiModalPredictor(
-        problem_type="object_detection",
-        sample_data_path=train_df,
-    )
-    predictor_2.fit(
-        train_df,
-        hyperparameters=hyperparameters,
-        time_limit=10,
-    )
+    predictor_2 = MultiModalPredictor(problem_type="object_detection", sample_data_path=train_df)
+    predictor_2.fit(train_df, hyperparameters=hyperparameters, time_limit=10)
     assert predictor._learner._config == predictor_2._learner._config
 
 

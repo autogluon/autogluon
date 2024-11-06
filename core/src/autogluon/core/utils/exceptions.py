@@ -1,18 +1,35 @@
-class TimeLimitExceeded(Exception):
+
+class AutoGluonException(Exception):
+    """
+    Generic AutoGluon exception.
+    Can be used to identify AutoGluon specific exception classes.
+    """
     pass
 
 
-class NotEnoughMemoryError(Exception):
+class TimeLimitExceeded(AutoGluonException):
     pass
 
 
-class NoGPUError(Exception):
+class NotEnoughMemoryError(AutoGluonException):
     pass
 
 
-class NotEnoughCudaMemoryError(Exception):
+class NoGPUError(AutoGluonException):
     pass
 
 
-class NoValidFeatures(Exception):
+class NotEnoughCudaMemoryError(AutoGluonException):
+    pass
+
+
+class NoValidFeatures(AutoGluonException):
+    pass
+
+
+class NoStackFeatures(NoValidFeatures):
+    pass
+
+
+class NotValidStacker(AutoGluonException):
     pass

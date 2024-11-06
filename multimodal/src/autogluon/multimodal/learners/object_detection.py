@@ -8,16 +8,7 @@ import pandas as pd
 from omegaconf import DictConfig, OmegaConf
 from torch import nn
 
-from ..constants import (
-    BBOX,
-    DDP,
-    MAP,
-    MULTI_IMAGE_MIX_DATASET,
-    OBJECT_DETECTION,
-    OPEN_VOCABULARY_OBJECT_DETECTION,
-    OVD_RET,
-    XYWH,
-)
+from ..constants import BBOX, DDP, MAP, MULTI_IMAGE_MIX_DATASET, OBJECT_DETECTION, XYWH
 from ..data import BaseDataModule, MultiImageMixDataset, MultiModalFeaturePreprocessor, infer_rois_column_type
 from ..optimization import LitModule, MMDetLitModule
 from ..utils import (
@@ -29,7 +20,6 @@ from ..utils import (
     from_coco_or_voc,
     get_detection_classes,
     object_detection_data_to_df,
-    save_ovd_result_df,
     save_result_df,
     setup_save_path,
     split_train_tuning_data,
@@ -91,11 +81,10 @@ class ObjectDetectionLearner(BaseLearner):
         self._sample_data_path = sample_data_path
 
         # TODO: merge object detection and open vocabulary object detection
-        if self._problem_type == OBJECT_DETECTION:
-            self._label_column = "label"
-            if self._sample_data_path is not None:
-                self._classes = get_detection_classes(self._sample_data_path)
-                self._output_shape = len(self._classes)
+        self._label_column = "label"
+        if self._sample_data_path is not None:
+            self._classes = get_detection_classes(self._sample_data_path)
+            self._output_shape = len(self._classes)
 
         # TODO: merge _detection_anno_train and detection_anno_train?
         self._detection_anno_train = None
@@ -325,10 +314,7 @@ class ObjectDetectionLearner(BaseLearner):
         optimization_kwargs: Optional[dict] = None,
         is_train=True,
     ):
-        # add ovd
-        if self._problem_type == OPEN_VOCABULARY_OBJECT_DETECTION:
-            LightningModule = LitModule
-        elif self._problem_type == OBJECT_DETECTION:
+        if self._problem_type == OBJECT_DETECTION:
             LightningModule = MMDetLitModule
         else:
             raise TypeError(f"problem type {self._problem_type} is not supported by ObjectDetectionLearner.")
@@ -657,8 +643,6 @@ class ObjectDetectionLearner(BaseLearner):
         Optionally return a dataframe of prediction results.
         """
         self.ensure_predict_ready()
-        if self._problem_type == OPEN_VOCABULARY_OBJECT_DETECTION:
-            raise NotImplementedError("Open vocabulary object detection doesn't support calling `evaluate` yet.")
 
         if realtime:
             return NotImplementedError(f"Current problem type {self._problem_type} does not support realtime predict.")
@@ -719,8 +703,6 @@ class ObjectDetectionLearner(BaseLearner):
             )
             if self._label_column not in data:
                 self._label_column = None
-        elif self._problem_type == OPEN_VOCABULARY_OBJECT_DETECTION:
-            ret_type = OVD_RET
 
         outputs = self.predict_per_run(
             data=data,
@@ -745,25 +727,15 @@ class ObjectDetectionLearner(BaseLearner):
             )
 
         if (as_pandas is None and isinstance(data, pd.DataFrame)) or as_pandas is True:
-            if (
-                self._problem_type == OBJECT_DETECTION
-            ):  # TODO: add prediction output in COCO format if as_pandas is False
-                # TODO: calling save_result_df to convert data to dataframe is not a good logic
-                # TODO: consider combining this with the above saving logic or using a different function.
-                pred = save_result_df(
-                    pred=pred,
-                    data=data,
-                    detection_classes=self._model.model.CLASSES,
-                    result_path=None,
-                )
-            elif (
-                self._problem_type == OPEN_VOCABULARY_OBJECT_DETECTION
-            ):  # TODO: refactor and merge with OBJECT DETECTION
-                pred = save_ovd_result_df(
-                    pred=pred,
-                    data=data,
-                    result_path=None,
-                )
+            # TODO: add prediction output in COCO format if as_pandas is False
+            # TODO: calling save_result_df to convert data to dataframe is not a good logic
+            # TODO: consider combining this with the above saving logic or using a different function.
+            pred = save_result_df(
+                pred=pred,
+                data=data,
+                detection_classes=self._model.model.CLASSES,
+                result_path=None,
+            )
 
         return pred
 

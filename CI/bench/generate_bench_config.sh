@@ -9,7 +9,7 @@ USER_DIR_S3_PREFIX=$5  # where to find the pre-generated config. This will eithe
 CDK_DEPLOY_ACCOUNT=369469875935
 CDK_DEPLOY_REGION=us-east-1
 METRICS_BUCKET=autogluon-ci-benchmark
-MAX_MACHINE_NUM=200
+MAX_MACHINE_NUM=1040
 
 if [ $MODULE == "tabular" ] || [ $MODULE == "timeseries" ]; then
     FRAMEWORK=AutoGluon_$PRESET:benchmark
@@ -27,7 +27,7 @@ if [ $MODULE == "tabular" ] || [ $MODULE == "timeseries" ]; then
     --amlb-benchmark $BENCHMARK \
     --amlb-constraint $TIME_LIMIT \
     --amlb-user-dir $(dirname "$0")/amlb_user_dir \
-    --git-uri-branch https://github.com/openml/automlbenchmark.git#stable
+    --git-uri-branch https://github.com/Innixma/automlbenchmark.git#autogluon_switch_to_uv
 else
     FRAMEWORK=AutoGluon_$PRESET
     aws s3 cp --recursive s3://autogluon-ci-benchmark/configs/$MODULE/$USER_DIR_S3_PREFIX/latest/ $(dirname "$0")/custom_user_dir/
@@ -35,9 +35,6 @@ else
     class_name=""
     dataset_file=""
     custom_dataloader_value=""
-    shot_value=0
-    seed_value=0
-    lang=""
     custom_metrics_path=""
     custom_function_name=""
     optimum=0
@@ -55,9 +52,6 @@ else
         dataloader_file="text_dataloader.py"
         class_name="TextDataLoader"
         dataset_file="text_datasets.yaml"
-        lang="en"
-        shot_value=500
-        seed_value=7
         custom_dataloader_value="dataloader_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataloader_file;class_name:$class_name;dataset_config_file:$(dirname "$0")/custom_user_dir/dataloaders/$dataset_file"
     elif [ $BENCHMARK == "automm-text-tabular-image" ]; then
         dataloader_file="text_tabular_image_dataloader.py"
@@ -100,7 +94,7 @@ else
     --custom-dataloader '$custom_dataloader_value'"
 
     if [ $BENCHMARK == "automm-text" ]; then
-        gen_bench_command="$gen_bench_command --fewshot --shot $shot_value --lang $lang --seed $seed_value"
+        gen_bench_command="$gen_bench_command"
     elif [ $BENCHMARK == "automm-text-tabular-image" ]; then
         gen_bench_command="$gen_bench_command --custom-metrics --metrics-path $custom_metrics_path --function-name $custom_function_name --optimum $optimum --greater-is-better"
     fi

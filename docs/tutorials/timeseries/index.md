@@ -7,8 +7,7 @@ and does not require you to manually deal with cumbersome issues like model sele
 Under the hood, AutoGluon combines various state of the art forecasting algorithms.
 These include established statical methods like ETS and ARIMA from
 [`StatsForecast`](https://github.com/Nixtla/statsforecast),
-efficient tree-based forecasters like LightGBM based on [AutoGluon-Tabular](https://auto.gluon.ai/stable/tutorials/tabular/index.html),
-and flexible deep learning models like DeepAR and Temporal Fusion Transformer from [GluonTS](https://ts.gluon.ai/).
+efficient tree-based forecasters like LightGBM based on [AutoGluon-Tabular](https://auto.gluon.ai/stable/tutorials/tabular/index.html), flexible deep learning models like DeepAR and Temporal Fusion Transformer from [GluonTS](https://ts.gluon.ai/), and a pretrained zero-shot forecasting model, [Chronos](https://github.com/amazon-science/chronos-forecasting). 
 
 Check out the [Quick Start Tutorial](forecasting-quick-start.ipynb) to learn how to make accurate forecasts in just 3 lines of code using AutoGluon.
 
@@ -25,6 +24,12 @@ Check out the [Quick Start Tutorial](forecasting-quick-start.ipynb) to learn how
   :link: forecasting-indepth.html
 
   Detailed discussion of the time series forecasting capabilities in AutoGluon.
+:::
+
+:::{grid-item-card} Forecasting with Chronos
+  :link: forecasting-chronos.html
+
+  Zero-shot forecasting with pretrained Chronos time series models in AutoGluon.
 :::
 
 :::{grid-item-card} Model Zoo
@@ -49,6 +54,7 @@ hidden: true
 
 Quick Start <forecasting-quick-start>
 In Depth <forecasting-indepth>
+Forecasting with Chronos <forecasting-chronos>
 Model Zoo <forecasting-model-zoo>
 Metrics <forecasting-metrics>
 ```

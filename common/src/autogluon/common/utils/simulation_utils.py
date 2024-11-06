@@ -16,7 +16,9 @@ def _dd_to_dict(dd):
     return dd
 
 
-def convert_simulation_artifacts_to_tabular_predictions_dict(simulation_artifacts: Dict[str, Dict[int, Dict[str, Any]]]) -> Tuple[dict, dict]:
+def convert_simulation_artifacts_to_tabular_predictions_dict(
+    simulation_artifacts: Dict[str, Dict[int, Dict[str, Any]]],
+) -> Tuple[dict, dict]:
     """
     Converts raw simulation artifacts to the format required for ensemble simulation.
 

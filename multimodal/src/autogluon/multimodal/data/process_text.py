@@ -302,6 +302,10 @@ class TextProcessor:
                     # naive way to detect categorical/numerical text:
                     if len(col_text.split(" ")) >= self.text_detection_length:
                         col_text = self.train_augmenter(col_text)
+                        # After text augmentation, "col_text" may become a list. An error will be raised when calling "tokenizer.encode".
+                        if type(col_text) == list and len(col_text) == 1:
+                            col_text = col_text[0]
+
             if col_name == CHOICES_IDS:
                 answer_ids = self.tokenizer(
                     col_text,

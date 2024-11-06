@@ -11,25 +11,28 @@ LITE_MODE = "lite" in PACKAGE_NAME
 
 AUTOGLUON_ROOT_PATH = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", ".."))
 
-PYTHON_REQUIRES = ">=3.8, <3.12"
+PYTHON_REQUIRES = ">=3.9, <3.13"
 
 
 # Only put packages here that would otherwise appear multiple times across different module's setup.py files.
 DEPENDENT_PACKAGES = {
     "boto3": ">=1.10,<2",  # <2 because unlikely to introduce breaking changes in minor releases. >=1.10 because 1.10 is 3 years old, no need to support older
     "numpy": ">=1.21,<1.29",  # "<{N+3}" upper cap, where N is the latest released minor version, assuming no warnings using N
-    "pandas": ">=2.0.0,<2.2.0",  # "<{N+1}" upper cap
-    "scikit-learn": ">=1.3.0,<1.5",  # "<{N+2}" upper cap
+    "pandas": ">=2.0.0,<2.3.0",  # "<{N+3}" upper cap
+    "scikit-learn": ">=1.4.0,<1.5.3",  # capping to latest version
     "scipy": ">=1.5.4,<1.13",  # "<{N+2}" upper cap
-    "psutil": ">=5.7.3,<6",  # Major version cap
+    "matplotlib": ">=3.7.0,<3.11",  # "<{N+2}" upper cap
+    "psutil": ">=5.7.3,<7.0.0",  # Major version cap
     "s3fs": ">=2023.1,<2025",  # Yearly cap
     "networkx": ">=3.0,<4",  # Major version cap
     "tqdm": ">=4.38,<5",  # Major version cap
-    "Pillow": ">=10.0.1,<11",  # Major version cap
-    "torch": ">=2.0,<2.1",  # "<{N+1}" upper cap, sync with common/src/autogluon/common/utils/try_import.py
-    "lightning": ">=2.0.0,<2.1",  # "<{N+1}" upper cap
-    "pytorch_lightning": ">=2.0.0,<2.1",  # "<{N+1}" upper cap, capping `lightning` does not cap `pytorch_lightning`!
+    "Pillow": ">=10.0.1,<12",  # Major version cap
+    "torch": ">=2.2,<2.5",  # Major version cap, sync with common/src/autogluon/common/utils/try_import.py
+    "lightning": ">=2.2,<2.4",  # Major version cap
+    "pytorch_lightning": ">=2.2,<2.4",  # Major version cap, capping `lightning` does not cap `pytorch_lightning`!
     "async_timeout": ">=4.0,<5",  # Major version cap
+    "transformers[sentencepiece]": ">=4.38.0,<4.41.0",
+    "accelerate": ">=0.21.0,<0.34.0",
 }
 if LITE_MODE:
     DEPENDENT_PACKAGES = {package: version for package, version in DEPENDENT_PACKAGES.items() if package not in ["psutil", "Pillow", "timm"]}
@@ -108,7 +111,7 @@ def default_setup_args(*, version, submodule):
         version=version,
         author="AutoGluon Community",
         url="https://github.com/autogluon/autogluon",
-        description="AutoML for Image, Text, and Tabular Data",
+        description="Fast and Accurate ML in 3 Lines of Code",
         long_description=long_description,
         long_description_content_type="text/markdown",
         license="Apache-2.0",
@@ -120,11 +123,7 @@ def default_setup_args(*, version, submodule):
         zip_safe=True,
         include_package_data=True,
         python_requires=PYTHON_REQUIRES,
-        package_data={
-            AUTOGLUON: [
-                "LICENSE",
-            ]
-        },
+        package_data={AUTOGLUON: ["LICENSE"]},
         classifiers=[
             development_status,
             "Intended Audience :: Education",
@@ -140,10 +139,10 @@ def default_setup_args(*, version, submodule):
             "Operating System :: POSIX",
             "Operating System :: Unix",
             "Programming Language :: Python :: 3",
-            "Programming Language :: Python :: 3.8",
             "Programming Language :: Python :: 3.9",
             "Programming Language :: Python :: 3.10",
             "Programming Language :: Python :: 3.11",
+            "Programming Language :: Python :: 3.12",
             "Topic :: Software Development",
             "Topic :: Scientific/Engineering :: Artificial Intelligence",
             "Topic :: Scientific/Engineering :: Information Analysis",

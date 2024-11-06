@@ -209,7 +209,12 @@ class LitModule(pl.LightningModule):
         label: torch.Tensor,
     ):
         if isinstance(
-            metric, (torchmetrics.classification.BinaryAUROC, torchmetrics.classification.BinaryAveragePrecision)
+            metric,
+            (
+                torchmetrics.classification.BinaryAUROC,
+                torchmetrics.classification.BinaryAveragePrecision,
+                torchmetrics.classification.BinaryF1Score,
+            ),
         ):
             prob = F.softmax(logits.float(), dim=1)
             metric.update(preds=prob[:, 1], target=label)  # only for binary classification
@@ -291,7 +296,7 @@ class LitModule(pl.LightningModule):
             custom_metric_func=self.custom_metric_func,
             logits=output[self.model.prefix][LOGITS],
             label=batch[self.model.label_key],
-        ),
+        )
         self.log(
             self.validation_metric_name,
             self.validation_metric,

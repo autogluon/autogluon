@@ -19,6 +19,8 @@ from autogluon.multimodal.constants import (
     ENVIRONMENT,
     GREEDY_SOUP,
     IA3,
+    IMAGE_BASE64_STR,
+    IMAGE_BYTEARRAY,
     LORA,
     LORA_BIAS,
     LORA_NORM,
@@ -599,10 +601,15 @@ def test_modifying_duplicate_model_names():
             assert per_processor.prefix in teacher_predictor._learner._config.model.names
 
 
-def test_image_bytearray():
+@pytest.mark.parametrize("image_type", [IMAGE_BYTEARRAY, IMAGE_BASE64_STR])
+def test_image_bytearray_or_base64_str(image_type):
     download_dir = "./"
     train_data_1, test_data_1 = shopee_dataset(download_dir=download_dir)
-    train_data_2, test_data_2 = shopee_dataset(download_dir=download_dir, is_bytearray=True)
+    if image_type == IMAGE_BYTEARRAY:
+        train_data_2, test_data_2 = shopee_dataset(download_dir=download_dir, is_bytearray=True)
+    elif image_type == IMAGE_BASE64_STR:
+        train_data_2, test_data_2 = shopee_dataset(download_dir=download_dir, is_base64str=True)
+
     predictor_1 = MultiModalPredictor(
         label="label",
     )
@@ -675,6 +682,29 @@ def test_load_ckpt():
     predictions_prob = predictor.predict_proba(test_data, as_pandas=False)
     predictions2_prob = loaded_predictor.predict_proba(test_data, as_pandas=False)
     npt.assert_equal(predictions_prob, predictions2_prob)
+
+
+def test_fttransformer_load_ckpt():
+    dataset = ALL_DATASETS["petfinder"]
+    metric_name = dataset.metric
+
+    predictor = MultiModalPredictor(
+        label=dataset.label_columns[0],
+        problem_type=dataset.problem_type,
+        eval_metric=metric_name,
+    )
+    hyperparameters = {
+        "model.names": ["ft_transformer"],
+        "model.ft_transformer.checkpoint_name": "https://automl-mm-bench.s3.amazonaws.com/ft_transformer_pretrained_ckpt/iter_2k.ckpt",
+        "data.categorical.convert_to_text": False,  # ensure the categorical model is used.
+        "data.numerical.convert_to_text": False,  # ensure the numerical model is used.
+    }
+    predictor.fit(
+        dataset.train_df,
+        hyperparameters=hyperparameters,
+        time_limit=10,
+    )
+    predictor.evaluate(dataset.test_df)
 
 
 @pytest.mark.parametrize(

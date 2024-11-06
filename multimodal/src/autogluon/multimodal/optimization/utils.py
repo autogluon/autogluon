@@ -25,6 +25,7 @@ from ..constants import (
     BIT_FIT,
     COLUMN_FEATURES,
     CONTRASTIVE_LOSS,
+    CONV_LORA,
     COSINE_EMBEDDING_LOSS,
     COSINE_SIMILARITY,
     CROSS_ENTROPY,
@@ -57,7 +58,6 @@ from ..constants import (
     NER_TOKEN_F1,
     NORM_FIT,
     OBJECT_DETECTION,
-    OPEN_VOCABULARY_OBJECT_DETECTION,
     OVERALL_ACCURACY,
     PAIR_MARGIN_MINER,
     PEARSONR,
@@ -132,7 +132,7 @@ def get_loss_func(
             loss_func = nn.MSELoss()
     elif problem_type == NER:
         loss_func = nn.CrossEntropyLoss(ignore_index=0)
-    elif problem_type in [OBJECT_DETECTION, OPEN_VOCABULARY_OBJECT_DETECTION, FEW_SHOT_CLASSIFICATION]:
+    elif problem_type in [OBJECT_DETECTION, FEW_SHOT_CLASSIFICATION]:
         return None
     elif problem_type == SEMANTIC_SEGMENTATION:
         if "structure_loss" in loss_func_name.lower():
@@ -441,6 +441,9 @@ def get_lr_scheduler(
             num_warmup_steps=num_warmup_steps,
             num_training_steps=num_max_steps,
         )
+    elif lr_schedule == "multi_step":
+        # TODO: add milestones, gamma into hyperparameters
+        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=[30, 55], gamma=0.1)
     else:
         raise ValueError(f"unknown lr schedule: {lr_schedule}")
 
@@ -675,7 +678,7 @@ def get_trainable_params_efficient_finetune(
     elif efficient_finetune == NORM_FIT:
         trainable_param_names.append(".*bias*.")
         trainable_param_names += norm_param_names
-    elif efficient_finetune in [LORA, IA3, IA3_LORA]:
+    elif efficient_finetune in [LORA, IA3, IA3_LORA, CONV_LORA]:
         trainable_param_names.append(".*lora_*.")
     elif efficient_finetune in [LORA_BIAS, IA3_BIAS, IA3_LORA_BIAS]:
         trainable_param_names.append(".*lora_*.")
@@ -849,8 +852,8 @@ def gather_column_features(
 
             # two or more columns share one cls feature, and no other columns share it.
             if len(columns_share_one_feature) > 0:
-                assert len("_".join(columns_share_one_feature)) == len(
-                    feature_name
+                assert (
+                    len("_".join(columns_share_one_feature)) == len(feature_name)
                 ), f"model `{per_model_name}`'s cls feature name `{feature_name}` doesn't match `{columns_share_one_feature}`"
                 gathered_features.append(per_model_output[COLUMN_FEATURES][FEATURES][feature_name])
 

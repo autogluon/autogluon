@@ -10,7 +10,7 @@ AutoGluon:
 ######### Do Not Remove #########
 
 
-AutoGluon_dev:
+AutoGluon_timeseries_best:
   extends: AutoGluon
   repo: https://github.com/autogluon/autogluon.git
   version: stable_GA4_update  # branch name

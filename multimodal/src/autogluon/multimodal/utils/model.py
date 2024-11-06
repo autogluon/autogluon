@@ -29,7 +29,7 @@ from ..constants import (
     NER_TEXT,
     NUMERICAL,
     NUMERICAL_MLP,
-    OVD,
+    PEFT_ADDITIVE_STRATEGIES,
     SAM,
     SEMANTIC_SEGMENTATION_IMG,
     T_FEW,
@@ -53,7 +53,6 @@ from ..models import (
     MultimodalFusionNER,
     MultimodalFusionTransformer,
     NumericalMLP,
-    OVDModel,
     SAMForSemanticSegmentation,
     TFewModel,
     TimmAutoModelForImagePrediction,
@@ -275,12 +274,6 @@ def create_model(
             output_bbox_format=OmegaConf.select(model_config, "output_bbox_format", default=XYXY),
             frozen_layers=OmegaConf.select(model_config, "frozen_layers", default=None),
         )
-    elif model_name.lower().startswith(OVD):
-        model = OVDModel(
-            prefix=model_name,
-            checkpoint_name=model_config.checkpoint_name,
-            pretrained=pretrained,
-        )
     elif model_name.lower().startswith(MMOCR_TEXT_DET):
         model = MMOCRAutoModelForTextDetection(
             prefix=model_name,
@@ -371,6 +364,8 @@ def create_model(
             additive_attention=OmegaConf.select(model_config, "additive_attention", default=False),
             share_qv_weights=OmegaConf.select(model_config, "share_qv_weights", default=False),
             pooling_mode=OmegaConf.select(model_config, "pooling_mode", default="cls"),
+            checkpoint_name=model_config.checkpoint_name,
+            pretrained=pretrained,
         )
     elif model_name.lower().startswith(SAM):
         model = SAMForSemanticSegmentation(
@@ -477,16 +472,18 @@ def apply_model_adaptation(model: nn.Module, config: DictConfig) -> nn.Module:
     config:
         A DictConfig object. The optimization config should be accessible by "config.optimization".
     """
-    model = inject_adaptation_to_linear_layer(
-        model=model,
-        efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
-        lora_r=config.optimization.lora.r,
-        lora_alpha=config.optimization.lora.alpha,
-        module_filter=config.optimization.lora.module_filter,
-        filter=config.optimization.lora.filter,
-        extra_trainable_params=OmegaConf.select(config, "optimization.extra_trainable_params"),
-    )
-    model.name_to_id = model.get_layer_ids()  # Need to update name to id dictionary.
+    if OmegaConf.select(config, "optimization.efficient_finetune") in PEFT_ADDITIVE_STRATEGIES:
+        model = inject_adaptation_to_linear_layer(
+            model=model,
+            efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
+            lora_r=config.optimization.lora.r,
+            lora_alpha=config.optimization.lora.alpha,
+            module_filter=config.optimization.lora.module_filter,
+            filter=config.optimization.lora.filter,
+            extra_trainable_params=OmegaConf.select(config, "optimization.extra_trainable_params"),
+            conv_lora_expert_num=config.optimization.lora.conv_lora_expert_num,
+        )
+        model.name_to_id = model.get_layer_ids()  # Need to update name to id dictionary.
 
     return model
 

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import copy
 import logging
+import os
 import time
+import warnings
 from builtins import classmethod
 from functools import partial
 from pathlib import Path
@@ -150,6 +152,12 @@ class NNFastAiTabularModel(AbstractModel):
             self.cont_columns = self._feature_metadata.get_features(valid_raw_types=[R_INT, R_FLOAT, R_DATETIME])
             self.cat_columns = self._feature_metadata.get_features(valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL])
             if self.cont_columns:
+                # Drop columns that have less than 2 unique values (ignoring NaNs)
+                # If these columns are kept, it will raise an exception when trying to normalize.
+                # TODO: Can instead treat them as boolean if 1 unique + NaN
+                unique_vals = X[self.cont_columns].nunique()
+                self.cont_columns = [c for c in self.cont_columns if unique_vals[c] > 1]
+            if self.cont_columns:
                 self._cont_normalization = (np.array(X[self.cont_columns].mean()), np.array(X[self.cont_columns].std()))
 
             num_cat_cols_og = len(self.cat_columns)
@@ -197,7 +205,10 @@ class NNFastAiTabularModel(AbstractModel):
             column_fills = {k: self.columns_fills[k] for k in columns_to_fill}
             if column_fills:
                 # TODO: pandas==1.5.3 fillna is 10x+ slower than pandas==1.3.5 with large column count
-                df = df.fillna(column_fills, inplace=False, downcast=False)
+                # TODO: Remove warning later as a follow up to https://github.com/autogluon/autogluon/pull/3734
+                with warnings.catch_warnings():
+                    warnings.simplefilter(action="ignore", category=FutureWarning)
+                    df = df.fillna(column_fills, inplace=False, downcast=False)
             else:
                 df = df.copy()
         else:
@@ -509,7 +520,7 @@ class NNFastAiTabularModel(AbstractModel):
         self.model = __model
         # Export model
         if self._load_model:
-            save_pkl.save_with_fn(f"{path}{self.model_internals_file_name}", self.model, pickle_fn=lambda m, buffer: export(m, buffer), verbose=verbose)
+            save_pkl.save_with_fn(self._model_internals_path, self.model, pickle_fn=lambda m, buffer: export(m, buffer), verbose=verbose)
         self._load_model = None
         return path
 
@@ -529,11 +540,17 @@ class NNFastAiTabularModel(AbstractModel):
             if plt != "Windows":
                 og_windows_path = pathlib.WindowsPath
                 pathlib.WindowsPath = pathlib.PosixPath
-            model.model = load_pkl.load_with_fn(f"{model.path}{model.model_internals_file_name}", lambda p: load_learner(p), verbose=verbose)
+            model_internals_path = os.path.join(path, model.model_internals_file_name)
+            model.model = load_pkl.load_with_fn(model_internals_path, lambda p: load_learner(p), verbose=verbose)
             if og_windows_path is not None:
                 pathlib.WindowsPath = og_windows_path
         model._load_model = None
         return model
+
+    @property
+    def _model_internals_path(self) -> str:
+        """Path to model-internals.pkl"""
+        return os.path.join(self.path, self.model_internals_file_name)
 
     def _set_default_params(self):
         """Specifies hyperparameter values to use by default"""
@@ -588,7 +605,7 @@ class NNFastAiTabularModel(AbstractModel):
             "recall_micro": Recall(average="micro"),
             "recall_weighted": Recall(average="weighted"),
             "log_loss": None,
-            "pinball_loss": HuberPinballLoss(quantile_levels=self.quantile_levels)
+            "pinball_loss": HuberPinballLoss(quantile_levels=self.quantile_levels),
             # Not supported: pac_score
         }
         return metrics_map

@@ -125,6 +125,22 @@ class LabelCleanerMulticlass(LabelCleaner):
         y = y.map(self.cat_mappings_dependent_var)
         return y
 
+    def transform_pred_uncleaned(self, y: Union[Series, np.ndarray]) -> Series:
+        """
+        Transform y labels to uncleaned internal labels.
+        """
+        y = self._convert_to_valid_series(y=y)
+        y = y.map(self.inv_map_uncleaned)
+        return y
+
+    def inverse_transform_pred_uncleaned(self, y: Union[Series, np.ndarray]) -> Series:
+        """
+        Inverse transforms uncleaned internal labels to external labels.
+        """
+        y = self._convert_to_valid_series(y=y)
+        y = y.map(self.cat_mappings_dependent_var_uncleaned)
+        return y
+
     # TODO: Unused? There are not many reasonable situations that seem to require this method.
     def transform_proba(self, y: Union[DataFrame, np.ndarray], as_pandas=False) -> Union[DataFrame, np.ndarray]:
         if self.invalid_class_count > 0:

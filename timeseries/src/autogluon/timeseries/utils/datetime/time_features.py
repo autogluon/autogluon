@@ -1,6 +1,7 @@
 """
 Generate time features based on frequency string. Adapted from gluonts.time_feature.time_feature.
 """
+
 from typing import Callable, List
 
 import numpy as np
@@ -57,20 +58,20 @@ def second_of_minute(index: pd.DatetimeIndex) -> np.ndarray:
 
 def get_time_features_for_frequency(freq) -> List[Callable]:
     features_by_offset_name = {
-        "A": [],
-        "Q": [quarter_of_year],
-        "M": [month_of_year],
-        "SM": [day_of_month, month_of_year],
+        "YE": [],
+        "QE": [quarter_of_year],
+        "ME": [month_of_year],
+        "SME": [day_of_month, month_of_year],
         "W": [day_of_month, week_of_year],
         "D": [day_of_week, day_of_month, day_of_year],
         "B": [day_of_week, day_of_month, day_of_year],
-        "BH": [hour_of_day, day_of_week, day_of_month, day_of_year],
-        "H": [hour_of_day, day_of_week, day_of_month, day_of_year],
-        "T": [minute_of_hour, hour_of_day, day_of_week, day_of_month, day_of_year],
-        "S": [second_of_minute, minute_of_hour, hour_of_day, day_of_week, day_of_month, day_of_year],
-        "L": [second_of_minute, minute_of_hour, hour_of_day, day_of_week, day_of_month, day_of_year],
-        "U": [second_of_minute, minute_of_hour, hour_of_day, day_of_week, day_of_month, day_of_year],
-        "N": [second_of_minute, minute_of_hour, hour_of_day, day_of_week, day_of_month, day_of_year],
+        "bh": [hour_of_day, day_of_week, day_of_month, day_of_year],
+        "h": [hour_of_day, day_of_week, day_of_month, day_of_year],
+        "min": [minute_of_hour, hour_of_day, day_of_week, day_of_month, day_of_year],
+        "s": [second_of_minute, minute_of_hour, hour_of_day, day_of_week, day_of_month, day_of_year],
+        "ms": [second_of_minute, minute_of_hour, hour_of_day, day_of_week, day_of_month, day_of_year],
+        "us": [second_of_minute, minute_of_hour, hour_of_day, day_of_week, day_of_month, day_of_year],
+        "ns": [second_of_minute, minute_of_hour, hour_of_day, day_of_week, day_of_month, day_of_year],
     }
     offset = pd.tseries.frequencies.to_offset(freq)
     offset_name = norm_freq_str(offset)

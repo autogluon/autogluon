@@ -510,6 +510,10 @@ class BaseForestQuantileRegressor(ForestRegressor):
                 bootstrap_indices = np.arange(len(y))
 
             est_weights = np.bincount(bootstrap_indices, minlength=len(y))
+            # FIXME: When updating from scikit-learn 1.3.2 to 1.4.0, BaseTreeQuantileRegressor.fit is not called
+            # Re-calculating y_train_ and y_train_leaves_ to resolve this issue
+            est.y_train_ = y
+            est.y_train_leaves_ = est.tree_.apply(X)
             y_train_leaves = est.y_train_leaves_
             # Normalize the bootstrap weights such that the total weight of each leaf sums up to 1
             # Relabel leaves starting from zero in order to efficiently count the total sum per leaf with bincount
@@ -551,7 +555,7 @@ class BaseForestQuantileRegressor(ForestRegressor):
         samples_with_weighted_neighbors = get_weighted_neighbors_dataframe(
             X_leaves=X_leaves, y_train_leaves=self.y_train_leaves_, y_train=self.y_train_, y_weights=self.y_weights_
         )
-        quantile_preds = samples_with_weighted_neighbors.groupby("item_id").apply(partial(get_quantiles, quantile_levels=quantile_levels))
+        quantile_preds = samples_with_weighted_neighbors.groupby("item_id").apply(partial(get_quantiles, quantile_levels=quantile_levels), include_groups=False)
         return np.stack(quantile_preds.values.tolist())
 
 

@@ -27,7 +27,7 @@ hide-toc: true
 :child-align: justify
 :class: sd-text-white sd-fs-3
 
-AutoML for Image, Text, Time Series, and Tabular Data
+Fast and Accurate ML in 3 Lines of Code
 
 ```{button-link} tutorials/tabular/tabular-quick-start.html
 :outline:
@@ -208,6 +208,10 @@ pip install autogluon
 ```
 
 AutoGluon supports Linux, MacOS, and Windows. See {doc}`./install` for detailed instructions.
+
+## Managed Service
+
+Looking for a managed AutoML service? We highly recommend checking out [Amazon SageMaker Canvas](https://aws.amazon.com/sagemaker/canvas/)! Powered by AutoGluon, it allows you to create highly accurate machine learning models without any machine learning experience or writing a single line of code.
 
 ## Community
 

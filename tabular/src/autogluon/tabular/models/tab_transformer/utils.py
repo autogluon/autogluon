@@ -3,6 +3,8 @@ import logging
 import torch
 from torch.utils.data import DataLoader, Dataset
 
+from autogluon.core.constants import REGRESSION
+
 from . import tab_transformer_encoder
 from .tab_transformer_encoder import NullEnc, WontEncodeError
 

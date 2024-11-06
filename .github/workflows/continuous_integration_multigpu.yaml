@@ -1,0 +1,119 @@
+name: Continuous Integration Multi-GPU AutoMM
+
+on:
+  pull_request_target:
+    types: [labeled, synchronize, opened]
+    paths:
+      - 'multimodal/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.number || github.event.pull_request.head.sha }}
+  cancel-in-progress: true
+
+permissions:
+  id-token: write
+  pull-requests: write
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  label_check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Label
+        if: contains(github.event.pull_request.labels.*.name, 'run-multi-gpu') == false
+        run: |
+          echo It appears that you have modified contents of multimodal module. Please label this PR with \"run-multi-gpu\".
+          exit 1
+  branch_check:
+    needs: label_check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail on restricted branch
+        # https://docs.github.com/en/actions/learn-github-actions/expressions#example-matching-an-array-of-strings
+        if: ${{ github.event_name == 'push' && contains(fromJSON('["cloud"]'), github.ref_name) }}
+        run: |
+          echo This is a restricted branch reserved for certain modules. Please use another branch instead
+          exit 1
+  lint_check:
+    needs: branch_check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Check if changes beside docs
+        uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            other_than_docs:
+              - '!(docs/**)**'
+      - name: Lint Check on AWS Batch
+        if: steps.changes.outputs.other_than_docs == 'true'
+        uses: ./.github/actions/submit-job
+        with:
+          job-type: CI-CPU
+          job-name: AutoGluon-LintCheck
+          command: chmod +x ./.github/workflow_scripts/lint_check.sh && ./.github/workflow_scripts/lint_check.sh
+  test_multimodal_others_multi_gpu:
+    needs: lint_check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Check if changes beside docs
+        uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            other_than_docs:
+              - '!(docs/**)**'
+      - name: Test Multimodal Others Multi-GPU on AWS Batch
+        if: steps.changes.outputs.other_than_docs == 'true'
+        uses: ./.github/actions/submit-job
+        with:
+          job-type: CI-MULTI-GPU
+          job-name: AutoGluon-Multimodal-Others-GPU
+          command: chmod +x ./.github/workflow_scripts/test_multimodal_others.sh && CUDA_VISIBLE_DEVICES=[0,1] ./.github/workflow_scripts/test_multimodal_others.sh
+  test_multimodal_others_2_multi_gpu:
+    needs: lint_check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Check if changes beside docs
+        uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            other_than_docs:
+              - '!(docs/**)**'
+      - name: Test Multimodal Others 2 Multi-GPU on AWS Batch
+        if: steps.changes.outputs.other_than_docs == 'true'
+        uses: ./.github/actions/submit-job
+        with:
+          job-type: CI-MULTI-GPU
+          job-name: AutoGluon-Multimodal-Others-2-GPU
+          command: chmod +x ./.github/workflow_scripts/test_multimodal_others_2.sh && CUDA_VISIBLE_DEVICES=[0,1] ./.github/workflow_scripts/test_multimodal_others_2.sh
+  test_multimodal_predictor_multi_gpu:
+    needs: lint_check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Check if changes beside docs
+        uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            other_than_docs:
+              - '!(docs/**)**'
+      - name: Test Multimodal Predictor Multi-GPU on AWS Batch
+        if: steps.changes.outputs.other_than_docs == 'true'
+        uses: ./.github/actions/submit-job
+        with:
+          job-type: CI-MULTI-GPU
+          job-name: AutoGluon-Multimodal-Predictor-GPU
+          command: chmod +x ./.github/workflow_scripts/test_multimodal_predictor.sh && CUDA_VISIBLE_DEVICES=[0,1] ./.github/workflow_scripts/test_multimodal_predictor.sh

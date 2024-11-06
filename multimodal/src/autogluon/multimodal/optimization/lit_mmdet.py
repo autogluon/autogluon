@@ -2,6 +2,7 @@ import logging
 from typing import Callable, Optional, Union
 
 import lightning.pytorch as pl
+import torch
 import torchmetrics
 from lightning.pytorch.utilities import grad_norm
 from torch.nn.modules.loss import _Loss
@@ -239,6 +240,7 @@ class MMDetLitModule(pl.LightningModule):
 
         logger.debug(f"warmup steps: {warmup_steps}")
         logger.debug(f"lr_schedule: {self.hparams.lr_schedule}")
+
         scheduler = get_lr_scheduler(
             optimizer=optimizer,
             num_max_steps=max_steps,
@@ -247,7 +249,13 @@ class MMDetLitModule(pl.LightningModule):
             end_lr=self.hparams.end_lr,
         )
 
-        sched = {"scheduler": scheduler, "interval": "step"}
+        # TODO: add lr_interval into hyperparameters?
+        if self.hparams.lr_schedule == "multi_step":
+            lr_interval = "epoch"
+        else:
+            lr_interval = "step"
+
+        sched = {"scheduler": scheduler, "interval": lr_interval}
         logger.debug("done configuring optimizer and scheduler")
         return [optimizer], [sched]
 

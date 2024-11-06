@@ -207,7 +207,13 @@ hyperparameter_portfolio_zeroshot_2023 = {
     "GBM": [
         {"extra_trees": True, "ag_args": {"name_suffix": "XT"}},
         {},
-        "GBMLarge",
+        {
+            "learning_rate": 0.03,
+            "num_leaves": 128,
+            "feature_fraction": 0.9,
+            "min_data_in_leaf": 3,
+            "ag_args": {"name_suffix": "Large", "priority": 0, "hyperparameter_tune_kwargs": None},
+        },
         {
             "extra_trees": False,
             "feature_fraction": 0.7023601671276614,

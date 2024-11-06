@@ -9,11 +9,11 @@ from typing import Dict, Optional, Type, Union
 import numpy as np
 
 import autogluon.core as ag
-from autogluon.common.utils.log_utils import set_logger_verbosity
 from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.local.abstract_local_model import AbstractLocalModel
 from autogluon.timeseries.splitter import AbstractWindowSplitter, ExpandingWindowSplitter
+from autogluon.timeseries.transforms import LocalTargetScaler
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +32,8 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
     model_base_kwargs : Optional[Dict[str, any]], default = None
         kwargs used to initialize model_base if model_base is a class.
     """
+
+    # TODO: Remove the MultiWindowBacktestingModel class, move the logic to AbstractTimeSeriesTrainer
 
     def __init__(
         self,
@@ -59,6 +61,18 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         self.most_recent_model_folder: Optional[str] = None
         super().__init__(**kwargs)
 
+    @property
+    def supports_static_features(self) -> bool:
+        return self.model_base_type.supports_static_features
+
+    @property
+    def supports_known_covariates(self) -> bool:
+        return self.model_base_type.supports_known_covariates
+
+    @property
+    def supports_past_covariates(self) -> bool:
+        return self.model_base_type.supports_past_covariates
+
     def _get_model_base(self):
         return self.model_base
 
@@ -71,6 +85,10 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
     def get_minimum_resources(self, is_gpu_available: bool = False) -> bool:
         return self._get_model_base().get_minimum_resources(is_gpu_available)
 
+    def _create_target_scaler(self) -> Optional[LocalTargetScaler]:
+        # Do not use scaler in the MultiWindowModel to avoid duplication; it will be created in the inner model
+        return None
+
     def _fit(
         self,
         train_data: TimeSeriesDataFrame,
@@ -82,9 +100,6 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
     ):
         # TODO: use incremental training for GluonTS models?
         # TODO: implement parallel fitting similar to ParallelLocalFoldFittingStrategy in tabular?
-        verbosity = kwargs.get("verbosity", 2)
-        set_logger_verbosity(verbosity, logger=logger)
-
         if val_data is not None:
             raise ValueError(f"val_data should not be passed to {self.name}.fit()")
         if val_splitter is None:
@@ -181,6 +196,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         val_data: TimeSeriesDataFrame,
         store_val_score: bool = False,
         store_predict_time: bool = False,
+        **predict_kwargs,
     ) -> None:
         # self.val_score, self.predict_time, self._oof_predictions already saved during _fit()
         assert self._oof_predictions is not None
@@ -216,6 +232,11 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
             most_recent_model.save()
         return save_path
 
+    def persist(self):
+        if self.most_recent_model is None:
+            raise ValueError(f"{self.name} must be fit before persisting")
+        self.most_recent_model.persist()
+
     @classmethod
     def load(
         cls, path: str, reset_paths: bool = True, load_oof: bool = False, verbose: bool = True
@@ -242,4 +263,6 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         return refit_model
 
     def _more_tags(self) -> dict:
-        return self.most_recent_model._get_tags()
+        tags = self.model_base._get_tags()
+        tags["can_use_val_data"] = False
+        return tags

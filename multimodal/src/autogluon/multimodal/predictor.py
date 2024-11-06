@@ -14,14 +14,7 @@ import transformers
 from autogluon.common.utils.log_utils import set_logger_verbosity, verbosity2loglevel
 from autogluon.core.metrics import Scorer
 
-from .constants import (
-    AUTOMM_TUTORIAL_MODE,
-    FEW_SHOT_CLASSIFICATION,
-    NER,
-    OBJECT_DETECTION,
-    OPEN_VOCABULARY_OBJECT_DETECTION,
-    SEMANTIC_SEGMENTATION,
-)
+from .constants import AUTOMM_TUTORIAL_MODE, FEW_SHOT_CLASSIFICATION, NER, OBJECT_DETECTION, SEMANTIC_SEGMENTATION
 from .learners import (
     BaseLearner,
     FewShotSVMLearner,
@@ -88,7 +81,6 @@ class MultiModalPredictor:
             In addition, we support advanced problems such as
 
             - 'object_detection': Object detection
-            - 'open_vocabulry_object_detection': Zero-shot object detection (only support inference)
             - 'ner' or 'named_entity_recognition': Named entity extraction
             - 'text_similarity': Text-text semantic matching
             - 'image_similarity': Image-image semantic matching
@@ -104,7 +96,6 @@ class MultiModalPredictor:
             problem types:
 
             - 'object_detection'
-            - 'open_vocabulary_object_detection'
             - 'text_similarity'
             - 'image_similarity'
             - 'image_text_similarity'
@@ -202,7 +193,7 @@ class MultiModalPredictor:
 
         if problem_property and problem_property.is_matching:
             learner_class = MultiModalMatcher
-        elif problem_type in [OBJECT_DETECTION, OPEN_VOCABULARY_OBJECT_DETECTION]:
+        elif problem_type == OBJECT_DETECTION:
             learner_class = ObjectDetectionLearner
         elif problem_type == NER:
             learner_class = NERLearner
@@ -780,6 +771,13 @@ class MultiModalPredictor:
         collapses in the middle, it can load the `last.ckpt` checkpoint by setting `resume=True`.
         It also supports loading one specific checkpoint given its path.
 
+        .. warning::
+
+            :meth:`autogluon.multimodal.MultiModalPredictor.load` uses `pickle` module implicitly, which is known to
+            be insecure. It is possible to construct malicious pickle data which will execute arbitrary code during
+            unpickling. Never load data that could have come from an untrusted source, or that could have been tampered
+            with. **Only load data you trust.**
+
         Parameters
         ----------
         path
@@ -805,7 +803,7 @@ class MultiModalPredictor:
             assets = json.load(fp)
         if "class_name" in assets and assets["class_name"] == "MultiModalMatcher":
             learner_class = MultiModalMatcher
-        elif assets["problem_type"] in [OBJECT_DETECTION, OPEN_VOCABULARY_OBJECT_DETECTION]:
+        elif assets["problem_type"] == OBJECT_DETECTION:
             learner_class = ObjectDetectionLearner
         elif assets["problem_type"] == NER:
             learner_class = NERLearner

@@ -202,8 +202,11 @@ def pac(solution, prediction):
         if len(prediction.shape) == 2:
             if prediction.shape[1] > 2:
                 raise ValueError(f"A prediction array with probability values " f"for {prediction.shape[1]} classes is not a binary " f"classification problem")
-            # Prediction will be copied into a new binary array - no copy
-            prediction = prediction.reshape((-1, 1))
+            elif prediction.shape[1] == 2:
+                prediction = prediction[:, 1]
+            else:
+                # Prediction will be copied into a new binary array - no copy
+                prediction = prediction.reshape((-1, 1))
         else:
             raise ValueError(f"Invalid prediction shape {prediction.shape}")
 

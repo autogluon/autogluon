@@ -106,7 +106,9 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
         if S_TEXT in feature_metadata_out_type_group_map_special:
             text_features = feature_metadata_out_type_group_map_special.pop(S_TEXT)
             feature_metadata_out_type_group_map_special[S_TEXT_AS_CATEGORY] += [
-                feature for feature in text_features if feature not in feature_metadata_out_type_group_map_special[S_TEXT_AS_CATEGORY]
+                feature
+                for feature in text_features
+                if feature not in feature_metadata_out_type_group_map_special[S_TEXT_AS_CATEGORY]
             ]
         return X_out, feature_metadata_out_type_group_map_special
 
@@ -115,7 +117,10 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
 
     @staticmethod
     def get_default_infer_features_in_args() -> dict:
-        return dict(valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL], invalid_special_types=[S_DATETIME_AS_OBJECT, S_IMAGE_PATH, S_IMAGE_BYTEARRAY])
+        return dict(
+            valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL],
+            invalid_special_types=[S_DATETIME_AS_OBJECT, S_IMAGE_PATH, S_IMAGE_BYTEARRAY],
+        )
 
     def _generate_features_category(self, X: DataFrame) -> DataFrame:
         if self.features_in:
@@ -126,7 +131,7 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
                 X_category = DataFrame(X_category, index=X.index)
                 if self._fillna_map is not None:
                     for column, column_map in self._fillna_map.items():
-                        X_category[column].fillna(column_map, inplace=True)
+                        X_category[column] = X_category[column].fillna(column_map)
         else:
             X_category = DataFrame(index=X.index)
         return X_category
@@ -142,7 +147,11 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
                     rank = rank[rank >= self._minimum_cat_count]
                 if self._maximum_num_cat is not None:
                     rank = rank[-self._maximum_num_cat :]
-                if self.cat_order == "count" or self._minimum_cat_count is not None or self._maximum_num_cat is not None:
+                if (
+                    self.cat_order == "count"
+                    or self._minimum_cat_count is not None
+                    or self._maximum_num_cat is not None
+                ):
                     category_list = list(rank.index)  # category_list in 'count' order
                     if len(category_list) > 1:
                         if self.cat_order == "original":
@@ -151,7 +160,9 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
                             category_list = [cat for cat in original_cat_order if cat in set_category_list]
                         elif self.cat_order == "alphanumeric":
                             category_list.sort()
-                    X_category[column] = X_category[column].astype(CategoricalDtype(categories=category_list))  # TODO: Remove columns if all NaN after this?
+                    X_category[column] = X_category[column].astype(
+                        CategoricalDtype(categories=category_list)
+                    )  # TODO: Remove columns if all NaN after this?
                     X_category[column] = X_category[column].cat.reorder_categories(category_list)
                 elif self.cat_order == "alphanumeric":
                     category_list = list(X_category[column].cat.categories)

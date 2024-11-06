@@ -146,7 +146,8 @@ def _rename_kwargs(
         if old_name in kwargs:
             if new_name is not None and new_name in kwargs:
                 raise ValueError(
-                    f"{func_name} received both {old_name} and {new_name} as arguments." f"{old_name} is deprecated, please use {new_name} instead."
+                    f"{func_name} received both {old_name} and {new_name} as arguments."
+                    f"{old_name} is deprecated, please use {new_name} instead."
                 )
             print(error)
             _deprecation_warning(

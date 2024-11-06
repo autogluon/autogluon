@@ -5,15 +5,14 @@ import time
 import traceback
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple, Type, Union
 
 import networkx as nx
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from autogluon.common.utils.log_utils import set_logger_verbosity
-from autogluon.common.utils.utils import hash_pandas_df
+from autogluon.common.utils.utils import hash_pandas_df, seed_everything
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.loaders import load_pkl
@@ -22,9 +21,14 @@ from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.ensemble import AbstractTimeSeriesEnsembleModel, TimeSeriesGreedyEnsemble
+from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
 from autogluon.timeseries.models.presets import contains_searchspace
 from autogluon.timeseries.splitter import AbstractWindowSplitter, ExpandingWindowSplitter
-from autogluon.timeseries.utils.features import CovariateMetadata
+from autogluon.timeseries.utils.features import (
+    ConstantReplacementFeatureImportanceTransform,
+    CovariateMetadata,
+    PermutationFeatureImportanceTransform,
+)
 from autogluon.timeseries.utils.warning_filters import disable_tqdm
 
 logger = logging.getLogger("autogluon.timeseries.trainer")
@@ -71,19 +75,6 @@ class SimpleAbstractTrainer:
         for model in models:
             results[model] = self.model_graph.nodes[model][attribute]
         return results
-
-    def get_model_best(self) -> str:
-        """Return the name of the best model by model performance on the validation set."""
-        models = self.get_model_names()
-        if not models:
-            raise ValueError("Trainer has no fit models that can predict.")
-        model_performances = self.get_models_attribute_dict(attribute="val_score")
-        performances_list = [(m, model_performances[m]) for m in models if model_performances[m] is not None]
-
-        if not performances_list:
-            raise ValueError("No fitted models have validation scores computed.")
-
-        return max(performances_list, key=lambda i: i[1])[0]
 
     def get_model_attribute(self, model: Union[str, AbstractModel], attribute: str):
         """Get a member attribute for given model from the `model_graph`."""
@@ -173,9 +164,12 @@ class SimpleAbstractTrainer:
         raise NotImplementedError
 
     # FIXME: Copy pasted from Tabular
-    def get_minimum_model_set(self, model: Union[str, AbstractTimeSeriesModel], include_self: bool = True) -> list:
+    def get_minimum_model_set(
+        self, model: Union[str, AbstractTimeSeriesModel], include_self: bool = True
+    ) -> List[str]:
         """Gets the minimum set of models that the provided model depends on, including itself.
-        Returns a list of model names"""
+        Returns a list of model names
+        """
         if not isinstance(model, str):
             model = model.name
         minimum_model_set = list(nx.bfs_tree(self.model_graph, model, reverse=True))
@@ -218,6 +212,9 @@ class SimpleAbstractTrainer:
         save_json.save(path=os.path.join(self.path, self.trainer_info_json_name), obj=info)
         return info
 
+    def get_model_best(self, *args, **kwargs) -> AbstractModel:
+        raise NotImplementedError
+
     def get_info(self, include_model_info: bool = False) -> Dict[str, Any]:
         num_models_trained = len(self.get_model_names())
         if self.model_best is not None:
@@ -250,6 +247,9 @@ class SimpleAbstractTrainer:
 class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
     _cached_predictions_filename = "cached_predictions.pkl"
 
+    max_rel_importance_score: float = 1e5
+    eps_abs_importance_score: float = 1e-5
+
     def __init__(
         self,
         path: str,
@@ -257,6 +257,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         eval_metric: Union[str, TimeSeriesScorer, None] = None,
         eval_metric_seasonal_period: Optional[int] = None,
         save_data: bool = True,
+        skip_model_selection: bool = False,
         enable_ensemble: bool = True,
         verbosity: int = 2,
         val_splitter: Optional[AbstractWindowSplitter] = None,
@@ -271,11 +272,12 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         self.target = kwargs.get("target", "target")
         self.metadata = kwargs.get("metadata", CovariateMetadata())
         self.is_data_saved = False
-        self.enable_ensemble = enable_ensemble
+        self.skip_model_selection = skip_model_selection
+        # Ensemble cannot be fit if val_scores are not computed
+        self.enable_ensemble = enable_ensemble and not skip_model_selection
         self.ensemble_model_type = TimeSeriesGreedyEnsemble
 
         self.verbosity = verbosity
-        set_logger_verbosity(self.verbosity, logger=logger)
 
         # Dict of normal model -> FULL model. FULL models are produced by
         # self.refit_single_full() and self.refit_full().
@@ -290,6 +292,10 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         self.refit_every_n_windows = refit_every_n_windows
         self.cache_predictions = cache_predictions
         self.hpo_results = {}
+
+        if self._cached_predictions_path.exists():
+            logger.debug(f"Removing existing cached predictions file {self._cached_predictions_path}")
+            self._cached_predictions_path.unlink()
 
     def save_train_data(self, data: TimeSeriesDataFrame, verbose: bool = True) -> None:
         path = os.path.join(self.path_data, "train.pkl")
@@ -385,6 +391,29 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             levels[n] = max(paths_from[n].get(src, 0) for src in rootset)
 
         return levels
+
+    def get_model_best(self) -> str:
+        """Return the name of the best model by model performance on the validation set."""
+        models = self.get_model_names()
+        if not models:
+            raise ValueError("Trainer has no fit models that can predict.")
+        if len(models) == 1:
+            return models[0]
+        model_performances = self.get_models_attribute_dict(attribute="val_score")
+        model_levels = self._get_model_levels()
+        model_name_score_level_list = [
+            (m, model_performances[m], model_levels.get(m, 0)) for m in models if model_performances[m] is not None
+        ]
+
+        if not model_name_score_level_list:
+            raise ValueError("No fitted models have validation scores computed.")
+
+        # rank models in terms of validation score. if two models have the same validation score,
+        # rank them by their level in the model graph (lower level models are preferred).
+        return max(
+            model_name_score_level_list,
+            key=lambda mns: (mns[1], -mns[2]),  # (score, -level)
+        )[0]
 
     def get_model_names(self, level: Optional[int] = None, **kwargs) -> List[str]:
         """Get model names that are registered in the model graph"""
@@ -489,7 +518,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             fit_end_time = time.time()
             model.fit_time = model.fit_time or (fit_end_time - fit_start_time)
 
-            if val_data is not None:
+            if val_data is not None and not self.skip_model_selection:
                 model.score_and_cache_oof(val_data, store_val_score=True, store_predict_time=True)
 
             self._log_scores_and_times(model.val_score, model.fit_time, model.predict_time)
@@ -531,6 +560,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         hyperparameter_tune_kwargs: Optional[Union[str, dict]] = None,
         excluded_model_types: Optional[List[str]] = None,
         time_limit: Optional[float] = None,
+        random_seed: Optional[int] = None,
     ) -> List[str]:
         logger.info(f"\nStarting training. Start time is {time.strftime('%Y-%m-%d %H:%M:%S')}")
 
@@ -558,6 +588,17 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         logger.info(f"Models that will be trained: {list(m.name for m in models)}")
 
+        if self.skip_model_selection:
+            if len(models) > 1:
+                raise ValueError(
+                    "When `skip_model_selection=True`, only a single model must be provided via `hyperparameters` "
+                    f"but {len(models)} models were given"
+                )
+            if contains_searchspace(models[0].get_user_params()):
+                raise ValueError(
+                    "When `skip_model_selection=True`, model configuration should contain no search spaces."
+                )
+
         num_base_models = len(models)
         model_names_trained = []
         for i, model in enumerate(models):
@@ -575,6 +616,9 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 if time_left <= 0:
                     logger.info(f"Stopping training due to lack of time remaining. Time left: {time_left:.1f} seconds")
                     break
+
+            if random_seed is not None:
+                seed_everything(random_seed + i)
 
             if contains_searchspace(model.get_user_params()):
                 fit_log_message = f"Hyperparameter tuning model {model.name}. "
@@ -644,7 +688,8 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         try:
             best_model = self.get_model_best()
             logger.info(f"Best model: {best_model}")
-            logger.info(f"Best model score: {self.get_model_attribute(best_model, 'val_score'):.4f}")
+            if not self.skip_model_selection:
+                logger.info(f"Best model score: {self.get_model_attribute(best_model, 'val_score'):.4f}")
         except ValueError as e:
             logger.error(str(e))
 
@@ -688,9 +733,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             quantile_levels=self.quantile_levels,
             metadata=self.metadata,
         )
-        ensemble.fit_ensemble(
-            model_preds, data_per_window=data_per_window, time_limit=time_limit, verbosity=self.verbosity
-        )
+        ensemble.fit_ensemble(model_preds, data_per_window=data_per_window, time_limit=time_limit)
         ensemble.fit_time = time.time() - time_start
 
         predict_time = 0
@@ -713,10 +756,19 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         self.save_model(model=ensemble)
         return ensemble.name
 
-    def leaderboard(self, data: Optional[TimeSeriesDataFrame] = None, use_cache: bool = True) -> pd.DataFrame:
+    def leaderboard(
+        self,
+        data: Optional[TimeSeriesDataFrame] = None,
+        extra_info: bool = False,
+        extra_metrics: Optional[List[Union[str, TimeSeriesScorer]]] = None,
+        use_cache: bool = True,
+    ) -> pd.DataFrame:
         logger.debug("Generating leaderboard for all models trained")
 
         model_names = self.get_model_names()
+        if len(model_names) == 0:
+            logger.warning("Warning: No models were trained during fit. Resulting leaderboard will be empty.")
+
         model_info = {}
         for ix, model_name in enumerate(model_names):
             model_info[model_name] = {
@@ -726,10 +778,18 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 "fit_time_marginal": self.get_model_attribute(model_name, "fit_time"),
                 "pred_time_val": self.get_model_attribute(model_name, "predict_time"),
             }
+            if extra_info:
+                model = self.load_model(model_name=model_name)
+                if isinstance(model, MultiWindowBacktestingModel):
+                    model = model.most_recent_model
+                model_info[model_name]["hyperparameters"] = model.params
+
+        if extra_metrics is None:
+            extra_metrics = []
 
         if data is not None:
             past_data, known_covariates = data.get_model_inputs_for_scoring(
-                prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates_real
+                prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates
             )
             logger.info(
                 "Additional data provided, testing on additional data. Resulting leaderboard "
@@ -754,11 +814,13 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                     model_info[model_name]["score_test"] = self._score_with_predictions(data, model_preds)
                     model_info[model_name]["pred_time_test"] = pred_time_dict[model_name]
 
-        df = pd.DataFrame(model_info.values())
-
-        sort_column = "score_test" if "score_test" in df.columns else "score_val"
-        df.sort_values(by=[sort_column, "model"], ascending=[False, False], inplace=True)
-        df.reset_index(drop=True, inplace=True)
+                for metric in extra_metrics:
+                    if model_preds is None:
+                        model_info[model_name][str(metric)] = float("nan")
+                    else:
+                        model_info[model_name][str(metric)] = self._score_with_predictions(
+                            data, model_preds, metric=metric
+                        )
 
         explicit_column_order = [
             "model",
@@ -769,13 +831,64 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             "fit_time_marginal",
             "fit_order",
         ]
-        explicit_column_order = [c for c in explicit_column_order if c in df.columns] + [
-            c for c in df.columns if c not in explicit_column_order
-        ]
+        if extra_info:
+            explicit_column_order += ["hyperparameters"]
+
+        if data is None:
+            explicit_column_order.remove("score_test")
+            explicit_column_order.remove("pred_time_test")
+            sort_column = "score_val"
+        else:
+            sort_column = "score_test"
+            explicit_column_order += [str(metric) for metric in extra_metrics]
+
+        df = pd.DataFrame(model_info.values(), columns=explicit_column_order)
+        df.sort_values(by=[sort_column, "model"], ascending=[False, False], inplace=True)
+        df.reset_index(drop=True, inplace=True)
 
         return df[explicit_column_order]
 
-    def _get_model_for_prediction(self, model: Optional[Union[str, AbstractTimeSeriesModel]] = None) -> str:
+    def persist(
+        self, model_names: Union[Literal["all", "best"], List[str]] = "all", with_ancestors: bool = False, **kwargs
+    ) -> List[str]:
+        if model_names == "all":
+            model_names = self.get_model_names()
+        elif model_names == "best":
+            model_names = [self.get_model_best()]
+        if not isinstance(model_names, list):
+            raise ValueError(f"model_names must be a list of model names. Invalid value: {model_names}")
+
+        if with_ancestors:
+            models_with_ancestors = set()
+            for model_name in model_names:
+                models_with_ancestors = models_with_ancestors.union(self.get_minimum_model_set(model_name))
+            model_names = list(models_with_ancestors)
+
+        model_names_already_persisted = [model_name for model_name in model_names if model_name in self.models]
+        model_names = [model_name for model_name in model_names if model_name not in model_names_already_persisted]
+
+        for model_name in model_names:
+            model = self.load_model(model_name)
+            model.persist()
+            self.models[model.name] = model
+
+        return model_names
+
+    def unpersist(self, model_names: Union[Literal["all"], List[str]] = "all") -> List[str]:
+        if model_names == "all":
+            model_names = list(self.models.keys())
+        if not isinstance(model_names, list):
+            raise ValueError(f"model_names must be a list of model names. Invalid value: {model_names}")
+        unpersisted_models = []
+        for model in model_names:
+            if model in self.models:
+                self.models.pop(model)
+                unpersisted_models.append(model)
+        return unpersisted_models
+
+    def _get_model_for_prediction(
+        self, model: Optional[Union[str, AbstractTimeSeriesModel]] = None, verbose: bool = True
+    ) -> str:
         """Given an optional identifier or model object, return the name of the model with which to predict.
 
         If the model is not provided, this method will default to the best model according to the validation score.
@@ -784,10 +897,11 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             if self.model_best is None:
                 best_model_name: str = self.get_model_best()
                 self.model_best = best_model_name
-            logger.info(
-                f"Model not specified in predict, will default to the model with the "
-                f"best validation score: {self.model_best}",
-            )
+            if verbose:
+                logger.info(
+                    f"Model not specified in predict, will default to the model with the "
+                    f"best validation score: {self.model_best}",
+                )
             return self.model_best
         else:
             if isinstance(model, AbstractTimeSeriesModel):
@@ -801,11 +915,16 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
         use_cache: bool = True,
+        random_seed: Optional[int] = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
         model_name = self._get_model_for_prediction(model)
         model_pred_dict = self.get_model_pred_dict(
-            model_names=[model_name], data=data, known_covariates=known_covariates, use_cache=use_cache
+            model_names=[model_name],
+            data=data,
+            known_covariates=known_covariates,
+            use_cache=use_cache,
+            random_seed=random_seed,
         )
         return model_pred_dict[model_name]
 
@@ -844,7 +963,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         use_cache: bool = True,
     ) -> Dict[str, float]:
         past_data, known_covariates = data.get_model_inputs_for_scoring(
-            prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates_real
+            prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates
         )
         predictions = self.predict(data=past_data, known_covariates=known_covariates, model=model, use_cache=use_cache)
         if not isinstance(metrics, list):  # a single metric is provided
@@ -856,6 +975,149 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 data=data, predictions=predictions, metric=eval_metric
             )
         return scores_dict
+
+    def get_feature_importance(
+        self,
+        data: TimeSeriesDataFrame,
+        features: List[str],
+        model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
+        metric: Optional[Union[str, TimeSeriesScorer]] = None,
+        time_limit: Optional[float] = None,
+        method: Literal["naive", "permutation"] = "permutation",
+        subsample_size: int = 50,
+        num_iterations: int = 1,
+        random_seed: Optional[int] = None,
+        relative_scores: bool = False,
+        include_confidence_band: bool = True,
+        confidence_level: float = 0.99,
+    ) -> pd.DataFrame:
+        assert method in ["naive", "permutation"], f"Invalid feature importance method {method}."
+        metric = check_get_evaluation_metric(metric) if metric is not None else self.eval_metric
+
+        logger.info("Computing feature importance")
+
+        # seed everything if random_seed is provided
+        if random_seed is not None:
+            seed_everything(random_seed)
+
+        # start timer and cap subsample size if it's greater than the number of items in the provided data set
+        time_start = time.time()
+        if subsample_size > data.num_items:
+            logger.info(
+                f"Subsample_size {subsample_size} is larger than the number of items in the data and will be ignored"
+            )
+            subsample_size = data.num_items
+
+        # set default number of iterations and cap iterations if the number of items in the data is smaller
+        # than the subsample size for the naive method
+        num_iterations = num_iterations or (5 if method == "permutation" else 1)
+        if method == "naive" and data.num_items <= subsample_size:
+            num_iterations = 1
+
+        # initialize the importance transform
+        importance_transform_type = {
+            "permutation": PermutationFeatureImportanceTransform,
+            "naive": ConstantReplacementFeatureImportanceTransform,
+        }.get(method)
+        importance_transform = importance_transform_type(
+            covariate_metadata=self.metadata,
+            prediction_length=self.prediction_length,
+            random_seed=random_seed,
+        )
+
+        # if model is not provided, use the best model according to the validation score
+        model = self._get_model_for_prediction(model, verbose=False)
+
+        # persist trainer to speed up repeated inference
+        persisted_models = self.persist(model_names=[model], with_ancestors=True)
+
+        importance_samples = defaultdict(list)
+        for n in range(num_iterations):
+            if subsample_size < data.num_items:
+                item_ids_sampled = data.item_ids.to_series().sample(subsample_size)  # noqa
+                data_sample = data.query("item_id in @item_ids_sampled")
+            else:
+                data_sample = data
+
+            base_score = self.evaluate(data=data_sample, model=model, metrics=metric, use_cache=False)[metric.name]
+
+            for feature in features:
+                # override importance for unused features
+                if not self._model_uses_feature(model, feature):
+                    continue
+                else:
+                    data_sample_replaced = importance_transform.transform(data_sample, feature_name=feature)
+                    score = self.evaluate(data=data_sample_replaced, model=model, metrics=metric, use_cache=False)[
+                        metric.name
+                    ]
+
+                    importance = base_score - score
+                    if relative_scores:
+                        importance /= np.abs(base_score - self.eps_abs_importance_score)
+                        importance = min(self.max_rel_importance_score, importance)
+
+                    importance_samples[feature].append(importance)
+
+            if time_limit is not None and time.time() - time_start > time_limit:
+                logger.info(f"Time limit reached, stopping feature importance computation after {n} iterations")
+                break
+
+        self.unpersist(model_names=persisted_models)
+
+        importance_df = (
+            (
+                pd.DataFrame(importance_samples)
+                .agg(["mean", "std", "count"])
+                .T.rename(columns={"mean": "importance", "std": "stdev", "count": "n"})
+            )
+            if len(importance_samples) > 0
+            else pd.DataFrame(columns=["importance", "stdev", "n"])
+        )
+
+        if include_confidence_band:
+            importance_df = self._add_ci_to_feature_importance(importance_df, confidence_level=confidence_level)
+
+        return importance_df
+
+    def _model_uses_feature(self, model: Optional[Union[str, AbstractTimeSeriesModel]], feature: str) -> bool:
+        """Check if the given model uses the given feature."""
+        models_with_ancestors = set(self.get_minimum_model_set(model))
+
+        if feature in self.metadata.static_features:
+            return any(self.load_model(m).supports_static_features for m in models_with_ancestors)
+        elif feature in self.metadata.known_covariates:
+            return any(self.load_model(m).supports_known_covariates for m in models_with_ancestors)
+        elif feature in self.metadata.past_covariates:
+            return any(self.load_model(m).supports_past_covariates for m in models_with_ancestors)
+
+        return False
+
+    def _add_ci_to_feature_importance(
+        self, importance_df: pd.DataFrame, confidence_level: float = 0.99
+    ) -> pd.DataFrame:
+        """Add confidence intervals to the feature importance."""
+        import scipy.stats
+
+        if confidence_level <= 0.5 or confidence_level >= 1.0:
+            raise ValueError("confidence_level must lie between 0.5 and 1.0")
+        ci_str = "{:.0f}".format(confidence_level * 100)
+
+        alpha = 1 - confidence_level
+        importance_df[f"p{ci_str}_low"] = np.nan
+        importance_df[f"p{ci_str}_high"] = np.nan
+
+        for i in importance_df.index:
+            r = importance_df.loc[i]
+            importance, stdev, n = r["importance"], r["stdev"], r["n"]
+            if np.isnan(importance) or np.isnan(stdev) or np.isnan(n) or n <= 1:
+                continue
+
+            t_crit = scipy.stats.t.ppf(1 - alpha / 2, df=n - 1)
+
+            importance_df.loc[i, f"p{ci_str}_low"] = importance - t_crit * stdev / np.sqrt(n)
+            importance_df.loc[i, f"p{ci_str}_high"] = importance + t_crit * stdev / np.sqrt(n)
+
+        return importance_df
 
     def _predict_model(
         self,
@@ -900,6 +1162,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         record_pred_time: bool = False,
         raise_exception_if_failed: bool = True,
         use_cache: bool = True,
+        random_seed: Optional[int] = None,
     ) -> Union[Dict[str, TimeSeriesDataFrame], Tuple[Dict[str, TimeSeriesDataFrame], Dict[str, float]]]:
         """Return a dictionary with predictions of all models for the given dataset.
 
@@ -939,6 +1202,8 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         failed_models = []
         for model_name in model_set:
             if model_name not in model_pred_dict:
+                if random_seed is not None:
+                    seed_everything(random_seed)
                 try:
                     predict_start_time = time.time()
                     model_pred_dict[model_name] = self._predict_model(
@@ -1091,11 +1356,13 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         valid_model_set = []
         for name in model_names:
-            if name in self.model_refit_map and self.model_refit_map[model] in existing_models:
+            if name in self.model_refit_map and self.model_refit_map[name] in existing_models:
                 logger.info(
                     f"Model '{name}' already has a refit _FULL model: "
-                    f"'{self.model_refit_map[model]}', skipping refit...",
+                    f"'{self.model_refit_map[name]}', skipping refit..."
                 )
+            elif name in self.model_refit_map.values():
+                logger.debug(f"Model '{name}' is a refit _FULL model, skipping refit...")
             else:
                 valid_model_set.append(name)
 

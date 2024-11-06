@@ -65,7 +65,11 @@ def _LoadNvmlLibrary():
                     if sys.platform[:3] == "win":
                         # cdecl calling convention
                         # load cuda.dll from %ProgramFiles%/NVIDIA Corporation/NVSMI/cuda.dll
-                        cudaLib = CDLL(os.path.join(os.getenv("ProgramFiles", "C:/Program Files"), "NVIDIA Corporation/NVSMI/cuda.dll"))
+                        cudaLib = CDLL(
+                            os.path.join(
+                                os.getenv("ProgramFiles", "C:/Program Files"), "NVIDIA Corporation/NVSMI/cuda.dll"
+                            )
+                        )
                     else:
                         # assume linux
                         cudaLib = CDLL("libnvidia-ml.so.1")

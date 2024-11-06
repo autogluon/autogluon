@@ -1,3 +1,5 @@
+import os
+import tempfile
 from typing import List, Optional
 
 import torch
@@ -39,7 +41,7 @@ class CategoricalFeatureTokenizer(nn.Module):
         References
         ----------
         1. Yury Gorishniy, Ivan Rubachev, Valentin Khrulkov, Artem Babenko,
-        "Revisiting Deep Learning Models for Tabular Data", 2021
+        "Revisiting Deep Learning Models for Tabular Data", NeurIPS 2021
         https://arxiv.org/pdf/2106.11959.pdf
         2. Code: https://github.com/Yura52/tabular-dl-revisiting-models
         """
@@ -457,6 +459,8 @@ class FT_Transformer(nn.Module):
         additive_attention: Optional[bool] = False,
         share_qv_weights: Optional[bool] = False,
         pooling_mode: Optional[str] = "cls",
+        checkpoint_name: str = None,
+        pretrained: bool = False,
     ) -> None:
         """
         Parameters
@@ -594,12 +598,25 @@ class FT_Transformer(nn.Module):
             initialization="uniform",
         )
 
-        # init weights
+        # init tokenizer and head weights
         if self.numerical_feature_tokenizer:
             self.numerical_adapter.apply(init_weights)
         if self.categorical_feature_tokenizer:
             self.categorical_adapter.apply(init_weights)
         self.head.apply(init_weights)
+        # init transformer backbone from provided checkpoint
+        from autogluon.multimodal.utils.download import download
+
+        if pretrained and checkpoint_name:
+            if os.path.exists(checkpoint_name):
+                ckpt = torch.load(checkpoint_name)  # nosec B614
+            else:
+                with tempfile.TemporaryDirectory() as tmpdirname:
+                    checkpoint_path = os.path.join(tmpdirname, "./ft_transformer_pretrained.ckpt")
+                    download(checkpoint_name, checkpoint_path)
+                    ckpt = torch.load(checkpoint_path)  # nosec B614
+            self.transformer.load_state_dict(ckpt["state_dict"])
+
         self.name_to_id = self.get_layer_ids()
 
     @property

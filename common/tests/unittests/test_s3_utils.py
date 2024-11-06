@@ -37,9 +37,21 @@ def test_get_local_path_to_download_objs(s3_objs, prefix, local_path, expected_o
     "s3_bucket,s3_prefix,local_path,s3_prefixes,expected_output",
     [
         ("foo", "bar", "local/path", [], []),
-        ("foo", "bar", "local/path", ["bar/test.txt"], [("s3://foo/bar/test.txt", os.path.join("local", "path", "test.txt"))]),
+        (
+            "foo",
+            "bar",
+            "local/path",
+            ["bar/test.txt"],
+            [("s3://foo/bar/test.txt", os.path.join("local", "path", "test.txt"))],
+        ),
         ("foo", "", "", ["test.txt"], [("s3://foo/test.txt", "test.txt")]),
-        ("foo", "bar/bar", "local/path", ["bar/bar/test.txt"], [("s3://foo/bar/bar/test.txt", os.path.join("local", "path", "test.txt"))]),
+        (
+            "foo",
+            "bar/bar",
+            "local/path",
+            ["bar/bar/test.txt"],
+            [("s3://foo/bar/bar/test.txt", os.path.join("local", "path", "test.txt"))],
+        ),
         (
             "foo",
             "bar",
@@ -50,12 +62,20 @@ def test_get_local_path_to_download_objs(s3_objs, prefix, local_path, expected_o
                 ("s3://foo/bar/test2.txt", os.path.join("local", "path", "test2.txt")),
             ],
         ),
-        ("foo", "bar", "local/path", ["bar/temp/test.txt"], [("s3://foo/bar/temp/test.txt", os.path.join("local", "path", "temp", "test.txt"))]),
+        (
+            "foo",
+            "bar",
+            "local/path",
+            ["bar/temp/test.txt"],
+            [("s3://foo/bar/temp/test.txt", os.path.join("local", "path", "temp", "test.txt"))],
+        ),
         ("foo", "", "", ["a"], [("s3://foo/a", "a")]),
     ],
 )
 def test_get_s3_to_local_tuple_list(s3_bucket, s3_prefix, local_path, s3_prefixes, expected_output):
-    actual_output = get_s3_to_local_tuple_list(s3_bucket=s3_bucket, s3_prefix=s3_prefix, local_path=local_path, s3_prefixes=s3_prefixes)
+    actual_output = get_s3_to_local_tuple_list(
+        s3_bucket=s3_bucket, s3_prefix=s3_prefix, local_path=local_path, s3_prefixes=s3_prefixes
+    )
     assert actual_output == expected_output
 
 
@@ -69,7 +89,9 @@ def test_get_s3_to_local_tuple_list(s3_bucket, s3_prefix, local_path, s3_prefixe
 )
 def test_get_s3_to_local_tuple_list_raises(s3_bucket, s3_prefix, local_path, s3_prefixes, expected_error):
     with pytest.raises(expected_error):
-        get_s3_to_local_tuple_list(s3_bucket=s3_bucket, s3_prefix=s3_prefix, local_path=local_path, s3_prefixes=s3_prefixes)
+        get_s3_to_local_tuple_list(
+            s3_bucket=s3_bucket, s3_prefix=s3_prefix, local_path=local_path, s3_prefixes=s3_prefixes
+        )
 
 
 def test_get_local_objs_to_upload_and_s3_prefix():

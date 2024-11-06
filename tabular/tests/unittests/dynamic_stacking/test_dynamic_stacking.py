@@ -112,7 +112,7 @@ def test_no_dynamic_stacking(fit_helper):
 
 
 def test_dynamic_stacking_fit_extra(fit_helper):
-    """Tests that dynamic stacking does not run if stacking is disabled."""
+    """Tests that fit_extra works after dynamic stacking."""
     fit_args = dict(
         hyperparameters={"RF": {}},
         dynamic_stacking=True,
@@ -130,13 +130,13 @@ def test_dynamic_stacking_fit_extra(fit_helper):
         dataset_name=dataset_name,
         fit_args=fit_args,
         extra_metrics=extra_metrics,
-        expected_model_count=2,
+        expected_model_count=1,
         refit_full=False,
         delete_directory=False,
         allowed_dataset_features=["age"],
-        expected_stacked_overfitting_at_test=True,
+        expected_stacked_overfitting_at_test=False,
         # This also check that we only consider something to be stacked overfitting if the dynamic stacking holdout score gets worse.
-        expected_stacked_overfitting_at_val=False,
+        expected_stacked_overfitting_at_val=True,
     )
 
     fit_extra_args = dict(
@@ -145,6 +145,8 @@ def test_dynamic_stacking_fit_extra(fit_helper):
     )
 
     predictor.fit_extra(**fit_extra_args)
+
+    assert len(predictor.model_names()) == 2
     shutil.rmtree(predictor.path, ignore_errors=True)
 
 
