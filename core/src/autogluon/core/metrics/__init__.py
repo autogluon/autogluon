@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 from abc import ABCMeta, abstractmethod
 from functools import partial
@@ -187,6 +189,11 @@ class Scorer(object, metaclass=ABCMeta):
 
     @property
     @abstractmethod
+    def needs_class(self) -> bool:
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
     def needs_threshold(self) -> bool:
         raise NotImplementedError
 
@@ -229,6 +236,51 @@ class _PredictScorer(Scorer):
         return False
 
     @property
+    def needs_class(self) -> bool:
+        return False
+
+    @property
+    def needs_threshold(self):
+        return False
+
+    @property
+    def needs_quantile(self):
+        return False
+
+
+class _ClassScorer(Scorer):
+    def _preprocess(self, y_true, y_pred, **kwargs):
+        if isinstance(y_true, list):
+            y_true = np.array(y_true)
+        if isinstance(y_pred, list):
+            y_pred = np.array(y_pred)
+
+        if len(y_pred.shape) == 1 or y_pred.shape[1] == 1:
+            pass  # FIXME
+        else:
+            type_true = type_of_target(y_true)
+            if type_true in ["binary", "multiclass"]:
+                y_pred = np.argmax(y_pred, axis=1)
+            elif type_true == "multilabel-indicator":
+                y_pred[y_pred > 0.5] = 1.0
+                y_pred[y_pred <= 0.5] = 0.0
+            else:
+                raise ValueError(type_true)
+        return y_true, y_pred, kwargs
+
+    @property
+    def needs_pred(self):
+        return True
+
+    @property
+    def needs_proba(self):
+        return False
+
+    @property
+    def needs_class(self) -> bool:
+        return True
+
+    @property
     def needs_threshold(self):
         return False
 
@@ -248,6 +300,10 @@ class _ProbaScorer(Scorer):
     @property
     def needs_proba(self):
         return True
+
+    @property
+    def needs_class(self) -> bool:
+        return False
 
     @property
     def needs_threshold(self):
@@ -281,6 +337,10 @@ class _ThresholdScorer(Scorer):
 
     @property
     def needs_proba(self):
+        return False
+
+    @property
+    def needs_class(self) -> bool:
         return False
 
     @property
@@ -320,6 +380,10 @@ class _QuantileScorer(Scorer):
         return False
 
     @property
+    def needs_class(self) -> bool:
+        return False
+
+    @property
     def needs_threshold(self):
         return False
 
@@ -339,7 +403,18 @@ def _add_scorer_to_metric_dict(metric_dict, scorer):
 
 
 def make_scorer(
-    name, score_func, *, optimum=1, greater_is_better=True, needs_proba=False, needs_threshold=False, needs_quantile=False, metric_kwargs: dict = None, **kwargs
+    name: str,
+    score_func: callable,
+    *,
+    optimum: int | float = 1,
+    greater_is_better: bool = True,
+    needs_pred: bool | str = "auto",
+    needs_proba: bool = False,
+    needs_class: bool = False,
+    needs_threshold: bool = False,
+    needs_quantile: bool = False,
+    metric_kwargs: dict = None,
+    **kwargs,
 ) -> Scorer:
     """Make a scorer from a performance metric or loss function.
 
@@ -348,11 +423,15 @@ def make_scorer(
 
     Parameters
     ----------
+    name : str
+        The name of the Scorer.
+        Accessible via `scorer.name`
+
     score_func : callable
         Score function (or loss function) with signature
         ``score_func(y, y_pred, **kwargs)``.
 
-    optimum : int or float, default=1
+    optimum : int | float, default=1
         The best score achievable by the score function, i.e. maximum in case of
         scorer function and minimum in case of loss function.
 
@@ -361,17 +440,33 @@ def make_scorer(
         or a loss function, meaning low is good. In the latter case, the
         scorer object will sign-flip the outcome of the score_func.
 
-    needs_proba : boolean, default=False
-        Whether score_func requires predict_proba to get probability estimates
-        out of a classifier.
+    needs_pred : bool | str, default="auto"
+        Whether score_func requires the predict model method output as input to scoring.
+        If "auto", will be inferred based on the values of the other `needs_*` arguments.
+        Defaults to True if all other `needs_*` are False.
+        Examples: ["root_mean_squared_error", "mean_squared_error", "r2", "mean_absolute_error", "median_absolute_error", "spearmanr", "pearsonr"]
 
-    needs_threshold : boolean, default=False
+    needs_proba : bool, default=False
+        Whether score_func requires predict_proba to get probability estimates out of a classifier.
+        These scorers can benefit from calibration methods such as temperature scaling.
+        Examples: ["log_loss", "roc_auc_ovo", "roc_auc_ovr", "pac"]
+
+    needs_class : bool, default=False
+        Whether score_func requires class predictions (classification only).
+        This is required to determine if the scorer is impacted by a decision threshold.
+        These scorers can benefit from decision threshold calibration methods such as via `predictor.calibrate_decision_threshold()`.
+        Examples: ["accuracy", "balanced_accuracy", "f1", "precision", "recall", "mcc", "quadratic_kappa", "f1_micro", "f1_macro", "f1_weighted"]
+
+    needs_threshold : bool, default=False
         Whether score_func takes a continuous decision certainty.
         This only works for binary classification.
+        These scorers care about the rank order of the prediction probabilities to calculate their scores, and are undefined if given a single sample to score.
+        Examples: ["roc_auc", "average_precision"]
 
-    needs_quantile : boolean, default=False
+    needs_quantile : bool, default=False
         Whether score_func is based on quantile predictions.
         This only works for quantile regression.
+        Examples: ["pinball_loss"]
 
     metric_kwargs : dict
         Additional parameters to be passed to score_func, merged with kwargs if both are present.
@@ -385,8 +480,24 @@ def make_scorer(
     scorer
         Callable object that returns a scalar score; greater is better.
     """
+    num_true = sum([1 if needs else 0 for needs in [needs_class, needs_proba, needs_threshold, needs_quantile]])
+    if num_true > 1:
+        raise ValueError(
+            f"When creating a Scorer, at most one can be True, found {num_true}: "
+            f"(needs_class={needs_class}, needs_proba={needs_proba}, needs_threshold={needs_threshold}, needs_quantile={needs_quantile})"
+        )
+
+    if num_true == 0 and not needs_pred:
+        raise ValueError(
+            f"When creating a Scorer, at least one must be True: "
+            f"(needs_pred={needs_pred}, needs_class={needs_class}, "
+            f"needs_proba={needs_proba}, needs_threshold={needs_threshold}, needs_quantile={needs_quantile})"
+        )
+
     sign = 1 if greater_is_better else -1
-    if needs_proba:
+    if needs_class:
+        cls = _ClassScorer
+    elif needs_proba:
         cls = _ProbaScorer
     elif needs_threshold:
         cls = _ThresholdScorer
@@ -394,15 +505,24 @@ def make_scorer(
         cls = _QuantileScorer
     else:
         cls = _PredictScorer
+
     if metric_kwargs is not None:
         kwargs.update(metric_kwargs)
-    return cls(
+    scorer = cls(
         name=name,
         score_func=score_func,
         optimum=optimum,
         sign=sign,
         kwargs=kwargs,
     )
+
+    if isinstance(needs_pred, bool) and needs_pred != scorer.needs_pred:
+        raise ValueError(
+            f"needs_pred specified by user does not match the required needs_pred value for {scorer.__class__.__name__}. (name={scorer.name}, "
+            f"actual_needs_pred={needs_pred}, expected_needs_pred={needs_pred})"
+        )
+
+    return scorer
 
 
 # Standard regression scores
@@ -460,27 +580,22 @@ pinball_loss.add_alias("pinball")
 
 
 # Standard Classification Scores
-accuracy = make_scorer("accuracy", sklearn.metrics.accuracy_score)
+accuracy = make_scorer("accuracy", sklearn.metrics.accuracy_score, needs_class=True)
 accuracy.add_alias("acc")
 
-balanced_accuracy = make_scorer("balanced_accuracy", classification_metrics.balanced_accuracy)
-f1 = make_scorer("f1", sklearn.metrics.f1_score)
-mcc = make_scorer("mcc", sklearn.metrics.matthews_corrcoef)
-
+balanced_accuracy = make_scorer("balanced_accuracy", classification_metrics.balanced_accuracy, needs_class=True)
+f1 = make_scorer("f1", sklearn.metrics.f1_score, needs_class=True)
+mcc = make_scorer("mcc", sklearn.metrics.matthews_corrcoef, needs_class=True)
 
 # Score functions that need decision values
 roc_auc = make_scorer("roc_auc", classification_metrics.customized_binary_roc_auc_score, greater_is_better=True, needs_threshold=True)
 
-roc_auc_ovo_macro = make_scorer(
-    "roc_auc_ovo_macro", sklearn.metrics.roc_auc_score, multi_class="ovo", average="macro", greater_is_better=True, needs_proba=True, needs_threshold=False
-)
-
 average_precision = make_scorer("average_precision", sklearn.metrics.average_precision_score, needs_threshold=True)
-precision = make_scorer("precision", sklearn.metrics.precision_score)
-recall = make_scorer("recall", sklearn.metrics.recall_score)
+precision = make_scorer("precision", sklearn.metrics.precision_score, needs_class=True)
+recall = make_scorer("recall", sklearn.metrics.recall_score, needs_class=True)
 
 # Register other metrics
-quadratic_kappa = make_scorer("quadratic_kappa", classification_metrics.quadratic_kappa, needs_proba=False)
+quadratic_kappa = make_scorer("quadratic_kappa", classification_metrics.quadratic_kappa, needs_class=True)
 
 
 def customized_log_loss(y_true, y_pred, eps=1e-15):
@@ -514,6 +629,17 @@ def customized_log_loss(y_true, y_pred, eps=1e-15):
         return sklearn.metrics.log_loss(y_true.astype(np.int32), y_pred, labels=labels)
 
 
+def customized_roc_auc(y_true, y_pred, **kwargs):
+    assert y_true.ndim == 1
+    if y_pred.ndim == 1 or "labels" in kwargs:
+        return sklearn.metrics.roc_auc_score(y_true, y_pred, **kwargs)
+    else:
+        # Avoid exception if not all classes are present in y_true
+        assert y_pred.ndim == 2, "Only ndim=2 is supported"
+        labels = np.arange(y_pred.shape[1], dtype=np.int32)
+        return sklearn.metrics.roc_auc_score(y_true.astype(np.int32), y_pred, labels=labels, **kwargs)
+
+
 # Score function for probabilistic classification
 log_loss = make_scorer("log_loss", customized_log_loss, optimum=0, greater_is_better=False, needs_proba=True)
 log_loss.add_alias("nll")
@@ -545,7 +671,6 @@ for scorer in [
     accuracy,
     balanced_accuracy,
     mcc,
-    roc_auc_ovo_macro,
     log_loss,
     pac,
     quadratic_kappa,
@@ -561,13 +686,33 @@ for scorer in [
 
 
 for name, metric in [("precision", sklearn.metrics.precision_score), ("recall", sklearn.metrics.recall_score), ("f1", sklearn.metrics.f1_score)]:
-    globals()[name] = make_scorer(name, metric)
+    globals()[name] = make_scorer(name, metric, needs_class=True)
     _add_scorer_to_metric_dict(metric_dict=BINARY_METRICS, scorer=globals()[name])
     for average in ["macro", "micro", "weighted"]:
         qualified_name = "{0}_{1}".format(name, average)
-        globals()[qualified_name] = make_scorer(qualified_name, partial(metric, pos_label=None, average=average))
+        globals()[qualified_name] = make_scorer(qualified_name, partial(metric, pos_label=None, average=average), needs_class=True)
         _add_scorer_to_metric_dict(metric_dict=BINARY_METRICS, scorer=globals()[qualified_name])
         _add_scorer_to_metric_dict(metric_dict=MULTICLASS_METRICS, scorer=globals()[qualified_name])
+
+
+for name, metric, kwargs in [
+    ("roc_auc_ovo", customized_roc_auc, dict(multi_class="ovo")),
+    ("roc_auc_ovr", customized_roc_auc, dict(multi_class="ovr")),
+]:
+    scorer_kwargs = dict(greater_is_better=True, needs_proba=True, needs_threshold=False)
+    globals()[name] = make_scorer(name, partial(metric, average="macro", **kwargs), **scorer_kwargs)
+    macro_name = "{0}_{1}".format(name, "macro")
+    globals()[name].add_alias(macro_name)
+    _add_scorer_to_metric_dict(metric_dict=MULTICLASS_METRICS, scorer=globals()[name])
+    if name == "roc_auc_ovo":
+        averages = ["weighted"]
+    else:
+        averages = ["micro", "weighted"]
+    for average in averages:
+        qualified_name = "{0}_{1}".format(name, average)
+        globals()[qualified_name] = make_scorer(qualified_name, partial(metric, average=average, **kwargs), **scorer_kwargs)
+        _add_scorer_to_metric_dict(metric_dict=MULTICLASS_METRICS, scorer=globals()[qualified_name])
+
 
 METRICS = {
     BINARY: BINARY_METRICS,
@@ -603,11 +748,13 @@ def get_metric(metric, problem_type=None, metric_type=None) -> Scorer:
                 valid_problem_types = _get_valid_metric_problem_types(metric)
                 if valid_problem_types:
                     raise ValueError(
-                        f"{metric_type}='{metric}' is not a valid metric for problem_type='{problem_type}'. Valid problem_types for this metric: {valid_problem_types}"
+                        f"{metric_type}='{metric}' is not a valid metric for problem_type='{problem_type}'. "
+                        f"Valid problem_types for this metric: {valid_problem_types}"
+                        f"\nValid metrics for problem_type='{problem_type}':\n{list(METRICS[problem_type].keys())}"
                     )
                 else:
                     raise ValueError(
-                        f"Unknown metric '{metric}'. " f"Valid metrics for problem_type='{problem_type}':\n" f"{list(METRICS[problem_type].keys())}"
+                        f"Unknown {metric_type} '{metric}'. Valid metrics for problem_type='{problem_type}':\n{list(METRICS[problem_type].keys())}"
                     )
             return METRICS[problem_type][metric]
         for pt in METRICS:

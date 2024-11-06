@@ -153,7 +153,7 @@ class CLIPForImageText(nn.Module):
             image_features = image_features.reshape((b, n, -1)) * image_masks[:, :, None]  # (b, n, num_features)
 
             # normalized features
-            image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+            image_features = image_features / torch.clamp(image_features.norm(dim=-1, keepdim=True), min=1e-6)
 
             # collect image features by image column names
             image_column_features, image_column_feature_masks = get_column_features(

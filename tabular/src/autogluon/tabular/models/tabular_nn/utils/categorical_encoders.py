@@ -1,8 +1,9 @@
-""" 
-Variant of the sklearn OneHotEncoder and OrdinalEncoder that can handle unknown classes at test-time 
+"""
+Variant of the sklearn OneHotEncoder and OrdinalEncoder that can handle unknown classes at test-time
 as well as binning of infrequent categories to limit the overall number of categories considered.
 Unknown categories are returned as None in inverse transforms. Always converts input list X to list of the same type elements first (string typically)
 """
+
 import copy
 from numbers import Integral
 
@@ -416,10 +417,8 @@ class OneHotMergeRaresHandleUnknownEncoder(_BaseEncoder):
                 raise ValueError(msg.format(len(self.categories_), len(self.drop)))
             missing_drops = [(i, val) for i, val in enumerate(self.drop) if val not in self.categories_[i]]
             if any(missing_drops):
-                msg = (
-                    "The following categories were supposed to be "
-                    "dropped, but were not found in the training "
-                    "data.\n{}".format("\n".join(["Category: {}, Feature: {}".format(c, v) for c, v in missing_drops]))
+                msg = "The following categories were supposed to be " "dropped, but were not found in the training " "data.\n{}".format(
+                    "\n".join(["Category: {}, Feature: {}".format(c, v) for c, v in missing_drops])
                 )
                 raise ValueError(msg)
             return np.array([np.where(cat_list == val)[0][0] for (val, cat_list) in zip(self.drop, self.categories_)], dtype=np.int_)
@@ -460,9 +459,9 @@ class OneHotMergeRaresHandleUnknownEncoder(_BaseEncoder):
             for feature_idx, (infrequent_indices, drop_idx) in enumerate(zip(self.infrequent_indices_, self.drop_idx_)):
                 if drop_idx in infrequent_indices:
                     raise ValueError(
-                        "Category {} of feature {} is infrequent and thus "
-                        "cannot be dropped. Use drop='infrequent' "
-                        "instead.".format(self.categories_[feature_idx][drop_idx], feature_idx)
+                        "Category {} of feature {} is infrequent and thus " "cannot be dropped. Use drop='infrequent' " "instead.".format(
+                            self.categories_[feature_idx][drop_idx], feature_idx
+                        )
                     )
         return self
 

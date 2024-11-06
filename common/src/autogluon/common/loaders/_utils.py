@@ -39,9 +39,7 @@ if not sys.platform.startswith("win32"):
             finally:
                 raise OSError(
                     "Moving downloaded temp file - {}, to {} failed. \
-                    Please retry the download.".format(
-                        src, dst
-                    )
+                    Please retry the download.".format(src, dst)
                 )
 
 else:
@@ -81,7 +79,12 @@ else:
         src : source file path
         dst : destination file path
         """
-        _handle_errors(ctypes.windll.kernel32.MoveFileExW(_str_to_unicode(src), _str_to_unicode(dst), _windows_default_flags | _MOVEFILE_REPLACE_EXISTING), src)
+        _handle_errors(
+            ctypes.windll.kernel32.MoveFileExW(
+                _str_to_unicode(src), _str_to_unicode(dst), _windows_default_flags | _MOVEFILE_REPLACE_EXISTING
+            ),
+            src,
+        )
 
 
 def sha1sum(filename):
@@ -158,7 +161,10 @@ def download(
     assert retries >= 0, "Number of retries should be at least 0, currently it's {}".format(retries)
 
     if not verify_ssl:
-        warnings.warn("Unverified HTTPS request is being made (verify_ssl=False). " "Adding certificate verification is strongly advised.")
+        warnings.warn(
+            "Unverified HTTPS request is being made (verify_ssl=False). "
+            "Adding certificate verification is strongly advised."
+        )
 
     if overwrite or not os.path.exists(fname) or (sha1_hash and not sha1sum(fname) == sha1_hash):
         dirname = os.path.dirname(os.path.abspath(os.path.expanduser(fname)))
@@ -230,7 +236,11 @@ def download(
                 if retries <= 0:
                     raise e
 
-                print("download failed due to {}, retrying, {} attempt{} left".format(repr(e), retries, "s" if retries > 1 else ""))
+                print(
+                    "download failed due to {}, retrying, {} attempt{} left".format(
+                        repr(e), retries, "s" if retries > 1 else ""
+                    )
+                )
 
     return fname
 

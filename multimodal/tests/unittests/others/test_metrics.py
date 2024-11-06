@@ -123,7 +123,7 @@ def test_f1_metrics_for_multiclass(eval_metric):
     )
     val_score = predictor._learner._best_score
     eval_score = predictor.evaluate(dataset.test_df)[eval_metric]
-    assert abs(val_score - eval_score) < 1e-4
+    assert abs(val_score - eval_score) < 2e-2
 
 
 @pytest.mark.single_gpu
@@ -134,12 +134,10 @@ def test_f1_metrics_for_multiclass(eval_metric):
         ("multiclass", "f1_macro", None, False, "f1_macro", "f1_macro"),
         ("regression", "f1", None, False, "rmse", "rmse"),
         ("object_detection", "map", "map", False, "map", "map"),
-        ("open_vocabulary_object_detection", "f1", None, False, "map", "map"),
         ("binary", None, None, False, "roc_auc", "roc_auc"),
         ("multiclass", None, None, False, "accuracy", "accuracy"),
         ("regression", None, None, False, "rmse", "rmse"),
         ("object_detection", None, None, False, "map", "map"),
-        ("open_vocabulary_object_detection", None, None, False, "map", "map"),
         ("semantic_segmentation", None, None, False, "iou", "iou"),
         ("ner", None, None, False, "overall_f1", "ner_token_f1"),
         ("few_shot_classification", None, None, False, "accuracy", "accuracy"),

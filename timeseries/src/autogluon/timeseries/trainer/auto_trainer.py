@@ -27,7 +27,8 @@ class AutoTimeSeriesTrainer(AbstractTimeSeriesTrainer):
             target=self.target,
             metadata=self.metadata,
             excluded_model_types=kwargs.get("excluded_model_types"),
-            multi_window=multi_window,
+            # if skip_model_selection = True, we skip backtesting
+            multi_window=multi_window and not self.skip_model_selection,
         )
 
     def fit(
@@ -38,6 +39,7 @@ class AutoTimeSeriesTrainer(AbstractTimeSeriesTrainer):
         hyperparameter_tune_kwargs: Optional[Union[str, Dict]] = None,
         excluded_model_types: Optional[List[str]] = None,
         time_limit: Optional[float] = None,
+        random_seed: Optional[int] = None,
     ):
         """
         Fit a set of timeseries models specified by the `hyperparameters`
@@ -59,6 +61,8 @@ class AutoTimeSeriesTrainer(AbstractTimeSeriesTrainer):
             Names of models that should not be trained, even if listed in `hyperparameters`.
         time_limit
             Time limit for training
+        random_seed
+            Random seed that will be set to each model during training
         """
         self._train_multi(
             train_data,
@@ -67,4 +71,5 @@ class AutoTimeSeriesTrainer(AbstractTimeSeriesTrainer):
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             excluded_model_types=excluded_model_types,
             time_limit=time_limit,
+            random_seed=random_seed,
         )

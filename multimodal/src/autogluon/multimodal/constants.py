@@ -1,4 +1,5 @@
 """Storing the constants"""
+
 from autogluon.core.metrics import METRICS
 
 # Column/Label Types
@@ -9,6 +10,7 @@ TEXT_NER = "text_ner"  # Added for NER text column
 NUMERICAL = "numerical"
 IMAGE_PATH = "image_path"
 IMAGE_BYTEARRAY = "image_bytearray"
+IMAGE_BASE64_STR = "image_base64_str"
 IDENTIFIER = "identifier"
 DOCUMENT = "document"
 DOCUMENT_IMAGE = "document_image"
@@ -29,7 +31,6 @@ NAMED_ENTITY_RECOGNITION = "named_entity_recognition"
 FEATURE_EXTRACTION = "feature_extraction"
 ZERO_SHOT_IMAGE_CLASSIFICATION = "zero_shot_image_classification"
 OBJECT_DETECTION = "object_detection"
-OPEN_VOCABULARY_OBJECT_DETECTION = "open_vocabulary_object_detection"
 OCR = "ocr"
 OCR_TEXT_DETECTION = f"{OCR}_text_detection"
 OCR_TEXT_RECOGNITION = f"{OCR}_text_recognition"
@@ -72,6 +73,9 @@ BBOX = "bbox"
 ROIS = "rois"
 SCORE = "score"
 LOGIT_SCALE = "logit_scale"
+
+# Loss
+MOE_LOSS = "moe_loss"
 
 # Metric for Object Detection
 MAP = "map"
@@ -232,9 +236,8 @@ IA3_NORM = "ia3_norm"
 IA3_LORA = "ia3_lora"
 IA3_LORA_BIAS = "ia3_lora_bias"
 IA3_LORA_NORM = "Ia3_lora_norm"
-PEFT_STRATEGIES = [
-    BIT_FIT,
-    NORM_FIT,
+CONV_LORA = "conv_lora"
+PEFT_ADDITIVE_STRATEGIES = [
     LORA,
     LORA_BIAS,
     LORA_NORM,
@@ -244,7 +247,13 @@ PEFT_STRATEGIES = [
     IA3_LORA,
     IA3_LORA_BIAS,
     IA3_LORA_NORM,
+    CONV_LORA,
 ]
+PEFT_NON_ADDITIVE_STRATEGIES = [
+    BIT_FIT,
+    NORM_FIT,
+]
+PEFT_STRATEGIES = list(set(PEFT_ADDITIVE_STRATEGIES) | set(PEFT_NON_ADDITIVE_STRATEGIES))
 
 # DeepSpeed constants
 DEEPSPEED_OFFLOADING = "deepspeed_stage_3_offload"
@@ -267,7 +276,6 @@ FUSION_NER = f"{FUSION}_{NER}"
 MMDET_IMAGE = "mmdet_image"
 MMOCR_TEXT_DET = "mmocr_text_detection"
 MMOCR_TEXT_RECOG = "mmocr_text_recognition"
-OVD = "ovd"
 NER_TEXT = "ner_text"
 DOCUMENT_TRANSFORMER = "document_transformer"
 HF_MODELS = (HF_TEXT, T_FEW, CLIP, NER_TEXT, DOCUMENT_TRANSFORMER)
@@ -315,10 +323,6 @@ TRIPLET = "triplet"
 XYWH = "xywh"
 XYXY = "xyxy"
 BBOX_FORMATS = [XYWH, XYXY]
-
-# open vocabulary detection
-PROMPT = "prompt"
-OVD_RET = "ovd_ret"
 
 # sam (multi-class)
 CLASS_LOGITS = "class_logits"

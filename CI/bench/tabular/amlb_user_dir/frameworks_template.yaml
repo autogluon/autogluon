@@ -10,28 +10,28 @@ AutoGluon:
 ######### Do Not Remove #########
 
 
-AutoGluon_best:
+AutoGluon_tabular_best:
   extends: AutoGluon
   repo: https://github.com/autogluon/autogluon.git
   version: master  # branch name
   params:  # TabularPredictor.fit(params)
     presets: best_quality
 
-AutoGluon_high:
+AutoGluon_tabular_high:
   extends: AutoGluon
   repo: https://github.com/autogluon/autogluon.git
   version: master  # branch name
   params:  # TabularPredictor.fit(params)
     presets: high_quality
 
-AutoGluon_good:
+AutoGluon_tabular_good:
   extends: AutoGluon
   repo: https://github.com/autogluon/autogluon.git
   version: master  # branch name
   params:  # TabularPredictor.fit(params)
     presets: good_quality
 
-AutoGluon_medium:
+AutoGluon_tabular_medium:
   extends: AutoGluon
   repo: https://github.com/autogluon/autogluon.git
   version: master  # branch name

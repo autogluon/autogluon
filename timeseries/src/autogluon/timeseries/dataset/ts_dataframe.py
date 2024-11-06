@@ -7,6 +7,7 @@ import reprlib
 from collections.abc import Iterable
 from itertools import islice
 from pathlib import Path
+from pprint import pformat
 from typing import Any, List, Optional, Tuple, Type, Union
 
 import pandas as pd
@@ -134,7 +135,7 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
     ----------
     freq : str
         A pandas-compatible string describing the frequency of the time series. For example ``"D"`` for daily data,
-        ``"H"`` for hourly data, etc. This attribute is determined automatically based on the timestamps. For the full
+        ``"h"`` for hourly data, etc. This attribute is determined automatically based on the timestamps. For the full
         list of possible values, see `pandas documentation <https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases>`_.
     num_items : int
         Number of items (time series) in the data set.
@@ -476,27 +477,81 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
 
         self._static_features = value
 
+    def infer_frequency(self, num_items: Optional[int] = 100, raise_if_irregular: bool = False) -> str:
+        """Infer the time series frequency based on the timestamps of the observations.
+
+        Parameters
+        ----------
+        num_items : int or None, default = 100
+            Number of items (individual time series) randomly selected to infer the frequency. Lower values speed up
+            the method, but increase the chance that some items with invalid frequency are missed by subsampling.
+
+            If set to `None`, all items will be used for inferring the frequency.
+        raise_if_irregular : bool, default = False
+            If True, an exception will be raised if some items have an irregular frequency, or if different items have
+            different frequencies.
+
+        Returns
+        -------
+        freq : str
+            If all time series have a regular frequency, returns a pandas-compatible `frequency alias <https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases>`_.
+
+            If some items have an irregular frequency or if different items have different frequencies, returns string
+            `IRREG`.
+        """
+
+        df = pd.DataFrame(self)
+        if num_items is not None:
+            all_item_ids = self.item_ids
+            if len(all_item_ids) > num_items:
+                items_subset = all_item_ids.to_series().sample(n=num_items, random_state=123)
+                df = df.loc[items_subset]
+
+        candidate_freq = df.index.levels[1].freq
+        index_df = df.index.to_frame(index=False)
+
+        def get_freq(series: pd.Series) -> Optional[str]:
+            dt_index = pd.DatetimeIndex(series)
+            inferred_freq = dt_index.inferred_freq
+            # Fallback option: maybe original index has a `freq` attribute that pandas fails to infer (e.g., 'SME')
+            if inferred_freq is None and candidate_freq is not None:
+                try:
+                    # If this line does not raise an exception, then candidate_freq is a compatible frequency
+                    dt_index.freq = candidate_freq
+                except ValueError:
+                    inferred_freq = None
+                else:
+                    inferred_freq = candidate_freq
+            return inferred_freq
+
+        freq_for_each_item = index_df.groupby(ITEMID, sort=False).agg(get_freq)[TIMESTAMP]
+        freq = freq_for_each_item.iloc[0]
+        if len(set(freq_for_each_item)) > 1 or freq is None:
+            if raise_if_irregular:
+                items_with_irregular_freq = freq_for_each_item[pd.isnull(freq_for_each_item)]
+                if len(items_with_irregular_freq) > 0:
+                    raise ValueError(
+                        "Cannot infer frequency. Items with irregular frequency: "
+                        f"{pformat(items_with_irregular_freq.index.tolist())}"
+                    )
+                else:
+                    raise ValueError(
+                        "Cannot infer frequency. Multiple frequencies detected in the dataset: "
+                        f"{freq_for_each_item.unique().tolist()}"
+                    )
+            return IRREGULAR_TIME_INDEX_FREQSTR
+        else:
+            return pd.tseries.frequencies.to_offset(freq).freqstr
+
     @property
     def freq(self):
-        if self._cached_freq is not None and self._cached_freq == IRREGULAR_TIME_INDEX_FREQSTR:
+        if self._cached_freq is None:
+            self._cached_freq = self.infer_frequency()
+
+        if self._cached_freq == IRREGULAR_TIME_INDEX_FREQSTR:
             return None  # irregularly sampled time series
-        elif self._cached_freq:
+        else:
             return self._cached_freq
-
-        def get_freq(series):
-            return series.index.freq or series.index.inferred_freq
-
-        # check the frequencies of the first 100 items to see if frequencies are consistent and
-        # can be inferred
-        freq_for_each_series = [get_freq(self.loc[idx]) for idx in self.item_ids[:100]]
-        freq = freq_for_each_series[0]
-        if len(set(freq_for_each_series)) > 1 or freq is None:
-            self._cached_freq = IRREGULAR_TIME_INDEX_FREQSTR
-            return None
-
-        freq = freq.freqstr if isinstance(freq, pd._libs.tslibs.BaseOffset) else freq
-        self._cached_freq = freq
-        return freq
 
     @property
     def num_items(self):
@@ -759,17 +814,25 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
                 2019-02-07     4.0
 
         """
-        if self.freq is None:
-            raise ValueError(
-                "Please make sure that all time series have a regular index before calling `fill_missing_values`"
-                "(for example, using the `convert_frequency` method)."
+        # Convert to pd.DataFrame for faster processing
+        df = pd.DataFrame(self)
+
+        # Skip filling if there are no NaNs
+        if not df.isna().any(axis=None):
+            return self
+
+        if not self.index.is_monotonic_increasing:
+            logger.warning(
+                "Trying to fill missing values in an unsorted dataframe. "
+                "It is highly recommended to call `ts_df.sort_index()` before calling `ts_df.fill_missing_values()`"
             )
 
-        grouped_df = pd.DataFrame(self).groupby(level=ITEMID, sort=False, group_keys=False)
+        grouped_df = df.groupby(level=ITEMID, sort=False, group_keys=False)
         if method == "auto":
             filled_df = grouped_df.ffill()
-            # Fill missing values at the start of each time series with bfill
-            filled_df = filled_df.groupby(level=ITEMID, sort=False, group_keys=False).bfill()
+            # If necessary, fill missing values at the start of each time series with bfill
+            if filled_df.isna().any(axis=None):
+                filled_df = filled_df.groupby(level=ITEMID, sort=False, group_keys=False).bfill()
         elif method in ["ffill", "pad"]:
             filled_df = grouped_df.ffill()
         elif method in ["bfill", "backfill"]:
@@ -953,12 +1016,12 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
                 2021-06-30     6.0
                 2021-09-30     7.0
                 2021-12-31     8.0
-        >>> ts_df.convert_frequency("Y")
+        >>> ts_df.convert_frequency("YE")
                             target
         item_id timestamp
         0       2020-12-31     2.5
                 2021-12-31     6.5
-        >>> ts_df.convert_frequency("Y", agg_numeric="sum")
+        >>> ts_df.convert_frequency("YE", agg_numeric="sum")
                             target
         item_id timestamp
         0       2020-12-31    10.0

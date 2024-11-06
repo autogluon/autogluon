@@ -339,7 +339,12 @@ class DistillerLitModule(pl.LightningModule):
         label: torch.Tensor,
     ):
         if isinstance(
-            metric, (torchmetrics.classification.BinaryAUROC, torchmetrics.classification.BinaryAveragePrecision)
+            metric,
+            (
+                torchmetrics.classification.BinaryAUROC,
+                torchmetrics.classification.BinaryAveragePrecision,
+                torchmetrics.classification.BinaryF1Score,
+            ),
         ):
             prob = F.softmax(logits.float(), dim=1)
             metric.update(preds=prob[:, 1], target=label)  # only for binary classification
@@ -411,7 +416,7 @@ class DistillerLitModule(pl.LightningModule):
             custom_metric_func=self.custom_metric_func,
             logits=student_output[self.student_model.prefix][LOGITS],
             label=batch[self.student_model.label_key],
-        ),
+        )
         self.log(
             self.validation_metric_name,
             self.validation_metric,

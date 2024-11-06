@@ -253,7 +253,7 @@ class TabularNeuralNetTorchOnnxTransformer:
             self.input_names = [onnx_to_raw[oname] for oname in self.onnx_input_names]
 
         input_dict = {}
-        input_arr = X[self.input_names].to_numpy().astype(np.float32)
+        input_arr = X[self.input_names].astype(np.float32).to_numpy()
         input_size = input_arr.shape[0]
         inputs = []
         if input_size > self.batch_size:
@@ -321,13 +321,6 @@ class TabularNeuralNetTorchOnnxCompiler:
             OrdinalMergeRaresHandleUnknownEncoder,
         )
 
-        # BIG HACK!
-        # It is required to take raw_name instead of onnx_name for inputs.
-        # TODO: Remove this hack after upgrading skl2onnx to >1.13
-        # See https://github.com/onnx/sklearn-onnx/pull/938
-        if int(skl2onnx.__version__.split(".")[1]) <= 13:
-            skl2onnx.common.utils.get_column_index = skl2onnx_common_utils_get_column_index
-
         update_registered_converter(
             QuantileTransformer,
             "SklearnQuantileTransformer",
@@ -379,62 +372,3 @@ class TabularNeuralNetTorchOnnxCompiler:
 
         onnx_bytes = onnx.load(os.path.join(path, "model.onnx"))
         return TabularNeuralNetTorchOnnxTransformer(model=onnx_bytes)
-
-
-# It is required to take raw_name instead of onnx_name for inputs.
-# TODO: Remove this hack after upgrading skl2onnx to >1.13
-# See https://github.com/onnx/sklearn-onnx/pull/938
-def skl2onnx_common_utils_get_column_index(i, inputs):
-    """
-    Returns a tuples (variable index, column index in that variable).
-    The function has two different behaviours, one when *i* (column index)
-    is an integer, another one when *i* is a string (column name).
-    If *i* is a string, the function looks for input name with
-    this name and returns (index, 0).
-    If *i* is an integer, let's assume first we have two inputs
-    *I0 = FloatTensorType([None, 2])* and *I1 = FloatTensorType([None, 3])*,
-    in this case, here are the results:
-
-    ::
-
-        get_column_index(0, inputs) -> (0, 0)
-        get_column_index(1, inputs) -> (0, 1)
-        get_column_index(2, inputs) -> (1, 0)
-        get_column_index(3, inputs) -> (1, 1)
-        get_column_index(4, inputs) -> (1, 2)
-    """
-    from skl2onnx.common.data_types import TensorType
-
-    if isinstance(i, int):
-        if i == 0:
-            # Useful shortcut, skips the case when end is None
-            # (unknown dimension)
-            return 0, 0
-        vi = 0
-        pos = 0
-        end = inputs[0].type.shape[1] if isinstance(inputs[0].type, TensorType) else 1
-        if end is None:
-            raise RuntimeError("Cannot extract a specific column {0} when " "one input ('{1}') has unknown " "dimension.".format(i, inputs[0]))
-        while True:
-            if pos <= i < end:
-                return (vi, i - pos)
-            vi += 1
-            pos = end
-            if vi >= len(inputs):
-                raise RuntimeError("Input {} (i={}, end={}) is not available in\n{}".format(vi, i, end, pprint.pformat(inputs)))
-            rel_end = inputs[vi].type.shape[1] if isinstance(inputs[vi].type, TensorType) else 1
-            if rel_end is None:
-                raise RuntimeError("Cannot extract a specific column {0} when " "one input ('{1}') has unknown " "dimension.".format(i, inputs[vi]))
-            end += rel_end
-    else:
-        for ind, inp in enumerate(inputs):
-            if inp.raw_name == i:
-                return ind, 0
-        raise RuntimeError(
-            "Unable to find column name %r among names %r. "
-            "Make sure the input names specified with parameter "
-            "initial_types fits the column names specified in the "
-            "pipeline to convert. This may happen because a "
-            "ColumnTransformer follows a transformer without "
-            "any mapped converter in a pipeline." % (i, [n.raw_name for n in inputs])
-        )

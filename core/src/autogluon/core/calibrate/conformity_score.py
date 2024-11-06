@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 
 
 def compute_conformity_score(y_val_pred: np.ndarray, y_val: np.ndarray, quantile_levels: list):
@@ -26,6 +27,9 @@ def compute_conformity_score(y_val_pred: np.ndarray, y_val: np.ndarray, quantile
     y_val = y_val.reshape(-1)
     assert y_val_pred.shape[0] == num_samples
     assert y_val_pred.shape[1] == len(quantile_levels)
+
+    if isinstance(y_val_pred, pd.DataFrame):
+        y_val_pred = y_val_pred.to_numpy()
 
     conformalize_list = []
     for i, q in enumerate(quantile_levels):

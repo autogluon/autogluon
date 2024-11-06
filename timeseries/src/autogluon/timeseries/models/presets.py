@@ -10,11 +10,13 @@ from autogluon.timeseries.metrics import TimeSeriesScorer
 
 from . import (
     ADIDAModel,
+    ARIMAModel,
     AutoARIMAModel,
     AutoCESModel,
     AutoETSModel,
     AverageModel,
-    CrostonSBAModel,
+    ChronosModel,
+    CrostonModel,
     DeepARModel,
     DirectTabularModel,
     DLinearModel,
@@ -30,14 +32,12 @@ from . import (
     SimpleFeedForwardModel,
     TemporalFusionTransformerModel,
     ThetaModel,
+    TiDEModel,
     WaveNetModel,
     ZeroModel,
 )
 from .abstract import AbstractTimeSeriesModel
 from .multi_window.multi_window_model import MultiWindowBacktestingModel
-
-# TODO: Enable ARIMAModel after upgrading to StatsForecast >=1.5.0 - currently ARIMA model is broken
-
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +50,7 @@ MODEL_TYPES = dict(
     DLinear=DLinearModel,
     PatchTST=PatchTSTModel,
     TemporalFusionTransformer=TemporalFusionTransformerModel,
+    TiDE=TiDEModel,
     WaveNet=WaveNetModel,
     RecursiveTabular=RecursiveTabularModel,
     DirectTabular=DirectTabularModel,
@@ -65,9 +66,12 @@ MODEL_TYPES = dict(
     NPTS=NPTSModel,
     Theta=ThetaModel,
     ETS=ETSModel,
+    ARIMA=ARIMAModel,
     ADIDA=ADIDAModel,
-    CrostonSBA=CrostonSBAModel,
+    Croston=CrostonModel,
+    CrostonSBA=CrostonModel,  # Alias for backward compatibility
     IMAPA=IMAPAModel,
+    Chronos=ChronosModel,
 )
 
 DEFAULT_MODEL_NAMES = {v: k for k, v in MODEL_TYPES.items()}
@@ -77,20 +81,25 @@ DEFAULT_MODEL_PRIORITY = dict(
     Average=100,
     SeasonalAverage=100,
     Zero=100,
-    NPTS=90,
-    ETS=90,
-    CrostonSBA=90,
-    Theta=80,
-    DynamicOptimizedTheta=80,
-    AutoETS=80,
-    AutoARIMA=70,
-    RecursiveTabular=60,
-    DirectTabular=50,
+    RecursiveTabular=90,
+    DirectTabular=85,
+    # All local models are grouped together to make sure that joblib parallel pool is reused
+    NPTS=80,
+    ETS=80,
+    CrostonSBA=80,  # Alias for backward compatibility
+    Croston=80,
+    Theta=75,
+    DynamicOptimizedTheta=75,
+    AutoETS=70,
+    AutoARIMA=60,
+    Chronos=55,
+    # Models that can early stop are trained at the end
+    TemporalFusionTransformer=45,
     DeepAR=40,
-    TemporalFusionTransformer=30,
-    WaveNet=25,
-    PatchTST=20,
+    TiDE=30,
+    PatchTST=30,
     # Models below are not included in any presets
+    WaveNet=25,
     AutoCES=10,
     ARIMA=10,
     ADIDA=10,
@@ -125,9 +134,16 @@ def get_default_hps(key):
             "DirectTabular": {},
             "TemporalFusionTransformer": {},
         },
+        "light_inference": {
+            "SeasonalNaive": {},
+            "DirectTabular": {},
+            "RecursiveTabular": {},
+            "TemporalFusionTransformer": {},
+            "PatchTST": {},
+        },
         "default": {
             "SeasonalNaive": {},
-            "CrostonSBA": {},
+            "Croston": {},
             "AutoETS": {},
             "AutoARIMA": {},
             "NPTS": {},
@@ -140,6 +156,7 @@ def get_default_hps(key):
             "TemporalFusionTransformer": {},
             "PatchTST": {},
             "DeepAR": {},
+            "Chronos": {"model_path": "base"},
         },
     }
     return default_model_hps[key]
@@ -194,7 +211,7 @@ def get_preset_models(
     for model in model_priority_list:
         if isinstance(model, str):
             if model not in MODEL_TYPES:
-                raise ValueError(f"Model {model} is not supported yet.")
+                raise ValueError(f"Model {model} is not supported. Available models: {sorted(MODEL_TYPES)}")
             if model in excluded_models:
                 logger.info(
                     f"\tFound '{model}' model in `hyperparameters`, but '{model}' "

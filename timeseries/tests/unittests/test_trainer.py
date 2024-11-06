@@ -1,4 +1,5 @@
 """Unit tests for trainers"""
+
 import copy
 import shutil
 import sys
@@ -341,7 +342,6 @@ def test_when_trainer_fit_and_deleted_then_oof_predictions_can_be_loaded(temp_mo
         hyperparameters={
             "Naive": {},
             "ETS": {},
-            "AutoETS": {"n_jobs": 1},
             "DirectTabular": {"tabular_hyperparameters": {"GBM": {}}},
             "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1},
         },
@@ -400,9 +400,9 @@ def trained_and_refit_trainers():
             train_data=DUMMY_TS_DATAFRAME,
             hyperparameters={
                 "Naive": {},
-                "ETS": {"maxiter": 1},
+                "Theta": {},
                 "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1},
-                "DirectTabular": {"tabular_hyperparameters": {"GBM": {}}},
+                "DirectTabular": {},
                 "RecursiveTabular": {},
             },
         )
@@ -423,6 +423,14 @@ def test_when_refit_full_called_then_all_models_are_retrained(trained_and_refit_
     expected_refit_full_dict = {name: name + ag.constants.REFIT_FULL_SUFFIX for name in trainer.get_model_names()}
     assert dict_equal_primitive(refit_trainer.model_refit_map, expected_refit_full_dict)
     assert len(leaderboard_refit) == len(leaderboard_initial) + len(expected_refit_full_dict)
+
+
+def test_when_refit_full_called_multiple_times_then_no_new_models_are_trained(trained_and_refit_trainers):
+    _, refit_trainer = trained_and_refit_trainers
+    model_names_refit = refit_trainer.get_model_names()
+    refit_trainer.refit_full("all")
+    model_names_second_refit = refit_trainer.get_model_names()
+    assert set(model_names_refit) == set(model_names_second_refit)
 
 
 def test_when_refit_full_called_then_all_models_can_predict(trained_and_refit_trainers):
@@ -558,3 +566,69 @@ def test_given_cache_predictions_is_false_when_calling_get_model_pred_dict_then_
     assert not trainer._cached_predictions_path.exists()
     trainer.get_model_pred_dict(trainer.get_model_names(), data=DUMMY_TS_DATAFRAME)
     assert not trainer._cached_predictions_path.exists()
+
+
+@pytest.mark.parametrize("use_test_data", [True, False])
+def test_given_no_models_trained_during_fit_then_empty_leaderboard_returned(use_test_data, temp_model_path):
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path)
+    with mock.patch("autogluon.timeseries.models.local.naive.NaiveModel.fit") as naive_fit:
+        naive_fit.side_effect = RuntimeError()
+        trainer.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
+    assert len(trainer.get_model_names()) == 0
+
+    expected_columns = ["model", "score_val", "pred_time_val", "fit_time_marginal", "fit_order"]
+    if use_test_data:
+        expected_columns += ["score_test", "pred_time_test"]
+        test_data = DUMMY_TS_DATAFRAME
+    else:
+        test_data = None
+
+    leaderboard = trainer.leaderboard(data=test_data)
+    assert all(c in leaderboard.columns for c in expected_columns)
+    assert len(leaderboard) == 0
+
+
+@pytest.mark.parametrize("skip_model_selection", [True, False])
+def test_given_skip_model_selection_when_trainer_fits_then_val_score_is_not_computed(
+    temp_model_path, skip_model_selection
+):
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path, skip_model_selection=skip_model_selection)
+    trainer.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}})
+
+    model = trainer.load_model("Naive")
+    assert (model.val_score is None) == skip_model_selection
+
+
+@pytest.mark.parametrize("confidence_level", [0.55, 0.65, 0.95, 0.99])
+def test_when_add_ci_to_feature_importance_called_then_confidence_bands_correct(temp_model_path, confidence_level):
+    import scipy.stats as sst
+
+    trainer = AutoTimeSeriesTrainer(path=temp_model_path)
+    feature_importance = pd.DataFrame(
+        {
+            "importance": [10.0, 0.1, 0.2, 0.3, -0.5, np.nan, 0.2, 0.1, 55.0],
+            "stdev": [0.1, 0.5, 3.0, 1.0, 1.5, 0.1, np.nan, 0.1, 0.1],
+            "n": [3, 4, 5, 6, 2, 5, 5, np.nan, 1],
+        },
+        index=["a", "b", "c", "d", "e", "f", "g", "h", "i"],
+    )
+
+    feature_importance = trainer._add_ci_to_feature_importance(feature_importance, confidence_level)
+    lower_ci_name, upper_ci_name = [f"p{confidence_level*100:.0f}_{k}" for k in ["low", "high"]]
+    assert lower_ci_name in feature_importance.columns
+    assert upper_ci_name in feature_importance.columns
+
+    alpha = 1 - confidence_level
+
+    for i, r in feature_importance.iterrows():
+        if np.isnan(r["stdev"]) or np.isnan(r["n"]) or np.isnan(r["importance"]) or r["n"] == 1:
+            assert np.isnan(r[lower_ci_name])
+            assert np.isnan(r[upper_ci_name])
+        else:
+            t_critical = sst.t.ppf(1 - alpha / 2, df=r["n"] - 1)
+
+            expected_lower = r["importance"] - t_critical * r["stdev"] / np.sqrt(r["n"])
+            expected_upper = r["importance"] + t_critical * r["stdev"] / np.sqrt(r["n"])
+
+            assert np.isclose(r[lower_ci_name], expected_lower)
+            assert np.isclose(r[upper_ci_name], expected_upper)

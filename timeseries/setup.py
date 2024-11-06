@@ -28,13 +28,15 @@ install_requires = [
     "torch",  # version range defined in `core/_setup_utils.py`
     "lightning",  # version range defined in `core/_setup_utils.py`
     "pytorch_lightning",  # version range defined in `core/_setup_utils.py`
-    "statsmodels>=0.13.0,<0.15",
-    "gluonts>=0.14.0,<0.15",
+    "transformers[sentencepiece]",  # version range defined in `core/_setup_utils.py`
+    "accelerate",  # version range defined in `core/_setup_utils.py`
+    "gluonts==0.15.1",
     "networkx",  # version range defined in `core/_setup_utils.py`
-    # TODO: update statsforecast to v1.5.0 - resolve antlr4-python3-runtime dependency clash with multimodal
-    "statsforecast>=1.4.0,<1.5",
-    "mlforecast>=0.10.0,<0.10.1",
-    "utilsforecast>=0.0.10,<0.0.11",
+    "statsforecast>=1.7.0,<1.8",
+    "mlforecast==0.13.4",
+    "utilsforecast>=0.2.3,<0.2.5",  # to prevent breaking changes that propagate through mlforecast's dependency
+    "coreforecast==0.0.12",  # to prevent breaking changes that propagate through mlforecast's dependency
+    "fugue>=0.9.0",  # prevent dependency clash with omegaconf
     "tqdm",  # version range defined in `core/_setup_utils.py`
     "orjson~=3.9",  # use faster JSON implementation in GluonTS
     # TODO v1.1: use lightning[pytorch-extra] instead of explicitly installing tensorboard
@@ -50,12 +52,18 @@ extras_require = {
         "ruff>=0.0.285",
         "flaky>=3.7,<4",
         "pytest-timeout>=2.1,<3",
-        "isort>=5.10",
-        "black~=23.0",
+    ],
+    "chronos-openvino": [  # for faster CPU inference in pretrained models with OpenVINO
+        "optimum-intel[openvino,nncf]>=1.15,<1.17",
+        "optimum[openvino,nncf]>=1.17,<1.19",
+    ],
+    "chronos-onnx": [  # for faster CPU inference in pretrained models with ONNX
+        "optimum[onnxruntime]>=1.17,<1.20",
     ],
 }
 
-extras_require["all"] = []
+# TODO: add openvino back to "all" after dependency versions are relaxed
+extras_require["all"] = list(set.union(*(set(extras_require[extra]) for extra in ["chronos-onnx"])))
 
 install_requires = ag.get_dependency_version_ranges(install_requires)
 

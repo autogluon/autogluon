@@ -70,10 +70,14 @@ def load(
         if delimiter is None:
             if path.endswith(".tsv"):
                 delimiter = "\t"
-                logger.debug(f"File delimiter for {path} inferred as '\\t' (tab). If this is incorrect, please manually load the data as a pandas DataFrame.")
+                logger.debug(
+                    f"File delimiter for {path} inferred as '\\t' (tab). If this is incorrect, please manually load the data as a pandas DataFrame."
+                )
             else:
                 delimiter = ","
-                logger.debug(f"File delimiter for {path} inferred as ',' (comma). If this is incorrect, please manually load the data as a pandas DataFrame.")
+                logger.debug(
+                    f"File delimiter for {path} inferred as ',' (comma). If this is incorrect, please manually load the data as a pandas DataFrame."
+                )
 
     if format == "pointer":
         content_path = load_pointer.get_pointer_content(path)
@@ -184,7 +188,22 @@ def load(
 
 
 def _load_multipart_child(chunk):
-    path, delimiter, encoding, columns_to_keep, dtype, header, names, format, nrows, skiprows, usecols, low_memory, converters, filters = chunk
+    (
+        path,
+        delimiter,
+        encoding,
+        columns_to_keep,
+        dtype,
+        header,
+        names,
+        format,
+        nrows,
+        skiprows,
+        usecols,
+        low_memory,
+        converters,
+        filters,
+    ) = chunk
     df = load(
         path=path,
         delimiter=delimiter,
@@ -231,11 +250,30 @@ def _load_multipart(
     logger.log(15, "Load multipart running pool with " + str(workers) + " workers...")
 
     full_chunks = [
-        [path, delimiter, encoding, columns_to_keep, dtype, header, names, format, nrows, skiprows, usecols, low_memory, converters, filters] for path in paths
+        [
+            path,
+            delimiter,
+            encoding,
+            columns_to_keep,
+            dtype,
+            header,
+            names,
+            format,
+            nrows,
+            skiprows,
+            usecols,
+            low_memory,
+            converters,
+            filters,
+        ]
+        for path in paths
     ]
 
     df_list = multiprocessing_utils.execute_multiprocessing(
-        workers_count=workers, transformer=_load_multipart_child, chunks=full_chunks, multiprocessing_method=multiprocessing_method
+        workers_count=workers,
+        transformer=_load_multipart_child,
+        chunks=full_chunks,
+        multiprocessing_method=multiprocessing_method,
     )
 
     df_combined = pd.concat(df_list, axis=0, ignore_index=True)
@@ -248,7 +286,14 @@ def _load_multipart(
 
 
 def _load_multipart_s3(
-    bucket, prefix, columns_to_keep=None, dtype=None, sample_count=None, filters=None, worker_count=None, multiprocessing_method="forkserver"
+    bucket,
+    prefix,
+    columns_to_keep=None,
+    dtype=None,
+    sample_count=None,
+    filters=None,
+    worker_count=None,
+    multiprocessing_method="forkserver",
 ):
     if prefix[-1] == "/":
         prefix = prefix[:-1]
@@ -257,10 +302,22 @@ def _load_multipart_s3(
     files = list_bucket_prefix_suffix_contains_s3(bucket=bucket, prefix=prefix_multipart, exclude_contains=["/"])
     paths_full = [s3_utils.s3_bucket_prefix_to_path(bucket=bucket, prefix=file, version="s3") for file in files]
     if sample_count is not None:
-        logger.log(15, "Load multipart s3 taking sample of " + str(sample_count) + " out of " + str(len(paths_full)) + " files to load")
+        logger.log(
+            15,
+            "Load multipart s3 taking sample of "
+            + str(sample_count)
+            + " out of "
+            + str(len(paths_full))
+            + " files to load",
+        )
         paths_full = paths_full[:sample_count]
 
     df = load(
-        path=paths_full, columns_to_keep=columns_to_keep, dtype=dtype, filters=filters, worker_count=worker_count, multiprocessing_method=multiprocessing_method
+        path=paths_full,
+        columns_to_keep=columns_to_keep,
+        dtype=dtype,
+        filters=filters,
+        worker_count=worker_count,
+        multiprocessing_method=multiprocessing_method,
     )
     return df

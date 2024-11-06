@@ -1,4 +1,4 @@
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -76,6 +76,7 @@ class TimeSeriesScorer:
         data_past = data.slice_by_timestep(None, -prediction_length)
         data_future = data.slice_by_timestep(-prediction_length, None)
 
+        assert not predictions.isna().any().any(), "Predictions contain NaN values."
         assert (predictions.num_timesteps_per_item() == prediction_length).all()
         assert data_future.index.equals(predictions.index), "Prediction and data indices do not match."
 
@@ -114,10 +115,10 @@ class TimeSeriesScorer:
         ----------
         data_future : TimeSeriesDataFrame
             Actual values of the time series during the forecast horizon (``prediction_length`` values for each time
-            series in the dataset). This data frame is guaranteed to have the same index as ``predictions``.
+            series in the dataset). Must have the same index as ``predictions``.
         predictions : TimeSeriesDataFrame
             Data frame with predictions for the forecast horizon. Contain columns "mean" (point forecast) and the
-            columns corresponding to each of the quantile levels.
+            columns corresponding to each of the quantile levels. Must have the same index as ``data_future``.
         target : str, default = "target"
             Name of the column in ``data_future`` that contains the target time series.
 
@@ -158,9 +159,9 @@ class TimeSeriesScorer:
         return self.optimum - self.score(*args, **kwargs)
 
     @staticmethod
-    def _safemean(series: pd.Series) -> float:
-        """Compute mean of an pd.Series, ignoring inf, -inf and nan values."""
-        return np.nanmean(series.replace([np.inf, -np.inf], np.nan).values)
+    def _safemean(array: Union[np.ndarray, pd.Series]) -> float:
+        """Compute mean of a numpy array-like object, ignoring inf, -inf and nan values."""
+        return np.mean(array[np.isfinite(array)])
 
     @staticmethod
     def _get_point_forecast_score_inputs(

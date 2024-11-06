@@ -1,4 +1,4 @@
-""" Metrics for classification with soft (probabilistic) labels """
+"""Metrics for classification with soft (probabilistic) labels"""
 
 import logging
 

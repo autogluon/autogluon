@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
+from autogluon.common.space import Space
 from autogluon.common.utils.distribute_utils import DistributedContext
 from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.log_utils import DuplicateFilter
@@ -25,17 +26,7 @@ from autogluon.common.utils.utils import setup_outputdir
 
 from ... import metrics
 from ...calibrate.temperature_scaling import apply_temperature_scaling
-from ...constants import (
-    AG_ARG_PREFIX,
-    AG_ARGS_FIT,
-    BINARY,
-    MULTICLASS,
-    OBJECTIVES_TO_NORMALIZE,
-    QUANTILE,
-    REFIT_FULL_SUFFIX,
-    REGRESSION,
-    SOFTCLASS,
-)
+from ...constants import AG_ARG_PREFIX, AG_ARGS_FIT, BINARY, MULTICLASS, OBJECTIVES_TO_NORMALIZE, QUANTILE, REFIT_FULL_SUFFIX, REGRESSION, SOFTCLASS
 from ...data.label_cleaner import LabelCleaner
 from ...hpo.constants import CUSTOM_BACKEND, RAY_BACKEND
 from ...hpo.exceptions import EmptySearchSpace
@@ -50,7 +41,7 @@ from ...utils import (
     normalize_pred_probas,
 )
 from ...utils.exceptions import NotEnoughMemoryError, NoValidFeatures, TimeLimitExceeded
-from ...utils.loaders import load_pkl
+from ...utils.loaders import load_json, load_pkl
 from ...utils.savers import save_json, save_pkl
 from ...utils.time import sample_df_for_time_func, time_func
 from ._tags import _DEFAULT_CLASS_TAGS, _DEFAULT_TAGS
@@ -84,9 +75,9 @@ class AbstractModel:
         If `eval_metric = None`, it is automatically chosen based on `problem_type`.
         Defaults to 'accuracy' for binary and multiclass classification and 'root_mean_squared_error' for regression.
         Otherwise, options for classification:
-            ['accuracy', 'balanced_accuracy', 'f1', 'f1_macro', 'f1_micro', 'f1_weighted',
-            'roc_auc', 'roc_auc_ovo_macro', 'average_precision', 'precision', 'precision_macro', 'precision_micro',
-            'precision_weighted', 'recall', 'recall_macro', 'recall_micro', 'recall_weighted', 'log_loss', 'pac_score']
+            ['accuracy', 'balanced_accuracy', 'f1', 'f1_macro', 'f1_micro', 'f1_weighted', 'roc_auc', 'roc_auc_ovo', 'roc_auc_ovr',
+            'average_precision', 'precision', 'precision_macro', 'precision_micro', 'precision_weighted', 'recall',
+            'recall_macro', 'recall_micro', 'recall_weighted', 'log_loss', 'pac_score', 'quadratic_kappa']
         Options for regression:
             ['root_mean_squared_error', 'mean_squared_error', 'mean_absolute_error', 'median_absolute_error', 'r2']
         Options for quantile regression:
@@ -102,6 +93,7 @@ class AbstractModel:
     model_file_name = "model.pkl"
     model_info_name = "info.pkl"
     model_info_json_name = "info.json"
+    learning_curve_file_name = "curves.json"
 
     def __init__(
         self,
@@ -139,7 +131,7 @@ class AbstractModel:
             self.eval_metric = metrics.get_metric(eval_metric, self.problem_type, "eval_metric")  # Note: we require higher values = better performance
         else:
             self.eval_metric = None
-        self.stopping_metric = None
+        self.stopping_metric: Scorer = None
         self.normalize_pred_probas = None
 
         self.features = None  # External features, do not use internally
@@ -150,6 +142,7 @@ class AbstractModel:
 
         self.fit_time = None  # Time taken to fit in seconds (Training data)
         self.predict_time = None  # Time taken to predict in seconds (Validation data)
+        self._predict_n_size = None  # Batch size used to calculate predict_time
         self.predict_1_time = None  # Time taken to predict 1 row of data in seconds (with batch size `predict_1_batch_size` in params_aux)
         self.compile_time = None  # Time taken to compile the model in seconds
         self.val_score = None  # Score with eval_metric (Validation data)
@@ -163,6 +156,7 @@ class AbstractModel:
         self._is_initialized = False
         self._is_fit_metadata_registered = False
         self._fit_metadata = dict()
+        self.saved_learning_curves = False
 
         self._compiler = None
 
@@ -247,6 +241,7 @@ class AbstractModel:
             self.params.update(hyperparameters)
             self.nondefault_params = list(hyperparameters.keys())[:]  # These are hyperparameters that user has specified.
         self.params_trained = dict()
+        self._validate_params()
 
     def _init_params_aux(self):
         """
@@ -258,6 +253,24 @@ class AbstractModel:
         self._set_default_auxiliary_params()
         if hyperparameters_aux is not None:
             self.params_aux.update(hyperparameters_aux)
+        self._validate_params_aux()
+
+    # TODO: Consider validating before fit call to avoid executing a ray task when it will immediately fail this check in distributed mode
+    # TODO: Consider avoiding logging `Fitting model: xyz...` if this fails for particular error types.
+    def _validate_params(self):
+        """
+        Verify correctness of self.params
+        """
+        pass
+
+    def _validate_params_aux(self):
+        """
+        Verify correctness of self.params_aux
+        """
+        if "num_cpus" in self.params_aux:
+            num_cpus = self.params_aux["num_cpus"]
+            if num_cpus is not None and not isinstance(num_cpus, int):
+                raise TypeError(f"`num_cpus` must be an int or None. Found: {type(num_cpus)} | Value: {num_cpus}")
 
     @property
     def path_suffix(self) -> str:
@@ -442,9 +455,10 @@ class AbstractModel:
             self.features = list(X.columns)
         # TODO: Consider changing how this works or where it is done
         if feature_metadata is None:
-            feature_metadata = FeatureMetadata.from_df(X)
+            feature_metadata = self._infer_feature_metadata(X=X)
         else:
             feature_metadata = copy.deepcopy(feature_metadata)
+        feature_metadata = self._update_feature_metadata(X=X, feature_metadata=feature_metadata)
         get_features_kwargs = self.params_aux.get("get_features_kwargs", None)
         if get_features_kwargs is not None:
             valid_features = feature_metadata.get_features(**get_features_kwargs)
@@ -464,13 +478,15 @@ class AbstractModel:
             valid_features_extra = feature_metadata.get_features(**get_features_kwargs_extra)
             valid_features = [feature for feature in valid_features if feature in valid_features_extra]
         dropped_features = [feature for feature in self.features if feature not in valid_features]
-        logger.log(10, f"\tDropped {len(dropped_features)} of {len(self.features)} features.")
+        if dropped_features:
+            logger.log(10, f"\tDropped {len(dropped_features)} of {len(self.features)} features.")
         self.features = [feature for feature in self.features if feature in valid_features]
         self.feature_metadata = feature_metadata.keep_features(self.features)
         error_if_no_features = self.params_aux.get("error_if_no_features", True)
         if error_if_no_features and not self.features:
             raise NoValidFeatures
         # TODO: If unique_counts == 2 (including NaN), then treat as boolean
+        #  FIXME: v1.3: Need to do this on a per-fold basis
         if self.params_aux.get("drop_unique", True):
             # TODO: Could this be optimized to be faster? This might be a bit slow for large data.
             unique_counts = X[self.features].nunique(axis=0, dropna=False)
@@ -491,6 +507,16 @@ class AbstractModel:
             self._is_features_in_same_as_ex = True
         if error_if_no_features and not self._features_internal:
             raise NoValidFeatures
+
+    def _update_feature_metadata(self, X: pd.DataFrame, feature_metadata: FeatureMetadata) -> FeatureMetadata:
+        """
+        [Advanced] Method that performs updates to feature_metadata during initialization.
+        Primarily present for use in stacker models.
+        """
+        return feature_metadata
+
+    def _infer_feature_metadata(self, X: pd.DataFrame) -> FeatureMetadata:
+        return FeatureMetadata.from_df(X)
 
     def _preprocess_fit_args(self, **kwargs) -> dict:
         sample_weight = kwargs.get("sample_weight", None)
@@ -550,10 +576,10 @@ class AbstractModel:
 
         self._init_misc(X=X, y=y, feature_metadata=feature_metadata, num_classes=num_classes, **kwargs)
 
+        self._init_params()
+
         if X is not None:
             self._preprocess_set_features(X=X, feature_metadata=feature_metadata)
-
-        self._init_params()
 
     def _init_misc(self, **kwargs):
         """Initialize parameters that depend on self.params_aux being initialized"""
@@ -567,7 +593,6 @@ class AbstractModel:
 
         self.stopping_metric = self.params_aux.get("stopping_metric", self._get_default_stopping_metric())
         self.stopping_metric = metrics.get_metric(self.stopping_metric, self.problem_type, "stopping_metric")
-
         self.quantile_levels = self.params_aux.get("quantile_levels", None)
 
         if self.eval_metric.name in OBJECTIVES_TO_NORMALIZE:
@@ -584,6 +609,10 @@ class AbstractModel:
 
         # retrieve model level requirement when self is bagged model
         user_specified_model_level_resource = self._get_child_aux_val(key=resource_type, default=None)
+        if user_specified_model_level_resource is not None and not isinstance(user_specified_model_level_resource, (int, float)):
+            raise TypeError(
+                f"{resource_type} must be int or float. Found: {type(user_specified_model_level_resource)} | Value: {user_specified_model_level_resource}"
+            )
         if user_specified_model_level_resource is not None:
             assert user_specified_model_level_resource <= system_resource, f"Specified {resource_type} per model base is more than the total: {system_resource}"
         user_specified_lower_level_resource = user_specified_ensemble_resource
@@ -710,6 +739,9 @@ class AbstractModel:
             num_gpus >= minimum_model_num_gpus
         ), f"Specified num_gpus={num_gpus} per {self.__class__.__name__} is less than minimum num_gpus={minimum_model_num_gpus}"
 
+        if not isinstance(num_cpus, int):
+            raise TypeError(f"`num_cpus` must be an int. Found: {type(num_cpus)} | Value: {num_cpus}")
+
         kwargs["num_cpus"] = num_cpus
         kwargs["num_gpus"] = num_gpus
         if not silent:
@@ -765,8 +797,8 @@ class AbstractModel:
             self._fit_metadata = self._compute_fit_metadata(**kwargs)
             self._is_fit_metadata_registered = True
 
-    def _compute_fit_metadata(self, X_val: pd.DataFrame = None, X_unlabeled: pd.DataFrame = None, **kwargs) -> dict:
-        fit_metadata = dict(val_in_fit=X_val is not None, unlabeled_in_fit=X_unlabeled is not None)
+    def _compute_fit_metadata(self, X_val: pd.DataFrame = None, X_unlabeled: pd.DataFrame = None, num_cpus: int = None, num_gpus: int = None, **kwargs) -> dict:
+        fit_metadata = dict(val_in_fit=X_val is not None, unlabeled_in_fit=X_unlabeled is not None, num_cpus=num_cpus, num_gpus=num_gpus)
         return fit_metadata
 
     def get_fit_metadata(self) -> dict:
@@ -805,6 +837,12 @@ class AbstractModel:
             If None, early stopping via validation score will be disabled.
         y_val : Series, default = None
             The validation data ground truth labels.
+            If None, early stopping via validation score will be disabled.
+        X_test : DataFrame, default = None
+            The test data features. Note: Not used for training, but for tracking test performance.
+            If None, early stopping via validation score will be disabled.
+        y_test : Series, default = None
+            The test data ground truth labels. Note: Not used for training, but for tracking test performance.
             If None, early stopping via validation score will be disabled.
         X_unlabeled : DataFrame, default = None
             Unlabeled data features.
@@ -867,6 +905,16 @@ class AbstractModel:
         -------
         Returns self
         """
+        compiler_configs = self.params_aux.get("compile", None)
+        if compiler_configs is not None:
+            compile_model = True
+            if isinstance(compiler_configs, bool):
+                if compiler_configs:
+                    compiler_configs = None
+                else:
+                    compile_model = False
+            if compile_model:
+                self.compile(compiler_configs=compiler_configs)
         predict_1_batch_size = self.params_aux.get("predict_1_batch_size", None)
         if self.predict_1_time is None and predict_1_batch_size is not None and "X" in kwargs and kwargs["X"] is not None:
             X_1 = sample_df_for_time_func(df=kwargs["X"], sample_size=predict_1_batch_size)
@@ -930,31 +978,57 @@ class AbstractModel:
     def predict(self, X, **kwargs) -> np.ndarray:
         """
         Returns class predictions of X.
-        For binary and multiclass problems, this returns the predicted class labels as a Series.
-        For regression problems, this returns the predicted values as a Series.
+        For binary and multiclass problems, this returns the predicted class labels as a 1d numpy array.
+        For regression problems, this returns the predicted values as a 1d numpy array.
         """
         y_pred_proba = self.predict_proba(X, **kwargs)
         y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
         return y_pred
 
-    def predict_proba(self, X, normalize=None, **kwargs) -> np.ndarray:
+    def predict_proba(self, X, *, normalize: bool | None = None, record_time: bool = False, **kwargs) -> np.ndarray:
         """
         Returns class prediction probabilities of X.
-        For binary problems, this returns the positive class label probability as a Series.
-        For multiclass problems, this returns the class label probabilities of each class as a DataFrame.
-        For regression problems, this returns the predicted values as a Series.
+        For binary problems, this returns the positive class label probability as a 1d numpy array.
+        For multiclass problems, this returns the class label probabilities of each class as a 2d numpy array.
+        For regression problems, this returns the predicted values as a 1d numpy array.
+
+        Parameters
+        ----------
+        X
+            The data used for prediction.
+        normalize: bool | None, default = None
+            Whether to normalize the predictions prior to returning.
+            If None, will default to `self.normalize_pred_probas`.
+        record_time: bool, default = False
+            If True, will record the time taken for prediction in `self.predict_time` and the number of rows of X in `self.predict_n_size`.
+        kwargs
+            Keyword arguments to pass into `self._predict_proba`.
+
+        Returns
+        -------
+        y_pred_proba : np.ndarray
+            The prediction probabilities
         """
+        time_start = time.time() if record_time else None
+
+        y_pred_proba = self._predict_proba_internal(X=X, normalize=normalize, **kwargs)
+
+        if self.params_aux.get("temperature_scalar", None) is not None:
+            y_pred_proba = self._apply_temperature_scaling(y_pred_proba)
+        elif self.conformalize is not None:
+            y_pred_proba = self._apply_conformalization(y_pred_proba)
+        if record_time:
+            self.predict_time = time.time() - time_start
+            self.record_predict_info(X=X)
+        return y_pred_proba
+
+    def _predict_proba_internal(self, X, *, normalize: bool | None = None, **kwargs):
         if normalize is None:
             normalize = self.normalize_pred_probas
         y_pred_proba = self._predict_proba(X=X, **kwargs)
         if normalize:
             y_pred_proba = normalize_pred_probas(y_pred_proba, self.problem_type)
         y_pred_proba = y_pred_proba.astype(np.float32)
-
-        if self.params_aux.get("temperature_scalar", None) is not None:
-            y_pred_proba = self._apply_temperature_scaling(y_pred_proba)
-        elif self.conformalize is not None:
-            y_pred_proba = self._apply_conformalization(y_pred_proba)
         return y_pred_proba
 
     def predict_from_proba(self, y_pred_proba: np.ndarray) -> np.ndarray:
@@ -1015,7 +1089,7 @@ class AbstractModel:
         else:  # Unknown problem type
             raise AssertionError(f'Unknown y_pred_proba format for `problem_type="{self.problem_type}"`.')
 
-    def score(self, X, y, metric=None, sample_weight=None, **kwargs) -> np.ndarray:
+    def score(self, X, y, metric=None, sample_weight=None, **kwargs) -> float:
         if metric is None:
             metric = self.eval_metric
 
@@ -1025,7 +1099,7 @@ class AbstractModel:
             y_pred = self.predict_proba(X=X, **kwargs)
         return compute_weighted_metric(y, y_pred, metric, sample_weight, quantile_levels=self.quantile_levels)
 
-    def score_with_y_pred_proba(self, y, y_pred_proba: np.ndarray, metric=None, sample_weight=None) -> np.ndarray:
+    def score_with_y_pred_proba(self, y, y_pred_proba: np.ndarray, metric=None, sample_weight=None) -> float:
         if metric is None:
             metric = self.eval_metric
         if metric.needs_pred:
@@ -1100,6 +1174,142 @@ class AbstractModel:
             if model._compiler is not None and not model._compiler.save_in_pkl:
                 model.model = model._compiler.load(path=path)
         return model
+
+    def save_learning_curves(self, metrics: str | List[str], curves: dict[dict[str : List[float]]], path: str = None) -> str:
+        """
+        Saves learning curves to disk.
+
+        Outputted Curve Format:
+            out = [
+                metrics,
+                [
+                    [ # log_loss
+                        [0.693147, 0.690162, ...], # train
+                        [0.693147, 0.690162, ...], # val
+                        [0.693147, 0.690162, ...], # test
+                    ],
+                    [ # accuracy
+                        [0.693147, 0.690162, ...], # train
+                        [0.693147, 0.690162, ...], # val
+                        [0.693147, 0.690162, ...], # test
+                    ],
+                    [ # f1
+                        [0.693147, 0.690162, ...], # train
+                        [0.693147, 0.690162, ...], # val
+                        [0.693147, 0.690162, ...], # test
+                    ],
+                ]
+            ]
+
+        Parameters
+        ----------
+        metrics : str or list(str)
+            List of all evaluation metrics computed at each iteration of the curve
+        curves : dict[dict[str : list[float]]]
+            Dictionary of evaluation sets and their learning curve dictionaries.
+            Each learning curve dictionary contains evaluation metrics computed at each iteration.
+            e.g.
+                curves = {
+                        "train": {
+                            'logloss': [0.693147, 0.690162, ...],
+                            'accuracy': [0.500000, 0.400000, ...],
+                            'f1': [0.693147, 0.690162, ...]
+                        },
+                        "val": {...},
+                        "test": {...},
+                    }
+
+        path : str, default None
+            Path where the learning curves are saved, minus the file name.
+            This should generally be a directory path ending with a '/' character (or appropriate path separator value depending on OS).
+            If None, self.path is used.
+            The final curve file is typically saved to os.path.join(path, curves.json).
+
+        Returns
+        -------
+        path : str
+            Path to the saved curves, minus the file name.
+        """
+        if not self._get_class_tags().get("supports_learning_curves", False):
+            raise AssertionError(f"Learning Curves are not supported for model: {self.name}")
+
+        if path is None:
+            path = self.path
+        if not isinstance(metrics, list):
+            metrics = [metrics]
+        if len(metrics) == 0:
+            raise ValueError("At least one metric must be specified to save generated learning curves.")
+
+        os.makedirs(path, exist_ok=True)
+        out = self._make_learning_curves(metrics=metrics, curves=curves)
+        file_path = os.path.join(path, self.learning_curve_file_name)
+        save_json.save(file_path, out)
+        self.saved_learning_curves = True
+        return file_path
+
+    def _make_learning_curves(self, metrics: str | List[str], curves: dict[dict[str : List[float]]]) -> List[List[str], List[str], List[List[float]]]:
+        """
+        Parameters
+        ----------
+        metrics : str or list(str)
+            List of all evaluation metrics computed at each iteration of the curve
+        curves : dict[dict[str : list[float]]]
+            Dictionary of evaluation sets and their learning curve dictionaries.
+            Each learning curve dictionary contains evaluation metrics computed at each iteration.
+            See Abstract Model's save_learning_curves method for a sample curves input.
+
+        Returns
+        -------
+        List[List[str], List[str], List[List[float]]]: The generated learning curve artifact.
+            if eval set names includes: train, val, or test
+            these sets will be placed first in the above order.
+        """
+
+        # ensure main eval sets first: train, val, test
+        items = []
+        order = ["train", "val", "test"]
+        for eval_set in order:
+            if eval_set in curves:
+                items.append((eval_set, curves[eval_set]))
+                del curves[eval_set]
+
+        items.extend(curves.items())
+        eval_sets, curves = list(zip(*items))
+
+        data = []
+        for metric in metrics:
+            data.append([c[metric] for c in curves])
+
+        return [eval_sets, metrics, data]
+
+    @classmethod
+    def load_learning_curves(cls, path: str) -> List:
+        """
+        Loads the learning_curve data from disk to memory.
+
+        Parameters
+        ----------
+        path : str
+            Path to the saved model, minus the file name.
+            This should generally be a directory path ending with a '/' character (or appropriate path separator value depending on OS).
+            The model file is typically located in os.path.join(path, cls.model_file_name).
+
+        Returns
+        -------
+        learning_curves : List
+            Loaded learning curve data.
+        """
+        if not cls._get_class_tags().get("supports_learning_curves", False):
+            raise AssertionError("Attempted to load learning curves from model without learning curve support")
+
+        file = os.path.join(path, cls.learning_curve_file_name)
+
+        if not os.path.exists(file):
+            raise FileNotFoundError(
+                f"Could not find learning curve file at {file}" + "\nDid you call predictor.fit() with an appropriate learning_curves parameter?"
+            )
+
+        return load_json.load(file)
 
     # TODO: v1.0: Add docs
     def compute_feature_importance(
@@ -1529,6 +1739,10 @@ class AbstractModel:
         if self.estimate_memory_usage is not None:
             model_estimate_memory_usage = self.estimate_memory_usage(X=X, **kwargs)
         minimum_resources = self.get_minimum_resources(is_gpu_available=(hpo_executor.resources.get("num_gpus", 0) > 0))
+        # This explicitly tells ray.Tune to not change the working directory
+        # to the trial directory, giving access to paths relative to
+        # the original working directory.
+        os.environ["RAY_CHDIR_TO_TRIAL_DIR"] = "0"
         hpo_executor.execute(
             model_trial=model_trial,
             train_fn_kwargs=train_fn_kwargs,
@@ -1537,7 +1751,6 @@ class AbstractModel:
             minimum_gpu_per_trial=minimum_resources.get("num_gpus", 0),
             model_estimate_memory_usage=model_estimate_memory_usage,
             adapter_type="tabular",
-            tune_config_kwargs={"chdir_to_trial_dir": False},
         )
 
         hpo_results = hpo_executor.get_hpo_results(
@@ -1840,7 +2053,7 @@ class AbstractModel:
             "hyperparameters": self.params,
             "hyperparameters_fit": self.params_trained,  # TODO: Explain in docs that this is for hyperparameters that differ in final model from original hyperparameters, such as epochs (from early stopping)
             "hyperparameters_nondefault": self.nondefault_params,
-            AG_ARGS_FIT: self.params_aux,
+            AG_ARGS_FIT: self.get_params_aux_info(),
             "num_features": len(self.features) if self.features else None,
             "features": self.features,
             "feature_metadata": self.feature_metadata,
@@ -1851,8 +2064,26 @@ class AbstractModel:
             "is_fit": self.is_fit(),
             "is_valid": self.is_valid(),
             "can_infer": self.can_infer(),
+            "has_learning_curves": self.saved_learning_curves,
         }
+        if self._is_fit_metadata_registered:
+            info.update(self._fit_metadata)
         return info
+
+    def get_params_aux_info(self) -> dict:
+        """
+        Converts learning curve scorer objects into their name strings.
+
+        Returns:
+        --------
+        params_aux dictionary with changed curve_metrics field, if applicable.
+        """
+        if self.params_aux.get("curve_metrics", None) is not None:
+            params_aux = self.params_aux.copy()
+            params_aux["curve_metrics"] = [metric.name for metric in params_aux["curve_metrics"]]
+            return params_aux
+
+        return self.params_aux
 
     @classmethod
     def load_info(cls, path: str, load_model_if_required: bool = True) -> dict:
@@ -1873,6 +2104,34 @@ class AbstractModel:
         json_path = os.path.join(self.path, self.model_info_json_name)
         save_json.save(path=json_path, obj=info)
         return info
+
+    @property
+    def predict_n_size(self) -> int | None:
+        """
+        The number of rows in the data used when calculating `self.predict_time`.
+        """
+        return self._predict_n_size
+
+    @property
+    def predict_n_time_per_row(self) -> float | None:
+        """
+        The time in seconds required to predict 1 row of data given a batch size of `self.predict_n_size`.
+        Returns None if either `self.predict_time` or `self.predict_n_size` are None.
+        """
+        if self.predict_time is None or self.predict_n_size is None:
+            return None
+        return self.predict_time / self.predict_n_size
+
+    def record_predict_info(self, X: pd.DataFrame):
+        """
+        Records the necessary information to compute `self.predict_n_time_per_row`.
+
+        Parameters
+        ----------
+        X: pd.DataFrame
+            The data used to predict on when calculating `self.predict_time`.
+        """
+        self._predict_n_size = len(X)
 
     def _get_maximum_resources(self) -> Dict[str, Union[int, float]]:
         """
@@ -1945,9 +2204,27 @@ class AbstractModel:
         else:
             return dict()
 
-    def _get_model_params(self) -> dict:
-        """Gets params that are passed to the inner model."""
-        return self._get_params()
+    def _get_model_params(self, convert_search_spaces_to_default: bool = False) -> dict:
+        """
+        Gets params that are passed to the inner model.
+
+        Parameters
+        ----------
+        convert_search_spaces_to_default: bool, default = False
+            If True, search spaces are converted to the default value.
+            This is useful when having to estimate memory usage estimates prior to doing hyperparameter tuning.
+
+        Returns
+        -------
+        params: dict
+            Dictionary of model hyperparameters.
+        """
+        params = self._get_params()
+        if convert_search_spaces_to_default:
+            for param, val in params.items():
+                if isinstance(val, Space):
+                    params[param] = val.default
+        return params
 
     # TODO: Add documentation for valid args for each model. Currently only `early_stop`
     def _ag_params(self) -> set:
@@ -1960,6 +2237,16 @@ class AbstractModel:
         Below are common patterns / options to make available. Their actual usage and options in a particular model should be documented in the model itself, as it has flexibility to differ.
 
         Possible params:
+
+        generate_curves : bool
+            boolean flag determining if learning curves should be saved to disk for iterative learners.
+
+        curve_metrics : list(...)
+            list of metrics to be evaluated at each iteration of the learning curves
+            (only used if generate_curves is True)
+
+        use_error_for_curve_metrics : bool
+            boolean flag determining if learning curve metrics should be displayed in error format (see Scorer class)
 
         early_stop : int, str, or tuple
             generic name for early stopping logic. Typically can be an int or a str preset/strategy.

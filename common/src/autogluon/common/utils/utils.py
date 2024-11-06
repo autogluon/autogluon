@@ -24,7 +24,9 @@ LITE_MODE: bool = __lite__ is not None and __lite__
 
 def setup_outputdir(path, warn_if_exist=True, create_dir=True, path_suffix=None):
     if path:
-        assert isinstance(path, (str, Path)), f"Only str and pathlib.Path types are supported for path, got {path} of type {type(path)}."
+        assert isinstance(
+            path, (str, Path)
+        ), f"Only str and pathlib.Path types are supported for path, got {path} of type {type(path)}."
     if path_suffix is None:
         path_suffix = ""
     if path_suffix and path_suffix[-1] == os.path.sep:
@@ -56,7 +58,9 @@ def setup_outputdir(path, warn_if_exist=True, create_dir=True, path_suffix=None)
             elif os.path.isdir(path):
                 raise FileExistsError
         except FileExistsError:
-            logger.warning(f'Warning: path already exists! This predictor may overwrite an existing predictor! path="{path}"')
+            logger.warning(
+                f'Warning: path already exists! This predictor may overwrite an existing predictor! path="{path}"'
+            )
     path = os.path.expanduser(path)  # replace ~ with absolute path if it exists
     return path
 
@@ -151,7 +155,7 @@ def check_saved_predictor_version(
         logger.warning(
             "WARNING: AutoGluon version differs from the version used to create the predictor! "
             "This may lead to instability and it is highly recommended the predictor be loaded "
-            "with the exact AutoGluon version it was created with."
+            "with the exact AutoGluon version it was created with. AutoGluon does not support backwards compatibility."
         )
         logger.warning(f"\tPredictor Version: {version_saved}")
         logger.warning(f"\tCurrent Version:   {version_current}")
@@ -162,7 +166,9 @@ def check_saved_predictor_version(
             raise AssertionError(
                 f"Predictor was created on version {version_saved} but is being loaded with version {version_current}. "
                 f"Please ensure the versions match to avoid instability. While it is NOT recommended, "
-                f"this error can be bypassed by specifying `require_version_match=False`."
+                f"this error can be bypassed by specifying `require_version_match=False`. "
+                f"Exceptions encountered after setting `require_version_match=False` may be very cryptic, "
+                f"and in most cases mean that the predictor is fully incompatible with the installed version."
             )
 
 

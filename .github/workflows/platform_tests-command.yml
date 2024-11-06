@@ -31,9 +31,9 @@ jobs:
 
       - name: Create comment
         if: (github.event_name == 'workflow_dispatch')
-        uses: peter-evans/create-or-update-comment@v1
+        uses: peter-evans/create-or-update-comment@v4
         with:
-          token: ${{ secrets.PAT }}
+          token: ${{ secrets.CICD_PAT }}
           repository: ${{ github.event.inputs.repository }}
           comment-id: ${{ github.event.inputs.comment-id }}
           body: |
@@ -51,7 +51,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-latest, windows-latest, ubuntu-latest]
-        python: ["3.8", "3.9", "3.10", "3.11"]
+        python: ["3.9", "3.10", "3.11", "3.12"]
     steps:  
       - name: Checkout repository for PR
         if: (github.event_name == 'workflow_dispatch')
@@ -62,12 +62,13 @@ jobs:
         if: (github.event_name == 'schedule')
         uses: actions/checkout@v2
       - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@v2.0.0
+        uses: conda-incubator/setup-miniconda@v3
         with:
           activate-environment: autogluon_py3
           environment-file: .github/workflows_env/unittest_env.yml
           auto-update-conda: true
           python-version: ${{ matrix.python }}
+          miniconda-version: "latest"
       - name: unit-test
         shell: bash -l {0}
         run: |
@@ -83,7 +84,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-latest, windows-latest, ubuntu-latest]
-        python: ["3.8", "3.9", "3.10", "3.11"]
+        python: ["3.9", "3.10", "3.11", "3.12"]
     steps:
       - name: Checkout repository for PR
         if: (github.event_name == 'workflow_dispatch')
@@ -94,12 +95,13 @@ jobs:
         if: (github.event_name == 'schedule')
         uses: actions/checkout@v2
       - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@v2.0.0
+        uses: conda-incubator/setup-miniconda@v3
         with:
           activate-environment: autogluon_py3
           environment-file: .github/workflows_env/unittest_env.yml
           auto-update-conda: true
           python-version: ${{ matrix.python }}
+          miniconda-version: "latest"
       - name: unit-test
         shell: bash -l {0}
         run: |
@@ -115,7 +117,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-latest, windows-latest, ubuntu-latest]
-        python: ["3.8", "3.9", "3.10", "3.11"]
+        python: ["3.9", "3.10", "3.11", "3.12"]
     steps:
       - name: Checkout repository for PR
         if: (github.event_name == 'workflow_dispatch')
@@ -126,12 +128,13 @@ jobs:
         if: (github.event_name == 'schedule')
         uses: actions/checkout@v2
       - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@v2.0.0
+        uses: conda-incubator/setup-miniconda@v3
         with:
           activate-environment: autogluon_py3
           environment-file: .github/workflows_env/unittest_env.yml
           auto-update-conda: true
           python-version: ${{ matrix.python }}
+          miniconda-version: "latest"
       - name: unit-test
         shell: bash -l {0}
         run: |
@@ -147,7 +150,7 @@ jobs:
   #     fail-fast: false
   #     matrix:
   #       os: [macos-latest, windows-latest, ubuntu-latest]
-  #       python: ["3.8", "3.9", "3.10", "3.11"]
+  #       python: ["3.9", "3.10", "3.11", "3.12"]
   #   steps:
   #     - name: Checkout repository for PR
   #       if: (github.event_name == 'workflow_dispatch')
@@ -158,7 +161,7 @@ jobs:
   #       if: (github.event_name == 'schedule')
   #       uses: actions/checkout@v2
   #     - name: Setup Miniconda
-  #       uses: conda-incubator/setup-miniconda@v2.0.0
+  #       uses: conda-incubator/setup-miniconda@v3
   #       with:
   #         activate-environment: autogluon_py3
   #         environment-file: .github/workflows_env/unittest_env.yml
@@ -180,7 +183,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-latest, windows-latest, ubuntu-latest]
-        python: ["3.8", "3.9", "3.10", "3.11"]
+        python: ["3.9", "3.10", "3.11", "3.12"]
     steps:
       - name: Checkout repository for PR
         if: (github.event_name == 'workflow_dispatch')
@@ -191,18 +194,21 @@ jobs:
         if: (github.event_name == 'schedule')
         uses: actions/checkout@v2
       - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@v2.0.0
+        uses: conda-incubator/setup-miniconda@v3
         with:
           activate-environment: autogluon_py3
           environment-file: .github/workflows_env/unittest_env.yml
           auto-update-conda: true
           python-version: ${{ matrix.python }}
+          miniconda-version: "latest"
       - name: Setup OMP
         if: matrix.os == 'macos-latest'
         shell: bash -l {0}
         run: |
           wget https://raw.githubusercontent.com/Homebrew/homebrew-core/fb8323f2b170bd4ae97e1bac9bf3e2983af3fdb0/Formula/libomp.rb
-          brew unlink libomp
+          if brew list | grep -q libomp; then
+            brew unlink libomp
+          fi
           brew install libomp.rb
           rm libomp.rb
       - name: unit-test
@@ -222,7 +228,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-latest, windows-latest, ubuntu-latest]
-        python: ["3.8", "3.9", "3.10", "3.11"]
+        python: ["3.9", "3.10", "3.11", "3.12"]
     steps:
       - name: Checkout repository for PR
         if: (github.event_name == 'workflow_dispatch')
@@ -233,18 +239,21 @@ jobs:
         if: (github.event_name == 'schedule')
         uses: actions/checkout@v2
       - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@v2.0.0
+        uses: conda-incubator/setup-miniconda@v3
         with:
           activate-environment: autogluon_py3
           environment-file: .github/workflows_env/unittest_env.yml
           auto-update-conda: true
           python-version: ${{ matrix.python }}
+          miniconda-version: "latest"
       - name: Setup OMP
         if: matrix.os == 'macos-latest'
         shell: bash -l {0}
         run: |
           wget https://raw.githubusercontent.com/Homebrew/homebrew-core/fb8323f2b170bd4ae97e1bac9bf3e2983af3fdb0/Formula/libomp.rb
-          brew unlink libomp
+          if brew list | grep -q libomp; then
+            brew unlink libomp
+          fi
           brew install libomp.rb
           rm libomp.rb
       - name: unit-test
@@ -263,7 +272,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-latest, windows-latest, ubuntu-latest]
-        python: ["3.8", "3.9", "3.10", "3.11"]
+        python: ["3.9", "3.10", "3.11", "3.12"]
     steps:
       - name: Checkout repository for PR
         if: (github.event_name == 'workflow_dispatch')
@@ -274,12 +283,13 @@ jobs:
         if: (github.event_name == 'schedule')
         uses: actions/checkout@v2
       - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@v2.0.0
+        uses: conda-incubator/setup-miniconda@v3
         with:
           activate-environment: autogluon_py3
           environment-file: .github/workflows_env/unittest_env.yml
           auto-update-conda: true
           python-version: ${{ matrix.python }}
+          miniconda-version: "latest"
       - name: unit-test
         if: matrix.os != 'windows-latest'
         shell: bash -l {0}

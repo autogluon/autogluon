@@ -12,6 +12,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import QuantileTransformer, StandardScaler
 
 from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT, R_OBJECT, S_BOOL, S_TEXT_AS_CATEGORY
+from autogluon.common.utils.log_utils import fix_sklearnex_logging_if_kaggle
 from autogluon.core.constants import BINARY, REGRESSION
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils.exceptions import TimeLimitExceeded
@@ -42,11 +43,17 @@ class LinearModel(AbstractModel):
 
     def _get_model_type(self):
         penalty = self.params.get("penalty", "L2")
-        if self.params_aux.get("use_daal", True):
+        # FIXME: False by default because AdultIncome dataset shows worse results with use_daal=True.
+        #  Version: scikit-learn-intelex-2024.4.0
+        #                     model  score_test  score_val eval_metric
+        #  0            LinearModel    0.902293   0.904318     roc_auc
+        #  1  LinearModel_SKLEARNEX    0.863535   0.873544     roc_auc
+        if self.params_aux.get("use_daal", False):
             # Appears to give 20x training speedup when enabled
             try:
-                # TODO: Add more granular switch, currently this affects all future LR models even if they had `use_daal=False`
                 from sklearnex.linear_model import Lasso, LogisticRegression, Ridge
+
+                fix_sklearnex_logging_if_kaggle()  # Fix logging verbosity if in Kaggle notebook environment
 
                 logger.log(15, "\tUsing sklearnex LR backend...")
             except:
@@ -290,3 +297,7 @@ class LinearModel(AbstractModel):
         )
         default_auxiliary_params.update(extra_auxiliary_params)
         return default_auxiliary_params
+
+    def _more_tags(self):
+        # `can_refit_full=True` because validation data isn't used during fit.
+        return {"can_refit_full": True}

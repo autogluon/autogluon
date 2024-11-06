@@ -1,24 +1,25 @@
-""" Runs autogluon.tabular on multiple benchmark datasets.
-    Run this benchmark with fast_benchmark=False to assess whether major chances make autogluon better or worse overall.
-    Lower performance-values = better, normalized to [0,1] for each dataset to enable cross-dataset comparisons.
-    Classification performance = error-rate, Regression performance = 1 - R^2
+"""Runs autogluon.tabular on multiple benchmark datasets.
+Run this benchmark with fast_benchmark=False to assess whether major chances make autogluon better or worse overall.
+Lower performance-values = better, normalized to [0,1] for each dataset to enable cross-dataset comparisons.
+Classification performance = error-rate, Regression performance = 1 - R^2
 
-    # TODO: assess that Autogluon correctly inferred the type of each feature (continuous vs categorical vs text)
+# TODO: assess that Autogluon correctly inferred the type of each feature (continuous vs categorical vs text)
 
-    # TODO: may want to take allowed run-time of AutoGluon into account? Eg. can produce performance vs training time curves for each dataset.
+# TODO: may want to take allowed run-time of AutoGluon into account? Eg. can produce performance vs training time curves for each dataset.
 
-    # TODO: We'd like to add extra benchmark datasets with the following properties:
-    - parquet file format
-    - poker hand data: https://archive.ics.uci.edu/ml/datasets/Poker+Hand
-    - test dataset with just one data point
-    - test dataset where order of columns different than in training data (same column names)
-    - extreme-multiclass classification (500+ classes)
-    - high-dimensional features + low-sample size
-    - high levels of missingness in test data only, no missingness in train data
-    - classification w severe class imbalance
-    - regression with severely skewed Y-values (eg. predicting count data)
-    - text features in dataset
+# TODO: We'd like to add extra benchmark datasets with the following properties:
+- parquet file format
+- poker hand data: https://archive.ics.uci.edu/ml/datasets/Poker+Hand
+- test dataset with just one data point
+- test dataset where order of columns different than in training data (same column names)
+- extreme-multiclass classification (500+ classes)
+- high-dimensional features + low-sample size
+- high levels of missingness in test data only, no missingness in train data
+- classification w severe class imbalance
+- regression with severely skewed Y-values (eg. predicting count data)
+- text features in dataset
 """
+
 import os
 import shutil
 import sys
@@ -29,13 +30,12 @@ from random import seed
 import numpy as np
 import pandas as pd
 import pytest
-from networkx.exception import NetworkXError
 
 from autogluon.common import space
 from autogluon.common.utils.simulation_utils import convert_simulation_artifacts_to_tabular_predictions_dict
 from autogluon.core.constants import BINARY, MULTICLASS, PROBLEM_TYPES_CLASSIFICATION, QUANTILE, REGRESSION
 from autogluon.core.utils import download, unzip
-from autogluon.tabular import TabularDataset, TabularPredictor
+from autogluon.tabular import TabularDataset, TabularPredictor, __version__
 from autogluon.tabular.configs.hyperparameter_configs import get_hyperparameter_config
 
 PARALLEL_LOCAL_BAGGING = "parallel_local"
@@ -90,7 +90,12 @@ def _assert_predict_dict_identical_to_predict(predictor: TabularPredictor, data)
                 else:
                     model_pred = predictor.predict(data, model=m, as_pandas=as_pandas)
                 if as_pandas:
-                    assert model_pred.equals(predict_dict[m])
+                    # pandas default int type on Windows is int64, while on Linux it is int32
+                    if model_pred.dtype in ["int64", "int32"]:
+                        assert predict_dict[m].dtype in ["int64", "int32"]
+                        assert model_pred.astype("int64").equals(predict_dict[m].astype("int64"))
+                    else:
+                        assert model_pred.equals(predict_dict[m])
                 else:
                     assert np.array_equal(model_pred, predict_dict[m])
 
@@ -144,6 +149,10 @@ def test_advanced_functionality():
     shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
     savedir_predictor_original = savedir + "predictor/"
     predictor: TabularPredictor = TabularPredictor(label=label, path=savedir_predictor_original).fit(train_data)
+
+    version_in_file = predictor._load_version_file(path=predictor.path)
+    assert version_in_file == __version__
+
     leaderboard = predictor.leaderboard(data=test_data)
 
     # test metric_error leaderboard
@@ -242,7 +251,7 @@ def test_advanced_functionality():
     assert predictor.model_names(persisted=True) == []  # Assert that all models were unpersisted
 
     # Raise exception
-    with pytest.raises(NetworkXError):
+    with pytest.raises(ValueError):
         predictor.persist(models=["UNKNOWN_MODEL_1", "UNKNOWN_MODEL_2"])
 
     assert predictor.model_names(persisted=True) == []
@@ -306,7 +315,18 @@ def test_advanced_functionality():
     predictor.delete_models(models_to_keep=[])  # Test that dry-run doesn't delete models
     assert len(predictor.model_names()) == num_models * 2
     predictor.predict(data=test_data)
-    predictor.delete_models(models_to_keep=[], dry_run=False)  # Test that dry-run deletes models
+
+    # Test refit_full with train_data_extra argument
+    refit_full_models = list(predictor.model_refit_map().values())
+    predictor.delete_models(models_to_delete=refit_full_models, dry_run=False)
+    assert len(predictor.model_names()) == num_models
+    assert predictor.model_refit_map() == dict()
+    predictor.refit_full(train_data_extra=test_data)  # train_data_extra argument
+    assert len(predictor.model_names()) == num_models * 2
+    assert len(predictor.model_refit_map()) == num_models
+    predictor.predict(data=test_data)
+
+    predictor.delete_models(models_to_keep=[], dry_run=False)  # Test that dry_run=False deletes models
     assert len(predictor.model_names()) == 0
     assert len(predictor.leaderboard()) == 0
     assert len(predictor.leaderboard(extra_info=True)) == 0
@@ -375,6 +395,11 @@ def test_advanced_functionality_bagging():
         predict_proba_oof = predictor.predict_proba_oof(model=m)
         assert predict_proba_oof.equals(predict_proba_dict_oof[m])
 
+    predict_dict_oof = predictor.predict_multi()
+    for m in predictor.model_names():
+        predict_oof = predictor.predict_oof(model=m)
+        assert predict_oof.equals(predict_dict_oof[m])
+
     score_oof = predictor.evaluate_predictions(train_data[label], oof_pred_proba)
     model_best = predictor.model_best
 
@@ -388,6 +413,18 @@ def test_advanced_functionality_bagging():
     # assert that refit model uses original model's OOF predictions
     oof_pred_proba_refit = predictor.predict_proba_oof()
     assert oof_pred_proba.equals(oof_pred_proba_refit)
+
+    # check predict_proba_multi after refit does not raise an exception
+    predict_proba_dict_oof = predictor.predict_proba_multi()
+    for m in predictor.model_names():
+        predict_proba_oof = predictor.predict_proba_oof(model=m)
+        assert predict_proba_oof.equals(predict_proba_dict_oof[m])
+
+    # check predict_multi after refit does not raise an exception
+    predict_dict_oof = predictor.predict_multi()
+    for m in predictor.model_names():
+        predict_oof = predictor.predict_oof(model=m)
+        assert predict_oof.equals(predict_dict_oof[m])
 
 
 def load_data(directory_prefix, train_file, test_file, name, url=None):
@@ -655,6 +692,7 @@ def test_pseudolabeling():
         num_bag_folds=2,
         num_bag_sets=1,
         ag_args_ensemble=dict(fold_fitting_strategy="sequential_local"),
+        dynamic_stacking=False,
     )
     for idx in range(len(datasets)):
         dataset = datasets[idx]
@@ -801,7 +839,7 @@ def test_tabularHPO():
     if fast_benchmark:
         subsample_size = 100
         time_limit = 240
-        hyperparameter_tune_kwargs["num_trials"] = 5
+        hyperparameter_tune_kwargs["num_trials"] = 3
 
     fit_args = {
         "verbosity": verbosity,
@@ -927,8 +965,8 @@ def test_sample_weight():
     test_file = "test_data.csv"
     train_data, test_data = load_data(directory_prefix=directory_prefix, train_file=train_file, test_file=test_file, name=dataset["name"], url=dataset["url"])
     print(f"Evaluating Benchmark Dataset {dataset['name']}")
-    directory = directory_prefix + dataset["name"] + "/"
-    savedir = directory + "AutogluonOutput/"
+    directory = os.path.join(directory_prefix, dataset["name"])
+    savedir = os.path.join(directory, "AutogluonOutput")
     shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
     sample_weight = "sample_weights"
     weights = np.abs(
@@ -979,86 +1017,6 @@ def test_quantile():
     perf = predictor.evaluate(test_data)
 
 
-@pytest.mark.skip(reason="Ignored for now, since stacking is disabled without bagging.")
-def test_tabular_stack1():
-    ############ Benchmark options you can set: ########################
-    num_stack_levels = 1
-    num_bag_folds = 0
-    perf_threshold = 1.1  # How much worse can performance on each dataset be vs previous performance without warning
-    seed_val = 32  # random seed
-    subsample_size = None
-    hyperparameter_tune_kwargs = None
-    verbosity = 2  # how much output to print
-    hyperparameters = None
-    time_limit = None
-    fast_benchmark = True  # False
-    # If True, run a faster benchmark (subsample training sets, less epochs, etc),
-    # otherwise we run full benchmark with default AutoGluon settings.
-    # performance_value warnings are disabled when fast_benchmark = True.
-
-    #### If fast_benchmark = True, can control model training time here. Only used if fast_benchmark=True ####
-    if fast_benchmark:
-        subsample_size = 100
-        nn_options = {"num_epochs": 3}
-        gbm_options = {"num_boost_round": 30}
-        hyperparameters = {"GBM": gbm_options, "NN_TORCH": nn_options}
-        time_limit = 60
-
-    fit_args = {
-        "num_bag_folds": num_bag_folds,
-        "num_stack_levels": num_stack_levels,
-        "verbosity": verbosity,
-    }
-    if hyperparameter_tune_kwargs is not None:
-        fit_args["hyperparameter_tune_kwargs"] = hyperparameter_tune_kwargs
-    if hyperparameters is not None:
-        fit_args["hyperparameters"] = hyperparameters
-    if time_limit is not None:
-        fit_args["time_limit"] = time_limit
-    ###################################################################
-    run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold, seed_val=seed_val, fit_args=fit_args)
-
-
-@pytest.mark.skip(reason="Ignored for now, since stacking is disabled without bagging.")
-def test_tabular_stack2():
-    ############ Benchmark options you can set: ########################
-    num_stack_levels = 2
-    num_bag_folds = 0
-    perf_threshold = 1.1  # How much worse can performance on each dataset be vs previous performance without warning
-    seed_val = 66  # random seed
-    subsample_size = None
-    hyperparameter_tune_kwargs = None
-    verbosity = 2  # how much output to print
-    hyperparameters = None
-    time_limit = None
-    fast_benchmark = True  # False
-    # If True, run a faster benchmark (subsample training sets, less epochs, etc),
-    # otherwise we run full benchmark with default AutoGluon settings.
-    # performance_value warnings are disabled when fast_benchmark = True.
-
-    #### If fast_benchmark = True, can control model training time here. Only used if fast_benchmark=True ####
-    if fast_benchmark:
-        subsample_size = 100
-        nn_options = {"num_epochs": 3}
-        gbm_options = {"num_boost_round": 30}
-        hyperparameters = {"GBM": gbm_options, "NN_TORCH": nn_options}
-        time_limit = 60
-
-    fit_args = {
-        "num_bag_folds": num_bag_folds,
-        "num_stack_levels": num_stack_levels,
-        "verbosity": verbosity,
-    }
-    if hyperparameter_tune_kwargs is not None:
-        fit_args["hyperparameter_tune_kwargs"] = hyperparameter_tune_kwargs
-    if hyperparameters is not None:
-        fit_args["hyperparameters"] = hyperparameters
-    if time_limit is not None:
-        fit_args["time_limit"] = time_limit
-    ###################################################################
-    run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold, seed_val=seed_val, fit_args=fit_args)
-
-
 @pytest.mark.slow
 def test_tabular_bagstack():
     ############ Benchmark options you can set: ########################
@@ -1080,9 +1038,18 @@ def test_tabular_bagstack():
     if fast_benchmark:
         subsample_size = 105
         nn_options = {"num_epochs": 2}
-        gbm_options = [{"num_boost_round": 40}, "GBMLarge"]
+        gbm_options = [
+            {"num_boost_round": 40},
+            {
+                "learning_rate": 0.03,
+                "num_leaves": 128,
+                "feature_fraction": 0.9,
+                "min_data_in_leaf": 3,
+                "ag_args": {"name_suffix": "Large", "priority": 0, "hyperparameter_tune_kwargs": None},
+            },
+        ]
         hyperparameters = {"GBM": gbm_options, "NN_TORCH": nn_options}
-        time_limit = 60
+        time_limit = 240
 
     fit_args = {
         "num_bag_folds": num_bag_folds,
@@ -1123,9 +1090,18 @@ def test_tabular_bagstack_use_bag_holdout():
     if fast_benchmark:
         subsample_size = 105
         nn_options = {"num_epochs": 2}
-        gbm_options = [{"num_boost_round": 40}, "GBMLarge"]
+        gbm_options = [
+            {"num_boost_round": 40},
+            {
+                "learning_rate": 0.03,
+                "num_leaves": 128,
+                "feature_fraction": 0.9,
+                "min_data_in_leaf": 3,
+                "ag_args": {"name_suffix": "Large", "priority": 0, "hyperparameter_tune_kwargs": None},
+            },
+        ]
         hyperparameters = {"GBM": gbm_options, "NN_TORCH": nn_options}
-        time_limit = 60
+        time_limit = 240
 
     fit_args = {
         "num_bag_folds": num_bag_folds,

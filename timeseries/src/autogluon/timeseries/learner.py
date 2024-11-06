@@ -1,7 +1,7 @@
 import logging
 import reprlib
 import time
-from typing import Any, Dict, List, Optional, Type, Union
+from typing import Any, Dict, List, Literal, Optional, Type, Union
 
 import pandas as pd
 
@@ -43,6 +43,7 @@ class TimeSeriesLearner(AbstractLearner):
         self.prediction_length = prediction_length
         self.quantile_levels = kwargs.get("quantile_levels", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
         self.cache_predictions = cache_predictions
+        self.freq: Optional[str] = None
 
         self.feature_generator = TimeSeriesFeatureGenerator(
             target=self.target, known_covariates_names=self.known_covariates_names
@@ -77,14 +78,17 @@ class TimeSeriesLearner(AbstractLearner):
         time_limit: Optional[int] = None,
         val_splitter: Optional[AbstractWindowSplitter] = None,
         refit_every_n_windows: Optional[int] = 1,
+        random_seed: Optional[int] = None,
         **kwargs,
     ) -> None:
         self._time_limit = time_limit
         time_start = time.time()
 
-        train_data = self.feature_generator.fit_transform(train_data, data_frame_name="train_data")
+        train_data = self.feature_generator.fit_transform(train_data)
         if val_data is not None:
             val_data = self.feature_generator.transform(val_data, data_frame_name="tuning_data")
+
+        self.freq = train_data.freq
 
         trainer_init_kwargs = kwargs.copy()
         trainer_init_kwargs.update(
@@ -96,6 +100,7 @@ class TimeSeriesLearner(AbstractLearner):
                 target=self.target,
                 quantile_levels=self.quantile_levels,
                 verbosity=kwargs.get("verbosity", 2),
+                skip_model_selection=kwargs.get("skip_model_selection", False),
                 enable_ensemble=kwargs.get("enable_ensemble", True),
                 metadata=self.feature_generator.covariate_metadata,
                 val_splitter=val_splitter,
@@ -122,10 +127,11 @@ class TimeSeriesLearner(AbstractLearner):
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             excluded_model_types=kwargs.get("excluded_model_types"),
             time_limit=time_limit,
+            random_seed=random_seed,
         )
-        self.save_trainer(trainer=self.trainer)
 
         self._time_fit_training = time.time() - time_start
+        self.save()
 
     def _align_covariates_with_forecast_index(
         self,
@@ -152,7 +158,9 @@ class TimeSeriesLearner(AbstractLearner):
                 f"known_covariates are missing information for the following item_ids: {reprlib.repr(missing_item_ids.to_list())}."
             )
 
-        forecast_index = get_forecast_horizon_index_ts_dataframe(data, prediction_length=self.prediction_length)
+        forecast_index = get_forecast_horizon_index_ts_dataframe(
+            data, prediction_length=self.prediction_length, freq=self.freq
+        )
         try:
             known_covariates = known_covariates.loc[forecast_index]
         except KeyError:
@@ -168,13 +176,19 @@ class TimeSeriesLearner(AbstractLearner):
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
         use_cache: bool = True,
+        random_seed: Optional[int] = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
         data = self.feature_generator.transform(data)
         known_covariates = self.feature_generator.transform_future_known_covariates(known_covariates)
         known_covariates = self._align_covariates_with_forecast_index(known_covariates=known_covariates, data=data)
         return self.load_trainer().predict(
-            data=data, known_covariates=known_covariates, model=model, use_cache=use_cache, **kwargs
+            data=data,
+            known_covariates=known_covariates,
+            model=model,
+            use_cache=use_cache,
+            random_seed=random_seed,
+            **kwargs,
         )
 
     def score(
@@ -189,7 +203,7 @@ class TimeSeriesLearner(AbstractLearner):
 
     def evaluate(
         self,
-        data: Union[TimeSeriesDataFrame, pd.DataFrame, str],
+        data: TimeSeriesDataFrame,
         model: Optional[str] = None,
         metrics: Optional[Union[str, TimeSeriesScorer, List[Union[str, TimeSeriesScorer]]]] = None,
         use_cache: bool = True,
@@ -197,10 +211,87 @@ class TimeSeriesLearner(AbstractLearner):
         data = self.feature_generator.transform(data)
         return self.load_trainer().evaluate(data=data, model=model, metrics=metrics, use_cache=use_cache)
 
-    def leaderboard(self, data: Optional[TimeSeriesDataFrame] = None, use_cache: bool = True) -> pd.DataFrame:
+    def get_feature_importance(
+        self,
+        data: Optional[TimeSeriesDataFrame] = None,
+        model: Optional[str] = None,
+        metric: Optional[Union[str, TimeSeriesScorer]] = None,
+        features: Optional[List[str]] = None,
+        time_limit: Optional[float] = None,
+        method: Literal["naive", "permutation"] = "permutation",
+        subsample_size: int = 50,
+        num_iterations: int = 1,
+        random_seed: Optional[int] = None,
+        relative_scores: bool = False,
+        include_confidence_band: bool = True,
+        confidence_level: float = 0.99,
+    ) -> pd.DataFrame:
+        trainer = self.load_trainer()
+        if data is None:
+            data = trainer.load_val_data() or trainer.load_train_data()
+
+        # if features are provided in the dataframe, check that they are valid features in the covariate metadata
+        provided_static_columns = [] if data.static_features is None else data.static_features.columns
+        unused_features = [
+            f
+            for f in set(provided_static_columns).union(set(data.columns) - {self.target})
+            if f not in self.feature_generator.covariate_metadata.all_features
+        ]
+
+        if features is None:
+            features = self.feature_generator.covariate_metadata.all_features
+        else:
+            if len(features) == 0:
+                raise ValueError(
+                    "No features provided to compute feature importance. At least some valid features should be provided."
+                )
+            for fn in features:
+                if fn not in self.feature_generator.covariate_metadata.all_features and fn not in unused_features:
+                    raise ValueError(f"Feature {fn} not found in covariate metadata or the dataset.")
+
+        if len(set(features)) < len(features):
+            raise ValueError(
+                "Duplicate feature names provided to compute feature importance. "
+                "Please provide unique feature names across both static features and covariates."
+            )
+
+        data = self.feature_generator.transform(data)
+
+        importance_df = trainer.get_feature_importance(
+            data=data,
+            features=features,
+            model=model,
+            metric=metric,
+            time_limit=time_limit,
+            method=method,
+            subsample_size=subsample_size,
+            num_iterations=num_iterations,
+            random_seed=random_seed,
+            relative_scores=relative_scores,
+            include_confidence_band=include_confidence_band,
+            confidence_level=confidence_level,
+        )
+
+        for feature in set(features).union(unused_features):
+            if feature not in importance_df.index:
+                importance_df.loc[feature] = (
+                    [0, 0, 0] if not include_confidence_band else [0, 0, 0, float("nan"), float("nan")]
+                )
+
+        return importance_df
+
+    def leaderboard(
+        self,
+        data: Optional[TimeSeriesDataFrame] = None,
+        extra_info: bool = False,
+        extra_metrics: Optional[List[Union[str, TimeSeriesScorer]]] = None,
+        use_cache: bool = True,
+    ) -> pd.DataFrame:
         if data is not None:
             data = self.feature_generator.transform(data)
-        return self.load_trainer().leaderboard(data, use_cache=use_cache)
+        return self.load_trainer().leaderboard(
+            data, extra_info=extra_info, extra_metrics=extra_metrics, use_cache=use_cache
+        )
 
     def get_info(self, include_model_info: bool = False, **kwargs) -> Dict[str, Any]:
         learner_info = super().get_info(include_model_info=include_model_info)
@@ -218,6 +309,33 @@ class TimeSeriesLearner(AbstractLearner):
         # TODO: Report random seed passed to predictor.fit?
         learner_info.pop("random_state", None)
         return learner_info
+
+    def persist_trainer(
+        self, models: Union[Literal["all", "best"], List[str]] = "all", with_ancestors: bool = False
+    ) -> List[str]:
+        """Loads models and trainer in memory so that they don't have to be
+        loaded during predictions
+
+        Returns
+        -------
+        list_of_models : List[str]
+            List of models persisted in memory
+        """
+        self.trainer = self.load_trainer()
+        return self.trainer.persist(models, with_ancestors=with_ancestors)
+
+    def unpersist_trainer(self) -> List[str]:
+        """Unloads models and trainer from memory. Models will have to be reloaded from disk
+        when predicting.
+
+        Returns
+        -------
+        list_of_models : List[str]
+            List of models removed from memory
+        """
+        unpersisted_models = self.load_trainer().unpersist()
+        self.trainer = None
+        return unpersisted_models
 
     def refit_full(self, model: str = "all") -> Dict[str, str]:
         return self.load_trainer().refit_full(model=model)

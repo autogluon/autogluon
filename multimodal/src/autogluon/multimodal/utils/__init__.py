@@ -94,6 +94,5 @@ from .object_detection import (
     save_result_voc_format,
     visualize_detection,
 )
-from .ovd import save_ovd_result_df
 from .save import process_save_path, save_text_tokenizers, setup_save_path
 from .visualizer import NERVisualizer, ObjectDetectionVisualizer, SemanticSegmentationVisualizer, visualize_ner

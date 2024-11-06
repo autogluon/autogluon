@@ -189,7 +189,7 @@ class NerLitModule(LitModule):
             custom_metric_func=self.custom_metric_func,
             logits=active_logits,
             label=active_labels,
-        ),
+        )
         self.log(
             self.validation_metric_name,
             self.validation_metric,

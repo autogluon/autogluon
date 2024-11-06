@@ -176,7 +176,8 @@ class RegressionEvaluation(AbstractVisualization, JupyterMixin):
             "hist": dict(hist=True, qqplot=False),
             "qoq": dict(hist=False, qqplot=True),
         }.get(
-            self.residuals_analysis_mode, dict(hist=False, qqplot=False)  # type: ignore
+            self.residuals_analysis_mode,
+            dict(hist=False, qqplot=False),  # type: ignore
         )
         return res_plot_kwargs
 

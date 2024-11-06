@@ -294,7 +294,7 @@ class TimmAutoModelForImagePrediction(nn.Module):
 
     def save(self, save_path: str = "./", tokenizers: Optional[dict] = None):
         weights_path = f"{save_path}/pytorch_model.bin"
-        torch.save(self.model.state_dict(), weights_path)
+        torch.save(self.model.state_dict(), weights_path)  # nosec B614
         logger.info(f"Model {self.prefix} weights saved to {weights_path}.")
         config_path = f"{save_path}/config.json"
         self.dump_config(config_path)

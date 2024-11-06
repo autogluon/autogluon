@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 import logging
 import math
@@ -5,10 +7,9 @@ import time
 
 import numpy as np
 import pandas as pd
-from pandas import DataFrame
+from pandas import DataFrame, Series
 
 from autogluon.common.utils.log_utils import convert_time_in_s_to_log_friendly
-from autogluon.common.utils.system_info import get_ag_system_info
 from autogluon.core.constants import AUTO_WEIGHT, BALANCE_WEIGHT, BINARY, MULTICLASS, QUANTILE, REGRESSION
 from autogluon.core.data import LabelCleaner
 from autogluon.core.data.cleaner import Cleaner
@@ -43,6 +44,7 @@ class DefaultLearner(AbstractTabularLearner):
         self,
         X: DataFrame,
         X_val: DataFrame = None,
+        X_test: DataFrame = None,
         X_unlabeled: DataFrame = None,
         holdout_frac=0.1,
         num_bag_folds=0,
@@ -56,6 +58,7 @@ class DefaultLearner(AbstractTabularLearner):
         """Arguments:
         X (DataFrame): training data
         X_val (DataFrame): data used for hyperparameter tuning. Note: final model may be trained using this data as well as training data
+        X_test (DataFrame): data used for tracking model performance on test data during training. Note: this data is never used to train the model
         X_unlabeled (DataFrame): data used for pretraining a model. This is same data format as X, without label-column. This data is used for semi-supervised learning.
         holdout_frac (float): Fraction of data to hold out for evaluating validation performance (ignored if X_val != None, ignored if kfolds != 0)
         num_bag_folds (int): kfolds used for bagging of models, roughly increases model training time by a factor of k (0: disabled)
@@ -65,15 +68,10 @@ class DefaultLearner(AbstractTabularLearner):
         # TODO: if provided, feature_types in X, X_val are ignored right now, need to pass to Learner/trainer and update this documentation.
         self._time_limit = time_limit
         if time_limit:
-            logger.log(20, f"Beginning AutoGluon training ... Time limit = {time_limit}s")
+            logger.log(20, f"Beginning AutoGluon training ... Time limit = {time_limit:.0f}s")
         else:
             logger.log(20, "Beginning AutoGluon training ...")
         logger.log(20, f'AutoGluon will save models to "{self.path}"')
-        include_gpu_count = False
-        if verbosity >= 3:
-            include_gpu_count = True
-        msg = get_ag_system_info(path=self.path, include_gpu_count=include_gpu_count)
-        logger.log(20, msg)
         logger.log(20, f"Train Data Rows:    {len(X)}")
         logger.log(20, f"Train Data Columns: {len([column for column in X.columns if column != self.label])}")
         if X_val is not None:
@@ -85,12 +83,17 @@ class DefaultLearner(AbstractTabularLearner):
         if self.problem_type is None:
             self.problem_type = self.infer_problem_type(y=X[self.label])
         logger.log(20, f"Problem Type:       {self.problem_type}")
+        if self._eval_metric_was_str:
+            # Ensure that the eval_metric is valid for the problem_type
+            self._verify_metric(eval_metric=self.eval_metric, problem_type=self.problem_type)
         if self.groups is not None:
             num_bag_sets = 1
             num_bag_folds = len(X[self.groups].unique())
         X_og = None if infer_limit_batch_size is None else X
         logger.log(20, "Preprocessing data ...")
-        X, y, X_val, y_val, X_unlabeled, holdout_frac, num_bag_folds, groups = self.general_data_processing(X, X_val, X_unlabeled, holdout_frac, num_bag_folds)
+        X, y, X_val, y_val, X_test, y_test, X_unlabeled, holdout_frac, num_bag_folds, groups = self.general_data_processing(
+            X=X, X_val=X_val, X_test=X_test, X_unlabeled=X_unlabeled, holdout_frac=holdout_frac, num_bag_folds=num_bag_folds
+        )
         if X_og is not None:
             infer_limit = self._update_infer_limit(X=X_og, infer_limit_batch_size=infer_limit_batch_size, infer_limit=infer_limit)
 
@@ -130,6 +133,8 @@ class DefaultLearner(AbstractTabularLearner):
             y=y,
             X_val=X_val,
             y_val=y_val,
+            X_test=X_test,
+            y_test=y_test,
             X_unlabeled=X_unlabeled,
             holdout_frac=holdout_frac,
             time_limit=time_limit_trainer,
@@ -142,7 +147,15 @@ class DefaultLearner(AbstractTabularLearner):
         time_end = time.time()
         self._time_fit_training = time_end - time_preprocessing_end
         self._time_fit_total = time_end - time_preprocessing_start
-        logger.log(20, f'AutoGluon training complete, total runtime = {round(self._time_fit_total, 2)}s ... Best model: "{trainer.model_best}"')
+        log_throughput = ""
+        if trainer.model_best is not None:
+            predict_n_time_per_row = trainer.get_model_attribute_full(model=trainer.model_best, attribute="predict_n_time_per_row")
+            predict_n_size = trainer.get_model_attribute_full(model=trainer.model_best, attribute="predict_n_size", func=min)
+            if predict_n_time_per_row is not None and predict_n_size is not None:
+                log_throughput = f" | Estimated inference throughput: {1/(predict_n_time_per_row if predict_n_time_per_row else np.finfo(np.float16).eps):.1f} rows/s ({int(predict_n_size)} batch size)"
+        logger.log(
+            20, f"AutoGluon training complete, total runtime = {round(self._time_fit_total, 2)}s ... Best model: {trainer.model_best}" f"{log_throughput}"
+        )
 
     def _update_infer_limit(self, X: DataFrame, *, infer_limit_batch_size: int, infer_limit: float = None):
         """
@@ -182,28 +195,22 @@ class DefaultLearner(AbstractTabularLearner):
         return infer_limit
 
     # TODO: Add default values to X_val, X_unlabeled, holdout_frac, and num_bag_folds
-    def general_data_processing(self, X: DataFrame, X_val: DataFrame, X_unlabeled: DataFrame, holdout_frac: float, num_bag_folds: int):
+    def general_data_processing(
+        self, X: DataFrame, X_val: DataFrame = None, X_test: DataFrame = None, X_unlabeled: DataFrame = None, holdout_frac: float = 1, num_bag_folds: int = 0
+    ):
         """General data processing steps used for all models."""
-        X = copy.deepcopy(X)
-        # treat None, NaN, INF, NINF as NA
-        X[self.label].replace([np.inf, -np.inf], np.nan, inplace=True)
-        invalid_labels = X[self.label].isna()
-        if invalid_labels.any():
-            first_invalid_label_idx = invalid_labels.idxmax()
-            raise ValueError(f"Label column cannot contain non-finite values (NaN, Inf, Ninf). First invalid label at idx: {first_invalid_label_idx}")
+        X = self._check_for_non_finite_values(X, name="train", is_train=True)
+        if X_val is not None:
+            X_val = self._check_for_non_finite_values(X_val, name="val", is_train=False)
+        if X_test is not None:
+            X_test = self._check_for_non_finite_values(X_test, name="test", is_train=False)
 
         holdout_frac_og = holdout_frac
         if X_val is not None and self.label in X_val.columns:
-            # treat None, NaN, INF, NINF as NA
-            X_val[self.label].replace([np.inf, -np.inf], np.nan, inplace=True)
-            invalid_tuning_labels = X_val[self.label].isna()
-            if invalid_tuning_labels.any():
-                first_invalid_label_idx = invalid_tuning_labels.idxmax()
-                raise ValueError(f"Label column cannot contain non-finite values (NaN, Inf, Ninf). First invalid label at idx: {first_invalid_label_idx}")
-
             holdout_frac = 1
 
-        if (self.eval_metric is not None) and (self.eval_metric.name in ["log_loss", "pac_score"]) and (self.problem_type == MULTICLASS):
+        if self.eval_metric is not None and self.eval_metric.needs_proba and self.problem_type == MULTICLASS:
+            # Metric requires all classes present in training to be able to compute a score
             if num_bag_folds > 0:
                 self.threshold = 2
                 if self.groups is None:
@@ -229,107 +236,89 @@ class DefaultLearner(AbstractTabularLearner):
         if self.label_cleaner.num_classes is not None and self.problem_type != BINARY:
             logger.log(20, f"Train Data Class Count: {self.label_cleaner.num_classes}")
 
-        if X_val is not None and self.label in X_val.columns:
-            y_val_og = X_val[self.label]
-            X_val = self.cleaner.transform(X_val)
-            if len(X_val) == 0:
-                logger.warning(
-                    "############################################################################################################\n"
-                    "WARNING: All X_val data contained low frequency classes, ignoring X_val and generating from subset of X\n"
-                    "\tYour input validation data or training data labels might be corrupted, please manually inspect them for correctness!"
-                )
-                if self.problem_type in [BINARY, MULTICLASS]:
-                    train_classes = sorted(list(y_uncleaned.unique()))
-                    val_classes = sorted(list(y_val_og.unique()))
-                    logger.warning(f"\tTraining Classes: {train_classes}")
-                    logger.warning(f"\tTuning   Classes: {val_classes}")
-                    logger.warning(f"\tTraining Class Dtype: {y_uncleaned.dtype}")
-                    logger.warning(f"\tTuning   Class Dtype: {y_val_og.dtype}")
-                    missing_classes = [c for c in val_classes if c not in train_classes]
-                    logger.warning(f"\tClasses missing from Training Data: {missing_classes}")
-                logger.warning("############################################################################################################")
-
-                X_val = None
-                y_val = None
-                w_val = None
-                holdout_frac = holdout_frac_og
-            else:
-                X_val, y_val = self.extract_label(X_val)
-                y_val = self.label_cleaner.transform(y_val)
-                X_val = self.set_predefined_weights(X_val, y_val)
-                X_val, w_val = extract_column(X_val, self.sample_weight)
-        else:
-            y_val = None
-            w_val = None
+        X_val, y_val, w_val, holdout_frac = self._apply_cleaner_transform(
+            X=X_val, y_uncleaned=y_uncleaned, holdout_frac=holdout_frac, holdout_frac_og=holdout_frac_og, name="val", is_test=False
+        )
+        X_test, y_test, w_test, _ = self._apply_cleaner_transform(
+            X=X_test, y_uncleaned=y_uncleaned, holdout_frac=holdout_frac, holdout_frac_og=holdout_frac_og, name="test", is_test=True
+        )
 
         self._original_features = list(X.columns)
         # TODO: Move this up to top of data before removing data, this way our feature generator is better
         logger.log(20, f"Using Feature Generators to preprocess the data ...")
-        if X_val is not None:
-            # Do this if working with SKLearn models, otherwise categorical features may perform very badly on the test set
+
+        if X_test is not None:
             logger.log(
                 15,
-                "Performing general data preprocessing with merged train & validation data, so validation performance may not accurately reflect performance on new test data",
+                "Performing general data preprocessing with merged train & validation data, so validation/test performance may not accurately reflect performance on new test data",
             )
-            X_super = pd.concat([X, X_val, X_unlabeled], ignore_index=True)
-            if self.feature_generator.is_fit():
-                logger.log(
-                    20,
-                    f"{self.feature_generator.__class__.__name__} is already fit, so the training data will be processed via .transform() instead of .fit_transform().",
-                )
-                X_super = self.feature_generator.transform(X_super)
-                self.feature_generator.print_feature_metadata_info()
-            else:
-                if X_unlabeled is None:
-                    y_super = pd.concat([y, y_val], ignore_index=True)
-                else:
-                    y_unlabeled = pd.Series(np.nan, index=X_unlabeled.index)
-                    y_super = pd.concat([y, y_val, y_unlabeled], ignore_index=True)
-                X_super = self.fit_transform_features(X_super, y_super, problem_type=self.label_cleaner.problem_type_transform, eval_metric=self.eval_metric)
-            X = X_super.head(len(X)).set_index(X.index)
 
-            X_val = X_super.head(len(X) + len(X_val)).tail(len(X_val)).set_index(X_val.index)
+        # TODO: extend this boolean flag into learner init parameter
+        transform_with_test = False
 
-            if X_unlabeled is not None:
-                X_unlabeled = X_super.tail(len(X_unlabeled)).set_index(X_unlabeled.index)
-            del X_super
+        X_test_super = None
+        y_test_super = None
+        if transform_with_test:
+            X_test_super = X_test
+            y_test_super = y_test
+
+        datasets = [X, X_val, X_test_super, X_unlabeled]
+        X_super = pd.concat(datasets, ignore_index=True)
+
+        if self.feature_generator.is_fit():
+            logger.log(
+                20,
+                f"{self.feature_generator.__class__.__name__} is already fit, so the training data will be processed via .transform() instead of .fit_transform().",
+            )
+            X_super = self.feature_generator.transform(X_super)
+            if not transform_with_test and X_test is not None:
+                X_test = self.feature_generator.transform(X_test)
+            self.feature_generator.print_feature_metadata_info()
         else:
-            X_super = pd.concat([X, X_unlabeled], ignore_index=True)
-            if self.feature_generator.is_fit():
-                logger.log(
-                    20,
-                    f"{self.feature_generator.__class__.__name__} is already fit, so the training data will be processed via .transform() instead of .fit_transform().",
-                )
-                X_super = self.feature_generator.transform(X_super)
-                self.feature_generator.print_feature_metadata_info()
+            y_unlabeled = pd.Series(np.nan, index=X_unlabeled.index) if X_unlabeled is not None else None
+            y_list = [y, y_val, y_test_super, y_unlabeled]
+            y_super = pd.concat(y_list, ignore_index=True)
+            X_super = self.fit_transform_features(X_super, y_super, problem_type=self.label_cleaner.problem_type_transform, eval_metric=self.eval_metric)
+            if not transform_with_test and X_test is not None:
+                X_test = self.feature_generator.transform(X_test)
+
+        idx = 0
+        for i in range(len(datasets)):
+            if datasets[i] is not None:
+                length = len(datasets[i])
+                datasets[i] = X_super.iloc[idx : idx + length].set_index(datasets[i].index)
+                idx += length
+
+        X, X_val, X_test_super, X_unlabeled = datasets
+        del X_super
+
+        if transform_with_test:
+            X_test = X_test_super
+
+        # TODO: consider not bundling sample-weights inside X, X_val
+        X = self.bundle_weights(X, w, "X", is_train=True)
+        X_val = self.bundle_weights(X_val, w_val, "X_val", is_train=False)
+        X_test = self.bundle_weights(X_test, w_test, "X_test", is_train=False)
+        return X, y, X_val, y_val, X_test, y_test, X_unlabeled, holdout_frac, num_bag_folds, groups
+
+    def bundle_weights(self, X: DataFrame | None, w: Series | None, name: str, is_train=False) -> DataFrame:
+        if is_train:
+            if w is not None:
+                X[self.sample_weight] = w
+        elif X is not None:
+            if w is not None:
+                X[self.sample_weight] = w
+            elif not self.weight_evaluation:
+                nan_vals = np.empty((len(X),))
+                nan_vals[:] = np.nan
+                X[self.sample_weight] = nan_vals
             else:
-                if X_unlabeled is None:
-                    y_super = y.reset_index(drop=True)
-                else:
-                    y_unlabeled = pd.Series(np.nan, index=X_unlabeled.index)
-                    y_super = pd.concat([y, y_unlabeled], ignore_index=True)
-                X_super = self.fit_transform_features(X_super, y_super, problem_type=self.label_cleaner.problem_type_transform, eval_metric=self.eval_metric)
+                raise ValueError(
+                    f"sample_weight column '{self.sample_weight}' \
+                                 cannot be missing from {name} dataset if weight_evaluation=True"
+                )
 
-            X = X_super.head(len(X)).set_index(X.index)
-            if X_unlabeled is not None:
-                X_unlabeled = X_super.tail(len(X_unlabeled)).set_index(X_unlabeled.index)
-            del X_super
-        X, X_val = self.bundle_weights(X, w, X_val, w_val)  # TODO: consider not bundling sample-weights inside X, X_val
-        return X, y, X_val, y_val, X_unlabeled, holdout_frac, num_bag_folds, groups
-
-    def bundle_weights(self, X, w, X_val, w_val):
-        if w is not None:
-            X[self.sample_weight] = w
-            if X_val is not None:
-                if w_val is not None:
-                    X_val[self.sample_weight] = w_val
-                elif not self.weight_evaluation:
-                    nan_vals = np.empty((len(X_val),))
-                    nan_vals[:] = np.nan
-                    X_val[self.sample_weight] = nan_vals
-                else:
-                    raise ValueError(f"sample_weight column '{self.sample_weight}' cannot be missing from X_val if weight_evaluation=True")
-        return X, X_val
+        return X
 
     def set_predefined_weights(self, X, y):
         if self.sample_weight not in [AUTO_WEIGHT, BALANCE_WEIGHT] or self.problem_type not in [BINARY, MULTICLASS]:
@@ -351,6 +340,66 @@ class DefaultLearner(AbstractTabularLearner):
             raise NotImplementedError(f"{AUTO_WEIGHT} strategy not yet supported.")
         X[self.sample_weight] = w  # TODO: consider not bundling sample weights inside X
         return X
+
+    def _check_for_non_finite_values(self, X: DataFrame, name: str = "", is_train: bool = False) -> DataFrame:
+        if is_train or (X is not None and self.label in X.columns):
+            X = copy.deepcopy(X)
+
+            # treat None, NaN, INF, NINF as NA
+            X[self.label] = X[self.label].replace([np.inf, -np.inf], np.nan)
+            invalid_labels = X[self.label].isna()
+            if invalid_labels.any():
+                first_invalid_label_idx = invalid_labels.idxmax()
+                raise ValueError(
+                    f"{name} dataset label column cannot contain non-finite values (NaN, Inf, Ninf). First invalid label at data idx: {first_invalid_label_idx}"
+                )
+
+        return X
+
+    def _apply_cleaner_transform(
+        self, X: DataFrame, y_uncleaned: Series, holdout_frac: float | int, holdout_frac_og: float | int, name: str, is_test: bool = False
+    ) -> tuple[DataFrame, Series, Series | None, float | int]:
+        if X is not None and self.label in X.columns:
+            y_og = X[self.label]
+            len_og = len(X) if is_test else None
+            X = self.cleaner.transform(X)
+            if is_test and len(X) != len_og:
+                # FIXME: Currently, there are ways in which this code can be reached (@innixma)
+                raise AssertionError(
+                    f"{name} cannot have low frequency classes! Please create a GitHub issue if you see this message, as it should never occur."
+                )
+
+            if len(X) == 0:
+                logger.warning(
+                    "############################################################################################################\n"
+                    f"WARNING: All {name} data contained low frequency classes, ignoring {name} and generating from subset of X\n"
+                    "\tYour input validation data or training data labels might be corrupted, please manually inspect them for correctness!"
+                )
+                if self.problem_type in [BINARY, MULTICLASS]:
+                    train_classes = sorted(list(y_uncleaned.unique()))
+                    val_classes = sorted(list(y_og.unique()))
+                    logger.warning(f"\ttrain Classes: {train_classes}")
+                    logger.warning(f"\t{name}   Classes: {val_classes}")
+                    logger.warning(f"\ttrain Class Dtype: {y_uncleaned.dtype}")
+                    logger.warning(f"\t{name}   Class Dtype: {y_og.dtype}")
+                    missing_classes = [c for c in val_classes if c not in train_classes]
+                    logger.warning(f"\tClasses missing from Training Data: {missing_classes}")
+                logger.warning("############################################################################################################")
+
+                X = None
+                y = None
+                w = None
+                holdout_frac = holdout_frac_og
+            else:
+                X, y = self.extract_label(X)
+                y = self.label_cleaner.transform(y)
+                X = self.set_predefined_weights(X, y)
+                X, w = extract_column(X, self.sample_weight)
+        else:
+            y = None
+            w = None
+
+        return X, y, w, holdout_frac
 
     def adjust_threshold_if_necessary(self, y, threshold, holdout_frac, num_bag_folds):
         new_threshold, new_holdout_frac, new_num_bag_folds = self._adjust_threshold_if_necessary(y, threshold, holdout_frac, num_bag_folds)

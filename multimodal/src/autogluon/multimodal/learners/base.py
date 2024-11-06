@@ -45,6 +45,7 @@ from ..constants import (
     FEW_SHOT,
     FEW_SHOT_CLASSIFICATION,
     GREEDY_SOUP,
+    IMAGE_BASE64_STR,
     IMAGE_BYTEARRAY,
     IMAGE_PATH,
     LABEL,
@@ -184,7 +185,6 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             In addition, we support advanced problems such as
 
             - 'object_detection': Object detection
-            - 'open_vocabulry_object_detection': Zero-shot object detection (only support inference for now, finetuning TBC)
             - 'ner' or 'named_entity_recognition': Named entity extraction
             - 'text_similarity': Text-text similarity problem
             - 'image_similarity': Image-image similarity problem
@@ -199,7 +199,6 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             problem types:
 
             - 'object_detection'
-            - 'open_vocabulry_object_detection'
             - 'text_similarity'
             - 'image_similarity'
             - 'image_text_similarity'
@@ -1018,8 +1017,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         if (
             config.env.strategy == DEEPSPEED_OFFLOADING and num_gpus == 1 and DEEPSPEED_MODULE not in sys.modules
         ):  # Offloading currently only tested for single GPU
-            assert version.parse(pl.__version__) >= version.parse(
-                DEEPSPEED_MIN_PL_VERSION
+            assert (
+                version.parse(pl.__version__) >= version.parse(DEEPSPEED_MIN_PL_VERSION)
             ), f"For DeepSpeed Offloading to work reliably you need at least lightning version {DEEPSPEED_MIN_PL_VERSION}, however, found {pl.__version__}. Please update your lightning version."
             from ..optimization.deepspeed import CustomDeepSpeedStrategy
 
@@ -1335,13 +1334,19 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             model=model,
         )
 
+        best_score = (
+            trainer.callback_metrics[f"val_{self._validation_metric_name}"].item()
+            if f"val_{self._validation_metric_name}" in trainer.callback_metrics
+            else self._best_score
+        )  # https://github.com/autogluon/autogluon/issues/4428
+
         return dict(
             config=config,
             df_preprocessor=df_preprocessor,
             data_processors=data_processors,
             model=model,
             model_postprocess_fn=model_postprocess_fn,
-            best_score=trainer.callback_metrics[f"val_{self._validation_metric_name}"].item(),
+            best_score=best_score,
             strategy=strategy,
             strict_loading=not peft_param_names,
         )
@@ -1472,7 +1477,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                     "state_dict": {"model." + name: param for name, param in self._model.state_dict().items()}
                 }
 
-        torch.save(checkpoint, os.path.join(save_path, MODEL_CHECKPOINT))
+        torch.save(checkpoint, os.path.join(save_path, MODEL_CHECKPOINT))  # nosec B614
 
         if clean_ckpts:
             # clean old checkpoints + the intermediate files stored
@@ -1543,7 +1548,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         column_types = self._column_types
         column_types_copy = copy.deepcopy(column_types)
         for col_name, col_type in column_types.items():
-            if col_type in [IMAGE_BYTEARRAY, IMAGE_PATH]:
+            if col_type in [IMAGE_BYTEARRAY, IMAGE_PATH, IMAGE_BASE64_STR]:
                 if is_image_column(data=data[col_name], col_name=col_name, image_type=IMAGE_PATH):
                     image_type = IMAGE_PATH
                 elif is_image_column(
@@ -1552,6 +1557,8 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                     image_type=IMAGE_BYTEARRAY,
                 ):
                     image_type = IMAGE_BYTEARRAY
+                elif is_image_column(data=data[col_name], col_name=col_name, image_type=IMAGE_BASE64_STR):
+                    image_type = IMAGE_BASE64_STR
                 else:
                     image_type = col_type
                 if col_type != image_type:
@@ -2105,9 +2112,9 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
                 convert_zero_checkpoint_to_fp32_state_dict(path + "-dir", path)
                 shutil.rmtree(path + "-dir")
-                state_dict = torch.load(path, map_location=torch.device("cpu"))["state_dict"]
+                state_dict = torch.load(path, map_location=torch.device("cpu"))["state_dict"]  # nosec B614
             else:
-                state_dict = torch.load(path, map_location=torch.device("cpu"))["state_dict"]
+                state_dict = torch.load(path, map_location=torch.device("cpu"))["state_dict"]  # nosec B614
         state_dict = {k.partition(prefix)[2]: v for k, v in state_dict.items() if k.startswith(prefix)}
 
         # Some buffers like `position_ids` are registered as persistent=False since transformers 4.31.0
@@ -2215,7 +2222,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
         if save_model:
             checkpoint = {"state_dict": {"model." + name: param for name, param in model.state_dict().items()}}
-            torch.save(checkpoint, os.path.join(os.path.abspath(path), MODEL_CHECKPOINT))
+            torch.save(checkpoint, os.path.join(os.path.abspath(path), MODEL_CHECKPOINT))  # nosec B614
 
     @staticmethod
     def _load_metadata(
