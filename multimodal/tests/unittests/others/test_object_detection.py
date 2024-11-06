@@ -269,6 +269,8 @@ def test_detector_hyperparameters_consistency():
     assert predictor._learner._config == predictor_2._learner._config
 
 
+# TODO: Issue #4126 Skipping object detection tests due to incompatibility of mmdet with Torch 2.2
+@pytest.mark.torch_mmdet
 def test_detector_coco_root_setup():
     data_dir = download_sample_dataset()
     train_path = os.path.join(data_dir, "Annotations", "trainval_cocoformat.json")
