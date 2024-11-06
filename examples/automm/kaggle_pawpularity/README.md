@@ -84,7 +84,6 @@ Through the code following, you can import AutoGluon into your work.
 It should be noted that AutoGluon itself needs some dependencies which are not supported in the Kaggle environment. They should be introduced the same way as Auotgluon. 
 Currently, these libraries need to be imported manually:
 
- - nptyping
  - typish
  - timm
  - omegaconf

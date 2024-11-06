@@ -6,7 +6,7 @@ from copy import deepcopy
 from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
-from nptyping import NDArray
+from numpy.typing import NDArray
 from omegaconf import DictConfig
 from torch import nn
 
@@ -181,7 +181,7 @@ class TextProcessor:
 
     def build_one_token_sequence(
         self,
-        text_tokens: Dict[str, NDArray],
+        text_tokens: Dict[str, NDArray[np.float64]],
     ) -> Dict:
         """
         Construct one token sequence based on multiple token sequences coming from different

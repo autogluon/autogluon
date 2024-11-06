@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
-from nptyping import NDArray
+from numpy.typing import NDArray
 from omegaconf import DictConfig, OmegaConf
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.impute import SimpleImputer
@@ -655,7 +655,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
     def transform_numerical(
         self,
         df: pd.DataFrame,
-    ) -> Tuple[Dict[str, NDArray], None]:
+    ) -> Tuple[Dict[str, NDArray[np.float64]], None]:
         """
         Preprocess numerical data by using SimpleImputer to fill possible missing values
         and StandardScaler to standardize the values (z = (x - mean) / std).

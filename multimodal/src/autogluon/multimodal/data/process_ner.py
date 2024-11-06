@@ -4,7 +4,7 @@ import warnings
 from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
-from nptyping import NDArray
+from numpy.typing import NDArray
 from omegaconf import DictConfig
 from torch import nn
 
@@ -146,8 +146,8 @@ class NerProcessor:
 
     def __call__(
         self,
-        all_features: Dict[str, Union[NDArray, list]],
-        feature_modalities: Dict[str, Union[NDArray, list]],
+        all_features: Dict[str, Union[NDArray[np.float64], list]],
+        feature_modalities: Dict[str, Union[NDArray[np.float64], list]],
         is_training: bool,
     ) -> Dict:
         """
