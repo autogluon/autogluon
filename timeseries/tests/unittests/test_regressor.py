@@ -19,7 +19,6 @@ def get_multi_window_zero_model(hyperparameters=None, **kwargs):
     return MultiWindowBacktestingModel(model_base=ZeroModel, model_base_kwargs=model_base_kwargs, **kwargs)
 
 
-REGRESSOR_MODELS = ["LR", "GBM"]
 TESTABLE_MODELS = [ZeroModel, get_multi_window_zero_model]
 
 
