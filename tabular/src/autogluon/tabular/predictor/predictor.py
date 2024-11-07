@@ -714,6 +714,15 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             The total amount of gpus you want AutoGluon predictor to use.
             Auto means AutoGluon will make the decision based on the total number of gpus available and the model requirement for best performance.
             Users generally don't need to set this value
+        fit_strategy: Literal["sequential", "parallel"], default = "sequential"
+            The strategy used to fit models.
+            If "sequential", models will be fit sequentially. This is the most stable option with the most readable logging.
+            If "parallel", models will be fit in parallel with ray, splitting available compute between them.
+                Note: "parallel" is experimental and may run into issues. It was first added in version 1.2.0.
+            For machines with 16 or more CPU cores, it is likely that "parallel" will be faster than "sequential".
+
+            .. versionadded:: 1.2.0
+
         memory_limit: float | str, default = "auto"
             The total amount of memory in GB you want AutoGluon predictor to use. "auto" means AutoGluon will use all available memory on the system
             (that is detectable by psutil).
@@ -1807,6 +1816,16 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             The total amount of gpus you want AutoGluon predictor to use.
             Auto means AutoGluon will make the decision based on the total number of gpus available and the model requirement for best performance.
             Users generally don't need to set this value
+        fit_strategy: Literal["auto", "sequential", "parallel"], default = "auto"
+            The strategy used to fit models.
+            If "auto", uses the same fit_strategy as used in the original :meth:`TabularPredictor.fit` call.
+            If "sequential", models will be fit sequentially. This is the most stable option with the most readable logging.
+            If "parallel", models will be fit in parallel with ray, splitting available compute between them.
+                Note: "parallel" is experimental and may run into issues. It was first added in version 1.2.0.
+            For machines with 16 or more CPU cores, it is likely that "parallel" will be faster than "sequential".
+
+            .. versionadded:: 1.2.0
+
         memory_limit: float | str, default = "auto"
             The total amount of memory in GB you want AutoGluon predictor to use. "auto" means AutoGluon will use all available memory on the system
             (that is detectable by psutil).
@@ -3596,6 +3615,16 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             The total amount of gpus you want AutoGluon predictor to use.
             Auto means AutoGluon will make the decision based on the total number of gpus available and the model requirement for best performance.
             Users generally don't need to set this value
+        fit_strategy: Literal["auto", "sequential", "parallel"], default = "auto"
+            The strategy used to fit models.
+            If "auto", uses the same fit_strategy as used in the original :meth:`TabularPredictor.fit` call.
+            If "sequential", models will be fit sequentially. This is the most stable option with the most readable logging.
+            If "parallel", models will be fit in parallel with ray, splitting available compute between them.
+                Note: "parallel" is experimental and may run into issues. It was first added in version 1.2.0.
+            For machines with 16 or more CPU cores, it is likely that "parallel" will be faster than "sequential".
+
+            .. versionadded:: 1.2.0
+
         **kwargs
             [Advanced] Developer debugging arguments.
 
