@@ -10,7 +10,7 @@ import traceback
 import typing
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import networkx as nx
 import numpy as np
@@ -726,6 +726,7 @@ class AbstractTrainer:
         X_unlabeled=None,
         level=1,
         base_model_names: List[str] = None,
+        fit_strategy: Literal["sequential", "parallel"] = "sequential",
         stack_name="core",
         ag_args=None,
         ag_args_fit=None,
@@ -808,7 +809,7 @@ class AbstractTrainer:
                 }
                 kwargs["hyperparameter_tune_kwargs"] = hyperparameter_tune_kwargs
 
-        logger.log(10 if ((not refit_full) and DistributedContext.is_distributed_mode()) else 20, f"Fitting {len(models)} L{level} models ...")
+        logger.log(10 if ((not refit_full) and DistributedContext.is_distributed_mode()) else 20, f'Fitting {len(models)} L{level} models, fit_strategy="{fit_strategy}" ...')
 
         X_init = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=True)
         feature_metadata = self.get_feature_metadata(use_orig_features=True, base_models=base_model_names)
@@ -844,6 +845,7 @@ class AbstractTrainer:
             stack_name=stack_name,
             compute_score=compute_score,
             fit_kwargs=fit_kwargs,
+            fit_strategy=fit_strategy,
             **kwargs,
         )
 
@@ -1413,7 +1415,17 @@ class AbstractTrainer:
 
     # You must have previously called fit() with cache_data=True
     # Fits _FULL versions of specified models, but does NOT link them (_FULL stackers will still use normal models as input)
-    def refit_single_full(self, X=None, y=None, X_val=None, y_val=None, X_unlabeled=None, models=None, **kwargs) -> List[str]:
+    def refit_single_full(
+        self,
+        X=None,
+        y=None,
+        X_val=None,
+        y_val=None,
+        X_unlabeled=None,
+        models=None,
+        fit_strategy: Literal["sequential", "parallel"] = "sequential",
+        **kwargs,
+    ) -> list[str]:
         if X is None:
             X = self.load_X()
         if X_val is None:
@@ -1442,7 +1454,7 @@ class AbstractTrainer:
         models_trained_full = []
         model_refit_map = {}  # FIXME: is this even used, remove?
 
-        if not DistributedContext.is_distributed_mode():
+        if fit_strategy == "sequential":
             for level in levels:
                 models_level = model_levels[level]
                 for model in models_level:
@@ -1467,11 +1479,8 @@ class AbstractTrainer:
                             refit_full_parent_val_score=self.get_model_attribute(model_name, "val_score"),
                         )
                     models_trained_full += models_trained
-        else:
+        elif fit_strategy == "parallel":
             # -- Distributed refit
-            from autogluon.core.ray.distributed_jobs_managers import DistributedFitManager
-            from autogluon.common.utils.try_import import try_import_ray
-
             ray = try_import_ray()
 
             distributed_manager = DistributedFitManager(
@@ -1528,6 +1537,8 @@ class AbstractTrainer:
                 distributed_manager.clean_job_state(unfinished_job_refs=unfinished_job_refs)
 
             distributed_manager.clean_up_ray()
+        else:
+            raise ValueError(f"Invalid value for fit_strategy: '{fit_strategy}'")
 
         keys_to_del = []
         for model in model_refit_map.keys():
@@ -2685,14 +2696,22 @@ class AbstractTrainer:
     # TODO: Add time_limit_per_model
     # TODO: Rename for v0.1
     def _train_multi_fold(
-        self, X, y, models: List[AbstractModel], time_limit=None, time_split=False, time_ratio=1, hyperparameter_tune_kwargs=None, **kwargs
-    ) -> List[str]:
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
+        models: list[AbstractModel],
+        time_limit: float | None = None,
+        time_split: bool = False,
+        time_ratio: float = 1,
+        hyperparameter_tune_kwargs: dict | None = None,
+        fit_strategy: Literal["sequential", "parallel"] = "sequential",
+        **kwargs,
+    ) -> list[str]:
         """
         Trains and saves a list of models sequentially.
         This method should only be called in self._train_multi_initial
         Returns a list of trained model names.
         """
-        models_valid = []
         time_start = time.time()
         if time_limit is not None:
             time_limit = time_limit * time_ratio
@@ -2701,7 +2720,8 @@ class AbstractTrainer:
         else:
             time_limit_model_split = time_limit
 
-        if (not DistributedContext.is_distributed_mode()) or (kwargs["stack_name"] != "core"):
+        if fit_strategy == "sequential":
+            models_valid = []
             for model in models:
                 if self._callback_early_stop:
                     return models_valid
@@ -2718,13 +2738,40 @@ class AbstractTrainer:
                     hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
                     kwargs=kwargs,
                 )
+        elif fit_strategy == "parallel":
+            models_valid = self._train_multi_fold_parallel(
+                X=X,
+                y=y,
+                models=models,
+                time_start=time_start,
+                time_limit_model_split=time_limit_model_split,
+                time_limit=time_limit,
+                time_split=time_split,
+                hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+                **kwargs,
+            )
+        else:
+            raise ValueError(f"Invalid value for fit_strategy: '{fit_strategy}'")
+        return models_valid
 
-            return models_valid
-
-        # -- Distributed training
+    def _train_multi_fold_parallel(
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
+        models: list[AbstractModel],
+        time_start: float,
+        time_limit_model_split: float | None,
+        time_limit: float | None = None,
+        time_split: bool = False,
+        hyperparameter_tune_kwargs: dict | None = None,
+        **kwargs,
+    ) -> list[str]:
+        # -- Parallel or Distributed training
         ray = try_import_ray()
 
-        logger.log(20, "Scheduling distributed model-workers for training...")
+        models_valid = []
+
+        logger.log(20, "Scheduling parallel model-workers for training...")
         distributed_manager = DistributedFitManager(
             mode="fit",
             func=_remote_train_multi_fold,
@@ -2746,14 +2793,13 @@ class AbstractTrainer:
             num_splits=kwargs.get("k_fold", 1) * kwargs.get("n_repeats", 1)
         )
         unfinished_job_refs = distributed_manager.schedule_jobs(models_to_fit=models)
-        timeout = int(time_limit - (time.time() - time_start) + 5) if time_limit is not None else None # include 5 second overhead.
-
+        timeout = int(time_limit - (time.time() - time_start) + 5) if time_limit is not None else None  # include 5 second overhead.
 
         while unfinished_job_refs:
             finished, unfinished_job_refs = ray.wait(unfinished_job_refs, num_returns=1, timeout=timeout)
 
             if not finished:
-                logger.log(20,"Ran into timeout while waiting for model training to finish. Stopping now.")
+                logger.log(20, "Ran into timeout while waiting for model training to finish. Stopping now.")
                 break
 
             distributed_manager.deallocate_resources(job_ref=finished[0])
@@ -2789,13 +2835,13 @@ class AbstractTrainer:
                     logger.log(20, f"Failed to add {model_name} to model graph.")
 
             # Stop due to time limit after adding model
-            if (time_limit is not None) and ((time.time()-time_start) > time_limit):
-                logger.log(20,"Time limit reached for this stacking layer. Stopping model training and cancel pending tasks.")
+            if (time_limit is not None) and ((time.time() - time_start) > time_limit):
+                logger.log(20, "Time limit reached for this stacking layer. Stopping model training and cancel pending tasks.")
                 break
 
             # TODO: look into what this does / how this works for distributed training
             if self._callback_early_stop:
-                logger.log(20,"Callback triggered in distributed setting. Stopping model training and cancel pending tasks.")
+                logger.log(20, "Callback triggered in parallel setting. Stopping model training and cancel pending tasks.")
                 break
 
             # Re-schedule jobs

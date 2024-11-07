@@ -226,6 +226,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         self._trainer: AbstractTrainer = None
         self._sub_fits: List[str] = []
         self._stacked_overfitting_occurred: bool | None = None
+        self._fit_strategy = None
 
         if log_to_file:
             self._setup_log_to_file(log_file_path=log_file_path)
@@ -411,6 +412,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         calibrate_decision_threshold: bool | str = "auto",
         num_cpus: int | str = "auto",
         num_gpus: int | str = "auto",
+        fit_strategy: Literal["sequential", "parallel"] = "sequential",
         memory_limit: float | str = "auto",
         callbacks: List[AbstractCallback] = None,
         **kwargs,
@@ -1075,6 +1077,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         self._validate_num_gpus(num_gpus=num_gpus)
         self._validate_and_set_memory_limit(memory_limit=memory_limit)
         self._validate_calibrate_decision_threshold(calibrate_decision_threshold=calibrate_decision_threshold)
+        self._validate_fit_strategy(fit_strategy=fit_strategy)
 
         holdout_frac = kwargs["holdout_frac"]
         num_bag_folds = kwargs["num_bag_folds"]
@@ -1209,6 +1212,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             "excluded_model_types": excluded_model_types,
             "feature_prune_kwargs": kwargs.get("feature_prune_kwargs", None),
             "delay_bag_sets": delay_bag_sets,
+            "fit_strategy": fit_strategy,
         }
         aux_kwargs = {
             "total_resources": {
@@ -1250,6 +1254,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             infer_limit=infer_limit,
             num_cpus=num_cpus,
             num_gpus=num_gpus,
+            fit_strategy=fit_strategy,
             raise_on_no_models_fitted=kwargs["raise_on_no_models_fitted"],
         )
         if dynamic_stacking:
@@ -1273,6 +1278,9 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
             ag_fit_kwargs["num_stack_levels"] = num_stack_levels
             ag_fit_kwargs["time_limit"] = time_limit
+
+        # keep track of the fit strategy used for future calls
+        self._fit_strategy = fit_strategy
 
         self._fit(ag_fit_kwargs=ag_fit_kwargs, ag_post_fit_kwargs=ag_post_fit_kwargs)
 
@@ -1598,6 +1606,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         num_cpus: int | str = "auto",
         num_gpus: int | str = "auto",
         refit_full_kwargs: dict = None,
+        fit_strategy: Literal["auto", "sequential", "parallel"] = "sequential",
         raise_on_no_models_fitted: bool = True,
     ):
         if refit_full_kwargs is None:
@@ -1640,6 +1649,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                     set_best_to_refit_full=_set_best_to_refit_full,
                     num_cpus=num_cpus,
                     num_gpus=num_gpus,
+                    fit_strategy=fit_strategy,
                     **refit_full_kwargs,
                 )
             else:
@@ -1648,6 +1658,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                     set_best_to_refit_full=_set_best_to_refit_full,
                     num_cpus=num_cpus,
                     num_gpus=num_gpus,
+                    fit_strategy=fit_strategy,
                     **refit_full_kwargs,
                 )
 
@@ -1753,6 +1764,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         full_weighted_ensemble_additionally: bool = False,
         num_cpus: str | int = "auto",
         num_gpus: str | int = "auto",
+        fit_strategy: Literal["auto", "sequential", "parallel"] = "auto",
         memory_limit: float | str = "auto",
         **kwargs,
     ) -> "TabularPredictor":
@@ -1834,6 +1846,10 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         self._validate_num_gpus(num_gpus=num_gpus)
         self._validate_and_set_memory_limit(memory_limit=memory_limit)
 
+        if fit_strategy == "auto":
+            fit_strategy = self._fit_strategy
+        self._validate_fit_strategy(fit_strategy=fit_strategy)
+
         # TODO: Allow disable aux (default to disabled)
         # TODO: num_bag_sets
         # num_bag_sets = kwargs['num_bag_sets']
@@ -1893,6 +1909,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             "ag_args_ensemble": ag_args_ensemble,
             "ag_args_fit": ag_args_fit,
             "excluded_model_types": excluded_model_types,
+            "fit_strategy": fit_strategy,
         }
 
         # FIXME: v1.2 pseudo_data can be passed in `fit()` but it is ignored!
@@ -3531,6 +3548,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         train_data_extra: pd.DataFrame = None,
         num_cpus: int | str = "auto",
         num_gpus: int | str = "auto",
+        fit_strategy: Literal["auto", "sequential", "parallel"] = "auto",
         **kwargs,
     ) -> Dict[str, str]:
         """
@@ -3605,13 +3623,17 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             "num_gpus": num_gpus,
         }
 
+        if fit_strategy == "auto":
+            fit_strategy = self._fit_strategy
+        self._validate_fit_strategy(fit_strategy=fit_strategy)
+
         if train_data_extra is not None:
             assert kwargs.get("X_pseudo", None) is None, f"Cannot pass both train_data_extra and X_pseudo arguments"
             assert kwargs.get("y_pseudo", None) is None, f"Cannot pass both train_data_extra and y_pseudo arguments"
             X_pseudo, y_pseudo, _ = self._sanitize_pseudo_data(pseudo_data=train_data_extra, name="train_data_extra")
             kwargs["X_pseudo"] = X_pseudo
             kwargs["y_pseudo"] = y_pseudo
-        refit_full_dict = self._learner.refit_ensemble_full(model=model, total_resources=total_resources, **kwargs)
+        refit_full_dict = self._learner.refit_ensemble_full(model=model, total_resources=total_resources, fit_strategy=fit_strategy, **kwargs)
 
         if set_best_to_refit_full:
             if isinstance(set_best_to_refit_full, str):
@@ -4936,6 +4958,11 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         if memory_limit != "auto":
             logger.log(20, f"Enforcing custom memory (soft) limit of {memory_limit} GB!")
             os.environ["AG_MEMORY_LIMIT_IN_GB"] = str(memory_limit)
+
+    def _validate_fit_strategy(self, fit_strategy: str):
+        valid_values = ["sequential", "parallel"]
+        if fit_strategy not in valid_values:
+            raise ValueError(f"fit_strategy must be one of {valid_values}. Value: {fit_strategy}")
 
     def _fit_extra_kwargs_dict(self) -> dict:
         """
