@@ -60,13 +60,13 @@ def _get_image_info(image_path: str):
 def get_df_unique_classes(data: pd.DataFrame):
     """
     Get the unique classes and their category IDs from the dataframe for object detection.
-    
+
     Parameters
     ----------
     data : pd.DataFrame
-        DataFrame holding the data for object detection. Each row should contain a 'rois' 
+        DataFrame holding the data for object detection. Each row should contain a 'rois'
         column with detection boxes and class labels.
-        
+
     Returns
     -------
     tuple
@@ -75,26 +75,26 @@ def get_df_unique_classes(data: pd.DataFrame):
         - category_ids: dict mapping class names to their numeric IDs
     """
     unique_classes = {}
-    
+
     # Iterate through all rows in the dataframe
     for idx in range(data.shape[0]):
         row = data.iloc[idx]
         rois = row["rois"]
-        
+
         # Process each ROI in the current row
         for roi in rois:
             # Unpack ROI values (assuming last element is class label)
             *_, class_label = roi
-            
+
             # Add new classes to the dictionary with auto-incrementing IDs
             if class_label not in unique_classes:
                 # Start IDs from 1, as 0 is often reserved for background
                 unique_classes[class_label] = len(unique_classes) + 1
-    
+
     # Create the output lists/dicts
     class_names = list(unique_classes.keys())
     category_ids = unique_classes
-    
+
     return class_names, category_ids
 
 
@@ -1204,12 +1204,12 @@ def from_coco_or_voc(file_path: str, splits: Optional[Union[str]] = None, coco_r
 def get_coco_format_classes(sample_data_path: str):
     """
     Get class names and category IDs for COCO format data.
-    
+
     Parameters
     ----------
     sample_data_path : str
         The path to COCO format json annotation file. Could be any split, e.g. train/val/test/....
-        
+
     Returns
     -------
     tuple
@@ -1222,25 +1222,25 @@ def get_coco_format_classes(sample_data_path: str):
             annotation = json.load(f)
     except:
         raise ValueError(f"Failed to load json from provided json file: {sample_data_path}.")
-    
+
     # Extract both names and IDs from categories
     class_names = [cat["name"] for cat in annotation["categories"]]
-    
+
     # Create mapping of names to their original COCO category IDs
     category_ids = [cat["id"] for cat in annotation["categories"]]
-    
+
     return class_names, category_ids
 
 
 def get_voc_format_classes(root: str):
     """
     Get class names and category IDs for VOC format data.
-    
+
     Parameters
     ----------
     root : str
         The path to the root directory of VOC data.
-        
+
     Returns
     -------
     tuple
@@ -1250,10 +1250,10 @@ def get_voc_format_classes(root: str):
     """
     if is_url(root):
         root = download(root)
-    
+
     rpath = Path(root).expanduser()
     labels_file = os.path.join(rpath, "labels.txt")
-    
+
     if os.path.exists(labels_file):
         with open(labels_file) as f:
             class_names = [line.rstrip().lower() for line in f]
@@ -1265,22 +1265,21 @@ def get_voc_format_classes(root: str):
             "Creating labels.txt by scanning the directory: {}".format(os.path.join(root, "Annotations"))
         )
         class_names = dump_voc_classes(
-            voc_annotation_path=os.path.join(root, "Annotations"), 
-            voc_class_names_output_path=labels_file
+            voc_annotation_path=os.path.join(root, "Annotations"), voc_class_names_output_path=labels_file
         )
-    
+
     # There are no category IDs in VOC format
     # Create category IDs dictionary starting from 1
     # 0 is typically reserved for background in many frameworks
     category_ids = [idx + 1 for idx, name in enumerate(class_names)]
-    
+
     return class_names, category_ids
 
 
 def get_detection_classes(sample_data_path):
     """
     Get class names and category IDs from detection dataset in various formats.
-    
+
     Parameters
     ----------
     sample_data_path : Union[str, pd.DataFrame]
@@ -1288,14 +1287,14 @@ def get_detection_classes(sample_data_path):
         - str (directory): Path to root directory of VOC format data
         - str (file): Path to COCO format JSON annotation file
         - pd.DataFrame: DataFrame containing detection data with 'rois' column
-        
+
     Returns
     -------
     tuple
         A tuple containing (class_names, category_ids) where:
         - class_names: list of class name strings
         - category_ids: dict mapping class names to their numeric IDs
-        
+
         For VOC: IDs start from 1
         For COCO: Original category IDs from annotation file
         For DataFrame: Sequential IDs starting from 1
@@ -1621,20 +1620,20 @@ def save_result_voc_format(pred, result_path):
 def convert_pred_to_xywh(pred: Optional[List]) -> Optional[List]:
     """
     Convert prediction bounding boxes from XYXY to XYWH format.
-    
+
     Args:
         pred: List of predictions, where each prediction contains 'bboxes' that can be
              either a torch.Tensor or numpy.ndarray
-    
+
     Returns:
         Modified list of predictions with bboxes in XYWH format
     """
     if not pred:
         return pred
-        
+
     for i, pred_per_image in enumerate(pred):
         bboxes = pred_per_image["bboxes"]
-        
+
         # Handle numpy array case
         if isinstance(bboxes, np.ndarray):
             pred[i]["bboxes"] = bbox_xyxy_to_xywh(bboxes)
@@ -1643,5 +1642,5 @@ def convert_pred_to_xywh(pred: Optional[List]) -> Optional[List]:
             pred[i]["bboxes"] = bbox_xyxy_to_xywh(bboxes.detach().numpy())
         else:
             raise TypeError(f"Unsupported bbox type: {type(bboxes)}. Expected numpy.ndarray or torch.Tensor")
-            
+
     return pred

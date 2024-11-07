@@ -105,7 +105,7 @@ class ObjectDetectionLearner(BaseLearner):
         if self._model.model.CLASSES is not None and self._classes is not None:
             assert self._classes == self._model.model.CLASSES, f"{self._classes}\n{self._model.model.CLASSES}"
         return self._classes if self._classes is not None else self._model.model.CLASSES
-    
+
     @property
     def category_ids(self):
         """
