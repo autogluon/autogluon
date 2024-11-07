@@ -111,7 +111,7 @@ class InterpretableTabularPredictor(TabularPredictor):
 
         Parameters
         ----------
-        data : str or :class:`TabularDataset` or :class:`pd.DataFrame`
+        data : str or :class:`pd.DataFrame`
             The data to make predictions for. Should contain same column names as training Dataset and follow same format
             (may contain extra columns that won't be used by Predictor, including the label-column itself).
             If str is passed, `data` will be loaded using the str value as the file path.

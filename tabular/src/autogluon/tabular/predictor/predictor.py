@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 from packaging import version
 
-from autogluon.common import FeatureMetadata
+from autogluon.common import FeatureMetadata, TabularDataset
 from autogluon.common.loaders import load_json
 from autogluon.common.savers import save_json
 from autogluon.common.utils.file_utils import get_directory_size, get_directory_size_per_file
@@ -39,7 +39,6 @@ from autogluon.core.constants import (
     SOFTCLASS,
 )
 from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
-from autogluon.core.dataset import TabularDataset
 from autogluon.core.metrics import Scorer, get_metric
 from autogluon.core.problem_type import problem_type_info
 from autogluon.core.pseudolabeling.pseudolabeling import filter_ensemble_pseudo, filter_pseudo
@@ -397,8 +396,8 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
     @apply_presets(tabular_presets_dict, tabular_presets_alias)
     def fit(
         self,
-        train_data,
-        tuning_data=None,
+        train_data: pd.DataFrame | str,
+        tuning_data: pd.DataFrame | str = None,
         time_limit: float = None,
         presets: List[str] | str = None,
         hyperparameters: dict | str = None,
@@ -421,10 +420,10 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
         Parameters
         ----------
-        train_data : str or :class:`TabularDataset` or :class:`pd.DataFrame`
-            Table of the training data, which is similar to a pandas DataFrame.
+        train_data : :class:`pd.DataFrame` or str
+            Table of the training data as a pandas DataFrame.
             If str is passed, `train_data` will be loaded using the str value as the file path.
-        tuning_data : str or :class:`TabularDataset` or :class:`pd.DataFrame`, default = None
+        tuning_data : :class:`pd.DataFrame` or str, optional
             Another dataset containing validation data reserved for tuning processes such as early stopping and hyperparameter tuning.
             This dataset should be in the same format as `train_data`.
             If str is passed, `tuning_data` will be loaded using the str value as the file path.
@@ -868,7 +867,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                     `enable_callbacks` : bool, default = False
                         If True, will perform a deepcopy on the specified user callbacks and enable them during the DyStack call.
                         If False, will not include callbacks in the DyStack call.
-                    `holdout_data`: str or :class:`TabularDataset` or :class:`pd.DataFrame`, default = None
+                    `holdout_data`: str or :class:`pd.DataFrame`, default = None
                         Another dataset containing validation data reserved for detecting stacked overfitting. This dataset should be in the same format as
                         `train_data`. If str is passed, `holdout_data` will be loaded using the str value as the file path.
                         If `holdout_data` is not None, the sub-fit is fit on all of `train_data` and the full fit is fit on all of `train_data` and
@@ -987,8 +986,8 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 (which may improve metrics like log_loss) and will train a scalar parameter on the validation set.
                 If True and the problem_type is quantile regression, conformalization will be used to calibrate the Predictor's estimated quantiles
                 (which may improve the prediction interval coverage, and bagging could further improve it) and will compute a set of scalar parameters on the validation set.
-            test_data : str or :class:`TabularDataset` or :class:`pd.DataFrame`, default = None
-                Table of the test data, which is similar to a pandas DataFrame.
+            test_data : str or :class:`pd.DataFrame`, default = None
+                Table of the test data.
                 If str is passed, `test_data` will be loaded using the str value as the file path.
                 NOTE: This test_data is NEVER SEEN by the model during training and, if specified, is only used for logging purposes (i.e. for learning curve generation).
                 This test_data should be treated the same way test data is used in predictor.leaderboard.
@@ -1972,9 +1971,9 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
         Parameters:
         -----------
-        unlabeled_data: Extra unlabeled data (could be the test data) to assign pseudolabels to
-            and incorporate as extra training data.
-        max_iter: int, default = 5
+        unlabeled_data: pd.DataFrame
+            Extra unlabeled data (could be the test data) to assign pseudolabels to and incorporate as extra training data.
+        max_iter: int
             Maximum allowed number of iterations, where in each iteration, the data are pseudolabeled
             by the current predictor and the predictor is refit including the pseudolabled data in its training set.
         return_pred_proba: bool, default = False
@@ -2128,7 +2127,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
         Parameters
         ----------
-        pseudo_data : str or :class:`TabularDataset` or :class:`pd.DataFrame`
+        pseudo_data : :class:`pd.DataFrame`
             Extra data to incorporate into training. Pre-labeled test data allowed. If no labels
             then pseudo-labeling algorithm will predict and filter out which rows to incorporate into training
         max_iter: int, default = 3
@@ -2233,20 +2232,20 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
     def predict(
         self,
-        data: str | TabularDataset | pd.DataFrame,
+        data: pd.DataFrame | str,
         model: str | None = None,
         as_pandas: bool = True,
         transform_features: bool = True,
         *,
         decision_threshold: float | None = None,
-    ):
+    ) -> pd.Series | np.ndarray:
         """
         Use trained models to produce predictions of `label` column values for new data.
 
         Parameters
         ----------
-        data : str or :class:`TabularDataset` or :class:`pd.DataFrame`
-            The data to make predictions for. Should contain same column names as training Dataset and follow same format
+        data : :class:`pd.DataFrame` or str
+            The data to make predictions for. Should contain same column names as training data and follow same format
             (may contain extra columns that won't be used by Predictor, including the label-column itself).
             If str is passed, `data` will be loaded using the str value as the file path.
         model : str (optional)
@@ -2279,19 +2278,19 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
     def predict_proba(
         self,
-        data: str | TabularDataset | pd.DataFrame,
+        data: pd.DataFrame | str,
         model: str | None = None,
         as_pandas: bool = True,
         as_multiclass: bool = True,
         transform_features: bool = True,
-    ):
+    ) -> pd.DataFrame | pd.Series | np.ndarray:
         """
         Use trained models to produce predicted class probabilities rather than class-labels (if task is classification).
         If `predictor.problem_type` is regression or quantile, this will raise an AssertionError.
 
         Parameters
         ----------
-        data : str or :class:`TabularDataset` or :class:`pd.DataFrame`
+        data : :class:`pd.DataFrame` or str
             The data to make predictions for. Should contain same column names as training dataset and follow same format
             (may contain extra columns that won't be used by Predictor, including the label-column itself).
             If str is passed, `data` will be loaded using the str value as the file path.
@@ -2383,14 +2382,23 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         """
         return self._learner.is_fit
 
-    def evaluate(self, data, model=None, decision_threshold=None, display: bool = False, auxiliary_metrics=True, detailed_report=False, **kwargs) -> dict:
+    def evaluate(
+        self,
+        data: pd.DataFrame | str,
+        model: str = None,
+        decision_threshold: float = None,
+        display: bool = False,
+        auxiliary_metrics: bool = True,
+        detailed_report: bool = False,
+        **kwargs,
+    ) -> dict:
         """
         Report the predictive performance evaluated over a given dataset.
         This is basically a shortcut for: `pred_proba = predict_proba(data); evaluate_predictions(data[label], pred_proba)`.
 
         Parameters
         ----------
-        data : str or :class:`TabularDataset` or :class:`pd.DataFrame`
+        data : str or :class:`pd.DataFrame`
             This dataset must also contain the `label` with the same column-name as previously specified.
             If str is passed, `data` will be loaded using the str value as the file path.
             If `self.sample_weight` is set and `self.weight_evaluation==True`, then a column with the sample weight name is checked and used for weighted metric evaluation if it exists.
@@ -2500,7 +2508,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
     def leaderboard(
         self,
-        data: str | TabularDataset | pd.DataFrame | None = None,
+        data: pd.DataFrame | str | None = None,
         extra_info: bool = False,
         extra_metrics: list | None = None,
         decision_threshold: float | None = None,
@@ -2539,8 +2547,8 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
         Parameters
         ----------
-        data : str or :class:`TabularDataset` or :class:`pd.DataFrame` (optional)
-            This Dataset must also contain the label-column with the same column-name as specified during fit().
+        data : str or :class:`pd.DataFrame` (optional)
+            This dataset must also contain the label-column with the same column-name as specified during fit().
             If extra_metrics=None and skip_score=True, then the label column is not required.
             If specified, then the leaderboard returned will contain additional columns 'score_test', 'pred_time_test', and 'pred_time_test_marginal'.
                 'score_test': The score of the model on the 'eval_metric' for the data provided.
@@ -2962,7 +2970,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             decision_threshold=decision_threshold,
         )
 
-    def fit_summary(self, verbosity=3, show_plot=False):
+    def fit_summary(self, verbosity: int = 3, show_plot: bool = False) -> dict:
         """
         Output summary of information about models produced during `fit()`.
         May create various generated summary plots and store them in folder: `predictor.path`.
@@ -3096,7 +3104,13 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             print("*** End of fit() summary ***")
         return results
 
-    def transform_features(self, data=None, model: str = None, base_models: List[str] = None, return_original_features: bool = True) -> pd.DataFrame:
+    def transform_features(
+        self,
+        data: pd.DataFrame | str = None,
+        model: str = None,
+        base_models: list[str] = None,
+        return_original_features: bool = True,
+    ) -> pd.DataFrame:
         """
         Transforms data features through the AutoGluon feature generator.
         This is useful to gain an understanding of how AutoGluon interprets the data features.
@@ -3109,7 +3123,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
         Parameters
         ----------
-        data: str or :class:`TabularDataset` or :class:`pd.DataFrame` (optional)
+        data: :class:`pd.DataFrame` or str (optional)
             The data to apply feature transformation to.
             This data does not require the label column.
             If str is passed, `data` will be loaded using the str value as the file path.
@@ -3225,7 +3239,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
         Parameters
         ----------
-        data : str or :class:`TabularDataset` or :class:`pd.DataFrame` (optional)
+        data : str or :class:`pd.DataFrame` (optional)
             This data must also contain the label-column with the same column-name as specified during `fit()`.
             If specified, then the data is used to calculate the feature importance scores.
             If str is passed, `data` will be loaded using the str value as the file path.
@@ -3787,7 +3801,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
     def calibrate_decision_threshold(
         self,
-        data: str | TabularDataset | pd.DataFrame | None = None,
+        data: pd.DataFrame | str | None = None,
         metric: str | Scorer | None = None,
         model: str = "best",
         decision_thresholds: int | List[float] = 25,
@@ -3807,7 +3821,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
         Parameters
         ----------
-        data : Union[str, pd.DataFrame], default = None
+        data : pd.DataFrame or str, optional
             The data to use for calibration. Must contain the label column.
             We recommend to keep this value as None unless you are an advanced user and understand the implications.
             If None, will use internal data such as the holdout validation data or out-of-fold predictions.
@@ -4251,17 +4265,17 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
     def distill(
         self,
-        train_data=None,
-        tuning_data=None,
-        augmentation_data=None,
-        time_limit=None,
-        hyperparameters=None,
-        holdout_frac=None,
-        teacher_preds="soft",
-        augment_method="spunge",
-        augment_args={"size_factor": 5, "max_size": int(1e5)},
-        models_name_suffix=None,
-        verbosity=None,
+        train_data: pd.DataFrame | str = None,
+        tuning_data: pd.DataFrame | str = None,
+        augmentation_data: pd.DataFrame = None,
+        time_limit: float = None,
+        hyperparameters: dict | str = None,
+        holdout_frac: float = None,
+        teacher_preds: str = "soft",
+        augment_method: str = "spunge",
+        augment_args: dict = {"size_factor": 5, "max_size": int(1e5)},
+        models_name_suffix: str = None,
+        verbosity: int = None,
     ):
         """
         [EXPERIMENTAL]
@@ -4274,14 +4288,14 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
 
         Parameters
         ----------
-        train_data : str or :class:`TabularDataset` or :class:`pd.DataFrame`, default = None
+        train_data : str or :class:`pd.DataFrame`, default = None
             Same as `train_data` argument of `fit()`.
             If None, the same training data will be loaded from `fit()` call used to produce this Predictor.
-        tuning_data : str or :class:`TabularDataset` or :class:`pd.DataFrame`, default = None
+        tuning_data : str or :class:`pd.DataFrame`, default = None
             Same as `tuning_data` argument of `fit()`.
             If `tuning_data = None` and `train_data = None`: the same training/validation splits will be loaded from `fit()` call used to produce this Predictor,
             unless bagging/stacking was previously used in which case a new training/validation split is performed.
-        augmentation_data : :class:`TabularDataset` or :class:`pd.DataFrame`, default = None
+        augmentation_data : :class:`pd.DataFrame`, default = None
             An optional extra dataset of unlabeled rows that can be used for augmenting the dataset used to fit student models during distillation (ignored if None).
         time_limit : int, default = None
             Approximately how long (in seconds) the distillation process should run for.
@@ -4479,25 +4493,23 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             print(msg + ": " + str(results[key]))
 
     @staticmethod
-    def _get_dataset(data, allow_nan: bool = False):
+    def _get_dataset(data, allow_nan: bool = False) -> pd.DataFrame | None:
         if data is None:
             if allow_nan:
                 return data
             else:
-                raise TypeError("data=None is invalid. data must be a TabularDataset or pandas.DataFrame or str file path to data")
-        elif isinstance(data, TabularDataset):
-            return data
+                raise TypeError("data=None is invalid. data must be a pd.DataFrame or str file path to data")
         elif isinstance(data, pd.DataFrame):
-            return TabularDataset(data)
+            return data
         elif isinstance(data, str):
             return TabularDataset(data)
         elif isinstance(data, pd.Series):
             raise TypeError(
-                "data must be TabularDataset or pandas.DataFrame, not pandas.Series. \
+                "data must be a pd.DataFrame, not pd.Series. \
                    To predict on just single example (ith row of table), use data.iloc[[i]] rather than data.iloc[i]"
             )
         else:
-            raise TypeError("data must be TabularDataset or pandas.DataFrame or str file path to data")
+            raise TypeError("data must be a pd.DataFrame or str file path to data")
 
     def _validate_hyperparameter_tune_kwargs(self, hyperparameter_tune_kwargs, time_limit=None):
         """
