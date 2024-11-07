@@ -134,7 +134,7 @@ class CovariateRegressor:
         available_columns = [ITEMID] + self.metadata.known_covariates
         if include_target:
             available_columns += [self.target]
-        tabular_df = pd.DataFrame(data).reset_index()[available_columns]
+        tabular_df = pd.DataFrame(data).reset_index()[available_columns].astype({ITEMID: "category"})
         if static_features is not None:
             tabular_df = pd.merge(tabular_df, static_features, on=ITEMID)
         return tabular_df

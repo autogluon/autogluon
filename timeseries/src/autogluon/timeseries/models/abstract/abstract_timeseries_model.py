@@ -168,6 +168,8 @@ class AbstractTimeSeriesModel(AbstractModel):
     def _initialize(self, **kwargs) -> None:
         self._init_params_aux()
         self._init_params()
+        self.target_scaler = self._create_target_scaler()
+        self.covariate_regressor = self._create_covariate_regressor()
 
     def _compute_fit_metadata(self, val_data: TimeSeriesDataFrame = None, **kwargs):
         fit_metadata = dict(
@@ -253,11 +255,9 @@ class AbstractTimeSeriesModel(AbstractModel):
         """
         start_time = time.monotonic()
         self.initialize(**kwargs)
-        self.target_scaler = self._create_target_scaler()
         if self.target_scaler is not None:
             train_data = self.target_scaler.fit_transform(train_data)
 
-        self.covariate_regressor = self._create_covariate_regressor()
         if self.covariate_regressor is not None:
             train_data = self.covariate_regressor.fit_transform(
                 train_data,

@@ -85,7 +85,7 @@ class LocalMinMaxScaler(LocalTargetScaler):
     def _compute_loc_scale(self, target_series: pd.Series) -> Tuple[pd.Series, pd.Series]:
         stats = target_series.abs().groupby(level=ITEMID, sort=False).agg(["min", "max"])
         scale = (stats["max"] - stats["min"]).clip(lower=self.min_scale)
-        loc = stats["min"] / scale
+        loc = stats["min"]
         return loc, scale
 
 
