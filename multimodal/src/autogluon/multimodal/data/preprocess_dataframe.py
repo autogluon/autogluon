@@ -655,7 +655,7 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
     def transform_numerical(
         self,
         df: pd.DataFrame,
-    ) -> Tuple[Dict[str, NDArray[np.float64]], None]:
+    ) -> Tuple[Dict[str, NDArray], None]:
         """
         Preprocess numerical data by using SimpleImputer to fill possible missing values
         and StandardScaler to standardize the values (z = (x - mean) / std).

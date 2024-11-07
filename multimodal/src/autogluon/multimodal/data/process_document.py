@@ -250,8 +250,8 @@ class DocumentProcessor:
 
     def process_one_sample(
         self,
-        document_features: Dict[str, Union[NDArray[np.float64], list]],
-        feature_modalities: Dict[str, Union[NDArray[np.float64], list]],
+        document_features: Dict[str, Union[NDArray, list]],
+        feature_modalities: Dict[str, Union[NDArray, list]],
         is_training: bool,
         image_mode: Optional[str] = "RGB",
     ):
@@ -361,8 +361,8 @@ class DocumentProcessor:
 
     def __call__(
         self,
-        all_features: Dict[str, Union[NDArray[np.float64], list]],
-        feature_modalities: Dict[str, Union[NDArray[np.float64], list]],
+        all_features: Dict[str, Union[NDArray, list]],
+        feature_modalities: Dict[str, Union[NDArray, list]],
         is_training: bool,
     ) -> Dict:
         """
