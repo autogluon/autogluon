@@ -127,8 +127,8 @@ def test_mmdet_object_detection_inference_basics(checkpoint_name):
     # Save inference in COCO on data without annotations
     pred = predictor.predict(test_path_with_images_only, save_results=True)
 
-    # Save inference in COCO on data without annotations
-    pred = predictor.predict(test_path_with_images_only, save_results=True, as_coco=True)
+    # Save inference in Pandas Dataframe (.csv) on data without annotations
+    pred = predictor.predict(test_path_with_images_only, save_results=True, as_coco=False)
 
 
 # TODO: FIX DDP multi runs!
