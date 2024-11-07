@@ -23,7 +23,7 @@ from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.log_utils import convert_time_in_s_to_log_friendly
 from autogluon.common.utils.path_converter import PathConverter
 from autogluon.common.utils.resource_utils import ResourceManager
-from autogluon.common.utils.try_import import try_import_torch
+from autogluon.common.utils.try_import import try_import_ray, try_import_torch
 
 from ..augmentation.distill_utils import augment_data, format_distillation_labels
 from ..calibrate import calibrate_decision_threshold
@@ -35,6 +35,7 @@ from ..data.label_cleaner import LabelCleanerMulticlassToBinary
 from ..metrics import compute_metric, Scorer, get_metric
 from ..models import AbstractModel, BaggedEnsembleModel, GreedyWeightedEnsembleModel, SimpleWeightedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel
 from ..pseudolabeling.pseudolabeling import assert_pseudo_column_match
+from ..ray.distributed_jobs_managers import DistributedFitManager
 from ..utils import (
     compute_permutation_feature_importance,
     convert_pred_probas_to_df,
@@ -2721,9 +2722,6 @@ class AbstractTrainer:
             return models_valid
 
         # -- Distributed training
-        from autogluon.core.ray.distributed_jobs_managers import DistributedFitManager
-        from autogluon.common.utils.try_import import try_import_ray
-
         ray = try_import_ray()
 
         logger.log(20, "Scheduling distributed model-workers for training...")
@@ -4427,6 +4425,7 @@ def _detached_refit_single_full(
         models_trained=[model_full.name]
 
     return model_name, models_trained
+
 
 def _remote_refit_single_full(
     *,
