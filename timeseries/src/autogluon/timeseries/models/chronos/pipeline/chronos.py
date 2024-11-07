@@ -11,14 +11,17 @@ from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import torch
 import torch.nn as nn
-from transformers import AutoConfig, AutoModelForCausalLM, AutoModelForSeq2SeqLM, GenerationConfig, PreTrainedModel
+from transformers import AutoConfig, AutoModelForSeq2SeqLM, GenerationConfig, PreTrainedModel
 
 from autogluon.timeseries.utils.warning_filters import set_loggers_level
+
+from . import ForecastPipeline, ForecastType
+from .utils import left_pad_and_stack_1D
 
 logger = logging.getLogger(__name__)
 
 
-__all__ = ["ChronosConfig", "ChronosPipeline", "OptimizedChronosPipeline"]
+__all__ = ["ChronosConfig", "ChronosPipeline"]
 
 
 @dataclass
@@ -35,7 +38,7 @@ class ChronosConfig:
     pad_token_id: int
     eos_token_id: int
     use_eos_token: bool
-    model_type: Literal["causal", "seq2seq"]
+    model_type: Literal["seq2seq"]
     context_length: int
     prediction_length: int
     num_samples: int
@@ -279,18 +282,7 @@ class ChronosPretrainedModel(nn.Module):
         return preds.reshape(input_ids.size(0), num_samples, -1)
 
 
-def left_pad_and_stack_1D(tensors: List[torch.Tensor]):
-    max_len = max(len(c) for c in tensors)
-    padded = []
-    for c in tensors:
-        assert isinstance(c, torch.Tensor)
-        assert c.ndim == 1
-        padding = torch.full(size=(max_len - len(c),), fill_value=torch.nan, device=c.device)
-        padded.append(torch.concat((padding, c), dim=-1))
-    return torch.stack(padded)
-
-
-class ChronosPipeline:
+class ChronosPipeline(ForecastPipeline):
     """
     A ``ChronosPipeline`` uses the given tokenizer and model to forecast
     input time series.
@@ -308,6 +300,12 @@ class ChronosPipeline:
 
     tokenizer: ChronosTokenizer
     model: ChronosPretrainedModel
+    forecast_type: ForecastType = ForecastType.SAMPLES
+    dtypes = {
+        "bfloat16": torch.bfloat16,
+        "float32": torch.float32,
+        "float64": torch.float64,
+    }
 
     def __init__(self, tokenizer, model):
         self.tokenizer = tokenizer
@@ -363,7 +361,7 @@ class ChronosPipeline:
         temperature: Optional[float] = None,
         top_k: Optional[int] = None,
         top_p: Optional[float] = None,
-        limit_prediction_length: bool = True,
+        limit_prediction_length: bool = False,
     ) -> torch.Tensor:
         """
         Get forecasts for the given time series.
@@ -449,43 +447,6 @@ class ChronosPipeline:
         Supports the same arguments as ``AutoConfig`` and ``AutoModel``
         from ``transformers``.
         """
-
-        config = AutoConfig.from_pretrained(*args, **kwargs)
-
-        assert hasattr(config, "chronos_config"), "Not a Chronos config file"
-
-        chronos_config = ChronosConfig(**config.chronos_config)
-
-        if chronos_config.model_type == "seq2seq":
-            inner_model = AutoModelForSeq2SeqLM.from_pretrained(*args, **kwargs)
-        else:
-            assert config.model_type == "causal"
-            inner_model = AutoModelForCausalLM.from_pretrained(*args, **kwargs)
-
-        return cls(
-            tokenizer=chronos_config.create_tokenizer(),
-            model=ChronosPretrainedModel(config=chronos_config, model=inner_model),
-        )
-
-
-class OptimizedChronosPipeline(ChronosPipeline):
-    """A wrapper around the ChronosPipeline object for CPU-optimized model classes from
-    HuggingFace optimum.
-    """
-
-    dtypes = {
-        "bfloat16": torch.bfloat16,
-        "float32": torch.float32,
-        "float64": torch.float64,
-    }
-
-    @classmethod
-    def from_pretrained(cls, *args, **kwargs):
-        """
-        Load the model, either from a local path or from the HuggingFace Hub.
-        Supports the same arguments as ``AutoConfig`` and ``AutoModel``
-        from ``transformers``.
-        """
         kwargs = kwargs.copy()
 
         optimization_strategy = kwargs.pop("optimization_strategy", None)
@@ -502,45 +463,40 @@ class OptimizedChronosPipeline(ChronosPipeline):
         if torch_dtype != "auto" and isinstance(torch_dtype, str):
             kwargs["torch_dtype"] = cls.dtypes[torch_dtype]
 
-        if chronos_config.model_type == "seq2seq":
-            if optimization_strategy is None:
-                inner_model = AutoModelForSeq2SeqLM.from_pretrained(*args, **kwargs)
-            else:
-                assert optimization_strategy in [
-                    "onnx",
-                    "openvino",
-                ], "optimization_strategy not recognized. Please provide one of `onnx` or `openvino`"
-                torch_dtype = kwargs.pop("torch_dtype", "auto")
-                if torch_dtype != "auto":
-                    logger.warning(
-                        f"\t`torch_dtype` will be ignored for optimization_strategy {optimization_strategy}"
+        assert chronos_config.model_type == "seq2seq"
+        if optimization_strategy is None:
+            inner_model = AutoModelForSeq2SeqLM.from_pretrained(*args, **kwargs)
+        else:
+            assert optimization_strategy in [
+                "onnx",
+                "openvino",
+            ], "optimization_strategy not recognized. Please provide one of `onnx` or `openvino`"
+            torch_dtype = kwargs.pop("torch_dtype", "auto")
+            if torch_dtype != "auto":
+                logger.warning(f"\t`torch_dtype` will be ignored for optimization_strategy {optimization_strategy}")
+
+            if optimization_strategy == "onnx":
+                try:
+                    from optimum.onnxruntime import ORTModelForSeq2SeqLM
+                except ImportError:
+                    raise ImportError(
+                        "Huggingface Optimum library must be installed with ONNX for using the `onnx` strategy"
                     )
 
-                if optimization_strategy == "onnx":
-                    try:
-                        from optimum.onnxruntime import ORTModelForSeq2SeqLM
-                    except ImportError:
-                        raise ImportError(
-                            "Huggingface Optimum library must be installed with ONNX for using the `onnx` strategy"
-                        )
-
-                    assert kwargs.pop("device_map", "cpu") in ["cpu", "auto"], "ONNX mode only available on the CPU"
-                    with set_loggers_level(regex=r"^optimum.*", level=logging.ERROR):
-                        inner_model = ORTModelForSeq2SeqLM.from_pretrained(*args, **{**kwargs, "export": True})
-                elif optimization_strategy == "openvino":
-                    try:
-                        from optimum.intel import OVModelForSeq2SeqLM
-                    except ImportError:
-                        raise ImportError(
-                            "Huggingface Optimum library must be installed with OpenVINO for using the `openvino` strategy"
-                        )
-                    with set_loggers_level(regex=r"^optimum.*", level=logging.ERROR):
-                        inner_model = OVModelForSeq2SeqLM.from_pretrained(
-                            *args, **{**kwargs, "device_map": "cpu", "export": True}
-                        )
-        else:
-            assert config.model_type == "causal"
-            inner_model = AutoModelForCausalLM.from_pretrained(*args, **kwargs)
+                assert kwargs.pop("device_map", "cpu") in ["cpu", "auto"], "ONNX mode only available on the CPU"
+                with set_loggers_level(regex=r"^optimum.*", level=logging.ERROR):
+                    inner_model = ORTModelForSeq2SeqLM.from_pretrained(*args, **{**kwargs, "export": True})
+            elif optimization_strategy == "openvino":
+                try:
+                    from optimum.intel import OVModelForSeq2SeqLM
+                except ImportError:
+                    raise ImportError(
+                        "Huggingface Optimum library must be installed with OpenVINO for using the `openvino` strategy"
+                    )
+                with set_loggers_level(regex=r"^optimum.*", level=logging.ERROR):
+                    inner_model = OVModelForSeq2SeqLM.from_pretrained(
+                        *args, **{**kwargs, "device_map": "cpu", "export": True}
+                    )
 
         return cls(
             tokenizer=chronos_config.create_tokenizer(),

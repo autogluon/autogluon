@@ -1,11 +1,22 @@
 import time
-from typing import Callable, Optional
+from typing import Callable, List, Optional
 
 import numpy as np
 import torch
 
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
+
+
+def left_pad_and_stack_1D(tensors: List[torch.Tensor]) -> torch.Tensor:
+    max_len = max(len(c) for c in tensors)
+    padded = []
+    for c in tensors:
+        assert isinstance(c, torch.Tensor)
+        assert c.ndim == 1
+        padding = torch.full(size=(max_len - len(c),), fill_value=torch.nan, device=c.device)
+        padded.append(torch.concat((padding, c), dim=-1))
+    return torch.stack(padded)
 
 
 class ChronosInferenceDataset:

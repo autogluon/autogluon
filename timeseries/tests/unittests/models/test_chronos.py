@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Optional
 
 import numpy as np
@@ -7,7 +8,7 @@ import torch
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.timeseries import TimeSeriesPredictor
 from autogluon.timeseries.models import ChronosModel
-from autogluon.timeseries.models.chronos.utils import (
+from autogluon.timeseries.models.chronos.pipeline.utils import (
     ChronosInferenceDataLoader,
     ChronosInferenceDataset,
     timeout_callback,
@@ -43,6 +44,15 @@ HYPERPARAMETER_DICTS = [
 ]
 
 
+@pytest.fixture(scope="module", params=["default", "bolt-t5-efficient-350k"])
+def chronos_model_path(request, hf_model_path):
+    if request.param == "default":
+        yield hf_model_path
+    elif request.param == "bolt-t5-efficient-350k":
+        model_path = Path(__file__).parents[2] / "fixtures" / "bolt-t5-efficient-350k"
+        yield str(model_path)
+
+
 @pytest.fixture(
     scope="module",
     params=[
@@ -56,10 +66,10 @@ HYPERPARAMETER_DICTS = [
         *HYPERPARAMETER_DICTS,
     ],
 )
-def default_chronos_tiny_model(request, hf_model_path) -> ChronosModel:
+def default_chronos_tiny_model(request, chronos_model_path) -> ChronosModel:
     model = ChronosModel(
         hyperparameters={
-            "model_path": hf_model_path,
+            "model_path": chronos_model_path,
             "num_samples": 3,
             "context_length": 16,
             "device": "cpu",
@@ -71,13 +81,13 @@ def default_chronos_tiny_model(request, hf_model_path) -> ChronosModel:
 
 
 @pytest.fixture(scope="module", params=HYPERPARAMETER_DICTS)
-def default_chronos_tiny_model_gpu(request, hf_model_path) -> Optional[ChronosModel]:
+def default_chronos_tiny_model_gpu(request, chronos_model_path) -> Optional[ChronosModel]:
     if not GPU_AVAILABLE:
         return None
 
     model = ChronosModel(
         hyperparameters={
-            "model_path": hf_model_path,
+            "model_path": chronos_model_path,
             "device": "cuda",
             **request.param,
         },

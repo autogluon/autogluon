@@ -1,0 +1,51 @@
+{
+  "_name_or_path": "bolt-t5-efficient-350k",
+  "architectures": [
+    "PatchedT5ForForecasting"
+  ],
+  "chronos_config": {
+    "context_length": 2048,
+    "input_patch_size": 16,
+    "input_patch_stride": 16,
+    "prediction_length": 64,
+    "quantiles": [
+      0.1,
+      0.2,
+      0.3,
+      0.4,
+      0.5,
+      0.6,
+      0.7,
+      0.8,
+      0.9
+    ],
+    "use_reg_token": true
+  },
+  "chronos_pipeline_class": "PatchedT5Pipeline",
+  "classifier_dropout": 0.0,
+  "d_ff": 256,
+  "d_kv": 16,
+  "d_model": 64,
+  "decoder_start_token_id": 0,
+  "dense_act_fn": "relu",
+  "dropout_rate": 0.1,
+  "eos_token_id": 1,
+  "feed_forward_proj": "relu",
+  "initializer_factor": 0.05,
+  "is_encoder_decoder": true,
+  "is_gated_act": false,
+  "layer_norm_epsilon": 1e-06,
+  "model_type": "t5",
+  "n_positions": 512,
+  "num_decoder_layers": 1,
+  "num_heads": 4,
+  "num_layers": 1,
+  "pad_token_id": 0,
+  "reg_token_id": 1,
+  "relative_attention_max_distance": 128,
+  "relative_attention_num_buckets": 32,
+  "torch_dtype": "float32",
+  "transformers_version": "4.39.3",
+  "use_cache": true,
+  "vocab_size": 2
+}
