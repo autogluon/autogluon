@@ -1,3 +1,4 @@
+import copy
 from typing import Optional
 
 import numpy as np
@@ -22,7 +23,6 @@ from ..common import (
 )
 
 DATASETS = [DUMMY_TS_DATAFRAME, DATAFRAME_WITH_STATIC, DATAFRAME_WITH_COVARIATES]
-TESTABLE_MODELS = [ChronosModel]
 GPU_AVAILABLE = torch.cuda.is_available()
 HYPERPARAMETER_DICTS = [
     {
@@ -41,6 +41,17 @@ HYPERPARAMETER_DICTS = [
         "context_length": None,
     },
 ]
+CHRONOS_BOLT_TEST_MODEL_PATH = "autogluon/chronos-bolt-350k-test"
+
+
+def chronos_bolt_model(*args, hyperparameters=None, **kwargs):
+    hyperparameters = copy.deepcopy(hyperparameters or {})
+    hyperparameters |= {"model_path": CHRONOS_BOLT_TEST_MODEL_PATH}
+    kwargs["hyperparameters"] = hyperparameters
+    return ChronosModel(*args, **kwargs)
+
+
+TESTABLE_MODELS = [ChronosModel, chronos_bolt_model]
 
 
 @pytest.fixture(scope="module", params=["default", "bolt-t5-efficient-350k"])
@@ -48,7 +59,7 @@ def chronos_model_path(request, hf_model_path):
     if request.param == "default":
         yield hf_model_path
     elif request.param == "bolt-t5-efficient-350k":
-        yield "autogluon/chronos-bolt-350k-test"
+        yield CHRONOS_BOLT_TEST_MODEL_PATH
 
 
 @pytest.fixture(

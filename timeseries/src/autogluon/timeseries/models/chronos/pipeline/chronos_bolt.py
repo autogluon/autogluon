@@ -438,7 +438,7 @@ class ChronosBoltPipeline(BaseChronosPipeline):
     def predict_quantiles(
         self, context: torch.Tensor, prediction_length: int, quantile_levels: List[float], **kwargs
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        # shape (batch_size, prediction_length, num_model_quantiles)
+        # shape (batch_size, prediction_length, len(self.quantiles))
         predictions = (
             self.predict(
                 context,
@@ -449,16 +449,23 @@ class ChronosBoltPipeline(BaseChronosPipeline):
             .swapaxes(1, 2)
         )
 
-        quantile_levels = [str(q) for q in quantile_levels]
+        quantile_levels_labels = [str(q) for q in quantile_levels]
 
-        if set(quantile_levels).issubset(set(self.quantiles)):
+        if set(quantile_levels_labels).issubset(set(self.quantiles)):
             # no need to perform intra/extrapolation
-            quantiles = predictions[..., [self.quantiles.index(q) for q in quantile_levels]]
-            mean = predictions[:, :, self.quantiles.index("0.5")]
-            return quantiles, mean
+            quantiles = predictions[..., [self.quantiles.index(q) for q in quantile_levels_labels]]
         else:
-            # TODO: Handle interpolation for arbitrary quantiles
-            raise NotImplementedError()
+            # we rely on torch for interpolating quantiles if quantiles that
+            # Chronos Bolt was trained on were not provided
+            augmented_predictions = torch.cat(
+                [predictions[..., [0]], predictions, predictions[..., [-1]]],
+                dim=-1,
+            )
+            quantiles = torch.quantile(
+                augmented_predictions, q=torch.tensor(quantile_levels, dtype=augmented_predictions.dtype), dim=-1
+            )
+        mean = predictions[:, :, self.quantiles.index("0.5")]
+        return quantiles, mean
 
     @classmethod
     def from_pretrained(cls, *args, **kwargs):
