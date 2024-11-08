@@ -302,8 +302,6 @@ jobs:
       - name: Test Timeseries on AWS Batch
         if: steps.changes.outputs.other_than_docs == 'true'
         uses: ./.github/actions/submit-job
-        env:  # temporary token to provide access to Hugging Face
-          HF_TOKEN: ${{ secrets.TIMESERIES_HF_TOKEN }}
         with:
           job-type: CI-GPU
           job-name: AutoGluon-Forecasting
