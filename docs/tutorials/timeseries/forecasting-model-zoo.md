@@ -276,10 +276,16 @@ Deep learning models pretrained on large time series datasets, able to perform z
    - `None` - no scaling
 
 - **covariate_regressor** *({"LR", "GBM", "CAT", "XGB", None}, default = None)* - If provided, the chosen tabular
-   regression model will be fit on the known covariates & static features. The predictions of this regression model
-   will be subtracted from the target column, and the forecasting model will be used to forecast the residuals.
+   regression model will be fit on the known covariates & static features to predict the target column at the same time
+   step.
+
+   The predictions of the regression model will be subtracted from the target column, and the forecasting model will
+   be used to forecast the residuals.
 
    At prediction time, the predictions of the regression model will be added to the predictions of the forecasting model.
+
+   If both a `target_scaler` and a `covariate_regressor` are provided, then scaling will be performed before the
+   regressor is applied.
 
 
 ## MXNet Models
