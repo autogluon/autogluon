@@ -1,4 +1,4 @@
-# nosec
+# nosec B614  # Skip specific Bandit checks for SSL and shell injection
 _base_ = ["../coco_detection.py", "../default_runtime.py"]
 model = dict(
     type="DINO",
