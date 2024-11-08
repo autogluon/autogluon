@@ -1,6 +1,8 @@
 # Implements Chronos with T5 architecture but with patched inputs instead of
 # per-time-step tokenization. a.k.a. Chronos-Bolt
 
+# Authors: Abdul Fatir Ansari <ansarnd@amazon.com>, Lorenzo Stella <stellalo@amazon.com>, Caner Turkmen <atturkm@amazon.com>
+
 import copy
 import warnings
 from dataclasses import dataclass, fields
@@ -18,7 +20,7 @@ from transformers.models.t5.modeling_t5 import (
 )
 from transformers.utils import ModelOutput
 
-from . import ForecastPipeline, ForecastType
+from .forecast_pipeline import ForecastPipeline, ForecastType
 from .utils import left_pad_and_stack_1D
 
 

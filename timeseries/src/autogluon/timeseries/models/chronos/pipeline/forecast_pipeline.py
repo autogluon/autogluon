@@ -1,7 +1,5 @@
-# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-# SPDX-License-Identifier: Apache-2.0
+# Authors: Lorenzo Stella <stellalo@amazon.com>, Caner Turkmen <atturkm@amazon.com>
 
-# Authors: Lorenzo Stella <stellalo@amazon.com>, Abdul Fatir Ansari <ansarnd@amazon.com>
 from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional, Union
@@ -82,6 +80,5 @@ class ForecastPipeline(metaclass=PipelineRegistry):
 
         pipeline_class_name = getattr(config, "chronos_pipeline_class", "ChronosPipeline")
         class_ = PipelineRegistry.REGISTRY.get(pipeline_class_name)
-        assert issubclass(class_, ForecastPipeline)
 
         return class_.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)

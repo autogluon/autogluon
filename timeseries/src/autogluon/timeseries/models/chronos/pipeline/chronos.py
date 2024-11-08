@@ -15,7 +15,7 @@ from transformers import AutoConfig, AutoModelForSeq2SeqLM, GenerationConfig, Pr
 
 from autogluon.timeseries.utils.warning_filters import set_loggers_level
 
-from . import ForecastPipeline, ForecastType
+from .forecast_pipeline import ForecastPipeline, ForecastType
 from .utils import left_pad_and_stack_1D
 
 logger = logging.getLogger(__name__)
