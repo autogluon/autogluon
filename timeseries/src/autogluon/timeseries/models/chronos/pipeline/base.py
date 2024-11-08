@@ -2,7 +2,7 @@
 
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import torch
 
@@ -51,6 +51,37 @@ class BaseChronosPipeline(metaclass=PipelineRegistry):
         forecasts
             Tensor containing forecasts. The layout and meaning
             of the forecasts values depends on ``self.forecast_type``.
+        """
+        raise NotImplementedError()
+
+    def predict_quantiles(
+        self, context: torch.Tensor, prediction_length: int, quantile_levels: List[float], **kwargs
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Get quantile and mean forecasts for given time series. All
+        predictions are returned on the CPU.
+
+        Parameters
+        ----------
+        context
+            Input series. This is either a 1D tensor, or a list
+            of 1D tensors, or a 2D tensor whose first dimension
+            is batch. In the latter case, use left-padding with
+            ``torch.nan`` to align series of different lengths.
+        prediction_length
+            Time steps to predict. Defaults to a model-dependent
+            value if not given.
+        quantile_levels: List[float]
+            Quantile levels to compute
+
+        Returns
+        -------
+        quantiles
+            Tensor containing quantile forecasts. Shape
+            (batch_size, prediction_length, num_quantiles)
+        mean
+            Tensor containing mean (point) forecasts. Shape
+            (batch_size, prediction_length)
         """
         raise NotImplementedError()
 

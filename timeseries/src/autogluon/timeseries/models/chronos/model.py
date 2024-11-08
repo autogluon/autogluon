@@ -159,7 +159,7 @@ class ChronosModel(AbstractTimeSeriesModel):
             **kwargs,
         )
 
-        self.model_pipeline: Optional[Any] = None  # of type OptimizedChronosPipeline
+        self.model_pipeline: Optional[Any] = None  # of type BaseChronosPipeline
         self.time_limit: Optional[float] = None
 
     def save(self, path: str = None, verbose: bool = True) -> str:
@@ -298,8 +298,6 @@ class ChronosModel(AbstractTimeSeriesModel):
         with warning_filter(all_warnings=True):
             import torch
 
-            from .pipeline import ForecastType
-
             if self.model_pipeline is None:
                 # load model pipeline to device memory
                 self.load_model_pipeline(context_length=context_length)
@@ -310,41 +308,28 @@ class ChronosModel(AbstractTimeSeriesModel):
                 context_length=context_length,
                 time_limit=kwargs.get("time_limit"),
             )
+
             self.model_pipeline.model.eval()
             with torch.inference_mode():
-                if self.model_pipeline.forecast_type == ForecastType.SAMPLES:
-                    prediction_samples = [
-                        self.model_pipeline.predict(
-                            batch,
-                            prediction_length=self.prediction_length,
-                            num_samples=self.num_samples,
-                        )
-                        .detach()
-                        .cpu()
-                        .numpy()
-                        for batch in inference_data_loader
-                    ]
-                    samples = np.concatenate(prediction_samples, axis=0).swapaxes(1, 2).reshape(-1, self.num_samples)
-                    mean = samples.mean(axis=-1, keepdims=True)
-                    quantiles = np.quantile(samples, self.quantile_levels, axis=-1).T
-                elif self.model_pipeline.forecast_type == ForecastType.QUANTILES:
-                    # TODO: Handle interpolation for arbitrary quantiles
-                    predictions = [
-                        self.model_pipeline.predict(
-                            batch,
-                            prediction_length=self.prediction_length,
-                        )
-                        .detach()
-                        .cpu()
-                        .numpy()
-                        for batch in inference_data_loader
-                    ]
-                    model_quantiles = self.model_pipeline.quantiles
-                    quantiles = np.concatenate(predictions, axis=0).swapaxes(1, 2).reshape(-1, len(model_quantiles))
-                    mean = quantiles[:, [model_quantiles.index("0.5")]]
+                batch_quantiles, batch_means = [], []
+                for batch in inference_data_loader:
+                    qs, mn = self.model_pipeline.predict_quantiles(
+                        batch,
+                        prediction_length=self.prediction_length,
+                        quantile_levels=self.quantile_levels,
+                        num_samples=self.num_samples,
+                    )
+                    batch_quantiles.append(qs.numpy())
+                    batch_means.append(mn.numpy())
 
         df = pd.DataFrame(
-            np.concatenate([mean, quantiles], axis=1),
+            np.concatenate(
+                [
+                    np.concatenate(batch_means, axis=0).reshape(-1, 1),
+                    np.concatenate(batch_quantiles, axis=0).reshape(-1, len(self.quantile_levels)),
+                ],
+                axis=1,
+            ),
             columns=["mean"] + [str(q) for q in self.quantile_levels],
             index=get_forecast_horizon_index_ts_dataframe(data, self.prediction_length, freq=self.freq),
         )

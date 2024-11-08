@@ -20,7 +20,7 @@ from transformers.models.t5.modeling_t5 import (
 )
 from transformers.utils import ModelOutput
 
-from .forecast_pipeline import BaseChronosPipeline, ForecastType
+from .base import BaseChronosPipeline, ForecastType
 from .utils import left_pad_and_stack_1D
 
 
@@ -434,6 +434,31 @@ class ChronosBoltPipeline(BaseChronosPipeline):
             context_tensor = torch.cat([context_tensor, central_prediction], dim=-1)
 
         return torch.cat(predictions, dim=-1)[..., :prediction_length]
+
+    def predict_quantiles(
+        self, context: torch.Tensor, prediction_length: int, quantile_levels: List[float], **kwargs
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        # shape (batch_size, prediction_length, num_model_quantiles)
+        predictions = (
+            self.predict(
+                context,
+                prediction_length=prediction_length,
+            )
+            .detach()
+            .cpu()
+            .swapaxes(1, 2)
+        )
+
+        quantile_levels = [str(q) for q in quantile_levels]
+
+        if set(quantile_levels).issubset(set(self.quantiles)):
+            # no need to perform intra/extrapolation
+            quantiles = predictions[..., [self.quantiles.index(q) for q in quantile_levels]]
+            mean = predictions[:, :, self.quantiles.index("0.5")]
+            return quantiles, mean
+        else:
+            # TODO: Handle interpolation for arbitrary quantiles
+            raise NotImplementedError()
 
     @classmethod
     def from_pretrained(cls, *args, **kwargs):

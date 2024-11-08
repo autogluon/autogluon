@@ -1,6 +1,6 @@
 from .chronos import ChronosPipeline
 from .chronos_bolt import ChronosBoltPipeline
-from .forecast_pipeline import BaseChronosPipeline, ForecastType
+from .base import BaseChronosPipeline, ForecastType
 
 
 __all__ = [

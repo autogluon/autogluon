@@ -15,7 +15,7 @@ from transformers import AutoConfig, AutoModelForSeq2SeqLM, GenerationConfig, Pr
 
 from autogluon.timeseries.utils.warning_filters import set_loggers_level
 
-from .forecast_pipeline import BaseChronosPipeline, ForecastType
+from .base import BaseChronosPipeline, ForecastType
 from .utils import left_pad_and_stack_1D
 
 logger = logging.getLogger(__name__)
@@ -439,6 +439,34 @@ class ChronosPipeline(BaseChronosPipeline):
             context = torch.cat([context, prediction.median(dim=1).values], dim=-1)
 
         return torch.cat(predictions, dim=-1)
+
+    def predict_quantiles(
+        self,
+        context: torch.Tensor,
+        prediction_length: int,
+        quantile_levels: List[float],
+        num_samples: Optional[int] = None,
+        **kwargs,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        num_samples = num_samples or self.model.config.num_samples
+        prediction_samples = (
+            self.predict(
+                context,
+                prediction_length=prediction_length,
+                num_samples=num_samples,
+            )
+            .detach()
+            .cpu()
+            .swapaxes(1, 2)
+        )
+        mean = prediction_samples.mean(axis=-1, keepdims=True)
+        quantiles = torch.quantile(
+            prediction_samples,
+            q=torch.tensor(quantile_levels, dtype=prediction_samples.dtype),
+            dim=-1,
+        )
+
+        return quantiles, mean
 
     @classmethod
     def from_pretrained(cls, *args, **kwargs):
