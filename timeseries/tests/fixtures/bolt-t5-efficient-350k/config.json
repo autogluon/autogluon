@@ -1,7 +1,7 @@
 {
   "_name_or_path": "bolt-t5-efficient-350k",
   "architectures": [
-    "PatchedT5ForForecasting"
+    "ChronosBoltModelForForecasting"
   ],
   "chronos_config": {
     "context_length": 2048,
@@ -21,7 +21,7 @@
     ],
     "use_reg_token": true
   },
-  "chronos_pipeline_class": "PatchedT5Pipeline",
+  "chronos_pipeline_class": "ChronosBoltPipeline",
   "classifier_dropout": 0.0,
   "d_ff": 256,
   "d_kv": 16,

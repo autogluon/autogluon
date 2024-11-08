@@ -318,7 +318,6 @@ class ChronosModel(AbstractTimeSeriesModel):
                             batch,
                             prediction_length=self.prediction_length,
                             num_samples=self.num_samples,
-                            limit_prediction_length=False,
                         )
                         .detach()
                         .cpu()
@@ -334,7 +333,6 @@ class ChronosModel(AbstractTimeSeriesModel):
                         self.model_pipeline.predict(
                             batch,
                             prediction_length=self.prediction_length,
-                            limit_prediction_length=False,
                         )
                         .detach()
                         .cpu()

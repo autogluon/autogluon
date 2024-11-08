@@ -25,13 +25,21 @@ from .utils import left_pad_and_stack_1D
 
 
 @dataclass
-class PatchedT5Config:
+class ChronosBoltConfig:
     context_length: int
     prediction_length: int
     input_patch_size: int
     input_patch_stride: int
     quantiles: List[float]
     use_reg_token: bool = False
+
+
+@dataclass
+class ChronosBoltOutput(ModelOutput):
+    loss: Optional[torch.Tensor] = None
+    quantile_preds: Optional[torch.Tensor] = None
+    attentions: Optional[torch.Tensor] = None
+    cross_attentions: Optional[torch.Tensor] = None
 
 
 class Patch(nn.Module):
@@ -83,14 +91,6 @@ class InstanceNorm(nn.Module):
         return x * scale + loc
 
 
-@dataclass
-class PatchedT5Output(ModelOutput):
-    loss: Optional[torch.Tensor] = None
-    quantile_preds: Optional[torch.Tensor] = None
-    attentions: Optional[torch.Tensor] = None
-    cross_attentions: Optional[torch.Tensor] = None
-
-
 class ResidualBlock(nn.Module):
     def __init__(
         self,
@@ -125,7 +125,7 @@ class ResidualBlock(nn.Module):
         return out
 
 
-class BasePatchedModelForForecasting(T5PreTrainedModel):
+class ChronosBoltModelForForecasting(T5PreTrainedModel):
     _keys_to_ignore_on_load_missing = [
         r"input_patch_embedding\.",
         r"output_patch_embedding\.",
@@ -140,8 +140,10 @@ class BasePatchedModelForForecasting(T5PreTrainedModel):
         self.model_dim = config.d_model
 
         # TODO: remove filtering eventually, added for backward compatibility
-        config_fields = {f.name for f in fields(PatchedT5Config)}
-        self.chronos_config = PatchedT5Config(**{k: v for k, v in config.chronos_config.items() if k in config_fields})
+        config_fields = {f.name for f in fields(ChronosBoltConfig)}
+        self.chronos_config = ChronosBoltConfig(
+            **{k: v for k, v in config.chronos_config.items() if k in config_fields}
+        )
 
         # Only decoder_start_id (and optionally REG token)
         if self.chronos_config.use_reg_token:
@@ -195,33 +197,6 @@ class BasePatchedModelForForecasting(T5PreTrainedModel):
         self.model_parallel = False
         self.device_map = None
 
-    def _init_decoder(self, config):
-        raise NotImplementedError
-
-    def decode(
-        self,
-        input_embeds: torch.Tensor,
-        attention_mask: torch.Tensor,
-        hidden_states: torch.Tensor,
-        output_attentions: bool = False,
-    ):
-        """
-        Parameters
-        ----------
-        input_embeds: torch.Tensor
-            Patched and embedded inputs. Shape (batch_size, patched_context_length, d_model)
-        attention_mask: torch.Tensor
-            Attention mask for the patched context. Shape (batch_size, patched_context_length), type: torch.int64
-        hidden_states: torch.Tensor
-            Hidden states returned by the encoder. Shape (batch_size, patched_context_length, d_model)
-
-        Returns
-        -------
-        last_hidden_state
-            Last hidden state returned by the decoder, of shape (batch_size, 1, d_model)
-        """
-        raise NotImplementedError
-
     def _init_weights(self, module):
         super()._init_weights(module)
         """Initialize the weights"""
@@ -253,7 +228,7 @@ class BasePatchedModelForForecasting(T5PreTrainedModel):
         mask: Optional[torch.Tensor] = None,
         target: Optional[torch.Tensor] = None,
         target_mask: Optional[torch.Tensor] = None,
-    ) -> PatchedT5Output:
+    ) -> ChronosBoltOutput:
         mask = mask.to(context.dtype) if mask is not None else torch.isnan(context).logical_not().to(context.dtype)
 
         batch_size, _ = context.shape
@@ -338,13 +313,11 @@ class BasePatchedModelForForecasting(T5PreTrainedModel):
             loc_scale,
         ).view(*quantile_preds_shape)
 
-        return PatchedT5Output(
+        return ChronosBoltOutput(
             loss=loss,
             quantile_preds=quantile_preds,
         )
 
-
-class PatchedT5ForForecasting(BasePatchedModelForForecasting):
     def _init_decoder(self, config):
         decoder_config = copy.deepcopy(config)
         decoder_config.is_decoder = True
@@ -359,6 +332,21 @@ class PatchedT5ForForecasting(BasePatchedModelForForecasting):
         hidden_states,
         output_attentions=False,
     ):
+        """
+        Parameters
+        ----------
+        input_embeds: torch.Tensor
+            Patched and embedded inputs. Shape (batch_size, patched_context_length, d_model)
+        attention_mask: torch.Tensor
+            Attention mask for the patched context. Shape (batch_size, patched_context_length), type: torch.int64
+        hidden_states: torch.Tensor
+            Hidden states returned by the encoder. Shape (batch_size, patched_context_length, d_model)
+
+        Returns
+        -------
+        last_hidden_state
+            Last hidden state returned by the decoder, of shape (batch_size, 1, d_model)
+        """
         batch_size = input_embeds.shape[0]
         decoder_input_ids = torch.full(
             (batch_size, 1),
@@ -376,25 +364,11 @@ class PatchedT5ForForecasting(BasePatchedModelForForecasting):
         return decoder_outputs.last_hidden_state  # sequence_outputs, b x 1 x d_model
 
 
-class PatchedT5EncoderForForecasting(BasePatchedModelForForecasting):
-    def _init_decoder(self, config):
-        pass
-
-    def decode(
-        self,
-        input_embeds,
-        attention_mask,
-        hidden_states,
-        output_attentions=False,
-    ):
-        return hidden_states[:, -1:]
-
-
-class PatchedT5Pipeline(ForecastPipeline):
+class ChronosBoltPipeline(ForecastPipeline):
     forecast_type: ForecastType = ForecastType.QUANTILES
     default_context_length: int = 2048
 
-    def __init__(self, model: BasePatchedModelForForecasting):
+    def __init__(self, model: ChronosBoltModelForForecasting):
         self.model = model
         self.quantiles = list(map(str, self.model.config.chronos_config["quantiles"]))
 
