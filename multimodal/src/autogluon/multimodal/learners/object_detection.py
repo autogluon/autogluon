@@ -739,7 +739,7 @@ class ObjectDetectionLearner(BaseLearner):
         result_path = os.path.join(self._save_path, "result.txt")
 
         pred_df = convert_result_df(
-            pred=convert_pred_to_xywh(pred) if self._model.output_bbox_format == XYWH else pred,
+            predictions=convert_pred_to_xywh(pred) if self._model.output_bbox_format == XYWH else pred,
             data=data_df,
             detection_classes=self.classes,
             result_path=result_path,

@@ -176,7 +176,7 @@ def cocoeval_pycocotools(
             "or pip install pycocotools (on Linux/Mac)"
         )
 
-    from .output_utils import extract_from_output
+    from .. import extract_from_output
 
     # Initialize COCO dataset and save predictions
     coco_dataset = COCODataset(anno_file)
