@@ -32,7 +32,7 @@ def download_sample_dataset():
 
 # TODO: Pytest does not support DDP
 # TODO: Issue #4126 Skipping object detection tests due to incompatibility of mmdet with Torch 2.2
-@pytest.mark.torch_mmdet
+#@pytest.mark.torch_mmdet
 @pytest.mark.parametrize("checkpoint_name", ["yolox_s"])
 def test_mmdet_object_detection_fit_basics(checkpoint_name):
     mmdet_image_name = download_sample_images()
@@ -79,7 +79,7 @@ def test_mmdet_object_detection_fit_basics(checkpoint_name):
 
 # TODO: Pytest does not support DDP
 # TODO: Issue #4126 Skipping object detection tests due to incompatibility of mmdet with Torch 2.2
-@pytest.mark.torch_mmdet
+#@pytest.mark.torch_mmdet
 @pytest.mark.parametrize("checkpoint_name", ["yolov3_mobilenetv2_8xb24-320-300e_coco"])
 def test_mmdet_object_detection_inference_basics(checkpoint_name):
     mmdet_image_name = download_sample_images()
@@ -133,7 +133,7 @@ def test_mmdet_object_detection_inference_basics(checkpoint_name):
 
 # TODO: FIX DDP multi runs!
 # TODO: Issue #4126 Skipping object detection tests due to incompatibility of mmdet with Torch 2.2
-@pytest.mark.torch_mmdet
+#@pytest.mark.torch_mmdet
 @pytest.mark.parametrize("checkpoint_name", ["yolov3_mobilenetv2_8xb24-320-300e_coco"])
 def test_mmdet_object_detection_inference_xywh_output(checkpoint_name):
     mmdet_image_name = download_sample_images()
@@ -173,7 +173,7 @@ def test_mmdet_object_detection_inference_xywh_output(checkpoint_name):
 
 # TODO: FIX DDP multi runs!
 # TODO: Issue #4126 Skipping object detection tests due to incompatibility of mmdet with Torch 2.2
-@pytest.mark.torch_mmdet
+#@pytest.mark.torch_mmdet
 @pytest.mark.parametrize("checkpoint_name", ["yolov3_mobilenetv2_8xb24-320-300e_coco"])
 def test_mmdet_object_detection_save_and_load(checkpoint_name):
     data_dir = download_sample_dataset()
@@ -208,7 +208,7 @@ def test_mmdet_object_detection_save_and_load(checkpoint_name):
 
 # TODO: FIX DDP multi runs!
 # TODO: Issue #4126 Skipping object detection tests due to incompatibility of mmdet with Torch 2.2
-@pytest.mark.torch_mmdet
+#@pytest.mark.torch_mmdet
 @pytest.mark.parametrize("checkpoint_name", ["yolov3_mobilenetv2_8xb24-320-300e_coco"])
 def test_mmdet_object_detection_fit_eval_predict_df(checkpoint_name):
     data_dir = download_sample_dataset()
@@ -234,7 +234,7 @@ def test_mmdet_object_detection_fit_eval_predict_df(checkpoint_name):
 
 # TODO: Pytest does not support DDP
 # TODO: Issue #4126 Skipping object detection tests due to incompatibility of mmdet with Torch 2.2
-@pytest.mark.torch_mmdet
+#@pytest.mark.torch_mmdet
 @pytest.mark.parametrize("checkpoint_name", ["yolov3_mobilenetv2_8xb24-320-300e_coco"])
 def test_mmdet_object_detection_fit_with_freeze_backbone(checkpoint_name):
     data_dir = download_sample_dataset()
@@ -260,7 +260,7 @@ def test_mmdet_object_detection_fit_with_freeze_backbone(checkpoint_name):
 
 # TODO: FIX DDP multi runs!
 # TODO: Issue #4126 Skipping object detection tests due to incompatibility of mmdet with Torch 2.2
-@pytest.mark.torch_mmdet
+#@pytest.mark.torch_mmdet
 def test_detector_hyperparameters_consistency():
     data_dir = download_sample_dataset()
 
@@ -285,7 +285,7 @@ def test_detector_hyperparameters_consistency():
 
 
 # TODO: Issue #4126 Skipping object detection tests due to incompatibility of mmdet with Torch 2.2
-@pytest.mark.torch_mmdet
+#@pytest.mark.torch_mmdet
 def test_detector_coco_root_setup():
     data_dir = download_sample_dataset()
     train_path = os.path.join(data_dir, "Annotations", "trainval_cocoformat.json")
