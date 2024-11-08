@@ -219,7 +219,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         return minimum_resources
 
     def load_model_pipeline(self, context_length: Optional[int] = None):
-        from .pipeline import ForecastPipeline
+        from .pipeline import BaseChronosPipeline
 
         gpu_available = self._is_gpu_available()
 
@@ -232,7 +232,7 @@ class ChronosModel(AbstractTimeSeriesModel):
 
         device = self.device or ("cuda" if gpu_available else "cpu")
 
-        pipeline = ForecastPipeline.from_pretrained(
+        pipeline = BaseChronosPipeline.from_pretrained(
             self.model_path,
             device_map=device,
             torch_dtype=self.torch_dtype,

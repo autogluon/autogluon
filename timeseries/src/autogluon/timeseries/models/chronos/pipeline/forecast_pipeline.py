@@ -23,7 +23,7 @@ class PipelineRegistry(type):
         return new_cls
 
 
-class ForecastPipeline(metaclass=PipelineRegistry):
+class BaseChronosPipeline(metaclass=PipelineRegistry):
     forecast_type: ForecastType
 
     def predict(

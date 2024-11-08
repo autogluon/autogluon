@@ -1,11 +1,11 @@
 from .chronos import ChronosPipeline
 from .chronos_bolt import ChronosBoltPipeline
-from .forecast_pipeline import ForecastPipeline, ForecastType
+from .forecast_pipeline import BaseChronosPipeline, ForecastType
 
 
 __all__ = [
     "ChronosPipeline",
-    "ForecastPipeline",
+    "BaseChronosPipeline",
     "ForecastType",
     "ChronosBoltPipeline",
 ]

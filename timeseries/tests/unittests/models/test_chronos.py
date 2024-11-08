@@ -1,4 +1,4 @@
-from pathlib import Path
+import os
 from typing import Optional
 
 import numpy as np
@@ -49,8 +49,11 @@ def chronos_model_path(request, hf_model_path):
     if request.param == "default":
         yield hf_model_path
     elif request.param == "bolt-t5-efficient-350k":
-        model_path = Path(__file__).parents[2] / "fixtures" / "bolt-t5-efficient-350k"
-        yield str(model_path)
+        hf_token = os.environ.get("HF_TOKEN")
+        if not hf_token:
+            pytest.skip("Hugging Face API token not available")
+        else:
+            yield "autogluon/chronos-t5-tiny-test"
 
 
 @pytest.fixture(

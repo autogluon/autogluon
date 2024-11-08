@@ -20,7 +20,7 @@ from transformers.models.t5.modeling_t5 import (
 )
 from transformers.utils import ModelOutput
 
-from .forecast_pipeline import ForecastPipeline, ForecastType
+from .forecast_pipeline import BaseChronosPipeline, ForecastType
 from .utils import left_pad_and_stack_1D
 
 
@@ -364,7 +364,7 @@ class ChronosBoltModelForForecasting(T5PreTrainedModel):
         return decoder_outputs.last_hidden_state  # sequence_outputs, b x 1 x d_model
 
 
-class ChronosBoltPipeline(ForecastPipeline):
+class ChronosBoltPipeline(BaseChronosPipeline):
     forecast_type: ForecastType = ForecastType.QUANTILES
     default_context_length: int = 2048
 

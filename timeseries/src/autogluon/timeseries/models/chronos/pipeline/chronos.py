@@ -15,7 +15,7 @@ from transformers import AutoConfig, AutoModelForSeq2SeqLM, GenerationConfig, Pr
 
 from autogluon.timeseries.utils.warning_filters import set_loggers_level
 
-from .forecast_pipeline import ForecastPipeline, ForecastType
+from .forecast_pipeline import BaseChronosPipeline, ForecastType
 from .utils import left_pad_and_stack_1D
 
 logger = logging.getLogger(__name__)
@@ -282,7 +282,7 @@ class ChronosPretrainedModel(nn.Module):
         return preds.reshape(input_ids.size(0), num_samples, -1)
 
 
-class ChronosPipeline(ForecastPipeline):
+class ChronosPipeline(BaseChronosPipeline):
     """
     A ``ChronosPipeline`` uses the given tokenizer and model to forecast
     input time series.
