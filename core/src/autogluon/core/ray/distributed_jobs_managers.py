@@ -134,16 +134,21 @@ class DistributedFitManager:
         models_to_schedule_later = []
         job_refs = []
         for model in models_to_schedule:
-            model = prepare_model_resources_for_fit(
-                model=model,
-                num_cpus=1,
-                num_gpus=0,
-                total_num_cpus=self.total_num_cpus,
-                total_num_gpus=self.total_num_gpus,
-            )
+            if isinstance(model, AbstractModel):
+                # FIXME: Prefer to avoid this hack, but doing so would require some refactoring.
+                #  Basically, we want to avoid passing `model` when it is initialized.
+                #  Rather, it is better to pass the cls and kwargs to initialize the model downstream as late as possible.
+                model = prepare_model_resources_for_fit(
+                    model=model,
+                    num_cpus=1,
+                    num_gpus=0,
+                    total_num_cpus=self.total_num_cpus,
+                    total_num_gpus=self.total_num_gpus,
+                )
             model_resources = self.get_resources_for_model(model=model)
             model_name = model if self.mode == "refit" else model.name
 
+            # FIXME: Keep track of memory usage estimates, use it to limit # of parallel model fits
             is_sufficient, reason = self.check_sufficient_resources(resources=model_resources)
             if not is_sufficient:
                 if len(job_refs) + len(self.job_refs_to_allocated_resources) == 0:
@@ -226,10 +231,14 @@ class DistributedFitManager:
     def get_resources_for_model_refit(self, model: str) -> ModelResources:
         """Estimate the resources required to fit a model."""
 
-        num_gpus_for_fold_worker = self.get_model_attribute_func(model=model, attribute="fit_num_gpu")
-        num_cpus_for_fold_worker = self.get_model_attribute_func(model=model, attribute="fit_num_cpu")
+        # FIXME: We should synchronize this with the actual values used downstream.
+        #  Currently we are specifying it here and downstream separately, which gives the opportunity for them to not be matching.
+        #  This should be fixed.
+        # FIXME: Should this use fit_num_cpus_child or fit_num_cpus ?
+        num_gpus_for_fold_worker = self.get_model_attribute_func(model=model, attribute="fit_num_gpus_child")
+        num_cpus_for_fold_worker = self.get_model_attribute_func(model=model, attribute="fit_num_cpus_child")
         num_cpus_for_fold_worker = (
-            num_cpus_for_fold_worker if num_cpus_for_fold_worker is not None else self.max_cpu_resources_per_node
+            num_cpus_for_fold_worker if num_cpus_for_fold_worker is not None else min(self.max_cpu_resources_per_node, self.total_num_cpus)
         )
         num_gpus_for_fold_worker = num_gpus_for_fold_worker if num_gpus_for_fold_worker is not None else 0
 

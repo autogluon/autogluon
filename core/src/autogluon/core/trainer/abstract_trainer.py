@@ -1468,6 +1468,7 @@ class AbstractTrainer:
                         X_unlabeled=X_unlabeled,
                         level=level,
                         kwargs=kwargs,
+                        fit_strategy=fit_strategy,
                     )
                     if len(models_trained) == 1:
                         model_refit_map[model_name] = models_trained[0]
@@ -1483,10 +1484,14 @@ class AbstractTrainer:
             # -- Distributed refit
             ray = try_import_ray()
 
+            # FIXME: Need a common utility class for initializing ray so we don't duplicate code
+            if not ray.is_initialized():
+                ray.init(log_to_driver=False, logging_level=logging.ERROR)
+
             distributed_manager = DistributedFitManager(
                 mode="refit",
                 func=_remote_refit_single_full,
-                func_kwargs=dict(),
+                func_kwargs=dict(fit_strategy=fit_strategy),
                 func_put_kwargs=dict(
                     _self=self,
                     X=X,
@@ -2157,9 +2162,11 @@ class AbstractTrainer:
             stack_name=stack_name,
             level=level,
             num_children=num_children,
-            fit_num_cpu=model.fit_num_cpus,
-            fit_num_gpu=model.fit_num_gpus,
-            refit_full_requires_gpu=(model.fit_num_gpus is not None) and (model.fit_num_gpus > 1) and model._user_params.get("refit_folds", False),
+            fit_num_cpus=model.fit_num_cpus,
+            fit_num_gpus=model.fit_num_gpus,
+            fit_num_cpus_child=model.fit_num_cpus_child,
+            fit_num_gpus_child=model.fit_num_gpus_child,
+            refit_full_requires_gpu=(model.fit_num_gpus_child is not None) and (model.fit_num_gpus_child >= 1) and model._user_params.get("refit_folds", False),
             **fit_metadata,
         )
         return model_metadata
@@ -2768,6 +2775,10 @@ class AbstractTrainer:
     ) -> list[str]:
         # -- Parallel or Distributed training
         ray = try_import_ray()
+
+        # FIXME: Need a common utility class for initializing ray so we don't duplicate code
+        if not ray.is_initialized():
+            ray.init(log_to_driver=False, logging_level=logging.ERROR)
 
         models_valid = []
 
@@ -4350,6 +4361,7 @@ def _detached_train_multi_fold(
 
     return model_name_trained_lst
 
+
 def _remote_train_multi_fold(
     *,
     _self: AbstractTrainer,
@@ -4386,6 +4398,7 @@ def _remote_train_multi_fold(
     model_name = model_name_list[0]
     return model_name, _self.get_model_attribute(model=model_name,attribute="path"), _self.get_model_attribute(model=model_name,attribute="type")
 
+
 def _detached_refit_single_full(
     *,
     _self: AbstractTrainer,
@@ -4397,6 +4410,7 @@ def _detached_refit_single_full(
     X_unlabeled: pd.DataFrame,
     level: int,
     kwargs: dict,
+    fit_strategy: Literal["sequential", "parallel"] = "sequential",
 ) -> tuple[str, list[str]]:
     # TODO: loading the model is the reasons we must allocate GPU resources for this job in cases where models require GPU when loaded from disk
     model=_self.load_model(model)
@@ -4420,12 +4434,17 @@ def _detached_refit_single_full(
         # Mitigates situation where bagged models barely had enough memory and refit requires more. Worst case results in OOM, but this lowers chance of failure.
         model_full._user_params_aux["max_memory_usage_ratio"]=model.params_aux["max_memory_usage_ratio"]*1.15
         # Re-set user specified training resources.
-        if DistributedContext.is_distributed_mode():
-            # FIXME: this is technically also a bug for non-distributed mode, but there it is good to use more/all resources per refit.
-            if model.fit_num_cpus is not None:
-                model_full._user_params_aux["num_cpus"] = model.fit_num_cpus
-            if model.fit_num_gpus is not None:
-                model_full._user_params_aux["num_gpus"] = model.fit_num_gpus
+        # FIXME: this is technically also a bug for non-distributed mode, but there it is good to use more/all resources per refit.
+        # FIXME: Unsure if it is better to do model.fit_num_cpus or model.fit_num_cpus_child,
+        #  (Nick): I'm currently leaning towards model.fit_num_cpus, it is also less memory intensive
+        # Better to not specify this for sequential fits, since we want the models to use the optimal amount of resources,
+        # which could be less than the available resources (ex: LightGBM fits faster using 50% of the cores)
+        if fit_strategy == "parallel":
+            # FIXME: Why use `model.fit_num_cpus_child` when we can use the same values as was passed to `ray` for the process, just pass those values as kwargs. Eliminates chance of inconsistency.
+            if model.fit_num_cpus_child is not None:
+                model_full._user_params_aux["num_cpus"] = model.fit_num_cpus_child
+            if model.fit_num_gpus_child is not None:
+                model_full._user_params_aux["num_gpus"] = model.fit_num_gpus_child
         # TODO: Do it for all models in the level at once to avoid repeated processing of data?
         base_model_names=_self.get_base_model_names(model_name)
         # FIXME: Logs for inference speed (1 row) are incorrect because
@@ -4484,6 +4503,7 @@ def _remote_refit_single_full(
     X_unlabeled: pd.DataFrame,
     level: int,
     kwargs: dict,
+    fit_strategy: Literal["sequential", "parallel"],
 ) -> tuple[str, str, list[str], str, str]:
     from autogluon.common.utils.log_utils import reset_logger_for_remote_call
     reset_logger_for_remote_call(verbosity=_self.verbosity)
@@ -4498,6 +4518,7 @@ def _remote_refit_single_full(
         X_unlabeled=X_unlabeled,
         level=level,
         kwargs=kwargs,
+        fit_strategy=fit_strategy,
     )
 
     # We always just refit one model per call, so this must be the case.

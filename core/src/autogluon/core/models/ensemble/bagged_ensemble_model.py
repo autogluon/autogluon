@@ -94,6 +94,9 @@ class BaggedEnsembleModel(AbstractModel):
 
         self._predict_n_size_lst = None  # A list of the predict row count for each child, useful to calculate the expected inference throughput of the bag.
 
+        self._child_num_cpus = None
+        self._child_num_gpus = None
+
         super().__init__(problem_type=self.model_base.problem_type, eval_metric=self.model_base.eval_metric, **kwargs)
 
     def _set_default_params(self):
@@ -559,7 +562,7 @@ class BaggedEnsembleModel(AbstractModel):
             model_base.model = None
         if self.low_memory:
             self.save_child(model_base)
-        self.add_child(model=model_base, add_child_times=True)
+        self.add_child(model=model_base, add_child_times=True, add_child_resources=True)
         self._set_n_repeat_single()
 
     def _set_n_repeat_single(self):
@@ -715,7 +718,7 @@ class BaggedEnsembleModel(AbstractModel):
 
         for model in models:
             # No need to add child times or save child here as this already occurred in the fold_fitting_strategy
-            self.add_child(model=model, add_child_times=False)
+            self.add_child(model=model, add_child_times=False, add_child_resources=False)
         self._bagged_mode = True
 
         if self._oof_pred_proba is None:
@@ -912,7 +915,7 @@ class BaggedEnsembleModel(AbstractModel):
         else:
             return model
 
-    def add_child(self, model: Union[AbstractModel, str], add_child_times=False):
+    def add_child(self, model: Union[AbstractModel, str], add_child_times=False, add_child_resources=False):
         """
         Add a new fit child model to `self.models`
 
@@ -941,6 +944,11 @@ class BaggedEnsembleModel(AbstractModel):
             if model is None:
                 model = self.load_child(model=model_name, verbose=False)
             self._add_child_times_to_bag(model=model)
+        if add_child_resources:
+            if model is None:
+                model = self.load_child(model=model_name, verbose=False)
+            self._add_child_num_cpus(num_cpus=model.fit_num_cpus)
+            self._add_child_num_gpus(num_gpus=model.fit_num_gpus)
 
     def save_child(self, model: Union[AbstractModel, str], path=None, verbose=False):
         """Save child model to disk."""
@@ -1096,6 +1104,32 @@ class BaggedEnsembleModel(AbstractModel):
         if self._predict_n_size_lst is None:
             self._predict_n_size_lst = []
         self._predict_n_size_lst += predict_n_size_lst
+
+    def _add_child_num_cpus(self, num_cpus: int):
+        if self._child_num_cpus is None:
+            self._child_num_cpus = []
+        self._child_num_cpus.append(num_cpus)
+
+    def _add_child_num_gpus(self, num_gpus: float):
+        if self._child_num_gpus is None:
+            self._child_num_gpus = []
+        self._child_num_gpus.append(num_gpus)
+
+    @property
+    def fit_num_cpus_child(self) -> int:
+        """Number of CPUs used for fitting one model (i.e. a child model)"""
+        if self._child_num_cpus:
+            return min(self._child_num_cpus)
+        else:
+            return self.fit_num_cpus
+
+    @property
+    def fit_num_gpus_child(self) -> float:
+        """Number of GPUs used for fitting one model (i.e. a child model)"""
+        if self._child_num_gpus:
+            return min(self._child_num_gpus)
+        else:
+            return self.fit_num_gpus
 
     @property
     def predict_n_size(self) -> float | None:
