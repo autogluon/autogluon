@@ -30,21 +30,21 @@ def bbox_xywh_to_xyxy(xywh: BBoxType) -> Union[Tuple[float, ...], np.ndarray]:
     if isinstance(xywh, (tuple, list)):
         if len(xywh) != 4:
             raise IndexError(f"Bounding box must have 4 elements, got {len(xywh)}")
-        
+
         # Convert to xmin, ymin, xmax, ymax
         x, y = xywh[0], xywh[1]
         w = max(xywh[2] - 1, 0)  # Ensure non-negative width
         h = max(xywh[3] - 1, 0)  # Ensure non-negative height
         return (x, y, x + w, y + h)
-    
+
     if isinstance(xywh, np.ndarray):
         if xywh.size % 4 != 0:
             raise IndexError(f"Bounding boxes must have n * 4 elements, got shape {xywh.shape}")
-        
+
         # Convert array of boxes
         w = np.maximum(0, xywh[:, 2:4] - 1)  # Ensure non-negative dimensions
         return np.hstack((xywh[:, :2], xywh[:, :2] + w))
-    
+
     raise TypeError(f"Expected list, tuple or numpy.ndarray, got {type(xywh)}")
 
 
@@ -67,27 +67,25 @@ def bbox_xyxy_to_xywh(xyxy: BBoxType) -> Union[Tuple[float, ...], np.ndarray]:
     if isinstance(xyxy, (tuple, list)):
         if len(xyxy) != 4:
             raise IndexError(f"Bounding box must have 4 elements, got {len(xyxy)}")
-        
+
         # Convert to x, y, width, height
         x1, y1 = xyxy[0], xyxy[1]
         w = xyxy[2] - x1
         h = xyxy[3] - y1
         return (x1, y1, w, h)
-    
+
     if isinstance(xyxy, np.ndarray):
         if xyxy.size % 4 != 0:
             raise IndexError(f"Bounding boxes must have n * 4 elements, got shape {xyxy.shape}")
-        
+
         # Convert array of boxes
         return np.hstack((xyxy[:, :2], xyxy[:, 2:4] - xyxy[:, :2] + 1))
-    
+
     raise TypeError(f"Expected list, tuple or numpy.ndarray, got {type(xyxy)}")
 
 
 def bbox_clip_xyxy(
-    xyxy: BBoxType,
-    width: Union[int, float],
-    height: Union[int, float]
+    xyxy: BBoxType, width: Union[int, float], height: Union[int, float]
 ) -> Union[Tuple[float, ...], np.ndarray]:
     """
     Clip bounding boxes to stay within image boundaries.
@@ -107,35 +105,34 @@ def bbox_clip_xyxy(
     if isinstance(xyxy, (tuple, list)):
         if len(xyxy) != 4:
             raise IndexError(f"Bounding box must have 4 elements, got {len(xyxy)}")
-        
+
         # Clip coordinates to image boundaries
         x1 = np.clip(xyxy[0], 0, width - 1)
         y1 = np.clip(xyxy[1], 0, height - 1)
         x2 = np.clip(xyxy[2], 0, width - 1)
         y2 = np.clip(xyxy[3], 0, height - 1)
         return (x1, y1, x2, y2)
-    
+
     if isinstance(xyxy, np.ndarray):
         if xyxy.size % 4 != 0:
             raise IndexError(f"Bounding boxes must have n * 4 elements, got shape {xyxy.shape}")
-        
+
         # Clip array of boxes
         x1 = np.clip(xyxy[:, 0], 0, width - 1)
         y1 = np.clip(xyxy[:, 1], 0, height - 1)
         x2 = np.clip(xyxy[:, 2], 0, width - 1)
         y2 = np.clip(xyxy[:, 3], 0, height - 1)
         return np.stack([x1, y1, x2, y2], axis=1)
-    
+
     raise TypeError(f"Expected list, tuple or numpy.ndarray, got {type(xyxy)}")
 
 
 def bbox_ratio_xywh_to_index_xyxy(
-    xywh: BBoxType,
-    image_wh: Union[List[float], Tuple[float, float], np.ndarray]
+    xywh: BBoxType, image_wh: Union[List[float], Tuple[float, float], np.ndarray]
 ) -> Union[Tuple[float, ...], np.ndarray]:
     """
     Convert bounding boxes from normalized ratios to absolute pixel coordinates.
-    
+
     Converts from format (x_center_ratio, y_center_ratio, w_ratio, h_ratio)
     to (xmin, ymin, xmax, ymax) in pixel coordinates.
 
@@ -153,10 +150,8 @@ def bbox_ratio_xywh_to_index_xyxy(
     """
     if isinstance(xywh, (tuple, list)):
         if not isinstance(image_wh, (tuple, list)):
-            raise TypeError(
-                f"image_wh type ({type(image_wh)}) should match xywh type ({type(xywh)})"
-            )
-        
+            raise TypeError(f"image_wh type ({type(image_wh)}) should match xywh type ({type(xywh)})")
+
         if len(xywh) != 4:
             raise IndexError(f"Bounding box must have 4 elements, got {len(xywh)}")
         if len(image_wh) != 2:
@@ -176,38 +171,33 @@ def bbox_ratio_xywh_to_index_xyxy(
         # Convert center to top-left corner
         x1 = x_center - w / 2
         y1 = y_center - h / 2
-        
+
         return (x1, y1, x1 + w, y1 + h)
 
     if isinstance(xywh, np.ndarray):
         if not xywh.size % 4 == 0:
             raise IndexError(f"Bounding boxes must have n * 4 elements, got shape {xywh.shape}")
-            
+
         if isinstance(image_wh, np.ndarray):
             if not image_wh.size % 2 == 0:
-                raise IndexError(
-                    f"Image dimensions must have n * 2 elements, got shape {image_wh.shape}"
-                )
+                raise IndexError(f"Image dimensions must have n * 2 elements, got shape {image_wh.shape}")
             # Handle batched image dimensions
             scale_factors = np.concatenate([image_wh, image_wh], axis=1)
-            
+
         elif isinstance(image_wh, (tuple, list)):
             # Handle single image dimensions
             img_w, img_h = image_wh
             scale_factors = np.array([[img_w, img_h, img_w, img_h]])
-        
+
         # Scale to absolute coordinates
         abs_coords = xywh * scale_factors
-        
+
         # Convert centers to corners
         abs_coords[:, :2] -= abs_coords[:, 2:] / 2
-        
+
         # Convert to xyxy format
-        return np.hstack((
-            abs_coords[:, :2],
-            abs_coords[:, :2] + np.maximum(0, abs_coords[:, 2:] - 1)
-        ))
-    
+        return np.hstack((abs_coords[:, :2], abs_coords[:, :2] + np.maximum(0, abs_coords[:, 2:] - 1)))
+
     raise TypeError(f"Expected list, tuple or numpy.ndarray, got {type(xywh)}")
 
 
@@ -227,15 +217,12 @@ def convert_pred_to_xywh(predictions: Optional[List[dict]]) -> Optional[List[dic
 
     for pred in predictions:
         bboxes = pred["bboxes"]
-        
+
         if isinstance(bboxes, np.ndarray):
             pred["bboxes"] = bbox_xyxy_to_xywh(bboxes)
         elif torch.is_tensor(bboxes):
             pred["bboxes"] = bbox_xyxy_to_xywh(bboxes.detach().numpy())
         else:
-            raise TypeError(
-                f"Unsupported bbox type: {type(bboxes)}. "
-                "Expected numpy.ndarray or torch.Tensor"
-            )
+            raise TypeError(f"Unsupported bbox type: {type(bboxes)}. " "Expected numpy.ndarray or torch.Tensor")
 
     return predictions

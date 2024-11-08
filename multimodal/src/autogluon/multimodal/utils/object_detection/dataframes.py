@@ -34,11 +34,11 @@ def get_df_unique_classes(data: pd.DataFrame) -> tuple[list, dict]:
 
     for _, row in data.iterrows():
         rois = row["rois"]
-        
+
         for roi in rois:
             # Unpack ROI values (assuming last element is class label)
             class_label = roi[-1]
-            
+
             # Add new classes to the dictionary with auto-incrementing IDs
             if class_label not in unique_classes:
                 # Start IDs from 1, as 0 is often reserved for background
@@ -58,11 +58,7 @@ def from_dict(data: dict) -> pd.DataFrame:
     Returns:
         DataFrame with columns "image", "rois", and "label"
     """
-    df_data = {
-        "image": [],
-        "rois": [],
-        "label": []
-    }
+    df_data = {"image": [], "rois": [], "label": []}
 
     for image in data["image"]:
         df_data["image"].append(image)
@@ -85,11 +81,7 @@ def from_list(image_paths: List[str]) -> pd.DataFrame:
     Returns:
         DataFrame with columns "image", "rois", and "label"
     """
-    df_data = {
-        "image": [],
-        "rois": [],
-        "label": []
-    }
+    df_data = {"image": [], "rois": [], "label": []}
 
     for image_path in image_paths:
         df_data["image"].append(image_path)
@@ -115,7 +107,7 @@ def from_str(image_path: str) -> pd.DataFrame:
     df_data = {
         "image": [image_path],
         "rois": [[[-1, -1, -1, -1, 0]]],  # Dummy ROIs
-        "label": [[[-1, -1, -1, -1, 0]]]  # Dummy labels
+        "label": [[[-1, -1, -1, -1, 0]]],  # Dummy labels
     }
 
     df = pd.DataFrame(df_data)
@@ -152,8 +144,7 @@ def sanity_check_dataframe(data: pd.DataFrame):
 
 
 def object_detection_data_to_df(
-    data: Union[pd.DataFrame, dict, list, str], 
-    coco_root: Optional[str] = None
+    data: Union[pd.DataFrame, dict, list, str], coco_root: Optional[str] = None
 ) -> pd.DataFrame:
     """
     Convert various input formats to a standardized detection dataframe.
@@ -174,30 +165,26 @@ def object_detection_data_to_df(
     """
     if isinstance(data, dict):
         return from_dict(data)
-    
+
     if isinstance(data, list):
         return from_list(data)
-    
+
     if isinstance(data, str):
         if os.path.isdir(data) or data.endswith(".json"):
             from .format_converter import from_coco_or_voc
+
             return from_coco_or_voc(data, coco_root=coco_root)
         return from_str(data)
-    
+
     if isinstance(data, pd.DataFrame):
         sanity_check_dataframe(data)
         return data
 
-    raise TypeError(
-        f"Expected data to be dict, list, str or pd.DataFrame, but got {type(data)}"
-    )
+    raise TypeError(f"Expected data to be dict, list, str or pd.DataFrame, but got {type(data)}")
 
 
 def convert_result_df(
-    predictions: List, 
-    data: Union[pd.DataFrame, Dict], 
-    detection_classes: List[str], 
-    result_path: Optional[str] = None
+    predictions: List, data: Union[pd.DataFrame, Dict], detection_classes: List[str], result_path: Optional[str] = None
 ) -> pd.DataFrame:
     """
     Convert detection results to DataFrame format.
@@ -213,23 +200,25 @@ def convert_result_df(
     """
     image_names = data["image"].tolist() if isinstance(data, pd.DataFrame) else data["image"]
     idx_to_classname = {i: classname for i, classname in enumerate(detection_classes)}
-    
+
     results = []
     for image_pred, image_name in zip(predictions, image_names):
         boxes = []
         for i in range(len(image_pred["bboxes"])):
-            boxes.append({
-                "class": idx_to_classname[image_pred["labels"][i].item()],
-                "class_id": image_pred["labels"][i].item(),
-                "bbox": image_pred["bboxes"][i].tolist(),
-                "score": image_pred["scores"][i].item(),
-            })
+            boxes.append(
+                {
+                    "class": idx_to_classname[image_pred["labels"][i].item()],
+                    "class_id": image_pred["labels"][i].item(),
+                    "bbox": image_pred["bboxes"][i].tolist(),
+                    "score": image_pred["scores"][i].item(),
+                }
+            )
         results.append([image_name, boxes])
 
     result_df = pd.DataFrame(results, columns=["image", "bboxes"])
-    
+
     if result_path:
         result_df.to_csv(result_path, index=False)
         logger.info("Saved detection results to %s", result_path)
-        
+
     return result_df

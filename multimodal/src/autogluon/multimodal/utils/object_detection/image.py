@@ -30,10 +30,7 @@ def _get_image_info(image_path: str) -> Optional[Dict[str, int]]:
     try:
         with PIL.Image.open(image_path) as img:
             width, height = img.size
-            return {
-                "height": height,
-                "width": width
-            }
+            return {"height": height, "width": width}
     except Exception as e:
         warnings.warn(f"Could not read image {image_path}: {str(e)}")
         return None
@@ -90,16 +87,17 @@ def download(url: str, save_dir: Optional[str] = None) -> str:
 
     if save_dir is None:
         import tempfile
+
         save_dir = tempfile.gettempdir()
 
     try:
         # Extract filename from URL
         filename = os.path.basename(urlparse(url).path)
         if not filename:
-            filename = 'downloaded_file'
+            filename = "downloaded_file"
 
         save_path = os.path.join(save_dir, filename)
-        
+
         # Create directory if it doesn't exist
         os.makedirs(save_dir, exist_ok=True)
 
@@ -107,17 +105,17 @@ def download(url: str, save_dir: Optional[str] = None) -> str:
         response = requests.get(
             url,
             stream=True,
-            timeout=(5.0, 30.0)  # (connect timeout, read timeout)
+            timeout=(5.0, 30.0),  # (connect timeout, read timeout)
         )
         response.raise_for_status()
-        
-        total_size = int(response.headers.get('content-length', 0))
+
+        total_size = int(response.headers.get("content-length", 0))
         block_size = 1024  # 1 KB
 
-        with open(save_path, 'wb') as f, tqdm(
+        with open(save_path, "wb") as f, tqdm(
             desc=f"Downloading {filename}",
             total=total_size,
-            unit='iB',
+            unit="iB",
             unit_scale=True,
             unit_divisor=1024,
         ) as pbar:
@@ -136,7 +134,7 @@ def download(url: str, save_dir: Optional[str] = None) -> str:
 
 class ImageLoader:
     """Utility class for efficient image loading and caching."""
-    
+
     def __init__(self, cache_size: int = 100):
         """
         Initialize ImageLoader.
@@ -161,29 +159,23 @@ class ImageLoader:
         # Return cached image if available
         if image_path in self.cache:
             self._access_count += 1
-            self.cache[image_path]['last_access'] = self._access_count
-            return self.cache[image_path]['image']
+            self.cache[image_path]["last_access"] = self._access_count
+            return self.cache[image_path]["image"]
 
         # Load new image
         try:
             image = PIL.Image.open(image_path)
-            
+
             # Manage cache size
             if len(self.cache) >= self.cache_size:
                 # Remove least recently used image
-                lru_path = min(
-                    self.cache.keys(),
-                    key=lambda k: self.cache[k]['last_access']
-                )
+                lru_path = min(self.cache.keys(), key=lambda k: self.cache[k]["last_access"])
                 del self.cache[lru_path]
 
             # Cache new image
             self._access_count += 1
-            self.cache[image_path] = {
-                'image': image,
-                'last_access': self._access_count
-            }
-            
+            self.cache[image_path] = {"image": image, "last_access": self._access_count}
+
             return image
 
         except Exception as e:
@@ -197,8 +189,7 @@ class ImageLoader:
 
 
 def verify_image_directory(
-    directory: Union[str, Path],
-    extensions: tuple = ('.jpg', '.jpeg', '.png', '.bmp')
+    directory: Union[str, Path], extensions: tuple = (".jpg", ".jpeg", ".png", ".bmp")
 ) -> tuple[list, list]:
     """
     Verify all images in a directory are readable and have valid dimensions.
@@ -217,39 +208,30 @@ def verify_image_directory(
 
     valid_images = []
     invalid_images = []
-    
+
     # Check if directory exists
     if not directory.exists():
         raise ValueError(f"Directory does not exist: {directory}")
 
     # Iterate through all files in directory
-    for filepath in tqdm(
-        list(directory.glob("*")),
-        desc="Verifying images",
-        unit="files"
-    ):
+    for filepath in tqdm(list(directory.glob("*")), desc="Verifying images", unit="files"):
         if filepath.suffix.lower() in extensions:
             image_info = _get_image_info(str(filepath))
-            
-            if image_info is not None and image_info['width'] > 0 and image_info['height'] > 0:
+
+            if image_info is not None and image_info["width"] > 0 and image_info["height"] > 0:
                 valid_images.append(str(filepath))
             else:
                 invalid_images.append(str(filepath))
                 logger.warning(f"Invalid image found: {filepath}")
 
     # Log summary
-    logger.info(
-        f"Image verification complete: "
-        f"{len(valid_images)} valid, {len(invalid_images)} invalid"
-    )
+    logger.info(f"Image verification complete: " f"{len(valid_images)} valid, {len(invalid_images)} invalid")
 
     return valid_images, invalid_images
 
 
 def create_image_thumbnail(
-    image_path: str,
-    max_size: tuple = (128, 128),
-    output_path: Optional[str] = None
+    image_path: str, max_size: tuple = (128, 128), output_path: Optional[str] = None
 ) -> Optional[PIL.Image.Image]:
     """
     Create a thumbnail of an image while maintaining aspect ratio.
@@ -265,15 +247,15 @@ def create_image_thumbnail(
     try:
         with PIL.Image.open(image_path) as img:
             # Convert to RGB if necessary
-            if img.mode not in ('RGB', 'L'):
-                img = img.convert('RGB')
-            
+            if img.mode not in ("RGB", "L"):
+                img = img.convert("RGB")
+
             # Create thumbnail
             img.thumbnail(max_size, PIL.Image.LANCZOS)
-            
+
             if output_path:
                 img.save(output_path, quality=95, optimize=True)
-            
+
             return img
 
     except Exception as e:

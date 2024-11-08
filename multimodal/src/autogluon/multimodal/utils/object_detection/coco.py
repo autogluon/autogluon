@@ -16,9 +16,21 @@ import torch
 from torchmetrics.detection.mean_ap import MeanAveragePrecision
 
 from ...constants import (
-    BBOX, LABEL, MAP, MAP_50, MAP_75, MAP_LARGE, MAP_MEDIUM,
-    MAP_SMALL, MAR_1, MAR_10, MAR_100, MAR_LARGE, MAR_MEDIUM,
-    MAR_SMALL, MEAN_AVERAGE_PRECISION
+    BBOX,
+    LABEL,
+    MAP,
+    MAP_50,
+    MAP_75,
+    MAP_LARGE,
+    MAP_MEDIUM,
+    MAP_SMALL,
+    MAR_1,
+    MAR_10,
+    MAR_100,
+    MAR_LARGE,
+    MAR_MEDIUM,
+    MAR_SMALL,
+    MEAN_AVERAGE_PRECISION,
 )
 from .bbox import bbox_clip_xyxy, bbox_xywh_to_xyxy, bbox_xyxy_to_xywh
 from .image import get_image_filename, _get_image_info
@@ -28,7 +40,7 @@ logger = logging.getLogger(__name__)
 
 class COCODataset:
     """Class for handling COCO format datasets."""
-    
+
     def __init__(self, anno_file: str, category_ids: Optional[List[int]] = None):
         """
         Initialize COCO dataset handler.
@@ -39,24 +51,22 @@ class COCODataset:
         """
         self.anno_file = anno_file
         self._load_annotations(category_ids)
-        
+
     def _load_annotations(self, category_ids: Optional[List[int]] = None) -> None:
         """Load annotations from file and setup internal mappings."""
-        with open(self.anno_file, 'r') as f:
+        with open(self.anno_file, "r") as f:
             data = json.load(f)
-            
+
         # Build image filename to ID mapping
-        self.image_filename_to_id = {
-            get_image_filename(img["file_name"]): int(img["id"])
-            for img in data["images"]
-        }
-        
+        self.image_filename_to_id = {get_image_filename(img["file_name"]): int(img["id"]) for img in data["images"]}
+
         # Set category IDs
         if category_ids is not None:
             self.category_ids = category_ids
         else:
-            self.category_ids = ([cat["id"] for cat in data["categories"]] 
-                               if "categories" in data else list(range(9999)))
+            self.category_ids = (
+                [cat["id"] for cat in data["categories"]] if "categories" in data else list(range(9999))
+            )
 
     def get_image_id_from_path(self, image_path: str) -> int:
         """Get COCO image ID from image path."""
@@ -72,18 +82,20 @@ class COCODataset:
             save_path: Path to save JSON results
         """
         coco_results = []
-        
+
         for i, row in data.reset_index(drop=True).iterrows():
             image_id = self.get_image_id_from_path(row["image"])
             pred_result = ret[i]
-            
+
             for bbox_idx in range(len(pred_result["bboxes"])):
-                coco_results.append({
-                    "image_id": image_id,
-                    "category_id": self.category_ids[int(pred_result["labels"][bbox_idx].item())],
-                    "bbox": bbox_xyxy_to_xywh(pred_result["bboxes"][bbox_idx].tolist()),
-                    "score": pred_result["scores"][bbox_idx].item(),
-                })
+                coco_results.append(
+                    {
+                        "image_id": image_id,
+                        "category_id": self.category_ids[int(pred_result["labels"][bbox_idx].item())],
+                        "bbox": bbox_xyxy_to_xywh(pred_result["bboxes"][bbox_idx].tolist()),
+                        "score": pred_result["scores"][bbox_idx].item(),
+                    }
+                )
 
         with open(save_path, "w") as f:
             logger.info("Saving COCO results to %s", save_path)
@@ -131,29 +143,28 @@ def cocoeval_torchmetrics(outputs: List[Dict]) -> Dict:
 
     preds = []
     targets = []
-    
+
     for output in outputs:
-        preds.append({
-            "boxes": output[BBOX]["bboxes"].to("cpu"),
-            "scores": output[BBOX]["scores"].to("cpu"),
-            "labels": output[BBOX]["labels"].to("cpu"),
-        })
-        
-        targets.append({
-            "boxes": output[LABEL]["bboxes"].to("cpu"),
-            "labels": output[LABEL]["labels"].to("cpu"),
-        })
+        preds.append(
+            {
+                "boxes": output[BBOX]["bboxes"].to("cpu"),
+                "scores": output[BBOX]["scores"].to("cpu"),
+                "labels": output[BBOX]["labels"].to("cpu"),
+            }
+        )
+
+        targets.append(
+            {
+                "boxes": output[LABEL]["bboxes"].to("cpu"),
+                "labels": output[LABEL]["labels"].to("cpu"),
+            }
+        )
 
     map_metric.update(preds, targets)
     return map_metric.compute()
 
 
-def cocoeval_pycocotools(
-    outputs: List[Dict],
-    data: pd.DataFrame,
-    anno_file: str,
-    cache_path: str
-) -> np.ndarray:
+def cocoeval_pycocotools(outputs: List[Dict], data: pd.DataFrame, anno_file: str, cache_path: str) -> np.ndarray:
     """
     Evaluate detection outputs using pycocotools' mAP implementation.
 
@@ -186,8 +197,8 @@ def cocoeval_pycocotools(
     # Perform evaluation
     coco_gt = COCO(anno_file)
     coco_dt = coco_gt.loadRes(cache_path)
-    
-    evaluator = COCOeval(coco_gt, coco_dt, 'bbox')
+
+    evaluator = COCOeval(coco_gt, coco_dt, "bbox")
     evaluator.evaluate()
     evaluator.accumulate()
     evaluator.summarize()
@@ -222,7 +233,7 @@ def parse_detection_result(result: Union[Dict, np.ndarray]) -> Dict:
         }
         parsed[MEAN_AVERAGE_PRECISION] = parsed[MAP]
         return parsed
-        
+
     result[MEAN_AVERAGE_PRECISION] = result[MAP]
     return result
 
@@ -233,7 +244,7 @@ def cocoeval(
     anno_file: str,
     cache_path: str,
     metrics: Optional[Union[str, List[str]]] = None,
-    tool: str = "pycocotools"
+    tool: str = "pycocotools",
 ) -> Dict:
     """
     Evaluate detection outputs using specified evaluation tool.
@@ -271,11 +282,7 @@ def cocoeval(
 
 
 def save_result_coco_format(
-    data_path: str,
-    predictions: List,
-    category_ids: List[int],
-    result_path: str,
-    coco_root: Optional[str] = None
+    data_path: str, predictions: List, category_ids: List[int], result_path: str, coco_root: Optional[str] = None
 ) -> None:
     """
     Save detection results in COCO format.
@@ -288,13 +295,13 @@ def save_result_coco_format(
         coco_root: Optional root directory for COCO dataset
     """
     from .format_converter import from_coco_or_voc
-    
+
     # Initialize COCO dataset and save results
     coco_dataset = COCODataset(data_path, category_ids=category_ids)
     result_name = os.path.splitext(result_path)[0]
     json_path = f"{result_name}.json"
-    
+
     data_df = from_coco_or_voc(data_path, "test", coco_root=coco_root)
     coco_dataset.save_result(predictions, data_df, json_path)
-    
+
     logger.info("Saved COCO format results to %s", json_path)

@@ -40,10 +40,7 @@ def from_coco_or_voc(file_path: str, splits: Optional[str] = None, coco_root: Op
 
 
 def from_coco(
-    anno_file: str,
-    coco_root: Optional[str] = None,
-    min_object_area: float = 0,
-    use_crowd: bool = False
+    anno_file: str, coco_root: Optional[str] = None, min_object_area: float = 0, use_crowd: bool = False
 ) -> pd.DataFrame:
     """
     Load COCO format annotations into DataFrame.
@@ -78,7 +75,7 @@ def from_coco(
     # Process images and annotations
     data = {"image": [], "rois": []}
     image_ids = sorted(coco.getImgIds())
-    
+
     for img_entry in coco.loadImgs(image_ids):
         # Get image path
         if "coco_url" in img_entry:
@@ -92,9 +89,7 @@ def from_coco(
             continue
 
         # Get annotations for image
-        rois, _ = _check_load_coco_bbox(
-            coco, img_entry, min_object_area, use_crowd
-        )
+        rois, _ = _check_load_coco_bbox(coco, img_entry, min_object_area, use_crowd)
 
         if not rois and num_annotations > 0:
             continue
@@ -108,10 +103,7 @@ def from_coco(
 
 
 def _check_load_coco_bbox(
-    coco,
-    img_entry: dict,
-    min_object_area: float = 0,
-    use_crowd: bool = False
+    coco, img_entry: dict, min_object_area: float = 0, use_crowd: bool = False
 ) -> Tuple[List, List]:
     """
     Load and validate COCO bounding boxes for an image.
@@ -138,30 +130,26 @@ def _check_load_coco_bbox(
 
     for ann in annotations:
         # Filter annotations
-        if (ann["area"] < min_object_area or
-            ann.get("ignore", 0) == 1 or
-            (not use_crowd and ann.get("iscrowd", 0))):
+        if ann["area"] < min_object_area or ann.get("ignore", 0) == 1 or (not use_crowd and ann.get("iscrowd", 0)):
             continue
 
         # Convert box format and clip to image bounds
-        xmin, ymin, xmax, ymax = bbox_clip_xyxy(
-            bbox_xywh_to_xyxy(ann["bbox"]),
-            img_width,
-            img_height
-        )
+        xmin, ymin, xmax, ymax = bbox_clip_xyxy(bbox_xywh_to_xyxy(ann["bbox"]), img_width, img_height)
 
         # Validate box
         if ann["area"] > 0 and xmax > xmin and ymax > ymin:
             cat_ids = coco.getCatIds()
             id_to_idx = dict(zip(cat_ids, range(len(cat_ids))))
             class_id = id_to_idx[coco.loadCats(ann["category_id"])[0]["id"]]
-            valid_boxes.append([
-                float(xmin),
-                float(ymin),
-                float(xmax),
-                float(ymax),
-                class_id,
-            ])
+            valid_boxes.append(
+                [
+                    float(xmin),
+                    float(ymin),
+                    float(xmax),
+                    float(ymax),
+                    class_id,
+                ]
+            )
             is_crowd_flags.append(ann.get("iscrowd", 0))
 
     return valid_boxes, is_crowd_flags
@@ -170,7 +158,7 @@ def _check_load_coco_bbox(
 def from_voc(
     root: str,
     splits: Optional[Union[str, Tuple[str, ...]]] = None,
-    exts: Union[str, Tuple[str, ...]] = ('.jpg', '.jpeg', '.png')
+    exts: Union[str, Tuple[str, ...]] = (".jpg", ".jpeg", ".png"),
 ) -> pd.DataFrame:
     """
     Load Pascal VOC format dataset into DataFrame.
@@ -197,15 +185,15 @@ def from_voc(
     if splits:
         logger.debug("Using splits: %s for root: %s", splits, root)
         splits = [splits] if isinstance(splits, str) else splits
-        
+
         for split in splits:
             split_file = root_path / "ImageSets" / "Main" / split
             if not split_file.exists():
-                split_file = split_file.with_suffix('.txt')
-            
+                split_file = split_file.with_suffix(".txt")
+
             if not split_file.exists():
                 raise FileNotFoundError(f"Split file not found: {split_file}")
-                
+
             with split_file.open() as f:
                 img_list.extend([line.split()[0].strip() for line in f])
     else:
@@ -220,18 +208,18 @@ def from_voc(
 
     for img_id in img_list:
         anno_path = root_path / "Annotations" / f"{img_id}.xml"
-        
+
         # Parse XML annotation
         tree = ET.parse(anno_path)
         root_elem = tree.getroot()
-        
+
         # Get image path and dimensions
         img_filename = root_elem.find("filename").text
         if "." not in img_filename:
             img_filename += ".jpg"
-            
+
         img_path = str(root_path / "JPEGImages" / img_filename)
-        
+
         size_elem = root_elem.find("size")
         width = float(size_elem.find("width").text)
         height = float(size_elem.find("height").text)
@@ -241,7 +229,7 @@ def from_voc(
         for obj in root_elem.iter("object"):
             class_name = obj.find("name").text.strip().lower()
             class_idx = name_to_idx[class_name]
-            
+
             bbox = obj.find("bndbox")
             xmin = max(0, float(bbox.find("xmin").text) - 1)
             ymin = max(0, float(bbox.find("ymin").text) - 1)
@@ -281,13 +269,9 @@ def get_voc_format_classes(root: str) -> Tuple[List[str], List[int]]:
             class_names = [line.rstrip().lower() for line in f]
         logger.info("Using class names from labels.txt: %s", class_names)
     else:
-        logger.warning(
-            "labels.txt not found, scanning annotations directory: %s",
-            root_path / "Annotations"
-        )
+        logger.warning("labels.txt not found, scanning annotations directory: %s", root_path / "Annotations")
         class_names = dump_voc_classes(
-            voc_annotation_path=str(root_path / "Annotations"),
-            voc_class_names_output_path=str(labels_file)
+            voc_annotation_path=str(root_path / "Annotations"), voc_class_names_output_path=str(labels_file)
         )
 
     # Create category IDs (1-based indexing)
@@ -295,10 +279,7 @@ def get_voc_format_classes(root: str) -> Tuple[List[str], List[int]]:
     return class_names, category_ids
 
 
-def dump_voc_classes(
-    voc_annotation_path: str,
-    voc_class_names_output_path: Optional[str] = None
-) -> List[str]:
+def dump_voc_classes(voc_annotation_path: str, voc_class_names_output_path: Optional[str] = None) -> List[str]:
     """
     Extract unique class names from VOC annotations.
 
@@ -310,22 +291,22 @@ def dump_voc_classes(
         List of unique class names
     """
     class_names = set()
-    
+
     for xml_file in os.listdir(voc_annotation_path):
-        if not xml_file.endswith('.xml'):
+        if not xml_file.endswith(".xml"):
             continue
-            
+
         tree = ET.parse(os.path.join(voc_annotation_path, xml_file))
         root = tree.getroot()
-        
+
         for obj in root.iter("object"):
             class_names.add(obj.find("name").text.lower())
 
     sorted_names = sorted(list(class_names))
-    
+
     if voc_class_names_output_path:
         with open(voc_class_names_output_path, "w") as f:
-            f.write('\n'.join(sorted_names))
+            f.write("\n".join(sorted_names))
         logger.info("Saved class names to %s", voc_class_names_output_path)
 
     return sorted_names
@@ -342,13 +323,8 @@ def object_detection_df_to_coco(data: pd.DataFrame, save_path: Optional[str] = N
     Returns:
         Dictionary in COCO format
     """
-    coco_data = {
-        "images": [],
-        "type": "instances",
-        "annotations": [],
-        "categories": []
-    }
-    
+    coco_data = {"images": [], "type": "instances", "annotations": [], "categories": []}
+
     bbox_count = 0
     unique_classes = {}
 
@@ -358,12 +334,7 @@ def object_detection_df_to_coco(data: pd.DataFrame, save_path: Optional[str] = N
         if img_info is None:
             continue
 
-        image_entry = {
-            "file_name": row["image"],
-            "height": img_info["height"],
-            "width": img_info["width"],
-            "id": idx
-        }
+        image_entry = {"file_name": row["image"], "height": img_info["height"], "width": img_info["width"], "id": idx}
         coco_data["images"].append(image_entry)
 
         # Process annotations
@@ -379,7 +350,7 @@ def object_detection_df_to_coco(data: pd.DataFrame, save_path: Optional[str] = N
                 "ignore": 0,
                 "segmentation": [],
                 "image_id": idx,
-                "id": bbox_count
+                "id": bbox_count,
             }
             bbox_count += 1
             coco_data["annotations"].append(annotation)
@@ -389,14 +360,10 @@ def object_detection_df_to_coco(data: pd.DataFrame, save_path: Optional[str] = N
 
     # Add categories
     for class_name, class_id in unique_classes.items():
-        coco_data["categories"].append({
-            "supercategory": "none",
-            "id": class_id,
-            "name": class_name
-        })
+        coco_data["categories"].append({"supercategory": "none", "id": class_id, "name": class_name})
 
-    if save_path and save_path.endswith('.json'):
-        with open(save_path, 'w') as f:
+    if save_path and save_path.endswith(".json"):
+        with open(save_path, "w") as f:
             json.dump(coco_data, f)
         logger.info("Saved COCO format data to %s", save_path)
 

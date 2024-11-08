@@ -31,7 +31,7 @@ def get_color(idx: int) -> Tuple[int, int, int]:
     return (
         (37 * idx) % 255,  # Red
         (17 * idx) % 255,  # Green
-        (29 * idx) % 255   # Blue
+        (29 * idx) % 255,  # Blue
     )
 
 
@@ -41,7 +41,7 @@ def add_bbox_with_alpha(
     br: Tuple[int, int],
     line_color: Tuple[int, int, int],
     alpha: float = 0.5,
-    line_thickness: int = 2
+    line_thickness: int = 2,
 ) -> np.ndarray:
     """
     Draw a single bounding box with transparency on an image.
@@ -71,7 +71,7 @@ def add_text_with_bg_color(
     font: int = cv2.FONT_HERSHEY_DUPLEX,
     text_scale: float = 0.75,
     text_thickness: int = 1,
-    text_vert_padding: Optional[int] = None
+    text_vert_padding: Optional[int] = None,
 ) -> np.ndarray:
     """
     Add text with background color to an image.
@@ -91,41 +91,29 @@ def add_text_with_bg_color(
         Image with added text
     """
     x1, y1 = tl
-    
+
     # Calculate text size and padding
     text_size, _ = cv2.getTextSize(text, font, float(text_scale), text_thickness)
     text_w, text_h = text_size
-    
+
     if text_vert_padding is None:
         text_vert_padding = int(text_h * 0.1)
-    
+
     # Ensure text stays within image bounds
     y1 = max(y1 - text_h - text_vert_padding * 2, 0)
-    
+
     # Create background rectangle
     overlay = im.copy()
-    cv2.rectangle(
-        overlay,
-        (x1, y1),
-        (x1 + text_w, y1 + text_h + text_vert_padding * 2),
-        bg_color,
-        -1
-    )
-    
+    cv2.rectangle(overlay, (x1, y1), (x1 + text_w, y1 + text_h + text_vert_padding * 2), bg_color, -1)
+
     # Blend background
     im = cv2.addWeighted(overlay, alpha, im, 1 - alpha, 0)
-    
+
     # Add text
     cv2.putText(
-        im,
-        text,
-        (x1, y1 + text_h + text_vert_padding),
-        font,
-        text_scale,
-        (255, 255, 255),
-        thickness=text_thickness
+        im, text, (x1, y1 + text_h + text_vert_padding), font, text_scale, (255, 255, 255), thickness=text_thickness
     )
-    
+
     return im
 
 
@@ -139,7 +127,7 @@ def plot_detections(
     text_scale: float = 0.75,
     text_thickness: int = 1,
     line_thickness: int = 2,
-    alpha: float = 0.5
+    alpha: float = 0.5,
 ) -> np.ndarray:
     """
     Plot detection results on an image.
@@ -176,7 +164,7 @@ def plot_detections(
         alpha=alpha,
         font=font,
         text_scale=text_scale,
-        text_thickness=text_thickness
+        text_thickness=text_thickness,
     )
 
     # Plot each detection
@@ -184,24 +172,19 @@ def plot_detections(
         x1, y1, w, h = tlwh
         intbox = tuple(map(int, (x1, y1, x1 + w, y1 + h)))
         obj_id = int(obj_ids[i])
-        
+
         # Create label text
         class_name = idx2classname[obj_ids[i]]
         label = f"{class_name},{scores[i]:.3f}" if scores is not None else class_name
-        
+
         # Get unique color for class
         color = get_color(abs(obj_id))
-        
+
         # Draw box
         im = add_bbox_with_alpha(
-            im=im,
-            tl=intbox[0:2],
-            br=intbox[2:4],
-            line_color=color,
-            alpha=alpha,
-            line_thickness=line_thickness
+            im=im, tl=intbox[0:2], br=intbox[2:4], line_color=color, alpha=alpha, line_thickness=line_thickness
         )
-        
+
         # Add label
         im = add_text_with_bg_color(
             im=im,
@@ -211,17 +194,14 @@ def plot_detections(
             alpha=0.75,
             font=font,
             text_scale=text_scale,
-            text_thickness=text_thickness
+            text_thickness=text_thickness,
         )
 
     return im
 
 
 def visualize_detection(
-    predictions: pd.DataFrame,
-    detection_classes: List[str],
-    conf_threshold: float,
-    visualization_result_dir: str
+    predictions: pd.DataFrame, detection_classes: List[str], conf_threshold: float, visualization_result_dir: str
 ) -> List[np.ndarray]:
     """
     Visualize detection results for multiple images and save to directory.
@@ -241,10 +221,7 @@ def visualize_detection(
     try:
         import cv2
     except ImportError:
-        raise ImportError(
-            "OpenCV is required for visualization. "
-            "Install it with: pip install opencv-python"
-        )
+        raise ImportError("OpenCV is required for visualization. " "Install it with: pip install opencv-python")
 
     # Create output directory if needed
     os.makedirs(visualization_result_dir, exist_ok=True)
@@ -266,7 +243,7 @@ def visualize_detection(
         boxes = []
         ids = []
         scores = []
-        
+
         for det in row["bboxes"]:
             if det["score"] > conf_threshold:
                 boxes.append(bbox_xyxy_to_xywh(det["bbox"]))
@@ -284,9 +261,9 @@ def visualize_detection(
             obj_ids=ids,
             idx2classname=idx2classname,
             conf_threshold=conf_threshold,
-            scores=scores
+            scores=scores,
         )
-        
+
         visualized_images.append(vis_image)
 
         # Save result
