@@ -4,8 +4,9 @@ Provides functions for converting between different bounding box formats
 and performing operations like clipping and transformations.
 """
 
-import numpy as np
 from typing import List, Optional, Tuple, Union
+
+import numpy as np
 import torch
 
 BBoxType = Union[List[float], Tuple[float, ...], np.ndarray]

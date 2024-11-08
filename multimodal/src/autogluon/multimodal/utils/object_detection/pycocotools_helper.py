@@ -8,7 +8,7 @@ import logging
 import os
 import tempfile
 from types import ModuleType
-from typing import Optional, Any
+from typing import Any, Optional
 
 import portalocker
 

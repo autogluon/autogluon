@@ -8,7 +8,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Dict, List, Optional, Union, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -33,7 +33,7 @@ from ...constants import (
     MEAN_AVERAGE_PRECISION,
 )
 from .bbox import bbox_clip_xyxy, bbox_xywh_to_xyxy, bbox_xyxy_to_xywh
-from .image import get_image_filename, _get_image_info
+from .image import _get_image_info, get_image_filename
 
 logger = logging.getLogger(__name__)
 
