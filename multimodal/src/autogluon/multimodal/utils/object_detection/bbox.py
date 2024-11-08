@@ -41,10 +41,7 @@ def bbox_xywh_to_xyxy(xywh: BBoxType) -> Union[Tuple[float, ...], np.ndarray]:
     if isinstance(xywh, np.ndarray):
         if xywh.size % 4 != 0:
             raise IndexError(f"Bounding boxes must have n * 4 elements, got shape {xywh.shape}")
-
-        # Convert array of boxes
-        w = np.maximum(0, xywh[:, 2:4] - 1)  # Ensure non-negative dimensions
-        return np.hstack((xywh[:, :2], xywh[:, :2] + w))
+        return np.hstack((xywh[:, :2], xywh[:, :2] + np.maximum(0, xywh[:, 2:4] - 1)))
 
     raise TypeError(f"Expected list, tuple or numpy.ndarray, got {type(xywh)}")
 
@@ -80,7 +77,7 @@ def bbox_xyxy_to_xywh(xyxy: BBoxType) -> Union[Tuple[float, ...], np.ndarray]:
             raise IndexError(f"Bounding boxes must have n * 4 elements, got shape {xyxy.shape}")
 
         # Convert array of boxes
-        return np.hstack((xyxy[:, :2], xyxy[:, 2:4] - xyxy[:, :2] + 1))
+        return np.hstack((xyxy[:, :2], xyxy[:, 2:4] - xyxy[:, :2]))
 
     raise TypeError(f"Expected list, tuple or numpy.ndarray, got {type(xyxy)}")
 

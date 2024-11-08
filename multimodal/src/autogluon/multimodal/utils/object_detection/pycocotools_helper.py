@@ -10,8 +10,6 @@ import tempfile
 from types import ModuleType
 from typing import Any, Optional
 
-import portalocker
-
 logger = logging.getLogger(__name__)
 
 
@@ -36,6 +34,8 @@ def import_try_install(package: str, extern_url: Optional[str] = None) -> Module
     Raises:
         PackageInstallError: If package installation fails
     """
+    import portalocker
+
     # Create a lock file to prevent concurrent installations
     lockfile = os.path.join(tempfile.gettempdir(), f"{package}_install.lck")
 
