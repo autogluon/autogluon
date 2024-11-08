@@ -413,6 +413,9 @@ class ChronosBoltPipeline(BaseChronosPipeline):
         if context_tensor.shape[-1] > model_context_length:
             context_tensor = context_tensor[..., -model_context_length:]
 
+        # TODO: We unroll the forecast of Chronos Bolt greedily with the full forecast
+        # horizon that the model was trained with (i.e., 64). This results in variance collapsing
+        # every 64 steps. 
         while remaining > 0:
             with torch.no_grad():
                 prediction = self.model(
