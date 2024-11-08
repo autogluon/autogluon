@@ -104,7 +104,11 @@ def download(url: str, save_dir: Optional[str] = None) -> str:
         os.makedirs(save_dir, exist_ok=True)
 
         # Download with progress bar
-        response = requests.get(url, stream=True)
+        response = requests.get(
+            url,
+            stream=True,
+            timeout=(5.0, 30.0)  # (connect timeout, read timeout)
+        )
         response.raise_for_status()
         
         total_size = int(response.headers.get('content-length', 0))

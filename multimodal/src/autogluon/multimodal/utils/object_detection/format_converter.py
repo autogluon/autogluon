@@ -136,10 +136,6 @@ def _check_load_coco_bbox(
     img_width = img_entry["width"]
     img_height = img_entry["height"]
 
-    # Get category mapping
-    cat_ids = coco.getCatIds()
-    id_to_idx = dict(zip(cat_ids, range(len(cat_ids))))
-
     for ann in annotations:
         # Filter annotations
         if (ann["area"] < min_object_area or
@@ -156,6 +152,8 @@ def _check_load_coco_bbox(
 
         # Validate box
         if ann["area"] > 0 and xmax > xmin and ymax > ymin:
+            cat_ids = coco.getCatIds()
+            id_to_idx = dict(zip(cat_ids, range(len(cat_ids))))
             class_id = id_to_idx[coco.loadCats(ann["category_id"])[0]["id"]]
             valid_boxes.append([
                 float(xmin),

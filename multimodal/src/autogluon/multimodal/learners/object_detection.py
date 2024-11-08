@@ -754,7 +754,7 @@ class ObjectDetectionLearner(BaseLearner):
                 result_path = os.path.join(self._save_path, "result.json")
                 save_result_coco_format(
                     data_path=data_path,
-                    pred=pred,
+                    predictions=pred,
                     category_ids=self.category_ids,
                     result_path=result_path,
                     coco_root=self._config.model.mmdet_image.coco_root,
