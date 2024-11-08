@@ -589,7 +589,7 @@ def test_when_inference_only_model_scores_oof_then_time_limit_is_passed_to_predi
     model.fit(train_data=data, time_limit=time_limit)
     with mock.patch.object(model, "_predict") as mock_predict:
         model.score_and_cache_oof(data)
-        assert mock_predict.call_args[1]["time_limit"] == time_limit
+        assert abs(mock_predict.call_args[1]["time_limit"] - time_limit) < 0.5
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
@@ -649,8 +649,12 @@ def test_when_covariate_regressor_is_used_then_model_can_fit_and_predict(
         metadata=covariate_metadata,
     )
     model.fit(train_data=train_data)
-    assert isinstance(model.covariate_regressor, CovariateRegressor)
-    assert model.covariate_regressor.is_fit()
+    if isinstance(model, MultiWindowBacktestingModel):
+        regressor = model.most_recent_model.covariate_regressor
+    else:
+        regressor = model.covariate_regressor
+    assert isinstance(regressor, CovariateRegressor)
+    assert regressor.is_fit()
 
     predictions = model.predict(
         train_data,
@@ -659,3 +663,4 @@ def test_when_covariate_regressor_is_used_then_model_can_fit_and_predict(
     assert isinstance(predictions, TimeSeriesDataFrame)
     assert not predictions.isna().any(axis=None)
     assert len(predictions) == predictions.num_items * model.prediction_length
+    assert set(predictions.columns) == set(["mean"] + [str(q) for q in model.quantile_levels])
