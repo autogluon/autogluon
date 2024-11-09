@@ -107,19 +107,24 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         model._mlf.models_["mean"].predictor = TabularPredictor.load(model.tabular_predictor_path)
         return model
 
-    def preprocess(self, data: TimeSeriesDataFrame, is_train: bool = False, **kwargs) -> Any:
+    def preprocess(
+        self,
+        data: TimeSeriesDataFrame,
+        known_covariates: Optional[TimeSeriesDataFrame] = None,
+        is_train: bool = False,
+        **kwargs,
+    ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
         if is_train:
             # All-NaN series are removed; partially-NaN series in train_data are handled inside _generate_train_val_dfs
             all_nan_items = data.item_ids[data[self.target].isna().groupby(ITEMID, sort=False).all()]
             if len(all_nan_items):
                 data = data.query("item_id not in @all_nan_items")
-            return data
         else:
             data = data.fill_missing_values()
             # Fill time series consisting of all NaNs with the median of target in train_data
             if data.isna().any(axis=None):
                 data[self.target] = data[self.target].fillna(value=self._train_target_median)
-            return data
+        return data, known_covariates
 
     def _get_extra_tabular_init_kwargs(self) -> dict:
         raise NotImplementedError

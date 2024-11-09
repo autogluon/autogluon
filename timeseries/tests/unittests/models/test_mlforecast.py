@@ -238,7 +238,7 @@ def test_given_train_data_has_nans_when_fit_called_then_nan_rows_removed_from_tr
         hyperparameters={"differences": []},
     )
     model.fit(train_data=data)
-    train_df, val_df = model._generate_train_val_dfs(model.preprocess(data, is_train=True))
+    train_df, val_df = model._generate_train_val_dfs(model.preprocess(data, is_train=True)[0])
     assert len(train_df) + len(val_df) == len(data.dropna())
 
 

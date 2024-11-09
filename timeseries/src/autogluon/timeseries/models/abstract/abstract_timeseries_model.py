@@ -3,7 +3,7 @@ import os
 import re
 import time
 from contextlib import nullcontext
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import pandas as pd
 
@@ -274,14 +274,14 @@ class AbstractTimeSeriesModel(AbstractModel):
         if self._get_tags()["can_use_train_data"]:
             if self.covariate_regressor is not None:
                 train_data = self.covariate_regressor.transform(train_data)
-            train_data = self.preprocess(train_data, is_train=True)
+            train_data, _ = self.preprocess(train_data, is_train=True)
 
         if self._get_tags()["can_use_val_data"] and val_data is not None:
             if self.target_scaler is not None:
                 val_data = self.target_scaler.transform(val_data)
             if self.covariate_regressor is not None:
                 val_data = self.covariate_regressor.transform(val_data)
-            val_data = self.preprocess(val_data, is_train=False)
+            val_data, _ = self.preprocess(val_data, is_train=False)
 
         if time_limit is not None:
             time_limit = time_limit - (time.monotonic() - start_time)
@@ -387,8 +387,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         if self.covariate_regressor is not None:
             data = self.covariate_regressor.fit_transform(data)
 
-        data = self.preprocess(data, is_train=False)
-        known_covariates = self.preprocess_known_covariates(known_covariates)
+        data, known_covariates = self.preprocess(data, known_covariates, is_train=False)
 
         # FIXME: Set self.covariate_regressor=None so to avoid copying it across processes during _predict
         # FIXME: The clean solution is to convert all methods executed in parallel to @classmethod
@@ -610,13 +609,15 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         return hpo_models, analysis
 
-    def preprocess(self, data: TimeSeriesDataFrame, is_train: bool = False, **kwargs) -> TimeSeriesDataFrame:
-        return data
-
-    def preprocess_known_covariates(
-        self, known_covariates: Optional[TimeSeriesDataFrame]
-    ) -> Optional[TimeSeriesDataFrame]:
-        return known_covariates
+    def preprocess(
+        self,
+        data: TimeSeriesDataFrame,
+        known_covariates: Optional[TimeSeriesDataFrame] = None,
+        is_train: bool = False,
+        **kwargs,
+    ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
+        """Method that implements model-specific preprocessing logic."""
+        return data, known_covariates
 
     def get_memory_size(self, **kwargs) -> Optional[int]:
         return None
