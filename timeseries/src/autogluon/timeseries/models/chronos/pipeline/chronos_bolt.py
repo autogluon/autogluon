@@ -21,7 +21,6 @@ from transformers.models.t5.modeling_t5 import (
 from transformers.utils import ModelOutput
 
 from .base import BaseChronosPipeline, ForecastType
-from .utils import left_pad_and_stack_1D
 
 
 @dataclass
@@ -371,16 +370,6 @@ class ChronosBoltPipeline(BaseChronosPipeline):
     def __init__(self, model: ChronosBoltModelForForecasting):
         self.model = model
         self.quantiles = list(map(str, self.model.config.chronos_config["quantiles"]))
-
-    def _prepare_and_validate_context(self, context: Union[torch.Tensor, List[torch.Tensor]]):
-        if isinstance(context, list):
-            context = left_pad_and_stack_1D(context)
-        assert isinstance(context, torch.Tensor)
-        if context.ndim == 1:
-            context = context.unsqueeze(0)
-        assert context.ndim == 2
-
-        return context
 
     def predict(  # type: ignore[override]
         self,

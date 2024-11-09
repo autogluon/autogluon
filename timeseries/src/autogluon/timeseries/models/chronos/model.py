@@ -69,17 +69,19 @@ MODEL_ALIASES = {
 
 
 class ChronosModel(AbstractTimeSeriesModel):
-    """Chronos pretrained time series forecasting models, based on the original
-    `ChronosModel <https://github.com/amazon-science/chronos-forecasting/blob/main/src/chronos/chronos.py>`_ implementation.
+    """Chronos pretrained time series forecasting models. Models can be based on the original
+    `ChronosModel <https://github.com/amazon-science/chronos-forecasting/blob/main/src/chronos/chronos.py>`_ implementation,
+    as well as a newer family of Chronos-Bolt models which are capable of much faster inference.
 
-    Chronos is family of pretrained models, based on the T5 family, with number of parameters ranging between 8M and 710M.
-    The full collection of Chronos models is available on
+    The original Chronos is a family of pretrained models, based on the T5 family, with number of parameters ranging between
+    8M and 710M. The full collection of Chronos models is available on
     `Hugging Face <https://huggingface.co/collections/amazon/chronos-models-65f1791d630a8d57cb718444>`_. For Chronos small,
     base, and large variants a GPU is required to perform inference efficiently.
 
-    Chronos takes a minimalistic approach to pretraining time series models, by discretizing time series data directly into bins
-    which are treated as tokens, effectively performing regression by classification. This results in a simple and flexible framework
-    for using any language model in the context of time series forecasting. See [Ansari2024]_ for more information.
+    The newer Chronos-Bolt variants enable much faster inference by first "patching" the time series. The resulting
+    time series is then fed into a T5 model for forecasting. The Chronos-Bolt variants are capable of performing inference
+    on CPUs, and are available on Hugging Face <https://huggingface.co/collections/>`_.
+    Chronos-Bolt variants are capable of much faster inference, especially on CPUs. Chronos-Bolt variants can be used with
 
     References
     ----------
@@ -105,11 +107,15 @@ class ChronosModel(AbstractTimeSeriesModel):
     context_length : int or None, default = None
         The context length to use in the model. Shorter context lengths will decrease model accuracy, but result
         in faster inference. If None, the model will infer context length from the data set length at inference
-        time, but set it to a maximum of 512.
+        time, but set it to a maximum of 2048. Note that this is only the context length used to pass data into
+        the model. Individual model implementations may have different context lengths specified in their configuration,
+        and may truncate the context further. For example, original Chronos models have a context length of 512, but
+        Chronos-Bolt models handle contexts up to 2048.
     optimization_strategy : {None, "onnx", "openvino"}, default = None
         Optimization strategy to use for inference on CPUs. If None, the model will use the default implementation.
         If `onnx`, the model will be converted to ONNX and the inference will be performed using ONNX. If ``openvino``,
-        inference will be performed with the model compiled to OpenVINO.
+        inference will be performed with the model compiled to OpenVINO. These optimizations are only available for
+        the original set of Chronos models, and not in Chronos-Bolt where they are not needed.
     torch_dtype : torch.dtype or {"auto", "bfloat16", "float32", "float64"}, default = "auto"
         Torch data type for model weights, provided to ``from_pretrained`` method of Hugging Face AutoModels. If
         original Chronos models are specified and the model size is ``small``, ``base``, or ``large``, the
@@ -122,7 +128,7 @@ class ChronosModel(AbstractTimeSeriesModel):
     # default number of samples for prediction
     default_num_samples: int = 20
     default_model_path = "autogluon/chronos-t5-small"
-    maximum_context_length = 512
+    maximum_context_length = 2048
 
     def __init__(
         self,
@@ -233,7 +239,7 @@ class ChronosModel(AbstractTimeSeriesModel):
             minimum_resources["num_gpus"] = self.min_num_gpus
         return minimum_resources
 
-    def load_model_pipeline(self, context_length: Optional[int] = None):
+    def load_model_pipeline(self):
         from .pipeline import BaseChronosPipeline
 
         gpu_available = self._is_gpu_available()
@@ -252,13 +258,12 @@ class ChronosModel(AbstractTimeSeriesModel):
             device_map=device,
             torch_dtype=self.torch_dtype,
             optimization_strategy=self.optimization_strategy,
-            context_length=context_length or self.context_length,
         )
 
         self.model_pipeline = pipeline
 
     def persist(self) -> "ChronosModel":
-        self.load_model_pipeline(context_length=self.context_length or self.maximum_context_length)
+        self.load_model_pipeline()
         return self
 
     def _fit(
@@ -305,6 +310,9 @@ class ChronosModel(AbstractTimeSeriesModel):
         # and use that to determine the context length of the model. If the context length is specified
         # during initialization, this is always used. If not, the context length is set to the longest
         # item length. The context length is always capped by self.maximum_context_length.
+        # Note that this is independent of the model's own context length set in the model's config file.
+        # For example, if the context_length is set to 2048 here but the model expects context length
+        # (according to its config.json file) of 512, it will further truncate the series during inference.
         context_length = self.context_length or min(
             data.num_timesteps_per_item().max(),
             self.maximum_context_length,
@@ -315,7 +323,7 @@ class ChronosModel(AbstractTimeSeriesModel):
 
             if self.model_pipeline is None:
                 # load model pipeline to device memory
-                self.load_model_pipeline(context_length=context_length)
+                self.load_model_pipeline()
 
             inference_data_loader = self._get_inference_data_loader(
                 data=data,

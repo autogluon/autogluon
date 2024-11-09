@@ -1,5 +1,6 @@
 import copy
 from typing import Optional
+from unittest import mock
 
 import numpy as np
 import pytest
@@ -237,7 +238,7 @@ def test_when_gpu_models_saved_then_models_can_be_loaded_and_inferred(data, defa
 
 
 @pytest.mark.parametrize(
-    "data_length, expected_context_length", [(5, 5), (7, 7), (1000, ChronosModel.maximum_context_length)]
+    "data_length, expected_context_length", [(5, 5), (7, 7), (5000, ChronosModel.maximum_context_length)]
 )
 def test_when_context_length_not_provided_then_context_length_set_to_dataset_length(
     chronos_model_path, data_length, expected_context_length
@@ -245,9 +246,17 @@ def test_when_context_length_not_provided_then_context_length_set_to_dataset_len
     data = get_data_frame_with_item_index(list(range(3)), data_length=data_length)
     model = ChronosModel(hyperparameters={"model_path": chronos_model_path})
     model.fit(train_data=None)
-    model.predict(data)
+    model.persist()  # persist so that we can patch the predict method
 
-    assert model.model_pipeline.model.config.context_length == expected_context_length
+    with mock.patch.object(model.model_pipeline, "predict_quantiles") as patch_predict_quantiles:
+        try:
+            model.predict(data)
+        except ValueError:
+            pass
+
+        batch = patch_predict_quantiles.call_args.args[0]
+
+    assert batch.shape[-1] == expected_context_length
 
 
 @pytest.mark.parametrize(
@@ -257,7 +266,7 @@ def test_when_context_length_not_provided_then_context_length_set_to_dataset_len
         (32, 7, 32),
         (32, 64, 32),
         (10000, 30, ChronosModel.maximum_context_length),
-        (10000, 1000, ChronosModel.maximum_context_length),
+        (10000, 5000, ChronosModel.maximum_context_length),
     ],
 )
 def test_when_context_length_provided_then_context_length_set_to_capped_init_context_length(
@@ -266,13 +275,21 @@ def test_when_context_length_provided_then_context_length_set_to_capped_init_con
     data = get_data_frame_with_item_index(list(range(3)), data_length=data_length)
     model = ChronosModel(hyperparameters={"model_path": chronos_model_path, "context_length": init_context_length})
     model.fit(train_data=None)
-    model.predict(data)
+    model.persist()  # persist so that we can patch the predict method
 
-    assert model.model_pipeline.model.config.context_length == expected_context_length
+    with mock.patch.object(model.model_pipeline, "predict_quantiles") as patch_predict_quantiles:
+        try:
+            model.predict(data)
+        except ValueError:
+            pass
+
+        batch = patch_predict_quantiles.call_args.args[0]
+
+    assert batch.shape[-1] == expected_context_length
 
 
 @pytest.mark.parametrize(
-    "longest_data_length, expected_context_length", [(5, 5), (7, 7), (1000, ChronosModel.maximum_context_length)]
+    "longest_data_length, expected_context_length", [(5, 5), (7, 7), (5000, ChronosModel.maximum_context_length)]
 )
 def test_given_variable_length_data_when_context_length_not_provided_then_context_length_set_to_max_data_length(
     chronos_model_path, longest_data_length, expected_context_length
@@ -280,9 +297,17 @@ def test_given_variable_length_data_when_context_length_not_provided_then_contex
     data = get_data_frame_with_variable_lengths({"A": 3, "B": 3, "C": longest_data_length})
     model = ChronosModel(hyperparameters={"model_path": chronos_model_path})
     model.fit(train_data=None)
-    model.predict(data)
+    model.persist()  # persist so that we can patch the predict method
 
-    assert model.model_pipeline.model.config.context_length == expected_context_length
+    with mock.patch.object(model.model_pipeline, "predict_quantiles") as patch_predict_quantiles:
+        try:
+            model.predict(data)
+        except ValueError:
+            pass
+
+        batch = patch_predict_quantiles.call_args.args[0]
+
+    assert batch.shape[-1] == expected_context_length
 
 
 DTYPE_TEST_CASES = [  # dtype_arg, expected_dtype
@@ -310,8 +335,8 @@ def test_when_torch_dtype_provided_then_parameters_loaded_in_torch_dtype(
     model.fit(train_data=None)
     model.load_model_pipeline()
 
-    embedding_matrix = next(iter(model.model_pipeline.model.model.shared.parameters()))
-    assert embedding_matrix.dtype is expected_dtype
+    parameter = next(iter(model.model_pipeline.model.parameters()))
+    assert parameter.dtype is expected_dtype
 
 
 @pytest.mark.parametrize("dtype_arg, expected_dtype", DTYPE_TEST_CASES)
@@ -327,8 +352,8 @@ def test_when_torch_dtype_provided_and_model_persisted_then_parameters_loaded_in
     )
     model.persist()
 
-    embedding_matrix = next(iter(model.model_pipeline.model.model.shared.parameters()))
-    assert embedding_matrix.dtype is expected_dtype
+    parameter = next(iter(model.model_pipeline.model.parameters()))
+    assert parameter.dtype is expected_dtype
 
 
 def test_when_model_persisted_then_model_pipeline_can_infer(chronos_model_path):
@@ -410,7 +435,7 @@ def test_when_chronos_scores_oof_and_time_limit_is_exceeded_then_exception_is_ra
         path=temp_model_path,
         hyperparameters={"model_path": chronos_model_path, "data_loader_num_workers": data_loader_num_workers},
     )
-    model.fit(data, time_limit=1.0)
+    model.fit(data, time_limit=0.001)
     with pytest.raises(TimeLimitExceeded):
         model.score_and_cache_oof(data)
 

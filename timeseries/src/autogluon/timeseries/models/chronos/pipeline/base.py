@@ -6,6 +6,8 @@ from typing import Dict, List, Optional, Tuple, Union
 
 import torch
 
+from .utils import left_pad_and_stack_1D
+
 
 class ForecastType(Enum):
     SAMPLES = "samples"
@@ -25,6 +27,21 @@ class PipelineRegistry(type):
 
 class BaseChronosPipeline(metaclass=PipelineRegistry):
     forecast_type: ForecastType
+    dtypes = {
+        "bfloat16": torch.bfloat16,
+        "float32": torch.float32,
+        "float64": torch.float64,
+    }
+
+    def _prepare_and_validate_context(self, context: Union[torch.Tensor, List[torch.Tensor]]):
+        if isinstance(context, list):
+            context = left_pad_and_stack_1D(context)
+        assert isinstance(context, torch.Tensor)
+        if context.ndim == 1:
+            context = context.unsqueeze(0)
+        assert context.ndim == 2
+
+        return context
 
     def predict(
         self,
@@ -102,8 +119,11 @@ class BaseChronosPipeline(metaclass=PipelineRegistry):
         """
         from transformers import AutoConfig
 
-        config = AutoConfig.from_pretrained(pretrained_model_name_or_path, **kwargs)
+        torch_dtype = kwargs.get("torch_dtype", "auto")
+        if torch_dtype != "auto" and isinstance(torch_dtype, str):
+            kwargs["torch_dtype"] = cls.dtypes[torch_dtype]
 
+        config = AutoConfig.from_pretrained(pretrained_model_name_or_path, **kwargs)
         is_valid_config = hasattr(config, "chronos_pipeline_class") or hasattr(config, "chronos_config")
 
         if not is_valid_config:

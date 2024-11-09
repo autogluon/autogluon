@@ -16,7 +16,6 @@ from transformers import AutoConfig, AutoModelForSeq2SeqLM, GenerationConfig, Pr
 from autogluon.timeseries.utils.warning_filters import set_loggers_level
 
 from .base import BaseChronosPipeline, ForecastType
-from .utils import left_pad_and_stack_1D
 
 logger = logging.getLogger(__name__)
 
@@ -301,25 +300,10 @@ class ChronosPipeline(BaseChronosPipeline):
     tokenizer: ChronosTokenizer
     model: ChronosPretrainedModel
     forecast_type: ForecastType = ForecastType.SAMPLES
-    dtypes = {
-        "bfloat16": torch.bfloat16,
-        "float32": torch.float32,
-        "float64": torch.float64,
-    }
 
     def __init__(self, tokenizer, model):
         self.tokenizer = tokenizer
         self.model = model
-
-    def _prepare_and_validate_context(self, context: Union[torch.Tensor, List[torch.Tensor]]):
-        if isinstance(context, list):
-            context = left_pad_and_stack_1D(context)
-        assert isinstance(context, torch.Tensor)
-        if context.ndim == 1:
-            context = context.unsqueeze(0)
-        assert context.ndim == 2
-
-        return context
 
     @torch.no_grad()
     def embed(self, context: Union[torch.Tensor, List[torch.Tensor]]) -> Tuple[torch.Tensor, Any]:
@@ -486,10 +470,6 @@ class ChronosPipeline(BaseChronosPipeline):
         if context_length is not None:
             config.chronos_config["context_length"] = context_length
         chronos_config = ChronosConfig(**config.chronos_config)
-
-        torch_dtype = kwargs.get("torch_dtype", "auto")
-        if torch_dtype != "auto" and isinstance(torch_dtype, str):
-            kwargs["torch_dtype"] = cls.dtypes[torch_dtype]
 
         assert chronos_config.model_type == "seq2seq"
         if optimization_strategy is None:
