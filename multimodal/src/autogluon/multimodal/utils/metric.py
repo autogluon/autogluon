@@ -8,8 +8,8 @@ import evaluate
 import numpy as np
 from sklearn.metrics import f1_score
 
-from autogluon.core.utils import compute_weighted_metric
 from autogluon.core.metrics import Scorer, get_metric
+from autogluon.core.utils import compute_weighted_metric
 
 from ..constants import (
     ACCURACY,
