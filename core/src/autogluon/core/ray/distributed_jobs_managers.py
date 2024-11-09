@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_REMOTE_KWARGS = dict(max_calls=1, retry_exceptions=False, max_retries=0)
 
 
-@dataclass(kw_only=True)
+@dataclass
 class ModelResources:
     """Resource allocation for a model."""
 
