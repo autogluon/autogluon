@@ -272,8 +272,20 @@ Deep learning models pretrained on large time series datasets, able to perform z
    - `"standard"` - standard scaler, `loc = mean(y)`, `scale = std(y)`
    - `"mean_abs"` - mean absolute scaler, `loc = 0`, `scale = mean(abs(y))`
    - `"robust"` - robust scaler, `loc = median(y)`, `scale = quantile(y, 0.75) - quantile(y, 0.25)`
-   - `"min_max"` - min-max scaler that converts data into the (0, 1) range, `loc = min(y) / scale`, `scale = max(y) - min(y)`.
+   - `"min_max"` - min-max scaler that converts data into the (0, 1) range, `loc = min(y)`, `scale = max(y) - min(y)`.
    - `None` - no scaling
+
+- **covariate_regressor** *({"LR", "GBM", "CAT", "XGB", None}, default = None)* - If provided, the chosen tabular
+   regression model will be fit on the known covariates & static features to predict the target column at the same time
+   step.
+
+   The predictions of the regression model will be subtracted from the target column, and the forecasting model will
+   be used to forecast the residuals.
+
+   At prediction time, the predictions of the regression model will be added to the predictions of the forecasting model.
+
+   If both a `target_scaler` and a `covariate_regressor` are provided, then scaling will be performed before the
+   regressor is applied.
 
 
 ## MXNet Models

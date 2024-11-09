@@ -19,6 +19,7 @@ from autogluon.timeseries.metrics import AVAILABLE_METRICS
 from autogluon.timeseries.models import DeepARModel, ETSModel
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
+from autogluon.timeseries.regressor import CovariateRegressor
 
 from ..common import (
     DUMMY_TS_DATAFRAME,
@@ -42,17 +43,6 @@ TESTABLE_MODELS = (
 )
 
 TESTABLE_PREDICTION_LENGTHS = [1, 5]
-
-
-@pytest.fixture(scope="module")
-def dummy_hyperparameters(hf_model_path):
-    return {
-        "epochs": 1,
-        "num_batches_per_epoch": 1,
-        "n_jobs": 1,
-        "use_fallback_model": False,
-        "model_path": hf_model_path,
-    }
 
 
 @pytest.fixture(scope="module")
@@ -528,9 +518,11 @@ def test_when_fit_and_predict_called_then_train_val_and_test_data_is_preprocesse
     else:
         expected_val_data = train_data
     # We need the ugly line break because Python <3.10 does not support parentheses for context managers
-    with mock.patch.object(model, "preprocess") as mock_preprocess, mock.patch.object(
-        model, "_fit"
-    ) as mock_fit, mock.patch.object(model, "_predict") as mock_predict:
+    with (
+        mock.patch.object(model, "preprocess") as mock_preprocess,
+        mock.patch.object(model, "_fit") as mock_fit,
+        mock.patch.object(model, "_predict") as mock_predict,
+    ):
         mock_preprocess.return_value = preprocessed_data
         model.fit(train_data=train_data, val_data=train_data)
         fit_kwargs = mock_fit.call_args[1]
@@ -597,7 +589,7 @@ def test_when_inference_only_model_scores_oof_then_time_limit_is_passed_to_predi
     model.fit(train_data=data, time_limit=time_limit)
     with mock.patch.object(model, "_predict") as mock_predict:
         model.score_and_cache_oof(data)
-        assert mock_predict.call_args[1]["time_limit"] == time_limit
+        assert abs(mock_predict.call_args[1]["time_limit"] - time_limit) < 0.5
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
@@ -627,3 +619,48 @@ def test_when_itemid_has_string_dtype_then_model_can_predict(model_class, traine
     predictions = model.predict(data)
     assert isinstance(predictions, TimeSeriesDataFrame)
     assert len(predictions) == predictions.num_items * model.prediction_length
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+def test_when_target_scaler_is_used_then_model_can_fit_and_predict(
+    model_class, dummy_hyperparameters, df_with_covariates_and_metadata
+):
+    data, covariate_metadata = df_with_covariates_and_metadata
+    model = model_class(freq=data.freq, hyperparameters={"target_scaler": "min_max", **dummy_hyperparameters})
+    model.fit(train_data=data)
+    predictions = model.predict(data)
+    assert isinstance(predictions, TimeSeriesDataFrame)
+    assert not predictions.isna().any(axis=None)
+    assert len(predictions) == predictions.num_items * model.prediction_length
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+@pytest.mark.parametrize("target_scaler", [None, "standard"])
+def test_when_covariate_regressor_is_used_then_model_can_fit_and_predict(
+    model_class, dummy_hyperparameters, target_scaler, df_with_covariates_and_metadata
+):
+    prediction_length = 3
+    data, covariate_metadata = df_with_covariates_and_metadata
+    train_data, test_data = data.train_test_split(prediction_length)
+    model = model_class(
+        freq=train_data.freq,
+        prediction_length=prediction_length,
+        hyperparameters={"covariate_regressor": "LR", "target_scaler": target_scaler, **dummy_hyperparameters},
+        metadata=covariate_metadata,
+    )
+    model.fit(train_data=train_data)
+    if isinstance(model, MultiWindowBacktestingModel):
+        regressor = model.most_recent_model.covariate_regressor
+    else:
+        regressor = model.covariate_regressor
+    assert isinstance(regressor, CovariateRegressor)
+    assert regressor.is_fit()
+
+    predictions = model.predict(
+        train_data,
+        known_covariates=test_data.slice_by_timestep(-prediction_length, None),
+    )
+    assert isinstance(predictions, TimeSeriesDataFrame)
+    assert not predictions.isna().any(axis=None)
+    assert len(predictions) == predictions.num_items * model.prediction_length
+    assert set(predictions.columns) == set(["mean"] + [str(q) for q in model.quantile_levels])

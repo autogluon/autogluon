@@ -201,6 +201,12 @@ DATAFRAME_WITH_COVARIATES = get_data_frame_with_variable_lengths(
     ITEM_ID_TO_LENGTH, covariates_names=["cov1", "cov2", "cov3"]
 )
 
+DATAFRAME_WITH_STATIC_AND_COVARIATES = get_data_frame_with_variable_lengths(
+    ITEM_ID_TO_LENGTH,
+    covariates_names=["cov1", "cov2", "cov3"],
+    static_features=get_static_features(ITEM_ID_TO_LENGTH.keys(), ["feat1", "feat2", "feat3"]),
+)
+
 
 def dict_equal_primitive(this, that):
     """Compare two dictionaries but consider only primitive values"""
