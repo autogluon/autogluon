@@ -415,7 +415,7 @@ class ChronosBoltPipeline(BaseChronosPipeline):
 
         # TODO: We unroll the forecast of Chronos Bolt greedily with the full forecast
         # horizon that the model was trained with (i.e., 64). This results in variance collapsing
-        # every 64 steps. 
+        # every 64 steps.
         while remaining > 0:
             with torch.no_grad():
                 prediction = self.model(

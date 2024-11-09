@@ -41,6 +41,21 @@ MODEL_CONFIGS = {
         "default_torch_dtype": "bfloat16",
         "default_batch_size": 8,
     },
+    "chronos-bolt-tiny": {
+        "num_gpus": 0,
+        "default_torch_dtype": "auto",
+        "default_batch_size": 256,
+    },
+    "chronos-bolt-small": {
+        "num_gpus": 0,
+        "default_torch_dtype": "auto",
+        "default_batch_size": 256,
+    },
+    "chronos-bolt-large": {
+        "num_gpus": 1,
+        "default_torch_dtype": "bfloat16",
+        "default_batch_size": 32,
+    },
 }
 
 
