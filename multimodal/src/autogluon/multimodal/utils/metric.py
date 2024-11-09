@@ -244,12 +244,8 @@ def compute_score(
         y_pred = (y_pred == pos_label).astype(int)
     else:
         y = metric_data[Y_TRUE]
-    
-    return metric.convert_score_to_original(
-        compute_weighted_metric(
-            y=y, y_pred=y_pred, metric=metric, weights=None
-        )
-    )
+
+    return metric.convert_score_to_original(compute_weighted_metric(y=y, y_pred=y_pred, metric=metric, weights=None))
 
 
 class RankingMetrics:
