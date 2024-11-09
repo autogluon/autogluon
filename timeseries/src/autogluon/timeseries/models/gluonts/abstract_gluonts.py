@@ -353,6 +353,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         columns = self.metadata.known_covariates_real
         if self.supports_known_covariates and len(columns) > 0:
             assert "known" in self._real_column_transformers, "Preprocessing pipeline must be fit first"
+            known_covariates = known_covariates.copy()
             known_covariates[columns] = self._real_column_transformers["known"].transform(known_covariates[columns])
         return known_covariates
 
