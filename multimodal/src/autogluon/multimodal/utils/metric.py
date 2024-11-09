@@ -17,8 +17,6 @@ from ..constants import (
     BINARY,
     DIRECT_LOSS,
     F1,
-    F1_MACRO,
-    F1_MICRO,
     FEW_SHOT_CLASSIFICATION,
     IOU,
     MAP,
@@ -239,7 +237,7 @@ def compute_score(
     else:
         y_pred = metric_data[Y_PRED]
 
-    if metric.name in [F1, F1_MACRO, F1_MICRO]:  # only for binary classification
+    if metric.name == F1:  # only for binary classification
         y = (metric_data[Y_TRUE] == pos_label).astype(int)
         y_pred = (y_pred == pos_label).astype(int)
     else:
