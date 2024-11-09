@@ -85,7 +85,10 @@ class ChronosModel(AbstractTimeSeriesModel):
     The original Chronos is a family of pretrained models, based on the T5 family, with number of parameters ranging between
     8M and 710M. The full collection of Chronos models is available on
     `Hugging Face <https://huggingface.co/collections/amazon/chronos-models-65f1791d630a8d57cb718444>`_. For Chronos small,
-    base, and large variants a GPU is required to perform inference efficiently.
+    base, and large variants a GPU is required to perform inference efficiently. Chronos takes a minimalistic approach to 
+    pretraining time series models, by discretizing time series data directly into bins which are treated as tokens, 
+    effectively performing regression by classification. This results in a simple and flexible framework
+    for using any language model in the context of time series forecasting. See [Ansari2024]_ for more information.
 
     The newer Chronos-Bolt variants enable much faster inference by first "patching" the time series. The resulting
     time series is then fed into a T5 model for forecasting. The Chronos-Bolt variants are capable of performing inference
