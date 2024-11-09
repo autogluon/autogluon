@@ -4,8 +4,8 @@ from .base import BaseChronosPipeline, ForecastType
 
 
 __all__ = [
-    "ChronosPipeline",
     "BaseChronosPipeline",
-    "ForecastType",
     "ChronosBoltPipeline",
+    "ChronosPipeline",
+    "ForecastType",
 ]
