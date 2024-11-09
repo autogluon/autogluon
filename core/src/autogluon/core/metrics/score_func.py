@@ -12,7 +12,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-# TODO: Replace usages of `compute_weighted_metric` with `compute_metric`
 def compute_metric(
     y: np.ndarray,
     metric: "Scorer",
