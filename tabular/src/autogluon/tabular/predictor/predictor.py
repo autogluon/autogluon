@@ -1657,6 +1657,27 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 calibrate = True
             else:
                 calibrate = False
+            if calibrate:
+                num_rows_val_for_calibration = self._trainer.num_rows_val_for_calibration
+                if self.problem_type == BINARY:
+                    # Tested on "adult" dataset
+                    min_val_rows_for_calibration = 3000
+                elif self.problem_type == MULTICLASS:
+                    # Tested on "covertype" dataset
+                    min_val_rows_for_calibration = 500
+                else:
+                    # problem_type == "quantile"
+                    # TODO: Haven't benchmarked, this is just a guess
+                    min_val_rows_for_calibration = 1000
+                if num_rows_val_for_calibration < min_val_rows_for_calibration:
+                    calibrate = False
+                    logger.log(
+                        30,
+                        f"Disabling calibration for metric `{self.eval_metric.name}` due to having "
+                        f"fewer than {min_val_rows_for_calibration} rows of validation data for calibration, "
+                        f"to avoid overfitting ({num_rows_val_for_calibration} rows). "
+                        f"Force calibration via specifying `calibrate=True`. (calibrate='auto')",
+                    )
 
         if calibrate:
             if self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
@@ -1685,19 +1706,21 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                     logger.log(
                         20,
                         f"Disabling decision threshold calibration for metric `accuracy` due to having "
-                        f"fewer than {min_val_rows_for_calibration} rows of validation data for calibration ({num_rows_val_for_calibration} rows). "
+                        f"fewer than {min_val_rows_for_calibration} rows of validation data for calibration, "
+                        f"to avoid overfitting ({num_rows_val_for_calibration} rows)."
                         f"\n\t`accuracy` is generally not improved through threshold calibration "
                         f"Force calibration via specifying `calibrate_decision_threshold=True`.",
                     )
             elif calibrate_decision_threshold:
                 num_rows_val_for_calibration = self._trainer.num_rows_val_for_calibration
-                min_val_rows_for_calibration = 20
+                min_val_rows_for_calibration = 50
                 if num_rows_val_for_calibration < min_val_rows_for_calibration:
                     calibrate_decision_threshold = False
                     logger.log(
                         30,
                         f"Disabling decision threshold calibration for metric `{self.eval_metric.name}` due to having "
-                        f"fewer than {min_val_rows_for_calibration} rows of validation data for calibration ({num_rows_val_for_calibration} rows). "
+                        f"fewer than {min_val_rows_for_calibration} rows of validation data for calibration "
+                        f"to avoid overfitting ({num_rows_val_for_calibration} rows). "
                         f"Force calibration via specifying `calibrate_decision_threshold=True`.",
                     )
             if calibrate_decision_threshold:
