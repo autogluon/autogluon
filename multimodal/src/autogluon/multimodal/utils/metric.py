@@ -8,6 +8,7 @@ import evaluate
 import numpy as np
 from sklearn.metrics import f1_score
 
+from autogluon.core.utils import compute_weighted_metric
 from autogluon.core.metrics import Scorer, get_metric
 
 from ..constants import (
@@ -16,6 +17,8 @@ from ..constants import (
     BINARY,
     DIRECT_LOSS,
     F1,
+    F1_MACRO,
+    F1_MICRO,
     FEW_SHOT_CLASSIFICATION,
     IOU,
     MAP,
@@ -231,15 +234,22 @@ def compute_score(
         return metric.compute(references=metric_data[Y_TRUE], predictions=metric_data[Y_PRED])
 
     metric = get_metric(metric)
-    if metric.name in [ROC_AUC, AVERAGE_PRECISION]:
-        return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED_PROB][:, pos_label])
-    elif metric.name in [F1]:  # only for binary classification
-        return f1_score(metric_data[Y_TRUE], metric_data[Y_PRED], pos_label=pos_label)
+    if metric.needs_proba or metric.needs_threshold:
+        y_pred = metric_data[Y_PRED_PROB][:, pos_label]
     else:
-        try:
-            return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED], y_prob=metric_data[Y_PRED_PROB])
-        except:
-            return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED])
+        y_pred = metric_data[Y_PRED]
+
+    if metric.name in [F1, F1_MACRO, F1_MICRO]:  # only for binary classification
+        y = (metric_data[Y_TRUE] == pos_label).astype(int)
+        y_pred = (y_pred == pos_label).astype(int)
+    else:
+        y = metric_data[Y_TRUE]
+    
+    return metric.convert_score_to_original(
+        compute_weighted_metric(
+            y=y, y_pred=y_pred, metric=metric, weights=None
+        )
+    )
 
 
 class RankingMetrics:
