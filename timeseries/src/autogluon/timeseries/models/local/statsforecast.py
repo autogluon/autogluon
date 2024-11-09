@@ -129,6 +129,7 @@ class AutoARIMAModel(AbstractProbabilisticStatsForecastModel):
         This significantly speeds up fitting and usually leads to no change in accuracy.
     """
 
+    init_time_in_seconds = 0  # C++ models require no compilation
     allowed_local_model_args = [
         "d",
         "D",
@@ -206,6 +207,7 @@ class ARIMAModel(AbstractProbabilisticStatsForecastModel):
         This significantly speeds up fitting and usually leads to no change in accuracy.
     """
 
+    init_time_in_seconds = 0  # C++ models require no compilation
     allowed_local_model_args = [
         "order",
         "seasonal_order",
@@ -261,6 +263,7 @@ class AutoETSModel(AbstractProbabilisticStatsForecastModel):
         This significantly speeds up fitting and usually leads to no change in accuracy.
     """
 
+    init_time_in_seconds = 0  # C++ models require no compilation
     allowed_local_model_args = [
         "damped",
         "model",
