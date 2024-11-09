@@ -267,6 +267,12 @@ In the following, we decompose the functionalities of AutoMM and prepare step-by
   How to use TensorRT in accelerating AutoMM model inference.
 :::
 
+:::{grid-item-card} AutoMM Problem Types and Evaluation Metrics.
+  :link: advanced_topics/problem_types_and_metrics.html
+
+  A comprehensive guide to AutoGluon's supported problem types and their evaluation metrics.
+:::
+
 ::::
 
 ```{toctree}
