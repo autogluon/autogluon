@@ -131,5 +131,7 @@ class BaseChronosPipeline(metaclass=PipelineRegistry):
 
         pipeline_class_name = getattr(config, "chronos_pipeline_class", "ChronosPipeline")
         class_ = PipelineRegistry.REGISTRY.get(pipeline_class_name)
+        if class_ is None:
+            raise ValueError(f"Trying to load unknown pipeline class: {pipeline_class_name}")
 
         return class_.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)

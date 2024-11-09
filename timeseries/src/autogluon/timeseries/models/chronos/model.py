@@ -41,7 +41,7 @@ MODEL_CONFIGS = {
         "default_torch_dtype": "bfloat16",
         "default_batch_size": 8,
     },
-    "chronos-bolt-tiny": {
+    "chronos-bolt-mini": {
         "num_gpus": 0,
         "default_torch_dtype": "auto",
         "default_batch_size": 256,
@@ -51,9 +51,14 @@ MODEL_CONFIGS = {
         "default_torch_dtype": "auto",
         "default_batch_size": 256,
     },
+    "chronos-bolt-base": {
+        "num_gpus": 0,
+        "default_torch_dtype": "auto",
+        "default_batch_size": 256,
+    },
     "chronos-bolt-large": {
-        "num_gpus": 1,
-        "default_torch_dtype": "bfloat16",
+        "num_gpus": 0,
+        "default_torch_dtype": "auto",
         "default_batch_size": 32,
     },
 }
@@ -65,6 +70,10 @@ MODEL_ALIASES = {
     "small": "autogluon/chronos-t5-small",
     "base": "autogluon/chronos-t5-base",
     "large": "autogluon/chronos-t5-large",
+    "bolt-mini": "autogluon/chronos-bolt-mini",
+    "bolt-small": "autogluon/chronos-bolt-small",
+    "bolt-base": "autogluon/chronos-bolt-base",
+    "bolt-large": "autogluon/chronos-bolt-large",
 }
 
 
