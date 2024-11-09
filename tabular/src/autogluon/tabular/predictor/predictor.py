@@ -408,7 +408,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         fit_full_last_level_weighted_ensemble: bool = True,
         full_weighted_ensemble_additionally: bool = False,
         dynamic_stacking: bool | str = False,
-        calibrate_decision_threshold: bool | str = False,
+        calibrate_decision_threshold: bool | str = "auto",
         num_cpus: int | str = "auto",
         num_gpus: int | str = "auto",
         memory_limit: float | str = "auto",
@@ -698,7 +698,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             time for fitting AutoGluon. This can be adjusted by specifying `ds_args` with different parameters to `fit()`.
             If "auto", will be set to `not use_bag_holdout`.
             See the documentation of `ds_args` for more information.
-        calibrate_decision_threshold : bool | str, default = False
+        calibrate_decision_threshold : bool | str, default = "auto"
             [Experimental] This may be removed / changed without warning in a future release.
             If True, will automatically calibrate the decision threshold at the end of fit for calls to `.predict` based on the evaluation metric.
             If "auto", will be set to True if `eval_metric.needs_class=True` and `problem_type="binary"`.
@@ -1678,7 +1678,30 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                     f"Disabling decision threshold calibration for metric `precision` to avoid undefined results. "
                     f"Force calibration via specifying `calibrate_decision_threshold=True`.",
                 )
+            elif calibrate_decision_threshold and self.eval_metric.name == "accuracy":
+                num_rows_val_for_calibration = self._trainer.num_rows_val_for_calibration
+                min_val_rows_for_calibration = 10000
+                if num_rows_val_for_calibration < min_val_rows_for_calibration:
+                    calibrate_decision_threshold = False
+                    logger.log(
+                        20,
+                        f"Disabling decision threshold calibration for metric `accuracy` due to having "
+                        f"fewer than {min_val_rows_for_calibration} rows of validation data for calibration ({num_rows_val_for_calibration} rows). "
+                        f"\n\t`accuracy` is generally not improved through threshold calibration "
+                        f"Force calibration via specifying `calibrate_decision_threshold=True`.",
+                    )
             elif calibrate_decision_threshold:
+                num_rows_val_for_calibration = self._trainer.num_rows_val_for_calibration
+                min_val_rows_for_calibration = 20
+                if num_rows_val_for_calibration < min_val_rows_for_calibration:
+                    calibrate_decision_threshold = False
+                    logger.log(
+                        30,
+                        f"Disabling decision threshold calibration for metric `{self.eval_metric.name}` due to having "
+                        f"fewer than {min_val_rows_for_calibration} rows of validation data for calibration ({num_rows_val_for_calibration} rows). "
+                        f"Force calibration via specifying `calibrate_decision_threshold=True`.",
+                    )
+            if calibrate_decision_threshold:
                 logger.log(20, f"Enabling decision threshold calibration (calibrate_decision_threshold='auto', metric is valid, problem_type is 'binary')")
         if calibrate_decision_threshold:
             if self.problem_type != BINARY:

@@ -239,6 +239,16 @@ class AbstractTrainer:
         return self._num_rows_val is not None
 
     @property
+    def num_rows_val_for_calibration(self) -> int:
+        """The number of rows available to optimize model calibration"""
+        if self._num_rows_val is not None:
+            return self._num_rows_val
+        elif self.bagged_mode:
+            return self._num_rows_train
+        else:
+            return 0
+
+    @property
     def time_left(self) -> float | None:
         """
         Remaining time left in the fit call.
