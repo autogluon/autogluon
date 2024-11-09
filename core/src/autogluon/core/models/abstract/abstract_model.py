@@ -31,10 +31,9 @@ from ...data.label_cleaner import LabelCleaner
 from ...hpo.constants import CUSTOM_BACKEND, RAY_BACKEND
 from ...hpo.exceptions import EmptySearchSpace
 from ...hpo.executors import HpoExecutor, HpoExecutorFactory
-from ...metrics import Scorer
+from ...metrics import compute_metric, Scorer
 from ...utils import (
     compute_permutation_feature_importance,
-    compute_weighted_metric,
     get_pred_from_proba,
     infer_eval_metric,
     infer_problem_type,
@@ -1089,24 +1088,59 @@ class AbstractModel:
         else:  # Unknown problem type
             raise AssertionError(f'Unknown y_pred_proba format for `problem_type="{self.problem_type}"`.')
 
-    def score(self, X, y, metric=None, sample_weight=None, **kwargs) -> float:
+    def score(
+        self,
+        X,
+        y: np.ndarray,
+        metric: Scorer = None,
+        sample_weight: np.ndarray = None,
+        as_error: bool = False,
+        **kwargs,
+    ) -> float:
         if metric is None:
             metric = self.eval_metric
 
         if metric.needs_pred or metric.needs_quantile:
             y_pred = self.predict(X=X, **kwargs)
+            y_pred_proba = None
         else:
-            y_pred = self.predict_proba(X=X, **kwargs)
-        return compute_weighted_metric(y, y_pred, metric, sample_weight, quantile_levels=self.quantile_levels)
+            y_pred = None
+            y_pred_proba = self.predict_proba(X=X, **kwargs)
 
-    def score_with_y_pred_proba(self, y, y_pred_proba: np.ndarray, metric=None, sample_weight=None) -> float:
+        return compute_metric(
+            y=y,
+            y_pred=y_pred,
+            y_pred_proba=y_pred_proba,
+            metric=metric,
+            weights=sample_weight,
+            as_error=as_error,
+            quantile_levels=self.quantile_levels,
+        )
+
+    def score_with_y_pred_proba(
+        self,
+        y: np.ndarray,
+        y_pred_proba: np.ndarray,
+        metric: Scorer = None,
+        sample_weight: np.ndarray = None,
+        as_error: bool = False,
+    ) -> float:
         if metric is None:
             metric = self.eval_metric
-        if metric.needs_pred:
+        if metric.needs_pred or metric.needs_quantile:
             y_pred = self.predict_from_proba(y_pred_proba=y_pred_proba)
+            y_pred_proba = None
         else:
-            y_pred = y_pred_proba
-        return compute_weighted_metric(y, y_pred, metric, sample_weight, quantile_levels=self.quantile_levels)
+            y_pred = None
+        return compute_metric(
+            y=y,
+            y_pred=y_pred,
+            y_pred_proba=y_pred_proba,
+            metric=metric,
+            weights=sample_weight,
+            as_error=as_error,
+            quantile_levels=self.quantile_levels,
+        )
 
     def save(self, path: str = None, verbose: bool = True) -> str:
         """

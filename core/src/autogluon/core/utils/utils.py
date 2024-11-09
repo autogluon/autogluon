@@ -731,10 +731,16 @@ def extract_column(X, col_name):
     return X, w
 
 
+# TODO: v1.4: Remove this
 def compute_weighted_metric(y: np.ndarray, y_pred: np.ndarray, metric: Scorer, weights: np.ndarray, weight_evaluation: bool = None, **kwargs) -> float:
     """Report weighted metric if: weights is not None, weight_evaluation=True, and the given metric supports sample weights.
     If weight_evaluation=None, it will be set to False if weights=None, True otherwise.
     """
+    logger.log(
+        30,
+        f"WARNING: `compute_weighted_metric` is deprecated as of AutoGluon 1.2 and will be removed in AutoGluon 1.4. "
+        f"Please use `autogluon.core.metrics.compute_metric` instead.",
+    )
     if not metric.needs_quantile:
         kwargs.pop("quantile_levels", None)
     if weight_evaluation is None:
