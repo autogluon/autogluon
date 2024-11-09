@@ -699,7 +699,6 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             If "auto", will be set to `not use_bag_holdout`.
             See the documentation of `ds_args` for more information.
         calibrate_decision_threshold : bool | str, default = "auto"
-            [Experimental] This may be removed / changed without warning in a future release.
             If True, will automatically calibrate the decision threshold at the end of fit for calls to `.predict` based on the evaluation metric.
             If "auto", will be set to True if `eval_metric.needs_class=True` and `problem_type="binary"`.
             By default, the decision threshold is `0.5`, however for some metrics such as `f1` and `balanced_accuracy`,
