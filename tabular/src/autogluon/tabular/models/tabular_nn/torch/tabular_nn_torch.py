@@ -7,7 +7,7 @@ import random
 import time
 import warnings
 from copy import deepcopy
-from typing import Dict, Union
+from typing import Dict, Union, TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -23,7 +23,6 @@ from autogluon.core.models._utils import get_early_stopping_rounds
 from autogluon.core.models.abstract.abstract_nn_model import AbstractNeuralNetworkModel
 from autogluon.core.utils.early_stopping import AdaptiveES, NoES, SimpleES
 from autogluon.core.utils.exceptions import TimeLimitExceeded
-from autogluon.tabular.models.tabular_nn.torch.tabular_torch_dataset import TabularTorchDataset
 
 from ..compilers.native import TabularNeuralNetTorchNativeCompiler
 from ..compilers.onnx import TabularNeuralNetTorchOnnxCompiler
@@ -31,6 +30,9 @@ from ..hyperparameters.parameters import get_default_param
 from ..hyperparameters.searchspaces import get_default_searchspace
 from ..utils.data_preprocessor import create_preprocessor, get_feature_arraycol_map, get_feature_type_map
 from ..utils.nn_architecture_utils import infer_y_range
+
+if TYPE_CHECKING:
+    from .tabular_torch_dataset import TabularTorchDataset
 
 logger = logging.getLogger(__name__)
 
@@ -533,9 +535,9 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         scorers: list[Scorer],
         best_epoch: int,
         use_curve_metric_error: bool,
-        train_dataset: TabularTorchDataset,
-        val_dataset: TabularTorchDataset,
-        test_dataset: TabularTorchDataset,
+        train_dataset: "TabularTorchDataset",
+        val_dataset: "TabularTorchDataset",
+        test_dataset: "TabularTorchDataset",
         y_train: np.ndarray,
         y_val: np.ndarray,
         y_test: np.ndarray,
