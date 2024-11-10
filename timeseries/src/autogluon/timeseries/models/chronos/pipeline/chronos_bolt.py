@@ -373,6 +373,10 @@ class ChronosBoltPipeline(BaseChronosPipeline):
     def __init__(self, model: ChronosBoltModelForForecasting):
         self.model = model
 
+    @property
+    def quantiles(self) -> List[float]:
+        return self.model.config.chronos_config["quantiles"]
+
     def predict(  # type: ignore[override]
         self,
         context: Union[torch.Tensor, List[torch.Tensor]],
@@ -422,7 +426,7 @@ class ChronosBoltPipeline(BaseChronosPipeline):
             if remaining <= 0:
                 break
 
-            central_idx = torch.abs(torch.tensor(self.model.config.chronos_config["quantiles"]) - 0.5).argmin()
+            central_idx = torch.abs(torch.tensor(self.quantiles) - 0.5).argmin()
             central_prediction = prediction[:, central_idx]
 
             context_tensor = torch.cat([context_tensor, central_prediction], dim=-1)
@@ -443,7 +447,7 @@ class ChronosBoltPipeline(BaseChronosPipeline):
             .swapaxes(1, 2)
         )
 
-        training_quantile_levels = self.model.config.chronos_config["quantiles"]
+        training_quantile_levels = self.quantiles
 
         if set(quantile_levels).issubset(set(training_quantile_levels)):
             # no need to perform intra/extrapolation

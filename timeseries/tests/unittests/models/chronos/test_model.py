@@ -15,13 +15,14 @@ from autogluon.timeseries.models.chronos.pipeline.utils import (
     timeout_callback,
 )
 
-from ..common import (
+from ...common import (
     DATAFRAME_WITH_COVARIATES,
     DATAFRAME_WITH_STATIC,
     DUMMY_TS_DATAFRAME,
     get_data_frame_with_item_index,
     get_data_frame_with_variable_lengths,
 )
+from .conftest import CHRONOS_BOLT_TEST_MODEL_PATH
 
 DATASETS = [DUMMY_TS_DATAFRAME, DATAFRAME_WITH_STATIC, DATAFRAME_WITH_COVARIATES]
 GPU_AVAILABLE = torch.cuda.is_available()
@@ -42,7 +43,6 @@ HYPERPARAMETER_DICTS = [
         "context_length": None,
     },
 ]
-CHRONOS_BOLT_TEST_MODEL_PATH = "autogluon/chronos-bolt-350k-test"
 
 
 def chronos_bolt_model(*args, hyperparameters=None, **kwargs):
@@ -53,14 +53,6 @@ def chronos_bolt_model(*args, hyperparameters=None, **kwargs):
 
 
 TESTABLE_MODELS = [ChronosModel, chronos_bolt_model]
-
-
-@pytest.fixture(scope="module", params=["default", "bolt-t5-efficient-350k"])
-def chronos_model_path(request, hf_model_path):
-    if request.param == "default":
-        yield hf_model_path
-    elif request.param == "bolt-t5-efficient-350k":
-        yield CHRONOS_BOLT_TEST_MODEL_PATH
 
 
 @pytest.fixture(
