@@ -369,6 +369,8 @@ class ChronosBoltModelForForecasting(T5PreTrainedModel):
 class ChronosBoltPipeline(BaseChronosPipeline):
     forecast_type: ForecastType = ForecastType.QUANTILES
     default_context_length: int = 2048
+    # register this class name with this alias for backward compatibility
+    _aliases = ["PatchedT5Pipeline"]
 
     def __init__(self, model: ChronosBoltModelForForecasting):
         self.model = model
@@ -495,8 +497,11 @@ class ChronosBoltPipeline(BaseChronosPipeline):
         architecture = config.architectures[0]
         class_ = globals().get(architecture)
 
+        # TODO: remove this once all models carry the correct architecture names in their configuration
+        # and raise an error instead.
         if class_ is None:
-            raise ValueError(f"{architecture} is not a valid patch-based model defined in the current package.")
+            logger.warning(f"Unknown architecture: {architecture}, defaulting to ChronosBoltModelForForecasting")
+            class_ = ChronosBoltModelForForecasting
 
         model = class_.from_pretrained(*args, **kwargs)
         return cls(model=model)

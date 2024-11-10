@@ -22,6 +22,9 @@ class PipelineRegistry(type):
         new_cls = type.__new__(cls, name, bases, attrs)
         if name is not None:
             cls.REGISTRY[name] = new_cls
+        if aliases := attrs.get("_aliases"):
+            for alias in aliases:
+                cls.REGISTRY[alias] = new_cls
         return new_cls
 
 
@@ -118,6 +121,12 @@ class BaseChronosPipeline(metaclass=PipelineRegistry):
         When a local path is provided, supports both a folder or a .tar.gz archive.
         """
         from transformers import AutoConfig
+
+        if str(pretrained_model_name_or_path).startswith("s3://"):
+            from .utils import cache_model_from_s3
+
+            local_model_path = cache_model_from_s3(str(pretrained_model_name_or_path), force=force)
+            return cls.from_pretrained(local_model_path, *model_args, **kwargs)
 
         torch_dtype = kwargs.get("torch_dtype", "auto")
         if torch_dtype != "auto" and isinstance(torch_dtype, str):
