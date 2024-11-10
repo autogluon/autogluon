@@ -9,9 +9,9 @@ from autogluon.common.loaders import load_pkl
 from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
-from autogluon.timeseries.utils.warning_filters import warning_filter
+from autogluon.timeseries.utils.warning_filters import disable_duplicate_logs, warning_filter
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("autogluon.timeseries.models.chronos")
 
 
 # allowed HuggingFace model paths with custom parameter definitions
@@ -56,11 +56,6 @@ MODEL_CONFIGS = {
         "default_torch_dtype": "auto",
         "default_batch_size": 256,
     },
-    "chronos-bolt-large": {
-        "num_gpus": 0,
-        "default_torch_dtype": "auto",
-        "default_batch_size": 32,
-    },
 }
 
 
@@ -73,7 +68,6 @@ MODEL_ALIASES = {
     "bolt-mini": "autogluon/chronos-bolt-mini",
     "bolt-small": "autogluon/chronos-bolt-small",
     "bolt-base": "autogluon/chronos-bolt-base",
-    "bolt-large": "autogluon/chronos-bolt-large",
 }
 
 
@@ -85,8 +79,8 @@ class ChronosModel(AbstractTimeSeriesModel):
     The original Chronos is a family of pretrained models, based on the T5 family, with number of parameters ranging between
     8M and 710M. The full collection of Chronos models is available on
     `Hugging Face <https://huggingface.co/collections/amazon/chronos-models-65f1791d630a8d57cb718444>`_. For Chronos small,
-    base, and large variants a GPU is required to perform inference efficiently. Chronos takes a minimalistic approach to 
-    pretraining time series models, by discretizing time series data directly into bins which are treated as tokens, 
+    base, and large variants a GPU is required to perform inference efficiently. Chronos takes a minimalistic approach to
+    pretraining time series models, by discretizing time series data directly into bins which are treated as tokens,
     effectively performing regression by classification. This results in a simple and flexible framework
     for using any language model in the context of time series forecasting. See [Ansari2024]_ for more information.
 
@@ -108,7 +102,8 @@ class ChronosModel(AbstractTimeSeriesModel):
         Model path used for the model, i.e., a HuggingFace transformers ``name_or_path``. Can be a
         compatible model name on HuggingFace Hub or a local path to a model directory. Original
         Chronos models (i.e., ``autogluon/chronos-t5-{model_size}``) can be specified with aliases
-        ``tiny``, ``mini`` , ``small``, ``base``, and ``large``.
+        ``tiny``, ``mini`` , ``small``, ``base``, and ``large``. Chronos-Bolt models can be specified
+        with ``bolt-mini``, ``bolt-small``, and ``bolt-base``.
     batch_size : int, default = 16
         Size of batches used during inference
     num_samples : int, default = 20
@@ -345,7 +340,7 @@ class ChronosModel(AbstractTimeSeriesModel):
             )
 
             self.model_pipeline.model.eval()
-            with torch.inference_mode():
+            with torch.inference_mode(), disable_duplicate_logs(logger):
                 batch_quantiles, batch_means = [], []
                 for batch in inference_data_loader:
                     qs, mn = self.model_pipeline.predict_quantiles(

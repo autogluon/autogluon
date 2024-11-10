@@ -4,6 +4,7 @@
 # Authors: Abdul Fatir Ansari <ansarnd@amazon.com>, Lorenzo Stella <stellalo@amazon.com>, Caner Turkmen <atturkm@amazon.com>
 
 import copy
+import logging
 import warnings
 from dataclasses import dataclass, fields
 from typing import List, Optional, Tuple, Union
@@ -21,6 +22,8 @@ from transformers.models.t5.modeling_t5 import (
 from transformers.utils import ModelOutput
 
 from .base import BaseChronosPipeline, ForecastType
+
+logger = logging.getLogger("autogluon.timeseries.models.chronos")
 
 
 @dataclass
@@ -369,7 +372,6 @@ class ChronosBoltPipeline(BaseChronosPipeline):
 
     def __init__(self, model: ChronosBoltModelForForecasting):
         self.model = model
-        self.quantiles = list(map(str, self.model.config.chronos_config["quantiles"]))
 
     def predict(  # type: ignore[override]
         self,
@@ -430,7 +432,7 @@ class ChronosBoltPipeline(BaseChronosPipeline):
     def predict_quantiles(
         self, context: torch.Tensor, prediction_length: int, quantile_levels: List[float], **kwargs
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        # shape (batch_size, prediction_length, len(self.quantiles))
+        # shape (batch_size, prediction_length, len(training_quantile_levels))
         predictions = (
             self.predict(
                 context,
@@ -441,14 +443,24 @@ class ChronosBoltPipeline(BaseChronosPipeline):
             .swapaxes(1, 2)
         )
 
-        quantile_levels_labels = [str(q) for q in quantile_levels]
+        training_quantile_levels = self.model.config.chronos_config["quantiles"]
 
-        if set(quantile_levels_labels).issubset(set(self.quantiles)):
+        if set(quantile_levels).issubset(set(training_quantile_levels)):
             # no need to perform intra/extrapolation
-            quantiles = predictions[..., [self.quantiles.index(q) for q in quantile_levels_labels]]
+            quantiles = predictions[..., [training_quantile_levels.index(q) for q in quantile_levels]]
         else:
             # we rely on torch for interpolating quantiles if quantiles that
             # Chronos Bolt was trained on were not provided
+            if min(quantile_levels) < min(training_quantile_levels) or max(quantile_levels) > max(
+                training_quantile_levels
+            ):
+                logger.warn(
+                    f"\tQuantiles to be predicted ({quantile_levels}) are not within the range of "
+                    f"quantiles that Chronos-Bolt was trained on ({training_quantile_levels}). "
+                    "Quantile predictions will be set to the minimum/maximum levels at which Chronos-Bolt "
+                    "was trained on. This may significantly affect the quality of the predictions."
+                )
+
             augmented_predictions = torch.cat(
                 [predictions[..., [0]], predictions, predictions[..., [-1]]],
                 dim=-1,
@@ -456,7 +468,7 @@ class ChronosBoltPipeline(BaseChronosPipeline):
             quantiles = torch.quantile(
                 augmented_predictions, q=torch.tensor(quantile_levels, dtype=augmented_predictions.dtype), dim=-1
             ).permute(1, 2, 0)
-        mean = predictions[:, :, self.quantiles.index("0.5")]
+        mean = predictions[:, :, training_quantile_levels.index(0.5)]
         return quantiles, mean
 
     @classmethod

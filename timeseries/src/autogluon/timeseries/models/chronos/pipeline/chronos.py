@@ -17,7 +17,7 @@ from autogluon.timeseries.utils.warning_filters import set_loggers_level
 
 from .base import BaseChronosPipeline, ForecastType
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("autogluon.timeseries.models.chronos")
 
 
 __all__ = ["ChronosConfig", "ChronosPipeline"]
