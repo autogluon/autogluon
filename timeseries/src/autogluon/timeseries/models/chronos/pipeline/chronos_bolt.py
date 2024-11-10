@@ -455,7 +455,7 @@ class ChronosBoltPipeline(BaseChronosPipeline):
             )
             quantiles = torch.quantile(
                 augmented_predictions, q=torch.tensor(quantile_levels, dtype=augmented_predictions.dtype), dim=-1
-            )
+            ).permute(1, 2, 0)
         mean = predictions[:, :, self.quantiles.index("0.5")]
         return quantiles, mean
 
