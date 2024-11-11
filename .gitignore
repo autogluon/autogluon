@@ -137,6 +137,3 @@ eda/src/autogluon/eda/version.py
 AutogluonModels
 lightning_logs
 VERSION.minor
-
-# timeseries text fixtures
-!timeseries/tests/fixtures/**/config.json
