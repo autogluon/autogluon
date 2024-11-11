@@ -8,8 +8,7 @@ import evaluate
 import numpy as np
 from sklearn.metrics import f1_score
 
-from autogluon.core.metrics import Scorer, get_metric
-from autogluon.core.utils import compute_weighted_metric
+from autogluon.core.metrics import Scorer, compute_metric, get_metric
 
 from ..constants import (
     ACCURACY,
@@ -232,18 +231,20 @@ def compute_score(
         return metric.compute(references=metric_data[Y_TRUE], predictions=metric_data[Y_PRED])
 
     metric = get_metric(metric)
+
+    y = metric_data[Y_TRUE]
     if metric.needs_proba or metric.needs_threshold:
-        y_pred = metric_data[Y_PRED_PROB][:, pos_label]
+        return metric.convert_score_to_original(compute_metric(y=y, y_pred_proba=metric_data[Y_PRED_PROB][:, pos_label], metric=metric, weights=None))
     else:
         y_pred = metric_data[Y_PRED]
 
-    if metric.name == F1:  # only for binary classification
-        y = (metric_data[Y_TRUE] == pos_label).astype(int)
-        y_pred = (y_pred == pos_label).astype(int)
-    else:
-        y = metric_data[Y_TRUE]
+        # TODO: This is a hack. Doesn't support `f1_macro`, `f1_micro`, `f1_weighted`, or custom `f1` metrics with different names.
+        # TODO: Longterm the solution should be to have the input data to this function use the internal representation without the original class names. This way `pos_label` would not need to be specified.
+        if metric.name == F1:  # only for binary classification
+            y = (metric_data[Y_TRUE] == pos_label).astype(int)
+            y_pred = (metric_data[Y_PRED] == pos_label).astype(int)
 
-    return metric.convert_score_to_original(compute_weighted_metric(y=y, y_pred=y_pred, metric=metric, weights=None))
+        return metric.convert_score_to_original(compute_metric(y=y, y_pred=y_pred, metric=metric, weights=None))
 
 
 class RankingMetrics:
