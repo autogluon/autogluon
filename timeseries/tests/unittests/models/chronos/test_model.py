@@ -42,6 +42,15 @@ HYPERPARAMETER_DICTS = [
     {
         "context_length": None,
     },
+    {
+        "fine_tune": True,
+        "fine_tune_steps": 10,
+    },
+    {
+        "fine_tune": True,
+        "fine_tune_steps": 10,
+        "context_length": 64,
+    },
 ]
 
 
@@ -52,7 +61,14 @@ def chronos_bolt_model(*args, hyperparameters=None, **kwargs):
     return ChronosModel(*args, **kwargs)
 
 
-TESTABLE_MODELS = [ChronosModel, chronos_bolt_model]
+def chronos_bolt_model_with_finetuning(*args, hyperparameters=None, **kwargs):
+    hyperparameters = copy.deepcopy(hyperparameters or {})
+    hyperparameters |= {"model_path": CHRONOS_BOLT_TEST_MODEL_PATH, "fine_tune": True, "fine_tune_steps": 10}
+    kwargs["hyperparameters"] = hyperparameters
+    return ChronosModel(*args, **kwargs)
+
+
+TESTABLE_MODELS = [ChronosModel, chronos_bolt_model, chronos_bolt_model_with_finetuning]
 
 
 @pytest.fixture(

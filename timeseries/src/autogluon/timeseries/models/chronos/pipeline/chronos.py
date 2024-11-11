@@ -65,9 +65,12 @@ class ChronosTokenizer:
     which concrete classes must implement.
     """
 
-    def input_transform(self, context: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, Any]:
+    def context_input_transform(
+        self,
+        context: torch.Tensor,
+    ) -> Tuple:
         """
-        Turn a batch of time series into token IDs, attention map, and scale.
+        Turn a batch of time series into token IDs, attention map, and tokenizer_state.
 
         Parameters
         ----------
@@ -87,9 +90,41 @@ class ChronosTokenizer:
             which input observations are not ``torch.nan`` (i.e. not
             missing nor padding).
         tokenizer_state
-            An object that will be passed to ``output_transform``.
-            Contains the relevant context to decode output samples into
-            real values, such as location and scale parameters.
+            An object that can be passed to ``label_input_transform``
+            and ``output_transform``. Contains the relevant information
+            to decode output samples into real values,
+            such as location and scale parameters.
+        """
+        raise NotImplementedError()
+
+    def label_input_transform(self, label: torch.Tensor, tokenizer_state: Any) -> Tuple:
+        """
+        Turn a batch of label slices of time series into token IDs and attention map
+        using the ``tokenizer_state`` provided by ``context_input_transform``.
+
+        Parameters
+        ----------
+        context
+            A tensor shaped (batch_size, time_length), containing the
+            timeseries to forecast. Use left-padding with ``torch.nan``
+            to align time series of different lengths.
+        tokenizer_state
+            An object returned by ``context_input_transform`` containing
+            relevant information to preprocess data, such as location and
+            scale. The nature of this depends on the specific tokenizer.
+            This is used for tokenizing the label, in order to use the same
+            scaling used to tokenize the context.
+
+        Returns
+        -------
+        token_ids
+            A tensor of integers, shaped (batch_size, time_length + 1)
+            if ``config.use_eos_token`` and (batch_size, time_length)
+            otherwise, containing token IDs for the input series.
+        attention_mask
+            A boolean tensor, same shape as ``token_ids``, indicating
+            which input observations are not ``torch.nan`` (i.e. not
+            missing nor padding).
         """
         raise NotImplementedError()
 
@@ -132,15 +167,15 @@ class MeanScaleUniformBins(ChronosTokenizer):
             )
         )
 
-    def input_transform(self, context: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        batch_size, length = context.shape
-
-        if length > self.config.context_length:
-            context = context[..., -self.config.context_length :]
-
+    def _input_transform(
+        self, context: torch.Tensor, scale: Optional[torch.Tensor] = None
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         attention_mask = ~torch.isnan(context)
-        scale = torch.nansum(torch.abs(context) * attention_mask, dim=-1) / torch.nansum(attention_mask, dim=-1)
-        scale[~(scale > 0)] = 1.0
+
+        if scale is None:
+            scale = torch.nansum(torch.abs(context) * attention_mask, dim=-1) / torch.nansum(attention_mask, dim=-1)
+            scale[~(scale > 0)] = 1.0
+
         scaled_context = context / scale.unsqueeze(dim=-1)
         token_ids = (
             torch.bucketize(
@@ -153,14 +188,41 @@ class MeanScaleUniformBins(ChronosTokenizer):
             + self.config.n_special_tokens
         )
         token_ids[~attention_mask] = self.config.pad_token_id
-
-        if self.config.use_eos_token:
-            eos_tokens = torch.full((batch_size, 1), fill_value=self.config.eos_token_id)
-            token_ids = torch.concat((token_ids, eos_tokens), dim=1)
-            eos_mask = torch.full((batch_size, 1), fill_value=True)
-            attention_mask = torch.concat((attention_mask, eos_mask), dim=1)
+        token_ids.clamp_(0, self.config.n_tokens - 1)
 
         return token_ids, attention_mask, scale
+
+    def _append_eos_token(
+        self, token_ids: torch.Tensor, attention_mask: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        batch_size = token_ids.shape[0]
+        eos_tokens = torch.full((batch_size, 1), fill_value=self.config.eos_token_id)
+        token_ids = torch.concat((token_ids, eos_tokens), dim=1)
+        eos_mask = torch.full((batch_size, 1), fill_value=True)
+        attention_mask = torch.concat((attention_mask, eos_mask), dim=1)
+
+        return token_ids, attention_mask
+
+    def context_input_transform(self, context: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        length = context.shape[-1]
+
+        if length > self.config.context_length:
+            context = context[..., -self.config.context_length :]
+
+        token_ids, attention_mask, scale = self._input_transform(context=context)
+
+        if self.config.use_eos_token and self.config.model_type == "seq2seq":
+            token_ids, attention_mask = self._append_eos_token(token_ids=token_ids, attention_mask=attention_mask)
+
+        return token_ids, attention_mask, scale
+
+    def label_input_transform(self, label: torch.Tensor, scale: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        token_ids, attention_mask, _ = self._input_transform(context=label, scale=scale)
+
+        if self.config.use_eos_token:
+            token_ids, attention_mask = self._append_eos_token(token_ids=token_ids, attention_mask=attention_mask)
+
+        return token_ids, attention_mask
 
     def output_transform(self, samples: torch.Tensor, scale: torch.Tensor) -> torch.Tensor:
         scale_unsqueezed = scale.unsqueeze(-1).unsqueeze(-1)
@@ -302,6 +364,7 @@ class ChronosPipeline(BaseChronosPipeline):
     forecast_type: ForecastType = ForecastType.SAMPLES
 
     def __init__(self, tokenizer, model):
+        super().__init__(inner_model=model.model)
         self.tokenizer = tokenizer
         self.model = model
 
@@ -330,7 +393,7 @@ class ChronosPipeline(BaseChronosPipeline):
             provided, and the extra 1 is for EOS.
         """
         context = self._prepare_and_validate_context(context=context)
-        token_ids, attention_mask, tokenizer_state = self.tokenizer.input_transform(context)
+        token_ids, attention_mask, tokenizer_state = self.tokenizer.context_input_transform(context)
         embeddings = self.model.encode(
             input_ids=token_ids.to(self.model.device),
             attention_mask=attention_mask.to(self.model.device),
@@ -402,7 +465,7 @@ class ChronosPipeline(BaseChronosPipeline):
         remaining = prediction_length
 
         while remaining > 0:
-            token_ids, attention_mask, scale = self.tokenizer.input_transform(context)
+            token_ids, attention_mask, scale = self.tokenizer.context_input_transform(context)
             samples = self.model(
                 token_ids.to(self.model.device),
                 attention_mask.to(self.model.device),

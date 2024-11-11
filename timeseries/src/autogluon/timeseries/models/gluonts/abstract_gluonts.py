@@ -38,7 +38,7 @@ gts_logger = logging.getLogger(gluonts.__name__)
 
 class SimpleGluonTSDataset(GluonTSDataset):
     """Wrapper for TimeSeriesDataFrame that is compatible with the GluonTS Dataset API."""
-
+    # TODO: Move this class to the dataset namespace as multiple models are using it now
     def __init__(
         self,
         target_df: TimeSeriesDataFrame,
