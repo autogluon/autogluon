@@ -450,9 +450,6 @@ class ChronosPipeline(BaseChronosPipeline):
             dim=-1,
         ).permute(1, 2, 0)
 
-        # sort quantiles to make them monotonic
-        quantiles, _ = torch.sort(quantiles, dim=-1)
-
         return quantiles, mean
 
     @classmethod
