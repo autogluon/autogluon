@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Any, Dict, Tuple
 
 import numpy as np
 import pandas as pd
@@ -92,23 +92,41 @@ ALL_MODELS = {
 def all_model_hyperparams(hf_model_path):
     return {
         **ALL_MODELS,
-        "Chronos": {"model_path": hf_model_path},
+        "Chronos": [
+            {"model_path": hf_model_path},
+            {"model_path": "autogluon/chronos-bolt-350k-test"},  # todo: replace after model release
+        ],
     }
 
 
-def assert_leaderboard_contains_all_models(leaderboard: pd.DataFrame, include_ensemble: bool = True):
-    expected_models = set(ALL_MODELS.keys())
-    if include_ensemble:
-        expected_models = expected_models.union({"WeightedEnsemble"})
+def assert_leaderboard_contains_all_models(
+    leaderboard: pd.DataFrame,
+    hyperparameters: Dict[str, Any],
+    include_ensemble: bool = True,
+):
+    """Compare the leaderboard to a set of hyperparameters provided to AutoGluon-TimeSeries,
+    asserting that every model that results from the hyperparameters is present in the leaderboard.
+    If include_ensemble is True, also assert that the ensemble is present in the leaderboard.
+    """
+    # flatten the hyperparameters dict (nested list of dicts will mean multiple models)
+    expected_models = []
+    for k, v in hyperparameters.items():
+        v = v if isinstance(v, list) else [v]
+        for _ in v:
+            expected_models.append(k)
 
-    failed_models = [
-        model
-        for model in expected_models
-        if not any(
-            fitted.startswith(model)
-            for fitted in leaderboard["model"]  # Chronos appends more information to name
-        )
-    ]
+    if include_ensemble:
+        expected_models.append("WeightedEnsemble")
+
+    leaderboard_models = list(leaderboard["model"])
+    failed_models = []
+    for model in expected_models:
+        match = next((m for m in leaderboard_models if m.startswith(model)), None)
+        if match is None:
+            failed_models.append(match)
+        else:
+            leaderboard_models.remove(match)
+
     assert len(failed_models) == 0, f"Failed models: {failed_models}"
 
 
@@ -146,7 +164,7 @@ def test_all_models_can_handle_all_covariates(
     predictor.evaluate(test_data)
     leaderboard = predictor.leaderboard(test_data)
 
-    assert_leaderboard_contains_all_models(leaderboard)
+    assert_leaderboard_contains_all_models(leaderboard, hyperparameters=all_model_hyperparams)
 
     known_covariates = test_data.slice_by_timestep(-prediction_length, None)[known_covariates_names]
     predictions = predictor.predict(train_data, known_covariates=known_covariates)
@@ -184,7 +202,7 @@ def test_all_models_handle_all_pandas_frequencies(freq, all_model_hyperparams):
     predictor.evaluate(test_data)
     leaderboard = predictor.leaderboard(test_data)
 
-    assert_leaderboard_contains_all_models(leaderboard)
+    assert_leaderboard_contains_all_models(leaderboard, hyperparameters=all_model_hyperparams)
 
     known_covariates = test_data.slice_by_timestep(-prediction_length, None)[known_covariates_names]
     predictions = predictor.predict(train_data, known_covariates=known_covariates)

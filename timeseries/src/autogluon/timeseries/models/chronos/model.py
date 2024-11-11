@@ -9,9 +9,9 @@ from autogluon.common.loaders import load_pkl
 from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
-from autogluon.timeseries.utils.warning_filters import warning_filter
+from autogluon.timeseries.utils.warning_filters import disable_duplicate_logs, warning_filter
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("autogluon.timeseries.models.chronos")
 
 
 # allowed HuggingFace model paths with custom parameter definitions
@@ -41,6 +41,21 @@ MODEL_CONFIGS = {
         "default_torch_dtype": "bfloat16",
         "default_batch_size": 8,
     },
+    "chronos-bolt-mini": {
+        "num_gpus": 0,
+        "default_torch_dtype": "auto",
+        "default_batch_size": 256,
+    },
+    "chronos-bolt-small": {
+        "num_gpus": 0,
+        "default_torch_dtype": "auto",
+        "default_batch_size": 256,
+    },
+    "chronos-bolt-base": {
+        "num_gpus": 0,
+        "default_torch_dtype": "auto",
+        "default_batch_size": 256,
+    },
 }
 
 
@@ -50,21 +65,28 @@ MODEL_ALIASES = {
     "small": "autogluon/chronos-t5-small",
     "base": "autogluon/chronos-t5-base",
     "large": "autogluon/chronos-t5-large",
+    "bolt-mini": "autogluon/chronos-bolt-mini",
+    "bolt-small": "autogluon/chronos-bolt-small",
+    "bolt-base": "autogluon/chronos-bolt-base",
 }
 
 
 class ChronosModel(AbstractTimeSeriesModel):
-    """Chronos pretrained time series forecasting models, based on the original
-    `ChronosModel <https://github.com/amazon-science/chronos-forecasting/blob/main/src/chronos/chronos.py>`_ implementation.
+    """Chronos pretrained time series forecasting models. Models can be based on the original
+    `ChronosModel <https://github.com/amazon-science/chronos-forecasting/blob/main/src/chronos/chronos.py>`_ implementation,
+    as well as a newer family of Chronos-Bolt models which are capable of much faster inference.
 
-    Chronos is family of pretrained models, based on the T5 family, with number of parameters ranging between 8M and 710M.
-    The full collection of Chronos models is available on
+    The original Chronos is a family of pretrained models, based on the T5 family, with number of parameters ranging between
+    8M and 710M. The full collection of Chronos models is available on
     `Hugging Face <https://huggingface.co/collections/amazon/chronos-models-65f1791d630a8d57cb718444>`_. For Chronos small,
-    base, and large variants a GPU is required to perform inference efficiently.
-
-    Chronos takes a minimalistic approach to pretraining time series models, by discretizing time series data directly into bins
-    which are treated as tokens, effectively performing regression by classification. This results in a simple and flexible framework
+    base, and large variants a GPU is required to perform inference efficiently. Chronos takes a minimalistic approach to
+    pretraining time series models, by discretizing time series data directly into bins which are treated as tokens,
+    effectively performing regression by classification. This results in a simple and flexible framework
     for using any language model in the context of time series forecasting. See [Ansari2024]_ for more information.
+
+    The newer Chronos-Bolt variants enable much faster inference by first "patching" the time series. The resulting
+    time series is then fed into a T5 model for forecasting. The Chronos-Bolt variants are capable of much faster inference,
+    and can all run on CPUs. Chronos-Bolt models are also available on Hugging Face <https://huggingface.co/autogluon/>`_.
 
     References
     ----------
@@ -79,7 +101,8 @@ class ChronosModel(AbstractTimeSeriesModel):
         Model path used for the model, i.e., a HuggingFace transformers ``name_or_path``. Can be a
         compatible model name on HuggingFace Hub or a local path to a model directory. Original
         Chronos models (i.e., ``autogluon/chronos-t5-{model_size}``) can be specified with aliases
-        ``tiny``, ``mini`` , ``small``, ``base``, and ``large``.
+        ``tiny``, ``mini`` , ``small``, ``base``, and ``large``. Chronos-Bolt models can be specified
+        with ``bolt-mini``, ``bolt-small``, and ``bolt-base``.
     batch_size : int, default = 16
         Size of batches used during inference
     num_samples : int, default = 20
@@ -90,11 +113,15 @@ class ChronosModel(AbstractTimeSeriesModel):
     context_length : int or None, default = None
         The context length to use in the model. Shorter context lengths will decrease model accuracy, but result
         in faster inference. If None, the model will infer context length from the data set length at inference
-        time, but set it to a maximum of 512.
+        time, but set it to a maximum of 2048. Note that this is only the context length used to pass data into
+        the model. Individual model implementations may have different context lengths specified in their configuration,
+        and may truncate the context further. For example, original Chronos models have a context length of 512, but
+        Chronos-Bolt models handle contexts up to 2048.
     optimization_strategy : {None, "onnx", "openvino"}, default = None
         Optimization strategy to use for inference on CPUs. If None, the model will use the default implementation.
         If `onnx`, the model will be converted to ONNX and the inference will be performed using ONNX. If ``openvino``,
-        inference will be performed with the model compiled to OpenVINO.
+        inference will be performed with the model compiled to OpenVINO. These optimizations are only available for
+        the original set of Chronos models, and not in Chronos-Bolt where they are not needed.
     torch_dtype : torch.dtype or {"auto", "bfloat16", "float32", "float64"}, default = "auto"
         Torch data type for model weights, provided to ``from_pretrained`` method of Hugging Face AutoModels. If
         original Chronos models are specified and the model size is ``small``, ``base``, or ``large``, the
@@ -107,7 +134,7 @@ class ChronosModel(AbstractTimeSeriesModel):
     # default number of samples for prediction
     default_num_samples: int = 20
     default_model_path = "autogluon/chronos-t5-small"
-    maximum_context_length = 512
+    maximum_context_length = 2048
 
     def __init__(
         self,
@@ -159,7 +186,7 @@ class ChronosModel(AbstractTimeSeriesModel):
             **kwargs,
         )
 
-        self.model_pipeline: Optional[Any] = None  # of type OptimizedChronosPipeline
+        self.model_pipeline: Optional[Any] = None  # of type BaseChronosPipeline
         self.time_limit: Optional[float] = None
 
     def save(self, path: str = None, verbose: bool = True) -> str:
@@ -218,8 +245,8 @@ class ChronosModel(AbstractTimeSeriesModel):
             minimum_resources["num_gpus"] = self.min_num_gpus
         return minimum_resources
 
-    def load_model_pipeline(self, context_length: Optional[int] = None):
-        from .pipeline import OptimizedChronosPipeline
+    def load_model_pipeline(self):
+        from .pipeline import BaseChronosPipeline
 
         gpu_available = self._is_gpu_available()
 
@@ -232,18 +259,17 @@ class ChronosModel(AbstractTimeSeriesModel):
 
         device = self.device or ("cuda" if gpu_available else "cpu")
 
-        pipeline = OptimizedChronosPipeline.from_pretrained(
+        pipeline = BaseChronosPipeline.from_pretrained(
             self.model_path,
             device_map=device,
-            optimization_strategy=self.optimization_strategy,
             torch_dtype=self.torch_dtype,
-            context_length=context_length or self.context_length,
+            optimization_strategy=self.optimization_strategy,
         )
 
         self.model_pipeline = pipeline
 
     def persist(self) -> "ChronosModel":
-        self.load_model_pipeline(context_length=self.context_length or self.maximum_context_length)
+        self.load_model_pipeline()
         return self
 
     def _fit(
@@ -263,7 +289,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         num_workers: int = 0,
         time_limit: Optional[float] = None,
     ):
-        from .utils import ChronosInferenceDataLoader, ChronosInferenceDataset, timeout_callback
+        from .pipeline.utils import ChronosInferenceDataLoader, ChronosInferenceDataset, timeout_callback
 
         chronos_dataset = ChronosInferenceDataset(
             target_df=data,
@@ -290,6 +316,9 @@ class ChronosModel(AbstractTimeSeriesModel):
         # and use that to determine the context length of the model. If the context length is specified
         # during initialization, this is always used. If not, the context length is set to the longest
         # item length. The context length is always capped by self.maximum_context_length.
+        # Note that this is independent of the model's own context length set in the model's config file.
+        # For example, if the context_length is set to 2048 here but the model expects context length
+        # (according to its config.json file) of 512, it will further truncate the series during inference.
         context_length = self.context_length or min(
             data.num_timesteps_per_item().max(),
             self.maximum_context_length,
@@ -300,7 +329,7 @@ class ChronosModel(AbstractTimeSeriesModel):
 
             if self.model_pipeline is None:
                 # load model pipeline to device memory
-                self.load_model_pipeline(context_length=context_length)
+                self.load_model_pipeline()
 
             inference_data_loader = self._get_inference_data_loader(
                 data=data,
@@ -308,28 +337,28 @@ class ChronosModel(AbstractTimeSeriesModel):
                 context_length=context_length,
                 time_limit=kwargs.get("time_limit"),
             )
+
             self.model_pipeline.model.eval()
-            with torch.inference_mode():
-                prediction_samples = [
-                    self.model_pipeline.predict(
+            with torch.inference_mode(), disable_duplicate_logs(logger):
+                batch_quantiles, batch_means = [], []
+                for batch in inference_data_loader:
+                    qs, mn = self.model_pipeline.predict_quantiles(
                         batch,
                         prediction_length=self.prediction_length,
+                        quantile_levels=self.quantile_levels,
                         num_samples=self.num_samples,
-                        limit_prediction_length=False,
                     )
-                    .detach()
-                    .cpu()
-                    .numpy()
-                    for batch in inference_data_loader
-                ]
-
-        samples = np.concatenate(prediction_samples, axis=0).swapaxes(1, 2).reshape(-1, self.num_samples)
-
-        mean = samples.mean(axis=-1, keepdims=True)
-        quantiles = np.quantile(samples, self.quantile_levels, axis=-1).T
+                    batch_quantiles.append(qs.numpy())
+                    batch_means.append(mn.numpy())
 
         df = pd.DataFrame(
-            np.concatenate([mean, quantiles], axis=1),
+            np.concatenate(
+                [
+                    np.concatenate(batch_means, axis=0).reshape(-1, 1),
+                    np.concatenate(batch_quantiles, axis=0).reshape(-1, len(self.quantile_levels)),
+                ],
+                axis=1,
+            ),
             columns=["mean"] + [str(q) for q in self.quantile_levels],
             index=get_forecast_horizon_index_ts_dataframe(data, self.prediction_length, freq=self.freq),
         )
