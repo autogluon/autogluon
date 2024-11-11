@@ -12,6 +12,7 @@ from gluonts.transform import ExpectedNumInstanceSampler, InstanceSplitter, Vali
 from torch.utils.data import IterableDataset
 from transformers import TrainerCallback
 
+from autogluon.common.loaders.load_s3 import download, list_bucket_prefix_suffix_contains_s3
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.models.gluonts.abstract_gluonts import SimpleGluonTSDataset
@@ -219,31 +220,25 @@ def left_pad_and_stack_1D(tensors: List[torch.Tensor]) -> torch.Tensor:
     return torch.stack(padded)
 
 
-def download_prefix(bucket, prefix, local_path, force: bool = False, boto3_session=None) -> None:
-    import boto3
-
-    boto3_session = boto3_session or boto3.Session()
-    s3_resource = boto3_session.resource("s3")
-    bucket = s3_resource.Bucket(bucket)
-
-    for obj in bucket.objects.filter(Prefix=prefix):
-        if obj.key.endswith("/"):
-            continue
-        dest = local_path / bucket.name / obj.key
-        if not force and dest.exists():
-            continue
-        if not dest.parent.exists():
-            dest.parent.mkdir(exist_ok=True, parents=True)
-        bucket.download_file(obj.key, str(dest))
-
-
 def cache_model_from_s3(s3_uri: str, force=False):
-    assert re.match("^s3://([^/]+)/(.*?([^/]+)/?)$", s3_uri) is not None, f"Not a valid S3 URI: {s3_uri}"
-    cache_home = Path(os.environ.get("XGD_CACHE_HOME", os.path.expanduser("~/.cache")))
-    cache_dir = cache_home / "autogluon-timeseries"
+    if re.match("^s3://([^/]+)/(.*?([^/]+)/?)$", s3_uri) is None:
+        raise ValueError(f"Not a valid S3 URI: {s3_uri}")
+
+    # we expect the prefix to point to a "directory" on S3
+    if not s3_uri.endswith("/"):
+        s3_uri += "/"
+
+    cache_home = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache")
     bucket, prefix = s3_uri.replace("s3://", "").split("/", 1)
-    download_prefix(bucket=bucket, prefix=prefix, local_path=cache_dir, force=force)
-    return cache_dir / bucket / prefix
+    bucket_cache_path = cache_home / "autogluon" / "timeseries" / bucket
+
+    for obj_path in list_bucket_prefix_suffix_contains_s3(bucket=bucket, prefix=prefix):
+        destination_path = bucket_cache_path / obj_path
+        if not force and destination_path.exists():
+            continue
+        download(bucket, obj_path, local_path=str(destination_path))
+
+    return str(bucket_cache_path / prefix)
 
 
 class ChronosInferenceDataset:
