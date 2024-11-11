@@ -85,9 +85,8 @@ class ChronosModel(AbstractTimeSeriesModel):
     for using any language model in the context of time series forecasting. See [Ansari2024]_ for more information.
 
     The newer Chronos-Bolt variants enable much faster inference by first "patching" the time series. The resulting
-    time series is then fed into a T5 model for forecasting. The Chronos-Bolt variants are capable of performing inference
-    on CPUs, and are available on Hugging Face <https://huggingface.co/collections/>`_.
-    Chronos-Bolt variants are capable of much faster inference, especially on CPUs. Chronos-Bolt variants can be used with
+    time series is then fed into a T5 model for forecasting. The Chronos-Bolt variants are capable of much faster inference,
+    and can all run on CPUs. Chronos-Bolt models are also available on Hugging Face <https://huggingface.co/autogluon/>`_.
 
     References
     ----------

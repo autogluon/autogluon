@@ -448,7 +448,7 @@ class ChronosPipeline(BaseChronosPipeline):
             prediction_samples,
             q=torch.tensor(quantile_levels, dtype=prediction_samples.dtype),
             dim=-1,
-        )
+        ).permute(1, 2, 0)
 
         return quantiles, mean
 
