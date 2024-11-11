@@ -77,7 +77,7 @@ class InstanceNorm(nn.Module):
     def forward(
         self,
         x: torch.Tensor,
-        loc_scale: Tuple[torch.Tensor, torch.Tensor] | None = None,
+        loc_scale: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
     ) -> Tuple[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
         if loc_scale is None:
             loc = torch.nan_to_num(torch.nanmean(x, dim=-1, keepdim=True), nan=0.0)
