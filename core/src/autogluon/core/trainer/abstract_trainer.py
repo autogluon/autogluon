@@ -31,12 +31,11 @@ from ..calibrate.temperature_scaling import apply_temperature_scaling, tune_temp
 from ..callbacks import AbstractCallback
 from ..constants import AG_ARGS, BINARY, MULTICLASS, QUANTILE, REFIT_FULL_NAME, REFIT_FULL_SUFFIX, REGRESSION, SOFTCLASS
 from ..data.label_cleaner import LabelCleanerMulticlassToBinary
-from ..metrics import Scorer, get_metric
+from ..metrics import compute_metric, Scorer, get_metric
 from ..models import AbstractModel, BaggedEnsembleModel, GreedyWeightedEnsembleModel, SimpleWeightedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel
 from ..pseudolabeling.pseudolabeling import assert_pseudo_column_match
 from ..utils import (
     compute_permutation_feature_importance,
-    compute_weighted_metric,
     convert_pred_probas_to_df,
     default_holdout_frac,
     extract_column,
@@ -969,25 +968,57 @@ class AbstractTrainer:
             X = model.preprocess(X=X, preprocess_stateful=False)
         return X
 
-    def score(self, X: pd.DataFrame, y: np.ndarray, model: str = None, weights: np.ndarray = None) -> float:
-        if self.eval_metric.needs_pred or self.eval_metric.needs_quantile:
-            y_pred = self.predict(X=X, model=model)
-        else:
-            y_pred = self.predict_proba(X=X, model=model)
-        return compute_weighted_metric(y, y_pred, self.eval_metric, weights, weight_evaluation=self.weight_evaluation, quantile_levels=self.quantile_levels)
-
-    def score_with_y_pred_proba(self, y: np.ndarray, y_pred_proba: np.ndarray, weights: np.ndarray = None) -> float:
-        if self.eval_metric.needs_pred or self.eval_metric.needs_quantile:
-            y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
-        else:
-            y_pred = y_pred_proba
-        return compute_weighted_metric(y, y_pred, self.eval_metric, weights, weight_evaluation=self.weight_evaluation, quantile_levels=self.quantile_levels)
-
-    def _score_with_y_pred(self, y: np.ndarray, y_pred: np.ndarray, weights: np.ndarray = None, metric=None) -> float:
+    def score(self, X: pd.DataFrame, y: np.ndarray, model: str = None, metric: Scorer = None, weights: np.ndarray = None, as_error: bool = False) -> float:
         if metric is None:
             metric = self.eval_metric
-        return compute_weighted_metric(
-            y, y_pred, metric=metric, weights=weights, weight_evaluation=self.weight_evaluation, quantile_levels=self.quantile_levels
+        if metric.needs_pred or metric.needs_quantile:
+            y_pred = self.predict(X=X, model=model)
+            y_pred_proba = None
+        else:
+            y_pred = None
+            y_pred_proba = self.predict_proba(X=X, model=model)
+        return compute_metric(
+            y=y,
+            y_pred=y_pred,
+            y_pred_proba=y_pred_proba,
+            metric=metric,
+            weights=weights,
+            weight_evaluation=self.weight_evaluation,
+            as_error=as_error,
+            quantile_levels=self.quantile_levels,
+        )
+
+    def score_with_y_pred_proba(self, y: np.ndarray, y_pred_proba: np.ndarray, metric: Scorer = None, weights: np.ndarray = None, as_error: bool = False) -> float:
+        if metric is None:
+            metric = self.eval_metric
+        if metric.needs_pred or metric.needs_quantile:
+            y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
+            y_pred_proba = None
+        else:
+            y_pred = None
+        return compute_metric(
+            y=y,
+            y_pred=y_pred,
+            y_pred_proba=y_pred_proba,
+            metric=metric,
+            weights=weights,
+            weight_evaluation=self.weight_evaluation,
+            as_error=as_error,
+            quantile_levels=self.quantile_levels,
+        )
+
+    def score_with_y_pred(self, y: np.ndarray, y_pred: np.ndarray, weights: np.ndarray = None, metric: Scorer = None, as_error: bool = False) -> float:
+        if metric is None:
+            metric = self.eval_metric
+        return compute_metric(
+            y=y,
+            y_pred=y_pred,
+            y_pred_proba=None,
+            metric=metric,
+            weights=weights,
+            weight_evaluation=self.weight_evaluation,
+            as_error=as_error,
+            quantile_levels=self.quantile_levels,
         )
 
     # TODO: Slow if large ensemble with many models, could cache output result to speed up during inference
@@ -4088,7 +4119,7 @@ class AbstractTrainer:
         return calibrate_decision_threshold(
             y=y,
             y_pred_proba=y_pred_proba,
-            metric=lambda y, y_pred: self._score_with_y_pred(y=y, y_pred=y_pred, weights=weights, metric=metric),
+            metric=lambda y, y_pred: self.score_with_y_pred(y=y, y_pred=y_pred, weights=weights, metric=metric),
             decision_thresholds=decision_thresholds,
             secondary_decision_thresholds=secondary_decision_thresholds,
             metric_name=metric.name,

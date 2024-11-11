@@ -339,6 +339,8 @@ class PatchTSTModel(AbstractGluonTSModel):
         If True, ``lightning_logs`` directory will NOT be removed after the model finished training.
     """
 
+    supports_known_covariates = True
+
     @property
     def default_context_length(self) -> int:
         return 96
@@ -351,6 +353,7 @@ class PatchTSTModel(AbstractGluonTSModel):
     def _get_estimator_init_args(self) -> Dict[str, Any]:
         init_kwargs = super()._get_estimator_init_args()
         init_kwargs.setdefault("patch_len", 16)
+        init_kwargs["num_feat_dynamic_real"] = self.num_feat_dynamic_real
         return init_kwargs
 
 

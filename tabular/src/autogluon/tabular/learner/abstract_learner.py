@@ -15,11 +15,10 @@ from sklearn.metrics import classification_report
 from autogluon.core.constants import AUTO_WEIGHT, BALANCE_WEIGHT, BINARY, MULTICLASS, QUANTILE, REGRESSION
 from autogluon.core.data.label_cleaner import LabelCleaner, LabelCleanerMulticlass, LabelCleanerMulticlassToBinary
 from autogluon.core.learner import AbstractLearner
-from autogluon.core.metrics import Scorer, confusion_matrix, get_metric
+from autogluon.core.metrics import Scorer, compute_metric, confusion_matrix, get_metric
 from autogluon.core.models.greedy_ensemble.ensemble_selection import EnsembleSelection
 from autogluon.core.utils import (
     augment_rare_classes,
-    compute_weighted_metric,
     extract_column,
     get_leaderboard_pareto_frontier,
     get_pred_from_proba,
@@ -486,25 +485,37 @@ class AbstractTabularLearner(AbstractLearner):
             X = feature_generator.transform(X)
         return X
 
-    def score(self, X: DataFrame, y=None, model=None):
+    def score(self, X: DataFrame, y=None, model: str = None, metric: Scorer = None, as_error: bool = False) -> float:
+        if metric is None:
+            metric = self.eval_metric
         if y is None:
             X, y = self.extract_label(X)
         self._validate_class_labels(y)
-        w = None
+        weights = None
         if self.weight_evaluation:
-            X, w = extract_column(X, self.sample_weight)
-        if self.eval_metric.needs_pred:
+            X, weights = extract_column(X, self.sample_weight)
+        if self.eval_metric.needs_pred or self.eval_metric.needs_quantile:
+            y_pred_proba = None
             y_pred = self.predict(X=X, model=model, as_pandas=False)
             if self.problem_type == BINARY:
                 # Use 1 and 0, otherwise f1 can crash due to unknown pos_label.
                 y_pred = self.label_cleaner.transform(y_pred)
                 y = self.label_cleaner.transform(y)
-        elif self.eval_metric.needs_quantile:
-            y_pred = self.predict(X=X, model=model, as_pandas=False)
         else:
-            y_pred = self.predict_proba(X=X, model=model, as_pandas=False, as_multiclass=False)
+            y_pred_proba = self.predict_proba(X=X, model=model, as_pandas=False, as_multiclass=False)
+            y_pred = None
             y = self.label_cleaner.transform(y)
-        return compute_weighted_metric(y, y_pred, self.eval_metric, w, weight_evaluation=self.weight_evaluation, quantile_levels=self.quantile_levels)
+
+        return compute_metric(
+            y=y,
+            y_pred=y_pred,
+            y_pred_proba=y_pred_proba,
+            metric=metric,
+            weights=weights,
+            weight_evaluation=self.weight_evaluation,
+            as_error=as_error,
+            quantile_levels=self.quantile_levels,
+        )
 
     # Scores both learner and all individual models, along with computing the optimal ensemble score + weights (oracle)
     def score_debug(
@@ -570,14 +581,14 @@ class AbstractTabularLearner(AbstractLearner):
             if skip_score:
                 scores[model_name] = np.nan
             else:
-                scores[model_name] = self._score_with_pred_proba(
+                scores[model_name] = self.score_with_pred_proba(
                     y_pred_proba_internal=y_pred_proba_internal, metric=self.eval_metric, decision_threshold=decision_threshold, **scoring_args
                 )
             for metric in extra_metrics:
                 metric = get_metric(metric, self.problem_type, "leaderboard_metric")
                 if metric.name not in extra_scores:
                     extra_scores[metric.name] = {}
-                extra_scores[metric.name][model_name] = self._score_with_pred_proba(
+                extra_scores[metric.name][model_name] = self.score_with_pred_proba(
                     y_pred_proba_internal=y_pred_proba_internal, metric=metric, decision_threshold=decision_threshold, **scoring_args
                 )
 
@@ -659,23 +670,35 @@ class AbstractTabularLearner(AbstractLearner):
 
         return df_merged
 
-    def _score_with_pred_proba(self, y, y_internal, y_pred_proba_internal, metric, sample_weight=None, decision_threshold=None, weight_evaluation=None):
+    def score_with_pred_proba(
+        self,
+        y,
+        y_internal,
+        y_pred_proba_internal: np.ndarray,
+        metric: Scorer = None,
+        sample_weight: np.ndarray = None,
+        decision_threshold: float = None,
+        weight_evaluation: bool = None,
+        as_error: bool = False,
+    ) -> float:
+        if metric is None:
+            metric = self.eval_metric
         metric = get_metric(metric, self.problem_type, "leaderboard_metric")
         if weight_evaluation is None:
             weight_evaluation = self.weight_evaluation
-        if metric.needs_pred:
+        if metric.needs_pred or metric.needs_quantile:
             if self.problem_type == BINARY:
                 # Use 1 and 0, otherwise f1 can crash due to unknown pos_label.
                 y_pred = self.get_pred_from_proba(y_pred_proba_internal, decision_threshold=decision_threshold, inverse_transform=False)
+                y_pred_proba = None
                 y_tmp = y_internal
             else:
                 y_pred = self.label_cleaner.inverse_transform_proba(y_pred_proba_internal, as_pred=True)
+                y_pred_proba = None
                 y_tmp = y
-        elif metric.needs_quantile:
-            y_pred = self.label_cleaner.inverse_transform_proba(y_pred_proba_internal, as_pred=True)
-            y_tmp = y
         else:
-            y_pred = self.label_cleaner.inverse_transform_proba(y_pred_proba_internal, as_pred=False)
+            y_pred = None
+            y_pred_proba = self.label_cleaner.inverse_transform_proba(y_pred_proba_internal, as_pred=False)
             if isinstance(self.label_cleaner, LabelCleanerMulticlass):
                 # Ensures that logic works even when y contains previously dropped classes during fit.
                 # If y contains never before seen classes, this will raise a ValueError in `self._validate_class_labels`.
@@ -683,9 +706,30 @@ class AbstractTabularLearner(AbstractLearner):
                 y_tmp = self.label_cleaner.transform_pred_uncleaned(y)
             else:
                 y_tmp = y_internal
-        return compute_weighted_metric(y_tmp, y_pred, metric, weights=sample_weight, weight_evaluation=weight_evaluation, quantile_levels=self.quantile_levels)
 
-    def _score_with_pred(self, y, y_internal, y_pred_internal, metric, sample_weight=None, weight_evaluation=None):
+        return compute_metric(
+            y=y_tmp,
+            y_pred=y_pred,
+            y_pred_proba=y_pred_proba,
+            metric=metric,
+            weights=sample_weight,
+            weight_evaluation=weight_evaluation,
+            as_error=as_error,
+            quantile_levels=self.quantile_levels,
+        )
+
+    def score_with_pred(
+        self,
+        y,
+        y_internal,
+        y_pred_internal,
+        metric: Scorer = None,
+        sample_weight: np.ndarray = None,
+        weight_evaluation: bool = None,
+        as_error: bool = False,
+    ) -> float:
+        if metric is None:
+            metric = self.eval_metric
         metric = get_metric(metric, self.problem_type, "leaderboard_metric")
         if weight_evaluation is None:
             weight_evaluation = self.weight_evaluation
@@ -696,7 +740,17 @@ class AbstractTabularLearner(AbstractLearner):
         else:
             y_pred = self.label_cleaner.inverse_transform(y_pred_internal)
             y_tmp = y
-        return compute_weighted_metric(y_tmp, y_pred, metric, weights=sample_weight, weight_evaluation=weight_evaluation, quantile_levels=self.quantile_levels)
+
+        return compute_metric(
+            y=y_tmp,
+            y_pred=y_pred,
+            y_pred_proba=None,
+            metric=metric,
+            weights=sample_weight,
+            weight_evaluation=weight_evaluation,
+            as_error=as_error,
+            quantile_levels=self.quantile_levels,
+        )
 
     def _validate_class_labels(self, y: Series, eval_metric: Scorer = None):
         null_count = y.isnull().sum()
@@ -816,11 +870,11 @@ class AbstractTabularLearner(AbstractLearner):
 
             if aux_metric.name not in performance_dict:
                 if y_pred_proba_internal is not None:
-                    score = self._score_with_pred_proba(
+                    score = self.score_with_pred_proba(
                         y_pred_proba_internal=y_pred_proba_internal, metric=aux_metric, decision_threshold=decision_threshold, **scoring_args
                     )
                 else:
-                    score = self._score_with_pred(y_pred_internal=y_pred_internal, metric=aux_metric, **scoring_args)
+                    score = self.score_with_pred(y_pred_internal=y_pred_internal, metric=aux_metric, **scoring_args)
                 performance_dict[aux_metric.name] = score
 
         if display:

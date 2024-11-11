@@ -17,6 +17,7 @@ except:
 from ..constants import BINARY, MULTICLASS, QUANTILE, REGRESSION, SOFTCLASS
 from . import classification_metrics, quantile_metrics
 from .classification_metrics import confusion_matrix
+from .score_func import compute_metric
 
 
 class Scorer(object, metaclass=ABCMeta):
@@ -180,26 +181,31 @@ class Scorer(object, metaclass=ABCMeta):
     @property
     @abstractmethod
     def needs_pred(self) -> bool:
+        """If True, metric requires predictions rather than prediction probabilities"""
         raise NotImplementedError
 
     @property
     @abstractmethod
     def needs_proba(self) -> bool:
+        """If True, metric requires prediction probabilities rather than predictions"""
         raise NotImplementedError
 
     @property
     @abstractmethod
     def needs_class(self) -> bool:
+        """If True, metric requires class label predictions rather than prediction probabilities"""
         raise NotImplementedError
 
     @property
     @abstractmethod
     def needs_threshold(self) -> bool:
+        """If True, metric requires prediction probabilities rather than predictions"""
         raise NotImplementedError
 
     @property
     @abstractmethod
     def needs_quantile(self) -> bool:
+        """If True, metric requires quantile predictions rather than predictions or prediction probabilities"""
         raise NotImplementedError
 
     score = __call__
@@ -685,32 +691,32 @@ for scorer in [
     _add_scorer_to_metric_dict(metric_dict=BINARY_METRICS, scorer=scorer)
 
 
-for name, metric in [("precision", sklearn.metrics.precision_score), ("recall", sklearn.metrics.recall_score), ("f1", sklearn.metrics.f1_score)]:
-    globals()[name] = make_scorer(name, metric, needs_class=True)
-    _add_scorer_to_metric_dict(metric_dict=BINARY_METRICS, scorer=globals()[name])
+for _name, _metric in [("precision", sklearn.metrics.precision_score), ("recall", sklearn.metrics.recall_score), ("f1", sklearn.metrics.f1_score)]:
+    globals()[_name] = make_scorer(_name, _metric, needs_class=True)
+    _add_scorer_to_metric_dict(metric_dict=BINARY_METRICS, scorer=globals()[_name])
     for average in ["macro", "micro", "weighted"]:
-        qualified_name = "{0}_{1}".format(name, average)
-        globals()[qualified_name] = make_scorer(qualified_name, partial(metric, pos_label=None, average=average), needs_class=True)
+        qualified_name = "{0}_{1}".format(_name, average)
+        globals()[qualified_name] = make_scorer(qualified_name, partial(_metric, pos_label=None, average=average), needs_class=True)
         _add_scorer_to_metric_dict(metric_dict=BINARY_METRICS, scorer=globals()[qualified_name])
         _add_scorer_to_metric_dict(metric_dict=MULTICLASS_METRICS, scorer=globals()[qualified_name])
 
 
-for name, metric, kwargs in [
+for _name, _metric, _kwargs in [
     ("roc_auc_ovo", customized_roc_auc, dict(multi_class="ovo")),
     ("roc_auc_ovr", customized_roc_auc, dict(multi_class="ovr")),
 ]:
     scorer_kwargs = dict(greater_is_better=True, needs_proba=True, needs_threshold=False)
-    globals()[name] = make_scorer(name, partial(metric, average="macro", **kwargs), **scorer_kwargs)
-    macro_name = "{0}_{1}".format(name, "macro")
-    globals()[name].add_alias(macro_name)
-    _add_scorer_to_metric_dict(metric_dict=MULTICLASS_METRICS, scorer=globals()[name])
-    if name == "roc_auc_ovo":
+    globals()[_name] = make_scorer(_name, partial(_metric, average="macro", **_kwargs), **scorer_kwargs)
+    macro_name = "{0}_{1}".format(_name, "macro")
+    globals()[_name].add_alias(macro_name)
+    _add_scorer_to_metric_dict(metric_dict=MULTICLASS_METRICS, scorer=globals()[_name])
+    if _name == "roc_auc_ovo":
         averages = ["weighted"]
     else:
         averages = ["micro", "weighted"]
     for average in averages:
-        qualified_name = "{0}_{1}".format(name, average)
-        globals()[qualified_name] = make_scorer(qualified_name, partial(metric, average=average, **kwargs), **scorer_kwargs)
+        qualified_name = "{0}_{1}".format(_name, average)
+        globals()[qualified_name] = make_scorer(qualified_name, partial(_metric, average=average, **_kwargs), **scorer_kwargs)
         _add_scorer_to_metric_dict(metric_dict=MULTICLASS_METRICS, scorer=globals()[qualified_name])
 
 

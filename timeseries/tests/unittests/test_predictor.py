@@ -1815,3 +1815,22 @@ def test_when_extra_metrics_and_extra_info_provided_then_leaderboard_contains_co
     leaderboard = predictor.leaderboard(data, extra_info=True, extra_metrics=extra_metrics)
     for col in ["hyperparameters"] + extra_metrics:
         assert col in leaderboard.columns
+
+
+@pytest.mark.parametrize("target_scaler", ["mean_abs", None])
+def test_when_leaky_feature_provided_then_model_with_regressor_achieves_good_accuracy(temp_model_path, target_scaler):
+    data = DATAFRAME_WITH_COVARIATES.copy()
+    data["target"] += pd.Series([10, 20, 30, 40], index=data.item_ids)
+    data.static_features = None
+    data["leaky_feature"] = data["target"] * 0.5
+    prediction_length = 1
+    train_data, test_data = data.train_test_split(prediction_length)
+    predictor = TimeSeriesPredictor(
+        path=temp_model_path, prediction_length=prediction_length, known_covariates_names=["leaky_feature"]
+    )
+    predictor.fit(
+        train_data,
+        hyperparameters={"Zero": [{"covariate_regressor": "LR", "target_scaler": target_scaler}]},
+    )
+    score = predictor.evaluate(test_data, metrics=["RMSE"])["RMSE"]
+    assert score > -1.0
