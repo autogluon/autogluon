@@ -2,7 +2,6 @@ from pathlib import Path
 from unittest import mock
 
 import numpy as np
-import pandas as pd
 import pytest
 from gluonts.model.predictor import Predictor as GluonTSPredictor
 
@@ -389,33 +388,27 @@ def test_given_features_present_when_model_is_fit_then_feature_transformer_is_pr
         metadata=feat_generator.covariate_metadata,
     )
     model.fit(train_data=data, val_data=data)
+    covariate_scaler = model.covariate_scaler
+
     if len(known_covariates_real) > 0 and model.supports_known_covariates:
-        assert len(model._real_column_transformers["known"].feature_names_in_) > 0
+        assert len(covariate_scaler._column_transformers["known"].feature_names_in_) > 0
     else:
-        assert "known" not in model._real_column_transformers
+        assert "known" not in covariate_scaler._column_transformers
 
     if len(past_covariates_real) > 0 and model.supports_past_covariates:
-        assert len(model._real_column_transformers["past"].feature_names_in_) > 0
+        assert len(covariate_scaler._column_transformers["past"].feature_names_in_) > 0
     else:
-        assert "past" not in model._real_column_transformers
+        assert "past" not in covariate_scaler._column_transformers
 
     if len(static_features_real) > 0 and model.supports_static_features:
-        assert len(model._real_column_transformers["static"].feature_names_in_) > 0
+        assert len(covariate_scaler._column_transformers["static"].feature_names_in_) > 0
     else:
-        assert "static" not in model._real_column_transformers
+        assert "static" not in covariate_scaler._column_transformers
 
 
-def test_when_covariates_are_preprocessed_then_correct_transform_type_is_used():
-    model = TemporalFusionTransformerModel()
-    N = 500
-    df = pd.DataFrame(
-        {
-            "bool": np.random.choice([0, 1], size=N).astype(float),
-            "skewed": np.random.exponential(size=N),
-            "normal": np.random.normal(size=N),
-        }
-    )
-    pipeline = model._get_transformer_for_columns(df, df.columns)
-    normal_pipeline, skewed_pipeline = pipeline.transformers
-    assert normal_pipeline[-1] == ["normal"]
-    assert skewed_pipeline[-1] == ["skewed"]
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+def test_when_model_is_initialized_then_covariate_scaler_is_created(model_class, df_with_covariates):
+    df, metadata = df_with_covariates
+    model = model_class(freq=df.freq, metadata=metadata)
+    model.initialize()
+    assert model.covariate_scaler is not None
