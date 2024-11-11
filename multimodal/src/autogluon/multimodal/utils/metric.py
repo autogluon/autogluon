@@ -234,7 +234,9 @@ def compute_score(
 
     y = metric_data[Y_TRUE]
     if metric.needs_proba or metric.needs_threshold:
-        return metric.convert_score_to_original(compute_metric(y=y, y_pred_proba=metric_data[Y_PRED_PROB][:, pos_label], metric=metric, weights=None))
+        return metric.convert_score_to_original(
+            compute_metric(y=y, y_pred_proba=metric_data[Y_PRED_PROB][:, pos_label], metric=metric, weights=None)
+        )
     else:
         y_pred = metric_data[Y_PRED]
 
