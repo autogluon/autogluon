@@ -22,6 +22,7 @@ class CovariateScaler:
         use_known_covariates: bool = True,
         use_past_covariates: bool = True,
         use_static_features: bool = True,
+        **kwargs,
     ):
         self.metadata = metadata
         self.use_known_covariates = use_known_covariates
@@ -44,6 +45,16 @@ class CovariateScaler:
 
 
 class GlobalCovariateScaler(CovariateScaler):
+    """Applies preprocessing logic similar to tabular's NN_TORCH model to the covariates.
+
+    Performs following preprocessing for real-valued columns:
+    - sklearn.preprocessing.QuantileTransform for skewed features
+    - passthrough (ignore) boolean features
+    - sklearn.preprocessing.StandardScaler for the rest of the features
+
+    Preprocessing is done globally across all items.
+    """
+
     def __init__(
         self,
         metadata: CovariateMetadata,
@@ -139,7 +150,7 @@ AVAILABLE_COVARIATE_SCALERS = {
 }
 
 
-def get_covariate_scaler_from_name(name: Literal["local", "global"], **scaler_kwargs) -> CovariateScaler:
+def get_covariate_scaler_from_name(name: Literal["global"], **scaler_kwargs) -> CovariateScaler:
     if name not in AVAILABLE_COVARIATE_SCALERS:
         raise KeyError(
             f"Covariate scaler type {name} not supported. Available scalers: {list(AVAILABLE_COVARIATE_SCALERS)}"

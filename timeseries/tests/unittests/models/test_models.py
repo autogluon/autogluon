@@ -524,7 +524,7 @@ def test_when_fit_and_predict_called_then_train_val_and_test_data_is_preprocesse
         mock.patch.object(model, "_fit") as mock_fit,
         mock.patch.object(model, "_predict") as mock_predict,
     ):
-        mock_preprocess.return_value = preprocessed_data
+        mock_preprocess.return_value = preprocessed_data, None
         model.fit(train_data=train_data, val_data=train_data)
         fit_kwargs = mock_fit.call_args[1]
         model_train_data = fit_kwargs["train_data"]
