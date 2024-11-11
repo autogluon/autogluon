@@ -454,9 +454,6 @@ class ChronosBoltPipeline(BaseChronosPipeline):
         if set(quantile_levels).issubset(set(training_quantile_levels)):
             # no need to perform intra/extrapolation
             quantiles = predictions[..., [training_quantile_levels.index(q) for q in quantile_levels]]
-
-            # sort quantiles to make them monotonic
-            quantiles, _ = torch.sort(quantiles, dim=-1)
         else:
             # we rely on torch for interpolating quantiles if quantiles that
             # Chronos Bolt was trained on were not provided
