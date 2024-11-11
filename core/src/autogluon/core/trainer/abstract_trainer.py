@@ -239,6 +239,16 @@ class AbstractTrainer:
         return self._num_rows_val is not None
 
     @property
+    def num_rows_val_for_calibration(self) -> int:
+        """The number of rows available to optimize model calibration"""
+        if self._num_rows_val is not None:
+            return self._num_rows_val
+        elif self.bagged_mode:
+            return self._num_rows_train
+        else:
+            return 0
+
+    @property
     def time_left(self) -> float | None:
         """
         Remaining time left in the fit call.
@@ -4017,6 +4027,7 @@ class AbstractTrainer:
             y_val_probs = self.get_model_oof(model_name_og)
             y_val = self.load_y().to_numpy()
 
+        y_val_probs_og = y_val_probs
         if self.problem_type == BINARY:
             # Convert one-dimensional array to be in the form of a 2-class multiclass predict_proba output
             y_val_probs = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_val_probs)
@@ -4043,7 +4054,7 @@ class AbstractTrainer:
                 )
             else:
                 # Check that scaling improves performance for the target metric
-                score_without_temp = self.score_with_y_pred_proba(y=y_val, y_pred_proba=y_val_probs, weights=None)
+                score_without_temp = self.score_with_y_pred_proba(y=y_val, y_pred_proba=y_val_probs_og, weights=None)
                 scaled_y_val_probs = apply_temperature_scaling(y_val_probs, temp_scalar, problem_type=self.problem_type, transform_binary_proba=False)
                 score_with_temp = self.score_with_y_pred_proba(y=y_val, y_pred_proba=scaled_y_val_probs, weights=None)
 
