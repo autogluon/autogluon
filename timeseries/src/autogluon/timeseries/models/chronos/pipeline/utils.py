@@ -2,6 +2,7 @@ import logging
 import os
 import re
 import time
+from itertools import chain, cycle
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Iterable, Iterator, List, Literal, Optional
 
@@ -125,12 +126,8 @@ class ChronosFineTuningDataset(IterableDataset):
             dummy_value=np.nan,
         )
 
-    def _infinite_iterable(self, data: Iterable[dict]):
-        while True:
-            yield from data
-
     def _create_training_data(self, data: Iterable[dict]):
-        data = self._infinite_iterable(data)
+        data = chain.from_iterable(cycle([data]))
         split_transform = self._create_instance_splitter("training")
         data = split_transform.apply(data, is_train=True)
         return data
