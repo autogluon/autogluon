@@ -61,6 +61,13 @@ def chronos_bolt_model(*args, hyperparameters=None, **kwargs):
     return ChronosModel(*args, **kwargs)
 
 
+def chronos_with_finetuning(*args, hyperparameters=None, **kwargs):
+    hyperparameters = copy.deepcopy(hyperparameters or {})
+    hyperparameters |= {"fine_tune": True, "fine_tune_steps": 10}
+    kwargs["hyperparameters"] = hyperparameters
+    return ChronosModel(*args, **kwargs)
+
+
 def chronos_bolt_model_with_finetuning(*args, hyperparameters=None, **kwargs):
     hyperparameters = copy.deepcopy(hyperparameters or {})
     hyperparameters |= {"model_path": CHRONOS_BOLT_TEST_MODEL_PATH, "fine_tune": True, "fine_tune_steps": 10}
@@ -68,7 +75,7 @@ def chronos_bolt_model_with_finetuning(*args, hyperparameters=None, **kwargs):
     return ChronosModel(*args, **kwargs)
 
 
-TESTABLE_MODELS = [ChronosModel, chronos_bolt_model, chronos_bolt_model_with_finetuning]
+TESTABLE_MODELS = [ChronosModel, chronos_with_finetuning, chronos_bolt_model, chronos_bolt_model_with_finetuning]
 
 
 @pytest.fixture(
@@ -94,7 +101,6 @@ def default_chronos_tiny_model(request, chronos_model_path) -> ChronosModel:
             **request.param,
         },
     )
-    model.fit(train_data=None)
     return model
 
 
@@ -110,18 +116,19 @@ def default_chronos_tiny_model_gpu(request, chronos_model_path) -> Optional[Chro
             **request.param,
         },
     )
-    model.fit(train_data=None)
     return model
 
 
 @pytest.mark.parametrize("data", DATASETS)
 def test_when_on_cpu_then_chronos_model_can_score_and_cache_oof(data, default_chronos_tiny_model):
+    default_chronos_tiny_model.fit(train_data=data)
     default_chronos_tiny_model.score_and_cache_oof(data)
     assert default_chronos_tiny_model._oof_predictions is not None
 
 
 @pytest.mark.parametrize("data", DATASETS)
 def test_when_on_cpu_then_chronos_model_can_infer(data, default_chronos_tiny_model):
+    default_chronos_tiny_model.fit(train_data=data)
     predictions = default_chronos_tiny_model.predict(data)
     assert all(predictions.item_ids == data.item_ids)
 
@@ -140,7 +147,7 @@ def test_when_on_cpu_and_model_requested_from_hf_then_chronos_model_can_infer(da
 def test_given_nan_features_when_on_cpu_then_chronos_model_inferences_not_nan(default_chronos_tiny_model):
     data = get_data_frame_with_variable_lengths({"A": 20, "B": 12}, covariates_names=["cov1", "cov2", "cov3"])
     data[["cov1", "cov2", "cov3"]] = np.nan
-
+    default_chronos_tiny_model.fit(train_data=data)
     predictions = default_chronos_tiny_model.predict(data)
     assert all(predictions.item_ids == data.item_ids)
     assert not any(predictions["mean"].isna())
@@ -149,6 +156,7 @@ def test_given_nan_features_when_on_cpu_then_chronos_model_inferences_not_nan(de
 @pytest.mark.skipif(not GPU_AVAILABLE, reason="Requires GPU")
 @pytest.mark.parametrize("data", DATASETS)
 def test_when_on_gpu_then_chronos_model_can_score_and_cache_oof(data, default_chronos_tiny_model_gpu):
+    default_chronos_tiny_model_gpu.fit(train_data=data)
     default_chronos_tiny_model_gpu.score_and_cache_oof(data)
     assert default_chronos_tiny_model_gpu._oof_predictions is not None
 
@@ -156,6 +164,8 @@ def test_when_on_gpu_then_chronos_model_can_score_and_cache_oof(data, default_ch
 @pytest.mark.skipif(not GPU_AVAILABLE, reason="Requires GPU")
 @pytest.mark.parametrize("data", DATASETS)
 def test_when_on_gpu_then_chronos_model_can_infer(data, default_chronos_tiny_model_gpu):
+    default_chronos_tiny_model_gpu.fit(train_data=data)
+    default_chronos_tiny_model_gpu.fit(train_data=data)
     predictions = default_chronos_tiny_model_gpu.predict(data)
     assert all(predictions.item_ids == data.item_ids)
 
@@ -165,6 +175,7 @@ def test_given_nan_features_when_on_gpu_then_chronos_model_inferences_not_nan(de
     data = get_data_frame_with_variable_lengths({"A": 20, "B": 12}, covariates_names=["cov1", "cov2", "cov3"])
     data[["cov1", "cov2", "cov3"]] = np.nan
 
+    default_chronos_tiny_model_gpu.fit(train_data=data)
     predictions = default_chronos_tiny_model_gpu.predict(data)
     assert all(predictions.item_ids == data.item_ids)
     assert not any(predictions["mean"].isna())
@@ -226,6 +237,7 @@ def test_when_inference_dataset_initialized_then_indptr_set_correctly(item_id_to
 
 @pytest.mark.parametrize("data", DATASETS)
 def test_when_cpu_models_saved_then_models_can_be_loaded_and_inferred(data, default_chronos_tiny_model):
+    default_chronos_tiny_model.fit(train_data=data)
     default_chronos_tiny_model.save()
 
     loaded_model = default_chronos_tiny_model.__class__.load(path=default_chronos_tiny_model.path)
@@ -237,6 +249,7 @@ def test_when_cpu_models_saved_then_models_can_be_loaded_and_inferred(data, defa
 @pytest.mark.skipif(not GPU_AVAILABLE, reason="Requires GPU")
 @pytest.mark.parametrize("data", DATASETS)
 def test_when_gpu_models_saved_then_models_can_be_loaded_and_inferred(data, default_chronos_tiny_model_gpu):
+    default_chronos_tiny_model_gpu.fit(train_data=data)
     default_chronos_tiny_model_gpu.save()
 
     loaded_model = default_chronos_tiny_model_gpu.__class__.load(path=default_chronos_tiny_model_gpu.path)
