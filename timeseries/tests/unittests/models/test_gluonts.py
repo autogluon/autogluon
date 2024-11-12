@@ -45,7 +45,17 @@ def test_when_context_length_is_not_set_then_default_context_length_is_used(mode
     model = model_class(freq=data.freq, hyperparameters=DUMMY_HYPERPARAMETERS)
     model.fit(train_data=data)
     estimator_init_args = model._get_estimator_init_args()
-    assert estimator_init_args["context_length"] == model.default_context_length
+    default_context_length = model._get_default_params()["context_length"]
+    assert estimator_init_args["context_length"] == default_context_length
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+def test_when_context_length_is_set_then_provided_context_length_is_used(model_class):
+    data = DUMMY_TS_DATAFRAME
+    model = model_class(freq=data.freq, hyperparameters={**DUMMY_HYPERPARAMETERS, "context_length": 1337})
+    model.fit(train_data=data)
+    estimator_init_args = model._get_estimator_init_args()
+    assert estimator_init_args["context_length"] == 1337
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
