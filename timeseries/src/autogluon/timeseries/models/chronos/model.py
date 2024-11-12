@@ -434,6 +434,7 @@ class ChronosModel(AbstractTimeSeriesModel):
 
             fine_tune_trainer_kwargs = fine_tune_args["fine_tune_trainer_kwargs"]
             fine_tune_trainer_kwargs["disable_tqdm"] = fine_tune_trainer_kwargs.get("disable_tqdm", (verbosity < 3))
+            fine_tune_trainer_kwargs["use_cpu"] = str(self.model_pipeline.inner_model.device) == "cpu"
             output_dir = Path(fine_tune_trainer_kwargs["output_dir"])
 
             if not eval_during_fine_tune:
