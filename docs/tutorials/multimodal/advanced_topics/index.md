@@ -59,7 +59,7 @@
 :::
 
 :::{grid-item-card} AutoMM Problem Types and Evaluation Metrics.
-  :link: advanced_topics/problem_types_and_metrics.html
+  :link: problem_types_and_metrics.html
 
   A comprehensive guide to AutoGluon's supported problem types and their evaluation metrics.
 :::
