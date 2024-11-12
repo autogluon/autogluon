@@ -70,7 +70,7 @@ class ChronosTokenizer:
         context: torch.Tensor,
     ) -> Tuple:
         """
-        Turn a batch of time series into token IDs, attention map, and tokenizer_state.
+        Turn a batch of time series into token IDs, attention mask, and tokenizer_state.
 
         Parameters
         ----------
@@ -99,15 +99,14 @@ class ChronosTokenizer:
 
     def label_input_transform(self, label: torch.Tensor, tokenizer_state: Any) -> Tuple:
         """
-        Turn a batch of label slices of time series into token IDs and attention map
+        Turn a batch of label slices of time series into token IDs and attention mask
         using the ``tokenizer_state`` provided by ``context_input_transform``.
 
         Parameters
         ----------
-        context
+        label
             A tensor shaped (batch_size, time_length), containing the
-            timeseries to forecast. Use left-padding with ``torch.nan``
-            to align time series of different lengths.
+            timeseries label, i.e., the ground-truth future values.
         tokenizer_state
             An object returned by ``context_input_transform`` containing
             relevant information to preprocess data, such as location and
@@ -152,6 +151,10 @@ class ChronosTokenizer:
 
 
 class MeanScaleUniformBins(ChronosTokenizer):
+    """
+    A tokenizer that performs mean scaling and then quantizes the scaled time series into
+    uniformly-spaced bins between some bounds on the real line.
+    """
     def __init__(self, low_limit: float, high_limit: float, config: ChronosConfig) -> None:
         self.config = config
         self.centers = torch.linspace(
