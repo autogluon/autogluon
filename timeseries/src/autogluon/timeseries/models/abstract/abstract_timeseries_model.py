@@ -258,7 +258,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         start_time = time.monotonic()
         self.initialize(**kwargs)
 
-        if self._get_tags()["can_use_train_data"] and val_data is not None:
+        if self._get_tags()["can_use_train_data"]:
             if self.target_scaler is not None:
                 train_data = self.target_scaler.fit_transform(train_data)
             if self.covariate_regressor is not None:
