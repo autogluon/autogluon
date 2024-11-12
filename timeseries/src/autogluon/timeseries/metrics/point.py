@@ -362,33 +362,31 @@ class RMSLE(TimeSeriesScorer):
         )
 
 
-class CE(TimeSeriesScorer):
-    r"""Cumulative error.
+class WCD(TimeSeriesScorer):
+    r"""Weighted cumulative discrepancy.
 
-    This error measures the discrepancy between the cumulative sum of the forecast and the cumulative sum of the actual
-    values.
+    Measures the discrepancy between the cumulative sum of the forecast and the cumulative sum of the actual values.
 
     .. math::
 
-        \operatorname{CE} = \frac{1}{N} \frac{1}{H} \sum_{i=1}^{N} \sum_{t=T+1}^{T+H} \alpha1 \cdot \max(0, -d_{i, t}) + \alpha2 \cdot \max(0, d_{i, t})
+        \operatorname{WCD} = 2 \cdot \frac{1}{N} \frac{1}{H} \sum_{i=1}^{N} \sum_{t=T+1}^{T+H} \alpha \cdot \max(0, -d_{i, t}) + (1 - \alpha) \cdot \max(0, d_{i, t})
 
     where :math:`d_{i, t}` is the difference between the cumulative predicted value and the cumulative actual value
 
     .. math::
 
-        d_{i, t} = \left(\sum_{t=T+1}^t f_{i, t}) - \left(\sum_{t=T+1}^t y_{i, t})
+        d_{i, t} = \left(\sum_{s=T+1}^t f_{i, s}) - \left(\sum_{s=T+1}^t y_{i, s})
 
     Parameters
     ----------
-    alpha1 : float
-        Penalty assigned to underpredictions (when cumulative forecast is below the cumulative actual value).
-    alpha2 : float
-        Penalty assigned to overpredictions (when cumulative forecast is above the cumulative actual value).
+    alpha : float, default = 0.5
+        Values > 0.5 correspond put a stronger penalty on underpredictions (when cumulative forecast is below the
+        cumulative actual value). Values < 0.5 put a stronger penalty on overpredictions.
     """
 
-    def __init__(self, alpha1: float = 0.75, alpha2: float = 0.25):
-        self.alpha1 = alpha1
-        self.alpha2 = alpha2
+    def __init__(self, alpha: float = 0.5):
+        assert 0 < alpha < 1, "alpha must be in (0, 1)"
+        self.alpha = alpha
         self.num_items: Optional[int] = None
         warnings.warn(
             f"{self.name} is an experimental metric. Its behavior may change in the future version of AutoGluon."
@@ -409,5 +407,5 @@ class CE(TimeSeriesScorer):
         cumsum_true = self._fast_cumsum(y_true.to_numpy())
         cumsum_pred = self._fast_cumsum(y_pred.to_numpy())
         diffs = cumsum_pred - cumsum_true
-        error = diffs * np.where(diffs < 0, -self.alpha1, self.alpha2)
+        error = diffs * np.where(diffs < 0, -self.alpha, (1 - self.alpha))
         return self._safemean(error)
