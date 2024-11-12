@@ -416,6 +416,6 @@ def test_when_chronos_scores_oof_and_time_limit_is_exceeded_then_exception_is_ra
         path=temp_model_path,
         hyperparameters={"model_path": chronos_model_path, "data_loader_num_workers": data_loader_num_workers},
     )
-    model.fit(data, time_limit=0.001)
+    model.fit(data, time_limit=0.1)
     with pytest.raises(TimeLimitExceeded):
         model.score_and_cache_oof(data)
