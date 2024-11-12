@@ -179,7 +179,7 @@ def test_when_covariate_scaler_is_used_then_original_data_is_not_modified(
 
 def test_when_global_covariate_scaler_is_fit_then_column_transformers_are_created(df_with_covariates_and_metadata):
     df, metadata = df_with_covariates_and_metadata
-    scaler = GlobalCovariateScaler(metadata=metadata)
+    scaler = GlobalCovariateScaler(metadata=metadata, skew_threshold=1e10)
     scaler.fit_transform(df)
     assert scaler.is_fit()
     assert scaler._column_transformers["known"].transformers_[-1][-1] == ["cov2"]
