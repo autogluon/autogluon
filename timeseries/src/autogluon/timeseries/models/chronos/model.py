@@ -405,11 +405,12 @@ class ChronosModel(AbstractTimeSeriesModel):
             # load model pipeline to device memory
             self.load_model_pipeline(is_training=True)
 
-            extra_fine_tune_trainer_kwargs = {}
             fine_tune_prediction_length = self.prediction_length
             model_prediction_length = self.model_pipeline.inner_model.config.chronos_config["prediction_length"]
 
             if isinstance(self.model_pipeline, ChronosPipeline):
+                pipeline_specific_trainer_kwargs = {}
+
                 # Update prediction_length of the model
                 # NOTE: We only do this for ChronosPipeline because the prediction length of ChronosBolt models
                 # is fixed due to direct multistep forecasting setup
@@ -418,9 +419,9 @@ class ChronosModel(AbstractTimeSeriesModel):
                     fine_tune_prediction_length
                 )
 
-            if isinstance(self.model_pipeline, ChronosBoltPipeline):
+            elif isinstance(self.model_pipeline, ChronosBoltPipeline):
                 # custom label_names is needed for validation to work with ChronosBolt models
-                extra_fine_tune_trainer_kwargs = dict(label_names=["target"])
+                pipeline_specific_trainer_kwargs = dict(label_names=["target"])
 
                 # truncate prediction_length if it goes beyond ChronosBolt's prediction_length
                 fine_tune_prediction_length = min(model_prediction_length, self.prediction_length)
@@ -442,7 +443,7 @@ class ChronosModel(AbstractTimeSeriesModel):
                 fine_tune_trainer_kwargs["load_best_model_at_end"] = False
                 fine_tune_trainer_kwargs["metric_for_best_model"] = None
 
-            training_args = TrainingArguments(**fine_tune_trainer_kwargs, **extra_fine_tune_trainer_kwargs)
+            training_args = TrainingArguments(**fine_tune_trainer_kwargs, **pipeline_specific_trainer_kwargs)
             tokenizer_train_dataset = ChronosFineTuningDataset(
                 target_df=train_data,
                 target_column=self.target,
