@@ -608,7 +608,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             else:
                 time_left = time_limit - (time.time() - time_start)
                 if num_base_models > 1 and self.enable_ensemble:
-                    time_reserved_for_ensemble = min(600.0, time_left / (num_base_models - i + 1))
+                    time_reserved_for_ensemble = min(60.0, time_left / (num_base_models - i + 1))
                     logger.debug(f"Reserving {time_reserved_for_ensemble:.1f}s for ensemble")
                 else:
                     time_reserved_for_ensemble = 0.0

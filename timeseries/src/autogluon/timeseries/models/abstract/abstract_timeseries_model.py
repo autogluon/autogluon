@@ -128,6 +128,7 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         self._oof_predictions: Optional[List[TimeSeriesDataFrame]] = None
         self.target_scaler: Optional[LocalTargetScaler] = None
+        self.covariate_regressor: Optional[CovariateRegressor] = None
 
     def __repr__(self) -> str:
         return self.name
@@ -262,6 +263,7 @@ class AbstractTimeSeriesModel(AbstractModel):
             train_data = self.covariate_regressor.fit_transform(
                 train_data,
                 time_limit=0.5 * time_limit if time_limit is not None else None,
+                verbosity=kwargs.get("verbosity", 2) - 1,
             )
 
         train_data = self.preprocess(train_data, is_train=True)
