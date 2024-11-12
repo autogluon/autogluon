@@ -408,4 +408,4 @@ class WCD(TimeSeriesScorer):
         cumsum_pred = self._fast_cumsum(y_pred.to_numpy())
         diffs = cumsum_pred - cumsum_true
         error = diffs * np.where(diffs < 0, -self.alpha, (1 - self.alpha))
-        return self._safemean(error)
+        return 2 * self._safemean(error)
