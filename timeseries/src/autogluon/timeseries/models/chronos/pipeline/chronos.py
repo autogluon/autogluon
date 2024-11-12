@@ -155,6 +155,7 @@ class MeanScaleUniformBins(ChronosTokenizer):
     A tokenizer that performs mean scaling and then quantizes the scaled time series into
     uniformly-spaced bins between some bounds on the real line.
     """
+
     def __init__(self, low_limit: float, high_limit: float, config: ChronosConfig) -> None:
         self.config = config
         self.centers = torch.linspace(
