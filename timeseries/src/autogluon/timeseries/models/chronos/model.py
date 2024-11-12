@@ -406,14 +406,13 @@ class ChronosModel(AbstractTimeSeriesModel):
                 extra_fine_tune_trainer_kwargs = dict(label_names=["target"])
 
                 # truncate prediction_length if it goes beyond ChronosBolt's prediction_length
-                fine_tune_prediction_length = min(
-                    self.model_pipeline.inner_model.config.chronos_config["prediction_length"], self.prediction_length
-                )
+                model_prediction_length = self.model_pipeline.inner_model.config.chronos_config["prediction_length"]
+                fine_tune_prediction_length = min(model_prediction_length, self.prediction_length)
 
                 if self.prediction_length != fine_tune_prediction_length:
                     logger.debug(
-                        f"ChronosBolt models can only be fine-tuned with a maximum prediction_length of {fine_tune_prediction_length}. "
-                        f"Setting prediction_length to {fine_tune_prediction_length}."
+                        f"ChronosBolt models can only be fine-tuned with a maximum prediction_length of {model_prediction_length}. "
+                        f"Fine-tuning prediction_length has been changed to {fine_tune_prediction_length}."
                     )
 
             fine_tune_trainer_kwargs = fine_tune_args["fine_tune_trainer_kwargs"]
