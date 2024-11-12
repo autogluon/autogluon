@@ -128,7 +128,7 @@ class ChronosModel(AbstractTimeSeriesModel):
     eval_during_fine_tune : bool, default = False
         If True, validation will be performed during fine-tuning to select the best checkpoint.
         Setting this argument to True may result in slower fine-tuning.
-    fine_tune_eval_max_items : int, default = 100
+    fine_tune_eval_max_items : int, default = 256
         The maximum number of randomly-sampled time series to use from the validation set for evaluation
         during fine-tuning. If None, the entire validation dataset will be used.
     fine_tune_trainer_kwargs : dict, optional
@@ -323,7 +323,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         init_args.setdefault("fine_tune_steps", 5000)
         init_args.setdefault("fine_tune_batch_size", self.default_batch_size)
         init_args.setdefault("eval_during_fine_tune", False)
-        init_args.setdefault("fine_tune_eval_max_items", 100)
+        init_args.setdefault("fine_tune_eval_max_items", 256)
         init_args.setdefault("fine_tune_shuffle_buffer_size", 10_000)
 
         eval_during_fine_tune = init_args["eval_during_fine_tune"]
@@ -370,13 +370,15 @@ class ChronosModel(AbstractTimeSeriesModel):
     ) -> None:
         from transformers.trainer import PrinterCallback, Trainer, TrainingArguments
 
-        from .pipeline import ChronosBoltPipeline
+        from .pipeline import ChronosBoltPipeline, ChronosPipeline
         from .pipeline.utils import (
             ChronosFineTuningDataset,
             EvaluateAndSaveFinalStepCallback,
             LoggerCallback,
             TimeLimitCallback,
         )
+
+        # TODO: Add support for fine-tuning models with context_length longer than the pretrained model
 
         # verbosity < 3: all logs and warnings from transformers will be suppressed
         # verbosity >= 3: progress bar and loss logs will be logged
@@ -405,12 +407,22 @@ class ChronosModel(AbstractTimeSeriesModel):
 
             extra_fine_tune_trainer_kwargs = {}
             fine_tune_prediction_length = self.prediction_length
+            model_prediction_length = self.model_pipeline.inner_model.config.chronos_config["prediction_length"]
+
+            if isinstance(self.model_pipeline, ChronosPipeline):
+                # Update prediction_length of the model
+                # NOTE: We only do this for ChronosPipeline because the prediction length of ChronosBolt models
+                # is fixed due to direct multistep forecasting setup
+                self.model_pipeline.model.config.prediction_length = fine_tune_prediction_length
+                self.model_pipeline.inner_model.config.chronos_config["prediction_length"] = (
+                    fine_tune_prediction_length
+                )
+
             if isinstance(self.model_pipeline, ChronosBoltPipeline):
                 # custom label_names is needed for validation to work with ChronosBolt models
                 extra_fine_tune_trainer_kwargs = dict(label_names=["target"])
 
                 # truncate prediction_length if it goes beyond ChronosBolt's prediction_length
-                model_prediction_length = self.model_pipeline.inner_model.config.chronos_config["prediction_length"]
                 fine_tune_prediction_length = min(model_prediction_length, self.prediction_length)
 
                 if self.prediction_length != fine_tune_prediction_length:
@@ -508,6 +520,7 @@ class ChronosModel(AbstractTimeSeriesModel):
                 logger.info(f"Saving fine-tuned model to {fine_tuned_ckpt_path}")
                 self.model_pipeline.inner_model.save_pretrained(Path(self.path) / self.fine_tuned_ckpt_name)
             else:
+                # Reset the model to its pretrained state
                 logger.info("Validation loss worsened after fine-tuning. Reverting to the pretrained model.")
                 self.model_pipeline = None
                 self.load_model_pipeline(is_training=False)
