@@ -420,7 +420,7 @@ class ChronosModel(AbstractTimeSeriesModel):
             output_dir = Path(fine_tune_trainer_kwargs["output_dir"])
 
             if not eval_during_fine_tune:
-                # turn of eval-related trainer args
+                # turn off eval-related trainer args
                 fine_tune_trainer_kwargs["evaluation_strategy"] = "no"
                 fine_tune_trainer_kwargs["eval_steps"] = None
                 fine_tune_trainer_kwargs["load_best_model_at_end"] = False
