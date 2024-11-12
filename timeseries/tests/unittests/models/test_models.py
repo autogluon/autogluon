@@ -513,6 +513,7 @@ def test_when_fit_and_predict_called_then_train_val_and_test_data_is_preprocesse
 ):
     train_data = DUMMY_TS_DATAFRAME.copy()
     model = model_class(freq=train_data.freq, path=temp_model_path, hyperparameters=dummy_hyperparameters)
+    model.initialize()
     preprocessed_data = train_data + 5.0
     if model._get_tags()["can_use_val_data"]:
         expected_val_data = preprocessed_data
