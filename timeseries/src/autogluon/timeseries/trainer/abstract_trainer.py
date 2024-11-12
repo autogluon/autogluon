@@ -249,7 +249,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
     max_rel_importance_score: float = 1e5
     eps_abs_importance_score: float = 1e-5
-    max_ensemble_time_limit: float = 120.0
+    max_ensemble_time_limit: float = 600.0
 
     def __init__(
         self,
