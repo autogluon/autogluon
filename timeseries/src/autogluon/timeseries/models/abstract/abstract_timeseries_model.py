@@ -60,6 +60,7 @@ class AbstractTimeSeriesModel(AbstractModel):
     """
 
     _oof_filename = "oof.pkl"
+    _regressor_fit_time_fraction: float = 0.5
 
     # TODO: refactor "pruned" methods after AbstractModel is refactored
     predict_proba = None
@@ -256,17 +257,21 @@ class AbstractTimeSeriesModel(AbstractModel):
         """
         start_time = time.monotonic()
         self.initialize(**kwargs)
-        if self.target_scaler is not None:
-            train_data = self.target_scaler.fit_transform(train_data)
 
-        if self.covariate_regressor is not None:
-            train_data = self.covariate_regressor.fit_transform(
-                train_data,
-                time_limit=0.5 * time_limit if time_limit is not None else None,
-                verbosity=kwargs.get("verbosity", 2) - 1,
-            )
+        if self._get_tags()["can_use_train_data"] and val_data is not None:
+            if self.target_scaler is not None:
+                train_data = self.target_scaler.fit_transform(train_data)
+            if self.covariate_regressor is not None:
+                regressor_time_limit = (
+                    self._regressor_fit_time_fraction * time_limit if time_limit is not None else None
+                )
+                train_data = self.covariate_regressor.fit_transform(
+                    train_data,
+                    time_limit=regressor_time_limit,
+                    verbosity=kwargs.get("verbosity", 2) - 1,
+                )
+            train_data = self.preprocess(train_data, is_train=True)
 
-        train_data = self.preprocess(train_data, is_train=True)
         if self._get_tags()["can_use_val_data"] and val_data is not None:
             if self.target_scaler is not None:
                 val_data = self.target_scaler.transform(val_data)
@@ -632,10 +637,12 @@ class AbstractTimeSeriesModel(AbstractModel):
         - allow_nan: Can the model handle data with missing values represented by np.nan?
         - can_refit_full: Does it make sense to retrain the model without validation data?
             See `autogluon.core.models.abstract._tags._DEFAULT_TAGS` for more details.
-        - can_use_val_data: Can model use val_data if it's provided to model.fit()?
+        - can_use_train_data: Can the model use train_data if it's provided to model.fit()?
+        - can_use_val_data: Can the model use val_data if it's provided to model.fit()?
         """
         return {
             "allow_nan": False,
             "can_refit_full": False,
+            "can_use_train_data": True,
             "can_use_val_data": False,
         }

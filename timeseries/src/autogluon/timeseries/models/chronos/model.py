@@ -623,7 +623,12 @@ class ChronosModel(AbstractTimeSeriesModel):
         return TimeSeriesDataFrame(df)
 
     def _more_tags(self) -> Dict:
-        return {"allow_nan": True, "can_use_val_data": self._get_model_params()["fine_tune"]}
+        do_fine_tune = self._get_model_params()["fine_tune"]
+        return {
+            "allow_nan": True,
+            "can_use_train_data": do_fine_tune,
+            "can_use_val_data": do_fine_tune,
+        }
 
     def score_and_cache_oof(
         self,

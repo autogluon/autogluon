@@ -40,11 +40,16 @@ class CovariateRegressor:
     validation_frac : float, optional
         Fraction of observations that are reserved as the validation set during training (starting from the end of each
         time series).
+    fit_time_fraction: float
+        The fraction of the time_limit that will be reserved for model training. The remainder (1 - fit_time_fraction)
+        will be reserved for prediction.
+
+        If the estimated prediction time exceeds `(1 - fit_time_fraction) * time_limit`, the regressor will be disabled.
     """
 
     def __init__(
         self,
-        model_name: str = "GBM",
+        model_name: str = "CAT",
         model_hyperparameters: Optional[Dict[str, Any]] = None,
         eval_metric: str = "mean_absolute_error",
         refit_during_predict: bool = False,
@@ -52,6 +57,7 @@ class CovariateRegressor:
         metadata: Optional[CovariateMetadata] = None,
         target: str = "target",
         validation_fraction: Optional[float] = 0.1,
+        fit_time_fraction: float = 0.5,
     ):
         if model_name not in TABULAR_MODEL_TYPES:
             raise ValueError(
@@ -65,6 +71,8 @@ class CovariateRegressor:
         self.tabular_eval_metric = eval_metric
         self.max_num_samples = max_num_samples
         self.validation_fraction = validation_fraction
+        self.fit_time_fraction = fit_time_fraction
+
         self.model: Optional[AbstractModel] = None
         self.disabled_due_to_time_limit = False
         self.metadata = metadata or CovariateMetadata()
@@ -97,21 +105,24 @@ class CovariateRegressor:
 
         self.model = self.model_type(
             problem_type="regression",
-            hyperparameters={**self.model_hyperparameters, "ag_args_fit": {"predict_1_batch_size": 10000}},
+            hyperparameters={
+                **self.model_hyperparameters,
+                "ag_args_fit": {"predict_1_batch_size": 10000},  # needed to compute predict_1_time
+            },
             eval_metric=self.tabular_eval_metric,
         )
         if time_limit is not None:
-            time_for_fit = 0.5 * (time_limit - (time.monotonic() - start_time))
+            time_limit_fit = self._model_fit_time_frac * (time_limit - (time.monotonic() - start_time))
         else:
-            time_for_fit = None
-        self.model.fit(X=X, y=y, X_val=X_val, y_val=y_val, time_limit=time_for_fit, **kwargs)
+            time_limit_fit = None
+        self.model.fit(X=X, y=y, X_val=X_val, y_val=y_val, time_limit=time_limit_fit, **kwargs)
         logger.debug(f"\tRegressor fit duration: {time.monotonic() - start_time:.2f} s")
         if time_limit is not None:
             time_left = time_limit - (time.monotonic() - start_time)
             estimated_predict_time = self.model.predict_1_time * len(data)
             if estimated_predict_time > time_left:
                 logger.warning(
-                    f"\tDisabling the covariate_regressor since {estimated_predict_time=:.1f} and {time_left=:.1f}."
+                    f"\tDisabling the covariate_regressor since {estimated_predict_time=:.1f} exceeds {time_left=:.1f}."
                 )
                 self.disabled_due_to_time_limit = True
         return self
