@@ -201,42 +201,6 @@ def test_when_batch_size_provided_then_batch_size_used_to_infer(batch_size, chro
 
 
 @pytest.mark.parametrize("data", DATASETS)
-@pytest.mark.parametrize("context_length", [5, 10, 20])
-def test_when_context_length_provided_then_inference_dataset_context_length_used(data, context_length):
-    inference_dataset = ChronosInferenceDataset(data, context_length=context_length)
-    item = inference_dataset[0]
-
-    assert item.shape[-1] == context_length
-
-
-@pytest.mark.parametrize("context_length", [5, 10, 20])
-def test_when_context_length_provided_then_padding_correct(context_length):
-    data = get_data_frame_with_item_index(list(range(20)), data_length=5)
-    inference_dataset = ChronosInferenceDataset(data, context_length=context_length)
-    item = inference_dataset[0]
-
-    assert np.sum(np.isnan(item)) == context_length - 5
-    assert not np.isnan(item[-1])  # padding left
-
-
-@pytest.mark.parametrize(
-    "item_id_to_length, expected_indptr",
-    [
-        ({"A": 20, "B": 12}, [0, 20, 32]),
-        ({"A": 20, "B": 12, "C": 1}, [0, 20, 32, 33]),
-        ({"A": 20}, [0, 20]),
-        ({"A": 1}, [0, 1]),
-        ({"B": 10, "A": 10}, [0, 10, 20]),
-    ],
-)
-def test_when_inference_dataset_initialized_then_indptr_set_correctly(item_id_to_length, expected_indptr):
-    dataset = get_data_frame_with_variable_lengths(item_id_to_length)
-    inference_dataset = ChronosInferenceDataset(dataset, context_length=5)
-
-    assert inference_dataset.indptr.tolist() == expected_indptr
-
-
-@pytest.mark.parametrize("data", DATASETS)
 def test_when_cpu_models_saved_then_models_can_be_loaded_and_inferred(data, default_chronos_tiny_model):
     default_chronos_tiny_model.fit(train_data=data)
     default_chronos_tiny_model.save()
@@ -460,19 +424,3 @@ def test_when_chronos_scores_oof_and_time_limit_is_exceeded_then_exception_is_ra
     model.fit(data, time_limit=0.001)
     with pytest.raises(TimeLimitExceeded):
         model.score_and_cache_oof(data)
-
-
-@pytest.mark.parametrize("data_loader_num_workers", [0, 1, 2])
-def test_when_chronos_inference_dataloader_used_and_time_limit_exceeded_then_exception_is_raised(
-    data_loader_num_workers,
-):
-    data_loader = ChronosInferenceDataLoader(
-        range(100_000_000),
-        batch_size=2,
-        num_workers=data_loader_num_workers,
-        on_batch=timeout_callback(seconds=0.5),
-    )
-
-    with pytest.raises(TimeLimitExceeded):
-        for _ in data_loader:
-            pass

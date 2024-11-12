@@ -41,6 +41,7 @@ class PseudoShuffledIterableDataset(IterableDataset):
 
     def __init__(self, base_dataset, shuffle_buffer_size: int = 100) -> None:
         super().__init__()
+        assert shuffle_buffer_size > 0
         self.base_dataset = base_dataset
         self.shuffle_buffer_size = shuffle_buffer_size
         self.generator = torch.Generator()
@@ -111,7 +112,9 @@ class ChronosFineTuningDataset(IterableDataset):
 
     def _create_instance_splitter(self, mode: str):
         instance_sampler = {
-            "training": ExpectedNumInstanceSampler(num_instances=1.0, min_future=self.prediction_length),
+            "training": ExpectedNumInstanceSampler(
+                num_instances=1.0, min_future=self.prediction_length, min_instances=1
+            ),
             "validation": ValidationSplitSampler(min_future=self.prediction_length),
         }[mode]
 
