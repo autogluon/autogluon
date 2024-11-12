@@ -75,6 +75,7 @@ def chronos_bolt_model_with_finetuning(*args, hyperparameters=None, **kwargs):
     return ChronosModel(*args, **kwargs)
 
 
+ZERO_SHOT_MODELS = [ChronosModel, chronos_bolt_model]
 TESTABLE_MODELS = [ChronosModel, chronos_with_finetuning, chronos_bolt_model, chronos_bolt_model_with_finetuning]
 
 

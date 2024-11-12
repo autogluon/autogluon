@@ -28,7 +28,7 @@ from ..common import (
     get_data_frame_with_item_index,
     to_supported_pandas_freq,
 )
-from .chronos import TESTABLE_MODELS as CHRONOS_TESTABLE_MODELS
+from .chronos import TESTABLE_MODELS as CHRONOS_TESTABLE_MODELS, ZERO_SHOT_MODELS as CHRONOS_ZERO_SHOT_MODELS
 from .test_gluonts import TESTABLE_MODELS as GLUONTS_TESTABLE_MODELS
 from .test_local import TESTABLE_MODELS as LOCAL_TESTABLE_MODELS
 from .test_mlforecast import TESTABLE_MODELS as MLFORECAST_TESTABLE_MODELS
@@ -581,7 +581,7 @@ def test_when_model_created_then_model_has_all_required_tags(temp_model_path, mo
     assert len(model_tags) == len(EXPECTED_MODEL_TAGS)
 
 
-@pytest.mark.parametrize("model_class", CHRONOS_TESTABLE_MODELS + LOCAL_TESTABLE_MODELS)
+@pytest.mark.parametrize("model_class", CHRONOS_ZERO_SHOT_MODELS + LOCAL_TESTABLE_MODELS)
 def test_when_inference_only_model_scores_oof_then_time_limit_is_passed_to_predict(model_class, dummy_hyperparameters):
     data = DUMMY_TS_DATAFRAME
     model = model_class(freq=data.freq, hyperparameters=dummy_hyperparameters)
