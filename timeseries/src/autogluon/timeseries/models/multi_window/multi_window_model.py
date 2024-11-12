@@ -12,9 +12,7 @@ import autogluon.core as ag
 from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.local.abstract_local_model import AbstractLocalModel
-from autogluon.timeseries.regressor import CovariateRegressor
 from autogluon.timeseries.splitter import AbstractWindowSplitter, ExpandingWindowSplitter
-from autogluon.timeseries.transforms import LocalTargetScaler
 
 logger = logging.getLogger(__name__)
 
