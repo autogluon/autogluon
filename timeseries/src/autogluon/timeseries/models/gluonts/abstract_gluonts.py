@@ -166,7 +166,6 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
     # default number of samples for prediction
     default_num_samples: int = 250
     supports_cat_covariates: bool = False
-    _default_hyperparameters = {}
 
     def __init__(
         self,
