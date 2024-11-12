@@ -75,9 +75,10 @@ MODEL_ALIASES = {
 
 
 class ChronosModel(AbstractTimeSeriesModel):
-    """Chronos pretrained time series forecasting models. Models can be based on the original
+    """Chronos [Ansari2024]_ pretrained time series forecasting models which can be used for zero-shot forecasting or fine-tuned
+    in a task-specific manner. Models can be based on the original
     `ChronosModel <https://github.com/amazon-science/chronos-forecasting/blob/main/src/chronos/chronos.py>`_ implementation,
-    as well as a newer family of Chronos-Bolt models which are capable of much faster inference.
+    as well as a newer family of Chronos-Bolt models capable of much faster inference.
 
     The original Chronos is a family of pretrained models, based on the T5 family, with number of parameters ranging between
     8M and 710M. The full collection of Chronos models is available on
@@ -90,6 +91,9 @@ class ChronosModel(AbstractTimeSeriesModel):
     The newer Chronos-Bolt variants enable much faster inference by first "patching" the time series. The resulting
     time series is then fed into a T5 model for forecasting. The Chronos-Bolt variants are capable of much faster inference,
     and can all run on CPUs. Chronos-Bolt models are also available on Hugging Face <https://huggingface.co/autogluon/>`_.
+
+    Both Chronos and Chronos-Bolt variants can be fine-tuned by setting ``fine_tune=True`` and selecting appropriate
+    fine-tuning parameters such as the learning rate (``fine_tune_lr``) and max steps (``fine_tune_steps``).
 
     References
     ----------
@@ -370,8 +374,8 @@ class ChronosModel(AbstractTimeSeriesModel):
         from .pipeline.utils import (
             ChronosFineTuningDataset,
             EvaluateAndSaveFinalStepCallback,
-            TimeLimitCallback,
             LoggerCallback,
+            TimeLimitCallback,
         )
 
         # verbosity < 3: all logs and warnings from transformers will be suppressed
