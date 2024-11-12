@@ -200,8 +200,8 @@ class ChronosFineTuningDataset(IterableDataset):
 
         Parameters
         ----------
-        shuffle_buffer_size : int | None, optional
-            The shuffle buffer size used for pseudo shuffling, by default None
+        shuffle_buffer_size : int, optional, default = None
+            The shuffle buffer size used for pseudo shuffling
         """
         assert shuffle_buffer_size is None or shuffle_buffer_size >= 0
         if not shuffle_buffer_size:
@@ -289,7 +289,7 @@ class ChronosInferenceDataLoader(torch.utils.data.DataLoader):
 
 
 class EvaluateAndSaveFinalStepCallback(TrainerCallback):
-    """Callback evaluate and save the model at last training step."""
+    """Callback to evaluate and save the model at last training step."""
 
     def on_step_end(self, args, state, control, **kwargs):
         if state.global_step >= state.max_steps:
