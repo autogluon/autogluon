@@ -316,11 +316,8 @@ class TimeLimitCallback(TrainerCallback):
 
     def on_step_end(self, args, state, control, **kwargs):
         elapsed_time = time.monotonic() - self.start_time
-        if elapsed_time >= self.time_limit:
-            logger.warning(
-                f"The allocated training time limit of {self.time_limit:.1f}s exceeded. Interrupting training."
-            )
-            control.should_training_stop = True
+        if elapsed_time > self.time_limit:
+            raise TimeLimitExceeded
 
 
 class LoggerCallback(TrainerCallback):
