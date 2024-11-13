@@ -39,7 +39,6 @@ gts_logger = logging.getLogger(gluonts.__name__)
 class SimpleGluonTSDataset(GluonTSDataset):
     """Wrapper for TimeSeriesDataFrame that is compatible with the GluonTS Dataset API."""
 
-    # TODO: Move this class to the dataset namespace as multiple models are using it now
     def __init__(
         self,
         target_df: TimeSeriesDataFrame,
@@ -356,9 +355,9 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
     def _get_default_params(self):
         """Gets default parameters for GluonTS estimator initialization that are available after
-        AbstractTimeSeriesModel initialization (i.e., before deferred initialization)
+        AbstractTimeSeriesModel initialization (i.e., before deferred initialization). Models may
+        override this method to update default parameters.
         """
-        # Override library-wide defaults with specific hyperparameter defaults provided by the model
         return {
             "batch_size": 64,
             "context_length": min(512, max(10, 2 * self.prediction_length)),
@@ -366,19 +365,22 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             "early_stopping_patience": 20,
             "max_epochs": 100,
             "lr": 1e-3,
+            "freq": self._dummy_gluonts_freq,
+            "prediction_length": self.prediction_length,
+            "quantiles": self.quantile_levels,
         }
 
     def _get_model_params(self) -> dict:
         """Gets params that are passed to the inner model."""
         init_args = self._get_default_params() | super()._get_model_params()
-        init_args.update(
-            dict(
-                freq=self._dummy_gluonts_freq,
-                prediction_length=self.prediction_length,
-                quantiles=self.quantile_levels,
-                callbacks=self.callbacks,
+
+        if any(kw in init_args for kw in ["learning_rate", "epochs"]):
+            logger.warning(
+                "Use of `epochs` and `learning_rate` are deprecated. "
+                "GluonTS models use `max_epochs` instead of `epochs` and `lr` instead of `learning_rate`. "
+                "Please update your hyperparameters accordingly."
             )
-        )
+
         return init_args
 
     def _get_estimator_init_args(self) -> Dict[str, Any]:
@@ -399,7 +401,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         default_trainer_kwargs = {
             "limit_val_batches": 3,
             "max_epochs": init_args["max_epochs"],
-            "callbacks": init_args["callbacks"],
+            "callbacks": self.callbacks,
             "enable_progress_bar": False,
             "default_root_dir": self.path,
         }
