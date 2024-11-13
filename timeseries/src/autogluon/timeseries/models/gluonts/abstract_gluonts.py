@@ -372,16 +372,21 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
     def _get_model_params(self) -> dict:
         """Gets params that are passed to the inner model."""
-        init_args = self._get_default_params() | super()._get_model_params()
+        # for backward compatibility with the old GluonTS MXNet API
+        parameter_name_aliases = {
+            "epochs": "max_epochs",
+            "learning_rate": "lr",
+        }
 
-        if any(kw in init_args for kw in ["learning_rate", "epochs"]):
-            logger.warning(
-                "Use of `epochs` and `learning_rate` are deprecated. "
-                "GluonTS models use `max_epochs` instead of `epochs` and `lr` instead of `learning_rate`. "
-                "Please update your hyperparameters accordingly."
-            )
+        init_args = super()._get_model_params()
+        for alias, actual in parameter_name_aliases.items():
+            if alias in init_args:
+                if actual in init_args:
+                    raise ValueError(f"Parameter '{alias}' cannot be specified when '{actual}' is also specified.")
+                else:
+                    init_args[actual] = init_args.pop(alias)
 
-        return init_args
+        return self._get_default_params() | init_args
 
     def _get_estimator_init_args(self) -> Dict[str, Any]:
         """Get GluonTS specific constructor arguments for estimator objects, an alias to `self._get_model_params`
