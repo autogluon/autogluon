@@ -716,9 +716,11 @@ class BaggedEnsembleModel(AbstractModel):
             fold_fitting_strategy.schedule_fold_model_fit(**fold_fit_args)
         fold_fitting_strategy.after_all_folds_scheduled()
 
-        for model in models:
+        # Do this to maintain model name order based on kfold split regardless of which model finished first in parallel mode
+        for fold_fit_args in fold_fit_args_list:
+            model_name = fold_fit_args["fold_ctx"]["model_name_suffix"]
             # No need to add child times or save child here as this already occurred in the fold_fitting_strategy
-            self.add_child(model=model, add_child_times=False, add_child_resources=False)
+            self.add_child(model=model_name, add_child_times=False, add_child_resources=False)
         self._bagged_mode = True
 
         if self._oof_pred_proba is None:

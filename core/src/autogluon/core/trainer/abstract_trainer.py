@@ -2937,6 +2937,8 @@ class AbstractTrainer:
         jobs_finished = 0
         jobs_total = len(models)
 
+        ordered_model_names = [m.name for m in models]  # Use to ensure same model order is returned
+        expected_model_names = set(ordered_model_names)
         unfinished_job_refs = distributed_manager.schedule_jobs(models_to_fit=models)
 
         timeout = None
@@ -2967,6 +2969,9 @@ class AbstractTrainer:
 
             distributed_manager.deallocate_resources(job_ref=finished[0])
             model_name, model_path, model_type, exc, model_failure_info = ray.get(finished[0])
+            assert model_name in expected_model_names, (f"Unexpected model name outputted during parallel fit: {model_name}\n"
+                                                        f"Valid Names: {expected_model_names}\n"
+                                                        f"This should never happen. Please create a GitHub Issue.")
             jobs_finished += 1
 
             if exc is not None or model_path is None:
@@ -3055,6 +3060,9 @@ class AbstractTrainer:
 
         distributed_manager.clean_up_ray(unfinished_job_refs=unfinished_job_refs)
         logger.log(20, "Finished all parallel work for this stacking layer.")
+
+        models_valid = set(models_valid)
+        models_valid = [m for m in ordered_model_names if m in models_valid]  # maintain original order
 
         return models_valid
 
