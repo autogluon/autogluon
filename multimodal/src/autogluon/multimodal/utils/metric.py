@@ -248,7 +248,7 @@ def compute_score(
         # TODO: Longterm the solution should be to have the input data to this function use the internal representation without the original class names. This way `pos_label` would not need to be specified.
         if metric.name == F1:  # only for binary classification
             y = (y == pos_label).astype(int)
-            y_pred = (y == pos_label).astype(int)
+            y_pred = (y_pred == pos_label).astype(int)
 
         return metric.convert_score_to_original(compute_metric(y=y, y_pred=y_pred, metric=metric, weights=None))
 
