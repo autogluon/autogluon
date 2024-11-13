@@ -20,7 +20,7 @@ from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.features.types import R_FLOAT, S_STACK
 from autogluon.common.utils.distribute_utils import DistributedContext
 from autogluon.common.utils.lite import disable_if_lite_mode
-from autogluon.common.utils.log_utils import convert_time_in_s_to_log_friendly
+from autogluon.common.utils.log_utils import convert_time_in_s_to_log_friendly, reset_logger_for_remote_call
 from autogluon.common.utils.path_converter import PathConverter
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_ray, try_import_torch
@@ -45,7 +45,7 @@ from ..utils import (
     get_pred_from_proba,
     infer_eval_metric,
 )
-from ..utils.exceptions import NoGPUError, NotEnoughCudaMemoryError, NotEnoughMemoryError, NotValidStacker, NoStackFeatures, NoValidFeatures, TimeLimitExceeded
+from ..utils.exceptions import InsufficientTime, NoGPUError, NotEnoughCudaMemoryError, NotEnoughMemoryError, NotValidStacker, NoStackFeatures, NoValidFeatures, TimeLimitExceeded
 from ..utils.feature_selection import FeatureSelector
 from ..utils.loaders import load_pkl
 from ..utils.savers import save_json, save_pkl
@@ -1970,7 +1970,16 @@ class AbstractTrainer:
         return models
 
     def _train_single(
-        self, X, y, model: AbstractModel, X_val=None, y_val=None, X_test=None, y_test=None, total_resources=None, **model_fit_kwargs
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
+        model: AbstractModel,
+        X_val: pd.DataFrame = None,
+        y_val: pd.Series = None,
+        X_test: pd.DataFrame = None,
+        y_test: pd.Series = None,
+        total_resources: dict = None,
+        **model_fit_kwargs,
     ) -> AbstractModel:
         """
         Trains model but does not add the trained model to this Trainer.
@@ -1981,19 +1990,25 @@ class AbstractTrainer:
 
     def _train_and_save(
         self,
-        X,
-        y,
+        X: pd.DataFrame,
+        y: pd.Series,
         model: AbstractModel,
-        X_val=None,
-        y_val=None,
-        X_test=None,
-        y_test=None,
-        stack_name="core",
-        level=1,
-        compute_score=True,
-        total_resources=None,
+        X_val: pd.DataFrame = None,
+        y_val: pd.Series = None,
+        X_test: pd.DataFrame = None,
+        y_test: pd.Series = None,
+        X_pseudo: pd.DataFrame = None,
+        y_pseudo: pd.DataFrame = None,
+        time_limit: float = None,
+        stack_name: str = "core",
+        level: int = 1,
+        compute_score: bool = True,
+        total_resources: dict = None,
+        errors: Literal["ignore", "raise"] = "ignore",
+        errors_ignore: list = None,
+        errors_raise: list = None,
         **model_fit_kwargs,
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Trains model and saves it to disk, returning a list with a single element: The name of the model, or no elements if training failed.
         If the model name is returned:
@@ -2002,53 +2017,85 @@ class AbstractTrainer:
             The model's name will be appended to self.models_level[stack_name][level]
             The model will be accessible and usable through any Trainer function that takes as input 'model' or 'model_name'.
         Note: self._train_and_save should not be used outside of self._train_single_full
+
+        Parameters
+        ----------
+        errors: Literal["ignore", "raise"], default = "ignore"
+            Determines how model fit exceptions are handled.
+            If "ignore", will ignore all model exceptions during fit. If an exception occurs, an empty list is returned.
+            If "raise", will raise the model exception if it occurs.
+            Can be overwritten by `errors_ignore` and `errors_raise`.
+        errors_ignore: list[str], optional
+            The exception types specified in `errors_ignore` will be treated as if `errors="ignore"`.
+        errors_raise: list[str], optional
+            The exception types specified in `errors_raise` will be treated as if `errors="raise"`.
+
         """
-        X_pseudo = model_fit_kwargs.get("X_pseudo", None)
-        y_pseudo = model_fit_kwargs.get("y_pseudo", None)
         fit_start_time = time.time()
-        time_limit = model_fit_kwargs.get("time_limit", None)
         model_names_trained = []
         y_pred_proba_val = None
-        try:
-            fit_log_message = f"Fitting model: {model.name} ..."
-            if time_limit is not None:
-                if time_limit <= 0:
-                    logger.log(15, f"Skipping {model.name} due to lack of time remaining.")
-                    return model_names_trained
-                if self._time_limit is not None and self._time_train_start is not None:
-                    time_left_total = self._time_limit - (fit_start_time - self._time_train_start)
-                    # If only a very small amount of time remains, skip training
-                    min_time_required = min(self._time_limit * 0.01, 10)
-                    if (time_left_total < min_time_required) and (time_limit < min_time_required):
-                        logger.log(15, f"Skipping {model.name} due to lack of time remaining.")
-                        return model_names_trained
+
+        fit_log_message = f"Fitting model: {model.name} ..."
+        if time_limit is not None:
+            time_left_total = time_limit
+            not_enough_time = False
+            if time_limit <= 0:
+                not_enough_time = True
+            elif self._time_limit is not None and self._time_train_start is not None:
+                time_left_total = self._time_limit - (fit_start_time - self._time_train_start)
+                # If only a very small amount of time remains, skip training
+                min_time_required = min(self._time_limit * 0.01, 10)
+                if (time_left_total < min_time_required) and (time_limit < min_time_required):
+                    not_enough_time = True
+            if not_enough_time:
+                skip_msg = f"Skipping {model.name} due to lack of time remaining."
+                not_enough_time_exception = InsufficientTime(skip_msg)
+                if self._check_raise_exception(exception=not_enough_time_exception, errors=errors, errors_ignore=errors_ignore, errors_raise=errors_raise):
+                    raise not_enough_time_exception
                 else:
-                    time_left_total = time_limit
-                fit_log_message += f" Training model for up to {round(time_limit, 2)}s of the {round(time_left_total, 2)}s of remaining time."
-            logger.log(10 if DistributedContext.is_distributed_mode() else 20, fit_log_message)
+                    logger.log(15, skip_msg)
+                    return []
+            fit_log_message += f" Training model for up to {time_limit:.2f}s of the {time_left_total:.2f}s of remaining time."
+        logger.log(10 if DistributedContext.is_distributed_mode() else 20, fit_log_message)
 
-            if isinstance(model, BaggedEnsembleModel) and not compute_score:
-                # Do not perform OOF predictions when we don't compute a score.
-                model_fit_kwargs["_skip_oof"] = True
+        if isinstance(model, BaggedEnsembleModel) and not compute_score:
+            # Do not perform OOF predictions when we don't compute a score.
+            model_fit_kwargs["_skip_oof"] = True
 
-            # If model is not bagged model and not stacked then pseudolabeled data needs to be incorporated at this level
-            # Bagged model does validation on the fit level where as single models do it separately. Hence this if statement
-            # is required
-            if not isinstance(model, BaggedEnsembleModel) and X_pseudo is not None and y_pseudo is not None and X_pseudo.columns.equals(X.columns):
-                assert_pseudo_column_match(X=X, X_pseudo=X_pseudo)
-                X_w_pseudo = pd.concat([X, X_pseudo])
-                y_w_pseudo = pd.concat([y, y_pseudo])
-                model_fit_kwargs.pop("X_pseudo")
-                model_fit_kwargs.pop("y_pseudo")
-                logger.log(15, f"{len(X_pseudo)} extra rows of pseudolabeled data added to training set for {model.name}")
-                model = self._train_single(X_w_pseudo, y_w_pseudo, model, X_val, y_val, X_test=X_test, y_test=y_test, **model_fit_kwargs)
+        model_fit_kwargs = dict(
+            model=model,
+            X_val=X_val,
+            y_val=y_val,
+            X_test=X_test,
+            y_test=y_test,
+            time_limit=time_limit,
+            total_resources=total_resources,
+            **model_fit_kwargs,
+        )
+
+        # If model is not bagged model and not stacked then pseudolabeled data needs to be incorporated at this level
+        # Bagged model does validation on the fit level where as single models do it separately. Hence this if statement
+        # is required
+        if not isinstance(model, BaggedEnsembleModel) and X_pseudo is not None and y_pseudo is not None and X_pseudo.columns.equals(X.columns):
+            assert_pseudo_column_match(X=X, X_pseudo=X_pseudo)
+            X_w_pseudo = pd.concat([X, X_pseudo])
+            y_w_pseudo = pd.concat([y, y_pseudo])
+            logger.log(15, f"{len(X_pseudo)} extra rows of pseudolabeled data added to training set for {model.name}")
+            model_fit_kwargs["X"] = X_w_pseudo
+            model_fit_kwargs["y"] = y_w_pseudo
+        else:
+            model_fit_kwargs["X"] = X
+            model_fit_kwargs["y"] = y
+            if level > 1:
+                if X_pseudo is not None and y_pseudo is not None:
+                    logger.log(15, f"Dropping pseudo in stacking layer due to missing out-of-fold predictions")
             else:
-                if level > 1:
-                    if X_pseudo is not None and y_pseudo is not None:
-                        logger.log(15, f"Dropping pseudo in stacking layer due to missing out-of-fold predictions")
-                    model_fit_kwargs.pop("X_pseudo", None)
-                    model_fit_kwargs.pop("y_pseudo", None)
-                model = self._train_single(X, y, model, X_val, y_val, X_test=X_test, y_test=y_test, total_resources=total_resources, **model_fit_kwargs)
+                model_fit_kwargs["X_pseudo"] = X_pseudo
+                model_fit_kwargs["y_pseudo"] = y_pseudo
+
+        exception = None
+        try:
+            model = self._train_single(**model_fit_kwargs)
 
             fit_end_time = time.time()
             if self.weight_evaluation:
@@ -2078,31 +2125,32 @@ class AbstractTrainer:
             model.val_score = score
             # TODO: Add recursive=True to avoid repeatedly loading models each time this is called for bagged ensembles (especially during repeated bagging)
             self.save_model(model=model)
-        except Exception as err:
+        except Exception as exc:
+            exception = exc  # required to reference exc outside of `except` statement
             del_model = True
-            if isinstance(err, TimeLimitExceeded):
+            if isinstance(exception, TimeLimitExceeded):
                 logger.log(20, f"\tTime limit exceeded... Skipping {model.name}.")
-            elif isinstance(err, NotEnoughMemoryError):
+            elif isinstance(exception, NotEnoughMemoryError):
                 logger.warning(f"\tNot enough memory to train {model.name}... Skipping this model.")
-            elif isinstance(err, NoStackFeatures):
-                logger.warning(f"\tNo stack features to train {model.name}... Skipping this model. {err}")
-            elif isinstance(err, NotValidStacker):
-                logger.warning(f"\tStacking disabled for {model.name}... Skipping this model. {err}")
-            elif isinstance(err, NoValidFeatures):
+            elif isinstance(exception, NoStackFeatures):
+                logger.warning(f"\tNo stack features to train {model.name}... Skipping this model. {exception}")
+            elif isinstance(exception, NotValidStacker):
+                logger.warning(f"\tStacking disabled for {model.name}... Skipping this model. {exception}")
+            elif isinstance(exception, NoValidFeatures):
                 logger.warning(f"\tNo valid features to train {model.name}... Skipping this model.")
-            elif isinstance(err, NoGPUError):
+            elif isinstance(exception, NoGPUError):
                 logger.warning(f"\tNo GPUs available to train {model.name}... Skipping this model.")
-            elif isinstance(err, NotEnoughCudaMemoryError):
+            elif isinstance(exception, NotEnoughCudaMemoryError):
                 logger.warning(f"\tNot enough CUDA memory available to train {model.name}... Skipping this model.")
-            elif isinstance(err, ImportError):
+            elif isinstance(exception, ImportError):
                 logger.error(f"\tWarning: Exception caused {model.name} to fail during training (ImportError)... Skipping this model.")
-                logger.error(f"\t\t{err}")
+                logger.error(f"\t\t{exception}")
                 del_model = False
                 if self.verbosity > 2:
                     logger.exception("Detailed Traceback:")
             else:  # all other exceptions
                 logger.error(f"\tWarning: Exception caused {model.name} to fail during training... Skipping this model.")
-                logger.error(f"\t\t{err}")
+                logger.error(f"\t\t{exception}")
                 if self.verbosity > 0:
                     logger.exception("Detailed Traceback:")
             crash_time = time.time()
@@ -2110,8 +2158,8 @@ class AbstractTrainer:
             tb = traceback.format_exc()
             model_info = self.get_model_info(model=model)
             self._models_failed_to_train_errors[model.name] = dict(
-                exc_type=err.__class__.__name__,
-                exc_str=str(err),
+                exc_type=exception.__class__.__name__,
+                exc_str=str(exception),
                 exc_traceback=tb,
                 model_info=model_info,
                 total_time=total_time,
@@ -2124,6 +2172,9 @@ class AbstractTrainer:
             model_names_trained.append(model.name)
             if self.low_memory:
                 del model
+        if exception is not None:
+            if self._check_raise_exception(exception=exception, errors=errors, errors_ignore=errors_ignore, errors_raise=errors_raise):
+                raise exception
         return model_names_trained
 
     # FIXME: v1.0 Move to AbstractModel for most fields
@@ -2353,12 +2404,27 @@ class AbstractTrainer:
         fit_kwargs=None,
         compute_score=True,
         total_resources: dict | None = None,
+        errors: Literal["ignore", "raise"] = "ignore",
+        errors_ignore: list = None,
+        errors_raise: list = None,
         **kwargs,
     ) -> List[str]:
         """
         Trains a model, with the potential to train multiple versions of this model with hyperparameter tuning and feature pruning.
         Returns a list of successfully trained and saved model names.
         Models trained from this method will be accessible in this Trainer.
+
+        Parameters
+        ----------
+        errors: Literal["ignore", "raise"], default = "ignore"
+            Determines how model fit exceptions are handled.
+            If "ignore", will ignore all model exceptions during fit. If an exception occurs, an empty list is returned.
+            If "raise", will raise the model exception if it occurs.
+            Can be overwritten by `errors_ignore` and `errors_raise`.
+        errors_ignore: list[str], optional
+            The exception types specified in `errors_ignore` will be treated as if `errors="ignore"`.
+        errors_raise: list[str], optional
+            The exception types specified in `errors_raise` will be treated as if `errors="raise"`.
         """
         if self._callback_early_stop:
             return []
@@ -2377,6 +2443,7 @@ class AbstractTrainer:
         model_fit_kwargs = self._get_model_fit_kwargs(
             X=X, X_val=X_val, time_limit=time_limit, k_fold=k_fold, fit_kwargs=fit_kwargs, ens_sample_weight=kwargs.get("ens_sample_weight", None)
         )
+        exception = None
         if hyperparameter_tune_kwargs:
             if n_repeat_start != 0:
                 raise ValueError(f"n_repeat_start must be 0 to hyperparameter_tune, value = {n_repeat_start}")
@@ -2427,16 +2494,17 @@ class AbstractTrainer:
                     )
                 if len(hpo_models) == 0:
                     logger.warning(f"No model was trained during hyperparameter tuning {model.name}... Skipping this model.")
-            except Exception as err:
-                if isinstance(err, NoStackFeatures):
-                    logger.warning(f"\tNo stack features to train {model.name}... Skipping this model. {err}")
-                elif isinstance(err, NotValidStacker):
-                    logger.warning(f"\tStacking disabled for {model.name}... Skipping this model. {err}")
-                elif isinstance(err, NoValidFeatures):
+            except Exception as exc:
+                exception = exc  # required to provide exc outside of `except` statement
+                if isinstance(exception, NoStackFeatures):
+                    logger.warning(f"\tNo stack features to train {model.name}... Skipping this model. {exception}")
+                elif isinstance(exception, NotValidStacker):
+                    logger.warning(f"\tStacking disabled for {model.name}... Skipping this model. {exception}")
+                elif isinstance(exception, NoValidFeatures):
                     logger.warning(f"\tNo valid features to train {model.name}... Skipping this model.")
                 else:
                     logger.exception(f"Warning: Exception caused {model.name} to fail during hyperparameter tuning... Skipping this model.")
-                    logger.warning(err)
+                    logger.warning(exception)
                 del model
                 model_names_trained = []
             else:
@@ -2469,12 +2537,68 @@ class AbstractTrainer:
                 level=level,
                 compute_score=compute_score,
                 total_resources=total_resources,
+                errors=errors,
+                errors_ignore=errors_ignore,
+                errors_raise=errors_raise,
                 **model_fit_kwargs,
             )
         if self.callbacks and check_callbacks:
             self._callbacks_after_fit(model_names=model_names_trained, stack_name=stack_name, level=level)
         self.save()
+        if exception is not None:
+            if self._check_raise_exception(exception=exception, errors=errors, errors_ignore=errors_ignore, errors_raise=errors_raise):
+                raise exception
         return model_names_trained
+
+    # TODO: Move to a utility function outside of AbstractTrainer
+    @staticmethod
+    def _check_raise_exception(
+        exception: Exception,
+        errors: Literal["ignore", "raise"] = "ignore",
+        errors_ignore: list = None,
+        errors_raise: list = None,
+    ) -> bool:
+        """
+        Check if an exception should be raised based on the provided error handling logic.
+
+        Parameters
+        ----------
+        exception: Exception
+            The exception to check
+        errors: Literal["ignore", "raise"], default = "ignore"
+            Determines how exceptions are handled.
+            If "ignore", will return False.
+            If "raise", will return True.
+            Can be overwritten by `errors_ignore` and `errors_raise`.
+        errors_ignore: list[str], optional
+            The exception types specified in `errors_ignore` will be treated as if `errors="ignore"`.
+        errors_raise: list[str], optional
+            The exception types specified in `errors_raise` will be treated as if `errors="raise"`.
+
+        Returns
+        -------
+        raise_exception: bool
+            If True, indicates that the exception should be raised based on the provided error handling rules.
+        """
+        raise_exception = None
+        if errors_raise is not None:
+            for err_type in errors_raise:
+                if isinstance(exception, err_type):
+                    raise_exception = True
+                    break
+        if errors_ignore is not None and raise_exception is None:
+            for err_type in errors_ignore:
+                if isinstance(exception, err_type):
+                    raise_exception = False
+                    break
+        if raise_exception is None:
+            if errors == "ignore":
+                raise_exception = False
+            elif errors == "raise":
+                raise_exception = True
+            else:
+                raise ValueError(f"Invalid `errors` value: {errors} (valid values: ['ignore', 'raise']")
+        return raise_exception
 
     def _callbacks_before_fit(
         self,
@@ -2782,6 +2906,12 @@ class AbstractTrainer:
 
         models_valid = []
 
+        if time_limit is not None:
+            # Give models less than the full time limit to account for overheads (predict, cache, ray, etc.)
+            time_limit_models = time_limit * 0.9
+        else:
+            time_limit_models = None
+
         logger.log(20, "Scheduling parallel model-workers for training...")
         distributed_manager = DistributedFitManager(
             mode="fit",
@@ -2789,8 +2919,9 @@ class AbstractTrainer:
             func_kwargs=dict(
                 time_split=time_split,
                 time_limit_model_split=time_limit_model_split,
-                time_limit=time_limit,
+                time_limit=time_limit_models,
                 time_start=time_start,
+                errors="raise",
             ),
             func_put_kwargs=dict(
                 _self=self,
@@ -2803,10 +2934,31 @@ class AbstractTrainer:
             num_gpus=kwargs.get("total_resources", {}).get("num_gpus", 0),
             num_splits=kwargs.get("k_fold", 1) * kwargs.get("n_repeats", 1)
         )
-        unfinished_job_refs = distributed_manager.schedule_jobs(models_to_fit=models)
-        timeout = int(time_limit - (time.time() - time_start) + 5) if time_limit is not None else None  # include 5 second overhead.
+        jobs_finished = 0
+        jobs_total = len(models)
 
+        unfinished_job_refs = distributed_manager.schedule_jobs(models_to_fit=models)
+
+        timeout = None
+
+        if time_limit is not None:
+            # allow between 5 and 60 seconds overhead before force killing jobs to give some leniency to jobs with overhead.
+            time_overhead = min(max(time_limit * 0.01, 5), 60)
+            min_time_required_base = min(self._time_limit * 0.01, 10)  # This is checked in the worker thread, will skip if not satisfied
+            # If time remaining is less than min_time_required, avoid scheduling new jobs and only wait for existing ones to finish.
+            min_time_required = min_time_required_base * 1.5 + 1  # Add 50% buffer and 1 second to account for ray overhead
+        else:
+            time_overhead = None
+            min_time_required = None
+
+        can_schedule_jobs = True
         while unfinished_job_refs:
+            if time_limit is not None:
+                time_left = time_limit - (time.time() - time_start)
+                timeout = int(time_left + time_overhead)  # include overhead.
+                if timeout <= 0:
+                    logger.log(20, "Ran into timeout while waiting for model training to finish. Stopping now.")
+                    break
             finished, unfinished_job_refs = ray.wait(unfinished_job_refs, num_returns=1, timeout=timeout)
 
             if not finished:
@@ -2814,21 +2966,32 @@ class AbstractTrainer:
                 break
 
             distributed_manager.deallocate_resources(job_ref=finished[0])
-            model_name, model_path, model_type = ray.get(finished[0])
+            model_name, model_path, model_type, exc, model_failure_info = ray.get(finished[0])
+            jobs_finished += 1
 
-            if model_path is None:
-                logger.log(20, f"Model training failed for {model_name if isinstance(model_name, str) else model_name.name}.")
-            else:
-                if time_limit is not None:
-                    extra_log = f"\n\tTime remaining for this layer: {int(time_limit - (time.time() - time_start))}s..."
+            if exc is not None or model_path is None:
+                if exc is None:
+                    if model_failure_info is not None:
+                        exc_type = model_failure_info["exc_type"]
+                        exc_str = model_failure_info["exc_str"]
+                    else:
+                        exc_type = None
+                        exc_str = None
+                else:
+                    exc_type = exc.__class__
+                    exc_str = str(exc)
+                if exc_type is not None:
+                    extra_log = f": {exc_type.__name__}: {exc_str}"
                 else:
                     extra_log = ""
-                logger.log(
-                    20,
-                    f"Finished all jobs for {model_name}."
-                    f"\n\t{len(unfinished_job_refs)} jobs are still running."
-                    f"{extra_log}"
-                )
+                if exc_type is not None and issubclass(exc_type, InsufficientTime):
+                    logger.log(20, exc_str)
+                else:
+                    logger.log(20, f"Skipping {model_name if isinstance(model_name, str) else model_name.name} due to exception{extra_log}")
+                if model_failure_info is not None:
+                    self._models_failed_to_train_errors[model_name] = model_failure_info
+            else:
+                logger.log(20, f"Fitted {model_name}:")
 
                 # TODO: figure out a way to avoid calling _add_model in the worker-process to save overhead time.
                 #       - Right now, we need to call it within _add_model to be able to pass the model path to the main process without changing
@@ -2841,25 +3004,57 @@ class AbstractTrainer:
                         stack_name=kwargs["stack_name"],
                         level=kwargs["level"]
                 ):
+                    jobs_running = len(unfinished_job_refs)
+                    if can_schedule_jobs:
+                        remaining_task_word = "pending"
+                    else:
+                        remaining_task_word = "skipped"
+                    parallel_status_log = (
+                        f"\tJobs: {jobs_running} running, "
+                        f"{jobs_total - (jobs_finished + jobs_running)} {remaining_task_word}, "
+                        f"{jobs_finished}/{jobs_total} finished"
+                    )
+                    if time_limit is not None:
+                        time_left = time_limit - (time.time() - time_start)
+                        parallel_status_log += f" | {time_left:.0f}s remaining"
+                    logger.log(20, parallel_status_log)
                     models_valid.append(model_name)
                 else:
-                    logger.log(20, f"Failed to add {model_name} to model graph.")
+                    logger.log(40, f"Failed to add {model_name} to model graph. This should never happen. Please create a GitHub issue.")
 
-            # Stop due to time limit after adding model
-            if (time_limit is not None) and ((time.time() - time_start) > time_limit):
-                logger.log(20, "Time limit reached for this stacking layer. Stopping model training and cancel pending tasks.")
+            if not unfinished_job_refs and not distributed_manager.models_to_schedule:
+                # Completed all jobs
                 break
 
             # TODO: look into what this does / how this works for distributed training
             if self._callback_early_stop:
-                logger.log(20, "Callback triggered in parallel setting. Stopping model training and cancel pending tasks.")
+                logger.log(20, "Callback triggered in parallel setting. Stopping model training and cancelling remaining jobs.")
                 break
 
-            # Re-schedule jobs
-            unfinished_job_refs += distributed_manager.schedule_jobs()
+            # Stop due to time limit after adding model
+            if time_limit is not None:
+                time_elapsed = time.time() - time_start
+                time_left = time_limit - time_elapsed
+                time_left_models = time_limit_models - time_elapsed
+                if (time_left + time_overhead) <= 0:
+                    logger.log(20, "Time limit reached for this stacking layer. Stopping model training and cancelling remaining jobs.")
+                    break
+                elif time_left_models < min_time_required:
+                    if can_schedule_jobs:
+                        if len(distributed_manager.models_to_schedule) > 0:
+                            logger.log(
+                                20,
+                                f"Low on time, skipping {len(distributed_manager.models_to_schedule)} "
+                                f"pending jobs and waiting for running jobs to finish... ({time_left:.0f}s remaining time)"
+                            )
+                        can_schedule_jobs = False
+
+            if can_schedule_jobs:
+                # Re-schedule jobs
+                unfinished_job_refs += distributed_manager.schedule_jobs()
 
         distributed_manager.clean_up_ray(unfinished_job_refs=unfinished_job_refs)
-        logger.log(20, "Finished all distributed work for this stacking layer.")
+        logger.log(20, "Finished all parallel work for this stacking layer.")
 
         return models_valid
 
@@ -4370,33 +4565,53 @@ def _remote_train_multi_fold(
     y: pd.Series,
     time_split: bool,
     time_start: float,
-    time_limit: float|None,
+    time_limit: float | None,
     time_limit_model_split: float | None,
     hyperparameter_tune_kwargs: dict,
     kwargs: dict,
-) -> tuple[str, str | None, str | None]:
-    from autogluon.common.utils.log_utils import reset_logger_for_remote_call
+    errors: Literal["ignore", "raise"] | None = None,
+) -> tuple[str, str | None, str | None, Exception | None, dict | None]:
     reset_logger_for_remote_call(verbosity=_self.verbosity)
 
-    model_name_list = _detached_train_multi_fold(
-        _self=_self,
-        model=model,
-        X=X,
-        y=y,
-        time_start=time_start,
-        time_split=time_split,
-        time_limit=time_limit,
-        time_limit_model_split=time_limit_model_split,
-        hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-        kwargs=kwargs,
-    )
+    if errors is not None:
+        kwargs["errors"] = errors
+
+    exception = None
+    try:
+        model_name_list = _detached_train_multi_fold(
+            _self=_self,
+            model=model,
+            X=X,
+            y=y,
+            time_start=time_start,
+            time_split=time_split,
+            time_limit=time_limit,
+            time_limit_model_split=time_limit_model_split,
+            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+            kwargs=kwargs,
+        )
+    except Exception as exc:
+        model_name_list = []
+        if errors is not None and errors == "raise":
+            # If training fails and exception is returned, collect the exception information and return
+            exception = exc  # required to use in outer scope
+        else:
+            raise exc
+
+    if not model_name_list:
+        model_name = model if isinstance(model, str) else model.name
+        # Get model_failure metadata if it exists
+        model_failure_info = None
+        if model_name in _self._models_failed_to_train_errors:
+            model_failure_info = _self._models_failed_to_train_errors[model_name]
+        return model_name, None, None, exception, model_failure_info
 
     # Fallback, return original model name if training failed.
     if not model_name_list:
         model_name = model if isinstance(model, str) else model.name
-        return model_name, None, None
+        return model_name, None, None, None, None
     model_name = model_name_list[0]
-    return model_name, _self.get_model_attribute(model=model_name,attribute="path"), _self.get_model_attribute(model=model_name,attribute="type")
+    return model_name, _self.get_model_attribute(model=model_name, attribute="path"), _self.get_model_attribute(model=model_name, attribute="type"), None, None
 
 
 def _detached_refit_single_full(
@@ -4505,7 +4720,6 @@ def _remote_refit_single_full(
     kwargs: dict,
     fit_strategy: Literal["sequential", "parallel"],
 ) -> tuple[str, str, list[str], str, str]:
-    from autogluon.common.utils.log_utils import reset_logger_for_remote_call
     reset_logger_for_remote_call(verbosity=_self.verbosity)
 
     model_name, models_trained = _detached_refit_single_full(

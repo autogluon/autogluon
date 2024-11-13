@@ -878,17 +878,24 @@ class AbstractModel:
         **kwargs :
             Any additional fit arguments a model supports.
         """
+        if "time_limit" in kwargs and kwargs["time_limit"] is not None:
+            time_start = time.time()
+        else:
+            time_start = None
         kwargs = self.initialize(
             **kwargs
         )  # FIXME: This might have to go before self._preprocess_fit_args, but then time_limit might be incorrect in **kwargs init to initialize
         kwargs = self._preprocess_fit_args(**kwargs)
-        if "time_limit" in kwargs and kwargs["time_limit"] is not None and kwargs["time_limit"] <= 0:
-            logger.warning(f'\tWarning: Model has no time left to train, skipping model... (Time Left = {kwargs["time_limit"]:.1f}s)')
-            raise TimeLimitExceeded
 
         self._register_fit_metadata(**kwargs)
         self.validate_fit_resources(**kwargs)
         self._validate_fit_memory_usage(**kwargs)
+        if "time_limit" in kwargs and kwargs["time_limit"] is not None:
+            time_start_fit = time.time()
+            kwargs["time_limit"] -= time_start_fit - time_start
+            if kwargs["time_limit"] <= 0:
+                logger.warning(f'\tWarning: Model has no time left to train, skipping model... (Time Left = {kwargs["time_limit"]:.1f}s)')
+                raise TimeLimitExceeded
         out = self._fit(**kwargs)
         if out is None:
             out = self

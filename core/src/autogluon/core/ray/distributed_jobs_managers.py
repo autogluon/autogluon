@@ -106,6 +106,7 @@ class DistributedFitManager:
 
         # Job tracking
         self.job_refs_to_allocated_resources: dict[str, ModelResources] = {}
+        self.job_refs_to_model_name: dict[str, str] = {}
         self.models_to_schedule: list[AbstractModel] | list[str] = []
 
         # Init remote function
@@ -193,13 +194,13 @@ class DistributedFitManager:
                 num_cpus=model_resources.num_cpus_for_model_worker, num_gpus=model_resources.num_gpus_for_model_worker
             ).remote(model=ray.put(model) if self.mode in ["fit"] else model, **self.job_kwargs)
             job_refs.append(job_ref)
-            self.allocate_resources(job_ref=job_ref, resources=model_resources)
+            self.allocate_resources(job_ref=job_ref, resources=model_resources, model_name=model_name)
 
             logger.log(
                 20,
-                f"Scheduled model {self.mode} for {model_name}. {len(self.job_refs_to_allocated_resources)} jobs are running."
-                f"\n\tAllocated {'' if is_sufficient else 'UP TO '}{model_resources.total_num_cpus} CPUs and {model_resources.total_num_gpus} GPUs"
-                f"\n\tRay{job_ref}",
+                f"Scheduled model {self.mode} for {model_name}: "
+                f"allocated {'' if is_sufficient else 'UP TO '}{model_resources.total_num_cpus} CPUs and {model_resources.total_num_gpus} GPUs. "
+                f"{len(self.job_refs_to_allocated_resources)} jobs are running.",
             )
             time.sleep(0.1)
 
@@ -301,17 +302,19 @@ class DistributedFitManager:
             total_num_gpus=num_gpus_for_model_worker + num_gpus_for_fold_worker * self.num_splits,
         )
 
-    def allocate_resources(self, *, job_ref: str, resources: ModelResources) -> None:
+    def allocate_resources(self, *, job_ref: str, resources: ModelResources, model_name: str = None) -> None:
         """Allocate resources for a model fit."""
 
         self.available_num_cpus -= resources.total_num_cpus
         self.available_num_gpus -= resources.total_num_gpus
         self.job_refs_to_allocated_resources[job_ref] = resources
+        self.job_refs_to_model_name[job_ref] = model_name
 
     def deallocate_resources(self, *, job_ref: str) -> None:
         """Deallocate resources for a model fit."""
 
         resources = self.job_refs_to_allocated_resources.pop(job_ref)
+        self.job_refs_to_model_name.pop(job_ref)
         self.available_num_cpus += resources.total_num_cpus
         self.available_num_gpus += resources.total_num_gpus
 
@@ -319,13 +322,16 @@ class DistributedFitManager:
         import ray
 
         # TODO: determine how to suppress error messages from cancelling jobs.
-        if unfinished_job_refs is not None:
+        if unfinished_job_refs is not None and len(unfinished_job_refs) > 0:
+            model_names = [self.job_refs_to_model_name[f] for f in unfinished_job_refs]
+            logger.log(20, f"Cancelling {len(model_names)} jobs: {model_names}")
             for f in unfinished_job_refs:
                 ray.cancel(f, force=True)
 
     def clean_job_state(self, *, unfinished_job_refs: list[str] | None = None) -> None:
         """Clean up state of manager."""
         self.job_refs_to_allocated_resources = {}
+        self.job_refs_to_model_name = {}
         self.models_to_schedule = []
         self.available_num_cpus = self.total_num_cpus
         self.available_num_gpus = self.total_num_gpus
