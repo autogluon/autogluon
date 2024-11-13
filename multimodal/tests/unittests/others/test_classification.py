@@ -57,3 +57,33 @@ def test_focal_loss_multiclass(checkpoint_name):
     predictions_str = predictor.predict(image_path)
     predictions_list1 = predictor.predict([image_path])
     predictions_list10 = predictor.predict([image_path] * 10)
+
+
+@pytest.mark.parametrize(
+    "checkpoint_name,eval_metric",
+    [
+        ("swin_tiny_patch4_window7_224", "log_loss"),
+        ("swin_tiny_patch4_window7_224", "f1_micro"),
+    ],
+)
+def test_metrics_multiclass(checkpoint_name, eval_metric):
+    download_dir = "./ag_automm_tutorial_imgcls"
+    train_data, test_data = shopee_dataset(download_dir)
+
+    model_path = f"./tmp/{uuid.uuid4().hex}-automm_shopee"
+
+    predictor = MultiModalPredictor(label="label", problem_type="multiclass", eval_metric=eval_metric, path=model_path)
+
+    predictor.fit(
+        hyperparameters={
+            "model.mmdet_image.checkpoint_name": checkpoint_name,
+            "env.num_gpus": -1,
+            "optimization.max_epochs": 1,
+        },
+        train_data=train_data,
+        time_limit=30,  # seconds
+    )  # you can trust the default config, e.g., we use a `swin_base_patch4_window7_224` model
+
+    score = predictor.evaluate(train_data)
+    print(score)
+    assert predictor.eval_metric == eval_metric
