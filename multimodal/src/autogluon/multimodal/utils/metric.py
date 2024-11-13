@@ -234,9 +234,13 @@ def compute_score(
 
     y = metric_data[Y_TRUE]
     if metric.needs_proba or metric.needs_threshold:
-        y_pred_proba = metric_data[Y_PRED_PROB] 
-        y_pred_proba = y_pred_proba if y_pred_proba.shape[1] > 2 else y_pred_proba[:, pos_label]  # only use pos_label for binary classification
-        return metric.convert_score_to_original(compute_metric(y=y, y_pred_proba=y_pred_proba, metric=metric, weights=None))
+        y_pred_proba = metric_data[Y_PRED_PROB]
+        y_pred_proba = (
+            y_pred_proba if y_pred_proba.shape[1] > 2 else y_pred_proba[:, pos_label]
+        )  # only use pos_label for binary classification
+        return metric.convert_score_to_original(
+            compute_metric(y=y, y_pred_proba=y_pred_proba, metric=metric, weights=None)
+        )
     else:
         y_pred = metric_data[Y_PRED]
 
