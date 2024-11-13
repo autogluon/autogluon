@@ -93,8 +93,16 @@ def all_model_hyperparams(hf_model_path):
     return {
         **ALL_MODELS,
         "Chronos": [
+            # zero-shot models
             {"model_path": hf_model_path},
             {"model_path": "autogluon/chronos-bolt-350k-test"},  # todo: replace after model release
+            # fine-tuned models
+            {"model_path": hf_model_path, "fine_tune": True, "fine_tune_steps": 1},
+            {
+                "model_path": "autogluon/chronos-bolt-350k-test",  # todo: replace after model release
+                "fine_tune": True,
+                "fine_tune_steps": 1,
+            },
         ],
     }
 

@@ -9,11 +9,6 @@ import torch
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.timeseries import TimeSeriesPredictor
 from autogluon.timeseries.models import ChronosModel
-from autogluon.timeseries.models.chronos.pipeline.utils import (
-    ChronosInferenceDataLoader,
-    ChronosInferenceDataset,
-    timeout_callback,
-)
 
 from ...common import (
     DATAFRAME_WITH_COVARIATES,
@@ -42,6 +37,15 @@ HYPERPARAMETER_DICTS = [
     {
         "context_length": None,
     },
+    {
+        "fine_tune": True,
+        "fine_tune_steps": 10,
+    },
+    {
+        "fine_tune": True,
+        "fine_tune_steps": 10,
+        "context_length": 64,
+    },
 ]
 
 
@@ -52,7 +56,22 @@ def chronos_bolt_model(*args, hyperparameters=None, **kwargs):
     return ChronosModel(*args, **kwargs)
 
 
-TESTABLE_MODELS = [ChronosModel, chronos_bolt_model]
+def chronos_with_finetuning(*args, hyperparameters=None, **kwargs):
+    hyperparameters = copy.deepcopy(hyperparameters or {})
+    hyperparameters |= {"fine_tune": True, "fine_tune_steps": 10}
+    kwargs["hyperparameters"] = hyperparameters
+    return ChronosModel(*args, **kwargs)
+
+
+def chronos_bolt_model_with_finetuning(*args, hyperparameters=None, **kwargs):
+    hyperparameters = copy.deepcopy(hyperparameters or {})
+    hyperparameters |= {"model_path": CHRONOS_BOLT_TEST_MODEL_PATH, "fine_tune": True, "fine_tune_steps": 10}
+    kwargs["hyperparameters"] = hyperparameters
+    return ChronosModel(*args, **kwargs)
+
+
+ZERO_SHOT_MODELS = [ChronosModel, chronos_bolt_model]
+TESTABLE_MODELS = [ChronosModel, chronos_with_finetuning, chronos_bolt_model, chronos_bolt_model_with_finetuning]
 
 
 @pytest.fixture(
@@ -78,7 +97,6 @@ def default_chronos_tiny_model(request, chronos_model_path) -> ChronosModel:
             **request.param,
         },
     )
-    model.fit(train_data=None)
     return model
 
 
@@ -94,18 +112,19 @@ def default_chronos_tiny_model_gpu(request, chronos_model_path) -> Optional[Chro
             **request.param,
         },
     )
-    model.fit(train_data=None)
     return model
 
 
 @pytest.mark.parametrize("data", DATASETS)
 def test_when_on_cpu_then_chronos_model_can_score_and_cache_oof(data, default_chronos_tiny_model):
+    default_chronos_tiny_model.fit(train_data=data)
     default_chronos_tiny_model.score_and_cache_oof(data)
     assert default_chronos_tiny_model._oof_predictions is not None
 
 
 @pytest.mark.parametrize("data", DATASETS)
 def test_when_on_cpu_then_chronos_model_can_infer(data, default_chronos_tiny_model):
+    default_chronos_tiny_model.fit(train_data=data)
     predictions = default_chronos_tiny_model.predict(data)
     assert all(predictions.item_ids == data.item_ids)
 
@@ -124,7 +143,7 @@ def test_when_on_cpu_and_model_requested_from_hf_then_chronos_model_can_infer(da
 def test_given_nan_features_when_on_cpu_then_chronos_model_inferences_not_nan(default_chronos_tiny_model):
     data = get_data_frame_with_variable_lengths({"A": 20, "B": 12}, covariates_names=["cov1", "cov2", "cov3"])
     data[["cov1", "cov2", "cov3"]] = np.nan
-
+    default_chronos_tiny_model.fit(train_data=data)
     predictions = default_chronos_tiny_model.predict(data)
     assert all(predictions.item_ids == data.item_ids)
     assert not any(predictions["mean"].isna())
@@ -133,6 +152,7 @@ def test_given_nan_features_when_on_cpu_then_chronos_model_inferences_not_nan(de
 @pytest.mark.skipif(not GPU_AVAILABLE, reason="Requires GPU")
 @pytest.mark.parametrize("data", DATASETS)
 def test_when_on_gpu_then_chronos_model_can_score_and_cache_oof(data, default_chronos_tiny_model_gpu):
+    default_chronos_tiny_model_gpu.fit(train_data=data)
     default_chronos_tiny_model_gpu.score_and_cache_oof(data)
     assert default_chronos_tiny_model_gpu._oof_predictions is not None
 
@@ -140,6 +160,8 @@ def test_when_on_gpu_then_chronos_model_can_score_and_cache_oof(data, default_ch
 @pytest.mark.skipif(not GPU_AVAILABLE, reason="Requires GPU")
 @pytest.mark.parametrize("data", DATASETS)
 def test_when_on_gpu_then_chronos_model_can_infer(data, default_chronos_tiny_model_gpu):
+    default_chronos_tiny_model_gpu.fit(train_data=data)
+    default_chronos_tiny_model_gpu.fit(train_data=data)
     predictions = default_chronos_tiny_model_gpu.predict(data)
     assert all(predictions.item_ids == data.item_ids)
 
@@ -149,6 +171,7 @@ def test_given_nan_features_when_on_gpu_then_chronos_model_inferences_not_nan(de
     data = get_data_frame_with_variable_lengths({"A": 20, "B": 12}, covariates_names=["cov1", "cov2", "cov3"])
     data[["cov1", "cov2", "cov3"]] = np.nan
 
+    default_chronos_tiny_model_gpu.fit(train_data=data)
     predictions = default_chronos_tiny_model_gpu.predict(data)
     assert all(predictions.item_ids == data.item_ids)
     assert not any(predictions["mean"].isna())
@@ -173,43 +196,8 @@ def test_when_batch_size_provided_then_batch_size_used_to_infer(batch_size, chro
 
 
 @pytest.mark.parametrize("data", DATASETS)
-@pytest.mark.parametrize("context_length", [5, 10, 20])
-def test_when_context_length_provided_then_inference_dataset_context_length_used(data, context_length):
-    inference_dataset = ChronosInferenceDataset(data, context_length=context_length)
-    item = inference_dataset[0]
-
-    assert item.shape[-1] == context_length
-
-
-@pytest.mark.parametrize("context_length", [5, 10, 20])
-def test_when_context_length_provided_then_padding_correct(context_length):
-    data = get_data_frame_with_item_index(list(range(20)), data_length=5)
-    inference_dataset = ChronosInferenceDataset(data, context_length=context_length)
-    item = inference_dataset[0]
-
-    assert np.sum(np.isnan(item)) == context_length - 5
-    assert not np.isnan(item[-1])  # padding left
-
-
-@pytest.mark.parametrize(
-    "item_id_to_length, expected_indptr",
-    [
-        ({"A": 20, "B": 12}, [0, 20, 32]),
-        ({"A": 20, "B": 12, "C": 1}, [0, 20, 32, 33]),
-        ({"A": 20}, [0, 20]),
-        ({"A": 1}, [0, 1]),
-        ({"B": 10, "A": 10}, [0, 10, 20]),
-    ],
-)
-def test_when_inference_dataset_initialized_then_indptr_set_correctly(item_id_to_length, expected_indptr):
-    dataset = get_data_frame_with_variable_lengths(item_id_to_length)
-    inference_dataset = ChronosInferenceDataset(dataset, context_length=5)
-
-    assert inference_dataset.indptr.tolist() == expected_indptr
-
-
-@pytest.mark.parametrize("data", DATASETS)
 def test_when_cpu_models_saved_then_models_can_be_loaded_and_inferred(data, default_chronos_tiny_model):
+    default_chronos_tiny_model.fit(train_data=data)
     default_chronos_tiny_model.save()
 
     loaded_model = default_chronos_tiny_model.__class__.load(path=default_chronos_tiny_model.path)
@@ -221,6 +209,7 @@ def test_when_cpu_models_saved_then_models_can_be_loaded_and_inferred(data, defa
 @pytest.mark.skipif(not GPU_AVAILABLE, reason="Requires GPU")
 @pytest.mark.parametrize("data", DATASETS)
 def test_when_gpu_models_saved_then_models_can_be_loaded_and_inferred(data, default_chronos_tiny_model_gpu):
+    default_chronos_tiny_model_gpu.fit(train_data=data)
     default_chronos_tiny_model_gpu.save()
 
     loaded_model = default_chronos_tiny_model_gpu.__class__.load(path=default_chronos_tiny_model_gpu.path)
@@ -427,22 +416,6 @@ def test_when_chronos_scores_oof_and_time_limit_is_exceeded_then_exception_is_ra
         path=temp_model_path,
         hyperparameters={"model_path": chronos_model_path, "data_loader_num_workers": data_loader_num_workers},
     )
-    model.fit(data, time_limit=0.001)
+    model.fit(data, time_limit=0.1)
     with pytest.raises(TimeLimitExceeded):
         model.score_and_cache_oof(data)
-
-
-@pytest.mark.parametrize("data_loader_num_workers", [0, 1, 2])
-def test_when_chronos_inference_dataloader_used_and_time_limit_exceeded_then_exception_is_raised(
-    data_loader_num_workers,
-):
-    data_loader = ChronosInferenceDataLoader(
-        range(100_000_000),
-        batch_size=2,
-        num_workers=data_loader_num_workers,
-        on_batch=timeout_callback(seconds=0.5),
-    )
-
-    with pytest.raises(TimeLimitExceeded):
-        for _ in data_loader:
-            pass

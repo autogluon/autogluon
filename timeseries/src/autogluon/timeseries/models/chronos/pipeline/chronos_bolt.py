@@ -289,13 +289,19 @@ class ChronosBoltModelForForecasting(T5PreTrainedModel):
             # normalize target
             target, _ = self.instance_norm(target, loc_scale)
             target = target.unsqueeze(1)  # type: ignore
-            assert self.chronos_config.prediction_length == target.shape[-1]
+            assert self.chronos_config.prediction_length >= target.shape[-1]
 
             target = target.to(quantile_preds.device)
             target_mask = (
                 target_mask.unsqueeze(1).to(quantile_preds.device) if target_mask is not None else ~torch.isnan(target)
             )
             target[~target_mask] = 0.0
+
+            # pad target and target_mask if they are shorter than model's prediction_length
+            if self.chronos_config.prediction_length > target.shape[-1]:
+                padding_shape = (*target.shape[:-1], self.chronos_config.prediction_length - target.shape[-1])
+                target = torch.cat([target, torch.zeros(padding_shape).to(target)], dim=-1)
+                target_mask = torch.cat([target_mask, torch.zeros(padding_shape).to(target_mask)], dim=-1)
 
             loss = (
                 2
@@ -373,6 +379,7 @@ class ChronosBoltPipeline(BaseChronosPipeline):
     _aliases = ["PatchedT5Pipeline"]
 
     def __init__(self, model: ChronosBoltModelForForecasting):
+        super().__init__(inner_model=model)
         self.model = model
 
     @property
