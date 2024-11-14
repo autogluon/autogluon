@@ -11,6 +11,7 @@ from sklearn.base import BaseEstimator
 import autogluon.core as ag
 from autogluon.tabular import TabularPredictor
 from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TIMESTAMP, TimeSeriesDataFrame
+from autogluon.timeseries.metrics.utils import in_sample_squared_seasonal_error
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.local import SeasonalNaiveModel
 from autogluon.timeseries.utils.datetime import (
@@ -82,7 +83,6 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         self._mlf: Optional[MLForecast] = None
         self._scaler: Optional[BaseTargetTransform] = None
         self._residuals_std_per_item: Optional[pd.Series] = None
-        self._avg_residuals_std: Optional[float] = None
         self._train_target_median: Optional[float] = None
         self._non_boolean_real_covariates: List[str] = []
 
@@ -332,7 +332,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
     def _save_residuals_std(self, val_df: pd.DataFrame) -> None:
         """Compute standard deviation of residuals for each item using the validation set.
 
-        Saves per-item residuals to `self.residuals_std_per_item` and average std to `self._avg_residuals_std`.
+        Saves per-item residuals to `self.residuals_std_per_item`.
         """
         residuals_df = val_df[[MLF_ITEMID, MLF_TARGET]]
         residuals_df = residuals_df.assign(y_pred=self._mlf.models_["mean"].predict(val_df))
@@ -344,7 +344,6 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         self._residuals_std_per_item = (
             residuals.pow(2.0).groupby(val_df[MLF_ITEMID].values, sort=False).mean().pow(0.5)
         )
-        self._avg_residuals_std = np.sqrt(residuals.pow(2.0).mean())
 
     def _remove_short_ts_and_generate_fallback_forecast(
         self,
@@ -391,7 +390,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
             forecast_for_short_series = None
         return data_long, known_covariates_long, forecast_for_short_series
 
-    def _add_gaussian_quantiles(self, predictions: pd.DataFrame, repeated_item_ids: pd.Series):
+    def _add_gaussian_quantiles(self, predictions: pd.DataFrame, repeated_item_ids: pd.Series, past_target: pd.Series):
         """
         Add quantile levels assuming that residuals follow normal distribution
         """
@@ -403,9 +402,14 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         normal_scale_per_timestep = pd.Series(np.tile(sqrt_h, num_items), index=repeated_item_ids)
 
         residuals_std_per_timestep = self._residuals_std_per_item.reindex(repeated_item_ids)
-        # Use avg_residuals_std in case unseen item received for prediction
-        if residuals_std_per_timestep.isna().any():
-            residuals_std_per_timestep = residuals_std_per_timestep.fillna(value=self._avg_residuals_std)
+        # Use in-sample seasonal error in for items not seen during fit
+        items_not_seen_during_fit = residuals_std_per_timestep.index[residuals_std_per_timestep.isna()].unique()
+        if len(items_not_seen_during_fit):
+            scale_for_new_items = np.sqrt(
+                in_sample_squared_seasonal_error(y_past=past_target.loc[items_not_seen_during_fit])
+            )
+            residuals_std_per_timestep = residuals_std_per_timestep.fillna(scale_for_new_items)
+
         std_per_timestep = residuals_std_per_timestep * normal_scale_per_timestep
         for q in self.quantile_levels:
             predictions[str(q)] = predictions["mean"] + norm.ppf(q) * std_per_timestep.to_numpy()
@@ -493,7 +497,6 @@ class DirectTabularModel(AbstractMLForecastModel):
         if self.is_quantile_model:
             # Quantile model does not require residuals to produce prediction intervals
             self._residuals_std_per_item = pd.Series(1.0, index=val_df[MLF_ITEMID].unique())
-            self._avg_residuals_std = 1.0
         else:
             super()._save_residuals_std(val_df=val_df)
 
@@ -545,7 +548,9 @@ class DirectTabularModel(AbstractMLForecastModel):
                 predictions = apply_inverse_transform(predictions, transform=tfm)
 
         if not self.is_quantile_model:
-            predictions = self._add_gaussian_quantiles(predictions, repeated_item_ids=predictions[MLF_ITEMID])
+            predictions = self._add_gaussian_quantiles(
+                predictions, repeated_item_ids=predictions[MLF_ITEMID], past_target=data[self.target]
+            )
         predictions = TimeSeriesDataFrame(predictions.rename(columns={MLF_ITEMID: ITEMID, MLF_TIMESTAMP: TIMESTAMP}))
 
         if forecast_for_short_series is not None:
@@ -661,7 +666,9 @@ class RecursiveTabularModel(AbstractMLForecastModel):
             )
         predictions = raw_predictions.rename(columns={MLF_ITEMID: ITEMID, MLF_TIMESTAMP: TIMESTAMP})
         predictions = TimeSeriesDataFrame(
-            self._add_gaussian_quantiles(predictions, repeated_item_ids=predictions[ITEMID])
+            self._add_gaussian_quantiles(
+                predictions, repeated_item_ids=predictions[ITEMID], past_target=data[self.target]
+            )
         )
 
         if forecast_for_short_series is not None:
