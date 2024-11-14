@@ -116,7 +116,7 @@ class CovariateRegressor:
         else:
             time_limit_fit = None
         self.model.fit(X=X, y=y, X_val=X_val, y_val=y_val, time_limit=time_limit_fit, **kwargs)
-        logger.debug(f"\tRegressor fit duration: {time.monotonic() - start_time:.2f} s")
+
         if time_limit is not None:
             time_left = time_limit - (time.monotonic() - start_time)
             estimated_predict_time = self.model.predict_1_time * len(data)
@@ -130,10 +130,8 @@ class CovariateRegressor:
     def transform(self, data: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
         """Subtract the tabular regressor predictions from the target column."""
         if not self.disabled_due_to_time_limit:
-            start_time = time.monotonic()
             y_pred = self._predict(data, static_features=data.static_features)
             data = data.assign(**{self.target: data[self.target] - y_pred})
-            logger.debug(f"\tRegressor transform duration: {time.monotonic() - start_time:.2f} s")
         return data
 
     def fit_transform(
@@ -151,10 +149,8 @@ class CovariateRegressor:
     ) -> TimeSeriesDataFrame:
         """Add the tabular regressor predictions to the target column."""
         if not self.disabled_due_to_time_limit:
-            start_time = time.monotonic()
             y_pred = self._predict(known_covariates, static_features=static_features)
             predictions = predictions.assign(**{col: predictions[col] + y_pred for col in predictions.columns})
-            logger.debug(f"\tRegressor inverse_transform duration: {time.monotonic() - start_time:.2f} s")
         return predictions
 
     def _predict(self, data: TimeSeriesDataFrame, static_features: Optional[pd.DataFrame]) -> np.ndarray:
