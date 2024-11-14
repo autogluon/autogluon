@@ -16,9 +16,8 @@ from autogluon.tabular import TabularPredictor
 #  We may want to find a way to make it be the same `predictor.model_names` order based on priority, or at least make input to stacker models be the same
 #  This issue can theoretically lead to non-deterministic results in rare cases / edge cases
 #  Might be able to fix by not using `list(model_graph.nodes)` to produce model names, but instead keeping track of ordered model names as a variable in trainer
-# FIXME: For some reason FASTAI produces a different result when fit with parallel mode. The difference is extremely small (seems to be numerical precision)
-#  However it is odd because all other models produce identical results.
-#  The delta exists even without bagging.
+# Note: FASTAI produces a different result when fit with parallel mode when the cpus per fold/model differ.
+#  The difference is usually extremely small (seems to be numerical precision), unless it impacts the early stopping iteration.
 def test_bagged_deterministic(dataset_loader_helper):
     """
     Tests that bagged models get a deterministic result, regardless of how they are trained
@@ -62,7 +61,7 @@ def test_bagged_deterministic(dataset_loader_helper):
         hyperparameters={
             "GBM": {},
             "DUMMY": {},
-            # "FASTAI": {},  # FIXME: For some reason FASTAI is not identical between sequential and parallel fit
+            # "FASTAI": {},  # Note: FASTAI is not identical between sequential and parallel fit if CPU counts differ during model fit
         },
         num_bag_folds=4,
         num_stack_levels=1,
