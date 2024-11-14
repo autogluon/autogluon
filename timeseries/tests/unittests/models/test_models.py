@@ -515,10 +515,9 @@ def test_when_fit_and_predict_called_then_train_val_and_test_data_is_preprocesse
     model = model_class(freq=train_data.freq, path=temp_model_path, hyperparameters=dummy_hyperparameters)
     model.initialize()
     preprocessed_data = train_data + 5.0
-    if model._get_tags()["can_use_val_data"]:
-        expected_val_data = preprocessed_data
-    else:
-        expected_val_data = train_data
+    model_tags = model._get_tags()
+    expected_train_data = preprocessed_data if model_tags["can_use_train_data"] else train_data
+    expected_val_data = preprocessed_data if model_tags["can_use_val_data"] else train_data
     # We need the ugly line break because Python <3.10 does not support parentheses for context managers
     with (
         mock.patch.object(model, "preprocess") as mock_preprocess,
@@ -530,7 +529,7 @@ def test_when_fit_and_predict_called_then_train_val_and_test_data_is_preprocesse
         fit_kwargs = mock_fit.call_args[1]
         model_train_data = fit_kwargs["train_data"]
         model_val_data = fit_kwargs["val_data"]
-        assert model_train_data.equals(preprocessed_data)
+        assert model_train_data.equals(expected_train_data)
         assert model_val_data.equals(expected_val_data)
 
         model.predict(train_data)
@@ -567,6 +566,7 @@ def test_given_model_doesnt_support_nan_when_model_fits_then_nans_are_filled(
 EXPECTED_MODEL_TAGS = [
     "allow_nan",
     "can_refit_full",
+    "can_use_train_data",
     "can_use_val_data",
     # Tabular tags - not used by time series models
     "valid_oof",
