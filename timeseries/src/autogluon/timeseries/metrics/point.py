@@ -235,8 +235,6 @@ class MASE(TimeSeriesScorer):
         self._past_abs_seasonal_error = _in_sample_abs_seasonal_error(
             y_past=data_past[target], seasonal_period=seasonal_period
         )
-        # Avoid division by zero
-        self._past_abs_seasonal_error[self._past_abs_seasonal_error == 0] = 1.0
 
     def clear_past_metrics(self) -> None:
         self._past_abs_seasonal_error = None
@@ -297,8 +295,6 @@ class RMSSE(TimeSeriesScorer):
         self._past_squared_seasonal_error = _in_sample_squared_seasonal_error(
             y_past=data_past[target], seasonal_period=seasonal_period
         )
-        # Avoid division by zero
-        self._past_squared_seasonal_error[self._past_squared_seasonal_error == 0] = 1.0
 
     def clear_past_metrics(self) -> None:
         self._past_squared_seasonal_error = None
