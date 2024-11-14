@@ -1032,3 +1032,10 @@ def test_when_timestamps_have_datetime64_type_then_tsdf_can_be_constructed(dtype
     df[TIMESTAMP] = df[TIMESTAMP].astype(dtype)
     assert df[TIMESTAMP].dtype == dtype
     TimeSeriesDataFrame.from_data_frame(df)
+
+
+def test_when_to_data_frame_called_then_return_values_is_a_pandas_df():
+    tsdf = SAMPLE_TS_DATAFRAME.copy()
+    df = tsdf.to_data_frame()
+    assert isinstance(df, pd.DataFrame)
+    assert not isinstance(df, TimeSeriesDataFrame)
