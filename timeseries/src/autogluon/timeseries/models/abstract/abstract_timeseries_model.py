@@ -258,18 +258,19 @@ class AbstractTimeSeriesModel(AbstractModel):
         start_time = time.monotonic()
         self.initialize(**kwargs)
 
+        if self.target_scaler is not None:
+            train_data = self.target_scaler.fit_transform(train_data)
+        if self.covariate_regressor is not None:
+            regressor_time_limit = self._regressor_fit_time_fraction * time_limit if time_limit is not None else None
+            self.covariate_regressor.fit(
+                train_data,
+                time_limit=regressor_time_limit,
+                verbosity=kwargs.get("verbosity", 2) - 1,
+            )
+
         if self._get_tags()["can_use_train_data"]:
-            if self.target_scaler is not None:
-                train_data = self.target_scaler.fit_transform(train_data)
             if self.covariate_regressor is not None:
-                regressor_time_limit = (
-                    self._regressor_fit_time_fraction * time_limit if time_limit is not None else None
-                )
-                train_data = self.covariate_regressor.fit_transform(
-                    train_data,
-                    time_limit=regressor_time_limit,
-                    verbosity=kwargs.get("verbosity", 2) - 1,
-                )
+                train_data = self.covariate_regressor.transform(train_data)
             train_data = self.preprocess(train_data, is_train=True)
 
         if self._get_tags()["can_use_val_data"] and val_data is not None:
@@ -309,10 +310,12 @@ class AbstractTimeSeriesModel(AbstractModel):
             else:
                 if isinstance(covariate_regressor, str):
                     return CovariateRegressor(covariate_regressor, target=self.target, metadata=self.metadata)
-                elif isinstance(covariate_regressor, CovariateRegressor):
+                elif isinstance(covariate_regressor, (dict, CovariateRegressor)):
                     logger.warning(
-                        "Using a custom CovariateRegressor object is experimental functionality that may break in the future!"
+                        "Using a custom CovariateRegressor is experimental functionality that may break in the future!"
                     )
+                    if isinstance(covariate_regressor, dict):
+                        covariate_regressor = CovariateRegressor(**covariate_regressor)
                     covariate_regressor.target = self.target
                     covariate_regressor.metadata = self.metadata
                     return covariate_regressor

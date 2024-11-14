@@ -112,7 +112,7 @@ class CovariateRegressor:
             eval_metric=self.tabular_eval_metric,
         )
         if time_limit is not None:
-            time_limit_fit = self._model_fit_time_frac * (time_limit - (time.monotonic() - start_time))
+            time_limit_fit = self.fit_time_fraction * (time_limit - (time.monotonic() - start_time))
         else:
             time_limit_fit = None
         self.model.fit(X=X, y=y, X_val=X_val, y_val=y_val, time_limit=time_limit_fit, **kwargs)
