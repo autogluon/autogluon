@@ -303,19 +303,19 @@ class AbstractTimeSeriesModel(AbstractModel):
         covariate_regressor = self._get_model_params().get("covariate_regressor")
         if covariate_regressor is not None:
             if len(self.metadata.known_covariates + self.metadata.static_features) == 0:
-                logger.debug(
-                    "Skipping CovariateRegressor since the dataset contains no covariates or static features."
+                logger.info(
+                    "\tSkipping covariate_regressor since the dataset contains no covariates or static features."
                 )
                 return None
             else:
                 if isinstance(covariate_regressor, str):
                     return CovariateRegressor(covariate_regressor, target=self.target, metadata=self.metadata)
-                elif isinstance(covariate_regressor, (dict, CovariateRegressor)):
+                elif isinstance(covariate_regressor, dict):
+                    return CovariateRegressor(**covariate_regressor, target=self.target, metadata=self.metadata)
+                elif isinstance(covariate_regressor, CovariateRegressor):
                     logger.warning(
-                        "Using a custom CovariateRegressor is experimental functionality that may break in the future!"
+                        "\tUsing a custom covariate_regressor is experimental functionality that may break in the future!"
                     )
-                    if isinstance(covariate_regressor, dict):
-                        covariate_regressor = CovariateRegressor(**covariate_regressor)
                     covariate_regressor.target = self.target
                     covariate_regressor.metadata = self.metadata
                     return covariate_regressor

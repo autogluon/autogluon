@@ -88,7 +88,7 @@ class CovariateRegressor:
 
         median_ts_length = data.num_timesteps_per_item().median()
         if self.validation_fraction is not None:
-            grouped_df = tabular_df.groupby(ITEMID)
+            grouped_df = tabular_df.groupby(ITEMID, observed=False, sort=False)
             val_size = max(int(self.validation_fraction * median_ts_length), 1)
             train_df = self._subsample_df(grouped_df.head(-val_size))
             val_df = self._subsample_df(grouped_df.tail(val_size))
