@@ -2,7 +2,7 @@ import uuid
 
 import numpy as np
 import pytest
-from sklearn.metrics import log_loss, f1_score
+from sklearn.metrics import f1_score, log_loss
 
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.utils.misc import shopee_dataset
