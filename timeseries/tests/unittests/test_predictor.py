@@ -33,8 +33,8 @@ from .common import (
 )
 
 TEST_HYPERPARAMETER_SETTINGS = [
-    {"SimpleFeedForward": {"epochs": 1, "num_batches_per_epoch": 1}},
-    {"ETS": {"maxiter": 1}, "SimpleFeedForward": {"epochs": 1, "num_batches_per_epoch": 1}},
+    {"SimpleFeedForward": {"max_epochs": 1, "num_batches_per_epoch": 1}},
+    {"ETS": {"maxiter": 1}, "SimpleFeedForward": {"max_epochs": 1, "num_batches_per_epoch": 1}},
 ]
 DUMMY_HYPERPARAMETERS = {"SeasonalNaive": {"n_jobs": 1}, "Average": {"n_jobs": 1}}
 CHRONOS_HYPERPARAMETER_SETTINGS = [
@@ -53,7 +53,7 @@ def test_when_predictor_called_then_training_is_performed(temp_model_path):
     predictor = TimeSeriesPredictor(path=temp_model_path, eval_metric="MAPE")
     predictor.fit(
         train_data=DUMMY_TS_DATAFRAME,
-        hyperparameters={"SimpleFeedForward": {"epochs": 1}},
+        hyperparameters={"SimpleFeedForward": {"max_epochs": 1}},
         tuning_data=DUMMY_TS_DATAFRAME,
     )
     assert "SimpleFeedForward" in predictor.model_names()
@@ -83,7 +83,7 @@ def test_when_pathlib_path_provided_to_predictor_then_loaded_predictor_can_predi
     predictor = TimeSeriesPredictor(path=Path(temp_model_path))
     predictor.fit(
         train_data=DUMMY_TS_DATAFRAME,
-        hyperparameters={"SimpleFeedForward": {"epochs": 1}},
+        hyperparameters={"SimpleFeedForward": {"max_epochs": 1}},
     )
     predictor.save()
     loaded_predictor = TimeSeriesPredictor.load(predictor.path)
@@ -160,11 +160,11 @@ def test_given_hyperparameters_and_quantiles_when_predictor_called_then_model_ca
 @pytest.mark.parametrize(
     "hyperparameters, expected_board_length",
     [
-        ({DeepARModel: {"epochs": 1}}, 1),
+        ({DeepARModel: {"max_epochs": 1}}, 1),
         (
             {
-                DeepARModel: {"epochs": 1},
-                SimpleFeedForwardModel: {"epochs": 1},
+                DeepARModel: {"max_epochs": 1},
+                SimpleFeedForwardModel: {"max_epochs": 1},
             },
             2,
         ),
@@ -219,8 +219,8 @@ def test_given_hyperparameters_when_predictor_called_and_loaded_back_then_all_mo
 @pytest.mark.parametrize(
     "hyperparameters",
     [
-        {"Naive": {"maxiter": 1}, "SimpleFeedForward": {"epochs": 1}},
-        {"Naive": {"maxiter": 1}, "SimpleFeedForward": {"epochs": space.Int(1, 3)}},
+        {"Naive": {"maxiter": 1}, "SimpleFeedForward": {"max_epochs": 1}},
+        {"Naive": {"maxiter": 1}, "SimpleFeedForward": {"max_epochs": space.Int(1, 3)}},
     ],
 )
 def test_given_hp_spaces_and_custom_target_when_predictor_called_predictor_can_predict(
@@ -299,8 +299,8 @@ def test_given_enable_ensemble_true_when_predictor_called_then_ensemble_is_fitte
     predictor.fit(
         train_data=DUMMY_TS_DATAFRAME,
         hyperparameters={
-            "SimpleFeedForward": {"epochs": 1},
-            "DeepAR": {"epochs": 1},
+            "SimpleFeedForward": {"max_epochs": 1},
+            "DeepAR": {"max_epochs": 1},
         },
     )
     assert any("ensemble" in n.lower() for n in predictor.model_names())
@@ -315,7 +315,7 @@ def test_given_enable_ensemble_true_and_only_one_model_when_predictor_called_the
     )
     predictor.fit(
         train_data=DUMMY_TS_DATAFRAME,
-        hyperparameters={"SimpleFeedForward": {"epochs": 1}},
+        hyperparameters={"SimpleFeedForward": {"max_epochs": 1}},
     )
     assert not any("ensemble" in n.lower() for n in predictor.model_names())
 
@@ -327,7 +327,7 @@ def test_given_enable_ensemble_false_when_predictor_called_then_ensemble_is_not_
     )
     predictor.fit(
         train_data=DUMMY_TS_DATAFRAME,
-        hyperparameters={"SimpleFeedForward": {"epochs": 1}},
+        hyperparameters={"SimpleFeedForward": {"max_epochs": 1}},
         enable_ensemble=False,
     )
     assert not any("ensemble" in n.lower() for n in predictor.model_names())
@@ -358,7 +358,7 @@ def test_given_no_searchspace_and_hyperparameter_tune_kwargs_when_predictor_fits
     with pytest.raises(ValueError, match="no model contains a hyperparameter search space"):
         predictor.fit(
             train_data=DUMMY_TS_DATAFRAME,
-            hyperparameters={"SimpleFeedForward": {"epochs": 1}},
+            hyperparameters={"SimpleFeedForward": {"max_epochs": 1}},
             hyperparameter_tune_kwargs="random",
         )
 
@@ -372,7 +372,7 @@ def test_given_searchspace_and_no_hyperparameter_tune_kwargs_when_predictor_fits
     ):
         predictor.fit(
             train_data=DUMMY_TS_DATAFRAME,
-            hyperparameters={"SimpleFeedForward": {"epochs": space.Categorical(1, 2)}},
+            hyperparameters={"SimpleFeedForward": {"max_epochs": space.Categorical(1, 2)}},
         )
 
 
@@ -383,7 +383,7 @@ def test_given_mixed_searchspace_and_hyperparameter_tune_kwargs_when_predictor_f
     predictor = TimeSeriesPredictor(path=temp_model_path)
     predictor.fit(
         train_data=DUMMY_TS_DATAFRAME,
-        hyperparameters={"SimpleFeedForward": {"epochs": space.Categorical(1, 2), "ETS": {}}},
+        hyperparameters={"SimpleFeedForward": {"max_epochs": space.Categorical(1, 2), "ETS": {}}},
         hyperparameter_tune_kwargs={
             "scheduler": "local",
             "searcher": "random",
@@ -416,7 +416,7 @@ EXPECTED_FIT_SUMMARY_KEYS = [
     "hyperparameters, num_models",
     [
         ({"Naive": {}}, 1),
-        ({"Naive": {}, "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1}}, 3),  # + 1 for ensemble
+        ({"Naive": {}, "DeepAR": {"max_epochs": 1, "num_batches_per_epoch": 1}}, 3),  # + 1 for ensemble
     ],
 )
 def test_when_fit_summary_is_called_then_all_keys_and_models_are_included(
@@ -448,7 +448,7 @@ EXPECTED_INFO_KEYS = [
     "hyperparameters, num_models",
     [
         ({"Naive": {}}, 1),
-        ({"Naive": {}, "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1}}, 3),  # + 1 for ensemble
+        ({"Naive": {}, "DeepAR": {"max_epochs": 1, "num_batches_per_epoch": 1}}, 3),  # + 1 for ensemble
     ],
 )
 def test_when_info_is_called_then_all_keys_and_models_are_included(temp_model_path, hyperparameters, num_models):
@@ -626,8 +626,8 @@ def test_when_refit_full_called_then_best_model_is_updated(temp_model_path, set_
     predictor.fit(
         DUMMY_TS_DATAFRAME,
         hyperparameters={
-            "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1},
-            "SimpleFeedForward": {"epochs": 1, "num_batches_per_epoch": 1},
+            "DeepAR": {"max_epochs": 1, "num_batches_per_epoch": 1},
+            "SimpleFeedForward": {"max_epochs": 1, "num_batches_per_epoch": 1},
         },
     )
     model_best_before = predictor.model_best
@@ -660,8 +660,8 @@ def test_when_excluded_model_names_provided_then_excluded_models_are_not_trained
     predictor.fit(
         DUMMY_TS_DATAFRAME,
         hyperparameters={
-            "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1},
-            "SimpleFeedForward": {"epochs": 1, "num_batches_per_epoch": 1},
+            "DeepAR": {"max_epochs": 1, "num_batches_per_epoch": 1},
+            "SimpleFeedForward": {"max_epochs": 1, "num_batches_per_epoch": 1},
         },
         excluded_model_types=["DeepAR"],
     )
@@ -1180,7 +1180,7 @@ def test_when_predictor_predict_called_with_random_seed_then_torch_seed_set_for_
         DUMMY_TS_DATAFRAME,
         hyperparameters={
             "SeasonalNaive": {},
-            "DeepAR": {"epochs": 1},
+            "DeepAR": {"max_epochs": 1},
         },
         random_seed=random_seed,
         enable_ensemble=False,
@@ -1580,8 +1580,8 @@ def importance_dataset_and_predictors(request, tmp_path_factory):
 
     hyperparameter_map = {
         "no_features": {"Naive": {}},
-        "known_and_categorical_only": {"DeepAR": {"epochs": 1}},
-        "all_features": {"TemporalFusionTransformer": {"epochs": 1}},
+        "known_and_categorical_only": {"DeepAR": {"max_epochs": 1}},
+        "all_features": {"TemporalFusionTransformer": {"max_epochs": 1}},
     }
 
     predictors = {}

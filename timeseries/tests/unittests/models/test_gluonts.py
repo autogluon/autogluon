@@ -36,7 +36,7 @@ TESTABLE_MODELS = [
 ]
 
 
-DUMMY_HYPERPARAMETERS = {"epochs": 1, "num_batches_per_epoch": 1}
+DUMMY_HYPERPARAMETERS = {"max_epochs": 1, "num_batches_per_epoch": 1}
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
@@ -45,7 +45,17 @@ def test_when_context_length_is_not_set_then_default_context_length_is_used(mode
     model = model_class(freq=data.freq, hyperparameters=DUMMY_HYPERPARAMETERS)
     model.fit(train_data=data)
     estimator_init_args = model._get_estimator_init_args()
-    assert estimator_init_args["context_length"] == model.default_context_length
+    default_context_length = model._get_default_params()["context_length"]
+    assert estimator_init_args["context_length"] == default_context_length
+
+
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+def test_when_context_length_is_set_then_provided_context_length_is_used(model_class):
+    data = DUMMY_TS_DATAFRAME
+    model = model_class(freq=data.freq, hyperparameters={**DUMMY_HYPERPARAMETERS, "context_length": 1337})
+    model.fit(train_data=data)
+    estimator_init_args = model._get_estimator_init_args()
+    assert estimator_init_args["context_length"] == 1337
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
@@ -55,7 +65,7 @@ def test_given_time_limit_when_fit_called_then_models_train_correctly(model_clas
         path=temp_model_path,
         freq="h",
         prediction_length=5,
-        hyperparameters={"epochs": 2},
+        hyperparameters={"max_epochs": 2},
     )
 
     assert not model.gts_predictor
@@ -74,7 +84,7 @@ def test_given_low_time_limit_when_fit_called_then_model_training_does_not_excee
         path=temp_model_path,
         freq="h",
         prediction_length=5,
-        hyperparameters={"epochs": 20000},
+        hyperparameters={"max_epochs": 20000},
     )
 
     assert not model.gts_predictor

@@ -155,7 +155,7 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct
         path=temp_model_path,
         freq="h",
         quantile_levels=[0.1, 0.9],
-        hyperparameters={**dummy_hyperparameters, "epochs": space.Int(1, 3)},
+        hyperparameters={**dummy_hyperparameters, "max_epochs": space.Int(1, 3)},
     )
     if isinstance(model, MultiWindowBacktestingModel):
         val_data = None
@@ -172,7 +172,7 @@ def test_given_hyperparameter_spaces_when_tune_called_then_tuning_output_correct
     )
     assert len(hpo_results) == num_trials
     for result in hpo_results.values():
-        assert 1 <= result["hyperparameters"]["epochs"] <= 3
+        assert 1 <= result["hyperparameters"]["max_epochs"] <= 3
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)
@@ -182,7 +182,7 @@ def test_given_hyperparameter_spaces_to_init_when_fit_called_then_error_is_raise
         freq="h",
         quantile_levels=[0.1, 0.9],
         hyperparameters={
-            "epochs": space.Int(3, 4),
+            "max_epochs": space.Int(3, 4),
         },
     )
     with pytest.raises(ValueError, match=".*hyperparameter_tune.*"):
@@ -421,7 +421,7 @@ def test_when_custom_metric_passed_to_model_then_model_can_hyperparameter_tune(m
     model = model_class(
         prediction_length=3,
         freq=DUMMY_TS_DATAFRAME.freq,
-        hyperparameters={**dummy_hyperparameters, "epochs": space.Int(1, 3)},
+        hyperparameters={**dummy_hyperparameters, "max_epochs": space.Int(1, 3)},
         eval_metric=CustomMetric(),
     )
     backend = model._get_hpo_backend()
@@ -445,7 +445,7 @@ def test_when_custom_metric_passed_to_model_then_model_can_hyperparameter_tune(m
     )
     assert len(hpo_results) == num_trials
     for result in hpo_results.values():
-        assert 1 <= result["hyperparameters"]["epochs"] <= 3
+        assert 1 <= result["hyperparameters"]["max_epochs"] <= 3
         assert np.isfinite(result["val_score"])
 
 
@@ -456,7 +456,7 @@ def test_given_searcher_when_ray_backend_used_in_hpo_then_correct_searcher_used(
         prediction_length=3,
         freq=DUMMY_TS_DATAFRAME.freq,
         hyperparameters={
-            "epochs": space.Int(1, 3),
+            "max_epochs": space.Int(1, 3),
             "num_batches_per_epoch": 1,
             "use_fallback_model": False,
         },

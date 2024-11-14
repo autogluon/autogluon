@@ -20,10 +20,10 @@ from autogluon.timeseries.trainer.auto_trainer import AutoTimeSeriesTrainer
 
 from .common import DATAFRAME_WITH_COVARIATES, DUMMY_TS_DATAFRAME, dict_equal_primitive, get_data_frame_with_item_index
 
-DUMMY_TRAINER_HYPERPARAMETERS = {"SimpleFeedForward": {"epochs": 1}}
+DUMMY_TRAINER_HYPERPARAMETERS = {"SimpleFeedForward": {"max_epochs": 1}}
 TEST_HYPERPARAMETER_SETTINGS = [
-    {"SimpleFeedForward": {"epochs": 1}},
-    {"DeepAR": {"epochs": 1}, "ETS": {}},
+    {"SimpleFeedForward": {"max_epochs": 1}},
+    {"DeepAR": {"max_epochs": 1}, "ETS": {}},
 ]
 TEST_HYPERPARAMETER_SETTINGS_EXPECTED_LB_LENGTHS = [1, 2]
 
@@ -125,10 +125,10 @@ def test_given_hyperparameters_when_trainer_called_then_model_can_predict(
 @pytest.mark.parametrize(
     "hyperparameters",
     [
-        {"DeepAR": {"epochs": 4}, "SimpleFeedForward": {"epochs": 1}},
+        {"DeepAR": {"max_epochs": 4}, "SimpleFeedForward": {"max_epochs": 1}},
         {
-            "SimpleFeedForward": {"context_length": 44, "epochs": 2},
-            "DeepAR": {"epochs": 3},
+            "SimpleFeedForward": {"context_length": 44, "max_epochs": 2},
+            "DeepAR": {"max_epochs": 3},
         },
     ],
 )
@@ -148,10 +148,10 @@ def test_given_hyperparameters_when_trainer_model_templates_called_then_hyperpar
 @pytest.mark.parametrize(
     "hyperparameters",
     [
-        {"DeepAR": {"epochs": 1}, "SimpleFeedForward": {"epochs": 1}},
+        {"DeepAR": {"max_epochs": 1}, "SimpleFeedForward": {"max_epochs": 1}},
         {
-            "SimpleFeedForward": {"context_length": 44, "epochs": 1},
-            "DeepAR": {"epochs": 1},
+            "SimpleFeedForward": {"context_length": 44, "max_epochs": 1},
+            "DeepAR": {"max_epochs": 1},
         },
     ],
 )
@@ -170,7 +170,7 @@ def test_given_hyperparameters_when_trainer_fit_then_freq_set_correctly(temp_mod
 @pytest.mark.skipif(sys.platform.startswith("win"), reason="HPO tests lead to known issues in Windows platform tests")
 @pytest.mark.parametrize("model_name", ["DeepAR", "SimpleFeedForward"])
 def test_given_hyperparameters_with_spaces_when_trainer_called_then_hpo_is_performed(temp_model_path, model_name):
-    hyperparameters = {model_name: {"epochs": space.Int(1, 4)}}
+    hyperparameters = {model_name: {"max_epochs": space.Int(1, 4)}}
     # mock the default hps factory to prevent preset hyperparameter configurations from
     # creeping into the test case
     with mock.patch("autogluon.timeseries.models.presets.get_default_hps") as default_hps_mock:
@@ -192,7 +192,7 @@ def test_given_hyperparameters_with_spaces_when_trainer_called_then_hpo_is_perfo
     hpo_results_first_model = next(iter(trainer.hpo_results.values()))
     config_history = [result["hyperparameters"] for result in hpo_results_first_model.values()]
     assert len(config_history) == 2
-    assert all(1 <= config["epochs"] <= 4 for config in config_history)
+    assert all(1 <= config["max_epochs"] <= 4 for config in config_history)
 
 
 @pytest.mark.parametrize(
@@ -216,11 +216,11 @@ def test_given_hyperparameters_with_lists_when_trainer_called_then_multiple_mode
 @pytest.mark.parametrize(
     "hyperparameters, expected_board_length",
     [
-        ({DeepARModel: {"epochs": 1}}, 1),
+        ({DeepARModel: {"max_epochs": 1}}, 1),
         (
             {
                 ETSModel: {},
-                DeepARModel: {"epochs": 1},
+                DeepARModel: {"max_epochs": 1},
             },
             2,
         ),
@@ -247,25 +247,25 @@ def test_given_hyperparameters_and_custom_models_when_trainer_called_then_leader
     [
         (
             [
-                {DeepARModel: {"epochs": 1}},
-                {DeepARModel: {"epochs": 1}},
+                {DeepARModel: {"max_epochs": 1}},
+                {DeepARModel: {"max_epochs": 1}},
             ],
             3,
             ["AR_2"],
         ),
         (
             [
-                {DeepARModel: {"epochs": 1}, "ETS": {}},
-                {DeepARModel: {"epochs": 1}},
-                {DeepARModel: {"epochs": 1}},
+                {DeepARModel: {"max_epochs": 1}, "ETS": {}},
+                {DeepARModel: {"max_epochs": 1}},
+                {DeepARModel: {"max_epochs": 1}},
             ],
             7,
             ["AR_2", "AR_3", "Ensemble_2", "Ensemble_3"],
         ),
         (
             [
-                {DeepARModel: {"epochs": 1}, "DeepAR": {"epochs": 1}, "ETS": {}},
-                {DeepARModel: {"epochs": 1}},
+                {DeepARModel: {"max_epochs": 1}, "DeepAR": {"max_epochs": 1}, "ETS": {}},
+                {DeepARModel: {"max_epochs": 1}},
             ],
             6,
             ["AR_2", "AR_3", "Ensemble_2"],
@@ -298,10 +298,10 @@ def test_given_repeating_model_when_trainer_called_incrementally_then_name_colli
 @pytest.mark.parametrize(
     "hyperparameters",
     [
-        {"DeepAR": {"epochs": 1}, "SimpleFeedForward": {"epochs": 1}},
+        {"DeepAR": {"max_epochs": 1}, "SimpleFeedForward": {"max_epochs": 1}},
         {
-            "SimpleFeedForward": {"context_length": 44, "epochs": 1},
-            "DeepAR": {"epochs": 1},
+            "SimpleFeedForward": {"context_length": 44, "max_epochs": 1},
+            "DeepAR": {"max_epochs": 1},
         },
     ],
 )
@@ -343,7 +343,7 @@ def test_when_trainer_fit_and_deleted_then_oof_predictions_can_be_loaded(temp_mo
             "Naive": {},
             "ETS": {},
             "DirectTabular": {"tabular_hyperparameters": {"GBM": {}}},
-            "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1},
+            "DeepAR": {"max_epochs": 1, "num_batches_per_epoch": 1},
         },
     )
     model_names = copy.copy(trainer.get_model_names())
@@ -371,7 +371,9 @@ def test_when_known_covariates_present_then_all_ensemble_base_models_can_predict
     trainer = AutoTimeSeriesTrainer(
         path=temp_model_path, prediction_length=prediction_length, enable_ensemble=False, cache_predictions=False
     )
-    trainer.fit(df_train, hyperparameters={"ETS": {"maxiter": 1}, "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1}})
+    trainer.fit(
+        df_train, hyperparameters={"ETS": {"maxiter": 1}, "DeepAR": {"max_epochs": 1, "num_batches_per_epoch": 1}}
+    )
 
     # Manually add ensemble to ensure that both models have non-zero weight
     ensemble = TimeSeriesGreedyEnsemble(name="WeightedEnsemble", path=trainer.path)
@@ -401,7 +403,7 @@ def trained_and_refit_trainers():
             hyperparameters={
                 "Naive": {},
                 "Theta": {},
-                "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1},
+                "DeepAR": {"max_epochs": 1, "num_batches_per_epoch": 1},
                 "DirectTabular": {},
                 "RecursiveTabular": {},
             },
@@ -446,8 +448,8 @@ def test_when_refit_full_called_with_model_name_then_single_model_is_updated(tem
     trainer.fit(
         DUMMY_TS_DATAFRAME,
         hyperparameters={
-            "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1},
-            "SimpleFeedForward": {"epochs": 1, "num_batches_per_epoch": 1},
+            "DeepAR": {"max_epochs": 1, "num_batches_per_epoch": 1},
+            "SimpleFeedForward": {"max_epochs": 1, "num_batches_per_epoch": 1},
         },
     )
     model_refit_map = trainer.refit_full("DeepAR")
@@ -478,8 +480,8 @@ def test_when_excluded_model_names_provided_then_excluded_models_are_not_trained
     trainer.fit(
         DUMMY_TS_DATAFRAME,
         hyperparameters={
-            "DeepAR": {"epochs": 1, "num_batches_per_epoch": 1},
-            "SimpleFeedForward": {"epochs": 1, "num_batches_per_epoch": 1},
+            "DeepAR": {"max_epochs": 1, "num_batches_per_epoch": 1},
+            "SimpleFeedForward": {"max_epochs": 1, "num_batches_per_epoch": 1},
         },
         excluded_model_types=excluded_model_types,
     )

@@ -39,7 +39,6 @@ gts_logger = logging.getLogger(gluonts.__name__)
 class SimpleGluonTSDataset(GluonTSDataset):
     """Wrapper for TimeSeriesDataFrame that is compatible with the GluonTS Dataset API."""
 
-    # TODO: Move this class to the dataset namespace as multiple models are using it now
     def __init__(
         self,
         target_df: TimeSeriesDataFrame,
@@ -287,10 +286,6 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
         self.negative_data = (dataset[self.target] < 0).any()
 
-    @property
-    def default_context_length(self) -> int:
-        return min(512, max(10, 2 * self.prediction_length))
-
     def preprocess(self, data: TimeSeriesDataFrame, is_train: bool = False, **kwargs) -> TimeSeriesDataFrame:
         # Copy data to avoid SettingWithCopyWarning from pandas
         data = data.copy()
@@ -358,25 +353,40 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             known_covariates[columns] = self._real_column_transformers["known"].transform(known_covariates[columns])
         return known_covariates
 
+    def _get_default_params(self):
+        """Gets default parameters for GluonTS estimator initialization that are available after
+        AbstractTimeSeriesModel initialization (i.e., before deferred initialization). Models may
+        override this method to update default parameters.
+        """
+        return {
+            "batch_size": 64,
+            "context_length": min(512, max(10, 2 * self.prediction_length)),
+            "predict_batch_size": 500,
+            "early_stopping_patience": 20,
+            "max_epochs": 100,
+            "lr": 1e-3,
+            "freq": self._dummy_gluonts_freq,
+            "prediction_length": self.prediction_length,
+            "quantiles": self.quantile_levels,
+        }
+
     def _get_model_params(self) -> dict:
         """Gets params that are passed to the inner model."""
-        init_args = super()._get_model_params().copy()
-        init_args.setdefault("batch_size", 64)
-        init_args.setdefault("context_length", self.default_context_length)
-        init_args.setdefault("predict_batch_size", 500)
-        init_args.setdefault("early_stopping_patience", 20)
-        init_args.update(
-            dict(
-                freq=self._dummy_gluonts_freq,
-                prediction_length=self.prediction_length,
-                quantiles=self.quantile_levels,
-                callbacks=self.callbacks,
-            )
-        )
-        # Support MXNet kwarg names for backwards compatibility
-        init_args.setdefault("lr", init_args.get("learning_rate", 1e-3))
-        init_args.setdefault("max_epochs", init_args.get("epochs", 100))
-        return init_args
+        # for backward compatibility with the old GluonTS MXNet API
+        parameter_name_aliases = {
+            "epochs": "max_epochs",
+            "learning_rate": "lr",
+        }
+
+        init_args = super()._get_model_params()
+        for alias, actual in parameter_name_aliases.items():
+            if alias in init_args:
+                if actual in init_args:
+                    raise ValueError(f"Parameter '{alias}' cannot be specified when '{actual}' is also specified.")
+                else:
+                    init_args[actual] = init_args.pop(alias)
+
+        return self._get_default_params() | init_args
 
     def _get_estimator_init_args(self) -> Dict[str, Any]:
         """Get GluonTS specific constructor arguments for estimator objects, an alias to `self._get_model_params`
@@ -396,7 +406,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
         default_trainer_kwargs = {
             "limit_val_batches": 3,
             "max_epochs": init_args["max_epochs"],
-            "callbacks": init_args["callbacks"],
+            "callbacks": self.callbacks,
             "enable_progress_bar": False,
             "default_root_dir": self.path,
         }

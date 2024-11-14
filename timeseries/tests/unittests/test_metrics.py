@@ -55,7 +55,7 @@ def deepar_trained() -> AbstractGluonTSModel:
         DUMMY_TS_DATAFRAME,
         tuning_data=DUMMY_TS_DATAFRAME,
         hyperparameters={
-            "DeepAR": dict(epochs=2),
+            "DeepAR": {"max_epochs": 2},
         },
     )
     return pred._trainer.load_model("DeepAR")
@@ -71,7 +71,7 @@ def deepar_trained_zero_data() -> AbstractGluonTSModel:
         data,
         tuning_data=data,
         hyperparameters={
-            "DeepAR": dict(epochs=2),
+            "DeepAR": {"max_epochs": 2},
         },
     )
     return pred._trainer.load_model("DeepAR")
@@ -295,7 +295,7 @@ def test_RMSLE(prediction_length, expected_result):
 def test_given_metric_is_optimized_by_median_when_model_predicts_then_median_is_pasted_to_mean_forecast(metric_name):
     eval_metric = check_get_evaluation_metric(metric_name)
     pred = TimeSeriesPredictor(prediction_length=5, eval_metric=eval_metric)
-    pred.fit(DUMMY_TS_DATAFRAME, hyperparameters={"DeepAR": {"epochs": 1, "num_batches_per_epoch": 1}})
+    pred.fit(DUMMY_TS_DATAFRAME, hyperparameters={"DeepAR": {"max_epochs": 1, "num_batches_per_epoch": 1}})
     predictions = pred.predict(DUMMY_TS_DATAFRAME)
     if eval_metric.optimized_by_median:
         assert (predictions["mean"] == predictions["0.5"]).all()
@@ -331,6 +331,6 @@ def test_when_better_predictions_passed_to_metric_then_score_improves(metric_nam
 @pytest.mark.parametrize("metric_name", ["WCD", "wcd"])
 def test_when_experimental_metric_name_used_then_predictor_can_score(metric_name):
     predictor = TimeSeriesPredictor(prediction_length=3, eval_metric=metric_name)
-    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"DeepAR": {"epochs": 1, "num_batches_per_epoch": 1}})
+    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"DeepAR": {"max_epochs": 1, "num_batches_per_epoch": 1}})
     score = predictor.score(DUMMY_TS_DATAFRAME)
     assert np.isfinite(score["WCD"])

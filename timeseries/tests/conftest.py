@@ -67,7 +67,7 @@ def hf_model_path(tmp_path_factory):
 def dummy_hyperparameters(hf_model_path):
     """Hyperparameters passed to the models during tests to minimize training time."""
     return {
-        "epochs": 1,
+        "max_epochs": 1,
         "num_batches_per_epoch": 1,
         "n_jobs": 1,
         "use_fallback_model": False,

@@ -55,7 +55,7 @@ def generate_train_and_test_data(
     return train_data, test_data
 
 
-DUMMY_MODEL_HPARAMS = {"epochs": 1, "num_batches_per_epoch": 1, "use_fallback_model": False}
+DUMMY_MODEL_HPARAMS = {"max_epochs": 1, "num_batches_per_epoch": 1, "use_fallback_model": False}
 
 ALL_MODELS = {
     "ADIDA": DUMMY_MODEL_HPARAMS,

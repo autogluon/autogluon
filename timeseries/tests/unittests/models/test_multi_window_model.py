@@ -14,7 +14,7 @@ from ..common import DUMMY_TS_DATAFRAME, dict_equal_primitive
 def get_multi_window_deepar(hyperparameters=None, **kwargs):
     """Wrap DeepAR inside MultiWindowBacktestingModel."""
     if hyperparameters is None:
-        hyperparameters = {"epochs": 1, "num_batches_per_epoch": 1}
+        hyperparameters = {"max_epochs": 1, "num_batches_per_epoch": 1}
     model_base_kwargs = {**kwargs, "hyperparameters": hyperparameters}
     return MultiWindowBacktestingModel(model_base=DeepARModel, model_base_kwargs=model_base_kwargs, **kwargs)
 
