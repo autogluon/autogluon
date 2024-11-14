@@ -4,7 +4,7 @@ import logging
 from dataclasses import dataclass
 from typing import Callable, Literal
 import time
-from autogluon.core.models import AbstractModel, StackerEnsembleModel
+from autogluon.core.models import AbstractModel, BaggedEnsembleModel
 from autogluon.common.utils.resource_utils import get_resource_manager
 import math
 
@@ -274,7 +274,7 @@ class DistributedFitManager:
         # As we have no information about if the model needs GPUs, we assume that it does not need any.
         num_gpus_for_fold_worker = getattr(model, "model_base", model)._user_params_aux.get("num_gpus", 0)
 
-        if (not isinstance(model, StackerEnsembleModel)) or model._user_params.get("use_child_oof", False):
+        if (not isinstance(model, BaggedEnsembleModel)) or model._user_params.get("use_child_oof", False):
             # Only one fold is fit, so we need to use all fit resources for the model-worker
             num_cpus_for_model_worker = num_cpus_for_fold_worker
             num_gpus_for_model_worker = num_gpus_for_fold_worker
