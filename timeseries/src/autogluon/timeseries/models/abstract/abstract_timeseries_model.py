@@ -60,7 +60,8 @@ class AbstractTimeSeriesModel(AbstractModel):
     """
 
     _oof_filename = "oof.pkl"
-    _regressor_fit_time_fraction: float = 0.5
+    # TODO: For which models should we override this parameter?
+    _covariate_regressor_fit_time_fraction: float = 0.5
 
     # TODO: refactor "pruned" methods after AbstractModel is refactored
     predict_proba = None
@@ -261,10 +262,12 @@ class AbstractTimeSeriesModel(AbstractModel):
         if self.target_scaler is not None:
             train_data = self.target_scaler.fit_transform(train_data)
         if self.covariate_regressor is not None:
-            regressor_time_limit = self._regressor_fit_time_fraction * time_limit if time_limit is not None else None
+            covariate_regressor_time_limit = (
+                self._covariate_regressor_fit_time_fraction * time_limit if time_limit is not None else None
+            )
             self.covariate_regressor.fit(
                 train_data,
-                time_limit=regressor_time_limit,
+                time_limit=covariate_regressor_time_limit,
                 verbosity=kwargs.get("verbosity", 2) - 1,
             )
 
