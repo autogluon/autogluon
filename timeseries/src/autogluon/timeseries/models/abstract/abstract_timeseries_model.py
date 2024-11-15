@@ -413,7 +413,7 @@ class AbstractTimeSeriesModel(AbstractModel):
             data = self.target_scaler.fit_transform(data)
         if self.covariate_scaler is not None:
             data = self.covariate_scaler.fit_transform(data)
-            known_covariates = self.covariate_scaler.transform_known_covariates(data)
+            known_covariates = self.covariate_scaler.transform_known_covariates(known_covariates)
         if self.covariate_regressor is not None:
             data = self.covariate_regressor.fit_transform(data)
 
