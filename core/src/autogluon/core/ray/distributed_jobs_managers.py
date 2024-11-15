@@ -146,8 +146,12 @@ class DistributedFitManager:
         logger.log(20, f"MEM MAX PER CORE: {self.max_mem_per_core*1e-9:.2f} GB")
 
     @property
-    def available_num_cpus_virtual(self):
+    def available_num_cpus_virtual(self) -> int:
         return self.available_num_cpus + self.extra_num_cpus
+
+    @property
+    def total_num_cpus_virtual(self) -> int:
+        return self.total_num_cpus + self.extra_num_cpus
 
     def num_children_model(self, model: AbstractModel) -> int:
         if (not isinstance(model, BaggedEnsembleModel)) or model._user_params.get("use_child_oof", False):
@@ -281,15 +285,14 @@ class DistributedFitManager:
         else:
             models_to_schedule = self.models_to_schedule
 
+        cpus_fully_allocated = False
+        num_models_delay_to_fit_all = 0
+
         models_to_schedule_later = []
         job_refs = []
-        for model in models_to_schedule:
+        num_models_to_schedule = len(models_to_schedule)
+        for i, model in enumerate(models_to_schedule):
             model_name = model if self.mode == "refit" else model.name
-            if self.available_num_cpus_virtual < 1:
-                logger.log(20, f"Delay scheduling model {model_name}: CPUs are fully allocated")
-                models_to_schedule_later.append(model)
-                continue
-            num_children = self.num_children_model(model=model)
             if model_name in self.model_child_mem_estimate_cache:
                 model_child_memory_estimate = self.model_child_mem_estimate_cache[model_name]
             else:
@@ -298,14 +301,31 @@ class DistributedFitManager:
                 te = time.time()
                 logger.log(20, f"{te - ts:.2f}s\tMEM ESTIMATE TIME {model.name}")
                 self.model_child_mem_estimate_cache[model_name] = model_child_memory_estimate
-            num_cpus_per_child_safe = model_child_memory_estimate / max_mem_per_core
-
-            logger.log(20, f"Safe CPUs per child: {math.ceil(num_cpus_per_child_safe)} ({num_cpus_per_child_safe:.2f}): {model.name}")
-            num_cpus_per_child_safe = max(math.ceil(num_cpus_per_child_safe), 1)
-
             if model_child_memory_estimate > self.max_mem:
-                logger.log(20, f"Insufficient total memory to fit {model_name} for even a single fold. Skipping.")
+                logger.log(20, f"Insufficient total memory to fit model for even a single fold. Skipping {model_name}...")
                 continue
+            if self.available_num_cpus_virtual < 1:
+                if not cpus_fully_allocated:
+                    logger.log(20, f"Delay scheduling {num_models_to_schedule - i} models: CPUs are fully allocated")
+                cpus_fully_allocated = True
+                models_to_schedule_later.append(model)
+                continue
+            num_children = self.num_children_model(model=model)
+            if (num_children > self.available_num_cpus_virtual) and (self.total_num_cpus >= num_children):
+                # try to wait to schedule later when all folds can be fit in parallel
+                num_models_delay_to_fit_all += 1
+                models_to_schedule_later.append(model)
+                continue
+            if num_models_delay_to_fit_all > 0:
+                logger.log(
+                    20,
+                    f"Delay scheduling {num_models_delay_to_fit_all} models: waiting for enough CPUs to fit all folds in parallel..."
+                )
+                num_models_delay_to_fit_all = 0
+
+            num_cpus_per_child_safe = model_child_memory_estimate / max_mem_per_core
+            # logger.log(20, f"Safe CPUs per child: {math.ceil(num_cpus_per_child_safe)} ({num_cpus_per_child_safe:.2f}): {model.name}")
+            num_cpus_per_child_safe = max(math.ceil(num_cpus_per_child_safe), 1)
 
             num_cpus_avail = self.available_num_cpus_virtual
 
@@ -317,18 +337,18 @@ class DistributedFitManager:
 
             if safe_children < num_children:
                 # FIXME: Make this better, do real successive halving rather than this hack code that only works for 8 or fewer
-                if safe_children > 4:
+                if safe_children >= 4:
                     safe_children = 4
-                elif safe_children > 2:
+                elif safe_children >= 2:
                     safe_children = 2
-                elif safe_children > 1:
+                elif safe_children >= 1:
                     safe_children = 1
                 else:
                     safe_children = 0
                     # skip model
                     pass
 
-                logger.log(20, f"\t{max_safe_children} MAX SAFE CHILDREN\t| {model.name}")
+                # logger.log(20, f"\t{max_safe_children} MAX SAFE CHILDREN\t| {model.name}")
 
             if safe_children == 0:
                 # FIXME: level 15 logging for release
@@ -339,7 +359,7 @@ class DistributedFitManager:
             model_memory_estimate = self.get_memory_estimate_for_model(model=model, mem_usage_child=model_child_memory_estimate, num_children=safe_children)
 
             if safe_children < num_children:
-                if (num_children * model_child_memory_estimate) < self.max_mem:
+                if ((num_children * model_child_memory_estimate) < self.max_mem) and (self.total_num_cpus >= num_children):
                     # try to wait to schedule later when all folds can be fit in parallel
                     logger.log(
                         20,
@@ -422,13 +442,20 @@ class DistributedFitManager:
             logger.log(
                 20,
                 f"Scheduled model {self.mode} for {model_name}: "
-                f"allocated {'' if is_sufficient else 'UP TO '}{model_resources.total_num_cpus} CPUs and {model_resources.total_num_gpus} GPUs. | "
+                f"allocated {'' if is_sufficient else 'UP TO '}{model_resources.total_num_cpus} CPUs and {model_resources.total_num_gpus} GPUs | "
                 f"{len(self.job_refs_to_allocated_resources)} jobs are running."
                 f"\n\tUsing {model_resources.num_cpus_for_fold_worker if num_children != 1 else model_resources.num_cpus_for_model_worker} CPUs per fold for {num_children} folds, fitting {safe_children} folds in parallel"
-                f"\n\t{self.total_num_cpus - self.available_num_cpus}/{self.total_num_cpus} Allocated CPUS\n"
+                f"\n\t{self.total_num_cpus - self.available_num_cpus}/{self.total_num_cpus} Allocated CPUS ({self.total_num_cpus_virtual} allowed)\n"
                 f"\t{(self.total_mem - self.available_mem) * 1e-9:.1f}/{self.total_mem * 1e-9:.1f} GB Allocated Memory",
             )
             time.sleep(0.1)
+
+        if num_models_delay_to_fit_all > 0:
+            logger.log(
+                20,
+                f"Delay scheduling {num_models_delay_to_fit_all} models: waiting for enough CPUs to fit all folds in parallel..."
+            )
+            num_models_delay_to_fit_all = 0
 
         self.models_to_schedule = models_to_schedule_later
         return job_refs
@@ -480,12 +507,16 @@ class DistributedFitManager:
         model_clone.initialize(
             X=X,
             y=y,
+            problem_type=self.problem_type,
+            num_classes=self.num_classes,
             # total_resources=kwargs["total_resources"],
             # **kwargs["fit_kwargs"],
         )
         model_clone.model_base.initialize(
             X=X,
             y=y,
+            problem_type=self.problem_type,
+            num_classes=self.num_classes,
             # total_resources=kwargs["total_resources"],
             # **kwargs["fit_kwargs"],
         )
