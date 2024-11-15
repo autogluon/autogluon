@@ -275,7 +275,18 @@ Deep learning models pretrained on large time series datasets, able to perform z
    - `"min_max"` - min-max scaler that converts data into the (0, 1) range, `loc = min(y)`, `scale = max(y) - min(y)`.
    - `None` - no scaling
 
-- **covariate_regressor** *({"LR", "GBM", "CAT", "XGB", None}, default = None)* - If provided, the chosen tabular
+- **covariate_scaler** *({"global", None})* - If provided, the chosen scaling method will be applied to the covariates
+   and static features before fitting the model.
+
+   Such scaling be helpful for deep learning models that assume that the inputs are normalized.
+
+   Available options:
+   - `"global"` - `QuantileTransform` for skewed features, passthrough for boolean features, and `StandardScaler` for the rest of the features
+   - `None` - do not scale the covariates
+
+   By default, this parameter is set to `"global"` for GluonTS models, and `None` for all other models.
+
+- **covariate_regressor** *({"LR", "GBM", "CAT", "XGB", "RF", None}, default = None)* - If provided, the chosen tabular
    regression model will be fit on the known covariates & static features to predict the target column at the same time
    step.
 

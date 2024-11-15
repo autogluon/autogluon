@@ -293,7 +293,7 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         fit_start_time = time.time()
         self._train_target_median = train_data[self.target].median()
         for col in self.metadata.known_covariates_real:
-            if not train_data[col].isin([0, 1]).all():
+            if not set(train_data[col].unique()) == set([0, 1]):
                 self._non_boolean_real_covariates.append(col)
         # TabularEstimator is passed to MLForecast later to include tuning_data
         model_params = self._get_model_params()

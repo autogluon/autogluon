@@ -127,7 +127,7 @@ class GlobalCovariateScaler(CovariateScaler):
         skewed_features = []
         continuous_features = []
         for col in columns:
-            if df[col].isin([0, 1]).all():
+            if set(df[col].unique()) == set([0, 1]):
                 bool_features.append(col)
             elif np.abs(df[col].skew()) > self.skew_threshold:
                 skewed_features.append(col)
