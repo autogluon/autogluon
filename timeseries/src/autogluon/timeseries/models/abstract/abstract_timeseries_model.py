@@ -270,7 +270,7 @@ class AbstractTimeSeriesModel(AbstractModel):
             train_data = self.target_scaler.fit_transform(train_data)
 
         if self.covariate_scaler is not None:
-            train_data, _ = self.covariate_scaler.fit_transform(train_data)
+            train_data = self.covariate_scaler.fit_transform(train_data)
 
         if self.covariate_regressor is not None:
             covariate_regressor_time_limit = (
@@ -291,7 +291,7 @@ class AbstractTimeSeriesModel(AbstractModel):
             if self.target_scaler is not None:
                 val_data = self.target_scaler.transform(val_data)
             if self.covariate_scaler is not None:
-                val_data, _ = self.covariate_scaler.transform(val_data)
+                val_data = self.covariate_scaler.transform(val_data)
             if self.covariate_regressor is not None:
                 val_data = self.covariate_regressor.transform(val_data)
             val_data, _ = self.preprocess(val_data, is_train=False)
@@ -412,7 +412,8 @@ class AbstractTimeSeriesModel(AbstractModel):
         if self.target_scaler is not None:
             data = self.target_scaler.fit_transform(data)
         if self.covariate_scaler is not None:
-            data, known_covariates = self.covariate_scaler.fit_transform(data, known_covariates)
+            data = self.covariate_scaler.fit_transform(data)
+            known_covariates = self.covariate_scaler.transform_known_covariates(data)
         if self.covariate_regressor is not None:
             data = self.covariate_regressor.fit_transform(data)
 

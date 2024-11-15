@@ -14,7 +14,10 @@ logger = logging.getLogger(__name__)
 
 
 class CovariateScaler:
-    """Preprocesses covariates and static features."""
+    """Apply scaling to covariates and static features.
+
+    This can be helpful for deep learning models that assume that the inputs are normalized.
+    """
 
     def __init__(
         self,
@@ -29,18 +32,15 @@ class CovariateScaler:
         self.use_past_covariates = use_past_covariates
         self.use_static_features = use_static_features
 
-    def fit_transform(
-        self,
-        data: TimeSeriesDataFrame,
-        known_covariates: Optional[TimeSeriesDataFrame] = None,
-    ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
+    def fit_transform(self, data: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
         raise NotImplementedError
 
-    def transform(
-        self,
-        data: TimeSeriesDataFrame,
-        known_covariates: Optional[TimeSeriesDataFrame] = None,
-    ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
+    def transform(self, data: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
+        raise NotImplementedError
+
+    def transform_known_covariates(
+        self, known_covariates: Optional[TimeSeriesDataFrame] = None
+    ) -> Optional[TimeSeriesDataFrame]:
         raise NotImplementedError
 
 
@@ -86,25 +86,17 @@ class GlobalCovariateScaler(CovariateScaler):
                 data.static_features, columns=self.metadata.static_features_real
             )
 
-    def fit_transform(
-        self, data: TimeSeriesDataFrame, known_covariates: TimeSeriesDataFrame | None = None
-    ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
+    def fit_transform(self, data: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
         if not self.is_fit():
             self.fit(data=data)
-        return self.transform(data=data, known_covariates=known_covariates)
+        return self.transform(data=data)
 
-    def transform(
-        self, data: TimeSeriesDataFrame, known_covariates: TimeSeriesDataFrame | None = None
-    ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
-        # Copy data to avoid SettingWithCopyWarning from pandas
+    def transform(self, data: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
+        # Copy data to avoid inplace modification
         data = data.copy()
         if "known" in self._column_transformers:
             columns = self.metadata.known_covariates_real
             data[columns] = self._column_transformers["known"].transform(data[columns])
-
-            if known_covariates is not None:
-                known_covariates = known_covariates.copy()
-                known_covariates[columns] = self._column_transformers["known"].transform(known_covariates[columns])
 
         if "past" in self._column_transformers:
             columns = self.metadata.past_covariates_real
@@ -115,7 +107,16 @@ class GlobalCovariateScaler(CovariateScaler):
             data.static_features[columns] = self._column_transformers["static"].transform(
                 data.static_features[columns]
             )
-        return data, known_covariates
+        return data
+
+    def transform_known_covariates(
+        self, known_covariates: Optional[TimeSeriesDataFrame] = None
+    ) -> Optional[TimeSeriesDataFrame]:
+        if "known" in self._column_transformers:
+            columns = self.metadata.known_covariates_real
+            known_covariates = known_covariates.copy()
+            known_covariates[columns] = self._column_transformers["known"].transform(known_covariates[columns])
+        return known_covariates
 
     def _get_transformer_for_columns(self, df: pd.DataFrame, columns: List[str]) -> Dict[str, str]:
         """Passthrough bool features, use QuantileTransform for skewed features, and use StandardScaler for the rest.

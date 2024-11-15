@@ -170,7 +170,8 @@ def test_when_covariate_scaler_is_used_then_original_data_is_not_modified(
     known_covariates_orig = known_covariates.copy()
     static_features_orig = data.static_features.copy()
 
-    _ = scaler.fit_transform(data=data, known_covariates=known_covariates)
+    scaler.fit_transform(data)
+    scaler.transform_known_covariates(known_covariates)
 
     assert data_orig.equals(data)
     assert known_covariates_orig.equals(known_covariates)
@@ -193,7 +194,7 @@ def test_when_global_covariate_scaler_transforms_then_real_columns_are_standardi
     df, metadata = df_with_covariates_and_metadata
     # ensure that StandardScaler is used for all features by setting large skew_threshold
     scaler = GlobalCovariateScaler(metadata=metadata, skew_threshold=1e10)
-    df_out, _ = scaler.fit_transform(df)
+    df_out = scaler.fit_transform(df)
     assert is_standardized(df_out["cov2"])
     assert is_standardized(df_out.static_features["feat1"])
     assert is_standardized(df_out.static_features["feat3"])
