@@ -561,15 +561,27 @@ class AbstractModel:
         kwargs.pop("num_classes", None)
         return kwargs
 
+    @classmethod
+    def _infer_problem_type(cls, *, y: pd.Series, silent: bool = True) -> str:
+        """Infer the problem_type based on y train"""
+        return infer_problem_type(y=y, silent=silent)
+
+    @classmethod
+    def _infer_num_classes(cls, *, y: pd.Series, problem_type: str = None) -> int | None:
+        """Infer num_classes based on y train"""
+        if problem_type is None:
+            problem_type = cls._infer_problem_type(y=y, silent=True)
+        label_cleaner = LabelCleaner.construct(problem_type=problem_type, y=y)
+        return label_cleaner.num_classes
+
     def _initialize(self, X=None, y=None, feature_metadata=None, num_classes=None, **kwargs):
         if num_classes is not None:
             self.num_classes = num_classes
         if y is not None:
             if self.problem_type is None:
-                self.problem_type = infer_problem_type(y=y)
+                self.problem_type = self._infer_problem_type(y=y)
             if self.num_classes is None:
-                label_cleaner = LabelCleaner.construct(problem_type=self.problem_type, y=y)
-                self.num_classes = label_cleaner.num_classes
+                self.num_classes = self._infer_num_classes(y=y, problem_type=self.problem_type)
 
         self._init_params_aux()
 
@@ -1898,6 +1910,15 @@ class AbstractModel:
         assert self.is_initialized(), "Only estimate memory usage after the model is initialized."
         return self._estimate_memory_usage(**kwargs)
 
+    def estimate_memory_usage_child(self, **kwargs) -> int:
+        """
+        Estimates the memory usage of the child model while training.
+        Returns
+        -------
+            int: number of bytes will be used during training
+        """
+        return self.estimate_memory_usage(**kwargs)
+
     def validate_fit_resources(self, num_cpus="auto", num_gpus="auto", total_resources=None, **kwargs):
         """
         Verifies that the provided num_cpus and num_gpus (or defaults if not provided) are sufficient to train the model.
@@ -2258,15 +2279,36 @@ class AbstractModel:
 
         Returns
         -------
-        params: dict
+        hyperparameters: dict
             Dictionary of model hyperparameters.
         """
         params = self._get_params()
+        return self._get_model_params_static(hyperparameters=params, convert_search_spaces_to_default=convert_search_spaces_to_default)
+
+    @classmethod
+    def _get_model_params_static(cls, hyperparameters: dict, convert_search_spaces_to_default: bool = False) -> dict:
+        """
+        Gets params that are passed to the inner model.
+        This is the static version of `_get_model_params`.
+        This method can be called prior to initializing the model.
+
+        Parameters
+        ----------
+        convert_search_spaces_to_default: bool, default = False
+            If True, search spaces are converted to the default value.
+            This is useful when having to estimate memory usage estimates prior to doing hyperparameter tuning.
+
+        Returns
+        -------
+        hyperparameters: dict
+            Dictionary of model hyperparameters.
+        """
+        hyperparameters = hyperparameters.copy()
         if convert_search_spaces_to_default:
-            for param, val in params.items():
+            for param, val in hyperparameters.items():
                 if isinstance(val, Space):
-                    params[param] = val.default
-        return params
+                    hyperparameters[param] = val.default
+        return hyperparameters
 
     # TODO: Add documentation for valid args for each model. Currently only `early_stop`
     def _ag_params(self) -> set:

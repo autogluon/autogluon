@@ -2915,6 +2915,8 @@ class AbstractTrainer:
         logger.log(20, "Scheduling parallel model-workers for training...")
         distributed_manager = DistributedFitManager(
             mode="fit",
+            X=X,  # FIXME: REMOVE
+            y=y,  # FIXME: REMOVE
             func=_remote_train_multi_fold,
             func_kwargs=dict(
                 time_split=time_split,
@@ -2932,7 +2934,9 @@ class AbstractTrainer:
             ),
             num_cpus=kwargs.get("total_resources", {}).get("num_cpus", 1),
             num_gpus=kwargs.get("total_resources", {}).get("num_gpus", 0),
-            num_splits=kwargs.get("k_fold", 1) * kwargs.get("n_repeats", 1)
+            num_splits=kwargs.get("k_fold", 1) * kwargs.get("n_repeats", 1),
+            problem_type=self.problem_type,  # FIXME: Should this be passed here?
+            num_classes=self.num_classes,  # FIXME: Should this be passed here?
         )
         jobs_finished = 0
         jobs_total = len(models)

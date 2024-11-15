@@ -788,6 +788,16 @@ class BaggedEnsembleModel(AbstractModel):
 
         return fold_fit_args_list, n_repeats_started, n_repeats_finished
 
+    def estimate_memory_usage_child(self, **kwargs) -> int:
+        """
+        Estimates the memory usage of the child model while training.
+        Returns
+        -------
+            int: number of bytes will be used during training
+        """
+        assert self.is_initialized(), "Only estimate memory usage after the model is initialized."
+        return self._get_model_base().estimate_memory_usage(**kwargs)
+
     # TODO: Augment to generate OOF after shuffling each column in X (Batching), this is the fastest way.
     # TODO: Reduce logging clutter during OOF importance calculation (Currently logs separately for each child)
     # Generates OOF predictions from pre-trained bagged models, assuming X and y are in the same row order as used in .fit(X, y)

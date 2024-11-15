@@ -64,7 +64,7 @@ class LGBModel(AbstractModel):
             stopping_metric_name = stopping_metric
         return stopping_metric, stopping_metric_name
 
-    def _estimate_memory_usage(self, X: DataFrame, **kwargs) -> float:
+    def _estimate_memory_usage(self, X: DataFrame, **kwargs) -> int:
         """
         Returns the expected peak memory usage in bytes of the LightGBM model during fit.
 
@@ -75,16 +75,56 @@ class LGBModel(AbstractModel):
             Scales roughly by 5100*num_features*num_leaves bytes
             For 10000 features and 128 num_leaves, the histogram would be 6.5 GB.
         """
-        num_classes = self.num_classes if self.num_classes else 1  # self.num_classes could be None after initialization if it's a regression problem
+        params = self._get_model_params(convert_search_spaces_to_default=True)
+        return self.estimate_memory_usage_static(X=X, problem_type=self.problem_type, num_classes=self.num_classes, hyperparameters=params, **kwargs)
+
+    # TODO: Unit test that this is equivalent to initializing the model and calling `estimate_memory_usage`
+    @classmethod
+    def estimate_memory_usage_static(
+        cls,
+        *,
+        X: DataFrame,
+        y: Series = None,  # FIXME: Should this be required always? Should `_estimate_memory_usage` also take y in all cases?
+        hyperparameters: dict = None,
+        problem_type: str = "infer",
+        num_classes: int | None | str = "infer",
+        **kwargs,
+    ) -> int:
+        if problem_type == "infer":
+            problem_type = cls._infer_problem_type(y=y)
+        if isinstance(num_classes, str) and num_classes == "infer":
+            num_classes = cls._infer_num_classes(y=y, problem_type=problem_type)
+        if hyperparameters is None:
+            hyperparameters = {}
+        hyperparameters = cls._get_model_params_static(hyperparameters=hyperparameters, convert_search_spaces_to_default=True)
+        return cls._estimate_memory_usage_static(
+            X=X,
+            y=y,
+            hyperparameters=hyperparameters,
+            problem_type=problem_type,
+            num_classes=num_classes,
+            **kwargs
+        )
+
+    # FIXME: Don't use `hyperparameters.get("max_bins", 255)`, instead get the defaults all at once!
+    @classmethod
+    def _estimate_memory_usage_static(
+        cls,
+        *,
+        X: DataFrame,
+        hyperparameters: dict = None,
+        num_classes: int = 1,
+        **kwargs,
+    ) -> int:
+        num_classes = num_classes if num_classes else 1  # num_classes could be None after initialization if it's a regression problem
         data_mem_usage = get_approximate_df_mem_usage(X).sum()
         data_mem_usage_bytes = data_mem_usage * 5 + data_mem_usage / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
 
-        params = self._get_model_params(convert_search_spaces_to_default=True)
-        max_bins = params.get("max_bins", 255)
-        num_leaves = params.get("num_leaves", 31)
+        max_bins = hyperparameters.get("max_bins", 255)
+        num_leaves = hyperparameters.get("num_leaves", 31)
         # Memory usage of histogram based on https://github.com/microsoft/LightGBM/issues/562#issuecomment-304524592
         histogram_mem_usage_bytes = 20 * max_bins * len(X.columns) * num_leaves
-        histogram_mem_usage_bytes_max = params.get("histogram_pool_size", None)
+        histogram_mem_usage_bytes_max = hyperparameters.get("histogram_pool_size", None)
         if histogram_mem_usage_bytes_max is not None:
             histogram_mem_usage_bytes_max *= 1e6  # Convert megabytes to bytes, `histogram_pool_size` is in MB.
             if histogram_mem_usage_bytes > histogram_mem_usage_bytes_max:
