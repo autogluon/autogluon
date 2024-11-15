@@ -84,12 +84,6 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
     def get_minimum_resources(self, is_gpu_available: bool = False) -> bool:
         return self._get_model_base().get_minimum_resources(is_gpu_available)
 
-    def _initialize(self, **kwargs) -> None:
-        self._init_params_aux()
-        self._init_params()
-        # Do not create target_scaler, covariate_scaler and covariate_regressor here!
-        # They will be handled by the base model
-
     def _fit(
         self,
         train_data: TimeSeriesDataFrame,
