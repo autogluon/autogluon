@@ -60,6 +60,8 @@ class AbstractTimeSeriesModel(AbstractModel):
     """
 
     _oof_filename = "oof.pkl"
+    # TODO: For which models should we override this parameter?
+    _covariate_regressor_fit_time_fraction: float = 0.5
 
     # TODO: refactor "pruned" methods after AbstractModel is refactored
     predict_proba = None
@@ -128,6 +130,7 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         self._oof_predictions: Optional[List[TimeSeriesDataFrame]] = None
         self.target_scaler: Optional[LocalTargetScaler] = None
+        self.covariate_regressor: Optional[CovariateRegressor] = None
 
     def __repr__(self) -> str:
         return self.name
@@ -255,16 +258,24 @@ class AbstractTimeSeriesModel(AbstractModel):
         """
         start_time = time.monotonic()
         self.initialize(**kwargs)
+
         if self.target_scaler is not None:
             train_data = self.target_scaler.fit_transform(train_data)
-
         if self.covariate_regressor is not None:
-            train_data = self.covariate_regressor.fit_transform(
+            covariate_regressor_time_limit = (
+                self._covariate_regressor_fit_time_fraction * time_limit if time_limit is not None else None
+            )
+            self.covariate_regressor.fit(
                 train_data,
-                time_limit=0.5 * time_limit if time_limit is not None else None,
+                time_limit=covariate_regressor_time_limit,
+                verbosity=kwargs.get("verbosity", 2) - 1,
             )
 
-        train_data = self.preprocess(train_data, is_train=True)
+        if self._get_tags()["can_use_train_data"]:
+            if self.covariate_regressor is not None:
+                train_data = self.covariate_regressor.transform(train_data)
+            train_data = self.preprocess(train_data, is_train=True)
+
         if self._get_tags()["can_use_val_data"] and val_data is not None:
             if self.target_scaler is not None:
                 val_data = self.target_scaler.transform(val_data)
@@ -295,16 +306,18 @@ class AbstractTimeSeriesModel(AbstractModel):
         covariate_regressor = self._get_model_params().get("covariate_regressor")
         if covariate_regressor is not None:
             if len(self.metadata.known_covariates + self.metadata.static_features) == 0:
-                logger.debug(
-                    "Skipping CovariateRegressor since the dataset contains no covariates or static features."
+                logger.info(
+                    "\tSkipping covariate_regressor since the dataset contains no covariates or static features."
                 )
                 return None
             else:
                 if isinstance(covariate_regressor, str):
                     return CovariateRegressor(covariate_regressor, target=self.target, metadata=self.metadata)
+                elif isinstance(covariate_regressor, dict):
+                    return CovariateRegressor(**covariate_regressor, target=self.target, metadata=self.metadata)
                 elif isinstance(covariate_regressor, CovariateRegressor):
                     logger.warning(
-                        "Using a custom CovariateRegressor object is experimental functionality that may break in the future!"
+                        "\tUsing a custom covariate_regressor is experimental functionality that may break in the future!"
                     )
                     covariate_regressor.target = self.target
                     covariate_regressor.metadata = self.metadata
@@ -630,10 +643,12 @@ class AbstractTimeSeriesModel(AbstractModel):
         - allow_nan: Can the model handle data with missing values represented by np.nan?
         - can_refit_full: Does it make sense to retrain the model without validation data?
             See `autogluon.core.models.abstract._tags._DEFAULT_TAGS` for more details.
-        - can_use_val_data: Can model use val_data if it's provided to model.fit()?
+        - can_use_train_data: Can the model use train_data if it's provided to model.fit()?
+        - can_use_val_data: Can the model use val_data if it's provided to model.fit()?
         """
         return {
             "allow_nan": False,
             "can_refit_full": False,
+            "can_use_train_data": True,
             "can_use_val_data": False,
         }

@@ -12,9 +12,7 @@ import autogluon.core as ag
 from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.local.abstract_local_model import AbstractLocalModel
-from autogluon.timeseries.regressor import CovariateRegressor
 from autogluon.timeseries.splitter import AbstractWindowSplitter, ExpandingWindowSplitter
-from autogluon.timeseries.transforms import LocalTargetScaler
 
 logger = logging.getLogger(__name__)
 
@@ -85,14 +83,6 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
 
     def get_minimum_resources(self, is_gpu_available: bool = False) -> bool:
         return self._get_model_base().get_minimum_resources(is_gpu_available)
-
-    def _create_target_scaler(self) -> Optional[LocalTargetScaler]:
-        # Do not use scaler in the MultiWindowModel to avoid duplication; it will be created in the inner model
-        return None
-
-    def _create_covariates_regressor(self) -> Optional[CovariateRegressor]:
-        # Do not use regressor in the MultiWindowModel to avoid duplication; it will be created in the inner model
-        return None
 
     def _fit(
         self,
@@ -217,7 +207,9 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
         return self.model_base._get_search_space()
 
     def _initialize(self, **kwargs) -> None:
-        super()._initialize(**kwargs)
+        self._init_params_aux()
+        self._init_params()
+        # Do not initialize the target_scaler and covariate_regressor in the multi window model!
         self.model_base.initialize(**kwargs)
 
     def _get_hpo_train_fn_kwargs(self, **train_fn_kwargs) -> dict:

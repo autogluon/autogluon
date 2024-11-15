@@ -1,3 +1,4 @@
+import time
 from unittest import mock
 
 import numpy as np
@@ -20,6 +21,7 @@ def get_multi_window_zero_model(hyperparameters=None, **kwargs):
 
 
 TESTABLE_MODELS = [ZeroModel, get_multi_window_zero_model]
+MODEL_HPS = {"model_hyperparameters": {"max_iter": 5}}
 
 
 @pytest.fixture(scope="module")
@@ -50,7 +52,7 @@ def test_when_refit_during_predict_is_true_then_regressor_is_trained_during_pred
     model_class, get_model_with_regressor, df_with_covariates_and_metadata, refit_during_predict
 ):
     df, metadata = df_with_covariates_and_metadata
-    regressor = CovariateRegressor("LR", refit_during_predict=refit_during_predict)
+    regressor = CovariateRegressor("LR", **MODEL_HPS, refit_during_predict=refit_during_predict)
     model = get_model_with_regressor(model_class, regressor)
     model.fit(train_data=df)
     past, known_covariates = df.get_model_inputs_for_scoring(
@@ -170,8 +172,7 @@ def test_when_covariate_regressor_used_then_residuals_are_subtracted_before_fore
 
 def test_when_validation_fraction_is_set_then_tabular_model_uses_val_data(df_with_covariates_and_metadata):
     df, metadata = df_with_covariates_and_metadata
-    regressor = CovariateRegressor("LR", validation_fraction=0.1)
-    regressor.metadata = metadata
+    regressor = CovariateRegressor("LR", **MODEL_HPS, validation_fraction=0.1, metadata=metadata)
     with mock.patch("autogluon.tabular.models.LinearModel.fit") as mock_lr_fit:
         regressor.fit(df)
     assert mock_lr_fit.call_args[1]["X_val"] is not None
@@ -180,9 +181,38 @@ def test_when_validation_fraction_is_set_then_tabular_model_uses_val_data(df_wit
 
 def test_when_validation_fraction_is_none_then_tabular_model_doesnt_use_val_data(df_with_covariates_and_metadata):
     df, metadata = df_with_covariates_and_metadata
-    regressor = CovariateRegressor("LR", validation_fraction=None)
-    regressor.metadata = metadata
+    regressor = CovariateRegressor("LR", **MODEL_HPS, validation_fraction=None, metadata=metadata)
     with mock.patch("autogluon.tabular.models.LinearModel.fit") as mock_lr_fit:
         regressor.fit(df)
     assert mock_lr_fit.call_args[1]["X_val"] is None
     assert mock_lr_fit.call_args[1]["y_val"] is None
+
+
+def test_when_not_enough_time_is_left_to_predict_then_regressor_is_disabled(df_with_covariates_and_metadata):
+    df, metadata = df_with_covariates_and_metadata
+    regressor = CovariateRegressor("CAT", metadata=metadata)
+
+    def predict_with_sleep(X, **kwargs):
+        time.sleep(5)
+        return np.zeros(len(X))
+
+    with mock.patch("autogluon.tabular.models.CatBoostModel.predict", side_effect=predict_with_sleep):
+        regressor.fit(df, time_limit=5)
+
+    assert regressor.disabled_due_to_time_limit
+
+
+@pytest.mark.parametrize("use_fit_transform", [True, False])
+@pytest.mark.parametrize("refit_during_predict", [True, False])
+def test_when_regressor_is_disabled_then_data_is_not_modified_during_transform(
+    df_with_covariates_and_metadata, use_fit_transform, refit_during_predict
+):
+    df, metadata = df_with_covariates_and_metadata
+    regressor = CovariateRegressor("LR", **MODEL_HPS, metadata=metadata, refit_during_predict=refit_during_predict)
+    regressor.fit(df)
+    regressor.disabled_due_to_time_limit = True
+    if use_fit_transform:
+        df_out = regressor.fit_transform(df)
+    else:
+        df_out = regressor.transform(df)
+    assert df_out is df
