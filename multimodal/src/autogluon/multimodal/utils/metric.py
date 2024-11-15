@@ -234,8 +234,12 @@ def compute_score(
 
     y = metric_data[Y_TRUE]
     if metric.needs_proba or metric.needs_threshold:
+        y_pred_proba = metric_data[Y_PRED_PROB]
+        y_pred_proba = (
+            y_pred_proba if y_pred_proba.shape[1] > 2 else y_pred_proba[:, pos_label]
+        )  # only use pos_label for binary classification
         return metric.convert_score_to_original(
-            compute_metric(y=y, y_pred_proba=metric_data[Y_PRED_PROB][:, pos_label], metric=metric, weights=None)
+            compute_metric(y=y, y_pred_proba=y_pred_proba, metric=metric, weights=None)
         )
     else:
         y_pred = metric_data[Y_PRED]
@@ -243,8 +247,8 @@ def compute_score(
         # TODO: This is a hack. Doesn't support `f1_macro`, `f1_micro`, `f1_weighted`, or custom `f1` metrics with different names.
         # TODO: Longterm the solution should be to have the input data to this function use the internal representation without the original class names. This way `pos_label` would not need to be specified.
         if metric.name == F1:  # only for binary classification
-            y = (metric_data[Y_TRUE] == pos_label).astype(int)
-            y_pred = (metric_data[Y_PRED] == pos_label).astype(int)
+            y = (y == pos_label).astype(int)
+            y_pred = (y_pred == pos_label).astype(int)
 
         return metric.convert_score_to_original(compute_metric(y=y, y_pred=y_pred, metric=metric, weights=None))
 
