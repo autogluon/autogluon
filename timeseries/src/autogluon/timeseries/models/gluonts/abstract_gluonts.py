@@ -283,6 +283,24 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
         self.negative_data = (dataset[self.target] < 0).any()
 
+    def _get_default_params(self):
+        """Gets default parameters for GluonTS estimator initialization that are available after
+        AbstractTimeSeriesModel initialization (i.e., before deferred initialization). Models may
+        override this method to update default parameters.
+        """
+        return {
+            "batch_size": 64,
+            "context_length": min(512, max(10, 2 * self.prediction_length)),
+            "predict_batch_size": 500,
+            "early_stopping_patience": 20,
+            "max_epochs": 100,
+            "lr": 1e-3,
+            "freq": self._dummy_gluonts_freq,
+            "prediction_length": self.prediction_length,
+            "quantiles": self.quantile_levels,
+            "covariate_scaler": "global",
+        }
+
     def _get_model_params(self) -> dict:
         """Gets params that are passed to the inner model."""
         # for backward compatibility with the old GluonTS MXNet API
