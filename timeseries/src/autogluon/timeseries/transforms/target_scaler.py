@@ -115,7 +115,7 @@ class LocalRobustScaler(LocalTargetScaler):
         return loc, scale
 
 
-AVAILABLE_SCALERS = {
+AVAILABLE_TARGET_SCALERS = {
     "standard": LocalStandardScaler,
     "mean_abs": LocalMeanAbsScaler,
     "min_max": LocalMinMaxScaler,
@@ -127,6 +127,6 @@ def get_target_scaler_from_name(
     name: Literal["standard", "mean_abs", "min_max", "robust"], **scaler_kwargs
 ) -> LocalTargetScaler:
     """Get LocalTargetScaler object from a string."""
-    if name not in AVAILABLE_SCALERS:
-        raise KeyError(f"Scaler type {name} not supported. Available scalers: {list(AVAILABLE_SCALERS)}")
-    return AVAILABLE_SCALERS[name](**scaler_kwargs)
+    if name not in AVAILABLE_TARGET_SCALERS:
+        raise KeyError(f"Scaler type {name} not supported. Available scalers: {list(AVAILABLE_TARGET_SCALERS)}")
+    return AVAILABLE_TARGET_SCALERS[name](**scaler_kwargs)

@@ -95,10 +95,16 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
             + self.allowed_local_model_args
         )
 
-    def preprocess(self, data: TimeSeriesDataFrame, is_train: bool = False, **kwargs) -> Any:
+    def preprocess(
+        self,
+        data: TimeSeriesDataFrame,
+        known_covariates: Optional[TimeSeriesDataFrame] = None,
+        is_train: bool = False,
+        **kwargs,
+    ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
         if not self._get_tags()["allow_nan"]:
             data = data.fill_missing_values()
-        return data
+        return data, known_covariates
 
     def _fit(self, train_data: TimeSeriesDataFrame, time_limit: Optional[int] = None, **kwargs):
         self._check_fit_params()

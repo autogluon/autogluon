@@ -3,7 +3,7 @@ import os
 import shutil
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterator, List, Literal, Optional, Type, Union
+from typing import Any, Callable, Dict, Iterator, List, Optional, Type, Union
 
 import gluonts
 import gluonts.core.settings
@@ -15,8 +15,6 @@ from gluonts.dataset.field_names import FieldName
 from gluonts.model.estimator import Estimator as GluonTSEstimator
 from gluonts.model.forecast import Forecast, QuantileForecast, SampleForecast
 from gluonts.model.predictor import Predictor as GluonTSPredictor
-from sklearn.compose import ColumnTransformer
-from sklearn.preprocessing import QuantileTransformer, StandardScaler
 
 from autogluon.common.loaders import load_pkl
 from autogluon.core.hpo.constants import RAY_BACKEND
@@ -186,7 +184,6 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             **kwargs,
         )
         self.gts_predictor: Optional[GluonTSPredictor] = None
-        self._real_column_transformers: Dict[Literal["known", "past", "static"], ColumnTransformer] = {}
         self._ohe_generator_known: Optional[OneHotEncoder] = None
         self._ohe_generator_past: Optional[OneHotEncoder] = None
         self.callbacks = []
@@ -286,73 +283,6 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
 
         self.negative_data = (dataset[self.target] < 0).any()
 
-    def preprocess(self, data: TimeSeriesDataFrame, is_train: bool = False, **kwargs) -> TimeSeriesDataFrame:
-        # Copy data to avoid SettingWithCopyWarning from pandas
-        data = data.copy()
-        if self.supports_known_covariates and len(self.metadata.known_covariates_real) > 0:
-            columns = self.metadata.known_covariates_real
-            if is_train:
-                self._real_column_transformers["known"] = self._get_transformer_for_columns(data, columns=columns)
-            assert "known" in self._real_column_transformers, "Preprocessing pipeline must be fit first"
-            data[columns] = self._real_column_transformers["known"].transform(data[columns])
-
-        if self.supports_past_covariates and len(self.metadata.past_covariates_real) > 0:
-            columns = self.metadata.past_covariates_real
-            if is_train:
-                self._real_column_transformers["past"] = self._get_transformer_for_columns(data, columns=columns)
-            assert "past" in self._real_column_transformers, "Preprocessing pipeline must be fit first"
-            data[columns] = self._real_column_transformers["past"].transform(data[columns])
-
-        if self.supports_static_features and len(self.metadata.static_features_real) > 0:
-            columns = self.metadata.static_features_real
-            if is_train:
-                self._real_column_transformers["static"] = self._get_transformer_for_columns(
-                    data.static_features, columns=columns
-                )
-            assert "static" in self._real_column_transformers, "Preprocessing pipeline must be fit first"
-            data.static_features[columns] = self._real_column_transformers["static"].transform(
-                data.static_features[columns]
-            )
-        return data
-
-    def _get_transformer_for_columns(self, df: pd.DataFrame, columns: List[str]) -> Dict[str, str]:
-        """Passthrough bool features, use QuantileTransform for skewed features, and use StandardScaler for the rest.
-
-        The preprocessing logic is similar to the TORCH_NN model from Tabular.
-        """
-        skew_threshold = self._get_model_params().get("proc.skew_threshold", 0.99)
-        bool_features = []
-        skewed_features = []
-        continuous_features = []
-        for col in columns:
-            if df[col].isin([0, 1]).all():
-                bool_features.append(col)
-            elif np.abs(df[col].skew()) > skew_threshold:
-                skewed_features.append(col)
-            else:
-                continuous_features.append(col)
-        transformers = []
-        logger.debug(
-            f"\tbool_features: {bool_features}, continuous_features: {continuous_features}, skewed_features: {skewed_features}"
-        )
-        if continuous_features:
-            transformers.append(("scaler", StandardScaler(), continuous_features))
-        if skewed_features:
-            transformers.append(("skew", QuantileTransformer(output_distribution="normal"), skewed_features))
-        with warning_filter():
-            column_transformer = ColumnTransformer(transformers=transformers, remainder="passthrough").fit(df[columns])
-        return column_transformer
-
-    def preprocess_known_covariates(
-        self, known_covariates: Optional[TimeSeriesDataFrame]
-    ) -> Optional[TimeSeriesDataFrame]:
-        columns = self.metadata.known_covariates_real
-        if self.supports_known_covariates and len(columns) > 0:
-            assert "known" in self._real_column_transformers, "Preprocessing pipeline must be fit first"
-            known_covariates = known_covariates.copy()
-            known_covariates[columns] = self._real_column_transformers["known"].transform(known_covariates[columns])
-        return known_covariates
-
     def _get_default_params(self):
         """Gets default parameters for GluonTS estimator initialization that are available after
         AbstractTimeSeriesModel initialization (i.e., before deferred initialization). Models may
@@ -368,6 +298,7 @@ class AbstractGluonTSModel(AbstractTimeSeriesModel):
             "freq": self._dummy_gluonts_freq,
             "prediction_length": self.prediction_length,
             "quantiles": self.quantile_levels,
+            "covariate_scaler": "global",
         }
 
     def _get_model_params(self) -> dict:

@@ -3,7 +3,7 @@ import os
 import re
 import time
 from contextlib import nullcontext
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import pandas as pd
 
@@ -16,7 +16,12 @@ from autogluon.core.models import AbstractModel
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
 from autogluon.timeseries.regressor import CovariateRegressor
-from autogluon.timeseries.transforms import LocalTargetScaler, get_target_scaler_from_name
+from autogluon.timeseries.transforms import (
+    CovariateScaler,
+    LocalTargetScaler,
+    get_covariate_scaler_from_name,
+    get_target_scaler_from_name,
+)
 from autogluon.timeseries.utils.features import CovariateMetadata
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 from autogluon.timeseries.utils.warning_filters import disable_stdout, warning_filter
@@ -130,6 +135,7 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         self._oof_predictions: Optional[List[TimeSeriesDataFrame]] = None
         self.target_scaler: Optional[LocalTargetScaler] = None
+        self.covariate_scaler: Optional[CovariateScaler] = None
         self.covariate_regressor: Optional[CovariateRegressor] = None
 
     def __repr__(self) -> str:
@@ -172,6 +178,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         self._init_params_aux()
         self._init_params()
         self.target_scaler = self._create_target_scaler()
+        self.covariate_scaler = self._create_covariate_scaler()
         self.covariate_regressor = self._create_covariate_regressor()
 
     def _compute_fit_metadata(self, val_data: TimeSeriesDataFrame = None, **kwargs):
@@ -261,6 +268,10 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         if self.target_scaler is not None:
             train_data = self.target_scaler.fit_transform(train_data)
+
+        if self.covariate_scaler is not None:
+            train_data = self.covariate_scaler.fit_transform(train_data)
+
         if self.covariate_regressor is not None:
             covariate_regressor_time_limit = (
                 self._covariate_regressor_fit_time_fraction * time_limit if time_limit is not None else None
@@ -274,14 +285,16 @@ class AbstractTimeSeriesModel(AbstractModel):
         if self._get_tags()["can_use_train_data"]:
             if self.covariate_regressor is not None:
                 train_data = self.covariate_regressor.transform(train_data)
-            train_data = self.preprocess(train_data, is_train=True)
+            train_data, _ = self.preprocess(train_data, is_train=True)
 
         if self._get_tags()["can_use_val_data"] and val_data is not None:
             if self.target_scaler is not None:
                 val_data = self.target_scaler.transform(val_data)
+            if self.covariate_scaler is not None:
+                val_data = self.covariate_scaler.transform(val_data)
             if self.covariate_regressor is not None:
                 val_data = self.covariate_regressor.transform(val_data)
-            val_data = self.preprocess(val_data, is_train=False)
+            val_data, _ = self.preprocess(val_data, is_train=False)
 
         if time_limit is not None:
             time_limit = time_limit - (time.monotonic() - start_time)
@@ -298,6 +311,20 @@ class AbstractTimeSeriesModel(AbstractModel):
         target_scaler_type = self._get_model_params().get("target_scaler")
         if target_scaler_type is not None:
             return get_target_scaler_from_name(target_scaler_type, target=self.target)
+        else:
+            return None
+
+    def _create_covariate_scaler(self) -> Optional[CovariateScaler]:
+        """Create a CovariateScaler object based on the value of the `covariate_scaler` hyperparameter."""
+        covariate_scaler_type = self._get_model_params().get("covariate_scaler")
+        if covariate_scaler_type is not None:
+            return get_covariate_scaler_from_name(
+                covariate_scaler_type,
+                metadata=self.metadata,
+                use_static_features=self.supports_static_features,
+                use_known_covariates=self.supports_known_covariates,
+                use_past_covariates=self.supports_past_covariates,
+            )
         else:
             return None
 
@@ -384,11 +411,13 @@ class AbstractTimeSeriesModel(AbstractModel):
         """
         if self.target_scaler is not None:
             data = self.target_scaler.fit_transform(data)
+        if self.covariate_scaler is not None:
+            data = self.covariate_scaler.fit_transform(data)
+            known_covariates = self.covariate_scaler.transform_known_covariates(known_covariates)
         if self.covariate_regressor is not None:
             data = self.covariate_regressor.fit_transform(data)
 
-        data = self.preprocess(data, is_train=False)
-        known_covariates = self.preprocess_known_covariates(known_covariates)
+        data, known_covariates = self.preprocess(data, known_covariates, is_train=False)
 
         # FIXME: Set self.covariate_regressor=None so to avoid copying it across processes during _predict
         # FIXME: The clean solution is to convert all methods executed in parallel to @classmethod
@@ -610,13 +639,15 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         return hpo_models, analysis
 
-    def preprocess(self, data: TimeSeriesDataFrame, is_train: bool = False, **kwargs) -> TimeSeriesDataFrame:
-        return data
-
-    def preprocess_known_covariates(
-        self, known_covariates: Optional[TimeSeriesDataFrame]
-    ) -> Optional[TimeSeriesDataFrame]:
-        return known_covariates
+    def preprocess(
+        self,
+        data: TimeSeriesDataFrame,
+        known_covariates: Optional[TimeSeriesDataFrame] = None,
+        is_train: bool = False,
+        **kwargs,
+    ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
+        """Method that implements model-specific preprocessing logic."""
+        return data, known_covariates
 
     def get_memory_size(self, **kwargs) -> Optional[int]:
         return None
