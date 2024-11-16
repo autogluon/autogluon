@@ -786,6 +786,16 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         return self.eval_metric
 
     def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
+        hyperparameters = self._get_model_params()
+        return self.estimate_memory_usage_static(X=X, problem_type=self.problem_type, num_classes=self.num_classes, hyperparameters=hyperparameters, **kwargs)
+
+    @classmethod
+    def _estimate_memory_usage_static(
+        cls,
+        *,
+        X: pd.DataFrame,
+        **kwargs,
+    ) -> int:
         return 5 * get_approximate_df_mem_usage(X).sum()
 
     def _get_maximum_resources(self) -> Dict[str, Union[int, float]]:
@@ -878,16 +888,6 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             minimum_resources["num_gpus"] = 1
         return minimum_resources
 
-    @classmethod
-    def _class_tags(cls):
-        return {"supports_learning_curves": True}
-
-    def _more_tags(self):
-        # `can_refit_full=True` because batch_size and num_epochs is communicated at end of `_fit`:
-        #  self.params_trained['batch_size'] = batch_size
-        #  self.params_trained['num_epochs'] = best_epoch
-        return {"can_refit_full": True}
-
     def _valid_compilers(self):
         return [TabularNeuralNetTorchNativeCompiler, TabularNeuralNetTorchOnnxCompiler]
 
@@ -936,3 +936,16 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
             f"unexpected processor type {type(self.processor)}, " "expecting processor type to be sklearn.compose._column_transformer.ColumnTransformer"
         )
         self.processor = self._compiler.compile(model=(self.processor, self.model), path=self.path, input_types=input_types)
+
+    @classmethod
+    def _class_tags(cls):
+        return {
+            "can_estimate_memory_usage_static": True,
+            "supports_learning_curves": True,
+        }
+
+    def _more_tags(self):
+        # `can_refit_full=True` because batch_size and num_epochs is communicated at end of `_fit`:
+        #  self.params_trained['batch_size'] = batch_size
+        #  self.params_trained['num_epochs'] = best_epoch
+        return {"can_refit_full": True}

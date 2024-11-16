@@ -85,11 +85,13 @@ class DistributedFitManager:
         num_classes="infer",
         total_mem: int | None | str = "auto",
         max_mem_frac: float = 0.8,
+        delay_between_jobs: float = 0,
     ):
         self.X = X
         self.y = y
         self.problem_type = problem_type
         self.num_classes = num_classes
+        self.delay_between_jobs = delay_between_jobs
         import ray
 
         self.mode = mode
@@ -453,7 +455,8 @@ class DistributedFitManager:
                 f"\n\t{self.total_num_cpus - self.available_num_cpus}/{self.total_num_cpus} Allocated CPUS ({self.total_num_cpus_virtual} allowed)\n"
                 f"\t{(self.total_mem - self.available_mem) * 1e-9:.1f}/{self.total_mem * 1e-9:.1f} GB Allocated Memory",
             )
-            time.sleep(0.1)
+            if self.delay_between_jobs > 0:
+                time.sleep(self.delay_between_jobs)
 
         if num_models_delay_to_fit_all > 0:
             logger.log(
@@ -493,19 +496,23 @@ class DistributedFitManager:
         X = self.X  # FIXME: HACK
         y = self.y  # FIXME: HACK
 
-        if hasattr(model, "model_base") and isinstance(model.model_base, AbstractModel) and hasattr(model.model_base, "estimate_memory_usage_static"):
+        if model.can_estimate_memory_usage_static_child():
             # FIXME: Don't use `_user_params`
-            model_base_hyperparameters = model.model_base._user_params
-            # FIXME: need `hyperparameters`, `num_classes`, `problem_type`
-            alternate = model.model_base.estimate_memory_usage_static(
+            if isinstance(model, BaggedEnsembleModel):
+                hyperparameters = model.model_base._user_params
+            else:
+                hyperparameters = model._user_params
+            alternate = model.estimate_memory_usage_static_child(
                 X=X,
                 y=y,
-                hyperparameters=model_base_hyperparameters,
+                hyperparameters=hyperparameters,
                 problem_type=self.problem_type,
                 num_classes=self.num_classes,
             )
             # print(f"ALTERNATE: {alternate}")
             return alternate
+
+        print(f"EXPENSIVE: {model.name}")  # FIXME: Remove after testing
 
         model_clone = copy.deepcopy(model)
 
@@ -531,7 +538,6 @@ class DistributedFitManager:
             # total_resources=kwargs["total_resources"],
             # **kwargs["fit_kwargs"],
         )
-        # print(f"EXPENSIVE: {mem_usage_child}")
 
         return mem_usage_child
 

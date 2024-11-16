@@ -142,6 +142,13 @@ class BaggedEnsembleModel(AbstractModel):
         # If max_sets is specified and the model has already fit >=max_sets, return False
         return self._get_model_params().get("max_sets", None) is None or self._get_model_params().get("max_sets") > self._n_repeats_finished
 
+    def can_estimate_memory_usage_static_child(self) -> bool:
+        """
+        Returns True if `get_memory_estimate_static` is implemented for this model's child.
+        If False, calling `get_memory_estimate_static_child` will raise a NotImplementedError.
+        """
+        return self._get_model_base().can_estimate_memory_usage_static()
+
     @property
     def n_children(self) -> int:
         """Returns the count of fitted children"""
@@ -797,6 +804,15 @@ class BaggedEnsembleModel(AbstractModel):
         """
         assert self.is_initialized(), "Only estimate memory usage after the model is initialized."
         return self._get_model_base().estimate_memory_usage(**kwargs)
+
+    def estimate_memory_usage_static_child(self, **kwargs) -> int:
+        """
+        Estimates the memory usage of the child model while training.
+        Returns
+        -------
+            int: number of bytes will be used during training
+        """
+        return self._get_model_base().estimate_memory_usage_static(**kwargs)
 
     # TODO: Augment to generate OOF after shuffling each column in X (Batching), this is the fastest way.
     # TODO: Reduce logging clutter during OOF importance calculation (Currently logs separately for each child)

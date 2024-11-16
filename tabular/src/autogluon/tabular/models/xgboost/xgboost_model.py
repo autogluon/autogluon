@@ -3,6 +3,8 @@ import math
 import os
 import time
 
+import pandas as pd
+
 from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT
 from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
@@ -244,24 +246,25 @@ class XGBoostModel(AbstractModel):
     def _ag_params(self) -> set:
         return {"early_stop", "generate_curves", "curve_metrics", "use_error_for_curve_metrics"}
 
-    def _estimate_memory_usage(self, X, **kwargs):
-        """
-        Returns the expected peak memory usage in bytes of the XGBoost model during fit.
+    def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
+        hyperparameters = self._get_model_params()
+        return self.estimate_memory_usage_static(X=X, problem_type=self.problem_type, num_classes=self.num_classes, hyperparameters=hyperparameters, **kwargs)
 
-        The memory usage of XGBoost is primarily made up of two sources:
-
-        1. The size of the data
-        2. The size of the histogram cache
-            Scales roughly by 5120*num_features*2^max_depth bytes
-            For 10000 features and 6 max_depth, the histogram would be 3.2 GB.
-        """
-        num_classes = self.num_classes if self.num_classes else 1  # self.num_classes could be None after initialization if it's a regression problem
+    @classmethod
+    def _estimate_memory_usage_static(
+        cls,
+        *,
+        X: pd.DataFrame,
+        hyperparameters: dict = None,
+        num_classes: int = 1,
+        **kwargs,
+    ) -> int:
+        num_classes = num_classes if num_classes else 1  # self.num_classes could be None after initialization if it's a regression problem
         data_mem_usage = get_approximate_df_mem_usage(X).sum()
         data_mem_usage_bytes = data_mem_usage * 7 + data_mem_usage / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
 
-        params = self._get_model_params(convert_search_spaces_to_default=True)
-        max_bin = params.get("max_bin", 256)
-        max_depth = params.get("max_depth", 6)
+        max_bin = hyperparameters.get("max_bin", 256)
+        max_depth = hyperparameters.get("max_depth", 6)
         # Formula based on manual testing, aligns with LightGBM histogram sizes
         #  This approximation is less accurate than it is for LightGBM and CatBoost.
         #  Note that max_depth didn't appear to reduce memory usage below 6, and it was unclear if it increased memory usage above 6.
@@ -321,7 +324,10 @@ class XGBoostModel(AbstractModel):
 
     @classmethod
     def _class_tags(cls):
-        return {"supports_learning_curves": True}
+        return {
+            "can_estimate_memory_usage_static": True,
+            "supports_learning_curves": True,
+        }
 
     def _more_tags(self):
         # `can_refit_full=True` because n_estimators is communicated at end of `_fit`:

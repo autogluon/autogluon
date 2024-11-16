@@ -307,6 +307,20 @@ class AbstractModel:
         # TODO: v1.0: Enforce this by raising if `predict_proba` called when this is False.
         return self.can_infer() and self.problem_type in [BINARY, MULTICLASS, SOFTCLASS]
 
+    def can_estimate_memory_usage_static(self) -> bool:
+        """
+        True if `estimate_memory_usage_static` is implemented for this model.
+        If False, calling `estimate_memory_usage_static` will raise a NotImplementedError.
+        """
+        return self._get_class_tags().get("can_estimate_memory_usage_static", False)
+
+    def can_estimate_memory_usage_static_child(self) -> bool:
+        """
+        True if `estimate_memory_usage_static` is implemented for this model's child.
+        If False, calling `estimate_memory_usage_static_child` will raise a NotImplementedError.
+        """
+        return self.can_estimate_memory_usage_static()
+
     # TODO: v0.1 update to be aligned with _set_default_auxiliary_params(), add _get_default_params()
     def _set_default_params(self):
         pass
@@ -1910,6 +1924,48 @@ class AbstractModel:
         assert self.is_initialized(), "Only estimate memory usage after the model is initialized."
         return self._estimate_memory_usage(**kwargs)
 
+    @classmethod
+    def estimate_memory_usage_static(
+        cls,
+        *,
+        X: pd.DataFrame,
+        y: pd.Series = None,  # FIXME: Should this be required always? Should `_estimate_memory_usage` also take y in all cases?
+        hyperparameters: dict = None,
+        problem_type: str = "infer",
+        num_classes: int | None | str = "infer",
+        **kwargs,
+    ) -> int:
+        """
+        FIXME: Add  docstring
+        Parameters
+        ----------
+        X
+        y
+        hyperparameters
+        problem_type
+        num_classes
+        kwargs
+
+        Returns
+        -------
+
+        """
+        if problem_type == "infer":
+            problem_type = cls._infer_problem_type(y=y)
+        if isinstance(num_classes, str) and num_classes == "infer":
+            num_classes = cls._infer_num_classes(y=y, problem_type=problem_type)
+        if hyperparameters is None:
+            hyperparameters = {}
+        hyperparameters = cls._get_model_params_static(hyperparameters=hyperparameters, convert_search_spaces_to_default=True)
+        return cls._estimate_memory_usage_static(
+            X=X,
+            y=y,
+            hyperparameters=hyperparameters,
+            problem_type=problem_type,
+            num_classes=num_classes,
+            **kwargs
+        )
+
     def estimate_memory_usage_child(self, **kwargs) -> int:
         """
         Estimates the memory usage of the child model while training.
@@ -1918,6 +1974,15 @@ class AbstractModel:
             int: number of bytes will be used during training
         """
         return self.estimate_memory_usage(**kwargs)
+
+    def estimate_memory_usage_static_child(self, **kwargs) -> int:
+        """
+        Estimates the memory usage of the child model while training, without having to initialize the model.
+        Returns
+        -------
+            int: number of bytes will be used during training
+        """
+        return self.estimate_memory_usage_static(**kwargs)
 
     def validate_fit_resources(self, num_cpus="auto", num_gpus="auto", total_resources=None, **kwargs):
         """
@@ -1977,6 +2042,17 @@ class AbstractModel:
         The estimated peak memory usage in bytes during model fit.
         """
         return 4 * get_approximate_df_mem_usage(X).sum()
+
+    @classmethod
+    def _estimate_memory_usage_static(
+        cls,
+        *,
+        X: pd.DataFrame,
+        hyperparameters: dict = None,
+        num_classes: int = 1,
+        **kwargs,
+    ) -> int:
+        raise NotImplementedError
 
     @disable_if_lite_mode()
     def _validate_fit_memory_usage(
