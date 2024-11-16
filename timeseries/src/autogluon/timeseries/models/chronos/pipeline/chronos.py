@@ -510,7 +510,7 @@ class ChronosPipeline(BaseChronosPipeline):
             .cpu()
             .swapaxes(1, 2)
         )
-        mean = prediction_samples.mean(axis=-1, keepdims=True)
+        mean = prediction_samples.mean(dim=-1, keepdim=True)
         quantiles = torch.quantile(
             prediction_samples,
             q=torch.tensor(quantile_levels, dtype=prediction_samples.dtype),
