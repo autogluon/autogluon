@@ -297,7 +297,12 @@ class DistributedFitManager:
                 model_child_memory_estimate = self.model_child_mem_estimate_cache[model_name]
             else:
                 ts = time.time()
-                model_child_memory_estimate = self.get_memory_estimate_for_model_child(model=model)
+                try:
+                    # FIXME: DONT USE TRY/EXCEPT, this is done to handle models crashing during initialization such as KNN when `NoValidFeatures`. Instead figure this out earlier or in the worker thread
+                    model_child_memory_estimate = self.get_memory_estimate_for_model_child(model=model)
+                except Exception as e:
+                    logger.log(20, f"Ran into exception when getting memory estimate for model, skipping model {model.name}: {e.__class__.__name__}: {e}")
+                    continue
                 te = time.time()
                 logger.log(20, f"{te - ts:.2f}s\tMEM ESTIMATE TIME {model.name}")
                 self.model_child_mem_estimate_cache[model_name] = model_child_memory_estimate

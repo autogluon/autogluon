@@ -483,7 +483,7 @@ class AbstractModel:
         self.feature_metadata = feature_metadata.keep_features(self.features)
         error_if_no_features = self.params_aux.get("error_if_no_features", True)
         if error_if_no_features and not self.features:
-            raise NoValidFeatures
+            raise NoValidFeatures(f"No valid features exist to fit {self.name}")
         # TODO: If unique_counts == 2 (including NaN), then treat as boolean
         #  FIXME: v1.3: Need to do this on a per-fold basis
         if self.params_aux.get("drop_unique", True):
@@ -505,7 +505,7 @@ class AbstractModel:
             self._feature_metadata = self.feature_metadata
             self._is_features_in_same_as_ex = True
         if error_if_no_features and not self._features_internal:
-            raise NoValidFeatures
+            raise NoValidFeatures(f"No valid features exist after dropping features with only a single value to fit {self.name}")
 
     def _update_feature_metadata(self, X: pd.DataFrame, feature_metadata: FeatureMetadata) -> FeatureMetadata:
         """
