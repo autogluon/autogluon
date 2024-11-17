@@ -42,7 +42,7 @@ def try_import_ray() -> ModuleType:
     ray_min_version = "2.10.0"
     current_os = platform.system()
     ray_max_version = ray_max_version_os_map.get(current_os, RAY_MAX_VERSION)
-    strict_ray_version = os.environ.get("AUTOGLUON_STRICT_RAY_VERSION", "True") == "True"
+    strict_ray_version = os.environ.get("AG_LOOSE_RAY_VERSION", "False") != "True"
     try:
         import ray
         from packaging import version
