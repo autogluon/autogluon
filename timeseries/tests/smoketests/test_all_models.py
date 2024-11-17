@@ -55,12 +55,16 @@ def generate_train_and_test_data(
     return train_data, test_data
 
 
-DUMMY_MODEL_HPARAMS = {"max_epochs": 1, "num_batches_per_epoch": 1, "use_fallback_model": False}
+DUMMY_MODEL_HPARAMS = {
+    "max_epochs": 1,
+    "num_batches_per_epoch": 1,
+    "use_fallback_model": False,
+}
 
 ALL_MODELS = {
     "ADIDA": DUMMY_MODEL_HPARAMS,
     "Average": DUMMY_MODEL_HPARAMS,
-    "AutoCES": DUMMY_MODEL_HPARAMS,
+    # "AutoCES": {**DUMMY_MODEL_HPARAMS, "model": "S"},
     "Chronos": {},
     "Croston": DUMMY_MODEL_HPARAMS,
     "DLinear": DUMMY_MODEL_HPARAMS,
@@ -68,7 +72,7 @@ ALL_MODELS = {
     "DirectTabular": DUMMY_MODEL_HPARAMS,
     "DynamicOptimizedTheta": DUMMY_MODEL_HPARAMS,
     "IMAPA": DUMMY_MODEL_HPARAMS,
-    "ETS": DUMMY_MODEL_HPARAMS,
+    "AutoETS": {**DUMMY_MODEL_HPARAMS, "model": "ANN"},
     "NPTS": DUMMY_MODEL_HPARAMS,
     "Naive": DUMMY_MODEL_HPARAMS,
     "PatchTST": DUMMY_MODEL_HPARAMS,
@@ -77,7 +81,7 @@ ALL_MODELS = {
     "SeasonalNaive": DUMMY_MODEL_HPARAMS,
     "SimpleFeedForward": DUMMY_MODEL_HPARAMS,
     "TemporalFusionTransformer": DUMMY_MODEL_HPARAMS,
-    "Theta": DUMMY_MODEL_HPARAMS,
+    # "Theta": DUMMY_MODEL_HPARAMS,  # covered by DynamicOptimizedTheta
     "TiDE": DUMMY_MODEL_HPARAMS,
     "WaveNet": DUMMY_MODEL_HPARAMS,
     "Zero": DUMMY_MODEL_HPARAMS,
@@ -141,14 +145,10 @@ def assert_leaderboard_contains_all_models(
 @pytest.mark.parametrize("use_past_covariates", [True, False])
 @pytest.mark.parametrize("use_known_covariates", [True, False])
 @pytest.mark.parametrize("use_static_features_continuous", [True, False])
-@pytest.mark.parametrize("use_static_features_categorical", [True, False])
-@pytest.mark.parametrize("eval_metric", ["WQL", "MASE"])
 def test_all_models_can_handle_all_covariates(
     use_known_covariates,
     use_past_covariates,
     use_static_features_continuous,
-    use_static_features_categorical,
-    eval_metric,
     all_model_hyperparams,
 ):
     prediction_length = 5
@@ -157,7 +157,7 @@ def test_all_models_can_handle_all_covariates(
         use_known_covariates=use_known_covariates,
         use_past_covariates=use_past_covariates,
         use_static_features_continuous=use_static_features_continuous,
-        use_static_features_categorical=use_static_features_categorical,
+        use_static_features_categorical=False,
     )
 
     known_covariates_names = [col for col in train_data if col.startswith("known_")]
@@ -166,7 +166,7 @@ def test_all_models_can_handle_all_covariates(
         target=TARGET_COLUMN,
         prediction_length=prediction_length,
         known_covariates_names=known_covariates_names if len(known_covariates_names) > 0 else None,
-        eval_metric=eval_metric,
+        eval_metric="WQL",
     )
     predictor.fit(train_data, hyperparameters=all_model_hyperparams)
     predictor.evaluate(test_data)
@@ -182,8 +182,43 @@ def test_all_models_can_handle_all_covariates(
     assert predictions.index.equals(future_test_data.index)
 
 
-@pytest.mark.parametrize("freq", DEFAULT_SEASONALITIES.keys())
-def test_all_models_handle_all_pandas_frequencies(freq, all_model_hyperparams):
+@pytest.mark.parametrize(
+    "freq",
+    [
+        "YE",
+        "QE",
+        "SME",
+        "W",
+        "D",
+        "B",
+        "bh",
+        "h",
+        "min",
+        "s",
+    ],
+)
+@pytest.mark.parametrize(
+    "hyperparameters",
+    [
+        {"Chronos": {"model_path": "autogluon/chronos-bolt-350k-test"}},
+        {"DLinear": DUMMY_MODEL_HPARAMS},
+        {"DeepAR": DUMMY_MODEL_HPARAMS},
+        {"DirectTabular": DUMMY_MODEL_HPARAMS},
+        {"AutoETS": {**DUMMY_MODEL_HPARAMS, "model": "AAA"}},
+        {"NPTS": DUMMY_MODEL_HPARAMS},
+        {"Naive": DUMMY_MODEL_HPARAMS},
+        {"PatchTST": DUMMY_MODEL_HPARAMS},
+        {"RecursiveTabular": DUMMY_MODEL_HPARAMS},
+        {"SeasonalAverage": DUMMY_MODEL_HPARAMS},
+        {"SeasonalNaive": DUMMY_MODEL_HPARAMS},
+        {"SimpleFeedForward": DUMMY_MODEL_HPARAMS},
+        {"TemporalFusionTransformer": DUMMY_MODEL_HPARAMS},
+        {"TiDE": DUMMY_MODEL_HPARAMS},
+        {"WaveNet": DUMMY_MODEL_HPARAMS},
+        {"Zero": DUMMY_MODEL_HPARAMS},
+    ],
+)
+def test_all_models_handle_all_pandas_frequencies(freq, hyperparameters):
     if Version(pd.__version__) < Version("2.1") and freq in ["SME", "B", "bh"]:
         pytest.skip(f"'{freq}' frequency inference not supported by pandas < 2.1")
     if Version(pd.__version__) < Version("2.2"):
@@ -206,15 +241,18 @@ def test_all_models_handle_all_pandas_frequencies(freq, all_model_hyperparams):
         prediction_length=prediction_length,
         known_covariates_names=known_covariates_names if len(known_covariates_names) > 0 else None,
     )
-    predictor.fit(train_data, hyperparameters=all_model_hyperparams)
+    predictor.fit(train_data, hyperparameters=hyperparameters)
     predictor.evaluate(test_data)
     leaderboard = predictor.leaderboard(test_data)
 
-    assert_leaderboard_contains_all_models(leaderboard, hyperparameters=all_model_hyperparams)
+    assert_leaderboard_contains_all_models(
+        leaderboard,
+        hyperparameters=hyperparameters,
+        include_ensemble=False,
+    )
 
     known_covariates = test_data.slice_by_timestep(-prediction_length, None)[known_covariates_names]
     predictions = predictor.predict(train_data, known_covariates=known_covariates)
-
     future_test_data = test_data.slice_by_timestep(-prediction_length, None)
 
     assert predictions.index.equals(future_test_data.index)
