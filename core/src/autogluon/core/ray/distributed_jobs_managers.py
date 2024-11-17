@@ -123,8 +123,7 @@ class DistributedFitManager:
         self.max_mem = self.total_mem * self.max_mem_frac
 
         # Detect max resources a job could use on some node
-        # FIXME: deprecated call without alternative?
-        self.max_cpu_resources_per_node = int(max([n["CPU"] for n in ray.state.total_resources_per_node().values()]))
+        self.max_cpu_resources_per_node = int(max([n["Resources"]["CPU"] for n in ray.state.nodes()]))
 
         # Job tracking
         self.job_refs_to_allocated_resources: dict[str, ModelResources] = {}
