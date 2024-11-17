@@ -1,4 +1,5 @@
 import logging
+import os
 import platform
 import sys
 from types import ModuleType
@@ -41,13 +42,13 @@ def try_import_ray() -> ModuleType:
     ray_min_version = "2.10.0"
     current_os = platform.system()
     ray_max_version = ray_max_version_os_map.get(current_os, RAY_MAX_VERSION)
+    strict_ray_version = os.environ.get("AUTOGLUON_STRICT_RAY_VERSION", "True") == "True"
     try:
         import ray
         from packaging import version
-
-        if version.parse(ray.__version__) < version.parse(ray_min_version) or version.parse(
+        if (version.parse(ray.__version__) < version.parse(ray_min_version) or version.parse(
             ray.__version__
-        ) >= version.parse(ray_max_version):
+        ) >= version.parse(ray_max_version)) and strict_ray_version:
             msg = (
                 f"ray=={ray.__version__} detected. "
                 f"{ray_min_version} <= ray < {ray_max_version} is required. You can use pip to install certain version of ray "
