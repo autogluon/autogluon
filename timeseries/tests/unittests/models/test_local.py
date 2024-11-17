@@ -37,18 +37,22 @@ from ..common import (
 
 # models accepting seasonal_period
 SEASONAL_TESTABLE_MODELS = [
-    ARIMAModel,
     AutoARIMAModel,
     AutoETSModel,
-    AutoCESModel,
     AverageModel,
     DynamicOptimizedThetaModel,
-    ETSModel,
-    ThetaModel,
     NaiveModel,
     NPTSModel,
     SeasonalAverageModel,
     SeasonalNaiveModel,
+]
+# these models will only be tested in local tests, and will not be exported
+# to model tests to decrease test running time
+SEASONAL_TESTABLE_MODELS_LOCAL_ONLY = [
+    AutoCESModel,
+    ThetaModel,
+    ETSModel,
+    ARIMAModel,
 ]
 # intermittent demand models do not accept seasonal_period
 NONSEASONAL_TESTABLE_MODELS = [
@@ -57,14 +61,15 @@ NONSEASONAL_TESTABLE_MODELS = [
     CrostonModel,
     IMAPAModel,
 ]
+TESTABLE_MODELS_LOCAL = SEASONAL_TESTABLE_MODELS + SEASONAL_TESTABLE_MODELS_LOCAL_ONLY + NONSEASONAL_TESTABLE_MODELS
+SEASONAL_TESTABLE_MODELS_LOCAL = SEASONAL_TESTABLE_MODELS + SEASONAL_TESTABLE_MODELS_LOCAL_ONLY
 TESTABLE_MODELS = SEASONAL_TESTABLE_MODELS + NONSEASONAL_TESTABLE_MODELS
-
 
 # Restrict to single core for faster training on small datasets
 DEFAULT_HYPERPARAMETERS = {"n_jobs": 1, "use_fallback_model": False}
 
 
-@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS_LOCAL)
 def test_when_local_model_is_saved_and_loaded_then_model_can_predict(model_class, temp_model_path):
     model = model_class(path=temp_model_path, hyperparameters=DEFAULT_HYPERPARAMETERS, freq=DUMMY_TS_DATAFRAME.freq)
     model.fit(train_data=DUMMY_TS_DATAFRAME)
@@ -73,7 +78,7 @@ def test_when_local_model_is_saved_and_loaded_then_model_can_predict(model_class
     loaded_model.predict(data=DUMMY_TS_DATAFRAME)
 
 
-@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS_LOCAL)
 @pytest.mark.parametrize(
     "hyperparameters", [{}, {"seasonal_period": 5}, {"seasonal_period": 5, "dummy_argument": "a"}]
 )
@@ -93,7 +98,7 @@ def get_seasonal_period_from_fitted_local_model(model):
         return model._local_model_args["seasonal_period"]
 
 
-@pytest.mark.parametrize("model_class", SEASONAL_TESTABLE_MODELS)
+@pytest.mark.parametrize("model_class", SEASONAL_TESTABLE_MODELS_LOCAL)
 @pytest.mark.parametrize(
     "hyperparameters", [{**DEFAULT_HYPERPARAMETERS, "seasonal_period": None}, DEFAULT_HYPERPARAMETERS]
 )
@@ -122,7 +127,7 @@ def test_when_seasonal_period_is_set_to_none_then_inferred_period_is_used(
     assert get_seasonal_period_from_fitted_local_model(model) == expected_seasonal_period
 
 
-@pytest.mark.parametrize("model_class", SEASONAL_TESTABLE_MODELS)
+@pytest.mark.parametrize("model_class", SEASONAL_TESTABLE_MODELS_LOCAL)
 @pytest.mark.parametrize(
     "freqstr, ts_length, provided_seasonal_period",
     [
@@ -151,7 +156,7 @@ def test_when_seasonal_period_is_provided_then_inferred_period_is_overridden(
     assert get_seasonal_period_from_fitted_local_model(model) == provided_seasonal_period
 
 
-@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS_LOCAL)
 def test_when_invalid_model_arguments_provided_then_model_ignores_them(model_class, temp_model_path, caplog):
     model = model_class(
         path=temp_model_path,
@@ -163,7 +168,7 @@ def test_when_invalid_model_arguments_provided_then_model_ignores_them(model_cla
         assert "bad_argument" not in model._local_model_args
 
 
-@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS_LOCAL)
 @pytest.mark.parametrize("n_jobs", [0.5, 3])
 def test_when_local_model_saved_then_n_jobs_is_saved(model_class, n_jobs, temp_model_path):
     model = model_class(path=temp_model_path, hyperparameters={"n_jobs": n_jobs})
@@ -177,7 +182,7 @@ def failing_predict(*args, **kwargs):
     raise RuntimeError("Custom error message")
 
 
-@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS_LOCAL)
 def test_when_fallback_model_disabled_and_model_fails_then_exception_is_raised(temp_model_path, model_class):
     model = model_class(
         path=temp_model_path, hyperparameters={"use_fallback_model": False, "n_jobs": 1}, freq=DUMMY_TS_DATAFRAME.freq
@@ -188,7 +193,7 @@ def test_when_fallback_model_disabled_and_model_fails_then_exception_is_raised(t
         model.predict(DUMMY_TS_DATAFRAME)
 
 
-@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS_LOCAL)
 def test_when_fallback_model_enabled_and_model_fails_then_no_exception_is_raised(temp_model_path, model_class):
     model = model_class(
         path=temp_model_path, hyperparameters={"use_fallback_model": True, "n_jobs": 1}, freq=DUMMY_TS_DATAFRAME.freq
@@ -390,7 +395,7 @@ def test_when_intermittent_models_fit_then_values_are_lower_bounded(
             predictions.loc[item_id].values.min() >= data.loc[item_id].values.min()
 
 
-@pytest.mark.parametrize("model_class", TESTABLE_MODELS)
+@pytest.mark.parametrize("model_class", TESTABLE_MODELS_LOCAL)
 @pytest.mark.parametrize("prediction_length", [1, 3])
 def test_when_local_models_fit_then_quantiles_are_present_and_ranked(model_class, prediction_length, temp_model_path):
     data = get_data_frame_with_item_index(["B", "A", "X"])
