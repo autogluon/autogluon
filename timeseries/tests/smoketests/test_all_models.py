@@ -139,6 +139,8 @@ def assert_leaderboard_contains_all_models(
     assert len(failed_models) == 0, f"Failed models: {failed_models}"
 
 
+# TODO: Some models, such as local models, do not change behavior when past / known /
+# static features are provided. We could omit them from these tests.
 @pytest.mark.parametrize("use_past_covariates", [True, False])
 @pytest.mark.parametrize("use_known_covariates", [True, False])
 @pytest.mark.parametrize("use_static_features_categorical", [True, False])
