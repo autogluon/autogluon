@@ -404,8 +404,8 @@ class AbstractMLForecastModel(AbstractTimeSeriesModel):
         residuals_std_per_timestep = self._residuals_std_per_item.reindex(repeated_item_ids)
         # Use in-sample seasonal error in for items not seen during fit
         items_not_seen_during_fit = residuals_std_per_timestep.index[residuals_std_per_timestep.isna()].unique()
-        if len(items_not_seen_during_fit):
-            scale_for_new_items = np.sqrt(
+        if len(items_not_seen_during_fit) > 0:
+            scale_for_new_items: pd.Series = np.sqrt(
                 in_sample_squared_seasonal_error(y_past=past_target.loc[items_not_seen_during_fit])
             )
             residuals_std_per_timestep = residuals_std_per_timestep.fillna(scale_for_new_items)
