@@ -124,8 +124,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
                     num_refits_remaining = math.ceil(
                         (val_splitter.num_val_windows - window_index) / refit_every_n_windows
                     )
-                    # Reserve 10% of the remaining time for prediction, use 90% of time for training
-                    time_left_for_window = 0.9 * time_left / num_refits_remaining
+                    time_left_for_window = time_left / num_refits_remaining
 
             if refit_this_window:
                 model = self.get_child_model(window_index)

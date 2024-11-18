@@ -153,8 +153,6 @@ class ChronosModel(AbstractTimeSeriesModel):
     fine_tune_eval_max_items : int, default = 256
         The maximum number of randomly-sampled time series to use from the validation set for evaluation
         during fine-tuning. If None, the entire validation dataset will be used.
-    fine_tune_time_fraction: float, default = 0.8
-        Fraction of the time_limit that is reserved for fine-tuning. The remainder will be reserved for prediction.
     fine_tune_trainer_kwargs : dict, optional
         Extra keyword arguments passed to ``transformers.TrainingArguments``
     keep_transformers_logs: bool, default = False
@@ -164,6 +162,7 @@ class ChronosModel(AbstractTimeSeriesModel):
     # default number of samples for prediction
     default_num_samples: int = 20
     default_model_path = "autogluon/chronos-t5-small"
+    default_max_time_limit_ratio = 0.8
     maximum_context_length = 2048
     fine_tuned_ckpt_name: str = "fine-tuned-ckpt"
 
@@ -325,7 +324,6 @@ class ChronosModel(AbstractTimeSeriesModel):
         init_args.setdefault("fine_tune_steps", 5000)
         init_args.setdefault("fine_tune_batch_size", self.default_batch_size)
         init_args.setdefault("eval_during_fine_tune", False)
-        init_args.setdefault("fine_tune_time_fraction", 0.8)
         init_args.setdefault("fine_tune_eval_max_items", 256)
         init_args.setdefault("fine_tune_shuffle_buffer_size", 10_000)
 
@@ -467,7 +465,7 @@ class ChronosModel(AbstractTimeSeriesModel):
 
             callbacks = []
             if time_limit is not None:
-                callbacks.append(TimeLimitCallback(time_limit=time_limit * fine_tune_args["fine_tune_time_fraction"]))
+                callbacks.append(TimeLimitCallback(time_limit=time_limit))
 
             if val_data is not None:
                 callbacks.append(EvaluateAndSaveFinalStepCallback())
