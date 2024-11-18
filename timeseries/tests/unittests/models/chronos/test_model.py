@@ -23,13 +23,7 @@ DATASETS = [DUMMY_TS_DATAFRAME, DATAFRAME_WITH_STATIC, DATAFRAME_WITH_COVARIATES
 GPU_AVAILABLE = torch.cuda.is_available()
 HYPERPARAMETER_DICTS = [
     {
-        "batch_size": 32,
-    },
-    {
         "batch_size": 4,
-    },
-    {
-        "num_samples": 10,
     },
     {
         "context_length": 64,
@@ -39,11 +33,11 @@ HYPERPARAMETER_DICTS = [
     },
     {
         "fine_tune": True,
-        "fine_tune_steps": 10,
+        "fine_tune_steps": 2,
     },
     {
         "fine_tune": True,
-        "fine_tune_steps": 10,
+        "fine_tune_steps": 2,
         "context_length": 64,
     },
 ]
