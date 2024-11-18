@@ -63,7 +63,6 @@ DUMMY_MODEL_HPARAMS = {
 ALL_MODELS = {
     "ADIDA": DUMMY_MODEL_HPARAMS,
     "Average": DUMMY_MODEL_HPARAMS,
-    # "AutoCES": {**DUMMY_MODEL_HPARAMS, "model": "S"},
     "Chronos": {},
     "Croston": DUMMY_MODEL_HPARAMS,
     "DLinear": DUMMY_MODEL_HPARAMS,
@@ -80,7 +79,6 @@ ALL_MODELS = {
     "SeasonalNaive": DUMMY_MODEL_HPARAMS,
     "SimpleFeedForward": DUMMY_MODEL_HPARAMS,
     "TemporalFusionTransformer": DUMMY_MODEL_HPARAMS,
-    # "Theta": DUMMY_MODEL_HPARAMS,  # covered by DynamicOptimizedTheta
     "TiDE": DUMMY_MODEL_HPARAMS,
     "WaveNet": DUMMY_MODEL_HPARAMS,
     "Zero": DUMMY_MODEL_HPARAMS,
@@ -143,11 +141,11 @@ def assert_leaderboard_contains_all_models(
 
 @pytest.mark.parametrize("use_past_covariates", [True, False])
 @pytest.mark.parametrize("use_known_covariates", [True, False])
-@pytest.mark.parametrize("use_static_features_continuous", [True, False])
+@pytest.mark.parametrize("use_static_features_categorical", [True, False])
 def test_all_models_can_handle_all_covariates(
     use_known_covariates,
     use_past_covariates,
-    use_static_features_continuous,
+    use_static_features_categorical,
     all_model_hyperparams,
 ):
     prediction_length = 5
@@ -155,8 +153,8 @@ def test_all_models_can_handle_all_covariates(
         prediction_length=prediction_length,
         use_known_covariates=use_known_covariates,
         use_past_covariates=use_past_covariates,
-        use_static_features_continuous=use_static_features_continuous,
-        use_static_features_categorical=False,
+        use_static_features_continuous=False,
+        use_static_features_categorical=use_static_features_categorical,
     )
 
     known_covariates_names = [col for col in train_data if col.startswith("known_")]
@@ -188,12 +186,12 @@ def test_all_models_can_handle_all_covariates(
         "QE",
         "SME",
         "W",
-        "D",
+        "2D",
         "B",
         "bh",
-        "h",
+        "4h",
         "min",
-        "s",
+        "100s",
     ],
 )
 @pytest.mark.parametrize(
