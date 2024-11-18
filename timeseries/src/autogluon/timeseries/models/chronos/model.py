@@ -153,6 +153,8 @@ class ChronosModel(AbstractTimeSeriesModel):
     fine_tune_eval_max_items : int, default = 256
         The maximum number of randomly-sampled time series to use from the validation set for evaluation
         during fine-tuning. If None, the entire validation dataset will be used.
+    fine_tune_time_fraction: float, default = 0.8
+        Fraction of the time_limit that is reserved for fine-tuning. The remainder will be reserved for prediction.
     fine_tune_trainer_kwargs : dict, optional
         Extra keyword arguments passed to ``transformers.TrainingArguments``
     keep_transformers_logs: bool, default = False
@@ -234,7 +236,7 @@ class ChronosModel(AbstractTimeSeriesModel):
 
         fine_tune_ckpt_path = Path(model.path) / cls.fine_tuned_ckpt_name
         if fine_tune_ckpt_path.exists():
-            logger.debug(f"Fine-tuned checkpoint exists, setting model_path to {fine_tune_ckpt_path}")
+            logger.debug(f"\tFine-tuned checkpoint exists, setting model_path to {fine_tune_ckpt_path}")
             model.model_path = fine_tune_ckpt_path
 
         return model
@@ -323,6 +325,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         init_args.setdefault("fine_tune_steps", 5000)
         init_args.setdefault("fine_tune_batch_size", self.default_batch_size)
         init_args.setdefault("eval_during_fine_tune", False)
+        init_args.setdefault("fine_tune_time_fraction", 0.8)
         init_args.setdefault("fine_tune_eval_max_items", 256)
         init_args.setdefault("fine_tune_shuffle_buffer_size", 10_000)
 
@@ -428,7 +431,7 @@ class ChronosModel(AbstractTimeSeriesModel):
 
                 if self.prediction_length != fine_tune_prediction_length:
                     logger.debug(
-                        f"ChronosBolt models can only be fine-tuned with a maximum prediction_length of {model_prediction_length}. "
+                        f"\tChronosBolt models can only be fine-tuned with a maximum prediction_length of {model_prediction_length}. "
                         f"Fine-tuning prediction_length has been changed to {fine_tune_prediction_length}."
                     )
 
@@ -464,7 +467,7 @@ class ChronosModel(AbstractTimeSeriesModel):
 
             callbacks = []
             if time_limit is not None:
-                callbacks.append(TimeLimitCallback(time_limit=time_limit))
+                callbacks.append(TimeLimitCallback(time_limit=time_limit * fine_tune_args["fine_tune_time_fraction"]))
 
             if val_data is not None:
                 callbacks.append(EvaluateAndSaveFinalStepCallback())
@@ -525,11 +528,11 @@ class ChronosModel(AbstractTimeSeriesModel):
 
             if val_data is None or best_train_eval_loss <= zero_shot_eval_loss:
                 fine_tuned_ckpt_path = Path(self.path) / self.fine_tuned_ckpt_name
-                logger.info(f"Saving fine-tuned model to {fine_tuned_ckpt_path}")
+                logger.info(f"\tSaving fine-tuned model to {fine_tuned_ckpt_path}")
                 self.model_pipeline.inner_model.save_pretrained(Path(self.path) / self.fine_tuned_ckpt_name)
             else:
                 # Reset the model to its pretrained state
-                logger.info("Validation loss worsened after fine-tuning. Reverting to the pretrained model.")
+                logger.info("\tValidation loss worsened after fine-tuning. Reverting to the pretrained model.")
                 self.model_pipeline = None
                 self.load_model_pipeline(is_training=False)
 

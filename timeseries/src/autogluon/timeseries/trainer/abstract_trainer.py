@@ -29,7 +29,7 @@ from autogluon.timeseries.utils.features import (
     CovariateMetadata,
     PermutationFeatureImportanceTransform,
 )
-from autogluon.timeseries.utils.warning_filters import disable_tqdm
+from autogluon.timeseries.utils.warning_filters import disable_tqdm, warning_filter
 
 logger = logging.getLogger("autogluon.timeseries.trainer")
 
@@ -736,7 +736,8 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             quantile_levels=self.quantile_levels,
             metadata=self.metadata,
         )
-        ensemble.fit_ensemble(model_preds, data_per_window=data_per_window, time_limit=time_limit)
+        with warning_filter():
+            ensemble.fit_ensemble(model_preds, data_per_window=data_per_window, time_limit=time_limit)
         ensemble.fit_time = time.time() - time_start
 
         predict_time = 0
