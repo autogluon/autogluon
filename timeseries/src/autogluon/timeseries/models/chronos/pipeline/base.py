@@ -135,7 +135,7 @@ class BaseChronosPipeline(metaclass=PipelineRegistry):
         """
         from transformers import AutoConfig
 
-        kwargs.setdefault("resume_download", None)  # silence deprecation warning
+        kwargs.setdefault("resume_download", None)  # silence huggingface_hub warning
         if str(pretrained_model_name_or_path).startswith("s3://"):
             from .utils import cache_model_from_s3
 

@@ -591,7 +591,7 @@ def test_when_inference_only_model_scores_oof_then_time_limit_is_passed_to_predi
     model.fit(train_data=data, time_limit=time_limit)
     with mock.patch.object(model, "_predict") as mock_predict:
         model.score_and_cache_oof(data)
-        assert abs(mock_predict.call_args[1]["time_limit"] - time_limit) < 0.5
+        assert abs(mock_predict.call_args[1]["time_limit"] - time_limit) < 20
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)

@@ -546,6 +546,7 @@ class ChronosPipeline(BaseChronosPipeline):
                 "onnx",
                 "openvino",
             ], "optimization_strategy not recognized. Please provide one of `onnx` or `openvino`"
+            kwargs.pop("resume_download", None)  # Optimized pipeline does not support 'resume_download' kwargs
             torch_dtype = kwargs.pop("torch_dtype", "auto")
             if torch_dtype != "auto":
                 logger.warning(f"\t`torch_dtype` will be ignored for optimization_strategy {optimization_strategy}")
