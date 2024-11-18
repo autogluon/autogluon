@@ -1,7 +1,6 @@
 import logging
 import os
 import shutil
-import time
 from pathlib import Path
 from typing import Any, Dict, Literal, Optional, Union
 
@@ -399,7 +398,6 @@ class ChronosModel(AbstractTimeSeriesModel):
 
         eval_during_fine_tune = val_data is not None and fine_tune_args["eval_during_fine_tune"]
 
-        start_time = time.monotonic()
         if do_fine_tune:
             context_length = self._get_context_length(train_data)
             # load model pipeline to device memory
