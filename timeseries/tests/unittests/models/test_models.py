@@ -586,12 +586,17 @@ def test_when_model_created_then_model_has_all_required_tags(temp_model_path, mo
 @pytest.mark.parametrize("model_class", CHRONOS_ZERO_SHOT_MODELS + LOCAL_TESTABLE_MODELS)
 def test_when_inference_only_model_scores_oof_then_time_limit_is_passed_to_predict(model_class, dummy_hyperparameters):
     data = DUMMY_TS_DATAFRAME
-    model = model_class(freq=data.freq, hyperparameters=dummy_hyperparameters)
+    model_kwargs = dict(freq=data.freq, hyperparameters=dummy_hyperparameters)
+    base_model = model_class(**model_kwargs)
+    mw_model = MultiWindowBacktestingModel(model_base=base_model, **model_kwargs)
     time_limit = 94.4
-    model.fit(train_data=data, time_limit=time_limit)
-    with mock.patch.object(model, "_predict") as mock_predict:
-        model.score_and_cache_oof(data)
-        assert abs(mock_predict.call_args[1]["time_limit"] - time_limit) < 20
+    with mock.patch.object(type(base_model), "_predict") as mock_predict:
+        mock_predict.side_effect = RuntimeError
+        try:
+            mw_model.fit(train_data=data, time_limit=time_limit)
+        except RuntimeError:
+            pass
+        assert abs(mock_predict.call_args[1]["time_limit"] - time_limit) < 0.5
 
 
 @pytest.mark.parametrize("model_class", TESTABLE_MODELS)

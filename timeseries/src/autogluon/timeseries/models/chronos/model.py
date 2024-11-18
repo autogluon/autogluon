@@ -217,7 +217,6 @@ class ChronosModel(AbstractTimeSeriesModel):
         )
 
         self.model_pipeline: Optional[Any] = None  # of type BaseChronosPipeline
-        self.time_limit: Optional[float] = None
 
     def save(self, path: str = None, verbose: bool = True) -> str:
         pipeline = self.model_pipeline
@@ -538,9 +537,6 @@ class ChronosModel(AbstractTimeSeriesModel):
                 logger.debug(f"Removing transformers_logs directory {output_dir}")
                 shutil.rmtree(output_dir)
 
-        if time_limit is not None:
-            self.time_limit = time_limit - (time.monotonic() - start_time)  # inference time budget
-
     def _get_inference_data_loader(
         self,
         data: TimeSeriesDataFrame,
@@ -636,16 +632,3 @@ class ChronosModel(AbstractTimeSeriesModel):
             "can_use_train_data": do_fine_tune,
             "can_use_val_data": do_fine_tune,
         }
-
-    def score_and_cache_oof(
-        self,
-        val_data: TimeSeriesDataFrame,
-        store_val_score: bool = False,
-        store_predict_time: bool = False,
-        **predict_kwargs,
-    ) -> None:
-        # All computation happens during inference, so we provide the time_limit at prediction time
-        # TODO: Once custom predict_kwargs is allowed, make sure that `time_limit` is not among the keys
-        super().score_and_cache_oof(
-            val_data, store_val_score, store_predict_time, time_limit=self.time_limit, **predict_kwargs
-        )

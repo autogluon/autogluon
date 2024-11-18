@@ -33,6 +33,7 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
     """
 
     # TODO: Remove the MultiWindowBacktestingModel class, move the logic to AbstractTimeSeriesTrainer
+    default_max_time_limit_ratio = 1.0
 
     def __init__(
         self,
@@ -137,7 +138,15 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
                 )
                 model.fit_time = time.time() - model_fit_start_time
                 most_recent_refit_window = f"W{window_index}"
-            model.score_and_cache_oof(val_fold, store_val_score=True, store_predict_time=True)
+
+            if time_limit is None:
+                time_left_for_prediction = None
+            else:
+                time_left_for_prediction = time_limit - (time.time() - global_fit_start_time)
+
+            model.score_and_cache_oof(
+                val_fold, store_val_score=True, store_predict_time=True, time_limit=time_left_for_prediction
+            )
 
             oof_predictions_per_window.append(model.get_oof_predictions()[0])
 
