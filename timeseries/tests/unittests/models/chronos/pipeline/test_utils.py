@@ -105,6 +105,16 @@ def test_chronos_fine_tuning_dataset_returns_data_in_chronos_bolt_format_when_to
     assert entry["target"].shape[-1] == prediction_length
 
 
+@pytest.mark.parametrize(
+    "shuffle_buffer_size, expected_type",
+    [(100, PseudoShuffledIterableDataset), (0, ChronosFineTuningDataset), (None, ChronosFineTuningDataset)],
+)
+def test_chronos_fine_tuning_dataset_shuffle_returns_shuffled_dataset(shuffle_buffer_size, expected_type):
+    shuffled_dataset = ChronosFineTuningDataset(DUMMY_TS_DATAFRAME).shuffle(shuffle_buffer_size)
+
+    assert isinstance(shuffled_dataset, expected_type)
+
+
 # ChronosInferenceDataset tests
 
 

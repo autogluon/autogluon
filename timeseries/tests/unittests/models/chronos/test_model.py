@@ -413,3 +413,76 @@ def test_when_chronos_scores_oof_and_time_limit_is_exceeded_then_exception_is_ra
     model.fit(data)
     with pytest.raises(TimeLimitExceeded):
         model.score_and_cache_oof(data, time_limit=0.1)
+
+
+def test_when_eval_during_fine_tune_is_false_then_evaluation_is_turned_off(chronos_model_path):
+    model = ChronosModel(
+        hyperparameters={
+            "model_path": chronos_model_path,
+            "device": "cpu",
+            "fine_tune": True,
+            "eval_during_fine_tune": False,
+        },
+    )
+
+    with mock.patch("transformers.trainer.TrainingArguments.__init__") as training_args:
+        try:
+            model.fit(DUMMY_TS_DATAFRAME)
+        except TypeError:
+            pass
+
+        assert training_args.call_args.kwargs["evaluation_strategy"] == "no"
+        assert training_args.call_args.kwargs["eval_steps"] is None
+        assert not training_args.call_args.kwargs["load_best_model_at_end"]
+        assert training_args.call_args.kwargs["metric_for_best_model"] is None
+
+
+@pytest.mark.parametrize("max_items", [3, 20, None])
+def test_fine_tune_eval_max_items_is_used(chronos_model_path, max_items):
+    model = ChronosModel(
+        hyperparameters={
+            "model_path": chronos_model_path,
+            "device": "cpu",
+            "fine_tune": True,
+            "fine_tune_eval_max_items": max_items,
+        },
+    )
+    expected_max_items = (
+        min(max_items, DUMMY_TS_DATAFRAME.num_items) if max_items is not None else DUMMY_TS_DATAFRAME.num_items
+    )
+
+    with mock.patch(
+        "autogluon.timeseries.models.chronos.pipeline.utils.ChronosFineTuningDataset.__init__"
+    ) as chronos_ft_dataset:
+        chronos_ft_dataset.side_effect = [None, None]
+
+        try:
+            model.fit(DUMMY_TS_DATAFRAME, val_data=DUMMY_TS_DATAFRAME)
+        except AttributeError:
+            pass
+
+        val_data_subset = chronos_ft_dataset.call_args_list[1].kwargs["target_df"]
+
+        assert val_data_subset.num_items == expected_max_items
+
+
+@pytest.mark.parametrize("shuffle_buffer_size", [20, None])
+def test_fine_tune_shuffle_buffer_size_is_used(chronos_model_path, shuffle_buffer_size):
+    model = ChronosModel(
+        hyperparameters={
+            "model_path": chronos_model_path,
+            "device": "cpu",
+            "fine_tune": True,
+            "fine_tune_shuffle_buffer_size": shuffle_buffer_size,
+        },
+    )
+
+    with mock.patch(
+        "autogluon.timeseries.models.chronos.pipeline.utils.ChronosFineTuningDataset.shuffle"
+    ) as chronos_ft_dataset_shuffle:
+        try:
+            model.fit(DUMMY_TS_DATAFRAME)
+        except ValueError:
+            pass
+
+        assert chronos_ft_dataset_shuffle.call_args.args[0] == shuffle_buffer_size

@@ -113,7 +113,7 @@ class ChronosModel(AbstractTimeSeriesModel):
     batch_size : int, default = 16
         Size of batches used during inference
     num_samples : int, default = 20
-        Number of samples used during inference
+        Number of samples used during inference, only used for the original Chronos models
     device : str, default = None
         Device to use for inference (and fine-tuning, if enabled). If None, model will use the GPU if available.
         For larger model sizes `small`, `base`, and `large`; inference will fail if no GPU is available.
