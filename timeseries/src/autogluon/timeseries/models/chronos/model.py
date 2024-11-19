@@ -116,7 +116,9 @@ class ChronosModel(AbstractTimeSeriesModel):
         Number of samples used during inference, only used for the original Chronos models
     device : str, default = None
         Device to use for inference (and fine-tuning, if enabled). If None, model will use the GPU if available.
-        For larger model sizes `small`, `base`, and `large`; inference will fail if no GPU is available.
+        For larger Chronos model sizes ``small``, ``base``, and ``large``; inference will fail if no GPU is available.
+        For Chronos-Bolt models, inference can be done on the CPU. Although fine-tuning the smaller Chronos models
+        (``tiny`` and ``mini``) and all Chronos-Bolt is allowed on the CPU, we recommend using a GPU for faster fine-tuning.
     context_length : int or None, default = None
         The context length to use in the model. Shorter context lengths will decrease model accuracy, but result
         in faster inference. If None, the model will infer context length from the data set length at inference
@@ -140,9 +142,9 @@ class ChronosModel(AbstractTimeSeriesModel):
         If True, the pretrained model will be fine-tuned
     fine_tune_lr: float, default = 0.0001
         The learning rate used for fine-tuning
-    fine_tune_steps : int, default = 5000
+    fine_tune_steps : int, default = 1000
         The number of gradient update steps to fine-tune for
-    fine_tune_batch_size : int, default = 16
+    fine_tune_batch_size : int, default = 32
         The batch size to use for fine-tuning
     fine_tune_shuffle_buffer_size : int, default = 10000
         The size of the shuffle buffer to shuffle the data during fine-tuning. If None, shuffling will
@@ -320,8 +322,8 @@ class ChronosModel(AbstractTimeSeriesModel):
         init_args.setdefault("fine_tune", False)
         init_args.setdefault("keep_transformers_logs", False)
         init_args.setdefault("fine_tune_lr", 1e-4)
-        init_args.setdefault("fine_tune_steps", 5000)
-        init_args.setdefault("fine_tune_batch_size", self.default_batch_size)
+        init_args.setdefault("fine_tune_steps", 1000)
+        init_args.setdefault("fine_tune_batch_size", 32)
         init_args.setdefault("eval_during_fine_tune", False)
         init_args.setdefault("fine_tune_eval_max_items", 256)
         init_args.setdefault("fine_tune_shuffle_buffer_size", 10_000)
@@ -435,10 +437,15 @@ class ChronosModel(AbstractTimeSeriesModel):
             fine_tune_trainer_kwargs["disable_tqdm"] = fine_tune_trainer_kwargs.get("disable_tqdm", (verbosity < 3))
             fine_tune_trainer_kwargs["use_cpu"] = str(self.model_pipeline.inner_model.device) == "cpu"
 
-            # TODO: adamw_torch_fused is not supported on CPU in torch <= 2.3. When torch 2.4 becomes the lower bound
-            # this if block can be removed because torch >= 2.4 supports AdamW optimizer with fused=True on CPU
-            if fine_tune_trainer_kwargs["use_cpu"] and fine_tune_trainer_kwargs["optim"] == "adamw_torch_fused":
-                fine_tune_trainer_kwargs["optim"] = "adamw_torch"
+            if fine_tune_trainer_kwargs["use_cpu"]:
+                logger.info(
+                    "\tFine-tuning on the CPU detected. We recommend using a GPU for faster fine-tuning of Chronos."
+                )
+
+                # TODO: adamw_torch_fused is not supported on CPU in torch <= 2.3. When torch 2.4 becomes the lower bound
+                # this if block can be removed because torch >= 2.4 supports AdamW optimizer with fused=True on CPU
+                if fine_tune_trainer_kwargs["optim"] == "adamw_torch_fused":
+                    fine_tune_trainer_kwargs["optim"] = "adamw_torch"
 
             output_dir = Path(fine_tune_trainer_kwargs["output_dir"])
 
