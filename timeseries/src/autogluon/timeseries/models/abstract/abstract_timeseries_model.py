@@ -67,6 +67,7 @@ class AbstractTimeSeriesModel(AbstractModel):
     _oof_filename = "oof.pkl"
     # TODO: For which models should we override this parameter?
     _covariate_regressor_fit_time_fraction: float = 0.5
+    default_max_time_limit_ratio: float = 0.9
 
     # TODO: refactor "pruned" methods after AbstractModel is refactored
     predict_proba = None
@@ -173,6 +174,11 @@ class AbstractTimeSeriesModel(AbstractModel):
         if self._oof_predictions is None:
             self._oof_predictions = self.load_oof_predictions(self.path)
         return self._oof_predictions
+
+    def _get_default_auxiliary_params(self) -> dict:
+        default_auxiliary_params = super()._get_default_auxiliary_params()
+        default_auxiliary_params["max_time_limit_ratio"] = self.default_max_time_limit_ratio
+        return default_auxiliary_params
 
     def _initialize(self, **kwargs) -> None:
         self._init_params_aux()

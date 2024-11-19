@@ -1067,7 +1067,7 @@ def test_given_time_limit_is_not_none_then_time_is_distributed_across_windows_fo
     expected_time_limit_for_first_model = 0.9 * time_limit / num_refits + 0.1
 
     predictor = TimeSeriesPredictor(path=temp_model_path, prediction_length=5)
-    with mock.patch("autogluon.timeseries.models.RecursiveTabularModel.fit") as mock_fit:
+    with mock.patch("autogluon.timeseries.models.RecursiveTabularModel._fit") as mock_fit:
         mock_fit.side_effect = RuntimeError("Numerical error")
         try:
             predictor.fit(

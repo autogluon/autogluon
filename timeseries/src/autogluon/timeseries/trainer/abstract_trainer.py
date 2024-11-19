@@ -29,7 +29,7 @@ from autogluon.timeseries.utils.features import (
     CovariateMetadata,
     PermutationFeatureImportanceTransform,
 )
-from autogluon.timeseries.utils.warning_filters import disable_tqdm
+from autogluon.timeseries.utils.warning_filters import disable_tqdm, warning_filter
 
 logger = logging.getLogger("autogluon.timeseries.trainer")
 
@@ -519,8 +519,12 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             fit_end_time = time.time()
             model.fit_time = model.fit_time or (fit_end_time - fit_start_time)
 
+            if time_limit is not None:
+                time_limit = fit_end_time - fit_start_time
             if val_data is not None and not self.skip_model_selection:
-                model.score_and_cache_oof(val_data, store_val_score=True, store_predict_time=True)
+                model.score_and_cache_oof(
+                    val_data, store_val_score=True, store_predict_time=True, time_limit=time_limit
+                )
 
             self._log_scores_and_times(model.val_score, model.fit_time, model.predict_time)
 
@@ -736,7 +740,8 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             quantile_levels=self.quantile_levels,
             metadata=self.metadata,
         )
-        ensemble.fit_ensemble(model_preds, data_per_window=data_per_window, time_limit=time_limit)
+        with warning_filter():
+            ensemble.fit_ensemble(model_preds, data_per_window=data_per_window, time_limit=time_limit)
         ensemble.fit_time = time.time() - time_start
 
         predict_time = 0

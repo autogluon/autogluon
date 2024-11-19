@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional, Type, Union
 from autogluon.common import space
 from autogluon.core import constants
 from autogluon.timeseries.metrics import TimeSeriesScorer
+from autogluon.timeseries.utils.features import CovariateMetadata
 
 from . import (
     ADIDAModel,
@@ -170,6 +171,7 @@ def get_preset_models(
     eval_metric_seasonal_period: Optional[int],
     hyperparameters: Union[str, Dict, None],
     hyperparameter_tune: bool,
+    metadata: CovariateMetadata,
     all_assigned_names: List[str],
     excluded_model_types: List[str],
     multi_window: bool = False,
@@ -247,6 +249,7 @@ def get_preset_models(
                 prediction_length=prediction_length,
                 eval_metric=eval_metric,
                 eval_metric_seasonal_period=eval_metric_seasonal_period,
+                metadata=metadata,
                 hyperparameters=model_hps,
                 **kwargs,
             )

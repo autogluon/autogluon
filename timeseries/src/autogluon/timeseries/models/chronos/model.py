@@ -1,7 +1,6 @@
 import logging
 import os
 import shutil
-import time
 from pathlib import Path
 from typing import Any, Dict, Literal, Optional, Union
 
@@ -162,6 +161,7 @@ class ChronosModel(AbstractTimeSeriesModel):
     # default number of samples for prediction
     default_num_samples: int = 20
     default_model_path = "autogluon/chronos-t5-small"
+    default_max_time_limit_ratio = 0.8
     maximum_context_length = 2048
     fine_tuned_ckpt_name: str = "fine-tuned-ckpt"
 
@@ -216,7 +216,6 @@ class ChronosModel(AbstractTimeSeriesModel):
         )
 
         self.model_pipeline: Optional[Any] = None  # of type BaseChronosPipeline
-        self.time_limit: Optional[float] = None
 
     def save(self, path: str = None, verbose: bool = True) -> str:
         pipeline = self.model_pipeline
@@ -234,7 +233,7 @@ class ChronosModel(AbstractTimeSeriesModel):
 
         fine_tune_ckpt_path = Path(model.path) / cls.fine_tuned_ckpt_name
         if fine_tune_ckpt_path.exists():
-            logger.debug(f"Fine-tuned checkpoint exists, setting model_path to {fine_tune_ckpt_path}")
+            logger.debug(f"\tFine-tuned checkpoint exists, setting model_path to {fine_tune_ckpt_path}")
             model.model_path = fine_tune_ckpt_path
 
         return model
@@ -399,7 +398,6 @@ class ChronosModel(AbstractTimeSeriesModel):
 
         eval_during_fine_tune = val_data is not None and fine_tune_args["eval_during_fine_tune"]
 
-        start_time = time.monotonic()
         if do_fine_tune:
             context_length = self._get_context_length(train_data)
             # load model pipeline to device memory
@@ -428,7 +426,7 @@ class ChronosModel(AbstractTimeSeriesModel):
 
                 if self.prediction_length != fine_tune_prediction_length:
                     logger.debug(
-                        f"ChronosBolt models can only be fine-tuned with a maximum prediction_length of {model_prediction_length}. "
+                        f"\tChronosBolt models can only be fine-tuned with a maximum prediction_length of {model_prediction_length}. "
                         f"Fine-tuning prediction_length has been changed to {fine_tune_prediction_length}."
                     )
 
@@ -525,20 +523,17 @@ class ChronosModel(AbstractTimeSeriesModel):
 
             if val_data is None or best_train_eval_loss <= zero_shot_eval_loss:
                 fine_tuned_ckpt_path = Path(self.path) / self.fine_tuned_ckpt_name
-                logger.info(f"Saving fine-tuned model to {fine_tuned_ckpt_path}")
+                logger.info(f"\tSaving fine-tuned model to {fine_tuned_ckpt_path}")
                 self.model_pipeline.inner_model.save_pretrained(Path(self.path) / self.fine_tuned_ckpt_name)
             else:
                 # Reset the model to its pretrained state
-                logger.info("Validation loss worsened after fine-tuning. Reverting to the pretrained model.")
+                logger.info("\tValidation loss worsened after fine-tuning. Reverting to the pretrained model.")
                 self.model_pipeline = None
                 self.load_model_pipeline(is_training=False)
 
             if not fine_tune_args["keep_transformers_logs"]:
                 logger.debug(f"Removing transformers_logs directory {output_dir}")
                 shutil.rmtree(output_dir)
-
-        if time_limit is not None:
-            self.time_limit = time_limit - (time.monotonic() - start_time)  # inference time budget
 
     def _get_inference_data_loader(
         self,
@@ -635,16 +630,3 @@ class ChronosModel(AbstractTimeSeriesModel):
             "can_use_train_data": do_fine_tune,
             "can_use_val_data": do_fine_tune,
         }
-
-    def score_and_cache_oof(
-        self,
-        val_data: TimeSeriesDataFrame,
-        store_val_score: bool = False,
-        store_predict_time: bool = False,
-        **predict_kwargs,
-    ) -> None:
-        # All computation happens during inference, so we provide the time_limit at prediction time
-        # TODO: Once custom predict_kwargs is allowed, make sure that `time_limit` is not among the keys
-        super().score_and_cache_oof(
-            val_data, store_val_score, store_predict_time, time_limit=self.time_limit, **predict_kwargs
-        )

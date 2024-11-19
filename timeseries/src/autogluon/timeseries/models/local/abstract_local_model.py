@@ -44,6 +44,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
     allowed_local_model_args: List[str] = []
     default_n_jobs: Union[int, float] = AG_DEFAULT_N_JOBS
     default_max_ts_length: Optional[int] = 2500
+    default_max_time_limit_ratio = 1.0
     init_time_in_seconds: int = 0
 
     def __init__(
@@ -84,7 +85,6 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
 
         self._local_model_args: Dict[str, Any] = None
         self._seasonal_period: Optional[int] = None
-        self.time_limit: Optional[float] = None
         self._dummy_forecast: Optional[pd.DataFrame] = None
 
     @property
@@ -138,7 +138,6 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         self._seasonal_period = local_model_args["seasonal_period"]
 
         self._local_model_args = self._update_local_model_args(local_model_args=local_model_args)
-        self.time_limit = time_limit
 
         self._dummy_forecast = self._get_dummy_forecast(train_data)
         return self
@@ -186,18 +185,6 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         predictions_df = pd.concat([pred for pred, _ in predictions_with_flags])
         predictions_df.index = get_forecast_horizon_index_ts_dataframe(data, self.prediction_length, freq=self.freq)
         return TimeSeriesDataFrame(predictions_df)
-
-    def score_and_cache_oof(
-        self,
-        val_data: TimeSeriesDataFrame,
-        store_val_score: bool = False,
-        store_predict_time: bool = False,
-        **predict_kwargs,
-    ) -> None:
-        # All computation happens during inference, so we provide the time_limit at prediction time
-        super().score_and_cache_oof(
-            val_data, store_val_score, store_predict_time, time_limit=self.time_limit, **predict_kwargs
-        )
 
     def _predict_wrapper(self, time_series: pd.Series, end_time: Optional[float] = None) -> Tuple[pd.DataFrame, bool]:
         if end_time is not None and time.time() >= end_time:
