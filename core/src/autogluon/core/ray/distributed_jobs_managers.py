@@ -199,9 +199,45 @@ class DistributedFitManager:
         cpus_fully_allocated = False
         num_models_delay_to_fit_all = 0
 
-        models_to_schedule_later = []
         job_refs = []
         num_models_to_schedule = len(models_to_schedule)
+        models_to_schedule_tmp = []
+        total_models_to_fit = 0
+        for i, model in enumerate(models_to_schedule):
+            model_name = model if self.mode == "refit" else model.name
+            if model_name in self.model_child_mem_estimate_cache:
+                model_child_memory_estimate = self.model_child_mem_estimate_cache[model_name]
+            else:
+                try:
+                    # FIXME: DONT USE TRY/EXCEPT, this is done to handle models crashing during initialization such as KNN when `NoValidFeatures`. Instead figure this out earlier or in the worker thread
+                    model_child_memory_estimate = self.get_memory_estimate_for_model_child(model=model)
+                except Exception as e:
+                    logger.log(20, f"Ran into exception when getting memory estimate for model, skipping model {model.name}: {e.__class__.__name__}: {e}")
+                    continue
+                self.model_child_mem_estimate_cache[model_name] = model_child_memory_estimate
+            if model_child_memory_estimate > self.max_mem:
+                logger.log(20, f"Insufficient total memory to fit model for even a single fold. Skipping {model_name}...")
+                continue
+
+            num_children = self.num_children_model(model=model)
+            total_models_to_fit += num_children
+            models_to_schedule_tmp.append(model)
+
+        if total_models_to_fit == 0:
+            self.models_to_schedule = []
+            return []
+
+        # Use real CPUs to avoid overallocating
+        available_cpus = self.available_num_cpus
+        cpus_per_model = available_cpus / total_models_to_fit
+        cpus_per_model = math.floor(cpus_per_model)
+
+        # We should always use at least this many CPUs per model
+        # TODO: This isn't optimal if the user provides specific CPU requirements per model, we should take this into account
+        num_cpus_per_child_floor = max(int(cpus_per_model), 1)
+
+        models_to_schedule = models_to_schedule_tmp
+        models_to_schedule_later = []
         for i, model in enumerate(models_to_schedule):
             model_name = model if self.mode == "refit" else model.name
             if model_name in self.model_child_mem_estimate_cache:
