@@ -515,29 +515,11 @@ class ChronosModel(AbstractTimeSeriesModel):
                 )
                 trainer.add_callback(LoggerCallback())
 
-            if val_data is not None:
-                # evaluate once before training
-                zero_shot_eval_loss = trainer.evaluate()["eval_loss"]
-
             trainer.train()
 
-            if eval_during_fine_tune:
-                # get the best eval_loss logged during fine-tuning
-                log_history_df = pd.DataFrame(trainer.state.log_history)
-                best_train_eval_loss = log_history_df["eval_loss"].min()
-            elif val_data is not None:
-                # evaluate at the end of fine-tuning
-                best_train_eval_loss = trainer.evaluate()["eval_loss"]
-
-            if val_data is None or best_train_eval_loss <= zero_shot_eval_loss:
-                fine_tuned_ckpt_path = Path(self.path) / self.fine_tuned_ckpt_name
-                logger.info(f"\tSaving fine-tuned model to {fine_tuned_ckpt_path}")
-                self.model_pipeline.inner_model.save_pretrained(Path(self.path) / self.fine_tuned_ckpt_name)
-            else:
-                # Reset the model to its pretrained state
-                logger.info("\tValidation loss worsened after fine-tuning. Reverting to the pretrained model.")
-                self.model_pipeline = None
-                self.load_model_pipeline(is_training=False)
+            fine_tuned_ckpt_path = Path(self.path) / self.fine_tuned_ckpt_name
+            logger.info(f"\tSaving fine-tuned model to {fine_tuned_ckpt_path}")
+            self.model_pipeline.inner_model.save_pretrained(Path(self.path) / self.fine_tuned_ckpt_name)
 
             if not fine_tune_args["keep_transformers_logs"]:
                 logger.debug(f"Removing transformers_logs directory {output_dir}")
