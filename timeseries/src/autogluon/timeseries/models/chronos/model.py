@@ -164,7 +164,7 @@ class ChronosModel(AbstractTimeSeriesModel):
 
     # default number of samples for prediction
     default_num_samples: int = 20
-    default_model_path = "autogluon/chronos-t5-small"
+    default_model_path = "autogluon/chronos-bolt-small"
     default_max_time_limit_ratio = 0.8
     maximum_context_length = 2048
     fine_tuned_ckpt_name: str = "fine-tuned-ckpt"
