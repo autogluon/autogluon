@@ -247,7 +247,6 @@ class RayResourceManager:
         return ResourceManager.bytes_converter(value=bytes, format_in="B", format_out=format)
 
 
-
 def get_resource_manager():
     """Get resource manager class based on the training context"""
     return RayResourceManager if DistributedContext.is_distributed_mode() else ResourceManager

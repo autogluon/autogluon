@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import copy
-import logging
 from dataclasses import dataclass
-from typing import Callable, Literal
+import logging
+import math
 import time
+from typing import Callable, Literal
+
+import pandas as pd
+
 from autogluon.core.models import AbstractModel, BaggedEnsembleModel
 from autogluon.common.utils.resource_utils import get_resource_manager
-import math
+
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +30,7 @@ class ModelResources:
     total_num_gpus: int
 
 
+# FIXME: Rename to ParallelFitManager
 # TODO: test if `not isinstance(_model, StackerEnsembleModel)` makes non-bagged run to use num_cpus many for model-worker
 # TODO: cluster-wide memory management is not implemented so far and some memory checks might use memory values from the wrong node
 class DistributedFitManager:
@@ -67,7 +72,6 @@ class DistributedFitManager:
     get_model_attribute_func : callable, default=None
         Function to get an attribute for a model. Required if mode='refit'.
     """
-
     def __init__(
         self,
         *,
@@ -79,8 +83,8 @@ class DistributedFitManager:
         num_gpus: int | str,
         num_splits: int | None = None,
         get_model_attribute_func: Callable | None = None,
-        X,
-        y,
+        X: pd.DataFrame,
+        y: pd.Series,
         problem_type="infer",
         num_classes="infer",
         total_mem: int | None | str = "auto",
@@ -141,11 +145,15 @@ class DistributedFitManager:
             self.job_kwargs[key] = ray.put(value)
         self.func_put_kwargs = func_put_kwargs
 
-        logger.log(20, f"MEM AVAILABLE: {self.total_mem * 1e-9:.2f} GB")
-        logger.log(20, f"MEM MAX: {self.max_mem * 1e-9:.2f} GB")
-        logger.log(20, f"MEM AVAILABLE PER CORE: {self.total_mem_per_core*1e-9:.2f} GB")
-        logger.log(20, f"MEM MAX PER CORE: {self.max_mem_per_core*1e-9:.2f} GB")
-
+        logger.log(
+            20,
+            f"ParallelFitManager Details:"
+            f"\n\tCPU Total: {self.total_num_cpus}"
+            f"\n\tGPU Total: {self.total_num_gpus}"
+            f"\n\tMem Total: {self.total_mem * 1e-9:.1f} GB"
+            f"\n\t    Max Allowed: {self.max_mem * 1e-9:.1f}/{self.total_mem * 1e-9:.1f} GB (max_mem_frac={self.max_mem_frac})"
+            f"\n\t    Max Allowed Per Core: {self.max_mem_per_core * 1e-9:.2f}/{self.total_mem_per_core * 1e-9:.2f} GB"
+        )
     @property
     def available_num_cpus_virtual(self) -> int:
         return self.available_num_cpus + self.extra_num_cpus
@@ -168,16 +176,12 @@ class DistributedFitManager:
     def total_mem_per_core(self):
         return self.total_mem / self.total_num_cpus
 
-    # # FIXME: What if only 1 model to schedule? In this case we should use all resources for the 1 model.
-    # # FIXME: Record memory estimate for efficency per model
-    # #  Make mem estimates fast
-    # #  Don't mutate models ever
-    # #  Mutate num_cpus user args in worker process or even better just pass num_cpus as fit kwarg
-    # #  Remove memory estimate for model from total_estimate once job completes
-    # # FIXME: Don't give LightGBM/XGBoost/CatBoost more CPUs than they want, cap them at 50% of resources no matter what
-
-    # FIXME: We can lazily execute this logic. We first come up with a plan, then we schedule the workers. This allows for optimal CPU utilization.
-    # FIXME: Use available memory to re-calculate per-core values, will more effectively use memory.
+    # FIXME: Don't mutate models ever
+    #  Mutate num_cpus user args in worker process or even better just pass num_cpus as fit kwarg
+    # TODO: Don't give LightGBM/XGBoost/CatBoost more CPUs than they want, cap them at 50% of resources no matter what
+    # TODO: We can lazily execute this logic. We first come up with a plan, then we schedule the workers. This allows for optimal CPU utilization.
+    # FIXME v1.2: Use available memory to re-calculate per-core values, will more effectively use memory.
+    # TODO: Test performance if not allowing overallocated CPUs
     def schedule_jobs(self, *, models_to_fit: list[AbstractModel] | list[str] | None = None) -> list[str]:
         """Schedule model training.
 
@@ -273,7 +277,6 @@ class DistributedFitManager:
                 num_models_delay_to_fit_all = 0
 
             num_cpus_per_child_safe = model_child_memory_estimate / max_mem_per_core
-            # logger.log(20, f"Safe CPUs per child: {math.ceil(num_cpus_per_child_safe)} ({num_cpus_per_child_safe:.2f}): {model.name}")
             num_cpus_per_child_safe = max(math.ceil(num_cpus_per_child_safe), num_cpus_per_child_floor)
 
             num_cpus_avail = self.available_num_cpus_virtual
@@ -296,8 +299,6 @@ class DistributedFitManager:
                     safe_children = 0
                     # skip model
                     pass
-
-                # logger.log(20, f"\t{max_safe_children} MAX SAFE CHILDREN\t| {model.name}")
 
             if safe_children == 0:
                 # FIXME: level 15 logging for release
@@ -390,12 +391,12 @@ class DistributedFitManager:
 
             logger.log(
                 20,
-                f"Scheduled model {self.mode} for {model_name}: "
+                f"Scheduled {model_name}: "
                 f"allocated {'' if is_sufficient else 'UP TO '}{model_resources.total_num_cpus} CPUs and {model_resources.total_num_gpus} GPUs | "
                 f"{len(self.job_refs_to_allocated_resources)} jobs are running."
-                f"\n\tUsing {model_resources.num_cpus_for_fold_worker if num_children != 1 else model_resources.num_cpus_for_model_worker} CPUs per fold for {num_children} folds, fitting {safe_children} folds in parallel"
-                f"\n\t{self.total_num_cpus - self.available_num_cpus}/{self.total_num_cpus} Allocated CPUS ({self.total_num_cpus_virtual} allowed)\n"
-                f"\t{(self.total_mem - self.available_mem) * 1e-9:.1f}/{self.total_mem * 1e-9:.1f} GB Allocated Memory",
+                f"\n\t{model_resources.num_cpus_for_fold_worker if num_children != 1 else model_resources.num_cpus_for_model_worker} CPUs each for {num_children} folds, fitting {safe_children} in parallel"
+                f"\n\t{self.total_num_cpus - self.available_num_cpus}/{self.total_num_cpus} Allocated CPUS ({self.total_num_cpus_virtual} allowed)"
+                f"\t| {(self.total_mem - self.available_mem) * 1e-9:.1f}/{self.total_mem * 1e-9:.1f} GB Allocated Memory",
             )
             if self.delay_between_jobs > 0:
                 time.sleep(self.delay_between_jobs)
@@ -493,7 +494,7 @@ class DistributedFitManager:
         mem_usage_child_mb = mem_usage_child * 1e-6
         mem_usage_bag_mb = mem_usage_child_mb * num_children
 
-        logger.log(20, f"\t{mem_usage_bag_mb:.0f} MB (per bag)\t| {mem_usage_child_mb:.0f} MB (per child)\t| {num_children} children\t| {model.name}")
+        logger.log(15, f"\t{mem_usage_bag_mb:.0f} MB (per bag)\t| {mem_usage_child_mb:.0f} MB (per child)\t| {num_children} children\t| {model.name}")
         return mem_usage_bag
 
     def get_resources_for_model_refit(self, model: str) -> ModelResources:

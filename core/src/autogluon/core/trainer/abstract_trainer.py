@@ -22,7 +22,7 @@ from autogluon.common.utils.distribute_utils import DistributedContext
 from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.log_utils import convert_time_in_s_to_log_friendly, reset_logger_for_remote_call
 from autogluon.common.utils.path_converter import PathConverter
-from autogluon.common.utils.resource_utils import ResourceManager
+from autogluon.common.utils.resource_utils import ResourceManager, get_resource_manager
 from autogluon.common.utils.try_import import try_import_ray, try_import_torch
 
 from ..augmentation.distill_utils import augment_data, format_distillation_labels
@@ -1426,6 +1426,9 @@ class AbstractTrainer:
         fit_strategy: Literal["sequential", "parallel"] = "sequential",
         **kwargs,
     ) -> list[str]:
+        if fit_strategy == "parallel":
+            logger.log(30, f"Note: refit_full does not yet support fit_strategy='parallel', switching to 'sequential'...")
+            fit_strategy = "sequential"
         if X is None:
             X = self.load_X()
         if X_val is None:
@@ -1505,6 +1508,8 @@ class AbstractTrainer:
                 num_cpus=kwargs.get("total_resources", {}).get("num_cpus", 1),
                 num_gpus=kwargs.get("total_resources", {}).get("num_gpus", 0),
                 get_model_attribute_func=self.get_model_attribute,
+                X=X,
+                y=y,
             )
 
             for level in levels:
@@ -2850,6 +2855,41 @@ class AbstractTrainer:
             time_limit_model_split = time_limit / len(models)
         else:
             time_limit_model_split = time_limit
+
+        if fit_strategy == "parallel" and hyperparameter_tune_kwargs is not None and hyperparameter_tune_kwargs:
+            for k, v in hyperparameter_tune_kwargs.items():
+                if v is not None and (not isinstance(v, dict) or len(v) != 0):
+                    logger.log(
+                        30,
+                        f"WARNING: fit_strategy='parallel', but `hyperparameter_tune_kwargs` is specified for model '{k}' with value {v}. "
+                        f"Hyperparameter tuning does not yet support `parallel` fit_strategy. "
+                        f"Falling back to fit_strategy='sequential' ... "
+                    )
+                    fit_strategy = "sequential"
+                    break
+        if fit_strategy == "parallel":
+            num_gpus = kwargs.get("total_resources", {}).get("num_gpus", 0)
+            if isinstance(num_gpus, str) and num_gpus == "auto":
+                num_gpus = get_resource_manager().get_gpu_count()
+            if isinstance(num_gpus, (float, int)) and num_gpus > 0:
+                logger.log(
+                    30,
+                    f"WARNING: fit_strategy='parallel', but `num_gpus={num_gpus}` is specified. "
+                    f"GPU is not yet supported for `parallel` fit_strategy. To enable parallel, ensure you specify `num_gpus=0` in the fit call. "
+                    f"Falling back to fit_strategy='sequential' ... "
+                )
+                fit_strategy = "sequential"
+        if fit_strategy == "parallel":
+            try:
+                try_import_ray()
+            except Exception as e:
+                logger.log(
+                    30,
+                    f"WARNING: Exception encountered when trying to import ray (fit_strategy='parallel'). "
+                    f"ray is required for 'parallel' fit_strategy. Falling back to fit_strategy='sequential' ... "
+                    f"\n\tException details: {e.__class__.__name__}: {e}"
+                )
+                fit_strategy = "sequential"
 
         if fit_strategy == "sequential":
             models_valid = []
