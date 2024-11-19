@@ -134,6 +134,7 @@ def get_default_hps(key):
             "RecursiveTabular": {},
             "DirectTabular": {},
             "TemporalFusionTransformer": {},
+            "Chronos": {"model_path": "bolt-small"},
         },
         "light_inference": {
             "SeasonalNaive": {},
