@@ -87,3 +87,13 @@ html_js_files = ['custom.js']
 
 ogp_site_url = "https://auto.gluon.ai/"
 ogp_description_length = 300
+ogp_site_name = "AutoGluon"
+ogp_image = "_static/autogluon.png"
+ogp_image_alt = "AutoGluon Logo"
+ogp_type = "website"
+ogp_custom_meta_tags = [
+    '<meta name="twitter:card" content="summary_large_image">',
+    '<meta name="twitter:site" content="@autogluon">',
+    '<meta property="og:title" content="AutoGluon: AutoML for Text, Image, and Tabular Data">',
+    '<meta property="og:description" content="AutoGluon automates machine learning tasks enabling you to easily achieve strong predictive performance in your applications.  With just a few lines of code, you can train and deploy high-accuracy machine learning and deep learning models on image, text, time series, and tabular data.">',
+]
