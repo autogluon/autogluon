@@ -35,7 +35,7 @@ The Conda install may have subtle differences in installed dependencies that cou
     ::::
     
     ::::{tab} GPU
-    ```{include} install-gpu-pip.md
+    ```{include} install-gpu-uv.md
     ```
     ::::
   
