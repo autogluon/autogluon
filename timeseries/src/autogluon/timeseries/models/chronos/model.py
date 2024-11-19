@@ -443,10 +443,10 @@ class ChronosModel(AbstractTimeSeriesModel):
                     "\tFine-tuning on the CPU detected. We recommend using a GPU for faster fine-tuning of Chronos."
                 )
 
-            # TODO: adamw_torch_fused is not supported on CPU in torch <= 2.3. When torch 2.4 becomes the lower bound
-            # this if block can be removed because torch >= 2.4 supports AdamW optimizer with fused=True on CPU
-            if fine_tune_trainer_kwargs["use_cpu"] and fine_tune_trainer_kwargs["optim"] == "adamw_torch_fused":
-                fine_tune_trainer_kwargs["optim"] = "adamw_torch"
+                # TODO: adamw_torch_fused is not supported on CPU in torch <= 2.3. When torch 2.4 becomes the lower bound
+                # this if block can be removed because torch >= 2.4 supports AdamW optimizer with fused=True on CPU
+                if fine_tune_trainer_kwargs["optim"] == "adamw_torch_fused":
+                    fine_tune_trainer_kwargs["optim"] = "adamw_torch"
 
             output_dir = Path(fine_tune_trainer_kwargs["output_dir"])
 
