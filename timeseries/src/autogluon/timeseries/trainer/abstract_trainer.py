@@ -264,6 +264,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         val_splitter: Optional[AbstractWindowSplitter] = None,
         refit_every_n_windows: Optional[int] = 1,
         cache_predictions: bool = True,
+        ensemble_model_type: Optional[Type] = None,
         **kwargs,
     ):
         super().__init__(path=path, save_data=save_data, low_memory=True, **kwargs)
@@ -276,7 +277,13 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         self.skip_model_selection = skip_model_selection
         # Ensemble cannot be fit if val_scores are not computed
         self.enable_ensemble = enable_ensemble and not skip_model_selection
-        self.ensemble_model_type = TimeSeriesGreedyEnsemble
+        if ensemble_model_type is None:
+            ensemble_model_type = TimeSeriesGreedyEnsemble
+        else:
+            logger.warning(
+                "Using a custom `ensemble_model_type` is experimental functionality that may break in future versions."
+            )
+        self.ensemble_model_type = ensemble_model_type
 
         self.verbosity = verbosity
 
