@@ -243,15 +243,12 @@ class DistributedFitManager:
             if model_name in self.model_child_mem_estimate_cache:
                 model_child_memory_estimate = self.model_child_mem_estimate_cache[model_name]
             else:
-                ts = time.time()
                 try:
                     # FIXME: DONT USE TRY/EXCEPT, this is done to handle models crashing during initialization such as KNN when `NoValidFeatures`. Instead figure this out earlier or in the worker thread
                     model_child_memory_estimate = self.get_memory_estimate_for_model_child(model=model)
                 except Exception as e:
                     logger.log(20, f"Ran into exception when getting memory estimate for model, skipping model {model.name}: {e.__class__.__name__}: {e}")
                     continue
-                te = time.time()
-                logger.log(20, f"{te - ts:.2f}s\tMEM ESTIMATE TIME {model.name}")
                 self.model_child_mem_estimate_cache[model_name] = model_child_memory_estimate
             if model_child_memory_estimate > self.max_mem:
                 logger.log(20, f"Insufficient total memory to fit model for even a single fold. Skipping {model_name}...")
@@ -277,7 +274,7 @@ class DistributedFitManager:
 
             num_cpus_per_child_safe = model_child_memory_estimate / max_mem_per_core
             # logger.log(20, f"Safe CPUs per child: {math.ceil(num_cpus_per_child_safe)} ({num_cpus_per_child_safe:.2f}): {model.name}")
-            num_cpus_per_child_safe = max(math.ceil(num_cpus_per_child_safe), 1)
+            num_cpus_per_child_safe = max(math.ceil(num_cpus_per_child_safe), num_cpus_per_child_floor)
 
             num_cpus_avail = self.available_num_cpus_virtual
 
