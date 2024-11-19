@@ -176,96 +176,6 @@ class DistributedFitManager:
     # #  Mutate num_cpus user args in worker process or even better just pass num_cpus as fit kwarg
     # #  Remove memory estimate for model from total_estimate once job completes
     # # FIXME: Don't give LightGBM/XGBoost/CatBoost more CPUs than they want, cap them at 50% of resources no matter what
-    # def prepare_resource_allocation(self, *, models_to_fit: list[AbstractModel] | list[str] | None = None) -> list[str]:
-    #     max_mem_per_core = self.max_mem_per_core
-    #
-    #     if models_to_fit is not None:
-    #         models_to_schedule = models_to_fit
-    #     else:
-    #         models_to_schedule = self.models_to_schedule
-    #
-    #     models_to_schedule_later = []
-    #     job_refs = []
-    #     for model in models_to_schedule:
-    #         ts = time.time()
-    #         model_child_memory_estimate = self.get_memory_estimate_for_model_child(model=model)
-    #         te = time.time()
-    #         logger.log(20, f"{te - ts:.2f}s\tMEM ESTIMATE TIME {model.name}")
-    #         num_cpus_per_child_safe = model_child_memory_estimate / max_mem_per_core
-    #
-    #         logger.log(20, f"Safe CPUs per child: {math.ceil(num_cpus_per_child_safe)} ({num_cpus_per_child_safe:.2f}): {model.name}")
-    #         num_cpus_per_child_safe = max(math.ceil(num_cpus_per_child_safe), 1)
-    #
-    #         # FIXME: If enough memory for only fitting 1 child, then do it but without fitting parallel! Give bag same resources and model
-    #         # FIXME: If enough memory for only fitting 2 child, then do it but only fit 2 at a time, give bag 2x reosurces as child.
-    #         # FIXME: This does in-place mutation of model, don't do this!
-    #         model = prepare_model_resources_for_fit(
-    #             model=model,
-    #             num_cpus=num_cpus_per_child_safe,
-    #             num_gpus=0,
-    #             total_num_cpus=self.total_num_cpus,
-    #             total_num_gpus=self.total_num_gpus,
-    #         )
-    #
-    #         # FIXME: is_sufficient must satisfy memory!
-    #
-    #         model_resources = self.get_resources_for_model(model=model)
-    #         model_name = model if self.mode == "refit" else model.name
-    #
-    #         # FIXME: Keep track of memory usage estimates, use it to limit # of parallel model fits
-    #         is_sufficient, reason = self.check_sufficient_resources(resources=model_resources)
-    #         if not is_sufficient:
-    #             if len(job_refs) + len(self.job_refs_to_allocated_resources) == 0:
-    #                 logger.log(
-    #                     20,
-    #                     "DISTRIBUTED WARNING: Insufficient total resources for training a model fully distributed parallel. "
-    #                     "Consider disabling distributed training. "
-    #                     "Forcing to train one model anyhow, but this will lead to inefficient parallelization.",
-    #                 )
-    #
-    #                 # Ray's nested calls will keep blocking GPUs and thus create a deadlock if all GPUs are allocated to the model-worker and
-    #                 # none can be used by the fold-worker.
-    #                 if (
-    #                         model_resources.num_gpus_for_model_worker + model_resources.num_gpus_for_fold_worker
-    #                 ) > self.total_num_gpus:
-    #                     raise ValueError(
-    #                         "DISTRIBUTED ERROR: Insufficient number of GPUs to train any model, even in a non-parallel setting. "
-    #                         "This is likely the results of requiring more GPUs than available to distribute the training. "
-    #                         "Ray does not support freeing GPU resources for nested calls with GPUs. "
-    #                         "Thus, we need at least twice the amount of GPUs needed to fit one model."
-    #                     )
-    #             else:
-    #                 if (
-    #                         model_resources.num_gpus_for_model_worker + model_resources.num_gpus_for_fold_worker
-    #                 ) > self.total_num_gpus:
-    #                     logger.log(
-    #                         40,
-    #                         f"DISTRIBUTED WARNING: Delay scheduling model {model_name}: "
-    #                         "Insufficient number of GPUs to train any model, even in a non-parallel setting. "
-    #                         "This is likely the results of requiring more GPUs than available to distribute the training. "
-    #                         "Ray does not support freeing GPU resources for nested calls with GPUs. "
-    #                         "Thus, we need at least twice the amount of GPUs needed to fit one model.",
-    #                     )
-    #
-    #                 logger.log(0, f"Delay scheduling model {model_name}: {reason}.")
-    #                 models_to_schedule_later.append(model)
-    #                 continue
-    #
-    #         model_memory_estimate = self.get_memory_estimate_for_model(model=model, mem_usage_child=model_child_memory_estimate)  # FIXME: num_child parallel
-    #         job_ref = model_name
-    #         job_refs.append(job_ref)
-    #         self.allocate_resources(job_ref=job_ref, resources=model_resources, model_name=model_name, model_memory_estimate=model_memory_estimate)
-    #         logger.log(
-    #             20,
-    #             f"Scheduled model {self.mode} for {model_name}: "
-    #             f"allocated {'' if is_sufficient else 'UP TO '}{model_resources.total_num_cpus} CPUs and {model_resources.total_num_gpus} GPUs. "
-    #             f"{len(self.job_refs_to_allocated_resources)} jobs are running."
-    #             f"\n\t{self.total_num_cpus - self.available_num_cpus}/{self.total_num_cpus} Allocated CPUS\n"
-    #             f"\t{(self.total_mem - self.available_mem)*1e-9:.1f}/{self.total_mem*1e-9:.1f} GB Allocated Memory"
-    #         )
-    #
-    #     self.models_to_schedule = models_to_schedule_later
-    #     return job_refs
 
     # FIXME: We can lazily execute this logic. We first come up with a plan, then we schedule the workers. This allows for optimal CPU utilization.
     # FIXME: Use available memory to re-calculate per-core values, will more effectively use memory.
@@ -524,14 +434,15 @@ class DistributedFitManager:
             # total_resources=kwargs["total_resources"],
             # **kwargs["fit_kwargs"],
         )
-        model_clone.model_base.initialize(
-            X=X,
-            y=y,
-            problem_type=self.problem_type,
-            num_classes=self.num_classes,
-            # total_resources=kwargs["total_resources"],
-            # **kwargs["fit_kwargs"],
-        )
+        if isinstance(model, BaggedEnsembleModel):
+            model_clone.model_base.initialize(
+                X=X,
+                y=y,
+                problem_type=self.problem_type,
+                num_classes=self.num_classes,
+                # total_resources=kwargs["total_resources"],
+                # **kwargs["fit_kwargs"],
+            )
         mem_usage_child = model_clone.estimate_memory_usage_child(
             X=X,
             y=y,
