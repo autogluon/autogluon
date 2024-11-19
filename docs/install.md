@@ -175,7 +175,7 @@ The Conda install may have subtle differences in installed dependencies that cou
     ```{include} install-windows-gpu.md
     ```
 
-    ```{include} install-gpu-pip.md
+    ```{include} install-gpu-uv.md
     ```
     ::::
   
