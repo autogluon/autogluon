@@ -217,6 +217,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
                 prediction_length=self.prediction_length,
                 quantile_levels=self.quantile_levels,
                 cache_predictions=self.cache_predictions,
+                ensemble_model_type=kwargs.pop("ensemble_model_type", None),
             )
         )
         # Using `TimeSeriesLearner` as default argument breaks doc generation with Sphnix
