@@ -116,7 +116,9 @@ class ChronosModel(AbstractTimeSeriesModel):
         Number of samples used during inference
     device : str, default = None
         Device to use for inference (and fine-tuning, if enabled). If None, model will use the GPU if available.
-        For larger model sizes `small`, `base`, and `large`; inference will fail if no GPU is available.
+        For larger Chronos model sizes ``small``, ``base``, and ``large``; inference will fail if no GPU is available.
+        For Chronos-Bolt models, inference can be done on the CPU. Although fine-tuning the smaller Chronos models
+        (``tiny`` and ``mini``) and all Chronos-Bolt is allowed on the CPU, we recommend using a GPU for faster fine-tuning.
     context_length : int or None, default = None
         The context length to use in the model. Shorter context lengths will decrease model accuracy, but result
         in faster inference. If None, the model will infer context length from the data set length at inference
@@ -437,7 +439,7 @@ class ChronosModel(AbstractTimeSeriesModel):
             fine_tune_trainer_kwargs["use_cpu"] = str(self.model_pipeline.inner_model.device) == "cpu"
 
             if fine_tune_trainer_kwargs["use_cpu"]:
-                logger.warning(
+                logger.info(
                     "\tFine-tuning on the CPU detected. We recommend using a GPU for faster fine-tuning of Chronos."
                 )
 
