@@ -67,6 +67,7 @@ MODEL_ALIASES = {
     "small": "autogluon/chronos-t5-small",
     "base": "autogluon/chronos-t5-base",
     "large": "autogluon/chronos-t5-large",
+    "bolt-tiny": "autogluon/chronos-bolt-tiny",
     "bolt-mini": "autogluon/chronos-bolt-mini",
     "bolt-small": "autogluon/chronos-bolt-small",
     "bolt-base": "autogluon/chronos-bolt-base",
