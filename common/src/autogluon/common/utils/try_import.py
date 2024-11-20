@@ -46,9 +46,11 @@ def try_import_ray() -> ModuleType:
     try:
         import ray
         from packaging import version
-        if (version.parse(ray.__version__) < version.parse(ray_min_version) or version.parse(
-            ray.__version__
-        ) >= version.parse(ray_max_version)) and strict_ray_version:
+
+        if (
+            version.parse(ray.__version__) < version.parse(ray_min_version)
+            or version.parse(ray.__version__) >= version.parse(ray_max_version)
+        ) and strict_ray_version:
             msg = (
                 f"ray=={ray.__version__} detected. "
                 f"{ray_min_version} <= ray < {ray_max_version} is required. You can use pip to install certain version of ray "
