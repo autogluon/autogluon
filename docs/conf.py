@@ -114,5 +114,5 @@ ogp_custom_meta_tags = [
     '<meta name="twitter:card" content="summary_large_image">',
     '<meta name="twitter:site" content="@autogluon">',
     '<meta property="og:title" content="AutoGluon: Fast and Accurate ML in 3 Lines of Code">',
-    '<meta property="og:description" content="AutoGluon automates machine learning tasks enabling you to easily achieve strong predictive performance in your applications.  With just a few lines of code, you can train and deploy high-accuracy machine learning and deep learning models on image, text, time series, and tabular data.">',
+    '<meta property="og:description" content="With just a few lines of code, you can train and deploy high-accuracy machine learning and deep learning models on image, text, time series, and tabular data.">',
 ]
