@@ -31,7 +31,6 @@ class ModelResources:
 
 
 # TODO: test if `not isinstance(_model, StackerEnsembleModel)` makes non-bagged run to use num_cpus many for model-worker
-# TODO: cluster-wide memory management is not implemented so far and some memory checks might use memory values from the wrong node
 class ParallelFitManager:
     """Tracks how many resources are used when scheduling jobs in a parallel setting.
 
