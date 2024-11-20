@@ -147,10 +147,8 @@ def get_default_hps(key):
             "SeasonalNaive": {},
             "Croston": {},
             "AutoETS": {},
-            # "AutoARIMA": {},
             "NPTS": {},
             "DynamicOptimizedTheta": {},
-            # TODO: Define separate model for each tabular submodel?
             "RecursiveTabular": {},
             "DirectTabular": {},
             "TemporalFusionTransformer": {},
