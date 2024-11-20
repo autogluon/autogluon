@@ -142,6 +142,9 @@ def create_data_processor(
             size=model_config.image_size,
             max_img_num_per_col=model_config.max_img_num_per_col,
             missing_value_strategy=config.data.image.missing_value_strategy,
+            modality_drop_ratio=config.data.modality_drop_ratio
+            if hasattr(config.data, "modality_drop_ratio")
+            else 0.0,
         )
     elif data_type == TEXT:
         data_processor = TextProcessor(
@@ -155,10 +158,16 @@ def create_data_processor(
             train_augment_types=OmegaConf.select(model_config, "text_train_augment_types"),
             template_config=getattr(config.data, "templates", OmegaConf.create({"turn_on": False})),
             normalize_text=getattr(config.data.text, "normalize_text", False),
+            modality_drop_ratio=config.data.modality_drop_ratio
+            if hasattr(config.data, "modality_drop_ratio")
+            else 0.0,
         )
     elif data_type == CATEGORICAL:
         data_processor = CategoricalProcessor(
             model=model,
+            modality_drop_ratio=config.data.modality_drop_ratio
+            if hasattr(config.data, "modality_drop_ratio")
+            else 0.0,
         )
     elif data_type == NUMERICAL:
         data_processor = NumericalProcessor(

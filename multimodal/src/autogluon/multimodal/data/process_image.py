@@ -45,6 +45,7 @@ class ImageProcessor:
         max_img_num_per_col: Optional[int] = 1,
         missing_value_strategy: Optional[str] = "zero",
         requires_column_info: bool = False,
+        modality_drop_ratio: float = 0.0,
     ):
         """
         Parameters
@@ -143,6 +144,9 @@ class ImageProcessor:
         self.val_processor = construct_image_processor(
             image_transforms=self.val_transforms, size=self.size, normalization=self.normalization
         )
+
+        # modality dropout
+        self.modality_drop_rate = modality_drop_ratio
 
     @property
     def image_key(self):
@@ -281,6 +285,13 @@ class ImageProcessor:
                             is_zero_img = True
                         else:
                             raise e
+
+                    if is_training and not is_zero_img and self.modality_drop_rate > 0.0:
+                        dropout_probs = torch.empty(1).uniform_()
+                        if dropout_probs[0] <= self.modality_drop_rate:
+                            img = PIL.Image.new(image_mode, (self.size, self.size), color=0)
+                            is_zero_img = True
+
                 if is_training:
                     img = self.train_processor(img)
                 else:
