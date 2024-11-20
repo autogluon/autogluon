@@ -241,6 +241,7 @@ class ParallelFitManager:
         models_to_schedule_later = []
         for i, model in enumerate(models_to_schedule):
             model_name = model if self.mode == "refit" else model.name
+            # TODO: refactor memory estimate logic to be one function call with the same code below
             if model_name in self.model_child_mem_estimate_cache:
                 model_child_memory_estimate = self.model_child_mem_estimate_cache[model_name]
             else:
@@ -286,7 +287,9 @@ class ParallelFitManager:
 
             if safe_children < num_children:
                 # FIXME: Make this better, do real successive halving rather than this hack code that only works for 8 or fewer
-                if safe_children >= 4:
+                if safe_children >= 8:
+                    safe_children = 8
+                elif safe_children >= 4:
                     safe_children = 4
                 elif safe_children >= 2:
                     safe_children = 2
@@ -298,8 +301,7 @@ class ParallelFitManager:
                     pass
 
             if safe_children == 0:
-                # FIXME: level 15 logging for release
-                logger.log(20, f"Delay scheduling model {model_name}: No safe children able to be fit.")
+                logger.log(15, f"Delay scheduling model {model_name}: No safe children able to be fit.")
                 models_to_schedule_later.append(model)
                 continue
 
