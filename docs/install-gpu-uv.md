@@ -3,5 +3,5 @@
 pip install -U uv
 
 # Install AutoGluon with GPU support
-python -m uv pip install autogluon --extra-index-url https://download.pytorch.org/whl/cu118
+python -m uv pip install autogluon
 ```
