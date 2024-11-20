@@ -569,6 +569,7 @@ EXPECTED_MODEL_TAGS = [
     # Tabular tags - not used by time series models
     "valid_oof",
     "handles_text",
+    "can_estimate_memory_usage_static",
 ]
 
 
