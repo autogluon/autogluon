@@ -30,10 +30,26 @@ from ..calibrate import calibrate_decision_threshold
 from ..calibrate.conformity_score import compute_conformity_score
 from ..calibrate.temperature_scaling import apply_temperature_scaling, tune_temperature_scaling
 from ..callbacks import AbstractCallback
-from ..constants import AG_ARGS, BINARY, MULTICLASS, QUANTILE, REFIT_FULL_NAME, REFIT_FULL_SUFFIX, REGRESSION, SOFTCLASS
+from ..constants import (
+    AG_ARGS,
+    BINARY,
+    MULTICLASS,
+    QUANTILE,
+    REFIT_FULL_NAME,
+    REFIT_FULL_SUFFIX,
+    REGRESSION,
+    SOFTCLASS,
+)
 from ..data.label_cleaner import LabelCleanerMulticlassToBinary
-from ..metrics import compute_metric, Scorer, get_metric
-from ..models import AbstractModel, BaggedEnsembleModel, GreedyWeightedEnsembleModel, SimpleWeightedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel
+from ..metrics import Scorer, compute_metric, get_metric
+from ..models import (
+    AbstractModel,
+    BaggedEnsembleModel,
+    GreedyWeightedEnsembleModel,
+    SimpleWeightedEnsembleModel,
+    StackerEnsembleModel,
+    WeightedEnsembleModel,
+)
 from ..pseudolabeling.pseudolabeling import assert_pseudo_column_match
 from ..ray.distributed_jobs_managers import ParallelFitManager
 from ..utils import (
@@ -45,7 +61,16 @@ from ..utils import (
     get_pred_from_proba,
     infer_eval_metric,
 )
-from ..utils.exceptions import InsufficientTime, NoGPUError, NotEnoughCudaMemoryError, NotEnoughMemoryError, NotValidStacker, NoStackFeatures, NoValidFeatures, TimeLimitExceeded
+from ..utils.exceptions import (
+    InsufficientTime,
+    NoGPUError,
+    NoStackFeatures,
+    NotEnoughCudaMemoryError,
+    NotEnoughMemoryError,
+    NotValidStacker,
+    NoValidFeatures,
+    TimeLimitExceeded,
+)
 from ..utils.feature_selection import FeatureSelector
 from ..utils.loaders import load_pkl
 from ..utils.savers import save_json, save_pkl

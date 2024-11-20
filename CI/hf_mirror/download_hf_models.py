@@ -1,9 +1,8 @@
 import argparse
-import yaml
 
+import yaml
 from huggingface_hub import snapshot_download
 from huggingface_hub.utils import RepositoryNotFoundError
-
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
