@@ -30,7 +30,6 @@ class ModelResources:
     total_num_gpus: int
 
 
-# TODO: test if `not isinstance(_model, StackerEnsembleModel)` makes non-bagged run to use num_cpus many for model-worker
 class ParallelFitManager:
     """Tracks how many resources are used when scheduling jobs in a parallel setting.
 
