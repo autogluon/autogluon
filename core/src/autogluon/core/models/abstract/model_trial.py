@@ -38,6 +38,7 @@ def model_trial(
             model=model,
             fit_args=fit_model_args,
             predict_proba_args=predict_proba_args,
+            X_val=X_val,
             y_val=y_val,
             time_start=time_start,
             time_limit=time_limit,
