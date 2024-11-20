@@ -30,13 +30,12 @@ class ModelResources:
     total_num_gpus: int
 
 
-# FIXME: Rename to ParallelFitManager
 # TODO: test if `not isinstance(_model, StackerEnsembleModel)` makes non-bagged run to use num_cpus many for model-worker
 # TODO: cluster-wide memory management is not implemented so far and some memory checks might use memory values from the wrong node
-class DistributedFitManager:
-    """Tracks how many resources are used when scheduling jobs in a distributed setting.
+class ParallelFitManager:
+    """Tracks how many resources are used when scheduling jobs in a parallel setting.
 
-    Distributed Fit
+    Parallel Fit
     ---------------
     We use ray to start a model-worker with a certain number of CPUs and GPUs.
     The worker then starts new fold-workers to fit each fold of a model.
@@ -415,7 +414,7 @@ class DistributedFitManager:
         """Determine if there are enough resources to scheduling fitting another model."""
 
         # Allow for oversubscribing to 10% of the CPUs due to scheduling overhead.
-        if self.available_num_cpus + (self.total_num_cpus // 10) < resources.total_num_cpus:
+        if self.available_num_cpus_virtual < resources.total_num_cpus:
             return False, "not enough CPUs free."
 
         # All models need at least one CPU but not all a GPU
@@ -436,56 +435,48 @@ class DistributedFitManager:
             raise ValueError(f"Unknown mode: {self.mode}")
 
     def get_memory_estimate_for_model_child(self, *, model: AbstractModel) -> int:
-        X = self.X  # FIXME: HACK
-        y = self.y  # FIXME: HACK
+        X = self.X
+        y = self.y
 
         if model.can_estimate_memory_usage_static_child():
+            # This logic is fast and optimized
             # FIXME: Don't use `_user_params`
             if isinstance(model, BaggedEnsembleModel):
                 hyperparameters = model.model_base._user_params
             else:
                 hyperparameters = model._user_params
-            alternate = model.estimate_memory_usage_static_child(
+            mem_usage_child = model.estimate_memory_usage_static_child(
                 X=X,
                 y=y,
                 hyperparameters=hyperparameters,
                 problem_type=self.problem_type,
                 num_classes=self.num_classes,
             )
-            # print(f"ALTERNATE: {alternate}")
-            return alternate
-
-        print(f"EXPENSIVE: {model.name}")  # FIXME: Remove after testing
-
-        model_clone = copy.deepcopy(model)
-
-        model_clone.initialize(
-            X=X,
-            y=y,
-            problem_type=self.problem_type,
-            num_classes=self.num_classes,
-            # total_resources=kwargs["total_resources"],
-            # **kwargs["fit_kwargs"],
-        )
-        if isinstance(model, BaggedEnsembleModel):
-            model_clone.model_base.initialize(
+            return mem_usage_child
+        else:
+            # This logic is over 100x slower than the static method. Not recommended.
+            model_clone = copy.deepcopy(model)
+            model_clone.initialize(
                 X=X,
                 y=y,
                 problem_type=self.problem_type,
                 num_classes=self.num_classes,
-                # total_resources=kwargs["total_resources"],
-                # **kwargs["fit_kwargs"],
             )
-        mem_usage_child = model_clone.estimate_memory_usage_child(
-            X=X,
-            y=y,
-            # total_resources=kwargs["total_resources"],
-            # **kwargs["fit_kwargs"],
-        )
+            if isinstance(model, BaggedEnsembleModel):
+                model_clone.model_base.initialize(
+                    X=X,
+                    y=y,
+                    problem_type=self.problem_type,
+                    num_classes=self.num_classes,
+                )
+            mem_usage_child = model_clone.estimate_memory_usage_child(
+                X=X,
+                y=y,
+            )
 
-        return mem_usage_child
+            return mem_usage_child
 
-    def get_memory_estimate_for_model(self, *, model: AbstractModel, mem_usage_child: int = None, num_children: int = None) -> float:
+    def get_memory_estimate_for_model(self, *, model: AbstractModel, mem_usage_child: int = None, num_children: int = None) -> int:
         if num_children is None:
             num_children = self.num_children_model(model)
         if mem_usage_child is None:
@@ -524,6 +515,7 @@ class DistributedFitManager:
             total_num_gpus=num_gpus_for_model_worker + num_gpus_for_fold_worker,
         )
 
+    # FIXME: Refactor this to be cleaner after initial merge. This code works but it is overly confusing.
     def get_resources_for_model_fit(self, *, model: AbstractModel) -> ModelResources:
         """Estimate the resources required to fit a model."""
 
@@ -622,7 +614,7 @@ class DistributedFitManager:
             del self.job_kwargs[key]
 
 
-# TODO: make this logic be good.
+# TODO: This logic is a hack. We shouldn't be editing models in-place. Refactor this as a fast-follow. Currently it works, but it is not ideal long term.
 def prepare_model_resources_for_fit(
     *,
     model: AbstractModel,

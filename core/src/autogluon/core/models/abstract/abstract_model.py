@@ -1914,41 +1914,54 @@ class AbstractModel:
         gc.collect()  # Try to avoid OOM error
         return sys.getsizeof(pickle.dumps(self, protocol=4))
 
-    def estimate_memory_usage(self, **kwargs) -> int:
+    def estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
         """
-        Estimates the memory usage of the model while training.
+        Estimates the peak memory usage of the model while training.
+
+        Parameters
+        ----------
+        X: pd.DataFrame
+            The training data features
+
         Returns
         -------
-            int: number of bytes will be used during training
+        int: estimated peak memory usage in bytes during training
         """
         assert self.is_initialized(), "Only estimate memory usage after the model is initialized."
-        return self._estimate_memory_usage(**kwargs)
+        return self._estimate_memory_usage(X=X, **kwargs)
 
     @classmethod
     def estimate_memory_usage_static(
         cls,
         *,
         X: pd.DataFrame,
-        y: pd.Series = None,  # FIXME: Should this be required always? Should `_estimate_memory_usage` also take y in all cases?
+        y: pd.Series = None,
         hyperparameters: dict = None,
         problem_type: str = "infer",
         num_classes: int | None | str = "infer",
         **kwargs,
     ) -> int:
         """
-        FIXME: Add  docstring
+        Estimates the peak memory usage of the model while training, without having to initialize the model.
+
         Parameters
         ----------
-        X
-        y
-        hyperparameters
-        problem_type
+        X: pd.DataFrame
+            The training data features
+        y: pd.Series, optional
+            The training data ground truth. Must be specified if problem_type or num_classes is unspecified.
+        hyperparameters: dict, optional
+            The model hyperparameters
+        problem_type: str, default = "infer"
+            The problem_type. If "infer" will infer based on y.
         num_classes
-        kwargs
+            The num_classes. If "infer" will infer based on y.
+        **kwargs
+            Other optional key-word fit arguments that could impact memory usage for the model.
 
         Returns
         -------
-
+        int: estimated peak memory usage in bytes during training
         """
         if problem_type == "infer":
             problem_type = cls._infer_problem_type(y=y)
@@ -1966,21 +1979,60 @@ class AbstractModel:
             **kwargs
         )
 
-    def estimate_memory_usage_child(self, **kwargs) -> int:
+    def estimate_memory_usage_child(self, X: pd.DataFrame, **kwargs) -> int:
         """
-        Estimates the memory usage of the child model while training.
+        Estimates the peak memory usage of the child model while training.
+
+        If the model is not a bagged model (aka has no children), then will return its personal memory usage estimate.
+
+        Parameters
+        ----------
+        X: pd.DataFrame
+            The training data features
+        **kwargs
+
         Returns
         -------
-            int: number of bytes will be used during training
+        int: estimated peak memory usage in bytes during training of the child
         """
         return self.estimate_memory_usage(**kwargs)
 
-    def estimate_memory_usage_static_child(self, **kwargs) -> int:
+    def estimate_memory_usage_static_child(
+        self,
+        *,
+        X: pd.DataFrame,
+        y: pd.Series = None,
+        hyperparameters: dict = None,
+        problem_type: str = "infer",
+        num_classes: int | None | str = "infer",
+        **kwargs,
+    ) -> int:
         """
-        Estimates the memory usage of the child model while training, without having to initialize the model.
+        Estimates the peak memory usage of the child model while training, without having to initialize the model.
+
+        Note that this method itself is not static, because the child model must be present
+        as a variable in the model to call its static memory estimate method.
+
+        To obtain the child memory estimate in a fully static manner, instead directly call the child's `estimate_memory_usage_static` method.
+
+        Parameters
+        ----------
+        X: pd.DataFrame
+            The training data features
+        y: pd.Series, optional
+            The training data ground truth. Must be specified if problem_type or num_classes is unspecified.
+        hyperparameters: dict, optional
+            The model hyperparameters
+        problem_type: str, default = "infer"
+            The problem_type. If "infer" will infer based on y.
+        num_classes
+            The num_classes. If "infer" will infer based on y.
+        **kwargs
+            Other optional key-word fit arguments that could impact memory usage for the model.
+
         Returns
         -------
-            int: number of bytes will be used during training
+        int: estimated peak memory usage in bytes during training of the child
         """
         return self.estimate_memory_usage_static(**kwargs)
 

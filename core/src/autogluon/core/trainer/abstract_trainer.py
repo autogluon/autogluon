@@ -35,7 +35,7 @@ from ..data.label_cleaner import LabelCleanerMulticlassToBinary
 from ..metrics import compute_metric, Scorer, get_metric
 from ..models import AbstractModel, BaggedEnsembleModel, GreedyWeightedEnsembleModel, SimpleWeightedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel
 from ..pseudolabeling.pseudolabeling import assert_pseudo_column_match
-from ..ray.distributed_jobs_managers import DistributedFitManager
+from ..ray.distributed_jobs_managers import ParallelFitManager
 from ..utils import (
     compute_permutation_feature_importance,
     convert_pred_probas_to_df,
@@ -1484,14 +1484,14 @@ class AbstractTrainer:
                         )
                     models_trained_full += models_trained
         elif fit_strategy == "parallel":
-            # -- Distributed refit
+            # -- Parallel refit
             ray = try_import_ray()
 
             # FIXME: Need a common utility class for initializing ray so we don't duplicate code
             if not ray.is_initialized():
                 ray.init(log_to_driver=False, logging_level=logging.ERROR)
 
-            distributed_manager = DistributedFitManager(
+            distributed_manager = ParallelFitManager(
                 mode="refit",
                 func=_remote_refit_single_full,
                 func_kwargs=dict(fit_strategy=fit_strategy),
@@ -2953,7 +2953,7 @@ class AbstractTrainer:
             time_limit_models = None
 
         logger.log(20, "Scheduling parallel model-workers for training...")
-        distributed_manager = DistributedFitManager(
+        distributed_manager = ParallelFitManager(
             mode="fit",
             X=X,  # FIXME: REMOVE
             y=y,  # FIXME: REMOVE
