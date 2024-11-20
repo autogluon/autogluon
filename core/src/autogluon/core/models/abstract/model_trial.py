@@ -38,7 +38,6 @@ def model_trial(
             model=model,
             fit_args=fit_model_args,
             predict_proba_args=predict_proba_args,
-            X_val=X_val,
             y_val=y_val,
             time_start=time_start,
             time_limit=time_limit,
@@ -83,7 +82,7 @@ def init_model(args, model_cls, init_params, backend, is_bagged_model=False):
     return model_cls(**init_params)
 
 
-def fit_and_save_model(model, fit_args, predict_proba_args, X_val, y_val, time_start, time_limit=None):
+def fit_and_save_model(model, fit_args, predict_proba_args, y_val, time_start, time_limit=None):
     time_current = time.time()
     time_elapsed = time_current - time_start
     if time_limit is not None:
@@ -94,7 +93,7 @@ def fit_and_save_model(model, fit_args, predict_proba_args, X_val, y_val, time_s
         time_left = None
 
     time_fit_start = time.time()
-    model.fit(**fit_args, time_limit=time_left, X_val=X_val, y_val=y_val)
+    model.fit(**fit_args, time_limit=time_left)
     time_fit_end = time.time()
 
     if model._get_tags().get("valid_oof", False):
@@ -118,9 +117,9 @@ def fit_and_save_model(model, fit_args, predict_proba_args, X_val, y_val, time_s
 
 def skip_hpo(model, X, y, X_val, y_val, time_limit=None, **kwargs):
     """Skips HPO and simply trains the model once with the provided HPO time budget. Returns model artifacts as if from HPO."""
-    fit_model_args = dict(X=X, y=y, **kwargs)
+    fit_model_args = dict(X=X, y=y, X_val=X_val, y_val=y_val, **kwargs)
     predict_proba_args = dict(X=X_val)
-    fit_and_save_model(model=model, fit_args=fit_model_args, predict_proba_args=predict_proba_args, X_val=X_val, y_val=y_val, time_start=time.time(), time_limit=time_limit)
+    fit_and_save_model(model=model, fit_args=fit_model_args, predict_proba_args=predict_proba_args, y_val=y_val, time_start=time.time(), time_limit=time_limit)
     hpo_results = {"total_time": model.fit_time}
     hpo_model_performances = {model.name: model.val_score}
     hpo_results["hpo_model_performances"] = hpo_model_performances
