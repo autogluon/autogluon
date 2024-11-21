@@ -140,7 +140,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         for more information.
     fine_tune : bool, default = False
         If True, the pretrained model will be fine-tuned
-    fine_tune_lr: float, default = 0.00001
+    fine_tune_lr: float, default = 1e-5
         The learning rate used for fine-tuning. This default is suitable for Chronos-Bolt models; for the original
         Chronos models, we recommend using a higher learning rate such as ``1e-4``
     fine_tune_steps : int, default = 1000
