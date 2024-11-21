@@ -164,12 +164,13 @@ class TrainerFinetune(BaseEstimator):
             output_tracker = None
 
         for batch in dataloader:
-        
+            self.optimizer.zero_grad()
+
             x_support = batch['x_support'].to(self.cfg.device)
             y_support = batch['y_support'].to(self.cfg.device)
             x_query = batch['x_query'].to(self.cfg.device)
             y_query = batch['y_query'].to(self.cfg.device)
-            
+
             y_hat = self.model(x_support, y_support, x_query)
 
             match self.cfg.task:
@@ -181,7 +182,6 @@ class TrainerFinetune(BaseEstimator):
             y_query = y_query[0, :]
 
             loss = self.loss(y_hat, y_query)
-            self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
 
