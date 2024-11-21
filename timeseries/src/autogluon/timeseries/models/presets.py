@@ -134,7 +134,7 @@ def get_default_hps(key):
             "RecursiveTabular": {},
             "DirectTabular": {},
             "TemporalFusionTransformer": {},
-            "Chronos": {"model_path": "bolt-small"},
+            "Chronos": {"model_path": "bolt_small"},
         },
         "light_inference": {
             "SeasonalNaive": {},
@@ -157,11 +157,11 @@ def get_default_hps(key):
             "Chronos": [
                 {
                     "ag_args": {"name_suffix": "ZeroShot"},
-                    "model_path": "bolt-base",
+                    "model_path": "bolt_base",
                 },
                 {
                     "ag_args": {"name_suffix": "FineTuned"},
-                    "model_path": "bolt-small",
+                    "model_path": "bolt_small",
                     "fine_tune": True,
                     "target_scaler": "standard",
                     "covariate_regressor": {"model_name": "CAT", "model_hyperparameters": {"iterations": 1_000}},
