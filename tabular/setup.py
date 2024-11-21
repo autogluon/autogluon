@@ -56,6 +56,11 @@ extras_require = {
     "tabpfn": [
         "tabpfn>=0.1,<0.2",  # <{N+1} upper cap, where N is the latest released minor version
     ],
+    "tabpfnmix": [
+        "torch",
+        "pyyaml",
+        "einops>=0.7,<0.9",  # TODO: Try removing and replacing with native torch operations for minimal dependency footprint
+    ],
     "ray": [
         f"{ag.PACKAGE_NAME}.core[all]=={version}",
     ],
@@ -97,7 +102,7 @@ extras_require["all"] = all_requires
 
 
 test_requires = []
-for test_package in ["tabpfn", "imodels", "vowpalwabbit", "skl2onnx"]:
+for test_package in ["tabpfn", "tabpfnmix", "imodels", "vowpalwabbit", "skl2onnx"]:
     test_requires += extras_require[test_package]
 extras_require["tests"] = test_requires
 install_requires = ag.get_dependency_version_ranges(install_requires)
