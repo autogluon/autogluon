@@ -67,10 +67,10 @@ MODEL_ALIASES = {
     "small": "autogluon/chronos-t5-small",
     "base": "autogluon/chronos-t5-base",
     "large": "autogluon/chronos-t5-large",
-    "bolt-tiny": "autogluon/chronos-bolt-tiny",
-    "bolt-mini": "autogluon/chronos-bolt-mini",
-    "bolt-small": "autogluon/chronos-bolt-small",
-    "bolt-base": "autogluon/chronos-bolt-base",
+    "bolt_tiny": "autogluon/chronos-bolt-tiny",
+    "bolt_mini": "autogluon/chronos-bolt-mini",
+    "bolt_small": "autogluon/chronos-bolt-small",
+    "bolt_base": "autogluon/chronos-bolt-base",
 }
 
 
@@ -109,7 +109,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         compatible model name on HuggingFace Hub or a local path to a model directory. Original
         Chronos models (i.e., ``autogluon/chronos-t5-{model_size}``) can be specified with aliases
         ``tiny``, ``mini`` , ``small``, ``base``, and ``large``. Chronos-Bolt models can be specified
-        with ``bolt-mini``, ``bolt-small``, and ``bolt-base``.
+        with ``bolt_tiny``, ``bolt_mini``, ``bolt_small``, and ``bolt_base``.
     batch_size : int, default = 16
         Size of batches used during inference
     num_samples : int, default = 20
