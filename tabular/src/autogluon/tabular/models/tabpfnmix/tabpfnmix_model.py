@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 
@@ -13,6 +14,7 @@ from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE
 from autogluon.core.models import AbstractModel
 from autogluon.features.generators import LabelEncoderFeatureGenerator
 
+logger = logging.getLogger(__name__)
 
 # TODO: Add huggingface weights download support
 class TabPFNMixModel(AbstractModel):
@@ -35,8 +37,38 @@ class TabPFNMixModel(AbstractModel):
     def _set_default_params(self):
         """Specifies hyperparameter values to use by default"""
         default_params = {
-            "n_ensembles": 1,
-            "max_epochs": 0,
+            # most important hyperparameters. Only set `n_estimators>1` if `max_epochs>1`, else there will be no benefit.
+            # path_weights,  # most important
+            # path_weights_classifier,  # if specified, overrides path_weights for classification problems
+            # path_weights_regressor,  # if specified, overrides path_weights for regression problems
+            "n_ensembles": 1,  # FIXME: RENAME: n_estimators
+            "max_epochs": 0,  # fine-tuning epochs. Will do pure in-context learning if 0.
+
+            # next most important hyperparameters
+            "lr": 1.0e-05,
+            "max_samples_query": 1024,  # larger = slower but better quality on datasets with at least this many validation samples
+            "max_samples_support": 8196,  # larger = slower but better quality on datasets with at least this many training samples
+
+            # other hyperparameters
+            "early_stopping_patience": 40,  # TODO: Figure out optimal value
+            "linear_attention": True,
+            "lr_scheduler": False,
+            "lr_scheduler_patience": 30,
+            "optimizer": "adamw",
+            "use_feature_count_scaling": True,
+            "use_quantile_transformer": True,
+            "weight_decay": 0,
+            "y_as_float_embedding": True,
+
+            # architecture hyperparameters, recommended to keep as default unless using a custom pre-trained backbone
+            "n_classes": 10,
+            "n_features": 100,
+            "n_heads": 4,
+            "n_layers": 12,
+            "attn_dropout": 0.0,
+            "dim": 512,
+
+            # utility parameters, recommended to keep as default
             "split_val": False,
             "use_best_epoch": True,
         }
@@ -61,47 +93,66 @@ class TabPFNMixModel(AbstractModel):
 
         params = self._get_model_params()
 
+        from ._internal.core.enums import Task
+        if self.problem_type in [REGRESSION, QUANTILE]:
+            task = Task.REGRESSION
+            n_classes = 0
+        else:
+            task = Task.CLASSIFICATION
+            n_classes = self.num_classes
+
+        if num_gpus > 0:
+            device = "cuda:0"
+        else:
+            device = "cpu"
+
+        path_weights = None
+        if task == Task.CLASSIFICATION:
+            if "path_weights_classifier" in params and params["path_weights_classifier"] is not None:
+                path_weights = Path(params["path_weights_classifier"])
+        elif task == Task.REGRESSION:
+            if "path_weights_regressor" in params and params["path_weights_regressor"] is not None:
+                path_weights = Path(params["path_weights_regressor"])
+        if path_weights is None:
+            if "path_weights" in params and params["path_weights"] is not None:
+                path_weights = Path(params["path_weights"])
+
+        if path_weights is None:
+            logger.log(15, "\tNo path_weights specified, fitting model from random initialization...")
+        else:
+            logger.log(15, f'\tLoading pre-trained weights from file... (path_weights="{path_weights}")')
+
+        # FIXME: Note: Disabling path_config logic for v1.2 release, as it would be the only model to support this and it might cause bugs
         # FIXME: Don't require loading from file, allow user to specify everything?
         # TODO: Not a big fan of the path config logic due to possible portability issues
-        if "path_config" in params:
-            path_config = Path(params["path_config"])
-        else:
-            dir_path = os.path.dirname(os.path.realpath(__file__))
-            path_config = Path(dir_path) / "configs" / "tabpfnmix_base.yaml"
-        cfg = ConfigRun.load(Path(path_config))
-        if "path_weights" not in params:
+        # if "path_config" in params:
+        #     path_config = Path(params["path_config"])
+        # else:
+        #     path_config = None
+        # if path_config is not None:
+        #     cfg = ConfigRun.load(Path(path_config))
+        #     cfg.task = task
+        #     cfg.device = device
+        #     # FIXME: Cant use cfg values atm, need to allow overwriting values
+        #     if params.get("max_epochs", None) is not None:
+        #         cfg.hyperparams['max_epochs'] = params["max_epochs"]
+        #     if params.get("n_ensembles", None) is not None:
+        #         cfg.hyperparams['n_ensembles'] = params["n_ensembles"]
+        # else:
+        cfg = ConfigRun(hyperparams=params, task=task, device=device)
+        if path_weights is None and "path_weights" not in params:
             raise ValueError(
                 "Missing required model hyperparameter 'path_weights'. "
                 "Either specify `path_weights=None` to train from random initialization (not recommended), "
                 "or specify a local path to a pre-trained weights file such as `path/to/file/tabpfnmix_base.pt`."
             )
 
-        from ._internal.core.enums import Task
-        if self.problem_type in [REGRESSION, QUANTILE]:
-            task = Task.CLASSIFICATION
-        else:
-            task = Task.REGRESSION
-        cfg.task = task
-
-        if cfg.device is None:
-            if num_gpus > 0:
-                # TODO: Test with GPU
-                # TODO: What if multi-gpu?
-                cfg.device = 'cuda:0'
-            else:
-                cfg.device = "cpu"
-
-        if params.get("max_epochs", None) is not None:
-            cfg.hyperparams['max_epochs'] = params["max_epochs"]
-        if params.get("n_ensembles", None) is not None:
-            cfg.hyperparams['n_ensembles'] = params["n_ensembles"]
-
-        if self.problem_type == "regression":
-            cfg.task = "regression"
-            n_classes = 0
-        else:
-            cfg.task = "classification"
-            n_classes = self.num_classes
+        if cfg.hyperparams["max_epochs"] == 0 and cfg.hyperparams["n_ensembles"] != 1:
+            logger.log(
+                30,
+                f"WARNING: max_epochs should be > 0 if n_ensembles > 1, otherwise there will be zero quality benefit with slower inference. "
+                f"(max_epochs={cfg.hyperparams['max_epochs']}, n_ensembles={cfg.hyperparams['n_ensembles']})"
+            )
 
         X = self.preprocess(X)
         y = y.values
@@ -124,7 +175,7 @@ class TabPFNMixModel(AbstractModel):
             cfg=cfg,
             n_classes=n_classes,
             split_val=params["split_val"],
-            path_to_weights=params["path_weights"],
+            path_to_weights=path_weights,
             stopping_metric=self.stopping_metric,
             use_best_epoch=params["use_best_epoch"],
         )
@@ -208,7 +259,7 @@ class TabPFNMixModel(AbstractModel):
         return 10 * get_approximate_df_mem_usage(X).sum()
 
     @classmethod
-    def _class_tags(cls):
+    def _class_tags(cls) -> dict:
         return {
             "can_estimate_memory_usage_static": True,
         }
