@@ -1,96 +1,127 @@
 # Installing AutoGluon
 
-:::{note} 
+:::{note}
 
 * AutoGluon requires Python version 3.9, 3.10, 3.11, or 3.12 and is available on Linux, MacOS, and Windows.
- 
-* The AutoGluon library comes pre-installed in all releases of [Amazon SageMaker Distribution](https://github.com/aws/sagemaker-distribution). For more information, refer to the dropdown [AutoGluon in Amazon SageMaker Studio](#dropdown-sagemaker) in this page. 
+
+* The AutoGluon library comes pre-installed in all releases of [Amazon SageMaker Distribution](https://github.com/aws/sagemaker-distribution). For more information, refer to the dropdown [AutoGluon in Amazon SageMaker Studio](#dropdown-sagemaker) in this page.
 
 We recommend most users to install via pip. The pip install of AutoGluon is the version we actively benchmark and test on.
-The Conda install may have subtle differences in installed dependencies that could impact performance and stability, and we recommend trying pip if you run into issues with Conda. 
+The Conda install may have subtle differences in installed dependencies that could impact performance and stability, and we recommend trying pip if you run into issues with Conda.
 
 :::
 
 ::::::{tab} Linux
 
   :::::{tab} Pip
-  
+
     ::::{tab} CPU
     ```{include} install-cpu-pip.md
     ```
     ::::
-    
+
     ::::{tab} GPU
     ```{include} install-gpu-pip.md
     ```
     ::::
-  
+
   :::::
-  
+
+  :::::{tab} UV
+
+    ::::{tab} CPU
+    ```{include} install-cpu-uv.md
+    ```
+    ::::
+
+    ::::{tab} GPU
+    ```{include} install-gpu-uv.md
+    ```
+    ::::
+
+  :::::
+
   :::::{tab} Conda
-  
+
     ::::{tab} CPU
     ```{include} install-conda-full.md
     ```
     ::::
-    
+
     ::::{tab} GPU
     ```{include} install-linux-conda-gpu.md
     ```
     ::::
-  
+
   :::::
-  
+
   :::::{tab} Source
-  
+
     ::::{tab} CPU
     ```{include} install-cpu-source.md
     ```
     ::::
-    
+
     ::::{tab} GPU
     ```{include} install-gpu-source.md
     ```
     ::::
-  
+
   :::::
-  
+
 ::::::
 
 ::::::{tab} Mac
 
   :::::{tab} Pip
-  
+
     ::::{tab} CPU
     ```{include} install-mac-libomp.md
     ```
 
     ```{include} install-mac-cpu.md
-    ``` 
+    ```
     ::::
-  
+
     ::::{tab} GPU
     ```{include} install-mac-nogpu.md
     ::::
-  
+
   :::::
-  
+
+  :::::{tab} UV
+
+    ::::{tab} CPU
+    ```{include} install-mac-libomp.md
+    ```
+
+    ```{include} install-cpu-uv.md
+    ```
+    ::::
+
+    ::::{tab} GPU
+    ```{include} install-mac-nogpu.md
+    ```
+    ::::
+
+  :::::
+
   :::::{tab} Conda
-  
+
     ::::{tab} CPU
     ```{include} install-mac-conda.md
     ```
     ::::
-  
+
     ::::{tab} GPU
     ```{include} install-mac-nogpu.md
     ```
     ::::
-  
+
   :::::
-  
+
   :::::{tab} Source
-  
+
     ::::{tab} CPU
     ```{include} install-mac-libomp.md
     ```
@@ -98,12 +129,12 @@ The Conda install may have subtle differences in installed dependencies that cou
     ```{include} install-mac-cpu-source.md
     ```
     ::::
-    
+
     ::::{tab} GPU
     ```{include} install-mac-nogpu.md
     ```
     ::::
-  
+
   :::::
 
 ::::::
@@ -111,41 +142,61 @@ The Conda install may have subtle differences in installed dependencies that cou
 ::::::{tab} Windows
 
   :::::{tab} Pip
-  
+
     ::::{tab} CPU
     ```{include} install-windows-cpu.md
     ```
-    
-	  ```{include} install-cpu-pip.md 
+
+	  ```{include} install-cpu-pip.md
     ```
     ::::
-    
+
     ::::{tab} GPU
     ```{include} install-windows-gpu.md
     ```
 
-	  ```{include} install-gpu-pip.md 
+	  ```{include} install-gpu-pip.md
     ```
     ::::
-  
+
   :::::
-  
+
+  :::::{tab} UV
+
+    ::::{tab} CPU
+    ```{include} install-windows-cpu.md
+    ```
+
+    ```{include} install-cpu-uv.md
+    ```
+    ::::
+
+    ::::{tab} GPU
+    ```{include} install-windows-gpu.md
+    ```
+
+    ```{include} install-gpu-uv.md
+    ```
+    ::::
+
+  :::::
+
   :::::{tab} Conda
-  
+
     ::::{tab} CPU
     ```{include} install-conda-full.md
     ```
     ::::
-    
+
     ::::{tab} GPU
     ```{include} install-windows-conda-gpu.md
     ```
     ::::
-  
+
   :::::
-  
+
   :::::{tab} Source
-  
+
     ::::{tab} CPU
     ```{include} install-windows-cpu.md
     ```
@@ -153,7 +204,7 @@ The Conda install may have subtle differences in installed dependencies that cou
     ```{include} install-cpu-source.md
     ```
     ::::
-    
+
     ::::{tab} GPU
     ```{include} install-windows-gpu.md
     ```
@@ -161,7 +212,7 @@ The Conda install may have subtle differences in installed dependencies that cou
     ```{include} install-gpu-source.md
     ```
     ::::
-  
+
   :::::
 
 ::::::
@@ -176,10 +227,10 @@ The Conda install may have subtle differences in installed dependencies that cou
 
 :::{dropdown} AutoGluon in Amazon SageMaker Studio
 
-[Amazon SageMaker Distribution](https://github.com/aws/sagemaker-distribution) is the docker environment for data science used as the default image of [JupyterLab](https://docs.aws.amazon.com/sagemaker/latest/dg/studio-updated-jl.html) notebook instances and [Code Editor](https://docs.aws.amazon.com/sagemaker/latest/dg/code-editor.html) in [Amazon SageMaker Studio](https://docs.aws.amazon.com/sagemaker/latest/dg/studio-updated.html).  The AutoGluon library comes pre-installed in all releases of Amazon SageMaker Distribution. SageMaker Studio users can access AutoGluon's automation capabilities without needing to install anything additional. 
+[Amazon SageMaker Distribution](https://github.com/aws/sagemaker-distribution) is the docker environment for data science used as the default image of [JupyterLab](https://docs.aws.amazon.com/sagemaker/latest/dg/studio-updated-jl.html) notebook instances and [Code Editor](https://docs.aws.amazon.com/sagemaker/latest/dg/code-editor.html) in [Amazon SageMaker Studio](https://docs.aws.amazon.com/sagemaker/latest/dg/studio-updated.html).  The AutoGluon library comes pre-installed in all releases of Amazon SageMaker Distribution. SageMaker Studio users can access AutoGluon's automation capabilities without needing to install anything additional.
 
 
-To find the AutoGluon and PyTorch versions available in a SageMaker Distribution image, refer to the [RELEASE.md](https://github.com/aws/sagemaker-distribution/blob/main/build_artifacts/v1/v1.4/v1.4.2/RELEASE.md) file for your image version in the SageMaker Distribution GitHub repository. 
+To find the AutoGluon and PyTorch versions available in a SageMaker Distribution image, refer to the [RELEASE.md](https://github.com/aws/sagemaker-distribution/blob/main/build_artifacts/v1/v1.4/v1.4.2/RELEASE.md) file for your image version in the SageMaker Distribution GitHub repository.
 
 :::
 
@@ -189,7 +240,7 @@ To build AutoGluon from source for the purposes of testing a pull-request, you c
 This process is useful if you are a code reviewer or want to test if a PR fixes a bug you have reported.
 
 In this example, we are using [this PR](https://github.com/autogluon/autogluon/pull/2944).
-It is from the user `innixma` and the PR branch is called `accel_preprocess_bool`. 
+It is from the user `innixma` and the PR branch is called `accel_preprocess_bool`.
 This information is provided in the PR page directly under the title of the PR (where it says `into autogluon:master from Innixma:accel_preprocess_bool`).
 
 ```bash
@@ -213,7 +264,7 @@ AutoGluon offers nightly builds that can be installed using the `--pre` argument
 
 ```bash
 pip install -U uv
-uv pip install --pre autogluon
+python -m uv pip install --pre autogluon
 ```
 :::
 
@@ -247,4 +298,3 @@ If you encounter issues after installing AutoGluon, try restarting the notebook 
 If you encounter installation issues not covered here, please create a [GitHub issue](https://github.com/autogluon/autogluon/issues).
 
 :::
-
