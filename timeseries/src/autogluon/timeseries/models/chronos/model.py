@@ -140,8 +140,9 @@ class ChronosModel(AbstractTimeSeriesModel):
         for more information.
     fine_tune : bool, default = False
         If True, the pretrained model will be fine-tuned
-    fine_tune_lr: float, default = 0.0001
-        The learning rate used for fine-tuning
+    fine_tune_lr: float, default = 1e-5
+        The learning rate used for fine-tuning. This default is suitable for Chronos-Bolt models; for the original
+        Chronos models, we recommend using a higher learning rate such as ``1e-4``
     fine_tune_steps : int, default = 1000
         The number of gradient update steps to fine-tune for
     fine_tune_batch_size : int, default = 32
@@ -321,7 +322,7 @@ class ChronosModel(AbstractTimeSeriesModel):
 
         init_args.setdefault("fine_tune", False)
         init_args.setdefault("keep_transformers_logs", False)
-        init_args.setdefault("fine_tune_lr", 1e-4)
+        init_args.setdefault("fine_tune_lr", 1e-5)
         init_args.setdefault("fine_tune_steps", 1000)
         init_args.setdefault("fine_tune_batch_size", 32)
         init_args.setdefault("eval_during_fine_tune", False)
