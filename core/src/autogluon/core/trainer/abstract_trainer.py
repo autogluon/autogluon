@@ -10,7 +10,7 @@ import traceback
 import typing
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import networkx as nx
 import numpy as np
@@ -18,11 +18,12 @@ import pandas as pd
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.features.types import R_FLOAT, S_STACK
+from autogluon.common.utils.distribute_utils import DistributedContext
 from autogluon.common.utils.lite import disable_if_lite_mode
-from autogluon.common.utils.log_utils import convert_time_in_s_to_log_friendly
+from autogluon.common.utils.log_utils import convert_time_in_s_to_log_friendly, reset_logger_for_remote_call
 from autogluon.common.utils.path_converter import PathConverter
-from autogluon.common.utils.resource_utils import ResourceManager
-from autogluon.common.utils.try_import import try_import_torch
+from autogluon.common.utils.resource_utils import ResourceManager, get_resource_manager
+from autogluon.common.utils.try_import import try_import_ray, try_import_torch
 
 from ..augmentation.distill_utils import augment_data, format_distillation_labels
 from ..calibrate import calibrate_decision_threshold
@@ -34,6 +35,7 @@ from ..data.label_cleaner import LabelCleanerMulticlassToBinary
 from ..metrics import compute_metric, Scorer, get_metric
 from ..models import AbstractModel, BaggedEnsembleModel, GreedyWeightedEnsembleModel, SimpleWeightedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel
 from ..pseudolabeling.pseudolabeling import assert_pseudo_column_match
+from ..ray.distributed_jobs_managers import ParallelFitManager
 from ..utils import (
     compute_permutation_feature_importance,
     convert_pred_probas_to_df,
@@ -43,7 +45,7 @@ from ..utils import (
     get_pred_from_proba,
     infer_eval_metric,
 )
-from ..utils.exceptions import NoGPUError, NotEnoughCudaMemoryError, NotEnoughMemoryError, NotValidStacker, NoStackFeatures, NoValidFeatures, TimeLimitExceeded
+from ..utils.exceptions import InsufficientTime, NoGPUError, NotEnoughCudaMemoryError, NotEnoughMemoryError, NotValidStacker, NoStackFeatures, NoValidFeatures, TimeLimitExceeded
 from ..utils.feature_selection import FeatureSelector
 from ..utils.loaders import load_pkl
 from ..utils.savers import save_json, save_pkl
@@ -724,6 +726,7 @@ class AbstractTrainer:
         X_unlabeled=None,
         level=1,
         base_model_names: List[str] = None,
+        fit_strategy: Literal["sequential", "parallel"] = "sequential",
         stack_name="core",
         ag_args=None,
         ag_args_fit=None,
@@ -805,7 +808,9 @@ class AbstractTrainer:
                     if "hyperparameter_tune_kwargs" in model_args_fit[model_name]
                 }
                 kwargs["hyperparameter_tune_kwargs"] = hyperparameter_tune_kwargs
-        logger.log(20, f"Fitting {len(models)} L{level} models ...")
+
+        logger.log(10 if ((not refit_full) and DistributedContext.is_distributed_mode()) else 20, f'Fitting {len(models)} L{level} models, fit_strategy="{fit_strategy}" ...')
+
         X_init = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=True)
         feature_metadata = self.get_feature_metadata(use_orig_features=True, base_models=base_model_names)
         if X_val is not None:
@@ -840,6 +845,7 @@ class AbstractTrainer:
             stack_name=stack_name,
             compute_score=compute_score,
             fit_kwargs=fit_kwargs,
+            fit_strategy=fit_strategy,
             **kwargs,
         )
 
@@ -1409,7 +1415,20 @@ class AbstractTrainer:
 
     # You must have previously called fit() with cache_data=True
     # Fits _FULL versions of specified models, but does NOT link them (_FULL stackers will still use normal models as input)
-    def refit_single_full(self, X=None, y=None, X_val=None, y_val=None, X_unlabeled=None, models=None, **kwargs) -> List[str]:
+    def refit_single_full(
+        self,
+        X=None,
+        y=None,
+        X_val=None,
+        y_val=None,
+        X_unlabeled=None,
+        models=None,
+        fit_strategy: Literal["sequential", "parallel"] = "sequential",
+        **kwargs,
+    ) -> list[str]:
+        if fit_strategy == "parallel":
+            logger.log(30, f"Note: refit_full does not yet support fit_strategy='parallel', switching to 'sequential'...")
+            fit_strategy = "sequential"
         if X is None:
             X = self.load_X()
         if X_val is None:
@@ -1436,85 +1455,100 @@ class AbstractTrainer:
 
         levels = sorted(model_levels.keys())
         models_trained_full = []
-        model_refit_map = {}
-        for level in levels:
-            models_level = model_levels[level]
-            for model in models_level:
-                model = self.load_model(model)
-                model_name = model.name
-                reuse_first_fold = False
-                if isinstance(model, BaggedEnsembleModel):
-                    # Reuse if model is already _FULL and no X_val
-                    if X_val is None:
-                        reuse_first_fold = not model._bagged_mode
-                if not reuse_first_fold:
-                    if isinstance(model, BaggedEnsembleModel):
-                        can_refit_full = model._get_tags_child().get("can_refit_full", False)
-                    else:
-                        can_refit_full = model._get_tags().get("can_refit_full", False)
-                    reuse_first_fold = not can_refit_full
-                if not reuse_first_fold:
-                    model_full = model.convert_to_refit_full_template()
-                    # Mitigates situation where bagged models barely had enough memory and refit requires more. Worst case results in OOM, but this lowers chance of failure.
-                    model_full._user_params_aux["max_memory_usage_ratio"] = model.params_aux["max_memory_usage_ratio"] * 1.15
-                    # TODO: Do it for all models in the level at once to avoid repeated processing of data?
-                    base_model_names = self.get_base_model_names(model_name)
-                    # FIXME: Logs for inference speed (1 row) are incorrect because
-                    #  parents are non-refit models in this sequence and later correct after logging.
-                    #  Avoiding fix at present to minimize hacks in the code.
-                    #  Return to this later when Trainer controls all stacking logic to map correct parent.
-                    models_trained = self.stack_new_level_core(
+        model_refit_map = {}  # FIXME: is this even used, remove?
+
+        if fit_strategy == "sequential":
+            for level in levels:
+                models_level = model_levels[level]
+                for model in models_level:
+                    model_name, models_trained = _detached_refit_single_full(
+                        _self=self,
+                        model=model,
                         X=X,
                         y=y,
                         X_val=X_val,
                         y_val=y_val,
                         X_unlabeled=X_unlabeled,
-                        models=[model_full],
-                        base_model_names=base_model_names,
                         level=level,
-                        stack_name=REFIT_FULL_NAME,
-                        hyperparameter_tune_kwargs=None,
-                        feature_prune=False,
-                        k_fold=0,
-                        n_repeats=1,
-                        ensemble_type=type(model),
-                        refit_full=True,
-                        **kwargs,
+                        kwargs=kwargs,
+                        fit_strategy=fit_strategy,
                     )
-                    if len(models_trained) == 0:
-                        reuse_first_fold = True
-                        logger.log(
-                            30,
-                            f"WARNING: Refit training failure detected for '{model_name}'... "
-                            f"Falling back to using first fold to avoid downstream exception."
-                            f"\n\tThis is likely due to an out-of-memory error or other memory related issue. "
-                            f"\n\tPlease create a GitHub issue if this was triggered from a non-memory related problem.",
+                    if len(models_trained) == 1:
+                        model_refit_map[model_name] = models_trained[0]
+                    for model_trained in models_trained:
+                        self._update_model_attr(
+                            model_trained,
+                            refit_full=True,
+                            refit_full_parent=model_name,
+                            refit_full_parent_val_score=self.get_model_attribute(model_name, "val_score"),
                         )
-                        if not model.params.get("save_bag_folds", True):
-                            raise AssertionError(
-                                f"Cannot avoid training failure during refit for '{model_name}' by falling back to "
-                                f"copying the first fold because it does not exist! (save_bag_folds=False)"
-                                f"\n\tPlease specify `save_bag_folds=True` in the `.fit` call to avoid this exception."
-                            )
+                    models_trained_full += models_trained
+        elif fit_strategy == "parallel":
+            # -- Parallel refit
+            ray = try_import_ray()
 
-                if reuse_first_fold:
-                    # Perform fallback black-box refit logic that doesn't retrain.
-                    model_full = model.convert_to_refit_full_via_copy()
-                    # FIXME: validation time not correct for infer 1 batch time, needed to hack _is_refit=True to fix
-                    logger.log(20, f"Fitting model: {model_full.name} | Skipping fit via cloning parent ...")
-                    self._add_model(model_full, stack_name=REFIT_FULL_NAME, level=level, _is_refit=True)
-                    self.save_model(model_full)
-                    models_trained = [model_full.name]
-                if len(models_trained) == 1:
-                    model_refit_map[model_name] = models_trained[0]
-                for model_trained in models_trained:
+            # FIXME: Need a common utility class for initializing ray so we don't duplicate code
+            if not ray.is_initialized():
+                ray.init(log_to_driver=False, logging_level=logging.ERROR)
+
+            distributed_manager = ParallelFitManager(
+                mode="refit",
+                func=_remote_refit_single_full,
+                func_kwargs=dict(fit_strategy=fit_strategy),
+                func_put_kwargs=dict(
+                    _self=self,
+                    X=X,
+                    y=y,
+                    X_val=X_val,
+                    y_val=y_val,
+                    X_unlabeled=X_unlabeled,
+                    kwargs=kwargs,
+                ),
+                # TODO: check if this is available in the kwargs
+                num_cpus=kwargs.get("total_resources", {}).get("num_cpus", 1),
+                num_gpus=kwargs.get("total_resources", {}).get("num_gpus", 0),
+                get_model_attribute_func=self.get_model_attribute,
+                X=X,
+                y=y,
+            )
+
+            for level in levels:
+                models_trained_full_level = []
+                distributed_manager.job_kwargs["level"] = level
+                models_level = model_levels[level]
+
+                logger.log(20, f"Scheduling distributed model-workers for refitting {len(models_level)} L{level} models...")
+                unfinished_job_refs = distributed_manager.schedule_jobs(models_to_fit=models_level)
+
+                while unfinished_job_refs:
+                    finished, unfinished_job_refs = ray.wait(unfinished_job_refs, num_returns=1)
+                    refit_full_parent, model_trained, model_path, model_type = ray.get(finished[0])
+
+                    self._add_model(
+                        model_type.load(path=os.path.join(self.path,model_path), reset_paths=self.reset_paths),
+                        stack_name=REFIT_FULL_NAME,
+                        level=level,
+                        _is_refit=True
+                    )
+                    model_refit_map[refit_full_parent] = model_trained
                     self._update_model_attr(
                         model_trained,
                         refit_full=True,
-                        refit_full_parent=model_name,
-                        refit_full_parent_val_score=self.get_model_attribute(model_name, "val_score"),
+                        refit_full_parent=refit_full_parent,
+                        refit_full_parent_val_score=self.get_model_attribute(refit_full_parent,"val_score"),
                     )
-                models_trained_full += models_trained
+                    models_trained_full_level.append(model_trained)
+
+                    logger.log(20,f"Finished refit model for {refit_full_parent}")
+                    unfinished_job_refs += distributed_manager.schedule_jobs()
+
+                logger.log(20, f"Finished distributed refitting for {len(models_trained_full_level)} L{level} models.")
+                models_trained_full += models_trained_full_level
+                distributed_manager.clean_job_state(unfinished_job_refs=unfinished_job_refs)
+
+            distributed_manager.clean_up_ray()
+        else:
+            raise ValueError(f"Invalid value for fit_strategy: '{fit_strategy}'")
 
         keys_to_del = []
         for model in model_refit_map.keys():
@@ -1941,7 +1975,16 @@ class AbstractTrainer:
         return models
 
     def _train_single(
-        self, X, y, model: AbstractModel, X_val=None, y_val=None, X_test=None, y_test=None, total_resources=None, **model_fit_kwargs
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
+        model: AbstractModel,
+        X_val: pd.DataFrame = None,
+        y_val: pd.Series = None,
+        X_test: pd.DataFrame = None,
+        y_test: pd.Series = None,
+        total_resources: dict = None,
+        **model_fit_kwargs,
     ) -> AbstractModel:
         """
         Trains model but does not add the trained model to this Trainer.
@@ -1952,19 +1995,25 @@ class AbstractTrainer:
 
     def _train_and_save(
         self,
-        X,
-        y,
+        X: pd.DataFrame,
+        y: pd.Series,
         model: AbstractModel,
-        X_val=None,
-        y_val=None,
-        X_test=None,
-        y_test=None,
-        stack_name="core",
-        level=1,
-        compute_score=True,
-        total_resources=None,
+        X_val: pd.DataFrame = None,
+        y_val: pd.Series = None,
+        X_test: pd.DataFrame = None,
+        y_test: pd.Series = None,
+        X_pseudo: pd.DataFrame = None,
+        y_pseudo: pd.DataFrame = None,
+        time_limit: float = None,
+        stack_name: str = "core",
+        level: int = 1,
+        compute_score: bool = True,
+        total_resources: dict = None,
+        errors: Literal["ignore", "raise"] = "ignore",
+        errors_ignore: list = None,
+        errors_raise: list = None,
         **model_fit_kwargs,
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Trains model and saves it to disk, returning a list with a single element: The name of the model, or no elements if training failed.
         If the model name is returned:
@@ -1973,53 +2022,85 @@ class AbstractTrainer:
             The model's name will be appended to self.models_level[stack_name][level]
             The model will be accessible and usable through any Trainer function that takes as input 'model' or 'model_name'.
         Note: self._train_and_save should not be used outside of self._train_single_full
+
+        Parameters
+        ----------
+        errors: Literal["ignore", "raise"], default = "ignore"
+            Determines how model fit exceptions are handled.
+            If "ignore", will ignore all model exceptions during fit. If an exception occurs, an empty list is returned.
+            If "raise", will raise the model exception if it occurs.
+            Can be overwritten by `errors_ignore` and `errors_raise`.
+        errors_ignore: list[str], optional
+            The exception types specified in `errors_ignore` will be treated as if `errors="ignore"`.
+        errors_raise: list[str], optional
+            The exception types specified in `errors_raise` will be treated as if `errors="raise"`.
+
         """
-        X_pseudo = model_fit_kwargs.get("X_pseudo", None)
-        y_pseudo = model_fit_kwargs.get("y_pseudo", None)
         fit_start_time = time.time()
-        time_limit = model_fit_kwargs.get("time_limit", None)
         model_names_trained = []
         y_pred_proba_val = None
-        try:
-            fit_log_message = f"Fitting model: {model.name} ..."
-            if time_limit is not None:
-                if time_limit <= 0:
-                    logger.log(15, f"Skipping {model.name} due to lack of time remaining.")
-                    return model_names_trained
-                if self._time_limit is not None and self._time_train_start is not None:
-                    time_left_total = self._time_limit - (fit_start_time - self._time_train_start)
-                    # If only a very small amount of time remains, skip training
-                    min_time_required = min(self._time_limit * 0.01, 10)
-                    if (time_left_total < min_time_required) and (time_limit < min_time_required):
-                        logger.log(15, f"Skipping {model.name} due to lack of time remaining.")
-                        return model_names_trained
+
+        fit_log_message = f"Fitting model: {model.name} ..."
+        if time_limit is not None:
+            time_left_total = time_limit
+            not_enough_time = False
+            if time_limit <= 0:
+                not_enough_time = True
+            elif self._time_limit is not None and self._time_train_start is not None:
+                time_left_total = self._time_limit - (fit_start_time - self._time_train_start)
+                # If only a very small amount of time remains, skip training
+                min_time_required = min(self._time_limit * 0.01, 10)
+                if (time_left_total < min_time_required) and (time_limit < min_time_required):
+                    not_enough_time = True
+            if not_enough_time:
+                skip_msg = f"Skipping {model.name} due to lack of time remaining."
+                not_enough_time_exception = InsufficientTime(skip_msg)
+                if self._check_raise_exception(exception=not_enough_time_exception, errors=errors, errors_ignore=errors_ignore, errors_raise=errors_raise):
+                    raise not_enough_time_exception
                 else:
-                    time_left_total = time_limit
-                fit_log_message += f" Training model for up to {round(time_limit, 2)}s of the {round(time_left_total, 2)}s of remaining time."
-            logger.log(20, fit_log_message)
+                    logger.log(15, skip_msg)
+                    return []
+            fit_log_message += f" Training model for up to {time_limit:.2f}s of the {time_left_total:.2f}s of remaining time."
+        logger.log(10 if DistributedContext.is_distributed_mode() else 20, fit_log_message)
 
-            if isinstance(model, BaggedEnsembleModel) and not compute_score:
-                # Do not perform OOF predictions when we don't compute a score.
-                model_fit_kwargs["_skip_oof"] = True
+        if isinstance(model, BaggedEnsembleModel) and not compute_score:
+            # Do not perform OOF predictions when we don't compute a score.
+            model_fit_kwargs["_skip_oof"] = True
 
-            # If model is not bagged model and not stacked then pseudolabeled data needs to be incorporated at this level
-            # Bagged model does validation on the fit level where as single models do it separately. Hence this if statement
-            # is required
-            if not isinstance(model, BaggedEnsembleModel) and X_pseudo is not None and y_pseudo is not None and X_pseudo.columns.equals(X.columns):
-                assert_pseudo_column_match(X=X, X_pseudo=X_pseudo)
-                X_w_pseudo = pd.concat([X, X_pseudo])
-                y_w_pseudo = pd.concat([y, y_pseudo])
-                model_fit_kwargs.pop("X_pseudo")
-                model_fit_kwargs.pop("y_pseudo")
-                logger.log(15, f"{len(X_pseudo)} extra rows of pseudolabeled data added to training set for {model.name}")
-                model = self._train_single(X_w_pseudo, y_w_pseudo, model, X_val, y_val, X_test=X_test, y_test=y_test, **model_fit_kwargs)
+        model_fit_kwargs = dict(
+            model=model,
+            X_val=X_val,
+            y_val=y_val,
+            X_test=X_test,
+            y_test=y_test,
+            time_limit=time_limit,
+            total_resources=total_resources,
+            **model_fit_kwargs,
+        )
+
+        # If model is not bagged model and not stacked then pseudolabeled data needs to be incorporated at this level
+        # Bagged model does validation on the fit level where as single models do it separately. Hence this if statement
+        # is required
+        if not isinstance(model, BaggedEnsembleModel) and X_pseudo is not None and y_pseudo is not None and X_pseudo.columns.equals(X.columns):
+            assert_pseudo_column_match(X=X, X_pseudo=X_pseudo)
+            X_w_pseudo = pd.concat([X, X_pseudo])
+            y_w_pseudo = pd.concat([y, y_pseudo])
+            logger.log(15, f"{len(X_pseudo)} extra rows of pseudolabeled data added to training set for {model.name}")
+            model_fit_kwargs["X"] = X_w_pseudo
+            model_fit_kwargs["y"] = y_w_pseudo
+        else:
+            model_fit_kwargs["X"] = X
+            model_fit_kwargs["y"] = y
+            if level > 1:
+                if X_pseudo is not None and y_pseudo is not None:
+                    logger.log(15, f"Dropping pseudo in stacking layer due to missing out-of-fold predictions")
             else:
-                if level > 1:
-                    if X_pseudo is not None and y_pseudo is not None:
-                        logger.log(15, f"Dropping pseudo in stacking layer due to missing out-of-fold predictions")
-                    model_fit_kwargs.pop("X_pseudo", None)
-                    model_fit_kwargs.pop("y_pseudo", None)
-                model = self._train_single(X, y, model, X_val, y_val, X_test=X_test, y_test=y_test, total_resources=total_resources, **model_fit_kwargs)
+                model_fit_kwargs["X_pseudo"] = X_pseudo
+                model_fit_kwargs["y_pseudo"] = y_pseudo
+
+        exception = None
+        try:
+            model = self._train_single(**model_fit_kwargs)
 
             fit_end_time = time.time()
             if self.weight_evaluation:
@@ -2049,31 +2130,32 @@ class AbstractTrainer:
             model.val_score = score
             # TODO: Add recursive=True to avoid repeatedly loading models each time this is called for bagged ensembles (especially during repeated bagging)
             self.save_model(model=model)
-        except Exception as err:
+        except Exception as exc:
+            exception = exc  # required to reference exc outside of `except` statement
             del_model = True
-            if isinstance(err, TimeLimitExceeded):
+            if isinstance(exception, TimeLimitExceeded):
                 logger.log(20, f"\tTime limit exceeded... Skipping {model.name}.")
-            elif isinstance(err, NotEnoughMemoryError):
+            elif isinstance(exception, NotEnoughMemoryError):
                 logger.warning(f"\tNot enough memory to train {model.name}... Skipping this model.")
-            elif isinstance(err, NoStackFeatures):
-                logger.warning(f"\tNo stack features to train {model.name}... Skipping this model. {err}")
-            elif isinstance(err, NotValidStacker):
-                logger.warning(f"\tStacking disabled for {model.name}... Skipping this model. {err}")
-            elif isinstance(err, NoValidFeatures):
+            elif isinstance(exception, NoStackFeatures):
+                logger.warning(f"\tNo stack features to train {model.name}... Skipping this model. {exception}")
+            elif isinstance(exception, NotValidStacker):
+                logger.warning(f"\tStacking disabled for {model.name}... Skipping this model. {exception}")
+            elif isinstance(exception, NoValidFeatures):
                 logger.warning(f"\tNo valid features to train {model.name}... Skipping this model.")
-            elif isinstance(err, NoGPUError):
+            elif isinstance(exception, NoGPUError):
                 logger.warning(f"\tNo GPUs available to train {model.name}... Skipping this model.")
-            elif isinstance(err, NotEnoughCudaMemoryError):
+            elif isinstance(exception, NotEnoughCudaMemoryError):
                 logger.warning(f"\tNot enough CUDA memory available to train {model.name}... Skipping this model.")
-            elif isinstance(err, ImportError):
+            elif isinstance(exception, ImportError):
                 logger.error(f"\tWarning: Exception caused {model.name} to fail during training (ImportError)... Skipping this model.")
-                logger.error(f"\t\t{err}")
+                logger.error(f"\t\t{exception}")
                 del_model = False
                 if self.verbosity > 2:
                     logger.exception("Detailed Traceback:")
             else:  # all other exceptions
                 logger.error(f"\tWarning: Exception caused {model.name} to fail during training... Skipping this model.")
-                logger.error(f"\t\t{err}")
+                logger.error(f"\t\t{exception}")
                 if self.verbosity > 0:
                     logger.exception("Detailed Traceback:")
             crash_time = time.time()
@@ -2081,8 +2163,8 @@ class AbstractTrainer:
             tb = traceback.format_exc()
             model_info = self.get_model_info(model=model)
             self._models_failed_to_train_errors[model.name] = dict(
-                exc_type=err.__class__.__name__,
-                exc_str=str(err),
+                exc_type=exception.__class__.__name__,
+                exc_str=str(exception),
                 exc_traceback=tb,
                 model_info=model_info,
                 total_time=total_time,
@@ -2095,6 +2177,9 @@ class AbstractTrainer:
             model_names_trained.append(model.name)
             if self.low_memory:
                 del model
+        if exception is not None:
+            if self._check_raise_exception(exception=exception, errors=errors, errors_ignore=errors_ignore, errors_raise=errors_raise):
+                raise exception
         return model_names_trained
 
     # FIXME: v1.0 Move to AbstractModel for most fields
@@ -2111,6 +2196,7 @@ class AbstractTrainer:
         predict_1_child_time = model.predict_1_time / num_children if model.predict_1_time is not None else None
         fit_metadata = model.get_fit_metadata()
 
+        model_param_aux = getattr(model, "_params_aux_child", model.params_aux)
         model_metadata = dict(
             fit_time=model.fit_time,
             compile_time=model.compile_time,
@@ -2132,11 +2218,16 @@ class AbstractTrainer:
             stack_name=stack_name,
             level=level,
             num_children=num_children,
+            fit_num_cpus=model.fit_num_cpus,
+            fit_num_gpus=model.fit_num_gpus,
+            fit_num_cpus_child=model.fit_num_cpus_child,
+            fit_num_gpus_child=model.fit_num_gpus_child,
+            refit_full_requires_gpu=(model.fit_num_gpus_child is not None) and (model.fit_num_gpus_child >= 1) and model._user_params.get("refit_folds", False),
             **fit_metadata,
         )
         return model_metadata
 
-    def _add_model(self, model: AbstractModel, stack_name: str = "core", level: int = 1, y_pred_proba_val=None, _is_refit=False) -> bool:
+    def _add_model(self, model: AbstractModel, stack_name: str = "core", level: int = 1, y_pred_proba_val=None, _is_refit=False, is_distributed_main=False) -> bool:
         """
         Registers the fit model in the Trainer object. Stores information such as model performance, save path, model type, and more.
         To use a model in Trainer, self._add_model must be called.
@@ -2152,6 +2243,9 @@ class AbstractTrainer:
             Stack level of the stack name to assign the model to. This is used for advanced functionality.
             The model's name is appended to self.models_level[stack_name][level]
             The model's base_models (if it has any) must all be a lower level than the model.
+        is_distributed_main: bool, default = False
+            If True, the main process in distributed training is calling this function.
+            This is used to avoid redundant logging in distributed training.
 
         Returns
         -------
@@ -2188,7 +2282,7 @@ class AbstractTrainer:
                         f"Model '{model.name}' depends on model '{base_model_name}', but '{base_model_name}' is not in a lower stack level. ('{model.name}' level: {level}, '{base_model_name}' level: {self.model_graph.nodes[base_model_name]['level']})"
                     )
                 self.model_graph.add_edge(base_model_name, model.name)
-        self._log_model_stats(model, _is_refit=_is_refit)
+        self._log_model_stats(model, _is_refit=_is_refit, is_distributed_main=is_distributed_main)
         if self.low_memory:
             del model
         return True
@@ -2218,10 +2312,13 @@ class AbstractTrainer:
             raise AssertionError(f'"{model}" is not a key in self.model_graph, cannot add attributes: {attributes}')
         self.model_graph.nodes[model].update(attributes)
 
-    def _log_model_stats(self, model, _is_refit=False):
+    def _log_model_stats(self, model, _is_refit=False, is_distributed_main=False):
         """Logs model fit time, val score, predict time, and predict_1_time"""
         model = self.load_model(model)
         print_weights = model._get_tags().get("print_weights", False)
+
+        is_log_during_distributed_fit = DistributedContext.is_distributed_mode() and (not is_distributed_main)
+        log_level = 10 if is_log_during_distributed_fit else 20
 
         if print_weights:
             model_weights = model._get_model_weights()
@@ -2233,19 +2330,19 @@ class AbstractTrainer:
                     msg_weights += ", "
                 msg_weights += f"'{key}': {value}"
                 is_first = False
-            logger.log(20, f"\tEnsemble Weights: {{{msg_weights}}}")
+            logger.log(log_level, f"\tEnsemble Weights: {{{msg_weights}}}")
         if model.val_score is not None:
             if model.eval_metric.name != self.eval_metric.name:
-                logger.log(20, f"\tNote: model has different eval_metric than default.")
+                logger.log(log_level, f"\tNote: model has different eval_metric than default.")
             if not model.eval_metric.greater_is_better_internal:
                 sign_str = "-"
             else:
                 sign_str = ""
-            logger.log(20, f"\t{round(model.val_score, 4)}\t = Validation score   ({sign_str}{model.eval_metric.name})")
+            logger.log(log_level, f"\t{round(model.val_score, 4)}\t = Validation score   ({sign_str}{model.eval_metric.name})")
         if model.fit_time is not None:
-            logger.log(20, f"\t{round(model.fit_time, 2)}s\t = Training   runtime")
+            logger.log(log_level, f"\t{round(model.fit_time, 2)}s\t = Training   runtime")
         if model.predict_time is not None:
-            logger.log(20, f"\t{round(model.predict_time, 2)}s\t = Validation runtime")
+            logger.log(log_level, f"\t{round(model.predict_time, 2)}s\t = Validation runtime")
         predict_n_time_per_row = self.get_model_attribute_full(model=model.name, attribute="predict_n_time_per_row")
         predict_n_size = self.get_model_attribute_full(model=model.name, attribute="predict_n_size", func=min)
         if predict_n_time_per_row is not None and predict_n_size is not None:
@@ -2267,23 +2364,23 @@ class AbstractTrainer:
                 predict_1_time_full = self.get_model_attribute_full(model=model.name, attribute="predict_1_time")
 
             predict_1_time_log, time_unit = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time)
-            logger.log(20, f"\t{round(predict_1_time_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size | MARGINAL)")
+            logger.log(log_level, f"\t{round(predict_1_time_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size | MARGINAL)")
 
             predict_1_time_full_log, time_unit = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time_full)
-            logger.log(20, f"\t{round(predict_1_time_full_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size)")
+            logger.log(log_level, f"\t{round(predict_1_time_full_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size)")
 
             if not _is_refit:
                 predict_1_time_child = self.get_model_attribute(model=model.name, attribute="predict_1_child_time")
                 predict_1_time_child_log, time_unit = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time_child)
                 logger.log(
-                    20,
+                    log_level,
                     f"\t{round(predict_1_time_child_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size | REFIT | MARGINAL)",
                 )
 
                 predict_1_time_full_child = self.get_model_attribute_full(model=model.name, attribute="predict_1_child_time")
                 predict_1_time_full_child_log, time_unit = convert_time_in_s_to_log_friendly(time_in_sec=predict_1_time_full_child)
                 logger.log(
-                    20, f"\t{round(predict_1_time_full_child_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size | REFIT)"
+                    log_level, f"\t{round(predict_1_time_full_child_log, 3)}{time_unit}\t = Validation runtime (1 row | {predict_1_batch_size} batch size | REFIT)"
                 )
 
     # TODO: Split this to avoid confusion, HPO should go elsewhere?
@@ -2312,12 +2409,27 @@ class AbstractTrainer:
         fit_kwargs=None,
         compute_score=True,
         total_resources: dict | None = None,
+        errors: Literal["ignore", "raise"] = "ignore",
+        errors_ignore: list = None,
+        errors_raise: list = None,
         **kwargs,
     ) -> List[str]:
         """
         Trains a model, with the potential to train multiple versions of this model with hyperparameter tuning and feature pruning.
         Returns a list of successfully trained and saved model names.
         Models trained from this method will be accessible in this Trainer.
+
+        Parameters
+        ----------
+        errors: Literal["ignore", "raise"], default = "ignore"
+            Determines how model fit exceptions are handled.
+            If "ignore", will ignore all model exceptions during fit. If an exception occurs, an empty list is returned.
+            If "raise", will raise the model exception if it occurs.
+            Can be overwritten by `errors_ignore` and `errors_raise`.
+        errors_ignore: list[str], optional
+            The exception types specified in `errors_ignore` will be treated as if `errors="ignore"`.
+        errors_raise: list[str], optional
+            The exception types specified in `errors_raise` will be treated as if `errors="raise"`.
         """
         if self._callback_early_stop:
             return []
@@ -2336,6 +2448,7 @@ class AbstractTrainer:
         model_fit_kwargs = self._get_model_fit_kwargs(
             X=X, X_val=X_val, time_limit=time_limit, k_fold=k_fold, fit_kwargs=fit_kwargs, ens_sample_weight=kwargs.get("ens_sample_weight", None)
         )
+        exception = None
         if hyperparameter_tune_kwargs:
             if n_repeat_start != 0:
                 raise ValueError(f"n_repeat_start must be 0 to hyperparameter_tune, value = {n_repeat_start}")
@@ -2386,16 +2499,17 @@ class AbstractTrainer:
                     )
                 if len(hpo_models) == 0:
                     logger.warning(f"No model was trained during hyperparameter tuning {model.name}... Skipping this model.")
-            except Exception as err:
-                if isinstance(err, NoStackFeatures):
-                    logger.warning(f"\tNo stack features to train {model.name}... Skipping this model. {err}")
-                elif isinstance(err, NotValidStacker):
-                    logger.warning(f"\tStacking disabled for {model.name}... Skipping this model. {err}")
-                elif isinstance(err, NoValidFeatures):
+            except Exception as exc:
+                exception = exc  # required to provide exc outside of `except` statement
+                if isinstance(exception, NoStackFeatures):
+                    logger.warning(f"\tNo stack features to train {model.name}... Skipping this model. {exception}")
+                elif isinstance(exception, NotValidStacker):
+                    logger.warning(f"\tStacking disabled for {model.name}... Skipping this model. {exception}")
+                elif isinstance(exception, NoValidFeatures):
                     logger.warning(f"\tNo valid features to train {model.name}... Skipping this model.")
                 else:
                     logger.exception(f"Warning: Exception caused {model.name} to fail during hyperparameter tuning... Skipping this model.")
-                    logger.warning(err)
+                    logger.warning(exception)
                 del model
                 model_names_trained = []
             else:
@@ -2428,12 +2542,68 @@ class AbstractTrainer:
                 level=level,
                 compute_score=compute_score,
                 total_resources=total_resources,
+                errors=errors,
+                errors_ignore=errors_ignore,
+                errors_raise=errors_raise,
                 **model_fit_kwargs,
             )
         if self.callbacks and check_callbacks:
             self._callbacks_after_fit(model_names=model_names_trained, stack_name=stack_name, level=level)
         self.save()
+        if exception is not None:
+            if self._check_raise_exception(exception=exception, errors=errors, errors_ignore=errors_ignore, errors_raise=errors_raise):
+                raise exception
         return model_names_trained
+
+    # TODO: Move to a utility function outside of AbstractTrainer
+    @staticmethod
+    def _check_raise_exception(
+        exception: Exception,
+        errors: Literal["ignore", "raise"] = "ignore",
+        errors_ignore: list = None,
+        errors_raise: list = None,
+    ) -> bool:
+        """
+        Check if an exception should be raised based on the provided error handling logic.
+
+        Parameters
+        ----------
+        exception: Exception
+            The exception to check
+        errors: Literal["ignore", "raise"], default = "ignore"
+            Determines how exceptions are handled.
+            If "ignore", will return False.
+            If "raise", will return True.
+            Can be overwritten by `errors_ignore` and `errors_raise`.
+        errors_ignore: list[str], optional
+            The exception types specified in `errors_ignore` will be treated as if `errors="ignore"`.
+        errors_raise: list[str], optional
+            The exception types specified in `errors_raise` will be treated as if `errors="raise"`.
+
+        Returns
+        -------
+        raise_exception: bool
+            If True, indicates that the exception should be raised based on the provided error handling rules.
+        """
+        raise_exception = None
+        if errors_raise is not None:
+            for err_type in errors_raise:
+                if isinstance(exception, err_type):
+                    raise_exception = True
+                    break
+        if errors_ignore is not None and raise_exception is None:
+            for err_type in errors_ignore:
+                if isinstance(exception, err_type):
+                    raise_exception = False
+                    break
+        if raise_exception is None:
+            if errors == "ignore":
+                raise_exception = False
+            elif errors == "raise":
+                raise_exception = True
+            else:
+                raise ValueError(f"Invalid `errors` value: {errors} (valid values: ['ignore', 'raise']")
+        return raise_exception
 
     def _callbacks_before_fit(
         self,
@@ -2662,14 +2832,22 @@ class AbstractTrainer:
     # TODO: Add time_limit_per_model
     # TODO: Rename for v0.1
     def _train_multi_fold(
-        self, X, y, models: List[AbstractModel], time_limit=None, time_split=False, time_ratio=1, hyperparameter_tune_kwargs=None, **kwargs
-    ) -> List[str]:
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
+        models: list[AbstractModel],
+        time_limit: float | None = None,
+        time_split: bool = False,
+        time_ratio: float = 1,
+        hyperparameter_tune_kwargs: dict | None = None,
+        fit_strategy: Literal["sequential", "parallel"] = "sequential",
+        **kwargs,
+    ) -> list[str]:
         """
         Trains and saves a list of models sequentially.
         This method should only be called in self._train_multi_initial
         Returns a list of trained model names.
         """
-        models_valid = []
         time_start = time.time()
         if time_limit is not None:
             time_limit = time_limit * time_ratio
@@ -2677,33 +2855,258 @@ class AbstractTrainer:
             time_limit_model_split = time_limit / len(models)
         else:
             time_limit_model_split = time_limit
-        for i, model in enumerate(models):
-            if self._callback_early_stop:
-                return models_valid
-            if isinstance(model, str):
-                model = self.load_model(model)
-            elif self.low_memory:
-                model = copy.deepcopy(model)
-            if hyperparameter_tune_kwargs is not None and isinstance(hyperparameter_tune_kwargs, dict):
-                hyperparameter_tune_kwargs_model = hyperparameter_tune_kwargs.get(model.name, None)
-            else:
-                hyperparameter_tune_kwargs_model = None
-            # TODO: Only update scores when finished, only update model as part of final models if finished!
-            if time_split:
-                time_left = time_limit_model_split
-            else:
-                if time_limit is None:
-                    time_left = None
-                else:
-                    time_start_model = time.time()
-                    time_left = time_limit - (time_start_model - time_start)
-            model_name_trained_lst = self._train_single_full(
-                X, y, model, time_limit=time_left, hyperparameter_tune_kwargs=hyperparameter_tune_kwargs_model, **kwargs
-            )
 
-            if self.low_memory:
-                del model
-            models_valid += model_name_trained_lst
+        if fit_strategy == "parallel" and hyperparameter_tune_kwargs is not None and hyperparameter_tune_kwargs:
+            for k, v in hyperparameter_tune_kwargs.items():
+                if v is not None and (not isinstance(v, dict) or len(v) != 0):
+                    logger.log(
+                        30,
+                        f"WARNING: fit_strategy='parallel', but `hyperparameter_tune_kwargs` is specified for model '{k}' with value {v}. "
+                        f"Hyperparameter tuning does not yet support `parallel` fit_strategy. "
+                        f"Falling back to fit_strategy='sequential' ... "
+                    )
+                    fit_strategy = "sequential"
+                    break
+        if fit_strategy == "parallel":
+            num_gpus = kwargs.get("total_resources", {}).get("num_gpus", 0)
+            if isinstance(num_gpus, str) and num_gpus == "auto":
+                num_gpus = get_resource_manager().get_gpu_count()
+            if isinstance(num_gpus, (float, int)) and num_gpus > 0:
+                logger.log(
+                    30,
+                    f"WARNING: fit_strategy='parallel', but `num_gpus={num_gpus}` is specified. "
+                    f"GPU is not yet supported for `parallel` fit_strategy. To enable parallel, ensure you specify `num_gpus=0` in the fit call. "
+                    f"Falling back to fit_strategy='sequential' ... "
+                )
+                fit_strategy = "sequential"
+        if fit_strategy == "parallel":
+            try:
+                try_import_ray()
+            except Exception as e:
+                logger.log(
+                    30,
+                    f"WARNING: Exception encountered when trying to import ray (fit_strategy='parallel'). "
+                    f"ray is required for 'parallel' fit_strategy. Falling back to fit_strategy='sequential' ... "
+                    f"\n\tException details: {e.__class__.__name__}: {e}"
+                )
+                fit_strategy = "sequential"
+
+        if fit_strategy == "sequential":
+            models_valid = []
+            for model in models:
+                if self._callback_early_stop:
+                    return models_valid
+
+                models_valid += _detached_train_multi_fold(
+                    _self=self,
+                    model=model,
+                    X=X,
+                    y=y,
+                    time_start=time_start,
+                    time_split=time_split,
+                    time_limit=time_limit,
+                    time_limit_model_split=time_limit_model_split,
+                    hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+                    kwargs=kwargs,
+                )
+        elif fit_strategy == "parallel":
+            models_valid = self._train_multi_fold_parallel(
+                X=X,
+                y=y,
+                models=models,
+                time_start=time_start,
+                time_limit_model_split=time_limit_model_split,
+                time_limit=time_limit,
+                time_split=time_split,
+                hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+                **kwargs,
+            )
+        else:
+            raise ValueError(f"Invalid value for fit_strategy: '{fit_strategy}'")
+        return models_valid
+
+    def _train_multi_fold_parallel(
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
+        models: list[AbstractModel],
+        time_start: float,
+        time_limit_model_split: float | None,
+        time_limit: float | None = None,
+        time_split: bool = False,
+        hyperparameter_tune_kwargs: dict | None = None,
+        **kwargs,
+    ) -> list[str]:
+        # -- Parallel or Distributed training
+        ray = try_import_ray()
+
+        # FIXME: Need a common utility class for initializing ray so we don't duplicate code
+        if not ray.is_initialized():
+            ray.init(log_to_driver=False, logging_level=logging.ERROR)
+
+        models_valid = []
+
+        if time_limit is not None:
+            # Give models less than the full time limit to account for overheads (predict, cache, ray, etc.)
+            time_limit_models = time_limit * 0.9
+        else:
+            time_limit_models = None
+
+        logger.log(20, "Scheduling parallel model-workers for training...")
+        distributed_manager = ParallelFitManager(
+            mode="fit",
+            X=X,  # FIXME: REMOVE
+            y=y,  # FIXME: REMOVE
+            func=_remote_train_multi_fold,
+            func_kwargs=dict(
+                time_split=time_split,
+                time_limit_model_split=time_limit_model_split,
+                time_limit=time_limit_models,
+                time_start=time_start,
+                errors="raise",
+            ),
+            func_put_kwargs=dict(
+                _self=self,
+                X=X,
+                y=y,
+                hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+                kwargs=kwargs,
+            ),
+            num_cpus=kwargs.get("total_resources", {}).get("num_cpus", 1),
+            num_gpus=kwargs.get("total_resources", {}).get("num_gpus", 0),
+            num_splits=kwargs.get("k_fold", 1) * kwargs.get("n_repeats", 1),
+            problem_type=self.problem_type,  # FIXME: Should this be passed here?
+            num_classes=self.num_classes,  # FIXME: Should this be passed here?
+        )
+        jobs_finished = 0
+        jobs_total = len(models)
+
+        ordered_model_names = [m.name for m in models]  # Use to ensure same model order is returned
+        expected_model_names = set(ordered_model_names)
+        unfinished_job_refs = distributed_manager.schedule_jobs(models_to_fit=models)
+
+        timeout = None
+
+        if time_limit is not None:
+            # allow between 5 and 60 seconds overhead before force killing jobs to give some leniency to jobs with overhead.
+            time_overhead = min(max(time_limit * 0.01, 5), 60)
+            min_time_required_base = min(self._time_limit * 0.01, 10)  # This is checked in the worker thread, will skip if not satisfied
+            # If time remaining is less than min_time_required, avoid scheduling new jobs and only wait for existing ones to finish.
+            min_time_required = min_time_required_base * 1.5 + 1  # Add 50% buffer and 1 second to account for ray overhead
+        else:
+            time_overhead = None
+            min_time_required = None
+
+        can_schedule_jobs = True
+        while unfinished_job_refs:
+            if time_limit is not None:
+                time_left = time_limit - (time.time() - time_start)
+                timeout = int(time_left + time_overhead)  # include overhead.
+                if timeout <= 0:
+                    logger.log(20, "Ran into timeout while waiting for model training to finish. Stopping now.")
+                    break
+            finished, unfinished_job_refs = ray.wait(unfinished_job_refs, num_returns=1, timeout=timeout)
+
+            if not finished:
+                logger.log(20, "Ran into timeout while waiting for model training to finish. Stopping now.")
+                break
+
+            distributed_manager.deallocate_resources(job_ref=finished[0])
+            model_name, model_path, model_type, exc, model_failure_info = ray.get(finished[0])
+            assert model_name in expected_model_names, (f"Unexpected model name outputted during parallel fit: {model_name}\n"
+                                                        f"Valid Names: {expected_model_names}\n"
+                                                        f"This should never happen. Please create a GitHub Issue.")
+            jobs_finished += 1
+
+            if exc is not None or model_path is None:
+                if exc is None:
+                    if model_failure_info is not None:
+                        exc_type = model_failure_info["exc_type"]
+                        exc_str = model_failure_info["exc_str"]
+                    else:
+                        exc_type = None
+                        exc_str = None
+                else:
+                    exc_type = exc.__class__
+                    exc_str = str(exc)
+                if exc_type is not None:
+                    extra_log = f": {exc_type.__name__}: {exc_str}"
+                else:
+                    extra_log = ""
+                if exc_type is not None and issubclass(exc_type, InsufficientTime):
+                    logger.log(20, exc_str)
+                else:
+                    logger.log(20, f"Skipping {model_name if isinstance(model_name, str) else model_name.name} due to exception{extra_log}")
+                if model_failure_info is not None:
+                    self._models_failed_to_train_errors[model_name] = model_failure_info
+            else:
+                logger.log(20, f"Fitted {model_name}:")
+
+                # TODO: figure out a way to avoid calling _add_model in the worker-process to save overhead time.
+                #       - Right now, we need to call it within _add_model to be able to pass the model path to the main process without changing
+                #         the return signature of _train_single_full. This can be a lot of work to change.
+                # TODO: determine if y_pred_proba_val was cached in the worker-process. Right now, we re-do predictions for holdout data.
+                # Self object is not permanently mutated during worker execution, so we need to add model to the "main" self (again).
+                # This is the synchronization point between the distributed and main processes.
+                if self._add_model(
+                        model_type.load(path=os.path.join(self.path, model_path), reset_paths=self.reset_paths),
+                        stack_name=kwargs["stack_name"],
+                        level=kwargs["level"]
+                ):
+                    jobs_running = len(unfinished_job_refs)
+                    if can_schedule_jobs:
+                        remaining_task_word = "pending"
+                    else:
+                        remaining_task_word = "skipped"
+                    parallel_status_log = (
+                        f"\tJobs: {jobs_running} running, "
+                        f"{jobs_total - (jobs_finished + jobs_running)} {remaining_task_word}, "
+                        f"{jobs_finished}/{jobs_total} finished"
+                    )
+                    if time_limit is not None:
+                        time_left = time_limit - (time.time() - time_start)
+                        parallel_status_log += f" | {time_left:.0f}s remaining"
+                    logger.log(20, parallel_status_log)
+                    models_valid.append(model_name)
+                else:
+                    logger.log(40, f"Failed to add {model_name} to model graph. This should never happen. Please create a GitHub issue.")
+
+            if not unfinished_job_refs and not distributed_manager.models_to_schedule:
+                # Completed all jobs
+                break
+
+            # TODO: look into what this does / how this works for distributed training
+            if self._callback_early_stop:
+                logger.log(20, "Callback triggered in parallel setting. Stopping model training and cancelling remaining jobs.")
+                break
+
+            # Stop due to time limit after adding model
+            if time_limit is not None:
+                time_elapsed = time.time() - time_start
+                time_left = time_limit - time_elapsed
+                time_left_models = time_limit_models - time_elapsed
+                if (time_left + time_overhead) <= 0:
+                    logger.log(20, "Time limit reached for this stacking layer. Stopping model training and cancelling remaining jobs.")
+                    break
+                elif time_left_models < min_time_required:
+                    if can_schedule_jobs:
+                        if len(distributed_manager.models_to_schedule) > 0:
+                            logger.log(
+                                20,
+                                f"Low on time, skipping {len(distributed_manager.models_to_schedule)} "
+                                f"pending jobs and waiting for running jobs to finish... ({time_left:.0f}s remaining time)"
+                            )
+                        can_schedule_jobs = False
+
+            if can_schedule_jobs:
+                # Re-schedule jobs
+                unfinished_job_refs += distributed_manager.schedule_jobs()
+
+        distributed_manager.clean_up_ray(unfinished_job_refs=unfinished_job_refs)
+        logger.log(20, "Finished all parallel work for this stacking layer.")
+
+        models_valid = set(models_valid)
+        models_valid = [m for m in ordered_model_names if m in models_valid]  # maintain original order
 
         return models_valid
 
@@ -4157,3 +4560,234 @@ class AbstractTrainer:
             assert len(quantile_levels) > 0, f"quantile_levels must not be an empty list (quantile_levels={quantile_levels})"
         else:
             assert quantile_levels is None, f"quantile_levels must be None when problem_type='{problem_type}' (quantile_levels={quantile_levels})"
+
+
+def _detached_train_multi_fold(
+    *,
+    _self: AbstractTrainer,
+    model: str | AbstractModel,
+    X: pd.DataFrame,
+    y: pd.Series,
+    time_split: bool,
+    time_start: float,
+    time_limit: float|None,
+    time_limit_model_split: float | None,
+    hyperparameter_tune_kwargs: dict,
+    kwargs: dict,
+) -> list[str]:
+    """Dedicated class-detached function to train a single model on multiple folds."""
+    if isinstance(model,str):
+        model = _self.load_model(model)
+    elif _self.low_memory:
+        model = copy.deepcopy(model)
+    if hyperparameter_tune_kwargs is not None and isinstance(hyperparameter_tune_kwargs,dict):
+        hyperparameter_tune_kwargs_model = hyperparameter_tune_kwargs.get(model.name,None)
+    else:
+        hyperparameter_tune_kwargs_model=None
+    # TODO: Only update scores when finished, only update model as part of final models if finished!
+    if time_split:
+        time_left=time_limit_model_split
+    else:
+        if time_limit is None:
+            time_left=None
+        else:
+            time_start_model=time.time()
+            time_left=time_limit-(time_start_model-time_start)
+
+    model_name_trained_lst = _self._train_single_full(
+        X,
+        y,
+        model,
+        time_limit=time_left,
+        hyperparameter_tune_kwargs=hyperparameter_tune_kwargs_model,
+        **kwargs
+    )
+
+    if _self.low_memory:
+        del model
+
+    return model_name_trained_lst
+
+
+def _remote_train_multi_fold(
+    *,
+    _self: AbstractTrainer,
+    model: str | AbstractModel,
+    X: pd.DataFrame,
+    y: pd.Series,
+    time_split: bool,
+    time_start: float,
+    time_limit: float | None,
+    time_limit_model_split: float | None,
+    hyperparameter_tune_kwargs: dict,
+    kwargs: dict,
+    errors: Literal["ignore", "raise"] | None = None,
+) -> tuple[str, str | None, str | None, Exception | None, dict | None]:
+    reset_logger_for_remote_call(verbosity=_self.verbosity)
+
+    if errors is not None:
+        kwargs["errors"] = errors
+
+    exception = None
+    try:
+        model_name_list = _detached_train_multi_fold(
+            _self=_self,
+            model=model,
+            X=X,
+            y=y,
+            time_start=time_start,
+            time_split=time_split,
+            time_limit=time_limit,
+            time_limit_model_split=time_limit_model_split,
+            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+            kwargs=kwargs,
+        )
+    except Exception as exc:
+        model_name_list = []
+        if errors is not None and errors == "raise":
+            # If training fails and exception is returned, collect the exception information and return
+            exception = exc  # required to use in outer scope
+        else:
+            raise exc
+
+    if not model_name_list:
+        model_name = model if isinstance(model, str) else model.name
+        # Get model_failure metadata if it exists
+        model_failure_info = None
+        if model_name in _self._models_failed_to_train_errors:
+            model_failure_info = _self._models_failed_to_train_errors[model_name]
+        return model_name, None, None, exception, model_failure_info
+
+    # Fallback, return original model name if training failed.
+    if not model_name_list:
+        model_name = model if isinstance(model, str) else model.name
+        return model_name, None, None, None, None
+    model_name = model_name_list[0]
+    return model_name, _self.get_model_attribute(model=model_name, attribute="path"), _self.get_model_attribute(model=model_name, attribute="type"), None, None
+
+
+def _detached_refit_single_full(
+    *,
+    _self: AbstractTrainer,
+    model: str,
+    X: pd.DataFrame,
+    y: pd.Series,
+    X_val: pd.DataFrame,
+    y_val: pd.Series,
+    X_unlabeled: pd.DataFrame,
+    level: int,
+    kwargs: dict,
+    fit_strategy: Literal["sequential", "parallel"] = "sequential",
+) -> tuple[str, list[str]]:
+    # TODO: loading the model is the reasons we must allocate GPU resources for this job in cases where models require GPU when loaded from disk
+    model=_self.load_model(model)
+    model_name = model.name
+    reuse_first_fold = False
+
+    if isinstance(model,BaggedEnsembleModel):
+        # Reuse if model is already _FULL and no X_val
+        if X_val is None:
+            reuse_first_fold = not model._bagged_mode
+
+    if not reuse_first_fold:
+        if isinstance(model,BaggedEnsembleModel):
+            can_refit_full=model._get_tags_child().get("can_refit_full",False)
+        else:
+            can_refit_full=model._get_tags().get("can_refit_full",False)
+        reuse_first_fold = not can_refit_full
+
+    if not reuse_first_fold:
+        model_full=model.convert_to_refit_full_template()
+        # Mitigates situation where bagged models barely had enough memory and refit requires more. Worst case results in OOM, but this lowers chance of failure.
+        model_full._user_params_aux["max_memory_usage_ratio"]=model.params_aux["max_memory_usage_ratio"]*1.15
+        # Re-set user specified training resources.
+        # FIXME: this is technically also a bug for non-distributed mode, but there it is good to use more/all resources per refit.
+        # FIXME: Unsure if it is better to do model.fit_num_cpus or model.fit_num_cpus_child,
+        #  (Nick): I'm currently leaning towards model.fit_num_cpus, it is also less memory intensive
+        # Better to not specify this for sequential fits, since we want the models to use the optimal amount of resources,
+        # which could be less than the available resources (ex: LightGBM fits faster using 50% of the cores)
+        if fit_strategy == "parallel":
+            # FIXME: Why use `model.fit_num_cpus_child` when we can use the same values as was passed to `ray` for the process, just pass those values as kwargs. Eliminates chance of inconsistency.
+            if model.fit_num_cpus_child is not None:
+                model_full._user_params_aux["num_cpus"] = model.fit_num_cpus_child
+            if model.fit_num_gpus_child is not None:
+                model_full._user_params_aux["num_gpus"] = model.fit_num_gpus_child
+        # TODO: Do it for all models in the level at once to avoid repeated processing of data?
+        base_model_names=_self.get_base_model_names(model_name)
+        # FIXME: Logs for inference speed (1 row) are incorrect because
+        #  parents are non-refit models in this sequence and later correct after logging.
+        #  Avoiding fix at present to minimize hacks in the code.
+        #  Return to this later when Trainer controls all stacking logic to map correct parent.
+        models_trained = _self.stack_new_level_core(
+            X=X,
+            y=y,
+            X_val=X_val,
+            y_val=y_val,
+            X_unlabeled=X_unlabeled,
+            models=[model_full],
+            base_model_names=base_model_names,
+            level=level,
+            stack_name=REFIT_FULL_NAME,
+            hyperparameter_tune_kwargs=None,
+            feature_prune=False,
+            k_fold=0,
+            n_repeats=1,
+            ensemble_type=type(model),
+            refit_full=True,
+            **kwargs,
+        )
+        if len(models_trained)==0:
+            reuse_first_fold=True
+            logger.log(30,f"WARNING: Refit training failure detected for '{model_name}'... "
+                          f"Falling back to using first fold to avoid downstream exception."
+                          f"\n\tThis is likely due to an out-of-memory error or other memory related issue. "
+                          f"\n\tPlease create a GitHub issue if this was triggered from a non-memory related problem.",)
+            if not model.params.get("save_bag_folds",True):
+                raise AssertionError(f"Cannot avoid training failure during refit for '{model_name}' by falling back to "
+                                     f"copying the first fold because it does not exist! (save_bag_folds=False)"
+                                     f"\n\tPlease specify `save_bag_folds=True` in the `.fit` call to avoid this exception.")
+
+    if reuse_first_fold:
+        # Perform fallback black-box refit logic that doesn't retrain.
+        model_full=model.convert_to_refit_full_via_copy()
+        # FIXME: validation time not correct for infer 1 batch time, needed to hack _is_refit=True to fix
+        logger.log(20,f"Fitting model: {model_full.name} | Skipping fit via cloning parent ...")
+        _self._add_model(model_full,stack_name=REFIT_FULL_NAME,level=level,_is_refit=True)
+        _self.save_model(model_full)
+        models_trained=[model_full.name]
+
+    return model_name, models_trained
+
+
+def _remote_refit_single_full(
+    *,
+    _self: AbstractTrainer,
+    model: str,
+    X: pd.DataFrame,
+    y: pd.Series,
+    X_val: pd.DataFrame,
+    y_val: pd.Series,
+    X_unlabeled: pd.DataFrame,
+    level: int,
+    kwargs: dict,
+    fit_strategy: Literal["sequential", "parallel"],
+) -> tuple[str, str, list[str], str, str]:
+    reset_logger_for_remote_call(verbosity=_self.verbosity)
+
+    model_name, models_trained = _detached_refit_single_full(
+        _self=_self,
+        model=model,
+        X=X,
+        y=y,
+        X_val=X_val,
+        y_val=y_val,
+        X_unlabeled=X_unlabeled,
+        level=level,
+        kwargs=kwargs,
+        fit_strategy=fit_strategy,
+    )
+
+    # We always just refit one model per call, so this must be the case.
+    assert len(models_trained) == 1
+    refitted_model_name = models_trained[0]
+    return model_name, refitted_model_name, _self.get_model_attribute(model=refitted_model_name,attribute="path"),_self.get_model_attribute(model=refitted_model_name, attribute="type")

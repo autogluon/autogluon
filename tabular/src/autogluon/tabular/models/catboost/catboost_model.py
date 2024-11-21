@@ -63,7 +63,19 @@ class CatBoostModel(AbstractModel):
                     X[category] = X[category].cat.add_categories("__NaN__").fillna("__NaN__")
         return X
 
-    def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> float:
+    def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
+        hyperparameters = self._get_model_params()
+        return self.estimate_memory_usage_static(X=X, problem_type=self.problem_type, num_classes=self.num_classes, hyperparameters=hyperparameters, **kwargs)
+
+    @classmethod
+    def _estimate_memory_usage_static(
+        cls,
+        *,
+        X: pd.DataFrame,
+        hyperparameters: dict = None,
+        num_classes: int = 1,
+        **kwargs,
+    ) -> int:
         """
         Returns the expected peak memory usage in bytes of the CatBoost model during fit.
 
@@ -74,13 +86,12 @@ class CatBoostModel(AbstractModel):
             Scales roughly by 5080*num_features*2^depth bytes
             For 10000 features and 6 depth, the histogram would be 3.2 GB.
         """
-        num_classes = self.num_classes if self.num_classes else 1  # self.num_classes could be None after initialization if it's a regression problem
+        num_classes = num_classes if num_classes else 1  # self.num_classes could be None after initialization if it's a regression problem
         data_mem_usage = get_approximate_df_mem_usage(X).sum()
         data_mem_usage_bytes = data_mem_usage * 5 + data_mem_usage / 4 * num_classes  # TODO: Extremely crude approximation, can be vastly improved
 
-        params = self._get_model_params(convert_search_spaces_to_default=True)
-        border_count = params.get("border_count", 254)
-        depth = params.get("depth", 6)
+        border_count = hyperparameters.get("border_count", 254)
+        depth = hyperparameters.get("depth", 6)
         # Formula based on manual testing, aligns with LightGBM histogram sizes
         histogram_mem_usage_bytes = 20 * math.pow(2, depth) * len(X.columns) * border_count
         histogram_mem_usage_bytes *= 1.2  # Add a 20% buffer
@@ -325,6 +336,12 @@ class CatBoostModel(AbstractModel):
         num_cpus = ResourceManager.get_cpu_count_psutil(logical=False)
         num_gpus = 0
         return num_cpus, num_gpus
+
+    @classmethod
+    def _class_tags(cls):
+        return {
+            "can_estimate_memory_usage_static": True,
+        }
 
     def _more_tags(self):
         # `can_refit_full=True` because iterations is communicated at end of `_fit`

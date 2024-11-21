@@ -108,7 +108,7 @@ class DatasetLoaderHelper:
     )
 
     @staticmethod
-    def load_dataset(name: str, directory_prefix: str = "./datasets/"):
+    def load_dataset(name: str, directory_prefix: str = "./datasets/") -> tuple[pd.DataFrame, pd.DataFrame, dict]:
         dataset_info = copy.deepcopy(DatasetLoaderHelper.dataset_info_dict[name])
         train_file = dataset_info.pop("train_file", "train_data.csv")
         test_file = dataset_info.pop("test_file", "test_data.csv")

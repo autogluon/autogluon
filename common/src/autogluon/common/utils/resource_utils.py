@@ -241,6 +241,11 @@ class RayResourceManager:
         """Get number of gpus available in the cluster"""
         return int(RayResourceManager._get_cluster_resources("GPU"))
 
+    @staticmethod
+    def get_available_virtual_mem(format: str = "B") -> float:
+        bytes = int(RayResourceManager._get_cluster_resources("memory"))
+        return ResourceManager.bytes_converter(value=bytes, format_in="B", format_out=format)
+
 
 def get_resource_manager():
     """Get resource manager class based on the training context"""
