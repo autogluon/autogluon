@@ -28,14 +28,12 @@ install_requires = (
         "tqdm",  # version range defined in `core/_setup_utils.py`
         # s3fs is removed due to doubling install time due to version range resolution
         # "s3fs",  # version range defined in `core/_setup_utils.py`
-        "setuptools",
     ]
     if not ag.LITE_MODE
     else {
         "numpy",  # version range defined in `core/_setup_utils.py`
         "pandas",  # version range defined in `core/_setup_utils.py`
         "tqdm",  # version range defined in `core/_setup_utils.py`
-        "setuptools",
     }
 )
 

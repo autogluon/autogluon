@@ -40,7 +40,6 @@ install_requires = [
     "scikit-image>=0.19.1,<0.25.0",
     "text-unidecode>=1.3,<1.4",
     "torchmetrics>=1.2.0,<1.3.0",
-    "nptyping>=1.4.4,<2.5.0",
     "omegaconf>=2.1.1,<2.3.0",
     f"autogluon.core[raytune]=={version}",
     f"autogluon.features=={version}",
