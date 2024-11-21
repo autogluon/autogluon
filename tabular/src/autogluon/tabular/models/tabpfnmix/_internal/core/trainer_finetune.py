@@ -106,7 +106,7 @@ class TrainerFinetune(BaseEstimator):
 
             log_msg = f"Epoch 000"
             if self.compute_train_metrics:
-                log_msg += f" | Train errpr: -.---- | Train score: -.---- |"
+                log_msg += f" | Train error: -.---- | Train score: -.---- |"
             if metrics_valid is not None:
                 log_msg += f" | Val error: {metrics_valid.loss:.4f} | Val score: {metrics_valid.score:.4f}"
 
