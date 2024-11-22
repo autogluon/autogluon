@@ -166,13 +166,7 @@ class TabPFNMixModel(AbstractModel):
             X_val = self.preprocess(X_val)
             y_val = y_val.values
 
-        if time_limit is not None:
-            time_cur = time.time()
-            time_left = time_limit - (time_cur - time_start)
-            if time_left <= 0:
-                raise TimeLimitExceeded(f"No time remaining to fit model (time_limit={time_limit:.2f}s, time_left={time_left:.2f}s)")
-            time_limit = time_left
-
+        # FIXME: What if an exception occurs or timeout occurs after updating threads? Can we add logic to ensure torch num_threads are reset?
         need_to_reset_torch_threads = False
         torch_threads_og = None
         if num_cpus is not None and isinstance(num_cpus, (int, float)):
@@ -183,6 +177,13 @@ class TabPFNMixModel(AbstractModel):
                 need_to_reset_torch_threads = True
 
         model_cls = self._get_model_type()
+
+        if time_limit is not None:
+            time_cur = time.time()
+            time_left = time_limit - (time_cur - time_start)
+            if time_left <= 0:
+                raise TimeLimitExceeded(f"No time remaining to fit model (time_limit={time_limit:.2f}s, time_left={time_left:.2f}s)")
+            time_limit = time_left
 
         self.model = model_cls(
             cfg=cfg,

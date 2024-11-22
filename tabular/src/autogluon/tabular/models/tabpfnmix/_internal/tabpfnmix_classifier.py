@@ -46,7 +46,7 @@ class TabPFNMixClassifier(BaseEstimator, ClassifierMixin):
             X_train, X_valid, y_train, y_valid = make_stratified_dataset_split(X, y)  # FIXME: Add random seed
         else:
             X_train, X_valid, y_train, y_valid = X, None, y, None
-        self.trainer.train(x_train=X_train, y_train=y_train, x_val=X_valid, y_val=y_valid)
+        self.trainer.train(x_train=X_train, y_train=y_train, x_val=X_valid, y_val=y_valid, time_limit=time_limit)
 
         return self
 

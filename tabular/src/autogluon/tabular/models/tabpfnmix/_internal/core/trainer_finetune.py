@@ -69,7 +69,8 @@ class TrainerFinetune(BaseEstimator):
         self.optimizer = get_optimizer(self.cfg.hyperparams, self.model)
         self.scheduler = get_scheduler(self.cfg.hyperparams, self.optimizer)
 
-    def train(self, x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray = None, y_val: np.ndarray = None):
+    def train(self, x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray = None, y_val: np.ndarray = None, time_limit: float = None):
+        time_start = time.time()
         if self.optimizer is None:
             self.reset_optimizer()
         # FIXME: Figure out best way to seed model
@@ -129,8 +130,16 @@ class TrainerFinetune(BaseEstimator):
             if self.use_best_epoch:
                 checkpoint(self.model, metrics_valid.loss, epoch=0)
 
-        for epoch in range(1, max_epochs+1):
+            if time_limit is not None:
+                time_cur = time.time()
+                time_elapsed = time_cur - time_start
+                time_left = time_limit - time_elapsed
+                if time_left < (time_elapsed*3+3):
+                    # Fine-tuning an epoch will take longer than this, so triple the time required
+                    logger.log(15, "Early stopping due to running out of time...")
+                    max_epochs = 0
 
+        for epoch in range(1, max_epochs+1):
             dataset_train = next(dataset_train_generator)            
             loader_train = self.make_loader(dataset_train, training=True)
             
@@ -156,6 +165,16 @@ class TrainerFinetune(BaseEstimator):
                     logger.info("Early stopping")
                     break
                 self.scheduler.step(metrics_valid.loss)  # TODO: Make scheduler work properly during refit with no val data, to mimic scheduler in OG fit
+
+            if time_limit is not None:
+                time_cur = time.time()
+                time_elapsed = time_cur - time_start
+
+                time_per_epoch = time_elapsed / epoch
+                time_left = time_limit - time_elapsed
+                if time_left < (time_per_epoch+3):
+                    logger.log(15, "Early stopping due to running out of time...")
+                    break
 
         if use_val and self.use_best_epoch and checkpoint.best_model is not None:
             # TODO: Can do a trick: Skip saving and loading best epoch if best epoch is the final epoch, will save around ~0.5 seconds
