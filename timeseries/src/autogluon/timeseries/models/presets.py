@@ -145,7 +145,6 @@ def get_default_hps(key):
         },
         "default": {
             "SeasonalNaive": {},
-            "Croston": {},
             "AutoETS": {},
             "NPTS": {},
             "DynamicOptimizedTheta": {},

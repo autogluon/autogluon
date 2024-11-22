@@ -104,7 +104,7 @@ class ChronosModel(AbstractTimeSeriesModel):
 
     Other Parameters
     ----------------
-    model_path: str, default = "autogluon/chronos-t5-small"
+    model_path: str, default = "autogluon/chronos-bolt-small"
         Model path used for the model, i.e., a HuggingFace transformers ``name_or_path``. Can be a
         compatible model name on HuggingFace Hub or a local path to a model directory. Original
         Chronos models (i.e., ``autogluon/chronos-t5-{model_size}``) can be specified with aliases
@@ -164,7 +164,7 @@ class ChronosModel(AbstractTimeSeriesModel):
 
     # default number of samples for prediction
     default_num_samples: int = 20
-    default_model_path = "autogluon/chronos-t5-small"
+    default_model_path = "autogluon/chronos-bolt-small"
     default_max_time_limit_ratio = 0.8
     maximum_context_length = 2048
     fine_tuned_ckpt_name: str = "fine-tuned-ckpt"
