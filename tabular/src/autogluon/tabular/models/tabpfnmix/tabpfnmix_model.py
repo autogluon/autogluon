@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
+import time
 
 import numpy as np
 import pandas as pd
@@ -12,6 +13,7 @@ from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_torch
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE
 from autogluon.core.models import AbstractModel
+from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.features.generators import LabelEncoderFeatureGenerator
 
 logger = logging.getLogger(__name__)
@@ -21,9 +23,12 @@ class TabPFNMixModel(AbstractModel):
     """
     [Experimental model] Can be changed/removed without warning in future releases.
     """
+    weights_file_name = "model.pt"
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._feature_generator = None
+        self._weights_saved = False
 
     def _get_model_type(self):
         from ._internal.tabpfnmix_classifier import TabPFNMixClassifier
@@ -80,7 +85,8 @@ class TabPFNMixModel(AbstractModel):
     # FIXME: Handle model weights download
     # FIXME: GPU support?
     # FIXME: Save model weights to file instead of pickling?
-    def _fit(self, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame = None, y_val: pd.Series = None, num_cpus: int = 1, num_gpus: float = 0, **kwargs):
+    def _fit(self, X: pd.DataFrame, y: pd.Series, X_val: pd.DataFrame = None, y_val: pd.Series = None, time_limit: float = None, num_cpus: int = 1, num_gpus: float = 0, **kwargs):
+        time_start = time.time()
         try_import_torch()
         import torch
         from ._internal.config.config_run import ConfigRun
@@ -160,6 +166,13 @@ class TabPFNMixModel(AbstractModel):
             X_val = self.preprocess(X_val)
             y_val = y_val.values
 
+        if time_limit is not None:
+            time_cur = time.time()
+            time_left = time_limit - (time_cur - time_start)
+            if time_left <= 0:
+                raise TimeLimitExceeded(f"No time remaining to fit model (time_limit={time_limit:.2f}s, time_left={time_left:.2f}s)")
+            time_limit = time_left
+
         need_to_reset_torch_threads = False
         torch_threads_og = None
         if num_cpus is not None and isinstance(num_cpus, (int, float)):
@@ -184,7 +197,14 @@ class TabPFNMixModel(AbstractModel):
             y=y,
             X_val=X_val,
             y_val=y_val,
+            time_limit=time_limit,
         )
+
+        # Ensure refit_full uses the same number of max_epochs as the original's best
+        self.params_trained["max_epochs"] = self.model.trainer.best_epoch
+
+        # reduce memory and disk usage by 3x
+        self.model.trainer.minimize_for_inference()
 
         if need_to_reset_torch_threads:
             torch.set_num_threads(torch_threads_og)
@@ -206,6 +226,36 @@ class TabPFNMixModel(AbstractModel):
             X[self._feature_generator.features_in] = self._feature_generator.transform(X=X)
         X = X.values.astype(np.float64)
         return X
+
+    # FIXME: Switch to `torch.save(_model_weights.state_dict(), PATH)`, need to reinitialize the model though...
+    def save(self, path: str = None, verbose=True) -> str:
+        _model_weights = None
+        if self.model is not None:
+            _model_weights = self.model.trainer.model
+            self.model.trainer.model = None
+            self._weights_saved = True
+        path = super().save(path=path, verbose=verbose)
+        if _model_weights is not None:
+            import torch
+            os.makedirs(self.path, exist_ok=True)
+            torch.save(_model_weights, self.path_weights)
+            self.model.trainer.model = _model_weights
+        return path
+
+    # FIXME: Switch to `weights_only=True`, need to reinitialize the model though...
+    @classmethod
+    def load(cls, path: str, reset_paths=False, verbose=True):
+        model: TabPFNMixModel = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
+
+        if model._weights_saved:
+            import torch
+            model.model.trainer.model = torch.load(model.path_weights, weights_only=False)
+            model._weights_saved = False
+        return model
+
+    @property
+    def path_weights(self) -> str:
+        return os.path.join(self.path, self.weights_file_name)
 
     @classmethod
     def _get_default_ag_args(cls) -> dict:
@@ -248,6 +298,9 @@ class TabPFNMixModel(AbstractModel):
         hyperparameters = self._get_model_params()
         return self.estimate_memory_usage_static(X=X, problem_type=self.problem_type, num_classes=self.num_classes, hyperparameters=hyperparameters, **kwargs)
 
+    def get_minimum_ideal_resources(self) -> dict[str, int | float]:
+        return {"num_cpus": 4}
+
     @classmethod
     def _estimate_memory_usage_static(
         cls,
@@ -256,7 +309,11 @@ class TabPFNMixModel(AbstractModel):
         **kwargs,
     ) -> int:
         # TODO: This is wildly inaccurate, find a better estimation
-        return 10 * get_approximate_df_mem_usage(X).sum()
+        data_mem_usage = 5 * get_approximate_df_mem_usage(X).sum()  # rough estimate
+        model_size = 150*1e6  # model weights are ~150 MB  # TODO: Avoid hardcoding, we can derive from the model itself?
+        model_mem_usage = model_size * 5  # Account for 1x copy being fit, 1x copy checkpointed, 2x for optimizer, and 1x for overhead
+        mem_usage_estimate = data_mem_usage + model_mem_usage
+        return mem_usage_estimate
 
     @classmethod
     def _class_tags(cls) -> dict:

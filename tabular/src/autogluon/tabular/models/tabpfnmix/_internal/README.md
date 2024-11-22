@@ -19,3 +19,6 @@ The following changes to the original codebase have been made:
 11. Only checkpoint when a new best iteration is found, rather than each iteration
 12. Various cosmetic, logging, typing, docstring, and formatting changes
 13. Added random seed control for reproducible results
+14. Reduced memory usage and disk usage for inference by 5x by deleting unnecessary checkpoint and optimizer objects
+15. Added time_limit support
+16. Added support for fine-tuning without validation data

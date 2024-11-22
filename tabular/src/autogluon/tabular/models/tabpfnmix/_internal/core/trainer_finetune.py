@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 
 import einops
 import numpy as np
@@ -49,7 +50,6 @@ class TrainerFinetune(BaseEstimator):
         self.compute_train_metrics = compute_train_metrics
 
         self.early_stopping = EarlyStopping(patience=self.cfg.hyperparams['early_stopping_patience'])
-        self.checkpoint = Checkpoint(save_best=self.use_best_epoch, in_memory=True)
         self.preprocessor = Preprocessor( 
             use_quantile_transformer=self.cfg.hyperparams['use_quantile_transformer'],
             use_feature_count_scaling=self.cfg.hyperparams['use_feature_count_scaling'],
@@ -57,6 +57,7 @@ class TrainerFinetune(BaseEstimator):
         )
 
         self.stopping_metric = stopping_metric
+        self.best_epoch = None
 
     def set_random_seed(self) -> Generator:
         torch.manual_seed(self.cfg.seed)
@@ -64,13 +65,24 @@ class TrainerFinetune(BaseEstimator):
         rng = np.random.default_rng(seed=self.cfg.seed)
         return rng
 
-    def train(self, x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray, y_val: np.ndarray):
+    def reset_optimizer(self):
+        self.optimizer = get_optimizer(self.cfg.hyperparams, self.model)
+        self.scheduler = get_scheduler(self.cfg.hyperparams, self.optimizer)
+
+    def train(self, x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray = None, y_val: np.ndarray = None):
+        if self.optimizer is None:
+            self.reset_optimizer()
         # FIXME: Figure out best way to seed model
         rng = self.set_random_seed()
+        use_val = x_val is not None
+
+        checkpoint = Checkpoint(save_best=self.use_best_epoch, in_memory=True)
 
         self.preprocessor.fit(x_train, y_train)
         x_train = self.preprocessor.transform(x_train)
-        x_val = self.preprocessor.transform(x_val)
+
+        if use_val:
+            x_val = self.preprocessor.transform(x_val)
         self.y_transformer = create_y_transformer(y_train, self.cfg.task)
         
         dataset_train_generator = DatasetFinetuneGenerator(
@@ -84,24 +96,27 @@ class TrainerFinetune(BaseEstimator):
             random_state=rng,
         )
 
-        dataset_valid = DatasetFinetune(
-            self.cfg,
-            x_support = x_train, 
-            y_support = self.y_transformer.transform(y_train), 
-            x_query = x_val,
-            y_query = y_val,
-            max_samples_support = self.cfg.hyperparams['max_samples_support'],
-            max_samples_query = self.cfg.hyperparams['max_samples_query'],
-        )
+        if use_val:
+            dataset_valid = DatasetFinetune(
+                self.cfg,
+                x_support = x_train,
+                y_support = self.y_transformer.transform(y_train),
+                x_query = x_val,
+                y_query = y_val,
+                max_samples_support = self.cfg.hyperparams['max_samples_support'],
+                max_samples_query = self.cfg.hyperparams['max_samples_query'],
+            )
+            loader_valid = self.make_loader(dataset_valid, training=False)
+        else:
+            loader_valid = None
 
-        loader_valid = self.make_loader(dataset_valid, training=False)
-
-        if self.use_best_epoch:
-            self.checkpoint.reset()
+        if use_val and self.use_best_epoch:
+            checkpoint.reset()
 
         max_epochs = self.cfg.hyperparams['max_epochs']
 
-        if max_epochs != 0:
+        epoch = 0
+        if max_epochs != 0 and use_val:
             metrics_valid = self.test_epoch(loader_valid, y_val)
 
             log_msg = f"Epoch 000"
@@ -112,7 +127,7 @@ class TrainerFinetune(BaseEstimator):
 
             logger.log(20, log_msg)
             if self.use_best_epoch:
-                self.checkpoint(self.model, metrics_valid.loss)
+                checkpoint(self.model, metrics_valid.loss, epoch=0)
 
         for epoch in range(1, max_epochs+1):
 
@@ -120,7 +135,10 @@ class TrainerFinetune(BaseEstimator):
             loader_train = self.make_loader(dataset_train, training=True)
             
             metrics_train = self.train_epoch(loader_train, return_metrics=self.compute_train_metrics)
-            metrics_valid = self.test_epoch(loader_valid, y_val)
+            if use_val:
+                metrics_valid = self.test_epoch(loader_valid, y_val)
+            else:
+                metrics_valid = None
 
             log_msg = f"Epoch {epoch:03d}"
             if metrics_train is not None:
@@ -129,17 +147,27 @@ class TrainerFinetune(BaseEstimator):
                 log_msg += f" | Val error: {metrics_valid.loss:.4f} | Val score: {metrics_valid.score:.4f}"
 
             logger.log(20, log_msg)
-            if self.use_best_epoch:
-                self.checkpoint(self.model, metrics_valid.loss)
-            
-            self.early_stopping(metrics_valid.loss)
-            if self.early_stopping.we_should_stop():
-                logger.info("Early stopping")
-                break
-            self.scheduler.step(metrics_valid.loss)
+            if metrics_valid is not None:
+                if self.use_best_epoch:
+                    checkpoint(self.model, metrics_valid.loss, epoch=epoch)
 
-        if self.use_best_epoch and self.checkpoint.best_model is not None:
-            self.model.load_state_dict(self.checkpoint.load())
+                self.early_stopping(metrics_valid.loss)
+                if self.early_stopping.we_should_stop():
+                    logger.info("Early stopping")
+                    break
+                self.scheduler.step(metrics_valid.loss)  # TODO: Make scheduler work properly during refit with no val data, to mimic scheduler in OG fit
+
+        if use_val and self.use_best_epoch and checkpoint.best_model is not None:
+            # TODO: Can do a trick: Skip saving and loading best epoch if best epoch is the final epoch, will save around ~0.5 seconds
+            self.best_epoch = checkpoint.best_epoch
+            self.model.load_state_dict(checkpoint.load())
+        else:
+            self.best_epoch = epoch
+
+    def minimize_for_inference(self):
+        # delete unnecessary objects for inference
+        self.optimizer = None
+        self.scheduler = None
 
     def train_epoch(self, dataloader: torch.utils.data.DataLoader, return_metrics: bool = False) -> PredictionMetrics | None:
         """
@@ -155,7 +183,7 @@ class TrainerFinetune(BaseEstimator):
         -------
 
         """
-
+        assert self.optimizer is not None
         self.model.train()
 
         if return_metrics:

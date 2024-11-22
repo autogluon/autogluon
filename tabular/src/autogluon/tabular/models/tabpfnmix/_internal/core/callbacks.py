@@ -55,16 +55,19 @@ class Checkpoint:
 
         self.buffer = io.BytesIO()
         self.best_model = None
+        self.best_epoch = None
     
     def reset(self):
         self.curr_best_loss = np.inf
         self.best_model = None
+        self.best_epoch = None
         self.buffer = io.BytesIO()
 
-    def __call__(self, net, loss):
+    def __call__(self, net, loss: float, epoch: int):
         if loss < self.curr_best_loss:
             self.curr_best_loss = loss
             self.best_model = net.state_dict()
+            self.best_epoch = epoch
             if self.save_best:
                 self.save()
     
