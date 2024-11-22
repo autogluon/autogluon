@@ -18,7 +18,7 @@ logger = logging.getLogger("autogluon.timeseries.models.chronos")
 
 # TODO: Replace `evaluation_strategy` with `eval_strategy` when upgrading to `transformers>=4.41` + remove warning filter
 warnings.filterwarnings("ignore", category=FutureWarning, message="`evaluation_strategy` is deprecated")
-# # TODO: Remove warning filter when upgrading to `transformers>=4.40`
+# TODO: Remove warning filter when upgrading to `transformers>=4.40`
 warnings.filterwarnings("ignore", category=FutureWarning, message="Passing the following arguments to ")
 
 
