@@ -348,6 +348,7 @@ class ChronosModel(AbstractTimeSeriesModel):
             logging_dir=str(output_dir),
             logging_strategy="steps",
             logging_steps=100,
+            disable_tqdm=True,
             report_to="none",
             max_steps=init_args["fine_tune_steps"],
             gradient_accumulation_steps=1,
@@ -441,7 +442,6 @@ class ChronosModel(AbstractTimeSeriesModel):
                     )
 
             fine_tune_trainer_kwargs = fine_tune_args["fine_tune_trainer_kwargs"]
-            fine_tune_trainer_kwargs["disable_tqdm"] = fine_tune_trainer_kwargs.get("disable_tqdm", True)
             fine_tune_trainer_kwargs["use_cpu"] = str(self.model_pipeline.inner_model.device) == "cpu"
 
             if fine_tune_trainer_kwargs["use_cpu"]:
