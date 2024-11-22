@@ -1,6 +1,5 @@
-from enum import StrEnum
 
 
-class Task(StrEnum):
+class Task:
     CLASSIFICATION = "classification"
     REGRESSION = "regression"

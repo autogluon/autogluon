@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Self
 
 import numpy as np
 import scipy
@@ -17,7 +16,7 @@ class PredictionMetrics:
     metrics: dict[str, float]
 
     @classmethod
-    def from_prediction(cls, y_pred: np.ndarray, y_true: np.ndarray, task: Task, metric: Scorer) -> Self:
+    def from_prediction(cls, y_pred: np.ndarray, y_true: np.ndarray, task: Task, metric: Scorer):
 
         loss, score, metrics = compute_metrics(y_pred, y_true, task, metric=metric)
 
@@ -26,11 +25,10 @@ class PredictionMetrics:
 
 def compute_metrics(y_pred: np.ndarray, y_true: np.ndarray, task: Task, metric: Scorer) -> tuple[float, float, dict]:
 
-    match task:
-        case Task.CLASSIFICATION:
-            return compute_classification_metrics(y_pred, y_true, metric=metric)
-        case Task.REGRESSION:
-            return compute_regression_metrics(y_pred, y_true, metric=metric)
+    if task == Task.CLASSIFICATION:
+        return compute_classification_metrics(y_pred, y_true, metric=metric)
+    else:
+        return compute_regression_metrics(y_pred, y_true, metric=metric)
         
 
 def compute_classification_metrics(y_pred: np.ndarray, y_true: np.ndarray, metric: Scorer) -> tuple[float, float, dict]:

@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import Self
 
 import yaml
 
@@ -15,7 +14,7 @@ class ConfigSaveLoadMixin(yaml.YAMLObject):
 
 
     @classmethod
-    def load(cls, path: Path) -> Self:
+    def load(cls, path: Path):
 
         with open(path, 'r') as f:
             # It's unsafe, but not unsafer than the pickle module

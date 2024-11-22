@@ -220,11 +220,10 @@ class TrainerFinetune(BaseEstimator):
 
             y_hat = self.model(x_support, y_support, x_query)
 
-            match self.cfg.task:
-                case Task.REGRESSION:
-                    y_hat = y_hat[0, :, 0]
-                case Task.CLASSIFICATION:
-                    y_hat = y_hat[0, :, :self.n_classes]
+            if self.cfg.task == Task.REGRESSION:
+                y_hat = y_hat[0, :, 0]
+            else:
+                y_hat = y_hat[0, :, :self.n_classes]
 
             y_query = y_query[0, :]
 
@@ -250,6 +249,13 @@ class TrainerFinetune(BaseEstimator):
 
         prediction_metrics = PredictionMetrics.from_prediction(y_hat_finish, y_test, self.cfg.task, metric=self.stopping_metric)
         return prediction_metrics
+
+    def _get_memory_size(self) -> int:
+        import gc
+        import sys
+        import pickle
+        gc.collect()  # Try to avoid OOM error
+        return sys.getsizeof(pickle.dumps(self, protocol=4))
 
     def predict(self, x_support: np.ndarray, y_support: np.ndarray, x_query: np.ndarray) -> np.ndarray:
         """
@@ -301,11 +307,10 @@ class TrainerFinetune(BaseEstimator):
                 
                 y_hat = self.model(x_support, y_support, x_query)
 
-                match self.cfg.task:
-                    case Task.REGRESSION:
-                        y_hat = y_hat[0, :, 0]
-                    case Task.CLASSIFICATION:
-                        y_hat = y_hat[0, :, :self.n_classes]
+                if self.cfg.task == Task.REGRESSION:
+                    y_hat = y_hat[0, :, 0]
+                else:
+                    y_hat = y_hat[0, :, :self.n_classes]
 
                 y_hat_list.append(einops.asnumpy(y_hat))
 

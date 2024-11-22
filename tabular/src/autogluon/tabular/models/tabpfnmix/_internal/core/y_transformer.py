@@ -12,14 +12,13 @@ def create_y_transformer(y_train: np.ndarray, task: Task) -> TransformerMixin:
     # This should be used for the y variable when training a regression model,
     # but when testing the model, we want to inverse transform the predictions
 
-    match task:
-        case Task.REGRESSION:
-            y_transformer = QuantileTransformer1D(output_distribution="normal")
-            y_transformer.fit(y_train)
-            return y_transformer
-        case Task.CLASSIFICATION:
-            # Identity
-            return FunctionTransformer()
+    if task == Task.REGRESSION:
+        y_transformer = QuantileTransformer1D(output_distribution="normal")
+        y_transformer.fit(y_train)
+        return y_transformer
+    else:
+        # Identity
+        return FunctionTransformer()
 
 
 class QuantileTransformer1D(BaseEstimator, TransformerMixin):
