@@ -104,7 +104,7 @@ class ChronosModel(AbstractTimeSeriesModel):
 
     Other Parameters
     ----------------
-    model_path: str, default = "autogluon/chronos-t5-small"
+    model_path: str, default = "autogluon/chronos-bolt-small"
         Model path used for the model, i.e., a HuggingFace transformers ``name_or_path``. Can be a
         compatible model name on HuggingFace Hub or a local path to a model directory. Original
         Chronos models (i.e., ``autogluon/chronos-t5-{model_size}``) can be specified with aliases
