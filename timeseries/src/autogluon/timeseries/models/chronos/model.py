@@ -1,6 +1,7 @@
 import logging
 import os
 import shutil
+import warnings
 from pathlib import Path
 from typing import Any, Dict, Literal, Optional, Union
 
@@ -14,6 +15,11 @@ from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_da
 from autogluon.timeseries.utils.warning_filters import disable_duplicate_logs, warning_filter
 
 logger = logging.getLogger("autogluon.timeseries.models.chronos")
+
+# TODO: Replace `evaluation_strategy` with `eval_strategy` when upgrading to `transformers>=4.41` + remove warning filter
+warnings.filterwarnings("ignore", category=FutureWarning, message="`evaluation_strategy` is deprecated")
+# TODO: Remove warning filter when upgrading to `transformers>=4.40`
+warnings.filterwarnings("ignore", category=FutureWarning, message="Passing the following arguments to ")
 
 
 # allowed HuggingFace model paths with custom parameter definitions
@@ -199,7 +205,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         self.context_length = hyperparameters.get("context_length")
 
         if self.context_length is not None and self.context_length > self.maximum_context_length:
-            logger.warning(
+            logger.info(
                 f"\tContext length {self.context_length} exceeds maximum context length {self.maximum_context_length}."
                 f"Context length will be set to {self.maximum_context_length}."
             )
@@ -342,6 +348,7 @@ class ChronosModel(AbstractTimeSeriesModel):
             logging_dir=str(output_dir),
             logging_strategy="steps",
             logging_steps=100,
+            disable_tqdm=True,
             report_to="none",
             max_steps=init_args["fine_tune_steps"],
             gradient_accumulation_steps=1,
@@ -435,7 +442,6 @@ class ChronosModel(AbstractTimeSeriesModel):
                     )
 
             fine_tune_trainer_kwargs = fine_tune_args["fine_tune_trainer_kwargs"]
-            fine_tune_trainer_kwargs["disable_tqdm"] = fine_tune_trainer_kwargs.get("disable_tqdm", (verbosity < 3))
             fine_tune_trainer_kwargs["use_cpu"] = str(self.model_pipeline.inner_model.device) == "cpu"
 
             if fine_tune_trainer_kwargs["use_cpu"]:
