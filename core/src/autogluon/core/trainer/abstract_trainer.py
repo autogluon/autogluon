@@ -217,6 +217,10 @@ class AbstractTrainer:
         self.callbacks: List[AbstractCallback] = []
         self._callback_early_stop = False
 
+        self._refit_mem_cache : dict[str, int]|None = None
+        """Cache of memory that a refit_full likely requires. This is a dict of model_name -> mem estimate. 
+        This is required to run refit with fit_strategy="parallel" to know how much memory is required to schedule a refit_full."""
+
     # path_root is the directory containing learner.pkl
     @property
     def path_root(self) -> str:
@@ -1426,8 +1430,9 @@ class AbstractTrainer:
         fit_strategy: Literal["sequential", "parallel"] = "sequential",
         **kwargs,
     ) -> list[str]:
-        if fit_strategy == "parallel":
+        if fit_strategy == "parallel" and (self._refit_mem_cache is None):
             logger.log(30, f"Note: refit_full does not yet support fit_strategy='parallel', switching to 'sequential'...")
+            logger.log(10, f"No memory cache available for refit_full with fit_strategy='parallel', switching to 'sequential'...")
             fit_strategy = "sequential"
         if X is None:
             X = self.load_X()
@@ -1518,7 +1523,7 @@ class AbstractTrainer:
                 models_level = model_levels[level]
 
                 logger.log(20, f"Scheduling distributed model-workers for refitting {len(models_level)} L{level} models...")
-                unfinished_job_refs = distributed_manager.schedule_jobs(models_to_fit=models_level)
+                unfinished_job_refs = distributed_manager.schedule_jobs(models_to_fit=models_level, model_child_mem_estimate_cache=self._refit_mem_cache)
 
                 while unfinished_job_refs:
                     finished, unfinished_job_refs = ray.wait(unfinished_job_refs, num_returns=1)
@@ -3101,6 +3106,9 @@ class AbstractTrainer:
             if can_schedule_jobs:
                 # Re-schedule jobs
                 unfinished_job_refs += distributed_manager.schedule_jobs()
+
+        # FIXME: this might be slightly off due to less training data used for the bagging fit (depending on the validation method).
+        self._refit_mem_cache = distributed_manager.refit_model_child_mem_estimate_cache.copy()
 
         distributed_manager.clean_up_ray(unfinished_job_refs=unfinished_job_refs)
         logger.log(20, "Finished all parallel work for this stacking layer.")
