@@ -58,7 +58,6 @@ extras_require = {
     ],
     "tabpfnmix": [
         "torch",  # version range defined in `core/_setup_utils.py`
-        "pyyaml",  # FIXME: Can remove now that yaml code was deleted?
         "huggingface_hub[torch]",  # Only needed for HuggingFace downloads, currently uncapped to minimize future conflicts.
         "einops>=0.7,<0.9",
     ],

@@ -74,17 +74,17 @@ class Checkpoint:
     def save(self):
         if self.in_memory:
             self.buffer = io.BytesIO()
-            torch.save(self.best_model, self.buffer)
+            torch.save(self.best_model, self.buffer)  # nosec B614
         else:
-            torch.save(self.best_model, self.path)
+            torch.save(self.best_model, self.path)  # nosec B614
 
     def load(self):
         if self.in_memory:
             # Reset the buffer's position to the beginning
             self.buffer.seek(0)
-            return torch.load(self.buffer, weights_only=True)
+            return torch.load(self.buffer, weights_only=True)  # nosec B614
         else:
-            return torch.load(self.path)
+            return torch.load(self.path)  # nosec B614
 
 
 

@@ -4,12 +4,11 @@ from dataclasses import dataclass
 
 import torch
 
-from .config_save_load_mixin import ConfigSaveLoadMixin
 from ..core.enums import Task
 
 
 @dataclass
-class ConfigRun(ConfigSaveLoadMixin):
+class ConfigRun:
     task: Task
     hyperparams: dict
     seed: int = 0

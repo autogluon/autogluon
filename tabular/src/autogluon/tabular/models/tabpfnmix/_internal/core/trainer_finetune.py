@@ -317,10 +317,6 @@ class TrainerFinetune(BaseEstimator):
         y_hat = np.concatenate(y_hat_list, axis=0)
         return y_hat
 
-    def load_params(self, path):
-        self.model.load_state_dict(torch.load(path))
-    
-
     def make_loader(self, dataset, training):
 
         return torch.utils.data.DataLoader(
