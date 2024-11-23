@@ -8,9 +8,7 @@ from .enums import Task
 def make_dataset_split(x: np.ndarray, y: np.ndarray, task: Task, random_state: Generator = None) -> tuple[np.ndarray, ...]:
     # Splits the dataset into train and validation sets with ratio 80/20
 
-    size_of_smallest_class = np.min(np.bincount(y))
-
-    if task == Task.CLASSIFICATION and size_of_smallest_class >= 5:
+    if task == Task.CLASSIFICATION and np.min(np.bincount(y)) >= 5:
         # stratification needs have at least 5 samples in each class if split is 80/20
         return make_stratified_dataset_split(x, y, rng=random_state)
     else:

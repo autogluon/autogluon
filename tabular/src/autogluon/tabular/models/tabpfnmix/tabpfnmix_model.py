@@ -98,7 +98,7 @@ class TabPFNMixModel(AbstractModel):
 
         ag_params = self._get_ag_params()
         max_classes = ag_params.get("max_classes")
-        if max_classes is not None and self.num_classes > max_classes:
+        if max_classes is not None and self.num_classes is not None and self.num_classes > max_classes:
             # TODO: Move to earlier stage when problem_type is checked
             raise AssertionError(f"Max allowed classes for the model is {max_classes}, " f"but found {self.num_classes} classes.")
 
