@@ -211,9 +211,6 @@ class ParallelFitManager:
         else:
             models_to_schedule = self.models_to_schedule
 
-        if self.mode == "refit" and (model_child_mem_estimate_cache is None):
-            raise ValueError("model_child_mem_estimate_cache must be set for schedule_jobs if mode='refit'.")
-
         if model_child_mem_estimate_cache is not None:
             self.model_child_mem_estimate_cache = model_child_mem_estimate_cache.copy()
 

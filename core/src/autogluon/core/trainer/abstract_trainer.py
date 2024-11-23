@@ -1495,7 +1495,7 @@ class AbstractTrainer:
             # FIXME: Need a common utility class for initializing ray so we don't duplicate code
             if not ray.is_initialized():
                 ray.init(log_to_driver=False, logging_level=logging.ERROR)
-
+            assert self._refit_mem_cache is not None, "Memory cache must be available for parallel refit. This should not happen, please open an issue!"
             distributed_manager = ParallelFitManager(
                 mode="refit",
                 func=_remote_refit_single_full,
