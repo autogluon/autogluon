@@ -13,6 +13,7 @@ from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_torch
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE
 from autogluon.core.models import AbstractModel
+from autogluon.core.utils import generate_train_test_split
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.features.generators import LabelEncoderFeatureGenerator
 
@@ -102,6 +103,21 @@ class TabPFNMixModel(AbstractModel):
             raise AssertionError(f"Max allowed classes for the model is {max_classes}, " f"but found {self.num_classes} classes.")
 
         params = self._get_model_params()
+        sample_rows = ag_params.get("sample_rows", None)
+        sample_rows_val = ag_params.get("sample_rows_val", None)
+        max_rows = ag_params.get("max_rows", None)
+
+        # TODO: Make max_rows generic
+        if max_rows is not None and isinstance(max_rows, (int, float)) and len(X) > max_rows:
+            raise AssertionError(f"Skipping model due to X having more rows than `ag.max_rows={max_rows}` (len(X)={len(X)})")
+
+        # TODO: Make sample_rows generic
+        if sample_rows is not None and isinstance(sample_rows, int) and len(X) > sample_rows:
+            X, y = self._subsample_data(X=X, y=y, num_rows=sample_rows)
+
+        # TODO: Make sample_rows generic
+        if X_val is not None and y_val is not None and sample_rows_val is not None and isinstance(sample_rows_val, int) and len(X_val) > sample_rows_val:
+            X_val, y_val = self._subsample_data(X=X_val, y=y_val, num_rows=sample_rows_val)
 
         from ._internal.core.enums import Task
         if self.problem_type in [REGRESSION, QUANTILE]:
@@ -203,6 +219,19 @@ class TabPFNMixModel(AbstractModel):
             torch.set_num_threads(torch_threads_og)
 
         return self
+
+    # TODO: Make this generic by creating a generic `preprocess_train` and putting this logic prior to `_preprocess`.
+    def _subsample_data(self, X: pd.DataFrame, y: pd.Series, num_rows: int, random_state=0) -> (pd.DataFrame, pd.Series):
+        num_rows_to_drop = len(X) - num_rows
+        X, _, y, _ = generate_train_test_split(
+            X=X,
+            y=y,
+            problem_type=self.problem_type,
+            test_size=num_rows_to_drop,
+            random_state=random_state,
+            min_cls_count_train=1,
+        )
+        return X, y
 
     def _preprocess(self, X: pd.DataFrame, **kwargs) -> np.ndarray:
         """
@@ -315,7 +344,7 @@ class TabPFNMixModel(AbstractModel):
         }
 
     def _ag_params(self) -> set:
-        return {"max_classes"}
+        return {"max_classes", "max_rows", "sample_rows", "sample_rows_val"}
 
     def _more_tags(self) -> dict:
         tags = {"can_refit_full": True}

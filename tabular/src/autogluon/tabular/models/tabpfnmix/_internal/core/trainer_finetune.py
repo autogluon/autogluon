@@ -126,7 +126,7 @@ class TrainerFinetune(BaseEstimator):
             if metrics_valid is not None:
                 log_msg += f" | Val error: {metrics_valid.loss:.4f} | Val score: {metrics_valid.score:.4f}"
 
-            logger.log(20, log_msg)
+            logger.log(15, log_msg)
             if self.use_best_epoch:
                 checkpoint(self.model, metrics_valid.loss, epoch=0)
 
@@ -155,7 +155,7 @@ class TrainerFinetune(BaseEstimator):
             if metrics_valid is not None:
                 log_msg += f" | Val error: {metrics_valid.loss:.4f} | Val score: {metrics_valid.score:.4f}"
 
-            logger.log(20, log_msg)
+            logger.log(15, log_msg)
             if metrics_valid is not None:
                 if self.use_best_epoch:
                     checkpoint(self.model, metrics_valid.loss, epoch=epoch)
