@@ -2034,7 +2034,7 @@ class AbstractModel:
         -------
         int: estimated peak memory usage in bytes during training of the child
         """
-        return self.estimate_memory_usage_static(**kwargs)
+        return self.estimate_memory_usage_static(X=X, y=y, hyperparameters=hyperparameters, problem_type=problem_type, num_classes=num_classes, **kwargs)
 
     def validate_fit_resources(self, num_cpus="auto", num_gpus="auto", total_resources=None, **kwargs):
         """

@@ -113,7 +113,8 @@ class ParallelFitManager:
         self.total_num_gpus = num_gpus
         self.available_num_cpus = num_cpus
         self.available_num_gpus = num_gpus
-        self.extra_num_cpus = self.total_num_cpus // 10  # FIXME: Maybe remove, allows for oversubscribing
+        # self.extra_num_cpus = self.total_num_cpus // 10  # FIXME: Maybe remove, allows for oversubscribing
+        self.extra_num_cpus = 0  # Setting to 0 for now to avoid using more resources than requested by the user
         if isinstance(total_mem, str) and total_mem == "auto":
             # FIXME: when None should be infinite, implement
             total_mem = get_resource_manager().get_available_virtual_mem()
@@ -394,7 +395,7 @@ class ParallelFitManager:
                 f"allocated {'' if is_sufficient else 'UP TO '}{model_resources.total_num_cpus} CPUs and {model_resources.total_num_gpus} GPUs | "
                 f"{len(self.job_refs_to_allocated_resources)} jobs running"
                 f"\n\t{model_resources.num_cpus_for_fold_worker if num_children != 1 else model_resources.num_cpus_for_model_worker} CPUs each for {num_children} folds, fitting {safe_children} in parallel"
-                f"\n\t{self.total_num_cpus - self.available_num_cpus}/{self.total_num_cpus} Allocated CPUS ({self.total_num_cpus_virtual} allowed)"
+                f"\n\t{self.total_num_cpus - self.available_num_cpus}/{self.total_num_cpus} Allocated CPUS"
                 f"\t| {(self.total_mem - self.available_mem) * 1e-9:.1f}/{self.total_mem * 1e-9:.1f} GB Allocated Memory",
             )
             if self.delay_between_jobs > 0:
