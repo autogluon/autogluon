@@ -26,6 +26,7 @@ from .hyperparameters.searchspaces import get_default_searchspace
 from .lgb_utils import construct_dataset, train_lgb_model
 
 warnings.filterwarnings("ignore", category=UserWarning, message="Starting from version")  # lightGBM brew libomp warning
+warnings.filterwarnings("ignore", category=FutureWarning, message="Dask dataframe query")  # lightGBM dask-expr warning
 logger = logging.getLogger(__name__)
 
 
