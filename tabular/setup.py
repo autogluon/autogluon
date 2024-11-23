@@ -57,9 +57,10 @@ extras_require = {
         "tabpfn>=0.1,<0.2",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "tabpfnmix": [
-        "torch",
-        "pyyaml",
-        "einops>=0.7,<0.9",  # TODO: Try removing and replacing with native torch operations for minimal dependency footprint
+        "torch",  # version range defined in `core/_setup_utils.py`
+        "pyyaml",  # FIXME: Can remove now that yaml code was deleted?
+        "huggingface_hub[torch]",  # Only needed for HuggingFace downloads, currently uncapped to minimize future conflicts.
+        "einops>=0.7,<0.9",
     ],
     "ray": [
         f"{ag.PACKAGE_NAME}.core[all]=={version}",

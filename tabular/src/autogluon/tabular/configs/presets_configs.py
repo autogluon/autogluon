@@ -1,5 +1,24 @@
 # Dictionary of preset fit() parameter configurations.
 tabular_presets_dict = dict(
+    # [EXPERIMENTAL PRESET] The `extreme_quality` preset is experimental and may be changed or removed without warning.
+    # Using this preset can lead to unexpected crashes, as it hasn't been as thoroughly tested as other presets.
+    # Absolute best predictive accuracy with **zero** consideration to inference time or disk usage.
+    # Recommended for applications that benefit from the best possible model accuracy and **do not** care about inference speed.
+    # Significantly stronger than `best_quality`, but can be over 10x slower in inference.
+    # Uses pre-trained tabular foundation models, which add a minimum of 1-2 GB to the predictor artifact's size.
+    # For best results, use as large of an instance as possible with as many CPU cores as possible (ideally 64+ cores)
+    # DOES NOT SUPPORT GPU.
+    # Aliases: best
+    extreme_quality={
+        "auto_stack": True,
+        "dynamic_stacking": "auto",
+        "num_bag_sets": 1,
+        "hyperparameters": "extreme",
+        "fit_strategy": "parallel",
+        "num_gpus": 0,
+        "time_limit": 3600,
+    },
+
     # Best predictive accuracy with little consideration to inference time or disk usage. Achieve even better results by specifying a large time_limit value.
     # Recommended for applications that benefit from the best possible model accuracy.
     # Aliases: best

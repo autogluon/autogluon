@@ -43,9 +43,13 @@ class TabPFNMixModel(AbstractModel):
         """Specifies hyperparameter values to use by default"""
         default_params = {
             # most important hyperparameters. Only set `n_estimators>1` if `max_epochs>1`, else there will be no benefit.
-            # path_weights,  # most important
-            # path_weights_classifier,  # if specified, overrides path_weights for classification problems
-            # path_weights_regressor,  # if specified, overrides path_weights for regression problems
+            # model_path,  # most important, defines huggingface model path
+            "model_path_classifier": "autogluon/tabpfn-mix-1.0-classifier",  # if specified, overrides model_path for classification problems, set to None to ignore.
+            # model_path_classifier,
+            # model_path_regressor,  # if specified, overrides model_path for regression problems
+            # weights_path,  # most important, defines weights location (overrides huggingface weights if specified)
+            # weights_path_classifier,  # if specified, overrides weights_path for classification problems
+            # weights_path_regressor,  # if specified, overrides weights_path for regression problems
             "n_ensembles": 1,  # FIXME: RENAME: n_estimators
             "max_epochs": 0,  # fine-tuning epochs. Will do pure in-context learning if 0.
 
@@ -63,7 +67,6 @@ class TabPFNMixModel(AbstractModel):
             "use_feature_count_scaling": True,
             "use_quantile_transformer": True,
             "weight_decay": 0,
-            "y_as_float_embedding": True,
 
             # architecture hyperparameters, recommended to keep as default unless using a custom pre-trained backbone
             "n_classes": 10,
@@ -72,6 +75,7 @@ class TabPFNMixModel(AbstractModel):
             "n_layers": 12,
             "attn_dropout": 0.0,
             "dim": 512,
+            "y_as_float_embedding": True,
 
             # utility parameters, recommended to keep as default
             "split_val": False,
@@ -112,46 +116,33 @@ class TabPFNMixModel(AbstractModel):
         else:
             device = "cpu"
 
-        path_weights = None
+        model_path = None
         if task == Task.CLASSIFICATION:
-            if "path_weights_classifier" in params and params["path_weights_classifier"] is not None:
-                path_weights = Path(params["path_weights_classifier"])
+            if "model_path_classifier" in params and params["model_path_classifier"] is not None:
+                model_path = params["model_path_classifier"]
         elif task == Task.REGRESSION:
-            if "path_weights_regressor" in params and params["path_weights_regressor"] is not None:
-                path_weights = Path(params["path_weights_regressor"])
-        if path_weights is None:
-            if "path_weights" in params and params["path_weights"] is not None:
-                path_weights = Path(params["path_weights"])
+            if "model_path_regressor" in params and params["model_path_regressor"] is not None:
+                model_path = params["model_path_regressor"]
+        if model_path is None:
+            model_path = params.get("model_path", None)
 
-        if path_weights is None:
-            logger.log(15, "\tNo path_weights specified, fitting model from random initialization...")
-        else:
-            logger.log(15, f'\tLoading pre-trained weights from file... (path_weights="{path_weights}")')
+        weights_path = None
+        if task == Task.CLASSIFICATION:
+            if "weights_path_classifier" in params and params["weights_path_classifier"] is not None:
+                weights_path = Path(params["weights_path_classifier"])
+        elif task == Task.REGRESSION:
+            if "weights_path_regressor" in params and params["weights_path_regressor"] is not None:
+                weights_path = Path(params["weights_path_regressor"])
+        if weights_path is None:
+            if "weights_path" in params and params["weights_path"] is not None:
+                weights_path = Path(params["weights_path"])
 
-        # FIXME: Note: Disabling path_config logic for v1.2 release, as it would be the only model to support this and it might cause bugs
-        # FIXME: Don't require loading from file, allow user to specify everything?
-        # TODO: Not a big fan of the path config logic due to possible portability issues
-        # if "path_config" in params:
-        #     path_config = Path(params["path_config"])
-        # else:
-        #     path_config = None
-        # if path_config is not None:
-        #     cfg = ConfigRun.load(Path(path_config))
-        #     cfg.task = task
-        #     cfg.device = device
-        #     # FIXME: Cant use cfg values atm, need to allow overwriting values
-        #     if params.get("max_epochs", None) is not None:
-        #         cfg.hyperparams['max_epochs'] = params["max_epochs"]
-        #     if params.get("n_ensembles", None) is not None:
-        #         cfg.hyperparams['n_ensembles'] = params["n_ensembles"]
-        # else:
+        if weights_path is None and model_path is None:
+            logger.log(15, "\tNo model_path or weights_path specified, fitting model from random initialization...")
+        elif weights_path is not None:
+            logger.log(15, f'\tLoading pre-trained weights from file... (weights_path="{weights_path}")')
+
         cfg = ConfigRun(hyperparams=params, task=task, device=device)
-        if path_weights is None and "path_weights" not in params:
-            raise ValueError(
-                "Missing required model hyperparameter 'path_weights'. "
-                "Either specify `path_weights=None` to train from random initialization (not recommended), "
-                "or specify a local path to a pre-trained weights file such as `path/to/file/tabpfnmix_base.pt`."
-            )
 
         if cfg.hyperparams["max_epochs"] == 0 and cfg.hyperparams["n_ensembles"] != 1:
             logger.log(
@@ -189,7 +180,8 @@ class TabPFNMixModel(AbstractModel):
             cfg=cfg,
             n_classes=n_classes,
             split_val=params["split_val"],
-            path_to_weights=path_weights,
+            model_path=model_path,
+            weights_path=weights_path,
             stopping_metric=self.stopping_metric,
             use_best_epoch=params["use_best_epoch"],
         )
@@ -239,7 +231,7 @@ class TabPFNMixModel(AbstractModel):
         if _model_weights is not None:
             import torch
             os.makedirs(self.path, exist_ok=True)
-            torch.save(_model_weights, self.path_weights)
+            torch.save(_model_weights, self.weights_path)
             self.model.trainer.model = _model_weights
         return path
 
@@ -250,12 +242,12 @@ class TabPFNMixModel(AbstractModel):
 
         if model._weights_saved:
             import torch
-            model.model.trainer.model = torch.load(model.path_weights, weights_only=False)
+            model.model.trainer.model = torch.load(model.weights_path, weights_only=False)
             model._weights_saved = False
         return model
 
     @property
-    def path_weights(self) -> str:
+    def weights_path(self) -> str:
         return os.path.join(self.path, self.weights_file_name)
 
     @classmethod

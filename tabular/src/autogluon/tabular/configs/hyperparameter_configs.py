@@ -381,6 +381,7 @@ hyperparameter_config_dict = dict(
         ],
     },
     zeroshot=hyperparameter_portfolio_zeroshot_2023,
+    zeroshot_2023=hyperparameter_portfolio_zeroshot_2023,
     experiment_portfolio_1=experiment_portfolio_1,
     experiment_portfolio_2=experiment_portfolio_2,
     experiment_portfolio_3=experiment_portfolio_3,
@@ -394,9 +395,16 @@ hyperparameter_config_dict["default_FTT"] = {"FT_TRANSFORMER": {}}
 hyperparameter_config_dict["default_FTT"].update(hyperparameter_config_dict["default"])
 
 # extreme is experimental
-hyperparameter_config_dict["extreme"] = {"TABPFN": {"N_ensemble_configurations": 8}}
-hyperparameter_config_dict["extreme"].update(hyperparameter_config_dict["default_FTT"])
+tabpfnmix_default = {
+    "model_path_classifier": "autogluon/tabpfn-mix-1.0-classifier",
+    "n_ensembles": 1,
+    "max_epochs": 30,
+    "ag_args": {"name_suffix": "v1"},
+}
 
+hyperparameter_config_dict["extreme_2024"] = {"TABPFNMIX": tabpfnmix_default}
+hyperparameter_config_dict["extreme_2024"].update(hyperparameter_config_dict["zeroshot_2023"])
+hyperparameter_config_dict["extreme"] = hyperparameter_config_dict["extreme_2024"]
 
 def get_hyperparameter_config_options():
     return list(hyperparameter_config_dict.keys())

@@ -4,6 +4,7 @@ from pathlib import Path
 
 import numpy as np
 from sklearn.base import BaseEstimator, ClassifierMixin
+import torch
 
 from .core.dataset_split import make_stratified_dataset_split
 from .core.trainer_finetune import TrainerFinetune
@@ -15,22 +16,25 @@ from .models.foundation.foundation_transformer import FoundationTransformer
 # TODO: To mitigate val overfitting, can fit multiple random seeds at same time and pick same epoch for all of them, track average performance on epoch.
 # TODO: Test shuffling the data and see if it makes TabPFNv2 worse, same with TabForestPFN
 class TabPFNMixClassifier(BaseEstimator, ClassifierMixin):
-    def __init__(self, n_classes, cfg, split_val, path_to_weights, stopping_metric=None, use_best_epoch: bool = True):
-        if path_to_weights is not None:
-            path_to_weights = str(Path(path_to_weights))
-        if "use_pretrained_weights" not in cfg.hyperparams:
-            cfg.hyperparams["use_pretrained_weights"] = path_to_weights is not None
-        model = FoundationTransformer(
-            n_features=cfg.hyperparams['n_features'],
-            n_classes=cfg.hyperparams['n_classes'],
-            dim=cfg.hyperparams['dim'],
-            n_layers=cfg.hyperparams['n_layers'],
-            n_heads=cfg.hyperparams['n_heads'],
-            attn_dropout=cfg.hyperparams['attn_dropout'],
-            y_as_float_embedding=cfg.hyperparams['y_as_float_embedding'],
-            use_pretrained_weights=cfg.hyperparams['use_pretrained_weights'],
-            path_to_weights=path_to_weights,
-        )
+    def __init__(self, n_classes, cfg, split_val, model_path: str = None, weights_path: str | Path = None, stopping_metric=None, use_best_epoch: bool = True):
+        if weights_path is not None:
+            weights_path = str(Path(weights_path))
+
+        if model_path is not None:
+            model = FoundationTransformer.from_pretrained(model_path)
+        else:
+            model = FoundationTransformer(
+                n_features=cfg.hyperparams['n_features'],
+                n_classes=cfg.hyperparams['n_classes'],
+                dim=cfg.hyperparams['dim'],
+                n_layers=cfg.hyperparams['n_layers'],
+                n_heads=cfg.hyperparams['n_heads'],
+                attn_dropout=cfg.hyperparams['attn_dropout'],
+                y_as_float_embedding=cfg.hyperparams['y_as_float_embedding'],
+            )
+        if weights_path is not None:
+            model.load_state_dict(torch.load(weights_path, weights_only=True))
+
         self.split_val = split_val
         self.trainer = TrainerFinetune(cfg, model, n_classes=n_classes, stopping_metric=stopping_metric, use_best_epoch=use_best_epoch)
         super().__init__()

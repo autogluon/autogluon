@@ -5,22 +5,21 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .embedding import FoundationEmbeddingX, FoundationEmbeddingYFloat, FoundationEmbeddingYInteger
+from huggingface_hub import PyTorchModelHubMixin
 
 
-class FoundationTransformer(nn.Module):
+class FoundationTransformer(nn.Module, PyTorchModelHubMixin):
 
     def __init__(
-            self,
-            n_features: int,
-            n_classes: int, 
-            dim: int,
-            n_layers: int,
-            n_heads: int,
-            attn_dropout: float,
-            y_as_float_embedding: bool,
-            use_pretrained_weights: bool,
-            path_to_weights: str,
-        ) -> None:
+        self,
+        n_features: int,
+        n_classes: int,
+        dim: int,
+        n_layers: int,
+        n_heads: int,
+        attn_dropout: float,
+        y_as_float_embedding: bool,
+    ) -> None:
         
         super().__init__()
 
@@ -55,11 +54,7 @@ class FoundationTransformer(nn.Module):
 
         self.final_layer1 = nn.Linear(dim, dim*4)
         self.final_layer2 = nn.Linear(dim*4, n_classes)
-
-        if use_pretrained_weights:
-            self.load_state_dict(torch.load(path_to_weights, weights_only=True))
-        else:
-            self.init_weights()
+        self.init_weights()
 
 
     def init_weights(self):
