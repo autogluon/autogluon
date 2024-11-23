@@ -2012,6 +2012,7 @@ class AbstractTrainer:
         errors: Literal["ignore", "raise"] = "ignore",
         errors_ignore: list = None,
         errors_raise: list = None,
+        is_ray_worker: bool = False,
         **model_fit_kwargs,
     ) -> list[str]:
         """
@@ -2040,6 +2041,8 @@ class AbstractTrainer:
         model_names_trained = []
         y_pred_proba_val = None
 
+        is_distributed_mode = DistributedContext.is_distributed_mode() or is_ray_worker
+
         fit_log_message = f"Fitting model: {model.name} ..."
         if time_limit is not None:
             time_left_total = time_limit
@@ -2061,7 +2064,7 @@ class AbstractTrainer:
                     logger.log(15, skip_msg)
                     return []
             fit_log_message += f" Training model for up to {time_limit:.2f}s of the {time_left_total:.2f}s of remaining time."
-        logger.log(10 if DistributedContext.is_distributed_mode() else 20, fit_log_message)
+        logger.log(10 if is_distributed_mode else 20, fit_log_message)
 
         if isinstance(model, BaggedEnsembleModel) and not compute_score:
             # Do not perform OOF predictions when we don't compute a score.
@@ -2173,7 +2176,7 @@ class AbstractTrainer:
             if del_model:
                 del model
         else:
-            self._add_model(model=model, stack_name=stack_name, level=level, y_pred_proba_val=y_pred_proba_val)
+            self._add_model(model=model, stack_name=stack_name, level=level, y_pred_proba_val=y_pred_proba_val, is_ray_worker=is_ray_worker)
             model_names_trained.append(model.name)
             if self.low_memory:
                 del model
@@ -2227,7 +2230,7 @@ class AbstractTrainer:
         )
         return model_metadata
 
-    def _add_model(self, model: AbstractModel, stack_name: str = "core", level: int = 1, y_pred_proba_val=None, _is_refit=False, is_distributed_main=False) -> bool:
+    def _add_model(self, model: AbstractModel, stack_name: str = "core", level: int = 1, y_pred_proba_val=None, _is_refit=False, is_distributed_main=False, is_ray_worker: bool = False) -> bool:
         """
         Registers the fit model in the Trainer object. Stores information such as model performance, save path, model type, and more.
         To use a model in Trainer, self._add_model must be called.
@@ -2282,7 +2285,7 @@ class AbstractTrainer:
                         f"Model '{model.name}' depends on model '{base_model_name}', but '{base_model_name}' is not in a lower stack level. ('{model.name}' level: {level}, '{base_model_name}' level: {self.model_graph.nodes[base_model_name]['level']})"
                     )
                 self.model_graph.add_edge(base_model_name, model.name)
-        self._log_model_stats(model, _is_refit=_is_refit, is_distributed_main=is_distributed_main)
+        self._log_model_stats(model, _is_refit=_is_refit, is_distributed_main=is_distributed_main, is_ray_worker=is_ray_worker)
         if self.low_memory:
             del model
         return True
@@ -2312,12 +2315,14 @@ class AbstractTrainer:
             raise AssertionError(f'"{model}" is not a key in self.model_graph, cannot add attributes: {attributes}')
         self.model_graph.nodes[model].update(attributes)
 
-    def _log_model_stats(self, model, _is_refit=False, is_distributed_main=False):
+    def _log_model_stats(self, model, _is_refit=False, is_distributed_main=False, is_ray_worker: bool = False):
         """Logs model fit time, val score, predict time, and predict_1_time"""
         model = self.load_model(model)
         print_weights = model._get_tags().get("print_weights", False)
 
         is_log_during_distributed_fit = DistributedContext.is_distributed_mode() and (not is_distributed_main)
+        if is_ray_worker:
+            is_log_during_distributed_fit = True
         log_level = 10 if is_log_during_distributed_fit else 20
 
         if print_weights:
@@ -2412,6 +2417,7 @@ class AbstractTrainer:
         errors: Literal["ignore", "raise"] = "ignore",
         errors_ignore: list = None,
         errors_raise: list = None,
+        is_ray_worker: bool = False,
         **kwargs,
     ) -> List[str]:
         """
@@ -2545,6 +2551,7 @@ class AbstractTrainer:
                 errors=errors,
                 errors_ignore=errors_ignore,
                 errors_raise=errors_raise,
+                is_ray_worker=is_ray_worker,
                 **model_fit_kwargs,
             )
         if self.callbacks and check_callbacks:
@@ -2907,6 +2914,7 @@ class AbstractTrainer:
                     time_limit=time_limit,
                     time_limit_model_split=time_limit_model_split,
                     hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+                    is_ray_worker=False,
                     kwargs=kwargs,
                 )
         elif fit_strategy == "parallel":
@@ -4573,6 +4581,7 @@ def _detached_train_multi_fold(
     time_limit: float|None,
     time_limit_model_split: float | None,
     hyperparameter_tune_kwargs: dict,
+    is_ray_worker: bool = False,
     kwargs: dict,
 ) -> list[str]:
     """Dedicated class-detached function to train a single model on multiple folds."""
@@ -4600,6 +4609,7 @@ def _detached_train_multi_fold(
         model,
         time_limit=time_left,
         hyperparameter_tune_kwargs=hyperparameter_tune_kwargs_model,
+        is_ray_worker=is_ray_worker,
         **kwargs
     )
 
@@ -4640,6 +4650,7 @@ def _remote_train_multi_fold(
             time_limit=time_limit,
             time_limit_model_split=time_limit_model_split,
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
+            is_ray_worker=True,
             kwargs=kwargs,
         )
     except Exception as exc:
