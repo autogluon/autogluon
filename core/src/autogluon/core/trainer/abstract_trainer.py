@@ -2875,6 +2875,21 @@ class AbstractTrainer:
                     fit_strategy = "sequential"
                     break
         if fit_strategy == "parallel":
+            num_cpus = kwargs.get("total_resources", {}).get("num_cpus", "auto")
+            if isinstance(num_cpus, str) and num_cpus == "auto":
+                num_cpus = get_resource_manager().get_cpu_count_psutil()
+            if num_cpus < 12:
+                force_parallel = os.environ.get("AG_FORCE_PARALLEL", "False") == "True"
+                if not force_parallel:
+                    logger.log(
+                        30,
+                        f"Note: fit_strategy='parallel', but `num_cpus={num_cpus}`. "
+                        f"Running parallel mode with fewer than 12 CPUs is not recommended and has been disabled. "
+                        f'You can override this by specifying `os.environ["AG_FORCE_PARALLEL"] = "True"`. '
+                        f"Falling back to fit_strategy='sequential' ..."
+                    )
+                    fit_strategy = "sequential"
+        if fit_strategy == "parallel":
             num_gpus = kwargs.get("total_resources", {}).get("num_gpus", 0)
             if isinstance(num_gpus, str) and num_gpus == "auto":
                 num_gpus = get_resource_manager().get_gpu_count()
