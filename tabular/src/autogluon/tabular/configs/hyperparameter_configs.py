@@ -1,7 +1,6 @@
 import copy
 
 from .zeroshot.zeroshot_portfolio_2023 import hyperparameter_portfolio_zeroshot_2023
-from .zeroshot.experiment_portfolio import experiment_portfolio_1, experiment_portfolio_2, experiment_portfolio_3, experiment_portfolio_4, experiment_portfolio_5, experiment_portfolio_6
 
 # Dictionary of preset hyperparameter configurations.
 hyperparameter_config_dict = dict(
@@ -382,12 +381,6 @@ hyperparameter_config_dict = dict(
     },
     zeroshot=hyperparameter_portfolio_zeroshot_2023,
     zeroshot_2023=hyperparameter_portfolio_zeroshot_2023,
-    experiment_portfolio_1=experiment_portfolio_1,
-    experiment_portfolio_2=experiment_portfolio_2,
-    experiment_portfolio_3=experiment_portfolio_3,
-    experiment_portfolio_4=experiment_portfolio_4,
-    experiment_portfolio_5=experiment_portfolio_5,
-    experiment_portfolio_6=experiment_portfolio_6,
 )
 
 # default_FTT is experimental
