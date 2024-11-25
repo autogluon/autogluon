@@ -113,4 +113,4 @@ class AgSaveModelCallback(TrackerCallback):
 
     def after_fit(self, **kwargs):
         if not self.every_epoch:
-            self.learn.load(f"{self.fname}", with_opt=self.with_opt)
+            self.learn.load(f"{self.fname}", with_opt=self.with_opt, weights_only=False)   # nosec B614

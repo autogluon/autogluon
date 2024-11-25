@@ -282,7 +282,7 @@ class TabPFNMixModel(AbstractModel):
 
         if model._weights_saved:
             import torch
-            model.model.trainer.model = torch.load(model.weights_path, weights_only=False)
+            model.model.trainer.model = torch.load(model.weights_path, weights_only=False)  # nosec B614
             model._weights_saved = False
         return model
 
