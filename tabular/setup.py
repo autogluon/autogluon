@@ -33,7 +33,7 @@ install_requires = [
 
 extras_require = {
     "lightgbm": [
-        "lightgbm>=3.3,<4.6",  # <{N+1} upper cap, where N is the latest released minor version
+        "lightgbm>=4.0,<4.6",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "catboost": [
         "numpy>=1.25,<2.0.0",  # TODO support numpy>=2.0.0 once issue resolved https://github.com/catboost/catboost/issues/2671
@@ -62,7 +62,7 @@ extras_require = {
         f"{ag.PACKAGE_NAME}.core[all]=={version}",
     ],
     "skex": [
-        "scikit-learn-intelex>=2023.0,<2024.5",  # <{N+1} upper cap, where N is the latest released minor version
+        "scikit-learn-intelex>=2024.0,<2025.1",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "imodels": [
         "imodels>=1.3.10,<1.4.0",  # 1.3.8/1.3.9 either remove/renamed attribute `complexity_` causing failures. https://github.com/csinva/imodels/issues/147
