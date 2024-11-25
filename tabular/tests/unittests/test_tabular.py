@@ -62,9 +62,6 @@ def test_tabular():
         subsample_size = 100
         time_limit = 60
 
-    # Catboost > 1.2 is required for python 3.11 but cannot be correctly installed on macos
-    if sys.version_info >= (3, 11) and sys.platform == "darwin":
-        hyperparameters.pop("CAT")
 
     fit_args = {"verbosity": verbosity}
     if hyperparameter_tune_kwargs is not None:
