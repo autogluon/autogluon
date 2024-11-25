@@ -33,7 +33,7 @@ def try_import_mxboard():
 
 
 def try_import_ray() -> ModuleType:
-    RAY_MAX_VERSION = "2.32.0"  # sync with core/setup.py
+    RAY_MAX_VERSION = "2.40.0"  # sync with core/setup.py
     ray_max_version_os_map = dict(
         Darwin=RAY_MAX_VERSION,
         Windows=RAY_MAX_VERSION,
@@ -54,14 +54,14 @@ def try_import_ray() -> ModuleType:
             msg = (
                 f"ray=={ray.__version__} detected. "
                 f"{ray_min_version} <= ray < {ray_max_version} is required. You can use pip to install certain version of ray "
-                f"`pip install ray=={ray_min_version}` "
+                f'`pip install "ray>={ray_min_version},<{ray_max_version}"`'
             )
             raise ValueError(msg)
         return ray
     except ImportError:
         raise ImportError(
             "ray is required to train folds in parallel for TabularPredictor or HPO for MultiModalPredictor. "
-            f"A quick tip is to install via `pip install ray=={ray_min_version}`"
+            f'A quick tip is to install via `pip install "ray>={ray_min_version},<{ray_max_version}"`'
         )
 
 
