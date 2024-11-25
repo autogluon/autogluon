@@ -113,7 +113,8 @@ class ParallelFitManager:
         self.total_num_gpus = num_gpus
         self.available_num_cpus = num_cpus
         self.available_num_gpus = num_gpus
-        self.extra_num_cpus = self.total_num_cpus // 10  # FIXME: Maybe remove, allows for oversubscribing
+        # self.extra_num_cpus = self.total_num_cpus // 10  # FIXME: Maybe remove, allows for oversubscribing
+        self.extra_num_cpus = 0  # Setting to 0 for now to avoid using more resources than requested by the user
         if isinstance(total_mem, str) and total_mem == "auto":
             # FIXME: when None should be infinite, implement
             total_mem = get_resource_manager().get_available_virtual_mem()
@@ -257,7 +258,7 @@ class ParallelFitManager:
                 continue
             if self.available_num_cpus_virtual < 1:
                 if not cpus_fully_allocated:
-                    logger.log(20, f"Delay scheduling {num_models_to_schedule - i} models: CPUs are fully allocated")
+                    logger.log(15, f"Delay scheduling {num_models_to_schedule - i} models: CPUs are fully allocated")
                 cpus_fully_allocated = True
                 models_to_schedule_later.append(model)
                 continue
@@ -269,7 +270,7 @@ class ParallelFitManager:
                 continue
             if num_models_delay_to_fit_all > 0:
                 logger.log(
-                    20,
+                    15,
                     f"Delay scheduling {num_models_delay_to_fit_all} models: waiting for enough CPUs to fit all folds in parallel..."
                 )
                 num_models_delay_to_fit_all = 0
@@ -311,7 +312,7 @@ class ParallelFitManager:
                 if ((num_children * model_child_memory_estimate) < self.max_mem) and (self.total_num_cpus >= num_children):
                     # try to wait to schedule later when all folds can be fit in parallel
                     logger.log(
-                        20,
+                        15,
                         f"Delay scheduling model {model_name}: Currently can safely fit {safe_children} folds in parallel, "
                         f"waiting to be able to fit all {num_children} folds in parallel."
                     )
@@ -378,7 +379,7 @@ class ParallelFitManager:
                             "Thus, we need at least twice the amount of GPUs needed to fit one model.",
                         )
 
-                    logger.log(0, f"Delay scheduling model {model_name}: {reason}.")
+                    logger.log(15, f"Delay scheduling model {model_name}: {reason}.")
                     models_to_schedule_later.append(model)
                     continue
 
@@ -392,9 +393,9 @@ class ParallelFitManager:
                 20,
                 f"Scheduled {model_name}: "
                 f"allocated {'' if is_sufficient else 'UP TO '}{model_resources.total_num_cpus} CPUs and {model_resources.total_num_gpus} GPUs | "
-                f"{len(self.job_refs_to_allocated_resources)} jobs are running."
+                f"{len(self.job_refs_to_allocated_resources)} jobs running"
                 f"\n\t{model_resources.num_cpus_for_fold_worker if num_children != 1 else model_resources.num_cpus_for_model_worker} CPUs each for {num_children} folds, fitting {safe_children} in parallel"
-                f"\n\t{self.total_num_cpus - self.available_num_cpus}/{self.total_num_cpus} Allocated CPUS ({self.total_num_cpus_virtual} allowed)"
+                f"\n\t{self.total_num_cpus - self.available_num_cpus}/{self.total_num_cpus} Allocated CPUS"
                 f"\t| {(self.total_mem - self.available_mem) * 1e-9:.1f}/{self.total_mem * 1e-9:.1f} GB Allocated Memory",
             )
             if self.delay_between_jobs > 0:
@@ -402,7 +403,7 @@ class ParallelFitManager:
 
         if num_models_delay_to_fit_all > 0:
             logger.log(
-                20,
+                15,
                 f"Delay scheduling {num_models_delay_to_fit_all} models: waiting for enough CPUs to fit all folds in parallel..."
             )
             num_models_delay_to_fit_all = 0
