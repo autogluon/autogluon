@@ -331,10 +331,13 @@ class TabPFNMixModel(AbstractModel):
         **kwargs,
     ) -> int:
         # TODO: This is wildly inaccurate, find a better estimation
+        # TODO: Fitting 8 in parallel causes many OOM errors with 32 GB of memory on relatively small datasets, so each model is using over 4 GB of memory
+        #  The below logic returns a minimum of 5.6 GB, to avoid OOM errors
         data_mem_usage = 5 * get_approximate_df_mem_usage(X).sum()  # rough estimate
-        model_size = 150*1e6  # model weights are ~150 MB  # TODO: Avoid hardcoding, we can derive from the model itself?
+        model_size = 160*1e6  # model weights are ~160 MB  # TODO: Avoid hardcoding, we can derive from the model itself?
         model_mem_usage = model_size * 5  # Account for 1x copy being fit, 1x copy checkpointed, 2x for optimizer, and 1x for overhead
-        mem_usage_estimate = data_mem_usage + model_mem_usage
+        model_fit_usage = model_size * 30  # TODO: This is a placeholder large value to try to avoid OOM errors
+        mem_usage_estimate = data_mem_usage + model_mem_usage + model_fit_usage
         return mem_usage_estimate
 
     @classmethod

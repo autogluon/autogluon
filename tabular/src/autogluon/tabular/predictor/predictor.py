@@ -445,7 +445,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             For precise definitions of the provided presets, see file: `autogluon/tabular/configs/presets_configs.py`.
             Users can specify custom presets by passing in a dictionary of argument values as an element to the list.
 
-            Available Presets: ['best_quality', 'high_quality', 'good_quality', 'medium_quality', 'optimize_for_deployment', 'interpretable', 'ignore_text']
+            Available Presets: ['best_quality', 'high_quality', 'good_quality', 'medium_quality', 'experimental_quality', 'optimize_for_deployment', 'interpretable', 'ignore_text']
 
             It is recommended to only use one `quality` based preset in a given call to `fit()` as they alter many of the same arguments and are not compatible with each-other.
 
@@ -465,6 +465,10 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                 medium_quality={'auto_stack': False}
                     Medium predictive accuracy with very fast inference and very fast training time. ~20x faster training than `good_quality`.
                     This is the default preset in AutoGluon, but should generally only be used for quick prototyping, as `good_quality` results in significantly better predictive accuracy and faster inference time.
+
+                experimental_quality={'auto_stack': True, 'dynamic_stacking': 'auto', 'hyperparameters': 'experimental', 'fit_strategy': 'parallel', 'num_gpus': 0}
+                    This preset acts as a testing ground for cutting edge features and models which could later be added to the `best_quality` preset in future releases.
+                    Recommended when `best_quality` was already being used and the user wants to push performance even further.
 
                 optimize_for_deployment={'keep_only_best': True, 'save_space': True}
                     Optimizes result immediately for deployment by deleting unused models and removing training artifacts.
@@ -1060,12 +1064,13 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
         else:
             logger.log(
                 20,
-                "No presets specified! To achieve strong results with AutoGluon, it is recommended to use the available presets. Defaulting to `'medium_quality'`...\n"
+                "No presets specified! To achieve strong results with AutoGluon, it is recommended to use the available presets. Defaulting to `'medium'`...\n"
                 "\tRecommended Presets (For more details refer to https://auto.gluon.ai/stable/tutorials/tabular/tabular-essentials.html#presets):\n"
-                "\tpresets='best_quality'   : Maximize accuracy. Recommended for most users. Use in competitions and benchmarks. Default time_limit=3600.\n"
-                "\tpresets='high_quality'   : Strong accuracy with fast inference speed. Default time_limit=3600.\n"
-                "\tpresets='good_quality'   : Good accuracy with very fast inference speed. Default time_limit=3600.\n"
-                "\tpresets='medium_quality' : Fast training time, ideal for initial prototyping.",
+                "\tpresets='experimental' : New in v1.2: Pre-trained foundation model + parallel fits. The absolute best accuracy without consideration for inference speed. Does not support GPU.\n"
+                "\tpresets='best'         : Maximize accuracy. Recommended for most users. Use in competitions and benchmarks.\n"
+                "\tpresets='high'         : Strong accuracy with fast inference speed.\n"
+                "\tpresets='good'         : Good accuracy with very fast inference speed.\n"
+                "\tpresets='medium'       : Fast training time, ideal for initial prototyping.",
             )
 
         kwargs_orig = kwargs.copy()
