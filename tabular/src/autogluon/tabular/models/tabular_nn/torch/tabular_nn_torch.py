@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import json
 import logging
 import os
@@ -49,7 +50,6 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
 
     # Constants used throughout this class:
     unique_category_str = np.nan  # string used to represent missing values and unknown categories for categorical features.
-    temp_file_name = "temp_model.pt"  # Stores temporary network parameters (eg. during the course of training)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -321,7 +321,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         logger.log(15, "Neural network architecture:")
         logger.log(15, str(self.model))
 
-        net_filename = os.path.join(self.path, self.temp_file_name)
+        io_buffer = None
         if num_epochs == 0:
             # use dummy training loop that stops immediately
             # useful for using NN just for data preprocessing / debugging
@@ -335,10 +335,6 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
-
-            os.makedirs(os.path.dirname(self.path), exist_ok=True)
-            torch.save(self.model, net_filename) # nosec B614
-            logger.log(15, "Untrained Tabular Neural Network saved to file")
             return
 
         # start training loop:
@@ -444,8 +440,8 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
                     if val_metric > best_val_metric:
                         is_best = True
                     best_val_metric = val_metric
-                    os.makedirs(os.path.dirname(self.path), exist_ok=True)
-                    torch.save(self.model, net_filename) # nosec B614
+                    io_buffer = io.BytesIO()
+                    torch.save(self.model, io_buffer)  # nosec B614
                     best_epoch = epoch
                     best_val_update = total_updates
                 early_stop = early_stopping_method.update(cur_round=epoch-1, is_best=is_best)
@@ -496,11 +492,9 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         # revert back to best model
         if val_dataset is not None:
             logger.log(15, f"Best model found on Epoch {best_epoch} (Update {best_val_update}). Val {self.stopping_metric.name}: {best_val_metric}")
-            try:
-                self.model = torch.load(net_filename) # nosec B614
-                os.remove(net_filename)
-            except FileNotFoundError:
-                pass
+            if io_buffer is not None:
+                io_buffer.seek(0)
+                self.model = torch.load(io_buffer, weights_only=False)  # nosec B614
         else:
             logger.log(15, f"Best model found on Epoch {best_epoch} (Update {best_val_update}).")
         self.params_trained["batch_size"] = batch_size

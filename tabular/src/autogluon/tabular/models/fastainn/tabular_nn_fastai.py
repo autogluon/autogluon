@@ -350,6 +350,7 @@ class NNFastAiTabularModel(AbstractModel):
 
         callbacks = [save_callback, early_stopping]
 
+        # TODO: Optimize by using io.BytesIO() instead of temp_dir for checkpointing?
         with make_temp_directory() as temp_dir:
             with self.model.no_bar():
                 with self.model.no_logging():
@@ -365,7 +366,7 @@ class NNFastAiTabularModel(AbstractModel):
                     self.model.fit_one_cycle(epochs, params["lr"], cbs=callbacks)
 
                     # Load the best one and export it
-                    self.model = self.model.load(fname)
+                    self.model = self.model.load(fname, weights_only=False)  # nosec B614
 
                     if objective_func_name == "log_loss":
                         eval_result = self.model.validate(dl=dls.valid)[0]

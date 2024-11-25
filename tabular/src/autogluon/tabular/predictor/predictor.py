@@ -1734,7 +1734,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
                         f"Disabling decision threshold calibration for metric `accuracy` due to having "
                         f"fewer than {min_val_rows_for_calibration} rows of validation data for calibration, "
                         f"to avoid overfitting ({num_rows_val_for_calibration} rows)."
-                        f"\n\t`accuracy` is generally not improved through threshold calibration "
+                        f"\n\t`accuracy` is generally not improved through threshold calibration. "
                         f"Force calibration via specifying `calibrate_decision_threshold=True`.",
                     )
             elif calibrate_decision_threshold:
