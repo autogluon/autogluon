@@ -389,7 +389,7 @@ tabpfnmix_default = {
     "n_ensembles": 1,
     "max_epochs": 30,
     "ag.sample_rows_val": 5000,  # Beyond 5k val rows fine-tuning becomes very slow
-    "ag.max_rows": 200000,  # Beyond 200k rows, the time taken is longer than most users would like (hours), while the model is very weak at this size
+    "ag.max_rows": 50000,  # Beyond 50k rows, the time taken is longer than most users would like (hours), while the model is very weak at this size
     "ag_args": {"name_suffix": "_v1"},
 }
 
