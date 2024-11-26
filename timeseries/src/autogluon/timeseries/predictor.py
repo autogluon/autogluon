@@ -509,7 +509,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
             Available presets with the new, faster `Chronos-Bolt <https://github.com/amazon-science/chronos-forecasting>`_ model:
 
-            - ``"bolt_{model_size}"``: where model size is one of ``tiny,mini,small,base``. Uses the Chronos pretrained model for zero-shot forecasting.
+            - ``"bolt_{model_size}"``: where model size is one of ``tiny,mini,small,base``. Uses the Chronos-Bolt pretrained model for zero-shot forecasting.
               See the documentation for ``ChronosModel`` or see `Hugging Face <https://huggingface.co/collections/amazon/chronos-models-65f1791d630a8d57cb718444>`_ for more information.
 
             Available presets with the original `Chronos <https://github.com/amazon-science/chronos-forecasting>`_ model:
