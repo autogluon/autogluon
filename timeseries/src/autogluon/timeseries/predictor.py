@@ -447,9 +447,9 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
             If ``train_data`` contains covariates or static features, they will be interpreted as follows:
 
-                * columns with ``int``, ``bool`` and ``float`` dtypes are interpreted as continuous (real-valued) features
-                * columns with ``object``, ``str`` and ``category`` dtypes are as interpreted as categorical features
-                * columns with other dtypes are ignored
+            * columns with ``int``, ``bool`` and ``float`` dtypes are interpreted as continuous (real-valued) features
+            * columns with ``object``, ``str`` and ``category`` dtypes are as interpreted as categorical features
+            * columns with other dtypes are ignored
 
             To ensure that the column type is interpreted correctly, please convert it to one of the above dtypes.
             For example, to ensure that column "store_id" with dtype ``int`` is interpreted as a category, change
@@ -501,13 +501,18 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
             - ``"fast_training"``: fit simple statistical models (``ETS``, ``Theta``, ``Naive``, ``SeasonalNaive``) + fast tree-based models ``RecursiveTabular``
               and ``DirectTabular``. These models are fast to train but may not be very accurate.
-            - ``"medium_quality"``: all models mentioned above + deep learning model ``TemporalFusionTransformer``. Default setting that produces good forecasts
+            - ``"medium_quality"``: all models mentioned above + deep learning model ``TemporalFusionTransformer`` + Chronos-Bolt (small). Default setting that produces good forecasts
               with reasonable training time.
-            - ``"high_quality"``: All ML models available in AutoGluon + additional statistical models (``NPTS``, ``AutoETS``, ``AutoARIMA``, ``Croston``,
+            - ``"high_quality"``: All ML models available in AutoGluon + additional statistical models (``NPTS``, ``AutoETS``,
               ``DynamicOptimizedTheta``). Much more accurate than ``medium_quality``, but takes longer to train.
             - ``"best_quality"``: Same models as in ``"high_quality"``, but performs validation with multiple backtests. Usually better than ``high_quality``, but takes even longer to train.
 
-            Available presets with the `Chronos <https://github.com/amazon-science/chronos-forecasting>`_ model:
+            Available presets with the new, faster `Chronos-Bolt <https://github.com/amazon-science/chronos-forecasting>`_ model:
+
+            - ``"bolt_{model_size}"``: where model size is one of ``tiny,mini,small,base``. Uses the Chronos-Bolt pretrained model for zero-shot forecasting.
+              See the documentation for ``ChronosModel`` or see `Hugging Face <https://huggingface.co/collections/amazon/chronos-models-65f1791d630a8d57cb718444>`_ for more information.
+
+            Available presets with the original `Chronos <https://github.com/amazon-science/chronos-forecasting>`_ model:
 
             - ``"chronos_{model_size}"``: where model size is one of ``tiny,mini,small,base,large``. Uses the Chronos pretrained model for zero-shot forecasting.
               See the documentation for ``ChronosModel`` or see `Hugging Face <https://huggingface.co/collections/amazon/chronos-models-65f1791d630a8d57cb718444>`_ for more information.
