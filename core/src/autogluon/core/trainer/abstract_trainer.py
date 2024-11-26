@@ -2439,7 +2439,7 @@ class AbstractTrainer:
         """
         if self._callback_early_stop:
             return []
-        check_callbacks = k_fold_start == 0 and n_repeat_start == 0
+        check_callbacks = k_fold_start == 0 and n_repeat_start == 0 and not is_ray_worker
         skip_model = False
         if self.callbacks and check_callbacks:
             skip_model, time_limit = self._callbacks_before_fit(
