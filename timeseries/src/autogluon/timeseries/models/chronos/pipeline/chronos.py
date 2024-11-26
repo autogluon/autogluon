@@ -556,9 +556,9 @@ class ChronosPipeline(BaseChronosPipeline):
                     from optimum.onnxruntime import ORTModelForSeq2SeqLM
                 except ImportError:
                     raise ImportError(
-                        "Huggingface Optimum library must be installed with ONNX for using the `onnx` strategy "
+                        "Huggingface Optimum library must be installed with ONNX for using the `onnx` strategy. "
                         "Please try running `pip install optimum[onnxruntime]` or use Chronos-Bolt models for "
-                        "faster performance on the CPU"
+                        "faster performance on the CPU."
                     )
 
                 assert kwargs.pop("device_map", "cpu") in ["cpu", "auto"], "ONNX mode only available on the CPU"
@@ -569,9 +569,9 @@ class ChronosPipeline(BaseChronosPipeline):
                     from optimum.intel import OVModelForSeq2SeqLM
                 except ImportError:
                     raise ImportError(
-                        "Huggingface Optimum library must be installed with OpenVINO for using the `openvino` strategy"
+                        "Huggingface Optimum library must be installed with OpenVINO for using the `openvino` strategy. "
                         "Please try running `pip install optimum-intel[openvino,nncf] optimum[openvino,nncf]` or use "
-                        "Chronos-Bolt models for faster performance on the CPU"
+                        "Chronos-Bolt models for faster performance on the CPU."
                     )
                 with set_loggers_level(regex=r"^optimum.*", level=logging.ERROR):
                     inner_model = OVModelForSeq2SeqLM.from_pretrained(
