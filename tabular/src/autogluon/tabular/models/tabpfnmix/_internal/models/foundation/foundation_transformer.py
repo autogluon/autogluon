@@ -20,7 +20,7 @@ class FoundationTransformer(nn.Module, PyTorchModelHubMixin):
         n_heads: int,
         attn_dropout: float,
         y_as_float_embedding: bool,
-        task: str,
+        task: str = Task.CLASSIFICATION,
     ) -> None:
         
         super().__init__()
