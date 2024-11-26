@@ -59,8 +59,7 @@ class TabPFNMixModel(AbstractModel):
             # most important hyperparameters. Only set `n_estimators>1` if `max_epochs>1`, else there will be no benefit.
             # model_path,  # most important, defines huggingface model path
             "model_path_classifier": "autogluon/tabpfn-mix-1.0-classifier",  # if specified, overrides model_path for classification problems, set to None to ignore.
-            # model_path_classifier,
-            # model_path_regressor,  # if specified, overrides model_path for regression problems
+            "model_path_regressor": "autogluon/tabpfn-mix-1.0-regressor",  # if specified, overrides model_path for regression problems, set to None to ignore.
             # weights_path,  # most important, defines weights location (overrides huggingface weights if specified)
             # weights_path_classifier,  # if specified, overrides weights_path for classification problems
             # weights_path_regressor,  # if specified, overrides weights_path for regression problems
@@ -284,7 +283,7 @@ class TabPFNMixModel(AbstractModel):
 
         if model._weights_saved:
             import torch
-            model.model.trainer.model = torch.load(model.weights_path, weights_only=False)
+            model.model.trainer.model = torch.load(model.weights_path, weights_only=False)  # nosec B614
             model._weights_saved = False
         return model
 

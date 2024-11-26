@@ -54,6 +54,7 @@ class TrainerFinetune(BaseEstimator):
             use_quantile_transformer=self.cfg.hyperparams['use_quantile_transformer'],
             use_feature_count_scaling=self.cfg.hyperparams['use_feature_count_scaling'],
             max_features=self.cfg.hyperparams['n_features'],
+            task=self.cfg.task,
         )
 
         self.stopping_metric = stopping_metric
@@ -309,8 +310,8 @@ class TrainerFinetune(BaseEstimator):
                 x_query = batch['x_query'].to(self.cfg.device)
 
                 if self.cfg.task == Task.REGRESSION:
-                    x_support, y_support, x_query= x_support.float(), y_support.float(), x_query.float()
-                
+                    y_support = y_support.float()
+
                 y_hat = self.model(x_support, y_support, x_query)
                
                 if self.cfg.task == Task.REGRESSION:

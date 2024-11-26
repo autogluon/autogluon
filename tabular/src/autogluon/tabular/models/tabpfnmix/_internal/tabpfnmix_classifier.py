@@ -22,6 +22,7 @@ class TabPFNMixClassifier(BaseEstimator, ClassifierMixin):
 
         if model_path is not None:
             model = FoundationTransformer.from_pretrained(model_path)
+            assert model.task == cfg.task, f"The pretrained model '{model_path}' is for task {model.task}, but the problem type is for task {cfg.task}..."
         else:
             model = FoundationTransformer(
                 n_features=cfg.hyperparams['n_features'],
@@ -34,7 +35,7 @@ class TabPFNMixClassifier(BaseEstimator, ClassifierMixin):
                 task=cfg.task,
             )
         if weights_path is not None:
-            model.load_state_dict(torch.load(weights_path, weights_only=True))
+            model.load_state_dict(torch.load(weights_path, weights_only=True))  # nosec B614
 
         self.split_val = split_val
         self.trainer = TrainerFinetune(cfg, model, n_classes=n_classes, stopping_metric=stopping_metric, use_best_epoch=use_best_epoch)
