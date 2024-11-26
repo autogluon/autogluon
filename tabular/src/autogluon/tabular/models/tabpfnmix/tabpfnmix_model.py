@@ -44,10 +44,12 @@ class TabPFNMixModel(AbstractModel):
 
     def _get_model_type(self):
         from ._internal.tabpfnmix_classifier import TabPFNMixClassifier
+        from ._internal.tabpfnmix_regressor import TabPFNMixRegressor
         if self.problem_type in ['binary', 'multiclass']:
             model_cls = TabPFNMixClassifier
+        elif self.problem_type in ['regression']:
+            model_cls = TabPFNMixRegressor
         else:
-            # FIXME: Add regression support
             raise AssertionError(f"TabPFN does not support problem_type='{self.problem_type}'")
         return model_cls
 
@@ -282,7 +284,7 @@ class TabPFNMixModel(AbstractModel):
 
         if model._weights_saved:
             import torch
-            model.model.trainer.model = torch.load(model.weights_path, weights_only=False)  # nosec B614
+            model.model.trainer.model = torch.load(model.weights_path, weights_only=False)
             model._weights_saved = False
         return model
 
@@ -294,7 +296,7 @@ class TabPFNMixModel(AbstractModel):
     def _get_default_ag_args(cls) -> dict:
         default_ag_args = super()._get_default_ag_args()
         extra_ag_args = {
-            "problem_types": [BINARY, MULTICLASS],
+            "problem_types": [BINARY, MULTICLASS, REGRESSION],
         }
         default_ag_args.update(extra_ag_args)
         return default_ag_args
