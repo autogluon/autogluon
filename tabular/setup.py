@@ -3,6 +3,7 @@
 # This code block is a HACK (!), but is necessary to avoid code duplication. Do NOT alter these lines.
 import importlib.util
 import os
+import platform
 
 from setuptools import setup
 
@@ -72,7 +73,15 @@ extras_require = {
         # No vowpalwabbit wheel for python 3.11 or above yet
         "vowpalwabbit>=9,<9.10; python_version < '3.11' and sys_platform != 'darwin'",
     ],
-    "skl2onnx": [
+    
+}
+
+is_aarch64 = platform.machine() == 'aarch64'
+is_darwin = sys.platform == 'darwin'
+
+if is_darwin or is_aarch64:
+# For macOS or aarch64, only use CPU version
+    extras_require["skl2onnx"] = [
         "onnx>=1.13.0,<1.16.2;platform_system=='Windows'",  # cap at 1.16.1 for issue https://github.com/onnx/onnx/issues/6267
         "onnx>=1.13.0,<1.18.0;platform_system!='Windows'",
         "skl2onnx>=1.15.0,<1.18.0",
@@ -80,14 +89,15 @@ extras_require = {
         # Therefore, we install onnxruntime explicitly here just for macOS.
         "onnxruntime>=1.17.0,<1.20.0",
     ]
-    if sys.platform == "darwin"
-    else [
+else:
+# For other platforms, include both CPU and GPU versions
+    extras_require["skl2onnx"] = [
         "onnx>=1.13.0,<1.16.2;platform_system=='Windows'",  # cap at 1.16.1 for issue https://github.com/onnx/onnx/issues/6267
         "onnx>=1.13.0,<1.18.0;platform_system!='Windows'",
         "skl2onnx>=1.15.0,<1.18.0", 
         "onnxruntime>=1.17.0,<1.20.0",   # install for gpu system due to https://github.com/autogluon/autogluon/issues/3804
-        "onnxruntime-gpu>=1.17.0,<1.20.0"],
-}
+        "onnxruntime-gpu>=1.17.0,<1.20.0",
+    ]
 
 # TODO: v1.0: Rename `all` to `core`, make `all` contain everything.
 all_requires = []
