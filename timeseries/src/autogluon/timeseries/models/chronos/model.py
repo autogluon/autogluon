@@ -136,7 +136,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         Optimization strategy to use for inference on CPUs. If None, the model will use the default implementation.
         If `onnx`, the model will be converted to ONNX and the inference will be performed using ONNX. If ``openvino``,
         inference will be performed with the model compiled to OpenVINO. These optimizations are only available for
-        the original set of Chronos models, and not in Chronos-Bolt where they are not needed. Note that you will need to
+        the original set of Chronos models, and not in Chronos-Bolt where they are not needed. You will need to
         install the appropriate dependencies `optimum[onnxruntime]` or `optimum[openvino,nncf]` for optimizations to work.
         Note that support for optimization strategies is deprecated, and will be removed in a future release. We recommend
         using Chronos-Bolt models for fast inference on the CPU.
