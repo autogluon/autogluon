@@ -70,16 +70,7 @@ TESTABLE_MODELS = [ChronosModel, chronos_with_finetuning, chronos_bolt_model, ch
 
 @pytest.fixture(
     scope="module",
-    params=[
-        {
-            "optimization_strategy": "onnx",
-        },
-        # add openvino tests when they are in core requirements
-        # {
-        #     "optimization_strategy": "openvino",
-        # },
-        *HYPERPARAMETER_DICTS,
-    ],
+    params=HYPERPARAMETER_DICTS,
 )
 def default_chronos_tiny_model(request, chronos_model_path) -> ChronosModel:
     model = ChronosModel(
