@@ -223,6 +223,7 @@ class TabPFNMixModel(AbstractModel):
 
         # Ensure refit_full uses the same number of max_epochs as the original's best
         self.params_trained["max_epochs"] = self.model.trainer.best_epoch
+        self.params_trained["ag.max_rows"] = None  # This ensures we don't raise an exception during refit_full
 
         # reduce memory and disk usage by 3x
         self.model.trainer.minimize_for_inference()
