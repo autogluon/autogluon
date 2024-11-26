@@ -5647,62 +5647,6 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             raise AssertionError(error_message)
 
 
-# Location to store WIP functionality that will be later added to TabularPredictor
-class _TabularPredictorExperimental(TabularPredictor):
-    # TODO: Documentation, flesh out capabilities
-    # TODO: Rename feature_generator -> feature_pipeline for users?
-    # TODO: Return transformed data?
-    # TODO: feature_generator_kwargs?
-    def fit_feature_generator(self, data: pd.DataFrame, feature_generator="auto", feature_metadata=None):
-        self._set_feature_generator(feature_generator=feature_generator, feature_metadata=feature_metadata)
-        self._learner.fit_transform_features(data)
-
-    # TODO: rename to `advice`
-    # TODO: Add documentation
-    def _advice(self):
-        is_feature_generator_fit = self._learner.feature_generator.is_fit()
-        is_learner_fit = self._learner.trainer_path is not None
-        exists_trainer = self._trainer is not None
-
-        advice_dict = dict(
-            is_feature_generator_fit=is_feature_generator_fit,
-            is_learner_fit=is_learner_fit,
-            exists_trainer=exists_trainer,
-            # TODO
-        )
-
-        advice_list = []
-
-        if not advice_dict["is_feature_generator_fit"]:
-            advice_list.append("FeatureGenerator has not been fit, consider calling `predictor.fit_feature_generator(data)`.")
-        if not advice_dict["is_learner_fit"]:
-            advice_list.append("Learner is not fit, consider calling `predictor.fit(...)`")
-        if not advice_dict["exists_trainer"]:
-            advice_list.append("Trainer is not initialized, consider calling `predictor.fit(...)`")
-        # TODO: Advice on unused features (if no model uses a feature)
-        # TODO: Advice on fit_extra
-        # TODO: Advice on distill
-        # TODO: Advice on leaderboard
-        # TODO: Advice on persist
-        # TODO: Advice on refit_full
-        # TODO: Advice on feature_importance
-        # TODO: Advice on dropping poor models
-
-        logger.log(20, "======================= AutoGluon Advice =======================")
-        if advice_list:
-            for advice in advice_list:
-                logger.log(20, advice)
-        else:
-            logger.log(20, "No further advice found.")
-        logger.log(20, "================================================================")
-
-    @classmethod
-    def from_learner(cls, learner: AbstractTabularLearner):
-        predictor = cls(label=learner.label, path=learner.path)
-        predictor._set_post_fit_vars(learner=learner)
-        return predictor
-
-
 def _dystack(
     predictor: TabularPredictor,
     train_data: Union[str, pd.DataFrame],
