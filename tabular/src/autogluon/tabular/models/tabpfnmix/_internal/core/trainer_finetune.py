@@ -54,6 +54,7 @@ class TrainerFinetune(BaseEstimator):
             use_quantile_transformer=self.cfg.hyperparams['use_quantile_transformer'],
             use_feature_count_scaling=self.cfg.hyperparams['use_feature_count_scaling'],
             max_features=self.cfg.hyperparams['n_features'],
+            task=self.cfg.task,
         )
 
         self.stopping_metric = stopping_metric
@@ -218,6 +219,9 @@ class TrainerFinetune(BaseEstimator):
             x_query = batch['x_query'].to(self.cfg.device)
             y_query = batch['y_query'].to(self.cfg.device)
 
+            if self.cfg.task == Task.REGRESSION:
+                x_support, y_support, x_query, y_query = x_support.float(), y_support.float(), x_query.float(), y_query.float()
+
             y_hat = self.model(x_support, y_support, x_query)
 
             if self.cfg.task == Task.REGRESSION:
@@ -268,7 +272,7 @@ class TrainerFinetune(BaseEstimator):
         dataset = DatasetFinetune(
             self.cfg, 
             x_support = x_support, 
-            y_support = y_support, 
+            y_support = self.y_transformer.transform(y_support),
             x_query = x_query,
             y_query = None,
             max_samples_support = self.cfg.hyperparams['max_samples_support'],
@@ -304,9 +308,12 @@ class TrainerFinetune(BaseEstimator):
                 x_support = batch['x_support'].to(self.cfg.device)
                 y_support = batch['y_support'].to(self.cfg.device)
                 x_query = batch['x_query'].to(self.cfg.device)
-                
-                y_hat = self.model(x_support, y_support, x_query)
 
+                if self.cfg.task == Task.REGRESSION:
+                    y_support = y_support.float()
+
+                y_hat = self.model(x_support, y_support, x_query)
+               
                 if self.cfg.task == Task.REGRESSION:
                     y_hat = y_hat[0, :, 0]
                 else:
@@ -330,5 +337,3 @@ class TrainerFinetune(BaseEstimator):
                 pad_to_n_support_samples=None
             )
         )
-
-    

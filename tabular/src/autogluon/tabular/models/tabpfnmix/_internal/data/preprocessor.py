@@ -2,8 +2,10 @@ import logging
 
 import numpy as np
 from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.feature_selection import SelectKBest
+from sklearn.feature_selection import SelectKBest, f_classif, f_regression
 from sklearn.preprocessing import QuantileTransformer
+
+from ..core.enums import Task
 
 logger = logging.getLogger(__name__)
 
@@ -22,12 +24,13 @@ class Preprocessor(TransformerMixin, BaseEstimator):
             max_features: int,
             use_quantile_transformer: bool,
             use_feature_count_scaling: bool,
+            task: Task,
         ):
 
         self.max_features = max_features
         self.use_quantile_transformer = use_quantile_transformer
         self.use_feature_count_scaling = use_feature_count_scaling
-
+        self.task = task
     
     def fit(self, X: np.ndarray, y: np.ndarray):
 
@@ -78,17 +81,17 @@ class Preprocessor(TransformerMixin, BaseEstimator):
     def determine_which_features_are_singular(self, x: np.ndarray) -> None:
 
         self.singular_features = np.array([ len(np.unique(x_col)) for x_col in x.T ]) == 1
-        
-
 
     def determine_which_features_to_select(self, x: np.ndarray, y: np.ndarray) -> None:
 
         if x.shape[1] > self.max_features:
             logger.info(f"A maximum of {self.max_features} features are allowed, but the dataset has {x.shape[1]} features. A subset of {self.max_features} are selected using SelectKBest")
 
-            self.select_k_best = SelectKBest(k=self.max_features)
+            if self.task == Task.CLASSIFICATION:
+                self.select_k_best = SelectKBest(k=self.max_features, score_func=f_classif)
+            else:  # Task.REGRESSION
+                self.select_k_best = SelectKBest(k=self.max_features, score_func=f_regression)
             self.select_k_best.fit(x, y)
-
 
     def compute_pre_nan_mean(self, x: np.ndarray) -> None:
         """

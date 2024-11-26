@@ -4,7 +4,12 @@ The TabForestPFN codebase was originally created as an implementation of the pap
 
 The codebase provides convenient functionality surrounding conducting fine-tuning and inference on tabular transformer models, which we leverage in the TabPFNMix model.
 
-The following changes to the original codebase have been made by Nick Erickson (@innixma):
+For more information on the TabPFNMix model, refer to the HuggingFace model repositories:
+
+1. https://huggingface.co/autogluon/tabpfn-mix-1.0-classifier
+2. https://huggingface.co/autogluon/tabpfn-mix-1.0-regressor
+
+The following changes to the original codebase have been made by Nick Erickson (@innixma) and Xiyuan Zhang (@xiyuanzh):
 
 1. Improved model early stopping logic to properly load the best epoch's weights at the end of the fit call.
 2. Removed all code that is unused for model fine-tuning and inference. Therefore, all code related to benchmarking and pre-training have been removed.
@@ -23,3 +28,4 @@ The following changes to the original codebase have been made by Nick Erickson (
 15. Added time_limit support
 16. Added support for fine-tuning without validation data
 17. Added HuggingFace Hub `from_pretrained` support
+18. Added regression support

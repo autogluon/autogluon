@@ -44,10 +44,12 @@ class TabPFNMixModel(AbstractModel):
 
     def _get_model_type(self):
         from ._internal.tabpfnmix_classifier import TabPFNMixClassifier
+        from ._internal.tabpfnmix_regressor import TabPFNMixRegressor
         if self.problem_type in ['binary', 'multiclass']:
             model_cls = TabPFNMixClassifier
+        elif self.problem_type in ['regression']:
+            model_cls = TabPFNMixRegressor
         else:
-            # FIXME: Add regression support
             raise AssertionError(f"TabPFN does not support problem_type='{self.problem_type}'")
         return model_cls
 
@@ -57,8 +59,7 @@ class TabPFNMixModel(AbstractModel):
             # most important hyperparameters. Only set `n_estimators>1` if `max_epochs>1`, else there will be no benefit.
             # model_path,  # most important, defines huggingface model path
             "model_path_classifier": "autogluon/tabpfn-mix-1.0-classifier",  # if specified, overrides model_path for classification problems, set to None to ignore.
-            # model_path_classifier,
-            # model_path_regressor,  # if specified, overrides model_path for regression problems
+            "model_path_regressor": "autogluon/tabpfn-mix-1.0-regressor",  # if specified, overrides model_path for regression problems, set to None to ignore.
             # weights_path,  # most important, defines weights location (overrides huggingface weights if specified)
             # weights_path_classifier,  # if specified, overrides weights_path for classification problems
             # weights_path_regressor,  # if specified, overrides weights_path for regression problems
@@ -222,6 +223,7 @@ class TabPFNMixModel(AbstractModel):
 
         # Ensure refit_full uses the same number of max_epochs as the original's best
         self.params_trained["max_epochs"] = self.model.trainer.best_epoch
+        self.params_trained["ag.max_rows"] = None  # This ensures we don't raise an exception during refit_full
 
         # reduce memory and disk usage by 3x
         self.model.trainer.minimize_for_inference()
@@ -294,7 +296,7 @@ class TabPFNMixModel(AbstractModel):
     def _get_default_ag_args(cls) -> dict:
         default_ag_args = super()._get_default_ag_args()
         extra_ag_args = {
-            "problem_types": [BINARY, MULTICLASS],
+            "problem_types": [BINARY, MULTICLASS, REGRESSION],
         }
         default_ag_args.update(extra_ag_args)
         return default_ag_args

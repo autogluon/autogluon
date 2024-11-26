@@ -25,14 +25,15 @@ class CollatorWithPadding():
 
         n_support_features = batch[0]['x_support'].shape[1]
         n_query_features = batch[0]['x_query'].shape[1]
+        y_dtype = batch[0]['y_support'].dtype
 
         batch_size = len(batch)
 
         tensor_dict = {
             'x_support': torch.zeros((batch_size, self.n_support_samples, n_support_features), dtype=torch.float32),
-            'y_support': torch.zeros((batch_size, self.n_support_samples), dtype=torch.int64) - 100,
+            'y_support': torch.zeros((batch_size, self.n_support_samples), dtype=y_dtype),
             'x_query': torch.zeros((batch_size, max_query_samples, n_query_features), dtype=torch.float32),
-            'y_query': torch.zeros((batch_size, max_query_samples), dtype=torch.int64) - 100
+            'y_query': torch.zeros((batch_size, max_query_samples), dtype=y_dtype)
         }
 
         for i, dataset in enumerate(batch):

@@ -3,6 +3,7 @@ import einops
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from ...core.enums import Task
 
 from .embedding import FoundationEmbeddingX, FoundationEmbeddingYFloat, FoundationEmbeddingYInteger
 from huggingface_hub import PyTorchModelHubMixin
@@ -19,6 +20,7 @@ class FoundationTransformer(nn.Module, PyTorchModelHubMixin):
         n_heads: int,
         attn_dropout: float,
         y_as_float_embedding: bool,
+        task: str = Task.CLASSIFICATION,
     ) -> None:
         
         super().__init__()
@@ -30,6 +32,7 @@ class FoundationTransformer(nn.Module, PyTorchModelHubMixin):
         self.n_heads = n_heads
         self.attn_dropout = attn_dropout
         self.y_as_float_embedding = y_as_float_embedding
+        self.task = task
 
         self.x_embedding = FoundationEmbeddingX(dim, n_features)
 
@@ -53,7 +56,10 @@ class FoundationTransformer(nn.Module, PyTorchModelHubMixin):
             }))
 
         self.final_layer1 = nn.Linear(dim, dim*4)
-        self.final_layer2 = nn.Linear(dim*4, n_classes)
+        if self.task == Task.CLASSIFICATION:
+            self.final_layer2 = nn.Linear(dim*4, n_classes)
+        elif self.task == Task.REGRESSION:
+            self.final_layer2 = nn.Linear(dim*4, 1)
         self.init_weights()
 
 
