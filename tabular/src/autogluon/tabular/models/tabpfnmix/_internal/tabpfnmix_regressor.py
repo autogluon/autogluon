@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
-from sklearn.base import BaseEstimator, ClassifierMixin
+from sklearn.base import BaseEstimator, RegressorMixin
 import torch
 
 from .core.dataset_split import make_stratified_dataset_split
@@ -15,8 +15,11 @@ from .models.foundation.foundation_transformer import FoundationTransformer
 # TODO: test_epoch might be better if it uses the for loop logic with n_ensembles during finetuning to better estimate val score
 # TODO: To mitigate val overfitting, can fit multiple random seeds at same time and pick same epoch for all of them, track average performance on epoch.
 # TODO: Test shuffling the data and see if it makes TabPFNv2 worse, same with TabForestPFN
-class TabPFNMixClassifier(BaseEstimator, ClassifierMixin):
+class TabPFNMixRegressor(BaseEstimator, RegressorMixin):
     def __init__(self, n_classes, cfg, split_val, model_path: str = None, weights_path: str | Path = None, stopping_metric=None, use_best_epoch: bool = True):
+
+        self.cfg = cfg
+
         if weights_path is not None:
             weights_path = str(Path(weights_path))
 
@@ -58,9 +61,4 @@ class TabPFNMixClassifier(BaseEstimator, ClassifierMixin):
     # FIXME: Avoid preprocessing self.X_ and self.y_ each predict call
     def predict(self, X):
         logits = self.trainer.predict(self.X_, self.y_, X)
-        return logits.argmax(axis=1)
-
-    # FIXME: Avoid preprocessing self.X_ and self.y_ each predict_proba call
-    def predict_proba(self, X):
-        logits = self.trainer.predict(self.X_, self.y_, X)
-        return np.exp(logits) / np.exp(logits).sum(axis=1)[:, None]
+        return logits
