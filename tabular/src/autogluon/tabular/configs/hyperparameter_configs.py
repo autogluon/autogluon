@@ -385,6 +385,7 @@ hyperparameter_config_dict = dict(
 
 tabpfnmix_default = {
     "model_path_classifier": "autogluon/tabpfn-mix-1.0-classifier",
+    "model_path_regressor": "autogluon/tabpfn-mix-1.0-regressor",
     "n_ensembles": 1,
     "max_epochs": 30,
     "ag.sample_rows_val": 5000,  # Beyond 5k val rows fine-tuning becomes very slow
