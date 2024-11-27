@@ -1,6 +1,6 @@
 # Release process
 
-## Prior to release: 1 week out
+## Prior to release: 1 week out 
 
 * Ensure the version specified in `docs/conf.py` and `VERSION` align with the intended release version.
 * Check all dependency version ranges.
