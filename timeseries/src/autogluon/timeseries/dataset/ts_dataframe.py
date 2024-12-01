@@ -7,6 +7,7 @@ import reprlib
 from collections.abc import Iterable
 from itertools import islice
 from pathlib import Path
+from pprint import pformat
 from typing import Any, List, Optional, Tuple, Type, Union
 
 import pandas as pd
@@ -476,27 +477,81 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
 
         self._static_features = value
 
+    def infer_frequency(self, num_items: Optional[int] = 100, raise_if_irregular: bool = False) -> str:
+        """Infer the time series frequency based on the timestamps of the observations.
+
+        Parameters
+        ----------
+        num_items : int or None, default = 100
+            Number of items (individual time series) randomly selected to infer the frequency. Lower values speed up
+            the method, but increase the chance that some items with invalid frequency are missed by subsampling.
+
+            If set to `None`, all items will be used for inferring the frequency.
+        raise_if_irregular : bool, default = False
+            If True, an exception will be raised if some items have an irregular frequency, or if different items have
+            different frequencies.
+
+        Returns
+        -------
+        freq : str
+            If all time series have a regular frequency, returns a pandas-compatible `frequency alias <https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases>`_.
+
+            If some items have an irregular frequency or if different items have different frequencies, returns string
+            `IRREG`.
+        """
+
+        df = pd.DataFrame(self)
+        if num_items is not None:
+            all_item_ids = self.item_ids
+            if len(all_item_ids) > num_items:
+                items_subset = all_item_ids.to_series().sample(n=num_items, random_state=123)
+                df = df.loc[items_subset]
+
+        candidate_freq = df.index.levels[1].freq
+        index_df = df.index.to_frame(index=False)
+
+        def get_freq(series: pd.Series) -> Optional[str]:
+            dt_index = pd.DatetimeIndex(series)
+            inferred_freq = dt_index.inferred_freq
+            # Fallback option: maybe original index has a `freq` attribute that pandas fails to infer (e.g., 'SME')
+            if inferred_freq is None and candidate_freq is not None:
+                try:
+                    # If this line does not raise an exception, then candidate_freq is a compatible frequency
+                    dt_index.freq = candidate_freq
+                except ValueError:
+                    inferred_freq = None
+                else:
+                    inferred_freq = candidate_freq
+            return inferred_freq
+
+        freq_for_each_item = index_df.groupby(ITEMID, sort=False).agg(get_freq)[TIMESTAMP]
+        freq = freq_for_each_item.iloc[0]
+        if len(set(freq_for_each_item)) > 1 or freq is None:
+            if raise_if_irregular:
+                items_with_irregular_freq = freq_for_each_item[pd.isnull(freq_for_each_item)]
+                if len(items_with_irregular_freq) > 0:
+                    raise ValueError(
+                        "Cannot infer frequency. Items with irregular frequency: "
+                        f"{pformat(items_with_irregular_freq.index.tolist())}"
+                    )
+                else:
+                    raise ValueError(
+                        "Cannot infer frequency. Multiple frequencies detected in the dataset: "
+                        f"{freq_for_each_item.unique().tolist()}"
+                    )
+            return IRREGULAR_TIME_INDEX_FREQSTR
+        else:
+            return pd.tseries.frequencies.to_offset(freq).freqstr
+
     @property
     def freq(self):
-        if self._cached_freq is not None and self._cached_freq == IRREGULAR_TIME_INDEX_FREQSTR:
+        if self._cached_freq is None:
+            self._cached_freq = self.infer_frequency()
+
+        if self._cached_freq == IRREGULAR_TIME_INDEX_FREQSTR:
             return None  # irregularly sampled time series
-        elif self._cached_freq:
+        else:
             return self._cached_freq
-
-        def get_freq(series):
-            return series.index.freq or series.index.inferred_freq
-
-        # check the frequencies of the first 100 items to see if frequencies are consistent and
-        # can be inferred
-        freq_for_each_series = [get_freq(self.loc[idx]) for idx in self.item_ids[:100]]
-        freq = freq_for_each_series[0]
-        if len(set(freq_for_each_series)) > 1 or freq is None:
-            self._cached_freq = IRREGULAR_TIME_INDEX_FREQSTR
-            return None
-
-        freq = freq.freqstr if isinstance(freq, pd._libs.tslibs.BaseOffset) else freq
-        self._cached_freq = freq
-        return freq
 
     @property
     def num_items(self):
@@ -866,7 +921,11 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
         test_data : TimeSeriesDataFrame
             Test portion of the data. Contains the slice ``[:end_idx]`` of each time series in the original dataset.
         """
-        test_data = self.slice_by_timestep(None, end_index)
+        df = self
+        if not df.index.is_monotonic_increasing:
+            logger.warning("Sorting the dataframe index before generating the train/test split.")
+            df = df.sort_index()
+        test_data = df.slice_by_timestep(None, end_index)
         train_data = test_data.slice_by_timestep(None, -prediction_length)
 
         if suffix is not None:
@@ -1008,3 +1067,7 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
         # This hides method from IPython autocomplete, but not VSCode autocomplete
         deprecated = ["get_reindexed_view", "to_regular_index"]
         return [d for d in super().__dir__() if d not in deprecated]
+
+    def to_data_frame(self) -> pd.DataFrame:
+        """Convert `TimeSeriesDataFrame` to a `pandas.DataFrame`"""
+        return pd.DataFrame(self)

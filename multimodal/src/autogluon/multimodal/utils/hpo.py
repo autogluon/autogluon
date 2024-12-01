@@ -50,9 +50,9 @@ def hpo_trial(sampled_hyperparameters, learner, checkpoint_dir=None, **_fit_args
     resources = context.get_trial_resources().required_resources
     num_cpus = int(resources.get("CPU"))
 
-    _fit_args["hyperparameters"] = (
-        sampled_hyperparameters  # The original hyperparameters is the search space, replace it with the hyperparameters sampled
-    )
+    # The original hyperparameters is the search space, replace it with the hyperparameters sampled
+    _fit_args["hyperparameters"] = sampled_hyperparameters
+
     _fit_args["save_path"] = context.get_trial_dir()  # We want to save each trial to a separate directory
     logger.debug(f"hpo trial save_path: {_fit_args['save_path']}")
     if checkpoint_dir is not None:
@@ -62,7 +62,15 @@ def hpo_trial(sampled_hyperparameters, learner, checkpoint_dir=None, **_fit_args
         learner.fit_per_run(**_fit_args)
 
 
-def build_final_learner(learner, best_trial_path, save_path, last_ckpt_path, is_matching, standalone, clean_ckpts):
+def build_final_learner(
+    learner,
+    best_trial_path,
+    save_path,
+    last_ckpt_path,
+    is_matching,
+    standalone,
+    clean_ckpts,
+):
     """
     Build the final learner after HPO is finished.
 
@@ -167,12 +175,13 @@ def hyperparameter_tune(hyperparameter_tune_kwargs, resources, is_matching=False
     mode = _fit_args.get("learner")._minmax_mode
     save_path = _fit_args.get("save_path")
     time_budget_s = _fit_args.get("max_time")
+    num_to_keep = hyperparameter_tune_kwargs.pop("num_to_keep", 3)
     if time_budget_s is not None:
         time_budget_s *= 0.95  # give some buffer time to ray
     try:
         run_config_kwargs = {
             "checkpoint_config": CheckpointConfig(
-                num_to_keep=3,
+                num_to_keep=num_to_keep,
                 checkpoint_score_attribute=metric,
             ),
         }

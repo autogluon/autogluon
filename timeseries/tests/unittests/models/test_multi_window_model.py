@@ -7,6 +7,7 @@ import pytest
 from autogluon.timeseries.models import DeepARModel, ETSModel
 from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
 from autogluon.timeseries.splitter import ExpandingWindowSplitter
+from autogluon.timeseries.utils.features import CovariateMetadata
 
 from ..common import DUMMY_TS_DATAFRAME, dict_equal_primitive
 
@@ -14,7 +15,7 @@ from ..common import DUMMY_TS_DATAFRAME, dict_equal_primitive
 def get_multi_window_deepar(hyperparameters=None, **kwargs):
     """Wrap DeepAR inside MultiWindowBacktestingModel."""
     if hyperparameters is None:
-        hyperparameters = {"epochs": 1, "num_batches_per_epoch": 1}
+        hyperparameters = {"max_epochs": 1, "num_batches_per_epoch": 1}
     model_base_kwargs = {**kwargs, "hyperparameters": hyperparameters}
     return MultiWindowBacktestingModel(model_base=DeepARModel, model_base_kwargs=model_base_kwargs, **kwargs)
 
@@ -67,3 +68,15 @@ def test_when_saved_model_moved_then_model_can_be_loaded_with_updated_path():
 
     shutil.rmtree(original_path)
     shutil.rmtree(new_path)
+
+
+def test_when_multi_window_model_created_then_regressor_and_scaler_are_created_only_for_base_model():
+    model = get_multi_window_deepar(
+        hyperparameters={"target_scaler": "standard", "covariate_regressor": "LR"},
+        metadata=CovariateMetadata(known_covariates_real=["feat1"]),
+    )
+    model.initialize()
+    assert model.covariate_regressor is None
+    assert model.target_scaler is None
+    assert model.model_base.covariate_regressor is not None
+    assert model.model_base.target_scaler is not None

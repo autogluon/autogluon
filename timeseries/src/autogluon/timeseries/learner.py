@@ -32,6 +32,7 @@ class TimeSeriesLearner(AbstractLearner):
         eval_metric_seasonal_period: Optional[int] = None,
         prediction_length: int = 1,
         cache_predictions: bool = True,
+        ensemble_model_type: Optional[Type] = None,
         **kwargs,
     ):
         super().__init__(path_context=path_context)
@@ -44,6 +45,7 @@ class TimeSeriesLearner(AbstractLearner):
         self.quantile_levels = kwargs.get("quantile_levels", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
         self.cache_predictions = cache_predictions
         self.freq: Optional[str] = None
+        self.ensemble_model_type = ensemble_model_type
 
         self.feature_generator = TimeSeriesFeatureGenerator(
             target=self.target, known_covariates_names=self.known_covariates_names
@@ -84,7 +86,7 @@ class TimeSeriesLearner(AbstractLearner):
         self._time_limit = time_limit
         time_start = time.time()
 
-        train_data = self.feature_generator.fit_transform(train_data, data_frame_name="train_data")
+        train_data = self.feature_generator.fit_transform(train_data)
         if val_data is not None:
             val_data = self.feature_generator.transform(val_data, data_frame_name="tuning_data")
 
@@ -106,6 +108,7 @@ class TimeSeriesLearner(AbstractLearner):
                 val_splitter=val_splitter,
                 refit_every_n_windows=refit_every_n_windows,
                 cache_predictions=self.cache_predictions,
+                ensemble_model_type=self.ensemble_model_type,
             )
         )
         self.trainer = self.trainer_type(**trainer_init_kwargs)
@@ -280,10 +283,18 @@ class TimeSeriesLearner(AbstractLearner):
 
         return importance_df
 
-    def leaderboard(self, data: Optional[TimeSeriesDataFrame] = None, use_cache: bool = True) -> pd.DataFrame:
+    def leaderboard(
+        self,
+        data: Optional[TimeSeriesDataFrame] = None,
+        extra_info: bool = False,
+        extra_metrics: Optional[List[Union[str, TimeSeriesScorer]]] = None,
+        use_cache: bool = True,
+    ) -> pd.DataFrame:
         if data is not None:
             data = self.feature_generator.transform(data)
-        return self.load_trainer().leaderboard(data, use_cache=use_cache)
+        return self.load_trainer().leaderboard(
+            data, extra_info=extra_info, extra_metrics=extra_metrics, use_cache=use_cache
+        )
 
     def get_info(self, include_model_info: bool = False, **kwargs) -> Dict[str, Any]:
         learner_info = super().get_info(include_model_info=include_model_info)

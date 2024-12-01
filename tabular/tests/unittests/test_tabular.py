@@ -62,9 +62,6 @@ def test_tabular():
         subsample_size = 100
         time_limit = 60
 
-    # Catboost > 1.2 is required for python 3.11 but cannot be correctly installed on macos
-    if sys.version_info >= (3, 11) and sys.platform == "darwin":
-        hyperparameters.pop("CAT")
 
     fit_args = {"verbosity": verbosity}
     if hyperparameter_tune_kwargs is not None:
@@ -395,6 +392,11 @@ def test_advanced_functionality_bagging():
         predict_proba_oof = predictor.predict_proba_oof(model=m)
         assert predict_proba_oof.equals(predict_proba_dict_oof[m])
 
+    predict_dict_oof = predictor.predict_multi()
+    for m in predictor.model_names():
+        predict_oof = predictor.predict_oof(model=m)
+        assert predict_oof.equals(predict_dict_oof[m])
+
     score_oof = predictor.evaluate_predictions(train_data[label], oof_pred_proba)
     model_best = predictor.model_best
 
@@ -408,6 +410,18 @@ def test_advanced_functionality_bagging():
     # assert that refit model uses original model's OOF predictions
     oof_pred_proba_refit = predictor.predict_proba_oof()
     assert oof_pred_proba.equals(oof_pred_proba_refit)
+
+    # check predict_proba_multi after refit does not raise an exception
+    predict_proba_dict_oof = predictor.predict_proba_multi()
+    for m in predictor.model_names():
+        predict_proba_oof = predictor.predict_proba_oof(model=m)
+        assert predict_proba_oof.equals(predict_proba_dict_oof[m])
+
+    # check predict_multi after refit does not raise an exception
+    predict_dict_oof = predictor.predict_multi()
+    for m in predictor.model_names():
+        predict_oof = predictor.predict_oof(model=m)
+        assert predict_oof.equals(predict_dict_oof[m])
 
 
 def load_data(directory_prefix, train_file, test_file, name, url=None):
@@ -822,7 +836,7 @@ def test_tabularHPO():
     if fast_benchmark:
         subsample_size = 100
         time_limit = 240
-        hyperparameter_tune_kwargs["num_trials"] = 5
+        hyperparameter_tune_kwargs["num_trials"] = 3
 
     fit_args = {
         "verbosity": verbosity,
@@ -948,8 +962,8 @@ def test_sample_weight():
     test_file = "test_data.csv"
     train_data, test_data = load_data(directory_prefix=directory_prefix, train_file=train_file, test_file=test_file, name=dataset["name"], url=dataset["url"])
     print(f"Evaluating Benchmark Dataset {dataset['name']}")
-    directory = directory_prefix + dataset["name"] + "/"
-    savedir = directory + "AutogluonOutput/"
+    directory = os.path.join(directory_prefix, dataset["name"])
+    savedir = os.path.join(directory, "AutogluonOutput")
     shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
     sample_weight = "sample_weights"
     weights = np.abs(
@@ -1000,86 +1014,6 @@ def test_quantile():
     perf = predictor.evaluate(test_data)
 
 
-@pytest.mark.skip(reason="Ignored for now, since stacking is disabled without bagging.")
-def test_tabular_stack1():
-    ############ Benchmark options you can set: ########################
-    num_stack_levels = 1
-    num_bag_folds = 0
-    perf_threshold = 1.1  # How much worse can performance on each dataset be vs previous performance without warning
-    seed_val = 32  # random seed
-    subsample_size = None
-    hyperparameter_tune_kwargs = None
-    verbosity = 2  # how much output to print
-    hyperparameters = None
-    time_limit = None
-    fast_benchmark = True  # False
-    # If True, run a faster benchmark (subsample training sets, less epochs, etc),
-    # otherwise we run full benchmark with default AutoGluon settings.
-    # performance_value warnings are disabled when fast_benchmark = True.
-
-    #### If fast_benchmark = True, can control model training time here. Only used if fast_benchmark=True ####
-    if fast_benchmark:
-        subsample_size = 100
-        nn_options = {"num_epochs": 3}
-        gbm_options = {"num_boost_round": 30}
-        hyperparameters = {"GBM": gbm_options, "NN_TORCH": nn_options}
-        time_limit = 60
-
-    fit_args = {
-        "num_bag_folds": num_bag_folds,
-        "num_stack_levels": num_stack_levels,
-        "verbosity": verbosity,
-    }
-    if hyperparameter_tune_kwargs is not None:
-        fit_args["hyperparameter_tune_kwargs"] = hyperparameter_tune_kwargs
-    if hyperparameters is not None:
-        fit_args["hyperparameters"] = hyperparameters
-    if time_limit is not None:
-        fit_args["time_limit"] = time_limit
-    ###################################################################
-    run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold, seed_val=seed_val, fit_args=fit_args)
-
-
-@pytest.mark.skip(reason="Ignored for now, since stacking is disabled without bagging.")
-def test_tabular_stack2():
-    ############ Benchmark options you can set: ########################
-    num_stack_levels = 2
-    num_bag_folds = 0
-    perf_threshold = 1.1  # How much worse can performance on each dataset be vs previous performance without warning
-    seed_val = 66  # random seed
-    subsample_size = None
-    hyperparameter_tune_kwargs = None
-    verbosity = 2  # how much output to print
-    hyperparameters = None
-    time_limit = None
-    fast_benchmark = True  # False
-    # If True, run a faster benchmark (subsample training sets, less epochs, etc),
-    # otherwise we run full benchmark with default AutoGluon settings.
-    # performance_value warnings are disabled when fast_benchmark = True.
-
-    #### If fast_benchmark = True, can control model training time here. Only used if fast_benchmark=True ####
-    if fast_benchmark:
-        subsample_size = 100
-        nn_options = {"num_epochs": 3}
-        gbm_options = {"num_boost_round": 30}
-        hyperparameters = {"GBM": gbm_options, "NN_TORCH": nn_options}
-        time_limit = 60
-
-    fit_args = {
-        "num_bag_folds": num_bag_folds,
-        "num_stack_levels": num_stack_levels,
-        "verbosity": verbosity,
-    }
-    if hyperparameter_tune_kwargs is not None:
-        fit_args["hyperparameter_tune_kwargs"] = hyperparameter_tune_kwargs
-    if hyperparameters is not None:
-        fit_args["hyperparameters"] = hyperparameters
-    if time_limit is not None:
-        fit_args["time_limit"] = time_limit
-    ###################################################################
-    run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold, seed_val=seed_val, fit_args=fit_args)
-
-
 @pytest.mark.slow
 def test_tabular_bagstack():
     ############ Benchmark options you can set: ########################
@@ -1112,7 +1046,7 @@ def test_tabular_bagstack():
             },
         ]
         hyperparameters = {"GBM": gbm_options, "NN_TORCH": nn_options}
-        time_limit = 60
+        time_limit = 240
 
     fit_args = {
         "num_bag_folds": num_bag_folds,
@@ -1164,7 +1098,7 @@ def test_tabular_bagstack_use_bag_holdout():
             },
         ]
         hyperparameters = {"GBM": gbm_options, "NN_TORCH": nn_options}
-        time_limit = 60
+        time_limit = 240
 
     fit_args = {
         "num_bag_folds": num_bag_folds,
@@ -1193,7 +1127,7 @@ def test_tabular_bagstack_use_bag_holdout():
 
 def test_tabular_raise_on_nonfinite_float_labels():
     predictor = TabularPredictor(label="y")
-    nonfinite_values = [np.nan, np.inf, np.NINF]
+    nonfinite_values = [np.nan, np.inf, -np.inf]
 
     for idx, nonfinite_value in enumerate(nonfinite_values):
         train_data = TabularDataset({"x": [0.0, 1.0, 2.0, 3.0, 4.0], "y": [0.0, 1.0, 2.0, 3.0, 4.0]})
@@ -1206,7 +1140,7 @@ def test_tabular_raise_on_nonfinite_float_labels():
 
 def test_tabular_raise_on_nonfinite_class_labels():
     predictor = TabularPredictor(label="y")
-    nonfinite_values = [np.nan, np.inf, np.NINF]
+    nonfinite_values = [np.nan, np.inf, -np.inf]
 
     for idx, nonfinite_value in enumerate(nonfinite_values):
         train_data = TabularDataset({"x": [0.0, 1.0, 2.0, 3.0, 4.0], "y": ["a", "b", "c", "d", "e"]})

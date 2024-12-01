@@ -5,7 +5,7 @@ import os
 import pickle
 import time
 from abc import abstractmethod
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union, TYPE_CHECKING
 
 import pandas as pd
 from numpy import ndarray
@@ -16,11 +16,16 @@ from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.s3_utils import download_s3_folder, s3_path_to_bucket_prefix, upload_s3_folder
 from autogluon.common.utils.try_import import try_import_ray
+from autogluon.common.utils.distribute_utils import DistributedContext
+from autogluon.common.utils.log_utils import reset_logger_for_remote_call
 
 from ...pseudolabeling.pseudolabeling import assert_pseudo_column_match
 from ...ray.resources_calculator import ResourceCalculatorFactory
 from ...utils.exceptions import NotEnoughCudaMemoryError, NotEnoughMemoryError, TimeLimitExceeded
 from ..abstract.abstract_model import AbstractModel
+
+if TYPE_CHECKING:
+    from .bagged_ensemble_model import BaggedEnsembleModel
 
 logger = logging.getLogger(__name__)
 
@@ -120,7 +125,7 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
         self,
         model_base,
         model_base_kwargs,
-        bagged_ensemble_model,
+        bagged_ensemble_model: "BaggedEnsembleModel",
         X: DataFrame,
         y: Series,
         X_pseudo: DataFrame,
@@ -252,6 +257,8 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
         self.oof_pred_proba[val_index] += pred_proba
         self.oof_pred_model_repeats[val_index] += 1
         self.bagged_ensemble_model._add_child_times_to_bag(model=fold_model)
+        self.bagged_ensemble_model._add_child_num_cpus(num_cpus=fold_model.fit_num_cpus)
+        self.bagged_ensemble_model._add_child_num_gpus(num_gpus=fold_model.fit_num_gpus)
 
     def _predict_oof(self, fold_model: AbstractModel, fold_ctx) -> Tuple[AbstractModel, ndarray]:
         fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix = self._get_fold_properties(fold_ctx)
@@ -371,6 +378,8 @@ def _ray_fit(
 ):
     import ray  # ray must be present
 
+    reset_logger_for_remote_call(verbosity=kwargs_fold.get("verbosity",2))
+
     node_id = ray.get_runtime_context().get_node_id()
     is_head_node = node_id == head_node_id
     logger.debug(f"head node: {is_head_node}")
@@ -416,10 +425,10 @@ def _ray_fit(
         model_sync_path = model_sync_path + f"{fold_model.name}/"  # s3 path hence need "/" as the saperator
         bucket, prefix = s3_path_to_bucket_prefix(model_sync_path)
         upload_s3_folder(bucket=bucket, prefix=prefix, folder_to_upload=save_path, verbose=False)
-    return fold_model.name, pred_proba, time_start_fold, time_train_end_fold, fold_model.predict_time, fold_model.predict_1_time, fold_model.predict_n_size
+    return fold_model.name, pred_proba, time_start_fold, time_train_end_fold, fold_model.predict_time, fold_model.predict_1_time, fold_model.predict_n_size, fold_model.fit_num_cpus, fold_model.fit_num_gpus
 
 
-def _ray_predict_oof(fold_model: AbstractModel, X_val_fold: pd.DataFrame, y_val_fold: pd.Series, num_cpus: int = -1, save_bag_folds: bool = True):
+def _ray_predict_oof(fold_model: AbstractModel, X_val_fold: pd.DataFrame, y_val_fold: pd.Series, num_cpus: int = -1, save_bag_folds: bool = True) -> tuple[AbstractModel, ndarray]:
     y_pred_proba = fold_model.predict_proba(X_val_fold, record_time=True, num_cpus=num_cpus)
     fold_model.val_score = fold_model.score_with_y_pred_proba(y=y_val_fold, y_pred_proba=y_pred_proba)
     fold_model.reduce_memory_size(remove_fit=True, remove_info=False, requires_save=True)
@@ -478,6 +487,8 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         self.predict_time = 0
         self.predict_1_time = None
         self.predict_n_size_lst = None
+        self.fit_num_cpus = None
+        self.fit_num_gpus = None
         # max_calls to guarantee release of gpu resource
         self._ray_fit = self.ray.remote(max_calls=1)(_ray_fit)
         self.mem_est_model = self._initialized_model_base.estimate_memory_usage(X=self.X)
@@ -536,7 +547,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
 
     def _process_fold_results(self, finished, unfinished, fold_ctx):
         try:
-            fold_model, pred_proba, time_start_fit, time_end_fit, predict_time, predict_1_time, predict_n_size = self.ray.get(finished)
+            fold_model, pred_proba, time_start_fit, time_end_fit, predict_time, predict_1_time, predict_n_size, fit_num_cpus, fit_num_gpus = self.ray.get(finished)
             assert fold_ctx is not None
             self._update_bagged_ensemble(
                 fold_model=fold_model,
@@ -546,6 +557,8 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                 predict_time=predict_time,
                 predict_1_time=predict_1_time,
                 predict_n_size=predict_n_size,
+                fit_num_cpus=fit_num_cpus,
+                fit_num_gpus=fit_num_gpus,
                 fold_ctx=fold_ctx,
             )
             model_sync_path = None
@@ -580,6 +593,12 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         self.bagged_ensemble_model._add_parallel_child_times(fit_time=self.fit_time, predict_time=self.predict_time, predict_1_time=self.predict_1_time)
         self.bagged_ensemble_model._add_predict_n_size(predict_n_size_lst=self.predict_n_size_lst)
 
+    def _update_bagged_ensemble_child_resources(self):
+        for child_num_cpus in self.fit_num_cpus:
+            self.bagged_ensemble_model._add_child_num_cpus(num_cpus=child_num_cpus)
+        for child_num_gpus in self.fit_num_gpus:
+            self.bagged_ensemble_model._add_child_num_gpus(num_gpus=child_num_gpus)
+
     def _run_parallel(self, X, y, X_pseudo, y_pseudo, model_base_ref, time_limit_fold, head_node_id):
         job_refs = []
         job_fold_map = {}
@@ -611,6 +630,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
             fold_ctx = job_fold_map.get(finished, None)
             self._process_fold_results(finished, unfinished, fold_ctx)
 
+        self._update_bagged_ensemble_child_resources()
         self._update_bagged_ensemble_times()
 
     def _run_pseudo_sequential(self, X, y, X_pseudo, y_pseudo, model_base_ref, time_limit_fold, head_node_id):
@@ -691,7 +711,6 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         if resources_model is None:
             resources_model = resources
         fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix = self._get_fold_properties(fold_ctx)
-        logger.debug(f"Folding resources per job {resources}")
         train_index, val_index = fold
         fold_ctx_ref = self.ray.put(fold_ctx)
         save_bag_folds = self.save_folds
@@ -723,7 +742,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
             model_sync_path=self.model_sync_path,
         )
 
-    def _update_bagged_ensemble(self, fold_model, pred_proba, time_start_fit, time_end_fit, predict_time, predict_1_time, predict_n_size, fold_ctx):
+    def _update_bagged_ensemble(self, fold_model, pred_proba, time_start_fit, time_end_fit, predict_time, predict_1_time, predict_n_size, fit_num_cpus, fit_num_gpus, fold_ctx):
         _, val_index = fold_ctx["fold"]
         self.models.append(fold_model)
         self.oof_pred_proba[val_index] += pred_proba
@@ -744,6 +763,12 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         if self.predict_n_size_lst is None:
             self.predict_n_size_lst = []
         self.predict_n_size_lst.append(predict_n_size)
+        if self.fit_num_cpus is None:
+            self.fit_num_cpus = []
+        self.fit_num_cpus.append(fit_num_cpus)
+        if self.fit_num_gpus is None:
+            self.fit_num_gpus = []
+        self.fit_num_gpus.append(fit_num_gpus)
 
     def _get_fold_time_limit(self):
         time_elapsed = time.time() - self.time_start
@@ -912,9 +937,15 @@ class ParallelLocalFoldFittingStrategy(ParallelFoldFittingStrategy):
 class ParallelDistributedFoldFittingStrategy(ParallelFoldFittingStrategy):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        # Append bag model name in the path
-        self.model_sync_path = self.model_sync_path + os.path.basename(os.path.normpath(self.bagged_ensemble_model.path)) + "/"
+
+        # Append bag model name in the path, only use when sync path is required.
+        if not DistributedContext.is_shared_network_file_system():
+            self.model_sync_path = self.model_sync_path + os.path.basename(os.path.normpath(self.bagged_ensemble_model.path)) + "/"
 
     def _sync_model_artifact(self, local_path, model_sync_path):
+        if DistributedContext.is_shared_network_file_system():
+            # Not need to sync model artifacts in a shared file system.
+            return
+
         bucket, path = s3_path_to_bucket_prefix(model_sync_path)
         download_s3_folder(bucket=bucket, prefix=path, local_path=local_path, error_if_exists=False, verbose=False)

@@ -8,7 +8,7 @@ import evaluate
 import numpy as np
 from sklearn.metrics import f1_score
 
-from autogluon.core.metrics import Scorer, get_metric
+from autogluon.core.metrics import Scorer, compute_metric, get_metric
 
 from ..constants import (
     ACCURACY,
@@ -231,15 +231,26 @@ def compute_score(
         return metric.compute(references=metric_data[Y_TRUE], predictions=metric_data[Y_PRED])
 
     metric = get_metric(metric)
-    if metric.name in [ROC_AUC, AVERAGE_PRECISION]:
-        return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED_PROB][:, pos_label])
-    elif metric.name in [F1]:  # only for binary classification
-        return f1_score(metric_data[Y_TRUE], metric_data[Y_PRED], pos_label=pos_label)
+
+    y = metric_data[Y_TRUE]
+    if metric.needs_proba or metric.needs_threshold:
+        y_pred_proba = metric_data[Y_PRED_PROB]
+        y_pred_proba = (
+            y_pred_proba if y_pred_proba.shape[1] > 2 else y_pred_proba[:, pos_label]
+        )  # only use pos_label for binary classification
+        return metric.convert_score_to_original(
+            compute_metric(y=y, y_pred_proba=y_pred_proba, metric=metric, weights=None)
+        )
     else:
-        try:
-            return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED], y_prob=metric_data[Y_PRED_PROB])
-        except:
-            return metric._sign * metric(metric_data[Y_TRUE], metric_data[Y_PRED])
+        y_pred = metric_data[Y_PRED]
+
+        # TODO: This is a hack. Doesn't support `f1_macro`, `f1_micro`, `f1_weighted`, or custom `f1` metrics with different names.
+        # TODO: Longterm the solution should be to have the input data to this function use the internal representation without the original class names. This way `pos_label` would not need to be specified.
+        if metric.name == F1:  # only for binary classification
+            y = (y == pos_label).astype(int)
+            y_pred = (y_pred == pos_label).astype(int)
+
+        return metric.convert_score_to_original(compute_metric(y=y, y_pred=y_pred, metric=metric, weights=None))
 
 
 class RankingMetrics:

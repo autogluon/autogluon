@@ -31,10 +31,9 @@ from ...data.label_cleaner import LabelCleaner
 from ...hpo.constants import CUSTOM_BACKEND, RAY_BACKEND
 from ...hpo.exceptions import EmptySearchSpace
 from ...hpo.executors import HpoExecutor, HpoExecutorFactory
-from ...metrics import Scorer
+from ...metrics import compute_metric, Scorer
 from ...utils import (
     compute_permutation_feature_importance,
-    compute_weighted_metric,
     get_pred_from_proba,
     infer_eval_metric,
     infer_problem_type,
@@ -131,7 +130,7 @@ class AbstractModel:
             self.eval_metric = metrics.get_metric(eval_metric, self.problem_type, "eval_metric")  # Note: we require higher values = better performance
         else:
             self.eval_metric = None
-        self.stopping_metric = None
+        self.stopping_metric: Scorer = None
         self.normalize_pred_probas = None
 
         self.features = None  # External features, do not use internally
@@ -308,6 +307,20 @@ class AbstractModel:
         # TODO: v1.0: Enforce this by raising if `predict_proba` called when this is False.
         return self.can_infer() and self.problem_type in [BINARY, MULTICLASS, SOFTCLASS]
 
+    def can_estimate_memory_usage_static(self) -> bool:
+        """
+        True if `estimate_memory_usage_static` is implemented for this model.
+        If False, calling `estimate_memory_usage_static` will raise a NotImplementedError.
+        """
+        return self._get_class_tags().get("can_estimate_memory_usage_static", False)
+
+    def can_estimate_memory_usage_static_child(self) -> bool:
+        """
+        True if `estimate_memory_usage_static` is implemented for this model's child.
+        If False, calling `estimate_memory_usage_static_child` will raise a NotImplementedError.
+        """
+        return self.can_estimate_memory_usage_static()
+
     # TODO: v0.1 update to be aligned with _set_default_auxiliary_params(), add _get_default_params()
     def _set_default_params(self):
         pass
@@ -478,13 +491,15 @@ class AbstractModel:
             valid_features_extra = feature_metadata.get_features(**get_features_kwargs_extra)
             valid_features = [feature for feature in valid_features if feature in valid_features_extra]
         dropped_features = [feature for feature in self.features if feature not in valid_features]
-        logger.log(10, f"\tDropped {len(dropped_features)} of {len(self.features)} features.")
+        if dropped_features:
+            logger.log(10, f"\tDropped {len(dropped_features)} of {len(self.features)} features.")
         self.features = [feature for feature in self.features if feature in valid_features]
         self.feature_metadata = feature_metadata.keep_features(self.features)
         error_if_no_features = self.params_aux.get("error_if_no_features", True)
         if error_if_no_features and not self.features:
-            raise NoValidFeatures
+            raise NoValidFeatures(f"No valid features exist to fit {self.name}")
         # TODO: If unique_counts == 2 (including NaN), then treat as boolean
+        #  FIXME: v1.3: Need to do this on a per-fold basis
         if self.params_aux.get("drop_unique", True):
             # TODO: Could this be optimized to be faster? This might be a bit slow for large data.
             unique_counts = X[self.features].nunique(axis=0, dropna=False)
@@ -504,7 +519,7 @@ class AbstractModel:
             self._feature_metadata = self.feature_metadata
             self._is_features_in_same_as_ex = True
         if error_if_no_features and not self._features_internal:
-            raise NoValidFeatures
+            raise NoValidFeatures(f"No valid features exist after dropping features with only a single value to fit {self.name}")
 
     def _update_feature_metadata(self, X: pd.DataFrame, feature_metadata: FeatureMetadata) -> FeatureMetadata:
         """
@@ -560,15 +575,27 @@ class AbstractModel:
         kwargs.pop("num_classes", None)
         return kwargs
 
+    @classmethod
+    def _infer_problem_type(cls, *, y: pd.Series, silent: bool = True) -> str:
+        """Infer the problem_type based on y train"""
+        return infer_problem_type(y=y, silent=silent)
+
+    @classmethod
+    def _infer_num_classes(cls, *, y: pd.Series, problem_type: str = None) -> int | None:
+        """Infer num_classes based on y train"""
+        if problem_type is None:
+            problem_type = cls._infer_problem_type(y=y, silent=True)
+        label_cleaner = LabelCleaner.construct(problem_type=problem_type, y=y)
+        return label_cleaner.num_classes
+
     def _initialize(self, X=None, y=None, feature_metadata=None, num_classes=None, **kwargs):
         if num_classes is not None:
             self.num_classes = num_classes
         if y is not None:
             if self.problem_type is None:
-                self.problem_type = infer_problem_type(y=y)
+                self.problem_type = self._infer_problem_type(y=y)
             if self.num_classes is None:
-                label_cleaner = LabelCleaner.construct(problem_type=self.problem_type, y=y)
-                self.num_classes = label_cleaner.num_classes
+                self.num_classes = self._infer_num_classes(y=y, problem_type=self.problem_type)
 
         self._init_params_aux()
 
@@ -654,6 +681,7 @@ class AbstractModel:
                 user_specified_lower_level_num_gpus <= system_num_cpus
             ), f"Specified num_gpus per {self.__class__.__name__} is more than the total: {system_num_cpus}"
         k_fold = kwargs.get("k_fold", None)
+        k_fold = 1 if self.params.get("use_child_oof", False) else k_fold
         if k_fold is not None and k_fold > 0:
             # bagged model will look ag_args_ensemble and ag_args_fit internally to determine resources
             # pass all resources here by default
@@ -775,7 +803,7 @@ class AbstractModel:
             max_num_gpus = max_resources.get("num_gpus", None)
             if max_num_gpus is not None:
                 enforced_num_gpus = min(max_num_gpus, enforced_num_gpus)
-            if DistributedContext.is_distributed_mode():
+            if DistributedContext.is_distributed_mode() and (not DistributedContext.is_shared_network_file_system()):
                 minimum_model_resources = self.get_minimum_resources(is_gpu_available=(enforced_num_gpus > 0))
                 minimum_model_num_cpus = minimum_model_resources.get("num_cpus", 1)
                 enforced_num_cpus = max(minimum_model_num_cpus, enforced_num_cpus - 2)  # leave some cpu resources for process running by cluster nodes
@@ -795,8 +823,8 @@ class AbstractModel:
             self._fit_metadata = self._compute_fit_metadata(**kwargs)
             self._is_fit_metadata_registered = True
 
-    def _compute_fit_metadata(self, X_val: pd.DataFrame = None, X_unlabeled: pd.DataFrame = None, **kwargs) -> dict:
-        fit_metadata = dict(val_in_fit=X_val is not None, unlabeled_in_fit=X_unlabeled is not None)
+    def _compute_fit_metadata(self, X_val: pd.DataFrame = None, X_unlabeled: pd.DataFrame = None, num_cpus: int = None, num_gpus: int = None, **kwargs) -> dict:
+        fit_metadata = dict(val_in_fit=X_val is not None, unlabeled_in_fit=X_unlabeled is not None, num_cpus=num_cpus, num_gpus=num_gpus)
         return fit_metadata
 
     def get_fit_metadata(self) -> dict:
@@ -876,17 +904,24 @@ class AbstractModel:
         **kwargs :
             Any additional fit arguments a model supports.
         """
+        if "time_limit" in kwargs and kwargs["time_limit"] is not None:
+            time_start = time.time()
+        else:
+            time_start = None
         kwargs = self.initialize(
             **kwargs
         )  # FIXME: This might have to go before self._preprocess_fit_args, but then time_limit might be incorrect in **kwargs init to initialize
         kwargs = self._preprocess_fit_args(**kwargs)
-        if "time_limit" in kwargs and kwargs["time_limit"] is not None and kwargs["time_limit"] <= 0:
-            logger.warning(f'\tWarning: Model has no time left to train, skipping model... (Time Left = {kwargs["time_limit"]:.1f}s)')
-            raise TimeLimitExceeded
 
         self._register_fit_metadata(**kwargs)
         self.validate_fit_resources(**kwargs)
         self._validate_fit_memory_usage(**kwargs)
+        if "time_limit" in kwargs and kwargs["time_limit"] is not None:
+            time_start_fit = time.time()
+            kwargs["time_limit"] -= time_start_fit - time_start
+            if kwargs["time_limit"] <= 0:
+                logger.warning(f'\tWarning: Model has no time left to train, skipping model... (Time Left = {kwargs["time_limit"]:.1f}s)')
+                raise TimeLimitExceeded
         out = self._fit(**kwargs)
         if out is None:
             out = self
@@ -1087,24 +1122,59 @@ class AbstractModel:
         else:  # Unknown problem type
             raise AssertionError(f'Unknown y_pred_proba format for `problem_type="{self.problem_type}"`.')
 
-    def score(self, X, y, metric=None, sample_weight=None, **kwargs) -> np.ndarray:
+    def score(
+        self,
+        X,
+        y: np.ndarray,
+        metric: Scorer = None,
+        sample_weight: np.ndarray = None,
+        as_error: bool = False,
+        **kwargs,
+    ) -> float:
         if metric is None:
             metric = self.eval_metric
 
         if metric.needs_pred or metric.needs_quantile:
             y_pred = self.predict(X=X, **kwargs)
+            y_pred_proba = None
         else:
-            y_pred = self.predict_proba(X=X, **kwargs)
-        return compute_weighted_metric(y, y_pred, metric, sample_weight, quantile_levels=self.quantile_levels)
+            y_pred = None
+            y_pred_proba = self.predict_proba(X=X, **kwargs)
 
-    def score_with_y_pred_proba(self, y, y_pred_proba: np.ndarray, metric=None, sample_weight=None) -> np.ndarray:
+        return compute_metric(
+            y=y,
+            y_pred=y_pred,
+            y_pred_proba=y_pred_proba,
+            metric=metric,
+            weights=sample_weight,
+            as_error=as_error,
+            quantile_levels=self.quantile_levels,
+        )
+
+    def score_with_y_pred_proba(
+        self,
+        y: np.ndarray,
+        y_pred_proba: np.ndarray,
+        metric: Scorer = None,
+        sample_weight: np.ndarray = None,
+        as_error: bool = False,
+    ) -> float:
         if metric is None:
             metric = self.eval_metric
-        if metric.needs_pred:
+        if metric.needs_pred or metric.needs_quantile:
             y_pred = self.predict_from_proba(y_pred_proba=y_pred_proba)
+            y_pred_proba = None
         else:
-            y_pred = y_pred_proba
-        return compute_weighted_metric(y, y_pred, metric, sample_weight, quantile_levels=self.quantile_levels)
+            y_pred = None
+        return compute_metric(
+            y=y,
+            y_pred=y_pred,
+            y_pred_proba=y_pred_proba,
+            metric=metric,
+            weights=sample_weight,
+            as_error=as_error,
+            quantile_levels=self.quantile_levels,
+        )
 
     def save(self, path: str = None, verbose: bool = True) -> str:
         """
@@ -1844,15 +1914,127 @@ class AbstractModel:
         gc.collect()  # Try to avoid OOM error
         return sys.getsizeof(pickle.dumps(self, protocol=4))
 
-    def estimate_memory_usage(self, **kwargs) -> int:
+    def estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
         """
-        Estimates the memory usage of the model while training.
+        Estimates the peak memory usage of the model while training.
+
+        Parameters
+        ----------
+        X: pd.DataFrame
+            The training data features
+
         Returns
         -------
-            int: number of bytes will be used during training
+        int: estimated peak memory usage in bytes during training
         """
         assert self.is_initialized(), "Only estimate memory usage after the model is initialized."
-        return self._estimate_memory_usage(**kwargs)
+        return self._estimate_memory_usage(X=X, **kwargs)
+
+    @classmethod
+    def estimate_memory_usage_static(
+        cls,
+        *,
+        X: pd.DataFrame,
+        y: pd.Series = None,
+        hyperparameters: dict = None,
+        problem_type: str = "infer",
+        num_classes: int | None | str = "infer",
+        **kwargs,
+    ) -> int:
+        """
+        Estimates the peak memory usage of the model while training, without having to initialize the model.
+
+        Parameters
+        ----------
+        X: pd.DataFrame
+            The training data features
+        y: pd.Series, optional
+            The training data ground truth. Must be specified if problem_type or num_classes is unspecified.
+        hyperparameters: dict, optional
+            The model hyperparameters
+        problem_type: str, default = "infer"
+            The problem_type. If "infer" will infer based on y.
+        num_classes
+            The num_classes. If "infer" will infer based on y.
+        **kwargs
+            Other optional key-word fit arguments that could impact memory usage for the model.
+
+        Returns
+        -------
+        int: estimated peak memory usage in bytes during training
+        """
+        if problem_type == "infer":
+            problem_type = cls._infer_problem_type(y=y)
+        if isinstance(num_classes, str) and num_classes == "infer":
+            num_classes = cls._infer_num_classes(y=y, problem_type=problem_type)
+        if hyperparameters is None:
+            hyperparameters = {}
+        hyperparameters = cls._get_model_params_static(hyperparameters=hyperparameters, convert_search_spaces_to_default=True)
+        return cls._estimate_memory_usage_static(
+            X=X,
+            y=y,
+            hyperparameters=hyperparameters,
+            problem_type=problem_type,
+            num_classes=num_classes,
+            **kwargs
+        )
+
+    def estimate_memory_usage_child(self, X: pd.DataFrame, **kwargs) -> int:
+        """
+        Estimates the peak memory usage of the child model while training.
+
+        If the model is not a bagged model (aka has no children), then will return its personal memory usage estimate.
+
+        Parameters
+        ----------
+        X: pd.DataFrame
+            The training data features
+        **kwargs
+
+        Returns
+        -------
+        int: estimated peak memory usage in bytes during training of the child
+        """
+        return self.estimate_memory_usage(**kwargs)
+
+    def estimate_memory_usage_static_child(
+        self,
+        *,
+        X: pd.DataFrame,
+        y: pd.Series = None,
+        hyperparameters: dict = None,
+        problem_type: str = "infer",
+        num_classes: int | None | str = "infer",
+        **kwargs,
+    ) -> int:
+        """
+        Estimates the peak memory usage of the child model while training, without having to initialize the model.
+
+        Note that this method itself is not static, because the child model must be present
+        as a variable in the model to call its static memory estimate method.
+
+        To obtain the child memory estimate in a fully static manner, instead directly call the child's `estimate_memory_usage_static` method.
+
+        Parameters
+        ----------
+        X: pd.DataFrame
+            The training data features
+        y: pd.Series, optional
+            The training data ground truth. Must be specified if problem_type or num_classes is unspecified.
+        hyperparameters: dict, optional
+            The model hyperparameters
+        problem_type: str, default = "infer"
+            The problem_type. If "infer" will infer based on y.
+        num_classes
+            The num_classes. If "infer" will infer based on y.
+        **kwargs
+            Other optional key-word fit arguments that could impact memory usage for the model.
+
+        Returns
+        -------
+        int: estimated peak memory usage in bytes during training of the child
+        """
+        return self.estimate_memory_usage_static(X=X, y=y, hyperparameters=hyperparameters, problem_type=problem_type, num_classes=num_classes, **kwargs)
 
     def validate_fit_resources(self, num_cpus="auto", num_gpus="auto", total_resources=None, **kwargs):
         """
@@ -1912,6 +2094,17 @@ class AbstractModel:
         The estimated peak memory usage in bytes during model fit.
         """
         return 4 * get_approximate_df_mem_usage(X).sum()
+
+    @classmethod
+    def _estimate_memory_usage_static(
+        cls,
+        *,
+        X: pd.DataFrame,
+        hyperparameters: dict = None,
+        num_classes: int = 1,
+        **kwargs,
+    ) -> int:
+        raise NotImplementedError
 
     @disable_if_lite_mode()
     def _validate_fit_memory_usage(
@@ -2064,6 +2257,8 @@ class AbstractModel:
             "can_infer": self.can_infer(),
             "has_learning_curves": self.saved_learning_curves,
         }
+        if self._is_fit_metadata_registered:
+            info.update(self._fit_metadata)
         return info
 
     def get_params_aux_info(self) -> dict:
@@ -2212,15 +2407,36 @@ class AbstractModel:
 
         Returns
         -------
-        params: dict
+        hyperparameters: dict
             Dictionary of model hyperparameters.
         """
         params = self._get_params()
+        return self._get_model_params_static(hyperparameters=params, convert_search_spaces_to_default=convert_search_spaces_to_default)
+
+    @classmethod
+    def _get_model_params_static(cls, hyperparameters: dict, convert_search_spaces_to_default: bool = False) -> dict:
+        """
+        Gets params that are passed to the inner model.
+        This is the static version of `_get_model_params`.
+        This method can be called prior to initializing the model.
+
+        Parameters
+        ----------
+        convert_search_spaces_to_default: bool, default = False
+            If True, search spaces are converted to the default value.
+            This is useful when having to estimate memory usage estimates prior to doing hyperparameter tuning.
+
+        Returns
+        -------
+        hyperparameters: dict
+            Dictionary of model hyperparameters.
+        """
+        hyperparameters = hyperparameters.copy()
         if convert_search_spaces_to_default:
-            for param, val in params.items():
+            for param, val in hyperparameters.items():
                 if isinstance(val, Space):
-                    params[param] = val.default
-        return params
+                    hyperparameters[param] = val.default
+        return hyperparameters
 
     # TODO: Add documentation for valid args for each model. Currently only `early_stop`
     def _ag_params(self) -> set:
@@ -2302,3 +2518,23 @@ class AbstractModel:
 
     def _get_model_base(self):
         return self
+
+    @property
+    def fit_num_cpus(self) -> int:
+        """Number of CPUs used when this model was fit"""
+        return self.get_fit_metadata()["num_cpus"]
+
+    @property
+    def fit_num_gpus(self) -> float:
+        """Number of GPUs used when this model was fit"""
+        return self.get_fit_metadata()["num_gpus"]
+
+    @property
+    def fit_num_cpus_child(self) -> int:
+        """Number of CPUs used for fitting one model (i.e. a child model)"""
+        return self.fit_num_cpus
+
+    @property
+    def fit_num_gpus_child(self) -> float:
+        """Number of GPUs used for fitting one model (i.e. a child model)"""
+        return self.fit_num_gpus

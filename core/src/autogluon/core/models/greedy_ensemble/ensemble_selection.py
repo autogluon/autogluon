@@ -9,8 +9,8 @@ import numpy as np
 import pandas as pd
 
 from ...constants import PROBLEM_TYPES
-from ...metrics import log_loss
-from ...utils import compute_weighted_metric, get_pred_from_proba
+from ...metrics import compute_metric, log_loss, Scorer
+from ...utils import get_pred_from_proba
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ class EnsembleSelection(AbstractWeightedEnsemble):
         self,
         ensemble_size: int,
         problem_type: str,
-        metric,
+        metric: Scorer,
         sorted_initialization: bool = False,
         bagging: bool = False,
         tie_breaker: str = "random",
@@ -203,13 +203,22 @@ class EnsembleSelection(AbstractWeightedEnsemble):
 
         logger.debug("Ensemble indices: " + str(self.indices_))
 
-    def _calculate_regret(self, y_true: np.ndarray, y_pred_proba: np.ndarray, metric, sample_weight=None):
+    def _calculate_regret(self, y_true: np.ndarray, y_pred_proba: np.ndarray, metric: Scorer, sample_weight: np.ndarray = None) -> float:
         if metric.needs_pred or metric.needs_quantile:
-            preds = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
+            y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
+            y_pred_proba = None
         else:
-            preds = y_pred_proba
-        score = compute_weighted_metric(y_true, preds, metric, sample_weight, quantile_levels=self.quantile_levels)
-        return metric._optimum - score
+            y_pred = None
+        regret = compute_metric(
+            y=y_true,
+            y_pred=y_pred,
+            y_pred_proba=y_pred_proba,
+            metric=metric,
+            weights=sample_weight,
+            quantile_levels=self.quantile_levels,
+            as_error=True,
+        )
+        return regret
 
     def _calculate_weights(self):
         ensemble_members = Counter(self.indices_).most_common()

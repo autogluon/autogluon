@@ -152,6 +152,12 @@ class NNFastAiTabularModel(AbstractModel):
             self.cont_columns = self._feature_metadata.get_features(valid_raw_types=[R_INT, R_FLOAT, R_DATETIME])
             self.cat_columns = self._feature_metadata.get_features(valid_raw_types=[R_OBJECT, R_CATEGORY, R_BOOL])
             if self.cont_columns:
+                # Drop columns that have less than 2 unique values (ignoring NaNs)
+                # If these columns are kept, it will raise an exception when trying to normalize.
+                # TODO: Can instead treat them as boolean if 1 unique + NaN
+                unique_vals = X[self.cont_columns].nunique()
+                self.cont_columns = [c for c in self.cont_columns if unique_vals[c] > 1]
+            if self.cont_columns:
                 self._cont_normalization = (np.array(X[self.cont_columns].mean()), np.array(X[self.cont_columns].std()))
 
             num_cat_cols_og = len(self.cat_columns)
@@ -344,6 +350,7 @@ class NNFastAiTabularModel(AbstractModel):
 
         callbacks = [save_callback, early_stopping]
 
+        # TODO: Optimize by using io.BytesIO() instead of temp_dir for checkpointing?
         with make_temp_directory() as temp_dir:
             with self.model.no_bar():
                 with self.model.no_logging():
@@ -359,7 +366,7 @@ class NNFastAiTabularModel(AbstractModel):
                     self.model.fit_one_cycle(epochs, params["lr"], cbs=callbacks)
 
                     # Load the best one and export it
-                    self.model = self.model.load(fname)
+                    self.model = self.model.load(fname, weights_only=False)  # nosec B614
 
                     if objective_func_name == "log_loss":
                         eval_result = self.model.validate(dl=dls.valid)[0]
@@ -604,7 +611,17 @@ class NNFastAiTabularModel(AbstractModel):
         }
         return metrics_map
 
-    def _estimate_memory_usage(self, X, **kwargs):
+    def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
+        hyperparameters = self._get_model_params()
+        return self.estimate_memory_usage_static(X=X, problem_type=self.problem_type, num_classes=self.num_classes, hyperparameters=hyperparameters, **kwargs)
+
+    @classmethod
+    def _estimate_memory_usage_static(
+        cls,
+        *,
+        X: pd.DataFrame,
+        **kwargs,
+    ) -> int:
         return 10 * get_approximate_df_mem_usage(X).sum()
 
     def _get_hpo_backend(self):
@@ -622,6 +639,10 @@ class NNFastAiTabularModel(AbstractModel):
         if is_gpu_available:
             minimum_resources["num_gpus"] = 0.5
         return minimum_resources
+
+    @classmethod
+    def _class_tags(cls):
+        return {"can_estimate_memory_usage_static": True}
 
     def _more_tags(self):
         return {"can_refit_full": True}

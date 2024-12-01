@@ -4,7 +4,7 @@ import warnings
 from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
-from nptyping import NDArray
+from numpy.typing import NDArray
 from omegaconf import DictConfig
 from torch import nn
 

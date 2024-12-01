@@ -44,6 +44,7 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
     allowed_local_model_args: List[str] = []
     default_n_jobs: Union[int, float] = AG_DEFAULT_N_JOBS
     default_max_ts_length: Optional[int] = 2500
+    default_max_time_limit_ratio = 1.0
     init_time_in_seconds: int = 0
 
     def __init__(
@@ -84,13 +85,26 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
 
         self._local_model_args: Dict[str, Any] = None
         self._seasonal_period: Optional[int] = None
-        self.time_limit: Optional[float] = None
         self._dummy_forecast: Optional[pd.DataFrame] = None
 
-    def preprocess(self, data: TimeSeriesDataFrame, is_train: bool = False, **kwargs) -> Any:
+    @property
+    def allowed_hyperparameters(self) -> List[str]:
+        return (
+            super().allowed_hyperparameters
+            + ["use_fallback_model", "max_ts_length", "n_jobs"]
+            + self.allowed_local_model_args
+        )
+
+    def preprocess(
+        self,
+        data: TimeSeriesDataFrame,
+        known_covariates: Optional[TimeSeriesDataFrame] = None,
+        is_train: bool = False,
+        **kwargs,
+    ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
         if not self._get_tags()["allow_nan"]:
             data = data.fill_missing_values()
-        return data
+        return data, known_covariates
 
     def _fit(self, train_data: TimeSeriesDataFrame, time_limit: Optional[int] = None, **kwargs):
         self._check_fit_params()
@@ -103,9 +117,13 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
 
         unused_local_model_args = []
         local_model_args = {}
+        # TODO: Move filtering logic to AbstractTimeSeriesModel
         for key, value in raw_local_model_args.items():
             if key in self.allowed_local_model_args:
                 local_model_args[key] = value
+            elif key in self.allowed_hyperparameters:
+                # Quietly ignore params in self.allowed_hyperparameters - they are used by AbstractTimeSeriesModel
+                pass
             else:
                 unused_local_model_args.append(key)
 
@@ -120,7 +138,6 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         self._seasonal_period = local_model_args["seasonal_period"]
 
         self._local_model_args = self._update_local_model_args(local_model_args=local_model_args)
-        self.time_limit = time_limit
 
         self._dummy_forecast = self._get_dummy_forecast(train_data)
         return self
@@ -168,18 +185,6 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         predictions_df = pd.concat([pred for pred, _ in predictions_with_flags])
         predictions_df.index = get_forecast_horizon_index_ts_dataframe(data, self.prediction_length, freq=self.freq)
         return TimeSeriesDataFrame(predictions_df)
-
-    def score_and_cache_oof(
-        self,
-        val_data: TimeSeriesDataFrame,
-        store_val_score: bool = False,
-        store_predict_time: bool = False,
-        **predict_kwargs,
-    ) -> None:
-        # All computation happens during inference, so we provide the time_limit at prediction time
-        super().score_and_cache_oof(
-            val_data, store_val_score, store_predict_time, time_limit=self.time_limit, **predict_kwargs
-        )
 
     def _predict_wrapper(self, time_series: pd.Series, end_time: Optional[float] = None) -> Tuple[pd.DataFrame, bool]:
         if end_time is not None and time.time() >= end_time:

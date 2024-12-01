@@ -12,7 +12,7 @@ import numpy as np
 import PIL
 import pytesseract
 import torch
-from nptyping import NDArray
+from numpy.typing import NDArray
 from PIL import ImageFile
 from torch import nn
 from torchvision import transforms

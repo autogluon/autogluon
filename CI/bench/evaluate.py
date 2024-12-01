@@ -48,7 +48,7 @@ def process_results(eval_flag: bool):
         unique_framework = {}
         # Renaming the frameworks for dashboard formatting
         for file in os.listdir("./evaluate"):
-            if file.endswith("dataset_all.csv"):
+            if file.endswith("dataset_valid.csv"):
                 file_path = os.path.join("./evaluate", file)
                 df = pd.read_csv(file_path)
                 for index, row in df.iterrows():
@@ -72,11 +72,14 @@ def process_results(eval_flag: bool):
 
         df['framework'] = df['framework'].map(unique_framework)
         df.to_csv(file_path, index=False)
-        
+
         for file in os.listdir("./evaluate/pairwise/"):
             if file.endswith(".csv"):
                 file_path = os.path.join("./evaluate/pairwise/", file)
                 df = pd.read_csv(file_path)
+                cols_to_drop = ["% Loss Reduction (median)", "Avg Fit Speed Diff"]
+                df = df.drop(columns=cols_to_drop, errors='ignore')
+                df = df.rename(columns={'% Loss Reduction':'% Less Avg. Errors'})
 
         df['framework'] = df['framework'].map(unique_framework)
         df.to_csv(file_path, index=False)

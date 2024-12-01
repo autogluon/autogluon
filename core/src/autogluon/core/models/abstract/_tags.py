@@ -27,4 +27,10 @@ _DEFAULT_CLASS_TAGS = {
     # Whether the model can handle raw text input features.
     #  Used for informing the global feature preprocessor on if it should keep raw text features.
     "handles_text": False,
+
+    # Whether the model can estimate memory usage during fit without requiring initialization.
+    # If True, can call `model.estimate_memory_usage_static(...)` to get a memory estimate.
+    # For large datasets, it is much faster to get a memory estimate using this technique rather than having to first initialize the model
+    # For example, going from 15s -> 0.1s, approximately a 100x speedup.
+    "can_estimate_memory_usage_static": False,
 }

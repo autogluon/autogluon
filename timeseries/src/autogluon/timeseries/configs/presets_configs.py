@@ -10,6 +10,24 @@ TIMESERIES_PRESETS_CONFIGS = dict(
     high_quality={"hyperparameters": "default"},
     medium_quality={"hyperparameters": "light"},
     fast_training={"hyperparameters": "very_light"},
+    # Chronos-Bolt models
+    bolt_tiny={
+        "hyperparameters": {"Chronos": {"model_path": "bolt_tiny"}},
+        "skip_model_selection": True,
+    },
+    bolt_mini={
+        "hyperparameters": {"Chronos": {"model_path": "bolt_mini"}},
+        "skip_model_selection": True,
+    },
+    bolt_small={
+        "hyperparameters": {"Chronos": {"model_path": "bolt_small"}},
+        "skip_model_selection": True,
+    },
+    bolt_base={
+        "hyperparameters": {"Chronos": {"model_path": "bolt_base"}},
+        "skip_model_selection": True,
+    },
+    # Original Chronos models
     chronos_tiny={
         "hyperparameters": {"Chronos": {"model_path": "tiny"}},
         "skip_model_selection": True,

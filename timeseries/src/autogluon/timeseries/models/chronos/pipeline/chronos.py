@@ -11,14 +11,16 @@ from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import torch
 import torch.nn as nn
-from transformers import AutoConfig, AutoModelForCausalLM, AutoModelForSeq2SeqLM, GenerationConfig, PreTrainedModel
+from transformers import AutoConfig, AutoModelForSeq2SeqLM, GenerationConfig, PreTrainedModel
 
 from autogluon.timeseries.utils.warning_filters import set_loggers_level
 
-logger = logging.getLogger(__name__)
+from .base import BaseChronosPipeline, ForecastType
+
+logger = logging.getLogger("autogluon.timeseries.models.chronos")
 
 
-__all__ = ["ChronosConfig", "ChronosPipeline", "OptimizedChronosPipeline"]
+__all__ = ["ChronosConfig", "ChronosPipeline"]
 
 
 @dataclass
@@ -35,7 +37,7 @@ class ChronosConfig:
     pad_token_id: int
     eos_token_id: int
     use_eos_token: bool
-    model_type: Literal["causal", "seq2seq"]
+    model_type: Literal["seq2seq"]
     context_length: int
     prediction_length: int
     num_samples: int
@@ -63,9 +65,12 @@ class ChronosTokenizer:
     which concrete classes must implement.
     """
 
-    def input_transform(self, context: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, Any]:
+    def context_input_transform(
+        self,
+        context: torch.Tensor,
+    ) -> Tuple:
         """
-        Turn a batch of time series into token IDs, attention map, and scale.
+        Turn a batch of time series into token IDs, attention mask, and tokenizer_state.
 
         Parameters
         ----------
@@ -85,9 +90,40 @@ class ChronosTokenizer:
             which input observations are not ``torch.nan`` (i.e. not
             missing nor padding).
         tokenizer_state
-            An object that will be passed to ``output_transform``.
-            Contains the relevant context to decode output samples into
-            real values, such as location and scale parameters.
+            An object that can be passed to ``label_input_transform``
+            and ``output_transform``. Contains the relevant information
+            to decode output samples into real values,
+            such as location and scale parameters.
+        """
+        raise NotImplementedError()
+
+    def label_input_transform(self, label: torch.Tensor, tokenizer_state: Any) -> Tuple:
+        """
+        Turn a batch of label slices of time series into token IDs and attention mask
+        using the ``tokenizer_state`` provided by ``context_input_transform``.
+
+        Parameters
+        ----------
+        label
+            A tensor shaped (batch_size, time_length), containing the
+            timeseries label, i.e., the ground-truth future values.
+        tokenizer_state
+            An object returned by ``context_input_transform`` containing
+            relevant information to preprocess data, such as location and
+            scale. The nature of this depends on the specific tokenizer.
+            This is used for tokenizing the label, in order to use the same
+            scaling used to tokenize the context.
+
+        Returns
+        -------
+        token_ids
+            A tensor of integers, shaped (batch_size, time_length + 1)
+            if ``config.use_eos_token`` and (batch_size, time_length)
+            otherwise, containing token IDs for the input series.
+        attention_mask
+            A boolean tensor, same shape as ``token_ids``, indicating
+            which input observations are not ``torch.nan`` (i.e. not
+            missing nor padding).
         """
         raise NotImplementedError()
 
@@ -115,6 +151,11 @@ class ChronosTokenizer:
 
 
 class MeanScaleUniformBins(ChronosTokenizer):
+    """
+    A tokenizer that performs mean scaling and then quantizes the scaled time series into
+    uniformly-spaced bins between some bounds on the real line.
+    """
+
     def __init__(self, low_limit: float, high_limit: float, config: ChronosConfig) -> None:
         self.config = config
         self.centers = torch.linspace(
@@ -130,15 +171,15 @@ class MeanScaleUniformBins(ChronosTokenizer):
             )
         )
 
-    def input_transform(self, context: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        batch_size, length = context.shape
-
-        if length > self.config.context_length:
-            context = context[..., -self.config.context_length :]
-
+    def _input_transform(
+        self, context: torch.Tensor, scale: Optional[torch.Tensor] = None
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         attention_mask = ~torch.isnan(context)
-        scale = torch.nansum(torch.abs(context) * attention_mask, dim=-1) / torch.nansum(attention_mask, dim=-1)
-        scale[~(scale > 0)] = 1.0
+
+        if scale is None:
+            scale = torch.nansum(torch.abs(context) * attention_mask, dim=-1) / torch.nansum(attention_mask, dim=-1)
+            scale[~(scale > 0)] = 1.0
+
         scaled_context = context / scale.unsqueeze(dim=-1)
         token_ids = (
             torch.bucketize(
@@ -151,14 +192,41 @@ class MeanScaleUniformBins(ChronosTokenizer):
             + self.config.n_special_tokens
         )
         token_ids[~attention_mask] = self.config.pad_token_id
-
-        if self.config.use_eos_token:
-            eos_tokens = torch.full((batch_size, 1), fill_value=self.config.eos_token_id)
-            token_ids = torch.concat((token_ids, eos_tokens), dim=1)
-            eos_mask = torch.full((batch_size, 1), fill_value=True)
-            attention_mask = torch.concat((attention_mask, eos_mask), dim=1)
+        token_ids.clamp_(0, self.config.n_tokens - 1)
 
         return token_ids, attention_mask, scale
+
+    def _append_eos_token(
+        self, token_ids: torch.Tensor, attention_mask: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        batch_size = token_ids.shape[0]
+        eos_tokens = torch.full((batch_size, 1), fill_value=self.config.eos_token_id)
+        token_ids = torch.concat((token_ids, eos_tokens), dim=1)
+        eos_mask = torch.full((batch_size, 1), fill_value=True)
+        attention_mask = torch.concat((attention_mask, eos_mask), dim=1)
+
+        return token_ids, attention_mask
+
+    def context_input_transform(self, context: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        length = context.shape[-1]
+
+        if length > self.config.context_length:
+            context = context[..., -self.config.context_length :]
+
+        token_ids, attention_mask, scale = self._input_transform(context=context)
+
+        if self.config.use_eos_token and self.config.model_type == "seq2seq":
+            token_ids, attention_mask = self._append_eos_token(token_ids=token_ids, attention_mask=attention_mask)
+
+        return token_ids, attention_mask, scale
+
+    def label_input_transform(self, label: torch.Tensor, scale: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        token_ids, attention_mask, _ = self._input_transform(context=label, scale=scale)
+
+        if self.config.use_eos_token:
+            token_ids, attention_mask = self._append_eos_token(token_ids=token_ids, attention_mask=attention_mask)
+
+        return token_ids, attention_mask
 
     def output_transform(self, samples: torch.Tensor, scale: torch.Tensor) -> torch.Tensor:
         scale_unsqueezed = scale.unsqueeze(-1).unsqueeze(-1)
@@ -279,18 +347,7 @@ class ChronosPretrainedModel(nn.Module):
         return preds.reshape(input_ids.size(0), num_samples, -1)
 
 
-def left_pad_and_stack_1D(tensors: List[torch.Tensor]):
-    max_len = max(len(c) for c in tensors)
-    padded = []
-    for c in tensors:
-        assert isinstance(c, torch.Tensor)
-        assert c.ndim == 1
-        padding = torch.full(size=(max_len - len(c),), fill_value=torch.nan, device=c.device)
-        padded.append(torch.concat((padding, c), dim=-1))
-    return torch.stack(padded)
-
-
-class ChronosPipeline:
+class ChronosPipeline(BaseChronosPipeline):
     """
     A ``ChronosPipeline`` uses the given tokenizer and model to forecast
     input time series.
@@ -308,20 +365,12 @@ class ChronosPipeline:
 
     tokenizer: ChronosTokenizer
     model: ChronosPretrainedModel
+    forecast_type: ForecastType = ForecastType.SAMPLES
 
     def __init__(self, tokenizer, model):
+        super().__init__(inner_model=model.model)
         self.tokenizer = tokenizer
         self.model = model
-
-    def _prepare_and_validate_context(self, context: Union[torch.Tensor, List[torch.Tensor]]):
-        if isinstance(context, list):
-            context = left_pad_and_stack_1D(context)
-        assert isinstance(context, torch.Tensor)
-        if context.ndim == 1:
-            context = context.unsqueeze(0)
-        assert context.ndim == 2
-
-        return context
 
     @torch.no_grad()
     def embed(self, context: Union[torch.Tensor, List[torch.Tensor]]) -> Tuple[torch.Tensor, Any]:
@@ -348,7 +397,7 @@ class ChronosPipeline:
             provided, and the extra 1 is for EOS.
         """
         context = self._prepare_and_validate_context(context=context)
-        token_ids, attention_mask, tokenizer_state = self.tokenizer.input_transform(context)
+        token_ids, attention_mask, tokenizer_state = self.tokenizer.context_input_transform(context)
         embeddings = self.model.encode(
             input_ids=token_ids.to(self.model.device),
             attention_mask=attention_mask.to(self.model.device),
@@ -363,7 +412,7 @@ class ChronosPipeline:
         temperature: Optional[float] = None,
         top_k: Optional[int] = None,
         top_p: Optional[float] = None,
-        limit_prediction_length: bool = True,
+        limit_prediction_length: bool = False,
     ) -> torch.Tensor:
         """
         Get forecasts for the given time series.
@@ -420,7 +469,7 @@ class ChronosPipeline:
         remaining = prediction_length
 
         while remaining > 0:
-            token_ids, attention_mask, scale = self.tokenizer.input_transform(context)
+            token_ids, attention_mask, scale = self.tokenizer.context_input_transform(context)
             samples = self.model(
                 token_ids.to(self.model.device),
                 attention_mask.to(self.model.device),
@@ -442,42 +491,33 @@ class ChronosPipeline:
 
         return torch.cat(predictions, dim=-1)
 
-    @classmethod
-    def from_pretrained(cls, *args, **kwargs):
-        """
-        Load the model, either from a local path or from the HuggingFace Hub.
-        Supports the same arguments as ``AutoConfig`` and ``AutoModel``
-        from ``transformers``.
-        """
-
-        config = AutoConfig.from_pretrained(*args, **kwargs)
-
-        assert hasattr(config, "chronos_config"), "Not a Chronos config file"
-
-        chronos_config = ChronosConfig(**config.chronos_config)
-
-        if chronos_config.model_type == "seq2seq":
-            inner_model = AutoModelForSeq2SeqLM.from_pretrained(*args, **kwargs)
-        else:
-            assert config.model_type == "causal"
-            inner_model = AutoModelForCausalLM.from_pretrained(*args, **kwargs)
-
-        return cls(
-            tokenizer=chronos_config.create_tokenizer(),
-            model=ChronosPretrainedModel(config=chronos_config, model=inner_model),
+    def predict_quantiles(
+        self,
+        context: torch.Tensor,
+        prediction_length: int,
+        quantile_levels: List[float],
+        num_samples: Optional[int] = None,
+        **kwargs,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        num_samples = num_samples or self.model.config.num_samples
+        prediction_samples = (
+            self.predict(
+                context,
+                prediction_length=prediction_length,
+                num_samples=num_samples,
+            )
+            .detach()
+            .cpu()
+            .swapaxes(1, 2)
         )
+        mean = prediction_samples.mean(dim=-1, keepdim=True)
+        quantiles = torch.quantile(
+            prediction_samples,
+            q=torch.tensor(quantile_levels, dtype=prediction_samples.dtype),
+            dim=-1,
+        ).permute(1, 2, 0)
 
-
-class OptimizedChronosPipeline(ChronosPipeline):
-    """A wrapper around the ChronosPipeline object for CPU-optimized model classes from
-    HuggingFace optimum.
-    """
-
-    dtypes = {
-        "bfloat16": torch.bfloat16,
-        "float32": torch.float32,
-        "float64": torch.float64,
-    }
+        return quantiles, mean
 
     @classmethod
     def from_pretrained(cls, *args, **kwargs):
@@ -498,49 +538,45 @@ class OptimizedChronosPipeline(ChronosPipeline):
             config.chronos_config["context_length"] = context_length
         chronos_config = ChronosConfig(**config.chronos_config)
 
-        torch_dtype = kwargs.get("torch_dtype", "auto")
-        if torch_dtype != "auto" and isinstance(torch_dtype, str):
-            kwargs["torch_dtype"] = cls.dtypes[torch_dtype]
+        assert chronos_config.model_type == "seq2seq"
+        if optimization_strategy is None:
+            inner_model = AutoModelForSeq2SeqLM.from_pretrained(*args, **kwargs)
+        else:
+            assert optimization_strategy in [
+                "onnx",
+                "openvino",
+            ], "optimization_strategy not recognized. Please provide one of `onnx` or `openvino`"
+            kwargs.pop("resume_download", None)  # Optimized pipeline does not support 'resume_download' kwargs
+            torch_dtype = kwargs.pop("torch_dtype", "auto")
+            if torch_dtype != "auto":
+                logger.warning(f"\t`torch_dtype` will be ignored for optimization_strategy {optimization_strategy}")
 
-        if chronos_config.model_type == "seq2seq":
-            if optimization_strategy is None:
-                inner_model = AutoModelForSeq2SeqLM.from_pretrained(*args, **kwargs)
-            else:
-                assert optimization_strategy in [
-                    "onnx",
-                    "openvino",
-                ], "optimization_strategy not recognized. Please provide one of `onnx` or `openvino`"
-                torch_dtype = kwargs.pop("torch_dtype", "auto")
-                if torch_dtype != "auto":
-                    logger.warning(
-                        f"\t`torch_dtype` will be ignored for optimization_strategy {optimization_strategy}"
+            if optimization_strategy == "onnx":
+                try:
+                    from optimum.onnxruntime import ORTModelForSeq2SeqLM
+                except ImportError:
+                    raise ImportError(
+                        "Huggingface Optimum library must be installed with ONNX for using the `onnx` strategy. "
+                        "Please try running `pip install optimum[onnxruntime]` or use Chronos-Bolt models for "
+                        "faster performance on the CPU."
                     )
 
-                if optimization_strategy == "onnx":
-                    try:
-                        from optimum.onnxruntime import ORTModelForSeq2SeqLM
-                    except ImportError:
-                        raise ImportError(
-                            "Huggingface Optimum library must be installed with ONNX for using the `onnx` strategy"
-                        )
-
-                    assert kwargs.pop("device_map", "cpu") in ["cpu", "auto"], "ONNX mode only available on the CPU"
-                    with set_loggers_level(regex=r"^optimum.*", level=logging.ERROR):
-                        inner_model = ORTModelForSeq2SeqLM.from_pretrained(*args, **{**kwargs, "export": True})
-                elif optimization_strategy == "openvino":
-                    try:
-                        from optimum.intel import OVModelForSeq2SeqLM
-                    except ImportError:
-                        raise ImportError(
-                            "Huggingface Optimum library must be installed with OpenVINO for using the `openvino` strategy"
-                        )
-                    with set_loggers_level(regex=r"^optimum.*", level=logging.ERROR):
-                        inner_model = OVModelForSeq2SeqLM.from_pretrained(
-                            *args, **{**kwargs, "device_map": "cpu", "export": True}
-                        )
-        else:
-            assert config.model_type == "causal"
-            inner_model = AutoModelForCausalLM.from_pretrained(*args, **kwargs)
+                assert kwargs.pop("device_map", "cpu") in ["cpu", "auto"], "ONNX mode only available on the CPU"
+                with set_loggers_level(regex=r"^optimum.*", level=logging.ERROR):
+                    inner_model = ORTModelForSeq2SeqLM.from_pretrained(*args, **{**kwargs, "export": True})
+            elif optimization_strategy == "openvino":
+                try:
+                    from optimum.intel import OVModelForSeq2SeqLM
+                except ImportError:
+                    raise ImportError(
+                        "Huggingface Optimum library must be installed with OpenVINO for using the `openvino` strategy. "
+                        "Please try running `pip install optimum-intel[openvino,nncf] optimum[openvino,nncf]` or use "
+                        "Chronos-Bolt models for faster performance on the CPU."
+                    )
+                with set_loggers_level(regex=r"^optimum.*", level=logging.ERROR):
+                    inner_model = OVModelForSeq2SeqLM.from_pretrained(
+                        *args, **{**kwargs, "device_map": "cpu", "export": True}
+                    )
 
         return cls(
             tokenizer=chronos_config.create_tokenizer(),

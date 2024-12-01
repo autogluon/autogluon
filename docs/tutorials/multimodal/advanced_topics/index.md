@@ -58,6 +58,13 @@
   Different use cases for continuous training with AutoMM.
 :::
 
+:::{grid-item-card} AutoMM Problem Types and Evaluation Metrics.
+  :link: problem_types_and_metrics.html
+
+  A comprehensive guide to AutoGluon's supported problem types and their evaluation metrics.
+:::
+
+
 ::::
 
 ```{toctree}
@@ -66,6 +73,7 @@ maxdepth: 1
 hidden: true
 ---
 
+problem_types_and_metrics
 hyperparameter_optimization
 continuous_training
 customization

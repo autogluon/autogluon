@@ -94,6 +94,9 @@ class BaggedEnsembleModel(AbstractModel):
 
         self._predict_n_size_lst = None  # A list of the predict row count for each child, useful to calculate the expected inference throughput of the bag.
 
+        self._child_num_cpus = None
+        self._child_num_gpus = None
+
         super().__init__(problem_type=self.model_base.problem_type, eval_metric=self.model_base.eval_metric, **kwargs)
 
     def _set_default_params(self):
@@ -138,6 +141,13 @@ class BaggedEnsembleModel(AbstractModel):
             return False
         # If max_sets is specified and the model has already fit >=max_sets, return False
         return self._get_model_params().get("max_sets", None) is None or self._get_model_params().get("max_sets") > self._n_repeats_finished
+
+    def can_estimate_memory_usage_static_child(self) -> bool:
+        """
+        Returns True if `get_memory_estimate_static` is implemented for this model's child.
+        If False, calling `get_memory_estimate_static_child` will raise a NotImplementedError.
+        """
+        return self._get_model_base().can_estimate_memory_usage_static()
 
     @property
     def n_children(self) -> int:
@@ -559,7 +569,7 @@ class BaggedEnsembleModel(AbstractModel):
             model_base.model = None
         if self.low_memory:
             self.save_child(model_base)
-        self.add_child(model=model_base, add_child_times=True)
+        self.add_child(model=model_base, add_child_times=True, add_child_resources=True)
         self._set_n_repeat_single()
 
     def _set_n_repeat_single(self):
@@ -685,7 +695,7 @@ class BaggedEnsembleModel(AbstractModel):
         if issubclass(fold_fitting_strategy_cls, ParallelFoldFittingStrategy):
             fold_fitting_strategy_args["num_jobs"] = num_folds
             fold_fitting_strategy_args["num_folds_parallel"] = num_folds_parallel
-        if fold_fitting_strategy_cls == ParallelDistributedFoldFittingStrategy:
+        if (fold_fitting_strategy_cls == ParallelDistributedFoldFittingStrategy) and (not DistributedContext.is_shared_network_file_system()):
             fold_fitting_strategy_args["model_sync_path"] = DistributedContext.get_model_sync_path()
         fold_fitting_strategy: FoldFittingStrategy = fold_fitting_strategy_cls(**fold_fitting_strategy_args)
 
@@ -713,9 +723,11 @@ class BaggedEnsembleModel(AbstractModel):
             fold_fitting_strategy.schedule_fold_model_fit(**fold_fit_args)
         fold_fitting_strategy.after_all_folds_scheduled()
 
-        for model in models:
+        # Do this to maintain model name order based on kfold split regardless of which model finished first in parallel mode
+        for fold_fit_args in fold_fit_args_list:
+            model_name = fold_fit_args["fold_ctx"]["model_name_suffix"]
             # No need to add child times or save child here as this already occurred in the fold_fitting_strategy
-            self.add_child(model=model, add_child_times=False)
+            self.add_child(model=model_name, add_child_times=False, add_child_resources=False)
         self._bagged_mode = True
 
         if self._oof_pred_proba is None:
@@ -782,6 +794,25 @@ class BaggedEnsembleModel(AbstractModel):
         assert len(fold_fit_args_list) == folds_to_fit, "fold_fit_args_list is not the expected length!"
 
         return fold_fit_args_list, n_repeats_started, n_repeats_finished
+
+    def estimate_memory_usage_child(self, **kwargs) -> int:
+        """
+        Estimates the memory usage of the child model while training.
+        Returns
+        -------
+            int: number of bytes will be used during training
+        """
+        assert self.is_initialized(), "Only estimate memory usage after the model is initialized."
+        return self._get_model_base().estimate_memory_usage(**kwargs)
+
+    def estimate_memory_usage_static_child(self, **kwargs) -> int:
+        """
+        Estimates the memory usage of the child model while training.
+        Returns
+        -------
+            int: number of bytes will be used during training
+        """
+        return self._get_model_base().estimate_memory_usage_static(**kwargs)
 
     # TODO: Augment to generate OOF after shuffling each column in X (Batching), this is the fastest way.
     # TODO: Reduce logging clutter during OOF importance calculation (Currently logs separately for each child)
@@ -912,7 +943,7 @@ class BaggedEnsembleModel(AbstractModel):
         else:
             return model
 
-    def add_child(self, model: Union[AbstractModel, str], add_child_times=False):
+    def add_child(self, model: Union[AbstractModel, str], add_child_times=False, add_child_resources=False):
         """
         Add a new fit child model to `self.models`
 
@@ -941,6 +972,11 @@ class BaggedEnsembleModel(AbstractModel):
             if model is None:
                 model = self.load_child(model=model_name, verbose=False)
             self._add_child_times_to_bag(model=model)
+        if add_child_resources:
+            if model is None:
+                model = self.load_child(model=model_name, verbose=False)
+            self._add_child_num_cpus(num_cpus=model.fit_num_cpus)
+            self._add_child_num_gpus(num_gpus=model.fit_num_gpus)
 
     def save_child(self, model: Union[AbstractModel, str], path=None, verbose=False):
         """Save child model to disk."""
@@ -1096,6 +1132,32 @@ class BaggedEnsembleModel(AbstractModel):
         if self._predict_n_size_lst is None:
             self._predict_n_size_lst = []
         self._predict_n_size_lst += predict_n_size_lst
+
+    def _add_child_num_cpus(self, num_cpus: int):
+        if self._child_num_cpus is None:
+            self._child_num_cpus = []
+        self._child_num_cpus.append(num_cpus)
+
+    def _add_child_num_gpus(self, num_gpus: float):
+        if self._child_num_gpus is None:
+            self._child_num_gpus = []
+        self._child_num_gpus.append(num_gpus)
+
+    @property
+    def fit_num_cpus_child(self) -> int:
+        """Number of CPUs used for fitting one model (i.e. a child model)"""
+        if self._child_num_cpus:
+            return min(self._child_num_cpus)
+        else:
+            return self.fit_num_cpus
+
+    @property
+    def fit_num_gpus_child(self) -> float:
+        """Number of GPUs used for fitting one model (i.e. a child model)"""
+        if self._child_num_gpus:
+            return min(self._child_num_gpus)
+        else:
+            return self.fit_num_gpus
 
     @property
     def predict_n_size(self) -> float | None:
@@ -1337,7 +1399,7 @@ class BaggedEnsembleModel(AbstractModel):
         directory = self.path
         os.makedirs(directory, exist_ok=True)
         data_path = directory
-        if DistributedContext.is_distributed_mode():
+        if DistributedContext.is_distributed_mode() and (not DistributedContext.is_shared_network_file_system()):
             data_path = DistributedContext.get_util_path()
         train_path, val_path = hpo_executor.prepare_data(X=X, y=y, X_val=X_val, y_val=y_val, path_prefix=data_path)
 

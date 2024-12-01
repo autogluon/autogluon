@@ -3,7 +3,9 @@ import os
 import re
 import time
 from contextlib import nullcontext
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Tuple, Union
+
+import pandas as pd
 
 from autogluon.common import space
 from autogluon.common.loaders import load_pkl
@@ -13,7 +15,15 @@ from autogluon.core.hpo.executors import HpoExecutor, RayHpoExecutor
 from autogluon.core.models import AbstractModel
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
+from autogluon.timeseries.regressor import CovariateRegressor
+from autogluon.timeseries.transforms import (
+    CovariateScaler,
+    LocalTargetScaler,
+    get_covariate_scaler_from_name,
+    get_target_scaler_from_name,
+)
 from autogluon.timeseries.utils.features import CovariateMetadata
+from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 from autogluon.timeseries.utils.warning_filters import disable_stdout, warning_filter
 
 from .model_trial import model_trial, skip_hpo
@@ -55,6 +65,9 @@ class AbstractTimeSeriesModel(AbstractModel):
     """
 
     _oof_filename = "oof.pkl"
+    # TODO: For which models should we override this parameter?
+    _covariate_regressor_fit_time_fraction: float = 0.5
+    default_max_time_limit_ratio: float = 0.9
 
     # TODO: refactor "pruned" methods after AbstractModel is refactored
     predict_proba = None
@@ -122,6 +135,9 @@ class AbstractTimeSeriesModel(AbstractModel):
             self.must_drop_median = False
 
         self._oof_predictions: Optional[List[TimeSeriesDataFrame]] = None
+        self.target_scaler: Optional[LocalTargetScaler] = None
+        self.covariate_scaler: Optional[CovariateScaler] = None
+        self.covariate_regressor: Optional[CovariateRegressor] = None
 
     def __repr__(self) -> str:
         return self.name
@@ -159,9 +175,17 @@ class AbstractTimeSeriesModel(AbstractModel):
             self._oof_predictions = self.load_oof_predictions(self.path)
         return self._oof_predictions
 
+    def _get_default_auxiliary_params(self) -> dict:
+        default_auxiliary_params = super()._get_default_auxiliary_params()
+        default_auxiliary_params["max_time_limit_ratio"] = self.default_max_time_limit_ratio
+        return default_auxiliary_params
+
     def _initialize(self, **kwargs) -> None:
         self._init_params_aux()
         self._init_params()
+        self.target_scaler = self._create_target_scaler()
+        self.covariate_scaler = self._create_covariate_scaler()
+        self.covariate_regressor = self._create_covariate_regressor()
 
     def _compute_fit_metadata(self, val_data: TimeSeriesDataFrame = None, **kwargs):
         fit_metadata = dict(
@@ -206,7 +230,11 @@ class AbstractTimeSeriesModel(AbstractModel):
         return info
 
     def fit(
-        self, train_data: TimeSeriesDataFrame, val_data: Optional[TimeSeriesDataFrame] = None, **kwargs
+        self,
+        train_data: TimeSeriesDataFrame,
+        val_data: Optional[TimeSeriesDataFrame] = None,
+        time_limit: Optional[float] = None,
+        **kwargs,
     ) -> "AbstractTimeSeriesModel":
         """Fit timeseries model.
 
@@ -241,10 +269,98 @@ class AbstractTimeSeriesModel(AbstractModel):
         model: AbstractTimeSeriesModel
             The fitted model object
         """
-        train_data = self.preprocess(train_data, is_train=True)
+        start_time = time.monotonic()
+        self.initialize(**kwargs)
+
+        if self.target_scaler is not None:
+            train_data = self.target_scaler.fit_transform(train_data)
+
+        if self.covariate_scaler is not None:
+            train_data = self.covariate_scaler.fit_transform(train_data)
+
+        if self.covariate_regressor is not None:
+            covariate_regressor_time_limit = (
+                self._covariate_regressor_fit_time_fraction * time_limit if time_limit is not None else None
+            )
+            self.covariate_regressor.fit(
+                train_data,
+                time_limit=covariate_regressor_time_limit,
+                verbosity=kwargs.get("verbosity", 2) - 1,
+            )
+
+        if self._get_tags()["can_use_train_data"]:
+            if self.covariate_regressor is not None:
+                train_data = self.covariate_regressor.transform(train_data)
+            train_data, _ = self.preprocess(train_data, is_train=True)
+
         if self._get_tags()["can_use_val_data"] and val_data is not None:
-            val_data = self.preprocess(val_data, is_train=False)
-        return super().fit(train_data=train_data, val_data=val_data, **kwargs)
+            if self.target_scaler is not None:
+                val_data = self.target_scaler.transform(val_data)
+            if self.covariate_scaler is not None:
+                val_data = self.covariate_scaler.transform(val_data)
+            if self.covariate_regressor is not None:
+                val_data = self.covariate_regressor.transform(val_data)
+            val_data, _ = self.preprocess(val_data, is_train=False)
+
+        if time_limit is not None:
+            time_limit = time_limit - (time.monotonic() - start_time)
+        return super().fit(train_data=train_data, val_data=val_data, time_limit=time_limit, **kwargs)
+
+    @property
+    def allowed_hyperparameters(self) -> List[str]:
+        """List of hyperparameters allowed by the model."""
+        return ["target_scaler", "covariate_regressor"]
+
+    def _create_target_scaler(self) -> Optional[LocalTargetScaler]:
+        """Create a LocalTargetScaler object based on the value of the `target_scaler` hyperparameter."""
+        # TODO: Add support for custom target transforms (e.g., Box-Cox, log1p, ...)
+        target_scaler_type = self._get_model_params().get("target_scaler")
+        if target_scaler_type is not None:
+            return get_target_scaler_from_name(target_scaler_type, target=self.target)
+        else:
+            return None
+
+    def _create_covariate_scaler(self) -> Optional[CovariateScaler]:
+        """Create a CovariateScaler object based on the value of the `covariate_scaler` hyperparameter."""
+        covariate_scaler_type = self._get_model_params().get("covariate_scaler")
+        if covariate_scaler_type is not None:
+            return get_covariate_scaler_from_name(
+                covariate_scaler_type,
+                metadata=self.metadata,
+                use_static_features=self.supports_static_features,
+                use_known_covariates=self.supports_known_covariates,
+                use_past_covariates=self.supports_past_covariates,
+            )
+        else:
+            return None
+
+    def _create_covariate_regressor(self) -> Optional[CovariateRegressor]:
+        """Create a CovariateRegressor object based on the value of the `covariate_regressor` hyperparameter."""
+        covariate_regressor = self._get_model_params().get("covariate_regressor")
+        if covariate_regressor is not None:
+            if len(self.metadata.known_covariates + self.metadata.static_features) == 0:
+                logger.info(
+                    "\tSkipping covariate_regressor since the dataset contains no covariates or static features."
+                )
+                return None
+            else:
+                if isinstance(covariate_regressor, str):
+                    return CovariateRegressor(covariate_regressor, target=self.target, metadata=self.metadata)
+                elif isinstance(covariate_regressor, dict):
+                    return CovariateRegressor(**covariate_regressor, target=self.target, metadata=self.metadata)
+                elif isinstance(covariate_regressor, CovariateRegressor):
+                    logger.warning(
+                        "\tUsing a custom covariate_regressor is experimental functionality that may break in the future!"
+                    )
+                    covariate_regressor.target = self.target
+                    covariate_regressor.metadata = self.metadata
+                    return covariate_regressor
+                else:
+                    raise ValueError(
+                        f"Invalid value for covariate_regressor {covariate_regressor} of type {type(covariate_regressor)}"
+                    )
+        else:
+            return None
 
     def _fit(
         self,
@@ -299,16 +415,45 @@ class AbstractTimeSeriesModel(AbstractModel):
             data is given as a separate forecast item in the dictionary, keyed by the `item_id`s
             of input items.
         """
-        data = self.preprocess(data, is_train=False)
-        known_covariates = self.preprocess_known_covariates(known_covariates)
+        if self.target_scaler is not None:
+            data = self.target_scaler.fit_transform(data)
+        if self.covariate_scaler is not None:
+            data = self.covariate_scaler.fit_transform(data)
+            known_covariates = self.covariate_scaler.transform_known_covariates(known_covariates)
+        if self.covariate_regressor is not None:
+            data = self.covariate_regressor.fit_transform(data)
+
+        data, known_covariates = self.preprocess(data, known_covariates, is_train=False)
+
+        # FIXME: Set self.covariate_regressor=None so to avoid copying it across processes during _predict
+        # FIXME: The clean solution is to convert all methods executed in parallel to @classmethod
+        covariate_regressor = self.covariate_regressor
+        self.covariate_regressor = None
         predictions = self._predict(data=data, known_covariates=known_covariates, **kwargs)
-        logger.debug(f"Predicting with model {self.name}")
+        self.covariate_regressor = covariate_regressor
+
         # "0.5" might be missing from the quantiles if self is a wrapper (MultiWindowBacktestingModel or ensemble)
         if "0.5" in predictions.columns:
             if self.eval_metric.optimized_by_median:
                 predictions["mean"] = predictions["0.5"]
             if self.must_drop_median:
                 predictions = predictions.drop("0.5", axis=1)
+
+        if self.covariate_regressor is not None:
+            if known_covariates is None:
+                forecast_index = get_forecast_horizon_index_ts_dataframe(
+                    data, prediction_length=self.prediction_length, freq=self.freq
+                )
+                known_covariates = pd.DataFrame(index=forecast_index, dtype="float32")
+
+            predictions = self.covariate_regressor.inverse_transform(
+                predictions,
+                known_covariates=known_covariates,
+                static_features=data.static_features,
+            )
+
+        if self.target_scaler is not None:
+            predictions = self.target_scaler.inverse_transform(predictions)
         return predictions
 
     def _predict(
@@ -500,13 +645,15 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         return hpo_models, analysis
 
-    def preprocess(self, data: TimeSeriesDataFrame, is_train: bool = False, **kwargs) -> TimeSeriesDataFrame:
-        return data
-
-    def preprocess_known_covariates(
-        self, known_covariates: Optional[TimeSeriesDataFrame]
-    ) -> Optional[TimeSeriesDataFrame]:
-        return known_covariates
+    def preprocess(
+        self,
+        data: TimeSeriesDataFrame,
+        known_covariates: Optional[TimeSeriesDataFrame] = None,
+        is_train: bool = False,
+        **kwargs,
+    ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
+        """Method that implements model-specific preprocessing logic."""
+        return data, known_covariates
 
     def get_memory_size(self, **kwargs) -> Optional[int]:
         return None
@@ -533,10 +680,12 @@ class AbstractTimeSeriesModel(AbstractModel):
         - allow_nan: Can the model handle data with missing values represented by np.nan?
         - can_refit_full: Does it make sense to retrain the model without validation data?
             See `autogluon.core.models.abstract._tags._DEFAULT_TAGS` for more details.
-        - can_use_val_data: Can model use val_data if it's provided to model.fit()?
+        - can_use_train_data: Can the model use train_data if it's provided to model.fit()?
+        - can_use_val_data: Can the model use val_data if it's provided to model.fit()?
         """
         return {
             "allow_nan": False,
             "can_refit_full": False,
+            "can_use_train_data": True,
             "can_use_val_data": False,
         }

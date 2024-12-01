@@ -172,3 +172,26 @@ def convert_time_in_s_to_log_friendly(time_in_sec: float, min_value: float = 0.0
         if time_adjusted >= min_value:
             break
     return time_adjusted, time_unit
+
+
+def reset_logger_for_remote_call(verbosity: int):
+    """Reset logger to the verbosity level set by the user for distributed training.
+
+    The remote functions will re-import the files of AutoGluon and thereby re-setting the logger to the default
+    level (warning). This function resets the logger to the verbosity level set by the user.
+    """
+    from autogluon.core.models.abstract.abstract_model import logger as abstract_model_logger
+    from autogluon.core.models.ensemble.bagged_ensemble_model import logger as bem_logger
+    from autogluon.core.models.ensemble.fold_fitting_strategy import logger as ffs_logger
+    from autogluon.core.trainer.abstract_trainer import logger as abstract_trainer_logger
+
+    set_logger_verbosity(verbosity=verbosity, logger=None)  # Default AutoGluon logger
+    set_logger_verbosity(verbosity=verbosity, logger=abstract_model_logger)
+    set_logger_verbosity(verbosity=verbosity, logger=ffs_logger)
+    set_logger_verbosity(verbosity=verbosity, logger=abstract_trainer_logger)
+
+    # FIXME: move information from this (fitting strategy, how many folds, ...) to remote worker logger
+    # (or make these messages lvl 10)
+    # Limiting the verbosity of the BaggedEnsembleModel logger to 10 to avoid
+    # duplicated messages about fitting.
+    set_logger_verbosity(verbosity=min(verbosity, 1), logger=bem_logger)

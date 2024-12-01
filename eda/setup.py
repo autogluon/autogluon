@@ -24,12 +24,12 @@ install_requires = [
     "scipy",  # version range defined in `core/_setup_utils.py`
     "scikit-learn",  # version range defined in `core/_setup_utils.py`
     "pandas",  # version range defined in `core/_setup_utils.py`
-    "matplotlib>=3.4,<3.7",
+    "matplotlib",  # version range defined in `core/_setup_utils.py`
     "missingno>=0.5.1,<0.6",
     "phik>=0.12.2,<0.13",
     "seaborn>=0.12.0,<0.13",
     "ipywidgets>=7.7.1,<9.0",  # min versions guidance: 7.7.1 collab/kaggle
-    "shap>=0.44,<0.45",
+    "shap>=0.44,<0.47",
     "yellowbrick>=1.5,<1.6",
     "pyod>=1.1,<1.2",
     "suod>=0.0.8,<0.1",

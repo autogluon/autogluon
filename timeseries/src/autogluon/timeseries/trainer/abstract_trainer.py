@@ -21,6 +21,7 @@ from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.models.ensemble import AbstractTimeSeriesEnsembleModel, TimeSeriesGreedyEnsemble
+from autogluon.timeseries.models.multi_window import MultiWindowBacktestingModel
 from autogluon.timeseries.models.presets import contains_searchspace
 from autogluon.timeseries.splitter import AbstractWindowSplitter, ExpandingWindowSplitter
 from autogluon.timeseries.utils.features import (
@@ -28,7 +29,7 @@ from autogluon.timeseries.utils.features import (
     CovariateMetadata,
     PermutationFeatureImportanceTransform,
 )
-from autogluon.timeseries.utils.warning_filters import disable_tqdm
+from autogluon.timeseries.utils.warning_filters import disable_tqdm, warning_filter
 
 logger = logging.getLogger("autogluon.timeseries.trainer")
 
@@ -248,6 +249,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
     max_rel_importance_score: float = 1e5
     eps_abs_importance_score: float = 1e-5
+    max_ensemble_time_limit: float = 600.0
 
     def __init__(
         self,
@@ -262,6 +264,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         val_splitter: Optional[AbstractWindowSplitter] = None,
         refit_every_n_windows: Optional[int] = 1,
         cache_predictions: bool = True,
+        ensemble_model_type: Optional[Type] = None,
         **kwargs,
     ):
         super().__init__(path=path, save_data=save_data, low_memory=True, **kwargs)
@@ -274,7 +277,13 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         self.skip_model_selection = skip_model_selection
         # Ensemble cannot be fit if val_scores are not computed
         self.enable_ensemble = enable_ensemble and not skip_model_selection
-        self.ensemble_model_type = TimeSeriesGreedyEnsemble
+        if ensemble_model_type is None:
+            ensemble_model_type = TimeSeriesGreedyEnsemble
+        else:
+            logger.warning(
+                "Using a custom `ensemble_model_type` is experimental functionality that may break in future versions."
+            )
+        self.ensemble_model_type = ensemble_model_type
 
         self.verbosity = verbosity
 
@@ -517,8 +526,12 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             fit_end_time = time.time()
             model.fit_time = model.fit_time or (fit_end_time - fit_start_time)
 
+            if time_limit is not None:
+                time_limit = fit_end_time - fit_start_time
             if val_data is not None and not self.skip_model_selection:
-                model.score_and_cache_oof(val_data, store_val_score=True, store_predict_time=True)
+                model.score_and_cache_oof(
+                    val_data, store_val_score=True, store_predict_time=True, time_limit=time_limit
+                )
 
             self._log_scores_and_times(model.val_score, model.fit_time, model.predict_time)
 
@@ -607,7 +620,9 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             else:
                 time_left = time_limit - (time.time() - time_start)
                 if num_base_models > 1 and self.enable_ensemble:
-                    time_reserved_for_ensemble = min(600.0, time_left / (num_base_models - i + 1))
+                    time_reserved_for_ensemble = min(
+                        self.max_ensemble_time_limit, time_left / (num_base_models - i + 1)
+                    )
                     logger.debug(f"Reserving {time_reserved_for_ensemble:.1f}s for ensemble")
                 else:
                     time_reserved_for_ensemble = 0.0
@@ -732,7 +747,8 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             quantile_levels=self.quantile_levels,
             metadata=self.metadata,
         )
-        ensemble.fit_ensemble(model_preds, data_per_window=data_per_window, time_limit=time_limit)
+        with warning_filter():
+            ensemble.fit_ensemble(model_preds, data_per_window=data_per_window, time_limit=time_limit)
         ensemble.fit_time = time.time() - time_start
 
         predict_time = 0
@@ -755,7 +771,13 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         self.save_model(model=ensemble)
         return ensemble.name
 
-    def leaderboard(self, data: Optional[TimeSeriesDataFrame] = None, use_cache: bool = True) -> pd.DataFrame:
+    def leaderboard(
+        self,
+        data: Optional[TimeSeriesDataFrame] = None,
+        extra_info: bool = False,
+        extra_metrics: Optional[List[Union[str, TimeSeriesScorer]]] = None,
+        use_cache: bool = True,
+    ) -> pd.DataFrame:
         logger.debug("Generating leaderboard for all models trained")
 
         model_names = self.get_model_names()
@@ -771,6 +793,14 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 "fit_time_marginal": self.get_model_attribute(model_name, "fit_time"),
                 "pred_time_val": self.get_model_attribute(model_name, "predict_time"),
             }
+            if extra_info:
+                model = self.load_model(model_name=model_name)
+                if isinstance(model, MultiWindowBacktestingModel):
+                    model = model.most_recent_model
+                model_info[model_name]["hyperparameters"] = model.params
+
+        if extra_metrics is None:
+            extra_metrics = []
 
         if data is not None:
             past_data, known_covariates = data.get_model_inputs_for_scoring(
@@ -799,6 +829,14 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                     model_info[model_name]["score_test"] = self._score_with_predictions(data, model_preds)
                     model_info[model_name]["pred_time_test"] = pred_time_dict[model_name]
 
+                for metric in extra_metrics:
+                    if model_preds is None:
+                        model_info[model_name][str(metric)] = float("nan")
+                    else:
+                        model_info[model_name][str(metric)] = self._score_with_predictions(
+                            data, model_preds, metric=metric
+                        )
+
         explicit_column_order = [
             "model",
             "score_test",
@@ -808,15 +846,18 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             "fit_time_marginal",
             "fit_order",
         ]
+        if extra_info:
+            explicit_column_order += ["hyperparameters"]
 
-        df = pd.DataFrame(model_info.values(), columns=explicit_column_order)
         if data is None:
             explicit_column_order.remove("score_test")
             explicit_column_order.remove("pred_time_test")
             sort_column = "score_val"
         else:
             sort_column = "score_test"
+            explicit_column_order += [str(metric) for metric in extra_metrics]
 
+        df = pd.DataFrame(model_info.values(), columns=explicit_column_order)
         df.sort_values(by=[sort_column, "model"], ascending=[False, False], inplace=True)
         df.reset_index(drop=True, inplace=True)
 

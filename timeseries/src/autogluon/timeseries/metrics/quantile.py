@@ -6,7 +6,7 @@ import pandas as pd
 from autogluon.timeseries.dataset.ts_dataframe import TimeSeriesDataFrame
 
 from .abstract import TimeSeriesScorer
-from .utils import _in_sample_abs_seasonal_error
+from .utils import in_sample_abs_seasonal_error
 
 
 class WQL(TimeSeriesScorer):
@@ -85,7 +85,7 @@ class SQL(TimeSeriesScorer):
     def save_past_metrics(
         self, data_past: TimeSeriesDataFrame, target: str = "target", seasonal_period: int = 1, **kwargs
     ) -> None:
-        self._past_abs_seasonal_error = _in_sample_abs_seasonal_error(
+        self._past_abs_seasonal_error = in_sample_abs_seasonal_error(
             y_past=data_past[target], seasonal_period=seasonal_period
         )
 

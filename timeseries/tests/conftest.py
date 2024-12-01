@@ -61,3 +61,31 @@ def hf_model_path(tmp_path_factory):
 
         warnings.warn("Could not cache Chronos for test session. Will call Hugging Face directly.")
         yield model_hub_id  # fallback to hub id if no snapshots found
+
+
+@pytest.fixture(scope="module")
+def dummy_hyperparameters(hf_model_path):
+    """Hyperparameters passed to the models during tests to minimize training time."""
+    return {
+        "max_epochs": 1,
+        "num_batches_per_epoch": 1,
+        "n_jobs": 1,
+        "use_fallback_model": False,
+        "model_path": hf_model_path,
+    }
+
+
+@pytest.fixture(scope="module")
+def df_with_covariates_and_metadata():
+    """Create a TimeSeriesDataFrame with covariates & static features.
+
+    Returns the preprocessed TimeSeriesDataFrame and the respective CovariateMetadata.
+    """
+    from autogluon.timeseries.utils.features import TimeSeriesFeatureGenerator
+
+    from .unittests.common import DATAFRAME_WITH_STATIC_AND_COVARIATES
+
+    data = DATAFRAME_WITH_STATIC_AND_COVARIATES.copy()
+    feat_gen = TimeSeriesFeatureGenerator("target", known_covariates_names=["cov1", "cov2"])
+    data = feat_gen.fit_transform(data)
+    yield data, feat_gen.covariate_metadata

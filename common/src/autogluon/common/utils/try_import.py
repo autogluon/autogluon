@@ -1,4 +1,5 @@
 import logging
+import os
 import platform
 import sys
 from types import ModuleType
@@ -33,7 +34,7 @@ def try_import_mxboard():
 
 
 def try_import_ray() -> ModuleType:
-    RAY_MAX_VERSION = "2.32.0"  # sync with core/setup.py
+    RAY_MAX_VERSION = "2.40.0"  # sync with core/setup.py
     ray_max_version_os_map = dict(
         Darwin=RAY_MAX_VERSION,
         Windows=RAY_MAX_VERSION,
@@ -42,43 +43,50 @@ def try_import_ray() -> ModuleType:
     ray_min_version = "2.10.0"
     current_os = platform.system()
     ray_max_version = ray_max_version_os_map.get(current_os, RAY_MAX_VERSION)
+    strict_ray_version = os.environ.get("AG_LOOSE_RAY_VERSION", "False") != "True"
     try:
         import ray
         from packaging import version
 
-        if version.parse(ray.__version__) < version.parse(ray_min_version) or version.parse(
-            ray.__version__
-        ) >= version.parse(ray_max_version):
+        if (
+            version.parse(ray.__version__) < version.parse(ray_min_version)
+            or version.parse(ray.__version__) >= version.parse(ray_max_version)
+        ) and strict_ray_version:
             msg = (
                 f"ray=={ray.__version__} detected. "
                 f"{ray_min_version} <= ray < {ray_max_version} is required. You can use pip to install certain version of ray "
-                f"`pip install ray=={ray_min_version}` "
+                f'`pip install "ray>={ray_min_version},<{ray_max_version}"`'
             )
             raise ValueError(msg)
         return ray
     except ImportError:
         raise ImportError(
             "ray is required to train folds in parallel for TabularPredictor or HPO for MultiModalPredictor. "
-            f"A quick tip is to install via `pip install ray=={ray_min_version}`"
+            f'A quick tip is to install via `pip install "ray>={ray_min_version},<{ray_max_version}"`'
         )
 
 
 def try_import_catboost():
     try:
         import catboost
+        from pkg_resources import parse_version  # pylint: disable=import-outside-toplevel
+
+        catboost_version = parse_version(catboost.__version__)
+        min_version = "1.2"
+        assert catboost_version >= parse_version(
+            min_version
+        ), f'Currently, we support "catboost>={min_version}". Installed version: "catboost=={catboost.__version__}".'
     except ImportError as e:
-        error_msg = "`import catboost` failed. "
-        if sys.version_info >= (3, 11) and sys.platform == "darwin":
-            error_msg += f"Detected your env as {sys.platform}. Please either downgrade your python version to below 3.11 or move to another platform. Then install via ``pip install autogluon.tabular[catboost]=={__version__}``"
-        else:
-            error_msg += f"A quick tip is to install via `pip install autogluon.tabular[catboost]=={__version__}`."
-        raise ImportError()
+        raise ImportError(
+            "`import catboost` failed. "
+            f"A quick tip is to install via `pip install autogluon.tabular[catboost]=={__version__}`."
+        ) from e
     except ValueError as e:
         raise ImportError(
             "Import catboost failed. Numpy version may be outdated, "
             "Please ensure numpy version >=1.17.0. If it is not, please try 'pip uninstall numpy -y; pip install numpy>=1.17.0' "
             "Detailed info: {}".format(str(e))
-        )
+        ) from e
 
 
 def try_import_lightgbm():

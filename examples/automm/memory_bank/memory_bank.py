@@ -290,9 +290,9 @@ def train_logits(
         if acc > best_acc:
             best_acc = acc
             best_epoch = train_idx
-            torch.save(memory_bank_model.state_dict(), args.bank_dir + "/best_F_" + str(args.shots) + "shots.pt")
+            torch.save(memory_bank_model.state_dict(), args.bank_dir + "/best_F_" + str(args.shots) + "shots.pt") # nosec B614
     
-    memory_bank_model.load_state_dict(torch.load(args.bank_dir + "/best_F_" + str(args.shots) + "shots.pt"))
+    memory_bank_model.load_state_dict(torch.load(args.bank_dir + "/best_F_" + str(args.shots) + "shots.pt")) # nosec B614
     print(f"**** After fine-tuning {logits_type}, best val accuracy: {best_acc:.2f}, at epoch: {best_epoch}. ****\n")
     
     return memory_bank_model

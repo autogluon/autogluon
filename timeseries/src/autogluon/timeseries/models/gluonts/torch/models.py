@@ -66,7 +66,8 @@ class DeepARModel(AbstractGluonTSModel):
     distr_output : gluonts.torch.distributions.DistributionOutput, default = StudentTOutput()
         Distribution to use to evaluate observations and sample predictions
     scaling: bool, default = True
-        Whether to automatically scale the target values
+        If True, mean absolute scaling will be applied to each *context window* during training & prediction.
+        Note that this is different from the `target_scaler` that is applied to the *entire time series*.
     max_epochs : int, default = 100
         Number of epochs the model will be trained for
     batch_size : int, default = 64
@@ -84,6 +85,8 @@ class DeepARModel(AbstractGluonTSModel):
     keep_lightning_logs : bool, default = False
         If True, ``lightning_logs`` directory will NOT be removed after the model finished training.
     """
+
+    # TODO: Replace "scaling: bool" with "window_scaler": {"mean_abs", None} for consistency?
 
     supports_known_covariates = True
     supports_static_features = True
@@ -122,7 +125,8 @@ class SimpleFeedForwardModel(AbstractGluonTSModel):
     batch_normalization : bool, default = False
         Whether to use batch normalization
     mean_scaling : bool, default = True
-        Scale the network input by the data mean and the network output by its inverse
+        If True, mean absolute scaling will be applied to each *context window* during training & prediction.
+        Note that this is different from the `target_scaler` that is applied to the *entire time series*.
     max_epochs : int, default = 100
         Number of epochs the model will be trained for
     batch_size : int, default = 64
@@ -205,14 +209,15 @@ class TemporalFusionTransformerModel(AbstractGluonTSModel):
     supports_cat_covariates = True
     supports_static_features = True
 
-    @property
-    def default_context_length(self) -> int:
-        return min(512, max(64, 2 * self.prediction_length))
-
     def _get_estimator_class(self) -> Type[GluonTSEstimator]:
         from gluonts.torch.model.tft import TemporalFusionTransformerEstimator
 
         return TemporalFusionTransformerEstimator
+
+    def _get_default_params(self):
+        return super()._get_default_params() | {
+            "context_length": min(512, max(64, 2 * self.prediction_length)),
+        }
 
     def _get_estimator_init_args(self) -> Dict[str, Any]:
         init_kwargs = super()._get_estimator_init_args()
@@ -254,7 +259,10 @@ class DLinearModel(AbstractGluonTSModel):
     distr_output : gluonts.torch.distributions.DistributionOutput, default = StudentTOutput()
         Distribution to fit.
     scaling : {"mean", "std", None}, default = "mean"
-        Scaling applied to the inputs. One of ``"mean"`` (mean absolute scaling), ``"std"`` (standardization), ``None`` (no scaling).
+        Scaling applied to each *context window* during training & prediction.
+        One of ``"mean"`` (mean absolute scaling), ``"std"`` (standardization), ``None`` (no scaling).
+
+        Note that this is different from the `target_scaler` that is applied to the *entire time series*.
     max_epochs : int, default = 100
         Number of epochs the model will be trained for
     batch_size : int, default = 64
@@ -275,9 +283,10 @@ class DLinearModel(AbstractGluonTSModel):
         If True, ``lightning_logs`` directory will NOT be removed after the model finished training.
     """
 
-    @property
-    def default_context_length(self) -> int:
-        return 96
+    def _get_default_params(self):
+        return super()._get_default_params() | {
+            "context_length": 96,
+        }
 
     def _get_estimator_class(self) -> Type[GluonTSEstimator]:
         from gluonts.torch.model.d_linear import DLinearEstimator
@@ -314,7 +323,10 @@ class PatchTSTModel(AbstractGluonTSModel):
     distr_output : gluonts.torch.distributions.DistributionOutput, default = StudentTOutput()
         Distribution to fit.
     scaling : {"mean", "std", None}, default = "mean"
-        Scaling applied to the inputs. One of ``"mean"`` (mean absolute scaling), ``"std"`` (standardization), ``None`` (no scaling).
+        Scaling applied to each *context window* during training & prediction.
+        One of ``"mean"`` (mean absolute scaling), ``"std"`` (standardization), ``None`` (no scaling).
+
+        Note that this is different from the `target_scaler` that is applied to the *entire time series*.
     max_epochs : int, default = 100
         Number of epochs the model will be trained for
     batch_size : int, default = 64
@@ -329,18 +341,19 @@ class PatchTSTModel(AbstractGluonTSModel):
         If True, ``lightning_logs`` directory will NOT be removed after the model finished training.
     """
 
-    @property
-    def default_context_length(self) -> int:
-        return 96
+    supports_known_covariates = True
 
     def _get_estimator_class(self) -> Type[GluonTSEstimator]:
         from gluonts.torch.model.patch_tst import PatchTSTEstimator
 
         return PatchTSTEstimator
 
+    def _get_default_params(self):
+        return super()._get_default_params() | {"context_length": 96, "patch_len": 16}
+
     def _get_estimator_init_args(self) -> Dict[str, Any]:
         init_kwargs = super()._get_estimator_init_args()
-        init_kwargs.setdefault("patch_len", 16)
+        init_kwargs["num_feat_dynamic_real"] = self.num_feat_dynamic_real
         return init_kwargs
 
 
@@ -454,39 +467,42 @@ class TiDEModel(AbstractGluonTSModel):
         If False, past covariates will be used by the model if they are present in the dataset.
     feat_proj_hidden_dim : int, default = 4
         Size of the feature projection layer.
-    encoder_hidden_dim : int, default = 4
+    encoder_hidden_dim : int, default = 64
         Size of the dense encoder layer.
-    decoder_hidden_dim : int, default = 4
+    decoder_hidden_dim : int, default = 64
         Size of the dense decoder layer.
-    temporal_hidden_dim : int, default = 4
+    temporal_hidden_dim : int, default = 64
         Size of the temporal decoder layer.
-    distr_hidden_dim : int, default = 4
+    distr_hidden_dim : int, default = 64
         Size of the distribution projection layer.
-    num_layers_encoder : int, default = 1
+    num_layers_encoder : int, default = 2
         Number of layers in dense encoder.
-    num_layers_decoder : int, default = 1
+    num_layers_decoder : int, default = 2
         Number of layers in dense decoder.
-    decoder_output_dim : int, default = 4
+    decoder_output_dim : int, default = 16
         Output size of the dense decoder.
-    dropout_rate : float, default = 0.3
+    dropout_rate : float, default = 0.2
         Dropout regularization parameter.
     num_feat_dynamic_proj : int, default = 2
         Output size of feature projection layer.
     embedding_dimension : int, default = [16] * num_feat_static_cat
         Dimension of the embeddings for categorical features
-    layer_norm : bool, default = False
+    layer_norm : bool, default = True
         Should layer normalization be enabled?
     scaling : {"mean", "std", None}, default = "mean"
-        Scaling applied to the inputs. One of ``"mean"`` (mean absolute scaling), ``"std"`` (standardization), ``None`` (no scaling).
+        Scaling applied to each *context window* during training & prediction.
+        One of ``"mean"`` (mean absolute scaling), ``"std"`` (standardization), ``None`` (no scaling).
+
+        Note that this is different from the `target_scaler` that is applied to the *entire time series*.
     max_epochs : int, default = 100
         Number of epochs the model will be trained for
-    batch_size : int, default = 64
+    batch_size : int, default = 256
         Size of batches used during training
     predict_batch_size : int, default = 500
         Size of batches used during prediction.
     num_batches_per_epoch : int, default = 50
         Number of batches processed every epoch
-    lr : float, default = 1e-3,
+    lr : float, default = 1e-4,
         Learning rate used during training
     trainer_kwargs : dict, optional
         Optional keyword arguments passed to ``lightning.Trainer``.
@@ -499,14 +515,26 @@ class TiDEModel(AbstractGluonTSModel):
     supports_known_covariates = True
     supports_static_features = True
 
-    @property
-    def default_context_length(self) -> int:
-        return min(512, max(64, 2 * self.prediction_length))
-
     def _get_estimator_class(self) -> Type[GluonTSEstimator]:
         from gluonts.torch.model.tide import TiDEEstimator
 
         return TiDEEstimator
+
+    def _get_default_params(self):
+        return super()._get_default_params() | {
+            "context_length": min(512, max(64, 2 * self.prediction_length)),
+            "encoder_hidden_dim": 64,
+            "decoder_hidden_dim": 64,
+            "temporal_hidden_dim": 64,
+            "distr_hidden_dim": 64,
+            "num_layers_encoder": 2,
+            "num_layers_decoder": 2,
+            "decoder_output_dim": 16,
+            "dropout_rate": 0.2,
+            "layer_norm": True,
+            "lr": 1e-4,
+            "batch_size": 256,
+        }
 
     def _get_estimator_init_args(self) -> Dict[str, Any]:
         init_kwargs = super()._get_estimator_init_args()

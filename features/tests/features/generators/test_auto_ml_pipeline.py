@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+from packaging.version import Version
 from sklearn.feature_extraction.text import CountVectorizer
 
 from autogluon.features.generators import AutoMLPipelineFeatureGenerator, TextNgramFeatureGenerator
@@ -75,7 +76,9 @@ def test_auto_ml_pipeline_feature_generator(generator_helper, data_helper):
         1301322000000000000,
     ]
 
-    expected_output_data_feat_lower_ratio = [3, 2, 0, 3, 3, 3, 3, 3, 1]
+    expected_output_data_feat_lower_ratio_np_lt_2_0 = [3, 2, 0, 3, 3, 3, 3, 3, 1]
+    expected_output_data_feat_lower_ratio_np_ge_2_0 = [2, 2, 0, 2, 2, 2, 2, 2, 1]
+
     expected_output_data_feat_total = [1, 3, 0, 0, 9, 1, 3, 9, 3]
 
     # When
@@ -98,7 +101,11 @@ def test_auto_ml_pipeline_feature_generator(generator_helper, data_helper):
     assert expected_output_data_feat_datetime == list(output_data["datetime"].values)
 
     # text_special checks
-    assert expected_output_data_feat_lower_ratio == list(output_data["text.lower_ratio"].values)
+    assert (
+        list(map(int, output_data["text.lower_ratio"].values)) == expected_output_data_feat_lower_ratio_np_lt_2_0
+        if Version(np.__version__) < Version("2.0.0")
+        else expected_output_data_feat_lower_ratio_np_ge_2_0
+    )
 
     # text_ngram checks
     assert expected_output_data_feat_total == list(output_data["__nlp__._total_"].values)
@@ -296,7 +303,9 @@ def test_auto_ml_pipeline_feature_generator_duplicates(generator_helper, data_he
         1301322000000000000,
     ]
 
-    expected_output_data_feat_lower_ratio = [3, 2, 0, 3, 3, 3, 3, 3, 1]
+    expected_output_data_feat_lower_ratio_np_lt_2_0 = [3, 2, 0, 3, 3, 3, 3, 3, 1]
+    expected_output_data_feat_lower_ratio_np_ge_2_0 = [2, 2, 0, 2, 2, 2, 2, 2, 1]
+
     expected_output_data_feat_total = [1, 3, 0, 0, 9, 1, 3, 9, 3]
 
     # When
@@ -319,7 +328,11 @@ def test_auto_ml_pipeline_feature_generator_duplicates(generator_helper, data_he
     assert expected_output_data_feat_datetime == list(output_data["datetime_as_object"].values)
 
     # text_special checks
-    assert expected_output_data_feat_lower_ratio == list(output_data["text.lower_ratio"].values)
+    assert (
+        list(map(int, output_data["text.lower_ratio"].values)) == expected_output_data_feat_lower_ratio_np_lt_2_0
+        if Version(np.__version__) < Version("2.0.0")
+        else expected_output_data_feat_lower_ratio_np_ge_2_0
+    )
 
     # text_ngram checks
     assert expected_output_data_feat_total == list(output_data["__nlp__._total_"].values)
@@ -459,7 +472,9 @@ def test_auto_ml_pipeline_feature_generator_duplicates_without_dedupe(generator_
         1301322000000000000,
     ]
 
-    expected_output_data_feat_lower_ratio = [3, 2, 0, 3, 3, 3, 3, 3, 1]
+    expected_output_data_feat_lower_ratio_np_lt_2_0 = [3, 2, 0, 3, 3, 3, 3, 3, 1]
+    expected_output_data_feat_lower_ratio_np_ge_2_0 = [2, 2, 0, 2, 2, 2, 2, 2, 1]
+
     expected_output_data_feat_total = [1, 3, 0, 0, 9, 1, 3, 9, 3]
 
     # When
@@ -483,7 +498,11 @@ def test_auto_ml_pipeline_feature_generator_duplicates_without_dedupe(generator_
     assert expected_output_data_feat_datetime == list(output_data["datetime"].values)
 
     # text_special checks
-    assert expected_output_data_feat_lower_ratio == list(output_data["text.lower_ratio"].values)
+    assert (
+        list(map(int, output_data["text.lower_ratio"].values)) == expected_output_data_feat_lower_ratio_np_lt_2_0
+        if Version(np.__version__) < Version("2.0.0")
+        else expected_output_data_feat_lower_ratio_np_ge_2_0
+    )
 
     # text_ngram checks
     assert expected_output_data_feat_total == list(output_data["__nlp__._total_"].values)

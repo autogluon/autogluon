@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional, Type, Union
 from autogluon.common import space
 from autogluon.core import constants
 from autogluon.timeseries.metrics import TimeSeriesScorer
+from autogluon.timeseries.utils.features import CovariateMetadata
 
 from . import (
     ADIDAModel,
@@ -16,7 +17,7 @@ from . import (
     AutoETSModel,
     AverageModel,
     ChronosModel,
-    CrostonSBAModel,
+    CrostonModel,
     DeepARModel,
     DirectTabularModel,
     DLinearModel,
@@ -68,7 +69,8 @@ MODEL_TYPES = dict(
     ETS=ETSModel,
     ARIMA=ARIMAModel,
     ADIDA=ADIDAModel,
-    CrostonSBA=CrostonSBAModel,
+    Croston=CrostonModel,
+    CrostonSBA=CrostonModel,  # Alias for backward compatibility
     IMAPA=IMAPAModel,
     Chronos=ChronosModel,
 )
@@ -85,7 +87,8 @@ DEFAULT_MODEL_PRIORITY = dict(
     # All local models are grouped together to make sure that joblib parallel pool is reused
     NPTS=80,
     ETS=80,
-    CrostonSBA=80,
+    CrostonSBA=80,  # Alias for backward compatibility
+    Croston=80,
     Theta=75,
     DynamicOptimizedTheta=75,
     AutoETS=70,
@@ -131,6 +134,7 @@ def get_default_hps(key):
             "RecursiveTabular": {},
             "DirectTabular": {},
             "TemporalFusionTransformer": {},
+            "Chronos": {"model_path": "bolt_small"},
         },
         "light_inference": {
             "SeasonalNaive": {},
@@ -141,20 +145,34 @@ def get_default_hps(key):
         },
         "default": {
             "SeasonalNaive": {},
-            "CrostonSBA": {},
             "AutoETS": {},
-            "AutoARIMA": {},
             "NPTS": {},
             "DynamicOptimizedTheta": {},
-            # TODO: Define separate model for each tabular submodel?
-            "RecursiveTabular": {
-                "tabular_hyperparameters": {"NN_TORCH": {"proc.impute_strategy": "constant"}, "GBM": {}},
-            },
+            "RecursiveTabular": {},
             "DirectTabular": {},
             "TemporalFusionTransformer": {},
             "PatchTST": {},
             "DeepAR": {},
-            "Chronos": {"model_path": "base"},
+            "Chronos": [
+                {
+                    "ag_args": {"name_suffix": "ZeroShot"},
+                    "model_path": "bolt_base",
+                },
+                {
+                    "ag_args": {"name_suffix": "FineTuned"},
+                    "model_path": "bolt_small",
+                    "fine_tune": True,
+                    "target_scaler": "standard",
+                    "covariate_regressor": {"model_name": "CAT", "model_hyperparameters": {"iterations": 1_000}},
+                },
+            ],
+            "TiDE": {
+                "encoder_hidden_dim": 256,
+                "decoder_hidden_dim": 256,
+                "temporal_hidden_dim": 64,
+                "num_batches_per_epoch": 100,
+                "lr": 1e-4,
+            },
         },
     }
     return default_model_hps[key]
@@ -168,6 +186,7 @@ def get_preset_models(
     eval_metric_seasonal_period: Optional[int],
     hyperparameters: Union[str, Dict, None],
     hyperparameter_tune: bool,
+    metadata: CovariateMetadata,
     all_assigned_names: List[str],
     excluded_model_types: List[str],
     multi_window: bool = False,
@@ -209,7 +228,7 @@ def get_preset_models(
     for model in model_priority_list:
         if isinstance(model, str):
             if model not in MODEL_TYPES:
-                raise ValueError(f"Model {model} is not supported yet.")
+                raise ValueError(f"Model {model} is not supported. Available models: {sorted(MODEL_TYPES)}")
             if model in excluded_models:
                 logger.info(
                     f"\tFound '{model}' model in `hyperparameters`, but '{model}' "
@@ -245,6 +264,7 @@ def get_preset_models(
                 prediction_length=prediction_length,
                 eval_metric=eval_metric,
                 eval_metric_seasonal_period=eval_metric_seasonal_period,
+                metadata=metadata,
                 hyperparameters=model_hps,
                 **kwargs,
             )

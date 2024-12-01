@@ -110,8 +110,6 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         known as dynamic features, exogenous variables, additional regressors or related time series. Examples of such
         covariates include holidays, promotions or weather forecasts.
 
-        Currently, only numeric (float of integer dtype) are supported.
-
         If ``known_covariates_names`` are provided, then:
 
         - :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit`, :meth:`~autogluon.timeseries.TimeSeriesPredictor.evaluate`, and :meth:`~autogluon.timeseries.TimeSeriesPredictor.leaderboard` will expect a data frame with columns listed in ``known_covariates_names`` (in addition to the ``target`` column).
@@ -219,6 +217,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
                 prediction_length=self.prediction_length,
                 quantile_levels=self.quantile_levels,
                 cache_predictions=self.cache_predictions,
+                ensemble_model_type=kwargs.pop("ensemble_model_type", None),
             )
         )
         # Using `TimeSeriesLearner` as default argument breaks doc generation with Sphnix
@@ -254,7 +253,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         self,
         data: Union[TimeSeriesDataFrame, pd.DataFrame, Path, str],
         name: str = "data",
-    ) -> "TimeSeriesDataFrame":
+    ) -> TimeSeriesDataFrame:
         if isinstance(data, TimeSeriesDataFrame):
             return data
         elif isinstance(data, (pd.DataFrame, Path, str)):
@@ -293,7 +292,9 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             Preprocessed data in TimeSeriesDataFrame format.
         """
         df = self._to_data_frame(data, name=name)
-        df = df.astype({self.target: "float64"})
+        if not pd.api.types.is_numeric_dtype(df[self.target]):
+            raise ValueError(f"Target column {name}['{self.target}'] has a non-numeric dtype {df[self.target].dtype}")
+        df = df.assign(**{self.target: df[self.target].astype("float64")})
         # MultiIndex.is_monotonic_increasing checks if index is sorted by ["item_id", "timestamp"]
         if not df.index.is_monotonic_increasing:
             df = df.sort_index()
@@ -301,7 +302,10 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
         # Ensure that data has a regular frequency that matches the predictor frequency
         if self.freq is None:
-            if df.freq is None:
+            try:
+                # Use all items for inferring the frequency
+                self.freq = df.infer_frequency(num_items=None, raise_if_irregular=True)
+            except ValueError:
                 raise ValueError(
                     f"Frequency of {name} is not provided and cannot be inferred. Please set the expected data "
                     f"frequency when creating the predictor with `TimeSeriesPredictor(freq=...)` or ensure that "
@@ -418,7 +422,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         excluded_model_types: Optional[List[str]] = None,
         num_val_windows: int = 1,
         val_step_size: Optional[int] = None,
-        refit_every_n_windows: int = 1,
+        refit_every_n_windows: Optional[int] = 1,
         refit_full: bool = False,
         enable_ensemble: bool = True,
         skip_model_selection: bool = False,
@@ -437,17 +441,19 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
             If ``known_covariates_names`` were specified when creating the predictor, ``train_data`` must include the
             columns listed in ``known_covariates_names`` with the covariates values aligned with the target time series.
-            The known covariates must have a numeric (float or integer) dtype.
 
             Columns of ``train_data`` except ``target`` and those listed in ``known_covariates_names`` will be
             interpreted as ``past_covariates`` - covariates that are known only in the past.
 
-            If ``train_data`` has static features (i.e., ``train_data.static_features`` is a pandas DataFrame), the
-            predictor will interpret columns with ``int`` and ``float`` dtypes as continuous (real-valued) features,
-            columns with ``object`` and ``str`` dtypes as categorical features, and will ignore the rest of columns.
+            If ``train_data`` contains covariates or static features, they will be interpreted as follows:
 
-            For example, to ensure that column "store_id" with dtype ``int`` is interpreted as a category,
-            we need to change its type to ``category``::
+            * columns with ``int``, ``bool`` and ``float`` dtypes are interpreted as continuous (real-valued) features
+            * columns with ``object``, ``str`` and ``category`` dtypes are as interpreted as categorical features
+            * columns with other dtypes are ignored
+
+            To ensure that the column type is interpreted correctly, please convert it to one of the above dtypes.
+            For example, to ensure that column "store_id" with dtype ``int`` is interpreted as a category, change
+            its dtype to ``category``::
 
                 data.static_features["store_id"] = data.static_features["store_id"].astype("category")
 
@@ -495,13 +501,18 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
             - ``"fast_training"``: fit simple statistical models (``ETS``, ``Theta``, ``Naive``, ``SeasonalNaive``) + fast tree-based models ``RecursiveTabular``
               and ``DirectTabular``. These models are fast to train but may not be very accurate.
-            - ``"medium_quality"``: all models mentioned above + deep learning model ``TemporalFusionTransformer``. Default setting that produces good forecasts
+            - ``"medium_quality"``: all models mentioned above + deep learning model ``TemporalFusionTransformer`` + Chronos-Bolt (small). Default setting that produces good forecasts
               with reasonable training time.
-            - ``"high_quality"``: All ML models available in AutoGluon + additional statistical models (``NPTS``, ``AutoETS``, ``AutoARIMA``, ``CrostonSBA``,
+            - ``"high_quality"``: All ML models available in AutoGluon + additional statistical models (``NPTS``, ``AutoETS``,
               ``DynamicOptimizedTheta``). Much more accurate than ``medium_quality``, but takes longer to train.
             - ``"best_quality"``: Same models as in ``"high_quality"``, but performs validation with multiple backtests. Usually better than ``high_quality``, but takes even longer to train.
 
-            Available presets with the `Chronos <https://github.com/amazon-science/chronos-forecasting>`_ model:
+            Available presets with the new, faster `Chronos-Bolt <https://github.com/amazon-science/chronos-forecasting>`_ model:
+
+            - ``"bolt_{model_size}"``: where model size is one of ``tiny,mini,small,base``. Uses the Chronos-Bolt pretrained model for zero-shot forecasting.
+              See the documentation for ``ChronosModel`` or see `Hugging Face <https://huggingface.co/collections/amazon/chronos-models-65f1791d630a8d57cb718444>`_ for more information.
+
+            Available presets with the original `Chronos <https://github.com/amazon-science/chronos-forecasting>`_ model:
 
             - ``"chronos_{model_size}"``: where model size is one of ``tiny,mini,small,base,large``. Uses the Chronos pretrained model for zero-shot forecasting.
               See the documentation for ``ChronosModel`` or see `Hugging Face <https://huggingface.co/collections/amazon/chronos-models-65f1791d630a8d57cb718444>`_ for more information.
@@ -723,7 +734,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         if num_val_windows == 0 and tuning_data is None:
             raise ValueError("Please set num_val_windows >= 1 or provide custom tuning_data")
 
-        if num_val_windows <= 1 and refit_every_n_windows > 1:
+        if num_val_windows <= 1 and refit_every_n_windows is not None and refit_every_n_windows > 1:
             logger.warning(
                 f"\trefit_every_n_windows provided as {refit_every_n_windows} but num_val_windows is set to {num_val_windows}."
                 " Refit_every_n_windows will have no effect."
@@ -1199,6 +1210,8 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
     def leaderboard(
         self,
         data: Optional[Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]] = None,
+        extra_info: bool = False,
+        extra_metrics: Optional[List[Union[str, TimeSeriesScorer]]] = None,
         display: bool = False,
         use_cache: bool = True,
         **kwargs,
@@ -1236,6 +1249,20 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             If provided data is a path or a pandas.DataFrame, AutoGluon will attempt to automatically convert it to a
             ``TimeSeriesDataFrame``.
 
+        extra_info : bool, default = False
+            If True, the leaderboard will contain an additional column `hyperparameters` with the hyperparameters used
+            by each model during training. An empty dictionary `{}` means that the model was trained with default
+            hyperparameters.
+        extra_metrics : List[Union[str, TimeSeriesScorer]], optional
+            A list of metrics to calculate scores for and include in the output DataFrame.
+
+            Only valid when `data` is specified. The scores refer to the scores on `data` (same data as used to
+            calculate the `score_test` column).
+
+            This list can contain any values which would also be valid for `eval_metric` when creating a :class:`~autogluon.timeseries.TimeSeriesPredictor`.
+
+            For each provided `metric`, a column with name `str(metric)` will be added to the leaderboard, containing
+            the value of the metric computed on `data`.
         display : bool, default = False
             If True, the leaderboard DataFrame will be printed.
         use_cache : bool, default = True
@@ -1255,11 +1282,16 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         if len(kwargs) > 0:
             for key in kwargs:
                 raise TypeError(f"TimeSeriesPredictor.leaderboard() got an unexpected keyword argument '{key}'")
+        if data is None and extra_metrics is not None:
+            raise ValueError("`extra_metrics` is only valid when `data` is specified.")
 
         if data is not None:
             data = self._check_and_prepare_data_frame(data)
             self._check_data_for_evaluation(data)
-        leaderboard = self._learner.leaderboard(data, use_cache=use_cache)
+
+        leaderboard = self._learner.leaderboard(
+            data, extra_info=extra_info, extra_metrics=extra_metrics, use_cache=use_cache
+        )
         if display:
             with pd.option_context("display.max_rows", None, "display.max_columns", None, "display.width", 1000):
                 print(leaderboard)

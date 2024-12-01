@@ -1,4 +1,6 @@
+import copy
 from typing import Optional
+from unittest import mock
 
 import numpy as np
 import pytest
@@ -7,32 +9,21 @@ import torch
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.timeseries import TimeSeriesPredictor
 from autogluon.timeseries.models import ChronosModel
-from autogluon.timeseries.models.chronos.utils import (
-    ChronosInferenceDataLoader,
-    ChronosInferenceDataset,
-    timeout_callback,
-)
 
-from ..common import (
+from ...common import (
     DATAFRAME_WITH_COVARIATES,
     DATAFRAME_WITH_STATIC,
     DUMMY_TS_DATAFRAME,
     get_data_frame_with_item_index,
     get_data_frame_with_variable_lengths,
 )
+from .conftest import CHRONOS_BOLT_TEST_MODEL_PATH
 
 DATASETS = [DUMMY_TS_DATAFRAME, DATAFRAME_WITH_STATIC, DATAFRAME_WITH_COVARIATES]
-TESTABLE_MODELS = [ChronosModel]
 GPU_AVAILABLE = torch.cuda.is_available()
 HYPERPARAMETER_DICTS = [
     {
-        "batch_size": 32,
-    },
-    {
         "batch_size": 4,
-    },
-    {
-        "num_samples": 10,
     },
     {
         "context_length": 64,
@@ -40,60 +31,85 @@ HYPERPARAMETER_DICTS = [
     {
         "context_length": None,
     },
+    {
+        "fine_tune": True,
+        "fine_tune_steps": 2,
+    },
+    {
+        "fine_tune": True,
+        "fine_tune_steps": 2,
+        "context_length": 64,
+    },
 ]
+
+
+def chronos_bolt_model(*args, hyperparameters=None, **kwargs):
+    hyperparameters = copy.deepcopy(hyperparameters or {})
+    hyperparameters |= {"model_path": CHRONOS_BOLT_TEST_MODEL_PATH}
+    kwargs["hyperparameters"] = hyperparameters
+    return ChronosModel(*args, **kwargs)
+
+
+def chronos_with_finetuning(*args, hyperparameters=None, **kwargs):
+    hyperparameters = copy.deepcopy(hyperparameters or {})
+    hyperparameters |= {"fine_tune": True, "fine_tune_steps": 10}
+    kwargs["hyperparameters"] = hyperparameters
+    return ChronosModel(*args, **kwargs)
+
+
+def chronos_bolt_model_with_finetuning(*args, hyperparameters=None, **kwargs):
+    hyperparameters = copy.deepcopy(hyperparameters or {})
+    hyperparameters |= {"model_path": CHRONOS_BOLT_TEST_MODEL_PATH, "fine_tune": True, "fine_tune_steps": 10}
+    kwargs["hyperparameters"] = hyperparameters
+    return ChronosModel(*args, **kwargs)
+
+
+ZERO_SHOT_MODELS = [ChronosModel, chronos_bolt_model]
+TESTABLE_MODELS = [ChronosModel, chronos_with_finetuning, chronos_bolt_model, chronos_bolt_model_with_finetuning]
 
 
 @pytest.fixture(
     scope="module",
-    params=[
-        {
-            "optimization_strategy": "onnx",
-        },
-        # add openvino tests when they are in core requirements
-        # {
-        #     "optimization_strategy": "openvino",
-        # },
-        *HYPERPARAMETER_DICTS,
-    ],
+    params=HYPERPARAMETER_DICTS,
 )
-def default_chronos_tiny_model(request, hf_model_path) -> ChronosModel:
+def default_chronos_tiny_model(request, chronos_model_path) -> ChronosModel:
     model = ChronosModel(
         hyperparameters={
-            "model_path": hf_model_path,
+            "model_path": chronos_model_path,
             "num_samples": 3,
             "context_length": 16,
             "device": "cpu",
             **request.param,
         },
     )
-    model.fit(train_data=None)
     return model
 
 
 @pytest.fixture(scope="module", params=HYPERPARAMETER_DICTS)
-def default_chronos_tiny_model_gpu(request, hf_model_path) -> Optional[ChronosModel]:
+def default_chronos_tiny_model_gpu(request, chronos_model_path) -> Optional[ChronosModel]:
     if not GPU_AVAILABLE:
         return None
 
     model = ChronosModel(
         hyperparameters={
-            "model_path": hf_model_path,
+            "model_path": chronos_model_path,
             "device": "cuda",
             **request.param,
         },
     )
-    model.fit(train_data=None)
     return model
 
 
 @pytest.mark.parametrize("data", DATASETS)
 def test_when_on_cpu_then_chronos_model_can_score_and_cache_oof(data, default_chronos_tiny_model):
+    default_chronos_tiny_model.fit(train_data=data)
     default_chronos_tiny_model.score_and_cache_oof(data)
     assert default_chronos_tiny_model._oof_predictions is not None
 
 
 @pytest.mark.parametrize("data", DATASETS)
 def test_when_on_cpu_then_chronos_model_can_infer(data, default_chronos_tiny_model):
+    default_chronos_tiny_model.fit(train_data=data)
     predictions = default_chronos_tiny_model.predict(data)
     assert all(predictions.item_ids == data.item_ids)
 
@@ -112,7 +128,7 @@ def test_when_on_cpu_and_model_requested_from_hf_then_chronos_model_can_infer(da
 def test_given_nan_features_when_on_cpu_then_chronos_model_inferences_not_nan(default_chronos_tiny_model):
     data = get_data_frame_with_variable_lengths({"A": 20, "B": 12}, covariates_names=["cov1", "cov2", "cov3"])
     data[["cov1", "cov2", "cov3"]] = np.nan
-
+    default_chronos_tiny_model.fit(train_data=data)
     predictions = default_chronos_tiny_model.predict(data)
     assert all(predictions.item_ids == data.item_ids)
     assert not any(predictions["mean"].isna())
@@ -121,6 +137,7 @@ def test_given_nan_features_when_on_cpu_then_chronos_model_inferences_not_nan(de
 @pytest.mark.skipif(not GPU_AVAILABLE, reason="Requires GPU")
 @pytest.mark.parametrize("data", DATASETS)
 def test_when_on_gpu_then_chronos_model_can_score_and_cache_oof(data, default_chronos_tiny_model_gpu):
+    default_chronos_tiny_model_gpu.fit(train_data=data)
     default_chronos_tiny_model_gpu.score_and_cache_oof(data)
     assert default_chronos_tiny_model_gpu._oof_predictions is not None
 
@@ -128,6 +145,8 @@ def test_when_on_gpu_then_chronos_model_can_score_and_cache_oof(data, default_ch
 @pytest.mark.skipif(not GPU_AVAILABLE, reason="Requires GPU")
 @pytest.mark.parametrize("data", DATASETS)
 def test_when_on_gpu_then_chronos_model_can_infer(data, default_chronos_tiny_model_gpu):
+    default_chronos_tiny_model_gpu.fit(train_data=data)
+    default_chronos_tiny_model_gpu.fit(train_data=data)
     predictions = default_chronos_tiny_model_gpu.predict(data)
     assert all(predictions.item_ids == data.item_ids)
 
@@ -137,17 +156,18 @@ def test_given_nan_features_when_on_gpu_then_chronos_model_inferences_not_nan(de
     data = get_data_frame_with_variable_lengths({"A": 20, "B": 12}, covariates_names=["cov1", "cov2", "cov3"])
     data[["cov1", "cov2", "cov3"]] = np.nan
 
+    default_chronos_tiny_model_gpu.fit(train_data=data)
     predictions = default_chronos_tiny_model_gpu.predict(data)
     assert all(predictions.item_ids == data.item_ids)
     assert not any(predictions["mean"].isna())
 
 
 @pytest.mark.parametrize("batch_size", [6, 12])
-def test_when_batch_size_provided_then_batch_size_used_to_infer(batch_size, hf_model_path):
+def test_when_batch_size_provided_then_batch_size_used_to_infer(batch_size, chronos_model_path):
     data = get_data_frame_with_item_index(list(range(20)))
     model = ChronosModel(
         hyperparameters={
-            "model_path": hf_model_path,
+            "model_path": chronos_model_path,
             "device": "cpu",
             "batch_size": batch_size,
             "context_length": 16,
@@ -161,43 +181,8 @@ def test_when_batch_size_provided_then_batch_size_used_to_infer(batch_size, hf_m
 
 
 @pytest.mark.parametrize("data", DATASETS)
-@pytest.mark.parametrize("context_length", [5, 10, 20])
-def test_when_context_length_provided_then_inference_dataset_context_length_used(data, context_length):
-    inference_dataset = ChronosInferenceDataset(data, context_length=context_length)
-    item = inference_dataset[0]
-
-    assert item.shape[-1] == context_length
-
-
-@pytest.mark.parametrize("context_length", [5, 10, 20])
-def test_when_context_length_provided_then_padding_correct(context_length):
-    data = get_data_frame_with_item_index(list(range(20)), data_length=5)
-    inference_dataset = ChronosInferenceDataset(data, context_length=context_length)
-    item = inference_dataset[0]
-
-    assert np.sum(np.isnan(item)) == context_length - 5
-    assert not np.isnan(item[-1])  # padding left
-
-
-@pytest.mark.parametrize(
-    "item_id_to_length, expected_indptr",
-    [
-        ({"A": 20, "B": 12}, [0, 20, 32]),
-        ({"A": 20, "B": 12, "C": 1}, [0, 20, 32, 33]),
-        ({"A": 20}, [0, 20]),
-        ({"A": 1}, [0, 1]),
-        ({"B": 10, "A": 10}, [0, 10, 20]),
-    ],
-)
-def test_when_inference_dataset_initialized_then_indptr_set_correctly(item_id_to_length, expected_indptr):
-    dataset = get_data_frame_with_variable_lengths(item_id_to_length)
-    inference_dataset = ChronosInferenceDataset(dataset, context_length=5)
-
-    assert inference_dataset.indptr.tolist() == expected_indptr
-
-
-@pytest.mark.parametrize("data", DATASETS)
 def test_when_cpu_models_saved_then_models_can_be_loaded_and_inferred(data, default_chronos_tiny_model):
+    default_chronos_tiny_model.fit(train_data=data)
     default_chronos_tiny_model.save()
 
     loaded_model = default_chronos_tiny_model.__class__.load(path=default_chronos_tiny_model.path)
@@ -209,6 +194,7 @@ def test_when_cpu_models_saved_then_models_can_be_loaded_and_inferred(data, defa
 @pytest.mark.skipif(not GPU_AVAILABLE, reason="Requires GPU")
 @pytest.mark.parametrize("data", DATASETS)
 def test_when_gpu_models_saved_then_models_can_be_loaded_and_inferred(data, default_chronos_tiny_model_gpu):
+    default_chronos_tiny_model_gpu.fit(train_data=data)
     default_chronos_tiny_model_gpu.save()
 
     loaded_model = default_chronos_tiny_model_gpu.__class__.load(path=default_chronos_tiny_model_gpu.path)
@@ -218,17 +204,25 @@ def test_when_gpu_models_saved_then_models_can_be_loaded_and_inferred(data, defa
 
 
 @pytest.mark.parametrize(
-    "data_length, expected_context_length", [(5, 5), (7, 7), (1000, ChronosModel.maximum_context_length)]
+    "data_length, expected_context_length", [(5, 5), (7, 7), (5000, ChronosModel.maximum_context_length)]
 )
 def test_when_context_length_not_provided_then_context_length_set_to_dataset_length(
-    hf_model_path, data_length, expected_context_length
+    chronos_model_path, data_length, expected_context_length
 ):
     data = get_data_frame_with_item_index(list(range(3)), data_length=data_length)
-    model = ChronosModel(hyperparameters={"model_path": hf_model_path})
+    model = ChronosModel(hyperparameters={"model_path": chronos_model_path})
     model.fit(train_data=None)
-    model.predict(data)
+    model.persist()  # persist so that we can patch the predict method
 
-    assert model.model_pipeline.model.config.context_length == expected_context_length
+    with mock.patch.object(model.model_pipeline, "predict_quantiles") as patch_predict_quantiles:
+        try:
+            model.predict(data)
+        except ValueError:
+            pass
+
+        batch = patch_predict_quantiles.call_args.args[0]
+
+    assert batch.shape[-1] == expected_context_length
 
 
 @pytest.mark.parametrize(
@@ -238,32 +232,48 @@ def test_when_context_length_not_provided_then_context_length_set_to_dataset_len
         (32, 7, 32),
         (32, 64, 32),
         (10000, 30, ChronosModel.maximum_context_length),
-        (10000, 1000, ChronosModel.maximum_context_length),
+        (10000, 5000, ChronosModel.maximum_context_length),
     ],
 )
 def test_when_context_length_provided_then_context_length_set_to_capped_init_context_length(
-    hf_model_path, init_context_length, data_length, expected_context_length
+    chronos_model_path, init_context_length, data_length, expected_context_length
 ):
     data = get_data_frame_with_item_index(list(range(3)), data_length=data_length)
-    model = ChronosModel(hyperparameters={"model_path": hf_model_path, "context_length": init_context_length})
+    model = ChronosModel(hyperparameters={"model_path": chronos_model_path, "context_length": init_context_length})
     model.fit(train_data=None)
-    model.predict(data)
+    model.persist()  # persist so that we can patch the predict method
 
-    assert model.model_pipeline.model.config.context_length == expected_context_length
+    with mock.patch.object(model.model_pipeline, "predict_quantiles") as patch_predict_quantiles:
+        try:
+            model.predict(data)
+        except ValueError:
+            pass
+
+        batch = patch_predict_quantiles.call_args.args[0]
+
+    assert batch.shape[-1] == expected_context_length
 
 
 @pytest.mark.parametrize(
-    "longest_data_length, expected_context_length", [(5, 5), (7, 7), (1000, ChronosModel.maximum_context_length)]
+    "longest_data_length, expected_context_length", [(5, 5), (7, 7), (5000, ChronosModel.maximum_context_length)]
 )
 def test_given_variable_length_data_when_context_length_not_provided_then_context_length_set_to_max_data_length(
-    hf_model_path, longest_data_length, expected_context_length
+    chronos_model_path, longest_data_length, expected_context_length
 ):
     data = get_data_frame_with_variable_lengths({"A": 3, "B": 3, "C": longest_data_length})
-    model = ChronosModel(hyperparameters={"model_path": hf_model_path})
+    model = ChronosModel(hyperparameters={"model_path": chronos_model_path})
     model.fit(train_data=None)
-    model.predict(data)
+    model.persist()  # persist so that we can patch the predict method
 
-    assert model.model_pipeline.model.config.context_length == expected_context_length
+    with mock.patch.object(model.model_pipeline, "predict_quantiles") as patch_predict_quantiles:
+        try:
+            model.predict(data)
+        except ValueError:
+            pass
+
+        batch = patch_predict_quantiles.call_args.args[0]
+
+    assert batch.shape[-1] == expected_context_length
 
 
 DTYPE_TEST_CASES = [  # dtype_arg, expected_dtype
@@ -278,10 +288,12 @@ DTYPE_TEST_CASES = [  # dtype_arg, expected_dtype
 
 
 @pytest.mark.parametrize("dtype_arg, expected_dtype", DTYPE_TEST_CASES)
-def test_when_torch_dtype_provided_then_parameters_loaded_in_torch_dtype(hf_model_path, dtype_arg, expected_dtype):
+def test_when_torch_dtype_provided_then_parameters_loaded_in_torch_dtype(
+    chronos_model_path, dtype_arg, expected_dtype
+):
     model = ChronosModel(
         hyperparameters={
-            "model_path": hf_model_path,
+            "model_path": chronos_model_path,
             "device": "cpu",
             "torch_dtype": dtype_arg,
         },
@@ -289,31 +301,31 @@ def test_when_torch_dtype_provided_then_parameters_loaded_in_torch_dtype(hf_mode
     model.fit(train_data=None)
     model.load_model_pipeline()
 
-    embedding_matrix = next(iter(model.model_pipeline.model.model.shared.parameters()))
-    assert embedding_matrix.dtype is expected_dtype
+    parameter = next(iter(model.model_pipeline.model.parameters()))
+    assert parameter.dtype is expected_dtype
 
 
 @pytest.mark.parametrize("dtype_arg, expected_dtype", DTYPE_TEST_CASES)
 def test_when_torch_dtype_provided_and_model_persisted_then_parameters_loaded_in_torch_dtype(
-    hf_model_path, dtype_arg, expected_dtype
+    chronos_model_path, dtype_arg, expected_dtype
 ):
     model = ChronosModel(
         hyperparameters={
-            "model_path": hf_model_path,
+            "model_path": chronos_model_path,
             "device": "cpu",
             "torch_dtype": dtype_arg,
         },
     )
     model.persist()
 
-    embedding_matrix = next(iter(model.model_pipeline.model.model.shared.parameters()))
-    assert embedding_matrix.dtype is expected_dtype
+    parameter = next(iter(model.model_pipeline.model.parameters()))
+    assert parameter.dtype is expected_dtype
 
 
-def test_when_model_persisted_then_model_pipeline_can_infer(hf_model_path):
+def test_when_model_persisted_then_model_pipeline_can_infer(chronos_model_path):
     model = ChronosModel(
         hyperparameters={
-            "model_path": hf_model_path,
+            "model_path": chronos_model_path,
             "device": "cpu",
         },
     )
@@ -321,10 +333,10 @@ def test_when_model_persisted_then_model_pipeline_can_infer(hf_model_path):
     assert model.model_pipeline.predict(torch.tensor([[1, 2, 3]])) is not None
 
 
-def test_when_model_not_persisted_only_fit_then_model_pipeline_is_none(hf_model_path):
+def test_when_model_not_persisted_only_fit_then_model_pipeline_is_none(chronos_model_path):
     model = ChronosModel(
         hyperparameters={
-            "model_path": hf_model_path,
+            "model_path": chronos_model_path,
             "device": "cpu",
         },
     )
@@ -332,10 +344,10 @@ def test_when_model_not_persisted_only_fit_then_model_pipeline_is_none(hf_model_
     assert model.model_pipeline is None
 
 
-def test_when_model_saved_loaded_and_persisted_then_model_pipeline_can_infer(hf_model_path):
+def test_when_model_saved_loaded_and_persisted_then_model_pipeline_can_infer(chronos_model_path):
     model = ChronosModel(
         hyperparameters={
-            "model_path": hf_model_path,
+            "model_path": chronos_model_path,
             "device": "cpu",
         },
     )
@@ -347,13 +359,13 @@ def test_when_model_saved_loaded_and_persisted_then_model_pipeline_can_infer(hf_
 
 
 def test_when_chronos_fit_in_standalone_through_predictor_and_persist_called_then_chronos_pipeline_is_persisted(
-    hf_model_path,
+    chronos_model_path,
     temp_model_path,
 ):
     predictor = TimeSeriesPredictor(path=temp_model_path).fit(
         DUMMY_TS_DATAFRAME,
         skip_model_selection=True,
-        hyperparameters={"Chronos": {"model_path": hf_model_path}},
+        hyperparameters={"Chronos": {"model_path": chronos_model_path}},
         enable_ensemble=False,
     )
     predictor.persist()
@@ -363,12 +375,12 @@ def test_when_chronos_fit_in_standalone_through_predictor_and_persist_called_the
 
 
 def test_when_chronos_fit_with_validation_through_predictor_and_persist_called_then_chronos_pipeline_is_persisted(
-    hf_model_path,
+    chronos_model_path,
     temp_model_path,
 ):
     predictor = TimeSeriesPredictor(path=temp_model_path).fit(
         DUMMY_TS_DATAFRAME,
-        hyperparameters={"Chronos": {"model_path": hf_model_path}},
+        hyperparameters={"Chronos": {"model_path": chronos_model_path}},
         enable_ensemble=False,
     )
     predictor.persist()
@@ -381,30 +393,87 @@ def test_when_chronos_fit_with_validation_through_predictor_and_persist_called_t
 
 @pytest.mark.parametrize("data_loader_num_workers", [0, 1, 2])
 def test_when_chronos_scores_oof_and_time_limit_is_exceeded_then_exception_is_raised(
-    hf_model_path, temp_model_path, data_loader_num_workers
+    chronos_model_path, temp_model_path, data_loader_num_workers
 ):
     data = get_data_frame_with_item_index(item_list=list(range(1000)), data_length=50)
     model = ChronosModel(
         prediction_length=20,
         path=temp_model_path,
-        hyperparameters={"model_path": hf_model_path, "data_loader_num_workers": data_loader_num_workers},
+        hyperparameters={"model_path": chronos_model_path, "data_loader_num_workers": data_loader_num_workers},
     )
-    model.fit(data, time_limit=1.0)
+    model.fit(data)
     with pytest.raises(TimeLimitExceeded):
-        model.score_and_cache_oof(data)
+        model.score_and_cache_oof(data, time_limit=0.1)
 
 
-@pytest.mark.parametrize("data_loader_num_workers", [0, 1, 2])
-def test_when_chronos_inference_dataloader_used_and_time_limit_exceeded_then_exception_is_raised(
-    data_loader_num_workers,
-):
-    data_loader = ChronosInferenceDataLoader(
-        range(100_000_000),
-        batch_size=2,
-        num_workers=data_loader_num_workers,
-        on_batch=timeout_callback(seconds=0.5),
+def test_when_eval_during_fine_tune_is_false_then_evaluation_is_turned_off(chronos_model_path):
+    model = ChronosModel(
+        hyperparameters={
+            "model_path": chronos_model_path,
+            "device": "cpu",
+            "fine_tune": True,
+            "eval_during_fine_tune": False,
+        },
     )
 
-    with pytest.raises(TimeLimitExceeded):
-        for _ in data_loader:
+    with mock.patch("transformers.trainer.TrainingArguments.__init__") as training_args:
+        try:
+            model.fit(DUMMY_TS_DATAFRAME)
+        except TypeError:
             pass
+
+        assert training_args.call_args.kwargs["evaluation_strategy"] == "no"
+        assert training_args.call_args.kwargs["eval_steps"] is None
+        assert not training_args.call_args.kwargs["load_best_model_at_end"]
+        assert training_args.call_args.kwargs["metric_for_best_model"] is None
+
+
+@pytest.mark.parametrize("max_items", [3, 20, None])
+def test_fine_tune_eval_max_items_is_used(chronos_model_path, max_items):
+    model = ChronosModel(
+        hyperparameters={
+            "model_path": chronos_model_path,
+            "device": "cpu",
+            "fine_tune": True,
+            "fine_tune_eval_max_items": max_items,
+        },
+    )
+    expected_max_items = (
+        min(max_items, DUMMY_TS_DATAFRAME.num_items) if max_items is not None else DUMMY_TS_DATAFRAME.num_items
+    )
+
+    with mock.patch(
+        "autogluon.timeseries.models.chronos.pipeline.utils.ChronosFineTuningDataset.__init__"
+    ) as chronos_ft_dataset:
+        chronos_ft_dataset.side_effect = [None, None]
+
+        try:
+            model.fit(DUMMY_TS_DATAFRAME, val_data=DUMMY_TS_DATAFRAME)
+        except AttributeError:
+            pass
+
+        val_data_subset = chronos_ft_dataset.call_args_list[1].kwargs["target_df"]
+
+        assert val_data_subset.num_items == expected_max_items
+
+
+@pytest.mark.parametrize("shuffle_buffer_size", [20, None])
+def test_fine_tune_shuffle_buffer_size_is_used(chronos_model_path, shuffle_buffer_size):
+    model = ChronosModel(
+        hyperparameters={
+            "model_path": chronos_model_path,
+            "device": "cpu",
+            "fine_tune": True,
+            "fine_tune_shuffle_buffer_size": shuffle_buffer_size,
+        },
+    )
+
+    with mock.patch(
+        "autogluon.timeseries.models.chronos.pipeline.utils.ChronosFineTuningDataset.shuffle"
+    ) as chronos_ft_dataset_shuffle:
+        try:
+            model.fit(DUMMY_TS_DATAFRAME)
+        except ValueError:
+            pass
+
+        assert chronos_ft_dataset_shuffle.call_args.args[0] == shuffle_buffer_size

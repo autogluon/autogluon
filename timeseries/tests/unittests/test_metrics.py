@@ -21,7 +21,7 @@ from gluonts.model.forecast import QuantileForecast
 
 from autogluon.timeseries import TimeSeriesPredictor
 from autogluon.timeseries.metrics import AVAILABLE_METRICS, DEFAULT_METRIC_NAME, check_get_evaluation_metric
-from autogluon.timeseries.metrics.utils import _in_sample_abs_seasonal_error, _in_sample_squared_seasonal_error
+from autogluon.timeseries.metrics.utils import in_sample_abs_seasonal_error, in_sample_squared_seasonal_error
 from autogluon.timeseries.models.gluonts.abstract_gluonts import AbstractGluonTSModel
 
 from .common import DUMMY_TS_DATAFRAME, get_data_frame_with_item_index, get_prediction_for_df
@@ -55,7 +55,7 @@ def deepar_trained() -> AbstractGluonTSModel:
         DUMMY_TS_DATAFRAME,
         tuning_data=DUMMY_TS_DATAFRAME,
         hyperparameters={
-            "DeepAR": dict(epochs=2),
+            "DeepAR": {"max_epochs": 2},
         },
     )
     return pred._trainer.load_model("DeepAR")
@@ -71,7 +71,7 @@ def deepar_trained_zero_data() -> AbstractGluonTSModel:
         data,
         tuning_data=data,
         hyperparameters={
-            "DeepAR": dict(epochs=2),
+            "DeepAR": {"max_epochs": 2},
         },
     )
     return pred._trainer.load_model("DeepAR")
@@ -225,7 +225,7 @@ def test_given_historic_data_not_cached_when_scoring_then_exception_is_raised(ev
 
 def test_when_eval_metric_seasonal_period_is_longer_than_ts_then_abs_seasonal_error_is_set_to_1():
     seasonal_period = max(DUMMY_TS_DATAFRAME.num_timesteps_per_item())
-    naive_error_per_item = _in_sample_abs_seasonal_error(
+    naive_error_per_item = in_sample_abs_seasonal_error(
         y_past=DUMMY_TS_DATAFRAME["target"], seasonal_period=seasonal_period
     )
     assert (naive_error_per_item == 1.0).all()
@@ -233,7 +233,7 @@ def test_when_eval_metric_seasonal_period_is_longer_than_ts_then_abs_seasonal_er
 
 def test_when_eval_metric_seasonal_period_is_longer_than_ts_then_squared_seasonal_error_is_set_to_1():
     seasonal_period = max(DUMMY_TS_DATAFRAME.num_timesteps_per_item())
-    naive_error_per_item = _in_sample_squared_seasonal_error(
+    naive_error_per_item = in_sample_squared_seasonal_error(
         y_past=DUMMY_TS_DATAFRAME["target"], seasonal_period=seasonal_period
     )
     assert (naive_error_per_item == 1.0).all()
@@ -295,7 +295,7 @@ def test_RMSLE(prediction_length, expected_result):
 def test_given_metric_is_optimized_by_median_when_model_predicts_then_median_is_pasted_to_mean_forecast(metric_name):
     eval_metric = check_get_evaluation_metric(metric_name)
     pred = TimeSeriesPredictor(prediction_length=5, eval_metric=eval_metric)
-    pred.fit(DUMMY_TS_DATAFRAME, hyperparameters={"DeepAR": {"epochs": 1, "num_batches_per_epoch": 1}})
+    pred.fit(DUMMY_TS_DATAFRAME, hyperparameters={"DeepAR": {"max_epochs": 1, "num_batches_per_epoch": 1}})
     predictions = pred.predict(DUMMY_TS_DATAFRAME)
     if eval_metric.optimized_by_median:
         assert (predictions["mean"] == predictions["0.5"]).all()
@@ -326,3 +326,11 @@ def test_when_better_predictions_passed_to_metric_then_score_improves(metric_nam
     good_score = eval_metric.score(data, predictions + 1, prediction_length=prediction_length)
     bad_score = eval_metric.score(data, predictions + 50, prediction_length=prediction_length)
     assert good_score > bad_score
+
+
+@pytest.mark.parametrize("metric_name", ["WCD", "wcd"])
+def test_when_experimental_metric_name_used_then_predictor_can_score(metric_name):
+    predictor = TimeSeriesPredictor(prediction_length=3, eval_metric=metric_name)
+    predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"DeepAR": {"max_epochs": 1, "num_batches_per_epoch": 1}})
+    score = predictor.score(DUMMY_TS_DATAFRAME)
+    assert np.isfinite(score["WCD"])

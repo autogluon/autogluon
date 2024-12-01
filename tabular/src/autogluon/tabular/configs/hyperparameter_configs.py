@@ -380,16 +380,22 @@ hyperparameter_config_dict = dict(
         ],
     },
     zeroshot=hyperparameter_portfolio_zeroshot_2023,
+    zeroshot_2023=hyperparameter_portfolio_zeroshot_2023,
 )
 
-# default_FTT is experimental
-hyperparameter_config_dict["default_FTT"] = {"FT_TRANSFORMER": {}}
-hyperparameter_config_dict["default_FTT"].update(hyperparameter_config_dict["default"])
+tabpfnmix_default = {
+    "model_path_classifier": "autogluon/tabpfn-mix-1.0-classifier",
+    "model_path_regressor": "autogluon/tabpfn-mix-1.0-regressor",
+    "n_ensembles": 1,
+    "max_epochs": 30,
+    "ag.sample_rows_val": 5000,  # Beyond 5k val rows fine-tuning becomes very slow
+    "ag.max_rows": 50000,  # Beyond 50k rows, the time taken is longer than most users would like (hours), while the model is very weak at this size
+    "ag_args": {"name_suffix": "_v1"},
+}
 
-# extreme is experimental
-hyperparameter_config_dict["extreme"] = {"TABPFN": {"N_ensemble_configurations": 8}}
-hyperparameter_config_dict["extreme"].update(hyperparameter_config_dict["default_FTT"])
-
+hyperparameter_config_dict["experimental_2024"] = {"TABPFNMIX": tabpfnmix_default}
+hyperparameter_config_dict["experimental_2024"].update(hyperparameter_config_dict["zeroshot_2023"])
+hyperparameter_config_dict["experimental"] = hyperparameter_config_dict["experimental_2024"]
 
 def get_hyperparameter_config_options():
     return list(hyperparameter_config_dict.keys())

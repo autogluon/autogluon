@@ -5,7 +5,7 @@ import os
 import shutil
 import uuid
 from contextlib import contextmanager
-from typing import List, Tuple
+from typing import Tuple
 
 import numpy as np
 import pandas as pd
@@ -108,7 +108,7 @@ class DatasetLoaderHelper:
     )
 
     @staticmethod
-    def load_dataset(name: str, directory_prefix: str = "./datasets/"):
+    def load_dataset(name: str, directory_prefix: str = "./datasets/") -> tuple[pd.DataFrame, pd.DataFrame, dict]:
         dataset_info = copy.deepcopy(DatasetLoaderHelper.dataset_info_dict[name])
         train_file = dataset_info.pop("train_file", "train_data.csv")
         test_file = dataset_info.pop("test_file", "test_data.csv")
@@ -242,27 +242,6 @@ class FitHelper:
         if delete_directory:
             shutil.rmtree(save_path, ignore_errors=True)  # Delete AutoGluon output directory to ensure runs' information has been removed.
         return predictor
-
-    @staticmethod
-    def fit_and_validate_dataset_with_cascade(
-        dataset_name, fit_args, cascade: List[str], sample_size=1000, refit_full=True, delete_directory=True, expected_model_count=2
-    ):
-        predictor = FitHelper.fit_and_validate_dataset(
-            dataset_name=dataset_name,
-            fit_args=fit_args,
-            sample_size=sample_size,
-            refit_full=refit_full,
-            expected_model_count=expected_model_count,
-            delete_directory=False,
-        )
-        directory_prefix = "./datasets/"
-        train_data, test_data, dataset_info = DatasetLoaderHelper.load_dataset(name=dataset_name, directory_prefix=directory_prefix)
-
-        predictor.predict(test_data, model=cascade)
-        predictor.predict_proba(test_data, model=cascade)
-
-        if delete_directory:
-            shutil.rmtree(predictor.path, ignore_errors=True)  # Delete AutoGluon output directory to ensure runs' information has been removed.
 
     @staticmethod
     def fit_dataset(train_data, init_args, fit_args, sample_size=None, min_cls_count_train=1, scikit_api=False) -> TabularPredictor:

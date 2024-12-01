@@ -30,11 +30,12 @@ install_requires = [
     "pytorch_lightning",  # version range defined in `core/_setup_utils.py`
     "transformers[sentencepiece]",  # version range defined in `core/_setup_utils.py`
     "accelerate",  # version range defined in `core/_setup_utils.py`
-    "gluonts==0.15.1",
+    "gluonts>=0.15.0,<0.17",
     "networkx",  # version range defined in `core/_setup_utils.py`
     "statsforecast>=1.7.0,<1.8",
-    "mlforecast>=0.10.0,<0.10.1",
-    "utilsforecast<=0.1.9",  # to prevent breaking changes that propagate through mlforecast's dependency
+    "mlforecast==0.13.4",
+    "utilsforecast>=0.2.3,<0.2.5",  # to prevent breaking changes that propagate through mlforecast's dependency
+    "coreforecast==0.0.12",  # to prevent breaking changes that propagate through mlforecast's dependency
     "fugue>=0.9.0",  # prevent dependency clash with omegaconf
     "tqdm",  # version range defined in `core/_setup_utils.py`
     "orjson~=3.9",  # use faster JSON implementation in GluonTS
@@ -57,13 +58,12 @@ extras_require = {
         "optimum[openvino,nncf]>=1.17,<1.19",
     ],
     "chronos-onnx": [  # for faster CPU inference in pretrained models with ONNX
-        "optimum[onnxruntime]>=1.17,<1.19",
+        "optimum[onnxruntime]>=1.17,<1.20",
     ],
 }
 
-# TODO: add openvino back to "all" after dependency versions are relaxed
-extras_require["all"] = list(set.union(*(set(extras_require[extra]) for extra in ["chronos-onnx"])))
-
+# chronos-openvino and chronos-onnx are deprecated, and will be removed in a future version
+extras_require["all"] = []
 install_requires = ag.get_dependency_version_ranges(install_requires)
 
 if __name__ == "__main__":

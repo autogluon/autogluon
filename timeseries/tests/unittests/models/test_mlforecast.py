@@ -69,6 +69,57 @@ def test_when_covariates_and_features_present_then_train_and_val_dfs_have_correc
 
 
 @pytest.mark.parametrize("model_type", TESTABLE_MODELS)
+@pytest.mark.parametrize("prediction_length", [1, 5])
+@pytest.mark.parametrize("use_past_covariates", [True, False])
+@pytest.mark.parametrize("use_known_covariates", [True, False])
+@pytest.mark.parametrize("use_static_features", [True, False])
+@pytest.mark.parametrize("eval_metric", ["WQL", "MASE"])
+def test_when_covariates_and_features_are_varied_and_metric_provided_then_models_can_predict(
+    temp_model_path,
+    model_type,
+    prediction_length,
+    use_past_covariates,
+    use_known_covariates,
+    use_static_features,
+    eval_metric,
+):
+    item_id_to_length = {1: 30, 5: 40, 2: 25}
+    covariates_names = []
+    known_covariates_names = []
+    if use_known_covariates:
+        known_covariates_names = ["known_1", "known_2"]
+        covariates_names += known_covariates_names
+    if use_past_covariates:
+        covariates_names += ["past_1", "past_2"]
+
+    data = get_data_frame_with_variable_lengths(item_id_to_length, covariates_names=known_covariates_names)
+
+    if use_static_features:
+        columns = {k: np.random.normal(size=len(item_id_to_length)) for k in ["static_cont_1", "static_cont_2"]} | {
+            k: np.random.choice(["a", "b", "c"], size=len(item_id_to_length)) for k in ["static_cat_1", "static_cat_2"]
+        }
+        data.static_features = pd.DataFrame(columns, index=data.item_ids)
+
+    feat_gen = TimeSeriesFeatureGenerator(target="target", known_covariates_names=known_covariates_names)
+    data = feat_gen.fit_transform(data)
+    model = model_type(
+        freq=data.freq,
+        path=temp_model_path,
+        prediction_length=prediction_length,
+        metadata=feat_gen.covariate_metadata,
+        hyperparameters={"tabular_hyperparameters": {"DUMMY": {}}},
+        eval_metric=eval_metric,
+    )
+    # Initialize model._target_lags and model._date_features from freq
+    model.fit(train_data=data, time_limit=3)
+
+    train_data, known_covariates = data.get_model_inputs_for_scoring(prediction_length, known_covariates_names)
+    predictions = model.predict(train_data, known_covariates=known_covariates)
+    assert isinstance(predictions, TimeSeriesDataFrame)
+    assert len(predictions) == train_data.num_items * model.prediction_length
+
+
+@pytest.mark.parametrize("model_type", TESTABLE_MODELS)
 @pytest.mark.parametrize("data", [DATAFRAME_WITH_STATIC, DATAFRAME_WITH_COVARIATES])
 def test_when_covariates_and_features_present_then_model_can_predict(temp_model_path, model_type, data):
     prediction_length = 3
@@ -97,21 +148,6 @@ def test_when_eval_metric_is_changed_then_model_can_predict(temp_model_path, mod
     model.fit(train_data=data)
     predictions = model.predict(data)
     assert len(predictions) == data.num_items * model.prediction_length
-
-
-@pytest.mark.parametrize("model_type", TESTABLE_MODELS)
-@pytest.mark.parametrize("scaler", ["standard", "mean_abs"])
-def test_when_scaler_used_during_fit_then_scales_are_stored(temp_model_path, model_type, scaler):
-    data = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME.copy()
-    model = model_type(
-        path=temp_model_path,
-        freq=data.freq,
-        hyperparameters={"scaler": scaler, "tabular_hyperparameters": {"DUMMY": {}}},
-    )
-    model.fit(train_data=data)
-    scale_per_item = model._get_scale_per_item(data.item_ids)
-    assert model._scaler is not None
-    assert scale_per_item.index.equals(data.item_ids)
 
 
 @pytest.mark.parametrize("model_type", TESTABLE_MODELS)
@@ -253,7 +289,7 @@ def test_given_train_data_has_nans_when_fit_called_then_nan_rows_removed_from_tr
         hyperparameters={"differences": []},
     )
     model.fit(train_data=data)
-    train_df, val_df = model._generate_train_val_dfs(model.preprocess(data, is_train=True))
+    train_df, val_df = model._generate_train_val_dfs(model.preprocess(data, is_train=True)[0])
     assert len(train_df) + len(val_df) == len(data.dropna())
 
 
@@ -277,3 +313,19 @@ def test_when_trained_model_moved_to_different_folder_then_loaded_model_can_pred
     loaded_model = model_type.load(os.path.join(new_model_dir, model.name))
     predictions = loaded_model.predict(data)
     assert isinstance(predictions, TimeSeriesDataFrame)
+
+
+@pytest.mark.parametrize("model_type", TESTABLE_MODELS)
+@pytest.mark.parametrize("eval_metric", ["WAPE", "WQL"])
+def test_when_target_transform_provided_then_scaler_is_used_inside_mlforecast(model_type, eval_metric):
+    data = DUMMY_TS_DATAFRAME.copy().sort_index()
+    model = model_type(
+        freq=data.freq,
+        eval_metric=eval_metric,
+        quantile_levels=[0.1, 0.5, 0.9],
+        prediction_length=3,
+        hyperparameters={"target_scaler": "robust"},
+    )
+    model.fit(train_data=data)
+    assert model.target_scaler is None
+    assert model._scaler is not None
