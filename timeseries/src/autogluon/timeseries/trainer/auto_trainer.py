@@ -40,6 +40,7 @@ class AutoTimeSeriesTrainer(AbstractTimeSeriesTrainer):
         excluded_model_types: Optional[List[str]] = None,
         time_limit: Optional[float] = None,
         random_seed: Optional[int] = None,
+        **kwargs,
     ):
         """
         Fit a set of timeseries models specified by the `hyperparameters`

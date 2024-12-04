@@ -561,7 +561,7 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
         """Length of each time series in the dataframe."""
         return self.groupby(level=ITEMID, sort=False).size()
 
-    def copy(self: TimeSeriesDataFrame, deep: bool = True) -> pd.DataFrame:  # noqa
+    def copy(self: TimeSeriesDataFrame, deep: bool = True) -> pd.DataFrame:  # type: ignore # noqa
         """Make a copy of the TimeSeriesDataFrame.
 
         When ``deep=True`` (default), a new object will be created with a copy of the calling object's data and
@@ -849,7 +849,7 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
             )
         return TimeSeriesDataFrame(filled_df, static_features=self.static_features)
 
-    def dropna(self, how: str = "any") -> TimeSeriesDataFrame:
+    def dropna(self, how: str = "any") -> TimeSeriesDataFrame:  # type: ignore[override]
         """Drop rows containing NaNs.
 
         Parameters

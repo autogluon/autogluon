@@ -184,8 +184,8 @@ class ChronosModel(AbstractTimeSeriesModel):
         prediction_length: int = 1,
         path: Optional[str] = None,
         name: Optional[str] = None,
-        eval_metric: str = None,
-        hyperparameters: Dict[str, Any] = None,
+        eval_metric: Optional[str] = None,
+        hyperparameters: Optional[Dict[str, Any]] = None,
         **kwargs,  # noqa
     ):
         hyperparameters = hyperparameters if hyperparameters is not None else {}
@@ -237,13 +237,13 @@ class ChronosModel(AbstractTimeSeriesModel):
             **kwargs,
         )
 
-        self.model_pipeline: Optional[Any] = None  # of type BaseChronosPipeline
+        self._model_pipeline: Optional[Any] = None  # of type BaseChronosPipeline
 
-    def save(self, path: str = None, verbose: bool = True) -> str:
-        pipeline = self.model_pipeline
-        self.model_pipeline = None
+    def save(self, path: Optional[str] = None, verbose: bool = True) -> str:
+        pipeline = self._model_pipeline
+        self._model_pipeline = None
         path = super().save(path=path, verbose=verbose)
-        self.model_pipeline = pipeline
+        self._model_pipeline = pipeline
 
         return str(path)
 
@@ -264,6 +264,15 @@ class ChronosModel(AbstractTimeSeriesModel):
         import torch.cuda
 
         return torch.cuda.is_available()
+
+    @property
+    def model_pipeline(self) -> Any:  # of type BaseChronosPipeline
+        """The model pipeline used for inference. If the model is not loaded, this will be None."""
+        if self._model_pipeline is None:
+            # FIXME: optimization_strategy is ignored when model is fine-tuned
+            # load model pipeline to device memory
+            self.load_model_pipeline()
+        return self._model_pipeline
 
     @property
     def ag_default_config(self) -> Dict[str, Any]:
@@ -295,7 +304,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         return self.ag_default_config.get("default_torch_dtype", "auto")
 
     def get_minimum_resources(self, is_gpu_available: bool = False) -> Dict[str, Union[int, float]]:
-        minimum_resources = {"num_cpus": 1}
+        minimum_resources: Dict[str, Union[int, float]] = {"num_cpus": 1}
         # if GPU is available, we train with 1 GPU per trial
         if is_gpu_available:
             minimum_resources["num_gpus"] = self.min_num_gpus
@@ -323,7 +332,7 @@ class ChronosModel(AbstractTimeSeriesModel):
             torch_dtype=self.torch_dtype,
         )
 
-        self.model_pipeline = pipeline
+        self._model_pipeline = pipeline
 
     def persist(self) -> "ChronosModel":
         self.load_model_pipeline()
@@ -387,7 +396,7 @@ class ChronosModel(AbstractTimeSeriesModel):
         self,
         train_data: TimeSeriesDataFrame,
         val_data: Optional[TimeSeriesDataFrame] = None,
-        time_limit: int = None,
+        time_limit: Optional[int] = None,
         **kwargs,
     ) -> None:
         from transformers.trainer import PrinterCallback, Trainer, TrainingArguments
@@ -452,6 +461,8 @@ class ChronosModel(AbstractTimeSeriesModel):
                         f"\tChronosBolt models can only be fine-tuned with a maximum prediction_length of {model_prediction_length}. "
                         f"Fine-tuning prediction_length has been changed to {fine_tune_prediction_length}."
                     )
+            else:
+                raise ValueError(f"Unsupported model pipeline: {type(self.model_pipeline)}")
 
             fine_tune_trainer_kwargs = fine_tune_args["fine_tune_trainer_kwargs"]
             fine_tune_trainer_kwargs["use_cpu"] = str(self.model_pipeline.inner_model.device) == "cpu"
@@ -592,11 +603,6 @@ class ChronosModel(AbstractTimeSeriesModel):
 
         with warning_filter(all_warnings=True):
             import torch
-
-            if self.model_pipeline is None:
-                # FIXME: optimization_strategy is ignored when model is fine-tuned
-                # load model pipeline to device memory
-                self.load_model_pipeline()
 
             inference_data_loader = self._get_inference_data_loader(
                 data=data,

@@ -392,7 +392,9 @@ class WCD(TimeSeriesScorer):
             f"{self.name} is an experimental metric. Its behavior may change in the future version of AutoGluon."
         )
 
-    def save_past_metrics(self, data_past: TimeSeriesDataFrame, **kwargs) -> None:
+    def save_past_metrics(
+        self, data_past: TimeSeriesDataFrame, target: str = "target", seasonal_period: int = 1, **kwargs
+    ) -> None:
         self.num_items = data_past.num_items
 
     def _fast_cumsum(self, y: np.ndarray) -> np.ndarray:
