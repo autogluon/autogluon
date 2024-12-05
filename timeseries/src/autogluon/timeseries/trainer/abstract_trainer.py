@@ -1400,7 +1400,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
     def fit(
         self,
         train_data: TimeSeriesDataFrame,
-        hyperparameters: Dict[str, Any],
+        hyperparameters: Union[str, Dict[str, Any]],
         val_data: Optional[TimeSeriesDataFrame] = None,
         **kwargs,
     ) -> None:

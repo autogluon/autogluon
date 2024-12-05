@@ -341,7 +341,7 @@ def test_when_model_not_persisted_only_fit_then_model_pipeline_is_none(chronos_m
         },
     )
     model._fit(DUMMY_TS_DATAFRAME)
-    assert model.model_pipeline is None
+    assert model._model_pipeline is None
 
 
 def test_when_model_saved_loaded_and_persisted_then_model_pipeline_can_infer(chronos_model_path):

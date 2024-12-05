@@ -9,7 +9,7 @@ from autogluon.timeseries.utils.datetime import get_lags_for_frequency, get_time
 from autogluon.timeseries.utils.datetime.seasonality import DEFAULT_SEASONALITIES
 from autogluon.timeseries.utils.forecast import get_forecast_horizon_index_ts_dataframe
 
-from .common import ALL_PANDAS_FREQUENCIES, to_supported_pandas_freq
+from ..common import ALL_PANDAS_FREQUENCIES, to_supported_pandas_freq
 
 
 @pytest.mark.parametrize("freq", ["D", "W", "ME", "QE", "YE", "h", "min", "s", "30min", "2h", "17s"])

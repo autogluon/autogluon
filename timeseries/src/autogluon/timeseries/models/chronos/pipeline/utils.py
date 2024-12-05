@@ -312,10 +312,10 @@ class TimeLimitCallback(TrainerCallback):
         self.start_time = None
 
     def on_train_begin(self, args, state, control, **kwargs):
-        self.start_time = time.monotonic()
+        self.start_time = time.monotonic()  # type: ignore
 
     def on_step_end(self, args, state, control, **kwargs):
-        elapsed_time = time.monotonic() - self.start_time
+        elapsed_time = time.monotonic() - self.start_time  # type: ignore
         if elapsed_time > self.time_limit:
             logger.log(15, "Stopping fine-tuning since time_limit is reached")
             control.should_training_stop = True
