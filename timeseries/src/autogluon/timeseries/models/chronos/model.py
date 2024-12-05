@@ -269,9 +269,7 @@ class ChronosModel(AbstractTimeSeriesModel):
     def model_pipeline(self) -> Any:  # of type BaseChronosPipeline
         """The model pipeline used for inference. If the model is not loaded, this will be None."""
         if self._model_pipeline is None:
-            # FIXME: optimization_strategy is ignored when model is fine-tuned
-            # load model pipeline to device memory
-            self.load_model_pipeline()
+            self.load_model_pipeline()  # load model pipeline to device memory
         return self._model_pipeline
 
     @property
