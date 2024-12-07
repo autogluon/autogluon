@@ -7,7 +7,7 @@
 
 [![Latest Release](https://img.shields.io/github/v/release/autogluon/autogluon)](https://github.com/autogluon/autogluon/releases)
 [![Conda Forge](https://img.shields.io/conda/vn/conda-forge/autogluon.svg)](https://anaconda.org/conda-forge/autogluon)
-[![Python Versions](https://img.shields.io/badge/python-3.8%20%7C%203.9%20%7C%203.10%20%7C%203.11-blue)](https://pypi.org/project/autogluon/)
+[![Python Versions](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12-blue)](https://pypi.org/project/autogluon/)
 [![Downloads](https://pepy.tech/badge/autogluon/month)](https://pepy.tech/project/autogluon)
 [![GitHub license](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
 [![Discord](https://img.shields.io/discord/1043248669505368144?logo=discord&style=flat)](https://discord.gg/wjUmjqAc2N)
@@ -22,7 +22,7 @@ AutoGluon automates machine learning tasks enabling you to easily achieve strong
 
 ## 💾 Installation
 
-AutoGluon is supported on Python 3.8 - 3.11 and is available on Linux, MacOS, and Windows.
+AutoGluon is supported on Python 3.9 - 3.12 and is available on Linux, MacOS, and Windows.
 
 You can install AutoGluon with:
 
@@ -56,7 +56,8 @@ Below is a curated list of recent tutorials and talks on AutoGluon. A comprehens
 
 | Title                                                                                                                    | Format   | Location                                                                         | Date       |
 |--------------------------------------------------------------------------------------------------------------------------|----------|----------------------------------------------------------------------------------|------------|
-| :tv: [AutoGluon 1.0: Shattering the AutoML Ceiling with Zero Lines of Code](https://www.youtube.com/watch?v=5tvp_Ihgnuk) | Tutorial | [AutoML Conf 2023](https://2023.automl.cc/)                                      | 2023/09/12 |
+| :tv: [AutoGluon: Towards No-Code Automated Machine Learning](https://www.youtube.com/watch?v=SwPq9qjaN2Q)                | Tutorial | [AutoML 2024](https://2024.automl.cc/)                                           | 2024/09/09 |
+| :tv: [AutoGluon 1.0: Shattering the AutoML Ceiling with Zero Lines of Code](https://www.youtube.com/watch?v=5tvp_Ihgnuk) | Tutorial | [AutoML 2023](https://2023.automl.cc/)                                           | 2023/09/12 |
 | :sound: [AutoGluon: The Story](https://automlpodcast.com/episode/autogluon-the-story)                                    | Podcast  | [The AutoML Podcast](https://automlpodcast.com/)                                 | 2023/09/05 |
 | :tv: [AutoGluon: AutoML for Tabular, Multimodal, and Time Series Data](https://youtu.be/Lwu15m5mmbs?si=jSaFJDqkTU27C0fa) | Tutorial | PyData Berlin                                                                    | 2023/06/20 | 
 | :tv: [Solving Complex ML Problems in a few Lines of Code with AutoGluon](https://www.youtube.com/watch?v=J1UQUCPB88I)    | Tutorial | PyData Seattle                                                                   | 2023/06/20 | 
