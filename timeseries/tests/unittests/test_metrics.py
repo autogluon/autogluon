@@ -332,5 +332,5 @@ def test_when_better_predictions_passed_to_metric_then_score_improves(metric_nam
 def test_when_experimental_metric_name_used_then_predictor_can_score(metric_name):
     predictor = TimeSeriesPredictor(prediction_length=3, eval_metric=metric_name)
     predictor.fit(DUMMY_TS_DATAFRAME, hyperparameters={"DeepAR": {"max_epochs": 1, "num_batches_per_epoch": 1}})
-    score = predictor.score(DUMMY_TS_DATAFRAME)
-    assert np.isfinite(score["WCD"])
+    evaluation_results = predictor.evaluate(DUMMY_TS_DATAFRAME)
+    assert np.isfinite(evaluation_results["WCD"])
