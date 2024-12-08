@@ -9,7 +9,6 @@ import boto3
 from botocore.compat import total_seconds
 from botocore.config import Config
 
-
 job_type_info = {
     'CI-CPU': {
         'job_definition': 'autogluon-ci-cpu:3',

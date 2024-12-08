@@ -6,6 +6,7 @@ from datetime import datetime
 import pandas as pd
 import yaml
 
+
 def process_results(eval_flag: bool):
     try:
         paths = []
