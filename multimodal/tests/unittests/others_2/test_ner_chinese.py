@@ -75,10 +75,10 @@ def bio_samples_to_df(samples):
 
 
 def get_data():
-    train_data = open(os.path.join(get_home_dir(), "dev.txt")).read()
+    train_data = open(os.path.join(get_home_dir(), "dev.txt"), encoding="utf-8").read()
     train_df = bio_samples_to_df(train_data.split("\n\n"))
 
-    dev_data = open(os.path.join(get_home_dir(), "dev.txt")).read()
+    dev_data = open(os.path.join(get_home_dir(), "dev.txt"), encoding="utf-8").read()
     dev_df = bio_samples_to_df(dev_data.split("\n\n"))
 
     return train_df, dev_df
