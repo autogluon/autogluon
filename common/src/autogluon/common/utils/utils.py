@@ -62,7 +62,6 @@ def setup_outputdir(path, warn_if_exist=True, create_dir=True, path_suffix=None)
                 f'Warning: path already exists! This predictor may overwrite an existing predictor! path="{path}"'
             )
     path = os.path.expanduser(path)  # replace ~ with absolute path if it exists
-    path = os.path.abspath(path)
     return path
 
 
