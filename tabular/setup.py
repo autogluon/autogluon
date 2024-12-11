@@ -46,6 +46,9 @@ extras_require = {
     "xgboost": [
         "xgboost>=1.6,<2.2",  # <{N+1} upper cap, where N is the latest released minor version
     ],
+    "interpret": [
+        "interpret-core>=0.6.1",
+    ],
     "fastai": [
         "spacy<3.8",  # cap for issue https://github.com/explosion/spaCy/issues/13653
         "torch",  # version range defined in `core/_setup_utils.py`
@@ -109,7 +112,7 @@ extras_require["all"] = all_requires
 
 
 test_requires = []
-for test_package in ["tabpfn", "tabpfnmix", "imodels", "vowpalwabbit", "skl2onnx"]:
+for test_package in ["interpret", "tabpfn", "tabpfnmix", "imodels", "vowpalwabbit", "skl2onnx"]:
     test_requires += extras_require[test_package]
 extras_require["tests"] = test_requires
 install_requires = ag.get_dependency_version_ranges(install_requires)
