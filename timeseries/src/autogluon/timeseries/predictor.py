@@ -501,8 +501,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
 
             - ``"fast_training"``: fit simple statistical models (``ETS``, ``Theta``, ``Naive``, ``SeasonalNaive``) + fast tree-based models ``RecursiveTabular``
               and ``DirectTabular``. These models are fast to train but may not be very accurate.
-            - ``"medium_quality"``: all models mentioned above + deep learning model ``TemporalFusionTransformer`` + Chronos-Bolt (small). Default setting that produces good forecasts
-              with reasonable training time.
+            - ``"medium_quality"``: all models mentioned above + deep learning model ``TemporalFusionTransformer`` + Chronos-Bolt (small). Produces good forecasts with reasonable training time.
             - ``"high_quality"``: All ML models available in AutoGluon + additional statistical models (``NPTS``, ``AutoETS``,
               ``DynamicOptimizedTheta``). Much more accurate than ``medium_quality``, but takes longer to train.
             - ``"best_quality"``: Same models as in ``"high_quality"``, but performs validation with multiple backtests. Usually better than ``high_quality``, but takes even longer to train.
@@ -512,7 +511,8 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
             - ``"bolt_{model_size}"``: where model size is one of ``tiny,mini,small,base``. Uses the Chronos-Bolt pretrained model for zero-shot forecasting.
               See the documentation for ``ChronosModel`` or see `Hugging Face <https://huggingface.co/collections/amazon/chronos-models-65f1791d630a8d57cb718444>`_ for more information.
 
-            Available presets with the original `Chronos <https://github.com/amazon-science/chronos-forecasting>`_ model:
+            Available presets with the original `Chronos <https://github.com/amazon-science/chronos-forecasting>`_ model.
+            Note that as of v1.2 we recommend using the new, faster Chronos-Bolt models instead of the original Chronos models.
 
             - ``"chronos_{model_size}"``: where model size is one of ``tiny,mini,small,base,large``. Uses the Chronos pretrained model for zero-shot forecasting.
               See the documentation for ``ChronosModel`` or see `Hugging Face <https://huggingface.co/collections/amazon/chronos-models-65f1791d630a8d57cb718444>`_ for more information.
@@ -875,6 +875,12 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         This method measures the forecast accuracy using the last ``self.prediction_length`` time steps of each time
         series in ``data`` as a hold-out set.
 
+        .. note::
+            Metrics are always reported in 'higher is better' format.
+            This means that metrics such as MASE or MAPE will be multiplied by -1, so their values will be negative.
+            This is necessary to avoid the user needing to know the metric to understand if higher is better when
+            looking at the evaluation results.
+
         Parameters
         ----------
         data : Union[TimeSeriesDataFrame, pd.DataFrame, Path, str]
@@ -1224,10 +1230,10 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         * ``score_val``: The validation score of the model using the internal validation data. Computed according to ``eval_metric``.
 
         .. note::
-            Metrics scores are always shown in 'higher is better' format.
+            Metrics are always reported in 'higher is better' format.
             This means that metrics such as MASE or MAPE will be multiplied by -1, so their values will be negative.
             This is necessary to avoid the user needing to know the metric to understand if higher is better when
-            looking at leaderboard.
+            looking at the leaderboard.
 
         * ``pred_time_val``: Time taken by the model to predict on the validation data set
         * ``fit_time_marginal``: The fit time required to train the model (ignoring base models for ensembles).
