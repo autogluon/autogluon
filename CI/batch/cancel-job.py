@@ -1,6 +1,7 @@
 import argparse
-import boto3
 import re
+
+import boto3
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 

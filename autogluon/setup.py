@@ -1,9 +1,11 @@
 #!/usr/bin/env python
 ###########################
 # This code block is a HACK (!), but is necessary to avoid code duplication. Do NOT alter these lines.
-import os
-from setuptools import setup
 import importlib.util
+import os
+
+from setuptools import setup
+
 filepath = os.path.abspath(os.path.dirname(__file__))
 filepath_import = os.path.join(filepath, '..', 'core', 'src', 'autogluon', 'core', '_setup_utils.py')
 spec = importlib.util.spec_from_file_location("ag_min_dependencies", filepath_import)
