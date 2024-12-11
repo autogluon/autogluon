@@ -1432,6 +1432,7 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         base_models = trainer.get_model_names(level=0)
         pred_proba_dict_val: Dict[str, List[TimeSeriesDataFrame]] = {
             model: trainer._get_model_oof_predictions(model) for model in base_models
+            if "_FULL" not in model
         }
 
         past_data, known_covariates = test_data.get_model_inputs_for_scoring(
