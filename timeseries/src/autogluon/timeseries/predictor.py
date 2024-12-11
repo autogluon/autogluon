@@ -1431,7 +1431,8 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         val_data = trainer.load_val_data()
         base_model_names = trainer.get_model_names(level=0)
         pred_proba_dict_val: Dict[str, List[TimeSeriesDataFrame]] = {
-            model_name: trainer._get_model_oof_predictions(model_name) for model_name in base_model_names
+            model_name: trainer._get_model_oof_predictions(model_name)
+            for model_name in base_model_names
             if "_FULL" not in model_name
         }
 
