@@ -61,8 +61,9 @@ def setup_outputdir(path, warn_if_exist=True, create_dir=True, path_suffix=None)
             logger.warning(
                 f'Warning: path already exists! This predictor may overwrite an existing predictor! path="{path}"'
             )
-    path = os.path.expanduser(path)  # replace ~ with absolute path if it exists
-    path = os.path.abspath(path)
+    if not path.lower().startswith("s3://"):
+        path = os.path.expanduser(path)  # replace ~ with absolute path if it exists
+        path = os.path.abspath(path)
     return path
 
 
