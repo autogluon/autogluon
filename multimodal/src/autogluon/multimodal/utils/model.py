@@ -14,6 +14,7 @@ from ..constants import (
     CATEGORICAL,
     CATEGORICAL_MLP,
     CLIP,
+    CLIP_FUSION_MLP,
     DOCUMENT,
     DOCUMENT_TRANSFORMER,
     FT_TRANSFORMER,
@@ -42,6 +43,7 @@ from ..data import MultiModalFeaturePreprocessor
 from ..models import (
     CategoricalMLP,
     CLIPForImageText,
+    CLIPForImageText_fusionmlp,
     DocumentTransformer,
     FT_Transformer,
     HFAutoModelForNER,
@@ -139,6 +141,13 @@ def select_model(
         selected_model_names.extend(fusion_model_name)
     elif len(fusion_model_name) == 1 and hasattr(config.model, fusion_model_name[0]):
         delattr(config.model, fusion_model_name[0])
+    if "clip_fusion_mlp" in selected_model_names:
+        temp_selected_model_names = []
+        for model_name in selected_model_names:
+            if model_name == "timm_image" or model_name == "hf_text":
+                continue
+            temp_selected_model_names.append(model_name)
+        selected_model_names = temp_selected_model_names
 
     config.model.names = selected_model_names
     logger.debug(f"selected models: {selected_model_names}")
@@ -162,6 +171,7 @@ def create_model(
     num_numerical_columns: Optional[int] = None,
     num_categories: Optional[List[int]] = None,
     pretrained: Optional[bool] = True,
+    column_types: Optional[list] = None,
 ):
     """
     Create a single model.
@@ -187,7 +197,16 @@ def create_model(
     -------
     A model.
     """
-    if model_name.lower().startswith(CLIP):
+    if model_name.lower().startswith(CLIP_FUSION_MLP):
+        model = CLIPForImageText_fusionmlp(
+            prefix=model_name,
+            checkpoint_name=model_config.checkpoint_name,
+            num_classes=num_classes,
+            pretrained=pretrained,
+            tokenizer_name=model_config.tokenizer_name,
+            column_types=column_types,
+        )
+    elif model_name.lower().startswith(CLIP):
         model = CLIPForImageText(
             prefix=model_name,
             checkpoint_name=model_config.checkpoint_name,
@@ -389,6 +408,7 @@ def create_fusion_model(
     num_numerical_columns: Optional[int] = None,
     num_categories: Optional[List[int]] = None,
     pretrained: Optional[bool] = True,
+    column_types: Optional[list] = None,
 ):
     """
     Create models. It supports the auto models of huggingface text and timm image.
@@ -435,6 +455,7 @@ def create_fusion_model(
             num_numerical_columns=num_numerical_columns,
             num_categories=num_categories,
             pretrained=pretrained,
+            column_types=column_types,
         )
 
         if isinstance(model, functools.partial):  # fusion model
@@ -452,7 +473,7 @@ def create_fusion_model(
                 model = apply_model_adaptation(model, config)
             single_models.append(model)
 
-    if len(single_models) > 1:
+    if len(single_models) > 1 or isinstance(single_models[0], CLIPForImageText_fusionmlp):
         # must have one fusion model if there are multiple independent models
         return fusion_model(models=single_models)
     elif len(single_models) == 1:
