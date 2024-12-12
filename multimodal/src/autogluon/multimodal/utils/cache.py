@@ -10,7 +10,18 @@ import lightning.pytorch as pl
 import torch
 from lightning.pytorch.callbacks import BasePredictionWriter
 
-from ..constants import BBOX, LM_TARGET, LOGIT_SCALE, LOGITS, TEMPLATE_LOGITS, WEIGHT
+from ..constants import (
+    AUG_LOGITS,
+    LOGIT_SCALE,
+    MULTIMODAL_FEATURES,
+    MULTIMODAL_FEATURES_POST_AUG,
+    MULTIMODAL_FEATURES_PRE_AUG,
+    ORI_LOGITS,
+    VAE_MEAN,
+    VAE_VAR,
+    WEIGHT,
+    BBOX,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -92,10 +103,10 @@ class DDPPredictionWriter(BasePredictionWriter):
         """
         # this will create N (num processes) files in `cache_dir` each containing
         # the predictions of its respective rank
-        torch.save(predictions, self.get_predictions_cache_dir(trainer.global_rank))  # nosec B614
+        torch.save(predictions, self.get_predictions_cache_dir(trainer.global_rank))
         # here we save `batch_indices` to get the information about the data index
         # from prediction data
-        torch.save(batch_indices, self.get_batch_indices_cache_dir(trainer.global_rank))  # nosec B614
+        torch.save(batch_indices, self.get_batch_indices_cache_dir(trainer.global_rank))
 
     def read_single_gpu_results(self, global_rank: Optional[int]):
         """
@@ -109,8 +120,8 @@ class DDPPredictionWriter(BasePredictionWriter):
         while (not os.path.exists(sample_indices_file)) or (not os.path.exists(predictions_file)):
             logger.info(f"waiting for rank #{global_rank} to finish saving predictions...")
             time.sleep(self.sleep_time)
-        sample_indices = torch.load(sample_indices_file)  # nosec B614
-        predictions = torch.load(predictions_file)  # nosec B614
+        sample_indices = torch.load(sample_indices_file)
+        predictions = torch.load(predictions_file)
 
         return sample_indices, predictions
 
@@ -146,7 +157,17 @@ class DDPPredictionWriter(BasePredictionWriter):
             return dict()
 
         for k, v in x[0].items():
-            if k in [WEIGHT, LOGIT_SCALE]:  # ignore the keys
+            if k in [
+                WEIGHT,
+                LOGIT_SCALE,
+                MULTIMODAL_FEATURES,
+                MULTIMODAL_FEATURES_PRE_AUG,
+                MULTIMODAL_FEATURES_POST_AUG,
+                ORI_LOGITS,
+                AUG_LOGITS,
+                VAE_MEAN,
+                VAE_VAR,
+            ]:  # ignore the keys
                 continue
             elif isinstance(v, dict):
                 results[k] = self.collate([i[k] for i in x])

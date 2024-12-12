@@ -4,21 +4,23 @@ model:
     hidden_size: 64
     activation: "leaky_relu"
     num_layers: 1
-    drop_rate: 0.1
+    dropout: 0.1
     normalization: "layer_norm"
     data_types:
       - "categorical"
+
   numerical_mlp:
     hidden_size: 128
     activation: "leaky_relu"
     num_layers: 1
-    drop_rate: 0.1
+    dropout: 0.1
     normalization: "layer_norm"
-    d_token: 8
+    token_dim: 8
     embedding_arch:
     data_types:
       - "numerical"
     merge: "concat"
+
   hf_text:
     checkpoint_name: "google/electra-base-discriminator"
     gradient_checkpointing: False
@@ -39,6 +41,7 @@ model:
       # - "random_delete(0.05)"        # less than 0.1 based on eda paper
       # - "syn_replacement(0.05)"  # less than 0.1 based on eda paper
       # - "insert_punc(0.05)"
+
   ner_text:
     checkpoint_name: "bert-base-cased"
     max_text_len: 512
@@ -53,6 +56,7 @@ model:
     special_tags: 
       - X # CLS, SEP, and non-first tokens of a word will be labelled as X
       - O # Outside of a named entity
+
   document_transformer:
     checkpoint_name: "microsoft/layoutlmv3-base" # document foundation models
     gradient_checkpointing: False
@@ -75,6 +79,7 @@ model:
     stochastic_chunk: False
     text_aug_detect_length: 10                # We perform text augmentation only if a text has more than text_detection_length words. It is used to differentiate text columns versus tabular columns that are treated as text.
     text_trivial_aug_maxscale: 0.0            # augmentation magnitude randomly drawn from [0, text_trivial_aug_maxscale]
+
   t_few:
     checkpoint_name: "t5-small" #"bigscience/T0_3B"
     gradient_checkpointing: False
@@ -91,6 +96,8 @@ model:
     stochastic_chunk: False
     text_aug_detect_length: 10                # We perform text augmentation only if a text has more than text_detection_length words. It is used to differentiate text columns versus tabular columns that are treated as text.
     text_trivial_aug_maxscale: 0.0            # augmentation magnititude randomly drawn from [0, text_trivial_aug_maxscale]
+    text_train_augment_types:
+
   timm_image:
     checkpoint_name: "swin_base_patch4_window7_224"
     mix_choice: "all_logits"
@@ -105,7 +112,9 @@ model:
       - "center_crop"
     image_norm: "imagenet"
     image_size: null
-    max_img_num_per_col: 2
+    image_chan_num: 3
+    use_learnable_image: False
+    max_image_num_per_colum: 1
 
   mmdet_image:
     checkpoint_name: "yolov3_mobilenetv2_8xb24-320-300e_coco"
@@ -161,7 +170,9 @@ model:
       - "center_crop"
     image_norm: "clip"
     image_size: 224
-    max_img_num_per_col: 2
+    image_chan_num: 3
+    use_learnable_image: False
+    max_image_num_per_colum: 1
     tokenizer_name: "clip"
     max_text_len: 77  # The maximum possible length.
     insert_sep: False
@@ -174,15 +185,17 @@ model:
       # - "random_delete(0.05)"        # less than 0.1 based on eda paper
       # - "syn_replacement(0.05)"  # less than 0.1 based on eda paper
       # - "insert_punc(0.05)"
+
   fusion_mlp:
-    weight: 0.1
+    aux_loss_weight:
     adapt_in_features: "max"
     hidden_sizes:
       - 128
     activation: "leaky_relu"
-    drop_rate: 0.1
+    dropout: 0.1
     normalization: "layer_norm"
     data_types:
+
   fusion_ner:
     weight:
     adapt_in_features: "max"
@@ -192,21 +205,24 @@ model:
     drop_rate: 0.1
     normalization: "layer_norm"
     data_types:
+
   fusion_transformer:
+    aux_loss_weight:
     hidden_size: 192
-    n_blocks: 3
-    attention_n_heads: 8
+    num_blocks: 3
+    attention_num_heads: 8
     adapt_in_features: "max"
     attention_dropout: 0.2
     residual_dropout: 0.0
     ffn_dropout: 0.1
-    ffn_d_hidden: 192
+    ffn_hidden_size: 192
     normalization: "layer_norm"
     ffn_activation: "geglu"
     head_activation: "relu"
     data_types:
     additive_attention: False # Whether to use lightweight additive attention, can be True, False or "auto"
     share_qv_weights: False # Whether to share weight for query and value, can be True, False or "auto"
+
   ft_transformer:
     data_types:
       - "categorical"
@@ -216,7 +232,7 @@ model:
     token_dim: 192
     hidden_size: 192
     num_blocks: 3
-    attention_n_heads: 8
+    attention_num_heads: 8
     attention_dropout: 0.2
     residual_dropout: 0.0
     ffn_dropout: 0.1
@@ -247,3 +263,34 @@ model:
     frozen_layers: ["mask_decoder.iou_prediction_head", "prompt_encoder"]
     num_mask_tokens: 1
     ignore_label: 255
+
+  meta_transformer:
+    data_types:
+      - "image"
+      - "text"
+      - "categorical"
+      - "numerical"
+    checkpoint_path: null
+    model_version: "base"
+    requires_all_dtypes: False
+    train_transforms:
+      - "resize_shorter_side"
+      - "center_crop"
+      - "trivial_augment"
+    val_transforms:
+      - "resize_shorter_side"
+      - "center_crop"
+    image_norm: "imagenet"
+    image_size: 224
+    image_chan_num: 3
+    use_learnable_image: False
+    max_image_num_per_colum: 1
+    tokenizer_name: "hf_auto"
+    max_text_len: 512  # If None or <=0, then use the max length of pretrained models.
+    insert_sep: True
+    text_segment_num: 2
+    stochastic_chunk: False
+    text_aug_detect_length: 10     # We perform text augmentation only if a text has more than text_detection_length words. It is used to differentiate text columns versus tabular columns that are treated as text.
+    text_trivial_aug_maxscale: 0.1  # augmentation magnitude randomly drawn from [0, text_trivial_aug_maxscale]
+    text_train_augment_types:
+    merge: "concat"

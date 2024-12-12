@@ -108,10 +108,10 @@ class CLSToken(nn.Module):
     [1] Jacob Devlin, Ming-Wei Chang, Kenton Lee, Kristina Toutanova "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding" 2018
     """
 
-    def __init__(self, d_token: int, initialization: str) -> None:
+    def __init__(self, token_dim: int, initialization: str) -> None:
         """
         Args:
-            d_token: the size of token
+            token_dim: the size of token
             initialization: initialization policy for parameters. Must be one of
                 :code:`['uniform', 'normal']`. Let :code:`s = d ** -0.5`. Then, the
                 corresponding distributions are :code:`Uniform(-s, s)` and :code:`Normal(0, s)`. In
@@ -123,8 +123,8 @@ class CLSToken(nn.Module):
         """
         super().__init__()
         initialization_ = _TokenInitialization.from_str(initialization)
-        self.weight = nn.Parameter(Tensor(d_token))
-        initialization_.apply(self.weight, d_token)
+        self.weight = nn.Parameter(Tensor(token_dim))
+        initialization_.apply(self.weight, token_dim)
 
     def expand(self, *leading_dimensions: int) -> Tensor:
         """Expand (repeat) the underlying [CLS]-token to a tensor with the given leading dimensions.
@@ -192,8 +192,8 @@ class MultiheadAttention(nn.Module):
     def __init__(
         self,
         *,
-        d_token: int,
-        n_heads: int,
+        token_dim: int,
+        num_heads: int,
         dropout: float,
         bias: bool,
         initialization: str,
@@ -201,9 +201,9 @@ class MultiheadAttention(nn.Module):
         """
         Parameters
         ----------
-        d_token:
-            the token size. Must be a multiple of :code:`n_heads`.
-        n_heads:
+        token_dim:
+            the token size. Must be a multiple of :code:`num_heads`.
+        num_heads:
             the number of heads. If greater than 1, then the module will have
             an addition output layer (so called "mixing" layer).
         dropout:
@@ -221,15 +221,15 @@ class MultiheadAttention(nn.Module):
             AssertionError: if requirements for the inputs are not met.
         """
         super().__init__()
-        if n_heads > 1:
-            assert d_token % n_heads == 0, "d_token must be a multiple of n_heads"
+        if num_heads > 1:
+            assert token_dim % num_heads == 0, "token_dim must be a multiple of num_heads"
         assert initialization in ["kaiming", "xavier"]
 
-        self.W_q = nn.Linear(d_token, d_token, bias)
-        self.W_k = nn.Linear(d_token, d_token, bias)
-        self.W_v = nn.Linear(d_token, d_token, bias)
-        self.W_out = nn.Linear(d_token, d_token, bias) if n_heads > 1 else None
-        self.n_heads = n_heads
+        self.W_q = nn.Linear(token_dim, token_dim, bias)
+        self.W_k = nn.Linear(token_dim, token_dim, bias)
+        self.W_v = nn.Linear(token_dim, token_dim, bias)
+        self.W_out = nn.Linear(token_dim, token_dim, bias) if num_heads > 1 else None
+        self.num_heads = num_heads
         self.dropout = nn.Dropout(dropout) if dropout else None
 
         for m in [self.W_q, self.W_k, self.W_v]:
@@ -246,12 +246,12 @@ class MultiheadAttention(nn.Module):
             nn.init.zeros_(self.W_out.bias)
 
     def _reshape(self, x: Tensor) -> Tensor:
-        batch_size, n_tokens, d = x.shape
-        d_head = d // self.n_heads
+        batch_size, num_tokens, d = x.shape
+        head_dim = d // self.num_heads
         return (
-            x.reshape(batch_size, n_tokens, self.n_heads, d_head)
+            x.reshape(batch_size, num_tokens, self.num_heads, head_dim)
             .transpose(1, 2)
-            .reshape(batch_size * self.n_heads, n_tokens, d_head)
+            .reshape(batch_size * self.num_heads, num_tokens, head_dim)
         )
 
     def forward(
@@ -283,27 +283,27 @@ class MultiheadAttention(nn.Module):
         ), "If key_compression is (not) None, then value_compression must (not) be None"
         q, k, v = self.W_q(x_q), self.W_k(x_kv), self.W_v(x_kv)
         for tensor in [q, k, v]:
-            assert tensor.shape[-1] % self.n_heads == 0, _INTERNAL_ERROR_MESSAGE
+            assert tensor.shape[-1] % self.num_heads == 0, _INTERNAL_ERROR_MESSAGE
         if key_compression is not None:
             k = key_compression(k.transpose(1, 2)).transpose(1, 2)
             v = value_compression(v.transpose(1, 2)).transpose(1, 2)  # type: ignore
 
         batch_size = len(q)
-        d_head_key = k.shape[-1] // self.n_heads
-        d_head_value = v.shape[-1] // self.n_heads
+        head_dim_key = k.shape[-1] // self.num_heads
+        head_dim_value = v.shape[-1] // self.num_heads
         n_q_tokens = q.shape[1]
 
         q = self._reshape(q)
         k = self._reshape(k)
-        attention_logits = q @ k.transpose(1, 2) / math.sqrt(d_head_key)
+        attention_logits = q @ k.transpose(1, 2) / math.sqrt(head_dim_key)
         attention_probs = F.softmax(attention_logits, dim=-1)
         if self.dropout is not None:
             attention_probs = self.dropout(attention_probs)
         x = attention_probs @ self._reshape(v)
         x = (
-            x.reshape(batch_size, self.n_heads, n_q_tokens, d_head_value)
+            x.reshape(batch_size, self.num_heads, n_q_tokens, head_dim_value)
             .transpose(1, 2)
-            .reshape(batch_size, n_q_tokens, self.n_heads * d_head_value)
+            .reshape(batch_size, n_q_tokens, self.num_heads * head_dim_value)
         )
         if self.W_out is not None:
             x = self.W_out(x)
@@ -328,8 +328,8 @@ class AdditiveAttention(nn.Module):
     def __init__(
         self,
         *,
-        d_token: int,
-        n_heads: int,
+        token_dim: int,
+        num_heads: int,
         dropout: float,
         bias: bool,
         share_qv_weights: bool,
@@ -338,9 +338,9 @@ class AdditiveAttention(nn.Module):
         """
         Parameters
         ----------
-        d_token:
-            the token size. Must be a multiple of :code:`n_heads`.
-        n_heads:
+        token_dim:
+            the token size. Must be a multiple of :code:`num_heads`.
+        num_heads:
             the number of heads. If greater than 1, then the module will have
             an addition output layer (so called "mixing" layer).
         dropout:
@@ -357,26 +357,26 @@ class AdditiveAttention(nn.Module):
         """
         super().__init__()
 
-        assert d_token % n_heads == 0, "d_token must be a multiple of n_heads"
+        assert token_dim % num_heads == 0, "token_dim must be a multiple of num_heads"
         assert initialization in ["kaiming", "xavier"]
 
-        self.head_dim = d_token // n_heads
-        self.n_heads = n_heads
+        self.head_dim = token_dim // num_heads
+        self.num_heads = num_heads
         self.share_qv_weights = share_qv_weights
         self.dropout = nn.Dropout(dropout)
         trainable = []
         if share_qv_weights:
-            self.qv_proj = nn.Linear(d_token, d_token, bias=bias)
+            self.qv_proj = nn.Linear(token_dim, token_dim, bias=bias)
             trainable.extend([self.qv_proj])
         else:
-            self.q_proj = nn.Linear(d_token, d_token, bias=bias)
-            self.v_proj = nn.Linear(d_token, d_token, bias=bias)
+            self.q_proj = nn.Linear(token_dim, token_dim, bias=bias)
+            self.v_proj = nn.Linear(token_dim, token_dim, bias=bias)
             trainable.extend([self.q_proj, self.v_proj])
 
-        self.k_proj = nn.Linear(d_token, d_token, bias=bias)
-        self.W_q = nn.Linear(d_token, n_heads)
-        self.W_k = nn.Linear(d_token, n_heads)
-        self.r_out = nn.Linear(d_token, d_token)
+        self.k_proj = nn.Linear(token_dim, token_dim, bias=bias)
+        self.W_q = nn.Linear(token_dim, num_heads)
+        self.W_k = nn.Linear(token_dim, num_heads)
+        self.r_out = nn.Linear(token_dim, token_dim)
         trainable.extend([self.k_proj, self.W_q, self.W_k, self.r_out])
 
         if initialization == "xavier":
@@ -392,24 +392,24 @@ class AdditiveAttention(nn.Module):
         x_kv: Tensor,
         *args,  # Not used. just to make the input consistent with MultiheadAttention.
     ) -> Tuple[Tensor, Dict[str, Tensor]]:
-        batch_size, n_q_tokens, d_token = x_q.shape
-        batch_size, n_k_tokens, d_token = x_kv.shape
+        batch_size, n_q_tokens, token_dim = x_q.shape
+        batch_size, n_k_tokens, token_dim = x_kv.shape
 
         q = self.qv_proj(x_q) if self.share_qv_weights else self.q_proj(x_q)
         v = self.qv_proj(x_kv) if self.share_qv_weights else self.v_proj(x_kv)
         k = self.k_proj(x_kv)
 
         alphas = (self.W_q(q) / math.sqrt(self.head_dim)).softmax(dim=1)
-        q_r = q.reshape(batch_size, n_q_tokens, self.n_heads, self.head_dim)
+        q_r = q.reshape(batch_size, n_q_tokens, self.num_heads, self.head_dim)
         global_query = torch.einsum(" b s h, b s h d -> b h d", alphas, q_r)
-        global_query = global_query.reshape(batch_size, self.n_heads * self.head_dim).unsqueeze(1)
+        global_query = global_query.reshape(batch_size, self.num_heads * self.head_dim).unsqueeze(1)
 
         p = k * global_query
 
         betas = (self.W_k(p) / math.sqrt(self.head_dim)).softmax(dim=1)
-        p_r = p.reshape(batch_size, n_k_tokens, self.n_heads, self.head_dim)
+        p_r = p.reshape(batch_size, n_k_tokens, self.num_heads, self.head_dim)
         global_key = torch.einsum(" b s h, b s h d -> b h d", betas, p_r)
-        global_key = global_key.reshape(batch_size, self.n_heads * self.head_dim).unsqueeze(1)
+        global_key = global_key.reshape(batch_size, self.num_heads * self.head_dim).unsqueeze(1)
 
         u = v * global_key
         output = q + self.dropout(self.r_out(u))
@@ -433,7 +433,7 @@ class Custom_Transformer(nn.Module):
         def __init__(
             self,
             *,
-            d_token: int,
+            token_dim: int,
             d_hidden: int,
             bias_first: bool,
             bias_second: bool,
@@ -442,13 +442,13 @@ class Custom_Transformer(nn.Module):
         ):
             super().__init__()
             self.linear_first = nn.Linear(
-                d_token,
+                token_dim,
                 d_hidden * (2 if _is_glu_activation(activation) else 1),
                 bias_first,
             )
             self.activation = _make_nn_module(activation)
             self.dropout = nn.Dropout(dropout)
-            self.linear_second = nn.Linear(d_hidden, d_token, bias_second)
+            self.linear_second = nn.Linear(d_hidden, token_dim, bias_second)
 
         def forward(self, x: Tensor) -> Tensor:
             x = self.linear_first(x)
@@ -484,13 +484,13 @@ class Custom_Transformer(nn.Module):
     def __init__(
         self,
         *,
-        d_token: int,
-        n_blocks: int,
-        attention_n_heads: int,
+        token_dim: int,
+        num_blocks: int,
+        attention_num_heads: int,
         attention_dropout: float,
         attention_initialization: str,
         attention_normalization: str,
-        ffn_d_hidden: int,
+        ffn_hidden_size: int,
         ffn_dropout: float,
         ffn_activation: str,
         ffn_normalization: str,
@@ -498,7 +498,7 @@ class Custom_Transformer(nn.Module):
         prenormalization: bool,
         first_prenormalization: bool,
         last_layer_query_idx: Union[None, List[int], slice],
-        n_tokens: Optional[int],
+        num_tokens: Optional[int],
         kv_compression_ratio: Optional[float],
         kv_compression_sharing: Optional[str],
         head_activation: ModuleType,
@@ -511,11 +511,11 @@ class Custom_Transformer(nn.Module):
         """
         Parameters
         ----------
-        d_token
+        token_dim
             The size of one token for `_CategoricalFeatureTokenizer`.
-        n_blocks
+        num_blocks
             Number of the `FT_Transformer` blocks, which should be non-negative.
-        attention_n_heads
+        attention_num_heads
             Number of attention heads in each `FT_Transformer` block, which should be positive.
         attention_dropout
             Dropout ratio for the Multi Headed Attention module.
@@ -523,7 +523,7 @@ class Custom_Transformer(nn.Module):
             Weights initialization scheme for Multi Headed Attention module.
         attention_normalization
             Normalization policy for attention layers. "layer_norm" is a good default.
-        ffn_d_hidden
+        ffn_hidden_size
             Number of the hidden nodes of the linear layers in the Feed-Forward Network module.
         ffn_dropout
             Dropout ratio of the hidden nodes of the linear layers in the Feed-Forward Network module.
@@ -535,7 +535,7 @@ class Custom_Transformer(nn.Module):
             Dropout ratio for the linear layers in FT_Transformer block.
         prenormalization, first_prenormalization
             Prenormalization to stabilize the training.
-        n_tokens
+        num_tokens
             Number of tokens of the input sequence.
         kv_compression_ratio
             The compression ration to reduce the input sequence length.
@@ -564,9 +564,9 @@ class Custom_Transformer(nn.Module):
             assert (
                 not first_prenormalization
             ), "If `prenormalization` is False, then `first_prenormalization` must be False"
-        assert _all_or_none([n_tokens, kv_compression_ratio, kv_compression_sharing]), (
+        assert _all_or_none([num_tokens, kv_compression_ratio, kv_compression_sharing]), (
             "If any of the following arguments is (not) None, then all of them must (not) be None: "
-            "n_tokens, kv_compression_ratio, kv_compression_sharing"
+            "num_tokens, kv_compression_ratio, kv_compression_sharing"
         )
         assert (
             additive_attention or not share_qv_weights
@@ -595,9 +595,9 @@ class Custom_Transformer(nn.Module):
             )
 
         def make_kv_compression():
-            assert n_tokens and kv_compression_ratio, _INTERNAL_ERROR_MESSAGE  # for mypy
+            assert num_tokens and kv_compression_ratio, _INTERNAL_ERROR_MESSAGE  # for mypy
             # https://github.com/pytorch/fairseq/blob/1bba712622b8ae4efb3eb793a8a40da386fe11d0/examples/linformer/linformer_src/modules/multihead_linear_attention.py#L83
-            return nn.Linear(n_tokens, int(n_tokens * kv_compression_ratio), bias=False)
+            return nn.Linear(num_tokens, int(num_tokens * kv_compression_ratio), bias=False)
 
         self.shared_kv_compression = (
             make_kv_compression() if kv_compression_ratio and kv_compression_sharing == "layerwise" else None
@@ -607,12 +607,12 @@ class Custom_Transformer(nn.Module):
         self.last_layer_query_idx = last_layer_query_idx
 
         self.blocks = nn.ModuleList([])
-        for layer_idx in range(n_blocks):
+        for layer_idx in range(num_blocks):
             layer = nn.ModuleDict(
                 {
                     "attention": AdditiveAttention(
-                        d_token=d_token,
-                        n_heads=attention_n_heads,
+                        token_dim=token_dim,
+                        num_heads=attention_num_heads,
                         dropout=attention_dropout,
                         bias=True,
                         share_qv_weights=share_qv_weights,
@@ -620,15 +620,15 @@ class Custom_Transformer(nn.Module):
                     )
                     if additive_attention
                     else MultiheadAttention(
-                        d_token=d_token,
-                        n_heads=attention_n_heads,
+                        token_dim=token_dim,
+                        num_heads=attention_num_heads,
                         dropout=attention_dropout,
                         bias=True,
                         initialization=attention_initialization,
                     ),
                     "ffn": Custom_Transformer.FFN(
-                        d_token=d_token,
-                        d_hidden=ffn_d_hidden,
+                        token_dim=token_dim,
+                        d_hidden=ffn_hidden_size,
                         bias_first=True,
                         bias_second=True,
                         dropout=ffn_dropout,
@@ -640,8 +640,8 @@ class Custom_Transformer(nn.Module):
                 }
             )
             if layer_idx or not prenormalization or first_prenormalization:
-                layer["attention_normalization"] = _make_nn_module(attention_normalization, d_token)
-            layer["ffn_normalization"] = _make_nn_module(ffn_normalization, d_token)
+                layer["attention_normalization"] = _make_nn_module(attention_normalization, token_dim)
+            layer["ffn_normalization"] = _make_nn_module(ffn_normalization, token_dim)
             if kv_compression_ratio and self.shared_kv_compression is None:
                 layer["key_compression"] = make_kv_compression()
                 if kv_compression_sharing == "headwise":
@@ -652,7 +652,7 @@ class Custom_Transformer(nn.Module):
 
         self.head = (
             Custom_Transformer.Head(
-                d_in=d_token,
+                d_in=token_dim,
                 d_out=d_out,
                 bias=True,
                 activation=head_activation,  # type: ignore
@@ -691,7 +691,7 @@ class Custom_Transformer(nn.Module):
         return x
 
     def forward(self, x: Tensor) -> Tensor:
-        assert x.ndim == 3, "The input must have 3 dimensions: (n_objects, n_tokens, d_token)"
+        assert x.ndim == 3, "The input must have 3 dimensions: (n_objects, num_tokens, token_dim)"
         for layer_idx, layer in enumerate(self.blocks):
             layer = cast(nn.ModuleDict, layer)
 

@@ -5,22 +5,11 @@ import re
 import warnings
 from typing import Callable, Dict, List, Optional, Tuple, Union
 
-from omegaconf import DictConfig, OmegaConf
-from packaging import version
+from omegaconf import DictConfig, ListConfig, OmegaConf
 from torch import nn
 
-from ..constants import (
-    AUTOMM,
-    DATA,
-    FT_TRANSFORMER,
-    FUSION_TRANSFORMER,
-    HF_MODELS,
-    MODEL,
-    REGRESSION,
-    VALID_CONFIG_KEYS,
-)
-from ..presets import get_automm_presets, get_basic_automm_config
-from .data import get_detected_data_types
+from ..constants import DATA, FT_TRANSFORMER, FUSION_TRANSFORMER, HF_MODELS, MODEL, REGRESSION, VALID_CONFIG_KEYS
+from .presets import get_basic_config, get_presets
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +72,7 @@ def get_default_config(config: Optional[Union[Dict, DictConfig]] = None, extra: 
     if config is None:
         config = {}
 
-    basic_config = get_basic_automm_config(extra=extra)
+    basic_config = get_basic_config(extra=extra)
     for k, default_value in basic_config.items():
         if k not in config:
             config[k] = default_value
@@ -185,7 +174,7 @@ def get_config(
         if presets is None:
             preset_overrides = None
         else:
-            preset_overrides, _ = get_automm_presets(problem_type=problem_type, presets=presets)
+            preset_overrides, _ = get_presets(problem_type=problem_type, presets=presets)
 
         config = get_default_config(config, extra=extra)
         # apply the preset's overrides
@@ -404,33 +393,6 @@ def get_local_pretrained_config_paths(config: DictConfig, path: str) -> DictConf
     return config
 
 
-def upgrade_config(config, loaded_version):
-    """Upgrade outdated configurations
-
-    Parameters
-    ----------
-    config
-        The configuration
-    loaded_version
-        The version of the config that has been loaded
-
-    Returns
-    -------
-    config
-        The upgraded configuration
-    """
-    # backward compatibility for variable image size.
-    if version.parse(loaded_version) <= version.parse("0.6.2"):
-        logger.info(f"Start to upgrade the previous configuration trained by AutoMM version={loaded_version}.")
-        if OmegaConf.select(config, "model.timm_image") is not None:
-            logger.warning(
-                "Loading a model that has been trained via AutoGluon Multimodal<=0.6.2. "
-                "Setting config.model.timm_image.image_size = None."
-            )
-            config.model.timm_image.image_size = None
-    return config
-
-
 def parse_dotlist_conf(conf):
     """
     Parse the config files that is potentially in the dotlist format to a dictionary.
@@ -519,8 +481,32 @@ def apply_omegaconf_overrides(
                     f"overrides={overrides}"
                 )
     override_conf = OmegaConf.from_dotlist([f"{ele[0]}={ele[1]}" for ele in overrides.items()])
+    replace_none_str(override_conf)
     conf = OmegaConf.merge(conf, override_conf)
     return conf
+
+
+def replace_none_str(config: Union[DictConfig, ListConfig, dict, list]):
+    """
+    In-place replace "None" and "none" strings in the config with None.
+
+    Parameters
+    ----------
+    config
+        A config of type DictConfig, ListConfig, dict, or list.
+    """
+    if isinstance(config, (dict, DictConfig)):
+        for key, value in config.items():
+            if isinstance(value, str) and value.lower() == "none":
+                config[key] = None
+            elif isinstance(value, (dict, list, DictConfig, ListConfig)):
+                replace_none_str(value)
+    elif isinstance(config, (list, ListConfig)):
+        for i, value in enumerate(config):
+            if isinstance(value, str) and value.lower() == "none":
+                config[i] = None
+            elif isinstance(value, (dict, list, DictConfig, ListConfig)):
+                replace_none_str(value)
 
 
 def update_config_by_rules(
@@ -542,11 +528,11 @@ def update_config_by_rules(
     -------
     The modified config.
     """
-    loss_func = OmegaConf.select(config, "optimization.loss_function")
+    loss_func = config.optim.loss_func
     if loss_func is not None:
         if problem_type == REGRESSION and "bce" in loss_func.lower():
             # To use BCELoss for regression problems, need to first scale the labels.
-            config.data.label.numerical_label_preprocessing = "minmaxscaler"
+            config.data.label.numerical_preprocessing = "minmaxscaler"
 
     return config
 
@@ -658,7 +644,7 @@ def update_hyperparameters(
     -------
     The updated hyperparameters and hyperparameter_tune_kwargs.
     """
-    hyperparameters, hyperparameter_tune_kwargs = get_automm_presets(problem_type=problem_type, presets=presets)
+    hyperparameters, hyperparameter_tune_kwargs = get_presets(problem_type=problem_type, presets=presets)
 
     if hyperparameter_tune_kwargs and provided_hyperparameter_tune_kwargs:
         hyperparameter_tune_kwargs.update(provided_hyperparameter_tune_kwargs)
@@ -732,6 +718,8 @@ def filter_hyperparameters(
         # Filter models whose data types are not detected.
         # Avoid sampling unused checkpoints, e.g., hf_text models for image classification, to run jobs,
         # which wastes resources and time.
+        from ..data.utils import get_detected_data_types
+
         detected_data_types = get_detected_data_types(column_types)
         selected_model_names = []
         for model_name in hyperparameters[model_names_key]:

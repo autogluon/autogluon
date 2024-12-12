@@ -10,10 +10,10 @@ import torch
 
 from ..constants import CATEGORICAL, HF_TEXT, IMAGE_PATH, MMDET_IMAGE, NULL, NUMERICAL, TEXT, TIMM_IMAGE
 from ..models.fusion import AbstractMultimodalFusionModel
-from ..models.huggingface_text import HFAutoModelForTextPrediction
+from ..models.hf_text import HFAutoModelForTextPrediction
 from ..models.mmdet_image import MMDetAutoModelForObjectDetection
 from ..models.timm_image import TimmAutoModelForImagePrediction
-from .environment import infer_precision
+from .precision import infer_precision
 from .onnx import OnnxModule, onnx_get_dynamic_axes
 
 logger = logging.getLogger(__name__)

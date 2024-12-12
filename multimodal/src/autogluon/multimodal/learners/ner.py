@@ -7,15 +7,16 @@ from typing import Callable, Dict, List, Optional, Union
 
 import lightning.pytorch as pl
 import pandas as pd
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
 from torch import nn
 
 from autogluon.core.metrics import Scorer
 
 from ..constants import NER, NER_RET, Y_PRED, Y_TRUE
 from ..data import MultiModalFeaturePreprocessor
-from ..optimization import NerLitModule, get_metric
-from ..utils import compute_score, create_fusion_model, extract_from_output, merge_bio_format
+from ..optim import NerLitModule, get_torchmetric, compute_score, infer_metrics, get_minmax_mode
+from ..models import create_fusion_model
+from ..utils import extract_from_output, merge_bio_format
 from .base import BaseLearner
 
 logger = logging.getLogger(__name__)
@@ -63,6 +64,20 @@ class NERLearner(BaseLearner):
     def infer_output_shape(self):
         return  # output shape is conditioned on df_preprocessor in fit_per_run().
 
+    def infer_validation_metric(self):
+        if self._fit_called:
+            return
+        self._validation_metric_name, self._eval_metric_name = infer_metrics(
+            problem_type=self._problem_type,
+            eval_metric=self._eval_metric_name if self._eval_metric_func is None else self._eval_metric_func,
+            validation_metric_name=self._validation_metric_name,
+            is_matching=False,
+        )
+
+        self._minmax_mode = get_minmax_mode(self._validation_metric_name)
+        logger.debug(f"validation_metric_name: {self._validation_metric_name}")
+        logger.debug(f"minmax_mode: {self._minmax_mode}")
+
     def update_attributes(
         self,
         config: Optional[Dict] = None,
@@ -86,7 +101,7 @@ class NERLearner(BaseLearner):
             self._output_shape = output_shape  # since ner infers output_shape in fit_per_run(), the learners needs to update the attribute afterwards.
 
     def get_validation_metric_per_run(self, output_shape: int):
-        validation_metric, custom_metric_func = get_metric(
+        validation_metric, custom_metric_func = get_torchmetric(
             metric_name=self._validation_metric_name,
             num_classes=output_shape,
             problem_type=self._problem_type,
@@ -109,38 +124,38 @@ class NERLearner(BaseLearner):
             )
         return model
 
-    def get_optimization_kwargs_per_run(self, config, validation_metric, custom_metric_func, loss_func):
+    def get_optim_kwargs_per_run(self, config, validation_metric, custom_metric_func, loss_func):
         return dict(
-            optim_type=config.optimization.optim_type,
-            lr_choice=config.optimization.lr_choice,
-            lr_schedule=config.optimization.lr_schedule,
-            lr=config.optimization.learning_rate,
-            lr_decay=config.optimization.lr_decay,
-            end_lr=config.optimization.end_lr,
-            lr_mult=config.optimization.lr_mult,
-            weight_decay=config.optimization.weight_decay,
-            warmup_steps=config.optimization.warmup_steps,
-            track_grad_norm=OmegaConf.select(config, "optimization.track_grad_norm", default=-1),
+            optim_type=config.optim.optim_type,
+            lr_choice=config.optim.lr_choice,
+            lr_schedule=config.optim.lr_schedule,
+            lr=config.optim.lr,
+            lr_decay=config.optim.lr_decay,
+            end_lr=config.optim.end_lr,
+            lr_mult=config.optim.lr_mult,
+            weight_decay=config.optim.weight_decay,
+            warmup_steps=config.optim.warmup_steps,
+            track_grad_norm=config.optim.track_grad_norm,
             validation_metric=validation_metric,
             validation_metric_name=self._validation_metric_name,
             custom_metric_func=custom_metric_func,
             loss_func=loss_func,
-            efficient_finetune=OmegaConf.select(config, "optimization.efficient_finetune"),
-            skip_final_val=OmegaConf.select(config, "optimization.skip_final_val", default=False),
+            peft=config.optim.peft,
+            skip_final_val=config.optim.skip_final_val,
         )
 
     def get_litmodule_per_run(
         self,
         model: Optional[nn.Module] = None,
         peft_param_names: Optional[List[str]] = None,
-        optimization_kwargs: Optional[dict] = None,
+        optim_kwargs: Optional[dict] = None,
         is_train=True,
     ):
         if is_train:
             return NerLitModule(
                 model=model,
                 trainable_param_names=peft_param_names,
-                **optimization_kwargs,
+                **optim_kwargs,
             )
         else:
             return NerLitModule(model=self._model)
@@ -214,7 +229,7 @@ class NERLearner(BaseLearner):
             advanced_hyperparameters=advanced_hyperparameters,
         )
         validation_metric, custom_metric_func = self.get_validation_metric_per_run(output_shape=output_shape)
-        loss_func = self.get_loss_func_per_run(config=config)
+        loss_func, _ = self.get_loss_func_per_run(config=config)
         if max_time == timedelta(seconds=0):
             return dict(
                 config=config,
@@ -230,7 +245,7 @@ class NERLearner(BaseLearner):
             per_gpu_batch_size=config.env.per_gpu_batch_size,
             num_workers=config.env.num_workers,
         )
-        optimization_kwargs = self.get_optimization_kwargs_per_run(
+        optim_kwargs = self.get_optim_kwargs_per_run(
             config=config,
             validation_metric=validation_metric,
             custom_metric_func=custom_metric_func,
@@ -239,7 +254,7 @@ class NERLearner(BaseLearner):
         litmodule = self.get_litmodule_per_run(
             model=model,
             peft_param_names=peft_param_names,
-            optimization_kwargs=optimization_kwargs,
+            optim_kwargs=optim_kwargs,
         )
         callbacks = self.get_callbacks_per_run(save_path=save_path, config=config, litmodule=litmodule)
         plugins = self.get_plugins_per_run(model=model, peft_param_names=peft_param_names)

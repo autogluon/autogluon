@@ -5,26 +5,31 @@ from datetime import timedelta
 from typing import Dict, List, Optional, Union
 
 import pandas as pd
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
 from torch import nn
 
 from ..constants import BBOX, DDP, MAP, MULTI_IMAGE_MIX_DATASET, OBJECT_DETECTION, XYWH
-from ..data import BaseDataModule, MultiImageMixDataset, MultiModalFeaturePreprocessor, infer_rois_column_type
-from ..optimization import LitModule, MMDetLitModule
+from ..data import (
+    BaseDataModule,
+    MultiImageMixDataset,
+    MultiModalFeaturePreprocessor,
+    infer_rois_column_type,
+    split_train_tuning_data,
+)
+from ..optim import MMDetLitModule
 from ..utils import (
     check_if_packages_installed,
     cocoeval,
     convert_pred_to_xywh,
     convert_result_df,
-    create_fusion_model,
     extract_from_output,
     from_coco_or_voc,
     get_detection_classes,
     object_detection_data_to_df,
     save_result_coco_format,
     setup_save_path,
-    split_train_tuning_data,
 )
+from ..models import create_fusion_model
 from .base import BaseLearner
 
 logger = logging.getLogger(__name__)
@@ -305,16 +310,16 @@ class ObjectDetectionLearner(BaseLearner):
 
     def get_optimization_kwargs_per_run(self, config, validation_metric, custom_metric_func):
         return dict(
-            optim_type=config.optimization.optim_type,
-            lr_choice=config.optimization.lr_choice,
-            lr_schedule=config.optimization.lr_schedule,
-            lr=config.optimization.learning_rate,
-            lr_decay=config.optimization.lr_decay,
-            end_lr=config.optimization.end_lr,
-            lr_mult=config.optimization.lr_mult,
-            weight_decay=config.optimization.weight_decay,
-            warmup_steps=config.optimization.warmup_steps,
-            track_grad_norm=OmegaConf.select(config, "optimization.track_grad_norm", default=-1),
+            optim_type=config.optim.optim_type,
+            lr_choice=config.optim.lr_choice,
+            lr_schedule=config.optim.lr_schedule,
+            lr=config.optim.lr,
+            lr_decay=config.optim.lr_decay,
+            end_lr=config.optim.end_lr,
+            lr_mult=config.optim.lr_mult,
+            weight_decay=config.optim.weight_decay,
+            warmup_steps=config.optim.warmup_steps,
+            track_grad_norm=config.optim.track_grad_norm,
             validation_metric=validation_metric,
             validation_metric_name=self._validation_metric_name,
             custom_metric_func=custom_metric_func,
@@ -524,7 +529,7 @@ class ObjectDetectionLearner(BaseLearner):
             df_preprocessor=df_preprocessor,
             data_processors=data_processors,
             per_gpu_batch_size=batch_size,
-            num_workers=self._config.env.num_workers_evaluation,
+            num_workers=self._config.env.num_workers_inference,
             predict_data=data,
             is_train=False,
         )
