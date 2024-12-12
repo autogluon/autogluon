@@ -134,10 +134,10 @@ class SemanticSegmentationLearner(BaseLearner):
         loss_func = get_loss_func(
             problem_type=self._problem_type,
             loss_func_name=config.optim.loss_func,
-            config=config.optimization,
+            config=config.optim,
             num_classes=self._output_shape,
         )
-        return loss_func
+        return loss_func, None
 
     def evaluate_semantic_segmentation(
         self,
@@ -238,7 +238,7 @@ class SemanticSegmentationLearner(BaseLearner):
         model=None,
         model_postprocess_fn=None,
         peft_param_names=None,
-        optimization_kwargs=None,
+        optim_kwargs=None,
         distillation_kwargs=None,
         is_train=True,
     ):
@@ -247,13 +247,13 @@ class SemanticSegmentationLearner(BaseLearner):
                 model=model,
                 model_postprocess_fn=model_postprocess_fn,
                 trainable_param_names=peft_param_names,
-                **optimization_kwargs,
+                **optim_kwargs,
             )
         else:
             return SemanticSegmentationLitModule(
                 model=self._model,
                 model_postprocess_fn=self._model_postprocess_fn,
-                **optimization_kwargs,
+                **optim_kwargs,
             )
 
     def on_predict_start(self, data: pd.DataFrame):

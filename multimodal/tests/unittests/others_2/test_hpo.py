@@ -130,10 +130,10 @@ def matcher_hpo(searcher, scheduler, presets=None):
             {
                 "data.abc.def": tune.choice(["a", "b"]),
                 "model.abc": "def",
-                "environment.abc.def": tune.choice(["a", "b"]),
+                "env.abc.def": tune.choice(["a", "b"]),
             },
             ["data"],
-            {"model.abc": "def", "environment.abc.def": tune.choice(["a", "b"])},
+            {"model.abc": "def", "env.abc.def": tune.choice(["a", "b"])},
         ),
     ],
 )

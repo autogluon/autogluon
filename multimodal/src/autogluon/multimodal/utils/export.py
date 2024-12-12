@@ -110,7 +110,7 @@ class ExportMixin:
         import torch.jit
 
         from ..models.fusion.fusion_mlp import MultimodalFusionMLP
-        from ..models.huggingface_text import HFAutoModelForTextPrediction
+        from ..models.hf_text import HFAutoModelForTextPrediction
         from ..models.timm_image import TimmAutoModelForImagePrediction
 
         supported_models = (TimmAutoModelForImagePrediction, HFAutoModelForTextPrediction, MultimodalFusionMLP)

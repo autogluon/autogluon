@@ -308,7 +308,7 @@ class ObjectDetectionLearner(BaseLearner):
 
         return num_gpus
 
-    def get_optimization_kwargs_per_run(self, config, validation_metric, custom_metric_func):
+    def get_optim_kwargs_per_run(self, config, validation_metric, custom_metric_func):
         return dict(
             optim_type=config.optim.optim_type,
             lr_choice=config.optim.lr_choice,
@@ -328,7 +328,7 @@ class ObjectDetectionLearner(BaseLearner):
     def get_litmodule_per_run(
         self,
         model: Optional[nn.Module] = None,
-        optimization_kwargs: Optional[dict] = None,
+        optim_kwargs: Optional[dict] = None,
         is_train=True,
     ):
         if self._problem_type == OBJECT_DETECTION:
@@ -339,7 +339,7 @@ class ObjectDetectionLearner(BaseLearner):
         if is_train:
             return LightningModule(
                 model=model,
-                **optimization_kwargs,
+                **optim_kwargs,
             )
         else:
             return LightningModule(model=self._model)
@@ -400,14 +400,14 @@ class ObjectDetectionLearner(BaseLearner):
             num_workers=config.env.num_workers,
             model_config=model.config,
         )
-        optimization_kwargs = self.get_optimization_kwargs_per_run(
+        optim_kwargs = self.get_optim_kwargs_per_run(
             config=config,
             validation_metric=validation_metric,
             custom_metric_func=custom_metric_func,
         )
         litmodule = self.get_litmodule_per_run(
             model=model,
-            optimization_kwargs=optimization_kwargs,
+            optim_kwargs=optim_kwargs,
         )
         callbacks = self.get_callbacks_per_run(save_path=save_path, config=config, litmodule=litmodule)
         plugins = self.get_plugins_per_run(model=model)

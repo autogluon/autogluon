@@ -91,7 +91,7 @@ def test_ensemble_with_pretrained_predictors():
             time_limit=20,
             save_path=per_path,
         )
-        predictors.append(per_predictor)
+        predictors.append(per_predictor.path)
 
     ensemble_predictor = MultiModalPredictor(
         label=dataset.label_columns[0],

@@ -250,7 +250,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         self._eval_metric_func = None
         if isinstance(eval_metric, str):
             self._eval_metric_name = eval_metric.lower()
-            self._eval_metric_func = get_metric(self._eval_metric_name)
+            self.set_eval_metric_func()
         elif isinstance(eval_metric, Scorer):
             self._eval_metric_name = eval_metric.name
             self._eval_metric_func = eval_metric
@@ -347,6 +347,15 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             p.numel() * p.element_size() if not is_lazy_weight_tensor(p) else 0 for p in self._model.parameters()
         )
         return model_size * 1e-6  # convert to megabytes
+
+    def set_eval_metric_func(self):
+        from .ner import NERLearner
+        from .semantic_segmentation import SemanticSegmentationLearner
+        from .matching import MatchingLearner
+        from .object_detection import ObjectDetectionLearner
+
+        if not isinstance(self, (NERLearner, SemanticSegmentationLearner, MatchingLearner, ObjectDetectionLearner)):
+            self._eval_metric_func = get_metric(self._eval_metric_name)
 
     def ensure_fit_ready(self):
         if self._problem_type and not self.problem_property.support_fit:
@@ -480,8 +489,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             validation_metric_name=self._validation_metric_name,
             is_matching=is_matching,
         )
-        if self._eval_metric_func is None and not is_matching:
-            self._eval_metric_func = get_metric(self._eval_metric_name)
+        self.set_eval_metric_func()
         self._minmax_mode = get_minmax_mode(self._validation_metric_name)
         logger.debug(f"validation_metric_name: {self._validation_metric_name}")
         logger.debug(f"minmax_mode: {self._minmax_mode}")

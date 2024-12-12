@@ -78,8 +78,8 @@ if __name__ == "__main__":
     setup_args["package_data"]["autogluon.multimodal"] = [
         "configs/data/*.yaml",
         "configs/model/*.yaml",
-        "configs/optimization/*.yaml",
-        "configs/environment/*.yaml",
+        "configs/optim/*.yaml",
+        "configs/env/*.yaml",
         "configs/distiller/*.yaml",
         "configs/matcher/*.yaml",
     ]

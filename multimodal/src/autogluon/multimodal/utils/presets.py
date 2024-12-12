@@ -963,7 +963,7 @@ def get_basic_config(extra: Optional[List[str]] = None):
 
     Returns
     -------
-    A dict config with keys: MODEL, DATA, OPTIMIZATION, ENVIRONMENT, and their default values.
+    A dict config with keys: MODEL, DATA, OPTIM, ENV, and their default values.
     """
     config = {
         MODEL: DEFAULT,

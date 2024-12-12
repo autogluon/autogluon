@@ -64,20 +64,6 @@ class NERLearner(BaseLearner):
     def infer_output_shape(self):
         return  # output shape is conditioned on df_preprocessor in fit_per_run().
 
-    def infer_validation_metric(self):
-        if self._fit_called:
-            return
-        self._validation_metric_name, self._eval_metric_name = infer_metrics(
-            problem_type=self._problem_type,
-            eval_metric=self._eval_metric_name if self._eval_metric_func is None else self._eval_metric_func,
-            validation_metric_name=self._validation_metric_name,
-            is_matching=False,
-        )
-
-        self._minmax_mode = get_minmax_mode(self._validation_metric_name)
-        logger.debug(f"validation_metric_name: {self._validation_metric_name}")
-        logger.debug(f"minmax_mode: {self._minmax_mode}")
-
     def update_attributes(
         self,
         config: Optional[Dict] = None,

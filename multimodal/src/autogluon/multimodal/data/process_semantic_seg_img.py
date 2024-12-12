@@ -305,3 +305,19 @@ class SemanticSegImageProcessor(ImageProcessor):
             if trans_mode == "random_horizontal_flip":
                 train_trans.append(transforms.RandomHorizontalFlip(1.0))
         return transforms.Compose(train_trans)
+
+    def __getstate__(self):
+        odict = self.__dict__.copy()  # get attribute dictionary
+        del odict["img_processor"]
+        del odict["gt_processor"]
+
+        return odict
+
+    def __setstate__(self, state):
+        self.__dict__ = state
+        self.img_processor = self.construct_image_processor(
+            image_transforms=self.img_transforms, size=self.size, normalization=self.normalization
+        )
+        self.gt_processor = self.construct_image_processor(
+            image_transforms=self.gt_transforms, size=self.size, normalization=None
+        )

@@ -57,7 +57,7 @@ def get_default_config(config: Optional[Union[Dict, DictConfig]] = None, extra: 
     Parameters
     ----------
     config
-        A dictionary including four keys: "model", "data", "optimization", and "environment".
+        A dictionary including four keys: "model", "data", "optim", and "env".
         If any key is not given, we will fill in with the default value.
     extra
         A list of extra config keys.
@@ -108,7 +108,7 @@ def get_config(
     extra: Optional[List[str]] = None,
 ):
     """
-    Construct configurations for model, data, optimization, and environment.
+    Construct configurations for model, data, optim, and env.
     It supports to overrides some default configurations.
 
     Parameters
@@ -118,29 +118,29 @@ def get_config(
     presets
         Presets regarding model quality, e.g., best_quality, high_quality, and medium_quality.
     config
-        A dictionary including four keys: "model", "data", "optimization", and "environment".
+        A dictionary including four keys: "model", "data", "optim", and "env".
         If any key is not given, we will fill in with the default value.
 
         The value of each key can be a string, yaml path, or DictConfig object. For example:
         config = {
                         "model": "default",
                         "data": "default",
-                        "optimization": "default",
-                        "environment": "default",
+                        "optim": "default",
+                        "env": "default",
                     }
             or
             config = {
                         "model": "/path/to/model/config.yaml",
                         "data": "/path/to/data/config.yaml",
-                        "optimization": "/path/to/optimization/config.yaml",
-                        "environment": "/path/to/environment/config.yaml",
+                        "optim": "/path/to/optim/config.yaml",
+                        "env": "/path/to/env/config.yaml",
                     }
             or
             config = {
                         "model": OmegaConf.load("/path/to/model/config.yaml"),
                         "data": OmegaConf.load("/path/to/data/config.yaml"),
-                        "optimization": OmegaConf.load("/path/to/optimization/config.yaml"),
-                        "environment": OmegaConf.load("/path/to/environment/config.yaml"),
+                        "optim": OmegaConf.load("/path/to/optim/config.yaml"),
+                        "env": OmegaConf.load("/path/to/env/config.yaml"),
                     }
     overrides
         This is to override some default configurations.

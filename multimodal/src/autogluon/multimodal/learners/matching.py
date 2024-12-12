@@ -865,7 +865,7 @@ class MatchingLearner(BaseLearner):
             validate_data=self._tuning_data,
             id_mappings=id_mappings,
         )
-        optimization_kwargs = dict(
+        optim_kwargs = dict(
             optim_type=config.optim.optim_type,
             lr_choice=config.optim.lr_choice,
             lr_schedule=config.optim.lr_schedule,
@@ -895,7 +895,7 @@ class MatchingLearner(BaseLearner):
             loss_func=loss_func,
             miner_func=miner_func,
             **metrics_kwargs,
-            **optimization_kwargs,
+            **optim_kwargs,
         )
         callbacks = self.get_callbacks_per_run(save_path=save_path, config=config, litmodule=litmodule)
         tb_logger = self.get_tb_logger(save_path=save_path)

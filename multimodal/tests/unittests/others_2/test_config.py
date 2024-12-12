@@ -21,17 +21,17 @@ def test_get_config():
     model_config = OmegaConf.load(model_config_path)
     data_config_path = os.path.join(cur_path, "../../../src/autogluon/multimodal/configs/data/default.yaml")
     data_config = OmegaConf.load(data_config_path)
-    optimization_config_path = os.path.join(cur_path, "../../../src/autogluon/multimodal/configs/optim/default.yaml")
-    optimization_config = OmegaConf.load(optimization_config_path)
+    optim_config_path = os.path.join(cur_path, "../../../src/autogluon/multimodal/configs/optim/default.yaml")
+    optim_config = OmegaConf.load(optim_config_path)
     environemnt_config_path = os.path.join(cur_path, "../../../src/autogluon/multimodal/configs/env/default.yaml")
     environemnt_config = OmegaConf.load(environemnt_config_path)
-    config_gt = OmegaConf.merge(model_config, data_config, optimization_config, environemnt_config)
+    config_gt = OmegaConf.merge(model_config, data_config, optim_config, environemnt_config)
 
     # test yaml path
     config = {
         MODEL: model_config_path,
         DATA: data_config_path,
-        OPTIM: optimization_config_path,
+        OPTIM: optim_config_path,
         ENV: environemnt_config_path,
     }
     config = get_config(config=config)
@@ -41,7 +41,7 @@ def test_get_config():
     config = {
         MODEL: model_config,
         DATA: data_config,
-        OPTIM: optimization_config,
+        OPTIM: optim_config,
         ENV: environemnt_config,
     }
     config = get_config(config=config)
@@ -54,8 +54,8 @@ def test_get_config():
     data_config = OmegaConf.to_container(data_config)
     assert isinstance(data_config, dict)
 
-    optimization_config = OmegaConf.to_container(optimization_config)
-    assert isinstance(optimization_config, dict)
+    optim_config = OmegaConf.to_container(optim_config)
+    assert isinstance(optim_config, dict)
 
     environemnt_config = OmegaConf.to_container(environemnt_config)
     assert isinstance(environemnt_config, dict)
@@ -63,7 +63,7 @@ def test_get_config():
     config = {
         MODEL: model_config,
         DATA: data_config,
-        OPTIM: optimization_config,
+        OPTIM: optim_config,
         ENV: environemnt_config,
     }
     config = get_config(config=config)

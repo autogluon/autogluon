@@ -64,7 +64,7 @@ ALL_DATASETS = {
             "openai/clip-vit-base-patch32",
             "openai/clip-vit-base-patch32",
             GREEDY_SOUP,
-            None,
+            LORA,
             "auto",
         ),
         (
