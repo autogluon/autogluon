@@ -362,7 +362,7 @@ def create_data_processor(
             model=model,
             train_transforms=train_transforms,
             val_transforms=val_transforms,
-            max_image_num_per_colum=model_config.max_image_num_per_colum,
+            max_image_num_per_column=model_config.max_image_num_per_column,
             missing_value_strategy=config.data.image.missing_value_strategy,
             dropout=config.data.modality_dropout,
         )

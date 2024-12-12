@@ -114,7 +114,7 @@ model:
     image_size: null
     image_chan_num: 3
     use_learnable_image: False
-    max_image_num_per_colum: 1
+    max_image_num_per_column: 1
 
   mmdet_image:
     checkpoint_name: "yolov3_mobilenetv2_8xb24-320-300e_coco"
@@ -172,7 +172,7 @@ model:
     image_size: 224
     image_chan_num: 3
     use_learnable_image: False
-    max_image_num_per_colum: 1
+    max_image_num_per_column: 1
     tokenizer_name: "clip"
     max_text_len: 77  # The maximum possible length.
     insert_sep: False
@@ -284,7 +284,7 @@ model:
     image_size: 224
     image_chan_num: 3
     use_learnable_image: False
-    max_image_num_per_colum: 1
+    max_image_num_per_column: 1
     tokenizer_name: "hf_auto"
     max_text_len: 512  # If None or <=0, then use the max length of pretrained models.
     insert_sep: True

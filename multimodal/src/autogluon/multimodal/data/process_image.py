@@ -44,7 +44,7 @@ class ImageProcessor:
         model: nn.Module,
         train_transforms: Union[List[str], Callable, List[Callable]],
         val_transforms: Union[List[str], Callable, List[Callable]],
-        max_image_num_per_colum: Optional[int] = 1,
+        max_image_num_per_column: Optional[int] = 1,
         missing_value_strategy: Optional[str] = "zero",
         requires_column_info: Optional[bool] = False,
         dropout: Optional[float] = 0,
@@ -58,7 +58,7 @@ class ImageProcessor:
             A list of image transforms used in training. Note that the transform order matters.
         val_transforms
             A list of image transforms used in validation/test/prediction. Note that the transform order matters.
-        max_image_num_per_colum
+        max_image_num_per_column
             The maximum number of images one sample can have.
         missing_value_strategy
             How to deal with a missing image. We now support:
@@ -87,11 +87,11 @@ class ImageProcessor:
         self.std = model.image_std
 
         self.normalization = transforms.Normalize(self.mean, self.std)
-        if max_image_num_per_colum <= 0:
-            logger.debug(f"max_image_num_per_colum {max_image_num_per_colum} is reset to 1")
-            max_image_num_per_colum = 1
-        self.max_image_num_per_colum = max_image_num_per_colum
-        logger.debug(f"max_image_num_per_colum: {max_image_num_per_colum}")
+        if max_image_num_per_column <= 0:
+            logger.debug(f"max_image_num_per_column {max_image_num_per_column} is reset to 1")
+            max_image_num_per_column = 1
+        self.max_image_num_per_column = max_image_num_per_column
+        logger.debug(f"max_image_num_per_column: {max_image_num_per_column}")
 
         self.train_processor = self.construct_image_processor(
             image_transforms=self.train_transforms, size=self.size, normalization=self.normalization
@@ -147,7 +147,7 @@ class ImageProcessor:
     ) -> Dict:
         """
         Read images, process them, and stack them. One sample can have multiple images,
-        resulting in a tensor of (n, 3, size, size), where n <= max_image_num_per_colum is the available image number.
+        resulting in a tensor of (n, 3, size, size), where n <= max_image_num_per_column is the available image number.
 
         Parameters
         ----------
@@ -172,7 +172,7 @@ class ImageProcessor:
         column_start = 0
 
         for per_col_name, per_col_image_raw in images.items():
-            for img_raw in per_col_image_raw[: self.max_image_num_per_colum]:
+            for img_raw in per_col_image_raw[: self.max_image_num_per_column]:
                 if is_training and self.dropout > 0 and random.uniform(0, 1) <= self.dropout:
                     img = PIL.Image.new(image_mode, (self.size, self.size), color=0)
                     is_zero_img = True
