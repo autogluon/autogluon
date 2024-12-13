@@ -354,7 +354,10 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         from .matching import MatchingLearner
         from .object_detection import ObjectDetectionLearner
 
-        if not isinstance(self, (NERLearner, SemanticSegmentationLearner, MatchingLearner, ObjectDetectionLearner)):
+        if (
+            not isinstance(self, (NERLearner, SemanticSegmentationLearner, MatchingLearner, ObjectDetectionLearner))
+            and self._eval_metric_func is None
+        ):
             self._eval_metric_func = get_metric(self._eval_metric_name)
 
     def ensure_fit_ready(self):
