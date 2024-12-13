@@ -25,8 +25,8 @@ from .learners import (
     ObjectDetectionLearner,
     SemanticSegmentationLearner,
 )
-from .utils.problem_types import PROBLEM_TYPES_REG
 from .utils import get_dir_ckpt_paths
+from .utils.problem_types import PROBLEM_TYPES_REG
 
 pl_logger = logging.getLogger("lightning")
 pl_logger.propagate = False  # https://github.com/Lightning-AI/lightning/issues/4621

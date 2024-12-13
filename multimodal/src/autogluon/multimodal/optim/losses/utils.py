@@ -14,16 +14,16 @@ from ...constants import (
     FEW_SHOT_CLASSIFICATION,
     MULTI_NEGATIVES_SOFTMAX_LOSS,
     MULTICLASS,
-    PAIR_MARGIN_MINER,
-    REGRESSION,
     NER,
     OBJECT_DETECTION,
+    PAIR_MARGIN_MINER,
+    REGRESSION,
     SEMANTIC_SEGMENTATION,
 )
+from .bce_loss import BBCEWithLogitLoss
 from .focal_loss import FocalLoss
 from .lemda_loss import LemdaLoss
 from .softmax_losses import MultiNegativesSoftmaxLoss, SoftTargetCrossEntropy
-from .bce_loss import BBCEWithLogitLoss
 from .structure_loss import StructureLoss
 
 logger = logging.getLogger(__name__)

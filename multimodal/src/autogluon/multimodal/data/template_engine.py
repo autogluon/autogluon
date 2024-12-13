@@ -1,7 +1,7 @@
 import logging
 
 import numpy as np
-from omegaconf import OmegaConf, DictConfig
+from omegaconf import DictConfig, OmegaConf
 
 from .templates import DatasetTemplates, Template, TemplateCollection
 

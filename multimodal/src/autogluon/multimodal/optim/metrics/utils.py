@@ -2,55 +2,56 @@ import functools
 import logging
 import warnings
 from typing import Dict, List, Optional, Tuple, Union
-import evaluate
 
+import evaluate
 import torchmetrics
 from torch.nn import functional as F
 from torchmetrics.detection.mean_ap import MeanAveragePrecision
+
 from autogluon.core.metrics import Scorer, compute_metric, get_metric
 
 from ...constants import (
     ACC,
     ACCURACY,
     AVERAGE_PRECISION,
+    BER,
     COSINE_EMBEDDING_LOSS,
     COVERAGE,
     CROSS_ENTROPY,
+    DETECTION_METRICS,
+    DIRECT_LOSS,
+    EM,
     F1,
     F1_MACRO,
     F1_MICRO,
     F1_WEIGHTED,
-    HIT_RATE,
-    LOG_LOSS,
-    MULTICLASS,
-    PEARSONR,
-    QUADRATIC_KAPPA,
-    R2,
-    RECALL,
-    RMSE,
-    ROC_AUC,
-    ROOT_MEAN_SQUARED_ERROR,
-    SPEARMANR,
-    BER,
-    DETECTION_METRICS,
-    DIRECT_LOSS,
-    EM,
     FM,
+    HIT_RATE,
     IOU,
+    LOG_LOSS,
     MAE,
-    NER_TOKEN_F1,
-    OVERALL_ACCURACY,
-    SM,
     MATCHING_METRICS,
     MATCHING_METRICS_WITHOUT_PROBLEM_TYPE,
     MAX,
     METRIC_MODE_MAP,
     MIN,
+    MULTICLASS,
+    NER_TOKEN_F1,
+    OVERALL_ACCURACY,
+    OVERALL_F1,
+    PEARSONR,
+    QUADRATIC_KAPPA,
+    R2,
+    RECALL,
     RETRIEVAL_METRICS,
+    RMSE,
+    ROC_AUC,
+    ROOT_MEAN_SQUARED_ERROR,
+    SM,
+    SPEARMANR,
     Y_PRED,
     Y_PRED_PROB,
     Y_TRUE,
-    OVERALL_F1,
 )
 from .coverage_metrics import Coverage
 from .hit_rate_metrics import CustomHitRate

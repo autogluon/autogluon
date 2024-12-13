@@ -8,8 +8,8 @@ import yaml
 from autogluon.common.utils.context import set_torch_num_threads
 
 from ..constants import BEST_K_MODELS_FILE, RAY_TUNE_CHECKPOINT
-from .matcher import create_siamese_model
 from ..models import create_fusion_model
+from .matcher import create_siamese_model
 
 logger = logging.getLogger(__name__)
 

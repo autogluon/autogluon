@@ -2,8 +2,8 @@ import json
 import os
 import shutil
 import tempfile
-from unittest import mock
 from collections import OrderedDict
+from unittest import mock
 
 import numpy.testing as npt
 import pandas as pd
@@ -13,8 +13,6 @@ from ray import tune
 from transformers import AutoTokenizer
 
 from autogluon.multimodal import MultiModalPredictor
-from autogluon.multimodal.data import NerProcessor, infer_ner_column_type
-from autogluon.multimodal.utils import visualize_ner, merge_bio_format
 from autogluon.multimodal.constants import (
     IMAGE_PATH,
     NER,
@@ -22,6 +20,8 @@ from autogluon.multimodal.constants import (
     TEXT,
     TEXT_NER,
 )
+from autogluon.multimodal.data import NerProcessor, infer_ner_column_type
+from autogluon.multimodal.utils import merge_bio_format, visualize_ner
 
 from ..utils import get_home_dir
 

@@ -16,6 +16,7 @@ from ..data import (
     infer_rois_column_type,
     split_train_tuning_data,
 )
+from ..models import create_fusion_model
 from ..optim import MMDetLitModule
 from ..utils import (
     check_if_packages_installed,
@@ -29,7 +30,6 @@ from ..utils import (
     save_result_coco_format,
     setup_save_path,
 )
-from ..models import create_fusion_model
 from .base import BaseLearner
 
 logger = logging.getLogger(__name__)

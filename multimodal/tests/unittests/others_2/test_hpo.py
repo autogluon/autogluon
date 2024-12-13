@@ -8,8 +8,8 @@ from torch import nn
 from autogluon.core.hpo.ray_tune_constants import SCHEDULER_PRESETS, SEARCHER_PRESETS
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.constants import ALL_MODEL_QUALITIES
-from autogluon.multimodal.utils import filter_search_space
 from autogluon.multimodal.models import modify_duplicate_model_names
+from autogluon.multimodal.utils import filter_search_space
 
 from ..utils import (
     IDChangeDetectionDataset,

@@ -11,8 +11,8 @@ from typing import Callable, Dict, List, Optional, Union
 import numpy as np
 import pandas as pd
 
-from autogluon.core.models.greedy_ensemble.ensemble_selection import EnsembleSelection
 from autogluon.core.metrics import Scorer
+from autogluon.core.models.greedy_ensemble.ensemble_selection import EnsembleSelection
 
 from .. import version as ag_version
 from ..constants import BINARY, LOGITS, MULTICLASS, REGRESSION, TEST, VAL

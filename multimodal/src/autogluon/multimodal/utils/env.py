@@ -1,11 +1,10 @@
 import logging
 import sys
-from typing import Union, Any
 from pathlib import Path
+from typing import Any, Union
 
 from fsspec.core import url_to_fs
 from fsspec.implementations.local import AbstractFileSystem
-
 
 logger = logging.getLogger(__name__)
 

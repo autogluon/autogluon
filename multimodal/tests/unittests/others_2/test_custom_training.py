@@ -5,7 +5,7 @@ import numpy.testing as npt
 import pytest
 
 from autogluon.multimodal import MultiModalPredictor
-from autogluon.multimodal.constants import BIT_FIT, IA3, IA3_BIAS, IA3_LORA, LORA_BIAS, LORA_NORM, NORM_FIT, LORA
+from autogluon.multimodal.constants import BIT_FIT, IA3, IA3_BIAS, IA3_LORA, LORA, LORA_BIAS, LORA_NORM, NORM_FIT
 from autogluon.multimodal.models.timm_image import TimmAutoModelForImagePrediction
 from autogluon.multimodal.utils.misc import shopee_dataset
 

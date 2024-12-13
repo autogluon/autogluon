@@ -9,9 +9,9 @@ from autogluon.multimodal.constants import (
     ENV,
     FEATURE_EXTRACTION,
     MODEL,
+    OBJECT_DETECTION,
     OPTIM,
     ZERO_SHOT_IMAGE_CLASSIFICATION,
-    OBJECT_DETECTION,
 )
 from autogluon.multimodal.utils import PROBLEM_TYPES_REG, get_basic_config, get_config, get_presets, list_presets
 

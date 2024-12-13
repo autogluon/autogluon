@@ -13,11 +13,11 @@ from scipy.special import softmax
 from autogluon.core.metrics import Scorer
 
 from ..constants import LABEL, LOGITS, SEMANTIC_MASK, SEMANTIC_SEGMENTATION_IMG
+from ..optim import SemanticSegmentationLitModule, get_loss_func, get_norm_layer_param_names, get_peft_param_names
 from ..optim.metrics.semantic_seg_metrics import Balanced_Error_Rate_Pred as Balanced_Error_Rate
 from ..optim.metrics.semantic_seg_metrics import Binary_IoU_Pred as Binary_IoU
 from ..optim.metrics.semantic_seg_metrics import COD_METRICS_NAMES_Pred as COD_METRICS_NAMES
 from ..optim.metrics.semantic_seg_metrics import Multiclass_IoU_Pred as Multiclass_IoU
-from ..optim import get_loss_func, get_norm_layer_param_names, get_peft_param_names, SemanticSegmentationLitModule
 from ..utils import extract_from_output, setup_save_path
 from .base import BaseLearner
 

@@ -5,9 +5,9 @@ from omegaconf import DictConfig, OmegaConf
 from torch import nn
 
 from ..constants import REGRESSION
-from ..optim.losses import RKDLoss
 from ..data import turn_on_off_feature_column_info
 from ..models import modify_duplicate_model_names
+from ..optim.losses import RKDLoss
 
 logger = logging.getLogger(__name__)
 

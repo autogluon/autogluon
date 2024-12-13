@@ -13,8 +13,8 @@ from ..models.fusion import AbstractMultimodalFusionModel
 from ..models.hf_text import HFAutoModelForTextPrediction
 from ..models.mmdet_image import MMDetAutoModelForObjectDetection
 from ..models.timm_image import TimmAutoModelForImagePrediction
-from .precision import infer_precision
 from .onnx import OnnxModule, onnx_get_dynamic_axes
+from .precision import infer_precision
 
 logger = logging.getLogger(__name__)
 

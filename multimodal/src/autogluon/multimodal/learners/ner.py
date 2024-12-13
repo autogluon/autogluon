@@ -14,8 +14,8 @@ from autogluon.core.metrics import Scorer
 
 from ..constants import NER, NER_RET, Y_PRED, Y_TRUE
 from ..data import MultiModalFeaturePreprocessor
-from ..optim import NerLitModule, get_torchmetric, compute_score, infer_metrics, get_minmax_mode
 from ..models import create_fusion_model
+from ..optim import NerLitModule, compute_score, get_minmax_mode, get_torchmetric, infer_metrics
 from ..utils import extract_from_output, merge_bio_format
 from .base import BaseLearner
 

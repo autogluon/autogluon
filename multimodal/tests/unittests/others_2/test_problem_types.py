@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 
 from autogluon.multimodal import MultiModalPredictor
-from autogluon.multimodal.constants import BINARY, CLASSIFICATION, MULTICLASS, REGRESSION, NER, OBJECT_DETECTION
+from autogluon.multimodal.constants import BINARY, CLASSIFICATION, MULTICLASS, NER, OBJECT_DETECTION, REGRESSION
 from autogluon.multimodal.data import infer_problem_type
 from autogluon.multimodal.utils.problem_types import PROBLEM_TYPES_REG
 

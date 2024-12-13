@@ -9,8 +9,6 @@ from PIL import Image, ImageFile
 from torch import nn
 from torchvision import transforms
 
-from .process_image import ImageProcessor
-
 from ..constants import (
     CLASS_LABEL,
     COLUMN,
@@ -22,6 +20,7 @@ from ..constants import (
     SEMANTIC_SEGMENTATION_IMG,
 )
 from .collator import ListCollator, PadCollator
+from .process_image import ImageProcessor
 
 logger = logging.getLogger(__name__)
 ImageFile.LOAD_TRUNCATED_IMAGES = True

@@ -9,8 +9,8 @@ from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 from numpy.typing import NDArray
-from text_unidecode import unidecode
 from omegaconf import DictConfig
+from text_unidecode import unidecode
 from torch import nn
 
 from ..constants import CHOICES_IDS, COLUMN, TEXT, TEXT_SEGMENT_IDS, TEXT_TOKEN_IDS, TEXT_VALID_LENGTH

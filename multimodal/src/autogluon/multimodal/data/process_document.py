@@ -1,7 +1,7 @@
 import logging
 import os
 import warnings
-from typing import Any, Dict, List, Optional, Union, Callable
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import numpy as np
 import PIL
@@ -11,8 +11,8 @@ from torch import nn
 from torchvision import transforms
 
 from ..constants import BBOX, DOCUMENT_PDF
-from .collator import PadCollator
 from ..models.utils import get_pretrained_tokenizer
+from .collator import PadCollator
 from .process_image import ImageProcessor
 
 logger = logging.getLogger(__name__)

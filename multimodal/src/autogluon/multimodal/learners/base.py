@@ -349,10 +349,10 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         return model_size * 1e-6  # convert to megabytes
 
     def set_eval_metric_func(self):
-        from .ner import NERLearner
-        from .semantic_segmentation import SemanticSegmentationLearner
         from .matching import MatchingLearner
+        from .ner import NERLearner
         from .object_detection import ObjectDetectionLearner
+        from .semantic_segmentation import SemanticSegmentationLearner
 
         if (
             not isinstance(self, (NERLearner, SemanticSegmentationLearner, MatchingLearner, ObjectDetectionLearner))

@@ -8,6 +8,7 @@ from lightning.pytorch.accelerators import find_usable_cuda_devices
 from torch import nn
 
 from autogluon.common.utils.resource_utils import ResourceManager
+
 from .env import is_interactive_env
 
 logger = logging.getLogger(__name__)

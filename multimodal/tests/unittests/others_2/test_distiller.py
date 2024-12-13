@@ -3,7 +3,7 @@ import shutil
 
 from autogluon.multimodal import MultiModalPredictor
 
-from ..utils import get_home_dir, verify_predictor_save_load, PetFinderDataset
+from ..utils import PetFinderDataset, get_home_dir, verify_predictor_save_load
 
 
 def test_distillation():

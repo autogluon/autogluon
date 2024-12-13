@@ -12,6 +12,7 @@ from lightning.pytorch.callbacks import BasePredictionWriter
 
 from ..constants import (
     AUG_LOGITS,
+    BBOX,
     LOGIT_SCALE,
     MULTIMODAL_FEATURES,
     MULTIMODAL_FEATURES_POST_AUG,
@@ -20,7 +21,6 @@ from ..constants import (
     VAE_MEAN,
     VAE_VAR,
     WEIGHT,
-    BBOX,
 )
 
 logger = logging.getLogger(__name__)

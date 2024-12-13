@@ -6,46 +6,46 @@ import pandas as pd
 from omegaconf import DictConfig, OmegaConf
 from torch import nn
 
-from autogluon.core.utils.loaders import load_pd
 from autogluon.core.utils import default_holdout_frac, generate_train_test_split_combined
+from autogluon.core.utils.loaders import load_pd
 
 from ..constants import (
     BINARY,
     CATEGORICAL,
     DEFAULT_SHOT,
+    DOCUMENT,
     FEW_SHOT,
     IDENTIFIER,
     IMAGE,
     IMAGE_PATH,
+    LABEL,
     MMDET_IMAGE,
     MMLAB_MODELS,
-    LABEL,
     MULTICLASS,
+    NER_ANNOTATION,
+    NER_TEXT,
     NUMERICAL,
     REGRESSION,
-    TEXT,
-    NER_ANNOTATION,
-    TEXT_NER,
     ROIS,
-    DOCUMENT,
-    SEMANTIC_SEGMENTATION_IMG,
-    NER_TEXT,
     SAM,
+    SEMANTIC_SEGMENTATION_IMG,
+    TEXT,
+    TEXT_NER,
 )
-from .infer_types import is_image_column
 from .collator import DictCollator
+from .infer_types import is_image_column
+from .label_encoder import NerLabelEncoder
 from .mixup import MixupModule
 from .preprocess_dataframe import MultiModalFeaturePreprocessor
 from .process_categorical import CategoricalProcessor
+from .process_document import DocumentProcessor
 from .process_image import ImageProcessor
 from .process_label import LabelProcessor
-from .process_numerical import NumericalProcessor
-from .process_text import TextProcessor
-from .label_encoder import NerLabelEncoder
-from .process_ner import NerProcessor
-from .process_document import DocumentProcessor
-from .process_semantic_seg_img import SemanticSegImageProcessor
 from .process_mmlab import MMDetProcessor
+from .process_ner import NerProcessor
+from .process_numerical import NumericalProcessor
+from .process_semantic_seg_img import SemanticSegImageProcessor
+from .process_text import TextProcessor
 
 logger = logging.getLogger(__name__)
 

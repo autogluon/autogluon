@@ -7,8 +7,8 @@ from typing import Any, Dict, List, Optional, Union
 import numpy as np
 from numpy.typing import NDArray
 from omegaconf import DictConfig
-from torch import nn
 from tokenizers import pre_tokenizers
+from torch import nn
 
 from ..constants import NER_ANNOTATION, NER_TEXT, TEXT, TEXT_NER
 from ..models.utils import get_pretrained_tokenizer

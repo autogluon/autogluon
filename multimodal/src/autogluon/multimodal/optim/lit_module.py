@@ -13,17 +13,17 @@ from torchmetrics.aggregation import BaseAggregator
 
 from ..constants import (
     AUG_LOGITS,
+    LM_TARGET,
     LOGITS,
     MULTIMODAL_FEATURES,
     MULTIMODAL_FEATURES_POST_AUG,
     MULTIMODAL_FEATURES_PRE_AUG,
     ORI_LOGITS,
+    T_FEW,
+    TEMPLATE_LOGITS,
     VAE_MEAN,
     VAE_VAR,
     WEIGHT,
-    LM_TARGET,
-    T_FEW,
-    TEMPLATE_LOGITS,
 )
 from ..data.mixup import MixupModule, multimodel_mixup
 from ..models.utils import run_model
