@@ -1512,7 +1512,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                     "state_dict": {"model." + name: param for name, param in self._model.state_dict().items()}
                 }
 
-        torch.save(checkpoint, os.path.join(save_path, MODEL_CHECKPOINT))
+        torch.save(checkpoint, os.path.join(save_path, MODEL_CHECKPOINT))  # nosec B614
 
         if clean_ckpts:
             # clean old checkpoints + the intermediate files stored
@@ -2145,9 +2145,9 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
                 convert_zero_checkpoint_to_fp32_state_dict(path + "-dir", path)
                 shutil.rmtree(path + "-dir")
-                state_dict = torch.load(path, map_location=torch.device("cpu"))["state_dict"]
+                state_dict = torch.load(path, map_location=torch.device("cpu"))["state_dict"]  # nosec B614
             else:
-                state_dict = torch.load(path, map_location=torch.device("cpu"))["state_dict"]
+                state_dict = torch.load(path, map_location=torch.device("cpu"))["state_dict"]  # nosec B614
         state_dict = {k.partition(prefix)[2]: v for k, v in state_dict.items() if k.startswith(prefix)}
 
         # Some buffers like `position_ids` are registered as persistent=False since transformers 4.31.0
@@ -2256,7 +2256,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
 
         if save_model:
             checkpoint = {"state_dict": {"model." + name: param for name, param in model.state_dict().items()}}
-            torch.save(checkpoint, os.path.join(os.path.abspath(path), MODEL_CHECKPOINT))
+            torch.save(checkpoint, os.path.join(os.path.abspath(path), MODEL_CHECKPOINT))  # nosec B614
 
     @staticmethod
     def _load_metadata(
@@ -2277,10 +2277,10 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             assets = json.load(fp)
 
         with open(os.path.join(path, "df_preprocessor.pkl"), "rb") as fp:
-            df_preprocessor = pickle.load(fp)
+            df_preprocessor = pickle.load(fp)  # nosec B614
         try:
             with open(os.path.join(path, "data_processors.pkl"), "rb") as fp:
-                data_processors = pickle.load(fp)
+                data_processors = pickle.load(fp)  # nosec B614
             # Load text tokenizers after loading data processors.
             for modality in [TEXT, TEXT_NER, NER, DOCUMENT]:
                 if modality in data_processors:
@@ -2299,7 +2299,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         learner._total_train_time = assets["total_train_time"]
         learner._eval_metric_name = assets["eval_metric_name"]
         with open(os.path.join(path, "eval_metric.pkl"), "rb") as fp:
-            learner._eval_metric_func = pickle.load(fp)
+            learner._eval_metric_func = pickle.load(fp)  # nosec B614
         learner._verbosity = verbosity
         learner._resume = resume
         learner._save_path = path  # in case the original exp dir is copied to somewhere else

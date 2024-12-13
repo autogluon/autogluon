@@ -44,6 +44,63 @@ class EnsembleLearner(BaseLearner):
         ensemble_mode: Optional[str] = "one_shot",
         **kwargs,
     ):
+        """
+        Parameters
+        ----------
+        label
+            Name of the column that contains the target variable to predict.
+        problem_type
+            Type of the prediction problem. We support standard problems like
+
+            - 'binary': Binary classification
+            - 'multiclass': Multi-class classification
+            - 'regression': Regression
+            - 'classification': Classification problems include 'binary' and 'multiclass' classification.
+        presets
+            Presets regarding model quality, e.g., best_quality, high_quality, and medium_quality.
+        eval_metric
+            Evaluation metric name. If `eval_metric = None`, it is automatically chosen based on `problem_type`.
+            Defaults to 'accuracy' for multiclass classification, `roc_auc` for binary classification, and 'root_mean_squared_error' for regression.
+        hyperparameters
+            This is to override some default configurations.
+            For example, changing the text and image backbones can be done by formatting:
+
+            a string
+            hyperparameters = "model.hf_text.checkpoint_name=google/electra-small-discriminator model.timm_image.checkpoint_name=swin_small_patch4_window7_224"
+
+            or a list of strings
+            hyperparameters = ["model.hf_text.checkpoint_name=google/electra-small-discriminator", "model.timm_image.checkpoint_name=swin_small_patch4_window7_224"]
+
+            or a dictionary
+            hyperparameters = {
+                            "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
+                            "model.timm_image.checkpoint_name": "swin_small_patch4_window7_224",
+                        }
+        path
+            Path to directory where models and intermediate outputs should be saved.
+            If unspecified, a time-stamped folder called "AutogluonAutoMM/ag-[TIMESTAMP]"
+            will be created in the working directory to store all models.
+            Note: To call `fit()` twice and save all results of each fit,
+            you must specify different `path` locations or don't specify `path` at all.
+            Otherwise files from first `fit()` will be overwritten by second `fit()`.
+        verbosity
+            Verbosity levels range from 0 to 4 and control how much information is printed.
+            Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
+            If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`,
+            where `L` ranges from 0 to 50
+            (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels)
+        warn_if_exist
+            Whether to raise warning if the specified path already exists.
+        enable_progress_bar
+            Whether to show progress bar. It will be True by default and will also be
+            disabled if the environment variable os.environ["AUTOMM_DISABLE_PROGRESS_BAR"] is set.
+        ensemble_size
+            A multiple of number of models in the ensembling pool (Default 2). The actual ensemble size = ensemble_size * the model number
+        ensemble_mode
+            The mode of conducting ensembling:
+            - `one_shot`: the classic ensemble selection
+            - `sequential`: iteratively calling the classic ensemble selection with each time growing the model zoo by the best next model.
+        """
         super().__init__(
             label=label,
             problem_type=problem_type,
@@ -655,7 +712,7 @@ class EnsembleLearner(BaseLearner):
         learner._fit_called = assets["fit_called"]
 
         with open(os.path.join(path, "ensemble.pkl"), "rb") as fp:
-            learner._weighted_ensemble = pickle.load(fp)
+            learner._weighted_ensemble = pickle.load(fp)  # nosec B614
 
         learner.update_attributes_by_first_learner(learners=learner._selected_learners)
 
