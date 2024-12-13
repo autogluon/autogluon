@@ -6,15 +6,7 @@ import PIL
 from PIL import ImageFile
 from torch import nn
 
-try:
-    from torchvision.transforms import InterpolationMode
-
-    BICUBIC = InterpolationMode.BICUBIC
-except ImportError:
-    BICUBIC = PIL.Image.BICUBIC
-
-from ...constants import AUTOMM
-from ..utils import is_rois_input
+from ..infer_types import is_rois_input
 from .process_mmlab_base import MMLabProcessor
 
 logger = logging.getLogger(__name__)

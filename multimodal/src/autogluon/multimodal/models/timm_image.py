@@ -8,8 +8,14 @@ from timm import create_model
 from timm.layers.linear import Linear
 from torch import nn
 
-from ..constants import AUTOMM, COLUMN, COLUMN_FEATURES, FEATURES, IMAGE, IMAGE_VALID_NUM, LABEL, LOGITS, MASKS
-from .utils import assign_layer_ids, get_column_features, get_model_head
+from ..constants import COLUMN, COLUMN_FEATURES, FEATURES, IMAGE, IMAGE_VALID_NUM, LABEL, LOGITS, MASKS
+from .utils import (
+    assign_layer_ids,
+    get_column_features,
+    get_image_size_mean_std,
+    get_model_head,
+    replace_missing_images_with_learnable,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +37,10 @@ class TimmAutoModelForImagePrediction(nn.Module):
         num_classes: Optional[int] = 0,
         mix_choice: Optional[str] = "all_logits",
         pretrained: Optional[bool] = True,
+        image_size: Optional[int] = None,
+        image_norm: Optional[str] = None,
+        image_chan_num: Optional[int] = 3,
+        use_learnable_image: Optional[bool] = False,
     ):
         """
         Load a pretrained image backbone from TIMM.
@@ -51,10 +61,22 @@ class TimmAutoModelForImagePrediction(nn.Module):
                 The logits output from individual images are averaged to generate the final output.
         pretrained
             Whether using the pretrained timm models. If pretrained=True, download the pretrained model.
+        image_norm
+            How to normalize an image. We now support:
+            - inception
+                Normalize image by IMAGENET_INCEPTION_MEAN and IMAGENET_INCEPTION_STD from timm
+            - imagenet
+                Normalize image by IMAGENET_DEFAULT_MEAN and IMAGENET_DEFAULT_STD from timm
+            - clip
+                Normalize image by mean (0.48145466, 0.4578275, 0.40821073) and
+                std (0.26862954, 0.26130258, 0.27577711), used for CLIP.
+        image_size
+            The provided width / height of a square image.
         """
         super().__init__()
         # In TIMM, if num_classes==0, then create_model would automatically set self.model.head = nn.Identity()
-        logger.debug(f"initializing {checkpoint_name}")
+        logger.debug(f"initializing {prefix} (TimmAutoModelForImagePrediction)")
+        logger.debug(f"model checkpoint: {checkpoint_name}")
         if os.path.exists(checkpoint_name):
             checkpoint_path = f"{checkpoint_name}/pytorch_model.bin"
             try:
@@ -91,6 +113,18 @@ class TimmAutoModelForImagePrediction(nn.Module):
         logger.debug(f"mix_choice: {mix_choice}")
 
         self.prefix = prefix
+        self.image_size, self.image_mean, self.image_std = get_image_size_mean_std(
+            model_name=self.prefix,
+            config=self.config,
+            provided_size=image_size,
+            provided_norm_type=image_norm,
+            support_variable_input_size=self.support_variable_input_size(),
+        )
+        self.image_chan_num = image_chan_num
+        self.use_learnable_image = use_learnable_image
+        if self.use_learnable_image:
+            self.learnable_image = nn.Parameter(torch.zeros(image_chan_num, self.image_size, self.image_size))
+            logger.debug("will use a learnable image to replace missing ones")
 
         self.name_to_id = self.get_layer_ids()
         self.head_layer_names = [n for n, layer_id in self.name_to_id.items() if layer_id == 0]
@@ -152,6 +186,7 @@ class TimmAutoModelForImagePrediction(nn.Module):
         -------
             A dictionary with logits and features.
         """
+        column_features = column_feature_masks = dict()
         if self.mix_choice == "all_images":  # mix inputs
             mixed_images = (
                 images.sum(dim=1) / torch.clamp(image_valid_num, min=1e-6)[:, None, None, None]
@@ -162,49 +197,55 @@ class TimmAutoModelForImagePrediction(nn.Module):
             else:
                 logits = features
 
-            column_features = {}
-            column_feature_masks = {}
-
         elif self.mix_choice == "all_logits":  # mix outputs
             b, n, c, h, w = images.shape
+            steps = torch.arange(0, n).type_as(image_valid_num)
+            image_masks = steps.reshape((1, -1)) < image_valid_num.reshape((-1, 1))  # (b, n)
+
+            if self.use_learnable_image:
+                images = replace_missing_images_with_learnable(
+                    images=images,
+                    image_masks=image_masks,
+                    learnable_image=self.learnable_image,
+                )
             features = self.model(images.reshape((b * n, c, h, w)))  # (b*n, num_features)
             if self.num_classes > 0:
                 logits = self.head(features)
-            steps = torch.arange(0, n).type_as(image_valid_num)
-            image_masks = (steps.reshape((1, -1)) < image_valid_num.reshape((-1, 1))).type_as(features)  # (b, n)
-            features = features.reshape((b, n, -1)) * image_masks[:, :, None]  # (b, n, num_features)
+                logits = logits.reshape((b, n, -1))  # (b, n, num_classes)
+            # reshape features after head prediction
+            features = features.reshape((b, n, -1))  # (b, n, num_features)
 
-            batch = {
-                self.image_key: images,
-                self.image_valid_num_key: image_valid_num,
-            }
+            if not self.use_learnable_image:
+                features = features * image_masks[:, :, None].type_as(features)  # (b, n, num_features)
+
+            # need to collect column features before summing them
             if image_column_names:
                 assert len(image_column_names) == len(image_column_indices), "invalid image column inputs"
-                for idx, name in enumerate(image_column_names):
-                    batch[name] = image_column_indices[idx]
+                # collect features by image column names
+                column_features, column_feature_masks = get_column_features(
+                    batch=dict(zip(image_column_names, image_column_indices)),
+                    column_name_prefix=self.image_column_prefix,
+                    features=features,
+                    valid_lengths=image_valid_num,
+                )
 
-            # collect features by image column names
-            column_features, column_feature_masks = get_column_features(
-                batch=batch,
-                column_name_prefix=self.image_column_prefix,
-                features=features,
-                valid_lengths=image_valid_num,
-            )
-
-            features = features.sum(dim=1) / torch.clamp(image_valid_num, min=1e-6)[:, None]  # (b, num_features)
+            if self.use_learnable_image:
+                features = features.mean(dim=1)
+            else:
+                features = features.sum(dim=1) / torch.clamp(image_valid_num, min=1e-6)[:, None]  # (b, num_features)
             if self.num_classes > 0:
-                logits = logits.reshape((b, n, -1)) * image_masks[:, :, None]  # (b, n, num_classes)
-                logits = logits.sum(dim=1) / torch.clamp(image_valid_num, min=1e-6)[:, None]  # (b, num_classes)
+                if self.use_learnable_image:
+                    logits = logits.mean(dim=1)
+                else:
+                    logits = logits * image_masks[:, :, None].type_as(logits)  # (b, n, num_classes)
+                    logits = logits.sum(dim=1) / torch.clamp(image_valid_num, min=1e-6)[:, None]  # (b, num_classes)
             else:
                 logits = features
 
         else:
             raise ValueError(f"unknown mix_choice: {self.mix_choice}")
 
-        if column_features == {} or column_feature_masks == {}:
-            return features, logits
-        else:
-            return features, logits, column_features, column_feature_masks
+        return features, logits, column_features, column_feature_masks
 
     def get_output_dict(
         self,
@@ -215,7 +256,8 @@ class TimmAutoModelForImagePrediction(nn.Module):
     ):
         ret = {COLUMN_FEATURES: {FEATURES: {}, MASKS: {}}}
 
-        if column_features != None:
+        if column_features is not None and len(column_features) > 0:
+            assert column_feature_masks is not None and len(column_features) == len(column_feature_masks)
             ret[COLUMN_FEATURES][FEATURES].update(column_features)
             ret[COLUMN_FEATURES][MASKS].update(column_feature_masks)
 

@@ -27,9 +27,9 @@ def finetune_coco_format(
     if num_gpus is not None:
         hyperparameters["env.num_gpus"] = num_gpus
     if lr is not None:
-        hyperparameters["optimization.learning_rate"] = lr
+        hyperparameters["optim.lr"] = lr
     if epochs is not None:
-        hyperparameters["optimization.max_epochs"] = epochs
+        hyperparameters["optim.max_epochs"] = epochs
     if per_gpu_batch_size is not None:
         hyperparameters["env.per_gpu_batch_size"] = per_gpu_batch_size
 

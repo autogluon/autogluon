@@ -1,6 +1,7 @@
+import logging
 import os
 import tempfile
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 import torch
 from torch import Tensor, nn
@@ -8,6 +9,8 @@ from torch import Tensor, nn
 from ..constants import CATEGORICAL, FEATURES, LABEL, LOGITS, NUMERICAL
 from .custom_transformer import CLSToken, Custom_Transformer, _TokenInitialization
 from .utils import init_weights
+
+logger = logging.getLogger(__name__)
 
 
 class CategoricalFeatureTokenizer(nn.Module):
@@ -21,7 +24,7 @@ class CategoricalFeatureTokenizer(nn.Module):
     def __init__(
         self,
         num_categories: List[int],
-        d_token: int,
+        token_dim: int,
         bias: Optional[bool] = True,
         initialization: Optional[str] = "normal",
     ) -> None:
@@ -30,7 +33,7 @@ class CategoricalFeatureTokenizer(nn.Module):
         ----------
         num_categories:
             A list of integers. Each one is the number of categories in one categorical column.
-        d_token:
+        token_dim:
             The size of one token.
         bias:
             If `True`, for each feature, an additional trainable vector will be added to the
@@ -51,21 +54,21 @@ class CategoricalFeatureTokenizer(nn.Module):
         category_offsets = torch.tensor([0] + num_categories[:-1]).cumsum(0)
 
         self.register_buffer("category_offsets", category_offsets, persistent=False)
-        self.embeddings = nn.Embedding(sum(num_categories), d_token)
-        self.bias = nn.Parameter(Tensor(len(num_categories), d_token)) if bias else None
+        self.embeddings = nn.Embedding(sum(num_categories), token_dim)
+        self.bias = nn.Parameter(Tensor(len(num_categories), token_dim)) if bias else None
         initialization_ = _TokenInitialization.from_str(initialization)
 
         for parameter in [self.embeddings.weight, self.bias]:
             if parameter is not None:
-                initialization_.apply(parameter, d_token)
+                initialization_.apply(parameter, token_dim)
 
     @property
-    def n_tokens(self) -> int:
+    def num_tokens(self) -> int:
         """The number of tokens."""
         return len(self.num_categories)
 
     @property
-    def d_token(self) -> int:
+    def token_dim(self) -> int:
         """The size of one token."""
         return self.embeddings.embedding_dim
 
@@ -190,7 +193,7 @@ class NumericalFeatureTokenizer(nn.Module):
     def __init__(
         self,
         in_features: int,
-        d_token: int,
+        token_dim: int,
         bias: Optional[bool] = True,
         initialization: Optional[str] = "normal",
     ):
@@ -199,7 +202,7 @@ class NumericalFeatureTokenizer(nn.Module):
         ----------
         in_features:
             Dimension of input features i.e. the number of continuous (scalar) features
-        d_token:
+        token_dim:
             The size of one token.
         bias:
             If `True`, for each feature, an additional trainable vector will be added to the
@@ -216,19 +219,19 @@ class NumericalFeatureTokenizer(nn.Module):
         super().__init__()
 
         initialization_ = _TokenInitialization.from_str(initialization)
-        self.weight = nn.Parameter(Tensor(in_features, d_token))
-        self.bias = nn.Parameter(Tensor(in_features, d_token)) if bias else None
+        self.weight = nn.Parameter(Tensor(in_features, token_dim))
+        self.bias = nn.Parameter(Tensor(in_features, token_dim)) if bias else None
         for parameter in [self.weight, self.bias]:
             if parameter is not None:
-                initialization_.apply(parameter, d_token)
+                initialization_.apply(parameter, token_dim)
 
     @property
-    def n_tokens(self) -> int:
+    def num_tokens(self) -> int:
         """The number of tokens."""
         return len(self.weight)
 
     @property
-    def d_token(self) -> int:
+    def token_dim(self) -> int:
         """The size of one token."""
         return self.weight.shape[1]
 
@@ -266,7 +269,7 @@ class AutoDis(nn.Module):
         super().__init__()
         self.first_layer = NumericalFeatureTokenizer(
             in_features=in_features,
-            d_token=n_meta_embeddings,
+            token_dim=n_meta_embeddings,
             bias=False,
             initialization="uniform",
         )
@@ -357,7 +360,7 @@ class NumEmbeddings(nn.Module):
         if embedding_arch[0] == "linear":
             layers.append(
                 NumericalFeatureTokenizer(
-                    in_features=in_features, d_token=d_embedding, bias=True, initialization="normal"
+                    in_features=in_features, token_dim=d_embedding, bias=True, initialization="normal"
                 )
             )
         elif embedding_arch[0] == "positional":
@@ -406,13 +409,13 @@ class NumEmbeddings(nn.Module):
         self.layers = nn.Sequential(*layers)
 
     @property
-    def n_tokens(self) -> int:
+    def num_tokens(self) -> int:
         """The number of tokens."""
         y = self.forward(torch.ones(1, self.in_features))
         return y.shape[1]
 
     @property
-    def d_token(self) -> int:
+    def token_dim(self) -> int:
         """The size of one token."""
         y = self.forward(torch.ones(1, self.in_features))
         return y.shape[-1]
@@ -432,7 +435,8 @@ class FT_Transformer(nn.Module):
         self,
         prefix: str,
         num_numerical_columns: int,
-        num_categories: List[int],
+        num_categories: Dict,
+        numerical_fill_values: Dict,
         embedding_arch: List[str],
         token_dim: int,
         hidden_size: Optional[int] = 192,
@@ -441,7 +445,7 @@ class FT_Transformer(nn.Module):
         token_bias: Optional[bool] = True,
         token_initialization: Optional[str] = "normal",
         num_blocks: Optional[int] = 0,
-        attention_n_heads: Optional[int] = 8,
+        attention_num_heads: Optional[int] = 8,
         attention_initialization: Optional[str] = "kaiming",
         attention_normalization: Optional[str] = "layer_norm",
         attention_dropout: Optional[str] = 0.2,
@@ -485,7 +489,7 @@ class FT_Transformer(nn.Module):
             Must be one of `['uniform', 'normal']`.
         num_blocks
             Number of the `FT_Transformer` blocks, which should be non-negative.
-        attention_n_heads
+        attention_num_heads
             Number of attention heads in each `FT_Transformer` block, which should be positive.
         attention_initialization
             Weights initialization scheme for Multi Headed Attention module.
@@ -527,11 +531,11 @@ class FT_Transformer(nn.Module):
         """
 
         super().__init__()
-
+        logger.debug(f"initializing {prefix} (FT_Transformer)")
         assert num_categories or num_numerical_columns > 0, "there must be categorical columns or numerical columns"
-        assert token_dim > 0, "d_token must be positive"
-        assert num_blocks >= 0, "n_blocks must be non-negative"
-        assert attention_n_heads > 0, "attention_n_heads must be positive"
+        assert token_dim > 0, "token_dim must be positive"
+        assert num_blocks >= 0, "num_blocks must be non-negative"
+        assert attention_num_heads > 0, "attention_num_heads must be positive"
         assert token_initialization in ["uniform", "normal"], "initialization must be uniform or normal"
 
         self.prefix = prefix
@@ -544,14 +548,15 @@ class FT_Transformer(nn.Module):
         if num_categories:
             self.num_categories = num_categories
             self.categorical_feature_tokenizer = CategoricalFeatureTokenizer(
-                num_categories=num_categories,
-                d_token=token_dim,
+                num_categories=list(num_categories.values()),
+                token_dim=token_dim,
                 bias=token_bias,
                 initialization=token_initialization,
             )
             self.categorical_adapter = nn.Linear(token_dim, hidden_size)
 
         if num_numerical_columns > 0:
+            self.numerical_fill_values = numerical_fill_values
             self.numerical_feature_tokenizer = NumEmbeddings(
                 in_features=num_numerical_columns,
                 d_embedding=token_dim,
@@ -560,13 +565,13 @@ class FT_Transformer(nn.Module):
             self.numerical_adapter = nn.Linear(token_dim, hidden_size)
 
         self.transformer = Custom_Transformer(
-            d_token=hidden_size,
-            n_blocks=num_blocks,
-            attention_n_heads=attention_n_heads,
+            token_dim=hidden_size,
+            num_blocks=num_blocks,
+            attention_num_heads=attention_num_heads,
             attention_dropout=attention_dropout,
             attention_initialization=attention_initialization,
             attention_normalization=attention_normalization,
-            ffn_d_hidden=ffn_hidden_size,
+            ffn_hidden_size=ffn_hidden_size,
             ffn_dropout=ffn_dropout,
             ffn_activation=ffn_activation,
             ffn_normalization=ffn_normalization,
@@ -574,7 +579,7 @@ class FT_Transformer(nn.Module):
             prenormalization=prenormalization,
             first_prenormalization=first_prenormalization,
             last_layer_query_idx=None,
-            n_tokens=None,
+            num_tokens=None,
             kv_compression_ratio=kv_compression_ratio,
             kv_compression_sharing=kv_compression_sharing,
             head_activation=head_activation,
@@ -594,7 +599,7 @@ class FT_Transformer(nn.Module):
         )
 
         self.cls_token = CLSToken(
-            d_token=hidden_size,
+            token_dim=hidden_size,
             initialization="uniform",
         )
 
@@ -605,7 +610,7 @@ class FT_Transformer(nn.Module):
             self.categorical_adapter.apply(init_weights)
         self.head.apply(init_weights)
         # init transformer backbone from provided checkpoint
-        from autogluon.multimodal.utils.download import download
+        from ..utils.download import download
 
         if pretrained and checkpoint_name:
             if os.path.exists(checkpoint_name):

@@ -12,7 +12,7 @@ import boto3
 import requests
 import tqdm
 
-from ..constants import AUTOMM, S3_PREFIX
+from ..constants import S3_PREFIX
 
 logger = logging.getLogger(__name__)
 
