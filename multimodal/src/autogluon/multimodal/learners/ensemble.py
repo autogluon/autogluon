@@ -712,7 +712,7 @@ class EnsembleLearner(BaseLearner):
         learner._fit_called = assets["fit_called"]
 
         with open(os.path.join(path, "ensemble.pkl"), "rb") as fp:
-            learner._weighted_ensemble = pickle.load(fp)  # nosec B614
+            learner._weighted_ensemble = pickle.load(fp)  # nosec B301
 
         learner.update_attributes_by_first_learner(learners=learner._selected_learners)
 

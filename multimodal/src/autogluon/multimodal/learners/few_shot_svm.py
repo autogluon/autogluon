@@ -580,7 +580,7 @@ class FewShotSVMLearner(BaseLearner):
     ):
         predictor = super().load(path=path, resume=resume, verbosity=verbosity)
         with open(os.path.join(path, "svm.pkl"), "rb") as fp:
-            params = pickle.load(fp)  # nosec B614
+            params = pickle.load(fp)  # nosec B301
         svm = make_pipeline(StandardScaler(), SVC(gamma="auto"))
         svm.set_params(**params)
         predictor._svm = svm

@@ -2012,7 +2012,7 @@ class MatchingLearner(BaseLearner):
             assets = json.load(fp)
 
         with open(os.path.join(path, "df_preprocessor.pkl"), "rb") as fp:
-            df_preprocessor = pickle.load(fp)  # nosec B614
+            df_preprocessor = pickle.load(fp)  # nosec B301
 
         query_df_preprocessor = df_preprocessor[QUERY]
         response_df_preprocessor = df_preprocessor[RESPONSE]
@@ -2020,7 +2020,7 @@ class MatchingLearner(BaseLearner):
 
         try:
             with open(os.path.join(path, "data_processors.pkl"), "rb") as fp:
-                data_processors = pickle.load(fp)  # nosec B614
+                data_processors = pickle.load(fp)  # nosec B301
 
             query_processors = data_processors[QUERY]
             response_processors = data_processors[RESPONSE]

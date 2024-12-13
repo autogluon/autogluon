@@ -2277,10 +2277,10 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
             assets = json.load(fp)
 
         with open(os.path.join(path, "df_preprocessor.pkl"), "rb") as fp:
-            df_preprocessor = pickle.load(fp)  # nosec B614
+            df_preprocessor = pickle.load(fp)  # nosec B301
         try:
             with open(os.path.join(path, "data_processors.pkl"), "rb") as fp:
-                data_processors = pickle.load(fp)  # nosec B614
+                data_processors = pickle.load(fp)  # nosec B301
             # Load text tokenizers after loading data processors.
             for modality in [TEXT, TEXT_NER, NER, DOCUMENT]:
                 if modality in data_processors:
@@ -2299,7 +2299,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
         learner._total_train_time = assets["total_train_time"]
         learner._eval_metric_name = assets["eval_metric_name"]
         with open(os.path.join(path, "eval_metric.pkl"), "rb") as fp:
-            learner._eval_metric_func = pickle.load(fp)  # nosec B614
+            learner._eval_metric_func = pickle.load(fp)  # nosec B301
         learner._verbosity = verbosity
         learner._resume = resume
         learner._save_path = path  # in case the original exp dir is copied to somewhere else
