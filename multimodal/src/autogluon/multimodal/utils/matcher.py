@@ -11,8 +11,8 @@ from torch import nn
 from torch.nn import functional as F
 
 from ..constants import FUSION, QUERY, RESPONSE
-from .data import data_to_df
-from .model import create_model
+from ..data import data_to_df
+from ..models import create_model
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +103,7 @@ def create_fusion_model_dict(
             model_name=model_name,
             model_config=model_config,
             pretrained=pretrained,
+            is_matching=True,  # clip needs to use this to init attributes for both image and text
         )
         if model_name.lower().startswith(FUSION):
             fusion_model = model

@@ -59,12 +59,17 @@ SEMANTIC_SEGMENTATION_GT = "semantic_segmentation_gt"
 
 # Output keys
 LOGITS = "logits"
+ORI_LOGITS = "ori_logits"
+AUG_LOGITS = "aug_logits"
 TEMPLATE_LOGITS = "template_logits"
 LM_TARGET = "lm_target"
 LOSS = "loss"
 OUTPUT = "output"
 WEIGHT = "weight"
 FEATURES = "features"
+MULTIMODAL_FEATURES = "multimodal_features"  # used for the adapted multimodal features before the fusion module
+MULTIMODAL_FEATURES_PRE_AUG = "multimodal_features_pre_aug"
+MULTIMODAL_FEATURES_POST_AUG = "multimodal_features_post_aug"
 RAW_FEATURES = "raw_features"
 MASKS = "masks"
 PROBABILITY = "probability"
@@ -73,6 +78,8 @@ BBOX = "bbox"
 ROIS = "rois"
 SCORE = "score"
 LOGIT_SCALE = "logit_scale"
+VAE_MEAN = "vae_mean"
+VAE_VAR = "vae_var"
 
 # Loss
 MOE_LOSS = "moe_loss"
@@ -142,6 +149,7 @@ FM = "fm"
 MAE = "mae"
 BER = "ber"
 IOU = "iou"
+COVERAGE = "coverage"
 RETRIEVAL_METRICS = [NDCG, PRECISION, RECALL, MRR]
 METRIC_MODE_MAP = {
     ACC: MAX,
@@ -168,6 +176,7 @@ METRIC_MODE_MAP = {
     SM: MAX,
     IOU: MAX,
     BER: MIN,
+    COVERAGE: MAX,
 }
 
 MATCHING_METRICS = {
@@ -179,7 +188,7 @@ MATCHING_METRICS_WITHOUT_PROBLEM_TYPE = [RECALL, NDCG]
 
 EVALUATION_METRICS = {
     # Use evaluation metrics from METRICS for these types
-    BINARY: METRICS[BINARY].keys(),
+    BINARY: list(METRICS[BINARY].keys()) + [COVERAGE],
     MULTICLASS: METRICS[MULTICLASS].keys(),
     REGRESSION: METRICS[REGRESSION].keys(),
     OBJECT_DETECTION: DETECTION_METRICS,
@@ -197,6 +206,7 @@ VALIDATION_METRICS = {
 # Training status
 TRAIN = "train"
 VALIDATE = "validate"
+VAL = "val"
 TEST = "test"
 PREDICT = "predict"
 
@@ -217,11 +227,11 @@ Y_TRUE = "y_true"
 # Configuration keys
 MODEL = "model"
 DATA = "data"
-OPTIMIZATION = "optimization"
-ENVIRONMENT = "environment"
+OPTIM = "optim"
+ENV = "env"
 DISTILLER = "distiller"
 MATCHER = "matcher"
-VALID_CONFIG_KEYS = [MODEL, DATA, OPTIMIZATION, ENVIRONMENT, DISTILLER, MATCHER]
+VALID_CONFIG_KEYS = [MODEL, DATA, OPTIM, ENV, DISTILLER, MATCHER]
 
 # Image normalization mean and std. This is only to normalize images for the CLIP model.
 CLIP_IMAGE_MEAN = (0.48145466, 0.4578275, 0.40821073)
@@ -275,7 +285,7 @@ PEFT_STRATEGIES = list(set(PEFT_ADDITIVE_STRATEGIES) | set(PEFT_NON_ADDITIVE_STR
 # DeepSpeed constants
 DEEPSPEED_OFFLOADING = "deepspeed_stage_3_offload"
 DEEPSPEED_STRATEGY = "deepspeed"
-DEEPSPEED_MODULE = "autogluon.multimodal.optimization.deepspeed"
+DEEPSPEED_MODULE = "autogluon.multimodal.optim.deepspeed"
 DEEPSPEED_MIN_PL_VERSION = "1.7.1"
 
 # registered model keys. TODO: document how to add new models.
@@ -298,6 +308,7 @@ DOCUMENT_TRANSFORMER = "document_transformer"
 HF_MODELS = (HF_TEXT, T_FEW, CLIP, NER_TEXT, DOCUMENT_TRANSFORMER)
 MMLAB_MODELS = (MMDET_IMAGE, MMOCR_TEXT_DET, MMOCR_TEXT_RECOG)
 SAM = "sam"
+META_TRANSFORMER = "meta_transformer"
 
 # matcher loss type
 CONTRASTIVE_LOSS = "contrastive_loss"

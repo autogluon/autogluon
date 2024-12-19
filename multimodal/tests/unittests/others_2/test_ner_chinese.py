@@ -6,7 +6,7 @@ import pandas as pd
 from autogluon.multimodal import MultiModalPredictor
 from autogluon.multimodal.utils import download
 
-from ..utils.utils import get_home_dir
+from ..utils import get_home_dir
 
 
 def download_ecommerce():
@@ -75,10 +75,10 @@ def bio_samples_to_df(samples):
 
 
 def get_data():
-    train_data = open(os.path.join(get_home_dir(), "dev.txt")).read()
+    train_data = open(os.path.join(get_home_dir(), "dev.txt"), encoding="utf-8").read()
     train_df = bio_samples_to_df(train_data.split("\n\n"))
 
-    dev_data = open(os.path.join(get_home_dir(), "dev.txt")).read()
+    dev_data = open(os.path.join(get_home_dir(), "dev.txt"), encoding="utf-8").read()
     dev_df = bio_samples_to_df(dev_data.split("\n\n"))
 
     return train_df, dev_df
@@ -96,9 +96,9 @@ def test_ner_chinese():
         tuning_data=dev_df,
         hyperparameters={
             "model.ner_text.checkpoint_name": "hfl/chinese-lert-small",
-            "optimization.top_k": 1,
+            "optim.top_k": 1,
             "env.num_gpus": -1,
-            "optimization.max_epochs": 1,
+            "optim.max_epochs": 1,
         },
     )
     predictor.evaluate(dev_df)
