@@ -34,7 +34,7 @@ install_requires = [
     "networkx",  # version range defined in `core/_setup_utils.py`
     "statsforecast>=1.7.0,<2.0.1",
     "mlforecast>0.13,<0.14",
-    "utilsforecast>=0.2.3,<0.2.5",  # to prevent breaking changes that propagate through mlforecast's dependency
+    "utilsforecast>=0.2.3,<0.2.11",  # to prevent breaking changes that propagate through mlforecast's dependency
     "coreforecast>=0.0.12,<0.0.16",  # to prevent breaking changes that propagate through mlforecast's dependency
     "fugue>=0.9.0",  # prevent dependency clash with omegaconf
     "tqdm",  # version range defined in `core/_setup_utils.py`
