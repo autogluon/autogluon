@@ -23,11 +23,7 @@ def balanced_accuracy(solution, prediction):
     if y_type not in ["binary", "multiclass", "multilabel-indicator"]:
         raise ValueError(f"{y_type} is not supported")
 
-    if y_type == "binary":
-        # Do not transform into any multiclass representation
-        pass
-
-    elif y_type == "multiclass":
+    if y_type == "multiclass" or any(isinstance(item, str) for item in prediction):
         n = len(solution)
         unique_sol, encoded_sol = np.unique(solution, return_inverse=True)
         unique_pred, encoded_pred = np.unique(prediction, return_inverse=True)
@@ -41,7 +37,8 @@ def balanced_accuracy(solution, prediction):
         pred_ohe[np.arange(n), map_pred[encoded_pred]] = 1
         solution = sol_ohe
         prediction = pred_ohe
-
+    elif y_type == "binary":
+        pass
     elif y_type == "multilabel-indicator":
         solution = solution.toarray()
         prediction = prediction.toarray()
