@@ -17,7 +17,13 @@ from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.data.label_cleaner import LabelCleaner
 from autogluon.core.models import AbstractModel, BaggedEnsembleModel
 from autogluon.core.stacked_overfitting.utils import check_stacked_overfitting_from_leaderboard
-from autogluon.core.utils import download, generate_train_test_split, generate_train_test_split_combined, infer_problem_type, unzip
+from autogluon.core.utils import (
+    download,
+    generate_train_test_split,
+    generate_train_test_split_combined,
+    infer_problem_type,
+    unzip,
+)
 from autogluon.features.generators import AbstractFeatureGenerator, AutoMLPipelineFeatureGenerator
 from autogluon.tabular import TabularDataset, TabularPredictor
 
