@@ -8,7 +8,7 @@ import pandas as pd
 from omegaconf import DictConfig, OmegaConf
 from torch import nn
 
-from ..constants import BBOX, DDP, MAP, MULTI_IMAGE_MIX_DATASET, OBJECT_DETECTION, XYWH
+from ..constants import BBOX, DDP_FIND_UNUSED_PARAMETERS_TRUE, MAP, MULTI_IMAGE_MIX_DATASET, OBJECT_DETECTION, XYWH
 from ..data import BaseDataModule, MultiImageMixDataset, MultiModalFeaturePreprocessor, infer_rois_column_type
 from ..optimization import LitModule, MMDetLitModule
 from ..utils import (
@@ -293,12 +293,12 @@ class ObjectDetectionLearner(BaseLearner):
         if num_gpus <= 1:
             strategy = "auto"
         else:
-            strategy = DDP
+            strategy = DDP_FIND_UNUSED_PARAMETERS_TRUE
 
         return strategy
 
     def update_num_gpus_by_strategy(self, strategy, num_gpus):
-        if strategy == DDP and self._fit_called:
+        if strategy == DDP_FIND_UNUSED_PARAMETERS_TRUE and self._fit_called:
             num_gpus = 1  # While using DDP, we can only use single gpu after fit is called
 
         return num_gpus
