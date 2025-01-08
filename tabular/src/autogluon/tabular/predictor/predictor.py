@@ -1388,7 +1388,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             )
         else:
             # Holdout is false, use (repeated) cross-validation
-            is_stratified = self.problem_type in [BINARY, MULTICLASS, REGRESSION, QUANTILE]
+            is_stratified = self.problem_type in [BINARY, MULTICLASS]
             is_binned = self.problem_type in [REGRESSION, QUANTILE]
             self._learner._validate_groups(X=X, X_val=X_val)  # Validate splits before splitting
             splits = CVSplitter(

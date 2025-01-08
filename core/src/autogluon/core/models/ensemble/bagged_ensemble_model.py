@@ -129,13 +129,26 @@ class BaggedEnsembleModel(AbstractModel):
         return self.is_fit() and self.params.get("save_bag_folds", True)
 
     def is_stratified(self) -> bool:
+        """
+        Returns whether to stratify on the label during KFold splits
+        """
         stratify = self.params.get("stratify", "auto")
         if isinstance(stratify, str) and stratify == "auto":
-            return self.problem_type in [BINARY, MULTICLASS, REGRESSION, QUANTILE]
+            return self.problem_type in [
+                BINARY,
+                MULTICLASS,
+
+                # Commented out due to inconclusive results on whether this is helpful when combined with binning
+                # REGRESSION,
+                # QUANTILE,
+            ]
         else:
             return stratify
 
     def is_binned(self) -> bool:
+        """
+        Returns whether to bin the label during stratified KFold splits
+        """
         bin = self.params.get("bin", "auto")
         if isinstance(bin, str) and bin == "auto":
             return self.problem_type in [REGRESSION, QUANTILE]
