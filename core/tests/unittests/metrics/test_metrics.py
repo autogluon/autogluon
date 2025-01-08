@@ -7,9 +7,21 @@ import sklearn
 from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION
 from autogluon.core.metrics import METRICS, Scorer, make_scorer, rmse_func
 
+METRICS_NEEDS_CLASS = {}
+METRICS_NEEDS_PROBA = {}
+METRICS_NEEDS_THRESHOLD = {}
+NOT_METRICS_NEEDS_THRESHOLD = {}
+for problem_type in METRICS:
+    METRICS_NEEDS_CLASS[problem_type] = [k for k, v in METRICS[problem_type].items() if v.needs_class]
+    METRICS_NEEDS_PROBA[problem_type] = [k for k, v in METRICS[problem_type].items() if v.needs_proba or v.needs_threshold]
+    METRICS_NEEDS_THRESHOLD[problem_type] = [k for k, v in METRICS[problem_type].items() if v.needs_threshold]
+    NOT_METRICS_NEEDS_THRESHOLD[problem_type] = [k for k, v in METRICS[problem_type].items() if not v.needs_threshold]
+
 BINARY_METRICS = list(METRICS[BINARY].keys())
 MULTICLASS_METRICS = list(METRICS[MULTICLASS].keys())
 REGRESSION_METRICS = list(METRICS[REGRESSION].keys())
+
+BINARY_METRICS_NEEDS_POS_LABEL = [k for k, v in METRICS[BINARY].items() if v.needs_pos_label]
 
 EXPECTED_BINARY_METRICS = {
     "acc",
@@ -140,6 +152,60 @@ def test_metrics_perfect_multiclass(metric: str):
     _assert_perfect_score(scorer=METRICS[MULTICLASS][metric])
 
 
+@pytest.mark.skip(reason="average_precision doesn't raise an exception here when it should, so this test currently fails")
+@pytest.mark.parametrize("metric", METRICS_NEEDS_THRESHOLD[BINARY], ids=METRICS_NEEDS_THRESHOLD[BINARY])  # noqa
+def test_metrics_perfect_raises_binary_single_sample(metric: str):
+    with pytest.raises(Exception):
+        # threshold metrics should not be able to predict on a single sample
+        _assert_perfect_score_single_sample(scorer=METRICS[BINARY][metric])
+
+
+@pytest.mark.skip(reason="mcc, quadradic_kappa, and pac produce unexpected values here, so this test currently fails")
+@pytest.mark.parametrize("metric", NOT_METRICS_NEEDS_THRESHOLD[BINARY], ids=NOT_METRICS_NEEDS_THRESHOLD[BINARY])  # noqa
+def test_metrics_perfect_binary_single_sample(metric: str):
+    _assert_perfect_score_single_sample(scorer=METRICS[BINARY][metric])
+
+
+@pytest.mark.skip(reason="mcc and quadradic_kappa produce unexpected values here, so this test currently fails")
+@pytest.mark.parametrize("metric", METRICS_NEEDS_CLASS[MULTICLASS], ids=METRICS_NEEDS_CLASS[MULTICLASS])  # noqa
+def test_metrics_perfect_multiclass_single_sample(metric: str):
+    _assert_perfect_score_single_sample(scorer=METRICS[MULTICLASS][metric])
+
+
+@pytest.mark.parametrize("metric", METRICS_NEEDS_CLASS[MULTICLASS], ids=METRICS_NEEDS_CLASS[MULTICLASS])  # noqa
+def test_metrics_perfect_str_multiclass(metric: str):
+    scorer = METRICS[MULTICLASS][metric]
+    _assert_perfect_score_str_binary(scorer=scorer)
+    _assert_perfect_score_str_multiclass(scorer=scorer)
+
+
+@pytest.mark.parametrize("metric", METRICS_NEEDS_CLASS[BINARY], ids=METRICS_NEEDS_CLASS[BINARY])  # noqa
+def test_metrics_perfect_str_binary(metric: str):
+    scorer = METRICS[BINARY][metric]
+    if metric not in BINARY_METRICS_NEEDS_POS_LABEL:
+        _assert_perfect_score_str_binary(scorer=scorer)
+    else:
+        with pytest.raises(ValueError):
+            # pos_label should raise exception when passed string values
+            _assert_perfect_score_str_binary(scorer=scorer)
+
+
+@pytest.mark.parametrize("metric", METRICS_NEEDS_PROBA[BINARY], ids=METRICS_NEEDS_PROBA[BINARY])  # noqa
+def test_metrics_perfect_proba_raises_str_binary(metric: str):
+    scorer = METRICS[BINARY][metric]
+    with pytest.raises(Exception):
+        # proba metrics should fail with string inputs
+        scorer(np.array(["a", "a", "b"]), np.array(["a", "a", "b"]))
+
+
+@pytest.mark.parametrize("metric", METRICS_NEEDS_PROBA[MULTICLASS], ids=METRICS_NEEDS_PROBA[MULTICLASS])  # noqa
+def test_metrics_perfect_proba_raises_str_multiclass(metric: str):
+    scorer = METRICS[MULTICLASS][metric]
+    with pytest.raises(Exception):
+        # proba metrics should fail with string inputs
+        scorer(np.array(["a", "a", "b"]), np.array(["a", "a", "b"]))
+
+
 @pytest.mark.parametrize("metric", REGRESSION_METRICS, ids=REGRESSION_METRICS)  # noqa
 def test_metrics_perfect_regression(metric: str):
     _assert_valid_scorer_regressor(scorer=METRICS[REGRESSION][metric])
@@ -159,6 +225,22 @@ def test_metrics_imperfect_multiclass(metric: str):
 @pytest.mark.parametrize("metric", REGRESSION_METRICS, ids=REGRESSION_METRICS)  # noqa
 def test_metrics_imperfect_regression(metric: str):
     _assert_imperfect_score(scorer=METRICS[REGRESSION][metric])
+
+
+@pytest.mark.parametrize("metric", METRICS_NEEDS_CLASS[BINARY], ids=METRICS_NEEDS_CLASS[BINARY])  # noqa
+def test_metrics_imperfect_str_binary(metric: str):
+    if metric not in BINARY_METRICS_NEEDS_POS_LABEL:
+        _assert_imperfect_score_str_binary(scorer=METRICS[BINARY][metric])
+    else:
+        with pytest.raises(ValueError):
+            # pos_label should raise exception when passed string values
+            _assert_imperfect_score_str_binary(scorer=METRICS[BINARY][metric])
+
+
+@pytest.mark.parametrize("metric", METRICS_NEEDS_CLASS[MULTICLASS], ids=METRICS_NEEDS_CLASS[MULTICLASS])  # noqa
+def test_metrics_imperfect_str_multiclass(metric: str):
+    _assert_imperfect_score_str_multiclass(scorer=METRICS[MULTICLASS][metric])
+    _assert_imperfect_score_str_binary(scorer=METRICS[MULTICLASS][metric])
 
 
 def _assert_valid_scorer_classifier(scorer: Scorer):
@@ -196,6 +278,24 @@ def _assert_perfect_score(scorer: Scorer, abs_tol=1e-5):
     """
     y_true = np.array([0, 0, 1])
     y_pred = np.array([0.0, 0.0, 1.0])
+    _assert_perfect_score_generic(scorer=scorer, abs_tol=abs_tol, y_true=y_true, y_pred=y_pred)
+
+
+def _assert_perfect_score_single_sample(scorer: Scorer, abs_tol=1e-5):
+    """
+    Ensure a perfect prediction has an error of 0 when given only a single sample
+    and a score equal to scorer's optimum for a given scorer.
+    """
+    y_true = np.array([1])
+    y_pred = np.array([1.0])
+    _assert_perfect_score_generic(scorer=scorer, abs_tol=abs_tol, y_true=y_true, y_pred=y_pred)
+
+
+def _assert_perfect_score_generic(scorer: Scorer, y_true, y_pred, abs_tol=1e-5):
+    """
+    Ensure a perfect prediction has an error of 0
+    and a score equal to scorer's optimum for a given scorer.
+    """
     score = scorer(y_true, y_pred)
     assert score == scorer.score(y_true, y_pred)
     error = scorer.error(y_true, y_pred)
@@ -205,13 +305,77 @@ def _assert_perfect_score(scorer: Scorer, abs_tol=1e-5):
     assert isclose(score, scorer.optimum, abs_tol=abs_tol)
 
 
-def _assert_imperfect_score(scorer: Scorer, abs_tol=1e-5):
+def _assert_perfect_score_str_binary(scorer: Scorer, abs_tol=1e-5):
+    """
+    Ensure a perfect prediction has an error of 0
+    and a score equal to scorer's optimum for a given scorer.
+    """
+    y_true = np.array(["a", "a", "b"])
+    y_pred = np.array(["a", "a", "b"])
+    _assert_perfect_score_generic(scorer=scorer, abs_tol=abs_tol, y_true=y_true, y_pred=y_pred)
+
+
+def _assert_perfect_score_str_multiclass(scorer: Scorer, abs_tol=1e-5):
+    """
+    Ensure a perfect prediction has an error of 0
+    and a score equal to scorer's optimum for a given scorer.
+    """
+    y_true = np.array(["b", "a", "b", "c"])
+    y_pred = np.array(["b", "a", "b", "c"])
+    _assert_perfect_score_generic(scorer=scorer, abs_tol=abs_tol, y_true=y_true, y_pred=y_pred)
+
+
+def _assert_imperfect_score(scorer: Scorer, abs_tol: float = 1e-5) -> float:
     """
     Ensure an imperfect prediction has an error greater than 0
     and a score less than the scorer's optimum for a given scorer.
     """
     y_true = np.array([0, 0, 1])
     y_pred = np.array([1.0, 1.0, 0.0])
+    return _assert_imperfect_score_generic(scorer=scorer, y_true=y_true, y_pred=y_pred, abs_tol=abs_tol)
+
+
+def _assert_imperfect_score_str_binary(scorer: Scorer, abs_tol: float = 1e-5):
+    """
+    Ensure an imperfect prediction has an error greater than 0
+    and a score less than the scorer's optimum for a given scorer.
+
+    Also ensure that both numeric and string representations of the input get the same score without raising an exception.
+    """
+    y_true = np.array([0, 0, 1])
+    y_pred = np.array([0.0, 1.0, 0.0])
+    score_numeric = _assert_imperfect_score_generic(scorer=scorer, y_true=y_true, y_pred=y_pred, abs_tol=abs_tol)
+
+    y_true = np.array(["b", "b", "a"])
+    y_pred = np.array(["b", "a", "b"])
+    score_str = _assert_imperfect_score_generic(scorer=scorer, y_true=y_true, y_pred=y_pred, abs_tol=abs_tol)
+
+    assert isclose(score_numeric, score_str, abs_tol=abs_tol)
+
+
+def _assert_imperfect_score_str_multiclass(scorer: Scorer, abs_tol: float = 1e-5):
+    """
+    Ensure an imperfect prediction has an error greater than 0
+    and a score less than the scorer's optimum for a given scorer.
+
+    Also ensure that both numeric and string representations of the input get the same score without raising an exception.
+    """
+    y_true = np.array([1, 0, 1, 2, 2, 4])
+    y_pred = np.array([1.0, 1.0, 0.0, 0.0, 3.0, 1.0])
+    score_numeric = _assert_imperfect_score_generic(scorer=scorer, y_true=y_true, y_pred=y_pred, abs_tol=abs_tol)
+
+    y_true = np.array(["b", "a", "b", "c", "c", "e"])
+    y_pred = np.array(["b", "b", "a", "a", "d", "b"])
+    score_str = _assert_imperfect_score_generic(scorer=scorer, y_true=y_true, y_pred=y_pred, abs_tol=abs_tol)
+
+    assert isclose(score_numeric, score_str, abs_tol=abs_tol)
+
+
+def _assert_imperfect_score_generic(scorer: Scorer, y_true, y_pred, abs_tol: float = 1e-5) -> float:
+    """
+    Ensure an imperfect prediction has an error greater than 0
+    and a score less than the scorer's optimum for a given scorer.
+    """
     score = scorer(y_true, y_pred)
     assert score == scorer.score(y_true, y_pred)
     error = scorer.error(y_true, y_pred)
@@ -221,6 +385,7 @@ def _assert_imperfect_score(scorer: Scorer, abs_tol=1e-5):
     assert score < scorer.optimum
     assert not isclose(error, 0, abs_tol=abs_tol)
     assert not isclose(score, scorer.optimum, abs_tol=abs_tol)
+    return score
 
 
 @pytest.mark.parametrize("sample_weight", [None, np.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.2, 0.3])])
