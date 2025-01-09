@@ -44,7 +44,7 @@ Check out the [Quick Start Tutorial](forecasting-quick-start.ipynb) to learn how
   Evaluation metrics available in AutoGluon-TimeSeries.
 :::
 
-:::{grid-item-card} Adding a Custom Forecasting Model
+:::{grid-item-card} Custom Models
   :link: advanced/forecasting-custom-model.html
 
   How to add a custom time series forecasting model to AutoGluon.
@@ -64,4 +64,5 @@ In Depth <forecasting-indepth>
 Forecasting with Chronos <forecasting-chronos>
 Model Zoo <forecasting-model-zoo>
 Metrics <forecasting-metrics>
+Advanced <advanced/index>
 ```
