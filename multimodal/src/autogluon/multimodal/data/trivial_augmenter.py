@@ -10,7 +10,7 @@ import random
 import nltk
 from PIL import Image, ImageEnhance, ImageOps
 
-from ..constants import AUTOMM, IMAGE, TEXT
+from ..constants import IMAGE, TEXT
 
 logger = logging.getLogger(__name__)
 
@@ -290,7 +290,7 @@ class TrivialAugment:
         # lazy import of nlpaug due to the speed issue. See more in https://github.com/autogluon/autogluon/issues/2706
         import nlpaug.augmenter.word as naw
 
-        from ..utils.nlpaug import InsertPunctuation
+        from .nlpaug import InsertPunctuation
 
         if op == "syn_replacement":
             op = naw.SynonymAug(aug_src="wordnet", aug_p=scale, aug_max=None)

@@ -1,28 +1,60 @@
+import functools
 import logging
 import re
 import warnings
 from typing import Dict, List, Optional, Tuple
 
+import timm
 import torch
 import torch._dynamo
 import torch.nn.functional as F
+from omegaconf import DictConfig, OmegaConf
+from timm.data.constants import (
+    IMAGENET_DEFAULT_MEAN,
+    IMAGENET_DEFAULT_STD,
+    IMAGENET_INCEPTION_MEAN,
+    IMAGENET_INCEPTION_STD,
+)
 from torch import nn
 from torch.nn.modules.loss import _Loss
 from transformers import AutoConfig, AutoModel, AutoTokenizer, BertTokenizer, CLIPTokenizer, ElectraTokenizer
 from transformers.models.mask2former.modeling_mask2former import Mask2FormerLoss
 
 from ..constants import (
-    AUTOMM,
+    ALL_MODALITIES,
+    CATEGORICAL,
+    CATEGORICAL_MLP,
     CLASS_LOGITS,
-    COLUMN_FEATURES,
-    FEATURES,
+    CLIP,
+    CLIP_IMAGE_MEAN,
+    CLIP_IMAGE_STD,
+    DOCUMENT,
+    DOCUMENT_TRANSFORMER,
+    FT_TRANSFORMER,
+    FUSION_MLP,
+    FUSION_NER,
+    FUSION_TRANSFORMER,
+    HF_TEXT,
+    IMAGE,
     LOGITS,
-    MASKS,
+    META_TRANSFORMER,
+    MMDET_IMAGE,
+    MMOCR_TEXT_DET,
+    MMOCR_TEXT_RECOG,
+    NER_TEXT,
+    NUMERICAL,
+    NUMERICAL_MLP,
     OCR,
     PEFT_ADDITIVE_STRATEGIES,
     REGRESSION,
+    SAM,
     SEMANTIC_MASK,
     SEMANTIC_SEGMENTATION,
+    SEMANTIC_SEGMENTATION_IMG,
+    T_FEW,
+    TEXT,
+    TEXT_NER,
+    TIMM_IMAGE,
 )
 from .adaptation_layers import ConvLoRALinear, IA3Linear, IA3LoRALinear, LoRALinear
 
@@ -450,13 +482,13 @@ def get_column_features(
     return column_features, feature_masks
 
 
-def create_adaptation(efficient_finetune: str, layer: nn.Module, lora_r: int, lora_alpha: int, **kwargs):
+def create_adaptation(peft: str, layer: nn.Module, lora_r: int, lora_alpha: int, **kwargs):
     """
     Creates a model adaptation module (IA3, LoRA, IA3_LoRA) given a linear layer.
 
     Parameters
     ----------
-    efficient_finetune
+    peft
         Name of the adaptation module.
     layer
        The layer the adaptation module should be applied to.
@@ -476,11 +508,11 @@ def create_adaptation(efficient_finetune: str, layer: nn.Module, lora_r: int, lo
     -------
     Model with injected LoRA modules.
     """
-    if "ia3_lora" in efficient_finetune:
+    if "ia3_lora" in peft:
         return IA3LoRALinear(
             layer.in_features, layer.out_features, r=lora_r, lora_alpha=lora_alpha, merge_weights=False
         )
-    elif "conv_lora" in efficient_finetune:
+    elif "conv_lora" in peft:
         return ConvLoRALinear(
             layer.in_features,
             layer.out_features,
@@ -489,13 +521,13 @@ def create_adaptation(efficient_finetune: str, layer: nn.Module, lora_r: int, lo
             merge_weights=False,
             conv_lora_expert_num=kwargs["conv_lora_expert_num"],
         )
-    elif "ia3" in efficient_finetune:
+    elif "ia3" in peft:
         return IA3Linear(layer.in_features, layer.out_features, merge_weights=False)
-    elif "lora" in efficient_finetune:
+    elif "lora" in peft:
         return LoRALinear(layer.in_features, layer.out_features, r=lora_r, lora_alpha=lora_alpha, merge_weights=False)
-    elif efficient_finetune is not None and efficient_finetune != "None":
+    elif peft is not None:
         raise NotImplementedError(
-            f"The efficient finetuning strategy '{efficient_finetune}'"
+            f"The efficient finetuning strategy '{peft}'"
             f" is not supported. We only support"
             f" {', '.join(PEFT_ADDITIVE_STRATEGIES)}."
         )
@@ -503,7 +535,7 @@ def create_adaptation(efficient_finetune: str, layer: nn.Module, lora_r: int, lo
 
 def inject_adaptation_to_linear_layer(
     model: nn.Module,
-    efficient_finetune: str,
+    peft: str,
     lora_r: int = None,
     lora_alpha: int = None,
     filter: Optional[List[str]] = None,
@@ -520,7 +552,7 @@ def inject_adaptation_to_linear_layer(
     ----------
     model
         A PyTorch model.
-    efficient_finetune
+    peft
         Efficient finetuning method that should be applied.
     lora_r
         The rank r of the low-rank decomposition.
@@ -553,7 +585,7 @@ def inject_adaptation_to_linear_layer(
                     assert isinstance(
                         layer, nn.Linear
                     ), f"LoRA can only be applied to torch.nn.Linear, but {layer} is {type(layer)}."
-                    adaptation_layer = create_adaptation(efficient_finetune, layer, lora_r, lora_alpha, **kwargs)
+                    adaptation_layer = create_adaptation(peft, layer, lora_r, lora_alpha, **kwargs)
                     adaptation_layer.weight = layer.weight
                     adaptation_layer.bias = layer.bias
                     setattr(module, c_name, adaptation_layer)
@@ -786,7 +818,7 @@ def run_model(model: nn.Module, batch: dict, trt_model: Optional[nn.Module] = No
     from ..utils.onnx import OnnxModule
     from .document_transformer import DocumentTransformer
     from .fusion.fusion_mlp import MultimodalFusionMLP
-    from .huggingface_text import HFAutoModelForTextPrediction
+    from .hf_text import HFAutoModelForTextPrediction
     from .t_few import TFewModel
     from .timm_image import TimmAutoModelForImagePrediction
 
@@ -807,6 +839,7 @@ def run_model(model: nn.Module, batch: dict, trt_model: Optional[nn.Module] = No
             # HACK input data types in ONNX
             if batch[k].dtype == torch.int32:
                 batch[k] = batch[k].to(torch.int64)
+    # DocumentTransformer inherited from HFAutoModelForTextPrediction
     if (not isinstance(pure_model, DocumentTransformer)) and isinstance(pure_model, supported_models):
         input_vec = [batch[k] for k in pure_model.input_keys]
         column_names, column_values = [], []
@@ -903,3 +936,831 @@ def get_pretrained_tokenizer(
             return tokenizer
         except:
             raise e
+
+
+def extract_value_from_config(
+    config: Dict,
+    keys: Tuple[str, ...],
+):
+    """
+    Traverse a config dictionary to get some hyper-parameter's value.
+
+    Parameters
+    ----------
+    config
+        A config dictionary.
+    keys
+        The possible names of a hyper-parameter.
+
+    Returns
+    -------
+    The hyper-parameter value.
+    """
+    result = []
+    for k, v in config.items():
+        if k in keys:
+            result.append(v)
+        elif isinstance(v, dict):
+            result += extract_value_from_config(v, keys)
+        else:
+            pass
+
+    return result
+
+
+def extract_image_hparams_from_config(model_name: str, config):
+    """
+    Extract some default hyper-parameters, e.g., image size, mean, and std,
+    from a pre-trained (timm or huggingface) checkpoint.
+
+    Parameters
+    ----------
+    model_name
+        Name of model.
+    config
+        Config of a pre-trained checkpoint.
+
+    Returns
+    -------
+    image_size
+        Image width/height.
+    mean
+        Image normalization mean.
+    std
+        Image normalizaiton std.
+    """
+    if model_name.lower().startswith((TIMM_IMAGE, META_TRANSFORMER)):
+        image_size = config["input_size"][-1]
+        image_mean = config["mean"]
+        image_std = config["std"]
+    elif model_name.lower().startswith((CLIP, DOCUMENT_TRANSFORMER)):
+        extracted = extract_value_from_config(
+            config=config.to_diff_dict(),
+            keys=("image_size",),
+        )
+        if len(extracted) == 0:
+            image_size = None
+        elif len(extracted) >= 1:
+            image_size = extracted[0]
+            if isinstance(image_size, tuple):
+                image_size = image_size[-1]
+        else:
+            raise ValueError(f" more than one image_size values are detected: {extracted}")
+        image_mean = None
+        image_std = None
+    else:
+        raise ValueError(f"Unknown image processor prefix: {model_name}")
+    return image_size, image_mean, image_std
+
+
+def image_mean_std(norm_type: str):
+    """
+    Get image normalization mean and std by its name.
+
+    Parameters
+    ----------
+    norm_type
+        Name of image normalization.
+
+    Returns
+    -------
+    Normalization mean and std.
+    """
+    if norm_type == "inception":
+        return IMAGENET_INCEPTION_MEAN, IMAGENET_INCEPTION_STD
+    elif norm_type == "imagenet":
+        return IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
+    elif norm_type == "clip":
+        return CLIP_IMAGE_MEAN, CLIP_IMAGE_STD
+    else:
+        raise ValueError(f"unknown image normalization: {norm_type}")
+
+
+def get_image_size_mean_std(
+    model_name: str,
+    config,
+    provided_size: int,
+    provided_norm_type: str,
+    support_variable_input_size: Optional[bool] = False,
+):
+    image_size, image_mean, image_std = extract_image_hparams_from_config(
+        model_name=model_name,
+        config=config,
+    )
+    if support_variable_input_size and provided_size is not None:
+        # We have detected that the model supports using an image size that is
+        # different from the pretrained model, e.g., ConvNets with global pooling
+        if provided_size < image_size:
+            logger.warning(
+                f"The provided image size={provided_size} is smaller than the default size "
+                f"of the pretrained backbone, which is {image_size}. "
+                f"Detailed configuration of the backbone is in {config}. "
+                f"You may like to double check your configuration."
+            )
+        image_size = provided_size
+    elif provided_size is not None and provided_size != image_size:
+        logger.warning(
+            f"The model does not support using an image size that is different from the default size. "
+            f"Provided image size={provided_size}. Default size={image_size}. "
+            f"Detailed model configuration={config}. We have ignored the provided image size."
+        )
+
+    if image_size is None:
+        if provided_size is not None:
+            image_size = provided_size
+            logger.debug(f"using provided image size: {image_size}.")
+        else:
+            raise ValueError("image size is missing.")
+    else:
+        logger.debug(f"using detected image size: {image_size}")
+
+    if image_mean is None or image_std is None:
+        if provided_norm_type is not None:
+            image_mean, image_std = image_mean_std(provided_norm_type)
+            logger.debug(f"using provided normalization: {provided_norm_type}.")
+        else:
+            raise ValueError("image normalization mean and std are missing.")
+    else:
+        logger.debug(f"using detected image normalization: {image_mean} and {image_std}.")
+
+    return image_size, image_mean, image_std
+
+
+def get_text_segment_num(config, provided_segment_num: int, checkpoint_name: str):
+    extracted = extract_value_from_config(config=config.to_diff_dict(), keys=("type_vocab_size",))
+    if len(extracted) == 0:
+        default_segment_num = 1
+    elif len(extracted) == 1:
+        default_segment_num = extracted[0]
+    else:
+        raise ValueError(f" more than one type_vocab_size values are detected: {extracted}")
+
+    if default_segment_num <= 0:
+        default_segment_num = 1
+
+    if provided_segment_num < default_segment_num:
+        warnings.warn(
+            f"provided text_segment_num: {provided_segment_num} "
+            f"is smaller than {checkpoint_name}'s default: {default_segment_num}"
+        )
+    text_segment_num = min(provided_segment_num, default_segment_num)
+    assert text_segment_num >= 1
+    logger.debug(f"text segment num: {text_segment_num}")
+
+    return text_segment_num
+
+
+def get_text_token_max_len(provided_max_len, config, tokenizer, checkpoint_name):
+    """
+    Compute the allowable max length of token sequences.
+
+    Parameters
+    ----------
+    provided_max_len
+        The provided max length.
+    config
+        Model config.
+    tokenizer
+        Text tokenizer.
+    checkpoint_name
+        Name of checkpoint.
+
+    Returns
+    -------
+    Token sequence max length.
+    """
+    if hasattr(config, "relative_attention") and config.relative_attention:
+        default_max_len = tokenizer.model_max_length
+    elif hasattr(config, "position_embedding_type") and "relative" in config.position_embedding_type:
+        default_max_len = tokenizer.model_max_length
+    elif hasattr(config, "max_position_embeddings"):
+        default_max_len = config.max_position_embeddings
+    else:
+        default_max_len = tokenizer.model_max_length
+
+    if provided_max_len is None or provided_max_len <= 0:
+        max_len = default_max_len
+    else:
+        if provided_max_len < default_max_len:
+            if default_max_len < 10**6:  # Larger than this value usually means infinite.
+                warnings.warn(
+                    f"provided max length: {provided_max_len} "
+                    f"is smaller than {checkpoint_name}'s default: {default_max_len}"
+                )
+        max_len = min(provided_max_len, default_max_len)
+
+    logger.debug(f"text max length: {max_len}")
+
+    return max_len
+
+
+def replace_missing_images_with_learnable(
+    images: torch.Tensor,
+    image_masks,
+    learnable_image: nn.Parameter,
+):
+    b, n, c, h, w = images.shape
+    assert learnable_image.shape == (c, h, w)
+    for i in range(b):
+        for j in range(n):
+            if not image_masks[i][j]:  # False means a missing image
+                images[i][j] = learnable_image
+
+    return images
+
+
+def select_model(
+    config: DictConfig,
+    df_preprocessor,
+    strict: Optional[bool] = True,
+):
+    """
+    Filter model config through the detected modalities in the training data.
+    If MultiModalFeaturePreprocessor can't detect some modality,
+    this function will remove the models that use this modality. This function is to
+    maximize the user flexibility in defining the config.
+    For example, if one uses the default, including hf_text and timm_image, as the model config template
+    but the training data don't have images, this function will filter out timm_image.
+
+    Parameters
+    ----------
+    config
+        A DictConfig object. The model config should be accessible by "config.model"
+    df_preprocessor
+        A MultiModalFeaturePreprocessor object, which has called .fit() on the training data.
+        Column names of the same modality are grouped into one list. If a modality's list is empty,
+        it means the training data don't have this modality.
+    strict
+        If False, allow retaining one model when partial modalities are available for that model.
+
+    Returns
+    -------
+    Config with some unused models removed.
+    """
+    data_status = {}
+    for per_modality in ALL_MODALITIES:
+        data_status[per_modality] = False
+    if len(df_preprocessor.image_feature_names) > 0:
+        data_status[IMAGE] = True
+    if len(df_preprocessor.text_feature_names) > 0:
+        data_status[TEXT] = True
+    if len(df_preprocessor.categorical_feature_names) > 0:
+        data_status[CATEGORICAL] = True
+    if len(df_preprocessor.numerical_feature_names) > 0:
+        data_status[NUMERICAL] = True
+    if len(df_preprocessor.ner_feature_names) > 0:
+        data_status[TEXT_NER] = True
+    if len(df_preprocessor.document_feature_names) > 0:
+        data_status[DOCUMENT] = True
+    if len(df_preprocessor.semantic_segmentation_feature_names) > 0:
+        data_status[SEMANTIC_SEGMENTATION_IMG] = True
+
+    names = config.model.names
+    if isinstance(names, str):
+        names = [names]
+    selected_model_names = []
+    fusion_model_name = []
+    for model_name in names:
+        model_config = getattr(config.model, model_name)
+        strict = getattr(model_config, "requires_all_dtypes", strict)
+        if not model_config.data_types:
+            fusion_model_name.append(model_name)
+            continue
+        model_data_status = [data_status[d_type] for d_type in model_config.data_types]
+        if all(model_data_status):
+            selected_model_names.append(model_name)
+        else:
+            if any(model_data_status) and not strict:
+                selected_model_names.append(model_name)
+                # update data types to be consistent with detected
+                model_config.data_types = [d_type for d_type in model_config.data_types if data_status[d_type]]
+            else:
+                delattr(config.model, model_name)
+
+    if len(selected_model_names) == 0:
+        raise ValueError("No model is available for this dataset.")
+    # only allow no more than 1 fusion model
+    if len(fusion_model_name) > 1:
+        raise ValueError(f"More than one fusion models `{fusion_model_name}` are detected, but only one is allowed.")
+
+    if len(selected_model_names) > 1:
+        assert len(fusion_model_name) == 1
+        selected_model_names.extend(fusion_model_name)
+    elif len(fusion_model_name) == 1 and hasattr(config.model, fusion_model_name[0]):
+        delattr(config.model, fusion_model_name[0])
+
+    config.model.names = selected_model_names
+    logger.debug(f"selected models: {selected_model_names}")
+    for model_name in selected_model_names:
+        logger.debug(f"model dtypes: {getattr(config.model, model_name).data_types}")
+
+    # clean up unused model configs
+    model_keys = list(config.model.keys())
+    for model_name in model_keys:
+        if model_name not in selected_model_names + ["names"]:
+            delattr(config.model, model_name)
+
+    return config
+
+
+def create_model(
+    model_name: str,
+    model_config: DictConfig,
+    num_classes: Optional[int] = 0,
+    classes: Optional[list] = None,
+    num_numerical_columns: Optional[int] = None,
+    num_categories: Optional[Dict] = None,
+    numerical_fill_values: Optional[Dict] = None,
+    pretrained: Optional[bool] = True,
+    is_matching: Optional[bool] = False,
+):
+    """
+    Create a single model.
+
+    Parameters
+    ----------
+    model_name
+        Name of the model.
+    model_config
+        Config of the model.
+    num_classes
+        The class number for a classification task. It should be 1 for a regression task.
+    classes
+        All classes in this dataset.
+    num_numerical_columns
+        The number of numerical columns in the training dataframe.
+    num_categories
+        The category number for each categorical column in the training dataframe.
+    numerical_fill_values
+        If numerical values are null, fill them with these.
+    pretrained
+        Whether using the pretrained timm models. If pretrained=True, download the pretrained model.
+    is_matching
+        Whether the model is used for semantic matching.
+
+    Returns
+    -------
+    A model.
+    """
+    if model_name.lower().startswith(CLIP):
+        from .clip import CLIPForImageText
+
+        model = CLIPForImageText(
+            prefix=model_name,
+            checkpoint_name=model_config.checkpoint_name,
+            num_classes=num_classes,
+            pretrained=pretrained,
+            tokenizer_name=model_config.tokenizer_name,
+            has_image=IMAGE in model_config.data_types,
+            has_text=TEXT in model_config.data_types,
+            image_size=model_config.image_size,
+            image_norm=model_config.image_norm,
+            image_chan_num=model_config.image_chan_num,
+            use_learnable_image=model_config.use_learnable_image,
+            max_text_len=model_config.max_text_len,
+            text_segment_num=model_config.text_segment_num,
+            is_matching=is_matching,
+        )
+    elif model_name.lower().startswith(TIMM_IMAGE):
+        from .timm_image import TimmAutoModelForImagePrediction
+
+        model = TimmAutoModelForImagePrediction(
+            prefix=model_name,
+            checkpoint_name=model_config.checkpoint_name,
+            num_classes=num_classes,
+            mix_choice=model_config.mix_choice,
+            pretrained=pretrained,
+            image_size=model_config.image_size,
+            image_norm=model_config.image_norm,
+            image_chan_num=model_config.image_chan_num,
+            use_learnable_image=model_config.use_learnable_image,
+        )
+    elif model_name.lower().startswith(HF_TEXT):
+        from .hf_text import HFAutoModelForTextPrediction
+
+        model = HFAutoModelForTextPrediction(
+            prefix=model_name,
+            checkpoint_name=model_config.checkpoint_name,
+            num_classes=num_classes,
+            pooling_mode=model_config.pooling_mode,
+            gradient_checkpointing=model_config.gradient_checkpointing,
+            low_cpu_mem_usage=model_config.low_cpu_mem_usage,
+            pretrained=pretrained,
+            tokenizer_name=model_config.tokenizer_name,
+            max_text_len=model_config.max_text_len,
+            text_segment_num=model_config.text_segment_num,
+            use_fast=model_config.use_fast,
+        )
+    elif model_name.lower().startswith(T_FEW):
+        from .t_few import TFewModel
+
+        model = TFewModel(
+            prefix=model_name,
+            checkpoint_name=model_config.checkpoint_name,
+            length_norm=model_config.length_norm,  # Normalizes length to adjust for length bias in target template
+            unlikely_loss=model_config.unlikely_loss,  # Adds loss term that lowers probability of incorrect outputs
+            mc_loss=model_config.mc_loss,  # Adds multiple choice cross entropy loss
+            num_classes=num_classes,
+            gradient_checkpointing=model_config.gradient_checkpointing,
+            low_cpu_mem_usage=model_config.low_cpu_mem_usage,
+            pretrained=pretrained,
+            tokenizer_name=model_config.tokenizer_name,
+            max_text_len=model_config.max_text_len,
+            text_segment_num=model_config.text_segment_num,
+        )
+    elif model_name.lower().startswith(NUMERICAL_MLP):
+        from .numerical_mlp import NumericalMLP
+
+        model = NumericalMLP(
+            prefix=model_name,
+            in_features=num_numerical_columns,
+            hidden_features=model_config.hidden_size,
+            out_features=model_config.hidden_size,
+            num_layers=model_config.num_layers,
+            activation=model_config.activation,
+            dropout=model_config.dropout,
+            normalization=model_config.normalization,
+            token_dim=model_config.token_dim,
+            embedding_arch=model_config.embedding_arch,
+            num_classes=num_classes,
+            numerical_fill_values=numerical_fill_values,
+        )
+    elif model_name.lower().startswith(CATEGORICAL_MLP):
+        from .categorical_mlp import CategoricalMLP
+
+        model = CategoricalMLP(
+            prefix=model_name,
+            num_categories=num_categories,
+            out_features=model_config.hidden_size,
+            num_layers=model_config.num_layers,
+            activation=model_config.activation,
+            dropout=model_config.dropout,
+            normalization=model_config.normalization,
+            num_classes=num_classes,
+        )
+    elif model_name.lower().startswith(DOCUMENT_TRANSFORMER):
+        from .document_transformer import DocumentTransformer
+
+        model = DocumentTransformer(
+            prefix=model_name,
+            checkpoint_name=model_config.checkpoint_name,
+            num_classes=num_classes,
+            pooling_mode=model_config.pooling_mode,
+            gradient_checkpointing=model_config.gradient_checkpointing,
+            low_cpu_mem_usage=model_config.low_cpu_mem_usage,
+            pretrained=pretrained,
+            tokenizer_name=model_config.tokenizer_name,
+            image_size=model_config.image_size,
+            image_norm=model_config.image_norm,
+        )
+    elif model_name.lower().startswith(MMDET_IMAGE):
+        from .mmdet_image import MMDetAutoModelForObjectDetection
+
+        model = MMDetAutoModelForObjectDetection(
+            prefix=model_name,
+            checkpoint_name=model_config.checkpoint_name,
+            config_file=model_config.config_file,
+            classes=classes,
+            pretrained=pretrained,
+            output_bbox_format=model_config.output_bbox_format,
+            frozen_layers=model_config.frozen_layers,
+        )
+    elif model_name.lower().startswith(MMOCR_TEXT_DET):
+        from .mmocr_text_detection import MMOCRAutoModelForTextDetection
+
+        model = MMOCRAutoModelForTextDetection(
+            prefix=model_name,
+            checkpoint_name=model_config.checkpoint_name,
+        )
+    elif model_name.lower().startswith(MMOCR_TEXT_RECOG):
+        from .mmocr_text_recognition import MMOCRAutoModelForTextRecognition
+
+        model = MMOCRAutoModelForTextRecognition(
+            prefix=model_name,
+            checkpoint_name=model_config.checkpoint_name,
+        )
+    elif model_name.lower().startswith(NER_TEXT):
+        from .ner_text import HFAutoModelForNER
+
+        model = HFAutoModelForNER(
+            prefix=model_name,
+            checkpoint_name=model_config.checkpoint_name,
+            num_classes=num_classes,
+            gradient_checkpointing=model_config.gradient_checkpointing,
+            low_cpu_mem_usage=model_config.low_cpu_mem_usage,
+            pretrained=pretrained,
+            tokenizer_name=model_config.tokenizer_name,
+        )
+    elif model_name.lower().startswith(FUSION_MLP):
+        from .fusion import MultimodalFusionMLP
+
+        model = functools.partial(
+            MultimodalFusionMLP,
+            prefix=model_name,
+            hidden_features=model_config.hidden_sizes,
+            num_classes=num_classes,
+            adapt_in_features=model_config.adapt_in_features,
+            activation=model_config.activation,
+            dropout=model_config.dropout,
+            normalization=model_config.normalization,
+            aux_loss_weight=model_config.aux_loss_weight,
+        )
+    elif model_name.lower().startswith(FUSION_NER):
+        from .fusion import MultimodalFusionNER
+
+        model = functools.partial(
+            MultimodalFusionNER,
+            prefix=model_name,
+            hidden_features=model_config.hidden_sizes,
+            num_classes=num_classes,
+            adapt_in_features=model_config.adapt_in_features,
+            activation=model_config.activation,
+            dropout_prob=model_config.drop_rate,
+            normalization=model_config.normalization,
+            loss_weight=model_config.weight if hasattr(model_config, "weight") else None,
+        )
+    elif model_name.lower().startswith(FUSION_TRANSFORMER):
+        from .fusion import MultimodalFusionTransformer
+
+        model = functools.partial(
+            MultimodalFusionTransformer,
+            prefix=model_name,
+            hidden_features=model_config.hidden_size,
+            num_classes=num_classes,
+            num_blocks=model_config.num_blocks,
+            attention_num_heads=model_config.attention_num_heads,
+            ffn_hidden_size=model_config.ffn_hidden_size,
+            attention_dropout=model_config.attention_dropout,
+            residual_dropout=model_config.residual_dropout,
+            ffn_dropout=model_config.ffn_dropout,
+            attention_normalization=model_config.normalization,
+            ffn_normalization=model_config.normalization,
+            head_normalization=model_config.normalization,
+            ffn_activation=model_config.ffn_activation,
+            head_activation=model_config.head_activation,
+            adapt_in_features=model_config.adapt_in_features,
+            aux_loss_weight=model_config.aux_loss_weight,
+            additive_attention=model_config.additive_attention,
+            share_qv_weights=model_config.share_qv_weights,
+        )
+    elif model_name.lower().startswith(FT_TRANSFORMER):
+        from .ft_transformer import FT_Transformer
+
+        model = FT_Transformer(
+            prefix=model_name,
+            num_numerical_columns=num_numerical_columns,
+            num_categories=num_categories,
+            numerical_fill_values=numerical_fill_values,
+            embedding_arch=model_config.embedding_arch,
+            token_dim=model_config.token_dim,
+            hidden_size=model_config.hidden_size,
+            hidden_features=model_config.hidden_size,
+            num_classes=num_classes,
+            num_blocks=model_config.num_blocks,
+            attention_num_heads=model_config.attention_num_heads,
+            attention_dropout=model_config.attention_dropout,
+            attention_normalization=model_config.normalization,
+            ffn_hidden_size=model_config.ffn_hidden_size,
+            ffn_dropout=model_config.ffn_dropout,
+            ffn_normalization=model_config.normalization,
+            ffn_activation=model_config.ffn_activation,
+            residual_dropout=model_config.residual_dropout,
+            head_normalization=model_config.normalization,
+            head_activation=model_config.head_activation,
+            additive_attention=model_config.additive_attention,
+            share_qv_weights=model_config.share_qv_weights,
+            pooling_mode=model_config.pooling_mode,
+            checkpoint_name=model_config.checkpoint_name,
+            pretrained=pretrained,
+        )
+    elif model_name.lower().startswith(SAM):
+        from .sam import SAMForSemanticSegmentation
+
+        model = SAMForSemanticSegmentation(
+            prefix=model_name,
+            checkpoint_name=model_config.checkpoint_name,
+            num_classes=num_classes,
+            pretrained=pretrained,
+            frozen_layers=model_config.frozen_layers,
+            num_mask_tokens=model_config.num_mask_tokens,
+            image_norm=model_config.image_norm,
+        )
+    elif model_name.lower().startswith(META_TRANSFORMER):
+        from .meta_transformer import MetaTransformer
+
+        model = MetaTransformer(
+            prefix=model_name,
+            checkpoint_path=model_config.checkpoint_path,
+            num_classes=num_classes,
+            model_version=model_config.model_version,
+            has_image=IMAGE in model_config.data_types,
+            has_text=TEXT in model_config.data_types,
+            num_numerical_columns=num_numerical_columns,
+            num_categories=num_categories,
+            numerical_fill_values=numerical_fill_values,
+            image_size=model_config.image_size,
+            image_norm=model_config.image_norm,
+            image_chan_num=model_config.image_chan_num,
+            use_learnable_image=model_config.use_learnable_image,
+            max_text_len=model_config.max_text_len,
+            text_segment_num=model_config.text_segment_num,
+        )
+    else:
+        raise ValueError(f"unknown model name: {model_name}")
+
+    return model
+
+
+def create_fusion_model(
+    config: DictConfig,
+    num_classes: Optional[int] = None,
+    classes: Optional[list] = None,
+    num_numerical_columns: Optional[int] = None,
+    num_categories: Optional[Dict] = None,
+    numerical_fill_values: Optional[Dict] = None,
+    pretrained: Optional[bool] = True,
+):
+    """
+    Create models. It supports the auto models of huggingface text and timm image.
+    Multimodal models, e.g., CLIP, should be added case-by-case since their configs and usages
+    may be different. It uses MLP for the numerical features, categorical features, and late-fusion.
+
+    Parameters
+    ----------
+    config
+        A DictConfig object. The model config should be accessible by "config.model".
+    num_classes
+        The class number for a classification task. It should be 1 for a regression task.
+    classes
+        All classes in this dataset.
+    num_numerical_columns
+        The number of numerical columns in the training dataframe.
+    num_categories
+        The category number for each categorical column in the training dataframe.
+    numerical_fill_values
+        If numerical values are null, fill them with these.
+    pretrained
+        Whether using the pretrained timm models. If pretrained=True, download the pretrained model.
+
+    Returns
+    -------
+    A Pytorch model.
+    """
+    names = config.model.names
+    if isinstance(names, str):
+        names = [names]
+    # make sure no duplicate model names
+    assert len(names) == len(set(names))
+    logger.debug(f"output_shape: {num_classes}")
+    names = sorted(names)
+    config.model.names = names
+    single_models = []
+    fusion_model = None
+
+    for model_name in names:
+        model_config = getattr(config.model, model_name)
+        model = create_model(
+            model_name=model_name,
+            model_config=model_config,
+            num_classes=num_classes,
+            classes=classes,
+            num_numerical_columns=num_numerical_columns,
+            num_categories=num_categories,
+            numerical_fill_values=numerical_fill_values,
+            pretrained=pretrained,
+        )
+
+        if isinstance(model, functools.partial):  # fusion model
+            if fusion_model is None:
+                fusion_model = model
+            else:
+                raise ValueError(
+                    f"More than one fusion models are detected in {names}. Only one fusion model is allowed."
+                )
+        else:  # single model
+            if config.optim.peft is not None:
+                model = apply_peft_adaptation(model, config)
+            single_models.append(model)
+
+    if len(single_models) > 1:
+        # must have one fusion model if there are multiple independent models
+        model = fusion_model(models=single_models)
+    elif len(single_models) == 1:
+        model = single_models[0]
+    else:
+        raise ValueError(f"No available models for {names}")
+
+    # build augmenter for multimodal data augmentation
+    if config.optim.lemda.turn_on:
+        from .fusion import MultimodalFusionMLP
+
+        assert isinstance(model, MultimodalFusionMLP)
+        from .augmenter import Augmenter
+
+        augmenter = Augmenter(
+            arch_type=config.optim.lemda.arch_type,
+            input_dim=model.augmenter_in_features,
+            z_dim=config.optim.lemda.z_dim,
+            num_layers=config.optim.lemda.num_layers,
+            adv_weight=config.optim.lemda.adv_weight,
+        )
+        model.augmenter = augmenter
+
+    return model
+
+
+def apply_peft_adaptation(model: nn.Module, config: DictConfig) -> nn.Module:
+    """
+    Apply an adaptation to the model for efficient fine-tuning.
+
+    Parameters
+    ----------
+    model
+        A PyTorch model.
+    config:
+        A DictConfig object. The optimization config should be accessible by "config.optimization".
+    """
+    if config.optim.peft in PEFT_ADDITIVE_STRATEGIES:
+        model = inject_adaptation_to_linear_layer(
+            model=model,
+            peft=config.optim.peft,
+            lora_r=config.optim.lora.r,
+            lora_alpha=config.optim.lora.alpha,
+            module_filter=config.optim.lora.module_filter,
+            filter=config.optim.lora.filter,
+            extra_trainable_params=config.optim.extra_trainable_params,
+            conv_lora_expert_num=config.optim.lora.conv_lora_expert_num,
+        )
+        model.name_to_id = model.get_layer_ids()  # Need to update name to id dictionary.
+
+    return model
+
+
+def modify_duplicate_model_names(
+    learner,
+    postfix: str,
+    blacklist: List[str],
+):
+    """
+    Modify a learner's model names if they exist in a blacklist.
+
+    Parameters
+    ----------
+    learner
+        A BaseLearner object.
+    postfix
+        The postfix used to change the duplicate names.
+    blacklist
+        A list of names. The provided learner can't use model names in the list.
+
+    Returns
+    -------
+    The learner guaranteed has no duplicate model names with the blacklist names.
+    """
+    model_names = []
+    for n in learner._config.model.names:
+        if n in blacklist:
+            new_name = f"{n}_{postfix}"
+            assert new_name not in blacklist
+            assert new_name not in learner._config.model.names
+            # modify model prefix
+            if n == learner._model.prefix:
+                learner._model.prefix = new_name
+            else:
+                assert isinstance(learner._model.model, nn.ModuleList)
+                for per_model in learner._model.model:
+                    if n == per_model.prefix:
+                        per_model.prefix = new_name
+                        break
+            # modify data processor prefix
+            for per_modality_processors in learner._data_processors.values():
+                for per_processor in per_modality_processors:
+                    if n == per_processor.prefix:
+                        per_processor.prefix = new_name
+            # modify model config keys
+            setattr(learner._config.model, new_name, getattr(learner._config.model, n))
+            delattr(learner._config.model, n)
+
+            model_names.append(new_name)
+        else:
+            model_names.append(n)
+
+    learner._config.model.names = model_names
+
+    return learner
+
+
+def list_timm_models(pretrained=True):
+    return timm.list_models(pretrained=pretrained)
+
+
+def is_lazy_weight_tensor(p: torch.Tensor) -> bool:
+    from torch.nn.parameter import UninitializedParameter
+
+    if isinstance(p, UninitializedParameter):
+        warnings.warn(
+            "A layer with UninitializedParameter was found. "
+            "Thus, the total number of parameters detected may be inaccurate."
+        )
+        return True
+    return False

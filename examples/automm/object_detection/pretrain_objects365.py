@@ -15,7 +15,7 @@ def main():
         hyperparameters={
             "model.mmdet_image.checkpoint_name": checkpoint_name,
             "env.num_gpus": num_gpus,
-            "optimization.val_metric": "map",
+            "optim.val_metric": "map",
         },
         problem_type="object_detection",
         sample_data_path=train_path,
@@ -27,16 +27,16 @@ def main():
         tuning_data=val_path,
         max_num_tuning_data=5000,
         hyperparameters={
-            "optimization.learning_rate": 1e-3,  # we use two stage and detection head has 100x lr
-            "optimization.lr_decay": 0.9,
-            "optimization.lr_mult": 1,
-            "optimization.max_epochs": 12,
-            #"optimization.max_steps": 180000,
-            "optimization.warmup_steps": 0.1,
-            "optimization.patience": 1000,
-            "optimization.val_check_interval": 0.25,
-            "optimization.check_val_every_n_epoch": 1,
-            "optimization.top_k": 20,
+            "optim.lr": 1e-3,  # we use two stage and detection head has 100x lr
+            "optim.lr_decay": 0.9,
+            "optim.lr_mult": 1,
+            "optim.max_epochs": 12,
+            #"optim.max_steps": 180000,
+            "optim.warmup_steps": 0.1,
+            "optim.patience": 1000,
+            "optim.val_check_interval": 0.25,
+            "optim.check_val_every_n_epoch": 1,
+            "optim.top_k": 20,
             "env.per_gpu_batch_size": 6,  # decrease it when model is large
         },
         clean_ckpts=False,

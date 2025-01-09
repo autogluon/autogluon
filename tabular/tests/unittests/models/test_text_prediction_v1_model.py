@@ -8,7 +8,7 @@ def test_text_prediction_v1_sts(fit_helper):
     fit_args = dict(
         hyperparameters={
             "AG_TEXT_NN": {
-                "optimization.max_epochs": 1,
+                "optim.max_epochs": 1,
                 "model.hf_text.checkpoint_name": "google/electra-small-discriminator",
             }
         },
