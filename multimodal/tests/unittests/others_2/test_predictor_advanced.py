@@ -21,7 +21,7 @@ from ..utils.unittest_datasets import AmazonReviewSentimentCrossLingualDataset
         ("google/flan-t5-small", IA3_LORA, "mean", "bf16-mixed", 0.006865, True),
         ("google/flan-t5-small", IA3, "cls", "bf16-mixed", 0.0004201, False),
         ("microsoft/deberta-v3-small", LORA_BIAS, "mean", "16-mixed", 0.001422, True),
-        ("microsoft/deberta-v3-small", IA3_BIAS, "cls", "16-mixed", 0.00044566, False),
+        ("microsoft/deberta-v3-small", IA3_BIAS, "cls", "16-true", 0.00044566, False),
     ],
 )
 def test_predictor_gradient_checkpointing(
