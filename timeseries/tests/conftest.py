@@ -41,8 +41,8 @@ def pytest_sessionstart():
     The code first calls `from_pretrained` in order to download and cache the two models (if they aren't
     cached already) in a subprocess, and then sets the HF_HUB_OFFLINE environment variable to True, in
     order to prevent any calls from the main process. The caching has to be done in a subprocess due to
-    the way Hugging Face Hub works: if HF_HUB_OFFLINE=1 is set in the main process before the call to
-    transformers, then the models cannot be downloaded and cached. If it is set after the transformers call,
+    the way Hugging Face Hub works: if HF_HUB_OFFLINE=1 is set in the main process before importing
+    transformers, then the models cannot be downloaded and cached. If it is set after importing transformers,
     HF will have cached HF_HUB_OFFLINE=0 already and the updated environment variable will not take effect.
     """
 
