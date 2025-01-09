@@ -550,9 +550,9 @@ def inject_adaptation_to_linear_layer(
         if not module_filter or any(re.match(filter_module, m_name) for filter_module in module_filter):
             for c_name, layer in dict(module.named_children()).items():
                 if not filter or any(re.match(filter_layer, c_name) for filter_layer in filter):
-                    assert isinstance(
-                        layer, nn.Linear
-                    ), f"LoRA can only be applied to torch.nn.Linear, but {layer} is {type(layer)}."
+                    assert isinstance(layer, nn.Linear), (
+                        f"LoRA can only be applied to torch.nn.Linear, but {layer} is {type(layer)}."
+                    )
                     adaptation_layer = create_adaptation(efficient_finetune, layer, lora_r, lora_alpha, **kwargs)
                     adaptation_layer.weight = layer.weight
                     adaptation_layer.bias = layer.bias

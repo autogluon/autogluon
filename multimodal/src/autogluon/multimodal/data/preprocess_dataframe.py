@@ -447,9 +447,9 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         text_types
             The column types of these text data, e.g., text or text_identifier.
         """
-        assert (
-            self._fit_called or self._fit_x_called
-        ), "You will need to first call preprocessor.fit_x() before calling preprocessor.transform_text."
+        assert self._fit_called or self._fit_x_called, (
+            "You will need to first call preprocessor.fit_x() before calling preprocessor.transform_text."
+        )
         text_features = {}
         text_types = {}
         for col_name in self._text_feature_names:
@@ -494,9 +494,9 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         image_types
             The column types of these image data, e.g., image_path or image_identifier.
         """
-        assert (
-            self._fit_called or self._fit_x_called
-        ), "You will need to first call preprocessor.fit_x() before calling preprocessor.transform_rois."
+        assert self._fit_called or self._fit_x_called, (
+            "You will need to first call preprocessor.fit_x() before calling preprocessor.transform_rois."
+        )
 
         x = self.transform_image(df)
         ret_data = x[0]
@@ -538,9 +538,9 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         image_types
             The column types of these image data, e.g., image_path or image_identifier.
         """
-        assert (
-            self._fit_called or self._fit_x_called
-        ), "You will need to first call preprocessor.fit_x() before calling preprocessor.transform_semantic_segmentation_img."
+        assert self._fit_called or self._fit_x_called, (
+            "You will need to first call preprocessor.fit_x() before calling preprocessor.transform_semantic_segmentation_img."
+        )
 
         ret_data = {}
         ret_type = {}
@@ -583,9 +583,9 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
             All the image data stored in a dictionary.
         image_types
             The column types of these image data, e.g., image_path, image_bytearray or image_identifier."""
-        assert (
-            self._fit_called or self._fit_x_called
-        ), "You will need to first call preprocessor.fit_x() before calling preprocessor.transform_image."
+        assert self._fit_called or self._fit_x_called, (
+            "You will need to first call preprocessor.fit_x() before calling preprocessor.transform_image."
+        )
 
         image_features = {}
         image_types = {}
@@ -636,9 +636,9 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         document_types
             The column types of these document data.
         """
-        assert (
-            self._fit_called or self._fit_x_called
-        ), "You will need to first call preprocessor.fit_x() before calling preprocessor.transform_document."
+        assert self._fit_called or self._fit_x_called, (
+            "You will need to first call preprocessor.fit_x() before calling preprocessor.transform_document."
+        )
         document_features = {}
         document_types = {}
         for col_name in self._document_feature_names:
@@ -673,9 +673,9 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         None
             The column types of numerical data, which is None currently since only one numerical type exists.
         """
-        assert (
-            self._fit_called or self._fit_x_called
-        ), "You will need to first call preprocessor.fit before calling preprocessor.transform_numerical."
+        assert self._fit_called or self._fit_x_called, (
+            "You will need to first call preprocessor.fit before calling preprocessor.transform_numerical."
+        )
         numerical_features = {}
         for col_name in self._numerical_feature_names:
             generator = self._feature_generators[col_name]
@@ -706,9 +706,9 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         None
             The column types of categorical data, which is None currently since only one categorical type exists.
         """
-        assert (
-            self._fit_called or self._fit_x_called
-        ), "You will need to first call preprocessor.fit before calling preprocessor.transform_categorical."
+        assert self._fit_called or self._fit_x_called, (
+            "You will need to first call preprocessor.fit before calling preprocessor.transform_categorical."
+        )
         categorical_features = {}
         for col_name, num_category in zip(self._categorical_feature_names, self._categorical_num_categories):
             col_value = df[col_name]
@@ -744,9 +744,9 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         label_types
             The label column types.
         """
-        assert (
-            self._fit_called or self._fit_y_called
-        ), "You will need to first call preprocessor.fit_y() before calling preprocessor.transform_label."
+        assert self._fit_called or self._fit_y_called, (
+            "You will need to first call preprocessor.fit_y() before calling preprocessor.transform_label."
+        )
         # Creating deep copy of the DataFrame, which allows writable buffer to be created for the new df
         # This is needed for 1.4.1 < scikit-learn < 1.5.0, versions <=1.4.0 and >=1.5.1 do not need a writable buffer
         df = df.copy(deep=True)
@@ -770,9 +770,9 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         self,
         df: pd.DataFrame,
     ) -> Tuple[Dict[str, NDArray], Dict[str, str]]:
-        assert (
-            self._fit_called or self._fit_x_called
-        ), "You will need to first call preprocessor.fit_x() before calling preprocessor.transform_ner."
+        assert self._fit_called or self._fit_x_called, (
+            "You will need to first call preprocessor.fit_x() before calling preprocessor.transform_ner."
+        )
         ret_data, ret_type = {}, {}
         ner_text_features = {}
         ner_text_types = {}
@@ -817,12 +817,12 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         -------
         Ground-truth labels ready to compute metric scores.
         """
-        assert (
-            self._fit_called or self._fit_y_called
-        ), "You will need to first call preprocessor.fit_y() before calling preprocessor.transform_label_for_metric."
-        assert (
-            self._label_column in df.columns
-        ), f"Label {self._label_column} is not in the data. Cannot perform evaluation without ground truth labels."
+        assert self._fit_called or self._fit_y_called, (
+            "You will need to first call preprocessor.fit_y() before calling preprocessor.transform_label_for_metric."
+        )
+        assert self._label_column in df.columns, (
+            f"Label {self._label_column} is not in the data. Cannot perform evaluation without ground truth labels."
+        )
         y_df = df[self._label_column]
         if self.label_type == CATEGORICAL:
             # need to encode to integer labels
@@ -861,9 +861,9 @@ class MultiModalFeaturePreprocessor(TransformerMixin, BaseEstimator):
         -------
         Predicted labels ready to compute metric scores.
         """
-        assert (
-            self._fit_called or self._fit_y_called
-        ), "You will need to first call preprocessor.fit_y() before calling preprocessor.transform_prediction."
+        assert self._fit_called or self._fit_y_called, (
+            "You will need to first call preprocessor.fit_y() before calling preprocessor.transform_prediction."
+        )
 
         if self.label_type == CATEGORICAL:
             assert y_pred.shape[1] >= 2
