@@ -25,7 +25,13 @@ def balanced_accuracy(solution, prediction):
 
     if y_type == "binary":
         # Do not transform into any multiclass representation
-        pass
+        unique_sol = np.unique(solution)
+        unique_pred = np.unique(prediction)
+        classes = np.unique(np.concatenate((unique_sol, unique_pred)))
+        if set(classes) != {0, 1}:
+            pos_class = classes[-1]
+            solution = np.array([1 if i == pos_class else 0 for i in solution])
+            prediction = np.array([1 if i == pos_class else 0 for i in prediction])
 
     elif y_type == "multiclass":
         n = len(solution)
