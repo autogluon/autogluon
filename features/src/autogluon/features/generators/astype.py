@@ -68,7 +68,7 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
             self._use_fast_bool_method = "auto"
         else:
             raise ValueError(
-                f"Unknown `convert_bool_method` value: {convert_bool_method}. " f'Valid values: ["v1", "v2", "auto"]'
+                f'Unknown `convert_bool_method` value: {convert_bool_method}. Valid values: ["v1", "v2", "auto"]'
             )
         self._bool_features_list = None
         self._non_bool_features_list = None

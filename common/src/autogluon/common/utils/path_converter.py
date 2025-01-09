@@ -16,9 +16,9 @@ class PathConverter:
 
     @staticmethod
     def _validate_path(path: str):
-        assert not PathConverter._is_absolute(
-            path
-        ), "It is ambiguous on how to convert an absolute path. Please provide a relative path instead"
+        assert not PathConverter._is_absolute(path), (
+            "It is ambiguous on how to convert an absolute path. Please provide a relative path instead"
+        )
 
     @staticmethod
     def to_windows(path: str) -> str:

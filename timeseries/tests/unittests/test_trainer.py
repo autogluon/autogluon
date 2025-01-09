@@ -616,7 +616,7 @@ def test_when_add_ci_to_feature_importance_called_then_confidence_bands_correct(
     )
 
     feature_importance = trainer._add_ci_to_feature_importance(feature_importance, confidence_level)
-    lower_ci_name, upper_ci_name = [f"p{confidence_level*100:.0f}_{k}" for k in ["low", "high"]]
+    lower_ci_name, upper_ci_name = [f"p{confidence_level * 100:.0f}_{k}" for k in ["low", "high"]]
     assert lower_ci_name in feature_importance.columns
     assert upper_ci_name in feature_importance.columns
 
