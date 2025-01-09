@@ -6,7 +6,7 @@ import torch
 from autogluon.timeseries.models.chronos.pipeline import BaseChronosPipeline
 from autogluon.timeseries.models.chronos.pipeline.chronos_bolt import InstanceNorm, Patch
 
-from ..conftest import CHRONOS_BOLT_TEST_MODEL_PATH
+from ..test_model import CHRONOS_BOLT_MODEL_PATH
 
 
 def validate_tensor(input: torch.Tensor, shape: Tuple[int, ...]) -> None:
@@ -18,7 +18,7 @@ def validate_tensor(input: torch.Tensor, shape: Tuple[int, ...]) -> None:
 def pipeline(request):
     """Fixture to create a Chronos-Bolt pipeline with a given torch dtype"""
     return BaseChronosPipeline.from_pretrained(
-        CHRONOS_BOLT_TEST_MODEL_PATH,
+        CHRONOS_BOLT_MODEL_PATH,
         device_map="cpu",
         torch_dtype=request.param,
     )

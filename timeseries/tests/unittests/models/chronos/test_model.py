@@ -17,8 +17,9 @@ from ...common import (
     get_data_frame_with_item_index,
     get_data_frame_with_variable_lengths,
 )
-from .conftest import CHRONOS_BOLT_TEST_MODEL_PATH
 
+CHRONOS_BOLT_MODEL_PATH = "autogluon/chronos-bolt-tiny"
+CHRONOS_CLASSIC_MODEL_PATH = "autogluon/chronos-t5-tiny"
 DATASETS = [DUMMY_TS_DATAFRAME, DATAFRAME_WITH_STATIC, DATAFRAME_WITH_COVARIATES]
 GPU_AVAILABLE = torch.cuda.is_available()
 HYPERPARAMETER_DICTS = [
@@ -43,29 +44,35 @@ HYPERPARAMETER_DICTS = [
 ]
 
 
-def chronos_bolt_model(*args, hyperparameters=None, **kwargs):
-    hyperparameters = copy.deepcopy(hyperparameters or {})
-    hyperparameters |= {"model_path": CHRONOS_BOLT_TEST_MODEL_PATH}
-    kwargs["hyperparameters"] = hyperparameters
-    return ChronosModel(*args, **kwargs)
+def chronos_model_factory(model_path, hyperparameters=None):
+    def get_model(*args, hyperparameters=hyperparameters, **kwargs):
+        hyperparameters = copy.deepcopy(hyperparameters or {})
+        hyperparameters |= {"model_path": model_path}
+        kwargs["hyperparameters"] = hyperparameters
+        return ChronosModel(*args, **kwargs)
+
+    return get_model
 
 
-def chronos_with_finetuning(*args, hyperparameters=None, **kwargs):
-    hyperparameters = copy.deepcopy(hyperparameters or {})
-    hyperparameters |= {"fine_tune": True, "fine_tune_steps": 10}
-    kwargs["hyperparameters"] = hyperparameters
-    return ChronosModel(*args, **kwargs)
+ZERO_SHOT_MODELS = [
+    chronos_model_factory(model_path=CHRONOS_CLASSIC_MODEL_PATH),
+    chronos_model_factory(model_path=CHRONOS_BOLT_MODEL_PATH),
+]
+TESTABLE_MODELS = [
+    chronos_model_factory(model_path=CHRONOS_CLASSIC_MODEL_PATH),
+    chronos_model_factory(model_path=CHRONOS_BOLT_MODEL_PATH),
+    chronos_model_factory(
+        model_path=CHRONOS_CLASSIC_MODEL_PATH, hyperparameters={"fine_tune": True, "fine_tune_steps": 10}
+    ),
+    chronos_model_factory(
+        model_path=CHRONOS_BOLT_MODEL_PATH, hyperparameters={"fine_tune": True, "fine_tune_steps": 10}
+    ),
+]
 
 
-def chronos_bolt_model_with_finetuning(*args, hyperparameters=None, **kwargs):
-    hyperparameters = copy.deepcopy(hyperparameters or {})
-    hyperparameters |= {"model_path": CHRONOS_BOLT_TEST_MODEL_PATH, "fine_tune": True, "fine_tune_steps": 10}
-    kwargs["hyperparameters"] = hyperparameters
-    return ChronosModel(*args, **kwargs)
-
-
-ZERO_SHOT_MODELS = [ChronosModel, chronos_bolt_model]
-TESTABLE_MODELS = [ChronosModel, chronos_with_finetuning, chronos_bolt_model, chronos_bolt_model_with_finetuning]
+@pytest.fixture(scope="module", params=["bolt", "classic"])
+def chronos_model_path(request):
+    return CHRONOS_CLASSIC_MODEL_PATH if request.param == "classic" else CHRONOS_BOLT_MODEL_PATH
 
 
 @pytest.fixture(
@@ -88,7 +95,7 @@ def default_chronos_tiny_model(request, chronos_model_path) -> ChronosModel:
 @pytest.fixture(scope="module", params=HYPERPARAMETER_DICTS)
 def default_chronos_tiny_model_gpu(request, chronos_model_path) -> Optional[ChronosModel]:
     if not GPU_AVAILABLE:
-        return None
+        pytest.skip(reason="GPU not available")
 
     model = ChronosModel(
         hyperparameters={
@@ -134,7 +141,6 @@ def test_given_nan_features_when_on_cpu_then_chronos_model_inferences_not_nan(de
     assert not any(predictions["mean"].isna())
 
 
-@pytest.mark.skipif(not GPU_AVAILABLE, reason="Requires GPU")
 @pytest.mark.parametrize("data", DATASETS)
 def test_when_on_gpu_then_chronos_model_can_score_and_cache_oof(data, default_chronos_tiny_model_gpu):
     default_chronos_tiny_model_gpu.fit(train_data=data)
@@ -142,7 +148,6 @@ def test_when_on_gpu_then_chronos_model_can_score_and_cache_oof(data, default_ch
     assert default_chronos_tiny_model_gpu._oof_predictions is not None
 
 
-@pytest.mark.skipif(not GPU_AVAILABLE, reason="Requires GPU")
 @pytest.mark.parametrize("data", DATASETS)
 def test_when_on_gpu_then_chronos_model_can_infer(data, default_chronos_tiny_model_gpu):
     default_chronos_tiny_model_gpu.fit(train_data=data)
@@ -151,7 +156,6 @@ def test_when_on_gpu_then_chronos_model_can_infer(data, default_chronos_tiny_mod
     assert all(predictions.item_ids == data.item_ids)
 
 
-@pytest.mark.skipif(not GPU_AVAILABLE, reason="Requires GPU")
 def test_given_nan_features_when_on_gpu_then_chronos_model_inferences_not_nan(default_chronos_tiny_model_gpu):
     data = get_data_frame_with_variable_lengths({"A": 20, "B": 12}, covariates_names=["cov1", "cov2", "cov3"])
     data[["cov1", "cov2", "cov3"]] = np.nan
@@ -191,7 +195,6 @@ def test_when_cpu_models_saved_then_models_can_be_loaded_and_inferred(data, defa
     assert all(predictions.item_ids == data.item_ids)
 
 
-@pytest.mark.skipif(not GPU_AVAILABLE, reason="Requires GPU")
 @pytest.mark.parametrize("data", DATASETS)
 def test_when_gpu_models_saved_then_models_can_be_loaded_and_inferred(data, default_chronos_tiny_model_gpu):
     default_chronos_tiny_model_gpu.fit(train_data=data)
