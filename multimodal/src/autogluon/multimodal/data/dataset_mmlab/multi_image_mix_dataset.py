@@ -290,7 +290,7 @@ class Mosaic(BaseTransform):
         prob: float = 1.0,
     ) -> None:
         assert isinstance(img_scale, tuple)
-        assert 0 <= prob <= 1.0, "The probability should be in range [0,1]. " f"got {prob}."
+        assert 0 <= prob <= 1.0, f"The probability should be in range [0,1]. got {prob}."
 
         log_img_scale(img_scale, skip_square=True, shape_order="wh")
         self.img_scale = img_scale

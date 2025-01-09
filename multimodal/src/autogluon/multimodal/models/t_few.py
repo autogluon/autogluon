@@ -199,9 +199,9 @@ class TFewModel(nn.Module):
                 .to(text_token_ids)
             )
 
-        assert (
-            choices_ids.size(1) == self.num_classes
-        ), f"Number of target choices is different from number of classes, but they must be the same. Please check template."
+        assert choices_ids.size(1) == self.num_classes, (
+            f"Number of target choices is different from number of classes, but they must be the same. Please check template."
+        )
 
         bs = text_token_ids.size(0)
         # TODO(?) Currently does not support mixed-task batching, but can be added by adjusting the label_templates dict.
