@@ -739,7 +739,7 @@ class ObjectDetectionLearner(BaseLearner):
         result_path = os.path.join(self._save_path, "result.txt")
 
         pred_df = convert_result_df(
-            pred=convert_pred_to_xywh(pred) if self._model.output_bbox_format == XYWH else pred,
+            predictions=convert_pred_to_xywh(pred) if self._model.output_bbox_format == XYWH else pred,
             data=data_df,
             detection_classes=self.classes,
             result_path=result_path,
@@ -754,7 +754,7 @@ class ObjectDetectionLearner(BaseLearner):
                 result_path = os.path.join(self._save_path, "result.json")
                 save_result_coco_format(
                     data_path=data_path,
-                    pred=pred,
+                    predictions=pred,
                     category_ids=self.category_ids,
                     result_path=result_path,
                     coco_root=self._config.model.mmdet_image.coco_root,
