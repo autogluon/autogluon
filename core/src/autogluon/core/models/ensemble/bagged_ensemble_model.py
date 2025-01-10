@@ -1428,6 +1428,7 @@ class BaggedEnsembleModel(AbstractModel):
         fit_kwargs["num_classes"] = self.num_classes
         fit_kwargs["sample_weight"] = kwargs.get("sample_weight", None)
         fit_kwargs["sample_weight_val"] = kwargs.get("sample_weight_val", None)
+        fit_kwargs["verbosity"] = kwargs.get("verbosity", 2)
         fit_kwargs.pop("time_limit", None)  # time_limit already set in hpo_executor
         train_fn_kwargs = dict(
             model_cls=model_cls,
