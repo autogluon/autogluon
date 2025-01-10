@@ -12,7 +12,7 @@ from typing import Any, List, Optional, Tuple, Type, Union
 
 import pandas as pd
 from joblib.parallel import Parallel, delayed
-from pandas.core.internals import ArrayManager, BlockManager
+from pandas.core.internals import ArrayManager, BlockManager  # type: ignore
 
 from autogluon.common.loaders import load_pd
 
@@ -174,7 +174,7 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
             data = self._construct_tsdf_from_iterable_dataset(data, num_cpus=num_cpus)
         else:
             raise ValueError(f"data must be a pd.DataFrame, Iterable, string or Path (received {type(data)}).")
-        super().__init__(data=data, *args, **kwargs)
+        super().__init__(data=data, *args, **kwargs)  # type: ignore
         self._static_features: Optional[pd.DataFrame] = None
         if static_features is not None:
             self.static_features = self._construct_static_features(static_features, id_column=id_column)
@@ -419,10 +419,7 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
     def item_ids(self) -> pd.Index:
         return self.index.unique(level=ITEMID)
 
-    @property
-    def static_features(self):
-        return self._static_features
-
+    @classmethod
     def _construct_static_features(
         cls,
         static_features: Union[pd.DataFrame, str, Path],
@@ -442,6 +439,10 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
                 static_features.rename(columns={ITEMID: "__" + ITEMID}, inplace=True)
             static_features.rename(columns={id_column: ITEMID}, inplace=True)
         return static_features
+
+    @property
+    def static_features(self):
+        return self._static_features
 
     @static_features.setter
     def static_features(self, value: Optional[pd.DataFrame]):
