@@ -8,7 +8,7 @@ import random
 import time
 import warnings
 from copy import deepcopy
-from typing import Dict, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, Union
 
 import numpy as np
 import pandas as pd
