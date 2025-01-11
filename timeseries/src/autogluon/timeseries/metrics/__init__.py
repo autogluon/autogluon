@@ -50,28 +50,28 @@ EXPERIMENTAL_METRICS = {
 def check_get_evaluation_metric(
     eval_metric: Union[str, TimeSeriesScorer, Type[TimeSeriesScorer], None] = None
 ) -> TimeSeriesScorer:
+    scorer: TimeSeriesScorer
     if isinstance(eval_metric, TimeSeriesScorer):
-        eval_metric = eval_metric
+        scorer = eval_metric
     elif isinstance(eval_metric, type) and issubclass(eval_metric, TimeSeriesScorer):
         # e.g., user passed `eval_metric=CustomMetric` instead of `eval_metric=CustomMetric()`
-        eval_metric = eval_metric()
+        scorer = eval_metric()
     elif isinstance(eval_metric, str):
-        eval_metric = DEPRECATED_METRICS.get(eval_metric, eval_metric)
-        metric_name = eval_metric.upper()
+        metric_name = DEPRECATED_METRICS.get(eval_metric, eval_metric).upper()
         if metric_name in AVAILABLE_METRICS:
-            eval_metric = AVAILABLE_METRICS[metric_name]()
+            scorer = AVAILABLE_METRICS[metric_name]()
         elif metric_name in EXPERIMENTAL_METRICS:
-            eval_metric = EXPERIMENTAL_METRICS[metric_name]()
+            scorer = EXPERIMENTAL_METRICS[metric_name]()
         else:
             raise ValueError(
                 f"Time series metric {eval_metric} not supported. Available metrics are:\n"
                 f"{pformat(sorted(AVAILABLE_METRICS.keys()))}"
             )
     elif eval_metric is None:
-        eval_metric = AVAILABLE_METRICS[DEFAULT_METRIC_NAME]()
+        scorer = AVAILABLE_METRICS[DEFAULT_METRIC_NAME]()
     else:
         raise ValueError(
             f"eval_metric must be of type str, TimeSeriesScorer or None "
             f"(received eval_metric = {eval_metric} of type {type(eval_metric)})"
         )
-    return eval_metric
+    return scorer

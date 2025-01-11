@@ -20,7 +20,7 @@ class AbstractTimeSeriesEnsembleModel(AbstractTimeSeriesModel):
         self,
         predictions_per_window: Dict[str, List[TimeSeriesDataFrame]],
         data_per_window: List[TimeSeriesDataFrame],
-        time_limit: Optional[int] = None,
+        time_limit: Optional[float] = None,
         **kwargs,
     ):
         """Fit ensemble model given predictions of candidate base models and the true data.
@@ -67,7 +67,7 @@ class AbstractTimeSeriesEnsembleModel(AbstractTimeSeriesModel):
         """
         raise NotImplementedError
 
-    def predict(self, data: Dict[str, TimeSeriesDataFrame], **kwargs) -> TimeSeriesDataFrame:
+    def predict(self, data: Dict[str, Optional[TimeSeriesDataFrame]], **kwargs) -> TimeSeriesDataFrame:
         raise NotImplementedError
 
     def remap_base_models(self, model_refit_map: Dict[str, str]) -> None:

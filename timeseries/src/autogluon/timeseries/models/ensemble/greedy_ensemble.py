@@ -143,7 +143,7 @@ class TimeSeriesGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
     def model_weights(self) -> np.ndarray:
         return np.array(list(self.model_to_weight.values()), dtype=np.float64)
 
-    def predict(self, data: Dict[str, TimeSeriesDataFrame], **kwargs) -> TimeSeriesDataFrame:
+    def predict(self, data: Dict[str, Optional[TimeSeriesDataFrame]], **kwargs) -> TimeSeriesDataFrame:
         if set(data.keys()) != set(self.model_names):
             raise ValueError(
                 f"Set of models given for prediction in {self.name} differ from those provided during initialization."
