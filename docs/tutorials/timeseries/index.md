@@ -7,7 +7,7 @@ and does not require you to manually deal with cumbersome issues like model sele
 Under the hood, AutoGluon combines various state of the art forecasting algorithms.
 These include established statical methods like ETS and ARIMA from
 [`StatsForecast`](https://github.com/Nixtla/statsforecast),
-efficient tree-based forecasters like LightGBM based on [AutoGluon-Tabular](https://auto.gluon.ai/stable/tutorials/tabular/index.html), flexible deep learning models like DeepAR and Temporal Fusion Transformer from [GluonTS](https://ts.gluon.ai/), and a pretrained zero-shot forecasting model, [Chronos](https://github.com/amazon-science/chronos-forecasting). 
+efficient tree-based forecasters like LightGBM based on [AutoGluon-Tabular](https://auto.gluon.ai/stable/tutorials/tabular/index.html), flexible deep learning models like DeepAR and Temporal Fusion Transformer from [GluonTS](https://ts.gluon.ai/), and a pretrained zero-shot forecasting model, [Chronos](https://github.com/amazon-science/chronos-forecasting).
 
 Check out the [Quick Start Tutorial](forecasting-quick-start.ipynb) to learn how to make accurate forecasts in just 3 lines of code using AutoGluon.
 
@@ -44,11 +44,18 @@ Check out the [Quick Start Tutorial](forecasting-quick-start.ipynb) to learn how
   Evaluation metrics available in AutoGluon-TimeSeries.
 :::
 
+:::{grid-item-card} Custom Models
+  :link: advanced/forecasting-custom-model.html
+
+  How to add a custom time series forecasting model to AutoGluon.
+:::
+
 ::::
+
 
 ```{toctree}
 ---
-maxdepth: 1
+maxdepth: 2
 hidden: true
 ---
 
@@ -57,4 +64,5 @@ In Depth <forecasting-indepth>
 Forecasting with Chronos <forecasting-chronos>
 Model Zoo <forecasting-model-zoo>
 Metrics <forecasting-metrics>
+Advanced <advanced/index>
 ```

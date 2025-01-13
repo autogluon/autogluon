@@ -460,7 +460,7 @@ class FeatureMetadata:
                 features = str(val)
             if val:
                 message = (
-                    f'{log_prefix}{key}{" " * max_key_minus_cur} : {" " * max_val_minus_cur}{len(val)} | {features}'
+                    f"{log_prefix}{key}{' ' * max_key_minus_cur} : {' ' * max_val_minus_cur}{len(val)} | {features}"
                 )
                 if return_str:
                     output_str += message + "\n"

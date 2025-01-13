@@ -1793,6 +1793,7 @@ class AbstractModel:
         fit_kwargs["num_classes"] = self.num_classes
         fit_kwargs["sample_weight"] = kwargs.get("sample_weight", None)
         fit_kwargs["sample_weight_val"] = kwargs.get("sample_weight_val", None)
+        fit_kwargs["verbosity"] = kwargs.get("verbosity", 2)
         train_fn_kwargs = dict(
             model_cls=model_cls,
             init_params=init_params,

@@ -18,7 +18,7 @@ from autogluon.common.utils.distribute_utils import DistributedContext
 from autogluon.common.utils.log_utils import DuplicateFilter
 from autogluon.common.utils.try_import import try_import_ray
 
-from ...constants import MULTICLASS, QUANTILE, REFIT_FULL_SUFFIX, REGRESSION, SOFTCLASS
+from ...constants import BINARY, MULTICLASS, QUANTILE, REFIT_FULL_SUFFIX, REGRESSION, SOFTCLASS
 from ...hpo.exceptions import EmptySearchSpace
 from ...pseudolabeling.pseudolabeling import assert_pseudo_column_match
 from ...utils.exceptions import TimeLimitExceeded
@@ -106,6 +106,9 @@ class BaggedEnsembleModel(AbstractModel):
             # 'refit_folds': False,  # [Advanced, Experimental] Whether to refit bags immediately to a refit_full model in a single .fit call.
             # 'num_folds' None,  # Number of bagged folds per set. If specified, overrides .fit `k_fold` value.
             # 'max_sets': None,  # Maximum bagged repeats to allow, if specified, will set `self.can_fit()` to `self._n_repeats_finished < max_repeats`
+            "stratify": "auto",
+            "bin": "auto",
+            "n_bins": None,
         }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
@@ -125,11 +128,32 @@ class BaggedEnsembleModel(AbstractModel):
     def can_infer(self):
         return self.is_fit() and self.params.get("save_bag_folds", True)
 
-    def is_stratified(self):
-        if self.problem_type in [REGRESSION, QUANTILE, SOFTCLASS]:
-            return False
+    def is_stratified(self) -> bool:
+        """
+        Returns whether to stratify on the label during KFold splits
+        """
+        stratify = self.params.get("stratify", "auto")
+        if isinstance(stratify, str) and stratify == "auto":
+            return self.problem_type in [
+                BINARY,
+                MULTICLASS,
+
+                # Commented out due to inconclusive results on whether this is helpful when combined with binning
+                # REGRESSION,
+                # QUANTILE,
+            ]
         else:
-            return True
+            return stratify
+
+    def is_binned(self) -> bool:
+        """
+        Returns whether to bin the label during stratified KFold splits
+        """
+        bin = self.params.get("bin", "auto")
+        if isinstance(bin, str) and bin == "auto":
+            return self.problem_type in [REGRESSION, QUANTILE]
+        else:
+            return bin
 
     def is_fit(self) -> bool:
         return self.n_children != 0
@@ -188,24 +212,32 @@ class BaggedEnsembleModel(AbstractModel):
         else:
             return X
 
-    def _get_cv_splitter(self, n_splits, n_repeats, groups=None):
-        return CVSplitter(n_splits=n_splits, n_repeats=n_repeats, groups=groups, stratified=self.is_stratified(), random_state=self._random_state)
+    def _get_cv_splitter(self, n_splits: int, n_repeats: int, groups=None) -> CVSplitter:
+        return CVSplitter(
+            n_splits=n_splits,
+            n_repeats=n_repeats,
+            groups=groups,
+            stratify=self.is_stratified(),
+            bin=self.is_binned(),
+            n_bins=self.params.get("n_bins", None),
+            random_state=self._random_state,
+        )
 
     def _fit(
         self,
-        X,
-        y,
-        X_val=None,
-        y_val=None,
-        X_pseudo=None,
-        y_pseudo=None,
-        k_fold=None,
-        k_fold_start=0,
-        k_fold_end=None,
-        n_repeats=1,
-        n_repeat_start=0,
-        groups=None,
-        _skip_oof=False,
+        X: pd.DataFrame,
+        y: pd.Series,
+        X_val: pd.DataFrame = None,
+        y_val: pd.Series = None,
+        X_pseudo: pd.DataFrame = None,
+        y_pseudo: pd.Series = None,
+        k_fold: int = None,
+        k_fold_start: int = 0,
+        k_fold_end: int = None,
+        n_repeats: int = 1,
+        n_repeat_start: int = 0,
+        groups: pd.Series = None,
+        _skip_oof: bool = False,
         **kwargs,
     ):
         use_child_oof = self.params.get("use_child_oof", False)
@@ -223,8 +255,6 @@ class BaggedEnsembleModel(AbstractModel):
             k_fold, k_fold_end = self._update_k_fold(k_fold=k_fold, k_fold_end=k_fold_end)
         if k_fold is None and groups is None:
             k_fold = 5
-        if k_fold is not None and k_fold < 1:
-            k_fold = 1
         if k_fold is None or k_fold > 1:
             k_fold = self._get_cv_splitter(n_splits=k_fold, n_repeats=n_repeats, groups=groups).n_splits
         max_sets = self._get_model_params().get("max_sets", None)
@@ -238,6 +268,7 @@ class BaggedEnsembleModel(AbstractModel):
             n_repeats=n_repeats,
             n_repeat_start=n_repeat_start,
             groups=groups,
+            use_child_oof=use_child_oof,
         )
         if k_fold_end is None:
             k_fold_end = k_fold
@@ -327,7 +358,7 @@ class BaggedEnsembleModel(AbstractModel):
             else:
                 return self
 
-    def _update_k_fold(self, k_fold, k_fold_end=None, verbose=True):
+    def _update_k_fold(self, k_fold: int, k_fold_end: int = None, verbose: bool = True) -> tuple[int, int]:
         """Update k_fold and k_fold_end in case num_folds was specified"""
         k_fold_override = self.params.get("num_folds", None)
         if k_fold_override is not None:
@@ -343,7 +374,17 @@ class BaggedEnsembleModel(AbstractModel):
         assert self.is_initialized(), "Model must be initialized before calling self._get_child_aux_val!"
         return self._params_aux_child.get(key, default)
 
-    def _validate_bag_kwargs(self, *, k_fold, k_fold_start, k_fold_end, n_repeats, n_repeat_start, groups):
+    def _validate_bag_kwargs(
+        self,
+        *,
+        k_fold: int,
+        k_fold_start: int,
+        k_fold_end: int,
+        n_repeats: int,
+        n_repeat_start: int,
+        groups: pd.Series | None,
+        use_child_oof: bool,
+    ):
         if groups is not None:
             if self._n_repeats_finished != 0:
                 raise AssertionError("Bagged models cannot call fit with `groups` specified when a full k-fold set has already been fit.")
@@ -356,7 +397,7 @@ class BaggedEnsembleModel(AbstractModel):
         if k_fold is None:
             raise ValueError("k_fold cannot be None.")
         if k_fold < 1:
-            raise ValueError(f"k_fold must be equal or greater than 1, value: ({k_fold})")
+            raise ValueError(f"k_fold must be equal or greater than 1, value: {k_fold}")
         if n_repeat_start != self._n_repeats_finished:
             raise ValueError(f"n_repeat_start must equal self._n_repeats_finished, values: ({n_repeat_start}, {self._n_repeats_finished})")
         if n_repeats <= n_repeat_start:
@@ -370,7 +411,26 @@ class BaggedEnsembleModel(AbstractModel):
             # TODO: Remove this limitation
             raise ValueError(f"k_fold_end must equal k_fold when (n_repeats - n_repeat_start) > 1, values: ({k_fold_end}, {k_fold})")
         if self._k is not None and self._k != k_fold:
-            raise ValueError(f"k_fold must equal previously fit k_fold value for the current n_repeat, values: (({k_fold}, {self._k})")
+            raise ValueError(f"k_fold must equal previously fit k_fold value for the current n_repeat, values: ({k_fold}, {self._k})")
+        if use_child_oof and not self._get_tags_child().get("valid_oof", False):
+            raise AssertionError(
+                f"`use_child_oof=True` was specified, "
+                f"but the model {self._child_type.__name__} does not support this option. (valid_oof=False)\n"
+                f"\tTo enable this logic, `{self._child_type.__name__}._predict_proba_oof` must be implemented "
+                f"and `tags['valid_oof'] = True` must be set in `{self._child_type.__name__}._more_tags`."
+            )
+        if k_fold == 1 and not use_child_oof and not self._get_tags().get("can_get_oof_from_train", False):
+            logger.log(
+                30,
+                f"\tWARNING: Fitting bagged model with `k_fold=1`, "
+                f"but this model doesn't support getting out-of-fold predictions from training data!\n"
+                f"\t\tThe model will be fit on 100% of the training data without any validation split.\n"
+                f"\t\tIt will then predict on the same data used to train for generating out-of-fold predictions. "
+                f"This will likely be EXTREMELY overfit and produce terrible results.\n"
+                f"\t\tWe strongly recommend not forcing bagged models to use `k_fold=1`. "
+                f"Instead, specify `use_child_oof=True` if the model supports this option."
+            )
+
 
     def predict_proba_children(
         self,
@@ -557,8 +617,9 @@ class BaggedEnsembleModel(AbstractModel):
                     logger.log(
                         30,
                         f"\tWARNING: Setting `self._oof_pred_proba` by predicting on train directly! "
-                        f"This is probably a bug and should be investigated...\n"
-                        f'\tIf this is intended, set the model tag "can_get_oof_from_train" to True '
+                        f"This is probably a bug or the user specified `num_folds=1` "
+                        f"as an `ag_args_ensemble` hyperparameter... Results may be very poor.\n"
+                        f'\t\tIf this is intended, set the model tag "can_get_oof_from_train" to True '
                         f"in `{self.__class__.__name__}._more_tags` to avoid this warning.",
                     )
                 self._oof_pred_proba = model_base.predict_proba(X=X)  # TODO: Cheater value, will be overfit to valid set
@@ -1428,6 +1489,7 @@ class BaggedEnsembleModel(AbstractModel):
         fit_kwargs["num_classes"] = self.num_classes
         fit_kwargs["sample_weight"] = kwargs.get("sample_weight", None)
         fit_kwargs["sample_weight_val"] = kwargs.get("sample_weight_val", None)
+        fit_kwargs["verbosity"] = kwargs.get("verbosity", 2)
         fit_kwargs.pop("time_limit", None)  # time_limit already set in hpo_executor
         train_fn_kwargs = dict(
             model_cls=model_cls,
