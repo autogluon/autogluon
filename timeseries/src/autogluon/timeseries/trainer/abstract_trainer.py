@@ -642,9 +642,9 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                     )
                 logger.info(fit_log_message)
                 with tqdm.external_write_mode():
-                    assert (
-                        hyperparameter_tune_kwargs is not None
-                    ), "`hyperparameter_tune_kwargs` must be provided if hyperparameters contain a search space"
+                    assert hyperparameter_tune_kwargs is not None, (
+                        "`hyperparameter_tune_kwargs` must be provided if hyperparameters contain a search space"
+                    )
                     model_names_trained += self.tune_model_hyperparameters(
                         model,
                         time_limit=time_left_for_model,
@@ -1043,9 +1043,9 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             "permutation": PermutationFeatureImportanceTransform,
             "naive": ConstantReplacementFeatureImportanceTransform,
         }.get(method)
-        assert (
-            importance_transform_type is not None
-        ), f"Invalid feature importance method {method}. Valid methods are 'permutation' and 'naive',"
+        assert importance_transform_type is not None, (
+            f"Invalid feature importance method {method}. Valid methods are 'permutation' and 'naive',"
+        )
 
         importance_transform = importance_transform_type(
             covariate_metadata=self.metadata,
