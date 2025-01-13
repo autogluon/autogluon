@@ -212,7 +212,7 @@ class SimpleAbstractTrainer:
         save_json.save(path=os.path.join(self.path, self.trainer_info_json_name), obj=info)
         return info
 
-    def get_model_best(self, *args, **kwargs) -> AbstractModel:
+    def get_model_best(self, *args, **kwargs) -> Union[str, AbstractModel]:
         raise NotImplementedError
 
     def get_info(self, include_model_info: bool = False) -> Dict[str, Any]:
@@ -400,7 +400,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         return levels
 
-    def get_model_best(self) -> str:
+    def get_model_best(self, *args, **kwargs) -> str:
         """Return the name of the best model by model performance on the validation set."""
         models = self.get_model_names()
         if not models:
@@ -1254,7 +1254,9 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             raise RuntimeError(f"Following models failed to predict: {failed_models}")
         if self.cache_predictions and use_cache:
             self._save_cached_pred_dicts(
-                dataset_hash, model_pred_dict=model_pred_dict, pred_time_dict=pred_time_dict_marginal
+                dataset_hash,  # type: ignore
+                model_pred_dict=model_pred_dict,
+                pred_time_dict=pred_time_dict_marginal,
             )
         pred_time_dict_total = self._get_total_pred_time_from_marginal(pred_time_dict_marginal)
 
