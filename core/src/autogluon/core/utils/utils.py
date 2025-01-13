@@ -46,11 +46,25 @@ class CVSplitter:
         stratify: bool = False,
         bin: bool = False,
         n_bins: int | None = None,
-        groups=None,
+        groups: pd.Series = None,
     ):
         """
+        Wrapper around splitter objects to perform KFold splits.
+        Supports regression stratification via the `bin` and `n_bins` argument.
+
         Parameters
         ----------
+        splitter_cls, default None
+            The class to use for splitting.
+            If None, will automatically be determined based off of `stratify`, `groups`, and `n_repeats`.
+        n_splits : int, default 5
+            The number of splits to perform.
+            Ignored if `groups` is specified.
+        n_repeats: int, default 1
+            The number of repeated splits to perform.
+            Ignored if `groups` is specified.
+        random_state : int, default 0
+            The seed to use when splitting the data.
         stratify : bool, default False
             If True, will stratify the splits on `y`.
         bin : bool, default False
@@ -59,6 +73,9 @@ class CVSplitter:
         n_bins : int, default None
             The number of bins to use when `bin` is True.
             If None, defaults to `np.floor(n_samples / n_splits)`.
+        groups : pd.Series, default None
+            If specified, splitter_cls will default to LeaveOneGroupOut.
+
         """
         self.n_splits = n_splits
         self.n_repeats = n_repeats
