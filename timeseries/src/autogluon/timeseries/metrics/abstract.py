@@ -1,4 +1,4 @@
-from typing import Optional, Tuple, Union, cast
+from typing import Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -161,7 +161,7 @@ class TimeSeriesScorer:
     @staticmethod
     def _safemean(array: Union[np.ndarray, pd.Series]) -> float:
         """Compute mean of a numpy array-like object, ignoring inf, -inf and nan values."""
-        return cast(float, np.mean(array[np.isfinite(array)]))
+        return float(np.mean(array[np.isfinite(array)]))
 
     @staticmethod
     def _get_point_forecast_score_inputs(

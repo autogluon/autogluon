@@ -5,7 +5,7 @@ import time
 import traceback
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Tuple, Type, Union, cast
+from typing import Any, Dict, List, Literal, Optional, Tuple, Type, Union
 
 import networkx as nx
 import numpy as np
@@ -212,7 +212,7 @@ class SimpleAbstractTrainer:
         save_json.save(path=os.path.join(self.path, self.trainer_info_json_name), obj=info)
         return info
 
-    def get_model_best(self, *args, **kwargs) -> Union[str, AbstractModel]:
+    def get_model_best(self, *args, **kwargs) -> str:
         raise NotImplementedError
 
     def get_info(self, include_model_info: bool = False) -> Dict[str, Any]:
@@ -763,7 +763,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         for window_idx, data in enumerate(data_per_window):
             predictions = ensemble.predict({n: model_preds[n][window_idx] for n in ensemble.model_names})
             score_per_fold.append(self._score_with_predictions(data, predictions))
-        ensemble.val_score = cast(float, np.mean(score_per_fold))
+        ensemble.val_score = float(np.mean(score_per_fold, dtype=np.float64))
 
         self._log_scores_and_times(
             val_score=ensemble.val_score,
@@ -817,12 +817,9 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 model_names=model_names,
                 data=past_data,
                 known_covariates=known_covariates,
-                record_pred_time=True,
                 raise_exception_if_failed=False,
                 use_cache=use_cache,
             )
-            assert isinstance(model_predictions, dict)
-            assert isinstance(pred_time_dict, dict)
 
             for model_name in model_names:
                 model_preds = model_predictions[model_name]
@@ -939,14 +936,13 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         **kwargs,
     ) -> TimeSeriesDataFrame:
         model_name = self._get_model_for_prediction(model)
-        model_pred_dict = self.get_model_pred_dict(
+        model_pred_dict, _ = self.get_model_pred_dict(
             model_names=[model_name],
             data=data,
             known_covariates=known_covariates,
             use_cache=use_cache,
             random_seed=random_seed,
         )
-        assert isinstance(model_pred_dict, dict)
         predictions = model_pred_dict[model_name]
         if predictions is None:
             raise ValueError(f"Model {model_name} failed to predict. Please check the model's logs.")
@@ -1187,13 +1183,10 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         model_names: List[str],
         data: TimeSeriesDataFrame,
         known_covariates: Optional[TimeSeriesDataFrame] = None,
-        record_pred_time: bool = False,
         raise_exception_if_failed: bool = True,
         use_cache: bool = True,
         random_seed: Optional[int] = None,
-    ) -> Union[
-        Dict[str, Optional[TimeSeriesDataFrame]], Tuple[Dict[str, Optional[TimeSeriesDataFrame]], Dict[str, float]]
-    ]:
+    ) -> Tuple[Dict[str, Optional[TimeSeriesDataFrame]], Dict[str, float]]:
         """Return a dictionary with predictions of all models for the given dataset.
 
         Parameters
@@ -1262,10 +1255,8 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         final_model_pred_dict = {model_name: model_pred_dict[model_name] for model_name in model_names}
         final_pred_time_dict_total = {model_name: pred_time_dict_total[model_name] for model_name in model_names}
-        if record_pred_time:
-            return final_model_pred_dict, final_pred_time_dict_total
-        else:
-            return final_model_pred_dict
+
+        return final_model_pred_dict, final_pred_time_dict_total
 
     def _get_total_pred_time_from_marginal(self, pred_time_dict_marginal: Dict[str, float]) -> Dict[str, float]:
         pred_time_dict_total = defaultdict(float)
