@@ -649,13 +649,13 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         preds_dataset = np.concatenate(preds_dataset, 0)
         return preds_dataset
 
-    def _generate_dataset(self, X: pd.DataFrame, y: pd.Series, train_params: dict = {}, is_train: bool = False) -> "TabularTorchDataset":
+    def _generate_dataset(self, X: pd.DataFrame | TabularTorchDataset, y: pd.Series, train_params: dict = {}, is_train: bool = False) -> TabularTorchDataset:
         """
         Generate TabularTorchDataset from X and y.
 
         Params:
         -------
-        X: pd.DataFrame
+        X: pd.DataFrame | TabularTorchDataset
             The X data.
         y: pd.Series
             The y data.
