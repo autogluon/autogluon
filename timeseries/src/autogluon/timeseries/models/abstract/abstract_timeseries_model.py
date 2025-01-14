@@ -138,7 +138,6 @@ class AbstractTimeSeriesModel(AbstractModel):
         self.target_scaler: Optional[LocalTargetScaler] = None
         self.covariate_scaler: Optional[CovariateScaler] = None
         self.covariate_regressor: Optional[CovariateRegressor] = None
-        assert self.fit_time is None
         self.fit_time: Optional[float]
 
     def __repr__(self) -> str:
