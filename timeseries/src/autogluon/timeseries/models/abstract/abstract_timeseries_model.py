@@ -3,7 +3,7 @@ import os
 import re
 import time
 from contextlib import nullcontext
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import pandas as pd
 
@@ -138,6 +138,7 @@ class AbstractTimeSeriesModel(AbstractModel):
         self.target_scaler: Optional[LocalTargetScaler] = None
         self.covariate_scaler: Optional[CovariateScaler] = None
         self.covariate_regressor: Optional[CovariateRegressor] = None
+        self.fit_time: Optional[float]
 
     def __repr__(self) -> str:
         return self.name
@@ -389,7 +390,7 @@ class AbstractTimeSeriesModel(AbstractModel):
 
     def predict(
         self,
-        data: Union[TimeSeriesDataFrame, Dict[str, TimeSeriesDataFrame]],
+        data: Union[TimeSeriesDataFrame, Dict[str, Optional[TimeSeriesDataFrame]]],
         known_covariates: Optional[TimeSeriesDataFrame] = None,
         **kwargs,
     ) -> TimeSeriesDataFrame:
@@ -402,7 +403,7 @@ class AbstractTimeSeriesModel(AbstractModel):
 
         Parameters
         ----------
-        data: Union[TimeSeriesDataFrame, Dict[str, TimeSeriesDataFrame]]
+        data: Union[TimeSeriesDataFrame, Dict[str, Optional[TimeSeriesDataFrame]]]
             The dataset where each time series is the "context" for predictions. For ensemble models that depend on
             the predictions of other models, this method may accept a dictionary of previous models' predictions.
         known_covariates : Optional[TimeSeriesDataFrame]
@@ -543,8 +544,12 @@ class AbstractTimeSeriesModel(AbstractModel):
         return False
 
     def hyperparameter_tune(
-        self, hyperparameter_tune_kwargs="auto", hpo_executor: HpoExecutor = None, time_limit: float = None, **kwargs
-    ):
+        self,
+        hyperparameter_tune_kwargs: Union[str, dict] = "auto",
+        hpo_executor: Optional[HpoExecutor] = None,
+        time_limit: Optional[float] = None,
+        **kwargs,
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         if hpo_executor is None:
             hpo_executor = self._get_default_hpo_executor()
             default_num_trials = kwargs.pop("default_num_trials", None)

@@ -492,16 +492,14 @@ def test_when_excluded_model_names_provided_then_excluded_models_are_not_trained
 @pytest.mark.parametrize("model_names", [["WeightedEnsemble"], ["WeightedEnsemble", "DeepAR"], ["DeepAR"]])
 def test_when_get_model_pred_dict_called_then_it_contains_all_required_keys(trained_trainers, model_names):
     trainer = trained_trainers[repr(TEST_HYPERPARAMETER_SETTINGS[1])]
-    model_pred_dict = trainer.get_model_pred_dict(model_names=model_names, data=DUMMY_TS_DATAFRAME)
+    model_pred_dict, _ = trainer.get_model_pred_dict(model_names=model_names, data=DUMMY_TS_DATAFRAME)
     assert sorted(model_pred_dict.keys()) == sorted(model_names)
 
 
 @pytest.mark.parametrize("model_names", [["WeightedEnsemble"], ["WeightedEnsemble", "DeepAR"], ["DeepAR"]])
 def test_when_get_model_pred_dict_called_then_pred_time_dict_contains_all_required_keys(trained_trainers, model_names):
     trainer = trained_trainers[repr(TEST_HYPERPARAMETER_SETTINGS[1])]
-    model_pred_dict, pred_time_dict = trainer.get_model_pred_dict(
-        model_names=model_names, data=DUMMY_TS_DATAFRAME, record_pred_time=True
-    )
+    _, pred_time_dict = trainer.get_model_pred_dict(model_names=model_names, data=DUMMY_TS_DATAFRAME)
     assert sorted(pred_time_dict.keys()) == sorted(model_names)
 
 
@@ -518,7 +516,7 @@ def test_given_cache_predictions_is_true_when_calling_get_model_pred_dict_then_p
     trainer = AutoTimeSeriesTrainer(path=temp_model_path)
     trainer.fit(DUMMY_TS_DATAFRAME, hyperparameters={"Naive": {}, "SeasonalNaive": {}})
     assert not trainer._cached_predictions_path.exists()
-    trainer.get_model_pred_dict(trainer.get_model_names(), data=DUMMY_TS_DATAFRAME, record_pred_time=True)
+    trainer.get_model_pred_dict(trainer.get_model_names(), data=DUMMY_TS_DATAFRAME)
 
     dataset_hash = trainer._compute_dataset_hash(DUMMY_TS_DATAFRAME)
     model_pred_dict, pred_time_dict = trainer._get_cached_pred_dicts(dataset_hash)

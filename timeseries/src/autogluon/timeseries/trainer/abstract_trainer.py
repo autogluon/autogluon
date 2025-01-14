@@ -66,7 +66,7 @@ class SimpleAbstractTrainer:
         """
         return self.get_model_names() + list(self._extra_banned_names)
 
-    def get_models_attribute_dict(self, attribute: str, models: List[str] = None) -> Dict[str, Any]:
+    def get_models_attribute_dict(self, attribute: str, models: Optional[List[str]] = None) -> Dict[str, Any]:
         """Get an attribute from the `model_graph` for each of the model names
         specified. If `models` is none, the attribute will be returned for all models"""
         results = {}
@@ -150,15 +150,15 @@ class SimpleAbstractTrainer:
         model_type: Optional[Type[AbstractModel]] = None,
     ) -> AbstractTimeSeriesModel:
         if isinstance(model_name, AbstractModel):
+            assert isinstance(model_name, AbstractTimeSeriesModel)
             return model_name
         if model_name in self.models.keys():
             return self.models[model_name]
 
-        if path is None:
-            path = self.get_model_attribute(model=model_name, attribute="path")
-        if model_type is None:
-            model_type = self.get_model_attribute(model=model_name, attribute="type")
-        return model_type.load(path=os.path.join(self.path, path), reset_paths=self.reset_paths)
+        path_ = path if path is not None else self.get_model_attribute(model=model_name, attribute="path")
+        type_ = model_type if model_type is not None else self.get_model_attribute(model=model_name, attribute="type")
+
+        return type_.load(path=os.path.join(self.path, path_), reset_paths=self.reset_paths)
 
     def construct_model_templates(self, hyperparameters: Union[str, Dict[str, Any]], **kwargs):
         raise NotImplementedError
@@ -177,7 +177,7 @@ class SimpleAbstractTrainer:
             minimum_model_set = [m for m in minimum_model_set if m != model]
         return minimum_model_set
 
-    def get_models_info(self, models: List[str] = None) -> Dict[str, Any]:
+    def get_models_info(self, models: Optional[List[str]] = None) -> Dict[str, Any]:
         if models is None:
             models = self.get_model_names()
         model_info_dict = dict()
@@ -212,7 +212,7 @@ class SimpleAbstractTrainer:
         save_json.save(path=os.path.join(self.path, self.trainer_info_json_name), obj=info)
         return info
 
-    def get_model_best(self, *args, **kwargs) -> AbstractModel:
+    def get_model_best(self, *args, **kwargs) -> str:
         raise NotImplementedError
 
     def get_info(self, include_model_info: bool = False) -> Dict[str, Any]:
@@ -254,7 +254,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
     def __init__(
         self,
         path: str,
-        prediction_length: Optional[int] = 1,
+        prediction_length: int = 1,
         eval_metric: Union[str, TimeSeriesScorer, None] = None,
         eval_metric_seasonal_period: Optional[int] = None,
         save_data: bool = True,
@@ -347,7 +347,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
     def _add_model(
         self,
         model: AbstractTimeSeriesModel,
-        base_models: List[str] = None,
+        base_models: Optional[List[str]] = None,
     ):
         """Add a model to the model graph of the trainer. If the model is an ensemble, also add
         information about dependencies to the model graph (list of models specified via ``base_models``).
@@ -400,7 +400,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         return levels
 
-    def get_model_best(self) -> str:
+    def get_model_best(self, *args, **kwargs) -> str:
         """Return the name of the best model by model performance on the validation set."""
         models = self.get_model_names()
         if not models:
@@ -642,6 +642,9 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                     )
                 logger.info(fit_log_message)
                 with tqdm.external_write_mode():
+                    assert hyperparameter_tune_kwargs is not None, (
+                        "`hyperparameter_tune_kwargs` must be provided if hyperparameters contain a search space"
+                    )
                     model_names_trained += self.tune_model_hyperparameters(
                         model,
                         time_limit=time_left_for_model,
@@ -760,7 +763,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         for window_idx, data in enumerate(data_per_window):
             predictions = ensemble.predict({n: model_preds[n][window_idx] for n in ensemble.model_names})
             score_per_fold.append(self._score_with_predictions(data, predictions))
-        ensemble.val_score = np.mean(score_per_fold)
+        ensemble.val_score = float(np.mean(score_per_fold, dtype=np.float64))
 
         self._log_scores_and_times(
             val_score=ensemble.val_score,
@@ -814,7 +817,6 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 model_names=model_names,
                 data=past_data,
                 known_covariates=known_covariates,
-                record_pred_time=True,
                 raise_exception_if_failed=False,
                 use_cache=use_cache,
             )
@@ -934,14 +936,17 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         **kwargs,
     ) -> TimeSeriesDataFrame:
         model_name = self._get_model_for_prediction(model)
-        model_pred_dict = self.get_model_pred_dict(
+        model_pred_dict, _ = self.get_model_pred_dict(
             model_names=[model_name],
             data=data,
             known_covariates=known_covariates,
             use_cache=use_cache,
             random_seed=random_seed,
         )
-        return model_pred_dict[model_name]
+        predictions = model_pred_dict[model_name]
+        if predictions is None:
+            raise ValueError(f"Model {model_name} failed to predict. Please check the model's logs.")
+        return predictions
 
     def _score_with_predictions(
         self,
@@ -981,10 +986,10 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             prediction_length=self.prediction_length, known_covariates_names=self.metadata.known_covariates
         )
         predictions = self.predict(data=past_data, known_covariates=known_covariates, model=model, use_cache=use_cache)
-        if not isinstance(metrics, list):  # a single metric is provided
-            metrics = [metrics]
+
+        metrics_ = [metrics] if not isinstance(metrics, list) else metrics
         scores_dict = {}
-        for metric in metrics:
+        for metric in metrics_:
             eval_metric = self.eval_metric if metric is None else check_get_evaluation_metric(metric)
             scores_dict[eval_metric.name] = self._score_with_predictions(
                 data=data, predictions=predictions, metric=eval_metric
@@ -1034,6 +1039,10 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             "permutation": PermutationFeatureImportanceTransform,
             "naive": ConstantReplacementFeatureImportanceTransform,
         }.get(method)
+        assert importance_transform_type is not None, (
+            f"Invalid feature importance method {method}. Valid methods are 'permutation' and 'naive',"
+        )
+
         importance_transform = importance_transform_type(
             covariate_metadata=self.metadata,
             prediction_length=self.prediction_length,
@@ -1050,7 +1059,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         for n in range(num_iterations):
             if subsample_size < data.num_items:
                 item_ids_sampled = data.item_ids.to_series().sample(subsample_size)  # noqa
-                data_sample = data.query("item_id in @item_ids_sampled")
+                data_sample: TimeSeriesDataFrame = data.query("item_id in @item_ids_sampled")  # type: ignore
             else:
                 data_sample = data
 
@@ -1094,7 +1103,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         return importance_df
 
-    def _model_uses_feature(self, model: Optional[Union[str, AbstractTimeSeriesModel]], feature: str) -> bool:
+    def _model_uses_feature(self, model: Union[str, AbstractTimeSeriesModel], feature: str) -> bool:
         """Check if the given model uses the given feature."""
         models_with_ancestors = set(self.get_minimum_model_set(model))
 
@@ -1138,7 +1147,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         self,
         model: Union[str, AbstractTimeSeriesModel],
         data: TimeSeriesDataFrame,
-        model_pred_dict: Dict[str, TimeSeriesDataFrame],
+        model_pred_dict: Dict[str, Optional[TimeSeriesDataFrame]],
         known_covariates: Optional[TimeSeriesDataFrame] = None,
     ) -> TimeSeriesDataFrame:
         """Generate predictions using the given model.
@@ -1147,15 +1156,15 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         """
         if isinstance(model, str):
             model = self.load_model(model)
-        data = self._get_inputs_to_model(model=model, data=data, model_pred_dict=model_pred_dict)
-        return model.predict(data, known_covariates=known_covariates)
+        model_inputs = self._get_inputs_to_model(model=model, data=data, model_pred_dict=model_pred_dict)
+        return model.predict(model_inputs, known_covariates=known_covariates)
 
     def _get_inputs_to_model(
         self,
-        model: str,
+        model: Union[str, AbstractTimeSeriesModel],
         data: TimeSeriesDataFrame,
-        model_pred_dict: Dict[str, TimeSeriesDataFrame],
-    ) -> Union[TimeSeriesDataFrame, Dict[str, TimeSeriesDataFrame]]:
+        model_pred_dict: Dict[str, Optional[TimeSeriesDataFrame]],
+    ) -> Union[TimeSeriesDataFrame, Dict[str, Optional[TimeSeriesDataFrame]]]:
         """Get the first argument that should be passed to model.predict.
 
         This method assumes that model_pred_dict contains the predictions of all base models, if model is an ensemble.
@@ -1174,11 +1183,10 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         model_names: List[str],
         data: TimeSeriesDataFrame,
         known_covariates: Optional[TimeSeriesDataFrame] = None,
-        record_pred_time: bool = False,
         raise_exception_if_failed: bool = True,
         use_cache: bool = True,
         random_seed: Optional[int] = None,
-    ) -> Union[Dict[str, TimeSeriesDataFrame], Tuple[Dict[str, TimeSeriesDataFrame], Dict[str, float]]]:
+    ) -> Tuple[Dict[str, Optional[TimeSeriesDataFrame]], Dict[str, float]]:
         """Return a dictionary with predictions of all models for the given dataset.
 
         Parameters
@@ -1204,14 +1212,14 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             model_pred_dict, pred_time_dict_marginal = self._get_cached_pred_dicts(dataset_hash)
         else:
             model_pred_dict = {}
-            pred_time_dict_marginal = {}
+            pred_time_dict_marginal: Dict[str, Any] = {}
 
         model_set = set()
         for model_name in model_names:
             model_set.update(self.get_minimum_model_set(model_name))
         if len(model_set) > 1:
             model_to_level = self._get_model_levels()
-            model_set = sorted(model_set, key=model_to_level.get)
+            model_set = sorted(model_set, key=model_to_level.get)  # type: ignore
         logger.debug(f"Prediction order: {model_set}")
 
         failed_models = []
@@ -1239,16 +1247,16 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             raise RuntimeError(f"Following models failed to predict: {failed_models}")
         if self.cache_predictions and use_cache:
             self._save_cached_pred_dicts(
-                dataset_hash, model_pred_dict=model_pred_dict, pred_time_dict=pred_time_dict_marginal
+                dataset_hash,  # type: ignore
+                model_pred_dict=model_pred_dict,
+                pred_time_dict=pred_time_dict_marginal,
             )
         pred_time_dict_total = self._get_total_pred_time_from_marginal(pred_time_dict_marginal)
 
         final_model_pred_dict = {model_name: model_pred_dict[model_name] for model_name in model_names}
         final_pred_time_dict_total = {model_name: pred_time_dict_total[model_name] for model_name in model_names}
-        if record_pred_time:
-            return final_model_pred_dict, final_pred_time_dict_total
-        else:
-            return final_model_pred_dict
+
+        return final_model_pred_dict, final_pred_time_dict_total
 
     def _get_total_pred_time_from_marginal(self, pred_time_dict_marginal: Dict[str, float]) -> Dict[str, float]:
         pred_time_dict_total = defaultdict(float)
@@ -1270,7 +1278,9 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         combined_hash = hash_pandas_df(data) + hash_pandas_df(known_covariates) + hash_pandas_df(data.static_features)
         return combined_hash
 
-    def _get_cached_pred_dicts(self, dataset_hash: str) -> Tuple[Dict[str, TimeSeriesDataFrame], Dict[str, float]]:
+    def _get_cached_pred_dicts(
+        self, dataset_hash: str
+    ) -> Tuple[Dict[str, Optional[TimeSeriesDataFrame]], Dict[str, float]]:
         """Load cached predictions for given dataset_hash from disk, if possible. Otherwise returns empty dicts."""
         if self._cached_predictions_path.exists():
             cached_predictions = load_pkl.load(str(self._cached_predictions_path))
@@ -1286,7 +1296,10 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         return {}, {}
 
     def _save_cached_pred_dicts(
-        self, dataset_hash: str, model_pred_dict: Dict[str, TimeSeriesDataFrame], pred_time_dict: Dict[str, float]
+        self,
+        dataset_hash: str,
+        model_pred_dict: Dict[str, Optional[TimeSeriesDataFrame]],
+        pred_time_dict: Dict[str, float],
     ) -> None:
         # TODO: Save separate file for each dataset if _cached_predictions file grows large?
         if self._cached_predictions_path.exists():
@@ -1315,7 +1328,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         self,
         train_data: Optional[TimeSeriesDataFrame] = None,
         val_data: Optional[TimeSeriesDataFrame] = None,
-        models: List[str] = None,
+        models: Optional[List[str]] = None,
     ) -> List[str]:
         train_data = train_data or self.load_train_data()
         val_data = val_data or self.load_val_data()
@@ -1325,7 +1338,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
             models = self.get_model_names()
 
         model_to_level = self._get_model_levels()
-        models_sorted_by_level = sorted(models, key=model_to_level.get)
+        models_sorted_by_level = sorted(models, key=model_to_level.get)  # type: ignore
 
         model_refit_map = {}
         models_trained_full = []
@@ -1392,7 +1405,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         return copy.deepcopy(self.model_refit_map)
 
     def construct_model_templates(
-        self, hyperparameters: Union[str, Dict[str, Any]], multi_window: bool = False, **kwargs
+        self, hyperparameters: Optional[Union[str, Dict[str, Any]]], multi_window: bool = False, **kwargs
     ) -> List[AbstractTimeSeriesModel]:
         """Constructs a list of unfit models based on the hyperparameters dict."""
         raise NotImplementedError
