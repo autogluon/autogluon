@@ -52,7 +52,8 @@ extras_require = {
         "fastai>=2.3.1,<2.8",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "tabpfn": [
-        "tabpfn>=0.1,<0.2",  # <{N+1} upper cap, where N is the latest released minor version
+        # versions below 0.1.11 are broken
+        "tabpfn>=0.1.11,<0.2",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "tabpfnmix": [
         "torch",  # version range defined in `core/_setup_utils.py`
