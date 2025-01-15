@@ -36,5 +36,6 @@ class SetupOutputDirTestCase(unittest.TestCase):
             mock_makedirs.assert_not_called()
             self.assertEqual(returned_path, path)
 
+
 if __name__ == "__main__":
     unittest.main()
