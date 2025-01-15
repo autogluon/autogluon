@@ -30,15 +30,13 @@ Code contributions via pull requests are much appreciated. Before sending us a p
 
 To send us a pull request, please:
 
-1. Fork the repository and clone the source code to your local machine.
+1. [Fork the repository](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/fork-a-repo) and [clone the source code to your local machine](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository).
 2. Modify the source (see details below); please focus on the specific change you are contributing. If you also reformat all the code, it will be hard for us to focus on your change.
-3. Ensure local tests pass.
-4. Commit to your fork using clear commit messages.
-5. Send us a pull request, answering any default questions in the pull request interface.
-6. Pay attention to any automated CI failures reported in the pull request, and stay involved in the conversation.
-7. (Optional) To spin up the platform tests, which test autogluon among MacOS and Windows, comment on the PR with `/platform_tests`(You would need write permission to AutoGluon repo). It is recommended to run the platform tests only after you have passed the default CI and only for changes that are likely to cause platform specific issues.
+3. Commit to your fork using clear commit messages.
+4. [Create a pull request](https://github.com/autogluon/autogluon/pulls) ([GitHub Docs](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request)), answering any default questions in the pull request interface.
+5. Pay attention to any automated continuous integration (CI) failures reported in the pull request, and stay involved in the conversation.
 
-GitHub provides additional document on [forking a repository](https://help.github.com/articles/fork-a-repo/) and
+GitHub provides additional documentation on [forking a repository](https://help.github.com/articles/fork-a-repo/) and
 [creating a pull request](https://help.github.com/articles/creating-a-pull-request/).
 
 
@@ -58,59 +56,34 @@ Be sure to select the *Source* option from the installation preferences.
 - (Optional) After you have edited the code, ensure your changes pass the unit tests via the below commands. Note that in practice we don't do this and instead submit the pull request so that our continuous integration on GitHub automatically runs the tests. This is because our unit tests require multiple hours of compute to complete, and thus it isn't practical to run all the tests on a local machine.
 ```
 # optional, not recommended to run all tests on local machine
-cd common/
-pytest
-cd ../core/
-pytest
-cd ../features/
-pytest
-cd ../tabular/
-pytest
-cd ../multimodal/
-pytest
-cd ../timeseries/
-pytest
+pytest common/tests
+pytest core/tests
+pytest features/tests
+pytest tabular/tests
+pytest multimodal/tests
+pytest timeseries/tests
 ```
 
-- Lint the code, so it adheres to our code style by running the below command. Note that our lint check for tabular, core, and multimodal modules are temporarily disabled.
+- Style check and import sort the code, so it adheres to our code style by running the below command. Note that our checks for tabular, core, and multimodal modules are temporarily disabled.
 
 ```
-# the below will check for changes that will occur if performing linting
+# the below will check for changes that will occur if performing style checks (safe to run)
 
-# black
-ruff format --diff "timeseries/"
-# isort
-ruff check --select I "timeseries/"
-
-# black
-ruff format --diff "common/"
-# isort
-ruff check --select I "common/"
-
-# black
-ruff format --diff "features/"
-# isort
-ruff check --select I "features/"
+# Check formatting and the order of imports
+for dir in "timeseries" "common" "features"; do
+  ruff format --diff $dir
+  ruff check --select I $dir
+done
 ```
 
 ```
-# the below will actively change files to satisfy linting
+# the below will actively change files to satisfy style checks
 # DO NOT run the below commands before running the above commands, as you risk introducing many unintended changes.
 
-# black
-ruff format "timeseries/"
-# isort
-ruff check --fix  --select I "timeseries/"
-
-# black
-ruff format "common/"
-# isort
-ruff check --fix  --select I "common/"
-
-# black
-ruff format "features/"
-# isort
-ruff check --fix --select I "features/"
+for dir in "timeseries" "common" "features"; do
+  ruff format $dir
+  ruff check --fix --select I $dir
+done
 ```
 
 - After linting, make sure to commit the linting changes, so it appears in your pull request.
@@ -130,7 +103,7 @@ python3 -m pytest path_to_file
 
 - Remember to update all existing examples/tutorials/documentation affected by your code changes.
 
-- We also encourage you to contribute new tutorials or example scripts using AutoGluon for applications you think other users will be interested in. Please see [`docs/tutorials/`](https://github.com/autogluon/autogluon/tree/master/docs/tutorials) or [`examples/`](https://github.com/autogluon/autogluon/tree/master/examples). All tutorials should be Jupyter notebooks (.ipynb) files.
+- We also encourage you to contribute new tutorials using AutoGluon for applications you think other users will be interested in. Please see [`docs/tutorials/`](https://github.com/autogluon/autogluon/tree/master/docs/tutorials). All tutorials should be Jupyter notebooks (.ipynb) files.
 
 - After you open your pull request, our CI system will run to check your code and report found errors. This may take a few hours. Please check back and fix any errors encountered at this stage (you can retrigger a new CI check by pushing updated code to the same PR in a new commit).
 
@@ -156,6 +129,26 @@ opensource-codeofconduct@amazon.com with any additional questions or comments.
 ## Security Issue Notifications
 If you discover a potential security issue in this project we ask that you notify AWS/Amazon Security via our [vulnerability reporting page](http://aws.amazon.com/security/vulnerability-reporting/). Please do **not** create a public GitHub issue for a security vulnerability.
 
+
+## Instructions for Project Maintainers
+
+The following instructions are for project maintainers with write access to the AutoGluon repository (those with permissions to merge PRs)
+
+### Platform Tests
+
+To spin up the platform tests, which test AutoGluon on Linux, MacOS, and Windows separately for each supported Python version, do the following:
+
+1. Ensure that the PR branch is originating from the `autogluon/autogluon` repository. It cannot originate from your own personal repository or else the platform tests will not trigger. This is for security reasons.
+2. Comment on the PR with `/platform_tests` ([Example](https://github.com/autogluon/autogluon/pull/4714#issuecomment-2522270778)) (requires write permissions in AutoGluon repo). It is recommended to run the platform tests only after you have passed the default CI and only for changes that are likely to cause platform specific issues.
+
+### Benchmarking
+
+To spin up automated benchmarking, do the following:
+
+1. Comment on the PR with `/benchmark module=tabular preset=tabular_best benchmark=tabular_full time_limit=1h` to benchmark the tabular module ([Example](https://github.com/autogluon/autogluon/pull/4714#issuecomment-2524696887)).
+2. Comment on the PR with `/benchmark module=multimodal preset=multimodal_best benchmark=automm-image time_limit=g4_12x` to benchmark the multimodal module ([Example](https://github.com/autogluon/autogluon/pull/4714#issuecomment-2524199294))
+
+Automated benchmarking should only be performed for changes that are likely to impact performance, as it is computationally intensive.
 
 ## Licensing
 
