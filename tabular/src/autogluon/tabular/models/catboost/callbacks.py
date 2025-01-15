@@ -43,7 +43,8 @@ class MemoryCheckCallback:
         """
         Checks if memory usage is unsafe. If so, signals the model to stop training early.
 
-        Args:
+        Parameters
+        ----------
             iter (int): Current training iteration.
 
         Returns:
