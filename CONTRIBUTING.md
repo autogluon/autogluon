@@ -26,7 +26,7 @@ Code contributions via pull requests are much appreciated. Before sending us a p
 
 1. You are working against the latest source on the *master* branch.
 2. You check existing open, and recently merged, pull requests to make sure someone else hasn't addressed the problem already.
-3. You open an issue to discuss any significant work before implementing it. Major new features, submodules, and model contributions need to fit into our overall design philosophy and our user's interests. We also need to evaluate if the contribution is worth the maintenance overhead.
+3. You open an issue to discuss any significant work before implementing it. Major new features, submodules, and model contributions need to fit into our overall design philosophy and our users' interests. We also need to evaluate if the contribution is worth the maintenance overhead.
 
 To send us a pull request, please:
 
