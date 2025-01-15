@@ -1,6 +1,7 @@
 import os.path
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from autogluon.common.utils.utils import setup_outputdir
@@ -28,6 +29,12 @@ class SetupOutputDirTestCase(unittest.TestCase):
         returned_path = setup_outputdir(path, warn_if_exist=True, create_dir=False, path_suffix=None)
         assert str(Path(returned_path)) == str(path)
 
+        # checks that setup_outputdir handles S3 paths correctly
+        with patch("os.makedirs") as mock_makedirs:  # Mock os.makedirs to ensure no local directory is created
+            path = "s3://test-bucket/test-folder"
+            returned_path = setup_outputdir(path, warn_if_exist=True, create_dir=False, path_suffix=None)
+            mock_makedirs.assert_not_called()
+            self.assertEqual(returned_path, path)
 
 if __name__ == "__main__":
     unittest.main()
