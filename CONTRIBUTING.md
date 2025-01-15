@@ -55,8 +55,9 @@ Be sure to select the *Source* option from the installation preferences.
 
 - All code should adhere to the [PEP8 style](https://www.python.org/dev/peps/pep-0008/).
 
-- (Optional) After you have edited the code, ensure your changes pass the unit tests via the below commands. Note that in practice we don't do this and instead sent the pull request so that our continuous integration on GitHub automatically runs the tests. This is because our unit tests require multiple hours of compute to complete, and thus it isn't practical to run all the tests on a local machine.
+- (Optional) After you have edited the code, ensure your changes pass the unit tests via the below commands. Note that in practice we don't do this and instead submit the pull request so that our continuous integration on GitHub automatically runs the tests. This is because our unit tests require multiple hours of compute to complete, and thus it isn't practical to run all the tests on a local machine.
 ```
+# optional, not recommended to run all tests on local machine
 cd common/
 pytest
 cd ../core/
