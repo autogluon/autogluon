@@ -48,7 +48,8 @@ class MemoryCheckCallback:
             iter: int
                 The current training iteration.
 
-        Returns:
+        Returns
+        -------
             bool: True if training should stop due to memory constraints, False otherwise.
         """
         available_bytes = ResourceManager.get_available_virtual_mem()
