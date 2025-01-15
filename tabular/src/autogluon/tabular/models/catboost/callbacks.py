@@ -45,7 +45,8 @@ class MemoryCheckCallback:
 
         Parameters
         ----------
-            iter (int): Current training iteration.
+            iter: int
+                The current training iteration.
 
         Returns:
             bool: True if training should stop due to memory constraints, False otherwise.
