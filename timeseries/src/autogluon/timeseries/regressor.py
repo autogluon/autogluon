@@ -119,6 +119,7 @@ class CovariateRegressor:
 
         if time_limit is not None:
             time_left = time_limit - (time.monotonic() - start_time)
+            assert self.model.predict_1_time is not None
             estimated_predict_time = self.model.predict_1_time * len(data)
             if estimated_predict_time > time_left:
                 logger.warning(
@@ -155,6 +156,7 @@ class CovariateRegressor:
 
     def _predict(self, data: TimeSeriesDataFrame, static_features: Optional[pd.DataFrame]) -> np.ndarray:
         """Construct the tabular features matrix and make predictions"""
+        assert self.model is not None, "CovariateRegressor must be fit before calling predict."
         tabular_df = self._get_tabular_df(data, static_features=static_features)
         return self.model.predict(X=tabular_df)
 

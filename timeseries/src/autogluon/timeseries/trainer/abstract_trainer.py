@@ -566,8 +566,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
     def _train_multi(
         self,
         train_data: TimeSeriesDataFrame,
-        hyperparameters: Optional[Union[str, Dict]] = None,
-        models: Optional[List[AbstractTimeSeriesModel]] = None,
+        hyperparameters: Union[str, Dict],
         val_data: Optional[TimeSeriesDataFrame] = None,
         hyperparameter_tune_kwargs: Optional[Union[str, dict]] = None,
         excluded_model_types: Optional[List[str]] = None,
@@ -577,11 +576,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         logger.info(f"\nStarting training. Start time is {time.strftime('%Y-%m-%d %H:%M:%S')}")
 
         time_start = time.time()
-        if hyperparameters is not None:
-            hyperparameters = copy.deepcopy(hyperparameters)
-        else:
-            if models is None:
-                raise ValueError("Either models or hyperparameters should be provided")
+        hyperparameters = copy.deepcopy(hyperparameters)
 
         if self.save_data and not self.is_data_saved:
             self.save_train_data(train_data)
@@ -589,14 +584,13 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
                 self.save_val_data(val_data)
             self.is_data_saved = True
 
-        if models is None:
-            models = self.construct_model_templates(
-                hyperparameters=hyperparameters,
-                hyperparameter_tune=hyperparameter_tune_kwargs is not None,  # TODO: remove hyperparameter_tune
-                freq=train_data.freq,
-                multi_window=self.val_splitter.num_val_windows > 0,
-                excluded_model_types=excluded_model_types,
-            )
+        models = self.construct_model_templates(
+            hyperparameters=hyperparameters,
+            hyperparameter_tune=hyperparameter_tune_kwargs is not None,  # TODO: remove hyperparameter_tune
+            freq=train_data.freq,
+            multi_window=self.val_splitter.num_val_windows > 0,
+            excluded_model_types=excluded_model_types,
+        )
 
         logger.info(f"Models that will be trained: {list(m.name for m in models)}")
 
@@ -1405,7 +1399,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
         return copy.deepcopy(self.model_refit_map)
 
     def construct_model_templates(
-        self, hyperparameters: Optional[Union[str, Dict[str, Any]]], multi_window: bool = False, **kwargs
+        self, hyperparameters: Union[str, Dict[str, Any]], multi_window: bool = False, **kwargs
     ) -> List[AbstractTimeSeriesModel]:
         """Constructs a list of unfit models based on the hyperparameters dict."""
         raise NotImplementedError

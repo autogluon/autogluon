@@ -71,7 +71,7 @@ class LocalStandardScaler(LocalTargetScaler):
 class LocalMeanAbsScaler(LocalTargetScaler):
     """Applies mean absolute scaling to each time series in the dataset."""
 
-    def _compute_loc_scale(self, target_series: pd.Series) -> Tuple[pd.Series, pd.Series]:
+    def _compute_loc_scale(self, target_series: pd.Series) -> Tuple[Optional[pd.Series], pd.Series]:
         scale = target_series.abs().groupby(level=ITEMID, sort=False).agg("mean")
         return None, scale
 

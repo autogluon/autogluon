@@ -752,8 +752,8 @@ class TimeSeriesPredictor(TimeSeriesPredictorDeprecatedMixin):
         time_left = None if time_limit is None else time_limit - (time.time() - time_start)
         self._learner.fit(
             train_data=train_data,
-            val_data=tuning_data,
             hyperparameters=hyperparameters,
+            val_data=tuning_data,
             hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
             excluded_model_types=excluded_model_types,
             time_limit=time_left,

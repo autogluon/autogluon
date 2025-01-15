@@ -82,9 +82,12 @@ class GlobalCovariateScaler(CovariateScaler):
                 data, columns=self.metadata.past_covariates_real
             )
         if self.use_static_features and len(self.metadata.static_features_real) > 0:
+            assert data.static_features is not None
             self._column_transformers["static"] = self._get_transformer_for_columns(
                 data.static_features, columns=self.metadata.static_features_real
             )
+
+        return self
 
     def fit_transform(self, data: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
         if not self.is_fit():
@@ -94,6 +97,8 @@ class GlobalCovariateScaler(CovariateScaler):
     def transform(self, data: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
         # Copy data to avoid inplace modification
         data = data.copy()
+        assert self._column_transformers is not None, "CovariateScaler must be fit before transform can be called"
+
         if "known" in self._column_transformers:
             columns = self.metadata.known_covariates_real
             data[columns] = self._column_transformers["known"].transform(data[columns])
@@ -104,6 +109,8 @@ class GlobalCovariateScaler(CovariateScaler):
 
         if "static" in self._column_transformers:
             columns = self.metadata.static_features_real
+            assert data.static_features is not None
+
             data.static_features[columns] = self._column_transformers["static"].transform(
                 data.static_features[columns]
             )
@@ -112,13 +119,17 @@ class GlobalCovariateScaler(CovariateScaler):
     def transform_known_covariates(
         self, known_covariates: Optional[TimeSeriesDataFrame] = None
     ) -> Optional[TimeSeriesDataFrame]:
+        assert self._column_transformers is not None, "CovariateScaler must be fit before transform can be called"
+
         if "known" in self._column_transformers:
             columns = self.metadata.known_covariates_real
+            assert known_covariates is not None
+
             known_covariates = known_covariates.copy()
             known_covariates[columns] = self._column_transformers["known"].transform(known_covariates[columns])
         return known_covariates
 
-    def _get_transformer_for_columns(self, df: pd.DataFrame, columns: List[str]) -> Dict[str, str]:
+    def _get_transformer_for_columns(self, df: pd.DataFrame, columns: List[str]) -> ColumnTransformer:
         """Passthrough bool features, use QuantileTransform for skewed features, and use StandardScaler for the rest.
 
         The preprocessing logic is similar to the TORCH_NN model from Tabular.
@@ -129,7 +140,7 @@ class GlobalCovariateScaler(CovariateScaler):
         for col in columns:
             if set(df[col].unique()) == set([0, 1]):
                 bool_features.append(col)
-            elif np.abs(df[col].skew()) > self.skew_threshold:
+            elif np.abs(df[col].skew()) > self.skew_threshold:  # type: ignore
                 skewed_features.append(col)
             else:
                 continuous_features.append(col)

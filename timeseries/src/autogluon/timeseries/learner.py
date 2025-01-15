@@ -51,31 +51,15 @@ class TimeSeriesLearner(AbstractLearner):
             target=self.target, known_covariates_names=self.known_covariates_names
         )
 
-    def load_trainer(self) -> AbstractTimeSeriesTrainer:
+    def load_trainer(self) -> AbstractTimeSeriesTrainer:  # type: ignore
         """Return the trainer object corresponding to the learner."""
-        return super().load_trainer()  # noqa
+        return super().load_trainer()  # type: ignore
 
     def fit(
         self,
         train_data: TimeSeriesDataFrame,
-        val_data: TimeSeriesDataFrame = None,
-        hyperparameters: Union[str, Dict] = None,
-        hyperparameter_tune_kwargs: Optional[Union[str, dict]] = None,
-        **kwargs,
-    ) -> None:
-        return self._fit(
-            train_data=train_data,
-            val_data=val_data,
-            hyperparameters=hyperparameters,
-            hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
-            **kwargs,
-        )
-
-    def _fit(
-        self,
-        train_data: TimeSeriesDataFrame,
+        hyperparameters: Union[str, Dict],
         val_data: Optional[TimeSeriesDataFrame] = None,
-        hyperparameters: Union[str, Dict] = None,
         hyperparameter_tune_kwargs: Optional[Union[str, dict]] = None,
         time_limit: Optional[int] = None,
         val_splitter: Optional[AbstractWindowSplitter] = None,
@@ -111,7 +95,9 @@ class TimeSeriesLearner(AbstractLearner):
                 ensemble_model_type=self.ensemble_model_type,
             )
         )
-        self.trainer = self.trainer_type(**trainer_init_kwargs)
+
+        assert issubclass(self.trainer_type, AbstractTimeSeriesTrainer)
+        self.trainer: Optional[AbstractTimeSeriesTrainer] = self.trainer_type(**trainer_init_kwargs)
         self.trainer_path = self.trainer.path
         self.save()
 
@@ -145,7 +131,7 @@ class TimeSeriesLearner(AbstractLearner):
 
         If some of the item_ids or timestamps are missing, an exception is raised.
         """
-        if len(self.known_covariates_names) == 0:
+        if len(self.known_covariates_names) == 0 or known_covariates is None:
             return None
         if len(self.known_covariates_names) > 0 and known_covariates is None:
             raise ValueError(
@@ -165,7 +151,7 @@ class TimeSeriesLearner(AbstractLearner):
             data, prediction_length=self.prediction_length, freq=self.freq
         )
         try:
-            known_covariates = known_covariates.loc[forecast_index]
+            known_covariates = known_covariates.loc[forecast_index]  # type: ignore
         except KeyError:
             raise ValueError(
                 f"known_covariates should include the values for prediction_length={self.prediction_length} "
@@ -197,7 +183,7 @@ class TimeSeriesLearner(AbstractLearner):
     def score(
         self,
         data: TimeSeriesDataFrame,
-        model: AbstractTimeSeriesModel = None,
+        model: Optional[Union[str, AbstractTimeSeriesModel]] = None,
         metric: Union[str, TimeSeriesScorer, None] = None,
         use_cache: bool = True,
     ) -> float:
@@ -337,7 +323,7 @@ class TimeSeriesLearner(AbstractLearner):
             List of models removed from memory
         """
         unpersisted_models = self.load_trainer().unpersist()
-        self.trainer = None
+        self.trainer = None  # type: ignore
         return unpersisted_models
 
     def refit_full(self, model: str = "all") -> Dict[str, str]:
