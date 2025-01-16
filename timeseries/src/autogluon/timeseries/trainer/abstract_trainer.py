@@ -14,9 +14,10 @@ from tqdm import tqdm
 
 from autogluon.common.utils.utils import hash_pandas_df, seed_everything
 from autogluon.core.models import AbstractModel
+from autogluon.core.trainer.abstract_trainer import AbstractTrainer
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.core.utils.loaders import load_pkl
-from autogluon.core.utils.savers import save_json, save_pkl
+from autogluon.core.utils.savers import save_pkl
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
@@ -34,37 +35,11 @@ from autogluon.timeseries.utils.warning_filters import disable_tqdm, warning_fil
 logger = logging.getLogger("autogluon.timeseries.trainer")
 
 
-# TODO: This class is meant to be moved to `core`, where it will likely
-# TODO: be renamed `AbstractTrainer` and the current `AbstractTrainer`
-# TODO: will inherit from this class.
-# TODO: add documentation for abstract methods
-class SimpleAbstractTrainer:
-    trainer_file_name = "trainer.pkl"
-    trainer_info_name = "info.pkl"
-    trainer_info_json_name = "info.json"
-
-    def __init__(self, path: str, low_memory: bool, save_data: bool, *args, **kwargs):
-        self.path = path
-        self.reset_paths = False
-
-        self.low_memory = low_memory
-        self.save_data = save_data
-
-        self.models = {}
-        self.model_graph = nx.DiGraph()
-        self.model_best = None
-
-        self._extra_banned_names = set()
-
+# TODO: This class will be removed after the behavior is reconciled with core
+class SimpleAbstractTrainer(AbstractTrainer):
     def get_model_names(self, **kwargs) -> List[str]:
         """Get all model names that are registered in the model graph"""
         return list(self.model_graph.nodes)
-
-    def _get_banned_model_names(self) -> List[str]:
-        """Gets all model names which would cause model files to be overwritten if a new model
-        was trained with the name
-        """
-        return self.get_model_names() + list(self._extra_banned_names)
 
     def get_models_attribute_dict(self, attribute: str, models: Optional[List[str]] = None) -> Dict[str, Any]:
         """Get an attribute from the `model_graph` for each of the model names
@@ -91,28 +66,8 @@ class SimpleAbstractTrainer:
         self.model_graph.nodes[model][attribute] = val
 
     @property
-    def path_root(self) -> str:
-        return os.path.dirname(self.path)
-
-    @property
-    def path_utils(self) -> str:
-        return os.path.join(self.path_root, "utils")
-
-    @property
-    def path_data(self) -> str:
-        return os.path.join(self.path_utils, "data")
-
-    @property
     def path_pkl(self) -> str:
         return os.path.join(self.path, self.trainer_file_name)
-
-    def set_contexts(self, path_context: str) -> None:
-        self.path = self.create_contexts(path_context)
-
-    def create_contexts(self, path_context: str) -> str:
-        path = path_context
-
-        return path
 
     def save(self) -> None:
         # todo: remove / revise low_memory logic
@@ -138,11 +93,6 @@ class SimpleAbstractTrainer:
             obj.reset_paths = reset_paths
             return obj
 
-    def save_model(self, model: AbstractModel, **kwargs) -> None:  # noqa: F841
-        model.save()
-        if not self.low_memory:
-            self.models[model.name] = model
-
     def load_model(
         self,
         model_name: Union[str, AbstractModel],
@@ -160,23 +110,6 @@ class SimpleAbstractTrainer:
 
         return type_.load(path=os.path.join(self.path, path_), reset_paths=self.reset_paths)
 
-    def construct_model_templates(self, hyperparameters: Union[str, Dict[str, Any]], **kwargs):
-        raise NotImplementedError
-
-    # FIXME: Copy pasted from Tabular
-    def get_minimum_model_set(
-        self, model: Union[str, AbstractTimeSeriesModel], include_self: bool = True
-    ) -> List[str]:
-        """Gets the minimum set of models that the provided model depends on, including itself.
-        Returns a list of model names
-        """
-        if not isinstance(model, str):
-            model = model.name
-        minimum_model_set = list(nx.bfs_tree(self.model_graph, model, reverse=True))
-        if not include_self:
-            minimum_model_set = [m for m in minimum_model_set if m != model]
-        return minimum_model_set
-
     def get_models_info(self, models: Optional[List[str]] = None) -> Dict[str, Any]:
         if models is None:
             models = self.get_model_names()
@@ -192,28 +125,6 @@ class SimpleAbstractTrainer:
             else:
                 model_info_dict[model.name] = model.get_info()
         return model_info_dict
-
-    @classmethod
-    def load_info(cls, path, reset_paths=False, load_model_if_required=True) -> Dict[str, Any]:
-        load_path = os.path.join(path, cls.trainer_info_name)
-        try:
-            return load_pkl.load(path=load_path)
-        except:  # noqa
-            if load_model_if_required:
-                trainer = cls.load(path=path, reset_paths=reset_paths)
-                return trainer.get_info()
-            else:
-                raise
-
-    def save_info(self, include_model_info: bool = False):
-        info = self.get_info(include_model_info=include_model_info)
-
-        save_pkl.save(path=os.path.join(self.path, self.trainer_info_name), object=info)
-        save_json.save(path=os.path.join(self.path, self.trainer_info_json_name), obj=info)
-        return info
-
-    def get_model_best(self, *args, **kwargs) -> str:
-        raise NotImplementedError
 
     def get_info(self, include_model_info: bool = False) -> Dict[str, Any]:
         num_models_trained = len(self.get_model_names())
@@ -239,9 +150,6 @@ class SimpleAbstractTrainer:
             info["model_info"] = self.get_models_info()
 
         return info
-
-    def predict(self, *args, **kwargs):
-        raise NotImplementedError
 
 
 class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):

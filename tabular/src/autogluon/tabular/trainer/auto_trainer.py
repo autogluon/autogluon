@@ -2,8 +2,8 @@ import logging
 from typing import Dict, List
 
 from autogluon.core.models import AbstractModel
-from autogluon.core.trainer.abstract_trainer import AbstractTrainer
 from autogluon.core.utils import generate_train_test_split
+from autogluon.core.trainer.abstract_trainer import AbstractTabularTrainer
 
 from ..models.lgb.lgb_model import LGBModel
 from .model_presets.presets import MODEL_TYPES, get_preset_models
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 # This Trainer handles model training details
-class AutoTrainer(AbstractTrainer):
+class AutoTrainer(AbstractTabularTrainer):
     def construct_model_templates(self, hyperparameters, **kwargs):
         path = kwargs.pop("path", self.path)
         problem_type = kwargs.pop("problem_type", self.problem_type)
