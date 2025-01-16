@@ -131,12 +131,13 @@ class TimeSeriesLearner(AbstractLearner):
 
         If some of the item_ids or timestamps are missing, an exception is raised.
         """
-        if len(self.known_covariates_names) == 0 or known_covariates is None:
+        if len(self.known_covariates_names) == 0:
             return None
         if len(self.known_covariates_names) > 0 and known_covariates is None:
             raise ValueError(
                 f"known_covariates {self.known_covariates_names} for the forecast horizon should be provided at prediction time."
             )
+        assert known_covariates is not None
 
         if self.target in known_covariates.columns:
             known_covariates = known_covariates.drop(self.target, axis=1)
