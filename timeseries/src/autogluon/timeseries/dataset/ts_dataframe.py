@@ -870,6 +870,12 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
         """Assign new columns to the time series dataframe. See :meth:`pandas.DataFrame.assign` for details."""
         return super().assign(**kwargs)  # type: ignore
 
+    def query(self, *args, **kwargs) -> TimeSeriesDataFrame:
+        return super().query(*args, **kwargs)  # type: ignore
+
+    def sort_index(self, *args, **kwargs) -> TimeSeriesDataFrame:
+        return super().sort_index(*args, **kwargs)  # type: ignore
+
     def get_model_inputs_for_scoring(
         self, prediction_length: int, known_covariates_names: Optional[List[str]] = None
     ) -> Tuple[TimeSeriesDataFrame, Optional[TimeSeriesDataFrame]]:
