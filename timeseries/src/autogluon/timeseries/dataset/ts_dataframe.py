@@ -562,7 +562,7 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
         """Length of each time series in the dataframe."""
         return self.groupby(level=ITEMID, sort=False).size()
 
-    def copy(self: TimeSeriesDataFrame, deep: bool = True) -> pd.DataFrame:  # type: ignore # noqa
+    def copy(self: TimeSeriesDataFrame, deep: bool = True) -> TimeSeriesDataFrame:
         """Make a copy of the TimeSeriesDataFrame.
 
         When ``deep=True`` (default), a new object will be created with a copy of the calling object's data and
@@ -865,6 +865,10 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
         # (used inside dropna) is not supported for TimeSeriesDataFrame
         dropped_df = pd.DataFrame(self).dropna(how=how)
         return TimeSeriesDataFrame(dropped_df, static_features=self.static_features)
+
+    def assign(self, **kwargs) -> TimeSeriesDataFrame:
+        """Assign new columns to the time series dataframe. See :meth:`pandas.DataFrame.assign` for details."""
+        return super().assign(**kwargs)  # type: ignore
 
     def get_model_inputs_for_scoring(
         self, prediction_length: int, known_covariates_names: Optional[List[str]] = None
