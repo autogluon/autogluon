@@ -37,6 +37,25 @@ logger = logging.getLogger("autogluon.timeseries.trainer")
 
 # TODO: This class will be removed after the behavior is reconciled with core
 class SimpleAbstractTrainer(AbstractTrainer):
+    def __init__(self, path: str, low_memory: bool, save_data: bool, *args, **kwargs):
+        super().__init__(
+            path=path,
+            low_memory=low_memory,
+            save_data=save_data,
+        )
+
+        self.path = path
+        self.reset_paths = False
+
+        self.low_memory = low_memory
+        self.save_data = save_data
+
+        self.models = {}
+        self.model_graph = nx.DiGraph()
+        self.model_best = None
+
+        self._extra_banned_names = set()
+
     def get_model_names(self, **kwargs) -> List[str]:
         """Get all model names that are registered in the model graph"""
         return list(self.model_graph.nodes)
