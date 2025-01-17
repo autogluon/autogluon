@@ -2,7 +2,7 @@ import logging
 import os
 import platform
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from hashlib import md5
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -23,18 +23,23 @@ LITE_MODE: bool = __lite__ is not None and __lite__
 
 
 def setup_outputdir(path, warn_if_exist=True, create_dir=True, path_suffix=None):
+    is_s3_path = False
     if path:
         assert isinstance(path, (str, Path)), (
             f"Only str and pathlib.Path types are supported for path, got {path} of type {type(path)}."
         )
+
+        is_s3_path = str(path).lower().startswith("s3://")
+
     if path_suffix is None:
         path_suffix = ""
-    if path_suffix and path_suffix[-1] == os.path.sep:
+    if path_suffix and path_suffix[-1] == os.path.sep if not is_s3_path else "/":
         path_suffix = path_suffix[:-1]
+
     if path is not None:
         path = f"{path}{path_suffix}"
-    if path is None:
-        utcnow = datetime.utcnow()
+    else:
+        utcnow = datetime.now(timezone.utc)
         timestamp = utcnow.strftime("%Y%m%d_%H%M%S")
         path = os.path.join("AutogluonModels", f"ag-{timestamp}{path_suffix}")
         for i in range(1, 1000):
@@ -51,7 +56,8 @@ def setup_outputdir(path, warn_if_exist=True, create_dir=True, path_suffix=None)
         else:
             raise RuntimeError("more than 1000 jobs launched in the same second")
         logger.log(25, f'No path specified. Models will be saved in: "{path}"')
-    elif warn_if_exist:
+
+    if warn_if_exist and not is_s3_path:
         try:
             if create_dir:
                 os.makedirs(path, exist_ok=False)
@@ -61,8 +67,9 @@ def setup_outputdir(path, warn_if_exist=True, create_dir=True, path_suffix=None)
             logger.warning(
                 f'Warning: path already exists! This predictor may overwrite an existing predictor! path="{path}"'
             )
-    path = os.path.expanduser(path)  # replace ~ with absolute path if it exists
-    path = os.path.abspath(path)
+    if not is_s3_path:
+        path = os.path.expanduser(path)  # replace ~ with absolute path if it exists
+        path = os.path.abspath(path)
     return path
 
 
