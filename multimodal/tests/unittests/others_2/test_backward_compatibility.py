@@ -20,7 +20,7 @@ def test_v0_4_0_checkpoint_hf_text():
     if os.path.exists(save_path):
         shutil.rmtree(save_path)
     download(
-        url=f"s3://automl-mm-bench/unit-tests-0.4/checkpoints/{checkpoint_name}.zip",
+        url=f"https://automl-mm-bench.s3.us-east-1.amazonaws.com/unit-tests-0.4/checkpoints/{checkpoint_name}.zip",
         path=file_path,
         sha1_hash=sha1_hash,
     )
