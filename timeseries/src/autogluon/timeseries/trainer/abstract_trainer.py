@@ -51,7 +51,7 @@ class SimpleAbstractTrainer(AbstractTrainer):
             results[model] = self.model_graph.nodes[model][attribute]
         return results
 
-    def get_model_attribute(self, model: Union[str, AbstractModel], attribute: str):
+    def get_model_attribute(self, model: Union[str, AbstractModel], attribute: str, **kwargs) -> Any:
         """Get a member attribute for given model from the `model_graph`."""
         if not isinstance(model, str):
             model = model.name
@@ -110,11 +110,10 @@ class SimpleAbstractTrainer(AbstractTrainer):
 
         return type_.load(path=os.path.join(self.path, path_), reset_paths=self.reset_paths)
 
-    def get_models_info(self, models: Optional[List[str]] = None) -> Dict[str, Any]:
-        if models is None:
-            models = self.get_model_names()
+    def get_models_info(self, models: Optional[List[str | AbstractModel]] = None) -> Dict[str, Any]:
+        models_ = models if models is not None else self.get_model_names()
         model_info_dict = dict()
-        for model in models:
+        for model in models_:
             if isinstance(model, str):
                 if model in self.models.keys():
                     model = self.models[model]
@@ -126,7 +125,7 @@ class SimpleAbstractTrainer(AbstractTrainer):
                 model_info_dict[model.name] = model.get_info()
         return model_info_dict
 
-    def get_info(self, include_model_info: bool = False) -> Dict[str, Any]:
+    def get_info(self, include_model_info: bool = False, **kwargs) -> Dict[str, Any]:
         num_models_trained = len(self.get_model_names())
         if self.model_best is not None:
             best_model = self.model_best

@@ -132,7 +132,7 @@ class AbstractTrainer:
                 models_attribute_dict = {key: val for key, val in models_attribute_dict.items() if key in model_names}
         return models_attribute_dict
 
-    def get_model_attribute(self, model, attribute: str, **kwargs) -> Any:
+    def get_model_attribute(self, model: AbstractModel | str, attribute: str, **kwargs) -> Any:
         """Return model attribute value.
         If `default` is specified, return default value if attribute does not exist.
         If `default` is not specified, raise ValueError if attribute does not exist.
