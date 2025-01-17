@@ -50,7 +50,7 @@ class MemoryCheckCallback:
 
         Returns
         -------
-            bool: True if training should stop due to memory constraints, False otherwise.
+        bool: True if training should stop due to memory constraints, False otherwise.
         """
         available_bytes = ResourceManager.get_available_virtual_mem()
         cur_rss = ResourceManager.get_memory_rss()
@@ -69,14 +69,16 @@ class MemoryCheckCallback:
         if model_size_memory_ratio > 1.0:
             logger.warning(
                 f"Iteration {iter}: Model size exceeds available memory. "
-                f"Estimated model size: {estimated_model_size_mb:.2f} MB, Available memory: {available_mb:.2f} MB."
+                f"Available memory: {available_mb:.2f} MB, "
+                f"Estimated model size: {estimated_model_size_mb:.2f} MB."
             )
             early_stop = True
 
         if available_mb < 512:  # Less than 512 MB
             logger.warning(
-                f"Iteration {iter}: Low available memory. "
-                f"Available memory: {available_mb:.2f} MB, Estimated model size: {estimated_model_size_mb:.2f} MB."
+                f"Iteration {iter}: Low available memory (<512 MB). "
+                f"Available memory: {available_mb:.2f} MB, "
+                f"Estimated model size: {estimated_model_size_mb:.2f} MB."
             )
             early_stop = True
 
@@ -88,7 +90,8 @@ class MemoryCheckCallback:
             return True
         elif self.verbose or model_size_memory_ratio > 0.25:
             logger.debug(
-                f"Iteration {iter}: Available memory: {available_mb:.2f} MB, "
+                f"Iteration {iter}: "
+                f"Available memory: {available_mb:.2f} MB, "
                 f"Estimated model size: {estimated_model_size_mb:.2f} MB."
             )
 
