@@ -45,8 +45,8 @@ class MemoryCheckCallback:
 
         Parameters
         ----------
-            iter: int
-                The current training iteration.
+        iter: int
+            The current training iteration.
 
         Returns
         -------
