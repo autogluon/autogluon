@@ -3,10 +3,10 @@ import einops
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from ...core.enums import Task
-
-from .embedding import FoundationEmbeddingX, FoundationEmbeddingYFloat, FoundationEmbeddingYInteger
 from huggingface_hub import PyTorchModelHubMixin
+
+from ...core.enums import Task
+from .embedding import FoundationEmbeddingX, FoundationEmbeddingYFloat, FoundationEmbeddingYInteger
 
 
 class FoundationTransformer(nn.Module, PyTorchModelHubMixin):
