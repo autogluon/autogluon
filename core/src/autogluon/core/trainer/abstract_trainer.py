@@ -9,6 +9,7 @@ import traceback
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, Literal, Optional, Sequence
+from typing_extensions import Self
 
 import networkx as nx
 import numpy as np
@@ -241,7 +242,7 @@ class AbstractTrainer:
         raise NotImplementedError
 
     @classmethod
-    def load(cls, path: str, reset_paths: bool = False) -> AbstractTrainer:
+    def load(cls, path: str, reset_paths: bool = False) -> Self:
         raise NotImplementedError
 
     def fit(self, *args, **kwargs):
@@ -4200,7 +4201,7 @@ class AbstractTabularTrainer(AbstractTrainer):
         shutil.rmtree(path=path_attr_model, ignore_errors=True)
 
     @classmethod
-    def load(cls, path: str, reset_paths: bool = False) -> AbstractTabularTrainer:
+    def load(cls, path: str, reset_paths: bool = False) -> Self:
         load_path = os.path.join(path, cls.trainer_file_name)
         if not reset_paths:
             return load_pkl.load(path=load_path)
