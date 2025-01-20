@@ -4,13 +4,12 @@ import copy
 import logging
 import os
 import shutil
-import sys
 import time
 import traceback
-import typing
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Tuple, Union
+from typing import Any, Literal, Optional, Sequence, Type
+from typing_extensions import Self
 
 import networkx as nx
 import numpy as np
@@ -21,22 +20,27 @@ from autogluon.common.features.types import R_FLOAT, S_STACK
 from autogluon.common.utils.distribute_utils import DistributedContext
 from autogluon.common.utils.lite import disable_if_lite_mode
 from autogluon.common.utils.log_utils import convert_time_in_s_to_log_friendly, reset_logger_for_remote_call
-from autogluon.common.utils.path_converter import PathConverter
 from autogluon.common.utils.resource_utils import ResourceManager, get_resource_manager
 from autogluon.common.utils.try_import import try_import_ray, try_import_torch
-
-from ..augmentation.distill_utils import augment_data, format_distillation_labels
-from ..calibrate import calibrate_decision_threshold
-from ..calibrate.conformity_score import compute_conformity_score
-from ..calibrate.temperature_scaling import apply_temperature_scaling, tune_temperature_scaling
-from ..callbacks import AbstractCallback
-from ..constants import AG_ARGS, BINARY, MULTICLASS, QUANTILE, REFIT_FULL_NAME, REFIT_FULL_SUFFIX, REGRESSION, SOFTCLASS
-from ..data.label_cleaner import LabelCleanerMulticlassToBinary
-from ..metrics import compute_metric, Scorer, get_metric
-from ..models import AbstractModel, BaggedEnsembleModel, GreedyWeightedEnsembleModel, SimpleWeightedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel
-from ..pseudolabeling.pseudolabeling import assert_pseudo_column_match
-from ..ray.distributed_jobs_managers import ParallelFitManager
-from ..utils import (
+from autogluon.core.augmentation.distill_utils import augment_data, format_distillation_labels
+from autogluon.core.calibrate import calibrate_decision_threshold
+from autogluon.core.calibrate.conformity_score import compute_conformity_score
+from autogluon.core.calibrate.temperature_scaling import apply_temperature_scaling, tune_temperature_scaling
+from autogluon.core.callbacks import AbstractCallback
+from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REFIT_FULL_NAME, REGRESSION, SOFTCLASS
+from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
+from autogluon.core.metrics import Scorer, compute_metric, get_metric
+from autogluon.core.models import (
+    AbstractModel,
+    BaggedEnsembleModel,
+    GreedyWeightedEnsembleModel,
+    SimpleWeightedEnsembleModel,
+    StackerEnsembleModel,
+    WeightedEnsembleModel,
+)
+from autogluon.core.pseudolabeling.pseudolabeling import assert_pseudo_column_match
+from autogluon.core.ray.distributed_jobs_managers import ParallelFitManager
+from autogluon.core.utils import (
     compute_permutation_feature_importance,
     convert_pred_probas_to_df,
     default_holdout_frac,
@@ -45,18 +49,214 @@ from ..utils import (
     get_pred_from_proba,
     infer_eval_metric,
 )
-from ..utils.exceptions import InsufficientTime, NoGPUError, NotEnoughCudaMemoryError, NotEnoughMemoryError, NotValidStacker, NoStackFeatures, NoValidFeatures, TimeLimitExceeded
-from ..utils.feature_selection import FeatureSelector
-from ..utils.loaders import load_pkl
-from ..utils.savers import save_json, save_pkl
+from autogluon.core.utils.exceptions import (
+    InsufficientTime,
+    NoGPUError,
+    NoStackFeatures,
+    NotEnoughCudaMemoryError,
+    NotEnoughMemoryError,
+    NotValidStacker,
+    NoValidFeatures,
+    TimeLimitExceeded,
+)
+from autogluon.core.utils.feature_selection import FeatureSelector
+from autogluon.core.utils.loaders import load_pkl
+from autogluon.core.utils.savers import save_json, save_pkl
+
 from .utils import process_hyperparameters
 
 logger = logging.getLogger(__name__)
 
 
 class AbstractTrainer:
+    trainer_file_name = "trainer.pkl"
+    trainer_info_name = "info.pkl"
+    trainer_info_json_name = "info.json"
+
+    def __init__(self, path: str, *, low_memory: bool, save_data: bool):
+        self.path = path
+        self.reset_paths = False
+
+        self.low_memory: bool = low_memory
+        self.save_data: bool = save_data
+
+        self.models: dict[str, Any] = {}
+        self.model_graph = nx.DiGraph()
+        self.model_best: str | None = None
+
+        self._extra_banned_names: set[str] = set()
+
+    def _get_banned_model_names(self) -> list[str]:
+        """Gets all model names which would cause model files to be overwritten if a new model
+        was trained with the name
+        """
+        return self.get_model_names() + list(self._extra_banned_names)
+
+    @property
+    def path_root(self) -> str:
+        """directory containing learner.pkl"""
+        return os.path.dirname(self.path)
+
+    @property
+    def path_utils(self) -> str:
+        return os.path.join(self.path_root, "utils")
+
+    @property
+    def path_data(self) -> str:
+        return os.path.join(self.path_utils, "data")
+
+    def set_contexts(self, path_context: str) -> None:
+        self.path = self.create_contexts(path_context)
+
+    def create_contexts(self, path_context: str) -> str:
+        path = path_context
+        return path
+
+    def save_model(self, model: AbstractModel, **kwargs) -> None:
+        model.save()
+        if not self.low_memory:
+            self.models[model.name] = model
+
+    def get_models_attribute_dict(self, attribute: str, models: list | None = None) -> dict[str, Any]:
+        """Returns dictionary of model name -> attribute value for the provided attribute.
+        """
+        models_attribute_dict = nx.get_node_attributes(self.model_graph, attribute)
+        if models is not None:
+            model_names = []
+            for model in models:
+                if not isinstance(model, str):
+                    model = model.name
+                model_names.append(model)
+            if attribute == "path":
+                models_attribute_dict = {key: os.path.join(*val) for key, val in models_attribute_dict.items() if key in model_names}
+            else:
+                models_attribute_dict = {key: val for key, val in models_attribute_dict.items() if key in model_names}
+        return models_attribute_dict
+
+    def get_model_attribute(self, model: str | AbstractModel, attribute: str, **kwargs) -> Any:
+        """Return model attribute value.
+        If `default` is specified, return default value if attribute does not exist.
+        If `default` is not specified, raise ValueError if attribute does not exist.
+        """
+        if not isinstance(model, str):
+            model = model.name
+        if model not in self.model_graph.nodes:
+            raise ValueError(f"Model does not exist: (model={model})")
+        if attribute not in self.model_graph.nodes[model]:
+            if "default" in kwargs:
+                return kwargs["default"]
+            else:
+                raise ValueError(f"Model does not contain attribute: (model={model}, attribute={attribute})")
+        if attribute == "path":
+            return os.path.join(*self.model_graph.nodes[model][attribute])
+        return self.model_graph.nodes[model][attribute]
+
+    def set_model_attribute(self, model: str | AbstractModel, attribute: str, val: Any):
+        if not isinstance(model, str):
+            model = model.name
+        self.model_graph.nodes[model][attribute] = val
+
+    def get_minimum_model_set(self, model: str | AbstractModel, include_self: bool = True) -> list:
+        """Gets the minimum set of models that the provided model depends on, including itself
+        Returns a list of model names
+        """
+        if not isinstance(model, str):
+            model = model.name
+        minimum_model_set = list(nx.bfs_tree(self.model_graph, model, reverse=True))
+        if not include_self:
+            minimum_model_set = [m for m in minimum_model_set if m != model]
+        return minimum_model_set
+
+    def get_model_info(self, model: str | AbstractModel) -> dict[str, Any]:
+        if isinstance(model, str):
+            if model in self.models.keys():
+                model = self.models[model]
+        if isinstance(model, str):
+            model_type = self.get_model_attribute(model=model, attribute="type")
+            model_path = self.get_model_attribute(model=model, attribute="path")
+            model_info = model_type.load_info(path=os.path.join(self.path, model_path))
+        else:
+            model_info = model.get_info()
+        return model_info
+
+    def get_models_info(self, models: list[str | AbstractModel] | None = None) -> dict[str, dict[str, Any]]:
+        models_ = self.get_model_names() if models is None else models
+        model_info_dict = dict()
+        for model in models_:
+            if isinstance(model, str):
+                model_name = model
+            else:
+                model_name = model.name
+            model_info_dict[model_name] = self.get_model_info(model=model)
+        return model_info_dict
+
+    # TODO: model_name change to model in params
+    def load_model(self, model_name: str, path: str | None = None, model_type: Type[AbstractModel] | None = None) -> AbstractModel:
+        if isinstance(model_name, AbstractModel):
+            return model_name
+        if model_name in self.models.keys():
+            return self.models[model_name]
+        else:
+            if path is None:
+                path = self.get_model_attribute(model=model_name, attribute="path")  # get relative location of the model to the trainer
+                assert path is not None
+            if model_type is None:
+                model_type = self.get_model_attribute(model=model_name, attribute="type")
+                assert model_type is not None
+            return model_type.load(path=os.path.join(self.path, path), reset_paths=self.reset_paths)
+        
+    @classmethod
+    def load_info(cls, path: str, reset_paths: bool = False, load_model_if_required: bool = True) -> dict[str, Any]:
+        load_path = os.path.join(path, cls.trainer_info_name)
+        try:
+            return load_pkl.load(path=load_path)
+        except:
+            if load_model_if_required:
+                trainer = cls.load(path=path, reset_paths=reset_paths)
+                return trainer.get_info()
+            else:
+                raise
+
+    def save_info(self, include_model_info: bool = False) -> dict[str, Any]:
+        info = self.get_info(include_model_info=include_model_info)
+
+        save_pkl.save(path=os.path.join(self.path, self.trainer_info_name), object=info)
+        save_json.save(path=os.path.join(self.path, self.trainer_info_json_name), obj=info)
+        return info
+
+    def construct_model_templates(
+        self, hyperparameters: str | dict[str, Any], **kwargs
+    ) -> tuple[Sequence[AbstractModel], dict] | Sequence[AbstractModel]:
+        raise NotImplementedError
+
+    def get_model_best(self, *args, **kwargs) -> str:
+        raise NotImplementedError
+
+    def get_info(self, include_model_info: bool = False, **kwargs) -> dict[str, Any]:
+        raise NotImplementedError
+
+    def get_model_names(self, **kwargs) -> list[str]:
+        """Get all model names that are registered in the model graph"""
+        raise NotImplementedError
+
+    def save(self) -> None:
+        raise NotImplementedError
+
+    @classmethod
+    def load(cls, path: str, reset_paths: bool = False) -> Self:
+        raise NotImplementedError
+
+    def fit(self, *args, **kwargs):
+        raise NotImplementedError
+
+    def predict(self, *args, **kwargs) -> Any:
+        raise NotImplementedError
+    
+
+# TODO: This class will be moved to autogluon.tabular
+class AbstractTabularTrainer(AbstractTrainer):
     """
-    AbstractTrainer contains logic to train a variety of models under a variety of constraints and automatically generate a multi-layer stack ensemble.
+    AbstractTabularTrainer contains logic to train a variety of models under a variety of constraints and automatically generate a multi-layer stack ensemble.
     Beyond the basic functionality, it also has support for model refitting, distillation, pseudo-labelling, unlabeled data, and much more.
 
     It is not recommended to directly use Trainer. Instead, use Predictor or Learner which internally uses Trainer.
@@ -65,7 +265,7 @@ class AbstractTrainer:
     Due to the complexity of the logic within this class, a text description will not give the full picture.
     It is recommended to carefully read the code and use a debugger to understand how it works.
 
-    AbstractTrainer makes much fewer assumptions about the problem than Learner and Predictor.
+    AbstractTabularTrainer makes much fewer assumptions about the problem than Learner and Predictor.
     It expects these ambiguities to have already been resolved upstream. For example, problem_type, feature_metadata, num_classes, etc.
 
     Parameters
@@ -84,7 +284,7 @@ class AbstractTrainer:
         FeatureMetadata for X. Sent to each model during fit.
     eval_metric : Scorer, default = None
         Metric to optimize. If None, a default metric is used depending on the problem_type.
-    quantile_levels : List[float] | np.ndarray, default = None
+    quantile_levels : list[float] | np.ndarray, default = None
         # TODO: Add documentation, not documented in Predictor.
         Only used when problem_type=quantile
     low_memory : bool, default = True
@@ -116,9 +316,6 @@ class AbstractTrainer:
         where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels).
     """
 
-    trainer_file_name = "trainer.pkl"
-    trainer_info_name = "info.pkl"
-    trainer_info_json_name = "info.json"
     distill_stackname = "distill"  # name of stack-level for distilled student models
 
     def __init__(
@@ -126,22 +323,26 @@ class AbstractTrainer:
         path: str,
         *,
         problem_type: str,
-        num_classes: int = None,
-        feature_metadata: FeatureMetadata = None,
-        eval_metric: Scorer = None,
-        quantile_levels: List[float] | np.ndarray = None,
+        num_classes: int | None = None,
+        feature_metadata: FeatureMetadata | None = None,
+        eval_metric: Scorer | None = None,
+        quantile_levels: list[float] | np.ndarray | None = None,
         low_memory: bool = True,
         k_fold: int = 0,
         n_repeats: int = 1,
-        sample_weight: str = None,
+        sample_weight: str | None = None,
         weight_evaluation: bool = False,
         save_data: bool = False,
         random_state: int = 0,
         verbosity: int = 2,
     ):
+        super().__init__(
+            path=path,
+            low_memory=low_memory,
+            save_data=save_data,
+        )
         self._validate_num_classes(num_classes=num_classes, problem_type=problem_type)
         self._validate_quantile_levels(quantile_levels=quantile_levels, problem_type=problem_type)
-        self.path = path
         self.problem_type = problem_type
         self.feature_metadata = feature_metadata
         self.save_data = save_data
@@ -185,7 +386,7 @@ class AbstractTrainer:
 
         self.model_best = None
 
-        self.models = {}  # Dict of model name -> model object. A key, value pair only exists if a model is persisted in memory.  # TODO: v0.1 Rename and consider making private
+        self.models = {}  # dict of model name -> model object. A key, value pair only exists if a model is persisted in memory.  # TODO: v0.1 Rename and consider making private
         self.model_graph = nx.DiGraph()  # Directed Acyclic Graph (DAG) of model interactions. Describes how certain models depend on the predictions of certain other models. Contains numerous metadata regarding each model.
         self.reset_paths = False
 
@@ -210,30 +411,17 @@ class AbstractTrainer:
 
         self._extra_banned_names = set()  # Names which are banned but are not used by a trained model.
 
-        self._models_failed_to_train_errors = dict()  # Dict of model name -> model failure metadata
+        self._models_failed_to_train_errors = dict()  # dict of model name -> model failure metadata
 
         # self._exceptions_list = []  # TODO: Keep exceptions list for debugging during benchmarking.
 
-        self.callbacks: List[AbstractCallback] = []
+        self.callbacks: list[AbstractCallback] = []
         self._callback_early_stop = False
-
-    # path_root is the directory containing learner.pkl
-    @property
-    def path_root(self) -> str:
-        return os.path.dirname(self.path)
-
-    @property
-    def path_utils(self) -> str:
-        return os.path.join(self.path_root, "utils")
 
     @property
     def _path_attr(self) -> str:
         """Path to cached model graph attributes"""
         return os.path.join(self.path_utils, "attr")
-
-    @property
-    def path_data(self) -> str:
-        return os.path.join(self.path_utils, "data")
 
     @property
     def has_val(self) -> bool:
@@ -246,6 +434,7 @@ class AbstractTrainer:
         if self._num_rows_val is not None:
             return self._num_rows_val
         elif self.bagged_mode:
+            assert self._num_rows_train is not None
             return self._num_rows_train
         else:
             return 0
@@ -334,8 +523,12 @@ class AbstractTrainer:
         self._y_test_saved = True
 
     def get_model_names(
-        self, stack_name: Union[List[str], str] = None, level: Union[List[int], int] = None, can_infer: bool = None, models: List[str] = None
-    ) -> List[str]:
+        self, 
+        stack_name: list[str] | str | None = None, 
+        level: list[int] | int | None = None, 
+        can_infer: bool | None = None, 
+        models: list[str] | None = None
+    ) -> list[str]:
         if models is None:
             models = list(self.model_graph.nodes)
         if stack_name is not None:
@@ -354,7 +547,7 @@ class AbstractTrainer:
             models = [model for model in models if node_attributes[model] == can_infer]
         return models
 
-    def get_max_level(self, stack_name: str = None, models: List[str] = None) -> int:
+    def get_max_level(self, stack_name: str | None = None, models: list[str] | None = None) -> int:
         models = self.get_model_names(stack_name=stack_name, models=models)
         models_attribute_dict = self.get_models_attribute_dict(attribute="level", models=models)
         if models_attribute_dict:
@@ -362,24 +555,16 @@ class AbstractTrainer:
         else:
             return -1
 
-    def construct_model_templates(self, hyperparameters: dict, **kwargs) -> Tuple[List[AbstractModel], dict]:
+    def construct_model_templates(self, hyperparameters: dict, **kwargs) -> tuple[list[AbstractModel], dict]:
         """Constructs a list of unfit models based on the hyperparameters dict."""
         raise NotImplementedError
 
-    def construct_model_templates_distillation(self, hyperparameters: dict, **kwargs) -> Tuple[List[AbstractModel], dict]:
+    def construct_model_templates_distillation(self, hyperparameters: dict, **kwargs) -> tuple[list[AbstractModel], dict]:
         """Constructs a list of unfit models based on the hyperparameters dict for softclass distillation."""
         raise NotImplementedError
 
     def get_model_level(self, model_name: str) -> int:
         return self.get_model_attribute(model=model_name, attribute="level")
-
-    def set_contexts(self, path_context):
-        self.path = self.create_contexts(path_context)
-
-    def create_contexts(self, path_context: str) -> str:
-        path = path_context
-
-        return path
 
     def fit(self, X, y, hyperparameters: dict, X_val=None, y_val=None, **kwargs):
         raise NotImplementedError
@@ -395,19 +580,19 @@ class AbstractTrainer:
         X_test=None,
         y_test=None,
         X_unlabeled=None,
-        base_model_names: List[str] = None,
-        core_kwargs: dict = None,
-        aux_kwargs: dict = None,
+        base_model_names: list[str] | None = None,
+        core_kwargs: dict | None = None,
+        aux_kwargs: dict | None = None,
         level_start=1,
         level_end=1,
         time_limit=None,
-        name_suffix: str = None,
+        name_suffix: str | None = None,
         relative_stack=True,
         level_time_modifier=0.333,
         infer_limit=None,
         infer_limit_batch_size=None,
-        callbacks: List[AbstractCallback] = None,
-    ) -> List[str]:
+        callbacks: list[AbstractCallback] | None = None,
+    ) -> list[str]:
         """
         Trains a multi-layer stack ensemble using the input data on the hyperparameters dict input.
             hyperparameters is used to determine the models used in each stack layer.
@@ -426,6 +611,8 @@ class AbstractTrainer:
         """
         self._fit_setup(time_limit=time_limit, callbacks=callbacks)
         time_train_start = self._time_train_start
+        assert time_train_start is not None
+        
         if self.callbacks:
             callback_classes = [c.__class__.__name__ for c in self.callbacks]
             logger.log(20, f"User-specified callbacks ({len(self.callbacks)}): {callback_classes}")
@@ -517,7 +704,7 @@ class AbstractTrainer:
         self.save()
         return model_names_fit
 
-    def _fit_setup(self, time_limit: float | None = None, callbacks: List[AbstractCallback] = None):
+    def _fit_setup(self, time_limit: float | None = None, callbacks: list[AbstractCallback] | None = None):
         """
         Prepare the trainer state at the start of / prior to a fit call.
         Should be paired with a `self._fit_cleanup()` at the conclusion of the fit call.
@@ -561,8 +748,13 @@ class AbstractTrainer:
 
     # TODO: Consider better greedy approximation method such as via fitting a weighted ensemble to evaluate the value of a subset.
     def _filter_base_models_via_infer_limit(
-        self, base_model_names: List[str], infer_limit: float, infer_limit_modifier: float = 1.0, as_child: bool = True, verbose: bool = True
-    ) -> List[str]:
+        self, 
+        base_model_names: list[str], 
+        infer_limit: float | None, 
+        infer_limit_modifier: float = 1.0, 
+        as_child: bool = True, 
+        verbose: bool = True,
+    ) -> list[str]:
         """
         Returns a subset of base_model_names whose combined prediction time for 1 row of data does not exceed infer_limit seconds.
         With the goal of selecting the best valid subset that is most valuable to stack ensembles who use them as base models,
@@ -572,9 +764,9 @@ class AbstractTrainer:
 
         Parameters
         ----------
-        base_model_names: List[str]
-            List of model names. These models must already be added to the trainer.
-        infer_limit: float
+        base_model_names: list[str]
+            list of model names. These models must already be added to the trainer.
+        infer_limit: float, optional
             Inference limit in seconds for 1 row of data. This is compared against values pre-computed during fit for the models.
         infer_limit_modifier: float, default = 1.0
             Modifier to multiply infer_limit by.
@@ -655,22 +847,22 @@ class AbstractTrainer:
         self,
         X,
         y,
-        models: Union[List[AbstractModel], dict],
+        models: list[AbstractModel] | dict,
         X_val=None,
         y_val=None,
         X_test=None,
         y_test=None,
         X_unlabeled=None,
         level=1,
-        base_model_names: List[str] = None,
-        core_kwargs: dict = None,
-        aux_kwargs: dict = None,
-        name_suffix: str = None,
+        base_model_names: list[str] | None = None,
+        core_kwargs: dict | None = None,
+        aux_kwargs: dict | None = None,
+        name_suffix: str | None = None,
         infer_limit=None,
         infer_limit_batch_size=None,
         full_weighted_ensemble: bool = False,
         additional_full_weighted_ensemble: bool = False,
-    ) -> (List[str], List[str]):
+    ) -> tuple[list[str], list[str]]:
         """
         Similar to calling self.stack_new_level_core, except auxiliary models will also be trained via a call to self.stack_new_level_aux, with the models trained from self.stack_new_level_core used as base models.
         """
@@ -718,14 +910,14 @@ class AbstractTrainer:
         self,
         X,
         y,
-        models: Union[List[AbstractModel], dict],
+        models: list[AbstractModel] | dict,
         X_val=None,
         y_val=None,
         X_test=None,
         y_test=None,
         X_unlabeled=None,
         level=1,
-        base_model_names: List[str] = None,
+        base_model_names: list[str] | None = None,
         fit_strategy: Literal["sequential", "parallel"] = "sequential",
         stack_name="core",
         ag_args=None,
@@ -734,13 +926,13 @@ class AbstractTrainer:
         included_model_types=None,
         excluded_model_types=None,
         ensemble_type=StackerEnsembleModel,
-        name_suffix: str = None,
+        name_suffix: str | None = None,
         get_models_func=None,
         refit_full=False,
         infer_limit=None,
         infer_limit_batch_size=None,
         **kwargs,
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Trains all models using the data provided.
         If level > 1, then the models will use base model predictions as additional features.
@@ -757,7 +949,11 @@ class AbstractTrainer:
         if not self.bagged_mode and level != 1:
             raise ValueError("Stack Ensembling is not valid for non-bagged mode.")
 
-        base_model_names = self._filter_base_models_via_infer_limit(base_model_names=base_model_names, infer_limit=infer_limit, infer_limit_modifier=0.8)
+        base_model_names = self._filter_base_models_via_infer_limit(
+            base_model_names=base_model_names, 
+            infer_limit=infer_limit, 
+            infer_limit_modifier=0.8,
+        )
         if ag_args_fit is None:
             ag_args_fit = {}
         ag_args_fit = ag_args_fit.copy()
@@ -779,7 +975,7 @@ class AbstractTrainer:
                     (base_model_names, base_model_paths, base_model_types) = (None, None, None)
                 elif level > 1:
                     base_model_names, base_model_paths, base_model_types = self._get_models_load_info(model_names=base_model_names)
-                    if len(base_model_names) == 0:
+                    if len(base_model_names) == 0:  # type: ignore
                         logger.log(20, f"No base models to train on, skipping stack level {level}...")
                         return []
                 else:
@@ -874,7 +1070,7 @@ class AbstractTrainer:
         self,
         X,
         y,
-        base_model_names: List[str],
+        base_model_names: list[str],
         level: int | str = "auto",
         fit=True,
         stack_name="aux1",
@@ -888,7 +1084,7 @@ class AbstractTrainer:
         fit_weighted_ensemble: bool = True,
         name_extra: str | None = None,
         total_resources: dict | None = None,
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Trains auxiliary models (currently a single weighted ensemble) using the provided base models.
         Level must be greater than the level of any of the base models.
@@ -1038,13 +1234,13 @@ class AbstractTrainer:
         )
 
     # TODO: Slow if large ensemble with many models, could cache output result to speed up during inference
-    def _construct_model_pred_order(self, models: List[str]) -> List[str]:
+    def _construct_model_pred_order(self, models: list[str]) -> list[str]:
         """
         Constructs a list of model names in order of inference calls required to infer on all the models.
 
         Parameters
         ----------
-        models : List[str]
+        models : list[str]
             The list of models to construct the prediction order from.
             If a model has dependencies, the dependency models will be put earlier in the output list.
             Models explicitly mentioned in the `models` input will be placed as early as possible in the output list.
@@ -1068,17 +1264,17 @@ class AbstractTrainer:
             model_set = set(model_order)
         return model_order
 
-    def _construct_model_pred_order_with_pred_dict(self, models: List[str], models_to_ignore: List[str] = None) -> List[str]:
+    def _construct_model_pred_order_with_pred_dict(self, models: list[str], models_to_ignore: list[str] = None) -> list[str]:
         """
         Constructs a list of model names in order of inference calls required to infer on all the models.
         Unlike `_construct_model_pred_order`, this method's output is in undefined order when multiple models are valid to infer at the same time.
 
         Parameters
         ----------
-        models : List[str]
+        models : list[str]
             The list of models to construct the prediction order from.
             If a model has dependencies, the dependency models will be put earlier in the output list.
-        models_to_ignore : List[str], optional
+        models_to_ignore : list[str], optional
             A list of models that have already been computed and can be ignored.
             Models in this list and their dependencies (if not depended on by other models in `models`) will be pruned from the final output.
 
@@ -1117,7 +1313,7 @@ class AbstractTrainer:
     def get_model_pred_proba_dict(
         self,
         X: pd.DataFrame,
-        models: List[str],
+        models: list[str],
         model_pred_proba_dict: dict = None,
         model_pred_time_dict: dict = None,
         record_pred_time: bool = False,
@@ -1132,7 +1328,7 @@ class AbstractTrainer:
         ----------
         X : pd.DataFrame
             Input data to predict on.
-        models : List[str]
+        models : list[str]
             The list of models to predict with.
             Note that if models have dependency models, their dependencies will also be predicted with and included in the output.
         model_pred_proba_dict : dict, optional
@@ -1194,13 +1390,13 @@ class AbstractTrainer:
         else:
             return model_pred_proba_dict
 
-    def get_model_oof_dict(self, models: List[str]) -> dict:
+    def get_model_oof_dict(self, models: list[str]) -> dict:
         """
         Returns a dictionary of out-of-fold prediction probabilities, keyed by model name
         """
         return {model: self.get_model_oof(model) for model in models}
 
-    def get_model_pred_dict(self, X: pd.DataFrame, models: List[str], record_pred_time: bool = False, **kwargs):
+    def get_model_pred_dict(self, X: pd.DataFrame, models: list[str], record_pred_time: bool = False, **kwargs):
         """
         Optimally computes predictions for each model in `models`.
         Will compute each necessary model only once and store predictions in a `model_pred_dict` dictionary.
@@ -1212,7 +1408,7 @@ class AbstractTrainer:
         ----------
         X : pd.DataFrame
             Input data to predict on.
-        models : List[str]
+        models : list[str]
             The list of models to predict with.
             Note that if models have dependency models, their dependencies will also be predicted with and included in the output.
         record_pred_time : bool, default = False
@@ -1293,8 +1489,8 @@ class AbstractTrainer:
         self,
         X: pd.DataFrame,
         *,
-        model: str = None,
-        base_models: List[str] = None,
+        model: str | None = None,
+        base_models: list[str] | None = None,
         model_pred_proba_dict: Optional[dict] = None,
         fit: bool = False,
         use_orig_features: bool = True,
@@ -1311,7 +1507,7 @@ class AbstractTrainer:
         model : str, default = None
             The model to derive `base_models` from.
             Cannot be specified alongside `base_models`.
-        base_models : List[str], default = None
+        base_models : list[str], default = None
             The list of base models to augment X with.
             Base models will add their prediction probabilities as extra features to X.
             Cannot be specified alongside `model`.
@@ -1355,7 +1551,7 @@ class AbstractTrainer:
             X = X_stacker
         return X
 
-    def get_feature_metadata(self, use_orig_features: bool = True, model: str | None = None, base_models: List[str] | None = None) -> FeatureMetadata:
+    def get_feature_metadata(self, use_orig_features: bool = True, model: str | None = None, base_models: list[str] | None = None) -> FeatureMetadata:
         """
         Returns the FeatureMetadata input to a `model.fit` call.
         Pairs with `X = self.get_inputs_to_stacker(...)`. The returned FeatureMetadata should reflect the contents of `X`.
@@ -1368,7 +1564,7 @@ class AbstractTrainer:
         model : str, default = None
             If specified, it must be an already existing model.
             `base_models` will be set to the base models of `model`.
-        base_models : List[str], default = None
+        base_models : list[str], default = None
             If specified, will add the stack features of the `base_models` to FeatureMetadata.
 
         Returns
@@ -1397,7 +1593,7 @@ class AbstractTrainer:
             feature_metadata = FeatureMetadata(type_map_raw={})
         return feature_metadata
 
-    def _get_stack_column_names(self, models: List[str]) -> Tuple[List[str], int]:
+    def _get_stack_column_names(self, models: list[str]) -> tuple[list[str], int]:
         """
         Get the stack column names generated when the provided models are used as base models in a stack ensemble.
         Additionally output the number of columns per model as an int.
@@ -1562,7 +1758,7 @@ class AbstractTrainer:
     # Fits _FULL models and links them in the stack so _FULL models only use other _FULL models as input during stacking
     # If model is specified, will fit all _FULL models that are ancestors of the provided model, automatically linking them.
     # If no model is specified, all models are refit and linked appropriately.
-    def refit_ensemble_full(self, model: str | List[str] = "all", **kwargs) -> dict:
+    def refit_ensemble_full(self, model: str | list[str] = "all", **kwargs) -> dict:
         if model == "all":
             ensemble_set = self.get_model_names()
         elif isinstance(model, list):
@@ -1618,7 +1814,13 @@ class AbstractTrainer:
         """Get refit full model's parent. If model does not have a parent, return `model`."""
         return self.get_model_attribute(model=model, attribute="refit_full_parent", default=model)
 
-    def get_model_best(self, can_infer: bool = None, allow_full: bool = True, infer_limit: float = None, infer_limit_as_child: bool = False) -> str:
+    def get_model_best(
+        self, 
+        can_infer: bool | None = None, 
+        allow_full: bool = True, 
+        infer_limit: float | None = None, 
+        infer_limit_as_child: bool = False
+    ) -> str:
         """
         Returns the name of the model with the best validation score that satisfies all specified constraints.
         If no model satisfies the constraints, an AssertionError will be raised.
@@ -1704,7 +1906,7 @@ class AbstractTrainer:
         else:
             self.models[model.name] = model
 
-    def save(self):
+    def save(self) -> None:
         models = self.models
         if self.low_memory:
             self.models = {}
@@ -1712,7 +1914,7 @@ class AbstractTrainer:
         if self.low_memory:
             self.models = models
 
-    def compile(self, model_names="all", with_ancestors=False, compiler_configs=None) -> List[str]:
+    def compile(self, model_names="all", with_ancestors=False, compiler_configs=None) -> list[str]:
         """
         Compile a list of models for accelerated prediction.
 
@@ -1786,7 +1988,7 @@ class AbstractTrainer:
         self.save()
         return model_names
 
-    def persist(self, model_names="all", with_ancestors=False, max_memory=None) -> List[str]:
+    def persist(self, model_names="all", with_ancestors=False, max_memory=None) -> list[str]:
         if model_names == "all":
             model_names = self.get_model_names()
         elif model_names == "best":
@@ -1852,19 +2054,6 @@ class AbstractTrainer:
                         model.models[fold] = model.load_child(fold_model)
         return model_names
 
-    # TODO: model_name change to model in params
-    def load_model(self, model_name: str, path: str = None, model_type=None) -> AbstractModel:
-        if isinstance(model_name, AbstractModel):
-            return model_name
-        if model_name in self.models.keys():
-            return self.models[model_name]
-        else:
-            if path is None:
-                path = self.get_model_attribute(model=model_name, attribute="path")  # get relative location of the model to the trainer
-            if model_type is None:
-                model_type = self.get_model_attribute(model=model_name, attribute="type")
-            return model_type.load(path=os.path.join(self.path, path), reset_paths=self.reset_paths)
-
     def unpersist(self, model_names="all") -> list:
         if model_names == "all":
             model_names = list(self.models.keys())
@@ -1893,13 +2082,13 @@ class AbstractTrainer:
         hyperparameters=None,
         ag_args_fit=None,
         time_limit=None,
-        name_suffix: str = None,
+        name_suffix: str | None = None,
         save_bag_folds=None,
         check_if_best=True,
         child_hyperparameters=None,
         get_models_func=None,
         total_resources: dict | None = None,
-    ) -> List[str]:
+    ) -> list[str]:
         if get_models_func is None:
             get_models_func = self.construct_model_templates
         if len(base_model_names) == 0:
@@ -1979,10 +2168,10 @@ class AbstractTrainer:
         X: pd.DataFrame,
         y: pd.Series,
         model: AbstractModel,
-        X_val: pd.DataFrame = None,
-        y_val: pd.Series = None,
-        X_test: pd.DataFrame = None,
-        y_test: pd.Series = None,
+        X_val: pd.DataFrame | None = None,
+        y_val: pd.Series | None = None,
+        X_test: pd.DataFrame | None = None,
+        y_test: pd.Series | None = None,
         total_resources: dict = None,
         **model_fit_kwargs,
     ) -> AbstractModel:
@@ -1998,20 +2187,20 @@ class AbstractTrainer:
         X: pd.DataFrame,
         y: pd.Series,
         model: AbstractModel,
-        X_val: pd.DataFrame = None,
-        y_val: pd.Series = None,
-        X_test: pd.DataFrame = None,
-        y_test: pd.Series = None,
-        X_pseudo: pd.DataFrame = None,
-        y_pseudo: pd.DataFrame = None,
-        time_limit: float = None,
+        X_val: pd.DataFrame | None = None,
+        y_val: pd.Series | None = None,
+        X_test: pd.DataFrame | None = None,
+        y_test: pd.Series | None = None,
+        X_pseudo: pd.DataFrame | None = None,
+        y_pseudo: pd.DataFrame | None = None,
+        time_limit: float | None = None,
         stack_name: str = "core",
         level: int = 1,
         compute_score: bool = True,
-        total_resources: dict = None,
+        total_resources: dict | None = None,
         errors: Literal["ignore", "raise"] = "ignore",
-        errors_ignore: list = None,
-        errors_raise: list = None,
+        errors_ignore: list | None = None,
+        errors_raise: list | None = None,
         is_ray_worker: bool = False,
         **model_fit_kwargs,
     ) -> list[str]:
@@ -2186,7 +2375,7 @@ class AbstractTrainer:
         return model_names_trained
 
     # FIXME: v1.0 Move to AbstractModel for most fields
-    def _get_model_metadata(self, model: AbstractModel, stack_name: str = "core", level: int = 1) -> Dict[str, Any]:
+    def _get_model_metadata(self, model: AbstractModel, stack_name: str = "core", level: int = 1) -> dict[str, Any]:
         """
         Returns the model metadata used to initialize a node in the DAG (self.model_graph).
         """
@@ -2415,11 +2604,11 @@ class AbstractTrainer:
         compute_score=True,
         total_resources: dict | None = None,
         errors: Literal["ignore", "raise"] = "ignore",
-        errors_ignore: list = None,
-        errors_raise: list = None,
+        errors_ignore: list | None = None,
+        errors_raise: list | None = None,
         is_ray_worker: bool = False,
         **kwargs,
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Trains a model, with the potential to train multiple versions of this model with hyperparameter tuning and feature pruning.
         Returns a list of successfully trained and saved model names.
@@ -2562,7 +2751,7 @@ class AbstractTrainer:
                 raise exception
         return model_names_trained
 
-    # TODO: Move to a utility function outside of AbstractTrainer
+    # TODO: Move to a utility function outside of AbstractTabularTrainer
     @staticmethod
     def _check_raise_exception(
         exception: Exception,
@@ -2643,7 +2832,7 @@ class AbstractTrainer:
     def _callbacks_after_fit(
         self,
         *,
-        model_names: List[str],
+        model_names: list[str],
         stack_name: str,
         level: int,
     ):
@@ -2662,7 +2851,7 @@ class AbstractTrainer:
     # TODO: Time allowance not accurate if running from fit_continue
     # TODO: Remove level and stack_name arguments, can get them automatically
     # TODO: Make sure that pretraining on X_unlabeled only happens 1 time rather than every fold of bagging. (Do during pretrain API work?)
-    def _train_multi_repeats(self, X, y, models: list, n_repeats, n_repeat_start=1, time_limit=None, time_limit_total_level=None, **kwargs) -> List[str]:
+    def _train_multi_repeats(self, X, y, models: list, n_repeats, n_repeat_start=1, time_limit=None, time_limit_total_level=None, **kwargs) -> list[str]:
         """
         Fits bagged ensemble models with additional folds and/or bagged repeats.
         Models must have already been fit prior to entering this method.
@@ -2721,7 +2910,7 @@ class AbstractTrainer:
         return models_valid
 
     def _train_multi_initial(
-        self, X, y, models: List[AbstractModel], k_fold, n_repeats, hyperparameter_tune_kwargs=None, time_limit=None, feature_prune_kwargs=None, **kwargs
+        self, X, y, models: list[AbstractModel], k_fold, n_repeats, hyperparameter_tune_kwargs=None, time_limit=None, feature_prune_kwargs=None, **kwargs
     ):
         """
         Fits models that have not previously been fit.
@@ -3137,7 +3326,7 @@ class AbstractTrainer:
         self,
         X,
         y,
-        models: List[AbstractModel],
+        models: list[AbstractModel],
         hyperparameter_tune_kwargs=None,
         feature_prune_kwargs=None,
         k_fold=None,
@@ -3146,7 +3335,7 @@ class AbstractTrainer:
         time_limit=None,
         delay_bag_sets: bool = False,
         **kwargs,
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Train a list of models using the same data.
         Assumes that input data has already been processed in the form the models will receive as input (including stack feature generation).
@@ -3205,13 +3394,13 @@ class AbstractTrainer:
         y_val,
         X_test=None,
         y_test=None,
-        hyperparameters: dict = None,
+        hyperparameters: dict | None = None,
         X_unlabeled=None,
         num_stack_levels=0,
         time_limit=None,
         groups=None,
         **kwargs,
-    ) -> List[str]:
+    ) -> list[str]:
         """Identical to self.train_multi_levels, but also saves the data to disk. This should only ever be called once."""
         if time_limit is not None and time_limit <= 0:
             raise AssertionError(f"Not enough time left to train models. Consider specifying a larger time_limit. Time remaining: {round(time_limit, 2)}s")
@@ -3254,19 +3443,19 @@ class AbstractTrainer:
             logger.log(30, "Warning: AutoGluon did not successfully train any models")
         return model_names_fit
 
-    def _predict_model(self, X: pd.DataFrame, model: str, model_pred_proba_dict: dict = None) -> np.ndarray:
+    def _predict_model(self, X: pd.DataFrame, model: str, model_pred_proba_dict: dict | None = None) -> np.ndarray:
         y_pred_proba = self._predict_proba_model(X=X, model=model, model_pred_proba_dict=model_pred_proba_dict)
         return get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
 
-    def _predict_proba_model(self, X: pd.DataFrame, model: str, model_pred_proba_dict: dict = None) -> np.ndarray:
+    def _predict_proba_model(self, X: pd.DataFrame, model: str, model_pred_proba_dict: dict | None = None) -> np.ndarray:
         model_pred_proba_dict = self.get_model_pred_proba_dict(X=X, models=[model], model_pred_proba_dict=model_pred_proba_dict)
         if not isinstance(model, str):
             model = model.name
         return model_pred_proba_dict[model]
 
     def _proxy_model_feature_prune(
-        self, model_fit_kwargs: dict, time_limit: float, layer_fit_time: float, level: int, features: List[str], **feature_prune_kwargs: dict
-    ) -> List[str]:
+        self, model_fit_kwargs: dict, time_limit: float, layer_fit_time: float, level: int, features: list[str], **feature_prune_kwargs: dict
+    ) -> list[str]:
         """
         Uses the best LightGBM-based base learner of this layer to perform time-aware permutation feature importance based feature pruning.
         If all LightGBM models fail, use the model that achieved the highest validation accuracy. Feature pruning gets the smaller of the
@@ -3287,12 +3476,12 @@ class AbstractTrainer:
             How long it took to fit all the models in this layer once. Used to calculate how long to feature prune for.
         level : int
             Level of this stack layer.
-        features: List[str]
+        features: list[str]
             The list of feature names in the inputted dataset.
 
         Returns
         -------
-        candidate_features : List[str]
+        candidate_features : list[str]
             Feature names that survived the pruning procedure.
         """
         k = feature_prune_kwargs.pop("k", 2)
@@ -3326,14 +3515,14 @@ class AbstractTrainer:
     def _get_default_proxy_model_class(self):
         return None
 
-    def _retain_better_pruned_models(self, pruned_models: List[str], original_prune_map: dict, force_prune: bool = False) -> List[str]:
+    def _retain_better_pruned_models(self, pruned_models: list[str], original_prune_map: dict, force_prune: bool = False) -> list[str]:
         """
         Compares models fit on the pruned set of features with their counterpart, models fit on full set of features.
         Take the model that achieved a higher validation set score and delete the other from self.model_graph.
 
         Parameters
         ----------
-        pruned_models : List[str]
+        pruned_models : list[str]
             A list of pruned model names.
         original_prune_map : dict
             A dictionary mapping the names of models fitted on pruned features to the names of models fitted on original features.
@@ -3342,7 +3531,7 @@ class AbstractTrainer:
 
         Returns
         ----------
-        models : List[str]
+        models : list[str]
             A list of model names.
         """
         models = []
@@ -3460,7 +3649,7 @@ class AbstractTrainer:
         model_types = self.get_models_attribute_dict(attribute="type", models=model_names)
         return model_names, model_paths, model_types
 
-    def get_model_attribute_full(self, model: Union[str, List[str]], attribute: str, func=sum) -> Union[float, int]:
+    def get_model_attribute_full(self, model: str | list[str], attribute: str, func=sum) -> float | int:
         """
         Sums the attribute value across all models that the provided model depends on, including itself.
         For instance, this function can return the expected total predict_time of a model.
@@ -3497,7 +3686,7 @@ class AbstractTrainer:
             attribute_full = 0
         return attribute_full
 
-    def get_models_attribute_full(self, models: List[str], attribute: str, func=sum):
+    def get_models_attribute_full(self, models: list[str], attribute: str, func=sum):
         """
         For each model in models, returns the output of self.get_model_attribute_full mapped to a dict.
         """
@@ -3505,57 +3694,6 @@ class AbstractTrainer:
         for model in models:
             d[model] = self.get_model_attribute_full(model=model, attribute=attribute, func=func)
         return d
-
-    def get_models_attribute_dict(self, attribute: str, models: list = None) -> Dict[str, Any]:
-        """
-        Returns dictionary of model name -> attribute value for the provided attribute.
-        """
-        models_attribute_dict = nx.get_node_attributes(self.model_graph, attribute)
-        if models is not None:
-            model_names = []
-            for model in models:
-                if not isinstance(model, str):
-                    model = model.name
-                model_names.append(model)
-            if attribute == "path":
-                models_attribute_dict = {key: os.path.join(*val) for key, val in models_attribute_dict.items() if key in model_names}
-            else:
-                models_attribute_dict = {key: val for key, val in models_attribute_dict.items() if key in model_names}
-        return models_attribute_dict
-
-    def get_model_attribute(self, model, attribute: str, **kwargs) -> Any:
-        """
-        Return model attribute value.
-        If `default` is specified, return default value if attribute does not exist.
-        If `default` is not specified, raise ValueError if attribute does not exist.
-        """
-        if not isinstance(model, str):
-            model = model.name
-        if model not in self.model_graph.nodes:
-            raise ValueError(f"Model does not exist: (model={model})")
-        if attribute not in self.model_graph.nodes[model]:
-            if "default" in kwargs:
-                return kwargs["default"]
-            else:
-                raise ValueError(f"Model does not contain attribute: (model={model}, attribute={attribute})")
-        if attribute == "path":
-            return os.path.join(*self.model_graph.nodes[model][attribute])
-        return self.model_graph.nodes[model][attribute]
-
-    def set_model_attribute(self, model, attribute: str, val):
-        if not isinstance(model, str):
-            model = model.name
-        self.model_graph.nodes[model][attribute] = val
-
-    # Gets the minimum set of models that the provided model depends on, including itself
-    # Returns a list of model names
-    def get_minimum_model_set(self, model, include_self=True) -> list:
-        if not isinstance(model, str):
-            model = model.name
-        minimum_model_set = list(nx.bfs_tree(self.model_graph, model, reverse=True))
-        if not include_self:
-            minimum_model_set = [m for m in minimum_model_set if m != model]
-        return minimum_model_set
 
     # Gets the minimum set of models that the provided models depend on, including themselves
     # Returns a list of model names
@@ -3573,7 +3711,7 @@ class AbstractTrainer:
         base_model_set = list(self.model_graph.predecessors(model))
         return base_model_set
 
-    def model_refit_map(self, inverse=False) -> Dict[str, str]:
+    def model_refit_map(self, inverse=False) -> dict[str, str]:
         """
         Returns dict of parent model -> refit model
 
@@ -3586,10 +3724,6 @@ class AbstractTrainer:
 
     def model_exists(self, model: str) -> bool:
         return model in self.get_model_names()
-
-    def _get_banned_model_names(self) -> list:
-        """Gets all model names which would cause model files to be overwritten if a new model was trained with the name"""
-        return self.get_model_names() + list(self._extra_banned_names)
 
     def _flatten_model_info(self, model_info: dict) -> dict:
         """
@@ -3643,7 +3777,7 @@ class AbstractTrainer:
             model_info_flat[key] = custom_info[key]
         return model_info_flat
 
-    def leaderboard(self, extra_info=False, refit_full: bool = None, set_refit_score_to_parent: bool = False):
+    def leaderboard(self, extra_info=False, refit_full: bool | None = None, set_refit_score_to_parent: bool = False):
         model_names = self.get_model_names()
         models_full_dict = self.get_models_attribute_dict(models=model_names, attribute="refit_full_parent")
         if refit_full is not None:
@@ -3956,30 +4090,6 @@ class AbstractTrainer:
 
         return info
 
-    def get_model_info(self, model: str | AbstractModel) -> Dict[str, Any]:
-        if isinstance(model, str):
-            if model in self.models.keys():
-                model = self.models[model]
-        if isinstance(model, str):
-            model_type = self.get_model_attribute(model=model, attribute="type")
-            model_path = self.get_model_attribute(model=model, attribute="path")
-            model_info = model_type.load_info(path=os.path.join(self.path, model_path))
-        else:
-            model_info = model.get_info()
-        return model_info
-
-    def get_models_info(self, models: List[str | AbstractModel] = None) -> Dict[str, Dict[str, Any]]:
-        if models is None:
-            models = self.get_model_names()
-        model_info_dict = dict()
-        for model in models:
-            if isinstance(model, str):
-                model_name = model
-            else:
-                model_name = model.name
-            model_info_dict[model_name] = self.get_model_info(model=model)
-        return model_info_dict
-
     def reduce_memory_size(
         self, remove_data=True, remove_fit_stack=False, remove_fit=True, remove_info=False, requires_save=True, reduce_children=False, **kwargs
     ):
@@ -4062,7 +4172,7 @@ class AbstractTrainer:
                 for model in models_to_remove:
                     model = self.load_model(model)
                     logger.log(30, f"\tDirectory {model.path} would have been deleted.")
-            logger.log(30, f"To perform the deletion, set dry_run=False")
+            logger.log(30, "To perform the deletion, set dry_run=False")
             return
 
         if delete_from_disk:
@@ -4092,7 +4202,7 @@ class AbstractTrainer:
         shutil.rmtree(path=path_attr_model, ignore_errors=True)
 
     @classmethod
-    def load(cls, path, reset_paths=False):
+    def load(cls, path: str, reset_paths: bool = False) -> Self:
         load_path = os.path.join(path, cls.trainer_file_name)
         if not reset_paths:
             return load_pkl.load(path=load_path)
@@ -4102,26 +4212,8 @@ class AbstractTrainer:
             obj.reset_paths = reset_paths
             return obj
 
-    @classmethod
-    def load_info(cls, path, reset_paths=False, load_model_if_required=True):
-        load_path = os.path.join(path, cls.trainer_info_name)
-        try:
-            return load_pkl.load(path=load_path)
-        except:
-            if load_model_if_required:
-                trainer = cls.load(path=path, reset_paths=reset_paths)
-                return trainer.get_info()
-            else:
-                raise
-
-    def save_info(self, include_model_info=False):
-        info = self.get_info(include_model_info=include_model_info)
-
-        save_pkl.save(path=os.path.join(self.path, self.trainer_info_name), object=info)
-        save_json.save(path=os.path.join(self.path, self.trainer_info_json_name), obj=info)
-        return info
-
-    def _process_hyperparameters(self, hyperparameters: dict) -> dict:
+    @staticmethod
+    def _process_hyperparameters(hyperparameters: dict) -> dict:
         return process_hyperparameters(hyperparameters=hyperparameters)
 
     def distill(
@@ -4327,7 +4419,7 @@ class AbstractTrainer:
         return distilled_model_names
 
     def _get_model_fit_kwargs(
-        self, X: pd.DataFrame, X_val: pd.DataFrame, time_limit: float, k_fold: int, fit_kwargs: dict, ens_sample_weight: List = None
+        self, X: pd.DataFrame, X_val: pd.DataFrame, time_limit: float, k_fold: int, fit_kwargs: dict, ens_sample_weight: list | None = None
     ) -> dict:
         # Returns kwargs to be passed to AbstractModel's fit function
         if fit_kwargs is None:
@@ -4364,7 +4456,7 @@ class AbstractTrainer:
             k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start, compute_base_preds=False
         )
 
-    def _get_feature_prune_proxy_model(self, proxy_model_class: Union[AbstractModel, None], level: int) -> AbstractModel:
+    def _get_feature_prune_proxy_model(self, proxy_model_class: AbstractModel | None, level: int) -> AbstractModel:
         """
         Returns proxy model to be used for feature pruning - the base learner that has the highest validation score in a particular stack layer.
         Ties are broken by inference speed. If proxy_model_class is not None, take the best base learner belonging to proxy_model_class.
@@ -4398,7 +4490,7 @@ class AbstractTrainer:
         best_candidate_model_rows = candidate_model_rows.loc[candidate_model_rows["score_val"] == candidate_model_rows["score_val"].max()]
         return self.load_model(best_candidate_model_rows.loc[best_candidate_model_rows["fit_time"].idxmin()]["model"])
 
-    def calibrate_model(self, model_name: str = None, lr: float = 0.1, max_iter: int = 200, init_val: float = 1.0):
+    def calibrate_model(self, model_name: str | None = None, lr: float = 0.1, max_iter: int = 200, init_val: float = 1.0):
         """
         Applies temperature scaling to a model.
         Applies inverse softmax to predicted probs then trains temperature scalar
@@ -4494,11 +4586,11 @@ class AbstractTrainer:
     def calibrate_decision_threshold(
         self,
         X: pd.DataFrame | None = None,
-        y: np.array | None = None,
+        y: np.ndarray | None = None,
         metric: str | Scorer | None = None,
         model: str = "best",
         weights=None,
-        decision_thresholds: int | List[float] = 25,
+        decision_thresholds: int | list[float] = 25,
         secondary_decision_thresholds: int | None = 19,
         verbose: bool = True,
         **kwargs,
@@ -4565,7 +4657,7 @@ class AbstractTrainer:
         )
 
     @staticmethod
-    def _validate_num_classes(num_classes: int, problem_type: str):
+    def _validate_num_classes(num_classes: int | None, problem_type: str):
         if problem_type == BINARY:
             assert num_classes is not None and num_classes == 2, f"num_classes must be 2 when problem_type='{problem_type}' (num_classes={num_classes})"
         elif problem_type in [MULTICLASS, SOFTCLASS]:
@@ -4576,7 +4668,7 @@ class AbstractTrainer:
             raise AssertionError(f"Unknown problem_type: '{problem_type}'. Valid problem types: {[BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE]}")
 
     @staticmethod
-    def _validate_quantile_levels(quantile_levels: List[float] | np.array, problem_type: str):
+    def _validate_quantile_levels(quantile_levels: list[float] | np.ndarray | None, problem_type: str):
         if problem_type == QUANTILE:
             assert quantile_levels is not None, f"quantile_levels must not be None when problem_type='{problem_type}' (quantile_levels={quantile_levels})"
             assert isinstance(quantile_levels, (list, np.ndarray)), f"quantile_levels must be a list or np.ndarray (quantile_levels={quantile_levels})"
@@ -4587,13 +4679,13 @@ class AbstractTrainer:
 
 def _detached_train_multi_fold(
     *,
-    _self: AbstractTrainer,
+    _self: AbstractTabularTrainer,
     model: str | AbstractModel,
     X: pd.DataFrame,
     y: pd.Series,
     time_split: bool,
     time_start: float,
-    time_limit: float|None,
+    time_limit: float | None,
     time_limit_model_split: float | None,
     hyperparameter_tune_kwargs: dict,
     is_ray_worker: bool = False,
@@ -4636,7 +4728,7 @@ def _detached_train_multi_fold(
 
 def _remote_train_multi_fold(
     *,
-    _self: AbstractTrainer,
+    _self: AbstractTabularTrainer,
     model: str | AbstractModel,
     X: pd.DataFrame,
     y: pd.Series,
@@ -4694,7 +4786,7 @@ def _remote_train_multi_fold(
 
 def _detached_refit_single_full(
     *,
-    _self: AbstractTrainer,
+    _self: AbstractTabularTrainer,
     model: str,
     X: pd.DataFrame,
     y: pd.Series,
@@ -4787,7 +4879,7 @@ def _detached_refit_single_full(
 
 def _remote_refit_single_full(
     *,
-    _self: AbstractTrainer,
+    _self: AbstractTabularTrainer,
     model: str,
     X: pd.DataFrame,
     y: pd.Series,
