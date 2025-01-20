@@ -8,7 +8,7 @@ import time
 import traceback
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Literal, Optional, Sequence
+from typing import Any, Literal, Optional, Sequence, Type
 from typing_extensions import Self
 
 import networkx as nx
@@ -133,7 +133,7 @@ class AbstractTrainer:
                 models_attribute_dict = {key: val for key, val in models_attribute_dict.items() if key in model_names}
         return models_attribute_dict
 
-    def get_model_attribute(self, model: AbstractModel | str, attribute: str, **kwargs) -> Any:
+    def get_model_attribute(self, model: str | AbstractModel, attribute: str, **kwargs) -> Any:
         """Return model attribute value.
         If `default` is specified, return default value if attribute does not exist.
         If `default` is not specified, raise ValueError if attribute does not exist.
@@ -151,12 +151,12 @@ class AbstractTrainer:
             return os.path.join(*self.model_graph.nodes[model][attribute])
         return self.model_graph.nodes[model][attribute]
 
-    def set_model_attribute(self, model, attribute: str, val):
+    def set_model_attribute(self, model: str | AbstractModel, attribute: str, val: Any):
         if not isinstance(model, str):
             model = model.name
         self.model_graph.nodes[model][attribute] = val
 
-    def get_minimum_model_set(self, model, include_self=True) -> list:
+    def get_minimum_model_set(self, model: str | AbstractModel, include_self: bool = True) -> list:
         """Gets the minimum set of models that the provided model depends on, including itself
         Returns a list of model names
         """
@@ -191,7 +191,7 @@ class AbstractTrainer:
         return model_info_dict
 
     # TODO: model_name change to model in params
-    def load_model(self, model_name: str, path: str | None = None, model_type=None) -> AbstractModel:
+    def load_model(self, model_name: str, path: str | None = None, model_type: Type[AbstractModel] | None = None) -> AbstractModel:
         if isinstance(model_name, AbstractModel):
             return model_name
         if model_name in self.models.keys():
@@ -202,10 +202,11 @@ class AbstractTrainer:
                 assert path is not None
             if model_type is None:
                 model_type = self.get_model_attribute(model=model_name, attribute="type")
+                assert model_type is not None
             return model_type.load(path=os.path.join(self.path, path), reset_paths=self.reset_paths)
         
     @classmethod
-    def load_info(cls, path, reset_paths=False, load_model_if_required=True) -> dict[str, Any]:
+    def load_info(cls, path: str, reset_paths: bool = False, load_model_if_required: bool = True) -> dict[str, Any]:
         load_path = os.path.join(path, cls.trainer_info_name)
         try:
             return load_pkl.load(path=load_path)
@@ -216,7 +217,7 @@ class AbstractTrainer:
             else:
                 raise
 
-    def save_info(self, include_model_info=False) -> dict[str, Any]:
+    def save_info(self, include_model_info: bool = False) -> dict[str, Any]:
         info = self.get_info(include_model_info=include_model_info)
 
         save_pkl.save(path=os.path.join(self.path, self.trainer_info_name), object=info)

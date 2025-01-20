@@ -203,6 +203,7 @@ class AbstractTimeSeriesTrainer(SimpleAbstractTrainer):
 
         # Dict of normal model -> FULL model. FULL models are produced by
         # self.refit_single_full() and self.refit_full().
+        # TODO: reconcile this with abstract classes
         self.model_refit_map = {}
 
         self.eval_metric: TimeSeriesScorer = check_get_evaluation_metric(eval_metric)
