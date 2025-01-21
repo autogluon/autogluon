@@ -17,18 +17,18 @@ def test_config():
         cur_path, "../../../src/autogluon/multimodal/configs/optimization/default.yaml"
     )
     optimization_config = OmegaConf.load(optimization_config_path)
-    environemnt_config_path = os.path.join(
+    environment_config_path = os.path.join(
         cur_path, "../../../src/autogluon/multimodal/configs/environment/default.yaml"
     )
-    environemnt_config = OmegaConf.load(environemnt_config_path)
-    config_gt = OmegaConf.merge(model_config, data_config, optimization_config, environemnt_config)
+    environment_config = OmegaConf.load(environment_config_path)
+    config_gt = OmegaConf.merge(model_config, data_config, optimization_config, environment_config)
 
     # test yaml path
     config = {
         MODEL: model_config_path,
         DATA: data_config_path,
         OPTIMIZATION: optimization_config_path,
-        ENVIRONMENT: environemnt_config_path,
+        ENVIRONMENT: environment_config_path,
     }
     config = get_config(config=config)
     assert config == config_gt
@@ -38,7 +38,7 @@ def test_config():
         MODEL: model_config,
         DATA: data_config,
         OPTIMIZATION: optimization_config,
-        ENVIRONMENT: environemnt_config,
+        ENVIRONMENT: environment_config,
     }
     config = get_config(config=config)
     assert config == config_gt
@@ -53,14 +53,14 @@ def test_config():
     optimization_config = OmegaConf.to_container(optimization_config)
     assert isinstance(optimization_config, dict)
 
-    environemnt_config = OmegaConf.to_container(environemnt_config)
-    assert isinstance(environemnt_config, dict)
+    environment_config = OmegaConf.to_container(environment_config)
+    assert isinstance(environment_config, dict)
 
     config = {
         MODEL: model_config,
         DATA: data_config,
         OPTIMIZATION: optimization_config,
-        ENVIRONMENT: environemnt_config,
+        ENVIRONMENT: environment_config,
     }
     config = get_config(config=config)
     assert config == config_gt

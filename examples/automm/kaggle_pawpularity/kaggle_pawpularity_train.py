@@ -11,7 +11,7 @@ import os
 def get_args():
     parser = argparse.ArgumentParser(description="The example for Kaggle competition Petfinder Pawpularity with MultiModalPredictor.")
     parser.add_argument("--data_path", type=str,
-                        help="The path of the competiton dataset.",
+                        help="The path of the competition dataset.",
                         default="./data/")
     parser.add_argument("--label_column", type=str,
                         help="The column name of label.",

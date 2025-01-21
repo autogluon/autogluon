@@ -1492,7 +1492,7 @@ class BaseLearner(ExportMixin, DistillationMixin, RealtimeMixin):
                 os.remove(last_ckpt_path)
 
     def prepare_deepspeed_offloading(self, strategy):
-        # TODO: Using optimiation_kwargs for inference is confusing and bad design. Remove as soon as fixed in lightning.
+        # TODO: Using optimization_kwargs for inference is confusing and bad design. Remove as soon as fixed in lightning.
         if self._config.env.strategy == DEEPSPEED_OFFLOADING and DEEPSPEED_MODULE not in sys.modules:
             # Need to initialize DeepSpeed and optimizer as currently required in lightning's integration of deepspeed.
             from ..optimization.deepspeed import CustomDeepSpeedStrategy

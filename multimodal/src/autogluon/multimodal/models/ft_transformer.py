@@ -320,7 +320,7 @@ class NumEmbeddings(nn.Module):
             it identical as the original feature_tokenzier in FT_Transformer (c.f. Figure 2.a in https://arxiv.org/pdf/2106.11959.pdf).
         d_embedding:
             Dimension of the embeddings.
-            The output shape should be [batch_size, number_of_numerical_featurs, d_embedding]
+            The output shape should be [batch_size, number_of_numerical_features, d_embedding]
         memory_efficient:
             Use efficient linear layer scheme if True. Default is False.
 

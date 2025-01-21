@@ -14,7 +14,7 @@ def get_args() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="The example for Kaggle competition Feedback Prize - Predicting Effective Arguments."
     )
-    parser.add_argument("--data_path", type=str, help="The path of the competiton dataset.", default="./data/")
+    parser.add_argument("--data_path", type=str, help="The path of the competition dataset.", default="./data/")
     parser.add_argument("--model_path", type=str, help="The path of the model artifacts.", default="./model/")
     parser.add_argument(
         "--label_name", type=str, help="The column name of predictive label.", default="discourse_effectiveness"

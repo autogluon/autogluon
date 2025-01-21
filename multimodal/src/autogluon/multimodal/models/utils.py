@@ -269,8 +269,8 @@ def group_param_names(
 
 def reverse_layer_ids(
     encoder_name_to_id: dict,
-    pre_enocder_name_to_id: dict,
-    post_enocder_name_to_id: dict,
+    pre_encoder_name_to_id: dict,
+    post_encoder_name_to_id: dict,
 ):
     """
     The layer ids need to increase when going from the output end to the input end.
@@ -280,20 +280,20 @@ def reverse_layer_ids(
     ----------
     encoder_name_to_id
         The layer-to-id mapping of encoder layers.
-    pre_enocder_name_to_id
+    pre_encoder_name_to_id
         The layer-to-id mapping of pre-encoder layers.
-    post_enocder_name_to_id
+    post_encoder_name_to_id
         The layer-to-id mapping of post-encoder layers.
 
     Returns
     -------
     The layer-to-id mapping of all layers with layer ids reversed.
     """
-    name_to_id = {**pre_enocder_name_to_id, **encoder_name_to_id, **post_enocder_name_to_id}
+    name_to_id = {**pre_encoder_name_to_id, **encoder_name_to_id, **post_encoder_name_to_id}
     if len(name_to_id) > 0:
         layer_num = max(name_to_id.values())
         # if no post encoder layers, the minimum layer id should be 1
-        if len(post_enocder_name_to_id) == 0:
+        if len(post_encoder_name_to_id) == 0:
             layer_num += 1
     for n, layer_id in name_to_id.items():
         name_to_id[n] = layer_num - layer_id
@@ -358,8 +358,8 @@ def assign_layer_ids(
 
         name_to_id = reverse_layer_ids(
             encoder_name_to_id=encoder_name_to_id,
-            pre_enocder_name_to_id=pre_encoder_name_to_id,
-            post_enocder_name_to_id=post_encoder_name_to_id,
+            pre_encoder_name_to_id=pre_encoder_name_to_id,
+            post_encoder_name_to_id=post_encoder_name_to_id,
         )
     except Exception as e:
         logger.debug(
@@ -646,7 +646,7 @@ def apply_multi_class_semantic_seg_postprocess(output: Dict):
 
     Returns
     -------
-    The output with post-proceesed semantic masks.
+    The output with post-processed semantic masks.
     """
 
     def semantic_inference(mask_cls, mask_pred):

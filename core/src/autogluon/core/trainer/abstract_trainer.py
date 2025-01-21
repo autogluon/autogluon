@@ -4571,7 +4571,7 @@ class AbstractTrainer:
         elif problem_type in [MULTICLASS, SOFTCLASS]:
             assert num_classes is not None and num_classes >= 2, f"num_classes must be >=2 when problem_type='{problem_type}' (num_classes={num_classes})"
         elif problem_type in [REGRESSION, QUANTILE]:
-            assert num_classes is None, f"num_clases must be None when problem_type='{problem_type}' (num_classes={num_classes})"
+            assert num_classes is None, f"num_classes must be None when problem_type='{problem_type}' (num_classes={num_classes})"
         else:
             raise AssertionError(f"Unknown problem_type: '{problem_type}'. Valid problem types: {[BINARY, MULTICLASS, REGRESSION, SOFTCLASS, QUANTILE]}")
 

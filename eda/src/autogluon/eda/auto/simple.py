@@ -389,7 +389,7 @@ def quick_fit(
         If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`,
         where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels).
     show_feature_importance_barplots: bool, default = False
-        if `True`, then barplot char will ba added with feature importance visualization
+        if `True`, then barplot char will be added with feature importance visualization
     estimator_args: Optional[Dict[str, Dict[str, Any]]], default = None,
         args to pass into the estimator constructor
     fit_args: Optional[Dict[str, Dict[str, Any]]], default = None,

@@ -18,7 +18,7 @@ model = dict(
         widen_factor=0.5,
         out_indices=(2, 3, 4),
         use_depthwise=False,
-        spp_kernal_sizes=(5, 9, 13),
+        spp_kernel_sizes=(5, 9, 13),
         norm_cfg=dict(type="BN", momentum=0.03, eps=0.001),
         act_cfg=dict(type="Swish"),
     ),

@@ -48,7 +48,7 @@ def test_category_feature_generator(generator_helper, data_helper):
     ]
 
     # When
-    output_datas = []
+    output_data = []
     for generator in [generator_1, generator_2, generator_3, generator_4, generator_5, generator_6]:
         output_data = generator_helper.fit_transform_assert(
             input_data=input_data,
@@ -56,14 +56,14 @@ def test_category_feature_generator(generator_helper, data_helper):
             expected_feature_metadata_in_full=expected_feature_metadata_in_full,
             expected_feature_metadata_full=expected_feature_metadata_full,
         )
-        output_datas.append(output_data)
+        output_data.append(output_data)
 
     # Therefore
-    assert category_input_data.equals(output_datas[5])
-    output_datas = output_datas[:5]
+    assert category_input_data.equals(output_data[5])
+    output_data = output_data[:5]
 
-    for i in range(len(output_datas)):
-        output_data = output_datas[i]
+    for i in range(len(output_data)):
+        output_data = output_data[i]
         for col in ["obj", "cat"]:
             assert output_data[col].dtype.name == "category"
             assert list(output_data[col].cat.categories) == expected_cat_categories_lst[i]

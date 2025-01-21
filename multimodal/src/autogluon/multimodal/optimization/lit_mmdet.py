@@ -126,9 +126,9 @@ class MMDetLitModule(pl.LightningModule):
         for loss_key, loss_values in losses.items():
             curr_loss = 0.0
             if isinstance(loss_values, list) or isinstance(loss_values, tuple):  # is a collection of shape 0 tensors
-                for loss_chanel_idx, loss_val in enumerate(loss_values):
+                for loss_channel_idx, loss_val in enumerate(loss_values):
                     if logging:
-                        self.log(f"step/{loss_key}_{loss_chanel_idx}", loss_val)
+                        self.log(f"step/{loss_key}_{loss_channel_idx}", loss_val)
                     curr_loss += loss_val
             else:  # is a tensor
                 curr_loss += loss_values.sum()

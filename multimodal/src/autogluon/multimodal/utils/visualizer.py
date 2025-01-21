@@ -553,7 +553,7 @@ class NERVisualizer:
     @staticmethod
     def escape_html(text: str) -> str:
         """Replace <, >, &, " with their HTML encoded representation. Intended to
-        prevent HTML errors in rendered displaCy markup.
+        prevent HTML errors in rendered display markup.
         text (str): The original text.
         RETURNS (str): Equivalent text to be safely used within HTML.
         """

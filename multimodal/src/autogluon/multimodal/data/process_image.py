@@ -199,7 +199,7 @@ class ImageProcessor:
         mean
             Image normalization mean.
         std
-            Image normalizaiton std.
+            Image normalization std.
         """
         if self.prefix.lower().startswith(TIMM_IMAGE):
             image_size = config["input_size"][-1]
