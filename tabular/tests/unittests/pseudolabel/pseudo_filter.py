@@ -42,16 +42,16 @@ def test_classification_pseudofilter():
     # Test if percent preds is below min threshold
     y_reg_fake_below_min = np.zeros((num_rows, 2))
     y_reg_fake_below_min = pd.DataFrame(data=y_reg_fake_below_min)
-    pseudo_indicies_ans = filter_pseudo(y_reg_fake_below_min, "binary")
-    assert num_rows == len(pseudo_indicies_ans)
+    pseudo_indices_ans = filter_pseudo(y_reg_fake_below_min, "binary")
+    assert num_rows == len(pseudo_indices_ans)
 
     # Test if percent preds is above max threshold
     y_reg_fake_above_max = pandas.DataFrame(data=y_reg_fake)
-    pseudo_indicies_ans = filter_pseudo(y_reg_fake_above_max, "binary")
+    pseudo_indices_ans = filter_pseudo(y_reg_fake_above_max, "binary")
     num_rows_threshold = max(np.ceil(max_percent * len(y_reg_fake_above_max)), 1)
     curr_threshold = y_reg_fake_above_max.loc[num_rows_threshold - 1]
     answer = len(y_reg_fake_above_max >= curr_threshold)
-    assert answer == len(pseudo_indicies_ans)
+    assert answer == len(pseudo_indices_ans)
 
     # Test if normal functionality beginning
     y_reg_fake = np.column_stack((y_reg_fake, np.zeros((num_above_threshold))))
