@@ -89,8 +89,8 @@ def create_version_file(*, version, submodule):
         version_path = os.path.join(AUTOGLUON_ROOT_PATH, AUTOGLUON, "src", AUTOGLUON, "version.py")
     with open(version_path, "w") as f:
         f.write(f'"""This is the {AUTOGLUON} version file."""\n')
-        f.write("__version__ = '{}'\n".format(version))
-        f.write("__lite__ = {}\n".format(LITE_MODE))
+        f.write(f'\n__version__ = "{version}"\n')
+        f.write(f"__lite__ = {LITE_MODE}\n")
 
 
 def default_setup_args(*, version, submodule):
