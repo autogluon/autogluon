@@ -5,12 +5,11 @@ import os
 import pprint
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Type, Union
+from typing import Any, cast, Dict, List, Literal, Optional, Type, Union
 
 import numpy as np
 import pandas as pd
 
-from autogluon.common.utils.deprecated_utils import Deprecated_args
 from autogluon.common.utils.log_utils import add_log_to_file, set_logger_verbosity
 from autogluon.common.utils.system_info import get_ag_system_info
 from autogluon.common.utils.utils import check_saved_predictor_version, setup_outputdir
@@ -132,7 +131,6 @@ class TimeSeriesPredictor:
     _predictor_version_file_name = "version.txt"
     _predictor_log_file_name = "predictor_log.txt"
 
-    @Deprecated_args(min_version_to_warn="1.2", min_version_to_error="1.4", **{"learner_type": None})
     def __init__(
         self,
         target: Optional[str] = None,
@@ -215,6 +213,12 @@ class TimeSeriesPredictor:
                 "If your data has irregular timestamps, please either 1) specify the desired regular frequency when "
                 "creating the predictor as `TimeSeriesPredictor(freq=...)` or 2) manually convert timestamps to "
                 "regular frequency with `data.convert_frequency(freq=...)`."
+            )
+        if "learner_type" in kwargs:
+            val = kwargs.pop("learner_type")
+            logger.warning(
+                "Passing `learner_type` to TimeSeriesPredictor has been deprecated and will be removed in v1.4. "
+                f"The provided value {val} will be ignored."
             )
         if len(kwargs) > 0:
             for key in kwargs:
@@ -843,7 +847,7 @@ class TimeSeriesPredictor:
             use_cache=use_cache,
             random_seed=random_seed,
         )
-        return predictions.reindex(original_item_id_order, level=ITEMID)
+        return cast(TimeSeriesDataFrame, predictions.reindex(original_item_id_order, level=ITEMID))
 
     def evaluate(
         self,
@@ -1096,7 +1100,7 @@ class TimeSeriesPredictor:
         """
         if not path:
             raise ValueError("`path` cannot be None or empty in load().")
-        path: str = setup_outputdir(path, warn_if_exist=False)
+        path = setup_outputdir(path, warn_if_exist=False)
 
         predictor_path = Path(path) / cls.predictor_file_name
         if not predictor_path.exists():
@@ -1409,7 +1413,7 @@ class TimeSeriesPredictor:
         def select_target(ts_df: TimeSeriesDataFrame) -> TimeSeriesDataFrame:
             ts_df = ts_df.copy()
             ts_df.static_features = None
-            return ts_df[[self.target]]
+            return cast(TimeSeriesDataFrame, ts_df[[self.target]])
 
         test_data = self._check_and_prepare_data_frame(test_data)
         self._check_data_for_evaluation(test_data, name="test_data")
@@ -1548,7 +1552,7 @@ class TimeSeriesPredictor:
                 ax.plot(ts, label="Observed", color="C0")
 
                 if predictions is not None:
-                    forecast = predictions.loc[item_id]
+                    forecast: pd.DataFrame = predictions.loc[item_id]  # type: ignore
                     point_forecast = forecast[point_forecast_column]
                     ax.plot(point_forecast, color="C1", label="Forecast")
                     if quantile_levels is not None:

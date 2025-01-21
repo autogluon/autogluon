@@ -24,23 +24,7 @@ TIMESTAMP = "timestamp"
 IRREGULAR_TIME_INDEX_FREQSTR = "IRREG"
 
 
-class TimeSeriesDataFrameDeprecatedMixin:
-    """Contains deprecated methods from TimeSeriesDataFrame that shouldn't show up in API documentation."""
-
-    def get_reindexed_view(self, *args, **kwargs) -> TimeSeriesDataFrame:
-        raise ValueError(
-            "`TimeSeriesDataFrame.get_reindexed_view` has been deprecated. If your data has irregular timestamps, "
-            "please convert it to a regular frequency with `convert_frequency`."
-        )
-
-    def to_regular_index(self, *args, **kwargs) -> TimeSeriesDataFrame:
-        raise ValueError(
-            "`TimeSeriesDataFrame.to_regular_index` has been deprecated. "
-            "Please use `TimeSeriesDataFrame.convert_frequency` instead."
-        )
-
-
-class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
+class TimeSeriesDataFrame(pd.DataFrame):
     """A collection of univariate time series, where each row is identified by an (``item_id``, ``timestamp``) pair.
 
     For example, a time series data frame could represent the daily sales of a collection of products, where each
@@ -1082,3 +1066,15 @@ class TimeSeriesDataFrame(pd.DataFrame, TimeSeriesDataFrameDeprecatedMixin):
     def to_data_frame(self) -> pd.DataFrame:
         """Convert `TimeSeriesDataFrame` to a `pandas.DataFrame`"""
         return pd.DataFrame(self)
+
+    def get_reindexed_view(self, *args, **kwargs) -> TimeSeriesDataFrame:
+        raise ValueError(
+            "`TimeSeriesDataFrame.get_reindexed_view` has been deprecated. If your data has irregular timestamps, "
+            "please convert it to a regular frequency with `convert_frequency`."
+        )
+
+    def to_regular_index(self, *args, **kwargs) -> TimeSeriesDataFrame:
+        raise ValueError(
+            "`TimeSeriesDataFrame.to_regular_index` has been deprecated. "
+            "Please use `TimeSeriesDataFrame.convert_frequency` instead."
+        )
