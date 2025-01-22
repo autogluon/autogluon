@@ -1066,15 +1066,3 @@ class TimeSeriesDataFrame(pd.DataFrame):
     def to_data_frame(self) -> pd.DataFrame:
         """Convert `TimeSeriesDataFrame` to a `pandas.DataFrame`"""
         return pd.DataFrame(self)
-
-    def get_reindexed_view(self, *args, **kwargs) -> TimeSeriesDataFrame:
-        raise ValueError(
-            "`TimeSeriesDataFrame.get_reindexed_view` has been deprecated. If your data has irregular timestamps, "
-            "please convert it to a regular frequency with `convert_frequency`."
-        )
-
-    def to_regular_index(self, *args, **kwargs) -> TimeSeriesDataFrame:
-        raise ValueError(
-            "`TimeSeriesDataFrame.to_regular_index` has been deprecated. "
-            "Please use `TimeSeriesDataFrame.convert_frequency` instead."
-        )
