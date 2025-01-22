@@ -679,7 +679,7 @@ def test_when_use_cache_is_set_to_false_then_cached_predictions_are_ignored(temp
     predictor.predict(DUMMY_TS_DATAFRAME)
 
     with mock.patch(
-        "autogluon.timeseries.trainer.abstract_trainer.AbstractTimeSeriesTrainer._get_cached_pred_dicts"
+        "autogluon.timeseries.trainer.abstract_trainer.TimeSeriesTrainer._get_cached_pred_dicts"
     ) as mock_get_cached_pred_dicts:
         mock_get_cached_pred_dicts.return_value = {}, {}
         getattr(predictor, method_name)(DUMMY_TS_DATAFRAME, use_cache=use_cache)
@@ -1192,7 +1192,7 @@ def test_when_predictor_predict_called_with_random_seed_then_torch_seed_set_for_
         assert torch.get_rng_state().numpy()[0] == random_seed
         return DUMMY_TS_DATAFRAME
 
-    with mock.patch("autogluon.timeseries.trainer.AbstractTimeSeriesTrainer._predict_model") as mock_predict_model:
+    with mock.patch("autogluon.timeseries.trainer.TimeSeriesTrainer._predict_model") as mock_predict_model:
         mock_predict_model.side_effect = predict_model_side_effect
         try:
             predictor.predict(DUMMY_TS_DATAFRAME, random_seed=random_seed)
@@ -1633,7 +1633,7 @@ def test_when_feature_importance_called_with_improvements_then_improvements_are_
     predictor = predictors["all_features"]
 
     with mock.patch(
-        "autogluon.timeseries.trainer.abstract_trainer.AbstractTimeSeriesTrainer.evaluate"
+        "autogluon.timeseries.trainer.abstract_trainer.TimeSeriesTrainer.evaluate"
     ) as mock_evaluate:
         mock_evaluate.side_effect = [{"MAPE": v} for v in scores_returned] * num_iterations  # baseline, feature
 
@@ -1680,7 +1680,7 @@ def test_given_predictor_takes_no_features_when_feature_importance_called_with_i
     predictor = predictors["no_features"]
 
     with mock.patch(
-        "autogluon.timeseries.trainer.abstract_trainer.AbstractTimeSeriesTrainer.evaluate"
+        "autogluon.timeseries.trainer.abstract_trainer.TimeSeriesTrainer.evaluate"
     ) as mock_evaluate:
         mock_evaluate.side_effect = [
             {"MAPE": v} for v in scores_returned
@@ -1725,7 +1725,7 @@ def test_given_predictor_takes_known_only_when_feature_importance_called_with_im
     predictor = predictors["no_features"]
 
     with mock.patch(
-        "autogluon.timeseries.trainer.abstract_trainer.AbstractTimeSeriesTrainer.evaluate"
+        "autogluon.timeseries.trainer.abstract_trainer.TimeSeriesTrainer.evaluate"
     ) as mock_evaluate:
         mock_evaluate.side_effect = [
             {"MAPE": v} for v in scores_returned

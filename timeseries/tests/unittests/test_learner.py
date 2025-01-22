@@ -420,7 +420,7 @@ def test_when_features_are_all_nan_and_learner_is_loaded_then_mode_or_median_are
     data_with_nan, known_covariates_with_nan = data_with_nan.get_model_inputs_for_scoring(
         prediction_length, known_covariates_names
     )
-    with mock.patch("autogluon.timeseries.trainer.AbstractTimeSeriesTrainer.predict") as trainer_predict:
+    with mock.patch("autogluon.timeseries.trainer.TimeSeriesTrainer.predict") as trainer_predict:
         loaded_learner.predict(data_with_nan, known_covariates=known_covariates_with_nan)
         trainer_predict_call_args = trainer_predict.call_args[1]
         imputed_data = trainer_predict_call_args["data"]

@@ -22,7 +22,7 @@ from autogluon.timeseries.dataset.ts_dataframe import ITEMID, TimeSeriesDataFram
 from autogluon.timeseries.learner import TimeSeriesLearner
 from autogluon.timeseries.metrics import TimeSeriesScorer, check_get_evaluation_metric
 from autogluon.timeseries.splitter import ExpandingWindowSplitter
-from autogluon.timeseries.trainer import AbstractTimeSeriesTrainer
+from autogluon.timeseries.trainer import TimeSeriesTrainer
 
 logger = logging.getLogger("autogluon.timeseries")
 
@@ -218,7 +218,7 @@ class TimeSeriesPredictor:
                 raise TypeError(f"TimeSeriesPredictor.__init__() got an unexpected keyword argument '{key}'")
 
     @property
-    def _trainer(self) -> AbstractTimeSeriesTrainer:
+    def _trainer(self) -> TimeSeriesTrainer:
         return self._learner.load_trainer()  # noqa
 
     def _setup_log_to_file(self, log_to_file: bool, log_file_path: Union[str, Path]) -> None:

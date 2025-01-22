@@ -8,7 +8,7 @@ import time
 import traceback
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Generic, Literal, Optional, Sequence, Type, TypeVar
+from typing import Any, Generic, Literal, Optional, Type, TypeVar
 
 import networkx as nx
 import numpy as np
@@ -233,7 +233,7 @@ class AbstractTrainer(Generic[ModelTypeT]):
 
     def construct_model_templates(
         self, hyperparameters: str | dict[str, Any], **kwargs
-    ) -> tuple[Sequence[ModelTypeT], dict] | Sequence[ModelTypeT]:
+    ) -> tuple[list[ModelTypeT], dict] | list[ModelTypeT]:
         raise NotImplementedError
 
     def get_model_best(self, *args, **kwargs) -> str:
