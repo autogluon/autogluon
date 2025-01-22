@@ -1632,9 +1632,7 @@ def test_when_feature_importance_called_with_improvements_then_improvements_are_
     df_train, predictors = importance_dataset_and_predictors
     predictor = predictors["all_features"]
 
-    with mock.patch(
-        "autogluon.timeseries.trainer.abstract_trainer.TimeSeriesTrainer.evaluate"
-    ) as mock_evaluate:
+    with mock.patch("autogluon.timeseries.trainer.abstract_trainer.TimeSeriesTrainer.evaluate") as mock_evaluate:
         mock_evaluate.side_effect = [{"MAPE": v} for v in scores_returned] * num_iterations  # baseline, feature
 
         feature_importance = predictor.feature_importance(
@@ -1679,9 +1677,7 @@ def test_given_predictor_takes_no_features_when_feature_importance_called_with_i
     df_train, predictors = importance_dataset_and_predictors
     predictor = predictors["no_features"]
 
-    with mock.patch(
-        "autogluon.timeseries.trainer.abstract_trainer.TimeSeriesTrainer.evaluate"
-    ) as mock_evaluate:
+    with mock.patch("autogluon.timeseries.trainer.abstract_trainer.TimeSeriesTrainer.evaluate") as mock_evaluate:
         mock_evaluate.side_effect = [
             {"MAPE": v} for v in scores_returned
         ] * num_iterations  # baseline, feature taken out
@@ -1724,9 +1720,7 @@ def test_given_predictor_takes_known_only_when_feature_importance_called_with_im
     df_train, predictors = importance_dataset_and_predictors
     predictor = predictors["no_features"]
 
-    with mock.patch(
-        "autogluon.timeseries.trainer.abstract_trainer.TimeSeriesTrainer.evaluate"
-    ) as mock_evaluate:
+    with mock.patch("autogluon.timeseries.trainer.abstract_trainer.TimeSeriesTrainer.evaluate") as mock_evaluate:
         mock_evaluate.side_effect = [
             {"MAPE": v} for v in scores_returned
         ] * num_iterations  # baseline, feature taken out
