@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import List
-
 import pandas as pd
 from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.utils.validation import check_array, check_is_fitted, check_X_y
@@ -17,7 +15,7 @@ class TabularRegressor(BaseEstimator, RegressorMixin, ScikitMixin):
         self,
         eval_metric: str | Scorer = None,
         time_limit: float = None,
-        presets: List[str] | str = None,
+        presets: list[str] | str = None,
         hyperparameters: dict | str = None,
         path: str = None,
         verbosity: int = 2,
