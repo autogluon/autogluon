@@ -307,7 +307,7 @@ class TimeSeriesPredictor:
                 df = df.convert_frequency(freq=self.freq)
         return df
 
-    def _check_data_for_evaluation(self, data: TimeSeriesDataFrame, name: str = "data"):
+    def _check_data_for_evaluation(self, data: TimeSeriesDataFrame, name: str = "data") -> None:
         """Make sure that provided evaluation data includes both historic and future time series values."""
         if data.num_timesteps_per_item().min() <= self.prediction_length:
             raise ValueError(
@@ -926,7 +926,7 @@ class TimeSeriesPredictor:
         relative_scores: bool = False,
         include_confidence_band: bool = True,
         confidence_level: float = 0.99,
-    ):
+    ) -> pd.DataFrame:
         """
         Calculates feature importance scores for the given model via replacing each feature by a shuffled version of the same feature
         (also known as permutation feature importance) or by assigning a constant value representing the median or mode of the feature,
@@ -1129,7 +1129,7 @@ class TimeSeriesPredictor:
         predictor.path = learner.path
         return predictor
 
-    def _save_version_file(self):
+    def _save_version_file(self) -> None:
         version_file_contents = current_ag_version
         version_file_path = os.path.join(self.path, self._predictor_version_file_name)
         save_str.save(path=version_file_path, data=version_file_contents, verbose=False)
