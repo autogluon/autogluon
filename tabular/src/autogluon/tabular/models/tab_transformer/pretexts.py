@@ -111,8 +111,8 @@ class BERTPretext(nn.Module):
             assert torch.all(cat_feats[extra_replace] == orig_cat_feats[extra_replace]).item() is True
             extra_plus1 = cat_feats[extra_replace] + 1
             extra_minus1 = cat_feats[extra_replace] - 1
-            extra_zero_padd_idx = extra_minus1 == 0
-            extra_minus1[extra_zero_padd_idx] = extra_plus1[extra_zero_padd_idx]
+            extra_zero_pad_idx = extra_minus1 == 0
+            extra_minus1[extra_zero_pad_idx] = extra_plus1[extra_zero_pad_idx]
 
             cat_feats[extra_replace] = extra_minus1
             assert torch.all(~(cat_feats[extra_replace] == orig_cat_feats[extra_replace])).item() is True
@@ -135,8 +135,8 @@ class BERTPretext(nn.Module):
             assert torch.all(cat_feats[extra_replace] == orig_cat_feats[extra_replace]).item() is True
             extra_plus1 = cat_feats[extra_replace] + 1
             extra_minus1 = cat_feats[extra_replace] - 1
-            extra_zero_padd_idx = extra_minus1 == 0
-            extra_minus1[extra_zero_padd_idx] = extra_plus1[extra_zero_padd_idx]
+            extra_zero_pad_idx = extra_minus1 == 0
+            extra_minus1[extra_zero_pad_idx] = extra_plus1[extra_zero_pad_idx]
 
             cat_feats[extra_replace] = extra_minus1
             assert torch.all(~(cat_feats[extra_replace] == orig_cat_feats[extra_replace])).item() is True
