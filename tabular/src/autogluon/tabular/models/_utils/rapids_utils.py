@@ -4,7 +4,7 @@ from autogluon.common.utils.resource_utils import ResourceManager
 
 
 class RapidsModelMixin:
-    """Mixin class for methods re-used across RAPIDS models"""
+    """Mixin class for methods reused across RAPIDS models"""
 
     # FIXME: Efficient OOF doesn't work in RAPIDS
     @classmethod

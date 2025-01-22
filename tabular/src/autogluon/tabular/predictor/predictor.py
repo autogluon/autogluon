@@ -531,7 +531,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             Advanced functionality: Bring your own model / Custom model support
                 AutoGluon fully supports custom models. For a detailed tutorial on creating and using custom models with AutoGluon, refer to https://auto.gluon.ai/stable/tutorials/tabular/advanced/tabular-custom-model.html
             Advanced functionality: Custom stack levels
-                By default, AutoGluon re-uses the same models and model hyperparameters at each level during stack ensembling.
+                By default, AutoGluon reuses the same models and model hyperparameters at each level during stack ensembling.
                 To customize this behaviour, create a hyperparameters dictionary separately for each stack level, and then add them as values to a new dictionary, with keys equal to the stack level.
                     Example: `hyperparameters = {1: {'RF': rf_params1}, 2: {'CAT': [cat_params1, cat_params2], 'NN_TORCH': {}}}`
                     This will result in a stack ensemble that has one custom random forest in level 1 followed by two CatBoost models with custom hyperparameters and a default neural network in level 2, for a total of 4 models.
@@ -750,7 +750,7 @@ class TabularPredictor(TabularPredictorDeprecatedMixin):
             If None, no callback objects will be used.
 
             [Note] Callback objects can be mutated in-place by the fit call if they are stateful.
-            Ensure that you avoid re-using a mutated callback object between multiple fit calls.
+            Ensure that you avoid reusing a mutated callback object between multiple fit calls.
 
             [Note] Callback objects are deleted from trainer at the end of the fit call. They will not impact operations such as `refit_full` or `fit_extra`.
         **kwargs :
