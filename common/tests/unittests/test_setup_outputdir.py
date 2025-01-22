@@ -29,7 +29,7 @@ class SetupOutputDirTestCase(unittest.TestCase):
         returned_path = setup_outputdir(path, warn_if_exist=True, create_dir=False, path_suffix=None)
         assert str(Path(returned_path)) == str(path)
 
-        # checks behavior of path_suffic logic
+        # checks behavior of path_suffix logic
         path = tempfile.TemporaryDirectory().name
         path_suffix = f"my_subdir{os.path.sep}"
         returned_path = setup_outputdir(path, warn_if_exist=True, create_dir=False, path_suffix=path_suffix)
@@ -44,7 +44,7 @@ class SetupOutputDirTestCase(unittest.TestCase):
             mock_makedirs.assert_not_called()
             self.assertEqual(returned_path, path)
 
-        # checks behavior of path_suffic logic
+        # checks behavior of path_suffix logic
         path_suffix = "my_subdir/"
         returned_path = setup_outputdir(path, warn_if_exist=True, create_dir=False, path_suffix=path_suffix)
         self.assertFalse(returned_path.endswith("/"))
