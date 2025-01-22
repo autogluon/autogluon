@@ -11,7 +11,6 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-from typing_extensions import Self
 
 from autogluon.common.utils.utils import hash_pandas_df, seed_everything
 from autogluon.core.trainer.abstract_trainer import AbstractTrainer
@@ -137,17 +136,6 @@ class AbstractTimeSeriesTrainer(AbstractTrainer[AbstractTimeSeriesModel]):
             model.save()
 
         self.models = models
-
-    @classmethod
-    def load(cls, path: str, reset_paths: bool = False) -> Self:
-        load_path = os.path.join(path, cls.trainer_file_name)
-        if not reset_paths:
-            return load_pkl.load(path=load_path)
-        else:
-            obj = load_pkl.load(path=load_path)
-            obj.set_contexts(path)
-            obj.reset_paths = reset_paths
-            return obj
 
     def _get_model_oof_predictions(self, model_name: str) -> List[TimeSeriesDataFrame]:
         model_path = os.path.join(self.path, self.get_model_attribute(model=model_name, attribute="path"))

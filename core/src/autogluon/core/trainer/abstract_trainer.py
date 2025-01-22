@@ -247,7 +247,14 @@ class AbstractTrainer(Generic[ModelTypeT]):
 
     @classmethod
     def load(cls, path: str, reset_paths: bool = False) -> Self:
-        raise NotImplementedError
+        load_path = os.path.join(path, cls.trainer_file_name)
+        if not reset_paths:
+            return load_pkl.load(path=load_path)
+        else:
+            obj = load_pkl.load(path=load_path)
+            obj.set_contexts(path)
+            obj.reset_paths = reset_paths
+            return obj
 
     def fit(self, *args, **kwargs):
         raise NotImplementedError
@@ -4203,17 +4210,6 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             self.models.pop(model)
         path_attr_model = Path(self._path_attr_model(model))
         shutil.rmtree(path=path_attr_model, ignore_errors=True)
-
-    @classmethod
-    def load(cls, path: str, reset_paths: bool = False) -> Self:
-        load_path = os.path.join(path, cls.trainer_file_name)
-        if not reset_paths:
-            return load_pkl.load(path=load_path)
-        else:
-            obj = load_pkl.load(path=load_path)
-            obj.set_contexts(path)
-            obj.reset_paths = reset_paths
-            return obj
 
     @staticmethod
     def _process_hyperparameters(hyperparameters: dict) -> dict:
