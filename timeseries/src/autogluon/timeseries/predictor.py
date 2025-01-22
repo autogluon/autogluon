@@ -5,7 +5,7 @@ import os
 import pprint
 import time
 from pathlib import Path
-from typing import Any, cast, Dict, List, Literal, Optional, Type, Union
+from typing import Any, Dict, List, Literal, Optional, Type, Union, cast
 
 import numpy as np
 import pandas as pd
